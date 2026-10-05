@@ -56,7 +56,28 @@ internal sealed class FunctionLowerer
     /// <summary>The type arguments of the instance being lowered. The hook sits in
     /// <see cref="LowerType"/>, so the worklist monomorphization only has to fill the map rather than
     /// rebuild the whole expression path.</summary>
-    private readonly IReadOnlyDictionary<GenericParamSymbol, LyrType> _substitution;
+    /// <remarks>Not readonly for one reader: a generic type's FIELD DEFAULT, which is lowered
+    /// at the construction site and as code of the instance being built
+    /// (<see cref="UnderInstance"/>).</remarks>
+    private IReadOnlyDictionary<GenericParamSymbol, LyrType> _substitution;
+
+    /// <summary>
+    /// Lowers what belongs to an INSTANCE of a generic type from inside another function: the
+    /// instance's arguments are the substitution while it is lowered, over this function's own.
+    /// A field default names its type's parameters — <c>items: List&lt;T&gt; = List&lt;T&gt;.new()</c> —,
+    /// and the function that writes <c>Bag&lt;int&gt; { }</c> knows no such <c>T</c>.
+    /// </summary>
+    private TResult UnderInstance<TResult>(GenericInstance? instance, Func<TResult> lower)
+    {
+        if (instance is null || instance.Definition.Generics.Length != instance.Arguments.Length
+            || instance.Arguments.Length == 0) return lower();
+        var outer = _substitution;
+        var own = new Dictionary<GenericParamSymbol, LyrType>(outer, ReferenceEqualityComparer.Instance);
+        for (var i = 0; i < instance.Arguments.Length; i++) own[instance.Definition.Generics[i]] = instance.Arguments[i];
+        _substitution = own;
+        try { return lower(); }
+        finally { _substitution = outer; }
+    }
 
     /// <summary>
     /// Temps holding a FRESHLY BUILT value: the result of a <c>newobj</c> or of a call.
@@ -4797,11 +4818,13 @@ internal sealed class FunctionLowerer
         // substitution, in case the calling function is itself an instance.
         TypeId type;
         TypeSymbol declaring;
+        GenericInstance? built = null;
         if (SubstituteType(_types.TypeOf(expr)) is GenericInstance instance
             && instance.Definition.Kind is TypeSymbolKind.Class or TypeSymbolKind.Struct)
         {
             type = _typeTable.Intern(instance.Definition, instance.Arguments);
             declaring = instance.Definition;
+            built = instance;
         }
         else if (_types.TypeOf(expr) is NamedRef
                  { Symbol.Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct } named)
@@ -4863,9 +4886,10 @@ internal sealed class FunctionLowerer
                 throw NotSupported($"initializer omits field '{field.Name}', which has no default",
                     expr.Span);
 
-            values[field.Name] = index >= 0
+            // As code of the instance that is built: the default may name the type's parameters.
+            values[field.Name] = UnderInstance(built, () => index >= 0
                 ? LowerExprAs(field.Default, layout.FieldTypes[index])
-                : LowerExpr(field.Default);
+                : LowerExpr(field.Default));
         }
 
         foreach (var name in layout.FieldNames)
