@@ -105,6 +105,12 @@ public sealed record CallExpr(Expr Callee, Expr[] Arguments, Span Span,
     /// D5 — by argument index, <c>null</c> where the argument is positional; <c>null</c> as a whole
     /// when no argument is named, which is nearly every call.</summary>
     public string?[]? ArgumentNames { get; init; }
+
+    /// <summary>The arguments written in parentheses of their own, <c>f((a + b))</c>, each with
+    /// the span that holds its parentheses: the argument's node is the tree inside them, and
+    /// <c>@callerExpr</c> hands on the text the call wrote (09 A11). <c>null</c> where none is,
+    /// which is nearly every call.</summary>
+    public (Expr Argument, Span Written)[]? Parenthesized { get; init; }
 }
 public sealed record IndexExpr(Expr Target, Expr Index, Span Span) : Expr(Span);
 /// <remarks>IsOptional means '?.' rather than '.'.</remarks>

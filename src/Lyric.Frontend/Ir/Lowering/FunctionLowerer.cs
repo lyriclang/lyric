@@ -6319,7 +6319,16 @@ internal sealed class FunctionLowerer
     /// </summary>
     /// <summary>The arguments of a call in parameter order: as the sema arranged them when the call
     /// names some (04 D5), as written otherwise.</summary>
-    private Expr?[] ArgumentsOf(CallExpr expr) => _types.ArrangedArgumentsOf(expr) ?? expr.Arguments;
+    private Expr?[] ArgumentsOf(CallExpr expr)
+    {
+        if (expr.Parenthesized is { } grouped)
+            foreach (var (argument, written) in grouped) _writtenWith[argument] = written;
+        return _types.ArrangedArgumentsOf(expr) ?? expr.Arguments;
+    }
+
+    /// <summary>An argument written in parentheses of its own, with the span that holds them —
+    /// the text '@callerExpr' quotes is what the call wrote, parentheses included.</summary>
+    private readonly Dictionary<Expr, Span> _writtenWith = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>The argument materialized for an earlier parameter of the call whose default is
     /// being lowered (04 D5 F2): a default runs per call, in the callee's scope, and may read the
@@ -6358,7 +6367,8 @@ internal sealed class FunctionLowerer
                 && Array.FindIndex(parameters, q => q.Name == target) is var written and >= 0
                 && written < provided.Length && provided[written] is { } argument)
             {
-                args[i] = EmitConst(new StringConst(text(argument.Span)), new IrScalarType(IrScalar.String), span);
+                var quoted = _writtenWith.GetValueOrDefault(argument, argument.Span);
+                args[i] = EmitConst(new StringConst(text(quoted)), new IrScalarType(IrScalar.String), span);
                 continue;
             }
 
