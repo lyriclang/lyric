@@ -1055,7 +1055,7 @@ public sealed class AstFormatter
         if (lambda.Form == LambdaForm.Trailing && lambda.Parameters is not [{ Implicit: true }] && lambda.Body is Block withParameters)
         {
             var head = Doc.Join(Doc.From(", "), lambda.Parameters.Select(p =>
-                p.Pattern is { } pattern ? PatternDoc(pattern) : Doc.From(p.Name)).ToArray());
+                p.Pattern is { } pattern ? PatternDoc(pattern) : Doc.From((p.IsPlace ? "&" : "") + p.Name)).ToArray());
             var closing = withParameters.Span.End - 1;
             return Doc.GroupOf(Doc.From("{ "), head, Doc.From(" =>"),
                 Doc.IndentOf(Doc.LineOrSpace, SequenceDoc(withParameters.Statements, StmtDoc, (_, _) => Air.User, closing)),
@@ -1077,7 +1077,7 @@ public sealed class AstFormatter
             Doc.From("("),
             Doc.Join(Doc.From(", "), lambda.Parameters.Select(p =>
             {
-                var head = p.Pattern is { } pattern ? PatternDoc(pattern) : Doc.From(p.Name);
+                var head = p.Pattern is { } pattern ? PatternDoc(pattern) : Doc.From((p.IsPlace ? "&" : "") + p.Name);
                 return p.Type is { } type ? Doc.Of(head, Doc.From(": "), TypeDoc(type)) : head;
             }).ToArray()),
             Doc.From(")"),

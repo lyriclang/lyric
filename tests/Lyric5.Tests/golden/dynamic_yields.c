@@ -1391,37 +1391,37 @@ bb0:;
     t10 = (uint64_t)UINT64_C(9259542123273814144);
 #line 249
     lyr_g_std_collections_highBits = t10;
-#line 1510 "stdlib5/std/task.lyr"
+#line 1486 "stdlib5/std/task.lyr"
     t11 = 0;
-#line 1510
+#line 1486
     t12 = lyr_std_sync_Atomic_bool__new_3915f520(t11);
-#line 1019
+#line 995
     t13 = (lyr_ty_std_task_SpinLock *)lyr_alloc(&lyr_desc_ty_std_task_SpinLock);
-#line 1019
+#line 995
     LYR_WRITE_BARRIER(t13, &t13->f_held, t12);
-#line 1020
+#line 996
     t14 = NULL;
-#line 1021
+#line 997
     t15 = (int64_t)INT64_C(0);
-#line 1022
+#line 998
     t16 = 0;
-#line 1090
+#line 1066
     t17 = (lyr_ty_std_task_SignalHub *)lyr_alloc(&lyr_desc_ty_std_task_SignalHub);
-#line 1090
+#line 1066
     LYR_WRITE_BARRIER(t17, &t17->f_guard, t13);
-#line 1090
+#line 1066
     LYR_WRITE_BARRIER(t17, &t17->f_first, t14);
-#line 1090
+#line 1066
     t17->f_caught = t15;
-#line 1090
+#line 1066
     t17->f_watching = t16;
-#line 1090
+#line 1066
     lyr_g_std_task_signalHub = t17;
-#line 1788
+#line 1764
     t18 = (int64_t)INT64_C(0);
-#line 1788
+#line 1764
     t19 = lyr_std_sync_Atomic_int__new_67eb632f(t18);
-#line 1788
+#line 1764
     lyr_g_std_task_channelIds = t19;
     return;
 }

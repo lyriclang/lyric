@@ -158,7 +158,7 @@ public static class AstDumper
                 Write(n.Body, indent + 1, sb);
                 break;
             case LambdaParam n:
-                Line(sb, indent, n.Implicit ? "Param it (implicit)" : $"Param {n.Name}", n.Span);
+                Line(sb, indent, n.Implicit ? "Param it (implicit)" : $"Param {n.Name}{(n.IsPlace ? " (place)" : "")}", n.Span);
                 if (n.Pattern is not null) Write(n.Pattern, indent + 1, sb);
                 if (n.Type is not null) Write(n.Type, indent + 1, sb);
                 break;

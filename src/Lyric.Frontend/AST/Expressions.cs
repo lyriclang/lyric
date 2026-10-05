@@ -198,6 +198,11 @@ public sealed record LambdaParam(string Name, TypeNode? Type, Span Span) : Node(
     public required Span NameSpan { get; init; }
     public Pattern? Pattern { get; init; }
     public bool Implicit { get; init; }
+
+    /// <summary><c>(&amp;n) =&gt; …</c>, <c>{ &amp;n =&gt; … }</c> (design/v5/spec/03 T12; the review's
+    /// M6-24): the parameter takes a place, as a declaration's <c>&amp;n: T</c> does — the body
+    /// reads and writes the caller's, and the lambda's type is <c>fn(&amp;T) -&gt; R</c>.</summary>
+    public bool IsPlace { get; init; }
 }
 
 // --- control flow as an expression ---

@@ -1083,6 +1083,10 @@ public sealed partial class Parser
                 // '((k, v)) => …': a parenthesis where a name stands opens an irrefutable
                 // pattern over the parameter. The outer pair is still the parameter list, so
                 // '(k, v) => …' keeps its two parameters.
+                // '&n' (03 T12; the review's M6-24): the parameter takes a place, the mark at
+                // its start as on a declaration's. Read before a pattern is looked for: before
+                // one it is refused there, and the pattern is read on as the parameter it is.
+                var mark = LambdaPlaceMark();
                 if (_buffer.Check(TokenKind.LParen))
                 {
                     var patternStart = new Span(_buffer.Current.Span.File,
@@ -1100,9 +1104,10 @@ public sealed partial class Parser
                         $"expected lambda parameter name, got {_buffer.Current.TokenKind}");
                     TypeNode? type = null;
                     if (_buffer.Match(TokenKind.Colon)) type = ParseType();
-                    var pspan = type is null ? nameTok.Span : Span.Union(nameTok.Span, type.Span);
+                    var pstart = mark ?? nameTok.Span;
+                    var pspan = type is null ? Span.Union(pstart, nameTok.Span) : Span.Union(pstart, type.Span);
                     parameters.Add(new LambdaParam(_sm.Slice(nameTok.Span).ToString(), type, pspan)
-                        { NameSpan = nameTok.Span });
+                        { NameSpan = nameTok.Span, IsPlace = mark is not null });
                 }
                 if (!_buffer.Match(TokenKind.Comma)) break;
                 if (_buffer.Check(TokenKind.RParen)) break; // trailing comma
@@ -1189,6 +1194,7 @@ public sealed partial class Parser
             var parameters = new List<LambdaParam>();
             while (true)
             {
+                var mark = LambdaPlaceMark();
                 if (_buffer.Check(TokenKind.LParen))
                 {
                     var patternStart = new Span(_buffer.Current.Span.File, _buffer.Current.Span.Start, _buffer.Current.Span.Start);
@@ -1199,7 +1205,9 @@ public sealed partial class Parser
                 {
                     var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0013",
                         $"expected lambda parameter name, got {_buffer.Current.TokenKind}");
-                    parameters.Add(new LambdaParam(_sm.Slice(nameTok.Span).ToString(), null, nameTok.Span) { NameSpan = nameTok.Span });
+                    parameters.Add(new LambdaParam(_sm.Slice(nameTok.Span).ToString(), null,
+                        mark is { } from ? Span.Union(from, nameTok.Span) : nameTok.Span)
+                        { NameSpan = nameTok.Span, IsPlace = mark is not null });
                 }
                 if (!_buffer.Match(TokenKind.Comma)) break;
             }
@@ -1227,13 +1235,28 @@ public sealed partial class Parser
         return new LambdaExpr([it], null, body, Span.Union(open.Span, body.Span)) { Form = LambdaForm.Trailing };
     }
 
+    /// <summary>The <c>&amp;</c> before a lambda parameter, where one stands: the parameter takes a
+    /// place. Before a pattern it is refused — a pattern binds the values it takes apart, and a
+    /// place is one name for the caller's.</summary>
+    private Span? LambdaPlaceMark()
+    {
+        if (!_buffer.Check(TokenKind.Amp)) return null;
+        var mark = _buffer.Advance().Span;
+        if (_buffer.Check(TokenKind.LParen))
+            _de.Report("LYR-PAR0058", Severity.Error, mark,
+                "'&' marks a parameter that takes a place, and a place has a name — a pattern binds the values it takes apart");
+        return mark;
+    }
+
     /// <summary>Is there a parameter list before a <c>=&gt;</c> right after the <c>{</c> at the
-    /// cursor? Names or parenthesized patterns, comma-separated, then the arrow.</summary>
+    /// cursor? Names or parenthesized patterns, each with the '&amp;' of a place before it or
+    /// without, comma-separated, then the arrow.</summary>
     private bool TrailingParametersAhead()
     {
         var i = 1;
         while (true)
         {
+            if (_buffer.Peek(i).TokenKind == TokenKind.Amp) i++; // '&n': a place parameter's mark
             if (_buffer.Peek(i).TokenKind == TokenKind.Identifier) i++;
             else if (_buffer.Peek(i).TokenKind == TokenKind.LParen)
             {

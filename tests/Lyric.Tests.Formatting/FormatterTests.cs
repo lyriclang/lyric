@@ -1030,6 +1030,17 @@ public class FormatterTests
         Assert.True(formatted.IndexOf("fn rank", StringComparison.Ordinal) < formatted.IndexOf("pub static let all", StringComparison.Ordinal));
     }
 
+    /// <summary>A lambda's place parameter keeps its mark, in the form it was written in. (A
+    /// call statement that ends in a trailing block is written without a ';' behind the block.)</summary>
+    [Theory]
+    [InlineData("visit(&n, (&v) => v + 1);", "visit(&n, (&v) => v + 1);")]
+    [InlineData("visit(&n, (&v: int, w: int) => v + w);", "visit(&n, (&v: int, w: int) => v + w);")]
+    [InlineData("visit(&n) { &v => v += 1; };", "visit(&n) { &v => v += 1; }\n")]
+    [InlineData("fold(&n) { &acc, x => acc += x; };", "fold(&n) { &acc, x => acc += x; }\n")]
+    [InlineData("let m = fold(&n) { &acc, x => acc + x };", "let m = fold(&n) { &acc, x => acc + x };")]
+    public void A_lambdas_place_parameter_keeps_its_mark(string statement, string written) =>
+        Assert.Contains(written, Format("fn g() { " + statement + " }").Replace("\r\n", "\n"), StringComparison.Ordinal);
+
     [Fact]
     public void A_lambda_keeps_its_written_set() =>
         Assert.Contains("(x: int): int throws [A, B] => x", Format("fn g() { let f = (x: int): int throws [A,B] => x; }"), StringComparison.Ordinal);

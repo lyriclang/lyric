@@ -336,7 +336,10 @@ internal sealed class FunctionLowerer
             if (p.Implicit && _types.RefOf(p) is null) continue;
             if (_types.RefOf(p) is not ParameterSymbol ps)
                 throw Bug($"lambda parameter '{p.Name}' was not bound by the type checker");
-            _slots.DeclareFor(ps, LowerValueType(ps.Type, p.Span));
+            var valueType = LowerValueType(ps.Type, p.Span);
+            // '&n' (03 T12): the slot holds the caller's place, as a declaration's does.
+            if (ps.IsPlace) _places[_slots.DeclareFor(ps, new IrPlaceType(valueType))] = valueType;
+            else _slots.DeclareFor(ps, valueType);
             _lambdaParameterCount++;
         }
         Parameters = _slots.Locals.ToArray();
