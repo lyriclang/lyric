@@ -219,7 +219,8 @@ public class GenericMemberRunTests
             """));
         var (exit, _, error) = Run("build", "-C", dir);
         Assert.True(exit == 1, $"exit {exit}\n{error}");
-        Assert.Contains("src/main.lyr:12:18: error[LYR-SEM0020]: 'Outer' does not implement the generic member 'tag' of interface 'Tagger'", error);
+        // The file's name without its directory: the separator before it is the platform's.
+        Assert.Contains("main.lyr:12:18: error[LYR-SEM0020]: 'Outer' does not implement the generic member 'tag' of interface 'Tagger'", error);
         Assert.DoesNotContain("LYR-ICE0001", error);
         Assert.DoesNotContain("LYR-IR0001", error);
     }
