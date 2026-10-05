@@ -313,7 +313,7 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0034", $"expected '=>' in match arm, got {_buffer.Current.TokenKind}");
         // A block arm is a value block: in a match expression its tail is the arm's value.
         Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0);
-        return new MatchArm(pattern, guard, body, Span.Union(pattern.Span, body.Span));
+        return new MatchArm(pattern, guard, body, Span.Union(pattern.Span, End(body)));
     }
 
     // --- if as an expression: always needs an else ---
@@ -327,7 +327,7 @@ public sealed partial class Parser
         var then = ParseBranch();
         _buffer.Expect(TokenKind.Else, "LYR-PAR0036", "if-expression requires an 'else' branch");
         var elseBranch = ParseBranch(); // 'else if' falls out as a nested IfExpr; if is primary
-        return new IfExpr(cond, then, elseBranch, Span.Union(kw.Span, elseBranch.Span));
+        return new IfExpr(cond, then, elseBranch, Span.Union(kw.Span, Whole(elseBranch)));
     }
 
     /// <summary>A branch of an 'if' expression (08 Y5 S1): an expression, 'if (c) a else b', or a

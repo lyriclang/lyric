@@ -536,7 +536,7 @@ public sealed partial class Parser
         // block diverges — the same thing 'throw e;' says, in the position a tail stands in.
         if (_allowTail && _buffer.Check(TokenKind.RBrace))
         {
-            var span = Span.Union(kw.Span, value.Span);
+            var span = Span.Union(kw.Span, Whole(value));
             return new TailExprStmt(new ThrowExpr(value, span), span);
         }
         var semi = ExpectSemicolon();
@@ -586,8 +586,8 @@ public sealed partial class Parser
         {
             // A value position: a struct initializer may stand here, as on the right of an '='.
             var value = ParseSubExpr();
-            var tail = new Block([new TailExprStmt(value, value.Span)], value.Span);
-            return new CatchClause(name, type, tail, Span.Union(kw.Span, value.Span))
+            var tail = new Block([new TailExprStmt(value, Whole(value))], Whole(value));
+            return new CatchClause(name, type, tail, Span.Union(kw.Span, Whole(value)))
                 { NameSpan = idTok.Span, ExpressionBody = true, BindingTypes = set };
         }
         var body = ParseBlock(valueBlock: expressionForm);
@@ -647,12 +647,12 @@ public sealed partial class Parser
         // holds only inside a value block, and there the last expression IS the value — including
         // when it is written as a trailing lambda.
         if (_allowTail && _buffer.Check(TokenKind.RBrace))
-            return new TailExprStmt(expr, expr.Span);
+            return new TailExprStmt(expr, Whole(expr));
 
         // 'xs.forEach { println(it); }' — a statement that ends in a trailing lambda's '}'
         // needs no ';', as a block arm of a match needs no ','. One may still stand there.
         if (expr is CallExpr { Arguments: [.., LambdaExpr { Form: LambdaForm.Trailing }] } && !_buffer.Check(TokenKind.Semicolon))
-            return new ExprStmt(expr, expr.Span);
+            return new ExprStmt(expr, Whole(expr));
 
         var semi = ExpectSemicolon();
         return new ExprStmt(expr, Span.Union(expr.Span, semi.Span));

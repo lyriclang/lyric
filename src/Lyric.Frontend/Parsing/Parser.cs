@@ -159,7 +159,7 @@ public sealed partial class Parser
             {
                 _buffer.Advance();
                 var type = ParseType();
-                left = new CastExpr(left, type, Span.Union(left.Span, type.Span));
+                left = new CastExpr(left, type, Span.Union(Whole(left), type.Span));
                 continue;
             }
 
@@ -168,7 +168,7 @@ public sealed partial class Parser
             {
                 _buffer.Advance();
                 var type = ParseType();
-                left = new TypeTestExpr(left, type, Span.Union(left.Span, type.Span));
+                left = new TypeTestExpr(left, type, Span.Union(Whole(left), type.Span));
                 continue;
             }
 
@@ -179,11 +179,11 @@ public sealed partial class Parser
                 var opTok = _buffer.Advance();
                 if (_buffer.Check(TokenKind.RBracket))
                 {
-                    left = new SliceRangeExpr(left, null, op == TokenKind.DotDotEqual, Span.Union(left.Span, opTok.Span));
+                    left = new SliceRangeExpr(left, null, op == TokenKind.DotDotEqual, Span.Union(Whole(left), opTok.Span));
                     continue;
                 }
                 var high = ParseExpr(rightBp);
-                left = new RangeExpr(left, high, op == TokenKind.DotDotEqual, Span.Union(left.Span, high.Span));
+                left = new RangeExpr(left, high, op == TokenKind.DotDotEqual, Span.Union(Whole(left), Whole(high)));
                 if (_buffer.Current.TokenKind is TokenKind.DotDot or TokenKind.DotDotEqual)
                     _de.Report("LYR-PAR0005", Severity.Error, _buffer.Current.Span, "range operator is not chainable");
                 continue;
@@ -199,7 +199,7 @@ public sealed partial class Parser
                 // because a statement must not begin with 'Foo { … }' — ambiguous with a block.
                 // The ambiguity concerns the START only: no block can stand after an '='.
                 var value = ParseSubExpr(rightBp);
-                left = new AssignExpr(left, compound, value, Span.Union(left.Span, value.Span));
+                left = new AssignExpr(left, compound, value, Span.Union(Whole(left), Whole(value)));
                 continue;
             }
 
@@ -207,7 +207,7 @@ public sealed partial class Parser
             // 'x ?? { return 0; }' — nothing else an operand begins with is a brace.
             _buffer.Advance();
             var right = op == TokenKind.QuestionQuestion && _buffer.Check(TokenKind.LBrace) ? ParseValueBlock() : ParseExpr(rightBp);
-            left = new BinaryExpr(left, Operators.MapBinary(op), right, Span.Union(left.Span, right.Span));
+            left = new BinaryExpr(left, Operators.MapBinary(op), right, Span.Union(Whole(left), Whole(right)));
         }
 
         return left;
@@ -253,7 +253,7 @@ public sealed partial class Parser
             if (catches.Count > 0 && kind != TryKind.Propagate)
                 _de.Report("LYR-PAR0051", Severity.Error, catches[0].Span,
                     $"'{spelled}' takes every error itself — a 'catch' clause belongs to a plain 'try'");
-            var end = catches.Count > 0 ? catches[^1].Span : marked.Span;
+            var end = catches.Count > 0 ? catches[^1].Span : Whole(marked);
             return new TryExpr(marked, Span.Union(kw.Span, end))
                 { KeywordSpan = keyword, Kind = kind, Catches = catches.ToArray() };
         }
@@ -273,13 +273,13 @@ public sealed partial class Parser
         {
             var opTok = _buffer.Advance();
             var operand = ParsePrefix();
-            return new UnaryExpr(Operators.MapPrefix(op), operand, Span.Union(opTok.Span, operand.Span));
+            return new UnaryExpr(Operators.MapPrefix(op), operand, Span.Union(opTok.Span, Whole(operand)));
         }
         if (op is TokenKind.Throw) // 'x ?? throw e': a prefix, so 'throw e ?? f' is not 'throw (e ?? f)'
         {
             var kw = _buffer.Advance();
             var value = ParsePrefix();
-            return new ThrowExpr(value, Span.Union(kw.Span, value.Span));
+            return new ThrowExpr(value, Span.Union(kw.Span, Whole(value)));
         }
         // 'comptime e': contextual, a prefix in shape. It opens the prefix only when what
         // follows can begin an expression, so an identifier 'comptime' before an operator, a
@@ -288,7 +288,7 @@ public sealed partial class Parser
         {
             var kw = _buffer.Advance();
             var inner = ParsePrefix();
-            return new ComptimeExpr(inner, Span.Union(kw.Span, inner.Span));
+            return new ComptimeExpr(inner, Span.Union(kw.Span, Whole(inner)));
         }
 
         return ParsePostfix(ParsePrimary());
@@ -370,7 +370,7 @@ public sealed partial class Parser
                         var text = _sm.Slice(number.Span).ToString();
                         if (text.All(char.IsAsciiDigit))
                         {
-                            operand = new MemberExpr(operand, text, false, Span.Union(operand.Span, number.Span)) { MemberSpan = number.Span };
+                            operand = new MemberExpr(operand, text, false, Span.Union(Whole(operand), number.Span)) { MemberSpan = number.Span };
                             break;
                         }
                         var dot = text.IndexOf('.');
@@ -378,8 +378,8 @@ public sealed partial class Parser
                         {
                             var firstSpan = new Span(number.Span.File, number.Span.Start, number.Span.Start + dot);
                             var secondSpan = new Span(number.Span.File, number.Span.Start + dot + 1, number.Span.End);
-                            operand = new MemberExpr(operand, text[..dot], false, Span.Union(operand.Span, firstSpan)) { MemberSpan = firstSpan };
-                            operand = new MemberExpr(operand, text[(dot + 1)..], false, Span.Union(operand.Span, secondSpan)) { MemberSpan = secondSpan };
+                            operand = new MemberExpr(operand, text[..dot], false, Span.Union(Whole(operand), firstSpan)) { MemberSpan = firstSpan };
+                            operand = new MemberExpr(operand, text[(dot + 1)..], false, Span.Union(Whole(operand), secondSpan)) { MemberSpan = secondSpan };
                             break;
                         }
                         _de.Report("LYR-PAR0003", Severity.Error, number.Span, $"expected member name after '.', got {text}");
@@ -388,7 +388,7 @@ public sealed partial class Parser
                     var name = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0003",
                         $"expected member name after '.', got {_buffer.Current.TokenKind}");
                     operand = new MemberExpr(operand, _sm.Slice(name.Span).ToString(), false,
-                        Span.Union(operand.Span, name.Span)) { MemberSpan = name.Span };
+                        Span.Union(Whole(operand), name.Span)) { MemberSpan = name.Span };
                     break;
                 }
                 case TokenKind.QuestionDot:
@@ -397,7 +397,7 @@ public sealed partial class Parser
                     var name = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0003",
                         $"expected member name after '?.', got {_buffer.Current.TokenKind}");
                     operand = new MemberExpr(operand, _sm.Slice(name.Span).ToString(), true,
-                        Span.Union(operand.Span, name.Span)) { MemberSpan = name.Span };
+                        Span.Union(Whole(operand), name.Span)) { MemberSpan = name.Span };
                     break;
                 }
                 case TokenKind.LBracket:
@@ -405,7 +405,7 @@ public sealed partial class Parser
                     _buffer.Advance();
                     var index = ParseIndexElement();
                     var close = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close index");
-                    operand = new IndexExpr(operand, index, Span.Union(operand.Span, close.Span));
+                    operand = new IndexExpr(operand, index, Span.Union(Whole(operand), close.Span));
                     break;
                 }
                 // 'f<int>()' — explicit type arguments at a call site. Needed where the arguments
@@ -419,7 +419,8 @@ public sealed partial class Parser
                     var typedClose = _buffer.Expect(TokenKind.RParen, "LYR-PAR0008",
                         "expected ')' to close call");
                     operand = new CallExpr(operand, typedArgs,
-                        Span.Union(operand.Span, typedClose.Span), typeArguments) { ArgumentNames = typedNames };
+                        Span.Union(Whole(operand), typedClose.Span), typeArguments)
+                        { ArgumentNames = typedNames, Parenthesized = Parenthesized(typedArgs) };
                     break;
                 }
 
@@ -428,7 +429,8 @@ public sealed partial class Parser
                     _buffer.Advance();
                     var args = ParseArguments(out var names);
                     var close = _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' to close call");
-                    operand = new CallExpr(operand, args, Span.Union(operand.Span, close.Span)) { ArgumentNames = names };
+                    operand = new CallExpr(operand, args, Span.Union(Whole(operand), close.Span))
+                        { ArgumentNames = names, Parenthesized = Parenthesized(args) };
                     break;
                 }
                 case TokenKind.Inc:
@@ -437,7 +439,7 @@ public sealed partial class Parser
                 {
                     var opTok = _buffer.Advance();
                     operand = new PostfixExpr(operand, Operators.MapPostfix(opTok.TokenKind),
-                        Span.Union(operand.Span, opTok.Span));
+                        Span.Union(Whole(operand), opTok.Span));
                     break;
                 }
 
@@ -460,7 +462,7 @@ public sealed partial class Parser
                         if (!_buffer.Match(TokenKind.Comma)) break;
                     }
                     var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close 'with'");
-                    operand = new WithExpr(operand, fields.ToArray(), Span.Union(operand.Span, close.Span));
+                    operand = new WithExpr(operand, fields.ToArray(), Span.Union(Whole(operand), close.Span));
                     break;
                 }
 
@@ -476,7 +478,7 @@ public sealed partial class Parser
                     operand = operand is CallExpr call && call.Arguments is not [.., LambdaExpr { Form: LambdaForm.Trailing }]
                         ? new CallExpr(call.Callee, [.. call.Arguments, lambda],
                             Span.Union(call.Span, lambda.Span), call.TypeArguments)
-                        : new CallExpr(operand, [lambda], Span.Union(operand.Span, lambda.Span));
+                        : new CallExpr(operand, [lambda], Span.Union(Whole(operand), lambda.Span));
                     break;
                 }
                 default:
@@ -638,8 +640,38 @@ public sealed partial class Parser
             return new TupleLitExpr(elems.ToArray(), span);
         }
 
-        _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' to close parenthesized expression");
+        var closing = _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' to close parenthesized expression");
+        _grouped[first] = Span.Union(open.Span, closing.Span);
         return first;
+    }
+
+    /// <summary>
+    /// The parentheses around an expression, by the expression they hold. '(a + b)' IS the tree
+    /// of 'a + b' — no node stands for the parentheses — so that node's span ends where 'b' ends.
+    /// What is built ON it must not: '(a + b).abs()' begins at the '(', or its span cuts its own
+    /// text in half — the text a failed 'assertEq' quotes ('1..5).sum()'), and what a diagnostic
+    /// underlines. Every span the parser builds over an operand goes through <see cref="Whole"/>.
+    ///
+    /// <para>A table and not a node: a node for parentheses would stand between every walk and
+    /// what it looks for, in the checker, the lowering and each tool, for the sake of a span.
+    /// And not the operand's own span widened: 'x' in '(x)' is the name a rename edits.</para>
+    /// </summary>
+    private readonly Dictionary<Expr, Span> _grouped = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>An operand as it is written: with its parentheses, where it has them.</summary>
+    private Span Whole(Expr operand) => _grouped.TryGetValue(operand, out var written) ? written : operand.Span;
+
+    /// <summary>The span of a body that is an expression or a block.</summary>
+    private Span End(Node body) => body is Expr expression ? Whole(expression) : body.Span;
+
+    /// <summary>The arguments of a call that are written in parentheses of their own, each with
+    /// the span that holds them — what '@callerExpr' quotes (09 A11) — or null where none is.</summary>
+    private (Expr Argument, Span Written)[]? Parenthesized(Expr[] arguments)
+    {
+        List<(Expr, Span)>? found = null;
+        foreach (var argument in arguments)
+            if (_grouped.TryGetValue(argument, out var written)) (found ??= []).Add((argument, written));
+        return found?.ToArray();
     }
 
     private ArrayLitExpr ParseArrayLit()
@@ -684,7 +716,7 @@ public sealed partial class Parser
             var markSpan = _buffer.Current.Span;
             if (marked) _buffer.Advance();
             var argument = ParseSubExpr();
-            args.Add(marked ? new UnaryExpr(UnaryOp.Place, argument, Span.Union(markSpan, argument.Span)) : argument);
+            args.Add(marked ? new UnaryExpr(UnaryOp.Place, argument, Span.Union(markSpan, Whole(argument))) : argument);
             if (name is not null) written ??= new List<string?>(Enumerable.Repeat<string?>(null, args.Count - 1));
             written?.Add(name);
             if (!_buffer.Match(TokenKind.Comma)) break;
@@ -712,7 +744,7 @@ public sealed partial class Parser
             var inclusive = opTok.TokenKind == TokenKind.DotDotEqual;
             if (_buffer.Check(TokenKind.RBracket)) return new SliceRangeExpr(null, null, inclusive, opTok.Span);
             var high = ParseSubExpr();
-            return new SliceRangeExpr(null, high, inclusive, Span.Union(opTok.Span, high.Span));
+            return new SliceRangeExpr(null, high, inclusive, Span.Union(opTok.Span, Whole(high)));
         }
         var index = ParseSubExpr();
         return index is RangeExpr r ? new SliceRangeExpr(r.Low, r.High, r.IsInclusive, r.Span) : index;
@@ -878,7 +910,7 @@ public sealed partial class Parser
             _buffer.Expect(TokenKind.Equal, "LYR-PAR0037", "expected '=' in struct initializer (':' is only for types)");
             var value = ParseSubExpr();
             fields.Add(new StructInitField(_sm.Slice(nameTok.Span).ToString(), value,
-                Span.Union(nameTok.Span, value.Span)) { NameSpan = nameTok.Span });
+                Span.Union(nameTok.Span, Whole(value))) { NameSpan = nameTok.Span });
             if (!_buffer.Match(TokenKind.Comma)) break;
         }
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close struct initializer");
@@ -989,7 +1021,7 @@ public sealed partial class Parser
         // Body: an expression or a block, '=> expr' or '=> { ... }'. The block is a value block:
         // its tail is the lambda's result, like 'return tail;' at its end.
         Node body = OutsideLoops<Node>(() => _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0));
-        return new LambdaExpr(parameters.ToArray(), returnType, body, Span.Union(open.Span, body.Span)) { Throws = throws };
+        return new LambdaExpr(parameters.ToArray(), returnType, body, Span.Union(open.Span, End(body))) { Throws = throws };
     }
 
     /// <summary><c>x =&gt; body</c>: one parameter without parentheses and without an annotation —
@@ -1002,7 +1034,7 @@ public sealed partial class Parser
             { NameSpan = nameTok.Span };
         // The block is a value block, as the parenthesized form's is: 'x => { …; v }'.
         Node body = OutsideLoops<Node>(() => _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0));
-        return new LambdaExpr([parameter], null, body, Span.Union(nameTok.Span, body.Span))
+        return new LambdaExpr([parameter], null, body, Span.Union(nameTok.Span, End(body)))
             { Form = LambdaForm.Bare };
     }
 
