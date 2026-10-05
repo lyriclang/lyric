@@ -15,8 +15,14 @@ namespace Lyric.Sema;
 /// context's <c>throws</c> set (K8, <c>LYR-SEM0034</c>) — a <c>throw</c> needs no mark, but the
 /// same cover;</item>
 /// <item>a <c>try</c> no error reaches is warned about (<c>LYR-SEM0139</c>): nothing under it
-/// throws, or a <c>try</c> inside takes all of it.</item>
+/// throws, or a <c>try</c> inside takes all of it — and so is a mark over what another
+/// <c>try</c> marks already (the review's M5-5, M5-9).</item>
 /// </list>
+///
+/// <para>A mark to the right of an operator, <c>a() + try b() + c()</c>, covers by POSITION: from
+/// its keyword to the end of the expression it stands in (<see cref="TryReach"/>). The tree does
+/// not show that — the mark is a prefix of <c>b()</c> there — so such marks are kept beside the
+/// frames, with what they cover, and a site asks them by where it stands.</para>
 ///
 /// <para>A lambda is a context of its own — its body runs later, outside every <c>try</c> around
 /// it — that throws what its type says (K3): the set it writes or its position expects, or the one
@@ -45,6 +51,15 @@ internal sealed class ExceptionAnalyzer
         public string Name { get; } = name;
         public bool CanDeclare { get; } = canDeclare;
         public List<Frame> Frames { get; } = new();
+
+        /// <summary>The marks to the right of an operator met so far, each with a frame that
+        /// notes whether a site stood in what it covers. The walk goes through an expression in
+        /// the order it is written, so a mark is here before the sites behind it are asked.</summary>
+        public List<(TryExpr Mark, Frame Frame)> Rightward { get; } = new();
+
+        /// <summary>What the context walks: where an unmarked site looks for a mark that stands
+        /// behind it in its expression.</summary>
+        public Node? Body { get; init; }
     }
 
     /// <summary>An open <c>try</c>: a mark over an expression, a block or an expression with its
@@ -115,7 +130,7 @@ internal sealed class ExceptionAnalyzer
                 AnalyzeMembers(x.Statics);
                 break;
             case GlobalBindingDecl { Binding.Initializer: { } init }:
-                InContext(new Context([], "a global's initializer", canDeclare: false), () => AnalyzeExpr(init));
+                InContext(new Context([], "a global's initializer", canDeclare: false) { Body = init }, () => AnalyzeExpr(init));
                 break;
         }
     }
@@ -127,10 +142,10 @@ internal sealed class ExceptionAnalyzer
             {
                 case FunctionDecl f: AnalyzeFunction(f); break;
                 case FieldDecl { Default: { } value }:
-                    InContext(new Context([], "a field's default", canDeclare: false), () => AnalyzeExpr(value));
+                    InContext(new Context([], "a field's default", canDeclare: false) { Body = value }, () => AnalyzeExpr(value));
                     break;
                 case StaticBindingDecl { Binding.Initializer: { } init }:
-                    InContext(new Context([], "a constant's initializer", canDeclare: false), () => AnalyzeExpr(init));
+                    InContext(new Context([], "a constant's initializer", canDeclare: false) { Body = init }, () => AnalyzeExpr(init));
                     break;
             }
     }
@@ -139,10 +154,10 @@ internal sealed class ExceptionAnalyzer
     {
         foreach (var p in fn.Parameters)
             if (p.Default is { } value)
-                InContext(new Context([], "a parameter's default", canDeclare: false), () => AnalyzeExpr(value));
+                InContext(new Context([], "a parameter's default", canDeclare: false) { Body = value }, () => AnalyzeExpr(value));
 
         if (fn.Body is not { } body) return;
-        InContext(new Context(BodyCovers(_types.DeclaredThrows(fn), CoroutineShape.IsCoroutine(fn)), $"'{fn.Name}'", canDeclare: true),
+        InContext(new Context(BodyCovers(_types.DeclaredThrows(fn), CoroutineShape.IsCoroutine(fn)), $"'{fn.Name}'", canDeclare: true) { Body = body },
             () => AnalyzeStmt(body));
     }
 
@@ -150,7 +165,19 @@ internal sealed class ExceptionAnalyzer
     {
         var saved = _context;
         _context = context;
-        try { walk(); }
+        try
+        {
+            walk();
+            // A mark to the right of an operator covers to the end of its expression, so only
+            // now is it known that no site stood there. Coarser than the frame of a mark at the
+            // start, on purpose: a 'try?' under such a mark that takes everything leaves it
+            // unwarned — what it would need is the order of marks and frames by position, for
+            // a warning about a line that carries two marks and says so already.
+            foreach (var (mark, frame) in context.Rightward)
+                if (!frame.Reached)
+                    _de.Report("LYR-SEM0139", Severity.Warning, mark.KeywordSpan,
+                        "nothing to the right of this 'try' throws — the mark says a call may fail where none can");
+        }
         finally { _context = saved; }
     }
 
@@ -196,6 +223,10 @@ internal sealed class ExceptionAnalyzer
                 var walk = _types.ForInOf(fo);
                 if (walk is not null && fo.Iterable is TryExpr { Kind: TryKind.Propagate, Catches.Length: 0 } head)
                 {
+                    // In a 'try' block the loop's calls are marked already (M5-5): the head's mark
+                    // says nothing new, and that is the one thing said about it.
+                    var again = Marked(head.KeywordSpan.Start);
+                    if (again) MarksAgain(head);
                     var frame = Open(head.Catches, takesAll: false);
                     try
                     {
@@ -203,7 +234,7 @@ internal sealed class ExceptionAnalyzer
                         LoopCalls(walk, head.Value.Span);
                     }
                     finally { Close(); }
-                    if (!frame.Reached)
+                    if (!frame.Reached && !again)
                         _de.Report("LYR-SEM0139", Severity.Warning, head.KeywordSpan,
                             "nothing this loop walks throws — the mark says a pull may fail where none can");
                 }
@@ -291,11 +322,25 @@ internal sealed class ExceptionAnalyzer
                 // Its own context: the body runs later, outside every try around it, and throws what
                 // the lambda's type says (05 E2 K3) — a generator lambda's, what its coroutine's
                 // pulls throw (08 Y11 F5).
-                InContext(new Context(LambdaThrows(lam), "the lambda", canDeclare: false), () =>
+                InContext(new Context(LambdaThrows(lam), "the lambda", canDeclare: false) { Body = lam.Body }, () =>
                 {
                     if (lam.Body is Block b) AnalyzeStmt(b);
                     else if (lam.Body is Expr e) AnalyzeExpr(e);
                 });
+                break;
+            // A plain mark over what is marked already — under a 'try' block, under another
+            // mark, behind one that stands to its left in the same expression: it says nothing
+            // the other does not (M5-5, M5-9). Not the close a 'using let' writes for itself.
+            case TryExpr { Kind: TryKind.Propagate, Catches.Length: 0 } again
+                when Marked(again.KeywordSpan.Start) && !ReferenceEquals(again, _closing):
+                MarksAgain(again);
+                AnalyzeExpr(again.Value);
+                break;
+            // A mark to the right of an operator (M5-9): it covers from where it stands to the end
+            // of the expression it stands in — its operand, and what the walk meets behind it.
+            case TryExpr { Reach: not null } rightward:
+                _context.Rightward.Add((rightward, new Frame([], takesAll: false)));
+                AnalyzeExpr(rightward.Value);
                 break;
             case TryExpr tried:
             {
@@ -368,6 +413,11 @@ internal sealed class ExceptionAnalyzer
 
     /// <summary>An operator that IS a call — <c>a + b</c> through <c>Add</c>, <c>x[k]</c> through
     /// an index interface (04 D6) — throws what its method throws, and is marked like one.</summary>
+    /// <remarks>No operator's method throws in 5.0: the interfaces of <c>std.core</c> declare no
+    /// set, and a method may not throw more than its interface's (LYR-SEM0042). Should one ever,
+    /// its site is asked here where its NODE begins — and a mark that covers by position
+    /// (<see cref="TryReach"/>) would need where its sign stands: in <c>a + try b + c</c> the
+    /// second <c>+</c> stands behind the mark, and its node begins at <c>a</c>.</remarks>
     private void Operator(Expr node)
     {
         if (_types.OperatorCallOf(node) is { } call && _types.CallThrows(call) is { Length: > 0 } thrown)
@@ -409,10 +459,20 @@ internal sealed class ExceptionAnalyzer
     private void Site(LyrType[] thrown, Span at, string what, bool needsMark = true)
     {
         if (thrown.Length == 0 || thrown.Any(t => t.IsError)) return;
-        if (needsMark && _context.Frames.Count == 0)
+        var position = at.Start;
+        foreach (var (mark, frame) in _context.Rightward)
+            if (Covers(mark, position)) frame.Reached = true;
+        if (needsMark && !Marked(position))
         {
-            _de.Report("LYR-SEM0138", Severity.Error, at,
-                $"{what} throws {SetText(thrown)} — mark it 'try', so the propagation is seen where it happens");
+            // A mark further right in the same expression covers what stands behind it, not this.
+            if (MarkBehind(_context.Body, position) is { } behind)
+                _de.Report("LYR-SEM0138", Severity.Error, at,
+                    $"{what} throws {SetText(thrown)} and stands left of the 'try' that marks the rest of the expression — "
+                    + "a mark covers what is to its right",
+                    new DiagnosticNote(behind.KeywordSpan, "at the start of the expression it covers all of it: 'try a() + b()'"));
+            else
+                _de.Report("LYR-SEM0138", Severity.Error, at,
+                    $"{what} throws {SetText(thrown)} — mark it 'try', so the propagation is seen where it happens");
             return;
         }
         foreach (var t in thrown)
@@ -454,6 +514,41 @@ internal sealed class ExceptionAnalyzer
             }
         }
         return false;
+    }
+
+    /// <summary>Is a throw site at <paramref name="position"/> marked: under an open <c>try</c>
+    /// of this context, or behind a mark that stands to its left in the same expression?</summary>
+    private bool Marked(int position) =>
+        _context.Frames.Count > 0 || _context.Rightward.Any(r => Covers(r.Mark, position));
+
+    private static bool Covers(TryExpr mark, int position) =>
+        mark.Reach is { } reach && position >= mark.KeywordSpan.Start && position < reach.End;
+
+    private void MarksAgain(TryExpr again) =>
+        _de.Report("LYR-SEM0139", Severity.Warning, again.KeywordSpan,
+            "this 'try' marks what a 'try' around it or to its left marks already — one mark covers the expression");
+
+    /// <summary>The mark to the right of an operator that stands BEHIND <paramref name="position"/>
+    /// in the same expression — what an unmarked site left of it is told about. Not one in a
+    /// lambda: its body is a context of its own.</summary>
+    private static TryExpr? MarkBehind(Node? body, int position)
+    {
+        if (body is null) return null;
+        TryExpr? found = null;
+        Walk(body);
+        return found;
+
+        void Walk(Node node)
+        {
+            if (found is not null) return;
+            if (node is TryExpr { Reach: { } reach } mark && reach.From <= position && position < mark.KeywordSpan.Start)
+            {
+                found = mark;
+                return;
+            }
+            foreach (var child in AstChildren.Of(node))
+                if (child is not LambdaExpr) Walk(child);
+        }
     }
 
     private static string Spelled(TryKind kind) =>

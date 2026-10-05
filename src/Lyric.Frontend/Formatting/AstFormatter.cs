@@ -704,7 +704,9 @@ public sealed class AstFormatter
         var parts = new List<Doc>
         {
             Doc.From(keyword),
-            ExprDoc(t.Value, t.Catches.Length > 0 && t.Value is TryExpr ? Primary : Assign),
+            // A mark to the right of an operator is a prefix of its operand (M5-9): parentheses
+            // around more than that would be another program.
+            ExprDoc(t.Value, t.Reach is not null ? Prefix : t.Catches.Length > 0 && t.Value is TryExpr ? Primary : Assign),
         };
         for (var i = 0; i < t.Catches.Length; i++)
         {
@@ -798,7 +800,10 @@ public sealed class AstFormatter
         AssignExpr => Assign,
         // An if or a lambda extends to the end of the expression: as an operand it must be
         // parenthesized or the reparse reads past the operator. Treated as the loosest level.
-        // So does 'try', which covers everything to its right (08 Y4).
+        // So does 'try', which covers everything to its right (08 Y4) — but for the mark that
+        // stands to the right of an operator, which is a prefix there and must stay one: in
+        // parentheses it would be a mark at the start of them, and cover less.
+        TryExpr { Reach: not null } => Prefix,
         IfExpr or LambdaExpr or TryExpr => Assign,
         _ => Primary,
     };

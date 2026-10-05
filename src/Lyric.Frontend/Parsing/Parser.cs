@@ -138,9 +138,34 @@ public sealed partial class Parser
     private Expr ParseExpr(int minBp)
     {
         if (++_depth > MaxNesting) { _depth--; throw new NestingTooDeep(_buffer.Current.Span); }
-        try { return ParseExprInner(minBp); }
-        finally { _depth--; }
+        if (minBp != 0)
+        {
+            try { return ParseExprInner(minBp); }
+            finally { _depth--; }
+        }
+
+        // A whole expression — a statement's, an argument, what stands in parentheses, a branch:
+        // the marks to the right of its operators cover up to its end (M5-9), which is known now.
+        var from = _buffer.Current.Span.Start;
+        _marks.Add(null);
+        try
+        {
+            var expr = ParseExprInner(0);
+            if (_marks[^1] is { } marks)
+                foreach (var mark in marks) (mark.From, mark.End) = (from, Whole(expr).End);
+            return expr;
+        }
+        finally
+        {
+            _marks.RemoveAt(_marks.Count - 1);
+            _depth--;
+        }
     }
+
+    /// <summary>The marks to the right of an operator in each expression being read, innermost
+    /// last (<see cref="TryReach"/>); <c>null</c> for an expression that has met none — nearly
+    /// every one.</summary>
+    private readonly List<List<TryReach>?> _marks = new();
 
     private Expr ParseExprInner(int minBp)
     {
@@ -221,9 +246,10 @@ public sealed partial class Parser
     {
         var op = _buffer.Current.TokenKind;
         // 'try e' (design/v5/spec/05 E4, 08 Y4): the mark covers EVERYTHING to its right — 'try a +
-        // b' is 'try (a + b)' — so it stands at the start of the expression it covers. To the right
-        // of an operator it would cover another expression than it seems to (Swift refuses the
-        // same). 'try {' is the block form, which only a statement starts.
+        // b' is 'try (a + b)'. It may also stand to the right of an operator (the review's M5-9;
+        // Swift refuses that): there it covers from where it stands to the end of the expression,
+        // and what stands left of it is not covered. 'try {' is the block form, which only a
+        // statement starts.
         if (op is TokenKind.Try && _buffer.Peek(1).TokenKind is not TokenKind.LBrace)
         {
             var kw = _buffer.Advance();
@@ -239,10 +265,19 @@ public sealed partial class Parser
                 keyword = Span.Union(kw.Span, sign.Span);
             }
             var spelled = _sm.Slice(keyword).ToString();
+            // To the right of an operator the plain mark is a mark and nothing else: it changes
+            // no value, so where it stands changes no grouping. 'try?' and 'try!' are worth
+            // something else than what they cover, and so is a 'try' with clauses — WHAT they
+            // cover has to be unmistakable, and they stand at its start.
+            TryReach? reach = null;
             if (!atStart)
-                _de.Report("LYR-PAR0050", Severity.Error, keyword,
-                    $"'{spelled}' covers everything to its right, so it stands at the start of the expression "
-                    + $"it covers — '{spelled} a + b', not 'a + {spelled} b'");
+            {
+                if (kind == TryKind.Propagate && _marks.Count > 0) (_marks[^1] ??= new()).Add(reach = new TryReach());
+                else
+                    _de.Report("LYR-PAR0050", Severity.Error, keyword,
+                        $"'{spelled}' is worth something else than what it covers, so it stands at the start of the "
+                        + $"expression it covers — '{spelled} a + b', not 'a + {spelled} b'");
+            }
             var marked = atStart ? ParseExpr(0) : ParsePrefix();
 
             // 'try e catch (x: A) v' (08 Y4): the clauses belong to the nearest 'try' on their left,
@@ -253,9 +288,13 @@ public sealed partial class Parser
             if (catches.Count > 0 && kind != TryKind.Propagate)
                 _de.Report("LYR-PAR0051", Severity.Error, catches[0].Span,
                     $"'{spelled}' takes every error itself — a 'catch' clause belongs to a plain 'try'");
+            else if (catches.Count > 0 && reach is not null)
+                _de.Report("LYR-PAR0050", Severity.Error, keyword,
+                    "a 'try' with clauses is worth its clauses' values, so it stands at the start of the expression "
+                    + "it covers — 'try a + b catch (e) 0', not 'a + try b catch (e) 0'");
             var end = catches.Count > 0 ? catches[^1].Span : Whole(marked);
             return new TryExpr(marked, Span.Union(kw.Span, end))
-                { KeywordSpan = keyword, Kind = kind, Catches = catches.ToArray() };
+                { KeywordSpan = keyword, Kind = kind, Catches = catches.ToArray(), Reach = reach };
         }
         // '&x' marks the argument of a place parameter (03 T12, 08 Y4) and stands nowhere else:
         // there is no address as a value. ParseArguments takes the mark before it gets here; one

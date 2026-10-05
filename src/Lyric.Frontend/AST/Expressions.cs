@@ -71,6 +71,16 @@ public enum TryKind
 /// what its clauses cover and is worth the taking clause's value then.</summary>
 public sealed record TryExpr(Expr Value, Span Span) : Expr(Span)
 {
+    /// <summary>
+    /// Set on a mark that stands to the RIGHT of an operator, <c>a + try b() + c()</c> (the
+    /// review's M5-9). The mark changes nothing about how the expression is grouped — it is a
+    /// prefix of its operand, <see cref="Value"/> — and it covers every throw site from the
+    /// keyword to the end of the expression it stands in: <c>b()</c> and <c>c()</c>, not what
+    /// stands left of it. <c>null</c> for a mark at the start of its expression, whose Value IS
+    /// what it covers.
+    /// </summary>
+    public TryReach? Reach { get; init; }
+
     /// <summary>The keyword alone — with its <c>?</c> or <c>!</c> — where a diagnostic about the
     /// mark itself points.</summary>
     public required Span KeywordSpan { get; init; }
@@ -81,6 +91,19 @@ public sealed record TryExpr(Expr Value, Span Span) : Expr(Span)
     /// value block: <c>catch (e) v</c> is <c>catch (e) { v }</c> (<see cref="CatchClause.ExpressionBody"/>).</summary>
     public CatchClause[] Catches { get; init; } = [];
 }
+/// <summary>How far a mark to the right of an operator covers: the expression it stands in, from
+/// its start to its end. The parser fills it in when it has read that expression to its end —
+/// the mark's node is built before that.</summary>
+public sealed class TryReach
+{
+    /// <summary>Where the expression the mark stands in begins: what stands between here and the
+    /// keyword is LEFT of the mark, and not covered.</summary>
+    public int From { get; set; }
+
+    /// <summary>Where that expression ends: the mark covers up to here.</summary>
+    public int End { get; set; }
+}
+
 public sealed record PostfixExpr(Expr Operand, PostfixOp Operator, Span Span) : Expr(Span);
 public sealed record BinaryExpr(Expr Left, BinaryOp Operator, Expr Right, Span Span) : Expr(Span);
 public sealed record AssignExpr(Expr Target, BinaryOp? Operator, Expr Value, Span Span) : Expr(Span); // Operator == null means '='; otherwise a compound assignment

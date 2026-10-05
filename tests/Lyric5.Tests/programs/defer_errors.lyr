@@ -37,12 +37,12 @@ fn twoThrow(): int throws [First, Second] {
 
 fn outside(n: int): string throws [First, Second] {
     defer try fail(1);
-    try { try fail(n); return "body"; } catch (_) { return "caught by the inner try"; }
+    try { fail(n); return "body"; } catch (_) { return "caught by the inner try"; }
 }
 
 fn inside(): string {
     try {
-        defer try fail(2);
+        defer fail(2);
         return "body";
     } catch (e: Second) { return f"inside caught {e.message()}"; }
     catch (_) { return "other"; }

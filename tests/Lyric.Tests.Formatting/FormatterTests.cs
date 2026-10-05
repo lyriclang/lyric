@@ -905,6 +905,18 @@ public class FormatterTests
         // '(try f()) + 1' marks the call alone; without the parentheses 'try' would cover the sum.
         Assert.Contains("(try f()) + 1", Format("fn g(): int throws E { return (try f()) + 1; }"), StringComparison.Ordinal);
 
+    /// <summary>A mark to the right of an operator stays where it stands (the review's M5-9): it
+    /// is a prefix of its operand there, and in parentheses it would be a mark at their start,
+    /// which covers less. The last row is the control: a mark that IS in parentheses keeps them.</summary>
+    [Theory]
+    [InlineData("return a() + try b() * c();")]
+    [InlineData("return a() - try b() - c();")]
+    [InlineData("return x ?? try f() + 1;")]
+    [InlineData("return -try f();")]
+    [InlineData("return a() + (try b()) + c();")]
+    public void A_mark_right_of_an_operator_stays_where_it_stands(string statement) =>
+        Assert.Contains(statement, Format("fn g(): int throws E { " + statement + " }"), StringComparison.Ordinal);
+
     [Fact]
     public void Try_question_and_try_bang_keep_their_sign()
     {
