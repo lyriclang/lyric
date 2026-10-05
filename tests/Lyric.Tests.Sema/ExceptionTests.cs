@@ -309,7 +309,7 @@ public class ExceptionTests
     [Fact]
     public void The_set_is_part_of_the_type_and_has_no_order()
     {
-        AssertClean(Diags("fn t(k: fn() -> int throws [NotFound, DbError]): fn() -> int throws [DbError, NotFound] { return k; }"));
+        AssertClean(Diags("fn t(k: fn() -> int throws [NotFound, DbError]): (fn() -> int throws [DbError, NotFound]) { return k; }"));
         AssertCode(Diags("fn t(k: fn() -> int throws NotFound): fn() -> int { return k; }"), "LYR-SEM0001");
     }
 
@@ -317,9 +317,9 @@ public class ExceptionTests
     public void A_value_that_throws_less_fits_a_type_that_throws_more()
     {
         // K6, element by element: an interface covers its conformers. Never the way back.
-        AssertClean(Diags("fn t(): fn() -> int throws NotFound { return safe; }"));
-        AssertClean(Diags("fn t(k: fn() -> int throws DbError): fn() -> int throws [IOError, NotFound] { return k; }"));
-        AssertCode(Diags("fn t(k: fn() -> int throws [NotFound, DbError]): fn() -> int throws NotFound { return k; }"), "LYR-SEM0001");
+        AssertClean(Diags("fn t(): (fn() -> int throws NotFound) { return safe; }"));
+        AssertClean(Diags("fn t(k: fn() -> int throws DbError): (fn() -> int throws [IOError, NotFound]) { return k; }"));
+        AssertCode(Diags("fn t(k: fn() -> int throws [NotFound, DbError]): (fn() -> int throws NotFound) { return k; }"), "LYR-SEM0001");
     }
 
     [Fact]

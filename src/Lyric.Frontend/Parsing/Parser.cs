@@ -1100,9 +1100,12 @@ public sealed partial class Parser
         // clause is, so the return type does not take it.
         TypeNode? returnType = null;
         ThrowsClause? throws = null;
+        var grouped = false;
         if (_buffer.Match(TokenKind.Colon))
         {
+            _groupedType = null;
             returnType = ParseType(allowThrows: false);
+            grouped = ReferenceEquals(_groupedType, returnType);
             if (AtContextual("throws")) throws = ParseThrowsTypes(_buffer.Advance().Span);
         }
 
@@ -1112,7 +1115,8 @@ public sealed partial class Parser
         // Body: an expression or a block, '=> expr' or '=> { ... }'. The block is a value block:
         // its tail is the lambda's result, like 'return tail;' at its end.
         Node body = OutsideLoops<Node>(() => _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0));
-        return new LambdaExpr(parameters.ToArray(), returnType, body, Span.Union(open.Span, End(body))) { Throws = throws };
+        return new LambdaExpr(parameters.ToArray(), returnType, body, Span.Union(open.Span, End(body)))
+            { Throws = throws, ReturnGrouped = grouped };
     }
 
     /// <summary><c>x =&gt; body</c>: one parameter without parentheses and without an annotation —
@@ -1345,7 +1349,7 @@ public sealed partial class Parser
             else break;
         }
 
-        var type = ParseTypeAtom();
+        var type = ParseTypeAtom(returned: !allowThrows);
 
         while (_buffer.Check(TokenKind.LBracket)) // T[]
         {
@@ -1388,13 +1392,16 @@ public sealed partial class Parser
         is TokenKind.Identifier or TokenKind.Fn or TokenKind.LParen or TokenKind.Question
             or TokenKind.QuestionQuestion;
 
-    private TypeNode ParseTypeAtom()
+    /// <param name="returned">Whether the type stands, without parentheses, where a 'throws'
+    /// behind it is somebody else's: as the return type of a declaration, of a lambda or of a
+    /// function type.</param>
+    private TypeNode ParseTypeAtom(bool returned = false)
     {
         var cur = _buffer.Current;
         switch (cur.TokenKind)
         {
             case TokenKind.Fn:
-                return ParseFunctionType();
+                return ParseFunctionType(returned);
             case TokenKind.LParen:
                 return ParseParenthesizedType();
             case TokenKind.Identifier:
@@ -1427,7 +1434,7 @@ public sealed partial class Parser
         }
     }
 
-    private FunctionType ParseFunctionType()
+    private FunctionType ParseFunctionType(bool returned = false)
     {
         var start = _buffer.Advance(); // 'fn'
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0008", "expected '(' after 'fn' in function type");
@@ -1444,13 +1451,30 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.Arrow, "LYR-PAR0015",
             $"expected '->' in function type, got {_buffer.Current.TokenKind}");
         // A 'throws' after the return type is the function TYPE's set (03 T17): the return type is
-        // read without the coroutine suffix, so the nearest function type takes it.
+        // read without the coroutine suffix.
+        _groupedType = null;
         var returnType = ParseType(allowThrows: false);
+        var grouped = ReferenceEquals(_groupedType, returnType);
         ThrowsClause? throws = null;
-        if (AtContextual("throws")) throws = ParseTypeThrows(_buffer.Advance().Span);
+        if (AtContextual("throws"))
+        {
+            // … unless this function type is itself a return type: 'fn make(): fn() -> int throws E'
+            // — the returned function's set, or make's? The nearest took it, and a reader could
+            // not know (the review's M5-7). Parentheses say whose it is; it is still read as the
+            // nearest's, so that one mistake gives one message.
+            if (returned)
+            {
+                var written = _sm.Slice(Span.Union(start.Span, returnType.Span)).ToString();
+                _de.Report("LYR-PAR0056", Severity.Error, _buffer.Current.Span,
+                    $"this 'throws' stands behind '{written}', a function type that is itself a return type — it could be "
+                    + "the set of the function returned or of the one that returns it",
+                    new DiagnosticNote($"'({written} throws …)' is a function that throws; '({written}) throws …' gives the set to the one that returns it"));
+            }
+            throws = ParseTypeThrows(_buffer.Advance().Span);
+        }
         return new FunctionType(parameters.ToArray(), returnType,
             Span.Union(start.Span, throws?.Span ?? returnType.Span))
-            { Throws = throws, Places = places.Contains(true) ? places.ToArray() : [] };
+            { Throws = throws, Places = places.Contains(true) ? places.ToArray() : [], ReturnGrouped = grouped };
     }
 
     /// <summary>
@@ -1503,7 +1527,7 @@ public sealed partial class Parser
 
         // One element WITHOUT a comma is a grouping: the inner type moves up unchanged. With a
         // comma ('(T,)') a tuple was meant, and its second element is missing.
-        if (elems.Count == 1 && !sawComma && labels[0] is null) return elems[0];
+        if (elems.Count == 1 && !sawComma && labels[0] is null) return _groupedType = elems[0];
 
         if (elems.Count < 2) // no upper bound
             _de.Report("LYR-PAR0010", Severity.Error, span, "tuple types need at least 2 elements");
@@ -1513,6 +1537,12 @@ public sealed partial class Parser
 
         return new TupleType(elems.ToArray(), span) { Labels = labels.Any(l => l is not null) ? labels.ToArray() : null };
     }
+
+    /// <summary>The type the last grouping held, '(T)': a grouping leaves no node, and behind a
+    /// return type its parentheses say whose a 'throws' is (M5-7, M6-6). A return type that IS
+    /// this node was written in parentheses — one with something around them, '(T)[]' or '?(T)',
+    /// is another node.</summary>
+    private TypeNode? _groupedType;
 
     private TypeNode[] ParseTypeArguments(out Span closeSpan) => ParseTypeArguments(out closeSpan, out _);
 

@@ -441,7 +441,17 @@ public sealed partial class Parser
         // allowThrows: false — a trailing 'throws' here is the FUNCTION's clause, as it has been
         // since 1.0. For a coroutine function the checker moves it into the returned type, which
         // is what it has always described: the body runs at the pull, not at the call.
-        TypeNode? returnType = _buffer.Match(TokenKind.Colon) ? ParseType(allowThrows: false) : null;
+        // Whether the return type is written in parentheses: '(Task<int>) throws E' says the
+        // 'throws' is the function's, where 'Task<int> throws E' could mean the task's (M6-6).
+        // The grouping leaves no node, so the declaration remembers it.
+        var returnGrouped = false;
+        TypeNode? returnType = null;
+        if (_buffer.Match(TokenKind.Colon))
+        {
+            _groupedType = null;
+            returnType = ParseType(allowThrows: false);
+            returnGrouped = ReferenceEquals(_groupedType, returnType);
+        }
 
         ThrowsClause? throws = null;
         if (AtContextual("throws")) throws = ParseThrowsTypes(_buffer.Advance().Span);
@@ -477,7 +487,7 @@ public sealed partial class Parser
         }
 
         return new FunctionDecl(isPublic, isMut, isStatic, name.Name, generics, parameters, returnType, throws, body,
-            Span.Union(start, end)) { NameSpan = name.Span, Extern = spec };
+            Span.Union(start, end)) { NameSpan = name.Span, Extern = spec, ReturnGrouped = returnGrouped };
     }
 
     /// <summary>

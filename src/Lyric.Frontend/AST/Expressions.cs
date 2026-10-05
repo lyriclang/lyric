@@ -168,6 +168,10 @@ public sealed record LambdaExpr(LambdaParam[] Parameters, TypeNode? ReturnType, 
     /// <c>(s: string): int throws ParseError =&gt; …</c> (design/v5/spec/08 Y11 F7); null where the
     /// lambda's set comes from its position or from its body (05 E2 K3).</summary>
     public ThrowsClause? Throws { get; init; }
+
+    /// <summary>Whether the return type is written in parentheses — as on a declaration
+    /// (<see cref="FunctionDecl.ReturnGrouped"/>).</summary>
+    public bool ReturnGrouped { get; init; }
 }
 
 public enum LambdaForm { Parenthesized, Bare, Trailing }

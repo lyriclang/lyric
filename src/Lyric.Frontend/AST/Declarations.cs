@@ -125,6 +125,12 @@ public sealed record FunctionDecl(
 
     public required Span NameSpan { get; init; }
 
+    /// <summary>Whether the return type is written in parentheses, <c>fn f(): (Task&lt;int&gt;) throws E</c>.
+    /// A grouping leaves no node in a type, and here it carries meaning: behind a return type
+    /// that may itself carry a set, the parentheses say that the <c>throws</c> is the function's
+    /// (the review's M6-6).</summary>
+    public bool ReturnGrouped { get; init; }
+
     /// <summary>Set on a top-level function, and (since 2.1) on a method of a struct, class,
     /// enum or extend block — where the sema admits only the row-less <c>@Deprecated</c>.
     /// Interface members stay attribute-free: the parser rejects the list there.</summary>

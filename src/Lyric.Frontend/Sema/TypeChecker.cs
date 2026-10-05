@@ -1972,6 +1972,11 @@ public sealed class TypeChecker
                 + "has returned, when the place may be gone");
         _currentYield = coroutine?.Yield;
         var result = coroutine?.Result;
+        // A generator's clause is its coroutine's (10 §1 rule 6): it has nobody else to belong to.
+        // Where a clause leaves open whose it is, the body is not held to the return type:
+        // whichever was meant, a mismatch there would be a second message about one mistake.
+        if (fn.Throws is { } whose && coroutine is null && LeavesOpenWhoseThrows(_currentReturn, fn.ReturnGrouped, whose))
+            _currentReturn = LyrType.Error;
         CheckThrowsClause(fn, scope);
 
         if (fn.Body is not null)
@@ -2486,6 +2491,39 @@ public sealed class TypeChecker
         _result.RecordDeclaredThrows(fn, ClauseSetOf(fn));
         if (DeclaredThrowsOf(fn).Length > 0) _result.RecordThrowsAtCall(fn);
     }
+
+    /// <summary>
+    /// A <c>throws</c> behind a return type that may carry a set of its own — a task, a coroutine,
+    /// under any <c>?</c> — says whose it is (the review's M6-6): <c>(Task&lt;int&gt; throws E)</c>
+    /// returns a task that may end in the error, <c>(Task&lt;int&gt;) throws E</c> throws itself.
+    /// Without the parentheses the clause was the function's, and who meant the task's learned it
+    /// from a mismatch between the body's value and the return type, with no word about the
+    /// clause. A function type as the return type is the parser's to see (<c>LYR-PAR0056</c>):
+    /// what a name means is not. Said once per clause — a type is resolved again wherever it is
+    /// used — and answered every time, so that the type is the same wherever it is asked.
+    /// </summary>
+    private bool LeavesOpenWhoseThrows(LyrType returned, bool grouped, ThrowsClause clause)
+    {
+        if (grouped) return false;
+        var carrier = returned;
+        while (carrier is Optional optional) carrier = optional.Inner; // '?Task<int> throws E' is '?(Task<int> throws E)' as a type
+        var what = carrier switch
+        {
+            CoroutineOf { Throws: null } => "coroutine",
+            GenericInstance { Definition: var held, Throws: null } when _task is not null && ReferenceEquals(held, _task) => "task",
+            _ => null, // nothing to carry a set, or one that carries its own already: '?(Task<int> throws A) throws B'
+        };
+        if (what is null) return false;
+        if (!_whoseAsked.Add(clause)) return true;
+        var type = TypeFacts.Display(returned);
+        _de.Report("LYR-SEM0165", Severity.Error, clause.Span,
+            $"this 'throws' stands behind '{type}', which may carry a set of its own — it could be the {what}'s or the function's",
+            new DiagnosticNote($"'({type} throws …)' returns a {what} that may end in the error; '({type}) throws …' throws itself"));
+        return true;
+    }
+
+    /// <summary>The clauses <see cref="LeavesOpenWhoseThrows"/> has spoken about.</summary>
+    private readonly HashSet<ThrowsClause> _whoseAsked = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// The set a function type or a lambda writes (03 T17, 08 Y11 F7), under a declaration's rules:
@@ -9472,6 +9510,12 @@ public sealed class TypeChecker
 
         var contextRet = lam.ReturnType is not null ? ResolveType(lam.ReturnType, scope) : expFn?.Return;
 
+        // As on a declaration (M6-6): a set behind a written return type that may carry one says
+        // whose it is — but in a generator lambda, whose set is its coroutine's.
+        if (lam.Throws is { } whose && lam.ReturnType is not null && !(lam.Body is Block yielding && CoroutineShape.YieldsIn(yielding))
+            && LeavesOpenWhoseThrows(contextRet!, lam.ReturnGrouped, whose))
+            contextRet = LyrType.Error;
+
         // A yield of its own makes the lambda a GENERATOR (08 Y11 F5): 'fn(…) -> Coroutine<Y, R>'.
         // Calling it builds the coroutine and throws nothing; what the body throws is the pulls'.
         if (lam.Body is Block generator && CoroutineShape.YieldsIn(generator))
@@ -10244,8 +10288,14 @@ public sealed class TypeChecker
             case ArrayType a: return new ArrayOf(ResolveType(a.Element, scope));
             case TupleType t: return new TupleOf(t.Elements.Select(e => ResolveType(e, scope)).ToArray()) { Labels = t.Labels };
             case FunctionType f:
-                return new FnType(f.Parameters.Select(p => ResolveType(p, scope)).ToArray(), ResolveType(f.ReturnType, scope))
+            {
+                var parameters = f.Parameters.Select(p => ResolveType(p, scope)).ToArray();
+                var result = ResolveType(f.ReturnType, scope);
+                // 'fn() -> Task<int> throws E': the call's set, or the task's? As on a declaration (M6-6).
+                if (f.Throws is { } whose && LeavesOpenWhoseThrows(result, f.ReturnGrouped, whose)) return LyrType.Error;
+                return new FnType(parameters, result)
                     { Throws = f.Throws is { } thrown ? ResolveThrownSet(thrown, scope) : [], Places = f.Places };
+            }
             default: return LyrType.Error; // ErrorType
         }
     }
