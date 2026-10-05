@@ -329,7 +329,7 @@ public sealed class AstFormatter
             ParamListDoc(decl.Parameters),
         };
 
-        if (decl.ReturnType is { } ret) head.Add(Doc.Of(Doc.From(": "), ReturnDoc(ret, decl.Throws)));
+        if (decl.ReturnType is { } ret) head.Add(Doc.Of(Doc.From(": "), ReturnDoc(ret, decl.Throws, decl.ReturnGrouped)));
         if (decl.Throws is { } throws) head.Add(ThrowsDoc(throws));
 
         if (decl.Extern is { SymbolSpan: { } symbol })
@@ -1080,7 +1080,7 @@ public sealed class AstFormatter
         if (lambda.ReturnType is { } ret)
         {
             parts.Add(Doc.From(": "));
-            parts.Add(ReturnDoc(ret, lambda.Throws));
+            parts.Add(ReturnDoc(ret, lambda.Throws, lambda.ReturnGrouped));
         }
         if (lambda.Throws is { } throws) parts.Add(ThrowsDoc(throws));
 
@@ -1172,9 +1172,10 @@ public sealed class AstFormatter
         ThrowingType n => n.Thrown is { } thrown
             ? Doc.Of(TypeDoc(n.Inner), Doc.From(" throws "), TypeDoc(thrown))
             : Doc.Of(TypeDoc(n.Inner), Doc.From(" throws")),
-        // '(?T)[]' and '(fn(..) -> R)[]': without the parentheses the suffix would rebind.
+        // '(?T)[]', '(fn(..) -> R)[]' and '(Task<T> throws E)[]': without the parentheses the
+        // suffix would rebind.
         ArrayType a => Doc.Of(
-            a.Element is NullableType or FunctionType
+            a.Element is NullableType or FunctionType or ThrowingType
                 ? Doc.Of(Doc.From("("), TypeDoc(a.Element), Doc.From(")"))
                 : TypeDoc(a.Element),
             Doc.From(a.Length is { } len ? $"[{len}]" : "[]")),
@@ -1184,16 +1185,40 @@ public sealed class AstFormatter
         FunctionType f => Doc.Of(Doc.From("fn("),
             Doc.Join(Doc.From(", "), f.Parameters.Select((p, i) => i < f.Places.Length && f.Places[i]
                 ? Doc.Of(Doc.From("&"), TypeDoc(p)) : TypeDoc(p)).ToArray()),
-            Doc.From(") -> "), ReturnDoc(f.ReturnType, f.Throws), f.Throws is { } thrown ? ThrowsDoc(thrown) : Doc.Nil),
+            Doc.From(") -> "), ReturnDoc(f.ReturnType, f.Throws, f.ReturnGrouped), f.Throws is { } thrown ? ThrowsDoc(thrown) : Doc.Nil),
         _ => throw new InternalCompilationException($"unreachable: unformatted {type.GetType().Name}"),
     };
 
-    /// <summary>A return type with a set after it: a function type there is parenthesized, or the
-    /// set would read as its own — the nearest function type takes a 'throws' (03 T17).</summary>
-    private Doc ReturnDoc(TypeNode ret, ThrowsClause? after) =>
-        after is not null && ret is FunctionType
+    /// <summary>
+    /// A return type, with the parentheses that say whose a 'throws' is (03 T17; the review's
+    /// M5-7, M6-6). They are written where the type ends in a set of its own — a function type
+    /// that throws, a throwing task or coroutine: '(fn() -> int throws E)', '(Task&lt;int&gt; throws
+    /// E)'; without them the set would be read as the clause of whoever returns the type. And
+    /// where a set stands after a type that could have taken it: '(fn() -> int) throws E', and
+    /// '(Task&lt;int&gt;) throws E' as the source wrote it (<paramref name="grouped"/> — whether a
+    /// name is a task is not the formatter's to know).
+    /// </summary>
+    private Doc ReturnDoc(TypeNode ret, ThrowsClause? after, bool grouped) =>
+        EndsInASet(ret) || (after is not null && (grouped || EndsInAFunction(ret)))
             ? Doc.Of(Doc.From("("), TypeDoc(ret), Doc.From(")"))
             : TypeDoc(ret);
+
+    /// <summary>Whether a type's text ends in a set: its own, or — a '?' stands in front — that of
+    /// what it is the optional of.</summary>
+    private static bool EndsInASet(TypeNode type) => type switch
+    {
+        NullableType optional => EndsInASet(optional.Inner),
+        FunctionType { Throws: not null } or ThrowingType => true,
+        _ => false,
+    };
+
+    /// <summary>Whether a type's text ends in a function type, which takes a 'throws' behind it.</summary>
+    private static bool EndsInAFunction(TypeNode type) => type switch
+    {
+        NullableType optional => EndsInAFunction(optional.Inner),
+        FunctionType => true,
+        _ => false,
+    };
 
     /// <summary>A thrown set (05 E2): one type alone, several in brackets (the list rule, 08 D5/D6),
     /// none for the bare form.</summary>

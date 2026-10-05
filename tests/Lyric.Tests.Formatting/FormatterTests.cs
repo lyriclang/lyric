@@ -971,14 +971,35 @@ public class FormatterTests
         Assert.Contains("c: fn() -> void throws)", formatted, StringComparison.Ordinal);
     }
 
+    /// <summary>The parentheses of a return type say whose a 'throws' is (03 T17; the review's
+    /// M5-7, M6-6), and the text keeps them: without them it is refused, or — a task, a coroutine
+    /// — means another program. Each line is written back as it stands.</summary>
+    [Theory]
+    [InlineData("fn g(): (fn() -> int) throws E {")]
+    [InlineData("fn g(): (fn() -> int throws E) {")]
+    [InlineData("fn g(): (?fn() -> int) throws E {")]
+    [InlineData("fn g(): (?fn() -> int throws E) {")]
+    [InlineData("fn g(): (Task<int> throws E) {")]
+    [InlineData("fn g(): (Task<int>) throws E {")]
+    [InlineData("fn g(): (?Task<int>) throws E {")]
+    [InlineData("fn g(): (Task<int> throws E) throws F {")]
+    [InlineData("fn g(): fn() -> (fn() -> int throws E) {")]
+    [InlineData("fn g(h: fn() -> (Task<int>) throws E) {")]
+    [InlineData("fn g(h: fn() -> (Task<int> throws E)) {")]
+    [InlineData("fn g(hs: (Task<int> throws E)[]) {")]
+    public void A_return_type_keeps_the_parentheses_that_say_whose_a_set_is(string head) =>
+        Assert.Contains(head, Format(head + " }"), StringComparison.Ordinal);
+
     [Fact]
-    public void A_function_type_before_an_outer_set_keeps_its_parentheses()
-    {
-        // The nearest function type takes a 'throws' (03 T17): bare, the declaration's set would
-        // become the returned type's.
-        Assert.Contains("fn g(): (fn() -> int) throws E", Format("fn g(): (fn() -> int) throws E { return f; }"), StringComparison.Ordinal);
-        Assert.Contains("fn h(): fn() -> int throws E", Format("fn h(): fn() -> int throws E { return f; }"), StringComparison.Ordinal);
-    }
+    public void A_lambdas_return_type_keeps_them_too() =>
+        Assert.Contains("(): (Task<int>) throws E => f()", Format("fn g() { let m = (): (Task<int>) throws E => f(); }"), StringComparison.Ordinal);
+
+    /// <summary>Where no set follows, parentheses around a return type say nothing, and go.</summary>
+    [Theory]
+    [InlineData("fn g(): (Task<int>) { }", "fn g(): Task<int> {")]
+    [InlineData("fn g(): (fn() -> int) { }", "fn g(): fn() -> int {")]
+    public void Parentheses_that_say_nothing_go(string source, string head) =>
+        Assert.Contains(head, Format(source), StringComparison.Ordinal);
 
     [Fact]
     public void A_lambda_keeps_its_written_set() =>

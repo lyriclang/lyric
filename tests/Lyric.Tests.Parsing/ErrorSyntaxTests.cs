@@ -116,29 +116,6 @@ public class ErrorSyntaxTests
     }
 
     [Fact]
-    public void The_nearest_function_type_takes_the_set()
-    {
-        // In a return position too: the function returns a throwing function and throws nothing.
-        var (m, de) = ParseModule("fn f(): fn() -> int throws E { return g; }");
-        Assert.False(de.HasErrors);
-        var fn = Assert.IsType<FunctionDecl>(m.Declarations[0]);
-        Assert.Null(fn.Throws);
-        Assert.NotNull(Assert.IsType<FunctionType>(fn.ReturnType).Throws);
-
-        // Parenthesized, the function type is closed and the set is the declaration's.
-        (m, de) = ParseModule("fn f(): (fn() -> int) throws E { return g; }");
-        Assert.False(de.HasErrors);
-        fn = Assert.IsType<FunctionDecl>(m.Declarations[0]);
-        Assert.NotNull(fn.Throws);
-        Assert.Null(Assert.IsType<FunctionType>(fn.ReturnType).Throws);
-
-        // A function type returning one: the inner takes it.
-        var outer = ParamType("fn f(g: fn() -> fn() -> int throws E) { }");
-        Assert.Null(outer.Throws);
-        Assert.NotNull(Assert.IsType<FunctionType>(outer.ReturnType).Throws);
-    }
-
-    [Fact]
     public void A_coroutine_keeps_its_suffix_outside_a_function_type()
     {
         var (m, de) = ParseModule("fn f(c: Coroutine<int> throws E) { }");

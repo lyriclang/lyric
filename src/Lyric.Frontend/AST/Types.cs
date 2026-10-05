@@ -42,12 +42,18 @@ public sealed record TupleType(TypeNode[] Elements, Span Span) : TypeNode(Span) 
 }
 /// <summary><c>fn(A, B) -&gt; R</c>, and with a thrown set <c>fn(A) -&gt; R throws E</c>
 /// (design/v5/spec/03 T17, 05 E2): <see cref="Throws"/> is the TYPE's set, written after its return
-/// type. The nearest function type takes it — <c>fn() -&gt; fn() -&gt; int throws E</c> returns a
-/// throwing function — and a parenthesized return gives it to the outer one. Null when the type
-/// throws nothing.</summary>
+/// type. Where that return type could carry the set itself — a function type, a task, a
+/// coroutine — parentheses say whose it is (the review's M5-7, M6-6):
+/// <c>fn() -&gt; (fn() -&gt; int throws E)</c> returns a throwing function,
+/// <c>fn() -&gt; (fn() -&gt; int) throws E</c> throws itself. Null when the type throws nothing.</summary>
 public sealed record FunctionType(TypeNode[] Parameters, TypeNode ReturnType, Span Span) : TypeNode(Span)
 {
     public ThrowsClause? Throws { get; init; }
+
+    /// <summary>Whether the return type is written in parentheses, <c>fn() -&gt; (Task&lt;int&gt;) throws E</c>.
+    /// A grouping leaves no node in a type, and behind a return type that may carry a set its
+    /// parentheses carry meaning: the <c>throws</c> after them is this type's.</summary>
+    public bool ReturnGrouped { get; init; }
 
     /// <summary><c>fn(&amp;int) -&gt; void</c> (design/v5/spec/03 T12, T17): which parameters take a
     /// place, by position; empty when none does.</summary>
