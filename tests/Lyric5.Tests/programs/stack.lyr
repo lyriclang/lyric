@@ -13,7 +13,7 @@ pub interface Container<T> {
 pub class Stack<T> :: [Container<T>] {
     items: List<T>,
 
-    mut fn add(item: T) {
+    pub mut fn add(item: T) {
         this.items.push(item);
     }
 
@@ -28,7 +28,7 @@ pub class Stack<T> :: [Container<T>] {
         return this.items.get(this.items.length() - 1);
     }
 
-    fn count(): int {
+    pub fn count(): int {
         return this.items.length();
     }
 }

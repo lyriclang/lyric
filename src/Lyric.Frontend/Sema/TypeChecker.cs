@@ -1655,7 +1655,12 @@ public sealed class TypeChecker
                     if (im.Generics.Length > 0)
                     {
                         var promisedGeneric = FnSym(iface, im.Name)!;
-                        if (found.Any(candidate => GenericSignatureMismatch(want, promisedGeneric, candidate) is null)) continue;
+                        if (found.FirstOrDefault(candidate => GenericSignatureMismatch(want, promisedGeneric, candidate) is null)
+                            is { } answering)
+                        {
+                            CheckWitnessWord(answering, implementer, iface, name, NodeSpan(node));
+                            continue;
+                        }
                         var differs = GenericSignatureMismatch(want, promisedGeneric, found[0])!;
                         _de.Report("LYR-SEM0042", Severity.Error, found[0].Declaration?.Span ?? NodeSpan(node),
                             $"'{name}.{im.Name}' does not match interface '{iface.Name}'{implied}: {differs}");
@@ -1674,6 +1679,7 @@ public sealed class TypeChecker
                         // to repeat.
                         _result.RecordConformanceImpl(implementer, iface, im.Name,
                             InstanceOfConformance(iface, subst), satisfying);
+                        CheckWitnessWord(satisfying, implementer, iface, name, NodeSpan(node));
                         continue;
                     }
 
@@ -1704,6 +1710,7 @@ public sealed class TypeChecker
                             new DiagnosticNote(st.Span, $"'{st.Binding.Name}' is declared here"));
                         continue;
                     }
+                    CheckWitnessWord(answer, implementer, iface, name, NodeSpan(node));
                     var wanted = Substitute(GlobalTypeOf(promised), WithSelf(subst, iface, self ?? SelfType(implementer)));
                     var answered = GlobalTypeOf(answer);
                     if (!ContainsError(wanted) && !answered.IsError && !LyrType.Equal(wanted, answered))
@@ -1714,6 +1721,55 @@ public sealed class TypeChecker
             }
         }
     }
+
+    /// <summary>
+    /// The word of a member that answers an interface (design/v5/spec/07 V2 S4, S5; the review's
+    /// M7-2). A conformance is as visible as its type and its interface, whichever is narrower,
+    /// and it cannot be narrowed (S5) — so a member that answers it and is written narrower, in
+    /// the type's body or in an inherent block, would be called through the interface by callers
+    /// its own name refuses. It says the conformance's word itself (<c>LYR-SEM0167</c>), as Swift
+    /// asks of a witness.
+    ///
+    /// <para>A conformance block's members need no check: they take the block's visibility — the
+    /// resolver declares them as wide as can be —, and a word on one is refused
+    /// (<c>LYR-SEM0150</c>).</para>
+    /// </summary>
+    private void CheckWitnessWord(Symbol witness, TypeSymbol implementer, TypeSymbol iface, string typeName, Span entry)
+    {
+        if (!_comp.Lyric5Modules) return;
+        var (written, how) = witness switch
+        {
+            FunctionSymbol fn => (fn.Visibility, $"{(fn.IsStatic ? "static " : "")}{(fn.IsMut ? "mut " : "")}fn {fn.Name}"),
+            GlobalSymbol constant => (constant.Visibility, $"static let {constant.Name}"),
+            _ => (Visibility.Public, ""),
+        };
+        var needed = implementer.Visibility < iface.Visibility ? implementer.Visibility : iface.Visibility;
+        if (written >= needed || witness.Declaration is not { } declaration) return;
+        // One member may answer the same interface from two lists, a parent written out beside
+        // its child in another block: said once.
+        if (!_witnessWordsSaid.Add(witness)) return;
+
+        static string Said(Visibility visibility) => visibility switch
+        {
+            Visibility.Public => "pub",
+            Visibility.Internal => "internal",
+            _ => "private",
+        };
+        var at = declaration switch
+        {
+            FunctionDecl fn => fn.NameSpan,
+            StaticBindingDecl constant => constant.NameSpan,
+            _ => declaration.Span,
+        };
+        var write = needed == Visibility.Public ? $"'pub {how}'" : $"'{how}' — no word, or 'internal'";
+        _de.Report("LYR-SEM0167", Severity.Error, at,
+            $"'{witness.Name}' answers '{iface.Name}.{witness.Name}' for '{typeName}' and is {Said(written)}, but "
+            + $"the conformance is {Said(needed)} — as visible as '{typeName}' and '{iface.Name}' — and "
+            + $"would call it where its own name is refused: write {write}",
+            new DiagnosticNote(entry, "the conformance is declared here"));
+    }
+
+    private readonly HashSet<Symbol> _witnessWordsSaid = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>Why a conformer's generic member does not answer an abstract generic one of the
     /// interface (04 D9), or <c>null</c>: as many type parameters, the same constraints on each, and

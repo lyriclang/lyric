@@ -15,7 +15,7 @@ import std.time { Duration };
 /// throws in a cancelled task (06 N9 X1): an `Error`, so cleanup can catch it — though a coroutine
 /// that catches it may not yield again, and a task that waits again gets it again (X5).
 pub class Cancelled :: [Error] {
-    fn message(): string { return "cancelled"; }
+    pub fn message(): string { return "cancelled"; }
 }
 
 /// Parks the running task until `d` has passed, at least (06 K3), while the other tasks of its
@@ -191,7 +191,7 @@ pub fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
 
 /// What `withTimeout` throws when its time ran out before the body ended (06 N9 X4).
 pub class TimedOut :: [Error] {
-    fn message(): string { return "timed out"; }
+    pub fn message(): string { return "timed out"; }
 }
 
 /// Runs `body` as a task of its own and gives what it gives — unless `d` passes first: then the
@@ -220,7 +220,7 @@ pub fn withTimeout<T, E :: [Error]>(d: Duration, body: fn() -> T throws E): T th
 
 /// What `send` throws on a closed channel (06 K1).
 pub class ChannelClosed :: [Error] {
-    fn message(): string { return "channel closed"; }
+    pub fn message(): string { return "channel closed"; }
 }
 
 /// A channel (06 N5 K1): values go in with `send` and come out with `recv`, in the order they went
