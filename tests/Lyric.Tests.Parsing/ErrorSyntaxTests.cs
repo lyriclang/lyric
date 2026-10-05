@@ -8,8 +8,8 @@ namespace Lyric.Tests.Parsing;
 /// <summary>
 /// The syntax of errors (design/v5/spec/08 D9, D18, Y4, Y5; spec chapter 06 §2–§3): the
 /// <c>throws</c> set — one type, a bracketed list, the bare form — with the list rule's error
-/// (PAR0049); the <c>try</c> prefix covering everything to its right, at the start of the
-/// expression it covers (PAR0050); <c>try {</c> as the block form at a statement start; the
+/// (PAR0049); the <c>try</c> prefix covering everything to its right (where it may stand:
+/// <see cref="TryPlaceTests"/>); <c>try {</c> as the block form at a statement start; the
 /// expression forms (05 E4): <c>try?</c> and <c>try!</c> written against the keyword, and
 /// <c>try e catch (x: A) v</c> whose clauses belong to the nearest <c>try</c> on their left (PAR0051
 /// after a signed one).
@@ -196,14 +196,6 @@ public class ErrorSyntaxTests
         var tried = Assert.IsType<TryExpr>(expr);
         Assert.Equal(0, tried.KeywordSpan.Start);
         Assert.Equal(3, tried.KeywordSpan.End);
-    }
-
-    [Fact]
-    public void Try_to_the_right_of_an_operator_is_refused()
-    {
-        var (_, de) = ParseExpr("1 + try f()");
-        Assert.Equal("LYR-PAR0050", Assert.Single(de.Diagnostics).Code);
-        Assert.Contains(ParseExpr("a ?? try b()").De.Diagnostics, d => d.Code == "LYR-PAR0050");
     }
 
     [Fact]

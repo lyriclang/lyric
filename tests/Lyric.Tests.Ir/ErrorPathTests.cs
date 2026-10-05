@@ -297,7 +297,7 @@ public class ErrorPathTests
         var module = Lowered("""
             fn f(): int throws Boom {
                 defer try risky();
-                try { let a = try risky(); return a; } catch (_) { return 0; }
+                try { let a = risky(); return a; } catch (_) { return 0; }
             }
             fn main(): int throws Boom { return try f(); }
             """);
@@ -327,7 +327,7 @@ public class ErrorPathTests
     {
         var module = Lowered("""
             fn f(): int throws Boom {
-                try { return try risky(); } catch (e) { note(); throw e; }
+                try { return risky(); } catch (e) { note(); throw e; }
             }
             fn main(): int throws Boom { return try f(); }
             """);
@@ -345,7 +345,7 @@ public class ErrorPathTests
     {
         var module = Lowered("""
             fn f(): int throws Boom {
-                try { return try risky(); } catch (e: Boom) { let other = e; throw other; }
+                try { return risky(); } catch (e: Boom) { let other = e; throw other; }
             }
             fn main(): int throws Boom { return try f(); }
             """);

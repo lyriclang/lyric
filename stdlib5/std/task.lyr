@@ -209,7 +209,7 @@ pub fn withTimeout<T, E :: [Error]>(d: Duration, body: fn() -> T throws E): T th
     defer timer.cancel();
     defer work.settle();
     try {
-        return try work.await();
+        return work.await();
     } catch (e: Cancelled) {
         if (late) {
             throw TimedOut { };

@@ -141,7 +141,7 @@ pub fn subtest(name: string, body: fn() -> void throws Error): void {
 /// for the test to look at (X1).
 pub fn assertThrows<E :: [Error]>(f: fn() -> void throws E, message: string = ""): E {
     try {
-        try f();
+        f();
     } catch (e: E) {
         return e;
     }
