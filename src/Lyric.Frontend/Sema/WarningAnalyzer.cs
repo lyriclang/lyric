@@ -120,7 +120,44 @@ internal sealed class WarningAnalyzer
                 }
             }
         }
+
+        // The same of an INHERENT block (S5): a member's own word, or the block's — its members'
+        // default, said once for all of them — against the type the block extends. A conformance
+        // block writes no word (LYR-SEM0150), and a shape has no type to compare with.
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (block.IsImplicit || block.Decl.Interfaces.Length > 0 || _comp.IsNative(block.Module)
+                || block.Target is not { } target) continue;
+            if (Written(block.Decl.Visibility) is { } blockWord && blockWord > target.Visibility)
+            {
+                var start = block.Decl.Span.Start;
+                _de.Report("LYR-SEM0152", Severity.Warning,
+                    new Span(block.Decl.Span.File, start, start + Word(blockWord).Length),
+                    $"this block is {Word(blockWord)}, but its type '{target.Name}' is {Word(target.Visibility)} — "
+                    + "its members are exported only once the type is (07 V2 S3)");
+            }
+            foreach (var fn in block.Decl.Methods)
+                if (Written(fn.Visibility) is { } word && word > target.Visibility)
+                    WiderThan(target, fn.Name, fn.NameSpan, word);
+            foreach (var constant in block.Decl.Statics)
+                if (Written(constant.Visibility) is { } word && word > target.Visibility)
+                    WiderThan(target, constant.Name, constant.NameSpan, word);
+        }
+
+        void WiderThan(TypeSymbol type, string member, Span at, Visibility word) =>
+            _de.Report("LYR-SEM0152", Severity.Warning, at,
+                $"'{member}' is {Word(word)}, but its type '{type.Name}' is {Word(type.Visibility)} — "
+                + "the member is exported only once the type is (07 V2 S3)");
     }
+
+    /// <summary>The visibility a written word says; <c>null</c> where none is written.</summary>
+    private static Visibility? Written(VisibilityWord word) => word switch
+    {
+        VisibilityWord.Pub => Visibility.Public,
+        VisibilityWord.Internal => Visibility.Internal,
+        VisibilityWord.Private => Visibility.Private,
+        _ => null,
+    };
 
     /// <summary>
     /// A name a program declares or imports that hides one of the prelude's (design/v5/spec/07 V3
