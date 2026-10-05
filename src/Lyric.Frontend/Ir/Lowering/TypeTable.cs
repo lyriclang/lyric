@@ -94,7 +94,9 @@ internal sealed class TypeTable
         if (target.Members.LookupLocal(member) is GlobalSymbol own) return own;
         if (Compilation is not { } comp) return null;
         foreach (var block in comp.Extensions.Blocks)
-            if (ReferenceEquals(block.Target, target) && block.Decl.Generics.Length == 0
+            // A generic block's too: one per instance, the read binds the block's parameters
+            // (GlobalTable.FoldedOf). A type holds one constant of a name (05 §6 rule 2).
+            if (ReferenceEquals(block.Target, target)
                 && block.MethodScope.LookupLocal(member) is GlobalSymbol added)
                 return added;
         return null;

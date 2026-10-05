@@ -3451,7 +3451,8 @@ internal sealed class FunctionLowerer
     /// sema bound; or a static constant reached the same way.</summary>
     private TempId LowerImplicitMember(ImplicitMemberExpr expr)
     {
-        if (_types.RefOf(expr) is GlobalSymbol constant) return LowerGlobalRead(constant, expr.Span);
+        if (_types.RefOf(expr) is GlobalSymbol constant)
+            return LowerGlobalRead(constant, expr.Span, SubstituteType(_types.TypeOf(expr)));
         if (_types.RefOf(expr) is EnumVariantSymbol) return LowerVariantCall(expr.Name, [], expr, expr.Span);
         throw Bug($"implicit member '.{expr.Name}' is bound to nothing the lowering knows");
     }
@@ -4966,20 +4967,78 @@ internal sealed class FunctionLowerer
         if (symbol is ImportBindingSymbol import) symbol = import.Target;
         if (symbol is not GlobalSymbol global) return null;
         // A module 'let' narrows like a local (03 §3.2): the read unwraps what the test proved.
-        var type = _globals.ConstantOf(global)?.Type ?? _globals.Resolve(global, expr.Span).Type;
+        var type = _globals.FoldedOf(global) is not null ? LowerType(_types.TypeOfGlobal(global), expr.Span)
+            : _globals.ConstantOf(global)?.Type ?? _globals.ValueOf(global)?.Type ?? _globals.Resolve(global, expr.Span).Type;
         return Narrow(expr, LowerGlobalRead(global, expr.Span), type);
     }
 
     /// <summary>A global slot: a module <c>let</c> or a <c>static let</c>. Both are the same in the
     /// bytecode; the difference is only where the name is visible.</summary>
-    private TempId LowerGlobalRead(GlobalSymbol symbol, Span span)
+    /// <param name="through">The type the read names the constant on, where it names one —
+    /// <c>Crate&lt;int&gt;.empty</c>, the type a constraint's parameter stands for —, in this
+    /// instance's terms. <c>null</c> for a bare name: inside the constant's own type, where
+    /// this function's substitution holds the parameters already.</param>
+    private TempId LowerGlobalRead(GlobalSymbol symbol, Span span, LyrType? through = null)
     {
+        // A constant of a generic type is one per instance (07 G2): its initializer, lowered
+        // here under the instance the read names.
+        if (_globals.FoldedOf(symbol) is { } folded) return LowerFoldedConstant(symbol, folded, through, span);
         // A constant, a 'static let' of a literal, is the literal where it is read (GlobalTable).
         if (_globals.ConstantOf(symbol) is { } constant) return LowerExprAs(constant.Literal, constant.Type);
+        // … and one written by its bits, 'float.infinity', the float those bits are.
+        if (_globals.ValueOf(symbol) is { } value) return EmitConst(value.Value, value.Type, span);
         var (id, type) = _globals.Resolve(symbol, span);
         var dest = _slots.NewTemp(type);
         _b.Emit(new LoadGlobal(dest, id, type, span));
         return dest;
+    }
+
+    /// <summary>How deep a folded constant's value reads folded constants. The sema refuses one
+    /// that names itself; what it cannot see — a chain through a constraint that never ends —
+    /// stops here with a sentence.</summary>
+    private int _foldingDepth;
+
+    /// <summary>
+    /// A read of a constant that is one per instance (07 G2; the review's M8a-3): its
+    /// initializer — a constant by the sema's rule — lowered in place, with the parameters of
+    /// its type bound by the instance the read names; for a generic block's, the block's
+    /// parameters bound by matching its target against that instance.
+    /// </summary>
+    private TempId LowerFoldedConstant(GlobalSymbol symbol, (Expr Initializer, TypeSymbol Owner, ExtensionBlock? Block) folded,
+        LyrType? through, Span span)
+    {
+        Dictionary<GenericParamSymbol, LyrType>? bound = null;
+        if (through is GenericInstance named && ReferenceEquals(named.Definition, folded.Owner))
+        {
+            bound = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+            if (folded.Block is { TargetType: { } pattern })
+            {
+                if (!TypeFacts.Match(pattern, named, bound))
+                    throw NotSupported($"the constant '{symbol.Name}' of a block that '{TypeFacts.Display(named)}' does not match", span);
+            }
+            else
+                for (var i = 0; i < Math.Min(named.Definition.Generics.Length, named.Arguments.Length); i++)
+                    bound[named.Definition.Generics[i]] = named.Arguments[i];
+        }
+
+        if (++_foldingDepth > 64)
+        {
+            _foldingDepth = 0;
+            throw NotSupported($"the constant '{symbol.Name}' is folded where it is read, and its value asks for constants without end", span);
+        }
+        var outer = _substitution;
+        if (bound is not null)
+        {
+            var own = new Dictionary<GenericParamSymbol, LyrType>(outer, ReferenceEqualityComparer.Instance);
+            foreach (var (parameter, argument) in bound) own[parameter] = argument;
+            _substitution = own;
+        }
+        try { return LowerExprAs(folded.Initializer, LowerType(_types.TypeOfGlobal(symbol), span)); }
+        finally
+        {
+            _substitution = outer;
+            _foldingDepth--;
+        }
     }
 
     /// <summary>
@@ -5079,12 +5138,14 @@ internal sealed class FunctionLowerer
             return LowerGlobalRead(
                 (owner is null ? null : _typeTable.StaticOf(owner, expr.Member))
                 ?? throw NotSupported($"the constant '{expr.Member}' of '{TypeFacts.Display(boundTo)}' through a constraint", expr.Span),
-                expr.Span);
+                expr.Span, boundTo);
         }
 
         // 'P.ZERO' is not a field read but a constant read: a 'static let' is a global slot rather than
-        // an object slot.
-        if (_types.RefOf(expr) is GlobalSymbol constant) return LowerGlobalRead(constant, expr.Span);
+        // an object slot. On an instance, 'Crate<int>.empty', it is that instance's constant.
+        if (_types.RefOf(expr) is GlobalSymbol constant)
+            return LowerGlobalRead(constant, expr.Span,
+                _types.TypeOf(expr.Target) is NonValueType { Instance: { } onInstance } ? SubstituteType(onInstance) : null);
 
         // 'Shape.Empty' is a unit variant. It looks like a member access but is a construction without
         // arguments.

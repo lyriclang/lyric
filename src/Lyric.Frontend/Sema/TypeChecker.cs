@@ -350,6 +350,34 @@ public sealed class TypeChecker
         // module an inward opaque cast stands in. Null would mean "bare snippet" for every
         // global of a real module.
         _currentModule = module;
+
+        // A constant that is one per instance is folded where it is read (07 G2; the review's
+        // M8a-3b): there is no order among such constants, and the rule of slots — an initializer
+        // reads what stands before it (LYR-SEM0057) — is not theirs. Their written types are
+        // settled first, so one may name another that stands later; what an initializer may not
+        // do is name its own constant (CheckConstantInitializer). Muted: each type is resolved
+        // again, and reported, where its constant is checked.
+        using (_de.Mute())
+            foreach (var decl in _comp.AstOf(module).Declarations)
+            {
+                (IEnumerable<StaticBindingDecl> Statics, SymbolTable? Scope) folded = decl switch
+                {
+                    StructDecl s when module.Members.LookupLocal(s.Name) is TypeSymbol { Generics.Length: > 0 } t
+                        => (s.Members.OfType<StaticBindingDecl>(), t.Members),
+                    ClassDecl c when module.Members.LookupLocal(c.Name) is TypeSymbol { Generics.Length: > 0 } t
+                        => (c.Members.OfType<StaticBindingDecl>(), t.Members),
+                    EnumDecl e when module.Members.LookupLocal(e.Name) is TypeSymbol { Generics.Length: > 0 } t
+                        => (e.Statics, t.Members),
+                    ExtendDecl { Generics.Length: > 0 } x when _comp.Extensions.Blocks.FirstOrDefault(b => ReferenceEquals(b.Decl, x)) is { } block
+                        => (x.Statics, block.MethodScope),
+                    _ => ([], null),
+                };
+                if (folded.Scope is null) continue;
+                foreach (var sb in folded.Statics)
+                    if (sb.Binding.Type is { } written && folded.Scope.LookupLocal(sb.Binding.Name) is GlobalSymbol early)
+                        _globals.TryAdd(early, ResolveType(written, folded.Scope));
+            }
+
         foreach (var decl in _comp.AstOf(module).Declarations)
         {
             // A 'static let' is the same mechanism under a type's name (04 §1 rule 2), initialized
@@ -359,10 +387,10 @@ public sealed class TypeChecker
             {
                 case StructDecl or ClassDecl when module.Members.LookupLocal(((INamedDecl)decl).Name) is TypeSymbol owner:
                     foreach (var sb in (decl is StructDecl s ? s.Members : ((ClassDecl)decl).Members).OfType<StaticBindingDecl>())
-                        CheckStaticBinding(sb, owner.Members);
+                        CheckStaticBinding(sb, owner.Members, perInstance: owner.Generics.Length > 0);
                     continue;
                 case EnumDecl e when module.Members.LookupLocal(e.Name) is TypeSymbol owner:
-                    foreach (var sb in e.Statics) CheckStaticBinding(sb, owner.Members);
+                    foreach (var sb in e.Statics) CheckStaticBinding(sb, owner.Members, perInstance: owner.Generics.Length > 0);
                     continue;
                 case InterfaceDecl i when module.Members.LookupLocal(i.Name) is TypeSymbol iface:
                     foreach (var sb in i.Statics) CheckInterfaceStatic(sb, iface);
@@ -767,7 +795,10 @@ public sealed class TypeChecker
 
     /// <summary>A <c>static let</c> constant. Its initializer is checked in the scope it stands in —
     /// the type's, a block's — but without <c>this</c>: there is no instance it could refer to.</summary>
-    private void CheckStaticBinding(StaticBindingDecl sb, SymbolTable scope)
+    /// <param name="perInstance">The constant of a generic type or of a generic block: one per
+    /// instance, folded where it is read (07 G2; the review's M8a-3, M8a-3b) — so its
+    /// initializer is a constant, <see cref="CheckConstantInitializer"/>.</param>
+    private void CheckStaticBinding(StaticBindingDecl sb, SymbolTable scope, bool perInstance = false)
     {
         var outerThis = _currentThis;
         _currentThis = null;
@@ -799,9 +830,103 @@ public sealed class TypeChecker
         {
             _globals[gs] = declared ?? init ?? LyrType.Error;
             _result.BindGlobal(gs, _globals[gs]);   // for the lowering
+            if (perInstance && sb.Binding.Initializer is { } folded && quiet == 0) CheckConstantInitializer(gs, sb, folded);
         }
 
         _currentThis = outerThis;
+    }
+
+    /// <summary>The constants of generic types and blocks, with their initializers: what a read
+    /// folds, and what <see cref="NamesItself"/> follows.</summary>
+    private readonly Dictionary<GlobalSymbol, Expr> _foldedConstants = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// The initializer of a constant that is one per instance (07 G2; the review's M8a-3b). It is
+    /// folded where the constant is read — nothing runs for it before the entry, and no order
+    /// among the instances of a program is asked, which only a compilation that has found them
+    /// all could give. So it is a CONSTANT: a literal, <c>null</c>, an empty literal, another
+    /// constant (<c>T.zero</c> under a constraint too), a unit variant, a struct initializer of
+    /// these. What would run is refused with what it is and the way out (<c>LYR-SEM0169</c>).
+    /// Richer initializers come with <c>comptime</c>.
+    /// </summary>
+    private void CheckConstantInitializer(GlobalSymbol constant, StaticBindingDecl sb, Expr initializer)
+    {
+        _foldedConstants[constant] = initializer;
+        if (NotConstant(initializer) is { } found)
+        {
+            _de.Report("LYR-SEM0169", Severity.Error, found.At,
+                $"'{sb.Binding.Name}' is a constant of a generic type — one per instance, folded where it is read, so its "
+                + $"value is a constant: a literal, 'null', an empty literal, another constant, a struct of these — and "
+                + $"this is {found.What}; write a 'static fn {sb.Binding.Name}()' for a value that is computed");
+            return;
+        }
+        if (NamesItself(constant, initializer, new HashSet<GlobalSymbol>(ReferenceEqualityComparer.Instance)))
+            _de.Report("LYR-SEM0169", Severity.Error, initializer.Span,
+                $"'{sb.Binding.Name}' is a constant of a generic type, folded where it is read — and its value names "
+                + $"'{sb.Binding.Name}' itself, directly or through another constant");
+    }
+
+    /// <summary>Why an expression is no constant initializer (<see cref="CheckConstantInitializer"/>),
+    /// and where; <c>null</c> for one that is.</summary>
+    private (string What, Span At)? NotConstant(Expr e)
+    {
+        switch (e)
+        {
+            case IntLiteralExpr or FloatLiteralExpr or BoolLiteralExpr or CharLiteralExpr or StringLiteralExpr or NullLiteralExpr:
+            case UnaryExpr { Operator: UnaryOp.Neg, Operand: IntLiteralExpr or FloatLiteralExpr }:
+            case ArrayLitExpr { Elements.Length: 0 }:
+                return null;
+            case ArrayLitExpr:
+                return ("an array with elements", e.Span);
+            case IdentifierExpr or MemberExpr or ImplicitMemberExpr or TypePathExpr:
+                return _result.RefOf(e) switch
+                {
+                    GlobalSymbol { Declaration: StaticBindingDecl } => null,
+                    EnumVariantSymbol { Declaration: EnumVariant { TupleFields: null, StructFields: null } } => null,
+                    GlobalSymbol module => ($"the module's binding '{module.Name}', which is filled when the program starts", e.Span),
+                    _ => ("a value that is read when the program runs", e.Span),
+                };
+            case StructInitExpr init:
+            {
+                var built = _result.TypeOf(init);
+                if (TypeFacts.KindOf(built) is not TypeSymbolKind.Struct)
+                    return (TypeFacts.SymbolOf(built) is { Kind: TypeSymbolKind.Class } made
+                        ? $"an object of the class '{made.Name}', which is made when the program runs and has an identity"
+                        : "an initializer of no struct", e.Span);
+                foreach (var field in init.Fields)
+                    if (NotConstant(field.Value) is { } inside) return inside;
+                // A field the initializer leaves out takes its default, which is an expression too.
+                if (TypeFacts.SymbolOf(built)?.Declaration is StructDecl declared)
+                    foreach (var member in declared.Members)
+                        if (member is FieldDecl { Default: { } standing } omitted
+                            && !init.Fields.Any(f => f.Name == omitted.Name) && NotConstant(standing) is not null)
+                            return ($"a struct whose field '{omitted.Name}' takes a default that is none", e.Span);
+                return null;
+            }
+            case CallExpr:
+                return ("a call", e.Span);
+            case BinaryExpr or UnaryExpr or PostfixExpr or CastExpr:
+                return ("an operation", e.Span);
+            case InterpolatedStringExpr:
+                return ("a string that is put together when the program runs", e.Span);
+            default:
+                return ("an expression that is evaluated when the program runs", e.Span);
+        }
+    }
+
+    /// <summary>Whether the value of a folded constant names the constant again — itself, or
+    /// through the other folded constants it reads. Folding it would not end.</summary>
+    private bool NamesItself(GlobalSymbol start, Expr e, HashSet<GlobalSymbol> seen)
+    {
+        if (e is IdentifierExpr or MemberExpr or ImplicitMemberExpr or TypePathExpr && _result.RefOf(e) is GlobalSymbol read)
+        {
+            if (ReferenceEquals(read, start)) return true;
+            if (_foldedConstants.TryGetValue(read, out var other) && seen.Add(read) && NamesItself(start, other, seen)) return true;
+        }
+        if (e is StructInitExpr init)
+            foreach (var field in init.Fields)
+                if (NamesItself(start, field.Value, seen)) return true;
+        return false;
     }
 
     /// <summary>An interface's constant (05 §7 rule 2): a declaration — a type, read with
@@ -824,19 +949,10 @@ public sealed class TypeChecker
     }
 
     /// <summary>A block's constant (05 §6 rule 2): the type's, checked as one in its body is. A
-    /// generic block's would be one per instance, which is not decided.</summary>
-    private void CheckBlockStatic(StaticBindingDecl sb, ExtensionBlock block)
-    {
-        if (block.Decl.Generics.Length > 0)
-        {
-            _de.Report("LYR-SEM0159", Severity.Error, sb.Span,
-                $"'{sb.Binding.Name}' stands in a generic block, and its value would be one per instance of "
-                + "the block's parameters — not decided; declare the constant on a concrete type");
-            if (block.MethodScope.LookupLocal(sb.Binding.Name) is GlobalSymbol refused) _globals[refused] = LyrType.Error;
-            return;
-        }
-        CheckStaticBinding(sb, block.MethodScope);
-    }
+    /// generic block's is one per instance of the block's parameters (the review's M8a-3) — it
+    /// was refused, undecided (<c>LYR-SEM0159</c>).</summary>
+    private void CheckBlockStatic(StaticBindingDecl sb, ExtensionBlock block) =>
+        CheckStaticBinding(sb, block.MethodScope, perInstance: block.Decl.Generics.Length > 0);
 
     /// <summary>A constant's type, as its declaration's check settled it.</summary>
     private LyrType GlobalTypeOf(GlobalSymbol constant) =>
@@ -853,6 +969,19 @@ public sealed class TypeChecker
             if (!ReferenceEquals(block.Target, type) || block.Decl.Generics.Length > 0) continue;
             if (seen && _currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
             if (block.MethodScope.LookupLocal(name) is GlobalSymbol added) return added;
+        }
+        return null;
+    }
+
+    /// <summary>The constant of this name a GENERIC block the current module sees adds to a type
+    /// (one per instance of the block's parameters), with the block.</summary>
+    private (ExtensionBlock Block, GlobalSymbol Constant)? GenericBlockStatic(TypeSymbol type, string name)
+    {
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (!ReferenceEquals(block.Target, type) || block.Decl.Generics.Length == 0) continue;
+            if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (block.MethodScope.LookupLocal(name) is GlobalSymbol added) return (block, added);
         }
         return null;
     }
@@ -1852,7 +1981,13 @@ public sealed class TypeChecker
                 foreach (var st in idecl.Statics)
                 {
                     if (iface.Members.LookupLocal(st.Binding.Name) is not GlobalSymbol promised) continue;
-                    if (StaticOf(implementer, st.Binding.Name) is not { } answer)
+                    // The type's constant of the name — or, for a conformance a GENERIC block
+                    // declares, the constant that block holds: one per instance of the block's
+                    // parameters (04 §1 rule 6), and the instances the block reaches are the
+                    // ones that conform.
+                    if ((StaticOf(implementer, st.Binding.Name)
+                         ?? (from is { Decl.Generics.Length: > 0 } ? from.MethodScope.LookupLocal(st.Binding.Name) as GlobalSymbol : null))
+                        is not { } answer)
                     {
                         _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
                             $"'{name}' does not answer the static '{st.Binding.Name}' of interface '{iface.Name}'{implied} — "
@@ -7915,6 +8050,19 @@ public sealed class TypeChecker
 
             // A block's constant (05 §6 rule 2), under the type's name.
             _ when StaticOf(ts, member, seen: true) is { } added => (Of(TypeOfGlobalReference(added, span)), added),
+
+            // A generic block's constant (one per instance; the review's M8a-3): the named
+            // instance binds the BLOCK's parameters, as it does for a generic block's static
+            // function — the constant's type is written in them.
+            _ when GenericBlockStatic(ts, member) is { } inBlock => instance is null
+                ? (Report(span, "LYR-SEM0063",
+                    $"'{ts.Name}' is generic — write its type arguments: "
+                    + $"'{ts.Name}<{string.Join(", ", ts.Generics.Select(g => g.Name))}>.{member}'"), inBlock.Constant)
+                : BlockSubstitution(inBlock.Block, instance) is { } blockMap
+                    ? (Substitute(TypeOfGlobalReference(inBlock.Constant, span), blockMap), inBlock.Constant)
+                    : (Report(span, "LYR-SEM0134",
+                        $"'{member}' is added to '{TypeFacts.Display(BlockTargetType(inBlock.Block))}' under the block's "
+                        + $"constraints, which '{TypeFacts.Display(instance)}' does not satisfy"), inBlock.Constant),
 
             // The same fallback the instance path has: an extension block may add a static member,
             // and the lowering already emits one without a receiver.
