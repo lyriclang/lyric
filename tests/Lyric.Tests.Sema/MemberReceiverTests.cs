@@ -137,16 +137,25 @@ public class MemberReceiverTests
     }
 
     [Fact]
-    public void A_generic_type_through_a_module_qualifier_still_wants_its_arguments()
+    public void A_generic_type_through_a_module_qualifier_binds_its_arguments_as_the_bare_name_does()
     {
         // The qualified form takes the same route as the bare one, including its diagnostics:
-        // a generic static needs written type arguments (there is no field inference).
-        var de = Check(
+        // the call binds the type's parameters (03 T8, the review's M8a-2), and what neither the
+        // expected type nor an argument determines is said with the form to write. Until then
+        // this was LYR-SEM0063, "write its type arguments", for every call.
+        var open = Check(
             "import std.collections;\nfn main(): int {\n"
             + "    let xs = collections.List.empty();\n    return 0;\n}\n",
             withStdlib: true);
+        var said = Assert.Single(open.Diagnostics, d => d.Severity == Severity.Error);
+        Assert.Equal("LYR-SEM0060", said.Code);
+        Assert.Contains("'T' of 'List'", said.Message);
 
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0063");
+        var asked = Check(
+            "import std.collections;\nfn main(): int {\n"
+            + "    let xs: collections.List<int> = collections.List.empty();\n    return 0;\n}\n",
+            withStdlib: true);
+        Assert.DoesNotContain(asked.Diagnostics, d => d.Severity == Severity.Error);
     }
 
     // ------------------------------------------------------------------ the errors stay errors

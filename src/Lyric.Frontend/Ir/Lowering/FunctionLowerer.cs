@@ -6001,9 +6001,11 @@ internal sealed class FunctionLowerer
             // but a type path; there is no receiver, but there is an instantiation. The case stands
             // first, because every case below asks the type of the target EXPRESSION, and a type path
             // has none.
-            case MemberExpr { Target: TypePathExpr } member
-                when _types.TypeOf(((MemberExpr)expr.Callee).Target)
-                     is Sema.NonValueType { Instance: { } owner }:
+            //
+            // The instance is the one the receiver names — written, 'Pair<int>', or settled by the
+            // call for a bare 'Pair' (03 T8): the sema wrote it onto the receiver either way.
+            case MemberExpr member
+                when _types.TypeOf(member.Target) is Sema.NonValueType { Instance: { } owner }:
                 // Through the OWN substitution, as the instance-method dispatch below does: in
                 // 'fn make<T>()' the call 'List<T>.empty()' names the CALLER's T, and which type
                 // that is only the enclosing instantiation knows. Unsubstituted it reached the
