@@ -80,6 +80,85 @@ public class CNameTests
         Assert.Contains("struct lyr_ty_0tup_i64_str {", c);
     }
 
+    /// <summary>An instance writes a declared type among its arguments with the module that
+    /// declares it (07 K2) — a function's instance, a type's, and a type's inside another's; a
+    /// built-in type has no module to write. A type's own entry carries its module beside its
+    /// name, once.</summary>
+    [Fact]
+    public void An_instance_names_its_arguments_by_their_full_path()
+    {
+        var result = TestCompiler.Lower("names.lyr", """
+            struct Cat { lives: int }
+            struct Box<T> { held: T }
+            fn first<T>(xs: T[]): T { return xs[0]; }
+
+            fn main(): int {
+                let cats = [Cat { lives = 9 }];
+                let boxes = [Box<Cat> { held = cats[0] }];
+                return first(cats).lives - first(boxes).held.lives + first([0]);
+            }
+            """);
+        var rendered = new StringWriter();
+        result.Diagnostics.RenderText(rendered);
+        Assert.True(result.Ok && result.Ir is not null, rendered.ToString());
+
+        var functions = result.Ir!.Functions.Select(f => f.Name).ToArray();
+        Assert.Contains("app.main.first<app.main.Cat>", functions);
+        Assert.Contains("app.main.first<app.main.Box<app.main.Cat>>", functions);
+        Assert.Contains("app.main.first<int>", functions);
+        Assert.Contains(result.Ir.Types, t => t.Name == "Box<app.main.Cat>" && t.Module == "app.main");
+        Assert.DoesNotContain(result.Ir.Types, t => t.Name.StartsWith("app.main.", StringComparison.Ordinal));
+    }
+
+    /// <summary>The name of an instance is the same whatever else the program declares. It was
+    /// <c>first&lt;Cat&gt;</c> until another module declared a <c>Cat</c> too, and then
+    /// <c>first&lt;app.a.Cat&gt;</c>: a type added in one module renamed the frames, the cache
+    /// units and the C names of another's.</summary>
+    [Fact]
+    public void A_second_type_of_the_name_renames_no_instance()
+    {
+        const string a = "pub struct Cat { pub lives: int }\npub fn first<T>(xs: T[]): T { return xs[0]; }\n"
+            + "pub fn nine(): int { return first([Cat { lives = 9 }]).lives; }\n";
+
+        string Units(string main, params (string Path, string Text)[] more)
+        {
+            var dir = Package([("lyric.toml", AppManifest), ("src/a.lyr", a), ("src/main.lyr", main), .. more]);
+            var (exit, c, error) = Run("build", "-C", dir, "--emit", "c");
+            Assert.True(exit == 0, error);
+            return string.Join("\n", Regex.Matches(c, @"==== unit: (app\.a\.first<.*>) ====").Select(m => m.Groups[1].Value));
+        }
+
+        var alone = Units("import app.a;\n\nfn main(): int { return a.nine() - 9; }\n");
+        var beside = Units("import app.a;\nimport app.b;\n\n"
+                + "fn main(): int { let other = b.Cat { claws = 1 }; return a.nine() - 9 + other.claws - 1; }\n",
+            ("src/b.lyr", "pub struct Cat { pub claws: int }\n"));
+        Assert.Equal("app.a.first<app.a.Cat>", alone);
+        Assert.Equal(alone, beside);
+    }
+
+    /// <summary>Two modules' generic types of one name: an instance's entry has its module once.
+    /// Under the rule before, such a type's name carried the module as well, and the entry read
+    /// <c>app.a.app.a.Crate&lt;int&gt;</c>.</summary>
+    [Fact]
+    public void Two_modules_generic_types_of_one_name_have_one_module_each()
+    {
+        var dir = Package(("lyric.toml", AppManifest),
+            ("src/a.lyr", "pub class Crate<T> { pub var held: T }\n"
+                + "pub fn make(n: int): Crate<int> { return Crate<int> { held = n }; }\n"),
+            ("src/b.lyr", "pub class Crate<T> { pub var kept: T, pub var count: int }\n"
+                + "pub fn make(n: int): Crate<int> { return Crate<int> { kept = n, count = 1 }; }\n"),
+            ("src/main.lyr", "import std.io { println };\nimport app.a;\nimport app.b;\n\n"
+                + "fn main(): void {\n    let x = a.make(1);\n    let y = b.make(2);\n"
+                + "    println(f\"{x.held} {y.kept} {y.count}\");\n}\n"));
+        Assert.Equal("1 2 1\n", BuildAndRun(dir, "app", "build", "-C", dir));
+
+        var (exit, c, error) = Run("build", "-C", dir, "--emit", "c");
+        Assert.True(exit == 0, error);
+        Assert.Contains("\"app.a.Crate<int>\"", c);
+        Assert.Contains("\"app.b.Crate<int>\"", c);
+        Assert.DoesNotContain("app.a.app.a.", c);
+    }
+
     /// <summary>Two modules may each have a global of one name: the C tells them apart by their
     /// modules — and the program reads each one's own value.</summary>
     [Fact]

@@ -468,9 +468,12 @@ internal sealed class TypeTable
                     $"generic type '{symbol.Name}' needs {symbol.Generics.Length} type "
                     + $"argument(s), got {typeArguments.Count}", SpanOf(symbol));
 
-            // By the types, not their names: 'Box<Cat>' of two modules' 'Cat's is two layouts.
-            var instanceName = InstanceNames.Of(new GenericInstance(symbol, typeArguments.ToArray()), Compilation);
-            if (_instances.TryGetValue(instanceName, out var known)) return known;
+            // By the types, not their names: 'Box<Cat>' of two modules' 'Cat's is two layouts,
+            // and so is 'Box<int>' of two modules' 'Box'es — the key holds every path. The entry's
+            // name leaves its own module out, which the entry carries beside it.
+            var key = InstanceNames.Of(new GenericInstance(symbol, typeArguments.ToArray()), Compilation);
+            if (_instances.TryGetValue(key, out var known)) return known;
+            var instanceName = InstanceNames.Entry(symbol, typeArguments, Compilation);
 
             var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
             for (var i = 0; i < symbol.Generics.Length; i++)
@@ -484,16 +487,16 @@ internal sealed class TypeTable
                 if (symbol.Kind == TypeSymbolKind.Interface)
                 {
                     var id = InternInterface(symbol, instanceName);
-                    _instances[instanceName] = id;
+                    _instances[key] = id;
                     _instanceSymbols.Add((symbol, id, typeArguments.ToArray()));
                     return id;
                 }
 
                 if (symbol.Kind == TypeSymbolKind.Enum)
-                    return InternEnum(symbol, instanceName, _instances, typeArguments.ToArray());
+                    return InternEnum(symbol, instanceName, _instances, typeArguments.ToArray(), key);
 
                 return InternLayout(symbol, instanceName, _instances,
-                    typeArguments.ToArray());
+                    typeArguments.ToArray(), key);
             }
             finally
             {
@@ -559,7 +562,7 @@ internal sealed class TypeTable
     /// carried along, because the impl table has to compute back from a TypeId which instance was meant:
     /// the vtable row records the method of the INSTANCE.</param>
     private TypeId InternLayout(TypeSymbol symbol, string name, Dictionary<string, TypeId>? registry,
-        LyrType[]? instanceArguments = null)
+        LyrType[]? instanceArguments = null, string? key = null)
     {
         var members = symbol.Declaration switch
         {
@@ -577,7 +580,7 @@ internal sealed class TypeTable
         // Lower(field) needs only the id, not the layout.
         var id = new TypeId(_defs.Count);
         if (registry is null) _assigned[symbol] = id;
-        else { registry[name] = id; _instanceSymbols.Add((symbol, id, instanceArguments ?? [])); }
+        else { registry[key ?? name] = id; _instanceSymbols.Add((symbol, id, instanceArguments ?? [])); }
         _defs.Add(default);
 
         try
@@ -640,7 +643,7 @@ internal sealed class TypeTable
     /// <c>Opt&lt;string&gt;</c> would get the id of <c>Opt&lt;int&gt;</c> and with it its variant layouts,
     /// meaning an <c>i64</c> slot for a string.</param>
     private TypeId InternEnum(TypeSymbol symbol, string name, Dictionary<string, TypeId>? registry,
-        LyrType[]? instanceArguments)
+        LyrType[]? instanceArguments, string? key = null)
     {
         if (symbol.Declaration is not EnumDecl decl)
             throw new UnsupportedConstructException(
@@ -652,7 +655,7 @@ internal sealed class TypeTable
         // recursion comes back through the instance name rather than through the symbol.
         var id = new TypeId(_defs.Count);
         if (registry is null) _assigned[symbol] = id;
-        else { registry[name] = id; _instanceSymbols.Add((symbol, id, instanceArguments ?? [])); }
+        else { registry[key ?? name] = id; _instanceSymbols.Add((symbol, id, instanceArguments ?? [])); }
         _defs.Add(default);
         _variantNames[id.Value] = decl.Variants.Select(v => v.Name).ToArray();
 

@@ -12,9 +12,9 @@ typedef struct lyr_ty_app_main_Shape lyr_ty_app_main_Shape;
 typedef struct lyr_ty_14_app_main_Shape_Num lyr_ty_14_app_main_Shape_Num;
 typedef struct lyr_ty_14_app_main_Shape_Rect lyr_ty_14_app_main_Shape_Rect;
 typedef struct lyr_ty_14_app_main_Shape_Empty lyr_ty_14_app_main_Shape_Empty;
-typedef struct lyr_ty_app_main_Opt_Shape__17605d3d lyr_ty_app_main_Opt_Shape__17605d3d;
-typedef struct lyr_ty_28_app_main_Opt_Shape__17605d3d_Some lyr_ty_28_app_main_Opt_Shape__17605d3d_Some;
-typedef struct lyr_ty_28_app_main_Opt_Shape__17605d3d_None lyr_ty_28_app_main_Opt_Shape__17605d3d_None;
+typedef struct lyr_ty_app_main_Opt_app_main_Shape__15062795 lyr_ty_app_main_Opt_app_main_Shape__15062795;
+typedef struct lyr_ty_37_app_main_Opt_app_main_Shape__15062795_Some lyr_ty_37_app_main_Opt_app_main_Shape__15062795_Some;
+typedef struct lyr_ty_37_app_main_Opt_app_main_Shape__15062795_None lyr_ty_37_app_main_Opt_app_main_Shape__15062795_None;
 struct lyr_ty_15_app_main_Signal_Red {
     uint8_t lyr_unit;
 };
@@ -38,14 +38,14 @@ struct lyr_ty_14_app_main_Shape_Empty {
 };
 struct lyr_ty_app_main_Shape { uint32_t tag; union { lyr_ty_14_app_main_Shape_Num v0; lyr_ty_14_app_main_Shape_Rect v1; } as; };
 _Static_assert(sizeof(lyr_ty_app_main_Shape) == 24, "layout of lyr_ty_app_main_Shape");
-struct lyr_ty_28_app_main_Opt_Shape__17605d3d_Some {
+struct lyr_ty_37_app_main_Opt_app_main_Shape__15062795_Some {
     lyr_ty_app_main_Shape f_0;
 };
-struct lyr_ty_28_app_main_Opt_Shape__17605d3d_None {
+struct lyr_ty_37_app_main_Opt_app_main_Shape__15062795_None {
     uint8_t lyr_unit;
 };
-struct lyr_ty_app_main_Opt_Shape__17605d3d { uint32_t tag; union { lyr_ty_28_app_main_Opt_Shape__17605d3d_Some v0; } as; };
-_Static_assert(sizeof(lyr_ty_app_main_Opt_Shape__17605d3d) == 32, "layout of lyr_ty_app_main_Opt_Shape__17605d3d");
+struct lyr_ty_app_main_Opt_app_main_Shape__15062795 { uint32_t tag; union { lyr_ty_37_app_main_Opt_app_main_Shape__15062795_Some v0; } as; };
+_Static_assert(sizeof(lyr_ty_app_main_Opt_app_main_Shape__15062795) == 32, "layout of lyr_ty_app_main_Opt_app_main_Shape__15062795");
 
 /* module-level bindings */
 double lyr_g_std_core_float_infinity = 0;
@@ -87,8 +87,8 @@ lyr_ty_app_main_Signal lyr_app_main_next(lyr_ty_app_main_Signal l0_s);
 LyrStr * lyr_app_main_either(lyr_ty_app_main_Signal l0_s);
 int64_t lyr_app_main_size(lyr_ty_app_main_Shape l0_s);
 LyrStr * lyr_app_main_describe(lyr_ty_app_main_Shape l0_s);
-int64_t lyr_app_main_inner(lyr_ty_app_main_Opt_Shape__17605d3d l0_o);
-LyrStr * lyr_app_main_show(lyr_ty_app_main_Opt_Shape__17605d3d l0_o);
+int64_t lyr_app_main_inner(lyr_ty_app_main_Opt_app_main_Shape__15062795 l0_o);
+LyrStr * lyr_app_main_show(lyr_ty_app_main_Opt_app_main_Shape__15062795 l0_o);
 LyrStr * lyr_app_main_lit(lyr_ty_app_main_Signal l0_m);
 int64_t lyr_app_main_firstNum(lyr_ty_app_main_Shape l0_s);
 LYR_NOINLINE int64_t lyr_app_main_main(void);
@@ -586,16 +586,16 @@ bb11:;
 }
 
 #line 45 "programs/patterns.lyr"
-int64_t lyr_app_main_inner(lyr_ty_app_main_Opt_Shape__17605d3d l0_o) {
+int64_t lyr_app_main_inner(lyr_ty_app_main_Opt_app_main_Shape__15062795 l0_o) {
     int64_t l1__match0 = 0;
     int64_t l2_n = 0;
     lyr_ty_app_main_Shape l3_s = {0};
-    lyr_ty_app_main_Opt_Shape__17605d3d t0_s = {0};
-    lyr_ty_app_main_Opt_Shape__17605d3d *t0 = &t0_s;
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 t0_s = {0};
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 *t0 = &t0_s;
     int64_t t1 = 0;
     int64_t t2 = 0;
     uint8_t t3 = 0;
-    lyr_ty_28_app_main_Opt_Shape__17605d3d_Some *t4 = NULL;
+    lyr_ty_37_app_main_Opt_app_main_Shape__15062795_Some *t4 = NULL;
     lyr_ty_app_main_Shape t5_s = {0};
     lyr_ty_app_main_Shape *t5 = &t5_s;
     int64_t t6 = 0;
@@ -606,7 +606,7 @@ int64_t lyr_app_main_inner(lyr_ty_app_main_Opt_Shape__17605d3d l0_o) {
     int64_t t11 = 0;
     int64_t t12 = 0;
     uint8_t t13 = 0;
-    lyr_ty_28_app_main_Opt_Shape__17605d3d_Some *t14 = NULL;
+    lyr_ty_37_app_main_Opt_app_main_Shape__15062795_Some *t14 = NULL;
     lyr_ty_app_main_Shape t15_s = {0};
     lyr_ty_app_main_Shape *t15 = &t15_s;
     lyr_ty_app_main_Shape t16_s = {0};
@@ -688,14 +688,14 @@ bb6:;
 }
 
 #line 49 "programs/patterns.lyr"
-LyrStr * lyr_app_main_show(lyr_ty_app_main_Opt_Shape__17605d3d l0_o) {
+LyrStr * lyr_app_main_show(lyr_ty_app_main_Opt_app_main_Shape__15062795 l0_o) {
     LyrStr *l1__match0 = NULL;
-    lyr_ty_app_main_Opt_Shape__17605d3d t0_s = {0};
-    lyr_ty_app_main_Opt_Shape__17605d3d *t0 = &t0_s;
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 t0_s = {0};
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 *t0 = &t0_s;
     int64_t t1 = 0;
     int64_t t2 = 0;
     uint8_t t3 = 0;
-    lyr_ty_28_app_main_Opt_Shape__17605d3d_Some *t4 = NULL;
+    lyr_ty_37_app_main_Opt_app_main_Shape__15062795_Some *t4 = NULL;
     LyrStr *t5 = NULL;
     LyrStr *t6 = NULL;
     LyrStr *t7 = NULL;
@@ -822,8 +822,8 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty_app_main_Shape l3_num = {0};
     lyr_ty_app_main_Shape l4_rect = {0};
     lyr_ty_app_main_Shape l5_empty = {0};
-    lyr_ty_app_main_Opt_Shape__17605d3d l6_some = {0};
-    lyr_ty_app_main_Opt_Shape__17605d3d l7_none = {0};
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 l6_some = {0};
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 l7_none = {0};
     int64_t l8_iflet = 0;
     int64_t l9_v = 0;
     lyr_ty_app_main_Signal l10_light = {0};
@@ -942,32 +942,32 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     int64_t t89 = 0;
     lyr_ty_app_main_Shape t90_s = {0};
     lyr_ty_app_main_Shape *t90 = &t90_s;
-    lyr_ty_app_main_Opt_Shape__17605d3d t91_s = {0};
-    lyr_ty_app_main_Opt_Shape__17605d3d *t91 = &t91_s;
-    lyr_ty_app_main_Opt_Shape__17605d3d t92_s = {0};
-    lyr_ty_app_main_Opt_Shape__17605d3d *t92 = &t92_s;
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 t91_s = {0};
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 *t91 = &t91_s;
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 t92_s = {0};
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 *t92 = &t92_s;
     LyrStr *t93 = NULL;
-    lyr_ty_app_main_Opt_Shape__17605d3d t94_s = {0};
-    lyr_ty_app_main_Opt_Shape__17605d3d *t94 = &t94_s;
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 t94_s = {0};
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 *t94 = &t94_s;
     int64_t t95 = 0;
     LyrStr *t96 = NULL;
     LyrStr *t97 = NULL;
     LyrStr *t98 = NULL;
     LyrStr *t99 = NULL;
-    lyr_ty_app_main_Opt_Shape__17605d3d t100_s = {0};
-    lyr_ty_app_main_Opt_Shape__17605d3d *t100 = &t100_s;
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 t100_s = {0};
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 *t100 = &t100_s;
     LyrStr *t101 = NULL;
     LyrStr *t102 = NULL;
     LyrStr *t103 = NULL;
-    lyr_ty_app_main_Opt_Shape__17605d3d t104_s = {0};
-    lyr_ty_app_main_Opt_Shape__17605d3d *t104 = &t104_s;
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 t104_s = {0};
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 *t104 = &t104_s;
     int64_t t105 = 0;
     LyrStr *t106 = NULL;
     LyrStr *t107 = NULL;
     lyr_ty_app_main_Shape t108_s = {0};
     lyr_ty_app_main_Shape *t108 = &t108_s;
-    lyr_ty_app_main_Opt_Shape__17605d3d t109_s = {0};
-    lyr_ty_app_main_Opt_Shape__17605d3d *t109 = &t109_s;
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 t109_s = {0};
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 *t109 = &t109_s;
     int64_t t110 = 0;
     LyrStr *t111 = NULL;
     LyrStr *t112 = NULL;
@@ -975,12 +975,12 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     LyrStr *t114 = NULL;
     LyrStr *t115 = NULL;
     int64_t t116 = 0;
-    lyr_ty_app_main_Opt_Shape__17605d3d t117_s = {0};
-    lyr_ty_app_main_Opt_Shape__17605d3d *t117 = &t117_s;
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 t117_s = {0};
+    lyr_ty_app_main_Opt_app_main_Shape__15062795 *t117 = &t117_s;
     int64_t t118 = 0;
     uint8_t t119 = 0;
     int64_t t120 = 0;
-    lyr_ty_28_app_main_Opt_Shape__17605d3d_Some *t121 = NULL;
+    lyr_ty_37_app_main_Opt_app_main_Shape__15062795_Some *t121 = NULL;
     lyr_ty_app_main_Shape t122_s = {0};
     lyr_ty_app_main_Shape *t122 = &t122_s;
     int64_t t123 = 0;
@@ -1232,11 +1232,11 @@ bb0:;
 #line 79
     t90_s = (lyr_ty_app_main_Shape){ .tag = 0, .as.v0 = { .f_0 = t89 } }; t90 = &t90_s;
 #line 79
-    t91_s = (lyr_ty_app_main_Opt_Shape__17605d3d){ .tag = 0, .as.v0 = { .f_0 = *t90 } }; t91 = &t91_s;
+    t91_s = (lyr_ty_app_main_Opt_app_main_Shape__15062795){ .tag = 0, .as.v0 = { .f_0 = *t90 } }; t91 = &t91_s;
 #line 79
     l6_some = *t91;
 #line 80
-    t92_s = (lyr_ty_app_main_Opt_Shape__17605d3d){ .tag = 1 }; t92 = &t92_s;
+    t92_s = (lyr_ty_app_main_Opt_app_main_Shape__15062795){ .tag = 1 }; t92 = &t92_s;
 #line 80
     l7_none = *t92;
 #line 81
@@ -1272,7 +1272,7 @@ bb0:;
 #line 81
     t108 = &l4_rect;
 #line 81
-    t109_s = (lyr_ty_app_main_Opt_Shape__17605d3d){ .tag = 0, .as.v0 = { .f_0 = *t108 } }; t109 = &t109_s;
+    t109_s = (lyr_ty_app_main_Opt_app_main_Shape__15062795){ .tag = 0, .as.v0 = { .f_0 = *t108 } }; t109 = &t109_s;
 #line 81
     t110 = lyr_app_main_inner(*t109);
 #line 81
