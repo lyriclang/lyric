@@ -124,6 +124,13 @@ internal sealed class TypeTable
     /// qualified form, a delegated member), and the call goes through that interface's table.</summary>
     /// <summary>The interface that declares <paramref name="member"/> among its own members;
     /// <c>null</c> for a member of anything else.</summary>
+    /// <summary>The struct, class or enum that declares <paramref name="member"/> in its BODY;
+    /// <c>null</c> for a free function, a block's member and an interface's.</summary>
+    public static TypeSymbol? TypeDeclaring(FunctionSymbol member) =>
+        member.Home?.Members.Symbols.OfType<TypeSymbol>()
+            .FirstOrDefault(t => t.Kind is TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum
+                                 && t.Members.Symbols.Contains(member));
+
     public static TypeSymbol? InterfaceOwning(FunctionSymbol member) =>
         member.Home?.Members.Symbols.OfType<TypeSymbol>()
             .FirstOrDefault(t => t.Kind == TypeSymbolKind.Interface && t.Members.Symbols.Contains(member));
