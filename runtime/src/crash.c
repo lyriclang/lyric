@@ -42,7 +42,9 @@ static size_t crash_header(const char *what) {
 
 enum { ALT_STACK_SIZE = 256 * 1024 };
 
-static const int fault_signals[] = { SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT };
+/* TRAP among them: what '__builtin_trap()' raises where the trap is a breakpoint (arm64) and not
+ * an illegal instruction (x86-64) — the floor under unreachable code in a release build (panic.h). */
+static const int fault_signals[] = { SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGTRAP, SIGABRT };
 
 /* Per thread: the alternate stack the handler runs on (an overflowed stack has no room for it),
  * and the address range whose fault means the stack ran out. */
@@ -133,6 +135,7 @@ static const char *signal_name(int sig) {
     case SIGBUS: return "SIGBUS";
     case SIGFPE: return "SIGFPE";
     case SIGILL: return "SIGILL";
+    case SIGTRAP: return "SIGTRAP";
     case SIGABRT: return "SIGABRT";
     default: return "signal";
     }
@@ -165,6 +168,7 @@ static void lyr_crash_on_signal(int sig, siginfo_t *info, void *context) {
         break;
     case SIGFPE: snprintf(what, sizeof what, "SIGFPE (arithmetic fault)"); break;
     case SIGILL: snprintf(what, sizeof what, "SIGILL (illegal instruction)"); break;
+    case SIGTRAP: snprintf(what, sizeof what, "SIGTRAP (trap)"); break;
     default: snprintf(what, sizeof what, "%s (abort)", signal_name(sig)); break;
     }
     size_t header = crash_header(what);

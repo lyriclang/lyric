@@ -12,7 +12,12 @@
  *   rem0    panic [LYR-RT0001]: division by zero
  *   remmin  panic [LYR-RT0002]: arithmetic overflow in '%'      (INT64_MIN % -1)
  *   unwrap  panic [LYR-RT0004]: unwrapped a null value
- *   index   panic [LYR-RT0003]: index -1 out of bounds for length 4 */
+ *   index   panic [LYR-RT0003]: index -1 out of bounds for length 4
+ * And "floor": the place emitted code holds unreachable, reached. It prints "before", then
+ *   debug     panic [LYR-RT0017]: control reached code the compiler holds unreachable, exit 101
+ *   release   the processor's trap, reported as a crash (crash.c): "crash: SIGILL (illegal
+ *             instruction)" on x86-64, "crash: SIGTRAP (trap)" on arm64, "crash: illegal
+ *             instruction" on Windows; the process ends by that fault, not with 101 */
 #include "lyr/lyr.h"
 #include "check.h"
 
@@ -39,6 +44,10 @@ static int64_t program(void) {
     else if (strcmp(which, "remmin") == 0) result = LYR_CHECKED_REM(small, minus_one);
     else if (strcmp(which, "unwrap") == 0) result = (int64_t)(intptr_t)LYR_UNWRAP(nothing);
     else if (strcmp(which, "index") == 0) LYR_CHECK_INDEX(minus_one, 4);
+    else if (strcmp(which, "floor") == 0) {
+        lyr_println(lyr_str_from_cstr("before"));
+        LYR_UNREACHABLE();
+    }
     else {
         CHECK(LYR_CHECKED_ADD(big, minus_one) == INT64_MAX - 1);
         CHECK(LYR_CHECKED_SUB(small, minus_one) == INT64_MIN + 1);

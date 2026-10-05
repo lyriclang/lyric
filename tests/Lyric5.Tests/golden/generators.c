@@ -2630,7 +2630,7 @@ bb69:;
     goto bb71;
 bb70:;
 #line 283
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb71:;
 #line 296
     t416 = l66_nums;

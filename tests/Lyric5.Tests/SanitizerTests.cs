@@ -89,8 +89,8 @@ public class SanitizerTests
     /// <summary>
     /// The throw paths under ASan and UBSan (13, M5): the emitter's C for every program that throws,
     /// catches, runs a defer or a close on the error path, suppresses, rethrows, or lets an error
-    /// leave main — and UBSan's check of '__builtin_unreachable()' holds the blocks the lowering
-    /// sealed as unreachable to never being reached. An error escaping main exits 1, a 'try!' on
+    /// leave main — and the floor under the blocks the lowering sealed as unreachable (01 M5-4)
+    /// holds them to never being reached: one reached would panic. An error escaping main exits 1, a 'try!' on
     /// an error 101. Each under a name of its own, so the plain run of the same program in
     /// <see cref="CEmitterTests"/> never shares its sources.
     /// </summary>
@@ -175,13 +175,13 @@ public class SanitizerTests
 
     /// <summary>
     /// The controls for the ASan profile: with the runtime's options and the collector linked in,
-    /// a heap overflow, a signed overflow and a reached '__builtin_unreachable()' still end the
-    /// program with their report — the last is what the throw-path run relies on.
+    /// a heap overflow and a signed overflow still end the program with their report — and so
+    /// does a reached 'LYR_UNREACHABLE()', with the floor's panic: the throw-path run relies on it.
     /// </summary>
     [Theory]
     [InlineData("overflow", "ERROR: AddressSanitizer: heap-buffer-overflow")]
     [InlineData("signed", "runtime error: signed integer overflow")]
-    [InlineData("unreachable", "runtime error: execution reached an unreachable program point")]
+    [InlineData("unreachable", "panic [LYR-RT0017]: control reached code the compiler holds unreachable")]
     public void A_fault_under_ASan_is_reported_and_ends_the_program(string which, string report)
     {
         if (!Applies) return;

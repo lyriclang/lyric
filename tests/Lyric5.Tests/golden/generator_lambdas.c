@@ -1182,7 +1182,7 @@ bb19:;
     goto bb20;
 bb20:;
 #line 104
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb21:;
 #line 111
     t124 = (lyr_fn_to_coro_i64_to_void){ lyr_thunk_app_main_main__lambda7__843c4236, NULL };

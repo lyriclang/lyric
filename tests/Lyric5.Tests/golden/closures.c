@@ -2575,7 +2575,7 @@ bb1:;
 #line 63
     lyr_panic_message(t3);
 #line 63
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb2:;
 #line 65
     t4 = l0_n;

@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "r1d";
+    public const string Version = "r1e";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -2039,7 +2039,7 @@ public sealed class CEmitter
         Branch b => $"goto bb{b.Target.Value};",
         CondBranch c => $"if ({Temp(c.Cond)}) goto bb{c.IfTrue.Value}; else goto bb{c.IfFalse.Value};",
         // Reached only after a call that does not return; the verifier vouches for it.
-        Unreachable => "__builtin_unreachable();",
+        Unreachable => "LYR_UNREACHABLE();",
         // The error path (01 L5 E1-E3): a throw allocates the record and goes to its landing, a
         // failed call goes there too, the bottom hands the error to the caller's slot.
         Throw t => $"lyr_e = lyr_err_new({Value(t.Value)}); goto bb{t.Landing.Value};",

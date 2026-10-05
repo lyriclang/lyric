@@ -125,7 +125,7 @@ int64_t lyr_signal_kind(int64_t number) {
 static int catchable(int64_t number) {
     if (number < 1 || number > 63) return 0;
     switch ((int)number) {
-    case SIGKILL: case SIGSTOP: case SIGSEGV: case SIGBUS: case SIGFPE: case SIGILL: case SIGABRT:
+    case SIGKILL: case SIGSTOP: case SIGSEGV: case SIGBUS: case SIGFPE: case SIGILL: case SIGTRAP: case SIGABRT:
     case SIGPIPE: case SIGCHLD: case SIGALRM:
         return 0;
     default:

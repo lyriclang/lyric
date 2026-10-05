@@ -268,7 +268,7 @@ bb7:;
     goto bb8;
 bb8:;
 #line 18
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 }
 
 #line 24 "programs/catch_sets.lyr"

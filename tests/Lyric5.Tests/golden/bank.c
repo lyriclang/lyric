@@ -480,7 +480,7 @@ bb9:;
     goto bb10;
 bb10:;
 #line 66
-    __builtin_unreachable();
+    LYR_UNREACHABLE();
 bb11:;
 #line 78
     t49 = l0_checking;
