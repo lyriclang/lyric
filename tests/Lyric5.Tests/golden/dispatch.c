@@ -5,16 +5,16 @@
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_vt_ty0 lyr_vt_ty0;
-const char lyr_ifid_ty0[] = "main.Counter";
+const char lyr_ifid_ty0[] = "app.main.Counter";
 typedef struct lyr_ty1_Bag lyr_ty1_Bag;
 typedef struct lyr_ty2_Person lyr_ty2_Person;
 typedef struct lyr_vt_ty3 lyr_vt_ty3;
-const char lyr_ifid_ty3[] = "main.Greeter";
+const char lyr_ifid_ty3[] = "app.main.Greeter";
 typedef struct lyr_vt_ty4 lyr_vt_ty4;
-const char lyr_ifid_ty4[] = "main.Waver";
+const char lyr_ifid_ty4[] = "app.main.Waver";
 typedef struct lyr_ty5_Dog lyr_ty5_Dog;
 typedef struct lyr_vt_ty6 lyr_vt_ty6;
-const char lyr_ifid_ty6[] = "main.Walker";
+const char lyr_ifid_ty6[] = "app.main.Walker";
 typedef struct lyr_ty7_Legs lyr_ty7_Legs;
 typedef struct lyr_ty8_Wheels lyr_ty8_Wheels;
 typedef struct lyr_ty9_ParseError lyr_ty9_ParseError;
@@ -52,7 +52,7 @@ struct lyr_ty1_Bag {
 _Static_assert(sizeof(lyr_ty1_Bag) == 16, "layout of lyr_ty1_Bag");
 _Static_assert(offsetof(lyr_ty1_Bag, f_n) == 8, "layout of lyr_ty1_Bag");
 extern const LyrItable lyr_itab_ty1[];
-const LyrDesc lyr_desc_ty1_Bag = { sizeof(lyr_ty1_Bag), 0, 0, 0, NULL, "main.Bag", lyr_itab_ty1 };
+const LyrDesc lyr_desc_ty1_Bag = { sizeof(lyr_ty1_Bag), 0, 0, 0, NULL, "app.main.Bag", lyr_itab_ty1 };
 struct lyr_ty2_Person {
     LyrStr *f_name;
 };
@@ -78,7 +78,7 @@ _Static_assert(sizeof(lyr_ty5_Dog) == 24, "layout of lyr_ty5_Dog");
 _Static_assert(offsetof(lyr_ty5_Dog, f_legs) == 8, "layout of lyr_ty5_Dog");
 extern const LyrItable lyr_itab_ty5[];
 static const uint64_t lyr_refmap_ty5[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty5_Dog = { sizeof(lyr_ty5_Dog), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty5, "main.Dog", lyr_itab_ty5 };
+const LyrDesc lyr_desc_ty5_Dog = { sizeof(lyr_ty5_Dog), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty5, "app.main.Dog", lyr_itab_ty5 };
 struct lyr_ty7_Legs {
     LyrObj header;
     int64_t f_k;
@@ -86,13 +86,13 @@ struct lyr_ty7_Legs {
 _Static_assert(sizeof(lyr_ty7_Legs) == 16, "layout of lyr_ty7_Legs");
 _Static_assert(offsetof(lyr_ty7_Legs, f_k) == 8, "layout of lyr_ty7_Legs");
 extern const LyrItable lyr_itab_ty7[];
-const LyrDesc lyr_desc_ty7_Legs = { sizeof(lyr_ty7_Legs), 0, 0, 0, NULL, "main.Legs", lyr_itab_ty7 };
+const LyrDesc lyr_desc_ty7_Legs = { sizeof(lyr_ty7_Legs), 0, 0, 0, NULL, "app.main.Legs", lyr_itab_ty7 };
 struct lyr_ty8_Wheels {
     LyrObj header;
 };
 _Static_assert(sizeof(lyr_ty8_Wheels) == 8, "layout of lyr_ty8_Wheels");
 extern const LyrItable lyr_itab_ty8[];
-const LyrDesc lyr_desc_ty8_Wheels = { sizeof(lyr_ty8_Wheels), 0, 0, 0, NULL, "main.Wheels", lyr_itab_ty8 };
+const LyrDesc lyr_desc_ty8_Wheels = { sizeof(lyr_ty8_Wheels), 0, 0, 0, NULL, "app.main.Wheels", lyr_itab_ty8 };
 struct lyr_ty11_ParseErrorKind_Empty {
     uint8_t lyr_unit;
 };
@@ -201,7 +201,7 @@ _Static_assert(sizeof(lyr_box_ty2_Person) == 16, "layout of lyr_box_ty2_Person")
 _Static_assert(offsetof(lyr_box_ty2_Person, value) == 8, "layout of lyr_box_ty2_Person");
 extern const LyrItable lyr_itab_ty2[];
 static const uint64_t lyr_refmap_box2[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_box_ty2_Person = { sizeof(lyr_box_ty2_Person), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box2, "box<main.Person>", lyr_itab_ty2 };
+const LyrDesc lyr_desc_box_ty2_Person = { sizeof(lyr_box_ty2_Person), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box2, "box<app.main.Person>", lyr_itab_ty2 };
 
 /* module-level bindings */
 double lyr_g0_float_infinity = 0;
@@ -225,40 +225,40 @@ static const LyrStaticStr(6) lyr_lit8 = LYR_STR_INIT("hello");
 static const LyrStaticStr(3) lyr_lit9 = LYR_STR_INIT("hi");
 
 /* prototypes */
-int64_t lyr_main_viaTable(LyrIface l0_c);
-LYR_NOINLINE int64_t lyr_main_main(void);
-int64_t lyr_main_Counter_twice(LyrIface l0_this);
-int64_t lyr_main_Bag_count(lyr_ty1_Bag *l0_this);
-LyrStr * lyr_main_Walker_pace(LyrIface l0_this);
-LyrStr * lyr_main_Legs_walk(lyr_ty7_Legs *l0_this);
-int64_t lyr_main_Legs_speed(lyr_ty7_Legs *l0_this);
-LyrStr * lyr_main_Wheels_walk(lyr_ty8_Wheels *l0_this);
-int64_t lyr_main_Wheels_speed(lyr_ty8_Wheels *l0_this);
-int64_t lyr_main_Dog_speed(lyr_ty5_Dog *l0_this);
-int64_t lyr_main_viaConstraint_Bag__ff411a73(lyr_ty1_Bag *l0_c);
+int64_t lyr_app_main_viaTable(LyrIface l0_c);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+int64_t lyr_app_main_Counter_twice(LyrIface l0_this);
+int64_t lyr_app_main_Bag_count(lyr_ty1_Bag *l0_this);
+LyrStr * lyr_app_main_Walker_pace(LyrIface l0_this);
+LyrStr * lyr_app_main_Legs_walk(lyr_ty7_Legs *l0_this);
+int64_t lyr_app_main_Legs_speed(lyr_ty7_Legs *l0_this);
+LyrStr * lyr_app_main_Wheels_walk(lyr_ty8_Wheels *l0_this);
+int64_t lyr_app_main_Wheels_speed(lyr_ty8_Wheels *l0_this);
+int64_t lyr_app_main_Dog_speed(lyr_ty5_Dog *l0_this);
+int64_t lyr_app_main_viaConstraint_Bag__2f2a7292(lyr_ty1_Bag *l0_c);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
-LyrStr * lyr_main__extend__Person_greet_0_f050b083(lyr_ty2_Person *l0_this);
-LyrStr * lyr_main__extend__Person_greet_0_1_17849a03(lyr_ty2_Person *l0_this);
+LyrStr * lyr_app_main__extend__Person_greet_0_71f314bc(lyr_ty2_Person *l0_this);
+LyrStr * lyr_app_main__extend__Person_greet_0_1_86c58534(lyr_ty2_Person *l0_this);
 LyrStr * lyr_Dog_walk_by_legs__c9f4e61c(lyr_ty5_Dog *l0_this);
 
 /* interface tables: the descriptor, then the implementation of every slot */
-static int64_t lyr_vt_ty0_ty1_s0(LyrIface self) { return lyr_main_Bag_count((lyr_ty1_Bag *)self.data); }
-const lyr_vt_ty0 lyr_vt_ty0_ty1 = { &lyr_desc_ty1_Bag, lyr_vt_ty0_ty1_s0, lyr_main_Counter_twice };
-static LyrStr * lyr_vt_ty3_ty2_s0(LyrIface self) { return lyr_main__extend__Person_greet_0_f050b083(&((lyr_box_ty2_Person *)self.data)->value); }
+static int64_t lyr_vt_ty0_ty1_s0(LyrIface self) { return lyr_app_main_Bag_count((lyr_ty1_Bag *)self.data); }
+const lyr_vt_ty0 lyr_vt_ty0_ty1 = { &lyr_desc_ty1_Bag, lyr_vt_ty0_ty1_s0, lyr_app_main_Counter_twice };
+static LyrStr * lyr_vt_ty3_ty2_s0(LyrIface self) { return lyr_app_main__extend__Person_greet_0_71f314bc(&((lyr_box_ty2_Person *)self.data)->value); }
 const lyr_vt_ty3 lyr_vt_ty3_ty2 = { &lyr_desc_box_ty2_Person, lyr_vt_ty3_ty2_s0 };
-static LyrStr * lyr_vt_ty4_ty2_s0(LyrIface self) { return lyr_main__extend__Person_greet_0_1_17849a03(&((lyr_box_ty2_Person *)self.data)->value); }
+static LyrStr * lyr_vt_ty4_ty2_s0(LyrIface self) { return lyr_app_main__extend__Person_greet_0_1_86c58534(&((lyr_box_ty2_Person *)self.data)->value); }
 const lyr_vt_ty4 lyr_vt_ty4_ty2 = { &lyr_desc_box_ty2_Person, lyr_vt_ty4_ty2_s0 };
 static LyrStr * lyr_vt_ty6_ty5_s0(LyrIface self) { return lyr_Dog_walk_by_legs__c9f4e61c((lyr_ty5_Dog *)self.data); }
-static int64_t lyr_vt_ty6_ty5_s1(LyrIface self) { return lyr_main_Dog_speed((lyr_ty5_Dog *)self.data); }
-const lyr_vt_ty6 lyr_vt_ty6_ty5 = { &lyr_desc_ty5_Dog, lyr_vt_ty6_ty5_s0, lyr_vt_ty6_ty5_s1, lyr_main_Walker_pace };
-static LyrStr * lyr_vt_ty6_ty7_s0(LyrIface self) { return lyr_main_Legs_walk((lyr_ty7_Legs *)self.data); }
-static int64_t lyr_vt_ty6_ty7_s1(LyrIface self) { return lyr_main_Legs_speed((lyr_ty7_Legs *)self.data); }
-const lyr_vt_ty6 lyr_vt_ty6_ty7 = { &lyr_desc_ty7_Legs, lyr_vt_ty6_ty7_s0, lyr_vt_ty6_ty7_s1, lyr_main_Walker_pace };
-static LyrStr * lyr_vt_ty6_ty8_s0(LyrIface self) { return lyr_main_Wheels_walk((lyr_ty8_Wheels *)self.data); }
-static int64_t lyr_vt_ty6_ty8_s1(LyrIface self) { return lyr_main_Wheels_speed((lyr_ty8_Wheels *)self.data); }
-const lyr_vt_ty6 lyr_vt_ty6_ty8 = { &lyr_desc_ty8_Wheels, lyr_vt_ty6_ty8_s0, lyr_vt_ty6_ty8_s1, lyr_main_Walker_pace };
+static int64_t lyr_vt_ty6_ty5_s1(LyrIface self) { return lyr_app_main_Dog_speed((lyr_ty5_Dog *)self.data); }
+const lyr_vt_ty6 lyr_vt_ty6_ty5 = { &lyr_desc_ty5_Dog, lyr_vt_ty6_ty5_s0, lyr_vt_ty6_ty5_s1, lyr_app_main_Walker_pace };
+static LyrStr * lyr_vt_ty6_ty7_s0(LyrIface self) { return lyr_app_main_Legs_walk((lyr_ty7_Legs *)self.data); }
+static int64_t lyr_vt_ty6_ty7_s1(LyrIface self) { return lyr_app_main_Legs_speed((lyr_ty7_Legs *)self.data); }
+const lyr_vt_ty6 lyr_vt_ty6_ty7 = { &lyr_desc_ty7_Legs, lyr_vt_ty6_ty7_s0, lyr_vt_ty6_ty7_s1, lyr_app_main_Walker_pace };
+static LyrStr * lyr_vt_ty6_ty8_s0(LyrIface self) { return lyr_app_main_Wheels_walk((lyr_ty8_Wheels *)self.data); }
+static int64_t lyr_vt_ty6_ty8_s1(LyrIface self) { return lyr_app_main_Wheels_speed((lyr_ty8_Wheels *)self.data); }
+const lyr_vt_ty6 lyr_vt_ty6_ty8 = { &lyr_desc_ty8_Wheels, lyr_vt_ty6_ty8_s0, lyr_vt_ty6_ty8_s1, lyr_app_main_Walker_pace };
 const LyrItable lyr_itab_ty1[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty1 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty2[] = { { lyr_ifid_ty3, &lyr_vt_ty3_ty2 }, { lyr_ifid_ty4, &lyr_vt_ty4_ty2 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty5[] = { { lyr_ifid_ty6, &lyr_vt_ty6_ty5 } , { NULL, NULL } };
@@ -266,7 +266,7 @@ const LyrItable lyr_itab_ty7[] = { { lyr_ifid_ty6, &lyr_vt_ty6_ty7 } , { NULL, N
 const LyrItable lyr_itab_ty8[] = { { lyr_ifid_ty6, &lyr_vt_ty6_ty8 } , { NULL, NULL } };
 
 #line 18 "programs/dispatch.lyr"
-int64_t lyr_main_viaTable(LyrIface l0_c) {
+int64_t lyr_app_main_viaTable(LyrIface l0_c) {
     LyrIface t0 = {0};
     int64_t t1 = 0;
 bb0:;
@@ -279,7 +279,7 @@ bb0:;
 }
 
 #line 51 "programs/dispatch.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty1_Bag *l0_bag = NULL;
     lyr_ty2_Person l1_p = {0};
     lyr_ty5_Dog *l2_dog = NULL;
@@ -378,7 +378,7 @@ bb0:;
 #line 52
     t3 = l0_bag;
 #line 52
-    t4 = lyr_main_Bag_count(t3);
+    t4 = lyr_app_main_Bag_count(t3);
 #line 52
     t5 = lyr_str_from_int(t4);
 #line 52
@@ -388,7 +388,7 @@ bb0:;
 #line 52
     t8 = (LyrIface){ t7, &lyr_vt_ty0_ty1 };
 #line 52
-    t9 = lyr_main_viaTable(t8);
+    t9 = lyr_app_main_viaTable(t8);
 #line 52
     t10 = lyr_str_from_int(t9);
 #line 52
@@ -396,7 +396,7 @@ bb0:;
 #line 52
     t12 = l0_bag;
 #line 52
-    t13 = lyr_main_viaConstraint_Bag__ff411a73(t12);
+    t13 = lyr_app_main_viaConstraint_Bag__2f2a7292(t12);
 #line 52
     t14 = lyr_str_from_int(t13);
 #line 52
@@ -494,7 +494,7 @@ bb0:;
 #line 62
     t50 = l2_dog;
 #line 62
-    t51 = lyr_main_Dog_speed(t50);
+    t51 = lyr_app_main_Dog_speed(t50);
 #line 62
     t52 = lyr_str_from_int(t51);
 #line 62
@@ -546,7 +546,7 @@ bb0:;
 }
 
 #line 10 "programs/dispatch.lyr"
-int64_t lyr_main_Counter_twice(LyrIface l0_this) {
+int64_t lyr_app_main_Counter_twice(LyrIface l0_this) {
     LyrIface t0 = {0};
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -565,7 +565,7 @@ bb0:;
 }
 
 #line 15 "programs/dispatch.lyr"
-int64_t lyr_main_Bag_count(lyr_ty1_Bag *l0_this) {
+int64_t lyr_app_main_Bag_count(lyr_ty1_Bag *l0_this) {
     lyr_ty1_Bag *t0 = NULL;
     int64_t t1 = 0;
 bb0:;
@@ -578,7 +578,7 @@ bb0:;
 }
 
 #line 31 "programs/dispatch.lyr"
-LyrStr * lyr_main_Walker_pace(LyrIface l0_this) {
+LyrStr * lyr_app_main_Walker_pace(LyrIface l0_this) {
     LyrIface t0 = {0};
     LyrStr *t1 = NULL;
     LyrIface t2 = {0};
@@ -603,7 +603,7 @@ bb0:;
 }
 
 #line 36 "programs/dispatch.lyr"
-LyrStr * lyr_main_Legs_walk(lyr_ty7_Legs *l0_this) {
+LyrStr * lyr_app_main_Legs_walk(lyr_ty7_Legs *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 36
@@ -613,7 +613,7 @@ bb0:;
 }
 
 #line 37 "programs/dispatch.lyr"
-int64_t lyr_main_Legs_speed(lyr_ty7_Legs *l0_this) {
+int64_t lyr_app_main_Legs_speed(lyr_ty7_Legs *l0_this) {
     lyr_ty7_Legs *t0 = NULL;
     int64_t t1 = 0;
 bb0:;
@@ -626,7 +626,7 @@ bb0:;
 }
 
 #line 41 "programs/dispatch.lyr"
-LyrStr * lyr_main_Wheels_walk(lyr_ty8_Wheels *l0_this) {
+LyrStr * lyr_app_main_Wheels_walk(lyr_ty8_Wheels *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 41
@@ -636,7 +636,7 @@ bb0:;
 }
 
 #line 42 "programs/dispatch.lyr"
-int64_t lyr_main_Wheels_speed(lyr_ty8_Wheels *l0_this) {
+int64_t lyr_app_main_Wheels_speed(lyr_ty8_Wheels *l0_this) {
     int64_t t0 = 0;
 bb0:;
 #line 42
@@ -646,7 +646,7 @@ bb0:;
 }
 
 #line 47 "programs/dispatch.lyr"
-int64_t lyr_main_Dog_speed(lyr_ty5_Dog *l0_this) {
+int64_t lyr_app_main_Dog_speed(lyr_ty5_Dog *l0_this) {
     int64_t t0 = 0;
 bb0:;
 #line 47
@@ -741,7 +741,7 @@ bb0:;
 }
 
 #line 25 "programs/dispatch.lyr"
-LyrStr * lyr_main__extend__Person_greet_0_f050b083(lyr_ty2_Person *l0_this) {
+LyrStr * lyr_app_main__extend__Person_greet_0_71f314bc(lyr_ty2_Person *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 25
@@ -751,7 +751,7 @@ bb0:;
 }
 
 #line 26 "programs/dispatch.lyr"
-LyrStr * lyr_main__extend__Person_greet_0_1_17849a03(lyr_ty2_Person *l0_this) {
+LyrStr * lyr_app_main__extend__Person_greet_0_1_86c58534(lyr_ty2_Person *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 26
@@ -762,7 +762,7 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }
 
 /* ==== unit: Dog.walk<by legs> ==== */
@@ -805,9 +805,9 @@ bb0:;
 }
 
 
-/* ==== unit: main.viaConstraint<Bag> ==== */
+/* ==== unit: app.main.viaConstraint<Bag> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.viaConstraint<Bag>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.viaConstraint<Bag>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -823,18 +823,18 @@ _Static_assert(offsetof(lyr_ty1_Bag, f_n) == 8, "layout of lyr_ty1_Bag");
 extern const LyrDesc lyr_desc_ty1_Bag;
 
 /* prototypes */
-int64_t lyr_main_Bag_count(lyr_ty1_Bag *l0_this);
-int64_t lyr_main_viaConstraint_Bag__ff411a73(lyr_ty1_Bag *l0_c);
+int64_t lyr_app_main_Bag_count(lyr_ty1_Bag *l0_this);
+int64_t lyr_app_main_viaConstraint_Bag__2f2a7292(lyr_ty1_Bag *l0_c);
 
 #line 19 "programs/dispatch.lyr"
-int64_t lyr_main_viaConstraint_Bag__ff411a73(lyr_ty1_Bag *l0_c) {
+int64_t lyr_app_main_viaConstraint_Bag__2f2a7292(lyr_ty1_Bag *l0_c) {
     lyr_ty1_Bag *t0 = NULL;
     int64_t t1 = 0;
 bb0:;
 #line 19
     t0 = l0_c;
 #line 19
-    t1 = lyr_main_Bag_count(t0);
+    t1 = lyr_app_main_Bag_count(t0);
 #line 19
     return t1;
 }

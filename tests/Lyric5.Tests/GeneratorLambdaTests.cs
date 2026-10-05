@@ -12,12 +12,9 @@ namespace Lyric5.Tests;
 /// </summary>
 public class GeneratorLambdaTests
 {
-    private static readonly string Root = RuntimeLayout.FindRoot(AppContext.BaseDirectory);
-
     private static string[] Codes(string source)
     {
-        var options = new CompilerOptions { StdlibRoot = Path.Combine(Root, "stdlib5") };
-        var result = SourceCompiler.Lower(ScriptSource.FromBuffer("lambdas.lyr", source), options);
+        var result = TestCompiler.Lower("lambdas.lyr", source);
         return result.Diagnostics.Diagnostics.Select(d => d.Code).ToArray();
     }
 
@@ -108,6 +105,7 @@ public class GeneratorLambdaTests
         // 08 D11: a coroutine is 'Coroutine<…>' AND a yield of its own. Without the yield the body
         // returns a coroutine value like any function returns any value.
         Assert.Empty(Codes("""
+            import std.core { sequence };
             fn ones(): Coroutine<int> {
                 return sequence { while (true) { yield 1; } };
             }

@@ -41,7 +41,7 @@ _Static_assert(sizeof(lyr_ty0_Account) == 24, "layout of lyr_ty0_Account");
 _Static_assert(offsetof(lyr_ty0_Account, f_owner) == 8, "layout of lyr_ty0_Account");
 _Static_assert(offsetof(lyr_ty0_Account, f_balance) == 16, "layout of lyr_ty0_Account");
 static const uint64_t lyr_refmap_ty0[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty0_Account = { sizeof(lyr_ty0_Account), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "main.Account", NULL };
+const LyrDesc lyr_desc_ty0_Account = { sizeof(lyr_ty0_Account), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "app.main.Account", NULL };
 struct lyr_ty1_Team {
     LyrObj header;
     lyr_ty0_Account *f_lead;
@@ -51,7 +51,7 @@ _Static_assert(sizeof(lyr_ty1_Team) == 24, "layout of lyr_ty1_Team");
 _Static_assert(offsetof(lyr_ty1_Team, f_lead) == 8, "layout of lyr_ty1_Team");
 _Static_assert(offsetof(lyr_ty1_Team, f_second) == 16, "layout of lyr_ty1_Team");
 static const uint64_t lyr_refmap_ty1[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty1_Team = { sizeof(lyr_ty1_Team), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty1, "main.Team", NULL };
+const LyrDesc lyr_desc_ty1_Team = { sizeof(lyr_ty1_Team), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty1, "app.main.Team", NULL };
 struct lyr_ty3_Point {
     int64_t f_x;
     int64_t f_y;
@@ -70,7 +70,7 @@ _Static_assert(offsetof(lyr_ty2_Shape, f_name) == 8, "layout of lyr_ty2_Shape");
 _Static_assert(offsetof(lyr_ty2_Shape, f_at) == 16, "layout of lyr_ty2_Shape");
 _Static_assert(offsetof(lyr_ty2_Shape, f_hits) == 32, "layout of lyr_ty2_Shape");
 static const uint64_t lyr_refmap_ty2[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty2_Shape = { sizeof(lyr_ty2_Shape), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty2, "main.Shape", NULL };
+const LyrDesc lyr_desc_ty2_Shape = { sizeof(lyr_ty2_Shape), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty2, "app.main.Shape", NULL };
 struct lyr_ty7_ParseErrorKind_Empty {
     uint8_t lyr_unit;
 };
@@ -206,19 +206,19 @@ static const LyrStaticStr(6) lyr_lit17 = LYR_STR_INIT("carol");
 static const LyrStaticStr(6) lyr_lit18 = LYR_STR_INIT("made ");
 
 /* prototypes */
-LYR_NOINLINE int64_t lyr_main_main(void);
-lyr_ty0_Account * lyr_main_Account_new(LyrStr *l0_owner);
-void lyr_main_Account_deposit(lyr_ty0_Account *l0_this, int64_t l1_amount);
-LyrStr * lyr_main_Account_describe(lyr_ty0_Account *l0_this);
-void lyr_main_Counter_bump(lyr_ty4_Counter *l0_this);
-void lyr_main_Counter_reset(lyr_ty4_Counter *l0_this);
-int64_t lyr_main_Counter_read(lyr_ty4_Counter *l0_this);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+lyr_ty0_Account * lyr_app_main_Account_new(LyrStr *l0_owner);
+void lyr_app_main_Account_deposit(lyr_ty0_Account *l0_this, int64_t l1_amount);
+LyrStr * lyr_app_main_Account_describe(lyr_ty0_Account *l0_this);
+void lyr_app_main_Counter_bump(lyr_ty4_Counter *l0_this);
+void lyr_app_main_Counter_reset(lyr_ty4_Counter *l0_this);
+int64_t lyr_app_main_Counter_read(lyr_ty4_Counter *l0_this);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 39 "programs/objects.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty0_Account *l0_alice = NULL;
     lyr_ty0_Account *l1_again = NULL;
     lyr_ty0_Account *l2_twin = NULL;
@@ -411,11 +411,11 @@ bb0:;
 #line 40
     t4 = (int64_t)INT64_C(50);
 #line 40
-    lyr_main_Account_deposit(t3, t4);
+    lyr_app_main_Account_deposit(t3, t4);
 #line 41
     t5 = l0_alice;
 #line 41
-    t6 = lyr_main_Account_describe(t5);
+    t6 = lyr_app_main_Account_describe(t5);
 #line 41
     lyr_println(t6);
 #line 43
@@ -427,7 +427,7 @@ bb0:;
 #line 44
     t9 = (int64_t)INT64_C(25);
 #line 44
-    lyr_main_Account_deposit(t8, t9);
+    lyr_app_main_Account_deposit(t8, t9);
 #line 45
     t10 = (LyrStr *)&lyr_lit1;
 #line 45
@@ -653,19 +653,19 @@ bb0:;
 #line 61
     t97 = &t96->f_hits;
 #line 61
-    lyr_main_Counter_bump(t97);
+    lyr_app_main_Counter_bump(t97);
 #line 62
     t98 = l5_shape;
 #line 62
     t99 = &t98->f_hits;
 #line 62
-    lyr_main_Counter_bump(t99);
+    lyr_app_main_Counter_bump(t99);
 #line 63
     t100 = l5_shape;
 #line 63
     t101 = &t100->f_hits;
 #line 63
-    lyr_main_Counter_bump(t101);
+    lyr_app_main_Counter_bump(t101);
 #line 64
     t102 = (LyrStr *)&lyr_lit12;
 #line 64
@@ -673,7 +673,7 @@ bb0:;
 #line 64
     t104 = &t103->f_hits;
 #line 64
-    t105 = lyr_main_Counter_read(t104);
+    t105 = lyr_app_main_Counter_read(t104);
 #line 64
     t106 = lyr_str_from_int(t105);
 #line 64
@@ -691,7 +691,7 @@ bb0:;
 #line 67
     t111 = &l7_copy;
 #line 67
-    lyr_main_Counter_bump(t111);
+    lyr_app_main_Counter_bump(t111);
 #line 68
     t112 = (LyrStr *)&lyr_lit13;
 #line 68
@@ -721,7 +721,7 @@ bb0:;
 #line 69
     t124 = &l7_copy;
 #line 69
-    lyr_main_Counter_reset(t124);
+    lyr_app_main_Counter_reset(t124);
 #line 70
     t125 = (LyrStr *)&lyr_lit15;
 #line 70
@@ -751,7 +751,7 @@ bb0:;
 #line 72
     t137 = (LyrStr *)&lyr_lit17;
 #line 72
-    t138 = lyr_main_Account_new(t137);
+    t138 = lyr_app_main_Account_new(t137);
 #line 72
     l8_carol = t138;
 #line 73
@@ -759,7 +759,7 @@ bb0:;
 #line 73
     t140 = l8_carol;
 #line 73
-    t141 = lyr_main_Account_describe(t140);
+    t141 = lyr_app_main_Account_describe(t140);
 #line 73
     t142 = lyr_str_concat(t139, t141);
 #line 73
@@ -771,7 +771,7 @@ bb0:;
 }
 
 #line 20 "programs/objects.lyr"
-lyr_ty0_Account * lyr_main_Account_new(LyrStr *l0_owner) {
+lyr_ty0_Account * lyr_app_main_Account_new(LyrStr *l0_owner) {
     LyrStr *t0 = NULL;
     int64_t t1 = 0;
     lyr_ty0_Account *t2 = NULL;
@@ -791,7 +791,7 @@ bb0:;
 }
 
 #line 21 "programs/objects.lyr"
-void lyr_main_Account_deposit(lyr_ty0_Account *l0_this, int64_t l1_amount) {
+void lyr_app_main_Account_deposit(lyr_ty0_Account *l0_this, int64_t l1_amount) {
     lyr_ty0_Account *t0 = NULL;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -812,7 +812,7 @@ bb0:;
 }
 
 #line 22 "programs/objects.lyr"
-LyrStr * lyr_main_Account_describe(lyr_ty0_Account *l0_this) {
+LyrStr * lyr_app_main_Account_describe(lyr_ty0_Account *l0_this) {
     lyr_ty0_Account *t0 = NULL;
     LyrStr *t1 = NULL;
     LyrStr *t2 = NULL;
@@ -843,7 +843,7 @@ bb0:;
 }
 
 #line 31 "programs/objects.lyr"
-void lyr_main_Counter_bump(lyr_ty4_Counter *l0_this) {
+void lyr_app_main_Counter_bump(lyr_ty4_Counter *l0_this) {
     lyr_ty4_Counter t0_s = {0};
     lyr_ty4_Counter *t0 = &t0_s;
     int64_t t1 = 0;
@@ -865,7 +865,7 @@ bb0:;
 }
 
 #line 32 "programs/objects.lyr"
-void lyr_main_Counter_reset(lyr_ty4_Counter *l0_this) {
+void lyr_app_main_Counter_reset(lyr_ty4_Counter *l0_this) {
     int64_t t0 = 0;
     lyr_ty4_Counter t1_s = {0};
     lyr_ty4_Counter *t1 = &t1_s;
@@ -883,7 +883,7 @@ bb0:;
 }
 
 #line 33 "programs/objects.lyr"
-int64_t lyr_main_Counter_read(lyr_ty4_Counter *l0_this) {
+int64_t lyr_app_main_Counter_read(lyr_ty4_Counter *l0_this) {
     lyr_ty4_Counter t0_s = {0};
     lyr_ty4_Counter *t0 = &t0_s;
     int64_t t1 = 0;
@@ -983,5 +983,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

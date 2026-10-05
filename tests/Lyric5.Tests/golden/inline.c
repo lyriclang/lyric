@@ -40,7 +40,7 @@ _Static_assert(sizeof(lyr_ty0_Buffer) == 48, "layout of lyr_ty0_Buffer");
 _Static_assert(offsetof(lyr_ty0_Buffer, f_data) == 8, "layout of lyr_ty0_Buffer");
 _Static_assert(offsetof(lyr_ty0_Buffer, f_name) == 40, "layout of lyr_ty0_Buffer");
 static const uint64_t lyr_refmap_ty0[] = { UINT64_C(0x20) };
-const LyrDesc lyr_desc_ty0_Buffer = { sizeof(lyr_ty0_Buffer), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "main.Buffer", NULL };
+const LyrDesc lyr_desc_ty0_Buffer = { sizeof(lyr_ty0_Buffer), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "app.main.Buffer", NULL };
 struct lyr_ty1_Mat {
     lyr_inl4_i64 f_m;
 };
@@ -179,15 +179,15 @@ static const LyrStaticStr(7) lyr_lit7 = LYR_STR_INIT("array ");
 static const LyrStaticStr(7) lyr_lit8 = LYR_STR_INIT("match ");
 
 /* prototypes */
-int64_t lyr_main_sum(lyr_slice_i64 l0_xs);
-int64_t lyr_main_sumInline(lyr_inl4_i64 l0_xs);
-LYR_NOINLINE int64_t lyr_main_main(void);
+int64_t lyr_app_main_sum(lyr_slice_i64 l0_xs);
+int64_t lyr_app_main_sumInline(lyr_inl4_i64 l0_xs);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 18 "programs/inline.lyr"
-int64_t lyr_main_sum(lyr_slice_i64 l0_xs) {
+int64_t lyr_app_main_sum(lyr_slice_i64 l0_xs) {
     int64_t l1_s = 0;
     int64_t l2__range0 = 0;
     int64_t l3__last1 = 0;
@@ -270,7 +270,7 @@ bb4:;
 }
 
 #line 24 "programs/inline.lyr"
-int64_t lyr_main_sumInline(lyr_inl4_i64 l0_xs) {
+int64_t lyr_app_main_sumInline(lyr_inl4_i64 l0_xs) {
     int64_t l1_s = 0;
     int64_t l2__range0 = 0;
     int64_t l3__last1 = 0;
@@ -355,7 +355,7 @@ bb4:;
 }
 
 #line 30 "programs/inline.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_inl3_i64 l0_a = {0};
     lyr_inl3_i64 l1_b = {0};
     lyr_inl4_i64 l2_z = {0};
@@ -776,7 +776,7 @@ bb0:;
 #line 37
     t54_s = *t53; t54 = &t54_s;
 #line 37
-    t55 = lyr_main_sumInline(*t54);
+    t55 = lyr_app_main_sumInline(*t54);
 #line 37
     t56 = lyr_str_from_int(t55);
 #line 37
@@ -864,7 +864,7 @@ bb0:;
 #line 42
     LYR_CHECK_RANGE(t92, t90, INT64_C(4)); t91 = (lyr_slice_i64){ t89->v + t92, t90 - t92 };
 #line 42
-    t93 = lyr_main_sum(t91);
+    t93 = lyr_app_main_sum(t91);
 #line 42
     t94 = lyr_str_from_int(t93);
 #line 42
@@ -1108,7 +1108,7 @@ bb0:;
 #line 55
     LYR_CHECK_RANGE(t203, t201, INT64_C(4)); t202 = (lyr_slice_i64){ t200->v + t203, t201 - t203 };
 #line 55
-    t204 = lyr_main_sum(t202);
+    t204 = lyr_app_main_sum(t202);
 #line 55
     t205 = lyr_str_from_int(t204);
 #line 55
@@ -1271,5 +1271,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

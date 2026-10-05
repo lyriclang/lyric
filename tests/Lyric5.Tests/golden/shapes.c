@@ -5,12 +5,12 @@
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_vt_ty0 lyr_vt_ty0;
-const char lyr_ifid_ty0[] = "main.Shape";
+const char lyr_ifid_ty0[] = "app.main.Shape";
 typedef struct lyr_ty1_Circle lyr_ty1_Circle;
 typedef struct lyr_ty2_Rect lyr_ty2_Rect;
 typedef struct lyr_ty3_Tri lyr_ty3_Tri;
 typedef struct lyr_vt_ty4 lyr_vt_ty4;
-const char lyr_ifid_ty4[] = "main.Display";
+const char lyr_ifid_ty4[] = "app.main.Display";
 typedef struct lyr_ty5_ParseError lyr_ty5_ParseError;
 typedef struct lyr_ty6_ParseErrorKind lyr_ty6_ParseErrorKind;
 typedef struct lyr_ty7_ParseErrorKind_Empty lyr_ty7_ParseErrorKind_Empty;
@@ -51,7 +51,7 @@ _Static_assert(sizeof(lyr_ty2_Rect) == 24, "layout of lyr_ty2_Rect");
 _Static_assert(offsetof(lyr_ty2_Rect, f_w) == 8, "layout of lyr_ty2_Rect");
 _Static_assert(offsetof(lyr_ty2_Rect, f_h) == 16, "layout of lyr_ty2_Rect");
 extern const LyrItable lyr_itab_ty2[];
-const LyrDesc lyr_desc_ty2_Rect = { sizeof(lyr_ty2_Rect), 0, 0, 0, NULL, "main.Rect", lyr_itab_ty2 };
+const LyrDesc lyr_desc_ty2_Rect = { sizeof(lyr_ty2_Rect), 0, 0, 0, NULL, "app.main.Rect", lyr_itab_ty2 };
 struct lyr_ty3_Tri {
     int64_t f_b;
     int64_t f_h;
@@ -161,21 +161,21 @@ struct lyr_ty24_FixedHasher {
 struct lyr_ty25_Fnv1a64 {
     uint64_t f_state;
 };
-_Static_assert(sizeof(LyrIface) == 16, "layout of main.Shape[]");
+_Static_assert(sizeof(LyrIface) == 16, "layout of app.main.Shape[]");
 static const uint64_t lyr_refmap_arr_iface0[] = { UINT64_C(0x1) };
-const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "main.Shape[]", NULL };
+const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "app.main.Shape[]", NULL };
 _Static_assert(sizeof(uint8_t) == 1, "layout of u8[]");
 const LyrDesc lyr_desc_arr_u8 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(uint8_t), 0, NULL, "u8[]", NULL };
 typedef struct { LyrObj header; lyr_ty1_Circle value; } lyr_box_ty1_Circle;
 _Static_assert(sizeof(lyr_box_ty1_Circle) == 16, "layout of lyr_box_ty1_Circle");
 _Static_assert(offsetof(lyr_box_ty1_Circle, value) == 8, "layout of lyr_box_ty1_Circle");
 extern const LyrItable lyr_itab_ty1[];
-const LyrDesc lyr_desc_box_ty1_Circle = { sizeof(lyr_box_ty1_Circle), 0, 0, 0, NULL, "box<main.Circle>", lyr_itab_ty1 };
+const LyrDesc lyr_desc_box_ty1_Circle = { sizeof(lyr_box_ty1_Circle), 0, 0, 0, NULL, "box<app.main.Circle>", lyr_itab_ty1 };
 typedef struct { LyrObj header; lyr_ty3_Tri value; } lyr_box_ty3_Tri;
 _Static_assert(sizeof(lyr_box_ty3_Tri) == 24, "layout of lyr_box_ty3_Tri");
 _Static_assert(offsetof(lyr_box_ty3_Tri, value) == 8, "layout of lyr_box_ty3_Tri");
 extern const LyrItable lyr_itab_ty3[];
-const LyrDesc lyr_desc_box_ty3_Tri = { sizeof(lyr_box_ty3_Tri), 0, 0, 0, NULL, "box<main.Tri>", lyr_itab_ty3 };
+const LyrDesc lyr_desc_box_ty3_Tri = { sizeof(lyr_box_ty3_Tri), 0, 0, 0, NULL, "box<app.main.Tri>", lyr_itab_ty3 };
 
 /* module-level bindings */
 double lyr_g0_float_infinity = 0;
@@ -197,40 +197,40 @@ static const LyrStaticStr(9) lyr_lit6 = LYR_STR_INIT("display ");
 static const LyrStaticStr(7) lyr_lit7 = LYR_STR_INIT("kinds ");
 
 /* prototypes */
-LyrStr * lyr_main_name(LyrIface l0_s);
-int64_t lyr_main_kind(LyrIface l0_s);
-LyrStr * lyr_main_shown(LyrIface l0_d);
-LYR_NOINLINE int64_t lyr_main_main(void);
-int64_t lyr_main_Circle_area(lyr_ty1_Circle *l0_this);
-LyrStr * lyr_main_Circle_show(lyr_ty1_Circle *l0_this);
-int64_t lyr_main_Rect_area(lyr_ty2_Rect *l0_this);
-LyrStr * lyr_main_Rect_show(lyr_ty2_Rect *l0_this);
+LyrStr * lyr_app_main_name(LyrIface l0_s);
+int64_t lyr_app_main_kind(LyrIface l0_s);
+LyrStr * lyr_app_main_shown(LyrIface l0_d);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+int64_t lyr_app_main_Circle_area(lyr_ty1_Circle *l0_this);
+LyrStr * lyr_app_main_Circle_show(lyr_ty1_Circle *l0_this);
+int64_t lyr_app_main_Rect_area(lyr_ty2_Rect *l0_this);
+LyrStr * lyr_app_main_Rect_show(lyr_ty2_Rect *l0_this);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
-LyrStr * lyr_main__extend__Tri_show_588e8b62(lyr_ty3_Tri *l0_this);
-int64_t lyr_main__extend__Tri_area_cc489b82(lyr_ty3_Tri *l0_this);
+LyrStr * lyr_app_main__extend__Tri_show_270247fd(lyr_ty3_Tri *l0_this);
+int64_t lyr_app_main__extend__Tri_area_b40d8235(lyr_ty3_Tri *l0_this);
 
 /* interface tables: the descriptor, then the implementation of every slot */
-static LyrStr * lyr_vt_ty0_ty1_s0(LyrIface self) { return lyr_main_Circle_show(&((lyr_box_ty1_Circle *)self.data)->value); }
-static int64_t lyr_vt_ty0_ty1_s1(LyrIface self) { return lyr_main_Circle_area(&((lyr_box_ty1_Circle *)self.data)->value); }
+static LyrStr * lyr_vt_ty0_ty1_s0(LyrIface self) { return lyr_app_main_Circle_show(&((lyr_box_ty1_Circle *)self.data)->value); }
+static int64_t lyr_vt_ty0_ty1_s1(LyrIface self) { return lyr_app_main_Circle_area(&((lyr_box_ty1_Circle *)self.data)->value); }
 const lyr_vt_ty0 lyr_vt_ty0_ty1 = { &lyr_desc_box_ty1_Circle, lyr_vt_ty0_ty1_s0, lyr_vt_ty0_ty1_s1 };
-static LyrStr * lyr_vt_ty4_ty1_s0(LyrIface self) { return lyr_main_Circle_show(&((lyr_box_ty1_Circle *)self.data)->value); }
+static LyrStr * lyr_vt_ty4_ty1_s0(LyrIface self) { return lyr_app_main_Circle_show(&((lyr_box_ty1_Circle *)self.data)->value); }
 const lyr_vt_ty4 lyr_vt_ty4_ty1 = { &lyr_desc_box_ty1_Circle, lyr_vt_ty4_ty1_s0 };
-static LyrStr * lyr_vt_ty0_ty2_s0(LyrIface self) { return lyr_main_Rect_show((lyr_ty2_Rect *)self.data); }
-static int64_t lyr_vt_ty0_ty2_s1(LyrIface self) { return lyr_main_Rect_area((lyr_ty2_Rect *)self.data); }
+static LyrStr * lyr_vt_ty0_ty2_s0(LyrIface self) { return lyr_app_main_Rect_show((lyr_ty2_Rect *)self.data); }
+static int64_t lyr_vt_ty0_ty2_s1(LyrIface self) { return lyr_app_main_Rect_area((lyr_ty2_Rect *)self.data); }
 const lyr_vt_ty0 lyr_vt_ty0_ty2 = { &lyr_desc_ty2_Rect, lyr_vt_ty0_ty2_s0, lyr_vt_ty0_ty2_s1 };
-static LyrStr * lyr_vt_ty4_ty2_s0(LyrIface self) { return lyr_main_Rect_show((lyr_ty2_Rect *)self.data); }
+static LyrStr * lyr_vt_ty4_ty2_s0(LyrIface self) { return lyr_app_main_Rect_show((lyr_ty2_Rect *)self.data); }
 const lyr_vt_ty4 lyr_vt_ty4_ty2 = { &lyr_desc_ty2_Rect, lyr_vt_ty4_ty2_s0 };
-static LyrStr * lyr_vt_ty0_ty3_s0(LyrIface self) { return lyr_main__extend__Tri_show_588e8b62(&((lyr_box_ty3_Tri *)self.data)->value); }
-static int64_t lyr_vt_ty0_ty3_s1(LyrIface self) { return lyr_main__extend__Tri_area_cc489b82(&((lyr_box_ty3_Tri *)self.data)->value); }
+static LyrStr * lyr_vt_ty0_ty3_s0(LyrIface self) { return lyr_app_main__extend__Tri_show_270247fd(&((lyr_box_ty3_Tri *)self.data)->value); }
+static int64_t lyr_vt_ty0_ty3_s1(LyrIface self) { return lyr_app_main__extend__Tri_area_b40d8235(&((lyr_box_ty3_Tri *)self.data)->value); }
 const lyr_vt_ty0 lyr_vt_ty0_ty3 = { &lyr_desc_box_ty3_Tri, lyr_vt_ty0_ty3_s0, lyr_vt_ty0_ty3_s1 };
 const LyrItable lyr_itab_ty1[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty1 }, { lyr_ifid_ty4, &lyr_vt_ty4_ty1 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty2[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty2 }, { lyr_ifid_ty4, &lyr_vt_ty4_ty2 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty3[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty3 } , { NULL, NULL } };
 
 #line 30 "programs/shapes.lyr"
-LyrStr * lyr_main_name(LyrIface l0_s) {
+LyrStr * lyr_app_main_name(LyrIface l0_s) {
     LyrStr *l1__match0 = NULL;
     LyrIface t0 = {0};
     uint8_t t1 = 0;
@@ -280,7 +280,7 @@ bb5:;
 }
 
 #line 34 "programs/shapes.lyr"
-int64_t lyr_main_kind(LyrIface l0_s) {
+int64_t lyr_app_main_kind(LyrIface l0_s) {
     int64_t l1__match0 = 0;
     lyr_ty1_Circle l2_c = {0};
     lyr_ty2_Rect *l3_r = NULL;
@@ -370,7 +370,7 @@ bb5:;
 }
 
 #line 37 "programs/shapes.lyr"
-LyrStr * lyr_main_shown(LyrIface l0_d) {
+LyrStr * lyr_app_main_shown(LyrIface l0_d) {
     LyrIface t0 = {0};
     LyrStr *t1 = NULL;
 bb0:;
@@ -383,7 +383,7 @@ bb0:;
 }
 
 #line 40 "programs/shapes.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     LyrArr *l0_shapes = NULL;
     LyrIface l1_d = {0};
     int64_t t0 = 0;
@@ -577,7 +577,7 @@ bb0:;
 #line 42
     LYR_CHECK_INDEX(t37, t36->len); t38 = LYR_ARR_DATA(t36, LyrIface)[t37];
 #line 42
-    t39 = lyr_main_name(t38);
+    t39 = lyr_app_main_name(t38);
 #line 42
     t40 = (LyrStr *)&lyr_lit4;
 #line 42
@@ -587,7 +587,7 @@ bb0:;
 #line 42
     LYR_CHECK_INDEX(t42, t41->len); t43 = LYR_ARR_DATA(t41, LyrIface)[t42];
 #line 42
-    t44 = lyr_main_name(t43);
+    t44 = lyr_app_main_name(t43);
 #line 42
     t45 = (LyrStr *)&lyr_lit4;
 #line 42
@@ -597,7 +597,7 @@ bb0:;
 #line 42
     LYR_CHECK_INDEX(t47, t46->len); t48 = LYR_ARR_DATA(t46, LyrIface)[t47];
 #line 42
-    t49 = lyr_main_name(t48);
+    t49 = lyr_app_main_name(t48);
 #line 42
     t50 = lyr_str_concat(t35, t39);
 #line 42
@@ -637,7 +637,7 @@ bb0:;
 #line 44
     t66 = (LyrIface){ t65.data, lyr_iface_find((*(const LyrDesc *const *)t65.vt), lyr_ifid_ty4) };
 #line 44
-    t67 = lyr_main_shown(t66);
+    t67 = lyr_app_main_shown(t66);
 #line 44
     t68 = lyr_str_concat(t59, t61);
 #line 44
@@ -655,7 +655,7 @@ bb0:;
 #line 45
     LYR_CHECK_INDEX(t73, t72->len); t74 = LYR_ARR_DATA(t72, LyrIface)[t73];
 #line 45
-    t75 = lyr_main_kind(t74);
+    t75 = lyr_app_main_kind(t74);
 #line 45
     t76 = lyr_str_from_int(t75);
 #line 45
@@ -667,7 +667,7 @@ bb0:;
 #line 45
     LYR_CHECK_INDEX(t79, t78->len); t80 = LYR_ARR_DATA(t78, LyrIface)[t79];
 #line 45
-    t81 = lyr_main_kind(t80);
+    t81 = lyr_app_main_kind(t80);
 #line 45
     t82 = lyr_str_from_int(t81);
 #line 45
@@ -679,7 +679,7 @@ bb0:;
 #line 45
     LYR_CHECK_INDEX(t85, t84->len); t86 = LYR_ARR_DATA(t84, LyrIface)[t85];
 #line 45
-    t87 = lyr_main_kind(t86);
+    t87 = lyr_app_main_kind(t86);
 #line 45
     t88 = lyr_str_from_int(t87);
 #line 45
@@ -701,7 +701,7 @@ bb0:;
 }
 
 #line 14 "programs/shapes.lyr"
-int64_t lyr_main_Circle_area(lyr_ty1_Circle *l0_this) {
+int64_t lyr_app_main_Circle_area(lyr_ty1_Circle *l0_this) {
     int64_t t0 = 0;
     lyr_ty1_Circle t1_s = {0};
     lyr_ty1_Circle *t1 = &t1_s;
@@ -731,7 +731,7 @@ bb0:;
 }
 
 #line 15 "programs/shapes.lyr"
-LyrStr * lyr_main_Circle_show(lyr_ty1_Circle *l0_this) {
+LyrStr * lyr_app_main_Circle_show(lyr_ty1_Circle *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 15
@@ -741,7 +741,7 @@ bb0:;
 }
 
 #line 20 "programs/shapes.lyr"
-int64_t lyr_main_Rect_area(lyr_ty2_Rect *l0_this) {
+int64_t lyr_app_main_Rect_area(lyr_ty2_Rect *l0_this) {
     lyr_ty2_Rect *t0 = NULL;
     int64_t t1 = 0;
     lyr_ty2_Rect *t2 = NULL;
@@ -763,7 +763,7 @@ bb0:;
 }
 
 #line 21 "programs/shapes.lyr"
-LyrStr * lyr_main_Rect_show(lyr_ty2_Rect *l0_this) {
+LyrStr * lyr_app_main_Rect_show(lyr_ty2_Rect *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 21
@@ -858,7 +858,7 @@ bb0:;
 }
 
 #line 26 "programs/shapes.lyr"
-LyrStr * lyr_main__extend__Tri_show_588e8b62(lyr_ty3_Tri *l0_this) {
+LyrStr * lyr_app_main__extend__Tri_show_270247fd(lyr_ty3_Tri *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 26
@@ -868,7 +868,7 @@ bb0:;
 }
 
 #line 25 "programs/shapes.lyr"
-int64_t lyr_main__extend__Tri_area_cc489b82(lyr_ty3_Tri *l0_this) {
+int64_t lyr_app_main__extend__Tri_area_b40d8235(lyr_ty3_Tri *l0_this) {
     lyr_ty3_Tri t0_s = {0};
     lyr_ty3_Tri *t0 = &t0_s;
     int64_t t1 = 0;
@@ -899,5 +899,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

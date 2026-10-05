@@ -11,12 +11,9 @@ namespace Lyric5.Tests;
 /// </summary>
 public class DynamicYieldTests
 {
-    private static readonly string Root = RuntimeLayout.FindRoot(AppContext.BaseDirectory);
-
     private static string[] Codes(string source)
     {
-        var options = new CompilerOptions { StdlibRoot = Path.Combine(Root, "stdlib5") };
-        var result = SourceCompiler.Lower(ScriptSource.FromBuffer("dynamic.lyr", source), options);
+        var result = TestCompiler.Lower("dynamic.lyr", source);
         return result.Diagnostics.Diagnostics.Select(d => d.Code).ToArray();
     }
 

@@ -8,6 +8,7 @@
 //   sum 10 13 compound 7 (4, 6)                 'sum<T :: [Add<Out = T>]>' over ints and vectors; '+=' as 'a = a.add(b)'; Display in the f-string
 //   rem 1 bits 1 7 6 -3 8 2                     'Rem', 'BitAnd', 'BitOr', 'BitXor', 'BitNot', 'Shl', 'Shr'
 //   float false false partial                    'compare' answering null: every ordering is false
+import std.core { Add, Sub, Mul, Neg, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr };
 import std.io { println };
 
 struct V :: [Add, Sub, Mul<int>, Neg, Equatable, Ordered, Display] {

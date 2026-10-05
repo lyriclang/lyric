@@ -41,7 +41,7 @@ _Static_assert(offsetof(lyr_ty0_Account, f_owner) == 8, "layout of lyr_ty0_Accou
 _Static_assert(offsetof(lyr_ty0_Account, f_balance) == 16, "layout of lyr_ty0_Account");
 _Static_assert(offsetof(lyr_ty0_Account, f_open) == 24, "layout of lyr_ty0_Account");
 static const uint64_t lyr_refmap_ty0[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty0_Account = { sizeof(lyr_ty0_Account), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "main.Account", NULL };
+const LyrDesc lyr_desc_ty0_Account = { sizeof(lyr_ty0_Account), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "app.main.Account", NULL };
 typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface1;
 struct lyr_vt_ty1 {
     const LyrDesc *desc;
@@ -56,7 +56,7 @@ _Static_assert(sizeof(lyr_ty2_AccountClosed) == 16, "layout of lyr_ty2_AccountCl
 _Static_assert(offsetof(lyr_ty2_AccountClosed, f_owner) == 8, "layout of lyr_ty2_AccountClosed");
 extern const LyrItable lyr_itab_ty2[];
 static const uint64_t lyr_refmap_ty2[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty2_AccountClosed = { sizeof(lyr_ty2_AccountClosed), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty2, "main.AccountClosed", lyr_itab_ty2 };
+const LyrDesc lyr_desc_ty2_AccountClosed = { sizeof(lyr_ty2_AccountClosed), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty2, "app.main.AccountClosed", lyr_itab_ty2 };
 struct lyr_ty3_InsufficientFunds {
     LyrObj header;
     int64_t f_requested;
@@ -66,7 +66,7 @@ _Static_assert(sizeof(lyr_ty3_InsufficientFunds) == 24, "layout of lyr_ty3_Insuf
 _Static_assert(offsetof(lyr_ty3_InsufficientFunds, f_requested) == 8, "layout of lyr_ty3_InsufficientFunds");
 _Static_assert(offsetof(lyr_ty3_InsufficientFunds, f_available) == 16, "layout of lyr_ty3_InsufficientFunds");
 extern const LyrItable lyr_itab_ty3[];
-const LyrDesc lyr_desc_ty3_InsufficientFunds = { sizeof(lyr_ty3_InsufficientFunds), 0, 0, 0, NULL, "main.InsufficientFunds", lyr_itab_ty3 };
+const LyrDesc lyr_desc_ty3_InsufficientFunds = { sizeof(lyr_ty3_InsufficientFunds), 0, 0, 0, NULL, "app.main.InsufficientFunds", lyr_itab_ty3 };
 struct lyr_ty6_ParseErrorKind_Empty {
     uint8_t lyr_unit;
 };
@@ -195,29 +195,29 @@ static const LyrStaticStr(16) lyr_lit15 = LYR_STR_INIT("the account of ");
 static const LyrStaticStr(11) lyr_lit16 = LYR_STR_INIT(" is closed");
 
 /* prototypes */
-void lyr_main_transfer(lyr_ty0_Account *l0_source, lyr_ty0_Account *l1_target, int64_t l2_amount, LyrErr **lyr_err);
-int64_t lyr_main_balanceAfter(lyr_ty0_Account *l0_account, int64_t l1_amount, LyrErr **lyr_err);
-LYR_NOINLINE int64_t lyr_main_main(void);
-LyrStr * lyr_main_InsufficientFunds_message(lyr_ty3_InsufficientFunds *l0_this);
-LyrStr * lyr_main_AccountClosed_message(lyr_ty2_AccountClosed *l0_this);
-lyr_ty0_Account * lyr_main_Account_new(LyrStr *l0_owner, int64_t l1_opening);
-void lyr_main_Account_deposit(lyr_ty0_Account *l0_this, int64_t l1_amount, LyrErr **lyr_err);
-void lyr_main_Account_withdraw(lyr_ty0_Account *l0_this, int64_t l1_amount, LyrErr **lyr_err);
+void lyr_app_main_transfer(lyr_ty0_Account *l0_source, lyr_ty0_Account *l1_target, int64_t l2_amount, LyrErr **lyr_err);
+int64_t lyr_app_main_balanceAfter(lyr_ty0_Account *l0_account, int64_t l1_amount, LyrErr **lyr_err);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+LyrStr * lyr_app_main_InsufficientFunds_message(lyr_ty3_InsufficientFunds *l0_this);
+LyrStr * lyr_app_main_AccountClosed_message(lyr_ty2_AccountClosed *l0_this);
+lyr_ty0_Account * lyr_app_main_Account_new(LyrStr *l0_owner, int64_t l1_opening);
+void lyr_app_main_Account_deposit(lyr_ty0_Account *l0_this, int64_t l1_amount, LyrErr **lyr_err);
+void lyr_app_main_Account_withdraw(lyr_ty0_Account *l0_this, int64_t l1_amount, LyrErr **lyr_err);
 lyr_opt_iface1 lyr_std_core_Error_cause(LyrIface l0_this);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 /* interface tables: the descriptor, then the implementation of every slot */
-static LyrStr * lyr_vt_ty1_ty2_s0(LyrIface self) { return lyr_main_AccountClosed_message((lyr_ty2_AccountClosed *)self.data); }
+static LyrStr * lyr_vt_ty1_ty2_s0(LyrIface self) { return lyr_app_main_AccountClosed_message((lyr_ty2_AccountClosed *)self.data); }
 const lyr_vt_ty1 lyr_vt_ty1_ty2 = { &lyr_desc_ty2_AccountClosed, lyr_vt_ty1_ty2_s0, lyr_std_core_Error_cause };
-static LyrStr * lyr_vt_ty1_ty3_s0(LyrIface self) { return lyr_main_InsufficientFunds_message((lyr_ty3_InsufficientFunds *)self.data); }
+static LyrStr * lyr_vt_ty1_ty3_s0(LyrIface self) { return lyr_app_main_InsufficientFunds_message((lyr_ty3_InsufficientFunds *)self.data); }
 const lyr_vt_ty1 lyr_vt_ty1_ty3 = { &lyr_desc_ty3_InsufficientFunds, lyr_vt_ty1_ty3_s0, lyr_std_core_Error_cause };
 const LyrItable lyr_itab_ty2[] = { { lyr_ifid_ty1, &lyr_vt_ty1_ty2 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty3[] = { { lyr_ifid_ty1, &lyr_vt_ty1_ty3 } , { NULL, NULL } };
 
 #line 47 "programs/bank.lyr"
-void lyr_main_transfer(lyr_ty0_Account *l0_source, lyr_ty0_Account *l1_target, int64_t l2_amount, LyrErr **lyr_err) {
+void lyr_app_main_transfer(lyr_ty0_Account *l0_source, lyr_ty0_Account *l1_target, int64_t l2_amount, LyrErr **lyr_err) {
     lyr_ty2_AccountClosed *l3_e = NULL;
     LyrErr *lyr_e = NULL;
     LyrErr *lyr_s0 = NULL;
@@ -238,7 +238,7 @@ bb0:;
 #line 47
     t1 = l2_amount;
 #line 47
-    lyr_main_Account_withdraw(t0, t1, &lyr_e);
+    lyr_app_main_Account_withdraw(t0, t1, &lyr_e);
 #line 47
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -250,7 +250,7 @@ bb2:;
 #line 49
     t3 = l2_amount;
 #line 49
-    lyr_main_Account_deposit(t2, t3, &lyr_e);
+    lyr_app_main_Account_deposit(t2, t3, &lyr_e);
 #line 49
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb3; goto bb4;
 bb3:;
@@ -293,7 +293,7 @@ bb7:;
 }
 
 #line 57 "programs/bank.lyr"
-int64_t lyr_main_balanceAfter(lyr_ty0_Account *l0_account, int64_t l1_amount, LyrErr **lyr_err) {
+int64_t lyr_app_main_balanceAfter(lyr_ty0_Account *l0_account, int64_t l1_amount, LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     lyr_ty0_Account *t0 = NULL;
     int64_t t1 = 0;
@@ -305,7 +305,7 @@ bb0:;
 #line 57
     t1 = l1_amount;
 #line 57
-    lyr_main_Account_withdraw(t0, t1, &lyr_e);
+    lyr_app_main_Account_withdraw(t0, t1, &lyr_e);
 #line 57
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -321,7 +321,7 @@ bb2:;
 }
 
 #line 62 "programs/bank.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty0_Account *l0_checking = NULL;
     lyr_ty0_Account *l1_savings = NULL;
     lyr_ty3_InsufficientFunds *l2_e = NULL;
@@ -448,7 +448,7 @@ bb0:;
 #line 62
     t1 = (int64_t)INT64_C(100);
 #line 62
-    t2 = lyr_main_Account_new(t0, t1);
+    t2 = lyr_app_main_Account_new(t0, t1);
 #line 62
     l0_checking = t2;
 #line 63
@@ -456,7 +456,7 @@ bb0:;
 #line 63
     t4 = (int64_t)INT64_C(0);
 #line 63
-    t5 = lyr_main_Account_new(t3, t4);
+    t5 = lyr_app_main_Account_new(t3, t4);
 #line 63
     l1_savings = t5;
 #line 67
@@ -464,7 +464,7 @@ bb0:;
 #line 67
     t7 = (int64_t)INT64_C(50);
 #line 67
-    lyr_main_Account_deposit(t6, t7, &lyr_e);
+    lyr_app_main_Account_deposit(t6, t7, &lyr_e);
 #line 67
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -480,7 +480,7 @@ bb2:;
 #line 68
     t9 = (int64_t)INT64_C(30);
 #line 68
-    lyr_main_Account_withdraw(t8, t9, &lyr_e);
+    lyr_app_main_Account_withdraw(t8, t9, &lyr_e);
 #line 68
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb3;
 bb3:;
@@ -489,7 +489,7 @@ bb3:;
 #line 69
     t11 = (int64_t)INT64_C(200);
 #line 69
-    lyr_main_Account_withdraw(t10, t11, &lyr_e);
+    lyr_app_main_Account_withdraw(t10, t11, &lyr_e);
 #line 69
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb4;
 bb4:;
@@ -527,7 +527,7 @@ bb5:;
 #line 72
     t25 = l2_e;
 #line 72
-    t26 = lyr_main_InsufficientFunds_message(t25);
+    t26 = lyr_app_main_InsufficientFunds_message(t25);
 #line 72
     t27 = lyr_str_concat(t16, t19);
 #line 72
@@ -559,7 +559,7 @@ bb7:;
 #line 74
     t35 = l3_e;
 #line 74
-    t36 = lyr_main_AccountClosed_message(t35);
+    t36 = lyr_app_main_AccountClosed_message(t35);
 #line 74
     t37 = lyr_str_concat(t34, t36);
 #line 74
@@ -607,7 +607,7 @@ bb11:;
 #line 78
     t51 = (int64_t)INT64_C(70);
 #line 78
-    lyr_main_transfer(t49, t50, t51, &lyr_e);
+    lyr_app_main_transfer(t49, t50, t51, &lyr_e);
 #line 78
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb12; goto bb13;
 bb12:;
@@ -655,7 +655,7 @@ bb13:;
 #line 81
     t67 = (int64_t)INT64_C(20);
 #line 81
-    lyr_main_transfer(t65, t66, t67, &lyr_e);
+    lyr_app_main_transfer(t65, t66, t67, &lyr_e);
 #line 81
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb12; goto bb14;
 bb14:;
@@ -708,7 +708,7 @@ bb18:;
 #line 87
     t83 = (int64_t)INT64_C(500);
 #line 87
-    t84 = lyr_main_balanceAfter(t82, t83, &lyr_e);
+    t84 = lyr_app_main_balanceAfter(t82, t83, &lyr_e);
 #line 87
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb19; goto bb20;
 bb19:;
@@ -794,7 +794,7 @@ bb24:;
 }
 
 #line 11 "programs/bank.lyr"
-LyrStr * lyr_main_InsufficientFunds_message(lyr_ty3_InsufficientFunds *l0_this) {
+LyrStr * lyr_app_main_InsufficientFunds_message(lyr_ty3_InsufficientFunds *l0_this) {
     LyrStr *t0 = NULL;
     lyr_ty3_InsufficientFunds *t1 = NULL;
     int64_t t2 = 0;
@@ -840,7 +840,7 @@ bb0:;
 }
 
 #line 18 "programs/bank.lyr"
-LyrStr * lyr_main_AccountClosed_message(lyr_ty2_AccountClosed *l0_this) {
+LyrStr * lyr_app_main_AccountClosed_message(lyr_ty2_AccountClosed *l0_this) {
     LyrStr *t0 = NULL;
     lyr_ty2_AccountClosed *t1 = NULL;
     LyrStr *t2 = NULL;
@@ -865,7 +865,7 @@ bb0:;
 }
 
 #line 28 "programs/bank.lyr"
-lyr_ty0_Account * lyr_main_Account_new(LyrStr *l0_owner, int64_t l1_opening) {
+lyr_ty0_Account * lyr_app_main_Account_new(LyrStr *l0_owner, int64_t l1_opening) {
     LyrStr *t0 = NULL;
     int64_t t1 = 0;
     uint8_t t2 = 0;
@@ -890,7 +890,7 @@ bb0:;
 }
 
 #line 32 "programs/bank.lyr"
-void lyr_main_Account_deposit(lyr_ty0_Account *l0_this, int64_t l1_amount, LyrErr **lyr_err) {
+void lyr_app_main_Account_deposit(lyr_ty0_Account *l0_this, int64_t l1_amount, LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     lyr_ty0_Account *t0 = NULL;
     uint8_t t1 = 0;
@@ -944,7 +944,7 @@ bb3:;
 }
 
 #line 37 "programs/bank.lyr"
-void lyr_main_Account_withdraw(lyr_ty0_Account *l0_this, int64_t l1_amount, LyrErr **lyr_err) {
+void lyr_app_main_Account_withdraw(lyr_ty0_Account *l0_this, int64_t l1_amount, LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     lyr_ty0_Account *t0 = NULL;
     uint8_t t1 = 0;
@@ -1132,5 +1132,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

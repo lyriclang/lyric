@@ -11,7 +11,7 @@ typedef struct lyr_vt_ty3 lyr_vt_ty3;
 const char lyr_ifid_ty3[] = "std.core.Error";
 typedef struct lyr_ty4_Disk lyr_ty4_Disk;
 typedef struct lyr_vt_ty5 lyr_vt_ty5;
-const char lyr_ifid_ty5[] = "main.IoError";
+const char lyr_ifid_ty5[] = "app.main.IoError";
 typedef struct lyr_ty6_ParseError lyr_ty6_ParseError;
 typedef struct lyr_ty7_ParseErrorKind lyr_ty7_ParseErrorKind;
 typedef struct lyr_ty8_ParseErrorKind_Empty lyr_ty8_ParseErrorKind_Empty;
@@ -53,7 +53,7 @@ struct lyr_ty4_Disk {
 };
 _Static_assert(sizeof(lyr_ty4_Disk) == 8, "layout of lyr_ty4_Disk");
 extern const LyrItable lyr_itab_ty4[];
-const LyrDesc lyr_desc_ty4_Disk = { sizeof(lyr_ty4_Disk), 0, 0, 0, NULL, "main.Disk", lyr_itab_ty4 };
+const LyrDesc lyr_desc_ty4_Disk = { sizeof(lyr_ty4_Disk), 0, 0, 0, NULL, "app.main.Disk", lyr_itab_ty4 };
 struct lyr_vt_ty5 {
     const LyrDesc *desc;
     LyrStr * (*s0)(LyrIface);
@@ -209,25 +209,25 @@ static const LyrStaticStr(6) lyr_lit28 = LYR_STR_INIT("parse");
 static const LyrStaticStr(5) lyr_lit29 = LYR_STR_INIT("disk");
 
 /* prototypes */
-int64_t lyr_main_parse(LyrStr *l0_s, LyrErr **lyr_err);
-lyr_opt_i64 lyr_main_maybe(LyrStr *l0_s, LyrErr **lyr_err);
-LyrStr * lyr_main_read(uint8_t l0_ok, LyrErr **lyr_err);
-void lyr_main_save(uint8_t l0_ok, LyrErr **lyr_err);
-int64_t lyr_main_withDefer(LyrErr **lyr_err);
-LYR_NOINLINE void lyr_main_main(void);
-LyrStr * lyr_main_ParseError_message(lyr_ty0_ParseError *l0_this);
-LyrStr * lyr_main_Disk_message(lyr_ty4_Disk *l0_this);
+int64_t lyr_app_main_parse(LyrStr *l0_s, LyrErr **lyr_err);
+lyr_opt_i64 lyr_app_main_maybe(LyrStr *l0_s, LyrErr **lyr_err);
+LyrStr * lyr_app_main_read(uint8_t l0_ok, LyrErr **lyr_err);
+void lyr_app_main_save(uint8_t l0_ok, LyrErr **lyr_err);
+int64_t lyr_app_main_withDefer(LyrErr **lyr_err);
+LYR_NOINLINE void lyr_app_main_main(void);
+LyrStr * lyr_app_main_ParseError_message(lyr_ty0_ParseError *l0_this);
+LyrStr * lyr_app_main_Disk_message(lyr_ty4_Disk *l0_this);
 lyr_opt_iface3 lyr_std_core_Error_cause(LyrIface l0_this);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 /* interface tables: the descriptor, then the implementation of every slot */
-static LyrStr * lyr_vt_ty3_ty0_s0(LyrIface self) { return lyr_main_ParseError_message(&((lyr_box_ty0_ParseError *)self.data)->value); }
+static LyrStr * lyr_vt_ty3_ty0_s0(LyrIface self) { return lyr_app_main_ParseError_message(&((lyr_box_ty0_ParseError *)self.data)->value); }
 const lyr_vt_ty3 lyr_vt_ty3_ty0 = { &lyr_desc_box_ty0_ParseError, lyr_vt_ty3_ty0_s0, lyr_std_core_Error_cause };
-static LyrStr * lyr_vt_ty3_ty4_s0(LyrIface self) { return lyr_main_Disk_message((lyr_ty4_Disk *)self.data); }
+static LyrStr * lyr_vt_ty3_ty4_s0(LyrIface self) { return lyr_app_main_Disk_message((lyr_ty4_Disk *)self.data); }
 const lyr_vt_ty3 lyr_vt_ty3_ty4 = { &lyr_desc_ty4_Disk, lyr_vt_ty3_ty4_s0, lyr_std_core_Error_cause };
-static LyrStr * lyr_vt_ty5_ty4_s0(LyrIface self) { return lyr_main_Disk_message((lyr_ty4_Disk *)self.data); }
+static LyrStr * lyr_vt_ty5_ty4_s0(LyrIface self) { return lyr_app_main_Disk_message((lyr_ty4_Disk *)self.data); }
 const lyr_vt_ty5 lyr_vt_ty5_ty4 = { &lyr_desc_ty4_Disk, lyr_vt_ty5_ty4_s0, lyr_std_core_Error_cause };
 const LyrItable lyr_itab_ty0[] = { { lyr_ifid_ty3, &lyr_vt_ty3_ty0 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty4[] = { { lyr_ifid_ty3, &lyr_vt_ty3_ty4 }, { lyr_ifid_ty5, &lyr_vt_ty5_ty4 } , { NULL, NULL } };
@@ -237,7 +237,7 @@ const LyrStr *lyr_error_message(LyrIface e) { return ((const lyr_vt_ty3 *)e.vt)-
 int lyr_error_cause(LyrIface e, LyrIface *next) { lyr_opt_iface3 c = ((const lyr_vt_ty3 *)e.vt)->s1(e); *next = c.value; return c.has; }
 
 #line 11 "programs/try_forms.lyr"
-int64_t lyr_main_parse(LyrStr *l0_s, LyrErr **lyr_err) {
+int64_t lyr_app_main_parse(LyrStr *l0_s, LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     LyrStr *t0 = NULL;
     LyrStr *t1 = NULL;
@@ -301,7 +301,7 @@ bb5:;
 }
 
 #line 17 "programs/try_forms.lyr"
-lyr_opt_i64 lyr_main_maybe(LyrStr *l0_s, LyrErr **lyr_err) {
+lyr_opt_i64 lyr_app_main_maybe(LyrStr *l0_s, LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     LyrStr *t0 = NULL;
     LyrStr *t1 = NULL;
@@ -330,7 +330,7 @@ bb2:;
 #line 18
     t4 = l0_s;
 #line 18
-    t5 = lyr_main_parse(t4, &lyr_e);
+    t5 = lyr_app_main_parse(t4, &lyr_e);
 #line 18
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb3; goto bb4;
 bb3:;
@@ -344,7 +344,7 @@ bb4:;
 }
 
 #line 22 "programs/try_forms.lyr"
-LyrStr * lyr_main_read(uint8_t l0_ok, LyrErr **lyr_err) {
+LyrStr * lyr_app_main_read(uint8_t l0_ok, LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     uint8_t t0 = 0;
     uint8_t t1 = 0;
@@ -376,7 +376,7 @@ bb3:;
 }
 
 #line 27 "programs/try_forms.lyr"
-void lyr_main_save(uint8_t l0_ok, LyrErr **lyr_err) {
+void lyr_app_main_save(uint8_t l0_ok, LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     uint8_t t0 = 0;
     uint8_t t1 = 0;
@@ -410,7 +410,7 @@ bb3:;
 }
 
 #line 33 "programs/try_forms.lyr"
-int64_t lyr_main_withDefer(LyrErr **lyr_err) {
+int64_t lyr_app_main_withDefer(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     lyr_ty4_Disk *t0 = NULL;
     LyrIface t1 = {0};
@@ -435,7 +435,7 @@ bb2:;
 }
 
 #line 37 "programs/try_forms.lyr"
-LYR_NOINLINE void lyr_main_main(void) {
+LYR_NOINLINE void lyr_app_main_main(void) {
     lyr_opt_i64 l0_a = {0};
     lyr_opt_i64 l1__try0 = {0};
     lyr_opt_i64 l2_b = {0};
@@ -696,7 +696,7 @@ bb0:;
 #line 37
     t0 = (LyrStr *)&lyr_lit6;
 #line 37
-    t1 = lyr_main_parse(t0, &lyr_e);
+    t1 = lyr_app_main_parse(t0, &lyr_e);
 #line 37
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -723,7 +723,7 @@ bb3:;
 #line 38
     t5 = (LyrStr *)&lyr_lit0;
 #line 38
-    t6 = lyr_main_parse(t5, &lyr_e);
+    t6 = lyr_app_main_parse(t5, &lyr_e);
 #line 38
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb4; goto bb5;
 bb4:;
@@ -812,7 +812,7 @@ bb12:;
 #line 41
     t27 = (LyrStr *)&lyr_lit2;
 #line 41
-    t28_s = lyr_main_maybe(t27, &lyr_e); t28 = &t28_s;
+    t28_s = lyr_app_main_maybe(t27, &lyr_e); t28 = &t28_s;
 #line 41
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb13; goto bb14;
 bb13:;
@@ -839,7 +839,7 @@ bb15:;
 #line 42
     t32 = (LyrStr *)&lyr_lit0;
 #line 42
-    t33_s = lyr_main_maybe(t32, &lyr_e); t33 = &t33_s;
+    t33_s = lyr_app_main_maybe(t32, &lyr_e); t33 = &t33_s;
 #line 42
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb16; goto bb17;
 bb16:;
@@ -866,7 +866,7 @@ bb18:;
 #line 43
     t37 = (LyrStr *)&lyr_lit9;
 #line 43
-    t38_s = lyr_main_maybe(t37, &lyr_e); t38 = &t38_s;
+    t38_s = lyr_app_main_maybe(t37, &lyr_e); t38 = &t38_s;
 #line 43
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb19; goto bb20;
 bb19:;
@@ -995,7 +995,7 @@ bb27:;
 #line 48
     t77 = (LyrStr *)&lyr_lit14;
 #line 48
-    t78 = lyr_main_parse(t77, &lyr_e);
+    t78 = lyr_app_main_parse(t77, &lyr_e);
 #line 48
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb28; goto bb29;
 bb28:;
@@ -1017,7 +1017,7 @@ bb29:;
 #line 51
     t83 = (LyrStr *)&lyr_lit1;
 #line 51
-    t84 = lyr_main_parse(t83, &lyr_e);
+    t84 = lyr_app_main_parse(t83, &lyr_e);
 #line 51
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb30; goto bb31;
 bb30:;
@@ -1065,7 +1065,7 @@ bb35:;
 #line 53
     t93 = 0;
 #line 53
-    t94 = lyr_main_read(t93, &lyr_e);
+    t94 = lyr_app_main_read(t93, &lyr_e);
 #line 53
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb36; goto bb37;
 bb36:;
@@ -1122,7 +1122,7 @@ bb40:;
 #line 55
     t107 = 1;
 #line 55
-    t108 = lyr_main_read(t107, &lyr_e);
+    t108 = lyr_app_main_read(t107, &lyr_e);
 #line 55
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb41; goto bb42;
 bb41:;
@@ -1157,7 +1157,7 @@ bb43:;
 #line 58
     t115 = (LyrStr *)&lyr_lit0;
 #line 58
-    t116 = lyr_main_parse(t115, &lyr_e);
+    t116 = lyr_app_main_parse(t115, &lyr_e);
 #line 58
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb44; goto bb45;
 bb44:;
@@ -1226,7 +1226,7 @@ bb50:;
 #line 62
     t129 = 0;
 #line 62
-    t130 = lyr_main_read(t129, &lyr_e);
+    t130 = lyr_app_main_read(t129, &lyr_e);
 #line 62
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb51; goto bb52;
 bb51:;
@@ -1308,7 +1308,7 @@ bb60:;
 #line 65
     t146 = 1;
 #line 65
-    lyr_main_save(t146, &lyr_e);
+    lyr_app_main_save(t146, &lyr_e);
 #line 65
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb61; goto bb62;
 bb61:;
@@ -1318,7 +1318,7 @@ bb62:;
 #line 66
     t147 = 0;
 #line 66
-    lyr_main_save(t147, &lyr_e);
+    lyr_app_main_save(t147, &lyr_e);
 #line 66
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb63; goto bb64;
 bb63:;
@@ -1333,7 +1333,7 @@ bb65:;
 #line 67
     t148 = 0;
 #line 67
-    lyr_main_save(t148, &lyr_e);
+    lyr_app_main_save(t148, &lyr_e);
 #line 67
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb66; goto bb67;
 bb66:;
@@ -1410,7 +1410,7 @@ bb70:;
 #line 75
     t170 = l33_s;
 #line 75
-    t171 = lyr_main_parse(t170, &lyr_e);
+    t171 = lyr_app_main_parse(t170, &lyr_e);
 #line 75
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb72; goto bb73;
 bb71:;
@@ -1425,7 +1425,7 @@ bb71:;
 #line 78
     lyr_println(t180);
 #line 80
-    t181 = lyr_main_withDefer(&lyr_e);
+    t181 = lyr_app_main_withDefer(&lyr_e);
 #line 80
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb75; goto bb76;
 bb72:;
@@ -1491,7 +1491,7 @@ bb77:;
 }
 
 #line 6 "programs/try_forms.lyr"
-LyrStr * lyr_main_ParseError_message(lyr_ty0_ParseError *l0_this) {
+LyrStr * lyr_app_main_ParseError_message(lyr_ty0_ParseError *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 6
@@ -1501,7 +1501,7 @@ bb0:;
 }
 
 #line 8 "programs/try_forms.lyr"
-LyrStr * lyr_main_Disk_message(lyr_ty4_Disk *l0_this) {
+LyrStr * lyr_app_main_Disk_message(lyr_ty4_Disk *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 8
@@ -1608,5 +1608,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); lyr_main_main(); return 0; }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); lyr_app_main_main(); return 0; }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

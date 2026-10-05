@@ -11,7 +11,7 @@ typedef struct lyr_vt_ty3 lyr_vt_ty3;
 const char lyr_ifid_ty3[] = "std.core.Error";
 typedef struct lyr_ty4_Disk lyr_ty4_Disk;
 typedef struct lyr_vt_ty5 lyr_vt_ty5;
-const char lyr_ifid_ty5[] = "main.IoError";
+const char lyr_ifid_ty5[] = "app.main.IoError";
 typedef struct lyr_ty6_OutOfRange lyr_ty6_OutOfRange;
 typedef struct lyr_ty7_Wrap lyr_ty7_Wrap;
 typedef struct lyr_ty8_ParseError lyr_ty8_ParseError;
@@ -55,7 +55,7 @@ struct lyr_ty4_Disk {
 };
 _Static_assert(sizeof(lyr_ty4_Disk) == 8, "layout of lyr_ty4_Disk");
 extern const LyrItable lyr_itab_ty4[];
-const LyrDesc lyr_desc_ty4_Disk = { sizeof(lyr_ty4_Disk), 0, 0, 0, NULL, "main.Disk", lyr_itab_ty4 };
+const LyrDesc lyr_desc_ty4_Disk = { sizeof(lyr_ty4_Disk), 0, 0, 0, NULL, "app.main.Disk", lyr_itab_ty4 };
 struct lyr_vt_ty5 {
     const LyrDesc *desc;
     LyrStr * (*s0)(LyrIface);
@@ -76,7 +76,7 @@ _Static_assert(offsetof(lyr_ty7_Wrap, f_what) == 8, "layout of lyr_ty7_Wrap");
 _Static_assert(offsetof(lyr_ty7_Wrap, f_inner) == 16, "layout of lyr_ty7_Wrap");
 extern const LyrItable lyr_itab_ty7[];
 static const uint64_t lyr_refmap_ty7[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_ty7_Wrap = { sizeof(lyr_ty7_Wrap), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty7, "main.Wrap", lyr_itab_ty7 };
+const LyrDesc lyr_desc_ty7_Wrap = { sizeof(lyr_ty7_Wrap), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty7, "app.main.Wrap", lyr_itab_ty7 };
 struct lyr_ty10_ParseErrorKind_Empty {
     uint8_t lyr_unit;
 };
@@ -183,7 +183,7 @@ typedef struct { LyrObj header; lyr_ty6_OutOfRange value; } lyr_box_ty6_OutOfRan
 _Static_assert(sizeof(lyr_box_ty6_OutOfRange) == 32, "layout of lyr_box_ty6_OutOfRange");
 _Static_assert(offsetof(lyr_box_ty6_OutOfRange, value) == 8, "layout of lyr_box_ty6_OutOfRange");
 extern const LyrItable lyr_itab_ty6[];
-const LyrDesc lyr_desc_box_ty6_OutOfRange = { sizeof(lyr_box_ty6_OutOfRange), 0, 0, 0, NULL, "box<main.OutOfRange>", lyr_itab_ty6 };
+const LyrDesc lyr_desc_box_ty6_OutOfRange = { sizeof(lyr_box_ty6_OutOfRange), 0, 0, 0, NULL, "box<app.main.OutOfRange>", lyr_itab_ty6 };
 
 /* module-level bindings */
 double lyr_g0_float_infinity = 0;
@@ -228,46 +228,46 @@ static const LyrStaticStr(5) lyr_lit29 = LYR_STR_INIT("disk");
 static const LyrStaticStr(6) lyr_lit30 = LYR_STR_INIT("range");
 
 /* prototypes */
-int64_t lyr_main_level3(LyrErr **lyr_err);
-int64_t lyr_main_level2(LyrErr **lyr_err);
-int64_t lyr_main_level1(LyrErr **lyr_err);
-void lyr_main_deep(void);
-LyrStr * lyr_main_read(LyrErr **lyr_err);
-void lyr_main_iface(void);
-void lyr_main_all(void);
-int64_t lyr_main_check(int64_t l0_n, LyrErr **lyr_err);
-void lyr_main_data(void);
-LyrStr * lyr_main_config(LyrErr **lyr_err);
-void lyr_main_cause(void);
-int64_t lyr_main_risky(LyrErr **lyr_err);
-void lyr_main_order(void);
-void lyr_main_rethrow(void);
-void lyr_main_sister(void);
-int64_t lyr_main_safeDiv(int64_t l0_a, int64_t l1_b, LyrErr **lyr_err);
-void lyr_main_clean(void);
-int64_t lyr_main_ret(void);
-LYR_NOINLINE int64_t lyr_main_main(void);
-LyrStr * lyr_main_ParseError_message(lyr_ty0_ParseError *l0_this);
-LyrStr * lyr_main_Disk_message(lyr_ty4_Disk *l0_this);
-LyrStr * lyr_main_OutOfRange_message(lyr_ty6_OutOfRange *l0_this);
-LyrStr * lyr_main_Wrap_message(lyr_ty7_Wrap *l0_this);
-lyr_opt_iface3 lyr_main_Wrap_cause(lyr_ty7_Wrap *l0_this);
+int64_t lyr_app_main_level3(LyrErr **lyr_err);
+int64_t lyr_app_main_level2(LyrErr **lyr_err);
+int64_t lyr_app_main_level1(LyrErr **lyr_err);
+void lyr_app_main_deep(void);
+LyrStr * lyr_app_main_read(LyrErr **lyr_err);
+void lyr_app_main_iface(void);
+void lyr_app_main_all(void);
+int64_t lyr_app_main_check(int64_t l0_n, LyrErr **lyr_err);
+void lyr_app_main_data(void);
+LyrStr * lyr_app_main_config(LyrErr **lyr_err);
+void lyr_app_main_cause(void);
+int64_t lyr_app_main_risky(LyrErr **lyr_err);
+void lyr_app_main_order(void);
+void lyr_app_main_rethrow(void);
+void lyr_app_main_sister(void);
+int64_t lyr_app_main_safeDiv(int64_t l0_a, int64_t l1_b, LyrErr **lyr_err);
+void lyr_app_main_clean(void);
+int64_t lyr_app_main_ret(void);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+LyrStr * lyr_app_main_ParseError_message(lyr_ty0_ParseError *l0_this);
+LyrStr * lyr_app_main_Disk_message(lyr_ty4_Disk *l0_this);
+LyrStr * lyr_app_main_OutOfRange_message(lyr_ty6_OutOfRange *l0_this);
+LyrStr * lyr_app_main_Wrap_message(lyr_ty7_Wrap *l0_this);
+lyr_opt_iface3 lyr_app_main_Wrap_cause(lyr_ty7_Wrap *l0_this);
 lyr_opt_iface3 lyr_std_core_Error_cause(LyrIface l0_this);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 /* interface tables: the descriptor, then the implementation of every slot */
-static LyrStr * lyr_vt_ty3_ty0_s0(LyrIface self) { return lyr_main_ParseError_message(&((lyr_box_ty0_ParseError *)self.data)->value); }
+static LyrStr * lyr_vt_ty3_ty0_s0(LyrIface self) { return lyr_app_main_ParseError_message(&((lyr_box_ty0_ParseError *)self.data)->value); }
 const lyr_vt_ty3 lyr_vt_ty3_ty0 = { &lyr_desc_box_ty0_ParseError, lyr_vt_ty3_ty0_s0, lyr_std_core_Error_cause };
-static LyrStr * lyr_vt_ty3_ty4_s0(LyrIface self) { return lyr_main_Disk_message((lyr_ty4_Disk *)self.data); }
+static LyrStr * lyr_vt_ty3_ty4_s0(LyrIface self) { return lyr_app_main_Disk_message((lyr_ty4_Disk *)self.data); }
 const lyr_vt_ty3 lyr_vt_ty3_ty4 = { &lyr_desc_ty4_Disk, lyr_vt_ty3_ty4_s0, lyr_std_core_Error_cause };
-static LyrStr * lyr_vt_ty5_ty4_s0(LyrIface self) { return lyr_main_Disk_message((lyr_ty4_Disk *)self.data); }
+static LyrStr * lyr_vt_ty5_ty4_s0(LyrIface self) { return lyr_app_main_Disk_message((lyr_ty4_Disk *)self.data); }
 const lyr_vt_ty5 lyr_vt_ty5_ty4 = { &lyr_desc_ty4_Disk, lyr_vt_ty5_ty4_s0, lyr_std_core_Error_cause };
-static LyrStr * lyr_vt_ty3_ty6_s0(LyrIface self) { return lyr_main_OutOfRange_message(&((lyr_box_ty6_OutOfRange *)self.data)->value); }
+static LyrStr * lyr_vt_ty3_ty6_s0(LyrIface self) { return lyr_app_main_OutOfRange_message(&((lyr_box_ty6_OutOfRange *)self.data)->value); }
 const lyr_vt_ty3 lyr_vt_ty3_ty6 = { &lyr_desc_box_ty6_OutOfRange, lyr_vt_ty3_ty6_s0, lyr_std_core_Error_cause };
-static LyrStr * lyr_vt_ty3_ty7_s0(LyrIface self) { return lyr_main_Wrap_message((lyr_ty7_Wrap *)self.data); }
-static lyr_opt_iface3 lyr_vt_ty3_ty7_s1(LyrIface self) { return lyr_main_Wrap_cause((lyr_ty7_Wrap *)self.data); }
+static LyrStr * lyr_vt_ty3_ty7_s0(LyrIface self) { return lyr_app_main_Wrap_message((lyr_ty7_Wrap *)self.data); }
+static lyr_opt_iface3 lyr_vt_ty3_ty7_s1(LyrIface self) { return lyr_app_main_Wrap_cause((lyr_ty7_Wrap *)self.data); }
 const lyr_vt_ty3 lyr_vt_ty3_ty7 = { &lyr_desc_ty7_Wrap, lyr_vt_ty3_ty7_s0, lyr_vt_ty3_ty7_s1 };
 const LyrItable lyr_itab_ty0[] = { { lyr_ifid_ty3, &lyr_vt_ty3_ty0 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty4[] = { { lyr_ifid_ty3, &lyr_vt_ty3_ty4 }, { lyr_ifid_ty5, &lyr_vt_ty5_ty4 } , { NULL, NULL } };
@@ -275,7 +275,7 @@ const LyrItable lyr_itab_ty6[] = { { lyr_ifid_ty3, &lyr_vt_ty3_ty6 } , { NULL, N
 const LyrItable lyr_itab_ty7[] = { { lyr_ifid_ty3, &lyr_vt_ty3_ty7 } , { NULL, NULL } };
 
 #line 22 "programs/errors.lyr"
-int64_t lyr_main_level3(LyrErr **lyr_err) {
+int64_t lyr_app_main_level3(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     uint32_t t0 = 0;
     int64_t t1 = 0;
@@ -307,7 +307,7 @@ bb2:;
 }
 
 #line 26 "programs/errors.lyr"
-int64_t lyr_main_level2(LyrErr **lyr_err) {
+int64_t lyr_app_main_level2(LyrErr **lyr_err) {
     int64_t l0_v = 0;
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
@@ -317,7 +317,7 @@ int64_t lyr_main_level2(LyrErr **lyr_err) {
     LyrStr *t4 = NULL;
 bb0:;
 #line 26
-    t0 = lyr_main_level3(&lyr_e);
+    t0 = lyr_app_main_level3(&lyr_e);
 #line 26
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb3;
 bb1:;
@@ -348,7 +348,7 @@ bb3:;
 }
 
 #line 32 "programs/errors.lyr"
-int64_t lyr_main_level1(LyrErr **lyr_err) {
+int64_t lyr_app_main_level1(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
     LyrStr *t1 = NULL;
@@ -357,7 +357,7 @@ int64_t lyr_main_level1(LyrErr **lyr_err) {
     LyrStr *t4 = NULL;
 bb0:;
 #line 32
-    t0 = lyr_main_level2(&lyr_e);
+    t0 = lyr_app_main_level2(&lyr_e);
 #line 32
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb3;
 bb1:;
@@ -384,7 +384,7 @@ bb3:;
 }
 
 #line 36 "programs/errors.lyr"
-void lyr_main_deep(void) {
+void lyr_app_main_deep(void) {
     int64_t l0_n = 0;
     lyr_ty0_ParseError l1_e = {0};
     uint32_t l2_ch = 0;
@@ -419,7 +419,7 @@ void lyr_main_deep(void) {
     LyrStr *t24 = NULL;
 bb0:;
 #line 36
-    t0 = lyr_main_level1(&lyr_e);
+    t0 = lyr_app_main_level1(&lyr_e);
 #line 36
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -516,7 +516,7 @@ bb9:;
 }
 
 #line 46 "programs/errors.lyr"
-LyrStr * lyr_main_read(LyrErr **lyr_err) {
+LyrStr * lyr_app_main_read(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     lyr_ty4_Disk *t0 = NULL;
     LyrIface t1 = {0};
@@ -533,7 +533,7 @@ bb1:;
 }
 
 #line 48 "programs/errors.lyr"
-void lyr_main_iface(void) {
+void lyr_app_main_iface(void) {
     LyrStr *l0_s = NULL;
     LyrIface l1_e = {0};
     LyrErr *lyr_e = NULL;
@@ -548,7 +548,7 @@ void lyr_main_iface(void) {
     LyrStr *t8 = NULL;
 bb0:;
 #line 48
-    t0 = lyr_main_read(&lyr_e);
+    t0 = lyr_app_main_read(&lyr_e);
 #line 48
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -598,7 +598,7 @@ bb6:;
 }
 
 #line 52 "programs/errors.lyr"
-void lyr_main_all(void) {
+void lyr_app_main_all(void) {
     int64_t l0_n = 0;
     LyrIface l1_e = {0};
     LyrErr *lyr_e = NULL;
@@ -612,7 +612,7 @@ void lyr_main_all(void) {
     LyrStr *t7 = NULL;
 bb0:;
 #line 52
-    t0 = lyr_main_level3(&lyr_e);
+    t0 = lyr_app_main_level3(&lyr_e);
 #line 52
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -651,7 +651,7 @@ bb3:;
 }
 
 #line 56 "programs/errors.lyr"
-int64_t lyr_main_check(int64_t l0_n, LyrErr **lyr_err) {
+int64_t lyr_app_main_check(int64_t l0_n, LyrErr **lyr_err) {
     uint8_t l1__or0 = 0;
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
@@ -725,7 +725,7 @@ bb5:;
 }
 
 #line 60 "programs/errors.lyr"
-void lyr_main_data(void) {
+void lyr_app_main_data(void) {
     int64_t l0_n = 0;
     lyr_ty6_OutOfRange l1_e = {0};
     LyrErr *lyr_e = NULL;
@@ -761,7 +761,7 @@ bb0:;
 #line 60
     t0 = (int64_t)INT64_C(12);
 #line 60
-    t1 = lyr_main_check(t0, &lyr_e);
+    t1 = lyr_app_main_check(t0, &lyr_e);
 #line 60
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -839,7 +839,7 @@ bb6:;
 }
 
 #line 64 "programs/errors.lyr"
-LyrStr * lyr_main_config(LyrErr **lyr_err) {
+LyrStr * lyr_app_main_config(LyrErr **lyr_err) {
     lyr_ty4_Disk *l0_e = NULL;
     LyrErr *lyr_e = NULL;
     LyrStr *t0 = NULL;
@@ -853,7 +853,7 @@ LyrStr * lyr_main_config(LyrErr **lyr_err) {
     LyrIface t8 = {0};
 bb0:;
 #line 64
-    t0 = lyr_main_read(&lyr_e);
+    t0 = lyr_app_main_read(&lyr_e);
 #line 64
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -898,7 +898,7 @@ bb5:;
 }
 
 #line 67 "programs/errors.lyr"
-void lyr_main_cause(void) {
+void lyr_app_main_cause(void) {
     LyrStr *l0_s = NULL;
     lyr_ty7_Wrap *l1_e = NULL;
     lyr_opt_iface3 l2_c = {0};
@@ -924,7 +924,7 @@ void lyr_main_cause(void) {
     LyrStr *t16 = NULL;
 bb0:;
 #line 67
-    t0 = lyr_main_config(&lyr_e);
+    t0 = lyr_app_main_config(&lyr_e);
 #line 67
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -953,7 +953,7 @@ bb3:;
 #line 68
     t5 = l1_e;
 #line 68
-    t6_s = lyr_main_Wrap_cause(t5); t6 = &t6_s;
+    t6_s = lyr_app_main_Wrap_cause(t5); t6 = &t6_s;
 #line 68
     l2_c = *t6;
 #line 69
@@ -961,7 +961,7 @@ bb3:;
 #line 69
     t8 = l1_e;
 #line 69
-    t9 = lyr_main_Wrap_message(t8);
+    t9 = lyr_app_main_Wrap_message(t8);
 #line 69
     t10 = (LyrStr *)&lyr_lit15;
 #line 69
@@ -992,7 +992,7 @@ bb6:;
 }
 
 #line 73 "programs/errors.lyr"
-int64_t lyr_main_risky(LyrErr **lyr_err) {
+int64_t lyr_app_main_risky(LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     lyr_ty0_ParseError t0_s = {0};
     lyr_ty0_ParseError *t0 = &t0_s;
@@ -1010,7 +1010,7 @@ bb1:;
 }
 
 #line 77 "programs/errors.lyr"
-void lyr_main_order(void) {
+void lyr_app_main_order(void) {
     int64_t l0_n = 0;
     LyrErr *lyr_e = NULL;
     LyrStr *t0 = NULL;
@@ -1028,7 +1028,7 @@ bb0:;
 #line 77
     lyr_println(t0);
 #line 78
-    t1 = lyr_main_risky(&lyr_e);
+    t1 = lyr_app_main_risky(&lyr_e);
 #line 78
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb3;
 bb1:;
@@ -1081,7 +1081,7 @@ bb7:;
 }
 
 #line 87 "programs/errors.lyr"
-void lyr_main_rethrow(void) {
+void lyr_app_main_rethrow(void) {
     int64_t l0_n = 0;
     LyrIface l1_e = {0};
     LyrIface l2_e = {0};
@@ -1102,7 +1102,7 @@ void lyr_main_rethrow(void) {
     LyrStr *t12 = NULL;
 bb0:;
 #line 87
-    t0 = lyr_main_risky(&lyr_e);
+    t0 = lyr_app_main_risky(&lyr_e);
 #line 87
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -1165,7 +1165,7 @@ bb5:;
 }
 
 #line 93 "programs/errors.lyr"
-void lyr_main_sister(void) {
+void lyr_app_main_sister(void) {
     int64_t l0_n = 0;
     LyrIface l1_e = {0};
     LyrErr *lyr_e = NULL;
@@ -1187,7 +1187,7 @@ void lyr_main_sister(void) {
     LyrStr *t15 = NULL;
 bb0:;
 #line 93
-    t0 = lyr_main_risky(&lyr_e);
+    t0 = lyr_app_main_risky(&lyr_e);
 #line 93
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -1275,7 +1275,7 @@ bb12:;
 }
 
 #line 100 "programs/errors.lyr"
-int64_t lyr_main_safeDiv(int64_t l0_a, int64_t l1_b, LyrErr **lyr_err) {
+int64_t lyr_app_main_safeDiv(int64_t l0_a, int64_t l1_b, LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -1317,7 +1317,7 @@ bb3:;
 }
 
 #line 104 "programs/errors.lyr"
-void lyr_main_clean(void) {
+void lyr_app_main_clean(void) {
     int64_t l0_n = 0;
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
@@ -1338,7 +1338,7 @@ bb0:;
 #line 104
     t1 = (int64_t)INT64_C(2);
 #line 104
-    t2 = lyr_main_safeDiv(t0, t1, &lyr_e);
+    t2 = lyr_app_main_safeDiv(t0, t1, &lyr_e);
 #line 104
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -1388,7 +1388,7 @@ bb6:;
 }
 
 #line 110 "programs/errors.lyr"
-int64_t lyr_main_ret(void) {
+int64_t lyr_app_main_ret(void) {
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -1404,7 +1404,7 @@ bb0:;
 #line 110
     t1 = (int64_t)INT64_C(2);
 #line 110
-    t2 = lyr_main_safeDiv(t0, t1, &lyr_e);
+    t2 = lyr_app_main_safeDiv(t0, t1, &lyr_e);
 #line 110
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb3;
 bb1:;
@@ -1444,7 +1444,7 @@ bb6:;
 }
 
 #line 115 "programs/errors.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     LyrStr *t0 = NULL;
     int64_t t1 = 0;
     LyrStr *t2 = NULL;
@@ -1452,27 +1452,27 @@ LYR_NOINLINE int64_t lyr_main_main(void) {
     int64_t t4 = 0;
 bb0:;
 #line 115
-    lyr_main_deep();
+    lyr_app_main_deep();
 #line 116
-    lyr_main_iface();
+    lyr_app_main_iface();
 #line 117
-    lyr_main_all();
+    lyr_app_main_all();
 #line 118
-    lyr_main_data();
+    lyr_app_main_data();
 #line 119
-    lyr_main_cause();
+    lyr_app_main_cause();
 #line 120
-    lyr_main_order();
+    lyr_app_main_order();
 #line 121
-    lyr_main_rethrow();
+    lyr_app_main_rethrow();
 #line 122
-    lyr_main_sister();
+    lyr_app_main_sister();
 #line 123
-    lyr_main_clean();
+    lyr_app_main_clean();
 #line 124
     t0 = (LyrStr *)&lyr_lit27;
 #line 124
-    t1 = lyr_main_ret();
+    t1 = lyr_app_main_ret();
 #line 124
     t2 = lyr_str_from_int(t1);
 #line 124
@@ -1486,7 +1486,7 @@ bb0:;
 }
 
 #line 8 "programs/errors.lyr"
-LyrStr * lyr_main_ParseError_message(lyr_ty0_ParseError *l0_this) {
+LyrStr * lyr_app_main_ParseError_message(lyr_ty0_ParseError *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 8
@@ -1496,7 +1496,7 @@ bb0:;
 }
 
 #line 11 "programs/errors.lyr"
-LyrStr * lyr_main_Disk_message(lyr_ty4_Disk *l0_this) {
+LyrStr * lyr_app_main_Disk_message(lyr_ty4_Disk *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 11
@@ -1506,7 +1506,7 @@ bb0:;
 }
 
 #line 13 "programs/errors.lyr"
-LyrStr * lyr_main_OutOfRange_message(lyr_ty6_OutOfRange *l0_this) {
+LyrStr * lyr_app_main_OutOfRange_message(lyr_ty6_OutOfRange *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 13
@@ -1516,7 +1516,7 @@ bb0:;
 }
 
 #line 16 "programs/errors.lyr"
-LyrStr * lyr_main_Wrap_message(lyr_ty7_Wrap *l0_this) {
+LyrStr * lyr_app_main_Wrap_message(lyr_ty7_Wrap *l0_this) {
     lyr_ty7_Wrap *t0 = NULL;
     LyrStr *t1 = NULL;
 bb0:;
@@ -1529,7 +1529,7 @@ bb0:;
 }
 
 #line 17 "programs/errors.lyr"
-lyr_opt_iface3 lyr_main_Wrap_cause(lyr_ty7_Wrap *l0_this) {
+lyr_opt_iface3 lyr_app_main_Wrap_cause(lyr_ty7_Wrap *l0_this) {
     lyr_ty7_Wrap *t0 = NULL;
     LyrIface t1 = {0};
     lyr_opt_iface3 t2_s = {0};
@@ -1643,5 +1643,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

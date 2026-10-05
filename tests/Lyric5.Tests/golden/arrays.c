@@ -42,7 +42,7 @@ _Static_assert(sizeof(lyr_ty1_Person) == 24, "layout of lyr_ty1_Person");
 _Static_assert(offsetof(lyr_ty1_Person, f_name) == 8, "layout of lyr_ty1_Person");
 _Static_assert(offsetof(lyr_ty1_Person, f_age) == 16, "layout of lyr_ty1_Person");
 static const uint64_t lyr_refmap_ty1[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty1_Person = { sizeof(lyr_ty1_Person), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty1, "main.Person", NULL };
+const LyrDesc lyr_desc_ty1_Person = { sizeof(lyr_ty1_Person), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty1, "app.main.Person", NULL };
 struct lyr_ty4_ParseErrorKind_Empty {
     uint8_t lyr_unit;
 };
@@ -146,14 +146,14 @@ struct lyr_ty22_Fnv1a64 {
 };
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
 const LyrDesc lyr_desc_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(int64_t), 0, NULL, "int[]", NULL };
-_Static_assert(sizeof(lyr_ty0_Point) == 16, "layout of main.Point[]");
-const LyrDesc lyr_desc_arr_ty0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty0_Point), 0, NULL, "main.Point[]", NULL };
+_Static_assert(sizeof(lyr_ty0_Point) == 16, "layout of app.main.Point[]");
+const LyrDesc lyr_desc_arr_ty0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty0_Point), 0, NULL, "app.main.Point[]", NULL };
 _Static_assert(sizeof(LyrArr *) == 8, "layout of int[][]");
 static const uint64_t lyr_refmap_arr_arr_i64[] = { UINT64_C(0x1) };
 const LyrDesc lyr_desc_arr_arr_i64 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrArr *), 1, lyr_refmap_arr_arr_i64, "int[][]", NULL };
-_Static_assert(sizeof(lyr_ty1_Person *) == 8, "layout of main.Person[]");
+_Static_assert(sizeof(lyr_ty1_Person *) == 8, "layout of app.main.Person[]");
 static const uint64_t lyr_refmap_arr_ref1[] = { UINT64_C(0x1) };
-const LyrDesc lyr_desc_arr_ref1 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(lyr_ty1_Person *), 1, lyr_refmap_arr_ref1, "main.Person[]", NULL };
+const LyrDesc lyr_desc_arr_ref1 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(lyr_ty1_Person *), 1, lyr_refmap_arr_ref1, "app.main.Person[]", NULL };
 _Static_assert(sizeof(LyrStr *) == 8, "layout of string[]");
 static const uint64_t lyr_refmap_arr_str[] = { UINT64_C(0x1) };
 const LyrDesc lyr_desc_arr_str = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrStr *), 1, lyr_refmap_arr_str, "string[]", NULL };
@@ -187,15 +187,15 @@ static const LyrStaticStr(5) lyr_lit13 = LYR_STR_INIT("sum ");
 static const LyrStaticStr(5) lyr_lit14 = LYR_STR_INIT("opt ");
 
 /* prototypes */
-int64_t lyr_main_sum(LyrArr *l0_xs);
-LyrStr * lyr_main_count(LyrArr *l0_xs);
-LYR_NOINLINE int64_t lyr_main_main(void);
+int64_t lyr_app_main_sum(LyrArr *l0_xs);
+LyrStr * lyr_app_main_count(LyrArr *l0_xs);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 20 "programs/arrays.lyr"
-int64_t lyr_main_sum(LyrArr *l0_xs) {
+int64_t lyr_app_main_sum(LyrArr *l0_xs) {
     int64_t l1_total = 0;
     int64_t l2__range0 = 0;
     int64_t l3__last1 = 0;
@@ -278,7 +278,7 @@ bb4:;
 }
 
 #line 26 "programs/arrays.lyr"
-LyrStr * lyr_main_count(LyrArr *l0_xs) {
+LyrStr * lyr_app_main_count(LyrArr *l0_xs) {
     LyrArr *t0 = NULL;
     uint8_t t1 = 0;
     uint8_t t2 = 0;
@@ -315,7 +315,7 @@ bb2:;
 }
 
 #line 31 "programs/arrays.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     LyrArr *l0_xs = NULL;
     LyrArr *l1_sevens = NULL;
     LyrArr *l2_both = NULL;
@@ -1205,7 +1205,7 @@ bb0:;
 #line 58
     t261 = lyr_alloc_array(&lyr_desc_arr_i64, 10); LYR_ARR_DATA(t261, int64_t)[0] = t251; LYR_ARR_DATA(t261, int64_t)[1] = t252; LYR_ARR_DATA(t261, int64_t)[2] = t253; LYR_ARR_DATA(t261, int64_t)[3] = t254; LYR_ARR_DATA(t261, int64_t)[4] = t255; LYR_ARR_DATA(t261, int64_t)[5] = t256; LYR_ARR_DATA(t261, int64_t)[6] = t257; LYR_ARR_DATA(t261, int64_t)[7] = t258; LYR_ARR_DATA(t261, int64_t)[8] = t259; LYR_ARR_DATA(t261, int64_t)[9] = t260;
 #line 58
-    t262 = lyr_main_sum(t261);
+    t262 = lyr_app_main_sum(t261);
 #line 58
     t263 = lyr_str_from_int(t262);
 #line 58
@@ -1229,7 +1229,7 @@ bb0:;
 #line 62
     t270 = l9_some;
 #line 62
-    t271 = lyr_main_count(t270);
+    t271 = lyr_app_main_count(t270);
 #line 62
     t272 = lyr_str_concat(t269, t271);
 #line 62
@@ -1239,7 +1239,7 @@ bb0:;
 #line 62
     t275 = l10_none;
 #line 62
-    t276 = lyr_main_count(t275);
+    t276 = lyr_app_main_count(t275);
 #line 62
     t277 = lyr_str_concat(t274, t276);
 #line 62
@@ -1337,5 +1337,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

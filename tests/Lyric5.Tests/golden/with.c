@@ -46,7 +46,7 @@ struct lyr_ty2_Holder {
 };
 _Static_assert(sizeof(lyr_ty2_Holder) == 24, "layout of lyr_ty2_Holder");
 _Static_assert(offsetof(lyr_ty2_Holder, f_at) == 8, "layout of lyr_ty2_Holder");
-const LyrDesc lyr_desc_ty2_Holder = { sizeof(lyr_ty2_Holder), 0, 0, 0, NULL, "main.Holder", NULL };
+const LyrDesc lyr_desc_ty2_Holder = { sizeof(lyr_ty2_Holder), 0, 0, 0, NULL, "app.main.Holder", NULL };
 struct lyr_ty3_Pair_int_ {
     int64_t f_first;
     LyrStr *f_second;
@@ -177,13 +177,13 @@ static const LyrStaticStr(3) lyr_lit8 = LYR_STR_INIT("hi");
 static const LyrStaticStr(9) lyr_lit9 = LYR_STR_INIT("generic ");
 
 /* prototypes */
-LYR_NOINLINE int64_t lyr_main_main(void);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 18 "programs/with.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty0_Point l0_p = {0};
     lyr_ty0_Point l1_q = {0};
     lyr_ty0_Point l2_s = {0};
@@ -830,5 +830,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

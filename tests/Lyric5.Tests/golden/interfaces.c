@@ -5,7 +5,7 @@
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_vt_ty0 lyr_vt_ty0;
-const char lyr_ifid_ty0[] = "main.Damageable";
+const char lyr_ifid_ty0[] = "app.main.Damageable";
 typedef struct lyr_ty1_Player lyr_ty1_Player;
 typedef struct lyr_ty2_Wall lyr_ty2_Wall;
 typedef struct lyr_ty3_Crate lyr_ty3_Crate;
@@ -14,7 +14,7 @@ typedef struct lyr_ty5_Light_On lyr_ty5_Light_On;
 typedef struct lyr_ty6_Light_Off lyr_ty6_Light_Off;
 typedef struct lyr_ty7_Holder lyr_ty7_Holder;
 typedef struct lyr_vt_ty8 lyr_vt_ty8;
-const char lyr_ifid_ty8[] = "main.Shape";
+const char lyr_ifid_ty8[] = "app.main.Shape";
 typedef struct lyr_ty9_Square lyr_ty9_Square;
 typedef struct lyr_ty10_ParseError lyr_ty10_ParseError;
 typedef struct lyr_ty11_ParseErrorKind lyr_ty11_ParseErrorKind;
@@ -52,7 +52,7 @@ struct lyr_ty1_Player {
 _Static_assert(sizeof(lyr_ty1_Player) == 16, "layout of lyr_ty1_Player");
 _Static_assert(offsetof(lyr_ty1_Player, f_hp) == 8, "layout of lyr_ty1_Player");
 extern const LyrItable lyr_itab_ty1[];
-const LyrDesc lyr_desc_ty1_Player = { sizeof(lyr_ty1_Player), 0, 0, 0, NULL, "main.Player", lyr_itab_ty1 };
+const LyrDesc lyr_desc_ty1_Player = { sizeof(lyr_ty1_Player), 0, 0, 0, NULL, "app.main.Player", lyr_itab_ty1 };
 struct lyr_ty2_Wall {
     LyrObj header;
     int64_t f_hp;
@@ -60,7 +60,7 @@ struct lyr_ty2_Wall {
 _Static_assert(sizeof(lyr_ty2_Wall) == 16, "layout of lyr_ty2_Wall");
 _Static_assert(offsetof(lyr_ty2_Wall, f_hp) == 8, "layout of lyr_ty2_Wall");
 extern const LyrItable lyr_itab_ty2[];
-const LyrDesc lyr_desc_ty2_Wall = { sizeof(lyr_ty2_Wall), 0, 0, 0, NULL, "main.Wall", lyr_itab_ty2 };
+const LyrDesc lyr_desc_ty2_Wall = { sizeof(lyr_ty2_Wall), 0, 0, 0, NULL, "app.main.Wall", lyr_itab_ty2 };
 struct lyr_ty3_Crate {
     int64_t f_hp;
 };
@@ -79,7 +79,7 @@ struct lyr_ty7_Holder {
 _Static_assert(sizeof(lyr_ty7_Holder) == 24, "layout of lyr_ty7_Holder");
 _Static_assert(offsetof(lyr_ty7_Holder, f_target) == 8, "layout of lyr_ty7_Holder");
 static const uint64_t lyr_refmap_ty7[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty7_Holder = { sizeof(lyr_ty7_Holder), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty7, "main.Holder", NULL };
+const LyrDesc lyr_desc_ty7_Holder = { sizeof(lyr_ty7_Holder), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty7, "app.main.Holder", NULL };
 struct lyr_vt_ty8 {
     const LyrDesc *desc;
     int64_t (*s0)(LyrIface);
@@ -189,16 +189,16 @@ struct lyr_ty29_FixedHasher {
 struct lyr_ty30_Fnv1a64 {
     uint64_t f_state;
 };
-_Static_assert(sizeof(LyrIface) == 16, "layout of main.Damageable[]");
+_Static_assert(sizeof(LyrIface) == 16, "layout of app.main.Damageable[]");
 static const uint64_t lyr_refmap_arr_iface0[] = { UINT64_C(0x1) };
-const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "main.Damageable[]", NULL };
+const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "app.main.Damageable[]", NULL };
 _Static_assert(sizeof(uint8_t) == 1, "layout of u8[]");
 const LyrDesc lyr_desc_arr_u8 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(uint8_t), 0, NULL, "u8[]", NULL };
 typedef struct { LyrObj header; lyr_ty3_Crate value; } lyr_box_ty3_Crate;
 _Static_assert(sizeof(lyr_box_ty3_Crate) == 16, "layout of lyr_box_ty3_Crate");
 _Static_assert(offsetof(lyr_box_ty3_Crate, value) == 8, "layout of lyr_box_ty3_Crate");
 extern const LyrItable lyr_itab_ty3[];
-const LyrDesc lyr_desc_box_ty3_Crate = { sizeof(lyr_box_ty3_Crate), 0, 0, 0, NULL, "box<main.Crate>", lyr_itab_ty3 };
+const LyrDesc lyr_desc_box_ty3_Crate = { sizeof(lyr_box_ty3_Crate), 0, 0, 0, NULL, "box<app.main.Crate>", lyr_itab_ty3 };
 typedef struct { LyrObj header; lyr_ty4_Light value; } lyr_box_ty4_Light;
 _Static_assert(sizeof(lyr_box_ty4_Light) == 16, "layout of lyr_box_ty4_Light");
 _Static_assert(offsetof(lyr_box_ty4_Light, value) == 8, "layout of lyr_box_ty4_Light");
@@ -208,7 +208,7 @@ typedef struct { LyrObj header; lyr_ty9_Square value; } lyr_box_ty9_Square;
 _Static_assert(sizeof(lyr_box_ty9_Square) == 16, "layout of lyr_box_ty9_Square");
 _Static_assert(offsetof(lyr_box_ty9_Square, value) == 8, "layout of lyr_box_ty9_Square");
 extern const LyrItable lyr_itab_ty9[];
-const LyrDesc lyr_desc_box_ty9_Square = { sizeof(lyr_box_ty9_Square), 0, 0, 0, NULL, "box<main.Square>", lyr_itab_ty9 };
+const LyrDesc lyr_desc_box_ty9_Square = { sizeof(lyr_box_ty9_Square), 0, 0, 0, NULL, "box<app.main.Square>", lyr_itab_ty9 };
 
 /* module-level bindings */
 double lyr_g0_float_infinity = 0;
@@ -231,43 +231,43 @@ static const LyrStaticStr(7) lyr_lit7 = LYR_STR_INIT("array ");
 static const LyrStaticStr(7) lyr_lit8 = LYR_STR_INIT("chain ");
 
 /* prototypes */
-int64_t lyr_main_hit(LyrIface l0_target, int64_t l1_amount);
-LyrStr * lyr_main_describe(LyrIface l0_target);
-LYR_NOINLINE int64_t lyr_main_main(void);
-uint8_t lyr_main_Damageable_isAlive(LyrIface l0_this);
-lyr_ty1_Player * lyr_main_Player_new(int64_t l0_hp);
-void lyr_main_Player_takeDamage(lyr_ty1_Player *l0_this, int64_t l1_amount);
-int64_t lyr_main_Player_getHp(lyr_ty1_Player *l0_this);
-lyr_ty2_Wall * lyr_main_Wall_new(int64_t l0_hp);
-void lyr_main_Wall_takeDamage(lyr_ty2_Wall *l0_this, int64_t l1_amount);
-int64_t lyr_main_Wall_getHp(lyr_ty2_Wall *l0_this);
-uint8_t lyr_main_Wall_isAlive(lyr_ty2_Wall *l0_this);
-void lyr_main_Crate_takeDamage(lyr_ty3_Crate *l0_this, int64_t l1_amount);
-int64_t lyr_main_Crate_getHp(lyr_ty3_Crate *l0_this);
-void lyr_main_Light_takeDamage(lyr_ty4_Light *l0_this, int64_t l1_amount);
-int64_t lyr_main_Light_getHp(lyr_ty4_Light *l0_this);
-int64_t lyr_main_Shape_doubled(LyrIface l0_this);
-int64_t lyr_main_Square_area(lyr_ty9_Square *l0_this);
+int64_t lyr_app_main_hit(LyrIface l0_target, int64_t l1_amount);
+LyrStr * lyr_app_main_describe(LyrIface l0_target);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+uint8_t lyr_app_main_Damageable_isAlive(LyrIface l0_this);
+lyr_ty1_Player * lyr_app_main_Player_new(int64_t l0_hp);
+void lyr_app_main_Player_takeDamage(lyr_ty1_Player *l0_this, int64_t l1_amount);
+int64_t lyr_app_main_Player_getHp(lyr_ty1_Player *l0_this);
+lyr_ty2_Wall * lyr_app_main_Wall_new(int64_t l0_hp);
+void lyr_app_main_Wall_takeDamage(lyr_ty2_Wall *l0_this, int64_t l1_amount);
+int64_t lyr_app_main_Wall_getHp(lyr_ty2_Wall *l0_this);
+uint8_t lyr_app_main_Wall_isAlive(lyr_ty2_Wall *l0_this);
+void lyr_app_main_Crate_takeDamage(lyr_ty3_Crate *l0_this, int64_t l1_amount);
+int64_t lyr_app_main_Crate_getHp(lyr_ty3_Crate *l0_this);
+void lyr_app_main_Light_takeDamage(lyr_ty4_Light *l0_this, int64_t l1_amount);
+int64_t lyr_app_main_Light_getHp(lyr_ty4_Light *l0_this);
+int64_t lyr_app_main_Shape_doubled(LyrIface l0_this);
+int64_t lyr_app_main_Square_area(lyr_ty9_Square *l0_this);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 /* interface tables: the descriptor, then the implementation of every slot */
-static void lyr_vt_ty0_ty1_s0(LyrIface self, int64_t a0) { lyr_main_Player_takeDamage((lyr_ty1_Player *)self.data, a0); }
-static int64_t lyr_vt_ty0_ty1_s1(LyrIface self) { return lyr_main_Player_getHp((lyr_ty1_Player *)self.data); }
-const lyr_vt_ty0 lyr_vt_ty0_ty1 = { &lyr_desc_ty1_Player, lyr_vt_ty0_ty1_s0, lyr_vt_ty0_ty1_s1, lyr_main_Damageable_isAlive };
-static void lyr_vt_ty0_ty2_s0(LyrIface self, int64_t a0) { lyr_main_Wall_takeDamage((lyr_ty2_Wall *)self.data, a0); }
-static int64_t lyr_vt_ty0_ty2_s1(LyrIface self) { return lyr_main_Wall_getHp((lyr_ty2_Wall *)self.data); }
-static uint8_t lyr_vt_ty0_ty2_s2(LyrIface self) { return lyr_main_Wall_isAlive((lyr_ty2_Wall *)self.data); }
+static void lyr_vt_ty0_ty1_s0(LyrIface self, int64_t a0) { lyr_app_main_Player_takeDamage((lyr_ty1_Player *)self.data, a0); }
+static int64_t lyr_vt_ty0_ty1_s1(LyrIface self) { return lyr_app_main_Player_getHp((lyr_ty1_Player *)self.data); }
+const lyr_vt_ty0 lyr_vt_ty0_ty1 = { &lyr_desc_ty1_Player, lyr_vt_ty0_ty1_s0, lyr_vt_ty0_ty1_s1, lyr_app_main_Damageable_isAlive };
+static void lyr_vt_ty0_ty2_s0(LyrIface self, int64_t a0) { lyr_app_main_Wall_takeDamage((lyr_ty2_Wall *)self.data, a0); }
+static int64_t lyr_vt_ty0_ty2_s1(LyrIface self) { return lyr_app_main_Wall_getHp((lyr_ty2_Wall *)self.data); }
+static uint8_t lyr_vt_ty0_ty2_s2(LyrIface self) { return lyr_app_main_Wall_isAlive((lyr_ty2_Wall *)self.data); }
 const lyr_vt_ty0 lyr_vt_ty0_ty2 = { &lyr_desc_ty2_Wall, lyr_vt_ty0_ty2_s0, lyr_vt_ty0_ty2_s1, lyr_vt_ty0_ty2_s2 };
-static void lyr_vt_ty0_ty3_s0(LyrIface self, int64_t a0) { lyr_main_Crate_takeDamage(&((lyr_box_ty3_Crate *)self.data)->value, a0); }
-static int64_t lyr_vt_ty0_ty3_s1(LyrIface self) { return lyr_main_Crate_getHp(&((lyr_box_ty3_Crate *)self.data)->value); }
-const lyr_vt_ty0 lyr_vt_ty0_ty3 = { &lyr_desc_box_ty3_Crate, lyr_vt_ty0_ty3_s0, lyr_vt_ty0_ty3_s1, lyr_main_Damageable_isAlive };
-static void lyr_vt_ty0_ty4_s0(LyrIface self, int64_t a0) { lyr_main_Light_takeDamage(&((lyr_box_ty4_Light *)self.data)->value, a0); }
-static int64_t lyr_vt_ty0_ty4_s1(LyrIface self) { return lyr_main_Light_getHp(&((lyr_box_ty4_Light *)self.data)->value); }
-const lyr_vt_ty0 lyr_vt_ty0_ty4 = { &lyr_desc_box_ty4_Light, lyr_vt_ty0_ty4_s0, lyr_vt_ty0_ty4_s1, lyr_main_Damageable_isAlive };
-static int64_t lyr_vt_ty8_ty9_s0(LyrIface self) { return lyr_main_Square_area(&((lyr_box_ty9_Square *)self.data)->value); }
-const lyr_vt_ty8 lyr_vt_ty8_ty9 = { &lyr_desc_box_ty9_Square, lyr_vt_ty8_ty9_s0, lyr_main_Shape_doubled };
+static void lyr_vt_ty0_ty3_s0(LyrIface self, int64_t a0) { lyr_app_main_Crate_takeDamage(&((lyr_box_ty3_Crate *)self.data)->value, a0); }
+static int64_t lyr_vt_ty0_ty3_s1(LyrIface self) { return lyr_app_main_Crate_getHp(&((lyr_box_ty3_Crate *)self.data)->value); }
+const lyr_vt_ty0 lyr_vt_ty0_ty3 = { &lyr_desc_box_ty3_Crate, lyr_vt_ty0_ty3_s0, lyr_vt_ty0_ty3_s1, lyr_app_main_Damageable_isAlive };
+static void lyr_vt_ty0_ty4_s0(LyrIface self, int64_t a0) { lyr_app_main_Light_takeDamage(&((lyr_box_ty4_Light *)self.data)->value, a0); }
+static int64_t lyr_vt_ty0_ty4_s1(LyrIface self) { return lyr_app_main_Light_getHp(&((lyr_box_ty4_Light *)self.data)->value); }
+const lyr_vt_ty0 lyr_vt_ty0_ty4 = { &lyr_desc_box_ty4_Light, lyr_vt_ty0_ty4_s0, lyr_vt_ty0_ty4_s1, lyr_app_main_Damageable_isAlive };
+static int64_t lyr_vt_ty8_ty9_s0(LyrIface self) { return lyr_app_main_Square_area(&((lyr_box_ty9_Square *)self.data)->value); }
+const lyr_vt_ty8 lyr_vt_ty8_ty9 = { &lyr_desc_box_ty9_Square, lyr_vt_ty8_ty9_s0, lyr_app_main_Shape_doubled };
 const LyrItable lyr_itab_ty1[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty1 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty2[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty2 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty3[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty3 } , { NULL, NULL } };
@@ -275,7 +275,7 @@ const LyrItable lyr_itab_ty4[] = { { lyr_ifid_ty0, &lyr_vt_ty0_ty4 } , { NULL, N
 const LyrItable lyr_itab_ty9[] = { { lyr_ifid_ty8, &lyr_vt_ty8_ty9 } , { NULL, NULL } };
 
 #line 59 "programs/interfaces.lyr"
-int64_t lyr_main_hit(LyrIface l0_target, int64_t l1_amount) {
+int64_t lyr_app_main_hit(LyrIface l0_target, int64_t l1_amount) {
     LyrIface t0 = {0};
     int64_t t1 = 0;
     LyrIface t2 = {0};
@@ -296,7 +296,7 @@ bb0:;
 }
 
 #line 64 "programs/interfaces.lyr"
-LyrStr * lyr_main_describe(LyrIface l0_target) {
+LyrStr * lyr_app_main_describe(LyrIface l0_target) {
     LyrStr *l1__if0 = NULL;
     LyrIface t0 = {0};
     uint8_t t1 = 0;
@@ -332,7 +332,7 @@ bb3:;
 }
 
 #line 68 "programs/interfaces.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty1_Player *l0_player = NULL;
     lyr_ty2_Wall *l1_wall = NULL;
     lyr_ty3_Crate l2_crate = {0};
@@ -505,13 +505,13 @@ bb0:;
 #line 68
     t0 = (int64_t)INT64_C(100);
 #line 68
-    t1 = lyr_main_Player_new(t0);
+    t1 = lyr_app_main_Player_new(t0);
 #line 68
     l0_player = t1;
 #line 69
     t2 = (int64_t)INT64_C(100);
 #line 69
-    t3 = lyr_main_Wall_new(t2);
+    t3 = lyr_app_main_Wall_new(t2);
 #line 69
     l1_wall = t3;
 #line 70
@@ -523,7 +523,7 @@ bb0:;
 #line 70
     t7 = (int64_t)INT64_C(40);
 #line 70
-    t8 = lyr_main_hit(t6, t7);
+    t8 = lyr_app_main_hit(t6, t7);
 #line 70
     t9 = lyr_str_from_int(t8);
 #line 70
@@ -535,7 +535,7 @@ bb0:;
 #line 70
     t13 = (int64_t)INT64_C(40);
 #line 70
-    t14 = lyr_main_hit(t12, t13);
+    t14 = lyr_app_main_hit(t12, t13);
 #line 70
     t15 = lyr_str_from_int(t14);
 #line 70
@@ -553,27 +553,27 @@ bb0:;
 #line 71
     t21 = (LyrIface){ t20, &lyr_vt_ty0_ty1 };
 #line 71
-    t22 = lyr_main_describe(t21);
+    t22 = lyr_app_main_describe(t21);
 #line 71
     t23 = (LyrStr *)&lyr_lit3;
 #line 71
     t24 = (int64_t)INT64_C(5);
 #line 71
-    t25 = lyr_main_Player_new(t24);
+    t25 = lyr_app_main_Player_new(t24);
 #line 71
     t26 = (LyrIface){ t25, &lyr_vt_ty0_ty1 };
 #line 71
-    t27 = lyr_main_describe(t26);
+    t27 = lyr_app_main_describe(t26);
 #line 71
     t28 = (LyrStr *)&lyr_lit3;
 #line 71
     t29 = (int64_t)INT64_C(5);
 #line 71
-    t30 = lyr_main_Wall_new(t29);
+    t30 = lyr_app_main_Wall_new(t29);
 #line 71
     t31 = (LyrIface){ t30, &lyr_vt_ty0_ty2 };
 #line 71
-    t32 = lyr_main_describe(t31);
+    t32 = lyr_app_main_describe(t31);
 #line 71
     t33 = lyr_str_concat(t19, t22);
 #line 71
@@ -619,7 +619,7 @@ bb0:;
 #line 77
     t48 = (int64_t)INT64_C(7);
 #line 77
-    t49 = lyr_main_hit(t47, t48);
+    t49 = lyr_app_main_hit(t47, t48);
 #line 77
     l5_after = t49;
 #line 78
@@ -817,7 +817,7 @@ bb4:;
 #line 90
     t125 = l1_wall;
 #line 90
-    t126 = lyr_main_Wall_getHp(t125);
+    t126 = lyr_app_main_Wall_getHp(t125);
 #line 90
     t127 = lyr_str_from_int(t126);
 #line 90
@@ -865,7 +865,7 @@ bb4:;
 }
 
 #line 16 "programs/interfaces.lyr"
-uint8_t lyr_main_Damageable_isAlive(LyrIface l0_this) {
+uint8_t lyr_app_main_Damageable_isAlive(LyrIface l0_this) {
     LyrIface t0 = {0};
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -884,7 +884,7 @@ bb0:;
 }
 
 #line 21 "programs/interfaces.lyr"
-lyr_ty1_Player * lyr_main_Player_new(int64_t l0_hp) {
+lyr_ty1_Player * lyr_app_main_Player_new(int64_t l0_hp) {
     int64_t t0 = 0;
     lyr_ty1_Player *t1 = NULL;
 bb0:;
@@ -899,7 +899,7 @@ bb0:;
 }
 
 #line 22 "programs/interfaces.lyr"
-void lyr_main_Player_takeDamage(lyr_ty1_Player *l0_this, int64_t l1_amount) {
+void lyr_app_main_Player_takeDamage(lyr_ty1_Player *l0_this, int64_t l1_amount) {
     lyr_ty1_Player *t0 = NULL;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -946,7 +946,7 @@ bb2:;
 }
 
 #line 23 "programs/interfaces.lyr"
-int64_t lyr_main_Player_getHp(lyr_ty1_Player *l0_this) {
+int64_t lyr_app_main_Player_getHp(lyr_ty1_Player *l0_this) {
     lyr_ty1_Player *t0 = NULL;
     int64_t t1 = 0;
 bb0:;
@@ -959,7 +959,7 @@ bb0:;
 }
 
 #line 28 "programs/interfaces.lyr"
-lyr_ty2_Wall * lyr_main_Wall_new(int64_t l0_hp) {
+lyr_ty2_Wall * lyr_app_main_Wall_new(int64_t l0_hp) {
     int64_t t0 = 0;
     lyr_ty2_Wall *t1 = NULL;
 bb0:;
@@ -974,7 +974,7 @@ bb0:;
 }
 
 #line 29 "programs/interfaces.lyr"
-void lyr_main_Wall_takeDamage(lyr_ty2_Wall *l0_this, int64_t l1_amount) {
+void lyr_app_main_Wall_takeDamage(lyr_ty2_Wall *l0_this, int64_t l1_amount) {
     lyr_ty2_Wall *t0 = NULL;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -1027,7 +1027,7 @@ bb2:;
 }
 
 #line 30 "programs/interfaces.lyr"
-int64_t lyr_main_Wall_getHp(lyr_ty2_Wall *l0_this) {
+int64_t lyr_app_main_Wall_getHp(lyr_ty2_Wall *l0_this) {
     lyr_ty2_Wall *t0 = NULL;
     int64_t t1 = 0;
 bb0:;
@@ -1040,7 +1040,7 @@ bb0:;
 }
 
 #line 31 "programs/interfaces.lyr"
-uint8_t lyr_main_Wall_isAlive(lyr_ty2_Wall *l0_this) {
+uint8_t lyr_app_main_Wall_isAlive(lyr_ty2_Wall *l0_this) {
     lyr_ty2_Wall *t0 = NULL;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -1059,7 +1059,7 @@ bb0:;
 }
 
 #line 36 "programs/interfaces.lyr"
-void lyr_main_Crate_takeDamage(lyr_ty3_Crate *l0_this, int64_t l1_amount) {
+void lyr_app_main_Crate_takeDamage(lyr_ty3_Crate *l0_this, int64_t l1_amount) {
     lyr_ty3_Crate t0_s = {0};
     lyr_ty3_Crate *t0 = &t0_s;
     int64_t t1 = 0;
@@ -1081,7 +1081,7 @@ bb0:;
 }
 
 #line 37 "programs/interfaces.lyr"
-int64_t lyr_main_Crate_getHp(lyr_ty3_Crate *l0_this) {
+int64_t lyr_app_main_Crate_getHp(lyr_ty3_Crate *l0_this) {
     lyr_ty3_Crate t0_s = {0};
     lyr_ty3_Crate *t0 = &t0_s;
     int64_t t1 = 0;
@@ -1095,7 +1095,7 @@ bb0:;
 }
 
 #line 42 "programs/interfaces.lyr"
-void lyr_main_Light_takeDamage(lyr_ty4_Light *l0_this, int64_t l1_amount) {
+void lyr_app_main_Light_takeDamage(lyr_ty4_Light *l0_this, int64_t l1_amount) {
     lyr_ty4_Light t0_s = {0};
     lyr_ty4_Light *t0 = &t0_s;
 bb0:;
@@ -1108,7 +1108,7 @@ bb0:;
 }
 
 #line 43 "programs/interfaces.lyr"
-int64_t lyr_main_Light_getHp(lyr_ty4_Light *l0_this) {
+int64_t lyr_app_main_Light_getHp(lyr_ty4_Light *l0_this) {
     int64_t l1__match0 = 0;
     lyr_ty4_Light t0_s = {0};
     lyr_ty4_Light *t0 = &t0_s;
@@ -1151,7 +1151,7 @@ bb3:;
 }
 
 #line 48 "programs/interfaces.lyr"
-int64_t lyr_main_Shape_doubled(LyrIface l0_this) {
+int64_t lyr_app_main_Shape_doubled(LyrIface l0_this) {
     LyrIface t0 = {0};
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -1170,7 +1170,7 @@ bb0:;
 }
 
 #line 53 "programs/interfaces.lyr"
-int64_t lyr_main_Square_area(lyr_ty9_Square *l0_this) {
+int64_t lyr_app_main_Square_area(lyr_ty9_Square *l0_this) {
     lyr_ty9_Square t0_s = {0};
     lyr_ty9_Square *t0 = &t0_s;
     int64_t t1 = 0;
@@ -1280,5 +1280,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

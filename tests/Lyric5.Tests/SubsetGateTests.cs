@@ -15,8 +15,7 @@ public class SubsetGateTests
 {
     private static CompileResult Lower(string source)
     {
-        var options = new CompilerOptions { StdlibRoot = Path.Combine(AppContext.BaseDirectory, "stdlib5") };
-        return SourceCompiler.Lower(ScriptSource.FromBuffer("gate.lyr", source), options);
+        return TestCompiler.Lower("gate.lyr", source, stdlib: Path.Combine(AppContext.BaseDirectory, "stdlib5"));
     }
 
     private static string[] Refusals(string source)

@@ -160,31 +160,31 @@ static const LyrStaticStr(5) lyr_lit15 = LYR_STR_INIT("cmp ");
 static const LyrStaticStr(5) lyr_lit16 = LYR_STR_INIT("big ");
 
 /* prototypes */
-int64_t lyr_main_widen16(int16_t l0_x);
-int16_t lyr_main_takeUint8(uint8_t l0_x);
-int64_t lyr_main_shl(int64_t l0_a, int64_t l1_b);
-int64_t lyr_main_shr(int64_t l0_a, int64_t l1_b);
-uint8_t lyr_main_shrU8(uint8_t l0_a, uint8_t l1_b);
-uint8_t lyr_main_addWrapU8(uint8_t l0_a, uint8_t l1_b);
-uint8_t lyr_main_subWrapU8(uint8_t l0_a, uint8_t l1_b);
-uint8_t lyr_main_mulWrapU8(uint8_t l0_a, uint8_t l1_b);
-int8_t lyr_main_addWrapI8(int8_t l0_a, int8_t l1_b);
-int8_t lyr_main_subWrapI8(int8_t l0_a, int8_t l1_b);
-double lyr_main_fadd(double l0_a, double l1_b);
-double lyr_main_fsub(double l0_a, double l1_b);
-double lyr_main_fdiv(double l0_a, double l1_b);
-double lyr_main_frem(double l0_a, double l1_b);
-float lyr_main_f32add(float l0_a, float l1_b);
-int8_t lyr_main_toI8(double l0_x);
-uint8_t lyr_main_toU8(double l0_x);
-int64_t lyr_main_toInt(double l0_x);
-LYR_NOINLINE int64_t lyr_main_main(void);
+int64_t lyr_app_main_widen16(int16_t l0_x);
+int16_t lyr_app_main_takeUint8(uint8_t l0_x);
+int64_t lyr_app_main_shl(int64_t l0_a, int64_t l1_b);
+int64_t lyr_app_main_shr(int64_t l0_a, int64_t l1_b);
+uint8_t lyr_app_main_shrU8(uint8_t l0_a, uint8_t l1_b);
+uint8_t lyr_app_main_addWrapU8(uint8_t l0_a, uint8_t l1_b);
+uint8_t lyr_app_main_subWrapU8(uint8_t l0_a, uint8_t l1_b);
+uint8_t lyr_app_main_mulWrapU8(uint8_t l0_a, uint8_t l1_b);
+int8_t lyr_app_main_addWrapI8(int8_t l0_a, int8_t l1_b);
+int8_t lyr_app_main_subWrapI8(int8_t l0_a, int8_t l1_b);
+double lyr_app_main_fadd(double l0_a, double l1_b);
+double lyr_app_main_fsub(double l0_a, double l1_b);
+double lyr_app_main_fdiv(double l0_a, double l1_b);
+double lyr_app_main_frem(double l0_a, double l1_b);
+float lyr_app_main_f32add(float l0_a, float l1_b);
+int8_t lyr_app_main_toI8(double l0_x);
+uint8_t lyr_app_main_toU8(double l0_x);
+int64_t lyr_app_main_toInt(double l0_x);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 19 "programs/arith.lyr"
-int64_t lyr_main_widen16(int16_t l0_x) {
+int64_t lyr_app_main_widen16(int16_t l0_x) {
     int16_t t0 = 0;
     int64_t t1 = 0;
 bb0:;
@@ -197,7 +197,7 @@ bb0:;
 }
 
 #line 20 "programs/arith.lyr"
-int16_t lyr_main_takeUint8(uint8_t l0_x) {
+int16_t lyr_app_main_takeUint8(uint8_t l0_x) {
     uint8_t t0 = 0;
     int16_t t1 = 0;
 bb0:;
@@ -210,7 +210,7 @@ bb0:;
 }
 
 #line 21 "programs/arith.lyr"
-int64_t lyr_main_shl(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_app_main_shl(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -226,7 +226,7 @@ bb0:;
 }
 
 #line 22 "programs/arith.lyr"
-int64_t lyr_main_shr(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_app_main_shr(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -242,7 +242,7 @@ bb0:;
 }
 
 #line 23 "programs/arith.lyr"
-uint8_t lyr_main_shrU8(uint8_t l0_a, uint8_t l1_b) {
+uint8_t lyr_app_main_shrU8(uint8_t l0_a, uint8_t l1_b) {
     uint8_t t0 = 0;
     uint8_t t1 = 0;
     uint8_t t2 = 0;
@@ -258,7 +258,7 @@ bb0:;
 }
 
 #line 24 "programs/arith.lyr"
-uint8_t lyr_main_addWrapU8(uint8_t l0_a, uint8_t l1_b) {
+uint8_t lyr_app_main_addWrapU8(uint8_t l0_a, uint8_t l1_b) {
     uint8_t t0 = 0;
     uint8_t t1 = 0;
     uint8_t t2 = 0;
@@ -274,7 +274,7 @@ bb0:;
 }
 
 #line 25 "programs/arith.lyr"
-uint8_t lyr_main_subWrapU8(uint8_t l0_a, uint8_t l1_b) {
+uint8_t lyr_app_main_subWrapU8(uint8_t l0_a, uint8_t l1_b) {
     uint8_t t0 = 0;
     uint8_t t1 = 0;
     uint8_t t2 = 0;
@@ -290,7 +290,7 @@ bb0:;
 }
 
 #line 26 "programs/arith.lyr"
-uint8_t lyr_main_mulWrapU8(uint8_t l0_a, uint8_t l1_b) {
+uint8_t lyr_app_main_mulWrapU8(uint8_t l0_a, uint8_t l1_b) {
     uint8_t t0 = 0;
     uint8_t t1 = 0;
     uint8_t t2 = 0;
@@ -306,7 +306,7 @@ bb0:;
 }
 
 #line 27 "programs/arith.lyr"
-int8_t lyr_main_addWrapI8(int8_t l0_a, int8_t l1_b) {
+int8_t lyr_app_main_addWrapI8(int8_t l0_a, int8_t l1_b) {
     int8_t t0 = 0;
     int8_t t1 = 0;
     int8_t t2 = 0;
@@ -322,7 +322,7 @@ bb0:;
 }
 
 #line 28 "programs/arith.lyr"
-int8_t lyr_main_subWrapI8(int8_t l0_a, int8_t l1_b) {
+int8_t lyr_app_main_subWrapI8(int8_t l0_a, int8_t l1_b) {
     int8_t t0 = 0;
     int8_t t1 = 0;
     int8_t t2 = 0;
@@ -338,7 +338,7 @@ bb0:;
 }
 
 #line 29 "programs/arith.lyr"
-double lyr_main_fadd(double l0_a, double l1_b) {
+double lyr_app_main_fadd(double l0_a, double l1_b) {
     double t0 = 0;
     double t1 = 0;
     double t2 = 0;
@@ -354,7 +354,7 @@ bb0:;
 }
 
 #line 30 "programs/arith.lyr"
-double lyr_main_fsub(double l0_a, double l1_b) {
+double lyr_app_main_fsub(double l0_a, double l1_b) {
     double t0 = 0;
     double t1 = 0;
     double t2 = 0;
@@ -370,7 +370,7 @@ bb0:;
 }
 
 #line 31 "programs/arith.lyr"
-double lyr_main_fdiv(double l0_a, double l1_b) {
+double lyr_app_main_fdiv(double l0_a, double l1_b) {
     double t0 = 0;
     double t1 = 0;
     double t2 = 0;
@@ -386,7 +386,7 @@ bb0:;
 }
 
 #line 32 "programs/arith.lyr"
-double lyr_main_frem(double l0_a, double l1_b) {
+double lyr_app_main_frem(double l0_a, double l1_b) {
     double t0 = 0;
     double t1 = 0;
     double t2 = 0;
@@ -402,7 +402,7 @@ bb0:;
 }
 
 #line 33 "programs/arith.lyr"
-float lyr_main_f32add(float l0_a, float l1_b) {
+float lyr_app_main_f32add(float l0_a, float l1_b) {
     float t0 = 0;
     float t1 = 0;
     float t2 = 0;
@@ -418,7 +418,7 @@ bb0:;
 }
 
 #line 34 "programs/arith.lyr"
-int8_t lyr_main_toI8(double l0_x) {
+int8_t lyr_app_main_toI8(double l0_x) {
     double t0 = 0;
     int8_t t1 = 0;
 bb0:;
@@ -431,7 +431,7 @@ bb0:;
 }
 
 #line 35 "programs/arith.lyr"
-uint8_t lyr_main_toU8(double l0_x) {
+uint8_t lyr_app_main_toU8(double l0_x) {
     double t0 = 0;
     uint8_t t1 = 0;
 bb0:;
@@ -444,7 +444,7 @@ bb0:;
 }
 
 #line 36 "programs/arith.lyr"
-int64_t lyr_main_toInt(double l0_x) {
+int64_t lyr_app_main_toInt(double l0_x) {
     double t0 = 0;
     int64_t t1 = 0;
 bb0:;
@@ -457,7 +457,7 @@ bb0:;
 }
 
 #line 39 "programs/arith.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     int64_t l0_a = 0;
     int64_t l1_b = 0;
     int8_t l2_small = 0;
@@ -778,13 +778,13 @@ bb0:;
 #line 46
     t11 = l3_bigger;
 #line 46
-    t12 = lyr_main_widen16(t11);
+    t12 = lyr_app_main_widen16(t11);
 #line 46
     t13 = l4_u;
 #line 46
-    t14 = lyr_main_takeUint8(t13);
+    t14 = lyr_app_main_takeUint8(t13);
 #line 46
-    t15 = lyr_main_widen16(t14);
+    t15 = lyr_app_main_widen16(t14);
 #line 46
     t16 = LYR_CHECKED_ADD(t12, t15);
 #line 46
@@ -852,7 +852,7 @@ bb0:;
 #line 53
     t43 = (double)0.0;
 #line 53
-    t44 = lyr_main_fdiv(t42, t43);
+    t44 = lyr_app_main_fdiv(t42, t43);
 #line 53
     l8_nan = t44;
 #line 54
@@ -860,7 +860,7 @@ bb0:;
 #line 54
     t46 = (double)1000.0;
 #line 54
-    t47 = lyr_main_toI8(t46);
+    t47 = lyr_app_main_toI8(t46);
 #line 54
     t48 = (int64_t)t47;
 #line 54
@@ -876,7 +876,7 @@ bb0:;
 #line 54
     t54 = (-t53);
 #line 54
-    t55 = lyr_main_toI8(t54);
+    t55 = lyr_app_main_toI8(t54);
 #line 54
     t56 = (int64_t)t55;
 #line 54
@@ -890,7 +890,7 @@ bb0:;
 #line 54
     t61 = l8_nan;
 #line 54
-    t62 = lyr_main_toInt(t61);
+    t62 = lyr_app_main_toInt(t61);
 #line 54
     t63 = lyr_str_from_int(t62);
 #line 54
@@ -902,7 +902,7 @@ bb0:;
 #line 54
     t67 = (double)300.0;
 #line 54
-    t68 = lyr_main_toU8(t67);
+    t68 = lyr_app_main_toU8(t67);
 #line 54
     t69 = (uint64_t)t68;
 #line 54
@@ -918,7 +918,7 @@ bb0:;
 #line 55
     t74 = (-t73);
 #line 55
-    t75 = lyr_main_toInt(t74);
+    t75 = lyr_app_main_toInt(t74);
 #line 55
     t76 = lyr_str_from_int(t75);
 #line 55
@@ -930,7 +930,7 @@ bb0:;
 #line 55
     t80 = (double)3.9;
 #line 55
-    t81 = lyr_main_toInt(t80);
+    t81 = lyr_app_main_toInt(t80);
 #line 55
     t82 = lyr_str_from_int(t81);
 #line 55
@@ -1037,7 +1037,7 @@ bb5:;
 #line 63
     t116 = (int64_t)INT64_C(3);
 #line 63
-    t117 = lyr_main_shl(t115, t116);
+    t117 = lyr_app_main_shl(t115, t116);
 #line 63
     t118 = lyr_str_from_int(t117);
 #line 63
@@ -1051,7 +1051,7 @@ bb5:;
 #line 63
     t123 = (int64_t)INT64_C(3);
 #line 63
-    t124 = lyr_main_shr(t122, t123);
+    t124 = lyr_app_main_shr(t122, t123);
 #line 63
     t125 = lyr_str_from_int(t124);
 #line 63
@@ -1065,7 +1065,7 @@ bb5:;
 #line 63
     t130 = (uint8_t)UINT64_C(0);
 #line 63
-    t131 = lyr_main_shrU8(t129, t130);
+    t131 = lyr_app_main_shrU8(t129, t130);
 #line 63
     t132 = (uint64_t)t131;
 #line 63
@@ -1081,7 +1081,7 @@ bb5:;
 #line 64
     t137 = (uint8_t)UINT64_C(1);
 #line 64
-    t138 = lyr_main_addWrapU8(t136, t137);
+    t138 = lyr_app_main_addWrapU8(t136, t137);
 #line 64
     t139 = (uint64_t)t138;
 #line 64
@@ -1097,7 +1097,7 @@ bb5:;
 #line 64
     t145 = (uint8_t)UINT64_C(1);
 #line 64
-    t146 = lyr_main_subWrapU8(t144, t145);
+    t146 = lyr_app_main_subWrapU8(t144, t145);
 #line 64
     t147 = (uint64_t)t146;
 #line 64
@@ -1113,7 +1113,7 @@ bb5:;
 #line 64
     t153 = (uint8_t)UINT64_C(129);
 #line 64
-    t154 = lyr_main_mulWrapU8(t152, t153);
+    t154 = lyr_app_main_mulWrapU8(t152, t153);
 #line 64
     t155 = (uint64_t)t154;
 #line 64
@@ -1129,7 +1129,7 @@ bb5:;
 #line 65
     t160 = (int8_t)INT64_C(1);
 #line 65
-    t161 = lyr_main_addWrapI8(t159, t160);
+    t161 = lyr_app_main_addWrapI8(t159, t160);
 #line 65
     t162 = (int64_t)t161;
 #line 65
@@ -1145,7 +1145,7 @@ bb5:;
 #line 65
     t168 = (int8_t)INT64_C(1);
 #line 65
-    t169 = lyr_main_subWrapI8(t167, t168);
+    t169 = lyr_app_main_subWrapI8(t167, t168);
 #line 65
     t170 = (int64_t)t169;
 #line 65
@@ -1161,7 +1161,7 @@ bb5:;
 #line 67
     t175 = (double)0.5;
 #line 67
-    t176 = lyr_main_fadd(t174, t175);
+    t176 = lyr_app_main_fadd(t174, t175);
 #line 67
     t177 = lyr_str_from_float(t176);
 #line 67
@@ -1175,7 +1175,7 @@ bb5:;
 #line 67
     t182 = (double)2.0;
 #line 67
-    t183 = lyr_main_fdiv(t181, t182);
+    t183 = lyr_app_main_fdiv(t181, t182);
 #line 67
     t184 = lyr_str_from_float(t183);
 #line 67
@@ -1189,7 +1189,7 @@ bb5:;
 #line 67
     t189 = (double)0.2;
 #line 67
-    t190 = lyr_main_fsub(t188, t189);
+    t190 = lyr_app_main_fsub(t188, t189);
 #line 67
     t191 = lyr_str_from_float(t190);
 #line 67
@@ -1203,7 +1203,7 @@ bb5:;
 #line 67
     t196 = (double)2.5;
 #line 67
-    t197 = lyr_main_frem(t195, t196);
+    t197 = lyr_app_main_frem(t195, t196);
 #line 67
     t198 = lyr_str_from_float(t197);
 #line 67
@@ -1217,7 +1217,7 @@ bb5:;
 #line 68
     t202 = (double)0.0;
 #line 68
-    t203 = lyr_main_fdiv(t201, t202);
+    t203 = lyr_app_main_fdiv(t201, t202);
 #line 68
     t204 = lyr_str_from_float(t203);
 #line 68
@@ -1233,7 +1233,7 @@ bb5:;
 #line 68
     t210 = (double)0.0;
 #line 68
-    t211 = lyr_main_fdiv(t209, t210);
+    t211 = lyr_app_main_fdiv(t209, t210);
 #line 68
     t212 = lyr_str_from_float(t211);
 #line 68
@@ -1259,7 +1259,7 @@ bb5:;
 #line 70
     t221 = (float)0.20000000298023224;
 #line 70
-    t222 = lyr_main_f32add(t220, t221);
+    t222 = lyr_app_main_f32add(t220, t221);
 #line 70
     t223 = (double)t222;
 #line 70
@@ -1299,7 +1299,7 @@ bb5:;
 #line 73
     t238 = (double)0.0;
 #line 73
-    t239 = lyr_main_fsub(t237, t238);
+    t239 = lyr_app_main_fsub(t237, t238);
 #line 73
     t240 = (double)0.0;
 #line 73
@@ -1443,5 +1443,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

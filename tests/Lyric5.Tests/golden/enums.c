@@ -97,7 +97,7 @@ struct lyr_ty14_Scene {
 _Static_assert(sizeof(lyr_ty14_Scene) == 48, "layout of lyr_ty14_Scene");
 _Static_assert(offsetof(lyr_ty14_Scene, f_main) == 8, "layout of lyr_ty14_Scene");
 _Static_assert(offsetof(lyr_ty14_Scene, f_light) == 40, "layout of lyr_ty14_Scene");
-const LyrDesc lyr_desc_ty14_Scene = { sizeof(lyr_ty14_Scene), LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE, 0, 0, NULL, "main.Scene", NULL };
+const LyrDesc lyr_desc_ty14_Scene = { sizeof(lyr_ty14_Scene), LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE, 0, 0, NULL, "app.main.Scene", NULL };
 struct lyr_ty17_ParseErrorKind_Empty {
     uint8_t lyr_unit;
 };
@@ -239,25 +239,25 @@ static const LyrStaticStr(7) lyr_lit23 = LYR_STR_INIT("scene ");
 static const LyrStaticStr(6) lyr_lit24 = LYR_STR_INIT("tree ");
 
 /* prototypes */
-lyr_ty0_Box_Tree_ * lyr_main_leaf(int64_t l0_n);
-int64_t lyr_main_sum(lyr_ty1_Tree l0_t);
-LyrStr * lyr_main_name(lyr_ty4_Signal l0_s);
-lyr_ty4_Signal lyr_main_next(lyr_ty4_Signal l0_s);
-int64_t lyr_main_area(lyr_ty8_Shape l0_s);
-LyrStr * lyr_main_describe(lyr_ty8_Shape l0_s);
-LyrStr * lyr_main_grade(int64_t l0_n);
-lyr_ty4_Signal lyr_main_find(int64_t l0_n);
-LyrStr * lyr_main_show(lyr_ty4_Signal l0_m);
-LYR_NOINLINE int64_t lyr_main_main(void);
-uint8_t lyr_main_Signal_isStop(lyr_ty4_Signal *l0_this);
-int64_t lyr_main_Signal_ordinal(lyr_ty4_Signal *l0_this);
-void lyr_main_Signal_advance(lyr_ty4_Signal *l0_this);
+lyr_ty0_Box_Tree_ * lyr_app_main_leaf(int64_t l0_n);
+int64_t lyr_app_main_sum(lyr_ty1_Tree l0_t);
+LyrStr * lyr_app_main_name(lyr_ty4_Signal l0_s);
+lyr_ty4_Signal lyr_app_main_next(lyr_ty4_Signal l0_s);
+int64_t lyr_app_main_area(lyr_ty8_Shape l0_s);
+LyrStr * lyr_app_main_describe(lyr_ty8_Shape l0_s);
+LyrStr * lyr_app_main_grade(int64_t l0_n);
+lyr_ty4_Signal lyr_app_main_find(int64_t l0_n);
+LyrStr * lyr_app_main_show(lyr_ty4_Signal l0_m);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+uint8_t lyr_app_main_Signal_isStop(lyr_ty4_Signal *l0_this);
+int64_t lyr_app_main_Signal_ordinal(lyr_ty4_Signal *l0_this);
+void lyr_app_main_Signal_advance(lyr_ty4_Signal *l0_this);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 37 "programs/enums.lyr"
-lyr_ty0_Box_Tree_ * lyr_main_leaf(int64_t l0_n) {
+lyr_ty0_Box_Tree_ * lyr_app_main_leaf(int64_t l0_n) {
     int64_t t0 = 0;
     lyr_ty1_Tree t1_s = {0};
     lyr_ty1_Tree *t1 = &t1_s;
@@ -276,7 +276,7 @@ bb0:;
 }
 
 #line 40 "programs/enums.lyr"
-int64_t lyr_main_sum(lyr_ty1_Tree l0_t) {
+int64_t lyr_app_main_sum(lyr_ty1_Tree l0_t) {
     int64_t l1__match0 = 0;
     int64_t l2_n = 0;
     lyr_ty0_Box_Tree_ *l3_l = NULL;
@@ -342,13 +342,13 @@ bb2:;
 #line 42
     t11 = &t10->f_value;
 #line 42
-    t12 = lyr_main_sum(*t11);
+    t12 = lyr_app_main_sum(*t11);
 #line 42
     t13 = l4_r;
 #line 42
     t14 = &t13->f_value;
 #line 42
-    t15 = lyr_main_sum(*t14);
+    t15 = lyr_app_main_sum(*t14);
 #line 42
     t16 = LYR_CHECKED_ADD(t12, t15);
 #line 42
@@ -363,7 +363,7 @@ bb3:;
 }
 
 #line 47 "programs/enums.lyr"
-LyrStr * lyr_main_name(lyr_ty4_Signal l0_s) {
+LyrStr * lyr_app_main_name(lyr_ty4_Signal l0_s) {
     LyrStr *l1__match0 = NULL;
     lyr_ty4_Signal t0_s = {0};
     lyr_ty4_Signal *t0 = &t0_s;
@@ -423,7 +423,7 @@ bb5:;
 }
 
 #line 55 "programs/enums.lyr"
-lyr_ty4_Signal lyr_main_next(lyr_ty4_Signal l0_s) {
+lyr_ty4_Signal lyr_app_main_next(lyr_ty4_Signal l0_s) {
     lyr_ty4_Signal l1__match0 = {0};
     lyr_ty4_Signal t0_s = {0};
     lyr_ty4_Signal *t0 = &t0_s;
@@ -487,7 +487,7 @@ bb5:;
 }
 
 #line 63 "programs/enums.lyr"
-int64_t lyr_main_area(lyr_ty8_Shape l0_s) {
+int64_t lyr_app_main_area(lyr_ty8_Shape l0_s) {
     int64_t l1__match0 = 0;
     double l2_r = 0;
     int64_t l3_w = 0;
@@ -643,7 +643,7 @@ bb7:;
 }
 
 #line 72 "programs/enums.lyr"
-LyrStr * lyr_main_describe(lyr_ty8_Shape l0_s) {
+LyrStr * lyr_app_main_describe(lyr_ty8_Shape l0_s) {
     LyrStr *l1__match0 = NULL;
     int64_t l2_h = 0;
     int64_t l3_w = 0;
@@ -890,7 +890,7 @@ bb17:;
 }
 
 #line 83 "programs/enums.lyr"
-LyrStr * lyr_main_grade(int64_t l0_n) {
+LyrStr * lyr_app_main_grade(int64_t l0_n) {
     LyrStr *l1__match0 = NULL;
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -981,7 +981,7 @@ bb9:;
 }
 
 #line 92 "programs/enums.lyr"
-lyr_ty4_Signal lyr_main_find(int64_t l0_n) {
+lyr_ty4_Signal lyr_app_main_find(int64_t l0_n) {
     lyr_ty4_Signal l1__if0 = {0};
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -1050,7 +1050,7 @@ bb5:;
 }
 
 #line 97 "programs/enums.lyr"
-LyrStr * lyr_main_show(lyr_ty4_Signal l0_m) {
+LyrStr * lyr_app_main_show(lyr_ty4_Signal l0_m) {
     lyr_ty4_Signal t0_s = {0};
     lyr_ty4_Signal *t0 = &t0_s;
     uint8_t t1 = 0;
@@ -1081,13 +1081,13 @@ bb2:;
 #line 98
     t5 = t4;
 #line 98
-    t6 = lyr_main_name(*t5);
+    t6 = lyr_app_main_name(*t5);
 #line 98
     return t6;
 }
 
 #line 102 "programs/enums.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty4_Signal l0_red = {0};
     lyr_ty8_Shape l1_dot = {0};
     lyr_ty8_Shape l2_circle = {0};
@@ -1327,7 +1327,7 @@ bb0:;
 #line 103
     t2 = &l0_red;
 #line 103
-    t3 = lyr_main_name(*t2);
+    t3 = lyr_app_main_name(*t2);
 #line 103
     t4 = lyr_str_concat(t1, t3);
 #line 103
@@ -1337,9 +1337,9 @@ bb0:;
 #line 103
     t7 = &l0_red;
 #line 103
-    t8_s = lyr_main_next(*t7); t8 = &t8_s;
+    t8_s = lyr_app_main_next(*t7); t8 = &t8_s;
 #line 103
-    t9 = lyr_main_name(*t8);
+    t9 = lyr_app_main_name(*t8);
 #line 103
     t10 = lyr_str_concat(t6, t9);
 #line 103
@@ -1349,11 +1349,11 @@ bb0:;
 #line 103
     t13 = &l0_red;
 #line 103
-    t14_s = lyr_main_next(*t13); t14 = &t14_s;
+    t14_s = lyr_app_main_next(*t13); t14 = &t14_s;
 #line 103
-    t15_s = lyr_main_next(*t14); t15 = &t15_s;
+    t15_s = lyr_app_main_next(*t14); t15 = &t15_s;
 #line 103
-    t16 = lyr_main_name(*t15);
+    t16 = lyr_app_main_name(*t15);
 #line 103
     t17 = lyr_str_concat(t12, t16);
 #line 103
@@ -1397,7 +1397,7 @@ bb0:;
 #line 109
     t30 = &l1_dot;
 #line 109
-    t31 = lyr_main_area(*t30);
+    t31 = lyr_app_main_area(*t30);
 #line 109
     t32 = lyr_str_from_int(t31);
 #line 109
@@ -1405,7 +1405,7 @@ bb0:;
 #line 109
     t34 = &l2_circle;
 #line 109
-    t35 = lyr_main_area(*t34);
+    t35 = lyr_app_main_area(*t34);
 #line 109
     t36 = lyr_str_from_int(t35);
 #line 109
@@ -1413,7 +1413,7 @@ bb0:;
 #line 109
     t38 = &l3_rect;
 #line 109
-    t39 = lyr_main_area(*t38);
+    t39 = lyr_app_main_area(*t38);
 #line 109
     t40 = lyr_str_from_int(t39);
 #line 109
@@ -1421,7 +1421,7 @@ bb0:;
 #line 109
     t42 = &l4_far;
 #line 109
-    t43 = lyr_main_area(*t42);
+    t43 = lyr_app_main_area(*t42);
 #line 109
     t44 = lyr_str_from_int(t43);
 #line 109
@@ -1445,7 +1445,7 @@ bb0:;
 #line 111
     t53 = &l1_dot;
 #line 111
-    t54 = lyr_main_describe(*t53);
+    t54 = lyr_app_main_describe(*t53);
 #line 111
     t55 = lyr_str_concat(t52, t54);
 #line 111
@@ -1457,7 +1457,7 @@ bb0:;
 #line 111
     t59_s = (lyr_ty8_Shape){ .tag = 1, .as.v1 = { .f_0 = t58 } }; t59 = &t59_s;
 #line 111
-    t60 = lyr_main_describe(*t59);
+    t60 = lyr_app_main_describe(*t59);
 #line 111
     t61 = lyr_str_concat(t57, t60);
 #line 111
@@ -1471,7 +1471,7 @@ bb0:;
 #line 112
     t66_s = (lyr_ty8_Shape){ .tag = 2, .as.v2 = { .f_w = t64, .f_h = t65 } }; t66 = &t66_s;
 #line 112
-    t67 = lyr_main_describe(*t66);
+    t67 = lyr_app_main_describe(*t66);
 #line 111
     t68 = lyr_str_concat(t63, t67);
 #line 112
@@ -1485,7 +1485,7 @@ bb0:;
 #line 112
     t73_s = (lyr_ty8_Shape){ .tag = 2, .as.v2 = { .f_w = t71, .f_h = t72 } }; t73 = &t73_s;
 #line 112
-    t74 = lyr_main_describe(*t73);
+    t74 = lyr_app_main_describe(*t73);
 #line 111
     t75 = lyr_str_concat(t70, t74);
 #line 112
@@ -1495,7 +1495,7 @@ bb0:;
 #line 113
     t78 = &l3_rect;
 #line 113
-    t79 = lyr_main_describe(*t78);
+    t79 = lyr_app_main_describe(*t78);
 #line 111
     t80 = lyr_str_concat(t77, t79);
 #line 113
@@ -1517,7 +1517,7 @@ bb0:;
 #line 113
     t87_s = (lyr_ty8_Shape){ .tag = 3, .as.v3 = { .f_0 = t83, .f_1 = *t86 } }; t87 = &t87_s;
 #line 113
-    t88 = lyr_main_describe(*t87);
+    t88 = lyr_app_main_describe(*t87);
 #line 111
     t89 = lyr_str_concat(t82, t88);
 #line 113
@@ -1527,7 +1527,7 @@ bb0:;
 #line 113
     t92 = &l4_far;
 #line 113
-    t93 = lyr_main_describe(*t92);
+    t93 = lyr_app_main_describe(*t92);
 #line 111
     t94 = lyr_str_concat(t91, t93);
 #line 111
@@ -1537,7 +1537,7 @@ bb0:;
 #line 115
     t96 = (int64_t)INT64_C(0);
 #line 115
-    t97 = lyr_main_grade(t96);
+    t97 = lyr_app_main_grade(t96);
 #line 115
     t98 = lyr_str_concat(t95, t97);
 #line 115
@@ -1547,7 +1547,7 @@ bb0:;
 #line 115
     t101 = (int64_t)INT64_C(7);
 #line 115
-    t102 = lyr_main_grade(t101);
+    t102 = lyr_app_main_grade(t101);
 #line 115
     t103 = lyr_str_concat(t100, t102);
 #line 115
@@ -1557,7 +1557,7 @@ bb0:;
 #line 115
     t106 = (int64_t)INT64_C(-3);
 #line 115
-    t107 = lyr_main_grade(t106);
+    t107 = lyr_app_main_grade(t106);
 #line 115
     t108 = lyr_str_concat(t105, t107);
 #line 115
@@ -1567,7 +1567,7 @@ bb0:;
 #line 115
     t111 = (int64_t)INT64_C(42);
 #line 115
-    t112 = lyr_main_grade(t111);
+    t112 = lyr_app_main_grade(t111);
 #line 115
     t113 = lyr_str_concat(t110, t112);
 #line 115
@@ -1577,9 +1577,9 @@ bb0:;
 #line 117
     t115 = (int64_t)INT64_C(0);
 #line 117
-    t116_s = lyr_main_find(t115); t116 = &t116_s;
+    t116_s = lyr_app_main_find(t115); t116 = &t116_s;
 #line 117
-    t117 = lyr_main_show(*t116);
+    t117 = lyr_app_main_show(*t116);
 #line 117
     t118 = lyr_str_concat(t114, t117);
 #line 117
@@ -1589,9 +1589,9 @@ bb0:;
 #line 117
     t121 = (int64_t)INT64_C(3);
 #line 117
-    t122_s = lyr_main_find(t121); t122 = &t122_s;
+    t122_s = lyr_app_main_find(t121); t122 = &t122_s;
 #line 117
-    t123 = lyr_main_show(*t122);
+    t123 = lyr_app_main_show(*t122);
 #line 117
     t124 = lyr_str_concat(t120, t123);
 #line 117
@@ -1603,17 +1603,17 @@ bb0:;
 #line 120
     t126 = &l5_s;
 #line 120
-    t127 = lyr_main_Signal_isStop(t126);
+    t127 = lyr_app_main_Signal_isStop(t126);
 #line 120
     l6_stop = t127;
 #line 121
     t128 = &l5_s;
 #line 121
-    lyr_main_Signal_advance(t128);
+    lyr_app_main_Signal_advance(t128);
 #line 122
     t129 = &l5_s;
 #line 122
-    lyr_main_Signal_advance(t129);
+    lyr_app_main_Signal_advance(t129);
 #line 123
     t130 = (LyrStr *)&lyr_lit22;
 #line 123
@@ -1625,7 +1625,7 @@ bb0:;
 #line 123
     t134 = &l5_s;
 #line 123
-    t135 = lyr_main_Signal_isStop(t134);
+    t135 = lyr_app_main_Signal_isStop(t134);
 #line 123
     t136 = lyr_str_from_bool(t135);
 #line 123
@@ -1633,7 +1633,7 @@ bb0:;
 #line 123
     t138 = &l5_s;
 #line 123
-    t139 = lyr_main_Signal_ordinal(t138);
+    t139 = lyr_app_main_Signal_ordinal(t138);
 #line 123
     t140 = lyr_str_from_int(t139);
 #line 123
@@ -1675,7 +1675,7 @@ bb0:;
 #line 127
     t154 = &t153->f_main;
 #line 127
-    t155 = lyr_main_area(*t154);
+    t155 = lyr_app_main_area(*t154);
 #line 127
     t156 = lyr_str_from_int(t155);
 #line 127
@@ -1689,7 +1689,7 @@ bb0:;
 #line 127
     t161 = &t160->f_light;
 #line 127
-    t162 = lyr_main_show(*t161);
+    t162 = lyr_app_main_show(*t161);
 #line 127
     t163 = lyr_str_concat(t159, t162);
 #line 127
@@ -1697,15 +1697,15 @@ bb0:;
 #line 129
     t164 = (int64_t)INT64_C(1);
 #line 129
-    t165 = lyr_main_leaf(t164);
+    t165 = lyr_app_main_leaf(t164);
 #line 129
     t166 = (int64_t)INT64_C(2);
 #line 129
-    t167 = lyr_main_leaf(t166);
+    t167 = lyr_app_main_leaf(t166);
 #line 129
     t168 = (int64_t)INT64_C(4);
 #line 129
-    t169 = lyr_main_leaf(t168);
+    t169 = lyr_app_main_leaf(t168);
 #line 129
     t170_s = (lyr_ty1_Tree){ .tag = 1, .as.v1 = { .f_0 = t167, .f_1 = t169 } }; t170 = &t170_s;
 #line 129
@@ -1721,7 +1721,7 @@ bb0:;
 #line 130
     t174 = &l8_tree;
 #line 130
-    t175 = lyr_main_sum(*t174);
+    t175 = lyr_app_main_sum(*t174);
 #line 130
     t176 = lyr_str_from_int(t175);
 #line 130
@@ -1735,7 +1735,7 @@ bb0:;
 }
 
 #line 19 "programs/enums.lyr"
-uint8_t lyr_main_Signal_isStop(lyr_ty4_Signal *l0_this) {
+uint8_t lyr_app_main_Signal_isStop(lyr_ty4_Signal *l0_this) {
     uint8_t l1__match0 = 0;
     lyr_ty4_Signal t0_s = {0};
     lyr_ty4_Signal *t0 = &t0_s;
@@ -1778,7 +1778,7 @@ bb3:;
 }
 
 #line 20 "programs/enums.lyr"
-int64_t lyr_main_Signal_ordinal(lyr_ty4_Signal *l0_this) {
+int64_t lyr_app_main_Signal_ordinal(lyr_ty4_Signal *l0_this) {
     int64_t l1__match0 = 0;
     lyr_ty4_Signal t0_s = {0};
     lyr_ty4_Signal *t0 = &t0_s;
@@ -1838,7 +1838,7 @@ bb5:;
 }
 
 #line 21 "programs/enums.lyr"
-void lyr_main_Signal_advance(lyr_ty4_Signal *l0_this) {
+void lyr_app_main_Signal_advance(lyr_ty4_Signal *l0_this) {
     lyr_ty4_Signal t0_s = {0};
     lyr_ty4_Signal *t0 = &t0_s;
     lyr_ty4_Signal t1_s = {0};
@@ -1847,7 +1847,7 @@ bb0:;
 #line 21
     t0 = l0_this;
 #line 21
-    t1_s = lyr_main_next(*t0); t1 = &t1_s;
+    t1_s = lyr_app_main_next(*t0); t1 = &t1_s;
 #line 21
     *l0_this = *t1;
 #line 21
@@ -1941,5 +1941,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

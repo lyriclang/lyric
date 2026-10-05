@@ -37,7 +37,7 @@ _Static_assert(sizeof(lyr_ty0_Res) == 24, "layout of lyr_ty0_Res");
 _Static_assert(offsetof(lyr_ty0_Res, f_name) == 8, "layout of lyr_ty0_Res");
 _Static_assert(offsetof(lyr_ty0_Res, f_failing) == 16, "layout of lyr_ty0_Res");
 static const uint64_t lyr_refmap_ty0[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty0_Res = { sizeof(lyr_ty0_Res), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "main.Res", NULL };
+const LyrDesc lyr_desc_ty0_Res = { sizeof(lyr_ty0_Res), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty0, "app.main.Res", NULL };
 typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface2;
 struct lyr_vt_ty2 {
     const LyrDesc *desc;
@@ -169,14 +169,14 @@ static const LyrStaticStr(7) lyr_lit12 = LYR_STR_INIT("close ");
 static const LyrStaticStr(8) lyr_lit13 = LYR_STR_INIT(" failed");
 
 /* prototypes */
-lyr_ty0_Res * lyr_main_open(LyrStr *l0_name);
-lyr_ty0_Res * lyr_main_openFailing(LyrStr *l0_name);
-void lyr_main_scope(LyrErr **lyr_err);
-void lyr_main_closeFails(LyrErr **lyr_err);
-void lyr_main_bodyFails(LyrErr **lyr_err);
-void lyr_main_wrapped(LyrErr **lyr_err);
-LYR_NOINLINE void lyr_main_main(void);
-void lyr_main_Res_close(lyr_ty0_Res *l0_this, LyrErr **lyr_err);
+lyr_ty0_Res * lyr_app_main_open(LyrStr *l0_name);
+lyr_ty0_Res * lyr_app_main_openFailing(LyrStr *l0_name);
+void lyr_app_main_scope(LyrErr **lyr_err);
+void lyr_app_main_closeFails(LyrErr **lyr_err);
+void lyr_app_main_bodyFails(LyrErr **lyr_err);
+void lyr_app_main_wrapped(LyrErr **lyr_err);
+LYR_NOINLINE void lyr_app_main_main(void);
+void lyr_app_main_Res_close(lyr_ty0_Res *l0_this, LyrErr **lyr_err);
 LyrStr * lyr_std_core_Exception_message(lyr_ty1_Exception *l0_this);
 lyr_opt_iface2 lyr_std_core_Exception_cause(lyr_ty1_Exception *l0_this);
 void lyr__globals__9ee5f9b5(void);
@@ -190,7 +190,7 @@ const lyr_vt_ty2 lyr_vt_ty2_ty1 = { &lyr_desc_ty1_Exception, lyr_vt_ty2_ty1_s0, 
 const LyrItable lyr_itab_ty1[] = { { lyr_ifid_ty2, &lyr_vt_ty2_ty1 } , { NULL, NULL } };
 
 #line 16 "programs/resources.lyr"
-lyr_ty0_Res * lyr_main_open(LyrStr *l0_name) {
+lyr_ty0_Res * lyr_app_main_open(LyrStr *l0_name) {
     LyrStr *t0 = NULL;
     uint8_t t1 = 0;
     lyr_ty0_Res *t2 = NULL;
@@ -210,7 +210,7 @@ bb0:;
 }
 
 #line 17 "programs/resources.lyr"
-lyr_ty0_Res * lyr_main_openFailing(LyrStr *l0_name) {
+lyr_ty0_Res * lyr_app_main_openFailing(LyrStr *l0_name) {
     LyrStr *t0 = NULL;
     uint8_t t1 = 0;
     lyr_ty0_Res *t2 = NULL;
@@ -230,7 +230,7 @@ bb0:;
 }
 
 #line 20 "programs/resources.lyr"
-void lyr_main_scope(LyrErr **lyr_err) {
+void lyr_app_main_scope(LyrErr **lyr_err) {
     lyr_ty0_Res *l0_a = NULL;
     lyr_ty0_Res *l1_b = NULL;
     LyrErr *lyr_e = NULL;
@@ -249,13 +249,13 @@ bb0:;
 #line 20
     t0 = (LyrStr *)&lyr_lit0;
 #line 20
-    t1 = lyr_main_open(t0);
+    t1 = lyr_app_main_open(t0);
 #line 20
     l0_a = t1;
 #line 22
     t2 = (LyrStr *)&lyr_lit1;
 #line 22
-    t3 = lyr_main_open(t2);
+    t3 = lyr_app_main_open(t2);
 #line 22
     l1_b = t3;
 #line 23
@@ -265,7 +265,7 @@ bb0:;
 #line 22
     t5 = l1_b;
 #line 22
-    lyr_main_Res_close(t5, &lyr_e);
+    lyr_app_main_Res_close(t5, &lyr_e);
 #line 22
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb6;
 bb1:;
@@ -281,7 +281,7 @@ bb2:;
 #line 20
     t7 = l0_a;
 #line 20
-    lyr_main_Res_close(t7, &lyr_e);
+    lyr_app_main_Res_close(t7, &lyr_e);
 #line 20
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb3; goto bb4;
 bb3:;
@@ -305,13 +305,13 @@ bb6:;
 #line 20
     t9 = l0_a;
 #line 20
-    lyr_main_Res_close(t9, &lyr_e);
+    lyr_app_main_Res_close(t9, &lyr_e);
 #line 19
     return;
 }
 
 #line 27 "programs/resources.lyr"
-void lyr_main_closeFails(LyrErr **lyr_err) {
+void lyr_app_main_closeFails(LyrErr **lyr_err) {
     lyr_ty0_Res *l0_x = NULL;
     LyrErr *lyr_e = NULL;
     LyrStr *t0 = NULL;
@@ -322,7 +322,7 @@ bb0:;
 #line 27
     t0 = (LyrStr *)&lyr_lit4;
 #line 27
-    t1 = lyr_main_openFailing(t0);
+    t1 = lyr_app_main_openFailing(t0);
 #line 27
     l0_x = t1;
 #line 28
@@ -332,7 +332,7 @@ bb0:;
 #line 27
     t3 = l0_x;
 #line 27
-    lyr_main_Res_close(t3, &lyr_e);
+    lyr_app_main_Res_close(t3, &lyr_e);
 #line 27
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -344,7 +344,7 @@ bb2:;
 }
 
 #line 32 "programs/resources.lyr"
-void lyr_main_bodyFails(LyrErr **lyr_err) {
+void lyr_app_main_bodyFails(LyrErr **lyr_err) {
     lyr_ty0_Res *l0_y = NULL;
     LyrErr *lyr_e = NULL;
     LyrErr *lyr_s0 = NULL;
@@ -360,7 +360,7 @@ bb0:;
 #line 32
     t0 = (LyrStr *)&lyr_lit6;
 #line 32
-    t1 = lyr_main_openFailing(t0);
+    t1 = lyr_app_main_openFailing(t0);
 #line 32
     l0_y = t1;
 #line 33
@@ -383,7 +383,7 @@ bb1:;
 #line 32
     t6 = l0_y;
 #line 32
-    lyr_main_Res_close(t6, &lyr_e);
+    lyr_app_main_Res_close(t6, &lyr_e);
 #line 32
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb2; goto bb3;
 bb2:;
@@ -402,7 +402,7 @@ bb4:;
 }
 
 #line 37 "programs/resources.lyr"
-void lyr_main_wrapped(LyrErr **lyr_err) {
+void lyr_app_main_wrapped(LyrErr **lyr_err) {
     LyrIface l0_e = {0};
     LyrErr *lyr_e = NULL;
     LyrIface t0 = {0};
@@ -414,7 +414,7 @@ void lyr_main_wrapped(LyrErr **lyr_err) {
     LyrIface t5 = {0};
 bb0:;
 #line 37
-    lyr_main_closeFails(&lyr_e);
+    lyr_app_main_closeFails(&lyr_e);
 #line 37
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -452,7 +452,7 @@ bb4:;
 }
 
 #line 42 "programs/resources.lyr"
-LYR_NOINLINE void lyr_main_main(void) {
+LYR_NOINLINE void lyr_app_main_main(void) {
     LyrIface l0_e = {0};
     LyrIface l1_e = {0};
     LyrIface l2_e = {0};
@@ -486,7 +486,7 @@ LYR_NOINLINE void lyr_main_main(void) {
     LyrStr *t24 = NULL;
 bb0:;
 #line 42
-    lyr_main_scope(&lyr_e);
+    lyr_app_main_scope(&lyr_e);
 #line 42
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb1; goto bb2;
 bb1:;
@@ -505,7 +505,7 @@ bb2:;
     goto bb3;
 bb3:;
 #line 43
-    lyr_main_closeFails(&lyr_e);
+    lyr_app_main_closeFails(&lyr_e);
 #line 43
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb4; goto bb5;
 bb4:;
@@ -532,7 +532,7 @@ bb5:;
     goto bb6;
 bb6:;
 #line 44
-    lyr_main_bodyFails(&lyr_e);
+    lyr_app_main_bodyFails(&lyr_e);
 #line 44
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb7; goto bb8;
 bb7:;
@@ -559,7 +559,7 @@ bb8:;
     goto bb9;
 bb9:;
 #line 45
-    lyr_main_wrapped(&lyr_e);
+    lyr_app_main_wrapped(&lyr_e);
 #line 45
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb10; goto bb11;
 bb10:;
@@ -608,7 +608,7 @@ bb12:;
 }
 
 #line 11 "programs/resources.lyr"
-void lyr_main_Res_close(lyr_ty0_Res *l0_this, LyrErr **lyr_err) {
+void lyr_app_main_Res_close(lyr_ty0_Res *l0_this, LyrErr **lyr_err) {
     LyrErr *lyr_e = NULL;
     LyrStr *t0 = NULL;
     lyr_ty0_Res *t1 = NULL;
@@ -790,5 +790,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); lyr_main_main(); return 0; }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); lyr_app_main_main(); return 0; }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

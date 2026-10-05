@@ -141,15 +141,15 @@ uint64_t lyr_g5_lowBits = 0;
 uint64_t lyr_g6_highBits = 0;
 
 /* prototypes */
-int64_t lyr_main_fib(int64_t l0_n);
-int64_t lyr_main_fibIter(int64_t l0_n);
-LYR_NOINLINE int64_t lyr_main_main(void);
+int64_t lyr_app_main_fib(int64_t l0_n);
+int64_t lyr_app_main_fibIter(int64_t l0_n);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 3 "programs/fib.lyr"
-int64_t lyr_main_fib(int64_t l0_n) {
+int64_t lyr_app_main_fib(int64_t l0_n) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     uint8_t t2 = 0;
@@ -185,7 +185,7 @@ bb2:;
 #line 4
     t6 = LYR_CHECKED_SUB(t4, t5);
 #line 4
-    t7 = lyr_main_fib(t6);
+    t7 = lyr_app_main_fib(t6);
 #line 4
     t8 = l0_n;
 #line 4
@@ -193,7 +193,7 @@ bb2:;
 #line 4
     t10 = LYR_CHECKED_SUB(t8, t9);
 #line 4
-    t11 = lyr_main_fib(t10);
+    t11 = lyr_app_main_fib(t10);
 #line 4
     t12 = LYR_CHECKED_ADD(t7, t11);
 #line 4
@@ -201,7 +201,7 @@ bb2:;
 }
 
 #line 8 "programs/fib.lyr"
-int64_t lyr_main_fibIter(int64_t l0_n) {
+int64_t lyr_app_main_fibIter(int64_t l0_n) {
     int64_t l1_a = 0;
     int64_t l2_b = 0;
     int64_t l3__range0 = 0;
@@ -292,7 +292,7 @@ bb4:;
 }
 
 #line 19 "programs/fib.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -305,11 +305,11 @@ bb0:;
 #line 19
     t0 = (int64_t)INT64_C(10);
 #line 19
-    t1 = lyr_main_fib(t0);
+    t1 = lyr_app_main_fib(t0);
 #line 19
     t2 = (int64_t)INT64_C(10);
 #line 19
-    t3 = lyr_main_fibIter(t2);
+    t3 = lyr_app_main_fibIter(t2);
 #line 19
     t4 = (uint8_t)(t1 != t3);
 #line 19
@@ -323,7 +323,7 @@ bb2:;
 #line 20
     t6 = (int64_t)INT64_C(10);
 #line 20
-    t7 = lyr_main_fib(t6);
+    t7 = lyr_app_main_fib(t6);
 #line 20
     return t7;
 }
@@ -415,5 +415,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }
