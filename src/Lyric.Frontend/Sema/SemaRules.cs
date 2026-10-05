@@ -576,8 +576,12 @@ public sealed class SemaRules
 
             // A 'mut fn' writes its receiver, so the receiver is a place that is written: the
             // same rule as an assignment into it (design/v5/spec/02 M4).
+            // 'Counter.bump(c)' IS the member call 'c.bump()' (05 §4), which the sema stored for
+            // it: the receiver it writes is the first argument. Read as it is written, the call
+            // had an argument and no receiver, and a 'let' was written through it.
             case CallExpr { Callee: MemberExpr callee } call:
-                CheckMutCall(callee, call);
+                if (_types.OperatorCallOf(call) is { Callee: MemberExpr meant } settled) CheckMutCall(meant, settled);
+                else CheckMutCall(callee, call);
                 break;
 
             // '++' and '--' READ AND WRITE. Checked only as assignments, they were the one way past

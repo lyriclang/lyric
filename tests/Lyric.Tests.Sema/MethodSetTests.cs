@@ -108,6 +108,40 @@ public class MethodSetTests
     public void The_qualified_call_reaches_the_implementation_for_that_interface() =>
         Allowed(Blocks + "fn main(): int { let p = Person { name = \"x\" }; return if (Greeter.greet(p) == \"hello\" && Waver.greet(p) == \"hi\") 0 else 1; }");
 
+    private const string Bumper = """
+        interface Counter { mut fn bump(): void; }
+        struct C :: [Counter] { var n: int, mut fn bump(): void { this.n += 1; } }
+
+        """;
+
+    /// <summary>The qualified call is the member call it stands for (05 §4): a <c>mut fn</c>
+    /// writes its receiver, the first argument, which is a place as <c>c.bump()</c>'s is. The
+    /// rule read the call as it was written and saw an argument.</summary>
+    [Theory]
+    [InlineData("let c = C { n = 0 }; Counter.bump(c);", "bound with 'let'")]
+    [InlineData("Counter.bump(C { n = 0 });", "temporary")]
+    public void The_qualified_call_of_a_mut_fn_needs_a_place(string body, string because) =>
+        Assert.Contains(because, Rejected(Bumper + "fn main(): int { " + body + " return 0; }", "LYR-SEM0019"));
+
+    [Fact]
+    public void The_qualified_call_of_a_mut_fn_writes_a_var() =>
+        Allowed(Bumper + "fn main(): int { var c = C { n = 0 }; Counter.bump(c); return c.n; }");
+
+    /// <summary>… and the <c>var</c> it writes is written: no hint that <c>let</c> would do.</summary>
+    [Fact]
+    public void A_var_written_through_the_qualified_call_is_not_called_unchanged()
+    {
+        var hints = Check(Bumper + "fn main(): int { var c = C { n = 0 }; Counter.bump(c); return c.n; }")
+            .Diagnostics.Where(d => d.Code == "LYR-SEM0075").ToList();
+        Assert.True(hints.Count == 0, string.Join("\n", hints.Select(d => d.Message)));
+    }
+
+    /// <summary>Control: the hint is there for a var nothing writes.</summary>
+    [Fact]
+    public void A_var_nothing_writes_keeps_its_hint() =>
+        Assert.Single(Check(Bumper + "fn main(): int { var c = C { n = 0 }; return c.n; }")
+            .Diagnostics, d => d.Code == "LYR-SEM0075");
+
     [Fact]
     public void The_qualified_call_takes_the_receiver_first() =>
         Rejected(Blocks + "fn main(): int { let s = Greeter.greet(); return 0; }", "LYR-SEM0014");

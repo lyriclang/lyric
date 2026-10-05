@@ -785,6 +785,10 @@ internal sealed class WarningAnalyzer
                 if (c.Callee is MemberExpr callee
                     && _types.RefOf(callee) is FunctionSymbol { IsMut: true })
                     MarkMutated(callee.Target);
+                // 'Counter.bump(c)' is 'c.bump()' (05 §4): the call the sema stored for it.
+                if (_types.OperatorCallOf(c) is { Callee: MemberExpr meant }
+                    && _types.RefOf(meant) is FunctionSymbol { IsMut: true })
+                    MarkMutated(meant.Target);
                 foreach (var arg in c.Arguments)
                 {
                     // A reference-typed argument may be written by the callee — an array's
