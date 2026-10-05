@@ -290,15 +290,17 @@ bb4:;
 
 #line 37 "programs/resources.lyr"
 void lyr_app_main_wrapped(LyrErr **lyr_err) {
-    LyrIface l0_e = {0};
+    lyr_ty_std_core_Exception *l0_e = NULL;
     LyrErr *lyr_e = NULL;
     LyrIface t0 = {0};
-    LyrStr *t1 = NULL;
-    LyrIface t2 = {0};
-    lyr_opt_iface14_std_core_Error t3_s = {0};
-    lyr_opt_iface14_std_core_Error *t3 = &t3_s;
-    lyr_ty_std_core_Exception *t4 = NULL;
-    LyrIface t5 = {0};
+    lyr_ty_std_core_Exception *t1 = NULL;
+    LyrStr *t2 = NULL;
+    lyr_ty_std_core_Exception *t3 = NULL;
+    LyrIface t4 = {0};
+    lyr_opt_iface14_std_core_Error t5_s = {0};
+    lyr_opt_iface14_std_core_Error *t5 = &t5_s;
+    lyr_ty_std_core_Exception *t6 = NULL;
+    LyrIface t7 = {0};
 bb0:;
 #line 37
     lyr_app_main_closeFails(&lyr_e);
@@ -310,23 +312,27 @@ bb1:;
 #line 38
     lyr_e = NULL;
 #line 38
-    l0_e = t0;
+    t1 = (lyr_ty_std_core_Exception *)t0.data;
 #line 38
-    t1 = (LyrStr *)&lyr_lit8;
+    l0_e = t1;
 #line 38
-    t2 = l0_e;
+    t2 = (LyrStr *)&lyr_lit8;
 #line 38
-    t3_s = (lyr_opt_iface14_std_core_Error){ .value = t2, .has = 1 }; t3 = &t3_s;
+    t3 = l0_e;
 #line 38
-    t4 = (lyr_ty_std_core_Exception *)lyr_alloc(&lyr_desc_ty_std_core_Exception);
+    t4 = (LyrIface){ t3, &lyr_vt_14_std_core_Error_18_std_core_Exception };
 #line 38
-    LYR_WRITE_BARRIER(t4, &t4->f_text, t1);
+    t5_s = (lyr_opt_iface14_std_core_Error){ .value = t4, .has = 1 }; t5 = &t5_s;
 #line 38
-    LYR_WRITE_BARRIER_VALUE(t4, &t4->f_inner, *t3);
+    t6 = (lyr_ty_std_core_Exception *)lyr_alloc(&lyr_desc_ty_std_core_Exception);
 #line 38
-    t5 = (LyrIface){ t4, &lyr_vt_14_std_core_Error_18_std_core_Exception };
+    LYR_WRITE_BARRIER(t6, &t6->f_text, t2);
 #line 38
-    lyr_e = lyr_err_new(t5); goto bb3;
+    LYR_WRITE_BARRIER_VALUE(t6, &t6->f_inner, *t5);
+#line 38
+    t7 = (LyrIface){ t6, &lyr_vt_14_std_core_Error_18_std_core_Exception };
+#line 38
+    lyr_e = lyr_err_new(t7); goto bb3;
 bb2:;
 #line 37
     goto bb4;
@@ -340,37 +346,40 @@ bb4:;
 
 #line 42 "programs/resources.lyr"
 LYR_NOINLINE void lyr_app_main_main(void) {
-    LyrIface l0_e = {0};
-    LyrIface l1_e = {0};
-    LyrIface l2_e = {0};
+    lyr_ty_std_core_Exception *l0_e = NULL;
+    lyr_ty_std_core_Exception *l1_e = NULL;
+    lyr_ty_std_core_Exception *l2_e = NULL;
     LyrStr *l3_because = NULL;
     LyrErr *lyr_e = NULL;
     LyrIface t0 = {0};
     LyrStr *t1 = NULL;
     LyrIface t2 = {0};
-    LyrStr *t3 = NULL;
-    LyrIface t4 = {0};
-    LyrStr *t5 = NULL;
+    lyr_ty_std_core_Exception *t3 = NULL;
+    LyrStr *t4 = NULL;
+    lyr_ty_std_core_Exception *t5 = NULL;
     LyrStr *t6 = NULL;
-    LyrIface t7 = {0};
-    LyrStr *t8 = NULL;
-    LyrIface t9 = {0};
+    LyrStr *t7 = NULL;
+    LyrIface t8 = {0};
+    lyr_ty_std_core_Exception *t9 = NULL;
     LyrStr *t10 = NULL;
-    LyrStr *t11 = NULL;
-    LyrIface t12 = {0};
-    LyrIface t13 = {0};
-    lyr_opt_iface14_std_core_Error t14_s = {0};
-    lyr_opt_iface14_std_core_Error *t14 = &t14_s;
-    LyrIface t15 = {0};
-    LyrStr *t16 = NULL;
-    LyrStr *t17 = NULL;
+    lyr_ty_std_core_Exception *t11 = NULL;
+    LyrStr *t12 = NULL;
+    LyrStr *t13 = NULL;
+    LyrIface t14 = {0};
+    lyr_ty_std_core_Exception *t15 = NULL;
+    lyr_ty_std_core_Exception *t16 = NULL;
+    lyr_opt_iface14_std_core_Error t17_s = {0};
+    lyr_opt_iface14_std_core_Error *t17 = &t17_s;
     LyrIface t18 = {0};
     LyrStr *t19 = NULL;
     LyrStr *t20 = NULL;
-    LyrStr *t21 = NULL;
+    lyr_ty_std_core_Exception *t21 = NULL;
     LyrStr *t22 = NULL;
     LyrStr *t23 = NULL;
     LyrStr *t24 = NULL;
+    LyrStr *t25 = NULL;
+    LyrStr *t26 = NULL;
+    LyrStr *t27 = NULL;
 bb0:;
 #line 42
     lyr_app_main_scope(&lyr_e);
@@ -401,17 +410,19 @@ bb4:;
 #line 43
     lyr_e = NULL;
 #line 43
-    l0_e = t2;
+    t3 = (lyr_ty_std_core_Exception *)t2.data;
 #line 43
-    t3 = (LyrStr *)&lyr_lit10;
+    l0_e = t3;
 #line 43
-    t4 = l0_e;
+    t4 = (LyrStr *)&lyr_lit10;
 #line 43
-    t5 = ((const lyr_vt_ty_std_core_Error *)t4.vt)->s0(t4);
+    t5 = l0_e;
 #line 43
-    t6 = lyr_str_concat(t3, t5);
+    t6 = lyr_std_core_Exception_message(t5);
 #line 43
-    lyr_println(t6);
+    t7 = lyr_str_concat(t4, t6);
+#line 43
+    lyr_println(t7);
 #line 43
     goto bb6;
 bb5:;
@@ -424,21 +435,23 @@ bb6:;
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb7; goto bb8;
 bb7:;
 #line 44
-    t7 = lyr_e->value;
+    t8 = lyr_e->value;
 #line 44
     lyr_e = NULL;
 #line 44
-    l1_e = t7;
+    t9 = (lyr_ty_std_core_Exception *)t8.data;
 #line 44
-    t8 = (LyrStr *)&lyr_lit10;
+    l1_e = t9;
 #line 44
-    t9 = l1_e;
+    t10 = (LyrStr *)&lyr_lit10;
 #line 44
-    t10 = ((const lyr_vt_ty_std_core_Error *)t9.vt)->s0(t9);
+    t11 = l1_e;
 #line 44
-    t11 = lyr_str_concat(t8, t10);
+    t12 = lyr_std_core_Exception_message(t11);
 #line 44
-    lyr_println(t11);
+    t13 = lyr_str_concat(t10, t12);
+#line 44
+    lyr_println(t13);
 #line 44
     goto bb9;
 bb8:;
@@ -451,39 +464,41 @@ bb9:;
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb10; goto bb11;
 bb10:;
 #line 45
-    t12 = lyr_e->value;
+    t14 = lyr_e->value;
 #line 45
     lyr_e = NULL;
 #line 45
-    l2_e = t12;
+    t15 = (lyr_ty_std_core_Exception *)t14.data;
+#line 45
+    l2_e = t15;
 #line 46
-    t13 = l2_e;
+    t16 = l2_e;
 #line 46
-    t14_s = ((const lyr_vt_ty_std_core_Error *)t13.vt)->s1(t13); t14 = &t14_s;
+    t17_s = lyr_std_core_Exception_cause(t16); t17 = &t17_s;
 #line 46
-    if (LYR_UNLIKELY(!t14->has)) lyr_panic_null(); t15 = t14->value;
+    if (LYR_UNLIKELY(!t17->has)) lyr_panic_null(); t18 = t17->value;
 #line 46
-    t16 = ((const lyr_vt_ty_std_core_Error *)t15.vt)->s0(t15);
-#line 46
-    l3_because = t16;
-#line 47
-    t17 = (LyrStr *)&lyr_lit10;
-#line 47
-    t18 = l2_e;
-#line 47
     t19 = ((const lyr_vt_ty_std_core_Error *)t18.vt)->s0(t18);
+#line 46
+    l3_because = t19;
 #line 47
-    t20 = (LyrStr *)&lyr_lit11;
+    t20 = (LyrStr *)&lyr_lit10;
 #line 47
-    t21 = l3_because;
+    t21 = l2_e;
 #line 47
-    t22 = lyr_str_concat(t17, t19);
+    t22 = lyr_std_core_Exception_message(t21);
 #line 47
-    t23 = lyr_str_concat(t22, t20);
+    t23 = (LyrStr *)&lyr_lit11;
 #line 47
-    t24 = lyr_str_concat(t23, t21);
+    t24 = l3_because;
 #line 47
-    lyr_println(t24);
+    t25 = lyr_str_concat(t20, t22);
+#line 47
+    t26 = lyr_str_concat(t25, t23);
+#line 47
+    t27 = lyr_str_concat(t26, t24);
+#line 47
+    lyr_println(t27);
 #line 45
     goto bb12;
 bb11:;

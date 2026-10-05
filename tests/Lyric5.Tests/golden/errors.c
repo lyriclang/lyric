@@ -476,16 +476,19 @@ bb6:;
 #line 52 "programs/errors.lyr"
 void lyr_app_main_all(void) {
     int64_t l0_n = 0;
-    LyrIface l1_e = {0};
+    lyr_ty_app_main_ParseError l1_e = {0};
     LyrErr *lyr_e = NULL;
     int64_t t0 = 0;
     int64_t t1 = 0;
     LyrStr *t2 = NULL;
     LyrIface t3 = {0};
-    LyrStr *t4 = NULL;
-    LyrIface t5 = {0};
-    LyrStr *t6 = NULL;
+    lyr_ty_app_main_ParseError t4_s = {0};
+    lyr_ty_app_main_ParseError *t4 = &t4_s;
+    LyrStr *t5 = NULL;
+    lyr_ty_app_main_ParseError t6_s = {0};
+    lyr_ty_app_main_ParseError *t6 = &t6_s;
     LyrStr *t7 = NULL;
+    LyrStr *t8 = NULL;
 bb0:;
 #line 52
     t0 = lyr_app_main_level3(&lyr_e);
@@ -497,17 +500,19 @@ bb1:;
 #line 52
     lyr_e = NULL;
 #line 52
-    l1_e = t3;
+    t4_s = ((lyr_box_ty_app_main_ParseError *)t3.data)->value; t4 = &t4_s;
 #line 52
-    t4 = (LyrStr *)&lyr_lit9;
+    l1_e = *t4;
 #line 52
-    t5 = l1_e;
+    t5 = (LyrStr *)&lyr_lit9;
 #line 52
-    t6 = ((const lyr_vt_ty_std_core_Error *)t5.vt)->s0(t5);
+    t6 = &l1_e;
 #line 52
-    t7 = lyr_str_concat(t4, t6);
+    t7 = lyr_app_main_ParseError_message(t6);
 #line 52
-    lyr_println(t7);
+    t8 = lyr_str_concat(t5, t7);
+#line 52
+    lyr_println(t8);
 #line 52
     goto bb3;
 bb2:;
@@ -959,23 +964,29 @@ bb7:;
 #line 87 "programs/errors.lyr"
 void lyr_app_main_rethrow(void) {
     int64_t l0_n = 0;
-    LyrIface l1_e = {0};
-    LyrIface l2_e = {0};
+    lyr_ty_app_main_ParseError l1_e = {0};
+    lyr_ty_app_main_ParseError l2_e = {0};
     LyrErr *lyr_e = NULL;
     LyrErr *lyr_s0 = NULL;
     int64_t t0 = 0;
     int64_t t1 = 0;
     LyrStr *t2 = NULL;
     LyrIface t3 = {0};
-    LyrStr *t4 = NULL;
-    LyrIface t5 = {0};
-    LyrStr *t6 = NULL;
+    lyr_ty_app_main_ParseError t4_s = {0};
+    lyr_ty_app_main_ParseError *t4 = &t4_s;
+    LyrStr *t5 = NULL;
+    lyr_ty_app_main_ParseError t6_s = {0};
+    lyr_ty_app_main_ParseError *t6 = &t6_s;
     LyrStr *t7 = NULL;
-    LyrIface t8 = {0};
-    LyrStr *t9 = NULL;
-    LyrIface t10 = {0};
+    LyrStr *t8 = NULL;
+    LyrIface t9 = {0};
+    lyr_ty_app_main_ParseError t10_s = {0};
+    lyr_ty_app_main_ParseError *t10 = &t10_s;
     LyrStr *t11 = NULL;
-    LyrStr *t12 = NULL;
+    lyr_ty_app_main_ParseError t12_s = {0};
+    lyr_ty_app_main_ParseError *t12 = &t12_s;
+    LyrStr *t13 = NULL;
+    LyrStr *t14 = NULL;
 bb0:;
 #line 87
     t0 = lyr_app_main_risky(&lyr_e);
@@ -987,17 +998,19 @@ bb1:;
 #line 87
     lyr_s0 = lyr_e; lyr_e = NULL;
 #line 87
-    l1_e = t3;
+    t4_s = ((lyr_box_ty_app_main_ParseError *)t3.data)->value; t4 = &t4_s;
 #line 87
-    t4 = (LyrStr *)&lyr_lit19;
+    l1_e = *t4;
 #line 87
-    t5 = l1_e;
+    t5 = (LyrStr *)&lyr_lit19;
 #line 87
-    t6 = ((const lyr_vt_ty_std_core_Error *)t5.vt)->s0(t5);
+    t6 = &l1_e;
 #line 87
-    t7 = lyr_str_concat(t4, t6);
+    t7 = lyr_app_main_ParseError_message(t6);
 #line 87
-    lyr_println(t7);
+    t8 = lyr_str_concat(t5, t7);
+#line 87
+    lyr_println(t8);
 #line 87
     lyr_e = lyr_s0;
 #line 87
@@ -1015,21 +1028,23 @@ bb2:;
     goto bb4;
 bb3:;
 #line 86
-    t8 = lyr_e->value;
+    t9 = lyr_e->value;
 #line 88
     lyr_e = NULL;
 #line 88
-    l2_e = t8;
+    t10_s = ((lyr_box_ty_app_main_ParseError *)t9.data)->value; t10 = &t10_s;
 #line 88
-    t9 = (LyrStr *)&lyr_lit20;
+    l2_e = *t10;
 #line 88
-    t10 = l2_e;
+    t11 = (LyrStr *)&lyr_lit20;
 #line 88
-    t11 = ((const lyr_vt_ty_std_core_Error *)t10.vt)->s0(t10);
+    t12 = &l2_e;
 #line 88
-    t12 = lyr_str_concat(t9, t11);
+    t13 = lyr_app_main_ParseError_message(t12);
 #line 88
-    lyr_println(t12);
+    t14 = lyr_str_concat(t11, t13);
+#line 88
+    lyr_println(t14);
 #line 86
     goto bb5;
 bb4:;
