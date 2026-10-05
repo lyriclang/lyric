@@ -73,8 +73,9 @@ If you really must add something not decided there:
 2. Wait at least **7 days** before opening a PR. The waiting period is
    mandatory even for the maintainer.
 3. The PR must include the specification chapter and conformance cases
-   (spec-first: rule PR, then its twin), user-facing documentation, and
-   tests.
+   (spec-first: the rule PR in `lyric-spec`, then its twin here, which
+   moves [`spec.pin`](spec.pin) to the rule's commit), user-facing
+   documentation, and tests.
 
 If the change would push the milestone it lands in by more than 100 % of
 its size (13), it is rejected by default and stays a door.

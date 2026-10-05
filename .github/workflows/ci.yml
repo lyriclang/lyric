@@ -188,11 +188,19 @@ jobs:
           PY
 
   conformance:
-    # The specification's suite (lyriclang/lyric-spec, main) against the WORKING TREE, in both
-    # profiles: the tree is the candidate for 5.0.0, and a candidate that breaks a spec sentence
-    # fails here, not after tagging. Spec-first (design/v5/spec/13): a case lands before the
-    # compiler does, so this job is red on main between the two merges and green after — that
-    # window is the point of it, not a flaw.
+    # The specification's suite (lyriclang/lyric-spec) against the WORKING TREE, in both profiles:
+    # the tree is the candidate for 5.0.0, and a candidate that breaks a spec sentence fails here,
+    # not after tagging.
+    #
+    # WHICH specification is the one commit `spec.pin` names — not whatever lyric-spec's main is
+    # when the job starts. Spec-first (design/v5/spec/13): the rule and its cases are a pull request
+    # there; the compiler's pull request here moves the pin to that pull request's commit, and the
+    # two are checked together. The specification merges first, then this side.
+    #
+    # Until the pin, the job read `main` at run time. That made the order of two merges in two
+    # repositories a race: a spec merge that came before its compiler turned this main red
+    # (2026-10-03, 777 of 778 cases), and a gate that started a moment before a spec merge checked
+    # a compiler against cases it was never meant to meet.
     name: Conformance gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -201,12 +209,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Read the specification's pin
+        id: pin
+        shell: bash
+        run: |
+          sha=$(tr -d '[:space:]' < spec.pin)
+          echo "$sha" | grep -qE '^[0-9a-f]{40}$' || { echo "spec.pin holds one full commit of lyriclang/lyric-spec and nothing else; it holds '$sha'"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      # The whole history: the step after this one asks whether the pin is behind main.
       - name: Checkout the specification
         uses: actions/checkout@v7
         with:
           repository: lyriclang/lyric-spec
-          ref: main
+          ref: ${{ steps.pin.outputs.sha }}
           path: spec-repo
+          fetch-depth: 0
+
+      # A pin on a pull request's commit is how the two sides are checked together; on main it
+      # names a text the specification has merged. One that outlived its pull request would hold
+      # this repository to a commit nobody finds from the specification's history.
+      - name: On main, the pin is on the specification's main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          git -C spec-repo fetch --quiet origin main
+          git -C spec-repo merge-base --is-ancestor "${{ steps.pin.outputs.sha }}" origin/main || { echo "spec.pin names ${{ steps.pin.outputs.sha }}, which is not on lyric-spec's main: the specification merges first"; exit 1; }
 
       - name: Set up zig (the cases build to native binaries)
         uses: ./.github/actions/setup-zig
