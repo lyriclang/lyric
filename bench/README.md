@@ -78,6 +78,12 @@ After M8a S10c — the builder grows and copies through `memcpy`, `sort()` compa
 | sorting | 0.128 s | 0.084 s | 0.162 s | 1.53 |
 | strings | 0.070 s | 0.028 s | 0.072 s | 2.53 |
 
+In CI the job *Benchmarks* runs the same table on a shared runner and writes it into the run's
+summary. Its timings are too noisy for the ratchet, so the job fails only beyond a wide fence
+(`--bound 3.0`: three times Go); the ratchet of 1.5 stays a measurement by hand at each milestone.
+`strings` has a fence of its own, five times, until f-strings write into one builder: on the
+runner it stands at 3.6 (0.136 s against Go's 0.038 s), the other five at 1.64 or less.
+
 Still over the bound, and the runs vary by a fifth on this machine (Go's `maps` took 0.222 s in
 the first measurement); a second one, 7 runs each, gave 1.79, 1.63 and 2.27. What bounds the rest is the shape of the build, not the library alone:
 a generic instance is emitted into the program's translation unit and calls std.core's small

@@ -187,6 +187,38 @@ jobs:
           print(f"lyric5 --version:   {best([lyric5, '--version'], 10):.1f} ms (min of 10)")
           PY
 
+  bench:
+    # Measurement points 2 and 3 (design/v5/spec/13) on this runner, for the record: the table
+    # goes into the run's summary. A shared runner is too noisy for the plan's ratchet (1.5x Go),
+    # which stays a measurement by hand at each milestone; what fails here is a wide fence of
+    # 3x Go — a regression nobody would call noise. 'strings' has a fence of its own, 5x: it
+    # stands at 3.6x on this runner (2.3x to 2.7x on a quiet machine), because an f-string
+    # allocates a string per piece until f-strings write into one builder (10 S6). When that is
+    # built it joins the others. Go is the runner's own; nothing is downloaded for it (see the
+    # head of this file).
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up zig (the programs build to native binaries)
+        uses: ./.github/actions/setup-zig
+
+      - name: Build the compiler
+        run: dotnet build src/Lyric5/Lyric5.csproj --configuration Release
+
+      - name: Measure against C, Go and C#
+        shell: bash
+        run: |
+          set -o pipefail
+          go version
+          python3 bench/run.py --runs 5 --bound 3.0 loops arith structs maps sorting | tee -a "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          python3 bench/run.py --runs 5 --bound 5.0 strings | tee -a "$GITHUB_STEP_SUMMARY"
+
   conformance:
     # The specification's suite (lyriclang/lyric-spec) against the WORKING TREE, in both profiles:
     # the tree is the candidate for 5.0.0, and a candidate that breaks a spec sentence fails here,

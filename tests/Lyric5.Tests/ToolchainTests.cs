@@ -36,7 +36,7 @@ public class ToolchainTests
     public void The_sanitizer_profiles_refuse_a_compiler_without_their_runtime()
     {
         var zig = new CCompiler(CCompilerKind.Zig, "/usr/bin/zig", "0.16.0");
-        var cache = Directory.CreateTempSubdirectory("lyric5-cbuild").FullName;
+        var cache = TestDirectories.Fresh("lyric5-cbuild-");
         var refusal = Assert.Throws<CBuildException>(() => new CBuild(zig, Target.Host, Profile.Asan, cache));
         Assert.Contains("needs clang", refusal.Message);
     }
@@ -46,7 +46,7 @@ public class ToolchainTests
     {
         var gcc = new CCompiler(CCompilerKind.Gcc, "/usr/bin/gcc", "15");
         var other = Target.Tier1.First(t => t.Triple != Target.Host.Triple);
-        var cache = Directory.CreateTempSubdirectory("lyric5-cbuild").FullName;
+        var cache = TestDirectories.Fresh("lyric5-cbuild-");
         Assert.Throws<CBuildException>(() => new CBuild(gcc, other, Profile.Debug, cache));
     }
 
@@ -54,7 +54,7 @@ public class ToolchainTests
     public void An_uninstrumented_unit_keeps_the_codegen_flags_and_loses_the_sanitizers()
     {
         var clang = new CCompiler(CCompilerKind.Clang, "/usr/bin/clang", "22");
-        var cache = Directory.CreateTempSubdirectory("lyric5-cbuild").FullName;
+        var cache = TestDirectories.Fresh("lyric5-cbuild-");
         var build = new CBuild(clang, Target.Host, Profile.Asan, cache);
 
         var instrumented = build.FlagsFor(new CUnit("a.c", [], []));
@@ -68,7 +68,7 @@ public class ToolchainTests
     [Fact]
     public void The_cache_key_moves_with_a_header_and_stays_without_a_change()
     {
-        var dir = Directory.CreateTempSubdirectory("lyric5-key").FullName;
+        var dir = TestDirectories.Fresh("lyric5-key-");
         var include = Directory.CreateDirectory(Path.Combine(dir, "include")).FullName;
         File.WriteAllText(Path.Combine(dir, "a.c"), "#include \"h.h\"\nint f(void) { return H; }\n");
         File.WriteAllText(Path.Combine(include, "h.h"), "#define H 1\n");
