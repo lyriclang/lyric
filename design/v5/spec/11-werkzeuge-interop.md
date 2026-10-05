@@ -263,6 +263,24 @@ schweren Fragen des Dossiers schon beantwortet.
 | T7 | **Toolchain-Pin im Manifest ist die Wahrheit** (P12); `~/.lyric/config.toml` hält `default`; Präzedenz C4 | Go |
 | T8 | **Vormerk Website** (Maintainer): Neudesign als eigener Bereich; die Seite **spiegelt die Toolchain-Downloads** (T1/T5) und ist Download-Quelle für `lyric toolchain` neben GitHub — dieselben Hashes und Signaturen; trägt Guide, Spec, Katalogseite (G9), Paket-Doku (`lyric doc`) | — |
 
+## Review 2026-10-05 — Nachträge beim Bauen (M4–M8a)
+
+Entscheidungen des Maintainers aus der Durchsicht der offenen Punkte vor dem Abschluss von M8a.
+Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert oder schärft. Wo eine
+ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| M7-9 | `--locked` für `build`, `run`, `test` und `check` (07 P5) | W1 C3 |
+| M7-8 | `lyric update` hebt auf den neuesten Tag der Linie und schreibt Manifest und Lock (07 P4) | W1 C2 |
+| M7-12 | Feldflags der Profile: `--opt <0-3>`, `--[no-]lto`, `--[no-]debug-info`, `--[no-]deny-warnings`, `--[no-]overflow-checks`, `--[no-]fast-math`. `overflowChecks = false` gilt für das ganze Programm samt std; Division, Rest und Shifts bleiben geprüft | W2 P3 |
+| M7-12 | Git-Fehler: „Revision fehlt“ und „kein Paket an der Wurzel“ sind Exit 1; „Repository nicht erreichbar“, „git fehlt“ und „offline nicht im Cache“ sind Exit 2 | W1 C5 |
+| M7-12 | `build.lyr` (BS1–BS6) kommt nach M8b: ein Build-Skript braucht `std.fs` und `std.process` | W3 |
+| M7-3, M7-11 | Noten der Diagnostik: der verborgene Kandidat, der gepasst hätte; der Local, der einen Prelude-Namen verdeckt (07) | W6 |
+| M4-5 | Lint (warn, Gruppe `correctness`): eine Konformanz, deren Typ und Interface beide aus anderen Paketen stammen | W7 |
+| M5-8 | Das Konformanz-Gate liest die Spec an dem Commit, den `spec.pin` nennt (13) | W9 |
+| D4 | Ein CI-Job misst Messpunkt 3 berichtend, mit einer weiten Sperre (3× Go); 1,5× bleibt die Handprüfung je Meilenstein | — |
+
 ---
 
 **Bereich 11 ist damit vollständig entschieden** (W1–W9, 2026-09-29). Es bleibt 12 (Migration).

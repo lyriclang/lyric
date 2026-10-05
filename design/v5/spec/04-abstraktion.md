@@ -232,6 +232,25 @@ Blanket** `extend<T :: [I]> T :: [J] { … }` (X1/R4); ein Blanket-Extend schlie
 Fehler mit Hinweis auf die generische Form** (Swift's Protocol Extension als zweite Schreibweise
 verworfen). Statische Member ja, Felder nein (X5); Sichtbarkeit X6.
 
+## Review 2026-10-05 — Nachträge beim Bauen (M4–M8a)
+
+Entscheidungen des Maintainers aus der Durchsicht der offenen Punkte vor dem Abschluss von M8a.
+Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert oder schärft. Wo eine
+ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| A5 | **Ein eigenes Member gewinnt gegen ein Blanket-Member** (`extend<I :: [Iterator]> I { fn count() … }`) am konkreten Typ; generischer Code nimmt das Blanket-Member. Das eigene Member bekommt eine **Warnung**. R2 bleibt für die inhärente Extension neben der eigenen Konformanz eines Typs. Grund: sonst bricht jede neue Methode eines Blanket-Blocks der std fremden Code | D2 R2 |
+| A8 | **D9 gilt ganz**: ein generisches Member — auch mit Rumpf — macht das Interface als Wert unbenutzbar und ist je Konformer überschreibbar. Die 4.x-Regel (ein generisches Member mit Rumpf ist nicht überschreibbar) gilt nur noch im 4.x-Pfad, bis er `main` verlässt (M16) | D9 |
+| M8a-7 | Mit A8 sind `exact<T>` und `clamping<T>` statische Member von `Integer` (10 Z4). `parse` mit Radix bleibt eine eigene Überladung je Ganzzahltyp: ein Interface überlädt nicht, und `Parse.parse(s)` gibt es schon | D9, D4 |
+| M8a-5 | **Blanket-Block gegen Formblock**: ein Blanket-Block schließt einen Formblock nur aus, wo er die Form **erreicht** — die Form erfüllt seine Constraints über einen Block, der sie nennt. `T[] :: [Iterable]` steht damit neben „jeder Iterator ist Iterable“. Zwei Blanket-Blöcke gegeneinander bleiben ein Konflikt (kein Negativ-Schluss) | D15, 03 X4 |
+| M8a-11 | **Eine Fixierung in der Elternliste eines Interfaces ist ein Constraint auf `Self`** (`interface Num :: [Add<Out = Self>]`); ein Konformer, dessen Antwort abweicht, erfüllt das Interface nicht | 03 T6 |
+| M4-3 | `Default` für ein Enum schreibt man von Hand; es gibt keine Synthese | D7 |
+| M4-4 | `Ordered` für ein Enum mit Nutzlast vergleicht die Variantenposition zuerst, dann die Nutzlast von links | D7 |
+| M7-12 | **Ein Typ mit einem Feld, das ein Modul nicht nennen darf, ist dort nicht baubar** — weder per Initializer noch per `with`, auch wenn das Feld einen Default hat (Fabrikpflicht) | D11 |
+| M7-12 | **Interface-Helfer** (`private fn` mit Rumpf, 07 S4): aufrufbar nur aus den Defaults desselben Interfaces, dort auch auf anderen Werten des Interfaces; ein Kind-Interface ruft ihn nicht | D14 |
+| M8a-10 | `static let` steht auch im Rumpf eines Enums. Konstanten generischer Typen: 07 V5 | — |
+
 ---
 
 **Bereich 4 ist damit vollständig entschieden** (D1–D15, 2026-09-28).

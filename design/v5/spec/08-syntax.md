@@ -91,7 +91,7 @@ Aufrufstelle (Y1, T12) — `&` steht nie in einem Typ; keine `ref`-Locals, keine
 | D8 | **`sealed interface Shape { }`** — geschlossene Konformermenge im Paket: `match` über Typ-Patterns erschöpfend ohne `_`, ein neuer Konformer macht jedes `match` ohne ihn zum Fehler, fremde Pakete konformieren nicht, der Compiler darf `switch` über Deskriptoren emittieren. Gegen Enum: eigenständige Typen mit eigenen Membern (Kotlin, Java 17) |
 | D9 | `fn f(): int throws [IoError, ParseError]`; ein Typ auch ohne Klammern (Listenregel D5/D6); bar = `Error` |
 | D10 | Interface: `type Item;` / `type Out = Self;`, `static fn parse(s: string): ?Self;`, `static let ZERO: Self;`, Default-Rümpfe, `private fn` Helfer |
-| D11 | **Koroutine nur über den Rückgabetyp** `Coroutine<int>` + `yield` — keine Signaturmarkierung (keine Färbung) |
+| D11 | **Koroutine nur über den Rückgabetyp** `Coroutine<int>` + `yield` — keine Signaturmarkierung (keine Färbung). *Review 2026-10-05 (M6-3): Generator ist, was selbst yieldet oder keinen Wert zurückgibt* |
 | D12 | `extend T { }`, `extend T :: [I] { }`, `extend<T :: [I]> T[] { }`, `private extend T { }` |
 | D13 | `macro Name(target: StructDecl, n: Expr): Decl { … }` (Y12) |
 | D14 | `type Pair<T> = (T, T);`; kein `opaque` |
@@ -181,7 +181,7 @@ Makro-`quote`; JS-ASI verworfen.
 | S4 | Labels `outer: loop { … break outer; }` (4.x-Form, kein `'outer`); `break value` nur aus `loop`; `break outer value` erlaubt | Rust (Wert) |
 | S5 | **`using let f = open(p);`** — Wort vor `let`; `using var` ist ein Fehler | C# `using var` |
 | S6 | `defer expr;` / `defer { … }`; `return`/`break` im `defer`-Rumpf ist ein Übersetzungsfehler (heute Compiler-Stack-Overflow) | Go |
-| S7 | `try { } catch (e: T) { }` bleibt; `catch (e: A, B)` (E9) | — |
+| S7 | `try { } catch (e: T) { }` bleibt; mehrere Typen als `catch (e in [A, B])` (Y6) | — |
 | S8 | **Zuweisung bleibt Ausdruck** (Maintainer): Wert = neuer Wert des Ziels, Typ = Typ des Ziels, rechtsassoziativ, für `=` und Compound (`o ??= 3` liefert `?T`) — die gemessene Wirklichkeit als Spec-Zeile; **Zuweisung direkt als Bedingung → Warnung** „`==` gemeint?", Doppelklammer schaltet sie ab; Präzedenz niedrigste, unter `??` | C#; Clang `-Wparentheses` |
 | S9 | `match (e) { … }`; Ausdrucksarm endet mit `,`, Blockarm darf es weglassen (beide erlaubt; Formatter schreibt bei Blöcken keins) | Rust |
 | S10 | Leeres `;` erlaubt, Formatter entfernt es | — |
@@ -236,7 +236,7 @@ Ausrichtung `< > ^` mit Füllzeichen; Vorzeichen `+`/`-`; `#` alternative Form (
 `0xff`); `0`-Auffüllung; Breite, Präzision; Gruppierung `,`/`_` (`{1234567:,}` → `1,234,567`);
 Typ `b o x X e E f %` auf Zahlen, **`?` = Debug** auf allem (D7). Zahlen und `char`/`string`
 verstehen alles Passende; ein **`Display`-Typ** bekommt nur Breite/Ausrichtung/Füllung auf sein
-`show()`; ein Typ mit eigenen Specs konformiert **`Format { fn format(spec: StringView): string }`**.
+`show()`; ein Typ mit eigenen Specs konformiert **`Format { fn format(spec: StringView, &out: StringBuilder) }`** (10 S7).
 Kein `C`/`N2`/`P1`, keine Kultur. `std.fmt.format("{} {0:>4}", …)` zur Laufzeit mit derselben
 Sprache. (Python-Grammatik, Rust `{:?}`)
 
@@ -320,6 +320,29 @@ macro retry(n: Expr, body: Block): Expr {
 }
 let data = retry!(3) { try fetch(url) };
 ```
+
+## Review 2026-10-05 — Nachträge beim Bauen (M4–M8a)
+
+Entscheidungen des Maintainers aus der Durchsicht der offenen Punkte vor dem Abschluss von M8a.
+Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert oder schärft. Wo eine
+ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| M5-1 | **Tail-Regel**: `if`, `match` und `loop` als Letztes ohne `;` in einem Wertblock sind dessen Wert; mitten im Block sind sie Anweisungen. Ein `if`-Ausdruck nimmt Wertblöcke (`if (c) { 1 } else { 2 }`); ein Arm darf mit `break` oder `continue` enden | Y4, Y5 |
+| M6-2 | **Trailing-Block gegen Initializer**: nach `Name { feld = ausdruck` entscheidet das Trennzeichen — `;` macht ein Lambda, `,` oder `}` einen Initializer | Y4 |
+| M5-9 | **`try` deckt von seiner Stelle nach rechts** und darf rechts eines Operators stehen; ein werfender Aufruf links davon ist ein Fehler (05 E4) | Y4 |
+| M5-7, M6-6 | Klammerpflicht für `throws` hinter einem Rückgabetyp, der selbst eine Menge tragen kann (03 T17) | Y2 |
+| A2 | **Variadik, Aufrufseite**: `f(xs)` übergibt ein Array als **ein** Element; **`f(xs...)` breitet es aus**. Ein Array an einen variadischen Parameter seines Elementtyps ohne `...` ist ein Typfehler mit dem Hinweis | Y2, 12 S01 |
+| M6-24 | Lambda-Ortsparameter: `{ &n => … }`, `(&n) => …` (03 T12) | Y11 |
+| M6-3 | D11 erweitert (06) | Y2 D11 |
+| M8a-1 | `x[k] op= v` und `x[k]++` auf Containern (02 M4) | Y4 |
+| A9f | Der Schiebezähler ist jeder Ganzzahltyp (03 T2) | Y4 |
+| M8a-10 | `static let` steht im Enum-Rumpf. `+%`, `-%`, `*%` bleiben auf den eingebauten Ganzzahlen (generisch `wrappingAdd` …). Im Schleifenkopf steht nur das schlichte `try` | Y2, Y4, Y5 |
+| A3 | `Format { fn format(spec: StringView, &out: StringBuilder) }` — es gilt die Form aus 10 S7 | Y7 |
+| A4 | **Nullauffüllung gruppiert mit** (`{1234:010,}` ist `00,001,234`); die Breite zählt die Trenner und ist ein Minimum | Y7 |
+| M8a-8 | **Rundung unter einer Präzision: eine exakte Hälfte geht von null weg**, wie `round()` (`{0.125:.2f}` ist `0.13`, `{2.5:.0f}` ist `3`). Der Text entsteht aus der exakten Dezimalentwicklung, gleich auf jeder Plattform | Y7 |
+| M6-30 | Ein Aufruf `name(…)` in einer Methode meint ein Feld nur, wenn es aufrufbar ist (07 V6) | Y4 |
 
 ---
 

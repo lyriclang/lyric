@@ -90,9 +90,9 @@ the nearest running resume" bleibt wahr für `yield`; `VM0015` verschwindet. Ein
 
 | # | Entscheidung | Vorbild |
 |---|---|---|
-| T1 | **`spawn(fn(): T throws E): Task<T> throws E`** — Handle mit Ergebnis und Fehlermenge (E10); läuft auf dem Scheduler des aktuellen Threads, `thread.spawn`/`pool.spawn` wählt einen anderen | Kotlin, Swift |
+| T1 | **`spawn(fn(): T throws E): Task<T> throws E`** — Handle mit Ergebnis und Fehlermenge (E10); läuft auf dem Scheduler des aktuellen Threads, `pool.spawn` wählt einen anderen. *Review 2026-10-05 (M6-20): `thread.spawn(task)` entfällt, `Thread.spawn` gibt selbst einen Task-Handle* | Kotlin, Swift |
 | T2 | **`try task.await(): T`** parkt bis zum Ende; **Methode, kein Schlüsselwort** — keine Färbung | Kotlin |
-| T3 | Zustände `Running`, `Done(T)`, `Failed(E)`, `Panicked(PanicInfo)`, `Cancelled`; `status()`, `isDone` | — |
+| T3 | Zustände `Running`, `Done(T)`, `Failed(Error)` (*Review M6-16: die Menge steht nur statisch am Typ*), `Panicked(PanicInfo)`, `Cancelled`; `status()`, `isDone` | — |
 | T4 | **Panik im Task** (E8): Zustand `Panicked`; `await()` darauf **paniert erneut** — eine Panik bleibt ein Bug, außer ein Aufseher schaut per `status()` ohne zu warten. Ein Server überlebt einen Request-Bug nur, wenn er es ausdrücklich so baut | Erlang Monitor |
 | T5 | **Strukturierte Nebenläufigkeit als Hauptform**: `TaskScope` — Kinder enden vor dem Scope; erster Fehler bricht Geschwister ab (N9) und wird am Scope-Ende geworfen. `spawnDetached` für Fire-and-forget, beim Namen genannt | Trio, Kotlin `coroutineScope`, Swift `TaskGroup`, Java 21 |
 | T6 | `main` ist ein Task auf dem Hauptscheduler; endet `main`, endet das Programm, detachte Tasks werden nicht abgewartet | Go |
@@ -105,7 +105,7 @@ the nearest running resume" bleibt wahr für `yield`; `VM0015` verschwindet. Ein
 | K1 | **`Channel<T>`** ungepuffert/gepuffert; `send` parkt bei voll, `recv(): ?T` bei leer; `close()`: `recv` nach dem Leeren `null`, `send` wirft `ChannelClosed`; innerhalb eines Threads und darüber hinweg (P1) | Go, Kotlin |
 | K2 | **`select` als Bibliothek** mit Builder (`Select.on(c1) { … }.on(c2) { … }.timeout(d) { … }.run()`); kein Schlüsselwort; Bereich 8 darf Syntax darüberlegen | Kotlin DSL; Go-Statement verworfen |
 | K3 | `sleep(Duration)` parkt; `Timer.after(d)` ist ein einmal feuernder Channel; `timeout` ein `select`-Fall | Go |
-| K4 | **Typisierte Waker statt `interrupt()`**: `Signal` (einmalig), `Event`, `Semaphore`; das globale sticky `interrupt()` und die Zwei-Rollen-Falle sind weg | Java, Kotlin |
+| K4 | **Typisierte Waker statt `interrupt()`**: `Signal` (einmalig), `Event`, `Semaphore` (*Review M6-31: zu 5.0 gehört nur `Semaphore`*); das globale sticky `interrupt()` und die Zwei-Rollen-Falle sind weg | Java, Kotlin |
 | K5 | **Shutdown/Ctrl+C eigene Sache**: `os.signals(SIGINT): Channel<Signal>`; der Scheduler schluckt nie ein Signal | Go `signal.Notify` |
 | K6 | `Mutex<T>`, `RwLock<T>`, `Once`, `Atomic<T>` (G4); auch auf einem Thread nötig, sobald ein Abschnitt einen `wait` enthält; `Mutex` parkt statt zu spinnen | Rust |
 | K7 | alles in Lyric (L9) über `park`/`unpark` und Thread-Primitive; die Laufzeit kennt keinen Channel | — |
@@ -115,7 +115,7 @@ the nearest running resume" bleibt wahr für `yield`; `VM0015` verschwindet. Ein
 | # | Entscheidung | Vorbild |
 |---|---|---|
 | S1 | **Scheduler bleibt Lyric** über `park`/`unpark`, `poll(events, timeout)`, Timer (L9) | Lyric 4 |
-| S2 | **Poller in C je Plattform**: epoll, kqueue, **AFD/wepoll** unter Windows (Bereitschaftssemantik; IOCP's Completion-Modell würde die stdlib zweigleisig machen) | mio, libuv |
+| S2 | **Poller in C je Plattform**: epoll, kqueue, **AFD** unter Windows über eine eigene Anbindung (*Review M6-29; wepoll verworfen*) (Bereitschaftssemantik; IOCP's Completion-Modell würde die stdlib zweigleisig machen) | mio, libuv |
 | S3 | **Reguläre Dateien** über Pool-Thread + notify (4.2-Modell von `std.io.stream`, jetzt für alle Datei-I/O); `io_uring` Tür | libuv, tokio |
 | S4 | **Keine blockierenden Natives in der stdlib**: `sleep` parkt, DNS auf dem Pool-Thread, `file.bytes` über S3; ein blockierfähiges Native heißt so und existiert nur als Pool-Variante | — |
 | S5 | **Host-Pump**: `Scheduler.step(): bool` und `Scheduler.run()` — die 4.x-Form | Lyric 4, Erato |
@@ -125,7 +125,7 @@ the nearest running resume" bleibt wahr für `yield`; `VM0015` verschwindet. Ein
 
 | # | Regel | Vorbild |
 |---|---|---|
-| P1 | **Happens-before** nur durch `Channel`-Senden/Empfangen, `Mutex` lock/unlock, `Thread.join`, `Atomic`-Operationen, Thread-Start | Java JMM, Go |
+| P1 | **Happens-before** nur durch `Channel`-Senden/Empfangen, `Mutex` lock/unlock, `await()` auf dem Handle eines Threads, `Atomic`-Operationen, Thread-Start | Java JMM, Go |
 | P2 | `Atomic<T>` sequenziell konsistent (C11 `seq_cst`); schwächere Ordnungen als Methoden: Tür | C11, Rust |
 | P3 | Zugriff ohne Happens-before auf einen `var`-Ort, den ein anderer Thread schreibt: **Data Race, keine Zusage** (G3) | Go |
 | P4 | keine Umordnung über Atomics und Locks (clang mit C11-Atomics) | — |
@@ -159,6 +159,40 @@ Channels („ein Objekt gehört einem Thread, bis es übergeben wird"); globale 
 `Atomic`/`Mutex` in einem Programm mit Threads: **Warnung** (Lint, Bereich 11);
 Modulinitialisierung einmal, thread-sicher (`Once`); Sync-Typen: `Mutex<T>`, `RwLock<T>`,
 `Atomic<T>`, `Once`, `Channel<T>`.
+
+## Review 2026-10-05 — Nachträge beim Bauen (M4–M8a)
+
+Entscheidungen des Maintainers aus der Durchsicht der offenen Punkte vor dem Abschluss von M8a.
+Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert oder schärft. Wo eine
+ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| M6-3 | **Generator-Definition**: eine Funktion mit Ergebnis `Coroutine<…>` ist ein Generator, wenn sie selbst yieldet **oder** keinen Wert zurückgibt. `return make();` bleibt eine Fabrik, ein leerer Rumpf ist ein leerer Generator, und ein Rumpf, der nur über Helfer yieldet, ist einer | N2, 08 D11 |
+| M6-9 | Ein `yield` in einer Hilfsfunktion wirft beim Schließen `Cancelled`: der Helfer deklariert `throws Cancelled`, sein Aufruf trägt `try`; ein Generator-Rumpf deckt es für die Helfer, die er ruft | N2 A5 |
+| M6-10 | `close()` wirft den ersten Fehler weiter, den ein `defer` beim Abwickeln geworfen hat (05) | N2 A5 |
+| M6-4 | **`main` deckt `Cancelled` selbst**, wie ein Generator-Rumpf; wartende Aufrufe behalten ihr `try`. Benannte Funktionen deklarieren weiter | N4 T6, N9 X1 |
+| M6-26 | `main` wird nur dann ein Task, wenn das Programm warten kann; ein Programm, das nie wartet, lädt keinen Scheduler | N4 T6 |
+| M6-11 | **Jedes Warten in einem abgebrochenen Task wirft**, auch wenn es nicht warten müsste (fertiger Task, freies Schloss, bereitliegender Wert). Aufräumen, das warten muss, braucht die `shield`-Tür (X6) | N9 X5 |
+| M6-12 | **Deadlock**: hat ein Scheduler nichts Bereites, keinen Schläfer und keine Quelle, die wecken könnte (kein I/O-Interesse, kein Signal-Abo, kein zweiter lebender Thread), endet das Programm mit `LYR-RT0018` und dem Trace der wartenden Stelle. Mit laufenden Threads greift die Prüfung nicht | N6 |
+| M6-13 | **Form des Scopes**: `using let scope = TaskScope.new();` — der Scope ist `Closeable`, sein `close()` wartet. Eine Lambda-Form daneben gibt es nicht | N4 T5 |
+| M6-14 | `close()` des Scopes wirft den Kindfehler selbst, als `Error`. Ein Kind, das mit `Cancelled` endet, ist kein Fehler des Scopes | N4 T5 |
+| M6-15 | Der Rumpf von `spawnDetached` darf nur `Cancelled` werfen; alles andere fängt er selbst | N4 T5 |
+| M6-16 | `Task<T> throws E` trägt die Menge statisch am Typ (03); `status()` zeigt `Failed(Error)` | N4 T1, T3 |
+| M6-17 | **Select nimmt den ersten bereiten Fall in Schreibreihenfolge.** Ein geschlossener Kanal ist immer bereit: wer `null` bekommt, hört auf, ihn zu wählen | N5 K2 |
+| M6-18 | Select hat **nur Empfangsfälle und keinen Ergebniswert** — für 5.0 entschieden, keine Tür | N5 K2 |
+| M6-19 | `Timer.after(d)` feuert durch **Schließen**: jeder Empfang gibt `null`, auch später noch | N5 K3 |
+| M6-20 | `Thread.spawn` gibt den **Task-Handle** seines ersten Tasks; „join“ ist `await()`. Endet der erste Task, **bricht der Thread ab, was auf ihm noch lebt, und läuft, bis alle geendet haben** — `defer` laufen, Schlösser werden frei. `main` bleibt nach T6 | N1 G2, N7 P1 |
+| M6-21 | **Panik im Rumpf eines Schlosses**: das Schloss wird frei und ist vergiftet; jeder weitere `lock`/`read`/`write` paniert mit `LYR-RT0019` und nennt die erste Panik. Ein `Once` in dieser Lage ist ebenfalls vergiftet | N1 G4, N5 K6 |
+| M6-22 | Wirft der Rumpf eines `Once`, geht der Fehler an diesen Aufrufer, und der nächste `run` versucht es neu | N5 K6 |
+| M6-23 | `Atomic<T>` trägt `int` und `bool`. **Referenzen (`Atomic<Klasse>`) kommen mit M11** — ein atomarer Referenz-Store braucht die Schreibbarriere des eigenen GC | N1 G4, N5 K6 |
+| M6-24 | Der Rumpf von `lock` und `write` bekommt den **Ort** (`m.lock { &n => n += 1; }`, 03 T12); ein Guard-Typ entfällt. `read` gibt den Wert | N1 G4 |
+| M6-27 | `pool.spawn` und `scope.spawn` nach `close()` sind eine Panik | N1 G2 |
+| M6-28 | Der Signal-Kanal hat einen festen Puffer von 16; die Zustellung blockiert nie, ein voller Puffer verliert das Signal für diesen Kanal | N5 K5 |
+| M6-29 | **Windows-Poller: eigene AFD-Anbindung** — ein Completion-Port je Scheduler, Wecken per `PostQueuedCompletionStatus`, Sockets per `IOCTL_AFD_POLL`. Gebaut mit M8b. wepoll kann ein wartendes `epoll_wait` nicht von außen wecken | N6 S2 |
+| M6-31 | Von den Weckern aus K4 gehört **nur `Semaphore`** zu 5.0 (`std.sync`, M8b). Ein einmaliges Ereignis ist ein Kanal, der geschlossen wird. `Signal` ist der Name der Betriebssystem-Signale (10 Q9) | N5 K4 |
+| M7-5 | **Der Scheduler benutzt die Klasse `Atomic` nicht**: er arbeitet mit std-internen atomaren Operationen auf eigenen Feldern (07 D4). `std.sync` importiert `std.task`, nicht umgekehrt; der Modulschnitt 10 Q10 gilt unverändert | N10 |
+| — | Technische Wahl beim Bauen: `park` ist die Primitive der Laufzeit, „unpark“ das Wieder-bereit-Machen durch den Scheduler in Lyric. `Cancelled` lebt in `std.task`; der Compiler lädt das Modul für jedes Programm mit einer Koroutine | N5, 10 Q10 |
 
 ---
 

@@ -57,7 +57,7 @@ Fehler (L5 E5). Die Zwillingsdoktrin fällt (E5). Familie um ein Wort: `try f()`
 | K1 | **`throws A, B, C` ist eine Menge** (Reihenfolge egal, Duplikat Fehler) | Zig Error-Sets, Java |
 | K2 | **`throws` bar = `throws Error`** (Wurzeltyp, E6): erlaubt, untypisiert; der Aufrufer fängt `Error` und schaut per Typ-Pattern (T11) hinein. Die Liste ist die empfohlene Form; die stdlib schreibt Listen | Swift |
 | K3 | **Deklariert, nie inferiert** für benannte Funktionen; **inferiert für Lambdas**, wenn der erwartete Funktionstyp es nicht vorgibt | Swift |
-| K4 | **Generisch**: `fn map<T, U, E>(xs: T[], f: fn(T) -> U throws E): U[] throws E`; `E` aus dem Argument inferiert, **an der Aufrufstelle substituiert**; `E = never` ≡ keine Klausel; ein Aufruf mit leerer Menge nach Substitution braucht kein `try` (überflüssiges `try` = Warnung) | Swift `throws(Never)` |
+| K4 | **Generisch**: `fn map<T, U, E :: [Error]>(xs: T[], f: fn(T) -> U throws E): U[] throws E`; `E` aus dem Argument inferiert, **an der Aufrufstelle substituiert**; `E = never` ≡ keine Klausel; ein Aufruf mit leerer Menge nach Substitution braucht kein `try` (überflüssiges `try` = Warnung) | Swift `throws(Never)` |
 | K5 | **Deckung auf der Instanz** (`throws Box<int>` ≠ `catch Box<string>`) | — |
 | K6 | **Teilmengenregel**: Implementierung wirft ⊆ Interface-Member; Funktionswert mit kleinerer Menge koerziert zu größerer (T3-Liste), nie umgekehrt | Swift, Java |
 | K7 | **Nachtrag (Bereich 10 I5)** — assoziierte Fehlertypen: `interface Iterator { type Error :: [Error] = never; fn next(): ?Item throws Error; }`; **Join-Regel** beim Zusammensetzen (Adapter über werfendem Lambda): gleicher Typ → dieser, einer `never` → der andere, verschieden → Wurzel `Error` (K2, Typ-Pattern zum Unterscheiden) | Swift 6 `AsyncIteratorProtocol<Failure>` |
@@ -104,7 +104,7 @@ einmal entschieden nach „trägt der Fehler Information?". Beantwortet Korpus-W
 |---|---|---|
 | O1 | **`interface Error { fn message(): string; fn cause(): ?Error { return null; } }`** — Wurzel aller werfbaren Typen; ohne Vererbung (D1) kann die Wurzel nur ein Interface sein. `Debug` automatisch (D7) | Swift, Rust |
 | O2 | Ursache ist Sache des Typs (`class ConfigError :: [Error] { message, cause: ?Error }`); Rethrow-mit-Kontext `catch (e: IoError) throw ConfigError { …, cause = e }` | Java, Rust |
-| O3 | **Unterdrückte Fehler und Backtrace leben in der Box**, nicht im Typ (ein geworfener Wert wird geboxt, E3): `e.suppressed(): Error[]`, `e.backtrace(): ?Backtrace` von der Laufzeit für jeden Fehlerwert — löst „ein Interface ohne Speicher kann nichts anhängen" | — |
+| O3 | **Unterdrückte Fehler und Backtrace leben in der Box**, nicht im Typ (ein geworfener Wert wird geboxt, E3): `e.suppressed(): Error[]`, `e.backtrace(): ?Backtrace` von der Laufzeit für jeden Fehlerwert — löst „ein Interface ohne Speicher kann nichts anhängen". *Review 2026-10-05 (M5-3): die Auskunft gibt es an der `catch`-Bindung; gebaut mit M8c* | — |
 | O4 | **`main` darf `throws`**; entkommener Fehler: `error: <message>`, Ursachenkette, Backtrace im Debug, **Exit 1** (Panik: 101). Die 4.x-Regel fällt | Rust, Go |
 | O5 | Host-/C-Grenze: Wrapper nach L5 E7, Form Bereich 11 | — |
 
@@ -126,7 +126,7 @@ Panik; fallengelassene Koroutine läuft keine (bleibt; das Verb dafür ist Berei
 
 | # | Regel |
 |---|---|
-| R1 | `interface Resource { fn close(): void throws Error; }` (Name Bereich 10); `close` darf werfen |
+| R1 | `interface Resource { fn close(): void throws Error; }` (Name Bereich 10: **`Closeable`**, 10 K1); `close` darf werfen |
 | R2 | die Bindung ist `let`; `close()` läuft bei jedem Ausgang außer Panik; **`using` und `defer` sind eine gemeinsame LIFO-Liste** in Registrierungsreihenfolge |
 | R3 | ein `Resource`-Wert, der weder `using`-gebunden noch gespeichert, zurückgegeben oder weitergereicht wird: **Warnung** „wird nie geschlossen"; das GC-Netz (L1) fängt den Rest |
 | R4 | Fehler aus `close()` propagieren beim normalen Verlassen; während eines Fehlers werden sie angehängt |
@@ -157,7 +157,7 @@ verhindern. Verworfen: nie (Swift, Zig — ein Request-Bug tötet den Server), �
 | # | Regel |
 |---|---|
 | C1 | derselbe Typ zweimal → Fehler |
-| C2 | eine Klausel, die eine frühere vollständig abdeckt (Interface, `sealed`-Elternteil, `Error`) → **Fehler „unerreichbare Klausel"** (heute still tot; Java) |
+| C2 | eine Klausel, die von einer früheren vollständig abgedeckt wird (Interface, `sealed`-Elternteil, `Error`) → **Fehler „unerreichbare Klausel"** (heute still tot; Java) |
 | C3 | Catch-all `catch (e)` zuletzt, sonst Fehler; aus dem Anhang nach §9 |
 | C4 | Klauseln müssen die Menge nicht decken; Rest propagiert, wenn deklariert (K8) |
 | C5 | **Mehrfach-Klausel `catch (e in [A, B])`** (Listenregel 08 D5/D6: `catch (e in A)` erlaubt, `catch (e: A)` bleibt die Annotationsform) (Bereich 8, Y6 — `in` + eckige Liste wie jede Mehrfachliste), `e` trägt die Menge (K7) — Java Multi-Catch ohne Unionstyp |
@@ -185,6 +185,31 @@ Builtin-Typname; **gültig nur als Rückgabetyp** von Funktionen und Lambdas; `t
 `unreachable()`, `loop` ohne `break`, `return` haben Typ `never`; **`never` koerziert zu jedem
 Typ** an Ausdruckspositionen (T3-Liste); jede andere Position ist ein Sema-Fehler — die drei
 4.x-ICEs werden Diagnosen. (Rust `!`, Swift `Never`)
+
+## Review 2026-10-05 — Nachträge beim Bauen (M4–M8a)
+
+Entscheidungen des Maintainers aus der Durchsicht der offenen Punkte vor dem Abschluss von M8a.
+Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert oder schärft. Wo eine
+ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| M5-2 | **`Exception`** behält die Felder `text` und `inner`. Neu ist `static fn new(message: string, cause: ?Error = null)`, also `Exception("…")` und `Exception("…", cause: e)` | E6, 12 E06 |
+| M5-3 | **`e.suppressed()` und `e.backtrace()` gibt es an der `catch`-Bindung**: die Box lebt so lange wie die Klausel. Ein gespeicherter Fehlerwert gibt keine Auskunft. Gebaut mit M8c, mit einem Typ `Backtrace` in std | E6 O3 |
+| M5-5 | **Ein `try { }`-Block markiert seinen ganzen Rumpf.** Ein inneres `try`, das dort nichts mehr markiert, warnt | E4 |
+| M5-9 | **`try` darf rechts eines Operators stehen** und deckt von seiner Stelle alles nach rechts (`a + try b()`). Ein werfender Aufruf links davon ist ungedeckt: ein Fehler mit dem Hinweis, `try` an den Anfang zu setzen (`try a() + b()`). Ein zweites `try` im schon gedeckten Bereich warnt wie in M5-5 | E4 |
+| M5-10 | `try?` über einem `void`-Aufruf ist als Anweisung erlaubt (es verwirft den Fehler), als Wert ein Fehler | E4 |
+| M5-11 | **Rethrow** ist nur `throw e` der eigenen Bindung direkt in ihrer Klausel. Unter anderem Namen oder aus einem Lambda ist es ein neuer Wurf | E2 K7 |
+| M5-6 | **Typ der `catch`-Bindung**: kann nur ein Typ ankommen, ist die Bindung dieser Typ — in `(e in A)` wie in der typlosen Form. Bei mehreren Typen ist sie `Error` und trägt die Menge für `match` und `throw e` | E2 K7, E9 |
+| M5-13 | **K4-Inferenz**: `E` bindet nur aus genau `throws E`; die erste Bindung gilt, es gibt keinen Join über mehrere Argumente | E2 K4 |
+| M5-14 | **Paniktexte** tragen ihr Wort vorn (`not implemented: …`, `unreachable: …`, `assertion failed: …`). `assert` nennt den Quelltext der Bedingung, eine eigene Meldung folgt danach | E8 |
+| M5-15 | Die Zeile `suppressed:` im Bericht eines entkommenen Fehlers bleibt | E6 O4 |
+| M5-16 | Eine typlose Klausel, die nichts mehr erreichen kann, ist eine **Warnung** | E9 |
+| A7 | **`never` an drei weiteren Stellen**, nur unter der Schranke `Error`: als Default, als Antwort und als Fixierung eines assoziierten Typs (`type Error :: [Error] = never`, `Iterator<Error = never>`). `type Item = never` und ein geschriebenes `f<never>(…)` bleiben Fehler | E12 |
+| M6-10 | **`close()` eines Generators wirft den ersten Fehler weiter**, den ein `defer` während des Abwickelns geworfen hat. Das `Cancelled` selbst bleibt verworfen | E7 |
+| M8a-4 | **Die Instanz schließt**: jede Schleife, auch eine generische, ruft beim frühen Verlassen `close()`, wenn der konkrete Iterator `Closeable` ist. Die Regel dazu steht an der Deklaration: wer `Iterator` und `Closeable` ist, wirft in `close()` nur, was sein `Error` erlaubt — so deckt das `try` der Schleife das Schließen | E7 R7 |
+| M6-25 | Abweichung von E8 mit Uhr: der Stacküberlauf beendet bis M11 den Prozess (01 S3) | E8 |
+| M6-21 | Eine Panik im Rumpf eines Schlosses gibt es frei und vergiftet es (06) | E8 |
 
 ---
 

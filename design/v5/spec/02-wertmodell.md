@@ -244,6 +244,18 @@ Klasse verlangen (Swift).
 | I5 | fehlendes Feld ohne Default: Fehler, der **alle** fehlenden nennt | 4.6 `SEM0106` |
 | I6 | Structs haben nur den Initializer; `init`-Form für Klassen: Bereich 4 | — |
 
+## Review 2026-10-05 — Nachträge beim Bauen (M4–M8a)
+
+Entscheidungen des Maintainers aus der Durchsicht der offenen Punkte vor dem Abschluss von M8a.
+Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert oder schärft. Wo eine
+ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| A6 | **`for` über einen Struct-Iterator läuft über eine Kopie**; die Variable bleibt stehen (`var r = 0..10; for (i in r) { break; }` lässt `r` bei 0). Ein Klassen-Iterator läuft am Objekt, eine zweite Schleife macht weiter | M7 |
+| M6-1 | Eine **Koroutinen-Methode eines Werttyps hält eine Kopie des Empfängers** vom Aufruf (der Platz des Aufrufers kann vor dem Rumpf weg sein). Ein `mut fn`-Generator auf einem Werttyp ist erlaubt und **warnt**: er ändert die Kopie | M5 |
+| M8a-1 | **`x[k] op= v` und `x[k]++` auf Containern**: Empfänger und Schlüssel werden genau einmal ausgewertet, dann lesen (`Index`), rechnen, schreiben (`IndexSet`) — dasselbe Verhalten wie auf einem Array-Element | M4 |
+
 ---
 
 **Bereich 2 ist damit vollständig entschieden** (M1–M14, 2026-09-28).
