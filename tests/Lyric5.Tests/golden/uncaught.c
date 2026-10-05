@@ -214,14 +214,14 @@ bb0:;
     return *t2;
 }
 
-#line 108 "stdlib5/std/core.lyr"
+#line 111 "stdlib5/std/core.lyr"
 lyr_opt_iface14_std_core_Error lyr_std_core_Error_cause(LyrIface l0_this) {
     lyr_opt_iface14_std_core_Error t0_s = {0};
     lyr_opt_iface14_std_core_Error *t0 = &t0_s;
 bb0:;
-#line 108
+#line 111
     t0_s = (lyr_opt_iface14_std_core_Error){0}; t0 = &t0_s;
-#line 108
+#line 111
     return *t0;
 }
 

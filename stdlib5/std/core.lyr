@@ -7,15 +7,18 @@
 /// `never`, so a call stands wherever a value is wanted and ends the path it is on.
 pub fn panic(message: string): never;
 
-/// Ends the process unless `condition` holds (05 E8): `LYR-RT0011` with `message`. The check
-/// stands at the call; the message is built before it, as every argument is.
-pub fn assert(condition: bool, message: string = "assertion failed"): void;
+/// Ends the process unless `condition` holds (05 E8): `LYR-RT0011`, "assertion failed: " and
+/// the condition as it is written, then `message` where one is given. The check stands at the
+/// call; the message is built before it, as every argument is.
+pub fn assert(condition: bool, message: string = "", @callerExpr(condition) written: string = ""): void;
 
-/// A branch the program never takes (05 E8, E12): taking it ends the process, `LYR-RT0012`.
-pub fn unreachable(message: string = "entered unreachable code"): never;
+/// A branch the program never takes (05 E8, E12): taking it ends the process, `LYR-RT0012`,
+/// "unreachable" and `message` behind it where one is given.
+pub fn unreachable(message: string = ""): never;
 
-/// A place still to be written (10 prelude): reaching it ends the process, `LYR-RT0013`.
-pub fn todo(message: string = "not implemented yet"): never;
+/// A place still to be written (10 prelude): reaching it ends the process, `LYR-RT0013`,
+/// "not implemented" and `message` behind it where one is given.
+pub fn todo(message: string = ""): never;
 
 /// The empty interface (design/v5/spec/03 T10): every struct, class and enum value is an `Any`
 /// at the transition, and `is` or a type pattern takes it out again (T11). `Any[]` is the
@@ -110,14 +113,19 @@ pub interface Error {
 }
 
 /// The ready-made `Error` for throwing a message (design/v5/spec/12 E06):
-/// `throw Exception { text = "…" };`, with `inner` for the error it wraps. The field is `text`,
-/// not `message`: `Error` requires a METHOD `message()`, and one type's members cannot share a
-/// name.
+/// `throw Exception("…");`, and `Exception("…", cause: e)` for the error it wraps. The fields are
+/// `text` and `inner`, not `message` and `cause`: `Error` requires the METHODS `message()` and
+/// `cause()`, and one type's members cannot share a name.
 pub class Exception :: [Error] {
     /// What `message()` returns.
     pub text: string,
     /// The error this one wraps, if any: what `cause()` returns.
     pub inner: ?Error = null,
+
+    /// `Exception("…")`, `Exception("…", cause: e)` (08 Y9).
+    pub static fn new(message: string, cause: ?Error = null): Exception {
+        return Exception { text = message, inner = cause };
+    }
 
     pub fn message(): string {
         return this.text;

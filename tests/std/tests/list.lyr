@@ -104,4 +104,5 @@ fn forWalksItAndAChangePanics(): void {
         }
     });
     assertEq(info.message, "List: changed while it was walked");
+    assertEq(info.code, "LYR-RT0016");
 }

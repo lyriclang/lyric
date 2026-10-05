@@ -6078,23 +6078,23 @@ bb0:;
     return;
 }
 
-#line 625 "stdlib5/std/core.lyr"
+#line 633 "stdlib5/std/core.lyr"
 uint8_t lyr_std_core__extend__string_equals_033d1fbf(LyrStr *l0_this, LyrStr *l1_o) {
     LyrStr *t0 = NULL;
     LyrStr *t1 = NULL;
     uint8_t t2 = 0;
 bb0:;
-#line 625
+#line 633
     t0 = l0_this;
-#line 625
+#line 633
     t1 = l1_o;
-#line 625
+#line 633
     t2 = (uint8_t)lyr_str_eq(t0, t1);
-#line 625
+#line 633
     return t2;
 }
 
-#line 757 "stdlib5/std/core.lyr"
+#line 765 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__string_debug_a8a61b85(LyrStr *l0_this) {
     LyrStr *t0 = NULL;
     LyrStr *t1 = NULL;
@@ -6102,79 +6102,79 @@ LyrStr * lyr_std_core__extend__string_debug_a8a61b85(LyrStr *l0_this) {
     LyrStr *t3 = NULL;
     LyrStr *t4 = NULL;
 bb0:;
-#line 757
+#line 765
     t0 = (LyrStr *)&lyr_lit57;
-#line 757
+#line 765
     t1 = l0_this;
-#line 757
+#line 765
     t2 = lyr_str_concat(t0, t1);
-#line 757
+#line 765
     t3 = (LyrStr *)&lyr_lit57;
-#line 757
+#line 765
     t4 = lyr_str_concat(t2, t3);
-#line 757
+#line 765
     return t4;
 }
 
-#line 349 "stdlib5/std/core.lyr"
+#line 357 "stdlib5/std/core.lyr"
 uint8_t lyr_std_core__extend__int_equals_12f53381(int64_t l0_this, int64_t l1_o) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     uint8_t t2 = 0;
 bb0:;
-#line 349
+#line 357
     t0 = l0_this;
-#line 349
+#line 357
     t1 = l1_o;
-#line 349
+#line 357
     t2 = (uint8_t)(t0 == t1);
-#line 349
+#line 357
     return t2;
 }
 
-#line 654 "stdlib5/std/core.lyr"
+#line 662 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__int_debug_970869d7(int64_t l0_this) {
     int64_t t0 = 0;
     LyrStr *t1 = NULL;
 bb0:;
-#line 654
+#line 662
     t0 = l0_this;
-#line 654
+#line 662
     t1 = lyr_str_from_int(t0);
-#line 654
+#line 662
     return t1;
 }
 
-#line 656 "stdlib5/std/core.lyr"
+#line 664 "stdlib5/std/core.lyr"
 int64_t lyr_std_core__extend__int_default_a9664dcd(void) {
     int64_t t0 = 0;
 bb0:;
-#line 656
+#line 664
     t0 = (int64_t)INT64_C(0);
-#line 656
+#line 664
     return t0;
 }
 
-#line 311 "stdlib5/std/core.lyr"
+#line 319 "stdlib5/std/core.lyr"
 void lyr_std_core__default__Hasher_std_hash_FixedHasher_writeInt_d4f17b6b(lyr_ty_std_hash_FixedHasher *l0_this, int64_t l1_v) {
     int64_t t0 = 0;
     uint64_t t1 = 0;
     lyr_ty_std_hash_FixedHasher t2_s = {0};
     lyr_ty_std_hash_FixedHasher *t2 = &t2_s;
 bb0:;
-#line 311
+#line 319
     t0 = l1_v;
-#line 311
+#line 319
     t1 = (uint64_t)t0;
-#line 311
+#line 319
     t2 = l0_this;
-#line 311
+#line 319
     lyr_std_hash_FixedHasher_writeUint(t2, t1);
-#line 310
+#line 318
     return;
 }
 
-#line 351 "stdlib5/std/core.lyr"
+#line 359 "stdlib5/std/core.lyr"
 lyr_ty_std_core_Ordering lyr_std_core__extend__int_compare_33ab851f(int64_t l0_this, int64_t l1_o) {
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -6195,53 +6195,53 @@ lyr_ty_std_core_Ordering lyr_std_core__extend__int_compare_33ab851f(int64_t l0_t
     lyr_ty_std_core_Ordering t11_s = {0};
     lyr_ty_std_core_Ordering *t11 = &t11_s;
 bb0:;
-#line 351
+#line 359
     t0 = l0_this;
-#line 351
+#line 359
     t1 = l1_o;
-#line 351
+#line 359
     t2 = (uint8_t)(t0 < t1);
-#line 351
+#line 359
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 351
+#line 359
     t3_s = (lyr_ty_std_core_Ordering){ .tag = 0 }; t3 = &t3_s;
-#line 351
+#line 359
     t4_s = *t3; t4 = &t4_s;
-#line 351
+#line 359
     return *t4;
 bb2:;
-#line 352
+#line 360
     t5 = l0_this;
-#line 352
+#line 360
     t6 = l1_o;
-#line 352
+#line 360
     t7 = (uint8_t)(t5 > t6);
-#line 352
+#line 360
     if (t7) goto bb3; else goto bb4;
 bb3:;
-#line 352
+#line 360
     t8_s = (lyr_ty_std_core_Ordering){ .tag = 2 }; t8 = &t8_s;
-#line 352
+#line 360
     t9_s = *t8; t9 = &t9_s;
-#line 352
+#line 360
     return *t9;
 bb4:;
-#line 353
+#line 361
     t10_s = (lyr_ty_std_core_Ordering){ .tag = 1 }; t10 = &t10_s;
-#line 353
+#line 361
     t11_s = *t10; t11 = &t11_s;
-#line 353
+#line 361
     return *t11;
 }
 
-#line 655 "stdlib5/std/core.lyr"
+#line 663 "stdlib5/std/core.lyr"
 int64_t lyr_std_core__extend__int_clone_535f4ead(int64_t l0_this) {
     int64_t t0 = 0;
 bb0:;
-#line 655
+#line 663
     t0 = l0_this;
-#line 655
+#line 663
     return t0;
 }
 
@@ -6299,13 +6299,13 @@ bb0:;
     return t14;
 }
 
-#line 758 "stdlib5/std/core.lyr"
+#line 766 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__string_clone_b1ede3e7(LyrStr *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
-#line 758
+#line 766
     t0 = l0_this;
-#line 758
+#line 766
     return t0;
 }
 
@@ -6368,7 +6368,7 @@ bb0:;
     return t8;
 }
 
-#line 720 "stdlib5/std/core.lyr"
+#line 728 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__char_debug_3e6d3b84(uint32_t l0_this) {
     LyrStr *t0 = NULL;
     uint32_t t1 = 0;
@@ -6377,49 +6377,49 @@ LyrStr * lyr_std_core__extend__char_debug_3e6d3b84(uint32_t l0_this) {
     LyrStr *t4 = NULL;
     LyrStr *t5 = NULL;
 bb0:;
-#line 720
+#line 728
     t0 = (LyrStr *)&lyr_lit63;
-#line 720
+#line 728
     t1 = l0_this;
-#line 720
+#line 728
     t2 = lyr_str_from_char(t1);
-#line 720
+#line 728
     t3 = (LyrStr *)&lyr_lit63;
-#line 720
+#line 728
     t4 = lyr_str_concat(t0, t2);
-#line 720
+#line 728
     t5 = lyr_str_concat(t4, t3);
-#line 720
+#line 728
     return t5;
 }
 
-#line 714 "stdlib5/std/core.lyr"
+#line 722 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__bool_debug_5bdb8024(uint8_t l0_this) {
     uint8_t t0 = 0;
     LyrStr *t1 = NULL;
 bb0:;
-#line 714
+#line 722
     t0 = l0_this;
-#line 714
+#line 722
     t1 = lyr_str_from_bool(t0);
-#line 714
+#line 722
     return t1;
 }
 
-#line 702 "stdlib5/std/core.lyr"
+#line 710 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core__extend__float_debug_6991a0fc(double l0_this) {
     double t0 = 0;
     LyrStr *t1 = NULL;
 bb0:;
-#line 702
+#line 710
     t0 = l0_this;
-#line 702
+#line 710
     t1 = lyr_str_from_float(t0);
-#line 702
+#line 710
     return t1;
 }
 
-#line 356 "stdlib5/std/core.lyr"
+#line 364 "stdlib5/std/core.lyr"
 lyr_ty_std_core_Ordering lyr_std_core__extend__int_totalCompare_53718511(int64_t l0_this, int64_t l1_o) {
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -6434,37 +6434,37 @@ lyr_ty_std_core_Ordering lyr_std_core__extend__int_totalCompare_53718511(int64_t
     lyr_ty_std_core_Ordering t8_s = {0};
     lyr_ty_std_core_Ordering *t8 = &t8_s;
 bb0:;
-#line 356
+#line 364
     t0 = l0_this;
-#line 356
+#line 364
     t1 = l1_o;
-#line 356
+#line 364
     t2 = (uint8_t)(t0 < t1);
-#line 356
+#line 364
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 356
+#line 364
     t3_s = (lyr_ty_std_core_Ordering){ .tag = 0 }; t3 = &t3_s;
-#line 356
+#line 364
     return *t3;
 bb2:;
-#line 357
+#line 365
     t4 = l0_this;
-#line 357
+#line 365
     t5 = l1_o;
-#line 357
+#line 365
     t6 = (uint8_t)(t4 > t5);
-#line 357
+#line 365
     if (t6) goto bb3; else goto bb4;
 bb3:;
-#line 357
+#line 365
     t7_s = (lyr_ty_std_core_Ordering){ .tag = 2 }; t7 = &t7_s;
-#line 357
+#line 365
     return *t7;
 bb4:;
-#line 358
+#line 366
     t8_s = (lyr_ty_std_core_Ordering){ .tag = 1 }; t8 = &t8_s;
-#line 358
+#line 366
     return *t8;
 }
 
@@ -6772,19 +6772,19 @@ bb0:;
     return;
 }
 
-#line 933 "stdlib5/std/core.lyr"
+#line 941 "stdlib5/std/core.lyr"
 uint64_t lyr_std_core__default__Integer_uint_rotateLeft_48b0fa66(uint64_t l0_this, int64_t l1_n) {
     uint64_t t0 = 0;
     int64_t t1 = 0;
     uint64_t t2 = 0;
 bb0:;
-#line 933
+#line 941
     t0 = l0_this;
-#line 933
+#line 941
     t1 = l1_n;
-#line 933
+#line 941
     t2 = LYR_ROTL(t0, t1);
-#line 933
+#line 941
     return t2;
 }
 
@@ -7588,22 +7588,22 @@ struct lyr_ty_std_hash_FixedHasher {
 void lyr_std_core__extend__int_hash_std_hash_FixedHasher__2dd1f294(int64_t l0_this, lyr_ty_std_hash_FixedHasher *l1_h);
 void lyr_std_core__default__Hasher_std_hash_FixedHasher_writeInt_d4f17b6b(lyr_ty_std_hash_FixedHasher *l0_this, int64_t l1_v);
 
-#line 360 "stdlib5/std/core.lyr"
+#line 368 "stdlib5/std/core.lyr"
 void lyr_std_core__extend__int_hash_std_hash_FixedHasher__2dd1f294(int64_t l0_this, lyr_ty_std_hash_FixedHasher *l1_h) {
     int64_t t0 = 0;
     lyr_ty_std_hash_FixedHasher t1_s = {0};
     lyr_ty_std_hash_FixedHasher *t1 = &t1_s;
     lyr_ty_std_hash_FixedHasher *t2 = NULL;
 bb0:;
-#line 360
+#line 368
     t0 = l0_this;
-#line 360
+#line 368
     t2 = l1_h;
-#line 360
+#line 368
     t1 = t2;
-#line 360
+#line 368
     lyr_std_core__default__Hasher_std_hash_FixedHasher_writeInt_d4f17b6b(t1, t0);
-#line 360
+#line 368
     return;
 }
 
@@ -7627,7 +7627,7 @@ static const LyrStaticStr(27) lyr_lit0 = LYR_STR_INIT("arrayOf: a negative lengt
 /* prototypes */
 LyrArr * lyr_std_core_arrayOf_int__e7ec54de(int64_t l0_n, lyr_fn_i64_to_i64 l1_f);
 
-#line 62 "stdlib5/std/core.lyr"
+#line 65 "stdlib5/std/core.lyr"
 LyrArr * lyr_std_core_arrayOf_int__e7ec54de(int64_t l0_n, lyr_fn_i64_to_i64 l1_f) {
     int64_t l2_first = 0;
     LyrArr *l3_whole = NULL;
@@ -7683,167 +7683,167 @@ LyrArr * lyr_std_core_arrayOf_int__e7ec54de(int64_t l0_n, lyr_fn_i64_to_i64 l1_f
     int64_t t46 = 0;
     LyrArr *t47 = NULL;
 bb0:;
-#line 62
+#line 65
     t0 = l0_n;
-#line 62
+#line 65
     t1 = (int64_t)INT64_C(0);
-#line 62
+#line 65
     t2 = (uint8_t)(t0 < t1);
-#line 62
+#line 65
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 63
+#line 66
     t3 = (LyrStr *)&lyr_lit0;
-#line 63
+#line 66
     lyr_panic_message(t3);
-#line 63
+#line 66
     LYR_UNREACHABLE();
 bb2:;
-#line 65
+#line 68
     t4 = l0_n;
-#line 65
+#line 68
     t5 = (int64_t)INT64_C(0);
-#line 65
+#line 68
     t6 = (uint8_t)(t4 == t5);
-#line 65
+#line 68
     if (t6) goto bb3; else goto bb4;
 bb3:;
-#line 66
+#line 69
     t7 = lyr_alloc_array(&lyr_desc_arr_i64, 0);
-#line 66
+#line 69
     return t7;
 bb4:;
-#line 70
+#line 73
     t8 = l1_f;
-#line 70
+#line 73
     t9 = (int64_t)INT64_C(0);
-#line 70
+#line 73
     t10 = t8.fn(t8.env, t9, NULL);
-#line 70
+#line 73
     l2_first = t10;
-#line 71
-    t11 = lyr_alloc_array(&lyr_desc_arr_i64, 0);
-#line 71
-    l3_whole = t11;
-#line 72
-    t12 = l2_first;
-#line 72
-    t13 = lyr_alloc_array(&lyr_desc_arr_i64, 1); LYR_ARR_DATA(t13, int64_t)[0] = t12;
-#line 72
-    l4_block = t13;
-#line 73
-    t14 = l0_n;
-#line 73
-    l5_left = t14;
 #line 74
+    t11 = lyr_alloc_array(&lyr_desc_arr_i64, 0);
+#line 74
+    l3_whole = t11;
+#line 75
+    t12 = l2_first;
+#line 75
+    t13 = lyr_alloc_array(&lyr_desc_arr_i64, 1); LYR_ARR_DATA(t13, int64_t)[0] = t12;
+#line 75
+    l4_block = t13;
+#line 76
+    t14 = l0_n;
+#line 76
+    l5_left = t14;
+#line 77
     goto bb5;
 bb5:;
-#line 74
+#line 77
     t15 = l5_left;
-#line 74
+#line 77
     t16 = (int64_t)INT64_C(0);
-#line 74
+#line 77
     t17 = (uint8_t)(t15 > t16);
-#line 74
+#line 77
     if (t17) goto bb6; else goto bb7;
 bb6:;
-#line 75
+#line 78
     t18 = l5_left;
-#line 75
+#line 78
     t19 = (int64_t)INT64_C(2);
-#line 75
+#line 78
     t20 = LYR_CHECKED_REM(t18, t19);
-#line 75
+#line 78
     t21 = (int64_t)INT64_C(1);
-#line 75
+#line 78
     t22 = (uint8_t)(t20 == t21);
-#line 75
+#line 78
     if (t22) goto bb8; else goto bb9;
 bb7:;
-#line 83
+#line 86
     t35 = (int64_t)INT64_C(1);
-#line 83
+#line 86
     l6_i = t35;
-#line 84
+#line 87
     goto bb12;
 bb8:;
-#line 76
+#line 79
     t23 = l3_whole;
-#line 76
+#line 79
     t24 = l4_block;
-#line 76
+#line 79
     t25 = lyr_arr_concat(&lyr_desc_arr_i64, t23, t24);
-#line 76
+#line 79
     l3_whole = t25;
-#line 75
+#line 78
     goto bb9;
 bb9:;
-#line 78
+#line 81
     t26 = l5_left;
-#line 78
+#line 81
     t27 = (int64_t)INT64_C(2);
-#line 78
+#line 81
     t28 = LYR_CHECKED_DIV(t26, t27);
-#line 78
+#line 81
     l5_left = t28;
-#line 79
+#line 82
     t29 = l5_left;
-#line 79
+#line 82
     t30 = (int64_t)INT64_C(0);
-#line 79
+#line 82
     t31 = (uint8_t)(t29 > t30);
-#line 79
+#line 82
     if (t31) goto bb10; else goto bb11;
 bb10:;
-#line 80
+#line 83
     t32 = l4_block;
-#line 80
+#line 83
     t33 = l4_block;
-#line 80
+#line 83
     t34 = lyr_arr_concat(&lyr_desc_arr_i64, t32, t33);
-#line 80
+#line 83
     l4_block = t34;
-#line 79
+#line 82
     goto bb11;
 bb11:;
-#line 74
+#line 77
     goto bb5;
 bb12:;
-#line 84
+#line 87
     t36 = l6_i;
-#line 84
+#line 87
     t37 = l0_n;
-#line 84
+#line 87
     t38 = (uint8_t)(t36 < t37);
-#line 84
+#line 87
     if (t38) goto bb13; else goto bb14;
 bb13:;
-#line 85
+#line 88
     t39 = l3_whole;
-#line 85
+#line 88
     t40 = l6_i;
-#line 85
+#line 88
     t41 = l1_f;
-#line 85
+#line 88
     t42 = l6_i;
-#line 85
+#line 88
     t43 = t41.fn(t41.env, t42, NULL);
-#line 85
+#line 88
     LYR_CHECK_INDEX(t40, t39->len); LYR_ARR_DATA(t39, int64_t)[t40] = t43;
-#line 86
+#line 89
     t44 = l6_i;
-#line 86
+#line 89
     t45 = (int64_t)INT64_C(1);
-#line 86
+#line 89
     t46 = LYR_CHECKED_ADD(t44, t45);
-#line 86
+#line 89
     l6_i = t46;
-#line 84
+#line 87
     goto bb12;
 bb14:;
-#line 88
+#line 91
     t47 = l3_whole;
-#line 88
+#line 91
     return t47;
 }
 
@@ -7875,7 +7875,7 @@ LyrArr * lyr_std_core_cloneArray_int__c18945da(LyrArr *l0_xs);
 LyrArr * lyr_std_core_arrayOf_int__e7ec54de(int64_t l0_n, lyr_fn_i64_to_i64 l1_f);
 int64_t lyr_std_core_cloneArray_int___lambda1__50c32990(void *lyr_env, int64_t l1_i, LyrErr **lyr_err);
 
-#line 3578 "stdlib5/std/core.lyr"
+#line 3586 "stdlib5/std/core.lyr"
 LyrArr * lyr_std_core_cloneArray_int__c18945da(LyrArr *l0_xs) {
     LyrArr *t0 = NULL;
     int64_t t1 = 0;
@@ -7884,25 +7884,25 @@ LyrArr * lyr_std_core_cloneArray_int__c18945da(LyrArr *l0_xs) {
     lyr_fn_i64_to_i64 t4 = {0};
     LyrArr *t5 = NULL;
 bb0:;
-#line 3578
+#line 3586
     t0 = l0_xs;
-#line 3578
+#line 3586
     t1 = t0->len;
-#line 3578
+#line 3586
     t2 = l0_xs;
-#line 3578
+#line 3586
     t3 = (lyr_ty_0_env_std_core_cloneArray_int___2e4e7f9b *)lyr_alloc(&lyr_desc_ty_0_env_std_core_cloneArray_int___2e4e7f9b);
-#line 3578
+#line 3586
     LYR_WRITE_BARRIER(t3, &t3->f_xs, t2);
-#line 3578
+#line 3586
     t4 = (lyr_fn_i64_to_i64){ lyr_std_core_cloneArray_int___lambda1__50c32990, t3 };
-#line 3578
+#line 3586
     t5 = lyr_std_core_arrayOf_int__e7ec54de(t1, t4);
-#line 3578
+#line 3586
     return t5;
 }
 
-#line 3578 "stdlib5/std/core.lyr"
+#line 3586 "stdlib5/std/core.lyr"
 int64_t lyr_std_core_cloneArray_int___lambda1__50c32990(void *lyr_env, int64_t l1_i, LyrErr **lyr_err) {
     lyr_ty_0_env_std_core_cloneArray_int___2e4e7f9b *l0__env_ = (lyr_ty_0_env_std_core_cloneArray_int___2e4e7f9b *)lyr_env;
     (void)lyr_err;
@@ -7912,17 +7912,17 @@ int64_t lyr_std_core_cloneArray_int___lambda1__50c32990(void *lyr_env, int64_t l
     int64_t t3 = 0;
     int64_t t4 = 0;
 bb0:;
-#line 3578
+#line 3586
     t0 = l0__env_;
-#line 3578
+#line 3586
     t1 = t0->f_xs;
-#line 3578
+#line 3586
     t2 = l1_i;
-#line 3578
+#line 3586
     LYR_CHECK_INDEX(t2, t1->len); t3 = LYR_ARR_DATA(t1, int64_t)[t2];
-#line 3578
+#line 3586
     t4 = lyr_std_core__extend__int_clone_535f4ead(t3);
-#line 3578
+#line 3586
     return t4;
 }
 
@@ -7941,7 +7941,7 @@ typedef struct { int64_t value; uint8_t has; } lyr_opt_i64;
 int64_t lyr_std_core__extend__int_clone_535f4ead(int64_t l0_this);
 lyr_opt_i64 lyr_std_core_cloneOptional_int__eb36f321(lyr_opt_i64 l0_o);
 
-#line 3583 "stdlib5/std/core.lyr"
+#line 3591 "stdlib5/std/core.lyr"
 lyr_opt_i64 lyr_std_core_cloneOptional_int__eb36f321(lyr_opt_i64 l0_o) {
     lyr_opt_i64 t0_s = {0};
     lyr_opt_i64 *t0 = &t0_s;
@@ -7956,29 +7956,29 @@ lyr_opt_i64 lyr_std_core_cloneOptional_int__eb36f321(lyr_opt_i64 l0_o) {
     lyr_opt_i64 t7_s = {0};
     lyr_opt_i64 *t7 = &t7_s;
 bb0:;
-#line 3583
+#line 3591
     t0 = &l0_o;
-#line 3583
+#line 3591
     t1 = t0->has;
-#line 3583
+#line 3591
     t2 = (uint8_t)!t1;
-#line 3583
+#line 3591
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 3583
+#line 3591
     t3_s = (lyr_opt_i64){0}; t3 = &t3_s;
-#line 3583
+#line 3591
     return *t3;
 bb2:;
-#line 3584
+#line 3592
     t4 = &l0_o;
-#line 3584
+#line 3592
     t5 = t4->value;
-#line 3584
+#line 3592
     t6 = lyr_std_core__extend__int_clone_535f4ead(t5);
-#line 3584
+#line 3592
     t7_s = (lyr_opt_i64){ .value = t6, .has = 1 }; t7 = &t7_s;
-#line 3584
+#line 3592
     return *t7;
 }
 
@@ -8003,7 +8003,7 @@ static const LyrStaticStr(3) lyr_lit2 = LYR_STR_INIT(", ");
 LyrStr * lyr_std_core__extend__int_debug_970869d7(int64_t l0_this);
 LyrStr * lyr_std_core_debugArray_int__cdf07f0c(LyrArr *l0_xs);
 
-#line 3516 "stdlib5/std/core.lyr"
+#line 3524 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core_debugArray_int__cdf07f0c(LyrArr *l0_xs) {
     LyrStr *l1_out = NULL;
     int64_t l2__range0 = 0;
@@ -8035,89 +8035,89 @@ LyrStr * lyr_std_core_debugArray_int__cdf07f0c(LyrArr *l0_xs) {
     LyrStr *t23 = NULL;
     LyrStr *t24 = NULL;
 bb0:;
-#line 3516
+#line 3524
     t0 = (LyrStr *)&lyr_lit0;
-#line 3516
+#line 3524
     l1_out = t0;
-#line 3517
+#line 3525
     t1 = (int64_t)INT64_C(0);
-#line 3517
+#line 3525
     t2 = l0_xs;
-#line 3517
+#line 3525
     t3 = t2->len;
-#line 3517
+#line 3525
     l2__range0 = t1;
-#line 3517
+#line 3525
     l3__last1 = t3;
-#line 3517
+#line 3525
     goto bb1;
 bb1:;
-#line 3517
+#line 3525
     t4 = l2__range0;
-#line 3517
+#line 3525
     t5 = l3__last1;
-#line 3517
+#line 3525
     t6 = (uint8_t)(t4 < t5);
-#line 3517
+#line 3525
     if (t6) goto bb2; else goto bb4;
 bb2:;
-#line 3517
+#line 3525
     l4_i = t4;
-#line 3518
+#line 3526
     t7 = l4_i;
-#line 3518
+#line 3526
     t8 = (int64_t)INT64_C(0);
-#line 3518
+#line 3526
     t9 = (uint8_t)(t7 > t8);
-#line 3518
+#line 3526
     if (t9) goto bb5; else goto bb6;
 bb3:;
-#line 3517
+#line 3525
     t19 = l2__range0;
-#line 3517
+#line 3525
     t20 = (int64_t)INT64_C(1);
-#line 3517
+#line 3525
     t21 = LYR_CHECKED_ADD(t19, t20);
-#line 3517
+#line 3525
     l2__range0 = t21;
-#line 3517
+#line 3525
     goto bb1;
 bb4:;
-#line 3521
+#line 3529
     t22 = l1_out;
-#line 3521
+#line 3529
     t23 = (LyrStr *)&lyr_lit1;
-#line 3521
+#line 3529
     t24 = lyr_str_concat(t22, t23);
-#line 3521
+#line 3529
     return t24;
 bb5:;
-#line 3518
+#line 3526
     t10 = l1_out;
-#line 3518
+#line 3526
     t11 = (LyrStr *)&lyr_lit2;
-#line 3518
+#line 3526
     t12 = lyr_str_concat(t10, t11);
-#line 3518
+#line 3526
     l1_out = t12;
-#line 3518
+#line 3526
     goto bb6;
 bb6:;
-#line 3519
+#line 3527
     t13 = l1_out;
-#line 3519
+#line 3527
     t14 = l0_xs;
-#line 3519
+#line 3527
     t15 = l4_i;
-#line 3519
+#line 3527
     LYR_CHECK_INDEX(t15, t14->len); t16 = LYR_ARR_DATA(t14, int64_t)[t15];
-#line 3519
+#line 3527
     t17 = lyr_std_core__extend__int_debug_970869d7(t16);
-#line 3519
+#line 3527
     t18 = lyr_str_concat(t13, t17);
-#line 3519
+#line 3527
     l1_out = t18;
-#line 3517
+#line 3525
     goto bb3;
 }
 
@@ -8139,7 +8139,7 @@ static const LyrStaticStr(5) lyr_lit0 = LYR_STR_INIT("null");
 LyrStr * lyr_std_core__extend__int_debug_970869d7(int64_t l0_this);
 LyrStr * lyr_std_core_debugOptional_int__dfcf44e3(lyr_opt_i64 l0_o);
 
-#line 3536 "stdlib5/std/core.lyr"
+#line 3544 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core_debugOptional_int__dfcf44e3(lyr_opt_i64 l0_o) {
     lyr_opt_i64 t0_s = {0};
     lyr_opt_i64 *t0 = &t0_s;
@@ -8151,27 +8151,27 @@ LyrStr * lyr_std_core_debugOptional_int__dfcf44e3(lyr_opt_i64 l0_o) {
     int64_t t5 = 0;
     LyrStr *t6 = NULL;
 bb0:;
-#line 3536
+#line 3544
     t0 = &l0_o;
-#line 3536
+#line 3544
     t1 = t0->has;
-#line 3536
+#line 3544
     t2 = (uint8_t)!t1;
-#line 3536
+#line 3544
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 3536
+#line 3544
     t3 = (LyrStr *)&lyr_lit0;
-#line 3536
+#line 3544
     return t3;
 bb2:;
-#line 3537
+#line 3545
     t4 = &l0_o;
-#line 3537
+#line 3545
     t5 = t4->value;
-#line 3537
+#line 3545
     t6 = lyr_std_core__extend__int_debug_970869d7(t5);
-#line 3537
+#line 3545
     return t6;
 }
 

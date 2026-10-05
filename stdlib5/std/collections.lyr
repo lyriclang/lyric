@@ -226,7 +226,7 @@ pub struct ListIter<T> :: [Iterator] {
 
     pub mut fn next(): ?T {
         if (this.list.changes != this.changes) {
-            panic("List: changed while it was walked");
+            changedWhileWalked("List");
         }
         if (this.at >= this.list.count) {
             return null;
@@ -512,10 +512,12 @@ pub struct MapEntries<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
     map: Map<K, V, H>,
     var at: int,
     changes: int,
+    /// What the walk is called where it panics: a `Set` walks its table's entries.
+    label: string = "Map",
 
     pub mut fn next(): ?(K, V) {
         if (this.map.changes != this.changes) {
-            panic("Map: changed while it was walked");
+            changedWhileWalked(this.label);
         }
         while (this.at < this.map.slotKeys.length()) {
             let k = this.map.slotKeys[this.at];
@@ -558,6 +560,10 @@ pub struct MapValues<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
         return v;
     }
 }
+
+/// A collection changed while it was walked (10 I9): a panic of its own code, `LYR-RT0016`,
+/// "List: changed while it was walked". Native: the runtime's.
+fn changedWhileWalked(what: string): never;
 
 // --- Set (10 C5): a Map's keys -----------------------------------------------------------------
 
@@ -603,7 +609,9 @@ pub class Set<T :: [Hashable], H :: [Hasher] = DefaultHasher> :: [Iterable] {
 
     /// The values, in no order of the set's own.
     pub fn iter(): MapKeys<T, bool, H> {
-        return this.table.keys();
+        return MapKeys<T, bool, H> {
+            entries = MapEntries<T, bool, H> { map = this.table, at = 0, changes = this.table.changes, label = "Set" },
+        };
     }
 }
 
@@ -769,7 +777,7 @@ pub struct DequeIter<T> :: [Iterator] {
 
     pub mut fn next(): ?T {
         if (this.deque.changes != this.changes) {
-            panic("Deque: changed while it was walked");
+            changedWhileWalked("Deque");
         }
         if (this.at >= this.deque.count) {
             return null;

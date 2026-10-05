@@ -6634,7 +6634,11 @@ internal sealed class FunctionLowerer
         // as every other method. It stands in 'receiver', because the call 'e.damage(30)' does not have
         // it in the argument list.
         if (_imports.IsNative(symbol))
-            return LowerImportCall(_imports.Intern(symbol), WithDefaults(symbol, expr.Arguments), expr.Span, receiver);
+        {
+            var passed = WithDefaults(symbol, expr, out var quoted);
+            try { return LowerImportCall(_imports.Intern(symbol), passed, expr.Span, receiver); }
+            finally { foreach (var text in quoted) _chainResults.Remove(text); }
+        }
 
         // 'panic' is a language builtin and therefore has no module it is declared in; the resolver puts
         // it into the root scope. It is bound like any other native, through its symbolic name.
@@ -7088,12 +7092,39 @@ internal sealed class FunctionLowerer
 
     /// <summary>A native's arguments with the defaults its declaration gives for those a call leaves
     /// out (04 D5) — its own expressions, lowered at the call as every argument is: <c>assert(ok)</c>
-    /// passes the default message.</summary>
-    private static Expr[] WithDefaults(FunctionSymbol native, Expr[] given) =>
-        native.Declaration is FunctionDecl { Parameters: var declared } && given.Length < declared.Length
-        && declared.Skip(given.Length).All(p => p.Default is not null && !p.IsParams)
-            ? [.. given, .. declared.Skip(given.Length).Select(p => p.Default!)]
-            : given;
+    /// passes the default message. A parameter <c>@callerExpr</c> sits on (09 A11) gets the text
+    /// the call wrote instead, as in a call of a Lyric function (<see cref="MaterializeArguments"/>):
+    /// <c>assert</c> names its condition. That text is a literal the sema never saw; its type
+    /// stands in <c>_chainResults</c> for as long as the call is lowered, and
+    /// <paramref name="quoted"/> says which entries to take out again.</summary>
+    private Expr[] WithDefaults(FunctionSymbol native, CallExpr call, out List<Expr> quoted)
+    {
+        quoted = [];
+        var given = call.Arguments;
+        if (native.Declaration is not FunctionDecl { Parameters: var declared } || given.Length >= declared.Length
+            || !declared.Skip(given.Length).All(p => p.Default is not null && !p.IsParams))
+            return given;
+
+        if (call.Parenthesized is { } grouped)
+            foreach (var (argument, written) in grouped) _writtenWith[argument] = written;
+
+        var all = new List<Expr>(given);
+        foreach (var parameter in declared.Skip(given.Length))
+        {
+            if (_types.CallerExprOf(parameter) is { } target && _types.SourceText is { } source
+                && Array.FindIndex(declared, q => q.Name == target) is var at and >= 0 && at < given.Length)
+            {
+                var literal = new StringLiteralExpr(
+                    source(_writtenWith.GetValueOrDefault(given[at], given[at].Span)), given[at].Span);
+                _chainResults[literal] = new IrScalarType(IrScalar.String);
+                quoted.Add(literal);
+                all.Add(literal);
+                continue;
+            }
+            all.Add(parameter.Default!);
+        }
+        return [.. all];
+    }
 
     private TempId? LowerImportCall(ImportId target, Expr[] arguments, Span span,
         TempId? receiver = null)

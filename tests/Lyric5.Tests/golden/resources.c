@@ -252,7 +252,7 @@ bb0:;
     l0_y = t1;
 #line 33
     t2 = (LyrStr *)&lyr_lit7;
-#line 120 "stdlib5/std/core.lyr"
+#line 123 "stdlib5/std/core.lyr"
     t3_s = (lyr_opt_iface14_std_core_Error){0}; t3 = &t3_s;
 #line 33 "programs/resources.lyr"
     t4 = (lyr_ty_std_core_Exception *)lyr_alloc(&lyr_desc_ty_std_core_Exception);
@@ -558,7 +558,7 @@ bb1:;
     t10 = lyr_str_concat(t6, t8);
 #line 12
     t11 = lyr_str_concat(t10, t9);
-#line 120 "stdlib5/std/core.lyr"
+#line 123 "stdlib5/std/core.lyr"
     t12_s = (lyr_opt_iface14_std_core_Error){0}; t12 = &t12_s;
 #line 12 "programs/resources.lyr"
     t13 = (lyr_ty_std_core_Exception *)lyr_alloc(&lyr_desc_ty_std_core_Exception);
@@ -578,30 +578,30 @@ bb3:;
     *lyr_err = lyr_e; return;
 }
 
-#line 123 "stdlib5/std/core.lyr"
+#line 131 "stdlib5/std/core.lyr"
 LyrStr * lyr_std_core_Exception_message(lyr_ty_std_core_Exception *l0_this) {
     lyr_ty_std_core_Exception *t0 = NULL;
     LyrStr *t1 = NULL;
 bb0:;
-#line 123
+#line 131
     t0 = l0_this;
-#line 123
+#line 131
     t1 = t0->f_text;
-#line 123
+#line 131
     return t1;
 }
 
-#line 127 "stdlib5/std/core.lyr"
+#line 135 "stdlib5/std/core.lyr"
 lyr_opt_iface14_std_core_Error lyr_std_core_Exception_cause(lyr_ty_std_core_Exception *l0_this) {
     lyr_ty_std_core_Exception *t0 = NULL;
     lyr_opt_iface14_std_core_Error t1_s = {0};
     lyr_opt_iface14_std_core_Error *t1 = &t1_s;
 bb0:;
-#line 127
+#line 135
     t0 = l0_this;
-#line 127
+#line 135
     t1 = &t0->f_inner;
-#line 127
+#line 135
     return *t1;
 }
 

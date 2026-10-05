@@ -4308,13 +4308,15 @@ public sealed class TypeChecker
     }
 
     /// <summary>The interface an expression names — bare, or through a module — and <c>null</c>
-    /// for everything else, a local of that name included.</summary>
-    private static TypeSymbol? InterfaceNamed(Expr target, SymbolTable scope)
+    /// for everything else, a local of that name included. A bare name means what it means
+    /// everywhere (<see cref="NameOf"/>): the scope's, then the prelude's — <c>Display.show(x)</c>
+    /// without an import.</summary>
+    private TypeSymbol? InterfaceNamed(Expr target, SymbolTable scope)
     {
         static Symbol? Unwrap(Symbol? symbol) => symbol is ImportBindingSymbol binding ? binding.Target : symbol;
         var named = target switch
         {
-            IdentifierExpr id => Unwrap(scope.Lookup(id.Name)),
+            IdentifierExpr id => Unwrap(NameOf(id, scope)),
             MemberExpr { IsOptional: false, Target: IdentifierExpr holder } member
                 when Unwrap(scope.Lookup(holder.Name)) is ModuleSymbol module
                 => Unwrap(module.Members.LookupLocal(member.Member)),
@@ -4325,13 +4327,15 @@ public sealed class TypeChecker
 
     /// <summary>The class or struct a callee NAMES, when the callee is a type name in call
     /// position: <c>Point</c>, or <c>geometry.Point</c> through a module. A local of that name
-    /// shadows the type as it does everywhere. Generic types wait for the generics slice.</summary>
-    private static TypeSymbol? ConstructedType(Expr callee, SymbolTable scope)
+    /// shadows the type as it does everywhere, and a bare name means what it means everywhere
+    /// (<see cref="NameOf"/>): the scope's, then the prelude's — <c>Exception("…")</c>. Generic
+    /// types wait for the generics slice.</summary>
+    private TypeSymbol? ConstructedType(Expr callee, SymbolTable scope)
     {
         static Symbol? Unwrap(Symbol? symbol) => symbol is ImportBindingSymbol binding ? binding.Target : symbol;
         var named = callee switch
         {
-            IdentifierExpr id => Unwrap(scope.Lookup(id.Name)),
+            IdentifierExpr id => Unwrap(NameOf(id, scope)),
             MemberExpr { IsOptional: false, Target: IdentifierExpr holder } member
                 when Unwrap(scope.Lookup(holder.Name)) is ModuleSymbol module
                 => Unwrap(module.Members.LookupLocal(member.Member)),

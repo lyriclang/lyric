@@ -1259,14 +1259,14 @@ bb0:;
     return t0;
 }
 
-#line 108 "stdlib5/std/core.lyr"
+#line 111 "stdlib5/std/core.lyr"
 lyr_opt_iface14_std_core_Error lyr_std_core_Error_cause(LyrIface l0_this) {
     lyr_opt_iface14_std_core_Error t0_s = {0};
     lyr_opt_iface14_std_core_Error *t0 = &t0_s;
 bb0:;
-#line 108
+#line 111
     t0_s = (lyr_opt_iface14_std_core_Error){0}; t0 = &t0_s;
-#line 108
+#line 111
     return *t0;
 }
 
@@ -2042,16 +2042,16 @@ _Static_assert(sizeof(lyr_fn_to_coro_i64_to_void) == 16, "layout of lyr_fn_to_co
 /* prototypes */
 LyrCoro * lyr_std_core_sequence_int__bd56702b(lyr_fn_to_coro_i64_to_void l0_body);
 
-#line 3591 "stdlib5/std/core.lyr"
+#line 3599 "stdlib5/std/core.lyr"
 LyrCoro * lyr_std_core_sequence_int__bd56702b(lyr_fn_to_coro_i64_to_void l0_body) {
     lyr_fn_to_coro_i64_to_void t0 = {0};
     LyrCoro *t1 = NULL;
 bb0:;
-#line 3591
+#line 3599
     t0 = l0_body;
-#line 3591
+#line 3599
     t1 = t0.fn(t0.env, NULL);
-#line 3591
+#line 3599
     return t1;
 }
 
