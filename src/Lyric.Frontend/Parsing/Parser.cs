@@ -481,6 +481,26 @@ public sealed partial class Parser
                         : new CallExpr(operand, [lambda], Span.Union(Whole(operand), lambda.Span));
                     break;
                 }
+                // 'Point { x = 1 };' and 'run { total = 5 }' at the start of a statement: braces
+                // that read as an initializer's, where none may stand (§6.8) — its value would be
+                // dropped. One message, which also says what the second one most likely meant;
+                // the braces are read past, so nothing follows from them.
+                case TokenKind.LBrace when operand is IdentifierExpr named && !_allowStructInit && InitializerBodyAhead(0):
+                {
+                    var open = _buffer.Current;
+                    var field = _buffer.Peek(1).TokenKind == TokenKind.Identifier ? _sm.Slice(_buffer.Peek(1).Span).ToString() : null;
+                    _de.Report("LYR-PAR0055", Severity.Error, Span.Union(named.Span, open.Span),
+                        $"'{named.Name} {{ … }}' reads as an initializer, and an initializer begins no statement — its value would be dropped",
+                        new DiagnosticNote(field is null
+                            ? $"a call with a trailing block holds a statement: '{named.Name} {{ …; }}'"
+                            : $"if '{named.Name}' is called with a trailing block, the block's assignment ends with ';': '{named.Name} {{ {field} = …; }}'"));
+                    var behind = AfterGroup(0);
+                    var last = open;
+                    if (behind < 0) { while (!_buffer.AtEnd) last = _buffer.Advance(); }
+                    else { for (var k = 0; k < behind; k++) last = _buffer.Advance(); }
+                    operand = new ErrorExpr(Span.Union(named.Span, last.Span));
+                    break;
+                }
                 default:
                     return operand;
             }
@@ -785,12 +805,44 @@ public sealed partial class Parser
                 && _buffer.Peek(i + 1).TokenKind == TokenKind.Identifier)
                 i += 2;
         }
-        // The body decides the rest: a struct initializer holds nothing or 'name = …'; a block
-        // that holds anything else is a trailing lambda ('run { 7 }', 'xs.map { it * 2 }').
-        if (_buffer.Peek(i).TokenKind != TokenKind.LBrace) return false;
-        var after = _buffer.Peek(i + 1).TokenKind;
-        return after == TokenKind.RBrace
-            || (after == TokenKind.Identifier && _buffer.Peek(i + 2).TokenKind == TokenKind.Equal);
+        // The body decides the rest.
+        return _buffer.Peek(i).TokenKind == TokenKind.LBrace && InitializerBodyAhead(i);
+    }
+
+    /// <summary>
+    /// Is the brace <paramref name="open"/> tokens ahead an INITIALIZER's body and not a trailing
+    /// block's? An initializer holds nothing, or 'name = value, …'; a block that holds anything
+    /// else is a trailing lambda ('run { 7 }', 'xs.map { it * 2 }').
+    ///
+    /// <para>'name = value' alone does not tell them apart: a block may begin with an assignment,
+    /// 'run { total = 5; … }'. What ENDS the value does (08 Y4, the review's M6-2): a ';' makes
+    /// it a statement and the brace a block's; a ',' or the closing brace makes it a field. A
+    /// token scan over the first value, as the other lookaheads are.</para>
+    /// </summary>
+    private bool InitializerBodyAhead(int open)
+    {
+        var after = _buffer.Peek(open + 1).TokenKind;
+        if (after == TokenKind.RBrace) return true;
+        if (after != TokenKind.Identifier || _buffer.Peek(open + 2).TokenKind != TokenKind.Equal) return false;
+        var depth = 0;
+        for (var i = open + 3; ; i++)
+        {
+            switch (_buffer.Peek(i).TokenKind)
+            {
+                case TokenKind.LParen or TokenKind.LBracket or TokenKind.LBrace:
+                    depth++;
+                    break;
+                case TokenKind.RParen or TokenKind.RBracket or TokenKind.RBrace:
+                    if (depth-- == 0) return true; // the body's own '}': one field
+                    break;
+                case TokenKind.Comma when depth == 0:
+                    return true;
+                case TokenKind.Semicolon when depth == 0:
+                    return false;
+                case TokenKind.Eof:
+                    return true;
+            }
+        }
     }
 
     /// <summary>
@@ -1051,11 +1103,12 @@ public sealed partial class Parser
     private bool IsTrailingLambdaAhead(Expr operand) =>
         operand switch
         {
-            // At the START OF A STATEMENT a bare name followed by '{' is what §6.8 keeps out:
-            // 'Point { x = 1 };' must stay the error it is rather than turning into a call with
-            // a trailing lambda. Everywhere else — and after a member or a call anywhere — the
-            // brace is the lambda.
-            IdentifierExpr => _allowStructInit,
+            // At the START OF A STATEMENT an initializer is what §6.8 keeps out: 'Point { x = 1 };'
+            // must stay the error it is rather than turning into a call with a trailing lambda.
+            // What the braces hold tells the two apart there as everywhere (M6-2): a block of
+            // statements after a bare name is the call it looks like, 'run { total = 5; }'.
+            // After a member or a call the brace is the lambda anywhere.
+            IdentifierExpr => _allowStructInit || !InitializerBodyAhead(0),
             MemberExpr or CallExpr => true,
             _ => false,
         };
