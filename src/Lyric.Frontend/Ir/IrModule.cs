@@ -167,7 +167,13 @@ public record struct IrImpl(TypeId Type, TypeId Interface, FunctionId[] Methods)
 
 /// <summary>A global slot. <paramref name="Name"/> is diagnostics only — only the type reaches the
 /// bytecode, and the index is the identity.</summary>
-public record struct IrGlobal(string Name, IrType Type);
+public record struct IrGlobal(string Name, IrType Type)
+{
+    /// <summary>The full name of the module that declares the global, empty for a slot no
+    /// declaration stands behind. With <see cref="Name"/> it tells two modules' globals of one
+    /// name apart where a back end names them (as <see cref="IrTypeDef.Module"/> does for types).</summary>
+    public string Module { get; init; } = "";
+}
 
 /// <summary>What an attribute row describes. The numeric values are the bytecode encoding.</summary>
 public enum IrAttributeTarget : byte { Function = 0, Type = 1, Module = 2 }

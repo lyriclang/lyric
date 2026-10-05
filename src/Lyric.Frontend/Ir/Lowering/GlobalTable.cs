@@ -147,7 +147,7 @@ internal sealed class GlobalTable
         var type = typeTable.Lower(types.TypeOfGlobal(symbol), binding.Span);
 
         _assigned[symbol] = new GlobalId(_defs.Count);
-        _defs.Add(new IrGlobal(name, type));
+        _defs.Add(new IrGlobal(name, type) { Module = module.FullName });
         _pending.Add((symbol, binding, module));
     }
 
