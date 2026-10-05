@@ -2560,7 +2560,13 @@ internal sealed class FunctionLowerer
             //
             // 'Reachability' already knows 'MakeClosure' as a root, so a function referenced only this
             // way does not fall victim to the reachability analysis.
-            if (symbol is FunctionSymbol function)
+            //
+            // A selective import binds its name to a shell — under the function's own name or
+            // another, from the module that declares it or one that passes it on (07 V3 I2, I4) —
+            // and the function beneath is what the name means, here as at a call.
+            var meant = symbol;
+            while (meant is ImportBindingSymbol shell) meant = shell.Target;
+            if (meant is FunctionSymbol function)
             {
                 // BEFORE the type computation: `TypeOfExpr` on a generic signature throws itself, with
                 // "type parameter 'T' reached lowering unsubstituted" — a message about the compiler's
@@ -4967,7 +4973,10 @@ internal sealed class FunctionLowerer
         if (!TryResolveFunction(method, out var target))
             throw NotSupported($"reference to '{method.Name}' as a value", expr.Span);
 
-        if (method.Declaration is FunctionDecl { IsStatic: true })
+        // A function of a module, named through the module ('util.twice'), has no receiver
+        // either: its target names a module, not a value.
+        if (method.Declaration is FunctionDecl { IsStatic: true }
+            || _types.TypeOf(expr.Target) is NonValueType { Symbol: ModuleSymbol })
         {
             var direct = _slots.NewTemp(signature);
             _b.Emit(new MakeClosure(direct, target, null, signature, expr.Span));
@@ -5954,9 +5963,13 @@ internal sealed class FunctionLowerer
         //
         // Enumerated positively rather than negatively: a list of prohibitions would silently give the
         // wrong answer for every new kind of symbol, and in the dangerous direction.
+        //
+        // Through an import's shell, as everywhere: 'import app.util { handler }' names the
+        // module's binding, and 'handler(4)' calls the function it holds.
+        var called = _types.RefOf(expr.Callee);
+        while (called is ImportBindingSymbol calledThrough) called = calledThrough.Target;
         if (_types.TypeOf(expr.Callee) is FnType
-            && _types.RefOf(expr.Callee) is null or LocalSymbol or ParameterSymbol
-               or FieldSymbol or GlobalSymbol)
+            && called is null or LocalSymbol or ParameterSymbol or FieldSymbol or GlobalSymbol)
             return LowerIndirectCall(expr);
 
         switch (expr.Callee)

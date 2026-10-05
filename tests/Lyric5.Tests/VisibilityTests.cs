@@ -305,6 +305,41 @@ public class VisibilityTests
         Assert.Contains("warning[LYR-SEM0152]: 'x' is pub, but its type 'Wide' is internal — the member is exported only once the type is", error);
     }
 
+    /// <summary>The same of an inherent block (07 V2 S3, S5): a member's own word, or the
+    /// block's — its members' default — wider than the type the block extends.</summary>
+    [Theory]
+    [InlineData("struct Wide {\n    n: int,\n}\n\nextend Wide {\n    pub fn twice(): int {\n        return this.n * 2;\n    }\n}\n",
+        "'twice' is pub, but its type 'Wide' is internal — the member is exported only once the type is")]
+    [InlineData("private struct Wide {\n    n: int,\n}\n\nextend Wide {\n    internal fn twice(): int {\n        return this.n * 2;\n    }\n}\n",
+        "'twice' is internal, but its type 'Wide' is private — the member is exported only once the type is")]
+    [InlineData("struct Wide {\n    n: int,\n}\n\nextend Wide {\n    pub static let one: int = 1;\n}\n",
+        "'one' is pub, but its type 'Wide' is internal — the member is exported only once the type is")]
+    [InlineData("struct Wide {\n    n: int,\n}\n\npub extend Wide {\n    fn twice(): int {\n        return this.n * 2;\n    }\n    fn thrice(): int {\n        return this.n * 3;\n    }\n}\n",
+        "this block is pub, but its type 'Wide' is internal — its members are exported only once the type is")]
+    public void A_blocks_member_wider_than_its_type_warns(string declarations, string why)
+    {
+        var dir = Package(("main.lyr", declarations + "\nfn main(): void {\n}\n"));
+        var (exit, _, error) = Run("build", Path.Combine(dir, "main.lyr"), "--emit", "ir");
+        Assert.True(exit == 0, error);
+        Assert.Contains("warning[LYR-SEM0152]: " + why, error);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(error, "LYR-SEM0152"));
+    }
+
+    /// <summary>Controls: no word, a word as wide as the type, a narrower one, a builtin's.</summary>
+    [Theory]
+    [InlineData("struct Wide {\n    n: int,\n}\n\nextend Wide {\n    fn twice(): int {\n        return this.n * 2;\n    }\n}\n")]
+    [InlineData("pub struct Wide {\n    pub n: int,\n}\n\nextend Wide {\n    pub fn twice(): int {\n        return this.n * 2;\n    }\n}\n")]
+    [InlineData("pub struct Wide {\n    pub n: int,\n}\n\npub extend Wide {\n    fn twice(): int {\n        return this.n * 2;\n    }\n}\n")]
+    [InlineData("struct Wide {\n    n: int,\n}\n\nprivate extend Wide {\n    fn twice(): int {\n        return this.n * 2;\n    }\n}\n")]
+    [InlineData("extend int {\n    pub fn twice(): int {\n        return this * 2;\n    }\n}\n")]
+    public void A_blocks_member_as_wide_as_its_type_does_not(string declarations)
+    {
+        var dir = Package(("main.lyr", declarations + "\nfn main(): void {\n}\n"));
+        var (exit, _, error) = Run("build", Path.Combine(dir, "main.lyr"), "--emit", "ir");
+        Assert.True(exit == 0, error);
+        Assert.DoesNotContain("LYR-SEM0152", error);
+    }
+
     /// <summary>A program roots in its entry's main (07 B6): a 'pub' function nothing reaches is
     /// no part of it — the 4.x tools kept every 'pub' function as a library's root.</summary>
     [Fact]
