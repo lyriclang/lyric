@@ -336,6 +336,7 @@ internal sealed class ExceptionAnalyzer
             case IfExpr iff:
                 AnalyzeExpr(iff.Condition); AnalyzeExpr(iff.Then); AnalyzeExpr(iff.Else);
                 break;
+            case BlockExpr block: AnalyzeStmt(block.Block); break;
             case LoopExpr loop: AnalyzeStmt(loop.Body); break;
             case MatchExpr ma:
                 AnalyzeExpr(ma.Scrutinee);

@@ -203,9 +203,10 @@ public sealed partial class Parser
                 continue;
             }
 
-            // The remaining binary operators.
+            // The remaining binary operators. The right of '??' may be a value block (08 Y4):
+            // 'x ?? { return 0; }' — nothing else an operand begins with is a brace.
             _buffer.Advance();
-            var right = ParseExpr(rightBp);
+            var right = op == TokenKind.QuestionQuestion && _buffer.Check(TokenKind.LBrace) ? ParseValueBlock() : ParseExpr(rightBp);
             left = new BinaryExpr(left, Operators.MapBinary(op), right, Span.Union(left.Span, right.Span));
         }
 
@@ -999,7 +1000,8 @@ public sealed partial class Parser
         _buffer.Advance(); // '=>', checked by the caller
         var parameter = new LambdaParam(_sm.Slice(nameTok.Span).ToString(), null, nameTok.Span)
             { NameSpan = nameTok.Span };
-        Node body = OutsideLoops<Node>(() => _buffer.Check(TokenKind.LBrace) ? ParseBlock() : ParseExpr(0));
+        // The block is a value block, as the parenthesized form's is: 'x => { …; v }'.
+        Node body = OutsideLoops<Node>(() => _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0));
         return new LambdaExpr([parameter], null, body, Span.Union(nameTok.Span, body.Span))
             { Form = LambdaForm.Bare };
     }
@@ -1029,8 +1031,8 @@ public sealed partial class Parser
     /// <summary>
     /// <c>{ it * 2 }</c> or <c>{ println(it); }</c>: a trailing lambda's body. Without a ';' at
     /// the block's own level the braces hold ONE expression and the lambda yields it; with one
-    /// they hold statements, exactly as '=> { … }' does. (A value block with statements before
-    /// its tail is the ValueBlock proposal's ground and folds in when that lands.)
+    /// they hold statements, exactly as '=> { … }' does — a value block, whose tail is the
+    /// lambda's result: <c>{ let d = it * 2; d + 1 }</c>.
     /// </summary>
     private LambdaExpr ParseTrailingLambda()
     {
@@ -1070,7 +1072,7 @@ public sealed partial class Parser
         Node body;
         if (HoldsStatements())
         {
-            body = OutsideLoops(() => ParseBlock());
+            body = OutsideLoops(() => ParseBlock(valueBlock: true));
         }
         else
         {
@@ -1114,6 +1116,9 @@ public sealed partial class Parser
     // keyword? Then it is a statement block rather than a single expression.
     private bool HoldsStatements()
     {
+        // An 'if' that is a statement — no final 'else', a binding condition, more behind it —
+        // makes the braces a block; one that is an expression is the ONE expression they hold.
+        if (_buffer.Peek(1).TokenKind == TokenKind.If && !IfIsExpression(1)) return true;
         if (_buffer.Peek(1).TokenKind is TokenKind.Let or TokenKind.Var or TokenKind.Return
             or TokenKind.Throw or TokenKind.Defer or TokenKind.Try or TokenKind.While or TokenKind.For
             or TokenKind.Do or TokenKind.Break or TokenKind.Continue or TokenKind.Yield or TokenKind.LBrace)

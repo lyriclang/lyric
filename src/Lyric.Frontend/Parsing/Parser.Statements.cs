@@ -35,6 +35,9 @@ public sealed partial class Parser
         TokenKind.Identifier when IsLoopAhead(0) => LoopStatement(ParseLoop(null, default)),
         TokenKind.LBrace => ParseBlock(),
         TokenKind.Let or TokenKind.Var => ParseBinding(),
+        // In a value block an 'if' may be an expression (08 Y4, the tail rule): the form without
+        // braces, and the block form with its 'else' standing last — the block's value.
+        TokenKind.If when _allowTail && IfIsExpression(0) => ParseExprStmt(),
         TokenKind.If => ParseIf(),
         TokenKind.While => ParseWhile(),
         TokenKind.Do => ParseDoWhile(),
@@ -124,20 +127,33 @@ public sealed partial class Parser
             { Label = label, LabelSpan = labelSpan };
     }
 
-    /// <summary>A loop at the start of a statement is the statement, with no ';' after its block.</summary>
-    private static ExprStmt LoopStatement(LoopExpr loop) => new(loop, loop.Span);
+    /// <summary>A loop at the start of a statement is the statement, with no ';' after its block
+    /// — and, standing last in a value block, that block's value (the tail rule).</summary>
+    private Stmt LoopStatement(LoopExpr loop) =>
+        AtTail() ? new TailExprStmt(loop, loop.Span) : new ExprStmt(loop, loop.Span);
+
+    /// <summary>
+    /// Does the statement just parsed stand LAST in a value block, with no ';' behind it? Then it
+    /// is the block's value (08 Y4, design 05's review M5-1; Rust's rule): an 'if' with its
+    /// 'else', a 'match' and a 'loop' are worth what their expression forms are worth. In the
+    /// middle of the block they are statements, and so is each of them in a statement block.
+    /// </summary>
+    private bool AtTail() => _allowTail && _buffer.Check(TokenKind.RBrace);
 
     private Stmt ParseMatchStmt()
     {
         var kw = _buffer.Advance(); // 'match'
         var (scrutinee, arms, end) = ParseMatchCore();
-        return new MatchStmt(scrutinee, arms, Span.Union(kw.Span, end));
+        var span = Span.Union(kw.Span, end);
+        return AtTail() ? new TailExprStmt(new MatchExpr(scrutinee, arms, span), span) : new MatchStmt(scrutinee, arms, span);
     }
 
     /// <summary>A block; with <paramref name="valueBlock"/> one in value position — a match arm,
-    /// a lambda body — whose last statement may be a tail expression without ';' (§6.9). The flag
-    /// holds for the block's OWN statements only: a nested statement block resets it, so a tail
-    /// can stand exactly where its value has somewhere to go.</summary>
+    /// a lambda body, a clause of a 'try' expression, a branch of an 'if' expression, the right
+    /// of '??' — whose last statement may be a tail without ';': an expression, or an 'if', a
+    /// 'match' or a 'loop' (§6.9, 08 Y4). The flag holds for the block's OWN statements only: a
+    /// nested statement block resets it, so a tail can stand exactly where its value has
+    /// somewhere to go.</summary>
     private Block ParseBlock(bool valueBlock = false)
     {
         var open = _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open block");
@@ -333,6 +349,60 @@ public sealed partial class Parser
             end = elseBranch.Span;
         }
         return new IfStmt(cond, then, elseBranch, Span.Union(kw.Span, end));
+    }
+
+    /// <summary>
+    /// Is the 'if' <paramref name="at"/> tokens ahead — the start of a statement in a value block
+    /// — an EXPRESSION? Two shapes are: the form without braces, 'if (c) a else b', which is a
+    /// statement nowhere (08 Y5 S1); and the block form whose chain ends in an 'else' and which
+    /// stands last in the block — the block's value.
+    ///
+    /// <para>A statement, as in every other block: an 'if' without a final 'else' (it gives no
+    /// value on the other path), one with more of the block behind it, and one whose condition
+    /// binds, 'if (let …)' — the names it binds are a statement's.</para>
+    ///
+    /// <para>A token scan, as the other lookaheads are: nothing is parsed twice and nothing is
+    /// reported.</para>
+    /// </summary>
+    private bool IfIsExpression(int at)
+    {
+        var i = at; // at the 'if'
+        while (true)
+        {
+            if (_buffer.Peek(i + 1).TokenKind != TokenKind.LParen) return false;
+            if (_buffer.Peek(i + 2).TokenKind is TokenKind.Let or TokenKind.Var) return false;
+            i = AfterGroup(i + 1);
+            if (i < 0) return false;
+            if (_buffer.Peek(i).TokenKind != TokenKind.LBrace) return true;   // 'if (c) a else b'
+            i = AfterGroup(i);
+            if (i < 0 || _buffer.Peek(i).TokenKind != TokenKind.Else) return false; // no 'else': a statement
+            i++;
+            if (_buffer.Peek(i).TokenKind == TokenKind.If) continue;          // 'else if': the chain goes on
+            if (_buffer.Peek(i).TokenKind != TokenKind.LBrace) return true;   // 'else b': an expression's
+            i = AfterGroup(i);
+            return i >= 0 && _buffer.Peek(i).TokenKind == TokenKind.RBrace;
+        }
+    }
+
+    /// <summary>The offset behind the group opening <paramref name="i"/> tokens ahead — past its
+    /// matching ')', ']' or '}' — or -1 where the input ends first.</summary>
+    private int AfterGroup(int i)
+    {
+        var depth = 0;
+        for (; ; i++)
+        {
+            switch (_buffer.Peek(i).TokenKind)
+            {
+                case TokenKind.LParen or TokenKind.LBracket or TokenKind.LBrace:
+                    depth++;
+                    break;
+                case TokenKind.RParen or TokenKind.RBracket or TokenKind.RBrace:
+                    if (--depth <= 0) return i + 1;
+                    break;
+                case TokenKind.Eof:
+                    return -1;
+            }
+        }
     }
 
     private Stmt ParseWhile()

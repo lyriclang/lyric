@@ -99,7 +99,8 @@ public class ParserTests
         Assert.False(de.HasErrors);
         var binding = Assert.IsType<BindingStmt>(Assert.Single(Assert.IsType<LoopExpr>(Assert.IsType<ExprStmt>(stmt).Expr).Body.Statements));
         var lambda = Assert.IsType<LambdaExpr>(binding.Initializer);
-        var inner = Assert.IsType<LoopExpr>(Assert.IsType<ExprStmt>(Assert.Single(Assert.IsType<Block>(lambda.Body).Statements)).Expr);
+        // The loop stands last in the lambda's block: it is the block's tail (the tail rule).
+        var inner = Assert.IsType<LoopExpr>(Assert.IsType<Block>(lambda.Body).Tail!.Expr);
         var jump = Assert.IsType<BreakStmt>(Assert.Single(inner.Body.Statements));
         Assert.Null(jump.Label);
         Assert.Equal("outer", Assert.IsType<IdentifierExpr>(jump.Value).Name);

@@ -2464,6 +2464,7 @@ internal sealed class FunctionLowerer
         TypeTestExpr typeTest => LowerTypeTest(typeTest),
         CallExpr e => LowerCall(e),
         IfExpr e => LowerIfExpr(e),
+        BlockExpr e => LowerBlockExpr(e),
         LoopExpr e => LowerLoop(e),
 
         InterpolatedStringExpr e => LowerInterpolatedString(e),
@@ -2943,6 +2944,31 @@ internal sealed class FunctionLowerer
         }
     }
 
+
+    /// <summary>
+    /// A value block as an expression (08 Y4): its statements in a scope of their own — its
+    /// defers run at its end — and its tail into a slot, which is the block's value. A block
+    /// nobody takes a value from has no slot: it is worth nothing, or it leaves. One that does
+    /// not come out — it leaves, or an operand in it gives no value — ends where it stands.
+    /// </summary>
+    private TempId? LowerBlockExpr(BlockExpr expr)
+    {
+        var sema = _types.TypeOf(expr);
+        var type = sema is NeverType || TypeFacts.IsVoid(sema) ? null : TypeOfExpr(expr);
+        LocalId? slot = type is null ? null : _slots.DeclareSynthetic("block", type);
+
+        var savedSink = _tailSink;
+        _tailSink = new TailSink(slot, type, AsReturn: false);
+        bool comesOut;
+        try { comesOut = LowerScope(expr.Block); }
+        finally { _tailSink = savedSink; }
+        if (!comesOut) throw new Diverged();
+
+        if (slot is not { } result || type is null) return null;
+        var dest = _slots.NewTemp(type);
+        _b.Emit(new LoadLocal(dest, result, type, expr.Span));
+        return dest;
+    }
 
     /// <summary>
     /// <c>&amp;&amp;=</c>, <c>||=</c> and <c>??=</c> on anything that can be loaded and stored:

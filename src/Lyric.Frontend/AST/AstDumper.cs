@@ -436,6 +436,10 @@ public static class AstDumper
                 Write(n.Then, indent + 1, sb);
                 Write(n.Else, indent + 1, sb);
                 break;
+            case BlockExpr n:
+                Line(sb, indent, "BlockExpr", n.Span);
+                Write(n.Block, indent + 1, sb);
+                break;
             case MatchExpr n:
                 Line(sb, indent, "Match", n.Span);
                 Write(n.Scrutinee, indent + 1, sb);
