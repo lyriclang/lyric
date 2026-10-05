@@ -340,8 +340,17 @@ public sealed class Resolver
         // check of every use: the ExternalSymbol carries LyrType.Error, and Error means
         // "already reported" to every consumer, so it stays silent.
         if (target is null)
-            _de.Report("LYR-RES0003", Severity.Error, imp.Span,
-                $"cannot find module '{string.Join('.', imp.Path)}'");
+        {
+            // 'geo.lib' is what the root module's file looks like and what it is not called.
+            if (_comp.Lyric5Modules && imp.Path is [var package, Compilation.RootModuleFile])
+                _de.Report("LYR-RES0003", Severity.Error, imp.Span,
+                    $"cannot find module '{string.Join('.', imp.Path)}'",
+                    new DiagnosticNote($"a package's 'src/{Compilation.RootModuleFile}.lyr' is the module "
+                        + $"'{package}' itself — import '{package}'"));
+            else
+                _de.Report("LYR-RES0003", Severity.Error, imp.Span,
+                    $"cannot find module '{string.Join('.', imp.Path)}'");
+        }
         // A package imports what its manifest declares (07 P6) — not what those depend on.
         else if (_comp.Lyric5Modules && _comp.PackageDependencies is { } declared)
         {
@@ -444,17 +453,25 @@ public sealed class Resolver
     /// One namespace per module (design/v5/spec/07 V6 K1, K3): a name a module declares or imports
     /// is not also the last segment of one of its submodules — 'app.net.http' would otherwise mean
     /// the module and the member, and which one depended on the route. Asked of the modules the
-    /// program loads.
+    /// program loads and of the files of its packages (<see cref="Compilation.ModuleOnDisk"/>):
+    /// a submodule nobody imported here is one all the same — for the root module too, whose
+    /// names stand beside every module of its package (the review's M7-1).
+    ///
+    /// <para>An import that binds a module under its own last segment — <c>pub import
+    /// geo.shapes;</c> in <c>geo</c> — is that module: the name has one meaning, and a root
+    /// module that passes its submodules on is the facade it is meant to be.</para>
     /// </summary>
     private void CheckOneNamespace()
     {
         foreach (var module in _comp.Modules)
             foreach (var symbol in module.Members.Symbols)
             {
-                if (_comp.FindModule([.. module.Path, symbol.Name]) is not { } sub) continue;
+                string[] path = [.. module.Path, symbol.Name];
+                if (_comp.FindModule(path) is null && _comp.ModuleOnDisk?.Invoke(path) != true) continue;
                 if (symbol.Declaration is not { } declaration) continue;
+                if (symbol is ImportBindingSymbol { Target: ModuleSymbol itself } && itself.Path.SequenceEqual(path)) continue;
                 _de.Report("LYR-RES0012", Severity.Error, declaration.Span,
-                    $"'{symbol.Name}' in module '{module.FullName}' is also the module '{sub.FullName}' — "
+                    $"'{symbol.Name}' in module '{module.FullName}' is also the module '{string.Join('.', path)}' — "
                     + "one name has one meaning in a module (07 K1)");
             }
     }

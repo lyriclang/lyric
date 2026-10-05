@@ -53,6 +53,26 @@ public sealed class Compilation
     public Func<string[], LoadedModule?>? ModuleLoader { get; set; }
 
     /// <summary>
+    /// The file of a package's ROOT MODULE, without its ending (design/v5/spec/07 V1 M1, the
+    /// review's M7-1): <c>src/lib.lyr</c> is the module of the package's own name —
+    /// <c>import geo { Circle }</c> —, the one exception to "a module is named by its path".
+    /// There is no module <c>geo.lib</c> beside it; a directory <c>src/lib/</c> is a namespace
+    /// like any other.
+    /// </summary>
+    public const string RootModuleFile = "lib";
+
+    /// <summary>
+    /// Whether a package of the program holds a module of this path — as a FILE, loaded or not.
+    /// <c>null</c> where modules are not files of packages (the 4.x tools, a host's modules).
+    ///
+    /// <para>For the one-namespace check (07 V6 K1): asked only of what a program loaded, the
+    /// answer depended on the importer — a library declaring <c>shapes</c> beside its module
+    /// <c>geo.shapes</c> was refused in the program that imported both, and accepted in the
+    /// next.</para>
+    /// </summary>
+    public Func<string[], bool>? ModuleOnDisk { get; set; }
+
+    /// <summary>
     /// Lyric 5's module rules (design/v5/spec/07): a module is named by its path alone and a
     /// <c>module</c> header is refused (LYR-RES0008, M1, M2) — it said again what the path says,
     /// or something else; the entry module's <c>main</c> starts the program (M7a); a name is
