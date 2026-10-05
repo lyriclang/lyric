@@ -1697,6 +1697,21 @@ public sealed class TypeChecker
                                     + $"'{iface.Name}'{implied} — a generic member is not forwarded to a field yet; "
                                     + "write it on the type, calling the field's",
                                     new DiagnosticNote(im.Span, $"'{im.Name}' is declared here"));
+                            // As if 'mut fn m(…) { this.field.m(…); }' were written (05 §5): a
+                            // 'mut fn' writes the field's value, so a VALUE in the field — a
+                            // struct, an enum, a builtin — is in a 'var' field, as the written
+                            // forwarder would need it (LYR-SEM0019 there). A reference — a class,
+                            // a value of an interface — is written through, whatever the field.
+                            else if (im.IsMut && im.Body is null
+                                     && _result.DelegationOf(implementer, iface) is { } to
+                                     && implementer.Members.LookupLocal(to) is FieldSymbol { Declaration: FieldDecl { IsVar: false } } fixedField
+                                     && FieldType(fixedField) is var heldType && !heldType.IsError
+                                     && heldType is not (ArrayOf or CoroutineOf)
+                                     && TypeFacts.KindOf(heldType) is not (TypeSymbolKind.Class or TypeSymbolKind.Interface))
+                                _de.Report("LYR-SEM0019", Severity.Error, NodeSpan(node),
+                                    $"'{name}' delegates 'mut fn {im.Name}' of '{iface.Name}' to '{to}', a value in a field "
+                                    + $"that is no 'var' — forwarded, '{im.Name}' would write it; declare the field 'var {to}'",
+                                    new DiagnosticNote(fixedField.Declaration?.Span ?? default, $"'{to}' is declared here"));
                             continue;
                         }
                         if (im.Body is null) // abstract and not implemented

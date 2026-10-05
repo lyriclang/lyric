@@ -474,6 +474,11 @@ public static class ModuleLowerer
                     lambdas, de, ref failed);
                 if (failed) return null;
 
+                // The forwarders the rows and the calls asked for (04 D1), now that the rows they
+                // call into are there; one whose row is not there yet waits for the next pass.
+                var rows = impls;
+                lambdas.BuildForwarders(request => BuildForwarder(request, typeTable, rows, last: false));
+
                 DrainLate(late, coroutines, instances, lambdas, extensions, types, ids, imports,
                     typeTable, globals);
 
@@ -493,6 +498,13 @@ public static class ModuleLowerer
                     + "free function, which is instantiated per use rather than per instance");
                 return null;
             }
+
+            // A forwarder still open has no row to call into: through the field's table then.
+            // Every id that was handed out gets its function — the list is indexed by id.
+            var final = impls;
+            lambdas.BuildForwarders(request => BuildForwarder(request, typeTable, final, last: true));
+            DrainLate(late, coroutines, instances, lambdas, extensions, types, ids, imports,
+                typeTable, globals);
         }
         catch (UnsupportedConstructException ex)
         {
@@ -1134,9 +1146,7 @@ public static class ModuleLowerer
                     // the interface's defaults came first above, as the rule says.
                     if (types.DelegationOf(type, iface) is { } field)
                     {
-                        var slot = i;
-                        methods[i] = lambdas.RegisterBuilt(forwarderId => BuildForwarder(
-                            $"{type.Name}.{slots[slot]}<by {field}>", typeTable, type, typeId, iface, ifaceId, slot, field));
+                        methods[i] = lambdas.RequestForwarder(type, typeId, iface, ifaceId, i, field);
                         continue;
                     }
 
@@ -1225,13 +1235,24 @@ public static class ModuleLowerer
 
     /// <summary>
     /// The forwarder of one delegated slot (04 D1): <c>fn walk(d) { this.legs.walk(d); }</c> as IR
-    /// — the receiver, the field read, the field lifted to the interface (or taken as it is when
-    /// the field holds an interface value), and the slot called through the field's table. The
-    /// receiver of a struct or an enum is the caller's place, as every method's is.
+    /// — the receiver, the field where it lies, and the call of the field type's own function for
+    /// the slot: the one its row of the interface holds. A field that holds an interface value
+    /// is called through that value's table. The receiver of a struct or an enum is the caller's
+    /// place, as every method's is.
+    ///
+    /// <para>A direct call on the field, because a <c>mut fn</c> writes it. Lifted into the
+    /// interface first, a struct in the field was COPIED, and the copy was written: a delegated
+    /// <c>mut fn</c> never changed the field, in a struct and in a class alike. A hand-written
+    /// forwarder is this <c>loadfield</c> and <c>call</c>.</para>
     /// </summary>
-    private static IrFunction BuildForwarder(string name, TypeTable typeTable, TypeSymbol type, TypeId typeId,
-        TypeSymbol iface, TypeId ifaceId, int slot, string field)
+    /// <param name="rows">The rows built so far: the field type's row is looked up in them.</param>
+    /// <param name="last">Whether this is the last chance: without the row, the field is lifted
+    /// and the slot called through its table, as before. Else <c>null</c> — not yet.</param>
+    private static IrFunction? BuildForwarder(LambdaTable.ForwarderRequest request, TypeTable typeTable,
+        IReadOnlyList<IrImpl> rows, bool last)
     {
+        var (_, type, typeId, iface, ifaceId, slot, field) = request;
+        var name = $"{type.Name}.{typeTable.MethodSlotsOf(ifaceId)[slot]}<by {field}>";
         var def = typeTable.Defs[typeId.Value];
         var fieldIndex = Array.IndexOf(def.FieldNames, field);
         if (fieldIndex < 0)
@@ -1257,13 +1278,17 @@ public static class ModuleLowerer
         var held = Temp(fieldType);
         b.Emit(new LoadField(held, self, typeId, new FieldId(fieldIndex), fieldType, default));
 
-        TempId lifted;
+        // What is called, and on what: the field's own function on the field itself, or the
+        // slot through a table — the field's own value of the interface, or (the last resort)
+        // the field lifted into it.
+        TempId callee;
+        FunctionId? direct = null;
         var ifaceType = new IrInterfaceType(ifaceId);
         if (fieldType is IrInterfaceType already)
         {
             if (already.Type != ifaceId)
                 throw new UnsupportedConstructException($"'{type.Name}' delegates '{iface.Name}' to '{field}', a value of another interface — not yet", type.Declaration?.Span ?? default);
-            lifted = held;
+            callee = held;
         }
         else
         {
@@ -1274,12 +1299,23 @@ public static class ModuleLowerer
                 IrEnumType e => e.Type,
                 _ => throw new UnsupportedConstructException($"'{type.Name}' delegates '{iface.Name}' to '{field}', whose type cannot carry an interface value", type.Declaration?.Span ?? default),
             };
-            lifted = Temp(ifaceType);
-            b.Emit(new MakeInterface(lifted, held, concrete, ifaceId, default));
+            foreach (var row in rows)
+                if (row.Type == concrete && row.Interface == ifaceId && slot < row.Methods.Length)
+                {
+                    direct = row.Methods[slot];
+                    break;
+                }
+            if (direct is null && !last) return null;
+            if (direct is not null) callee = held;
+            else
+            {
+                callee = Temp(ifaceType);
+                b.Emit(new MakeInterface(callee, held, concrete, ifaceId, default));
+            }
         }
 
         var args = new TempId[parameters.Length + 1];
-        args[0] = lifted;
+        args[0] = callee;
         for (var i = 0; i < parameters.Length; i++)
         {
             args[i + 1] = Temp(parameters[i]);
@@ -1287,13 +1323,31 @@ public static class ModuleLowerer
         }
         var isVoid = returnType is IrScalarType { Kind: IrScalar.Void };
         TempId? result = isVoid ? null : Temp(returnType);
-        b.Emit(new CallVirt(result, ifaceId, slot, args, returnType, default));
+        if (direct is { } own) b.Emit(new Call(result, own, args, default));
+        else b.Emit(new CallVirt(result, ifaceId, slot, args, returnType, default));
+
+        // The slot's member throws (05 E2): the forwarder does, as the function written by hand
+        // would — the error its call set goes on through the caller's slot (01 L5 E1), the value
+        // on to the return. Built as a function that throws nothing, it had no slot to pass the
+        // error through: the error was dropped, and the call answered a zero.
+        var slotThrows = typeTable.Defs[ifaceId.Value].SlotThrows;
+        var throws = slot < slotThrows.Length && slotThrows[slot];
+        if (throws)
+        {
+            var failed = b.NewBlock();
+            var went = b.NewBlock();
+            b.Seal(new ErrorBranch(failed, went, default));
+            b.SwitchTo(failed);
+            b.Seal(new Propagate(default));
+            b.SwitchTo(went);
+        }
         b.Seal(new Return(result, default));
 
         return new IrFunction(name, returnType, locals.Count, locals, temps, blocks)
         {
             Entry = new BlockId(0),
             ReceiverByRef = !isClass,
+            Throws = throws,
         };
     }
 
