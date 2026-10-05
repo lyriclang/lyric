@@ -132,6 +132,8 @@ public class SanitizerTests
     [InlineData("thread_channels", 0)]
     [InlineData("locks", 0)]
     [InlineData("pool", 0)]
+    [InlineData("thread_end", 0)]
+    [InlineData("deadlock", 101)]
     [InlineData("task_status", 101)]
     [InlineData("scope_panic", 101)]
     [InlineData("detached_panic", 101)]
@@ -171,6 +173,7 @@ public class SanitizerTests
         RunEmittedClean("thread_channels", 0, Profile.Tsan);
         RunEmittedClean("locks", 0, Profile.Tsan);
         RunEmittedClean("pool", 0, Profile.Tsan);
+        RunEmittedClean("thread_end", 0, Profile.Tsan);
     }
 
     /// <summary>

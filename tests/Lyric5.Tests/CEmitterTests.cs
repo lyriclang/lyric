@@ -248,6 +248,10 @@ public class CEmitterTests
                 + "closed elsewhere true\n");
             data.Add("threads", profile, 0,
                 "21\nworker ran 3 tasks\nfailed: oops\ncancelled\natomic 4000\nchained 6\n");
+            // A thread cancels what still lives on it and waits for it (06 G2, the review's M6-20b).
+            data.Add("thread_end", profile, 0,
+                "parked: the defer ran\nparked: cancelled\nfresh: the defer ran\nfresh: cancelled\n"
+                + "detached ended true\npool: the defer ran\npool: cancelled\n");
             data.Add("atomics", profile, 0,
                 "0\n5\n5 7\ntrue 9\nfalse 9\n9 12\n15\ntrue\n-9223372036854775808\n");
             data.Add("select", profile, 0,

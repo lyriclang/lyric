@@ -30,6 +30,7 @@ public static class Intrinsics
         // scheduler; the park; the poller; the monotonic clock.
         ["std.task.startContext"] = "LYR_TASK_START",
         ["std.task.park"] = "lyr_coro_park",
+        ["std.task.deadlocked"] = "lyr_panic_deadlock",
         ["std.task.currentScheduler"] = "lyr_task_scheduler",
         ["std.task.setCurrentScheduler"] = "lyr_task_set_scheduler",
         ["std.task.waitOnPoller"] = "lyr_task_wait",
