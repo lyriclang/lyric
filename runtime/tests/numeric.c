@@ -7,6 +7,7 @@
  *   shl64   panic [LYR-RT0002]: shift by 64 exceeds the width of 64 bits
  *   shr8    panic [LYR-RT0002]: shift by 8 exceeds the width of 8 bits
  *   shlneg  panic [LYR-RT0002]: shift by -1 exceeds the width of 32 bits
+ *   shlwide panic [LYR-RT0002]: shift by 300 exceeds the width of 8 bits
  *   surrogate  panic [LYR-RT0009]: 0xDFFF is not a Unicode scalar value
  *   beyond     panic [LYR-RT0009]: 0x110000 is not a Unicode scalar value */
 #include "lyr/lyr.h"
@@ -17,6 +18,7 @@
 
 /* Volatile, so no operand is known at compile time and every check runs. */
 static volatile int64_t one = 1, sixty_four = 64, minus_one = -1, big = INT64_MAX, small = INT64_MIN;
+static volatile int64_t three_hundred = 300, forty = 40;
 static volatile int32_t i32_one = 1;
 static volatile int8_t i8_max = 127, i8_min = -128, i8_eight = 8;
 static volatile uint8_t u8_max = 255, u8_zero = 0, u8_129 = 129, u8_eight = 8;
@@ -36,6 +38,7 @@ static int64_t program(void) {
     if (strcmp(which, "shl64") == 0) result = LYR_CHECKED_SHL(int64_t, uint64_t, 64, one, sixty_four);
     else if (strcmp(which, "shr8") == 0) result = LYR_CHECKED_SHR(uint8_t, uint8_t, 8, u8_max, u8_eight);
     else if (strcmp(which, "shlneg") == 0) result = LYR_CHECKED_SHL(int32_t, uint32_t, 32, i32_one, (int32_t)minus_one);
+    else if (strcmp(which, "shlwide") == 0) result = LYR_CHECKED_SHL(int8_t, uint8_t, 8, i8_max, three_hundred);
     else if (strcmp(which, "surrogate") == 0) result = LYR_CHAR_FROM_U32(low_surrogate);
     else if (strcmp(which, "beyond") == 0) result = LYR_CHAR_FROM_U32(beyond_unicode);
     else {
@@ -50,6 +53,11 @@ static int64_t program(void) {
         CHECK(LYR_CHECKED_SHL(uint8_t, uint8_t, 8, u8_max, (uint8_t)7) == 128);
         CHECK(LYR_CHECKED_SHR(uint64_t, uint64_t, 64, u64_max, (uint64_t)63) == 1);
         CHECK(LYR_CHECKED_SHR(uint8_t, uint8_t, 8, u8_max, (uint8_t)0) == 255);
+        /* a count of another type than the operand's: checked as it is, in its own */
+        CHECK(LYR_CHECKED_SHL(int64_t, uint64_t, 64, one, (uint8_t)40) == (int64_t)1 << 40);
+        CHECK(LYR_CHECKED_SHR(uint8_t, uint8_t, 8, u8_max, (int64_t)4) == 15);
+        CHECK(LYR_CHECKED_SHL(uint64_t, uint64_t, 64, (uint64_t)1, forty) == (uint64_t)1 << 40);
+        CHECK(LYR_CHECKED_SHR(int8_t, uint8_t, 8, i8_min, u16_max & 7) == -1);
 
         /* the wrap operators */
         CHECK(LYR_WRAP_ADD(int64_t, uint64_t, big, one) == INT64_MIN);

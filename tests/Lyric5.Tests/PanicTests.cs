@@ -124,6 +124,7 @@ public partial class PanicTests
             data.Add("shl64", profile, "panic [LYR-RT0002]: shift by 64 exceeds the width of 64 bits");
             data.Add("shr8", profile, "panic [LYR-RT0002]: shift by 8 exceeds the width of 8 bits");
             data.Add("shlneg", profile, "panic [LYR-RT0002]: shift by -1 exceeds the width of 32 bits");
+            data.Add("shlwide", profile, "panic [LYR-RT0002]: shift by 300 exceeds the width of 8 bits");
             data.Add("surrogate", profile, "panic [LYR-RT0009]: 0xDFFF is not a Unicode scalar value");
             data.Add("beyond", profile, "panic [LYR-RT0009]: 0x110000 is not a Unicode scalar value");
         }

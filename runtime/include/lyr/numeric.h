@@ -14,17 +14,23 @@
  * not an overflow. `T` is the operand type, `U` its unsigned twin, `bits` its width: a left
  * shift computes in unsigned arithmetic, where C defines what a signed shift into the sign bit
  * leaves undefined; a right shift of a signed value is arithmetic on every compiler this
- * toolchain drives. A negative count is a huge unsigned one, so one compare covers both. */
+ * toolchain drives. A negative count is a huge unsigned one, so one compare covers both.
+ *
+ * The count is an integer of ANY type (lyric-spec 03 §1.6 rule 2) and is checked in its own:
+ * converted to `T` first, 300 on an 8-bit operand was 44 and passed. Widened to 64 bits it
+ * keeps its sign, so the one compare still covers a negative count. */
 LYR_NORETURN void lyr_panic_shift(int64_t count, int bits);
 #define LYR_CHECKED_SHL(T, U, bits, a, b)                                                           \
     __extension__({                                                                                 \
-        T lyr_a_ = (a), lyr_b_ = (b);                                                               \
+        T lyr_a_ = (a);                                                                             \
+        __typeof__(b) lyr_b_ = (b);                                                                 \
         if (LYR_UNLIKELY((uint64_t)lyr_b_ >= (bits))) lyr_panic_shift((int64_t)lyr_b_, (bits));    \
         (T)(U)((uint64_t)(U)lyr_a_ << (unsigned)lyr_b_);                                            \
     })
 #define LYR_CHECKED_SHR(T, U, bits, a, b)                                                           \
     __extension__({                                                                                 \
-        T lyr_a_ = (a), lyr_b_ = (b);                                                               \
+        T lyr_a_ = (a);                                                                             \
+        __typeof__(b) lyr_b_ = (b);                                                                 \
         if (LYR_UNLIKELY((uint64_t)lyr_b_ >= (bits))) lyr_panic_shift((int64_t)lyr_b_, (bits));    \
         (T)(lyr_a_ >> (unsigned)lyr_b_);                                                            \
     })

@@ -330,7 +330,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
             mark = 128;
             this.free = this.free + 1;
         }
-        this.controls[g] = (word & ~(255 << shift)) | (mark << shift);
+        this.controls[g] = (word & ~((255 as uint64) << shift)) | (mark << shift);
         let old = this.slotValues[at];
         this.slotKeys[at] = null;
         this.slotValues[at] = null;
@@ -470,7 +470,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
                 if (((word >> shift) & 255) == 128) {
                     this.free = this.free - 1;
                 }
-                this.controls[g] = (word & ~(255 << shift)) | (tag << shift);
+                this.controls[g] = (word & ~((255 as uint64) << shift)) | (tag << shift);
                 this.slotKeys[g * 8 + j] = k;
                 this.slotValues[g * 8 + j] = v;
                 return;
