@@ -1001,6 +1001,14 @@ public class FormatterTests
     public void Parentheses_that_say_nothing_go(string source, string head) =>
         Assert.Contains(head, Format(source), StringComparison.Ordinal);
 
+    /// <summary>A call with a trailing block is written back as it was written: the names of
+    /// its arguments were dropped where the block joined it, so the formatter made
+    /// 'apply(1, 10) { … }' of it — another call.</summary>
+    [Fact]
+    public void A_call_with_a_trailing_block_keeps_the_names_of_its_arguments() =>
+        Assert.Contains("return apply(b: 1, a: 10) { it * 2 };",
+            Format("fn g(): int { return apply(b: 1, a: 10) { it * 2 }; }"), StringComparison.Ordinal);
+
     [Fact]
     public void A_lambda_keeps_its_written_set() =>
         Assert.Contains("(x: int): int throws [A, B] => x", Format("fn g() { let f = (x: int): int throws [A,B] => x; }"), StringComparison.Ordinal);

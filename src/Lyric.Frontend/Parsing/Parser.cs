@@ -514,9 +514,11 @@ public sealed partial class Parser
                 case TokenKind.LBrace when IsTrailingLambdaAhead(operand):
                 {
                     var lambda = ParseTrailingLambda();
+                    // The block joins the call as it was written. Built anew here, the call had
+                    // lost the names of its arguments (04 D5) — 'apply(b: 1, a: 10) { … }' went
+                    // by position, in silence — and the parentheses '@callerExpr' quotes.
                     operand = operand is CallExpr call && call.Arguments is not [.., LambdaExpr { Form: LambdaForm.Trailing }]
-                        ? new CallExpr(call.Callee, [.. call.Arguments, lambda],
-                            Span.Union(call.Span, lambda.Span), call.TypeArguments)
+                        ? call with { Arguments = [.. call.Arguments, lambda], Span = Span.Union(call.Span, lambda.Span) }
                         : new CallExpr(operand, [lambda], Span.Union(Whole(operand), lambda.Span));
                     break;
                 }

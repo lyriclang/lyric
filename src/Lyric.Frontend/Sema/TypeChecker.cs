@@ -3739,7 +3739,9 @@ public sealed class TypeChecker
 
         // MemberSpan stays invalid, as on the operator desugar: the text writes no 'new'.
         var factory = new MemberExpr(call.Callee, "new", IsOptional: false, call.Callee.Span) { MemberSpan = default };
-        var meant = new CallExpr(factory, call.Arguments, call.Span) { ArgumentNames = call.ArgumentNames };
+        // The call as it was written — its names, the parentheses of its arguments — with the
+        // factory for its callee. The type arguments were the type's, read where it was resolved.
+        var meant = call with { Callee = factory, TypeArguments = null };
         var result = CheckExpr(meant, scope, expected);
         _result.DesugarOperator(call, meant);
         return result;
@@ -5569,6 +5571,19 @@ public sealed class TypeChecker
             var argument = call.Arguments[i];
             if (i >= names.Length || names[i] is not { } name)
             {
+                if (namedSeen && argument is LambdaExpr { Form: LambdaForm.Trailing })
+                {
+                    _de.Report("LYR-SEM0119", Severity.Error, argument.Span,
+                        "a trailing block is a positional argument, and it stands after a named one — the named ones "
+                        + "come last: hand the block over by its parameter's name, or the others by position");
+                    // By its position it would take a place a name has filled. It is the last
+                    // argument, so the first parameter still free is nobody else's: there it is
+                    // checked as what it most likely is, and the one message stays the one.
+                    var free = arranged.FindIndex(a => a is null);
+                    if (free >= 0) arranged[free] = argument;
+                    else arranged.Add(argument);
+                    continue;
+                }
                 if (namedSeen)
                     _de.Report("LYR-SEM0119", Severity.Error, argument.Span,
                         "a positional argument after a named one — the named ones come last");
