@@ -142,6 +142,26 @@ public class MethodSetTests
         Assert.Single(Check(Bumper + "fn main(): int { var c = C { n = 0 }; return c.n; }")
             .Diagnostics, d => d.Code == "LYR-SEM0075");
 
+    /// <summary>A delegated member is forwarded "as if it were written" (05 §5): a <c>mut fn</c>
+    /// forwarded to a struct in a field that is no <c>var</c> would write what cannot be
+    /// written. Said where the type delegates.</summary>
+    [Fact]
+    public void A_mut_fn_is_not_delegated_to_a_struct_in_a_field_that_is_no_var() =>
+        Assert.Contains("to 'inner', a value in a field that is no 'var'", Rejected("""
+            interface Counter { mut fn bump(): void; }
+            struct Inner :: [Counter] { var n: int, mut fn bump(): void { this.n += 1; } }
+            struct Outer :: [Counter by inner] { inner: Inner }
+            fn main(): int { return 0; }
+            """, "LYR-SEM0019"));
+
+    /// <summary>Controls: a <c>var</c> field; a class in a field that is no <c>var</c> — a
+    /// reference, which a <c>mut fn</c> writes through; a member that is no <c>mut fn</c>.</summary>
+    [Theory]
+    [InlineData("struct Inner :: [Counter] { var n: int, mut fn bump(): void { this.n += 1; } }\nstruct Outer :: [Counter by inner] { var inner: Inner }")]
+    [InlineData("class Inner :: [Counter] { var n: int, mut fn bump(): void { this.n += 1; } }\nstruct Outer :: [Counter by inner] { inner: Inner }")]
+    public void A_mut_fn_is_delegated_to_what_can_be_written(string types) =>
+        Allowed("interface Counter { mut fn bump(): void; }\n" + types + "\nfn main(): int { return 0; }");
+
     [Fact]
     public void The_qualified_call_takes_the_receiver_first() =>
         Rejected(Blocks + "fn main(): int { let s = Greeter.greet(); return 0; }", "LYR-SEM0014");

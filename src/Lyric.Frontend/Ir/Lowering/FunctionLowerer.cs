@@ -5759,6 +5759,46 @@ internal sealed class FunctionLowerer
             ? (promised, decl, iface)
             : null;
 
+    /// <summary>
+    /// A call of a member its type leaves to a field (04 D1), where the type is known: the
+    /// forwarder of the slot, called directly. <c>false</c> where the member is not delegated —
+    /// or is one this does not build a direct call for: a generic interface's, whose rows are
+    /// per instance.
+    /// </summary>
+    private bool TryLowerForwardedCall(MemberExpr member, TypeSymbol owner, LyrType receiver, TypeSymbol iface,
+        CallExpr expr, out TempId? result)
+    {
+        result = null;
+        if (iface.Generics.Length > 0 || _types.DelegationOf(owner, iface) is not { } field) return false;
+        if (iface.Members.LookupLocal(member.Member) is not FunctionSymbol
+            { Generics.Length: 0, IsStatic: false, Declaration: FunctionDecl { Body: null } promised })
+            return false;
+
+        var typeId = SubstituteType(receiver) is GenericInstance instance
+            ? _typeTable.Intern(instance.Definition, instance.Arguments)
+            : _typeTable.Intern(owner);
+        var ifaceId = _typeTable.InterfaceOf(iface).Type;
+        var slot = Array.IndexOf(_typeTable.MethodSlotsOf(ifaceId), member.Member);
+        if (slot < 0) return false;
+
+        var target = _lambdas.RequestForwarder(owner, typeId, iface, ifaceId, slot, field);
+        var passed = MaterializeArguments(promised, ArgumentsOf(expr), member.Member, expr.Span);
+        var all = new TempId[passed.Length + 1];
+        all[0] = LowerExpr(member.Target);
+        passed.CopyTo(all, 1);
+        var resultType = TypeOfExpr(expr);
+        if (IsVoid(resultType))
+        {
+            _b.Emit(new Call(null, target, all, expr.Span));
+            return true;
+        }
+        var value = _slots.NewTemp(resultType);
+        _b.Emit(new Call(value, target, all, expr.Span));
+        _fresh.Add(value);
+        result = value;
+        return true;
+    }
+
     /// <summary>Whether a conformer's own member stands in place of this generic default (04 D9
     /// whole): in Lyric 5, a member of the contract of a non-generic interface. The checker lets
     /// one be written exactly there (<c>LYR-SEM0082</c> elsewhere).</summary>
@@ -5922,6 +5962,13 @@ internal sealed class FunctionLowerer
             // conformances to one interface go by the instance, through the table below.
             if (!ConstraintNeedsTheInstance(member, owner) && DirectDefault(member) is { } ofType)
                 return LowerDefaultCall(member, ofType, concrete, expr);
+
+            // Left to a field (04 D1): the forwarder, direct, the receiver as it stands.
+            if (!ConstraintNeedsTheInstance(member, owner)
+                && _types.RefOf(member) is FunctionSymbol leftToAField
+                && TypeTable.InterfaceOwning(leftToAField) is { } forwarding
+                && TryLowerForwardedCall(member, owner, concrete, forwarding, expr, out var viaField))
+                return viaField;
 
             if (ReceiverType(member.Target) is TypeParamType parameter)
                 foreach (var constraint in parameter.Param.Constraints)
@@ -6219,6 +6266,12 @@ internal sealed class FunctionLowerer
                 // type (04 D9), direct — a constraint-only interface has no value to go through.
                 if (DirectDefault(member) is { } declared)
                     return LowerDefaultCall(member, declared, SubstituteType(ReceiverType(member.Target)), expr);
+                // A member the type leaves to a field (04 D1): its forwarder, called with the
+                // receiver as it stands — a struct is the caller's place there, and a 'mut fn'
+                // writes the field of THAT. Through the table, the struct went into a box first.
+                if (TryLowerForwardedCall(member, concrete, ReceiverType(member.Target), declaring, expr, out var forwarded))
+                    return forwarded;
+
                 var into = _typeTable.InterfaceAsDeclared(concrete, declaring, expr.Span);
                 return LowerVirtualCall(member, declaring, expr, into.Type,
                     LowerExprAs(member.Target, into));

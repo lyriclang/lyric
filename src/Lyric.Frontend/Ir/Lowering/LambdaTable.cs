@@ -52,6 +52,45 @@ internal sealed class LambdaTable
     /// <summary>A name for a built function, unique in the module.</summary>
     public string BuiltName(string enclosing, string what) => $"{enclosing}.<{what}{_built.Count}>";
 
+    /// <summary>The forwarder of one delegated slot (04 D1), asked for before it can be built:
+    /// its body calls into the field type's row of the interface, and the rows are built after
+    /// the lowering.</summary>
+    internal readonly record struct ForwarderRequest(FunctionId Id, TypeSymbol Type, TypeId TypeId,
+        TypeSymbol Iface, TypeId IfaceId, int Slot, string Field);
+
+    private readonly Dictionary<(TypeId Type, TypeId Iface, int Slot), FunctionId> _forwarders = new();
+    private readonly List<ForwarderRequest> _forwardersOpen = new();
+
+    /// <summary>
+    /// The forwarder of a delegated slot: ONE per type, interface and slot. The interface's row
+    /// asks for it, and so does a call of the member where the type is known — which goes to the
+    /// forwarder directly, the receiver as it stands, and not through the table, where a struct
+    /// receiver is a boxed copy. (The rows are rebuilt in passes; built where a row asked, each
+    /// pass made another function for the same slot.)
+    /// </summary>
+    public FunctionId RequestForwarder(TypeSymbol type, TypeId typeId, TypeSymbol iface, TypeId ifaceId,
+        int slot, string field)
+    {
+        if (_forwarders.TryGetValue((typeId, ifaceId, slot), out var known)) return known;
+        var id = _ids.Next();
+        _forwarders[(typeId, ifaceId, slot)] = id;
+        _forwardersOpen.Add(new ForwarderRequest(id, type, typeId, iface, ifaceId, slot, field));
+        return id;
+    }
+
+    /// <summary>Builds the forwarders asked for and not built yet — those
+    /// <paramref name="build"/> can build: it answers <c>null</c> for one whose row is not
+    /// there yet, and that one stays open. What is built is drained with the built functions.</summary>
+    public void BuildForwarders(Func<ForwarderRequest, IrFunction?> build)
+    {
+        for (var i = 0; i < _forwardersOpen.Count;)
+        {
+            if (build(_forwardersOpen[i]) is not { } function) { i++; continue; }
+            _built.Add((_forwardersOpen[i].Id, function));
+            _forwardersOpen.RemoveAt(i);
+        }
+    }
+
     /// <summary>The first id a lambda may take: behind all written functions and behind the global
     /// initializer.</summary>
     /// <summary>How far the lowering has come. The table is drained SEVERAL times — an instance can
