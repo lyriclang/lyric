@@ -83,6 +83,7 @@ internal sealed class GlobalTable
         {
             ClassDecl c => (c.Name, c.Members),
             StructDecl v => (v.Name, v.Members),
+            EnumDecl e => (e.Name, (Decl[])e.Statics),
             _ => (null, null),
         };
 

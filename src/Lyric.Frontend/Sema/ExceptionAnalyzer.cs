@@ -123,7 +123,10 @@ internal sealed class ExceptionAnalyzer
             case FunctionDecl fn: AnalyzeFunction(fn); break;
             case StructDecl s: AnalyzeMembers(s.Members); break;
             case ClassDecl c: AnalyzeMembers(c.Members); break;
-            case EnumDecl e: foreach (var f in e.Methods) AnalyzeFunction(f); break;
+            case EnumDecl e:
+                foreach (var f in e.Methods) AnalyzeFunction(f);
+                AnalyzeMembers(e.Statics);
+                break;
             case InterfaceDecl i: foreach (var f in i.Members) AnalyzeFunction(f); break; // default bodies
             case ExtendDecl x:
                 foreach (var f in x.Methods) AnalyzeFunction(f);

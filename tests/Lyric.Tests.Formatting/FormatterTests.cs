@@ -1018,6 +1018,18 @@ public class FormatterTests
     public void A_spread_argument_keeps_its_dots(string statement) =>
         Assert.Contains(statement, Format("fn g(): int { " + statement + " }"), StringComparison.Ordinal);
 
+    /// <summary>An enum's constants stand among its members, where the source wrote them.</summary>
+    [Fact]
+    public void An_enum_keeps_its_constants()
+    {
+        var formatted = Format("enum Level { Low, High; static let count: int = 2; fn rank(): int { return 0; } pub static let all = 3; }")
+            .Replace("\r\n", "\n");
+        Assert.Contains("    static let count: int = 2;\n", formatted, StringComparison.Ordinal);
+        Assert.Contains("    pub static let all = 3;\n", formatted, StringComparison.Ordinal);
+        Assert.True(formatted.IndexOf("static let count", StringComparison.Ordinal) < formatted.IndexOf("fn rank", StringComparison.Ordinal));
+        Assert.True(formatted.IndexOf("fn rank", StringComparison.Ordinal) < formatted.IndexOf("pub static let all", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void A_lambda_keeps_its_written_set() =>
         Assert.Contains("(x: int): int throws [A, B] => x", Format("fn g() { let f = (x: int): int throws [A,B] => x; }"), StringComparison.Ordinal);

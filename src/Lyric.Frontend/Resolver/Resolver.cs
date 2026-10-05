@@ -206,6 +206,10 @@ public sealed class Resolver
         foreach (var v in e.Variants) DeclareMember(module, scope, new EnumVariantSymbol(v.Name, v), v);
         foreach (var fn in e.Methods) DeclareMember(module, scope, Fn(fn, fn.Visibility), fn);
         foreach (var t in e.Types) DeclareMember(module, scope, new AssociatedTypeSymbol(t.Name, t), t);
+        // A constant of the enum, as of a struct or a class: a binding without an instance, in
+        // the type's scope.
+        foreach (var sb in e.Statics)
+            DeclareMember(module, scope, new GlobalSymbol(sb.Binding.Name, Vis(sb.Visibility), sb), sb);
     }
 
     private void DeclareInterface(ModuleSymbol module, InterfaceDecl i)

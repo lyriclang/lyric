@@ -103,6 +103,10 @@ public static class AstChildren
                 foreach (var g in e.Generics) yield return g;
                 foreach (var i in e.Interfaces) yield return i;
                 foreach (var v in e.Variants) yield return v;
+                // The associated types were not handed on: a 'type Item = …;' in an enum was a
+                // node no walk over the tree came to — an interface's and a block's are.
+                foreach (var t in e.Types) yield return t;
+                foreach (var s in e.Statics) yield return s;
                 foreach (var m in e.Methods) yield return m;
                 break;
 

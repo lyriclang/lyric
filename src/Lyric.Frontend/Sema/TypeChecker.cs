@@ -360,6 +360,9 @@ public sealed class TypeChecker
                     foreach (var sb in (decl is StructDecl s ? s.Members : ((ClassDecl)decl).Members).OfType<StaticBindingDecl>())
                         CheckStaticBinding(sb, owner.Members);
                     continue;
+                case EnumDecl e when module.Members.LookupLocal(e.Name) is TypeSymbol owner:
+                    foreach (var sb in e.Statics) CheckStaticBinding(sb, owner.Members);
+                    continue;
                 case InterfaceDecl i when module.Members.LookupLocal(i.Name) is TypeSymbol iface:
                     foreach (var sb in i.Statics) CheckInterfaceStatic(sb, iface);
                     continue;
@@ -882,6 +885,10 @@ public sealed class TypeChecker
                 targetIsGeneric: ts.Generics.Length > 0, ts.Members, "a member");
             CheckFunction(fn, ts.Members, thisType);
         }
+        // Typed and checked with the module's bindings, as a struct's are; their attributes here.
+        foreach (var sb in e.Statics)
+            CheckAttributes(sb.Attributes, AttributeTarget.Member,
+                targetIsGeneric: ts.Generics.Length > 0, ts.Members, "a member");
     }
 
     // `this` inside a method: for a generic type the self-instance Stack<T>, with the type parameters

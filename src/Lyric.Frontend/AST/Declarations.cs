@@ -228,6 +228,11 @@ public sealed record EnumDecl(VisibilityWord Visibility, string Name, GenericPar
     /// <summary>The associated types the enum binds for its conformances (03 T6).</summary>
     public AssociatedTypeDecl[] Types { get; init; } = [];
 
+    /// <summary>The enum's constants, <c>static let all: Level[] = [Level.Low, Level.High];</c>
+    /// (design/v5/spec/08; the review's M8a-10) — behind the ';' that ends the variants, among
+    /// the methods.</summary>
+    public StaticBindingDecl[] Statics { get; init; } = [];
+
     public AttributeNode[] Attributes { get; init; } = [];
 }
 

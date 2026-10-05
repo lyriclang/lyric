@@ -87,7 +87,7 @@ public sealed class SemaRules
                         TypeSurface(ct, c.Generics, [], c.Members);
                         break;
                     case EnumDecl e when module.Members.LookupLocal(e.Name) is TypeSymbol et:
-                        TypeSurface(et, e.Generics, [], e.Methods);
+                        TypeSurface(et, e.Generics, [], e.Methods.Cast<Decl>().Concat(e.Statics));
                         foreach (var v in e.Variants)
                         {
                             foreach (var t in v.TupleFields ?? []) Names(t, et.Visibility, $"'{e.Name}.{v.Name}'");
