@@ -23,6 +23,8 @@ public static class Intrinsics
         ["std.core.assert"] = "LYR_ASSERT",
         ["std.core.unreachable"] = "lyr_panic_unreachable",
         ["std.core.todo"] = "lyr_panic_todo",
+        // A collection changed while it was walked (10 I9): a panic of its own code.
+        ["std.collections.changedWhileWalked"] = "lyr_panic_walked",
         // std.task's side of the scheduler (06 N6 S1; 13 §1.6-1.7): a task's context around a
         // function value, which the macro passes as its code and environment; the thread's
         // scheduler; the park; the poller; the monotonic clock.

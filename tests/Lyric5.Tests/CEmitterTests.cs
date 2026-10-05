@@ -712,12 +712,12 @@ public class CEmitterTests
         { "inlineindex", Profile.Release, "panic [LYR-RT0003]: index 4 out of bounds for length 4" },
         // The catalogue of std.core (05 E8): 'assert' checks at the call, so the trace starts in
         // the program as a check's does; 'unreachable()' takes its default message at the call.
-        { "assertfail", Profile.Debug, "panic [LYR-RT0011]: 3 is too many" },
-        { "assertfail", Profile.Release, "panic [LYR-RT0011]: 3 is too many" },
-        { "unreachable", Profile.Debug, "panic [LYR-RT0012]: entered unreachable code" },
-        { "unreachable", Profile.Release, "panic [LYR-RT0012]: entered unreachable code" },
-        { "todo", Profile.Debug, "panic [LYR-RT0013]: negative numbers" },
-        { "todo", Profile.Release, "panic [LYR-RT0013]: negative numbers" },
+        { "assertfail", Profile.Debug, "panic [LYR-RT0011]: assertion failed: n < 3: 3 is too many" },
+        { "assertfail", Profile.Release, "panic [LYR-RT0011]: assertion failed: n < 3: 3 is too many" },
+        { "unreachable", Profile.Debug, "panic [LYR-RT0012]: unreachable" },
+        { "unreachable", Profile.Release, "panic [LYR-RT0012]: unreachable" },
+        { "todo", Profile.Debug, "panic [LYR-RT0013]: not implemented: negative numbers" },
+        { "todo", Profile.Release, "panic [LYR-RT0013]: not implemented: negative numbers" },
         // An operand that gives no value, on the path that is taken.
         { "path_taken", Profile.Debug, "panic [LYR-RT0008]: taken" },
         { "path_taken", Profile.Release, "panic [LYR-RT0008]: taken" },

@@ -46,6 +46,7 @@ fn aChangeWhileWalkingPanics(): void {
         }
     });
     assertEq(info.message, "Map: changed while it was walked");
+    assertEq(info.code, "LYR-RT0016");
 }
 
 @Test

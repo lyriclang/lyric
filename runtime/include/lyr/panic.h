@@ -22,6 +22,7 @@
 #define LYR_RT_COROUTINE        "LYR-RT0014"  /* a coroutine resumed while it runs, after it ended or on another
                                                  thread; a yield with none running (06 A8) */
 #define LYR_RT_SYSTEM           "LYR-RT0015"  /* the system refused the runtime what it needs to go on: a poller, random bytes */
+#define LYR_RT_WALKED           "LYR-RT0016"  /* a collection changed while it was walked (10 I9) */
 #define LYR_RT_FLOOR            "LYR-RT0017"  /* control reached code the compiler holds unreachable: a bug in the compiler (05 E8) */
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -63,10 +64,14 @@ LYR_NORETURN void lyr_panic_null(void);
 /* `panic(message)` from the program: the message as written, code RT0008. */
 struct LyrStr;
 LYR_NORETURN void lyr_panic_message(const struct LyrStr *message);
-/* The catalogue's other three (05 E8): the message as written, each under its own code. */
-LYR_NORETURN void lyr_panic_assert(const struct LyrStr *message);
+/* The catalogue's other three (05 E8), each under its own code: its WORD first — "assertion
+ * failed", "unreachable", "not implemented" —, then the program's message where it gave one; an
+ * assertion names its condition as it was written, between the two. */
+LYR_NORETURN void lyr_panic_assert(const struct LyrStr *written, const struct LyrStr *message);
 LYR_NORETURN void lyr_panic_unreachable(const struct LyrStr *message);
 LYR_NORETURN void lyr_panic_todo(const struct LyrStr *message);
+/* A collection changed while it was walked (10 I9): "List: changed while it was walked". */
+LYR_NORETURN void lyr_panic_walked(const struct LyrStr *what);
 
 /* Where the compiler knows control cannot arrive — behind a call that does not return, behind a
  * match that covers every case. That knowledge is the compiler's, and a compiler can be wrong: if
@@ -82,10 +87,11 @@ LYR_NORETURN void lyr_panic_floor(void);
 #endif
 
 /* `assert(condition, message)`: the check at the call, so the trace starts in the program's own
- * frame; the message is the argument as evaluated, before the check. */
-#define LYR_ASSERT(condition, message)                                                              \
+ * frame; the message is the argument as evaluated, before the check, and `written` the text of
+ * the condition, which the compiler passes. */
+#define LYR_ASSERT(condition, message, written)                                                     \
     do {                                                                                            \
-        if (LYR_UNLIKELY(!(condition))) lyr_panic_assert(message);                                  \
+        if (LYR_UNLIKELY(!(condition))) lyr_panic_assert(written, message);                         \
     } while (0)
 
 /* A view's bounds (03 T13 A2): 0 <= low <= high <= length, or a panic with the same code as an index. */

@@ -2435,7 +2435,7 @@ static const LyrStaticStr(27) lyr_lit0 = LYR_STR_INIT("arrayOf: a negative lengt
 /* prototypes */
 LyrArr * lyr_std_core_arrayOf_int__e7ec54de(int64_t l0_n, lyr_fn_i64_to_i64 l1_f);
 
-#line 62 "stdlib5/std/core.lyr"
+#line 65 "stdlib5/std/core.lyr"
 LyrArr * lyr_std_core_arrayOf_int__e7ec54de(int64_t l0_n, lyr_fn_i64_to_i64 l1_f) {
     int64_t l2_first = 0;
     LyrArr *l3_whole = NULL;
@@ -2491,167 +2491,167 @@ LyrArr * lyr_std_core_arrayOf_int__e7ec54de(int64_t l0_n, lyr_fn_i64_to_i64 l1_f
     int64_t t46 = 0;
     LyrArr *t47 = NULL;
 bb0:;
-#line 62
+#line 65
     t0 = l0_n;
-#line 62
+#line 65
     t1 = (int64_t)INT64_C(0);
-#line 62
+#line 65
     t2 = (uint8_t)(t0 < t1);
-#line 62
+#line 65
     if (t2) goto bb1; else goto bb2;
 bb1:;
-#line 63
+#line 66
     t3 = (LyrStr *)&lyr_lit0;
-#line 63
+#line 66
     lyr_panic_message(t3);
-#line 63
+#line 66
     LYR_UNREACHABLE();
 bb2:;
-#line 65
+#line 68
     t4 = l0_n;
-#line 65
+#line 68
     t5 = (int64_t)INT64_C(0);
-#line 65
+#line 68
     t6 = (uint8_t)(t4 == t5);
-#line 65
+#line 68
     if (t6) goto bb3; else goto bb4;
 bb3:;
-#line 66
+#line 69
     t7 = lyr_alloc_array(&lyr_desc_arr_i64, 0);
-#line 66
+#line 69
     return t7;
 bb4:;
-#line 70
+#line 73
     t8 = l1_f;
-#line 70
+#line 73
     t9 = (int64_t)INT64_C(0);
-#line 70
+#line 73
     t10 = t8.fn(t8.env, t9, NULL);
-#line 70
+#line 73
     l2_first = t10;
-#line 71
-    t11 = lyr_alloc_array(&lyr_desc_arr_i64, 0);
-#line 71
-    l3_whole = t11;
-#line 72
-    t12 = l2_first;
-#line 72
-    t13 = lyr_alloc_array(&lyr_desc_arr_i64, 1); LYR_ARR_DATA(t13, int64_t)[0] = t12;
-#line 72
-    l4_block = t13;
-#line 73
-    t14 = l0_n;
-#line 73
-    l5_left = t14;
 #line 74
+    t11 = lyr_alloc_array(&lyr_desc_arr_i64, 0);
+#line 74
+    l3_whole = t11;
+#line 75
+    t12 = l2_first;
+#line 75
+    t13 = lyr_alloc_array(&lyr_desc_arr_i64, 1); LYR_ARR_DATA(t13, int64_t)[0] = t12;
+#line 75
+    l4_block = t13;
+#line 76
+    t14 = l0_n;
+#line 76
+    l5_left = t14;
+#line 77
     goto bb5;
 bb5:;
-#line 74
+#line 77
     t15 = l5_left;
-#line 74
+#line 77
     t16 = (int64_t)INT64_C(0);
-#line 74
+#line 77
     t17 = (uint8_t)(t15 > t16);
-#line 74
+#line 77
     if (t17) goto bb6; else goto bb7;
 bb6:;
-#line 75
+#line 78
     t18 = l5_left;
-#line 75
+#line 78
     t19 = (int64_t)INT64_C(2);
-#line 75
+#line 78
     t20 = LYR_CHECKED_REM(t18, t19);
-#line 75
+#line 78
     t21 = (int64_t)INT64_C(1);
-#line 75
+#line 78
     t22 = (uint8_t)(t20 == t21);
-#line 75
+#line 78
     if (t22) goto bb8; else goto bb9;
 bb7:;
-#line 83
+#line 86
     t35 = (int64_t)INT64_C(1);
-#line 83
+#line 86
     l6_i = t35;
-#line 84
+#line 87
     goto bb12;
 bb8:;
-#line 76
+#line 79
     t23 = l3_whole;
-#line 76
+#line 79
     t24 = l4_block;
-#line 76
+#line 79
     t25 = lyr_arr_concat(&lyr_desc_arr_i64, t23, t24);
-#line 76
+#line 79
     l3_whole = t25;
-#line 75
+#line 78
     goto bb9;
 bb9:;
-#line 78
+#line 81
     t26 = l5_left;
-#line 78
+#line 81
     t27 = (int64_t)INT64_C(2);
-#line 78
+#line 81
     t28 = LYR_CHECKED_DIV(t26, t27);
-#line 78
+#line 81
     l5_left = t28;
-#line 79
+#line 82
     t29 = l5_left;
-#line 79
+#line 82
     t30 = (int64_t)INT64_C(0);
-#line 79
+#line 82
     t31 = (uint8_t)(t29 > t30);
-#line 79
+#line 82
     if (t31) goto bb10; else goto bb11;
 bb10:;
-#line 80
+#line 83
     t32 = l4_block;
-#line 80
+#line 83
     t33 = l4_block;
-#line 80
+#line 83
     t34 = lyr_arr_concat(&lyr_desc_arr_i64, t32, t33);
-#line 80
+#line 83
     l4_block = t34;
-#line 79
+#line 82
     goto bb11;
 bb11:;
-#line 74
+#line 77
     goto bb5;
 bb12:;
-#line 84
+#line 87
     t36 = l6_i;
-#line 84
+#line 87
     t37 = l0_n;
-#line 84
+#line 87
     t38 = (uint8_t)(t36 < t37);
-#line 84
+#line 87
     if (t38) goto bb13; else goto bb14;
 bb13:;
-#line 85
+#line 88
     t39 = l3_whole;
-#line 85
+#line 88
     t40 = l6_i;
-#line 85
+#line 88
     t41 = l1_f;
-#line 85
+#line 88
     t42 = l6_i;
-#line 85
+#line 88
     t43 = t41.fn(t41.env, t42, NULL);
-#line 85
+#line 88
     LYR_CHECK_INDEX(t40, t39->len); LYR_ARR_DATA(t39, int64_t)[t40] = t43;
-#line 86
+#line 89
     t44 = l6_i;
-#line 86
+#line 89
     t45 = (int64_t)INT64_C(1);
-#line 86
+#line 89
     t46 = LYR_CHECKED_ADD(t44, t45);
-#line 86
+#line 89
     l6_i = t46;
-#line 84
+#line 87
     goto bb12;
 bb14:;
-#line 88
+#line 91
     t47 = l3_whole;
-#line 88
+#line 91
     return t47;
 }
 

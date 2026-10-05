@@ -132,16 +132,27 @@ void lyr_panic_message(const LyrStr *message) {
     lyr_panic(LYR_RT_PANIC, "%.*s", (int)(message->len < 1000 ? message->len : 1000), message->bytes);
 }
 
-void lyr_panic_assert(const LyrStr *message) {
-    lyr_panic(LYR_RT_ASSERT, "%.*s", (int)(message->len < 1000 ? message->len : 1000), message->bytes);
+/* The word first, then what the program adds — nothing where it adds nothing. */
+static int shown(const LyrStr *text, int most) { return (int)(text->len < most ? text->len : most); }
+
+void lyr_panic_assert(const LyrStr *written, const LyrStr *message) {
+    int w = shown(written, 400), m = shown(message, 1000);
+    lyr_panic(LYR_RT_ASSERT, "assertion failed%s%.*s%s%.*s", w ? ": " : "", w, written->bytes, m ? ": " : "", m,
+              message->bytes);
 }
 
 void lyr_panic_unreachable(const LyrStr *message) {
-    lyr_panic(LYR_RT_UNREACHABLE, "%.*s", (int)(message->len < 1000 ? message->len : 1000), message->bytes);
+    int m = shown(message, 1000);
+    lyr_panic(LYR_RT_UNREACHABLE, "unreachable%s%.*s", m ? ": " : "", m, message->bytes);
 }
 
 void lyr_panic_todo(const LyrStr *message) {
-    lyr_panic(LYR_RT_TODO, "%.*s", (int)(message->len < 1000 ? message->len : 1000), message->bytes);
+    int m = shown(message, 1000);
+    lyr_panic(LYR_RT_TODO, "not implemented%s%.*s", m ? ": " : "", m, message->bytes);
+}
+
+void lyr_panic_walked(const LyrStr *what) {
+    lyr_panic(LYR_RT_WALKED, "%.*s: changed while it was walked", shown(what, 100), what->bytes);
 }
 
 void lyr_panic_floor(void) {
