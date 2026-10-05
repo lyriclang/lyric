@@ -755,9 +755,10 @@ pub class Timer {
     }
 }
 
-/// A value that one task at a time holds (06 G4, K6): `lock` gives it to its body only, through a
-/// guard — Rust's discipline, without its compiler. A task that finds it held waits, parked, while
-/// the other tasks of its thread run; across threads, and on one thread wherever a body waits.
+/// A value that one task at a time holds (06 G4, K6): `lock` gives it to its body only, as a
+/// place — `m.lock { &n => n += 1; }` — which ends with the body, so nothing reaches the value
+/// outside the lock. A task that finds it held waits, parked, while the other tasks of its thread
+/// run; across threads, and on one thread wherever a body waits.
 pub class Mutex<T> {
     slot: Slot<T>,
     state: LockState,
@@ -768,16 +769,13 @@ pub class Mutex<T> {
     }
 
     /// Runs `body` while the running task holds the mutex, and gives what it gives: the task waits
-    /// until no other holds it. The body reaches the value through its guard, which works only
-    /// until the body ends. A wait: in a cancelled task it throws `Cancelled` (N9 X1).
-    pub fn lock<R, E :: [Error]>(body: fn(LockGuard<T>) -> R throws E): R throws [E, Cancelled] {
+    /// until no other holds it. The body takes the value's place, `{ &v => … }`: it reads and
+    /// writes the value itself, and the place is the call's — it ends with the body, and no
+    /// closure in it holds it. A wait: in a cancelled task it throws `Cancelled` (N9 X1).
+    pub fn lock<R, E :: [Error]>(body: fn(&T) -> R throws E): R throws [E, Cancelled] {
         try this.state.acquireAlone(false);
-        let guard = LockGuard<T> { slot = this.slot };
-        defer {
-            guard.valid = false;
-            this.state.releaseAlone();
-        }
-        return try body(guard);
+        defer this.state.releaseAlone();
+        return try body(&this.slot.value);
     }
 }
 
@@ -801,15 +799,12 @@ pub class RwLock<T> {
     }
 
     /// Runs `body` while the running task alone holds the lock — no reader, no other writer — and
-    /// gives what it gives; the body reaches the value through its guard. A wait, as `read` is.
-    pub fn write<R, E :: [Error]>(body: fn(LockGuard<T>) -> R throws E): R throws [E, Cancelled] {
+    /// gives what it gives; the body takes the value's place, as a mutex's does. A wait, as
+    /// `read` is.
+    pub fn write<R, E :: [Error]>(body: fn(&T) -> R throws E): R throws [E, Cancelled] {
         try this.state.acquireAlone(true);
-        let guard = LockGuard<T> { slot = this.slot };
-        defer {
-            guard.valid = false;
-            this.state.releaseAlone();
-        }
-        return try body(guard);
+        defer this.state.releaseAlone();
+        return try body(&this.slot.value);
     }
 }
 
@@ -838,26 +833,7 @@ pub class Once {
     }
 }
 
-/// The value a lock gives its body (06 G4): `get()` reads it, `set(v)` replaces it — while the body
-/// runs; after, both panic.
-pub class LockGuard<T> {
-    slot: Slot<T>,
-    var valid: bool = true,
-
-    /// The value.
-    pub fn get(): T {
-        if (!this.valid) { panic("a lock's guard used after its body ended"); }
-        return this.slot.value;
-    }
-
-    /// Replaces the value.
-    pub fn set(value: T): void {
-        if (!this.valid) { panic("a lock's guard used after its body ended"); }
-        this.slot.value = value;
-    }
-}
-
-/// A lock's value, where its guard reaches it.
+/// A lock's value, where the place its body takes lies.
 class Slot<T> {
     var value: T,
 }

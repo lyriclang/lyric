@@ -9545,6 +9545,7 @@ public sealed class TypeChecker
 
         var lambdaScope = new SymbolTable(scope);
         var pTypes = new LyrType[parameters.Length];
+        var places = new bool[parameters.Length];
         for (var i = 0; i < parameters.Length; i++)
         {
             var p = parameters[i];
@@ -9553,7 +9554,23 @@ public sealed class TypeChecker
             else if (expFn is not null) pt = expFn.Parameters[i];
             else pt = Report(p.Span, "LYR-SEM0045",
                 $"lambda parameter '{p.Name}' needs a type annotation (no context type available)");
-            var ps = new ParameterSymbol(p.Name, pt, p);
+            // '&n' (03 T12; the review's M6-24): the parameter takes a place. The mark is the
+            // lambda's to write, as '&x' is the call's: where the position hands a place over
+            // the parameter says so, and the body shows what it may write. Said here, once —
+            // the lambda is then typed as its position wants it, so no mismatch follows.
+            places[i] = p.IsPlace;
+            if (expFn is not null && expFn.PlaceAt(i) != p.IsPlace)
+            {
+                _de.Report("LYR-SEM0157", Severity.Error, p.Span, !expFn.PlaceAt(i)
+                    ? $"'&{p.Name}' takes a place, and the function expected here is handed a value"
+                    : p.Implicit
+                        ? "this block is handed a place — name the parameter and mark it, '{ &n => … }', so the body shows what it may write"
+                        : p.Pattern is not null
+                            ? "this parameter is handed a place, and a pattern binds values — name it and mark it, '&pair'"
+                            : $"'{p.Name}' is handed a place: write '&{p.Name}', so the body shows what it may write");
+                places[i] = expFn.PlaceAt(i);
+            }
+            var ps = new ParameterSymbol(p.Name, pt, p) { IsPlace = places[i] };
             // A pattern parameter's '_' is not a name in scope, so there is nothing to declare
             // and nothing to collide.
             if (p.Pattern is null && !lambdaScope.TryDeclare(ps))
@@ -9578,6 +9595,12 @@ public sealed class TypeChecker
         // Calling it builds the coroutine and throws nothing; what the body throws is the pulls'.
         if (lam.Body is Block generator && CoroutineShape.YieldsIn(generator))
         {
+            // Its body runs after the call has returned, when the caller's place may be gone
+            // (03 §2.3a) — as a coroutine function's.
+            if (Array.FindIndex(places, held => held) is var holding and >= 0)
+                _de.Report("LYR-SEM0158", Severity.Error, parameters[holding].Span,
+                    $"'{parameters[holding].Name}' takes a place, and this lambda is a generator: its body runs after "
+                    + "the call has returned, when the place may be gone");
             var made = CheckGeneratorLambda(lam, generator, lambdaScope, scope, contextRet);
             _currentReturn = savedReturn;
             _currentYield = savedYield;
@@ -9585,7 +9608,7 @@ public sealed class TypeChecker
             _loops = savedLoops;
             RecordCaptures(lam);
             _result.MarkGeneratorLambda(lam);
-            return new FnType(pTypes, made);
+            return new FnType(pTypes, made) { Places = places.Contains(true) ? places : [] };
         }
 
         // A context return with type parameters still UNBOUND (map(xs, (x) => …), where U is open) is
@@ -9665,7 +9688,7 @@ public sealed class TypeChecker
         _loops = savedLoops;
 
         RecordCaptures(lam);
-        return new FnType(pTypes, ret) { Throws = thrown ?? EscapingOf(lam.Body) };
+        return new FnType(pTypes, ret) { Throws = thrown ?? EscapingOf(lam.Body), Places = places.Contains(true) ? places : [] };
     }
 
     /// <summary>

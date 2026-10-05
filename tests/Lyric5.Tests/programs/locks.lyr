@@ -1,14 +1,13 @@
 // Locks (design/v5/spec/06 G4, K6, N10; 10 §10). Expected stdout:
 //   counted 4000                      four threads add under one mutex
 //   in turn a1 a2 b1 b2               a body that waits keeps the mutex: the other task waits for it
-//   guard after its body: panicked    a guard used after its body ended panics
 //   readers at once 2                 readers share the lock
 //   written 9                         a writer replaces the value
 //   once ran 1                        four threads, one run
 //   attempts 2                        a run that threw leaves the work to the next call
 import std.io { println };
 import std.sync { Atomic };
-import std.task { spawn, sleep, yieldNow, Thread, Mutex, RwLock, Once, LockGuard, TaskStatus };
+import std.task { spawn, sleep, yieldNow, Thread, Mutex, RwLock, Once };
 import std.time { Duration };
 
 class Oops :: [Error] {
@@ -17,15 +16,8 @@ class Oops :: [Error] {
 
 fn add(m: Mutex<int>): void throws Error {
     for (_ in 0..1000) {
-        try m.lock { it.set(it.get() + 1) };
+        try m.lock { &n => n += 1; };
     }
-}
-
-fn describe(s: TaskStatus<int>): string {
-    return match (s) {
-        TaskStatus.Panicked(_) => "panicked",
-        _ => "not panicked",
-    };
 }
 
 fn main(): void throws Error {
@@ -38,34 +30,28 @@ fn main(): void throws Error {
     try t2.await();
     try t3.await();
     try t4.await();
-    let total = try m.lock { it.get() };
+    let total = try m.lock { &n => n };
     println(f"counted {total}");
 
     let order = Mutex<string>.new("");
     let a = spawn(() => {
-        try order.lock {
-            it.set(it.get() + "a1 ");
+        try order.lock { &text =>
+            text = text + "a1 ";
             try sleep(Duration.ofMillis(5));
-            it.set(it.get() + "a2 ");
+            text = text + "a2 ";
         };
     });
     let b = spawn(() => {
-        try order.lock {
-            it.set(it.get() + "b1 ");
+        try order.lock { &text =>
+            text = text + "b1 ";
             try yieldNow();
-            it.set(it.get() + "b2");
+            text = text + "b2";
         };
     });
     try a.await();
     try b.await();
-    let log = try order.lock { it.get() };
+    let log = try order.lock { &text => text };
     println(f"in turn {log}");
-
-    var leaked: ?LockGuard<int> = null;
-    try m.lock { leaked = it; };
-    let misuse = spawn(() => leaked!.get());
-    try yieldNow();
-    println(f"guard after its body: {describe(misuse.status())}");
 
     let rw = RwLock<int>.new(1);
     var inside = 0;
@@ -89,7 +75,7 @@ fn main(): void throws Error {
     try r1.await();
     try r2.await();
     println(f"readers at once {most}");
-    try rw.write { it.set(9) };
+    try rw.write { &v => v = 9; };
     let written = try rw.read { it };
     println(f"written {written}");
 
