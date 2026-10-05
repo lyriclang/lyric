@@ -37,10 +37,22 @@ public static class Program
         {
             // The toolchain's own failure (11 G4): not the program's fault, and worth a report.
             Console.Error.WriteLine($"error[LYR-ICE0001]: the toolchain failed: {crash.GetType().Name}: {crash.Message}");
+            if (Lyric.Core.CompilerPosition.Describe() is { } place) Console.Error.WriteLine($"  while {place}");
             Console.Error.WriteLine("  = help: this is a bug in lyric5 — please report it with the program that triggered it");
-            Console.Error.WriteLine(crash.StackTrace);
+            Console.Error.WriteLine(crash is Lyric.Core.CompilerDepthException ? Head(crash.StackTrace, 24) : crash.StackTrace);
             return 101;
         }
+    }
+
+    /// <summary>The first lines of a stack trace: a recursion that reached the end of the stack
+    /// has a few thousand frames, and they repeat after the first dozen.</summary>
+    internal static string Head(string? trace, int lines)
+    {
+        if (trace is null) return "";
+        var all = trace.Split('\n');
+        return all.Length <= lines
+            ? trace
+            : string.Join('\n', all.Take(lines)) + $"\n   … {all.Length - lines} more frames";
     }
 
     private static int Usage(TextWriter output, int exit)

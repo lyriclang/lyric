@@ -102,6 +102,7 @@ public static class SourceCompiler
 
         report?.BeginPhase(Phase.Load);
         var resolveStarted = Stopwatch.GetTimestamp();
+        CompilerPosition.Begin(sources);
         var binding = compilation.Resolve();
         var resolveTime = Stopwatch.GetElapsedTime(resolveStarted);
         report?.EndPhase(loaderTime);
@@ -302,6 +303,7 @@ public static class SourceCompiler
         // model on.
         if (entry is null) return new CompileResult(sources, diagnostics, null);
 
+        CompilerPosition.Begin(sources);
         var binding = compilation.Resolve();
         var types = Semantics.Analyze(compilation, binding, diagnostics, singleProgram: false);
 

@@ -1920,6 +1920,7 @@ public sealed class TypeChecker
 
     private void CheckFunction(FunctionDecl fn, SymbolTable outerScope, LyrType? thisType)
     {
+        CompilerPosition.At("checking", fn.Name, fn.Span);
         var savedReturn = _currentReturn;
         var savedYield = _currentYield;
         var savedThis = _currentThis;
@@ -5996,6 +5997,7 @@ public sealed class TypeChecker
     private static LyrType Substitute(LyrType type, Dictionary<GenericParamSymbol, LyrType> map)
     {
         if (map.Count == 0) return type;
+        StackGuard.Check("substituting a type");
         return type switch
         {
             TypeParamType tp => map.TryGetValue(tp.Param, out var m) ? m : tp,
@@ -6027,6 +6029,7 @@ public sealed class TypeChecker
     /// </summary>
     internal static LyrType ResolveAssociated(LyrType @base, AssociatedTypeSymbol member, LyrType? instance = null)
     {
+        StackGuard.Check("resolving an associated type");
         switch (@base)
         {
             case TypeParamType or AssocOf: return new AssocOf(@base, member);
@@ -6722,7 +6725,13 @@ public sealed class TypeChecker
     /// <param name="wanted">The interface WITH ITS TYPE ARGUMENTS, such as <c>Src&lt;string&gt;</c>.
     /// <c>iface</c> alone would be the symbol <c>Src</c>, under which <c>Ones :: [Src&lt;int&gt;]</c>
     /// would satisfy a <c>Src&lt;string&gt;</c> too.</param>
-    private bool Satisfies(LyrType arg, TypeSymbol iface, LyrType wanted) => arg switch
+    private bool Satisfies(LyrType arg, TypeSymbol iface, LyrType wanted)
+    {
+        StackGuard.Check("checking a constraint");
+        return SatisfiesOnce(arg, iface, wanted);
+    }
+
+    private bool SatisfiesOnce(LyrType arg, TypeSymbol iface, LyrType wanted) => arg switch
     {
         NamedRef nr => IsTheConstraint(nr, nr.Symbol, iface, wanted)
                        || ImplementsWithExtensions(nr.Symbol, iface, wanted, EmptySubst),
