@@ -101,6 +101,8 @@ public class NativeTests
     [InlineData("extern \"C\" fn f(c: char): int;", "parameter 'c' of extern 'f' has type 'char'")]
     [InlineData("extern \"C\" fn f(xs: int[]): int;", "parameter 'xs' of extern 'f'")]
     [InlineData("extern \"C\" fn f(): string;", "extern 'f' returns 'string', which does not come back from C")]
+    // a place is an address: it was taken, and a call of it stopped the toolchain (LYR-ICE0001)
+    [InlineData("extern \"C\" fn f(&x: int): void;", "parameter 'x' of extern 'f' takes a place ('&')")]
     [InlineData("extern \"C\" fn f(): ?int;", "extern 'f' returns '?int'")]
     [InlineData("extern \"dotnet\" fn f(): int = \"System.Math::Abs\";", "unknown ABI \"dotnet\" — this compiler binds \"C\"")]
     [InlineData("extern \"C\" fn f(): int = \"no-name\";", "'no-name' is no C function's name")]

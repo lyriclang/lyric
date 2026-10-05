@@ -1,6 +1,6 @@
 /// Synchronization between threads (design/v5/spec/06 G4, K6, N7; 10 Q10). M6 S6a: `Atomic<T>`.
 /// `Mutex`, `RwLock` and `Once` come with S6c.
-
+import std.task { atomicLoad, atomicStore, atomicExchange, atomicCompareAndSet, atomicFetchAndAdd };
 
 /// The types an `Atomic` holds: those the machine reads and writes in one step — `int` and `bool`.
 /// Sealed: no other type becomes one.
@@ -12,6 +12,10 @@ extend bool :: [AtomicValue] { }
 /// A value that every thread reads and writes in one step (06 G4, K6). Each operation is
 /// sequentially consistent (N7 P2) and orders the reads and writes around it (P4): what a thread
 /// did before a store, a thread that loads what it stored sees (P1).
+///
+/// Its operations are the scheduler's (std.task, the review's M7-5), on the place of `value`: an
+/// atomic is the object around one word for a program that shares it — what holds such a word in
+/// a field of its own needs no object.
 pub class Atomic<T :: [AtomicValue]> {
     var value: T,
 
@@ -22,42 +26,37 @@ pub class Atomic<T :: [AtomicValue]> {
 
     /// The value.
     pub fn load(): T {
-        return atomicLoad(this);
+        // Through the reference, not through 'this': the operation takes a place, and a place of
+        // 'this' is a 'mut fn''s to hand on (03 §2.3 rule 2) — a load writes nothing.
+        let me = this;
+        return atomicLoad(&me.value);
     }
 
     /// Sets the value.
-    pub fn store(value: T): void {
-        atomicStore(this, value);
+    pub mut fn store(value: T): void {
+        atomicStore(&this.value, value);
     }
 
     /// Sets the value and gives the one it replaced.
-    pub fn exchange(value: T): T {
-        return atomicExchange(this, value);
+    pub mut fn exchange(value: T): T {
+        return atomicExchange(&this.value, value);
     }
 
     /// Sets the value to `desired` where it is `expected`, in one step: true then — false, and
     /// nothing changed, where it was another.
-    pub fn compareAndSet(expected: T, desired: T): bool {
-        return atomicCompareAndSet(this, expected, desired);
+    pub mut fn compareAndSet(expected: T, desired: T): bool {
+        return atomicCompareAndSet(&this.value, expected, desired);
     }
 }
 
 extend Atomic<int> {
     /// Adds `n` and gives the value before. It wraps around, as `+%` does.
-    pub fn fetchAndAdd(n: int): int {
-        return atomicFetchAndAdd(this, n);
+    pub mut fn fetchAndAdd(n: int): int {
+        return atomicFetchAndAdd(&this.value, n);
     }
 
     /// Adds `n` and gives the value after. It wraps around, as `+%` does.
-    pub fn addAndFetch(n: int): int {
-        return atomicFetchAndAdd(this, n) +% n;
+    pub mut fn addAndFetch(n: int): int {
+        return atomicFetchAndAdd(&this.value, n) +% n;
     }
 }
-
-// The runtime's side (lyr/atomic.h): the C11 builtins on an atomic's `value`.
-
-fn atomicLoad<T :: [AtomicValue]>(a: Atomic<T>): T;
-fn atomicStore<T :: [AtomicValue]>(a: Atomic<T>, value: T): void;
-fn atomicExchange<T :: [AtomicValue]>(a: Atomic<T>, value: T): T;
-fn atomicCompareAndSet<T :: [AtomicValue]>(a: Atomic<T>, expected: T, desired: T): bool;
-fn atomicFetchAndAdd(a: Atomic<int>, n: int): int;
