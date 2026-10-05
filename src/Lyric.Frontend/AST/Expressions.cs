@@ -160,10 +160,23 @@ public sealed record LambdaParam(string Name, TypeNode? Type, Span Span) : Node(
 }
 
 // --- control flow as an expression ---
-// IfExpr branches are EXPRESSIONS rather than blocks, so a value is guaranteed. For statement blocks
-// there is IfStmt. The else is mandatory; 'else if' is a nested IfExpr.
+// IfExpr branches are EXPRESSIONS: 'if (c) a else b', or 'if (c) { …; a } else { …; b }' with a
+// value block as a branch (a BlockExpr). The else is mandatory; 'else if' is a nested IfExpr. An
+// 'if' whose branches are statement blocks, with or without an else, is an IfStmt — unless it
+// stands last in a value block, where it is the block's value (08 Y4, the tail rule).
 public sealed record IfExpr(Expr Condition, Expr Then, Expr Else, Span Span) : Expr(Span);
 public sealed record MatchExpr(Expr Scrutinee, MatchArm[] Arms, Span Span) : Expr(Span);
+
+/// <summary>
+/// A value block where an expression is wanted (08 Y4): a branch of an <c>if</c> expression,
+/// <c>if (c) { …; a } else { …; b }</c>, and the right of <c>??</c>, <c>x ?? { return 0; }</c>.
+/// It is worth its tail; without one it gives no value — it leaves, or it is worth nothing.
+///
+/// <para>NOT a general block expression: the parser makes one in those two places and nowhere
+/// else. A brace anywhere else in an expression is an initializer's or a trailing lambda's, and
+/// a third meaning there would have to be told from the two by what the braces hold.</para>
+/// </summary>
+public sealed record BlockExpr(Block Block, Span Span) : Expr(Span);
 
 /// <summary><c>loop { … }</c> (design/v5/spec/05 E11, 08 S3/S4): the block again and again, left by
 /// a <c>break</c> — <c>break value</c> gives the loop its value — or by nothing at all, the loop

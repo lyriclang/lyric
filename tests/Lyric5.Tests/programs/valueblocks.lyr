@@ -1,0 +1,140 @@
+// Value blocks and the tail rule (08 Y4, Y5 S1): a block that is worth its last statement —
+// as a branch of an 'if' expression, the right of '??', a lambda's body, an arm, a clause.
+import std.io { println };
+
+struct Bad :: [Error] { fn message(): string { return "too big"; } }
+
+fn risky(n: int): int throws Bad {
+    if (n > 2) { throw Bad { }; }
+    return n;
+}
+
+fn apply(v: int, f: fn(int) -> int): int { return f(v); }
+fn each(xs: int[], f: fn(int) -> void): void { for (x in xs) { f(x); } }
+fn find(n: int): ?int { return if (n > 0) n else null; }
+
+// --- 'if' with value blocks ---
+
+fn grade(n: int): string {
+    return if (n < 0) {
+        "negative"
+    } else if (n == 0) {
+        "zero"
+    } else {
+        let big = n > 100;
+        if (big) "big" else "small"
+    };
+}
+
+// A branch's statements run in a scope of their own: its 'defer' runs when the branch ends,
+// after the tail is taken.
+fn scoped(c: bool): int {
+    let x = if (c) {
+        defer println("left then");
+        println("in then");
+        5
+    } else {
+        6
+    };
+    println(f"after {x}");
+    return x;
+}
+
+// A branch that leaves gives no value; the other one is the 'if's.
+fn firstBig(xs: int[]): int {
+    var seen = 0;
+    for (x in xs) {
+        let v = if (x < 0) { continue; } else if (x > 100) { break; } else { x };
+        seen = seen + v;
+    }
+    return seen;
+}
+
+fn orZero(v: ?int): int {
+    let n = v ?? { return 0; };
+    return n + 1;
+}
+
+fn orSeven(v: ?int): int { return v ?? { let d = 3; d + 4 }; }
+
+// --- the tail rule: 'if', 'match' and 'loop' standing last ---
+
+fn classify(n: int, flag: bool): string {
+    return match (n) {
+        0 => "zero",
+        _ => {
+            let big = n > 100;
+            match (big) {
+                true => "big",
+                false => if (flag) { "small, flagged" } else { "small" }
+            }
+        }
+    };
+}
+
+fn firstOver(xs: int[], limit: int): int {
+    let search = (from: int) => {
+        var i = from;
+        loop {
+            if (xs[i] > limit) { break xs[i]; }
+            i = i + 1;
+        }
+    };
+    return search(0);
+}
+
+fn sign(n: int): int {
+    let pick = (k: int) => {
+        if (k < 0) { return -1; } else if (k == 0) { return 0; } else { return 1; }
+    };
+    return pick(n);
+}
+
+fn recover(n: int): int {
+    return try risky(n) catch (e: Bad) {
+        println(e.message());
+        if (n > 10) { 99 } else { -1 }
+    };
+}
+
+// An arm may end in a jump of the loop around the match.
+fn evens(): int {
+    var total = 0;
+    for (i in 0..10) {
+        let v = match (i) {
+            3 => { continue; }
+            7 => { println("seven"); break; }
+            _ => i * 2,
+        };
+        total = total + v;
+    }
+    return total;
+}
+
+fn main(): void {
+    println(f"{grade(-1)} {grade(0)} {grade(7)} {grade(700)}");
+    println(f"{scoped(true)} {scoped(false)}");
+    println(f"{firstBig([1, -5, 2, 300, 4])}");
+    println(f"{orZero(null)} {orZero(4)} {orSeven(null)} {orSeven(1)}");
+    println(f"{classify(0, false)} | {classify(5, true)} | {classify(5, false)} | {classify(500, true)}");
+    println(f"{firstOver([1, 2, 3, 4], 2)} {sign(-8)} {sign(0)} {sign(8)}");
+    println(f"{recover(1)} {recover(5)} {recover(50)}");
+    println(f"{evens()}");
+
+    // Every lambda's block is a value block: the bare form's and a trailing block of statements.
+    let twiceMore: fn(int) -> int = x => { let d = x * 2; d + 1 };
+    let plusTwo = apply(3) { let d = it * 2; d + 2 };
+    let picked = apply(4) { n => if (n > 2) 10 else 20 };
+    println(f"{twiceMore(3)} {plusTwo} {picked}");
+
+    // A lambda nobody takes a value from may end in any of the three.
+    each([1, 2, 3]) { if (it > 1) { println(f"big {it}"); } };
+    each([1, 2]) { x => if (x > 1) { println("two"); } else { println("one"); } };
+    each([1, 2, 3]) { x =>
+        match (x) {
+            1 => println("m one"),
+            2 => { println("m two"); }
+            _ => { }
+        }
+    };
+}

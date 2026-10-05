@@ -362,6 +362,10 @@ public static class AstChildren
                 yield return i.Then;
                 yield return i.Else;
                 break;
+
+            case BlockExpr b:
+                yield return b.Block;
+                break;
             case LoopExpr l:
                 yield return l.Body;
                 break;

@@ -713,6 +713,7 @@ internal sealed class WarningAnalyzer
                 break;
             case LetCondExpr lc: WalkExpr(lc.Initializer); break;
             case IfExpr iff: WalkExpr(iff.Condition); WalkExpr(iff.Then); WalkExpr(iff.Else); break;
+            case BlockExpr block: WalkBlock(block.Block); break;
             case LoopExpr loop: WalkBlock(loop.Body); break;
             case BinaryExpr bi: WalkExpr(bi.Left); WalkExpr(bi.Right); break;
             case UnaryExpr u:

@@ -44,6 +44,51 @@ public class FormatterTests
             """, Format("fn   main( ):int{let x=1;\n\n\n   return x;}"));
     }
 
+    /// <summary>An 'if' expression with value blocks is laid out as the statement is: '} else {'
+    /// on one line, the ladder straight down (08 Y5 S1).</summary>
+    [Fact]
+    public void An_if_expression_with_value_blocks_is_laid_out_as_the_statement_is()
+    {
+        Assert.Equal("""
+            fn f(c: bool): int {
+                let x = if (c) {
+                    1
+                } else if (!c) {
+                    2
+                } else {
+                    3
+                };
+                return x;
+            }
+
+            """, Format("fn f(c: bool): int { let x = if (c) { 1 } else if (!c) { 2 } else { 3 }; return x; }"));
+    }
+
+    /// <summary>The tail of a value block keeps no ';' — an 'if', a 'match' or a 'loop' standing
+    /// last is the block's value, and a ';' behind it would make it a statement.</summary>
+    [Fact]
+    public void A_tail_that_is_an_if_keeps_no_semicolon()
+    {
+        var formatted = Format("fn f(): int { let g = (n: int) => { let d = n * 2; if (d > 5) { d } else { 0 } }; return g(1); }");
+        Assert.Contains("} else {", formatted);
+        Assert.DoesNotContain("};\n    };", formatted);
+        Assert.DoesNotContain("}\n        ;", formatted);
+    }
+
+    [Fact]
+    public void The_block_right_of_a_coalesce_is_kept()
+    {
+        Assert.Equal("""
+            fn f(v: ?int): int {
+                let n = v ?? {
+                    return 0;
+                };
+                return n;
+            }
+
+            """, Format("fn f(v: ?int): int { let n = v ?? { return 0; }; return n; }"));
+    }
+
     [Fact]
     public void A_var_field_keeps_its_word()
     {

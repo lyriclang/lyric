@@ -752,7 +752,6 @@ bb5:;
 #line 54 "programs/paths.lyr"
 int64_t lyr_app_main_nestedIf(uint8_t l0_c, int64_t l1_n) {
     int64_t l2__if0 = 0;
-    int64_t l3__if1 = 0;
     uint8_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;

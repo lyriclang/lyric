@@ -325,7 +325,25 @@ internal sealed class FlowAnalyzer
                 AddPatternBindings(lc.Pattern, assigned);
                 return;
             case IfExpr iff:
-                AnalyzeExpr(iff.Condition, assigned); AnalyzeExpr(iff.Then, assigned); AnalyzeExpr(iff.Else, assigned);
+            {
+                // As the statement's (07 §1.5): each branch from what was assigned before it,
+                // and behind the 'if' what BOTH assigned — or what the one assigned that
+                // completes, where the other gives 'never'. (Both ran on one set before, so
+                // what only one branch assigned counted behind the 'if'.)
+                AnalyzeExpr(iff.Condition, assigned);
+                var thenSet = Clone(assigned);
+                AnalyzeExpr(iff.Then, thenSet);
+                var elseSet = Clone(assigned);
+                AnalyzeExpr(iff.Else, elseSet);
+                var thenLeaves = _types.TypeOf(iff.Then) is NeverType;
+                var elseLeaves = _types.TypeOf(iff.Else) is NeverType;
+                if (thenLeaves && elseLeaves) return;
+                assigned.UnionWith(thenLeaves ? elseSet : elseLeaves ? thenSet : Intersect(thenSet, elseSet));
+                return;
+            }
+            // A value block in an expression: its statements in order, on the set as it stands.
+            case BlockExpr block:
+                assigned.UnionWith(AnalyzeStatements(block.Block.Statements, Clone(assigned)));
                 return;
             case LoopExpr loop:
             {

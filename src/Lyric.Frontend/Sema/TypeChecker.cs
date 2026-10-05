@@ -3260,6 +3260,7 @@ public sealed class TypeChecker
             case StructInitExpr si: return CheckStructInit(si, scope, expected);
             case TypePathExpr tp: return CheckTypePath(tp, scope, expected);
             case IfExpr iff: return CheckIfExpr(iff, scope, expected);
+            case BlockExpr block: return CheckBlockExpr(block, scope, expected);
             case LoopExpr loop: return CheckLoop(loop, scope, expected);
             case LetCondExpr lc:
                 // Reached only OUTSIDE an if/while head, where CheckIf/CheckWhile take it first.
@@ -8256,6 +8257,10 @@ public sealed class TypeChecker
 
         _narrowed = snapshot;
 
+        // Both branches give nothing: so does the 'if' (06 §9 rule 2), whatever its position
+        // wants — as a 'match' whose arms all leave is 'never' there too.
+        if (thenT is NeverType && elseT is NeverType) return LyrType.Never;
+
         // With a context the arms check AGAINST it and the expression HAS it (§3.1/§6.9 since
         // 2.1): an unsuffixed literal arm adapts, and each arm meets the context as an
         // ordinary assignment. Unification among the arms is the contextless rule.
@@ -8267,6 +8272,28 @@ public sealed class TypeChecker
         }
 
         return Unify(iff.Then, thenT, iff.Else, elseT, iff.Span);
+    }
+
+    /// <summary>
+    /// A value block where an expression is wanted (08 Y4) — a branch of an 'if' expression, the
+    /// right of '??'. It is worth its tail. Without one it gives no value: 'never' when every
+    /// path through it leaves — 'return', 'throw', 'break', 'continue' — and nothing otherwise,
+    /// which a position that wants a value refuses.
+    /// </summary>
+    private LyrType CheckBlockExpr(BlockExpr block, SymbolTable scope, LyrType? expected)
+    {
+        var wanted = expected is null || expected.IsError || expected is NeverType || TypeFacts.IsVoid(expected) ? null : expected;
+        var savedTail = _tailExpected;
+        _tailExpected = wanted;
+        CheckBlock(block.Block, scope);
+        _tailExpected = savedTail;
+
+        if (block.Block.Tail is { } tail) return _result.TypeOf(tail.Expr);
+        if (Flow.AlwaysExits(block.Block, _result)) return LyrType.Never;
+        if (wanted is null) return LyrType.Void;
+        _de.Report("LYR-SEM0033", Severity.Error, block.Span,
+            "this block stands where a value is wanted — end it in a tail expression without ';', or leave on every path");
+        return LyrType.Error;
     }
 
     /// <summary>
@@ -8323,6 +8350,7 @@ public sealed class TypeChecker
     {
         var st = CheckExpr(scrutinee, scope);
         var bodies = new List<LyrType>();
+        var valueless = new List<MatchArm>();
         var patternsClean = true;
         foreach (var arm in arms)
         {
@@ -8349,7 +8377,10 @@ public sealed class TypeChecker
                         var tt = _result.TypeOf(tail.Expr);
                         if (!asExpression)
                         {
-                            if (Unmarked(tail.Expr) is not (CallExpr or AssignExpr or ThrowExpr or ErrorExpr))
+                            // An 'if', a 'match' or a 'loop' standing last is the statement it
+                            // would be anywhere in the block (the tail rule): no bare value.
+                            if (Unmarked(tail.Expr) is not (CallExpr or AssignExpr or ThrowExpr or ErrorExpr
+                                or IfExpr or MatchExpr or LoopExpr))
                                 _de.Report("LYR-SEM0022", Severity.Error, tail.Span,
                                     "expression statement has no effect (only calls and assignments are allowed)");
                             break;
@@ -8360,12 +8391,11 @@ public sealed class TypeChecker
                         break;
                     }
 
-                    // Without a tail a block has no value: in a match EXPRESSION it has to leave
-                    // the function on every path, and it contributes nothing to the unification.
-                    if (asExpression && !Flow.AlwaysReturns(b, _result))
-                        _de.Report("LYR-SEM0033", Severity.Error, arm.Span,
-                            "a block arm of a match expression must return or throw on every path, "
-                            + "or end in a tail expression without ';' that is the arm's value");
+                    // Without a tail a block has no value. One that leaves on every path —
+                    // 'return', 'throw', 'break', 'continue' — contributes nothing to the
+                    // unification; one that runs to its end is worth nothing, which is decided
+                    // below, when the other arms are known.
+                    if (asExpression && !Flow.AlwaysExits(b, _result)) valueless.Add(arm);
                     break;
                 }
                 case Expr e:
@@ -8378,6 +8408,21 @@ public sealed class TypeChecker
                     break;
             }
         }
+        // A block arm that neither delivers a value nor leaves. In a match nobody takes a value
+        // from — every arm such a block, or a call that gives none — it is an arm like the
+        // others, and the match is worth nothing. Beside an arm that does deliver one, or where
+        // the position wants a value, it is the mistake.
+        if (valueless.Count > 0)
+        {
+            var wanted = expected is not null && !expected.IsError && expected is not NeverType && !TypeFacts.IsVoid(expected);
+            if (wanted || bodies.Any(t => !t.IsError && t is not NeverType && !TypeFacts.IsVoid(t)))
+                foreach (var arm in valueless)
+                    _de.Report("LYR-SEM0033", Severity.Error, arm.Span,
+                        "a block arm of a match expression delivers the arm's value — end it in a tail "
+                        + "expression without ';', or leave on every path");
+            else bodies.Add(LyrType.Void);
+        }
+
         // Faulty patterns would only produce follow-up noise, so exhaustiveness is skipped then.
         if (patternsClean && !st.IsError)
             CheckExhaustiveness(match, st, arms, CatchSetOf(scrutinee));

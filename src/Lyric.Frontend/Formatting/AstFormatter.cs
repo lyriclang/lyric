@@ -853,8 +853,13 @@ public sealed class AstFormatter
 
         LambdaExpr l => LambdaDoc(l),
         LoopExpr l => Doc.Of(LabelDoc(l.Label), Doc.From("loop "), Labeled(l.Label, () => BlockDoc(l.Body))),
+        // With a value block as its branch an 'if' is laid out as the statement is: '} else {'
+        // on one line, an 'else if' ladder straight down.
+        IfExpr { Then: BlockExpr } i => Doc.Of(Doc.From("if ("), ExprDoc(i.Condition, Assign), Doc.From(") "),
+            ExprDoc(i.Then, Assign), Doc.From(" else "), ExprDoc(i.Else, Assign)),
         IfExpr i => Doc.GroupOf(Doc.From("if ("), ExprDoc(i.Condition, Assign), Doc.From(") "),
             ExprDoc(i.Then, Assign), Doc.LineOrSpace, Doc.From("else "), ExprDoc(i.Else, Assign)),
+        BlockExpr b => BlockDoc(b.Block),
         MatchExpr m => MatchDoc(m.Scrutinee, m.Arms, m.Span),
         StructInitExpr s => StructInitDoc(s),
         WithExpr w => WithDoc(w),

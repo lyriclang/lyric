@@ -80,6 +80,7 @@ public class CEmitterTests
     [InlineData("dynamic_yields")]
     [InlineData("tasks")]
     [InlineData("paths")]
+    [InlineData("valueblocks")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -219,6 +220,11 @@ public class CEmitterTests
             data.Add("resources", profile, 0, RESOURCES_EXPECTED);
             data.Add("fn_throws", profile, 0, FN_THROWS_EXPECTED);
             data.Add("loops", profile, 0, "8\n-1\n39\n3\n2\n1\n");
+            // Value blocks and the tail rule (08 Y4, Y5 S1).
+            data.Add("valueblocks", profile, 0,
+                "negative zero small big\nin then\nleft then\nafter 5\nafter 6\n5 6\n3\n0 5 7 1\n"
+                + "zero | small, flagged | small | big\n3 -1 0 1\ntoo big\ntoo big\n1 -1 99\nseven\n36\n7 8 10\n"
+                + "big 2\nbig 3\none\ntwo\nm one\nm two\n");
             // An operand that gives no value ends the path it stands on, and no other (06 §9).
             data.Add("paths", profile, 0,
                 "if 5 match 5 guard 5\ncoalesce 5 and 5 or 5 chain 5\nassign 5 5 5\nnested 5 5\n"

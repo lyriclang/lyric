@@ -324,9 +324,21 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'if'");
         var cond = ParseExpr(0);
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after if-condition");
-        var then = ParseExpr(0); // the branch is an expression, so a value is guaranteed
+        var then = ParseBranch();
         _buffer.Expect(TokenKind.Else, "LYR-PAR0036", "if-expression requires an 'else' branch");
-        var elseBranch = ParseExpr(0); // 'else if' falls out as a nested IfExpr; if is primary
+        var elseBranch = ParseBranch(); // 'else if' falls out as a nested IfExpr; if is primary
         return new IfExpr(cond, then, elseBranch, Span.Union(kw.Span, elseBranch.Span));
+    }
+
+    /// <summary>A branch of an 'if' expression (08 Y5 S1): an expression, 'if (c) a else b', or a
+    /// value block, 'if (c) { …; a } else { …; b }'.</summary>
+    private Expr ParseBranch() => _buffer.Check(TokenKind.LBrace) ? ParseValueBlock() : ParseExpr(0);
+
+    /// <summary>A value block as an expression (08 Y4): the statements, and a tail without ';'
+    /// that is the block's value.</summary>
+    private BlockExpr ParseValueBlock()
+    {
+        var block = ParseBlock(valueBlock: true);
+        return new BlockExpr(block, block.Span);
     }
 }
