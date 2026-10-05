@@ -304,7 +304,7 @@ public class CEmitterTests
         var units = EmitC("generics");
         Assert.Null(units[0].Instance);
         Assert.Equal(
-            ["app.main.collect<int, string>", "app.main.ident<int>", "app.main.ident<string>", "app.main.make<bool>",
+            ["app.main.Counter.make<bool>", "app.main.collect<int, string>", "app.main.ident<int>", "app.main.ident<string>",
              "app.main.swap<int, string>", "app.main.twice<int>"],
             units.Skip(1).Select(u => u.Instance).ToArray());
 

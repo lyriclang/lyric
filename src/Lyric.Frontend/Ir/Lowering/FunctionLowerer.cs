@@ -5190,6 +5190,15 @@ internal sealed class FunctionLowerer
     /// bought with it is chaining — <c>xs.iter().map(f).take(3)</c> — and what is paid is that such
     /// a method can never be dispatched dynamically.</para>
     /// </summary>
+    /// <summary>The base name of a generic function's instance where no receiver holds it: a
+    /// block's member by the block's target, a static of a type's body by the type, a free
+    /// function by itself. The name is the instance table's key
+    /// (<see cref="InstanceTable.Request"/>), so it tells apart what the program tells apart.</summary>
+    private string StaticBaseName(FunctionSymbol symbol, string calleeName) =>
+        _typeTable.BlockOf(symbol) is { Target: { } blockTarget } ? $"<extend>.{blockTarget.Name}.{calleeName}"
+        : TypeTable.TypeDeclaring(symbol) is { } declaring ? $"{declaring.Name}.{calleeName}"
+        : calleeName;
+
     private TempId? LowerGenericInterfaceMethod(MemberExpr member, CallExpr expr, TypeSymbol iface,
         FunctionSymbol method, TypeId interfaceId, TempId receiver)
     {
@@ -5301,8 +5310,9 @@ internal sealed class FunctionLowerer
             throw NotSupported($"the native generic '{symbol.Name}' as a value — wrap it in a lambda", expr.Span);
 
         // Without a receiver, as its call requests it: a free function has none, and the sema
-        // lets only a static method through this route.
-        var target = _instances.Request(symbol, declaration, symbol.Name, null,
+        // lets only a static method through this route. Under the name its call gives it, so the
+        // value and the call are one instance.
+        var target = _instances.Request(symbol, declaration, StaticBaseName(symbol, symbol.Name), null,
             SubstitutedTypeArguments(expr), _typeTable, expr.Span);
         if (TypeOfExpr(expr) is not IrFunctionType signature)
             throw Bug($"an instantiated function without a function type at {expr.Span}");
@@ -6299,11 +6309,14 @@ internal sealed class FunctionLowerer
             // A block's member on a builtin or through a type's name has no holder here: the block's
             // target goes into the name, or 'int8.exact<int>' and 'uint8.exact<int>' are one key
             // and the second call lands on the first block's function.
+            //
+            // And a STATIC function of a type's body has no holder either, through the type's name
+            // or — inside the type — through none: its type goes into the name, or 'Small.make<int>',
+            // 'Tiny.make<int>' and a free 'make<int>' are one key, and 'Thread.spawn<int, never>'
+            // is the task 'spawn<int, never>' whenever a program writes both.
             var instanceName = receiverOwner is { } holder && !calleeName.StartsWith(holder.Name + ".", StringComparison.Ordinal)
                 ? $"{holder.Name}.{calleeName}"
-                : receiverOwner is null && _typeTable.BlockOf(symbol) is { Target: { } blockTarget }
-                    ? $"<extend>.{blockTarget.Name}.{calleeName}"
-                    : calleeName;
+                : receiverOwner is null ? StaticBaseName(symbol, calleeName) : calleeName;
             // A builtin's value has no symbol to be the receiver: its type is, for the 'this'.
             var builtinReceiver = receiverOwner is null && receiver is not null && expr.Callee is MemberExpr { Target: var on }
                 ? SubstituteType(ReceiverType(on))

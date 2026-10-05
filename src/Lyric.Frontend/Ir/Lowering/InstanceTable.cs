@@ -46,7 +46,94 @@ internal sealed class InstanceTable
 
     /// <summary>What has already been requested, so two calls of <c>id(7)</c> get the same instance
     /// rather than producing two identical functions.</summary>
-    private readonly Dictionary<string, FunctionId> _byKey = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (FunctionId Id, FunctionDecl Decl)> _byKey = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The instance already requested under <paramref name="name"/> — of THIS declaration.
+    ///
+    /// <para>The name is the key, and a key that two declarations share hands the second one the
+    /// first one's function: <c>Small.make&lt;int&gt;</c>, <c>Tiny.make&lt;int&gt;</c> and a free
+    /// <c>make&lt;int&gt;</c> were one name, and in the library <c>spawn&lt;int, never&gt;</c> and
+    /// <c>Thread.spawn&lt;int, never&gt;</c> — a thread that ran as a task, or the reverse, by
+    /// the order of two lines, without a word from anyone. The names say more now
+    /// (<see cref="Suffix"/>, the lowerer's base names); what they may still fail to say is a
+    /// compiler error here, with both declarations in it, rather than a call.</para>
+    /// </summary>
+    private bool Known(string name, FunctionDecl decl, out FunctionId id)
+    {
+        if (!_byKey.TryGetValue(name, out var existing)) { id = default; return false; }
+        if (!ReferenceEquals(existing.Decl, decl))
+            throw new Core.InternalCompilationException(
+                $"lowering: two declarations share the instance name '{name}' — '{existing.Decl.Name}' at "
+                + $"{existing.Decl.Span} and '{decl.Name}' at {decl.Span}; the name is the instance's key, and "
+                + "the second would be called as the first");
+        id = existing.Id;
+        return true;
+    }
+
+    /// <summary>The functions that share a declaration's name where it stands — in its module,
+    /// or in its type's body together with the type's blocks, which are one scope (08 §1.2) —,
+    /// in declaration order.</summary>
+    private Dictionary<Node, List<FunctionDecl>>? _sameName;
+
+    /// <summary>
+    /// What tells one of several functions of a name apart in an instance's name: its count,
+    /// <c>of/1&lt;int&gt;</c> beside <c>of/2&lt;int&gt;</c> (04 D4) — the suffix a function that
+    /// is no instance carries (<see cref="NameMangling.OverloadSuffix"/>). Empty for a name
+    /// declared once, which is nearly every name.
+    /// </summary>
+    private string Suffix(FunctionDecl decl)
+    {
+        _sameName ??= BuildOverloadIndex(_compilation);
+        if (!_sameName.TryGetValue(decl, out var group) || group.Count < 2) return "";
+        var mine = NameMangling.OverloadSuffix(decl.Parameters, 0);
+        var ordinal = 0;
+        foreach (var other in group)
+        {
+            if (ReferenceEquals(other, decl)) break;
+            if (NameMangling.OverloadSuffix(other.Parameters, 0) == mine) ordinal++;
+        }
+        return NameMangling.OverloadSuffix(decl.Parameters, ordinal);
+    }
+
+    private static Dictionary<Node, List<FunctionDecl>> BuildOverloadIndex(Compilation? compilation)
+    {
+        var index = new Dictionary<Node, List<FunctionDecl>>(ReferenceEqualityComparer.Instance);
+        if (compilation is null) return index;
+
+        // A scope is a symbol — the module, or the type a body and its blocks belong to — and a
+        // symbol is its own identity.
+        var groups = new Dictionary<(object Scope, string Name), List<FunctionDecl>>();
+        void Add(object scope, FunctionDecl function)
+        {
+            if (!groups.TryGetValue((scope, function.Name), out var group))
+                groups[(scope, function.Name)] = group = new List<FunctionDecl>();
+            if (!group.Any(known => ReferenceEquals(known, function))) group.Add(function);
+            index[function] = group;
+        }
+
+        foreach (var module in compilation.Modules)
+            foreach (var decl in compilation.AstOf(module).Declarations)
+            {
+                if (decl is FunctionDecl free) { Add(module, free); continue; }
+                (string? name, IEnumerable<FunctionDecl>? members) = decl switch
+                {
+                    StructDecl s => (s.Name, s.Members.OfType<FunctionDecl>()),
+                    ClassDecl c => (c.Name, c.Members.OfType<FunctionDecl>()),
+                    EnumDecl e => (e.Name, e.Methods.OfType<FunctionDecl>()),
+                    InterfaceDecl i => (i.Name, i.Members.OfType<FunctionDecl>()),
+                    _ => (null, null),
+                };
+                if (name is null || members is null || module.Members.LookupLocal(name) is not TypeSymbol type) continue;
+                foreach (var member in members) Add(type, member);
+            }
+
+        foreach (var block in compilation.Extensions.Blocks)
+            foreach (var method in block.Decl.Methods)
+                Add(block.Target ?? (object)block, method);
+
+        return index;
+    }
 
     /// <summary>
     /// The module a generic declaration stands in, so its instances carry the module path the rest
@@ -153,10 +240,10 @@ internal sealed class InstanceTable
         var name = owner is { } owning
             ? Qualify(owning.Definition.Declaration,
                   $"{owning.Definition.Name}<{string.Join(", ", owning.Arguments.Select(NameOf))}>")
-              + $".{symbol.Name}<{string.Join(", ", typeArguments.Select(NameOf))}>"
-            : Qualify(decl, baseName)
+              + $".{symbol.Name}{Suffix(decl)}<{string.Join(", ", typeArguments.Select(NameOf))}>"
+            : Qualify(decl, baseName + Suffix(decl))
               + $"<{string.Join(", ", typeArguments.Select(NameOf))}>";
-        if (_byKey.TryGetValue(name, out var existing)) return existing;
+        if (Known(name, decl, out var existing)) return existing;
 
         // A type parameter still open means the inference did not get through at the call site, and then
         // there is no instance that could be built.
@@ -190,7 +277,7 @@ internal sealed class InstanceTable
         Guard(name, span);
 
         var id = _ids.Next();
-        _byKey[name] = id;
+        _byKey[name] = (id, decl);
         _pending.Add(new Pending(decl, name, id, receiver, substitution, owner, receiverType));
         return id;
     }
@@ -227,11 +314,11 @@ internal sealed class InstanceTable
         // A generic method's own arguments name its instance too: 'mapped<int>' and 'mapped<string>'
         // on one receiver are two functions.
         var own = typeArguments is { Count: > 0 } ? $"<{string.Join(", ", typeArguments.Select(NameOf))}>" : "";
-        var name = Qualify(decl, $"<extend>.{NameOf(receiver)}.{method.Name}{own}");
-        if (_byKey.TryGetValue(name, out var existing)) return existing;
+        var name = Qualify(decl, $"<extend>.{NameOf(receiver)}.{method.Name}{Suffix(decl)}{own}");
+        if (Known(name, decl, out var existing)) return existing;
         Guard(name, span);
         var id = _ids.Next();
-        _byKey[name] = id;
+        _byKey[name] = (id, decl);
         // 'this' is the receiver: the instance for a named target, the shape itself for a
         // built-in constructor (03 T7 X2), where no symbol stands — and whatever a blanket block
         // (04 D15) is reached on, an instance included, which no target symbol names.
@@ -250,12 +337,12 @@ internal sealed class InstanceTable
         LyrType conformer, Core.Span span)
     {
         var name = Qualify(decl, $"<default>.{iface.Name}.{NameOf(conformer)}.{method.Name}");
-        if (_byKey.TryGetValue(name, out var existing)) return existing;
+        if (Known(name, decl, out var existing)) return existing;
         Guard(name, span);
         var substitution = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
         if (iface.SelfParam is { } self) substitution[self] = conformer;
         var id = _ids.Next();
-        _byKey[name] = id;
+        _byKey[name] = (id, decl);
         _pending.Add(new Pending(decl, name, id, null, substitution, null, conformer));
         return id;
     }
@@ -265,8 +352,8 @@ internal sealed class InstanceTable
     {
         var ownerName = Qualify(owner.Definition.Declaration,
             $"{owner.Definition.Name}<{string.Join(", ", owner.Arguments.Select(NameOf))}>");
-        var name = $"{ownerName}.{method.Name}";
-        if (_byKey.TryGetValue(name, out var existing)) return existing;
+        var name = $"{ownerName}.{method.Name}{Suffix(decl)}";
+        if (Known(name, decl, out var existing)) return existing;
 
         var substitution = new Dictionary<GenericParamSymbol, LyrType>(
             ReferenceEqualityComparer.Instance);
@@ -278,7 +365,7 @@ internal sealed class InstanceTable
         Guard(name, span);
 
         var id = _ids.Next();
-        _byKey[name] = id;
+        _byKey[name] = (id, decl);
         // A STATIC method gets no 'this'. 'Owner' stays set all the same: its 'T' is that of the type,
         // even when no receiver brings it along.
         _pending.Add(new Pending(decl, name, id, method.IsStatic ? null : owner.Definition,

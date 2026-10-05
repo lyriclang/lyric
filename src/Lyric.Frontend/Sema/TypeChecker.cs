@@ -3559,8 +3559,8 @@ public sealed class TypeChecker
     /// <para>It used to be accepted without a word: a field was typed as the error type, which
     /// silences everything after it, a method as its function type without the receiver — and
     /// the lowering met a reference it had no word for (<c>LYR-IR0001</c>), an error type
-    /// (<c>LYR-ICE0001</c>) or a call one argument short (malformed IR). Where the method was
-    /// never reached, nothing was said at all.</para>
+    /// (<c>LYR-ICE0001</c>) or a call one argument short (malformed IR). In a method of a
+    /// generic type that no instance asked for, nothing was said at all.</para>
     ///
     /// <para>Of a static and a method of one name the call's count chooses first (08 §1.2):
     /// such a set is left to the choice, and <see cref="BareChoice"/> asks again for what was
@@ -3839,7 +3839,12 @@ public sealed class TypeChecker
     private LyrType OverloadTypeOf(FunctionSymbol chosen, Expr callee) =>
         callee is MemberExpr mem && ReceiverTypeOf(mem) is GenericInstance gi
             ? Substitute(FnTypeOf(chosen), SubstMap(gi))
-            : FnTypeOf(chosen);
+            // A static through the instance its receiver names, 'Box<int>.from(1)': the same
+            // instance. Without it one of two 'from' was typed in the type's own 'T' — "cannot
+            // assign 'int' to 'T'" — where a 'from' declared once was not.
+            : callee is MemberExpr named && ReceiverTypeOf(named) is NonValueType { Instance: { } written }
+                ? Substitute(FnTypeOf(chosen), SubstMap(written))
+                : FnTypeOf(chosen);
 
     /// <summary>
     /// Which overload a call means.
