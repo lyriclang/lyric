@@ -163,3 +163,34 @@ fn sortUnstableTakesDuplicatesAndOrderedInput(): void {
     assertTrue(isSorted(down));
     assertEq(down[0], 1);
 }
+
+/// Musser's killer for a quicksort that takes the median of the first, the middle and the last
+/// element: `1, k+1, 3, k+3, …, k-1, 2k-1` and then `2, 4, …, 2k`. The median is the second
+/// smallest of what is left, every partition splits two elements off, and `sortUnstable` has
+/// spent its partitions with all but a few dozen elements still unsorted.
+fn medianOfThreeKiller(n: int): int[] {
+    let k = n / 2;
+    var xs: int[] = [0] * (2 * k);
+    var i = 1;
+    while (i <= k) {
+        xs[i - 1] = if (i % 2 == 1) i else k + i - 1;
+        xs[k + i - 1] = 2 * i;
+        i = i + 1;
+    }
+    return xs;
+}
+
+@Test
+fn sortUnstableFallsBackToTheHeapSort(): void {
+    // No other input here reaches the fallback: 64 leaves the heap sort 40 elements, 1000 leaves
+    // it 964 (counted on a port of the sort).
+    for (n in [64, 100, 1000]) {
+        let xs = medianOfThreeKiller(n);
+        let before = total(xs);
+        xs.sortUnstable();
+        assertTrue(isSorted(xs));
+        assertEq(total(xs), before);
+        assertEq(xs[0], 1);
+        assertEq(xs[n - 1], n);
+    }
+}

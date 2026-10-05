@@ -17,7 +17,7 @@ public class BuildTests
 
     private static string Fresh(params string[] programs)
     {
-        var dir = Directory.CreateTempSubdirectory("lyric5-build").FullName;
+        var dir = TestDirectories.Fresh("lyric5-build-");
         foreach (var program in programs)
             File.Copy(Path.Combine(Root, "tests", "Lyric5.Tests", "programs", program + ".lyr"), Path.Combine(dir, program + ".lyr"));
         return dir;
@@ -46,7 +46,7 @@ public class BuildTests
     [Fact]
     public void A_file_is_a_package_with_out_beside_it_or_at_the_repository_root()
     {
-        var root = Directory.CreateTempSubdirectory("lyric5-root").FullName;
+        var root = TestDirectories.Fresh("lyric5-root-");
         Directory.CreateDirectory(Path.Combine(root, ".git"));
         var src = Directory.CreateDirectory(Path.Combine(root, "src", "deep")).FullName;
         File.WriteAllText(Path.Combine(src, "tool.lyr"), "fn main(): int { return 0; }\n");
