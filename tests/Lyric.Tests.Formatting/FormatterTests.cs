@@ -1009,6 +1009,15 @@ public class FormatterTests
         Assert.Contains("return apply(b: 1, a: 10) { it * 2 };",
             Format("fn g(): int { return apply(b: 1, a: 10) { it * 2 }; }"), StringComparison.Ordinal);
 
+    /// <summary>The dots that spread an argument (the review's A2) stay behind it.</summary>
+    [Theory]
+    [InlineData("return sum(0, xs...);")]
+    [InlineData("return all(xs...);")]
+    [InlineData("return all([1, 2]...);")]
+    [InlineData("return each(xs...) { it + 1 };")]
+    public void A_spread_argument_keeps_its_dots(string statement) =>
+        Assert.Contains(statement, Format("fn g(): int { " + statement + " }"), StringComparison.Ordinal);
+
     [Fact]
     public void A_lambda_keeps_its_written_set() =>
         Assert.Contains("(x: int): int throws [A, B] => x", Format("fn g() { let f = (x: int): int throws [A,B] => x; }"), StringComparison.Ordinal);

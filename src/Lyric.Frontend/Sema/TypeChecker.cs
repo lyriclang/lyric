@@ -5224,7 +5224,13 @@ public sealed class TypeChecker
 
             var member = new MemberExpr(receiverExpr, qualified.Member, IsOptional: false, qualified.Span) { MemberSpan = qualified.MemberSpan };
             var names = call.ArgumentNames is { } all ? all.Skip(1).ToArray() : null;
-            var meant = new CallExpr(member, call.Arguments[1..], call.Span) { ArgumentNames = names is { } n && n.Any(x => x is not null) ? n : null };
+            // The call as it was written, but for its receiver: what it spreads and the
+            // parentheses of its arguments stay with it.
+            var meant = call with
+            {
+                Callee = member, Arguments = call.Arguments[1..], TypeArguments = null,
+                ArgumentNames = names is { } n && n.Any(x => x is not null) ? n : null,
+            };
             _typedReceiver.Add(member);
             _operatorTarget[member] = (FnTypeOf(promised), promised);
             var result = CheckExpr(meant, scope, expected);
@@ -5300,7 +5306,7 @@ public sealed class TypeChecker
             if (args[i] is { } given && given is not LambdaExpr)
                 argTypes[i] = given is UnaryExpr { Operator: UnaryOp.Place } mark && fn.PlaceAt(i)
                     ? CheckPlaceArgument(mark, scope)
-                    : CheckExpr(given, scope, ConcreteExpectation(fn, decl, i, given));
+                    : CheckExpr(given, scope, ConcreteExpectation(fn, decl, i, Spreads(call, given)));
 
         // Phase B: type arguments from the eagerly typed arguments.
         Dictionary<GenericParamSymbol, LyrType>? map = null;
@@ -5346,15 +5352,12 @@ public sealed class TypeChecker
             for (var i = 0; i < n; i++)
                 if (i != variadicAt && args[i] is { } given && given is not LambdaExpr) UnifyInfer(fn.Parameters[i], argTypes[i]!, map, given.Span);
             // The variadic tail (08 §1.1 rule 1) binds through its element, one argument at a time —
-            // or, a single array left, as the whole array, the reading CheckCallArgs gives it.
+            // an array too, which is one element (the review's A2) — or through the array itself
+            // where the call spreads one over it, 'count(xs...)'.
             if (variadicAt >= 0 && variadicAt < fn.Parameters.Length && fn.Parameters[variadicAt] is ArrayOf tail)
-            {
-                if (args.Length == variadicAt + 1 && args[variadicAt] is { } whole and not LambdaExpr && argTypes[variadicAt] is ArrayOf)
-                    UnifyInfer(tail, argTypes[variadicAt]!, map, whole.Span);
-                else
-                    for (var i = variadicAt; i < args.Length; i++)
-                        if (args[i] is { } element && element is not LambdaExpr) UnifyInfer(tail.Element, argTypes[i]!, map, element.Span);
-            }
+                for (var i = variadicAt; i < args.Length; i++)
+                    if (args[i] is { } element && element is not LambdaExpr)
+                        UnifyInfer(Spreads(call, element) ? tail : tail.Element, argTypes[i]!, map, element.Span);
             substituted = (FnType)Substitute(fn, map);
         }
 
@@ -5362,7 +5365,7 @@ public sealed class TypeChecker
         for (var i = 0; i < args.Length; i++)
         {
             if (args[i] is not LambdaExpr lambda) continue;
-            argTypes[i] = CheckExpr(lambda, scope, ExpectedParamAt(substituted, decl, i, lambda));
+            argTypes[i] = CheckExpr(lambda, scope, ExpectedParamAt(substituted, decl, i, Spreads(call, lambda)));
             if (map is not null && i < fn.Parameters.Length)
                 UnifyInfer(Substitute(fn.Parameters[i], map), argTypes[i]!, map, lambda.Span);
         }
@@ -5434,9 +5437,12 @@ public sealed class TypeChecker
     /// <c>T</c> makes no such statement — it is the question the inference answers from the argument
     /// — and passing it down would answer that question with itself.</para>
     /// </summary>
-    private static LyrType? ConcreteExpectation(FnType fn, FunctionDecl? decl, int i,
-        Expr argument) =>
-        ExpectedParamAt(fn, decl, i, argument) is { } t && !MentionsTypeParam(t) ? t : null;
+    private static LyrType? ConcreteExpectation(FnType fn, FunctionDecl? decl, int i, bool spread) =>
+        ExpectedParamAt(fn, decl, i, spread) is { } t && !MentionsTypeParam(t) ? t : null;
+
+    /// <summary>Is this an argument the call spreads, <c>f(xs...)</c>?</summary>
+    private static bool Spreads(CallExpr call, Expr argument) =>
+        call.Spreads is { } spreads && Array.Exists(spreads, s => ReferenceEquals(s.Argument, argument));
 
     /// <summary>Does this type still carry a type parameter anywhere inside it?</summary>
     private static bool MentionsTypeParam(LyrType type) => type switch
@@ -5454,37 +5460,21 @@ public sealed class TypeChecker
         _ => false,
     };
 
-    private static LyrType? ExpectedParamAt(FnType fn, FunctionDecl? decl, int i, Expr argument)
+    /// <param name="spread">Whether the argument at <paramref name="i"/> is the one the call
+    /// spreads, <c>f(xs...)</c>.</param>
+    private static LyrType? ExpectedParamAt(FnType fn, FunctionDecl? decl, int i, bool spread)
     {
         var ps = decl?.Parameters;
         var variadic = ps is { Length: > 0 } && ps[^1].IsParams;
         var fixedCount = variadic ? ps!.Length - 1 : fn.Parameters.Length;
         if (i < fixedCount && i < fn.Parameters.Length) return fn.Parameters[i];
         // The variadic position expects the ELEMENT — that is what names an enum variant's
-        // instance in 'f(Opt.Some(1))'. EXCEPT for an array-literal argument: it may be one
-        // element or the whole array, the literal's own shape decides (PassesWholeArray), and
-        // since 2.1 an expectation PROPAGATES into the literal — offering the element type
-        // would force the element reading and take the whole-array form with it.
-        if (variadic && argument is not ArrayLitExpr && fn.Parameters[^1] is ArrayOf elem)
-            return elem.Element;
+        // instance in 'f(Opt.Some(1))', and what makes an array literal there one element, an
+        // array (the review's A2: the call says which, not the argument's shape). A spread
+        // argument is the parameter's array.
+        if (variadic && fn.Parameters[^1] is ArrayOf elem) return spread ? elem : elem.Element;
         return null;
     }
-
-    /// <summary>
-    /// Is the <c>params</c> array passed as a whole rather than piece by piece?
-    ///
-    /// <para>Exactly when ONE argument is left and its type is that of the array — <c>sum(xs)</c>
-    /// with <c>xs: int[]</c>. That is unambiguous in Lyric for two reasons C# lacks: there is no
-    /// implicit conversion between <c>T</c> and <c>T[]</c>, and there is no overloading. With
-    /// <c>params xs: int[][]</c> an element is <c>int[]</c> and the array <c>int[][]</c> — different
-    /// types, no conflict.</para>
-    ///
-    /// <para>Allowed at all because without this route no variadic function could delegate to
-    /// another: <c>fn logged(params xs: int[]) { return sum(xs); }</c> would be impossible. To pass
-    /// an array deliberately as ONE element, write <c>f([a])</c>.</para>
-    /// </summary>
-    private static bool PassesArrayDirectly(LyrType[] argTypes, int fixedCount, LyrType arrayType) =>
-        argTypes.Length == fixedCount + 1 && LyrType.Equal(argTypes[fixedCount], arrayType);
 
     /// <param name="args">In parameter order (<see cref="ArrangeArguments"/>); a <c>null</c> is a
     /// parameter the call leaves to its default.</param>
@@ -5510,9 +5500,27 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0014", Severity.Error, call.Span,
                 $"call expects {(variadic ? $"at least {minRequired}" : minRequired == fn.Parameters.Length ? minRequired.ToString() : $"{minRequired}–{fn.Parameters.Length}")} argument(s), got {given}");
 
+        // 'f(xs...)' (08 §1.1 rule 1; the review's A2): the argument is the REST — one, at a
+        // variadic parameter, alone there, and that parameter's array. Said once where it is
+        // not, on the dots; a spread argument that does not fit is then checked as nothing.
+        var spreads = call.Spreads ?? [];
+        var spreadAt = spreads.Length == 1 ? Array.FindIndex(args, a => ReferenceEquals(a, spreads[0].Argument)) : -1;
+        var spreadFits = spreadAt >= 0 && variadic && spreadAt == fixedCount && args.Length == fixedCount + 1
+            && fn.Parameters[^1] is ArrayOf;
+        if (spreads.Length > 1)
+            _de.Report("LYR-SEM0166", Severity.Error, spreads[1].Dots,
+                "a call spreads one array, the rest of its arguments — this is a second");
+        else if (spreads.Length == 1 && !spreadFits)
+            _de.Report("LYR-SEM0166", Severity.Error, spreads[0].Dots,
+                !variadic
+                    ? $"'...' spreads an array over a variadic parameter, and {CalleeText(call, decl)} has none"
+                    : spreadAt >= 0 && spreadAt < fixedCount
+                        ? $"'...' spreads an array over the variadic parameter '{ps![^1].Name}', and this argument goes to '{ps[spreadAt].Name}'"
+                        : $"a spread is the whole rest — '{ps![^1].Name}' takes the array as its own, and no other argument beside it");
+
         for (var i = 0; i < args.Length && i < fixedCount && i < fn.Parameters.Length; i++)
         {
-            if (args[i] is not { } a) continue;
+            if (args[i] is not { } a || Spreads(call, a)) continue;
             // A place parameter's argument is marked (03 §2.3a); a value parameter's mark was
             // refused where it was checked.
             if (!fn.PlaceAt(i)) { CheckAssignable(a, argTypes[i]!, fn.Parameters[i], a.Span); continue; }
@@ -5532,16 +5540,35 @@ public sealed class TypeChecker
         }
 
         if (variadic && fn.Parameters[^1] is ArrayOf elem)
-        {
-            // A ready-made array passes through as a whole, or one variadic function could not
-            // delegate to another. See PassesArrayDirectly.
-            var typed = argTypes.Select(t => t ?? LyrType.Error).ToArray();
-            if (PassesArrayDirectly(typed, fixedCount, fn.Parameters[^1])) return;
-
             for (var i = fixedCount; i < args.Length; i++)
-                if (args[i] is { } a) CheckAssignable(a, argTypes[i]!, elem.Element, a.Span);
-        }
+            {
+                if (args[i] is not { } a) continue;
+                if (Spreads(call, a))
+                {
+                    if (!spreadFits) continue;
+                    CheckAssignable(a, argTypes[i]!, fn.Parameters[^1], a.Span);
+                    _result.MarkSpread(a);
+                    continue;
+                }
+                // One argument is one element. An array of the parameter's own type was handed
+                // on as the rest until the review (A2) — who writes that now is told what does it.
+                if (argTypes[i] is { IsError: false } handed && LyrType.Equal(handed, fn.Parameters[^1])
+                    && !IsAssignable(a, handed, elem.Element))
+                {
+                    _de.Report("LYR-SEM0001", Severity.Error, a.Span,
+                        $"'{TypeFacts.Display(handed)}' is one argument here, and '{ps![^1].Name}' takes values of "
+                        + $"'{TypeFacts.Display(elem.Element)}'",
+                        new DiagnosticNote("to hand the array on as the rest, spread it: write '...' behind the argument"));
+                    continue;
+                }
+                CheckAssignable(a, argTypes[i]!, elem.Element, a.Span);
+            }
     }
+
+    /// <summary>The callee as a message names it.</summary>
+    private static string CalleeText(CallExpr call, FunctionDecl? decl) => decl is not null
+        ? $"'{decl.Name}'"
+        : call.Callee is IdentifierExpr { Name: var name } ? $"'{name}', a function value," : "a function value";
 
     /// <summary>
     /// The arguments of a call in PARAMETER order (design/v5/spec/04 D5): the positional ones

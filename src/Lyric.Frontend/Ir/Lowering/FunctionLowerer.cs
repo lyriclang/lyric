@@ -6400,10 +6400,9 @@ internal sealed class FunctionLowerer
     /// <summary>
     /// The remaining arguments as an array: <c>sum(1, 2, 3)</c> becomes <c>sum([1, 2, 3])</c>.
     ///
-    /// <para>A READY-MADE ARRAY PASSES THROUGH AS A WHOLE: <c>sum(xs)</c> with <c>xs: int[]</c> is the
-    /// array itself, not an array with an array inside. Without this route a variadic function could not
-    /// delegate to another. Recognisable from the type of the single remaining argument — nothing more
-    /// is needed, because an element never has the same type as the array taking it.</para>
+    /// <para>A SPREAD ARGUMENT IS THE ARRAY: <c>sum(xs...)</c> hands on <c>xs</c> itself, no copy
+    /// — that is how one variadic function hands its arguments to another. The call says so
+    /// (the review's A2); an array without the dots is one element, like any other argument.</para>
     /// </summary>
     private TempId CollectVariadic(Param parameter, Expr?[] provided, int from, Span span,
         IReadOnlyDictionary<string, LyrType>? calleeSubstitution = null)
@@ -6419,8 +6418,7 @@ internal sealed class FunctionLowerer
 
         var rest = provided.Length > from ? provided[from..].OfType<Expr>().ToArray() : [];
 
-        if (rest.Length == 1 && IrType.Equal(TypeOfExpr(rest[0]), array))
-            return LowerExpr(rest[0]);
+        if (rest is [var spread] && _types.IsSpread(spread)) return LowerExprAs(spread, array);
 
         var elements = new TempId[rest.Length];
         for (var i = 0; i < elements.Length; i++)

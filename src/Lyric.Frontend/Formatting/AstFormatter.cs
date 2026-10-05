@@ -1025,11 +1025,17 @@ public sealed class AstFormatter
         return trailing is null ? parenthesized : Doc.Of(parenthesized, trailing);
     }
 
-    /// <summary>An argument as written: by name, <c>host: "h"</c>, or positional.</summary>
-    private Doc ArgumentDoc(CallExpr call, Expr argument, int index) =>
-        call.ArgumentNames is { } names && index < names.Length && names[index] is { } name
+    /// <summary>An argument as written: by name, <c>host: "h"</c>, or positional — and with the
+    /// dots that spread it, <c>xs...</c>.</summary>
+    private Doc ArgumentDoc(CallExpr call, Expr argument, int index)
+    {
+        var written = call.ArgumentNames is { } names && index < names.Length && names[index] is { } name
             ? Doc.Of(Doc.From(name + ": "), ExprDoc(argument, Assign))
             : ExprDoc(argument, Assign);
+        return call.Spreads is { } spreads && Array.Exists(spreads, s => ReferenceEquals(s.Argument, argument))
+            ? Doc.Of(written, Doc.From("..."))
+            : written;
+    }
 
     private Doc ArrayDoc(ArrayLitExpr array)
     {

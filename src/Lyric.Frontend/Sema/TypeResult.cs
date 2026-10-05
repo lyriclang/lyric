@@ -163,6 +163,15 @@ public sealed class TypeResult
 
     public void MarkGeneratorLambda(LambdaExpr lambda) => _generatorLambdas.Add(lambda);
 
+    /// <summary>The arguments a call spreads over its variadic parameter, <c>f(xs...)</c>
+    /// (08 §1.1 rule 1): checked to be the rest, alone, and of the parameter's array type — the
+    /// lowering hands such an argument on as the array it is.</summary>
+    private readonly HashSet<Expr> _spreads = new(ReferenceEqualityComparer.Instance);
+
+    public void MarkSpread(Expr argument) => _spreads.Add(argument);
+
+    public bool IsSpread(Expr argument) => _spreads.Contains(argument);
+
     public bool IsGeneratorLambda(LambdaExpr lambda) => _generatorLambdas.Contains(lambda);
 
     public LyrType? ThrownByPull(Node pull) =>
