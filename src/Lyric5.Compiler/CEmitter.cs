@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "m6-s3c";
+    public const string Version = "r1c";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -55,6 +55,17 @@ public sealed class CEmitter
     /// <summary>Which entry of the type table is a variant of which enum, and which number it
     /// has there: the tag.</summary>
     private readonly Dictionary<int, (int Enum, int Tag)> _variants = new();
+
+    /// <summary>What each entry of the type table is called in C (<see cref="TypeToken"/>), made
+    /// when first asked for.</summary>
+    private readonly string?[] _typeTokens;
+
+    /// <summary>What each global is called in C (<see cref="GlobalName"/>).</summary>
+    private readonly string[] _globalNames;
+
+    /// <summary>Per entry of the type table, how many entries before it have its module and its
+    /// name: the environments of two lambdas in one function are both named after the function.</summary>
+    private readonly int[] _twins;
 
     private readonly string? _stdlibRoot;
 
@@ -81,6 +92,40 @@ public sealed class CEmitter
         for (var i = 0; i < module.Types.Count; i++)
             for (var tag = 0; tag < module.Types[i].Variants.Length; tag++)
                 _variants[module.Types[i].Variants[tag].Value] = (i, tag);
+        _typeTokens = new string?[module.Types.Count];
+        _twins = new int[module.Types.Count];
+        var named = new Dictionary<(string, string), int>();
+        for (var i = 0; i < module.Types.Count; i++)
+        {
+            var key = (module.Types[i].Module, module.Types[i].Name);
+            _twins[i] = named.GetValueOrDefault(key);
+            named[key] = _twins[i] + 1;
+        }
+        _globalNames = module.Globals
+            .Select(g => "lyr_g_" + Token(g.Module.Length > 0 ? $"{g.Module}.{g.Name}" : g.Name)).ToArray();
+        if (_main) RequireDistinctNames();
+    }
+
+    /// <summary>
+    /// Two entries under one C name would be one struct for two layouts, and the C compiler would
+    /// say so about a line nobody wrote — or, for two globals, say nothing. The names are made so
+    /// that it cannot happen (<see cref="TypeToken"/>); this is the place that would notice if it
+    /// did. Once per program, in the module's own unit.
+    /// </summary>
+    private void RequireDistinctNames()
+    {
+        var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var i = 0; i < _module.Types.Count; i++)
+            if (!seen.TryAdd(TypeToken(i), i))
+                throw new InvalidOperationException(
+                    $"the types '{Qualified(_module.Types[seen[TypeToken(i)]])}' and '{Qualified(_module.Types[i])}' "
+                    + $"would both be '{TypeToken(i)}' in C");
+        seen.Clear();
+        for (var i = 0; i < _globalNames.Length; i++)
+            if (!seen.TryAdd(_globalNames[i], i))
+                throw new InvalidOperationException(
+                    $"the globals '{_module.Globals[seen[_globalNames[i]]].Name}' and '{_module.Globals[i].Name}' "
+                    + $"would both be '{_globalNames[i]}' in C");
     }
 
     /// <summary>One translation unit of the emission: the module's own (<see cref="Instance"/>
@@ -167,7 +212,52 @@ public sealed class CEmitter
 
     private static string Temp(TempId temp) => $"t{temp.Value}";
 
-    private string GlobalName(int index) => $"lyr_g{index}_" + Identifier(_module.Globals[index].Name);
+    /// <summary><c>lyr_g_&lt;module&gt;_&lt;name&gt;</c>: a global by the module that declares it
+    /// and its name there — not by its place in the table, which moves with every global another
+    /// module gains.</summary>
+    private string GlobalName(int index) => _globalNames[index];
+
+    /// <summary>A name as C spells it, without the <c>lyr_</c> in front: dots are underscores, and
+    /// where a character had to go a short hash of the whole name follows
+    /// (<see cref="FunctionName"/>).</summary>
+    private static string Token(string name) => FunctionName(name)[4..];
+
+    /// <summary>A token with its length in front, for a name made of several: the reader of
+    /// <c>lyr_fn_ref12_app_main_Box_to_i64</c> knows where the type's name ends, so two different
+    /// types cannot spell the same C name.</summary>
+    private static string Sized(string token) => $"{token.Length}_{token}";
+
+    /// <summary>
+    /// What an entry of the type table is called in C, without a prefix: its module and its name
+    /// there — <c>std_core_ParseError</c>; a generic instance with a hash of its arguments behind
+    /// it. Not its number in the table: the table holds every type of the standard library, and a
+    /// number made each new one there rename every type of every program.
+    /// </summary>
+    /// <remarks>
+    /// What no module declares is named by what it is. A variant is its enum's, a tuple and the
+    /// cell of a captured variable are what they hold (the lowering interns both by that), an
+    /// environment is the function's its lambda stands in — the second lambda's there with a 2
+    /// behind it. Those tokens begin with a digit, which no module's name does, so they stand
+    /// apart from every declared type's.
+    /// </remarks>
+    private string TypeToken(int type) => _typeTokens[type] ??= NameType(type);
+
+    private string NameType(int type)
+    {
+        var def = _module.Types[type];
+        if (_variants.TryGetValue(type, out var of))
+        {
+            var owner = _module.Types[of.Enum].Name;
+            var own = def.Name.StartsWith(owner + ".", StringComparison.Ordinal) ? def.Name[(owner.Length + 1)..] : def.Name;
+            return Sized(TypeToken(of.Enum)) + "_" + Identifier(own);
+        }
+        if (def.Name == "<tuple>") return "0tup" + string.Concat(def.FieldTypes.Select(f => "_" + Mangle(f)));
+        if (def.Name == "<cell>") return "0cell_" + Mangle(def.FieldTypes[0]);
+        var token = def.Module.Length == 0 ? "0" + Token(def.Name) : Token($"{def.Module}.{def.Name}");
+        // Entries of one name are told apart by their order among themselves — which only
+        // another entry of that very name can move.
+        return _twins[type] == 0 ? token : $"{token}_{_twins[type] + 1}";
+    }
 
     public string CType(IrType type) => type switch
     {
@@ -262,20 +352,20 @@ public sealed class CEmitter
 
     /// <summary><c>lyr_opt_&lt;inner&gt;</c>: one C struct per optional type outside the niche,
     /// named after what it holds.</summary>
-    private static string OptionalName(IrOptionalType type) => "lyr_opt_" + Mangle(type.Inner);
+    private string OptionalName(IrOptionalType type) => "lyr_opt_" + Mangle(type.Inner);
 
     /// <summary><c>lyr_slice_&lt;element&gt;</c>: a view of <c>T[]</c> (03 T13 A2), a pointer into
     /// the elements and a length — two words, a value C passes and copies as one.</summary>
-    private static string SliceName(IrSliceType type) => "lyr_slice_" + Mangle(type.Element);
+    private string SliceName(IrSliceType type) => "lyr_slice_" + Mangle(type.Element);
 
     /// <summary><c>lyr_inl&lt;N&gt;_&lt;element&gt;</c>: an inline array (03 T13 A4), a struct around a
     /// C array so that C copies it as a value.</summary>
-    private static string InlineName(IrInlineArrayType type) => $"lyr_inl{type.Length}_" + Mangle(type.Element);
+    private string InlineName(IrInlineArrayType type) => $"lyr_inl{type.Length}_" + Mangle(type.Element);
 
     /// <summary><c>lyr_fn_&lt;signature&gt;</c>: a function value (01 V8), a pointer to the code and
     /// the environment it runs in — two words, a value. The code takes the environment first,
     /// as <c>void *</c>; a function without one gets a thunk that drops it.</summary>
-    private static string FnName(IrFunctionType type) => "lyr_" + Mangle(type);
+    private string FnName(IrFunctionType type) => "lyr_" + Mangle(type);
 
     /// <summary>The C type of the code pointer of a function value: the environment first, the
     /// caller's error slot last (03 T17) — whether the type throws or not. One code pointer per
@@ -294,19 +384,19 @@ public sealed class CEmitter
     private static bool TakesEnvironment(IrFunction function) =>
         function.ParamCount > 0 && function.Locals[0].Name == "<env>";
 
-    private static string Mangle(IrType type) => type switch
+    private string Mangle(IrType type) => type switch
     {
         IrScalarType { Kind: IrScalar.String } => "str",
         IrScalarType s => s.Kind.ToString().ToLowerInvariant(),
-        IrStructType s => $"ty{s.Type.Value}",
-        IrEnumType e => $"en{e.Type.Value}",
-        IrRefType r => $"ref{r.Type.Value}",
+        IrStructType s => "ty" + Sized(TypeToken(s.Type.Value)),
+        IrEnumType e => "en" + Sized(TypeToken(e.Type.Value)),
+        IrRefType r => "ref" + Sized(TypeToken(r.Type.Value)),
         IrArrayType a => "arr_" + Mangle(a.Element),
         IrSliceType s => "slice_" + Mangle(s.Element),
         IrInlineArrayType ia => $"inl{ia.Length}_" + Mangle(ia.Element),
         IrFunctionType f => "fn" + string.Concat(f.Parameters.Select(p => "_" + Mangle(p))) + "_to_" + Mangle(f.Return),
         IrCoroutineType c => "coro_" + Mangle(c.Yield) + "_to_" + Mangle(c.Result),
-        IrInterfaceType i => $"iface{i.Type.Value}",
+        IrInterfaceType i => "iface" + Sized(TypeToken(i.Type.Value)),
         IrOptionalType o => "opt_" + Mangle(o.Inner),
         IrPlaceType p => "place_" + Mangle(p.Value),
         _ => throw new InvalidOperationException($"the C emitter has no name for an optional of {type}; the gate let it through"),
@@ -337,10 +427,9 @@ public sealed class CEmitter
 
     private static string Qualified(IrTypeDef def) => def.Module.Length > 0 ? $"{def.Module}.{def.Name}" : def.Name;
 
-    /// <summary><c>lyr_ty&lt;index&gt;_&lt;Name&gt;</c>: the index makes it unique (the IR's type names
-    /// are not module-qualified), the name keeps it readable in a debugger.</summary>
-    private string StructName(TypeId id) =>
-        $"lyr_ty{id.Value}_" + Identifier(_module.Types[id.Value].Name);
+    /// <summary><c>lyr_ty_&lt;module&gt;_&lt;Name&gt;</c> (<see cref="TypeToken"/>): what a
+    /// debugger shows, and the same in every program that uses the type.</summary>
+    private string StructName(TypeId id) => "lyr_ty_" + TypeToken(id.Value);
 
     private static string Identifier(string name) =>
         new string(name.Select(c => char.IsAsciiLetterOrDigit(c) ? c : '_').ToArray());
@@ -496,10 +585,10 @@ public sealed class CEmitter
         else if (type is IrOptionalType optional) ReferenceWords(optional.Inner, offset, words, ref ambiguous);
     }
 
-    private string DescriptorName(TypeId id) => $"lyr_desc_ty{id.Value}_" + Identifier(_module.Types[id.Value].Name);
+    private string DescriptorName(TypeId id) => "lyr_desc_ty_" + TypeToken(id.Value);
 
     /// <summary>The descriptor of <c>T[]</c>, one per element type (V10).</summary>
-    private static string ArrayDescriptor(IrType element) => "lyr_desc_arr_" + Mangle(element);
+    private string ArrayDescriptor(IrType element) => "lyr_desc_arr_" + Mangle(element);
 
     /// <summary>The elements of an array or a view temp, typed: <c>LYR_ARR_DATA(t, T)[i]</c>, or
     /// the view's pointer.</summary>
@@ -639,7 +728,7 @@ public sealed class CEmitter
             // The conformance lists (03 T11): per concrete type its rows — the interface's
             // identity and the table — NULL-terminated, where the type's descriptor points.
             foreach (var group in _module.Impls.GroupBy(r => r.Type.Value).OrderBy(g => g.Key))
-                tables.AppendLine($"const LyrItable lyr_itab_ty{group.Key}[] = {{ "
+                tables.AppendLine($"const LyrItable {ItableName(group.Key)}[] = {{ "
                     + string.Join(", ", group.Select(r => $"{{ {IfaceId(r.Interface.Value)}, &{VtName(r.Type.Value, r.Interface.Value)} }}"))
                     + " , { NULL, NULL } };");
         }
@@ -807,17 +896,21 @@ public sealed class CEmitter
 
     // --- interfaces (01 V7) ----------------------------------------------------------------------
 
-    private string VtType(int iface) => $"lyr_vt_ty{iface}";
+    private string VtType(int iface) => "lyr_vt_ty_" + TypeToken(iface);
 
-    private string VtName(int concrete, int iface) => $"lyr_vt_ty{iface}_ty{concrete}";
+    /// <summary>The table of one conformance: the interface's name, then the type's, each with
+    /// its length (<see cref="Sized"/>).</summary>
+    private string VtName(int concrete, int iface) => $"lyr_vt_{Sized(TypeToken(iface))}_{Sized(TypeToken(concrete))}";
+
+    private string ItableName(int concrete) => "lyr_itab_ty_" + TypeToken(concrete);
 
     /// <summary>An interface's identity at runtime: the address of its name, defined once in the
     /// module's unit (03 T11).</summary>
-    private string IfaceId(int iface) => $"lyr_ifid_ty{iface}";
+    private string IfaceId(int iface) => "lyr_ifid_ty_" + TypeToken(iface);
 
     /// <summary>The conformance list of a concrete type, or <c>NULL</c> where no row names it.</summary>
     private string ItablesOf(int concrete) =>
-        _module.Impls.Any(r => r.Type.Value == concrete) ? $"lyr_itab_ty{concrete}" : "NULL";
+        _module.Impls.Any(r => r.Type.Value == concrete) ? ItableName(concrete) : "NULL";
 
     /// <summary>The descriptor an interface value's table begins with (01 V7).</summary>
     private string DescOfIface(TempId value) => $"(*(const LyrDesc *const *){Temp(value)}.vt)";
@@ -826,9 +919,9 @@ public sealed class CEmitter
     /// the box's for a struct or an enum.</summary>
     private string DescOfConcrete(int type) => _module.Types[type].IsClass ? DescriptorName(new TypeId(type)) : BoxDesc(type);
 
-    private string BoxName(int type) => $"lyr_box_ty{type}_" + Identifier(_module.Types[type].Name);
+    private string BoxName(int type) => "lyr_box_ty_" + TypeToken(type);
 
-    private string BoxDesc(int type) => $"lyr_desc_box_ty{type}_" + Identifier(_module.Types[type].Name);
+    private string BoxDesc(int type) => "lyr_desc_box_ty_" + TypeToken(type);
 
     private readonly Dictionary<int, (IrType[] Params, IrType Return)[]> _slots = new();
 
@@ -982,11 +1075,13 @@ public sealed class CEmitter
 
     /// <summary>The descriptor of a coroutine type: the object is the runtime's, traced by its own
     /// kind, so the descriptor names the type and describes nothing.</summary>
-    private static string CoroutineDesc(IrCoroutineType type) => "lyr_desc_" + Mangle(type);
+    private string CoroutineDesc(IrCoroutineType type) => "lyr_desc_" + Mangle(type);
 
-    private static string CoroutineEnv(int body) => $"lyr_coenv{body}";
+    /// <summary>The environment and the runner of a coroutine's body, named after the body — not
+    /// after its number among the program's functions.</summary>
+    private string CoroutineEnv(int body) => "lyr_coenv_" + FunctionName(_module.Functions[body].Name)[4..];
 
-    private static string CoroutineRunner(int body) => $"lyr_corun{body}";
+    private string CoroutineRunner(int body) => "lyr_corun_" + FunctionName(_module.Functions[body].Name)[4..];
 
     /// <summary>Whether a body needs an environment: it takes arguments, or leaves a result.</summary>
     private static bool HasEnvironment(IrFunction body, IrCoroutineType type) => body.ParamCount > 0 || !IsVoid(type.Result);
@@ -1278,8 +1373,8 @@ public sealed class CEmitter
         var map = new ulong[(total.Size / 8 + 63) / 64];
         foreach (var word in words) map[word / 64] |= 1UL << (word % 64);
         var bits = string.Join(", ", map.Select(m => $"UINT64_C(0x{m:x})"));
-        _out.AppendLine($"static const uint64_t lyr_refmap_ty{id.Value}[] = {{ {bits} }};");
-        _out.AppendLine($"const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), {flags}, 0, {map.Length}, lyr_refmap_ty{id.Value}, \"{text}\", {itables} }};");
+        _out.AppendLine($"static const uint64_t lyr_refmap_ty_{TypeToken(id.Value)}[] = {{ {bits} }};");
+        _out.AppendLine($"const LyrDesc {DescriptorName(id)} = {{ sizeof({name}), {flags}, 0, {map.Length}, lyr_refmap_ty_{TypeToken(id.Value)}, \"{text}\", {itables} }};");
     }
 
     /// <summary>A parameter: a value, except the receiver of a struct method, which is the

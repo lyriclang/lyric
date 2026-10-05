@@ -662,7 +662,10 @@ internal sealed class TypeTable
             for (var i = 0; i < decl.Variants.Length; i++)
                 variants[i] = InternVariant(name, decl.Variants[i]);
 
-            _defs[id.Value] = new IrTypeDef(name, [], []) { Variants = variants };
+            // Where it is declared, as for a class: the name a descriptor carries and a dynamic
+            // yield is checked by (06 §10a) is the module's and the type's, so two modules' enums
+            // of one name are two at run time as they are in the checker (04 §2 rule 9).
+            _defs[id.Value] = new IrTypeDef(name, [], []) { Variants = variants, Module = ModuleNameOf(symbol) };
             return id;
         }
         catch (UnsupportedConstructException ex)
