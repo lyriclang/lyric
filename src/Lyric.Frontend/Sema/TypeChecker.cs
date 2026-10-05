@@ -3060,7 +3060,19 @@ public sealed class TypeChecker
         for (var i = 0; i < clauses.Length; i++)
         {
             var above = clauses[..i];
-            if (clauses[i].TakesAll) _result.RecordCatchSet(clauses[i], Reaching(tried, above));
+            if (clauses[i].TakesAll)
+            {
+                var escaping = Escaping(tried);
+                var reaching = escaping.Where(t => !above.Any(c => TakesWhole(c, t))).ToArray();
+                _result.RecordCatchSet(clauses[i], reaching);
+                // The clauses above take every type the block throws: this one is dead (the
+                // review's M5-16, a warning). A block that throws nothing at all has its own
+                // sentence, for all its clauses (LYR-SEM0139).
+                if (reaching.Length == 0 && escaping.Length > 0)
+                    _de.Report("LYR-SEM0171", Severity.Warning, KeywordSpan(clauses[i]),
+                        "nothing reaches this clause — the clauses above take every type the block throws "
+                        + $"({string.Join(", ", escaping.Select(t => $"'{TypeFacts.Display(t)}'"))}); remove it");
+            }
             var catchScope = BindCatch(clauses[i], scope);
             CheckAgainstAbove(clauses[i], above);
             body(clauses[i], catchScope);
@@ -3070,13 +3082,25 @@ public sealed class TypeChecker
     /// <summary>What reaches a clause without a type (05 E2 K7): what the sites under the try throw
     /// past every try inside it — the exception analysis's own walk, run muted, so there is one
     /// notion of a site — less what the clauses above take whole.</summary>
-    private LyrType[] Reaching(Node tried, CatchClause[] above)
+    private LyrType[] Escaping(Node tried)
     {
-        LyrType[] escaping;
         using (_de.Mute())
-            escaping = new ExceptionAnalyzer(_comp, _result, _de, ThrownCoveredBy, ErrorRoot, CancelledType).Escaping(tried, _currentModule);
-        return escaping.Where(t => !above.Any(c => TakesWhole(c, t))).ToArray();
+            return new ExceptionAnalyzer(_comp, _result, _de, ThrownCoveredBy, ErrorRoot, CancelledType).Escaping(tried, _currentModule);
     }
+
+    /// <summary>The word <c>catch</c> of a clause, for a diagnostic about the clause as a whole.</summary>
+    private static Span KeywordSpan(CatchClause clause) =>
+        new(clause.Span.File, clause.Span.Start, Math.Min(clause.Span.End, clause.Span.Start + "catch".Length));
+
+    /// <summary>
+    /// The type of a binding that carries a set (the review's M5-6): where only ONE type can
+    /// arrive, the binding is that type — its fields and its variants are there, as in a typed
+    /// clause —; with several, or none, it is the root, and the set is what a rethrow and a match
+    /// ask (K7).
+    /// </summary>
+    private LyrType BindingOf(LyrType[] set) =>
+        // An open join is several types under one name (K7): no type for a value.
+        set is [var one] && !one.IsError && !IsOpenJoin(one) ? one : _error is not null ? new NamedRef(_error) : LyrType.Error;
 
     /// <summary>The types a clause names: its type, or its set's; none for the clause without a type.</summary>
     private LyrType[] CaughtTypes(CatchClause clause) =>
@@ -3212,7 +3236,7 @@ public sealed class TypeChecker
                 set.Add(caught);
             }
             _result.RecordCatchSet(clause, set.ToArray());
-            bt = _error is not null ? new NamedRef(_error) : LyrType.Error;
+            bt = BindingOf(set.ToArray()); // 'catch (e in A)' is 'catch (e: A)' (M5-6)
         }
         else if (clause.BindingType is not null)
         {
@@ -3224,7 +3248,7 @@ public sealed class TypeChecker
                 _result.BindRef(clause.BindingType, caught); // for the lowering and the editor
             _result.RecordCatchType(clause, bt);
         }
-        else bt = _error is not null ? new NamedRef(_error) : LyrType.Error; // a catch-all binds the root
+        else bt = BindingOf(_result.CatchSet(clause) ?? []); // what reaches it: one type, or the root
 
         // A clause with a NAME scopes it; a clause with a TYPE needs the symbol either way,
         // because the lowering reads the resolved catch type off it — 'catch (_: Boom)' used to
@@ -9475,7 +9499,9 @@ public sealed class TypeChecker
     /// <summary>The set a catch binding carries (05 E2 K7), when the scrutinee is one: the binding
     /// of a set clause or of a clause without a type — a 'let', so it holds what the clause took.</summary>
     private LyrType[]? CatchSetOf(Expr scrutinee) =>
-        scrutinee is IdentifierExpr id && _result.RefOf(id) is LocalSymbol { Declaration: CatchClause clause }
+        scrutinee is IdentifierExpr id && _result.RefOf(id) is LocalSymbol { Declaration: CatchClause clause } binding
+        // A binding of ONE type is that type (M5-6), and is matched as a value of it.
+        && (_error is null || binding.Type is NamedRef { Symbol: var root } && ReferenceEquals(root, _error))
             ? _result.CatchSet(clause) : null;
 
     /// <summary>What the arms leave of a catch binding's set (K7): every type of the set no

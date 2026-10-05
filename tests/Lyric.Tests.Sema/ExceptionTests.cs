@@ -622,16 +622,29 @@ public class ExceptionTests
         AssertClean(Diags("fn t(): int throws [NotFound, Parse] { try { return mayThrowBoth(); } catch (e in [NotFound, Parse]) { throw e; } }"));
 
     [Fact]
-    public void Stored_the_binding_is_an_error() =>
+    public void Stored_the_binding_is_an_error()
+    {
         // The set is the binding's, not a second type: 'x' is an Error, and so is what it throws.
-        AssertCode(Diags("fn t(): int throws Parse { try { return mayThrowBoth(); } catch (_: NotFound) { return 0; } catch (e) { let x = e; throw x; } }"),
+        AssertCode(Diags("fn t(): int throws [NotFound, Parse] { try { return mayThrowBoth(); } catch (e) { let x = e; throw x; } }"),
             "LYR-SEM0034");
+        // ONE type that can arrive is the binding's type (the review's M5-6), stored or not: 'x'
+        // is a Parse. It was an Error here too, and this function was LYR-SEM0034.
+        AssertClean(Diags("fn t(): int throws Parse { try { return mayThrowBoth(); } catch (_: NotFound) { return 0; } catch (e) { let x = e; throw x; } }"));
+    }
 
     [Fact]
     public void A_match_over_the_set_needs_no_default()
     {
         AssertClean(Diags("""fn t(): string { try { return f"{mayThrowBoth()}"; } catch (e) { return match (e) { _: NotFound => "n", _: Parse => "p" }; } }"""));
-        AssertClean(Diags("""fn t(): string { try { return f"{mayThrowDb()}"; } catch (e) { return match (e) { _: IOError => "io" }; } }"""));
+        // An interface among the patterns covers the types of the set that conform to it.
+        AssertClean(Diags("""
+            fn two(): int throws [DbError, NotFound] { return 1; }
+            fn t(): string { try { return f"{two()}"; } catch (e) { return match (e) { _: IOError => "io", _: NotFound => "n" }; } }
+            """));
+        // ONE type: the binding is a DbError (M5-6), and a type pattern over a known type has
+        // nothing to ask (05 §9 rule 3) — as over a typed clause's binding, below.
+        AssertCode(Diags("""fn t(): string { try { return f"{mayThrowDb()}"; } catch (e) { return match (e) { _: IOError => "io" }; } }"""),
+            "LYR-SEM0131");
     }
 
     [Fact]

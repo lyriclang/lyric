@@ -1306,24 +1306,12 @@ internal sealed class FunctionLowerer
                 }
                 _b.SwitchTo(take);
                 Take(clause, symbol);
-                if (symbol is not null && clause.BindingType is not null)
-                {
-                    // The value under its own type: a class's object, a struct's or an enum's
-                    // payload out of the box, an interface value re-tabled.
-                    var (target, bindingType) = TestTarget(tested[0], clause.Span);
-                    var bound = _slots.NewTemp(bindingType);
-                    _b.Emit(new Downcast(bound, error, target, bindingType, clause.Span));
-                    _b.Emit(new StoreLocal(_slots.DeclareFor(symbol, bindingType), bound, clause.Span));
-                }
-                // A set's binding is the Error value itself; what it may hold is the sema's (K7).
-                else if (symbol is not null)
-                    _b.Emit(new StoreLocal(_slots.DeclareFor(symbol, errorType), error, clause.Span));
+                if (symbol is not null) BindCaught(symbol, error, errorType, root, clause.Span);
             }
             else
             {
                 Take(clause, symbol);
-                if (symbol is not null)
-                    _b.Emit(new StoreLocal(_slots.DeclareFor(symbol, errorType), error, clause.Span));
+                if (symbol is not null) BindCaught(symbol, error, errorType, root, clause.Span);
             }
 
             if (lowerBody(clause)) open.Add(_b.CurrentId);
@@ -1337,6 +1325,26 @@ internal sealed class FunctionLowerer
         // bottom.
         if (!caughtAll) _b.Seal(new Branch(ErrorLanding(span), span));
         return open;
+    }
+
+    /// <summary>
+    /// A clause's binding. Under its OWN type where the sema gave it one — a typed clause, a set
+    /// of one, a clause without a type that one type reaches (the review's M5-6): a class's
+    /// object, a struct's or an enum's value out of the box, an interface value re-tabled.
+    /// Otherwise the Error value itself; what it may hold is the sema's (K7). The question was
+    /// "does the clause write a type", which a clause without one never does.
+    /// </summary>
+    private void BindCaught(LocalSymbol symbol, TempId error, IrType errorType, LyrType root, Span span)
+    {
+        if (symbol.Type is { IsError: false } own && !LyrType.Equal(own, root))
+        {
+            var (target, bindingType) = TestTarget(own, span);
+            var bound = _slots.NewTemp(bindingType);
+            _b.Emit(new Downcast(bound, error, target, bindingType, span));
+            _b.Emit(new StoreLocal(_slots.DeclareFor(symbol, bindingType), bound, span));
+            return;
+        }
+        _b.Emit(new StoreLocal(_slots.DeclareFor(symbol, errorType), error, span));
     }
 
     /// <summary>A clause takes the error off the slot: the record dropped — or, where the body throws
