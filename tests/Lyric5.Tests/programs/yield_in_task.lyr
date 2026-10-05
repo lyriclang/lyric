@@ -8,7 +8,7 @@ fn emit(): void throws Cancelled {
     yield 1;
 }
 
-fn main(): void throws Cancelled {
+fn main(): void {
     try sleep(Duration.ofNanos(1));
     try emit();
 }

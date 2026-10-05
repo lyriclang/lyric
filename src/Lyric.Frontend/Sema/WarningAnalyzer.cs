@@ -72,6 +72,7 @@ internal sealed class WarningAnalyzer
         WarnUnusedLocals();
         WarnNeverClosed();
         HintNeverReassigned();
+        if (_comp.Lyric5Modules) WarnNamedVoid();
         WarnUnusedImports();
         WarnBuiltinShadowingImports();
         if (_comp.Lyric5Modules) WarnMembersMoreVisibleThanTheirType();
@@ -632,14 +633,56 @@ internal sealed class WarningAnalyzer
     // The walk mirrors FlowAnalyzer's shape: every statement, and the expressions that carry
     // blocks of their own — lambdas and match expressions.
 
+    /// <summary>
+    /// A <c>void</c> under a name (03 M6-5): written, the type is allowed — it has one value, and
+    /// <c>?void</c>, <c>void[]</c> and <c>T = void</c> need it —, but a binding that holds it and a
+    /// parameter that takes it say nothing. A warning; in generic code, where a <c>T</c> happens
+    /// to be <c>void</c>, there is none — the binding is a <c>T</c>.
+    /// </summary>
+    private void WarnNamedVoid()
+    {
+        foreach (var (node, symbol) in _types.AllReferences)
+        {
+            if (!ReferenceEquals(symbol.Declaration, node) || symbol.Name == "_") continue;
+            if (_nativeFiles.Contains(node.Span.File)) continue;
+            switch (node, symbol)
+            {
+                case (BindingStmt binding, LocalSymbol { Type: PrimitiveType { Kind: PrimitiveKind.Void } }):
+                    _de.Report("LYR-SEM0173", Severity.Warning, binding.NameSpan,
+                        $"'{binding.Name}' holds a 'void' — the type has one value, and a name for it says nothing; "
+                        + "call for the effect, without the binding");
+                    break;
+                case (Param parameter, ParameterSymbol { Type: PrimitiveType { Kind: PrimitiveKind.Void } }):
+                    _de.Report("LYR-SEM0173", Severity.Warning, parameter.NameSpan,
+                        $"parameter '{parameter.Name}' is a 'void' — it takes the one value the type has, and says nothing");
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// A <c>mut fn</c> generator on a value type (06 M6-1): a generator holds its receiver as a
+    /// call holds an argument, so a struct or an enum is COPIED into it — what the body writes to
+    /// <c>this</c> stays in the copy, and the caller's value is as it was. Allowed, and warned
+    /// about where the method is declared.
+    /// </summary>
+    private void WarnMutGenerator(FunctionDecl fn)
+    {
+        if (!_comp.Lyric5Modules || !fn.IsMut || fn.IsStatic || !CoroutineShape.IsCoroutine(fn)) return;
+        _de.Report("LYR-SEM0172", Severity.Warning, fn.NameSpan,
+            $"this generator changes a copy of 'this' — a generator holds its receiver as a call holds an argument, "
+            + "and a value is copied into it: what '" + fn.Name + "' writes, the caller does not see. "
+            + "Yield what changed, or make the type a class");
+    }
+
     private void WalkDecl(Decl decl)
     {
         switch (decl)
         {
             case FunctionDecl fn: WalkFunction(fn); break;
-            case StructDecl s: foreach (var m in s.Members) if (m is FunctionDecl f) WalkFunction(f); break;
+            case StructDecl s: foreach (var m in s.Members) if (m is FunctionDecl f) { WarnMutGenerator(f); WalkFunction(f); } break;
             case ClassDecl c: foreach (var m in c.Members) if (m is FunctionDecl f) WalkFunction(f); break;
-            case EnumDecl e: foreach (var f in e.Methods) WalkFunction(f); break;
+            case EnumDecl e: foreach (var f in e.Methods) { WarnMutGenerator(f); WalkFunction(f); } break;
             case InterfaceDecl i: foreach (var f in i.Members) WalkFunction(f); break;
             case ExtendDecl x: foreach (var f in x.Methods) WalkFunction(f); break;
         }

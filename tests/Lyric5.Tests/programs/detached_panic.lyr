@@ -3,7 +3,7 @@
 import std.io { println };
 import std.task { spawnDetached, yieldNow, Cancelled };
 
-fn main(): void throws Cancelled {
+fn main(): void {
     spawnDetached(() => {
         panic("lost");
     });

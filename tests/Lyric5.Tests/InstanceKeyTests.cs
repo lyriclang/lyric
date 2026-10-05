@@ -62,7 +62,11 @@ public class InstanceKeyTests
             struct Holder<T> { v: T }
 
             fn numbers(): Coroutine<int> throws Oops { yield 1; throw Oops.Bad; }
-            fn refuse(): (Coroutine<int>) throws Oops { throw Oops.Bad; }
+            fn quiet(): Coroutine<int> { yield 1; }
+            fn check(): void throws Oops { throw Oops.Bad; }
+            // a factory: it returns a coroutine, and its own call throws. (A body that returned
+            // no value would be a generator - the review's M6-3 - whatever the parentheses say.)
+            fn refuse(): (Coroutine<int>) throws Oops { try check(); return quiet(); }
 
             fn main(): int {
                 let a = Holder<fn() -> (Coroutine<int> throws Oops)> { v = numbers };
