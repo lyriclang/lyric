@@ -4,7 +4,7 @@
 #include <math.h>
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
-typedef struct lyr_ty_std_core_Box_Tree__59365656 lyr_ty_std_core_Box_Tree__59365656;
+typedef struct lyr_ty_std_core_Box_app_main_Tree__16c6e1ce lyr_ty_std_core_Box_app_main_Tree__16c6e1ce;
 typedef struct lyr_ty_app_main_Tree lyr_ty_app_main_Tree;
 typedef struct lyr_ty_13_app_main_Tree_Leaf lyr_ty_13_app_main_Tree_Leaf;
 typedef struct lyr_ty_13_app_main_Tree_Node lyr_ty_13_app_main_Tree_Node;
@@ -23,18 +23,18 @@ struct lyr_ty_13_app_main_Tree_Leaf {
     int64_t f_0;
 };
 struct lyr_ty_13_app_main_Tree_Node {
-    lyr_ty_std_core_Box_Tree__59365656 *f_0;
-    lyr_ty_std_core_Box_Tree__59365656 *f_1;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *f_0;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *f_1;
 };
 struct lyr_ty_app_main_Tree { uint32_t tag; union { lyr_ty_13_app_main_Tree_Leaf v0; lyr_ty_13_app_main_Tree_Node v1; } as; };
 _Static_assert(sizeof(lyr_ty_app_main_Tree) == 24, "layout of lyr_ty_app_main_Tree");
-struct lyr_ty_std_core_Box_Tree__59365656 {
+struct lyr_ty_std_core_Box_app_main_Tree__16c6e1ce {
     LyrObj header;
     lyr_ty_app_main_Tree f_value;
 };
-_Static_assert(sizeof(lyr_ty_std_core_Box_Tree__59365656) == 32, "layout of lyr_ty_std_core_Box_Tree__59365656");
-_Static_assert(offsetof(lyr_ty_std_core_Box_Tree__59365656, f_value) == 8, "layout of lyr_ty_std_core_Box_Tree__59365656");
-const LyrDesc lyr_desc_ty_std_core_Box_Tree__59365656 = { sizeof(lyr_ty_std_core_Box_Tree__59365656), LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE, 0, 0, NULL, "std.core.Box<Tree>", NULL };
+_Static_assert(sizeof(lyr_ty_std_core_Box_app_main_Tree__16c6e1ce) == 32, "layout of lyr_ty_std_core_Box_app_main_Tree__16c6e1ce");
+_Static_assert(offsetof(lyr_ty_std_core_Box_app_main_Tree__16c6e1ce, f_value) == 8, "layout of lyr_ty_std_core_Box_app_main_Tree__16c6e1ce");
+const LyrDesc lyr_desc_ty_std_core_Box_app_main_Tree__16c6e1ce = { sizeof(lyr_ty_std_core_Box_app_main_Tree__16c6e1ce), LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE, 0, 0, NULL, "std.core.Box<app.main.Tree>", NULL };
 struct lyr_ty_15_app_main_Signal_Red {
     uint8_t lyr_unit;
 };
@@ -113,7 +113,7 @@ static const LyrStaticStr(7) lyr_lit23 = LYR_STR_INIT("scene ");
 static const LyrStaticStr(6) lyr_lit24 = LYR_STR_INIT("tree ");
 
 /* prototypes */
-lyr_ty_std_core_Box_Tree__59365656 * lyr_app_main_leaf(int64_t l0_n);
+lyr_ty_std_core_Box_app_main_Tree__16c6e1ce * lyr_app_main_leaf(int64_t l0_n);
 int64_t lyr_app_main_sum(lyr_ty_app_main_Tree l0_t);
 LyrStr * lyr_app_main_name(lyr_ty_app_main_Signal l0_s);
 lyr_ty_app_main_Signal lyr_app_main_next(lyr_ty_app_main_Signal l0_s);
@@ -131,18 +131,18 @@ double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 37 "programs/enums.lyr"
-lyr_ty_std_core_Box_Tree__59365656 * lyr_app_main_leaf(int64_t l0_n) {
+lyr_ty_std_core_Box_app_main_Tree__16c6e1ce * lyr_app_main_leaf(int64_t l0_n) {
     int64_t t0 = 0;
     lyr_ty_app_main_Tree t1_s = {0};
     lyr_ty_app_main_Tree *t1 = &t1_s;
-    lyr_ty_std_core_Box_Tree__59365656 *t2 = NULL;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *t2 = NULL;
 bb0:;
 #line 37
     t0 = l0_n;
 #line 37
     t1_s = (lyr_ty_app_main_Tree){ .tag = 0, .as.v0 = { .f_0 = t0 } }; t1 = &t1_s;
 #line 37
-    t2 = (lyr_ty_std_core_Box_Tree__59365656 *)lyr_alloc(&lyr_desc_ty_std_core_Box_Tree__59365656);
+    t2 = (lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *)lyr_alloc(&lyr_desc_ty_std_core_Box_app_main_Tree__16c6e1ce);
 #line 37
     LYR_WRITE_BARRIER_VALUE(t2, &t2->f_value, *t1);
 #line 37
@@ -153,8 +153,8 @@ bb0:;
 int64_t lyr_app_main_sum(lyr_ty_app_main_Tree l0_t) {
     int64_t l1__match0 = 0;
     int64_t l2_n = 0;
-    lyr_ty_std_core_Box_Tree__59365656 *l3_l = NULL;
-    lyr_ty_std_core_Box_Tree__59365656 *l4_r = NULL;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *l3_l = NULL;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *l4_r = NULL;
     lyr_ty_app_main_Tree t0_s = {0};
     lyr_ty_app_main_Tree *t0 = &t0_s;
     int64_t t1 = 0;
@@ -164,13 +164,13 @@ int64_t lyr_app_main_sum(lyr_ty_app_main_Tree l0_t) {
     int64_t t5 = 0;
     int64_t t6 = 0;
     lyr_ty_13_app_main_Tree_Node *t7 = NULL;
-    lyr_ty_std_core_Box_Tree__59365656 *t8 = NULL;
-    lyr_ty_std_core_Box_Tree__59365656 *t9 = NULL;
-    lyr_ty_std_core_Box_Tree__59365656 *t10 = NULL;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *t8 = NULL;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *t9 = NULL;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *t10 = NULL;
     lyr_ty_app_main_Tree t11_s = {0};
     lyr_ty_app_main_Tree *t11 = &t11_s;
     int64_t t12 = 0;
-    lyr_ty_std_core_Box_Tree__59365656 *t13 = NULL;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *t13 = NULL;
     lyr_ty_app_main_Tree t14_s = {0};
     lyr_ty_app_main_Tree *t14 = &t14_s;
     int64_t t15 = 0;
@@ -1174,14 +1174,14 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     LyrStr *t162 = NULL;
     LyrStr *t163 = NULL;
     int64_t t164 = 0;
-    lyr_ty_std_core_Box_Tree__59365656 *t165 = NULL;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *t165 = NULL;
     int64_t t166 = 0;
-    lyr_ty_std_core_Box_Tree__59365656 *t167 = NULL;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *t167 = NULL;
     int64_t t168 = 0;
-    lyr_ty_std_core_Box_Tree__59365656 *t169 = NULL;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *t169 = NULL;
     lyr_ty_app_main_Tree t170_s = {0};
     lyr_ty_app_main_Tree *t170 = &t170_s;
-    lyr_ty_std_core_Box_Tree__59365656 *t171 = NULL;
+    lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *t171 = NULL;
     lyr_ty_app_main_Tree t172_s = {0};
     lyr_ty_app_main_Tree *t172 = &t172_s;
     LyrStr *t173 = NULL;
@@ -1583,7 +1583,7 @@ bb0:;
 #line 129
     t170_s = (lyr_ty_app_main_Tree){ .tag = 1, .as.v1 = { .f_0 = t167, .f_1 = t169 } }; t170 = &t170_s;
 #line 129
-    t171 = (lyr_ty_std_core_Box_Tree__59365656 *)lyr_alloc(&lyr_desc_ty_std_core_Box_Tree__59365656);
+    t171 = (lyr_ty_std_core_Box_app_main_Tree__16c6e1ce *)lyr_alloc(&lyr_desc_ty_std_core_Box_app_main_Tree__16c6e1ce);
 #line 129
     LYR_WRITE_BARRIER_VALUE(t171, &t171->f_value, *t170);
 #line 129

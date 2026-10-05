@@ -6,31 +6,31 @@
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_vt_ty_std_core_Display lyr_vt_ty_std_core_Display;
 const char lyr_ifid_ty_std_core_Display[] = "std.core.Display";
-typedef struct lyr_ty_app_main_app_main_List_int__d66f6cf6 lyr_ty_app_main_app_main_List_int__d66f6cf6;
-typedef struct lyr_ty_app_main_app_main_List_string__73ad1248 lyr_ty_app_main_app_main_List_string__73ad1248;
+typedef struct lyr_ty_app_main_List_int__71c486c0 lyr_ty_app_main_List_int__71c486c0;
+typedef struct lyr_ty_app_main_List_string__840b0112 lyr_ty_app_main_List_string__840b0112;
 typedef struct lyr_ty_app_main_Pair_string__string__246b3e39 lyr_ty_app_main_Pair_string__string__246b3e39;
 typedef struct lyr_ty_app_main_Pair_int__string__b28b34f7 lyr_ty_app_main_Pair_int__string__b28b34f7;
-typedef struct lyr_ty_app_main_app_main_Box_int__b2a2122b lyr_ty_app_main_app_main_Box_int__b2a2122b;
+typedef struct lyr_ty_app_main_Box_int__d6d5d265 lyr_ty_app_main_Box_int__d6d5d265;
 struct lyr_vt_ty_std_core_Display {
     const LyrDesc *desc;
     LyrStr * (*s0)(LyrIface);
 };
-struct lyr_ty_app_main_app_main_List_int__d66f6cf6 {
+struct lyr_ty_app_main_List_int__71c486c0 {
     LyrObj header;
     LyrArr *f_items;
 };
-_Static_assert(sizeof(lyr_ty_app_main_app_main_List_int__d66f6cf6) == 16, "layout of lyr_ty_app_main_app_main_List_int__d66f6cf6");
-_Static_assert(offsetof(lyr_ty_app_main_app_main_List_int__d66f6cf6, f_items) == 8, "layout of lyr_ty_app_main_app_main_List_int__d66f6cf6");
-static const uint64_t lyr_refmap_ty_app_main_app_main_List_int__d66f6cf6[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty_app_main_app_main_List_int__d66f6cf6 = { sizeof(lyr_ty_app_main_app_main_List_int__d66f6cf6), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_app_main_app_main_List_int__d66f6cf6, "app.main.app.main.List<int>", NULL };
-struct lyr_ty_app_main_app_main_List_string__73ad1248 {
+_Static_assert(sizeof(lyr_ty_app_main_List_int__71c486c0) == 16, "layout of lyr_ty_app_main_List_int__71c486c0");
+_Static_assert(offsetof(lyr_ty_app_main_List_int__71c486c0, f_items) == 8, "layout of lyr_ty_app_main_List_int__71c486c0");
+static const uint64_t lyr_refmap_ty_app_main_List_int__71c486c0[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_ty_app_main_List_int__71c486c0 = { sizeof(lyr_ty_app_main_List_int__71c486c0), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_app_main_List_int__71c486c0, "app.main.List<int>", NULL };
+struct lyr_ty_app_main_List_string__840b0112 {
     LyrObj header;
     LyrArr *f_items;
 };
-_Static_assert(sizeof(lyr_ty_app_main_app_main_List_string__73ad1248) == 16, "layout of lyr_ty_app_main_app_main_List_string__73ad1248");
-_Static_assert(offsetof(lyr_ty_app_main_app_main_List_string__73ad1248, f_items) == 8, "layout of lyr_ty_app_main_app_main_List_string__73ad1248");
-static const uint64_t lyr_refmap_ty_app_main_app_main_List_string__73ad1248[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty_app_main_app_main_List_string__73ad1248 = { sizeof(lyr_ty_app_main_app_main_List_string__73ad1248), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_app_main_app_main_List_string__73ad1248, "app.main.app.main.List<string>", NULL };
+_Static_assert(sizeof(lyr_ty_app_main_List_string__840b0112) == 16, "layout of lyr_ty_app_main_List_string__840b0112");
+_Static_assert(offsetof(lyr_ty_app_main_List_string__840b0112, f_items) == 8, "layout of lyr_ty_app_main_List_string__840b0112");
+static const uint64_t lyr_refmap_ty_app_main_List_string__840b0112[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_ty_app_main_List_string__840b0112 = { sizeof(lyr_ty_app_main_List_string__840b0112), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_app_main_List_string__840b0112, "app.main.List<string>", NULL };
 struct lyr_ty_app_main_Pair_string__string__246b3e39 {
     LyrStr *f_a;
     LyrStr *f_b;
@@ -39,7 +39,7 @@ struct lyr_ty_app_main_Pair_int__string__b28b34f7 {
     int64_t f_a;
     LyrStr *f_b;
 };
-struct lyr_ty_app_main_app_main_Box_int__b2a2122b {
+struct lyr_ty_app_main_Box_int__d6d5d265 {
     int64_t f_v;
 };
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
@@ -76,20 +76,20 @@ static const LyrStaticStr(10) lyr_lit7 = LYR_STR_INIT("concrete ");
 /* prototypes */
 LyrStr * lyr_app_main_render(LyrIface l0_d);
 LYR_NOINLINE int64_t lyr_app_main_main(void);
-int64_t lyr_app_main__extend__app_main_List_int__first_7b57ec1c(lyr_ty_app_main_app_main_List_int__d66f6cf6 *l0_this);
-LyrStr * lyr_app_main__extend__app_main_List_string__first_b4cca276(lyr_ty_app_main_app_main_List_string__73ad1248 *l0_this);
-LyrStr * lyr_app_main__extend__app_main_List_int__show_e2a47fc3(lyr_ty_app_main_app_main_List_int__d66f6cf6 *l0_this);
-int64_t lyr_app_main__extend__Box_doubled_5b0f0f83(lyr_ty_app_main_app_main_Box_int__b2a2122b *l0_this);
-int64_t lyr_app_main__extend__app_main_List_int__count_da7ad63d(lyr_ty_app_main_app_main_List_int__d66f6cf6 *l0_this);
+int64_t lyr_app_main__extend__app_main_List_int__first_7b57ec1c(lyr_ty_app_main_List_int__71c486c0 *l0_this);
+LyrStr * lyr_app_main__extend__app_main_List_string__first_b4cca276(lyr_ty_app_main_List_string__840b0112 *l0_this);
+LyrStr * lyr_app_main__extend__app_main_List_int__show_e2a47fc3(lyr_ty_app_main_List_int__71c486c0 *l0_this);
+int64_t lyr_app_main__extend__Box_doubled_5b0f0f83(lyr_ty_app_main_Box_int__d6d5d265 *l0_this);
+int64_t lyr_app_main__extend__app_main_List_int__count_da7ad63d(lyr_ty_app_main_List_int__71c486c0 *l0_this);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 LyrStr * lyr_std_core__extend__int_show_957a2e09(int64_t l0_this);
-LyrStr * lyr_app_main__extend__Pair_string__string__show_b994fc96(lyr_ty_app_main_Pair_string__string__246b3e39 *l0_this);
+LyrStr * lyr_app_main__extend__app_main_Pair_string__string__show_1dff5e60(lyr_ty_app_main_Pair_string__string__246b3e39 *l0_this);
 LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *l0_this);
 
 /* interface tables: the descriptor, then the implementation of every slot */
-static LyrStr * lyr_vt_16_std_core_Display_38_app_main_Pair_string__string__246b3e39_s0(LyrIface self) { return lyr_app_main__extend__Pair_string__string__show_b994fc96(&((lyr_box_ty_app_main_Pair_string__string__246b3e39 *)self.data)->value); }
+static LyrStr * lyr_vt_16_std_core_Display_38_app_main_Pair_string__string__246b3e39_s0(LyrIface self) { return lyr_app_main__extend__app_main_Pair_string__string__show_1dff5e60(&((lyr_box_ty_app_main_Pair_string__string__246b3e39 *)self.data)->value); }
 const lyr_vt_ty_std_core_Display lyr_vt_16_std_core_Display_38_app_main_Pair_string__string__246b3e39 = { &lyr_desc_box_ty_app_main_Pair_string__string__246b3e39, lyr_vt_16_std_core_Display_38_app_main_Pair_string__string__246b3e39_s0 };
 const LyrItable lyr_itab_ty_app_main_Pair_string__string__246b3e39[] = { { lyr_ifid_ty_std_core_Display, &lyr_vt_16_std_core_Display_38_app_main_Pair_string__string__246b3e39 } , { NULL, NULL } };
 
@@ -108,30 +108,30 @@ bb0:;
 
 #line 41 "programs/extends.lyr"
 LYR_NOINLINE int64_t lyr_app_main_main(void) {
-    lyr_ty_app_main_app_main_List_int__d66f6cf6 *l0_ints = NULL;
-    lyr_ty_app_main_app_main_List_string__73ad1248 *l1_strs = NULL;
+    lyr_ty_app_main_List_int__71c486c0 *l0_ints = NULL;
+    lyr_ty_app_main_List_string__840b0112 *l1_strs = NULL;
     lyr_ty_app_main_Pair_int__string__b28b34f7 l2_p = {0};
-    lyr_ty_app_main_app_main_Box_int__b2a2122b l3_b = {0};
+    lyr_ty_app_main_Box_int__d6d5d265 l3_b = {0};
     int64_t t0 = 0;
     int64_t t1 = 0;
     LyrArr *t2 = NULL;
-    lyr_ty_app_main_app_main_List_int__d66f6cf6 *t3 = NULL;
+    lyr_ty_app_main_List_int__71c486c0 *t3 = NULL;
     LyrStr *t4 = NULL;
     LyrStr *t5 = NULL;
     LyrArr *t6 = NULL;
-    lyr_ty_app_main_app_main_List_string__73ad1248 *t7 = NULL;
+    lyr_ty_app_main_List_string__840b0112 *t7 = NULL;
     LyrStr *t8 = NULL;
-    lyr_ty_app_main_app_main_List_int__d66f6cf6 *t9 = NULL;
+    lyr_ty_app_main_List_int__71c486c0 *t9 = NULL;
     int64_t t10 = 0;
     LyrStr *t11 = NULL;
     LyrStr *t12 = NULL;
-    lyr_ty_app_main_app_main_List_string__73ad1248 *t13 = NULL;
+    lyr_ty_app_main_List_string__840b0112 *t13 = NULL;
     LyrStr *t14 = NULL;
     LyrStr *t15 = NULL;
     LyrStr *t16 = NULL;
     LyrStr *t17 = NULL;
     LyrStr *t18 = NULL;
-    lyr_ty_app_main_app_main_List_int__d66f6cf6 *t19 = NULL;
+    lyr_ty_app_main_List_int__71c486c0 *t19 = NULL;
     LyrStr *t20 = NULL;
     LyrStr *t21 = NULL;
     LyrStr *t22 = NULL;
@@ -160,13 +160,13 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     LyrStr *t41 = NULL;
     LyrStr *t42 = NULL;
     int64_t t43 = 0;
-    lyr_ty_app_main_app_main_Box_int__b2a2122b t44_s = {0};
-    lyr_ty_app_main_app_main_Box_int__b2a2122b *t44 = &t44_s;
+    lyr_ty_app_main_Box_int__d6d5d265 t44_s = {0};
+    lyr_ty_app_main_Box_int__d6d5d265 *t44 = &t44_s;
     LyrStr *t45 = NULL;
-    lyr_ty_app_main_app_main_Box_int__b2a2122b t46_s = {0};
-    lyr_ty_app_main_app_main_Box_int__b2a2122b *t46 = &t46_s;
+    lyr_ty_app_main_Box_int__d6d5d265 t46_s = {0};
+    lyr_ty_app_main_Box_int__d6d5d265 *t46 = &t46_s;
     int64_t t47 = 0;
-    lyr_ty_app_main_app_main_List_int__d66f6cf6 *t48 = NULL;
+    lyr_ty_app_main_List_int__71c486c0 *t48 = NULL;
     int64_t t49 = 0;
     int64_t t50 = 0;
     int64_t t51 = 0;
@@ -182,7 +182,7 @@ bb0:;
 #line 41
     t2 = lyr_alloc_array(&lyr_desc_arr_i64, 2); LYR_ARR_DATA(t2, int64_t)[0] = t0; LYR_ARR_DATA(t2, int64_t)[1] = t1;
 #line 41
-    t3 = (lyr_ty_app_main_app_main_List_int__d66f6cf6 *)lyr_alloc(&lyr_desc_ty_app_main_app_main_List_int__d66f6cf6);
+    t3 = (lyr_ty_app_main_List_int__71c486c0 *)lyr_alloc(&lyr_desc_ty_app_main_List_int__71c486c0);
 #line 41
     LYR_WRITE_BARRIER(t3, &t3->f_items, t2);
 #line 41
@@ -194,7 +194,7 @@ bb0:;
 #line 42
     t6 = lyr_alloc_array(&lyr_desc_arr_str, 2); LYR_ARR_DATA(t6, LyrStr *)[0] = t4; LYR_ARR_DATA(t6, LyrStr *)[1] = t5;
 #line 42
-    t7 = (lyr_ty_app_main_app_main_List_string__73ad1248 *)lyr_alloc(&lyr_desc_ty_app_main_app_main_List_string__73ad1248);
+    t7 = (lyr_ty_app_main_List_string__840b0112 *)lyr_alloc(&lyr_desc_ty_app_main_List_string__840b0112);
 #line 42
     LYR_WRITE_BARRIER(t7, &t7->f_items, t6);
 #line 42
@@ -288,7 +288,7 @@ bb0:;
 #line 47
     t43 = (int64_t)INT64_C(3);
 #line 47
-    t44_s = (lyr_ty_app_main_app_main_Box_int__b2a2122b){0}; t44 = &t44_s;
+    t44_s = (lyr_ty_app_main_Box_int__d6d5d265){0}; t44 = &t44_s;
 #line 47
     t44->f_v = t43;
 #line 47
@@ -322,9 +322,9 @@ bb0:;
 }
 
 #line 35 "programs/extends.lyr"
-int64_t lyr_app_main__extend__Box_doubled_5b0f0f83(lyr_ty_app_main_app_main_Box_int__b2a2122b *l0_this) {
-    lyr_ty_app_main_app_main_Box_int__b2a2122b t0_s = {0};
-    lyr_ty_app_main_app_main_Box_int__b2a2122b *t0 = &t0_s;
+int64_t lyr_app_main__extend__Box_doubled_5b0f0f83(lyr_ty_app_main_Box_int__d6d5d265 *l0_this) {
+    lyr_ty_app_main_Box_int__d6d5d265 t0_s = {0};
+    lyr_ty_app_main_Box_int__d6d5d265 *t0 = &t0_s;
     int64_t t1 = 0;
     int64_t t2 = 0;
     int64_t t3 = 0;
@@ -454,78 +454,6 @@ bb0:;
 static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }
 
-/* ==== unit: app.main.<extend>.Pair<string, string> ==== */
-/* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'app.main.<extend>.Pair<string, string>' (01 C3): its functions, the types they reach, and nothing else. */
-#include "lyr/lyr.h"
-#include <stdint.h>
-#include <math.h>
-
-/* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
-typedef struct lyr_ty_app_main_Pair_string__string__246b3e39 lyr_ty_app_main_Pair_string__string__246b3e39;
-struct lyr_ty_app_main_Pair_string__string__246b3e39 {
-    LyrStr *f_a;
-    LyrStr *f_b;
-};
-
-/* string literals */
-static const LyrStaticStr(2) lyr_lit0 = LYR_STR_INIT("<");
-static const LyrStaticStr(3) lyr_lit1 = LYR_STR_INIT(", ");
-static const LyrStaticStr(2) lyr_lit2 = LYR_STR_INIT(">");
-
-/* prototypes */
-LyrStr * lyr_app_main__extend__Pair_string__string__show_b994fc96(lyr_ty_app_main_Pair_string__string__246b3e39 *l0_this);
-LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *l0_this);
-
-#line 31 "programs/extends.lyr"
-LyrStr * lyr_app_main__extend__Pair_string__string__show_b994fc96(lyr_ty_app_main_Pair_string__string__246b3e39 *l0_this) {
-    LyrStr *t0 = NULL;
-    lyr_ty_app_main_Pair_string__string__246b3e39 t1_s = {0};
-    lyr_ty_app_main_Pair_string__string__246b3e39 *t1 = &t1_s;
-    LyrStr *t2 = NULL;
-    LyrStr *t3 = NULL;
-    LyrStr *t4 = NULL;
-    lyr_ty_app_main_Pair_string__string__246b3e39 t5_s = {0};
-    lyr_ty_app_main_Pair_string__string__246b3e39 *t5 = &t5_s;
-    LyrStr *t6 = NULL;
-    LyrStr *t7 = NULL;
-    LyrStr *t8 = NULL;
-    LyrStr *t9 = NULL;
-    LyrStr *t10 = NULL;
-    LyrStr *t11 = NULL;
-    LyrStr *t12 = NULL;
-bb0:;
-#line 31
-    t0 = (LyrStr *)&lyr_lit0;
-#line 31
-    t1 = l0_this;
-#line 31
-    t2 = t1->f_a;
-#line 31
-    t3 = lyr_std_core__extend__string_show_1c50ef57(t2);
-#line 31
-    t4 = (LyrStr *)&lyr_lit1;
-#line 31
-    t5 = l0_this;
-#line 31
-    t6 = t5->f_b;
-#line 31
-    t7 = lyr_std_core__extend__string_show_1c50ef57(t6);
-#line 31
-    t8 = (LyrStr *)&lyr_lit2;
-#line 31
-    t9 = lyr_str_concat(t0, t3);
-#line 31
-    t10 = lyr_str_concat(t9, t4);
-#line 31
-    t11 = lyr_str_concat(t10, t7);
-#line 31
-    t12 = lyr_str_concat(t11, t8);
-#line 31
-    return t12;
-}
-
-
 /* ==== unit: app.main.<extend>.app.main.List<int> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
 /* The unit of the generic instance 'app.main.<extend>.app.main.List<int>' (01 C3): its functions, the types they reach, and nothing else. */
@@ -534,14 +462,14 @@ bb0:;
 #include <math.h>
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
-typedef struct lyr_ty_app_main_app_main_List_int__d66f6cf6 lyr_ty_app_main_app_main_List_int__d66f6cf6;
-struct lyr_ty_app_main_app_main_List_int__d66f6cf6 {
+typedef struct lyr_ty_app_main_List_int__71c486c0 lyr_ty_app_main_List_int__71c486c0;
+struct lyr_ty_app_main_List_int__71c486c0 {
     LyrObj header;
     LyrArr *f_items;
 };
-_Static_assert(sizeof(lyr_ty_app_main_app_main_List_int__d66f6cf6) == 16, "layout of lyr_ty_app_main_app_main_List_int__d66f6cf6");
-_Static_assert(offsetof(lyr_ty_app_main_app_main_List_int__d66f6cf6, f_items) == 8, "layout of lyr_ty_app_main_app_main_List_int__d66f6cf6");
-extern const LyrDesc lyr_desc_ty_app_main_app_main_List_int__d66f6cf6;
+_Static_assert(sizeof(lyr_ty_app_main_List_int__71c486c0) == 16, "layout of lyr_ty_app_main_List_int__71c486c0");
+_Static_assert(offsetof(lyr_ty_app_main_List_int__71c486c0, f_items) == 8, "layout of lyr_ty_app_main_List_int__71c486c0");
+extern const LyrDesc lyr_desc_ty_app_main_List_int__71c486c0;
 _Static_assert(sizeof(int64_t) == 8, "layout of int[]");
 extern const LyrDesc lyr_desc_arr_i64;
 
@@ -551,14 +479,14 @@ static const LyrStaticStr(2) lyr_lit1 = LYR_STR_INIT("]");
 static const LyrStaticStr(3) lyr_lit2 = LYR_STR_INIT(", ");
 
 /* prototypes */
-int64_t lyr_app_main__extend__app_main_List_int__first_7b57ec1c(lyr_ty_app_main_app_main_List_int__d66f6cf6 *l0_this);
-LyrStr * lyr_app_main__extend__app_main_List_int__show_e2a47fc3(lyr_ty_app_main_app_main_List_int__d66f6cf6 *l0_this);
-int64_t lyr_app_main__extend__app_main_List_int__count_da7ad63d(lyr_ty_app_main_app_main_List_int__d66f6cf6 *l0_this);
+int64_t lyr_app_main__extend__app_main_List_int__first_7b57ec1c(lyr_ty_app_main_List_int__71c486c0 *l0_this);
+LyrStr * lyr_app_main__extend__app_main_List_int__show_e2a47fc3(lyr_ty_app_main_List_int__71c486c0 *l0_this);
+int64_t lyr_app_main__extend__app_main_List_int__count_da7ad63d(lyr_ty_app_main_List_int__71c486c0 *l0_this);
 LyrStr * lyr_std_core__extend__int_show_957a2e09(int64_t l0_this);
 
 #line 15 "programs/extends.lyr"
-int64_t lyr_app_main__extend__app_main_List_int__first_7b57ec1c(lyr_ty_app_main_app_main_List_int__d66f6cf6 *l0_this) {
-    lyr_ty_app_main_app_main_List_int__d66f6cf6 *t0 = NULL;
+int64_t lyr_app_main__extend__app_main_List_int__first_7b57ec1c(lyr_ty_app_main_List_int__71c486c0 *l0_this) {
+    lyr_ty_app_main_List_int__71c486c0 *t0 = NULL;
     LyrArr *t1 = NULL;
     int64_t t2 = 0;
     int64_t t3 = 0;
@@ -576,14 +504,14 @@ bb0:;
 }
 
 #line 21 "programs/extends.lyr"
-LyrStr * lyr_app_main__extend__app_main_List_int__show_e2a47fc3(lyr_ty_app_main_app_main_List_int__d66f6cf6 *l0_this) {
+LyrStr * lyr_app_main__extend__app_main_List_int__show_e2a47fc3(lyr_ty_app_main_List_int__71c486c0 *l0_this) {
     LyrStr *l1_out = NULL;
     int64_t l2__range0 = 0;
     int64_t l3__last1 = 0;
     int64_t l4_i = 0;
     LyrStr *t0 = NULL;
     int64_t t1 = 0;
-    lyr_ty_app_main_app_main_List_int__d66f6cf6 *t2 = NULL;
+    lyr_ty_app_main_List_int__71c486c0 *t2 = NULL;
     LyrArr *t3 = NULL;
     int64_t t4 = 0;
     int64_t t5 = 0;
@@ -596,7 +524,7 @@ LyrStr * lyr_app_main__extend__app_main_List_int__show_e2a47fc3(lyr_ty_app_main_
     LyrStr *t12 = NULL;
     LyrStr *t13 = NULL;
     LyrStr *t14 = NULL;
-    lyr_ty_app_main_app_main_List_int__d66f6cf6 *t15 = NULL;
+    lyr_ty_app_main_List_int__71c486c0 *t15 = NULL;
     LyrArr *t16 = NULL;
     int64_t t17 = 0;
     int64_t t18 = 0;
@@ -700,8 +628,8 @@ bb6:;
 }
 
 #line 16 "programs/extends.lyr"
-int64_t lyr_app_main__extend__app_main_List_int__count_da7ad63d(lyr_ty_app_main_app_main_List_int__d66f6cf6 *l0_this) {
-    lyr_ty_app_main_app_main_List_int__d66f6cf6 *t0 = NULL;
+int64_t lyr_app_main__extend__app_main_List_int__count_da7ad63d(lyr_ty_app_main_List_int__71c486c0 *l0_this) {
+    lyr_ty_app_main_List_int__71c486c0 *t0 = NULL;
     LyrArr *t1 = NULL;
     int64_t t2 = 0;
 bb0:;
@@ -724,23 +652,23 @@ bb0:;
 #include <math.h>
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
-typedef struct lyr_ty_app_main_app_main_List_string__73ad1248 lyr_ty_app_main_app_main_List_string__73ad1248;
-struct lyr_ty_app_main_app_main_List_string__73ad1248 {
+typedef struct lyr_ty_app_main_List_string__840b0112 lyr_ty_app_main_List_string__840b0112;
+struct lyr_ty_app_main_List_string__840b0112 {
     LyrObj header;
     LyrArr *f_items;
 };
-_Static_assert(sizeof(lyr_ty_app_main_app_main_List_string__73ad1248) == 16, "layout of lyr_ty_app_main_app_main_List_string__73ad1248");
-_Static_assert(offsetof(lyr_ty_app_main_app_main_List_string__73ad1248, f_items) == 8, "layout of lyr_ty_app_main_app_main_List_string__73ad1248");
-extern const LyrDesc lyr_desc_ty_app_main_app_main_List_string__73ad1248;
+_Static_assert(sizeof(lyr_ty_app_main_List_string__840b0112) == 16, "layout of lyr_ty_app_main_List_string__840b0112");
+_Static_assert(offsetof(lyr_ty_app_main_List_string__840b0112, f_items) == 8, "layout of lyr_ty_app_main_List_string__840b0112");
+extern const LyrDesc lyr_desc_ty_app_main_List_string__840b0112;
 _Static_assert(sizeof(LyrStr *) == 8, "layout of string[]");
 extern const LyrDesc lyr_desc_arr_str;
 
 /* prototypes */
-LyrStr * lyr_app_main__extend__app_main_List_string__first_b4cca276(lyr_ty_app_main_app_main_List_string__73ad1248 *l0_this);
+LyrStr * lyr_app_main__extend__app_main_List_string__first_b4cca276(lyr_ty_app_main_List_string__840b0112 *l0_this);
 
 #line 15 "programs/extends.lyr"
-LyrStr * lyr_app_main__extend__app_main_List_string__first_b4cca276(lyr_ty_app_main_app_main_List_string__73ad1248 *l0_this) {
-    lyr_ty_app_main_app_main_List_string__73ad1248 *t0 = NULL;
+LyrStr * lyr_app_main__extend__app_main_List_string__first_b4cca276(lyr_ty_app_main_List_string__840b0112 *l0_this) {
+    lyr_ty_app_main_List_string__840b0112 *t0 = NULL;
     LyrArr *t1 = NULL;
     int64_t t2 = 0;
     LyrStr *t3 = NULL;
@@ -755,5 +683,77 @@ bb0:;
     LYR_CHECK_INDEX(t2, t1->len); t3 = LYR_ARR_DATA(t1, LyrStr *)[t2];
 #line 15
     return t3;
+}
+
+
+/* ==== unit: app.main.<extend>.app.main.Pair<string, string> ==== */
+/* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
+/* The unit of the generic instance 'app.main.<extend>.app.main.Pair<string, string>' (01 C3): its functions, the types they reach, and nothing else. */
+#include "lyr/lyr.h"
+#include <stdint.h>
+#include <math.h>
+
+/* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
+typedef struct lyr_ty_app_main_Pair_string__string__246b3e39 lyr_ty_app_main_Pair_string__string__246b3e39;
+struct lyr_ty_app_main_Pair_string__string__246b3e39 {
+    LyrStr *f_a;
+    LyrStr *f_b;
+};
+
+/* string literals */
+static const LyrStaticStr(2) lyr_lit0 = LYR_STR_INIT("<");
+static const LyrStaticStr(3) lyr_lit1 = LYR_STR_INIT(", ");
+static const LyrStaticStr(2) lyr_lit2 = LYR_STR_INIT(">");
+
+/* prototypes */
+LyrStr * lyr_app_main__extend__app_main_Pair_string__string__show_1dff5e60(lyr_ty_app_main_Pair_string__string__246b3e39 *l0_this);
+LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *l0_this);
+
+#line 31 "programs/extends.lyr"
+LyrStr * lyr_app_main__extend__app_main_Pair_string__string__show_1dff5e60(lyr_ty_app_main_Pair_string__string__246b3e39 *l0_this) {
+    LyrStr *t0 = NULL;
+    lyr_ty_app_main_Pair_string__string__246b3e39 t1_s = {0};
+    lyr_ty_app_main_Pair_string__string__246b3e39 *t1 = &t1_s;
+    LyrStr *t2 = NULL;
+    LyrStr *t3 = NULL;
+    LyrStr *t4 = NULL;
+    lyr_ty_app_main_Pair_string__string__246b3e39 t5_s = {0};
+    lyr_ty_app_main_Pair_string__string__246b3e39 *t5 = &t5_s;
+    LyrStr *t6 = NULL;
+    LyrStr *t7 = NULL;
+    LyrStr *t8 = NULL;
+    LyrStr *t9 = NULL;
+    LyrStr *t10 = NULL;
+    LyrStr *t11 = NULL;
+    LyrStr *t12 = NULL;
+bb0:;
+#line 31
+    t0 = (LyrStr *)&lyr_lit0;
+#line 31
+    t1 = l0_this;
+#line 31
+    t2 = t1->f_a;
+#line 31
+    t3 = lyr_std_core__extend__string_show_1c50ef57(t2);
+#line 31
+    t4 = (LyrStr *)&lyr_lit1;
+#line 31
+    t5 = l0_this;
+#line 31
+    t6 = t5->f_b;
+#line 31
+    t7 = lyr_std_core__extend__string_show_1c50ef57(t6);
+#line 31
+    t8 = (LyrStr *)&lyr_lit2;
+#line 31
+    t9 = lyr_str_concat(t0, t3);
+#line 31
+    t10 = lyr_str_concat(t9, t4);
+#line 31
+    t11 = lyr_str_concat(t10, t7);
+#line 31
+    t12 = lyr_str_concat(t11, t8);
+#line 31
+    return t12;
 }
 
