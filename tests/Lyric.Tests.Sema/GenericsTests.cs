@@ -309,11 +309,15 @@ public class GenericsTests
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0026");
     }
 
+    /// <summary>Without a list and without a context the field values choose (03 T8, the
+    /// review's M8a-2) — until then this was LYR-SEM0026, "there is no field inference".</summary>
     [Fact]
-    public void Generic_construction_without_type_args_is_rejected()
+    public void Generic_construction_without_type_args_takes_them_from_its_values()
     {
-        var de = Diags("fn u() { let b = Box { value = 1 }; }");
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0026"); // there is no field inference
+        var (t, de) = LastInit("fn u() { let b = Box { value = 1 }; }");
+        Assert.False(de.HasErrors, string.Join("; ", de.Diagnostics.Select(d => d.Code)));
+        var gi = Assert.IsType<GenericInstance>(t);
+        AssertType(LyrType.Int, gi.Arguments[0]);
     }
 
     [Fact]
