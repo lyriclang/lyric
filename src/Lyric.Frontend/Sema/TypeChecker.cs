@@ -3186,10 +3186,18 @@ public sealed class TypeChecker
 
     private LyrType CheckExpr(Expr expr, SymbolTable scope, LyrType? expected = null)
     {
+        // A compound assignment's target, met again as its operator's left side (CheckAssign).
+        if (ReferenceEquals(expr, _typedTarget)) return _result.TypeOf(expr) ?? LyrType.Error;
         if (++_depth > MaxNesting) return Deeper(expr.Span);
         try { return CheckExprInner(expr, scope, expected); }
         finally { _depth--; }
     }
+
+    /// <summary>The target of the compound assignment being checked: typed where it is written,
+    /// and not a second time where the operator reads it — it is one expression, evaluated at
+    /// one place, and what is wrong with it is said once ('y += 1' without a 'y' said it
+    /// twice).</summary>
+    private Expr? _typedTarget;
 
     private LyrType CheckExprInner(Expr expr, SymbolTable scope, LyrType? expected)
     {
@@ -3377,6 +3385,8 @@ public sealed class TypeChecker
         // callee position. Nothing about the expression chooses, so the expected type has to: a
         // parameter of type 'fn(int) -> string' picks the overload with that shape, and without
         // one there is nothing to pick by.
+        if (BareMember(id, scope, called: false) is { } refused) return refused;
+
         if (scope.Overloads(id.Name) is { Count: > 1 } overloads)
         {
             var wanted = expected as FnType;
@@ -3398,7 +3408,7 @@ public sealed class TypeChecker
             }
 
             _result.BindRef(id, matching[0]);
-            return FnTypeOf(matching[0]);
+            return BareChoice(id, matching[0], scope, called: false) ?? FnTypeOf(matching[0]);
         }
 
         var sym = NameOf(id, scope); // 'Ordering.Less' through the prelude; 'debugArray(xs)', the compiler's, through std.core
@@ -3434,10 +3444,144 @@ public sealed class TypeChecker
             ModuleSymbol ms => new NonValueType(ms, "module"),
 
             // ExternalSymbol: the module could not be found and was reported as LYR-RES0003, so Error
-            // is the correct poison here.
+            // is the correct poison here. A field and a variant do not come this far: BareMember
+            // has refused them.
             _ => LyrType.Error
         };
     }
+
+    // --- a member's bare name ---
+
+    /// <summary>
+    /// A member named bare where nothing gives it a receiver (design/v5/spec/07, the review's
+    /// M6-30). Between a type's braces the names of its members are in scope, and a static one
+    /// is reached by its name alone. A field or a method that is not static belongs to an
+    /// instance and is written through it — <c>this.label</c>, <c>this.size()</c> —, a variant
+    /// through its type, as in a pattern (<c>LYR-SEM0111</c>). The bare name is refused here,
+    /// once and with what to write.
+    ///
+    /// <para>It used to be accepted without a word: a field was typed as the error type, which
+    /// silences everything after it, a method as its function type without the receiver — and
+    /// the lowering met a reference it had no word for (<c>LYR-IR0001</c>), an error type
+    /// (<c>LYR-ICE0001</c>) or a call one argument short (malformed IR). Where the method was
+    /// never reached, nothing was said at all.</para>
+    ///
+    /// <para>Of a static and a method of one name the call's count chooses first (08 §1.2):
+    /// such a set is left to the choice, and <see cref="BareChoice"/> asks again for what was
+    /// chosen.</para>
+    /// </summary>
+    /// <returns>The error type when the name was refused, <c>null</c> when it is no such name.</returns>
+    private LyrType? BareMember(IdentifierExpr id, SymbolTable scope, bool called)
+    {
+        if (_compilerWritten.Contains(id)) return null;
+        for (var holder = scope; holder is not null; holder = holder.Parent)
+        {
+            if (holder.LookupLocal(id.Name) is not { } found) continue;
+            return found switch
+            {
+                FieldSymbol or EnumVariantSymbol when TypeBodyOf(holder) is { } owner
+                    => RefuseBare(id, found, owner, called),
+                FunctionSymbol when holder.OverloadsLocal(id.Name) is { Count: > 0 } set
+                                    && set.All(f => !f.IsStatic) && MethodOwner(set[0], holder) is { } owner
+                    => RefuseBare(id, set[0], owner, called),
+                _ => null,
+            };
+        }
+        return null;
+    }
+
+    /// <summary>The same question for the function a count or an expected type chose among
+    /// several of one name.</summary>
+    private LyrType? BareChoice(IdentifierExpr id, FunctionSymbol chosen, SymbolTable scope, bool called)
+    {
+        if (chosen.IsStatic || _compilerWritten.Contains(id)) return null;
+        for (var holder = scope; holder is not null; holder = holder.Parent)
+            if (holder.LookupLocal(id.Name) is not null)
+                return MethodOwner(chosen, holder) is { } owner ? RefuseBare(id, chosen, owner, called) : null;
+        return null;
+    }
+
+    /// <summary>The bare names refused: a call whose callee is one chooses no function of the
+    /// name after it.</summary>
+    private readonly HashSet<Node> _bareRefused = new(ReferenceEqualityComparer.Instance);
+
+    private LyrType RefuseBare(IdentifierExpr id, Symbol member, string owner, bool called)
+    {
+        _result.BindRef(id, member);
+        _bareRefused.Add(id);
+
+        var name = id.Name;
+        if (member is EnumVariantSymbol)
+            return Report(id.Span, "LYR-SEM0055",
+                $"'{name}' is a variant of {owner} — a variant is written '.{name}' or '{owner[1..^1]}.{name}'");
+
+        var what = member is FieldSymbol ? "a field" : "a method";
+        var how = _currentThis is null
+            ? member is FieldSymbol
+                ? "there is no 'this' here"
+                : $"there is no 'this' here: call it on a value, or declare it 'static fn {name}(…)'"
+            : called ? $"call it as 'this.{name}(…)'"
+            : member is FieldSymbol ? $"write 'this.{name}'"
+            : $"as a value it is 'this.{name}'";
+        return Report(id.Span, "LYR-SEM0055", $"'{name}' is {what} of {owner} and needs a receiver — {how}");
+    }
+
+    /// <summary>The type a method found bare belongs to, as a diagnostic names it — the type
+    /// whose body or whose block holds it; <c>null</c> for a function of a module.</summary>
+    private string? MethodOwner(FunctionSymbol method, SymbolTable holder) =>
+        _comp.Extensions.BlockOf(method) is { } block
+            ? block.Target is { } target ? $"'{target.Name}'" : "the block's type"
+            : TypeBodyOf(holder);
+
+    /// <summary>The tables that hold a type's own members, with the type's name in quotes.</summary>
+    private Dictionary<SymbolTable, string>? _typeBodies;
+
+    /// <summary>The type whose body <paramref name="table"/> is, as a diagnostic names it;
+    /// <c>null</c> for a module's table, a block's and a body's own scopes.</summary>
+    private string? TypeBodyOf(SymbolTable table)
+    {
+        if (_typeBodies is null)
+        {
+            _typeBodies = new Dictionary<SymbolTable, string>(ReferenceEqualityComparer.Instance);
+            foreach (var module in _comp.Modules)
+                foreach (var type in module.Members.Symbols.OfType<TypeSymbol>())
+                    _typeBodies[type.Members] = $"'{type.Name}'";
+        }
+        return _typeBodies.GetValueOrDefault(table);
+    }
+
+    /// <summary>
+    /// Where a call's bare callee is looked up, when that is not the call's own scope: in a call
+    /// a field counts only if it can be called (the review's M6-30). <c>label()</c> beside a
+    /// field <c>label: string</c> means the function outside, so a field <c>size</c> or
+    /// <c>name</c> closes no function of that name to its type's methods. A local and a
+    /// parameter hide whole, as everywhere; a field that holds a function is what the call
+    /// means, and so is one that may hold one (<c>?fn() -&gt; int</c> — it says itself that it is
+    /// not called before it is unwrapped).
+    /// </summary>
+    /// <returns>The field passed, the type's body it stands in and the scope the lookup goes on
+    /// in — an empty one where the name is nobody else's; <c>null</c> when no field is passed.</returns>
+    private (FieldSymbol Passed, SymbolTable Body, SymbolTable Outward)? PastAField(IdentifierExpr callee, SymbolTable scope)
+    {
+        if (_compilerWritten.Contains(callee)) return null;
+        (FieldSymbol Field, SymbolTable Body)? passed = null;
+        for (var holder = scope; holder is not null; holder = holder.Parent)
+        {
+            if (holder.LookupLocal(callee.Name) is not { } found) continue;
+            if (found is FieldSymbol field && !CanBeCalled(FieldType(field)))
+            {
+                passed ??= (field, holder);
+                continue;
+            }
+            return passed is { } before ? (before.Field, before.Body, holder) : null;
+        }
+        return passed is { } alone ? (alone.Field, alone.Body, Nowhere) : null;
+    }
+
+    private static readonly SymbolTable Nowhere = new();
+
+    private static bool CanBeCalled(LyrType type) =>
+        type is FnType or Optional { Inner: FnType } || type.IsError;
 
     private FnType FnTypeOf(FunctionSymbol f)
     {
@@ -3734,7 +3878,9 @@ public sealed class TypeChecker
     /// call is checked as the member call it stands for and stored for the lowering, the seam
     /// the operators use.
     /// </summary>
-    private LyrType CheckConstruction(CallExpr call, TypeSymbol type, SymbolTable scope, LyrType? expected)
+    /// <param name="named">The scope the type's name was found in — the call's own, or the one
+    /// beyond a field of that name (<see cref="PastAField"/>).</param>
+    private LyrType CheckConstruction(CallExpr call, TypeSymbol type, SymbolTable scope, SymbolTable named, LyrType? expected)
     {
         if (type.Members.LookupLocal("new") is not FunctionSymbol { Declaration: FunctionDecl { IsStatic: true } })
         {
@@ -3749,6 +3895,13 @@ public sealed class TypeChecker
         // The call as it was written — its names, the parentheses of its arguments — with the
         // factory for its callee. The type arguments were the type's, read where it was resolved.
         var meant = call with { Callee = factory, TypeArguments = null };
+        // Typed where the name was found, so the member's target is not looked up again from
+        // the call's scope, where a field stands before it.
+        if (!ReferenceEquals(named, scope))
+        {
+            CheckTarget(call.Callee, named);
+            _typedReceiver.Add(factory);
+        }
         var result = CheckExpr(meant, scope, expected);
         _result.DesugarOperator(call, meant);
         return result;
@@ -3773,6 +3926,9 @@ public sealed class TypeChecker
         // though it were: this is the one position where something else chooses — the arguments,
         // a moment later in CheckCall. The first candidate is bound so the ordinary path has a
         // shape to work with, and the selection rebinds it.
+        if (callee is IdentifierExpr bare && BareMember(bare, scope, called: true) is { } refused)
+            return refused;
+
         if (callee is IdentifierExpr id && scope.Overloads(id.Name) is { Count: > 1 } set)
         {
             _result.BindRef(id, set[0]);
@@ -4646,7 +4802,10 @@ public sealed class TypeChecker
             and not (BinaryOp.LogicalAnd or BinaryOp.LogicalOr or BinaryOp.Coalesce))
         {
             var binary = new BinaryExpr(a.Target, op, a.Value, a.Span);
-            value = CheckBinary(binary, scope);
+            var outerTarget = _typedTarget;
+            _typedTarget = a.Target;
+            try { value = CheckBinary(binary, scope); }
+            finally { _typedTarget = outerTarget; }
 
             // The binary desugars through an operator interface: store the call ON THE ASSIGN,
             // where the lowering finds it and lowers it whole. For an identifier target that
@@ -5195,11 +5354,29 @@ public sealed class TypeChecker
     {
         // The two calls that are not calls of what their callee names: identity, which the
         // compiler answers itself, and a type name, which means its factory.
+        // A bare callee is looked up past a field that cannot be called (the review's M6-30):
+        // 'label()' beside a field 'label: string' means the function outside. The arguments
+        // stay in the call's own scope.
+        var calleeScope = scope;
+        if (call.Callee is IdentifierExpr bare && PastAField(bare, scope) is { } past)
+        {
+            calleeScope = past.Outward;
+            if (NameOf(bare, calleeScope) is null)
+            {
+                foreach (var leftover in call.Arguments) CheckExpr(leftover, scope);
+                _result.BindRef(bare, past.Passed);
+                return Report(bare.Span, "LYR-SEM0013",
+                    $"'{bare.Name}' is a field of {TypeBodyOf(past.Body) ?? "this type"} and a "
+                    + $"'{TypeFacts.Display(FieldType(past.Passed))}', which is not callable — and "
+                    + $"nothing else named '{bare.Name}' is in scope");
+            }
+        }
+
         if (call.Callee is IdentifierExpr identity && _same is not null
-            && ReferenceEquals(scope.Lookup(identity.Name), _same))
+            && ReferenceEquals(calleeScope.Lookup(identity.Name), _same))
             return CheckSame(call, identity, scope);
-        if (ConstructedType(call.Callee, scope) is { } constructed)
-            return CheckConstruction(call, constructed, scope, expected);
+        if (ConstructedType(call.Callee, calleeScope) is { } constructed)
+            return CheckConstruction(call, constructed, scope, calleeScope, expected);
 
         // 'Walker.describe(x)' (04 D2 R5): the interface's member, called with its receiver as
         // the first argument — the qualified form that reaches an implementation the unqualified
@@ -5244,18 +5421,24 @@ public sealed class TypeChecker
             return result;
         }
 
-        var calleeType = CheckTargetOfCall(call.Callee, scope, expected);
+        var calleeType = CheckTargetOfCall(call.Callee, calleeScope, expected);
 
         // OVERLOADING: the lookup above answered with the first function of the name, which is the
         // right answer whenever there is only one. With several, the arguments decide, and the
         // decision is recorded by rebinding the callee — from here on everything downstream, the
         // lowering included, reads one target and knows nothing of the set.
         if (!(call.Callee is MemberExpr settled && _operatorTarget.ContainsKey(settled))
-            && OverloadCandidates(call.Callee, scope) is { Count: > 1 } candidates)
+            && !_bareRefused.Contains(call.Callee)
+            && OverloadCandidates(call.Callee, calleeScope) is { Count: > 1 } candidates)
         {
             if (SelectOverload(call, candidates, scope) is not { } chosen) return LyrType.Error;
             _result.BindRef(call.Callee, chosen);
             calleeType = OverloadTypeOf(chosen, call.Callee);
+            // Of a static and a method of one name the count chose the method: nothing here
+            // is its receiver.
+            if (call.Callee is IdentifierExpr counted
+                && BareChoice(counted, chosen, calleeScope, called: true) is { } withoutReceiver)
+                calleeType = withoutReceiver;
         }
 
         // 'b?.get()' — optional chaining with a CALL. 'b?.get' is a '?fn() -> int', and without this
