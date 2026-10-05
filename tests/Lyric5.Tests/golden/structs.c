@@ -151,14 +151,14 @@ uint64_t lyr_g5_lowBits = 0;
 uint64_t lyr_g6_highBits = 0;
 
 /* prototypes */
-lyr_ty0_Point lyr_main_shift(lyr_ty0_Point l0_p, int64_t l1_dx);
-LYR_NOINLINE int64_t lyr_main_main(void);
+lyr_ty0_Point lyr_app_main_shift(lyr_ty0_Point l0_p, int64_t l1_dx);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 7 "programs/structs.lyr"
-lyr_ty0_Point lyr_main_shift(lyr_ty0_Point l0_p, int64_t l1_dx) {
+lyr_ty0_Point lyr_app_main_shift(lyr_ty0_Point l0_p, int64_t l1_dx) {
     lyr_ty0_Point l2_q = {0};
     lyr_ty0_Point t0_s = {0};
     lyr_ty0_Point *t0 = &t0_s;
@@ -203,7 +203,7 @@ bb0:;
 }
 
 #line 13 "programs/structs.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty0_Point l0_p = {0};
     lyr_ty1_Segment l1_s = {0};
     int64_t t0 = 0;
@@ -273,7 +273,7 @@ bb0:;
 #line 14
     t7 = (int64_t)INT64_C(10);
 #line 14
-    t8_s = lyr_main_shift(*t6, t7); t8 = &t8_s;
+    t8_s = lyr_app_main_shift(*t6, t7); t8 = &t8_s;
 #line 14
     t9_s = (lyr_ty1_Segment){0}; t9 = &t9_s;
 #line 14
@@ -417,5 +417,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

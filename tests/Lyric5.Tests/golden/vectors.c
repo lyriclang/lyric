@@ -174,33 +174,33 @@ static const LyrStaticStr(3) lyr_lit16 = LYR_STR_INIT(", ");
 static const LyrStaticStr(2) lyr_lit17 = LYR_STR_INIT(")");
 
 /* prototypes */
-int64_t lyr_main_sumTo(lyr_ty0_V l0_a, lyr_ty0_V l1_b);
-LYR_NOINLINE int64_t lyr_main_main(void);
-lyr_ty0_V lyr_main_V_add(lyr_ty0_V *l0_this, lyr_ty0_V l1_rhs);
-lyr_ty0_V lyr_main_V_sub(lyr_ty0_V *l0_this, lyr_ty0_V l1_rhs);
-lyr_ty0_V lyr_main_V_mul(lyr_ty0_V *l0_this, int64_t l1_rhs);
-lyr_ty0_V lyr_main_V_neg(lyr_ty0_V *l0_this);
-uint8_t lyr_main_V_equals(lyr_ty0_V *l0_this, lyr_ty0_V l1_o);
-lyr_ty1_Ordering lyr_main_V_compare(lyr_ty0_V *l0_this, lyr_ty0_V l1_o);
-LyrStr * lyr_main_V_show(lyr_ty0_V *l0_this);
-lyr_ty5_Bits lyr_main_Bits_rem(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs);
-lyr_ty5_Bits lyr_main_Bits_bitAnd(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs);
-lyr_ty5_Bits lyr_main_Bits_bitOr(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs);
-lyr_ty5_Bits lyr_main_Bits_bitXor(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs);
-lyr_ty5_Bits lyr_main_Bits_bitNot(lyr_ty5_Bits *l0_this);
-lyr_ty5_Bits lyr_main_Bits_shl(lyr_ty5_Bits *l0_this, int64_t l1_rhs);
-lyr_ty5_Bits lyr_main_Bits_shr(lyr_ty5_Bits *l0_this, int64_t l1_rhs);
-lyr_ty1_Ordering lyr_main_Partial_compare(lyr_ty6_Partial *l0_this, lyr_ty6_Partial l1_o);
-double lyr_main__extend__V_mul_4e36db10(lyr_ty0_V *l0_this, double l1_rhs);
-lyr_ty0_V lyr_main_sum_V__61e9f483(lyr_ty0_V l0_a, lyr_ty0_V l1_b, lyr_ty0_V l2_c);
-int64_t lyr_main_sum_int__73495576(int64_t l0_a, int64_t l1_b, int64_t l2_c);
+int64_t lyr_app_main_sumTo(lyr_ty0_V l0_a, lyr_ty0_V l1_b);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+lyr_ty0_V lyr_app_main_V_add(lyr_ty0_V *l0_this, lyr_ty0_V l1_rhs);
+lyr_ty0_V lyr_app_main_V_sub(lyr_ty0_V *l0_this, lyr_ty0_V l1_rhs);
+lyr_ty0_V lyr_app_main_V_mul(lyr_ty0_V *l0_this, int64_t l1_rhs);
+lyr_ty0_V lyr_app_main_V_neg(lyr_ty0_V *l0_this);
+uint8_t lyr_app_main_V_equals(lyr_ty0_V *l0_this, lyr_ty0_V l1_o);
+lyr_ty1_Ordering lyr_app_main_V_compare(lyr_ty0_V *l0_this, lyr_ty0_V l1_o);
+LyrStr * lyr_app_main_V_show(lyr_ty0_V *l0_this);
+lyr_ty5_Bits lyr_app_main_Bits_rem(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs);
+lyr_ty5_Bits lyr_app_main_Bits_bitAnd(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs);
+lyr_ty5_Bits lyr_app_main_Bits_bitOr(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs);
+lyr_ty5_Bits lyr_app_main_Bits_bitXor(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs);
+lyr_ty5_Bits lyr_app_main_Bits_bitNot(lyr_ty5_Bits *l0_this);
+lyr_ty5_Bits lyr_app_main_Bits_shl(lyr_ty5_Bits *l0_this, int64_t l1_rhs);
+lyr_ty5_Bits lyr_app_main_Bits_shr(lyr_ty5_Bits *l0_this, int64_t l1_rhs);
+lyr_ty1_Ordering lyr_app_main_Partial_compare(lyr_ty6_Partial *l0_this, lyr_ty6_Partial l1_o);
+double lyr_app_main__extend__V_mul_e861f035(lyr_ty0_V *l0_this, double l1_rhs);
+lyr_ty0_V lyr_app_main_sum_V__e119c522(lyr_ty0_V l0_a, lyr_ty0_V l1_b, lyr_ty0_V l2_c);
+int64_t lyr_app_main_sum_int__4e6866b3(int64_t l0_a, int64_t l1_b, int64_t l2_c);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 int64_t lyr_std_core__extend__int_add_cacbf113(int64_t l0_this, int64_t l1_rhs);
 
-#line 56 "programs/vectors.lyr"
-int64_t lyr_main_sumTo(lyr_ty0_V l0_a, lyr_ty0_V l1_b) {
+#line 57 "programs/vectors.lyr"
+int64_t lyr_app_main_sumTo(lyr_ty0_V l0_a, lyr_ty0_V l1_b) {
     lyr_ty0_V l2_acc = {0};
     lyr_ty0_V t0_s = {0};
     lyr_ty0_V *t0 = &t0_s;
@@ -232,58 +232,58 @@ int64_t lyr_main_sumTo(lyr_ty0_V l0_a, lyr_ty0_V l1_b) {
     int64_t t16 = 0;
     int64_t t17 = 0;
 bb0:;
-#line 56
+#line 57
     t0 = &l0_a;
-#line 56
+#line 57
     t1_s = *t0; t1 = &t1_s;
-#line 56
+#line 57
     l2_acc = *t1;
-#line 57
+#line 58
     t2 = &l2_acc;
-#line 57
+#line 58
     t3 = &l1_b;
-#line 57
+#line 58
     t4_s = *t3; t4 = &t4_s;
-#line 57
-    t5_s = lyr_main_V_add(t2, *t4); t5 = &t5_s;
-#line 57
+#line 58
+    t5_s = lyr_app_main_V_add(t2, *t4); t5 = &t5_s;
+#line 58
     l2_acc = *t5;
-#line 58
+#line 59
     t6 = &l2_acc;
-#line 58
+#line 59
     t7 = (int64_t)INT64_C(1);
-#line 58
+#line 59
     t8 = (int64_t)INT64_C(0);
-#line 58
+#line 59
     t9_s = (lyr_ty0_V){0}; t9 = &t9_s;
-#line 58
+#line 59
     t9->f_x = t7;
-#line 58
+#line 59
     t9->f_y = t8;
-#line 58
-    t10_s = lyr_main_V_add(t6, *t9); t10 = &t10_s;
-#line 58
+#line 59
+    t10_s = lyr_app_main_V_add(t6, *t9); t10 = &t10_s;
+#line 59
     l2_acc = *t10;
-#line 59
+#line 60
     t11 = &l2_acc;
-#line 59
+#line 60
     t12 = t11->f_x;
-#line 59
+#line 60
     t13 = &l2_acc;
-#line 59
+#line 60
     t14 = t13->f_y;
-#line 59
+#line 60
     t15 = LYR_CHECKED_ADD(t12, t14);
-#line 59
+#line 60
     t16 = (int64_t)INT64_C(4);
-#line 59
+#line 60
     t17 = LYR_CHECKED_SUB(t15, t16);
-#line 59
+#line 60
     return t17;
 }
 
-#line 63 "programs/vectors.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+#line 64 "programs/vectors.lyr"
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty0_V l0_a = {0};
     lyr_ty0_V l1_b = {0};
     lyr_ty0_V l2_s = {0};
@@ -690,762 +690,713 @@ LYR_NOINLINE int64_t lyr_main_main(void) {
     LyrStr *t288 = NULL;
     int64_t t289 = 0;
 bb0:;
-#line 63
+#line 64
     t0 = (int64_t)INT64_C(1);
-#line 63
+#line 64
     t1 = (int64_t)INT64_C(2);
-#line 63
+#line 64
     t2_s = (lyr_ty0_V){0}; t2 = &t2_s;
-#line 63
+#line 64
     t2->f_x = t0;
-#line 63
+#line 64
     t2->f_y = t1;
-#line 63
+#line 64
     l0_a = *t2;
-#line 64
+#line 65
     t3 = (int64_t)INT64_C(3);
-#line 64
+#line 65
     t4 = (int64_t)INT64_C(4);
-#line 64
+#line 65
     t5_s = (lyr_ty0_V){0}; t5 = &t5_s;
-#line 64
+#line 65
     t5->f_x = t3;
-#line 64
+#line 65
     t5->f_y = t4;
-#line 64
+#line 65
     l1_b = *t5;
-#line 65
+#line 66
     t6 = &l0_a;
-#line 65
+#line 66
     t7 = &l1_b;
-#line 65
+#line 66
     t8_s = *t7; t8 = &t8_s;
-#line 65
-    t9_s = lyr_main_V_add(t6, *t8); t9 = &t9_s;
-#line 65
+#line 66
+    t9_s = lyr_app_main_V_add(t6, *t8); t9 = &t9_s;
+#line 66
     l2_s = *t9;
-#line 66
+#line 67
     t10 = &l1_b;
-#line 66
+#line 67
     t11 = &l0_a;
-#line 66
+#line 67
     t12_s = *t11; t12 = &t12_s;
-#line 66
-    t13_s = lyr_main_V_sub(t10, *t12); t13 = &t13_s;
-#line 66
+#line 67
+    t13_s = lyr_app_main_V_sub(t10, *t12); t13 = &t13_s;
+#line 67
     l3_d = *t13;
-#line 67
+#line 68
     t14 = &l0_a;
-#line 67
+#line 68
     t15 = (int64_t)INT64_C(3);
-#line 67
-    t16_s = lyr_main_V_mul(t14, t15); t16 = &t16_s;
-#line 67
+#line 68
+    t16_s = lyr_app_main_V_mul(t14, t15); t16 = &t16_s;
+#line 68
     l4_m = *t16;
-#line 68
+#line 69
     t17 = (LyrStr *)&lyr_lit0;
-#line 68
+#line 69
     t18 = &l2_s;
-#line 68
+#line 69
     t19 = t18->f_x;
-#line 68
+#line 69
     t20 = lyr_str_from_int(t19);
-#line 68
+#line 69
     t21 = (LyrStr *)&lyr_lit1;
-#line 68
+#line 69
     t22 = &l2_s;
-#line 68
+#line 69
     t23 = t22->f_y;
-#line 68
+#line 69
     t24 = lyr_str_from_int(t23);
-#line 68
+#line 69
     t25 = (LyrStr *)&lyr_lit2;
-#line 68
+#line 69
     t26 = &l3_d;
-#line 68
+#line 69
     t27 = t26->f_x;
-#line 68
+#line 69
     t28 = lyr_str_from_int(t27);
-#line 68
+#line 69
     t29 = (LyrStr *)&lyr_lit1;
-#line 68
+#line 69
     t30 = &l3_d;
-#line 68
+#line 69
     t31 = t30->f_y;
-#line 68
+#line 69
     t32 = lyr_str_from_int(t31);
-#line 68
+#line 69
     t33 = (LyrStr *)&lyr_lit3;
-#line 68
+#line 69
     t34 = &l4_m;
-#line 68
+#line 69
     t35 = t34->f_x;
-#line 68
+#line 69
     t36 = lyr_str_from_int(t35);
-#line 68
+#line 69
     t37 = (LyrStr *)&lyr_lit1;
-#line 68
+#line 69
     t38 = &l4_m;
-#line 68
+#line 69
     t39 = t38->f_y;
-#line 68
+#line 69
     t40 = lyr_str_from_int(t39);
-#line 68
+#line 69
     t41 = (LyrStr *)&lyr_lit4;
-#line 68
+#line 69
     t42 = &l1_b;
-#line 68
+#line 69
     t43 = (double)1.5;
-#line 68
-    t44 = lyr_main__extend__V_mul_4e36db10(t42, t43);
-#line 68
+#line 69
+    t44 = lyr_app_main__extend__V_mul_e861f035(t42, t43);
+#line 69
     t45 = lyr_str_from_float(t44);
-#line 68
+#line 69
     t46 = (LyrStr *)&lyr_lit1;
-#line 68
+#line 69
     t47 = &l0_a;
-#line 68
+#line 69
     t48 = (double)2.5;
-#line 68
-    t49 = lyr_main__extend__V_mul_4e36db10(t47, t48);
-#line 68
+#line 69
+    t49 = lyr_app_main__extend__V_mul_e861f035(t47, t48);
+#line 69
     t50 = lyr_str_from_float(t49);
-#line 68
+#line 69
     t51 = lyr_str_concat(t17, t20);
-#line 68
+#line 69
     t52 = lyr_str_concat(t51, t21);
-#line 68
+#line 69
     t53 = lyr_str_concat(t52, t24);
-#line 68
+#line 69
     t54 = lyr_str_concat(t53, t25);
-#line 68
+#line 69
     t55 = lyr_str_concat(t54, t28);
-#line 68
+#line 69
     t56 = lyr_str_concat(t55, t29);
-#line 68
+#line 69
     t57 = lyr_str_concat(t56, t32);
-#line 68
+#line 69
     t58 = lyr_str_concat(t57, t33);
-#line 68
+#line 69
     t59 = lyr_str_concat(t58, t36);
-#line 68
+#line 69
     t60 = lyr_str_concat(t59, t37);
-#line 68
+#line 69
     t61 = lyr_str_concat(t60, t40);
-#line 68
+#line 69
     t62 = lyr_str_concat(t61, t41);
-#line 68
+#line 69
     t63 = lyr_str_concat(t62, t45);
-#line 68
+#line 69
     t64 = lyr_str_concat(t63, t46);
-#line 68
+#line 69
     t65 = lyr_str_concat(t64, t50);
-#line 68
+#line 69
     lyr_println(t65);
-#line 69
+#line 70
     t66 = &l0_a;
-#line 69
-    t67_s = lyr_main_V_neg(t66); t67 = &t67_s;
-#line 69
+#line 70
+    t67_s = lyr_app_main_V_neg(t66); t67 = &t67_s;
+#line 70
     l5_n = *t67;
-#line 70
+#line 71
     t68 = (LyrStr *)&lyr_lit5;
-#line 70
+#line 71
     t69 = &l5_n;
-#line 70
+#line 71
     t70 = t69->f_x;
-#line 70
+#line 71
     t71 = lyr_str_from_int(t70);
-#line 70
+#line 71
     t72 = (LyrStr *)&lyr_lit1;
-#line 70
+#line 71
     t73 = &l5_n;
-#line 70
+#line 71
     t74 = t73->f_y;
-#line 70
+#line 71
     t75 = lyr_str_from_int(t74);
-#line 70
+#line 71
     t76 = (LyrStr *)&lyr_lit6;
-#line 70
+#line 71
     t77 = &l0_a;
-#line 70
+#line 71
     t78 = (int64_t)INT64_C(1);
-#line 70
+#line 71
     t79 = (int64_t)INT64_C(2);
-#line 70
+#line 71
     t80_s = (lyr_ty0_V){0}; t80 = &t80_s;
-#line 70
+#line 71
     t80->f_x = t78;
-#line 70
+#line 71
     t80->f_y = t79;
-#line 70
-    t81 = lyr_main_V_equals(t77, *t80);
-#line 70
+#line 71
+    t81 = lyr_app_main_V_equals(t77, *t80);
+#line 71
     t82 = lyr_str_from_bool(t81);
-#line 70
+#line 71
     t83 = (LyrStr *)&lyr_lit1;
-#line 70
+#line 71
     t84 = &l0_a;
-#line 70
+#line 71
     t85 = &l1_b;
-#line 70
+#line 71
     t86_s = *t85; t86 = &t86_s;
-#line 70
-    t87 = lyr_main_V_equals(t84, *t86);
-#line 70
+#line 71
+    t87 = lyr_app_main_V_equals(t84, *t86);
+#line 71
     t88 = lyr_str_from_bool(t87);
-#line 70
+#line 71
     t89 = (LyrStr *)&lyr_lit7;
-#line 70
+#line 71
     t90 = &l0_a;
-#line 70
+#line 71
     t91 = &l1_b;
-#line 70
+#line 71
     t92_s = *t91; t92 = &t92_s;
-#line 70
-    t93_s = lyr_main_V_compare(t90, *t92); t93 = &t93_s;
-#line 70
+#line 71
+    t93_s = lyr_app_main_V_compare(t90, *t92); t93 = &t93_s;
+#line 71
     t94 = (uint8_t)(t93->tag != LYR_ENUM_NONE);
-#line 70
+#line 71
     if (t94) goto bb1; else goto bb2;
 bb1:;
-#line 70
+#line 71
     t96 = t93;
-#line 70
+#line 71
     t97 = (int64_t)t96->tag;
-#line 70
+#line 71
     t98 = (int64_t)INT64_C(0);
-#line 70
+#line 71
     t99 = (uint8_t)(t97 == t98);
-#line 70
+#line 71
     l6__ordered0 = t99;
-#line 70
+#line 71
     goto bb3;
 bb2:;
-#line 70
+#line 71
     t95 = 0;
-#line 70
+#line 71
     l6__ordered0 = t95;
-#line 70
+#line 71
     goto bb3;
 bb3:;
-#line 70
+#line 71
     t100 = l6__ordered0;
-#line 70
+#line 71
     t101 = lyr_str_from_bool(t100);
-#line 70
+#line 71
     t102 = (LyrStr *)&lyr_lit1;
-#line 70
+#line 71
     t103 = &l1_b;
-#line 70
+#line 71
     t104 = &l0_a;
-#line 70
+#line 71
     t105_s = *t104; t105 = &t105_s;
-#line 70
-    t106_s = lyr_main_V_compare(t103, *t105); t106 = &t106_s;
-#line 70
+#line 71
+    t106_s = lyr_app_main_V_compare(t103, *t105); t106 = &t106_s;
+#line 71
     t107 = (uint8_t)(t106->tag != LYR_ENUM_NONE);
-#line 70
+#line 71
     if (t107) goto bb4; else goto bb5;
 bb4:;
-#line 70
+#line 71
     t109 = t106;
-#line 70
+#line 71
     t110 = (int64_t)t109->tag;
-#line 70
+#line 71
     t111 = (int64_t)INT64_C(0);
-#line 70
+#line 71
     t112 = (uint8_t)(t110 == t111);
-#line 70
+#line 71
     l7__ordered1 = t112;
-#line 70
+#line 71
     goto bb6;
 bb5:;
-#line 70
+#line 71
     t108 = 0;
-#line 70
+#line 71
     l7__ordered1 = t108;
-#line 70
+#line 71
     goto bb6;
 bb6:;
-#line 70
+#line 71
     t113 = l7__ordered1;
-#line 70
+#line 71
     t114 = lyr_str_from_bool(t113);
-#line 70
+#line 71
     t115 = (LyrStr *)&lyr_lit8;
-#line 70
+#line 71
     t116 = &l0_a;
-#line 70
+#line 71
     t117 = &l0_a;
-#line 70
+#line 71
     t118_s = *t117; t118 = &t118_s;
-#line 70
-    t119_s = lyr_main_V_compare(t116, *t118); t119 = &t119_s;
-#line 70
+#line 71
+    t119_s = lyr_app_main_V_compare(t116, *t118); t119 = &t119_s;
+#line 71
     t120 = (uint8_t)(t119->tag != LYR_ENUM_NONE);
-#line 70
+#line 71
     if (t120) goto bb7; else goto bb8;
 bb7:;
-#line 70
+#line 71
     t122 = t119;
-#line 70
+#line 71
     t123 = (int64_t)t122->tag;
-#line 70
+#line 71
     t124 = (int64_t)INT64_C(2);
-#line 70
+#line 71
     t125 = (uint8_t)(t123 != t124);
-#line 70
+#line 71
     l8__ordered2 = t125;
-#line 70
+#line 71
     goto bb9;
 bb8:;
-#line 70
+#line 71
     t121 = 0;
-#line 70
+#line 71
     l8__ordered2 = t121;
-#line 70
+#line 71
     goto bb9;
 bb9:;
-#line 70
+#line 71
     t126 = l8__ordered2;
-#line 70
+#line 71
     t127 = lyr_str_from_bool(t126);
-#line 70
+#line 71
     t128 = lyr_str_concat(t68, t71);
-#line 70
+#line 71
     t129 = lyr_str_concat(t128, t72);
-#line 70
+#line 71
     t130 = lyr_str_concat(t129, t75);
-#line 70
+#line 71
     t131 = lyr_str_concat(t130, t76);
-#line 70
+#line 71
     t132 = lyr_str_concat(t131, t82);
-#line 70
+#line 71
     t133 = lyr_str_concat(t132, t83);
-#line 70
+#line 71
     t134 = lyr_str_concat(t133, t88);
-#line 70
+#line 71
     t135 = lyr_str_concat(t134, t89);
-#line 70
+#line 71
     t136 = lyr_str_concat(t135, t101);
-#line 70
+#line 71
     t137 = lyr_str_concat(t136, t102);
-#line 70
+#line 71
     t138 = lyr_str_concat(t137, t114);
-#line 70
+#line 71
     t139 = lyr_str_concat(t138, t115);
-#line 70
+#line 71
     t140 = lyr_str_concat(t139, t127);
-#line 70
+#line 71
     lyr_println(t140);
-#line 71
+#line 72
     t141 = &l0_a;
-#line 71
+#line 72
     t142_s = *t141; t142 = &t142_s;
-#line 71
+#line 72
     t143 = &l1_b;
-#line 71
+#line 72
     t144_s = *t143; t144 = &t144_s;
-#line 71
+#line 72
     t145 = &l0_a;
-#line 71
+#line 72
     t146_s = *t145; t146 = &t146_s;
-#line 71
-    t147_s = lyr_main_sum_V__61e9f483(*t142, *t144, *t146); t147 = &t147_s;
-#line 71
+#line 72
+    t147_s = lyr_app_main_sum_V__e119c522(*t142, *t144, *t146); t147 = &t147_s;
+#line 72
     l9_t = *t147;
-#line 72
+#line 73
     t148 = (LyrStr *)&lyr_lit9;
-#line 72
+#line 73
     t149 = (int64_t)INT64_C(1);
-#line 72
+#line 73
     t150 = (int64_t)INT64_C(2);
-#line 72
+#line 73
     t151 = (int64_t)INT64_C(3);
-#line 72
-    t152 = lyr_main_sum_int__73495576(t149, t150, t151);
-#line 72
+#line 73
+    t152 = lyr_app_main_sum_int__4e6866b3(t149, t150, t151);
+#line 73
     t153 = (int64_t)INT64_C(4);
-#line 72
+#line 73
     t154 = LYR_CHECKED_ADD(t152, t153);
-#line 72
+#line 73
     t155 = lyr_str_from_int(t154);
-#line 72
+#line 73
     t156 = (LyrStr *)&lyr_lit1;
-#line 72
+#line 73
     t157 = &l9_t;
-#line 72
+#line 73
     t158 = t157->f_x;
-#line 72
+#line 73
     t159 = &l9_t;
-#line 72
+#line 73
     t160 = t159->f_y;
-#line 72
+#line 73
     t161 = LYR_CHECKED_ADD(t158, t160);
-#line 72
+#line 73
     t162 = lyr_str_from_int(t161);
-#line 72
+#line 73
     t163 = (LyrStr *)&lyr_lit10;
-#line 72
+#line 73
     t164 = &l0_a;
-#line 72
+#line 73
     t165_s = *t164; t165 = &t165_s;
-#line 72
+#line 73
     t166 = &l1_b;
-#line 72
+#line 73
     t167_s = *t166; t167 = &t167_s;
-#line 72
-    t168 = lyr_main_sumTo(*t165, *t167);
-#line 72
+#line 73
+    t168 = lyr_app_main_sumTo(*t165, *t167);
+#line 73
     t169 = lyr_str_from_int(t168);
-#line 72
+#line 73
     t170 = (LyrStr *)&lyr_lit1;
-#line 72
+#line 73
     t171 = &l0_a;
-#line 72
+#line 73
     t172 = &l1_b;
-#line 72
+#line 73
     t173_s = *t172; t173 = &t173_s;
-#line 72
-    t174_s = lyr_main_V_add(t171, *t173); t174 = &t174_s;
-#line 72
-    t175 = lyr_main_V_show(t174);
-#line 72
+#line 73
+    t174_s = lyr_app_main_V_add(t171, *t173); t174 = &t174_s;
+#line 73
+    t175 = lyr_app_main_V_show(t174);
+#line 73
     t176 = lyr_str_concat(t148, t155);
-#line 72
+#line 73
     t177 = lyr_str_concat(t176, t156);
-#line 72
+#line 73
     t178 = lyr_str_concat(t177, t162);
-#line 72
+#line 73
     t179 = lyr_str_concat(t178, t163);
-#line 72
+#line 73
     t180 = lyr_str_concat(t179, t169);
-#line 72
+#line 73
     t181 = lyr_str_concat(t180, t170);
-#line 72
+#line 73
     t182 = lyr_str_concat(t181, t175);
-#line 72
+#line 73
     lyr_println(t182);
-#line 73
+#line 74
     t183 = (int64_t)INT64_C(5);
-#line 73
+#line 74
     t184_s = (lyr_ty5_Bits){0}; t184 = &t184_s;
-#line 73
+#line 74
     t184->f_n = t183;
-#line 73
+#line 74
     l10_p = *t184;
-#line 74
+#line 75
     t185 = (int64_t)INT64_C(3);
-#line 74
+#line 75
     t186_s = (lyr_ty5_Bits){0}; t186 = &t186_s;
-#line 74
+#line 75
     t186->f_n = t185;
-#line 74
+#line 75
     l11_q = *t186;
-#line 75
+#line 76
     t187 = (LyrStr *)&lyr_lit11;
-#line 75
+#line 76
     t188 = (int64_t)INT64_C(7);
-#line 75
+#line 76
     t189_s = (lyr_ty5_Bits){0}; t189 = &t189_s;
-#line 75
+#line 76
     t189->f_n = t188;
-#line 75
+#line 76
     t190 = &l11_q;
-#line 75
+#line 76
     t191_s = *t190; t191 = &t191_s;
-#line 75
-    t192_s = lyr_main_Bits_rem(t189, *t191); t192 = &t192_s;
-#line 75
+#line 76
+    t192_s = lyr_app_main_Bits_rem(t189, *t191); t192 = &t192_s;
+#line 76
     t193 = t192->f_n;
-#line 75
+#line 76
     t194 = lyr_str_from_int(t193);
-#line 75
+#line 76
     t195 = (LyrStr *)&lyr_lit12;
-#line 75
+#line 76
     t196 = &l10_p;
-#line 75
+#line 76
     t197 = &l11_q;
-#line 75
+#line 76
     t198_s = *t197; t198 = &t198_s;
-#line 75
-    t199_s = lyr_main_Bits_bitAnd(t196, *t198); t199 = &t199_s;
-#line 75
+#line 76
+    t199_s = lyr_app_main_Bits_bitAnd(t196, *t198); t199 = &t199_s;
+#line 76
     t200 = t199->f_n;
-#line 75
+#line 76
     t201 = lyr_str_from_int(t200);
-#line 75
+#line 76
     t202 = (LyrStr *)&lyr_lit1;
-#line 75
+#line 76
     t203 = &l10_p;
-#line 75
+#line 76
     t204 = &l11_q;
-#line 75
+#line 76
     t205_s = *t204; t205 = &t205_s;
-#line 75
-    t206_s = lyr_main_Bits_bitOr(t203, *t205); t206 = &t206_s;
-#line 75
+#line 76
+    t206_s = lyr_app_main_Bits_bitOr(t203, *t205); t206 = &t206_s;
+#line 76
     t207 = t206->f_n;
-#line 75
+#line 76
     t208 = lyr_str_from_int(t207);
-#line 75
+#line 76
     t209 = (LyrStr *)&lyr_lit1;
-#line 75
+#line 76
     t210 = &l10_p;
-#line 75
+#line 76
     t211 = &l11_q;
-#line 75
+#line 76
     t212_s = *t211; t212 = &t212_s;
-#line 75
-    t213_s = lyr_main_Bits_bitXor(t210, *t212); t213 = &t213_s;
-#line 75
+#line 76
+    t213_s = lyr_app_main_Bits_bitXor(t210, *t212); t213 = &t213_s;
+#line 76
     t214 = t213->f_n;
-#line 75
+#line 76
     t215 = lyr_str_from_int(t214);
-#line 75
+#line 76
     t216 = (LyrStr *)&lyr_lit1;
-#line 75
+#line 76
     t217 = (int64_t)INT64_C(2);
-#line 75
+#line 76
     t218_s = (lyr_ty5_Bits){0}; t218 = &t218_s;
-#line 75
+#line 76
     t218->f_n = t217;
-#line 75
-    t219_s = lyr_main_Bits_bitNot(t218); t219 = &t219_s;
-#line 75
+#line 76
+    t219_s = lyr_app_main_Bits_bitNot(t218); t219 = &t219_s;
+#line 76
     t220 = t219->f_n;
-#line 75
+#line 76
     t221 = lyr_str_from_int(t220);
-#line 75
+#line 76
     t222 = (LyrStr *)&lyr_lit1;
-#line 75
+#line 76
     t223 = &l11_q;
-#line 75
+#line 76
     t224 = (int64_t)INT64_C(1);
-#line 75
-    t225_s = lyr_main_Bits_shl(t223, t224); t225 = &t225_s;
-#line 75
+#line 76
+    t225_s = lyr_app_main_Bits_shl(t223, t224); t225 = &t225_s;
+#line 76
     t226 = t225->f_n;
-#line 75
+#line 76
     t227 = &l10_p;
-#line 75
+#line 76
     t228 = (int64_t)INT64_C(1);
-#line 75
-    t229_s = lyr_main_Bits_shl(t227, t228); t229 = &t229_s;
-#line 75
+#line 76
+    t229_s = lyr_app_main_Bits_shl(t227, t228); t229 = &t229_s;
+#line 76
     t230 = t229->f_n;
-#line 75
+#line 76
     t231 = LYR_CHECKED_ADD(t226, t230);
-#line 75
+#line 76
     t232 = (int64_t)INT64_C(8);
-#line 75
+#line 76
     t233 = LYR_CHECKED_SUB(t231, t232);
-#line 75
+#line 76
     t234 = lyr_str_from_int(t233);
-#line 75
+#line 76
     t235 = (LyrStr *)&lyr_lit1;
-#line 75
+#line 76
     t236 = &l10_p;
-#line 75
+#line 76
     t237 = (int64_t)INT64_C(1);
-#line 75
-    t238_s = lyr_main_Bits_shr(t236, t237); t238 = &t238_s;
-#line 75
+#line 76
+    t238_s = lyr_app_main_Bits_shr(t236, t237); t238 = &t238_s;
+#line 76
     t239 = t238->f_n;
-#line 75
+#line 76
     t240 = lyr_str_from_int(t239);
-#line 75
+#line 76
     t241 = lyr_str_concat(t187, t194);
-#line 75
+#line 76
     t242 = lyr_str_concat(t241, t195);
-#line 75
+#line 76
     t243 = lyr_str_concat(t242, t201);
-#line 75
+#line 76
     t244 = lyr_str_concat(t243, t202);
-#line 75
+#line 76
     t245 = lyr_str_concat(t244, t208);
-#line 75
+#line 76
     t246 = lyr_str_concat(t245, t209);
-#line 75
+#line 76
     t247 = lyr_str_concat(t246, t215);
-#line 75
+#line 76
     t248 = lyr_str_concat(t247, t216);
-#line 75
+#line 76
     t249 = lyr_str_concat(t248, t221);
-#line 75
+#line 76
     t250 = lyr_str_concat(t249, t222);
-#line 75
+#line 76
     t251 = lyr_str_concat(t250, t234);
-#line 75
+#line 76
     t252 = lyr_str_concat(t251, t235);
-#line 75
+#line 76
     t253 = lyr_str_concat(t252, t240);
-#line 75
+#line 76
     lyr_println(t253);
-#line 76
+#line 77
     t254 = (int64_t)INT64_C(1);
-#line 76
+#line 77
     t255_s = (lyr_ty6_Partial){0}; t255 = &t255_s;
-#line 76
+#line 77
     t255->f_v = t254;
-#line 76
+#line 77
     l12_x = *t255;
-#line 77
+#line 78
     t256 = (int64_t)INT64_C(2);
-#line 77
+#line 78
     t257_s = (lyr_ty6_Partial){0}; t257 = &t257_s;
-#line 77
+#line 78
     t257->f_v = t256;
-#line 77
+#line 78
     l13_y = *t257;
-#line 78
+#line 79
     t258 = (LyrStr *)&lyr_lit13;
-#line 78
+#line 79
     t259 = &l12_x;
-#line 78
+#line 79
     t260 = &l13_y;
-#line 78
+#line 79
     t261_s = *t260; t261 = &t261_s;
-#line 78
-    t262_s = lyr_main_Partial_compare(t259, *t261); t262 = &t262_s;
-#line 78
+#line 79
+    t262_s = lyr_app_main_Partial_compare(t259, *t261); t262 = &t262_s;
+#line 79
     t263 = (uint8_t)(t262->tag != LYR_ENUM_NONE);
-#line 78
+#line 79
     if (t263) goto bb10; else goto bb11;
 bb10:;
-#line 78
+#line 79
     t265 = t262;
-#line 78
+#line 79
     t266 = (int64_t)t265->tag;
-#line 78
+#line 79
     t267 = (int64_t)INT64_C(0);
-#line 78
+#line 79
     t268 = (uint8_t)(t266 == t267);
-#line 78
+#line 79
     l14__ordered3 = t268;
-#line 78
+#line 79
     goto bb12;
 bb11:;
-#line 78
+#line 79
     t264 = 0;
-#line 78
+#line 79
     l14__ordered3 = t264;
-#line 78
+#line 79
     goto bb12;
 bb12:;
-#line 78
+#line 79
     t269 = l14__ordered3;
-#line 78
+#line 79
     t270 = lyr_str_from_bool(t269);
-#line 78
+#line 79
     t271 = (LyrStr *)&lyr_lit1;
-#line 78
+#line 79
     t272 = &l12_x;
-#line 78
+#line 79
     t273 = &l13_y;
-#line 78
+#line 79
     t274_s = *t273; t274 = &t274_s;
-#line 78
-    t275_s = lyr_main_Partial_compare(t272, *t274); t275 = &t275_s;
-#line 78
+#line 79
+    t275_s = lyr_app_main_Partial_compare(t272, *t274); t275 = &t275_s;
+#line 79
     t276 = (uint8_t)(t275->tag != LYR_ENUM_NONE);
-#line 78
+#line 79
     if (t276) goto bb13; else goto bb14;
 bb13:;
-#line 78
+#line 79
     t278 = t275;
-#line 78
+#line 79
     t279 = (int64_t)t278->tag;
-#line 78
+#line 79
     t280 = (int64_t)INT64_C(0);
-#line 78
+#line 79
     t281 = (uint8_t)(t279 != t280);
-#line 78
+#line 79
     l15__ordered4 = t281;
-#line 78
+#line 79
     goto bb15;
 bb14:;
-#line 78
+#line 79
     t277 = 0;
-#line 78
+#line 79
     l15__ordered4 = t277;
-#line 78
+#line 79
     goto bb15;
 bb15:;
-#line 78
+#line 79
     t282 = l15__ordered4;
-#line 78
+#line 79
     t283 = lyr_str_from_bool(t282);
-#line 78
+#line 79
     t284 = (LyrStr *)&lyr_lit14;
-#line 78
+#line 79
     t285 = lyr_str_concat(t258, t270);
-#line 78
+#line 79
     t286 = lyr_str_concat(t285, t271);
-#line 78
+#line 79
     t287 = lyr_str_concat(t286, t283);
-#line 78
+#line 79
     t288 = lyr_str_concat(t287, t284);
-#line 78
+#line 79
     lyr_println(t288);
-#line 79
+#line 80
     t289 = (int64_t)INT64_C(0);
-#line 79
+#line 80
     return t289;
 }
 
-#line 16 "programs/vectors.lyr"
-lyr_ty0_V lyr_main_V_add(lyr_ty0_V *l0_this, lyr_ty0_V l1_rhs) {
-    lyr_ty0_V t0_s = {0};
-    lyr_ty0_V *t0 = &t0_s;
-    int64_t t1 = 0;
-    lyr_ty0_V t2_s = {0};
-    lyr_ty0_V *t2 = &t2_s;
-    int64_t t3 = 0;
-    int64_t t4 = 0;
-    lyr_ty0_V t5_s = {0};
-    lyr_ty0_V *t5 = &t5_s;
-    int64_t t6 = 0;
-    lyr_ty0_V t7_s = {0};
-    lyr_ty0_V *t7 = &t7_s;
-    int64_t t8 = 0;
-    int64_t t9 = 0;
-    lyr_ty0_V t10_s = {0};
-    lyr_ty0_V *t10 = &t10_s;
-bb0:;
-#line 16
-    t0 = l0_this;
-#line 16
-    t1 = t0->f_x;
-#line 16
-    t2 = &l1_rhs;
-#line 16
-    t3 = t2->f_x;
-#line 16
-    t4 = LYR_CHECKED_ADD(t1, t3);
-#line 16
-    t5 = l0_this;
-#line 16
-    t6 = t5->f_y;
-#line 16
-    t7 = &l1_rhs;
-#line 16
-    t8 = t7->f_y;
-#line 16
-    t9 = LYR_CHECKED_ADD(t6, t8);
-#line 16
-    t10_s = (lyr_ty0_V){0}; t10 = &t10_s;
-#line 16
-    t10->f_x = t4;
-#line 16
-    t10->f_y = t9;
-#line 16
-    return *t10;
-}
-
 #line 17 "programs/vectors.lyr"
-lyr_ty0_V lyr_main_V_sub(lyr_ty0_V *l0_this, lyr_ty0_V l1_rhs) {
+lyr_ty0_V lyr_app_main_V_add(lyr_ty0_V *l0_this, lyr_ty0_V l1_rhs) {
     lyr_ty0_V t0_s = {0};
     lyr_ty0_V *t0 = &t0_s;
     int64_t t1 = 0;
@@ -1472,7 +1423,7 @@ bb0:;
 #line 17
     t3 = t2->f_x;
 #line 17
-    t4 = LYR_CHECKED_SUB(t1, t3);
+    t4 = LYR_CHECKED_ADD(t1, t3);
 #line 17
     t5 = l0_this;
 #line 17
@@ -1482,7 +1433,7 @@ bb0:;
 #line 17
     t8 = t7->f_y;
 #line 17
-    t9 = LYR_CHECKED_SUB(t6, t8);
+    t9 = LYR_CHECKED_ADD(t6, t8);
 #line 17
     t10_s = (lyr_ty0_V){0}; t10 = &t10_s;
 #line 17
@@ -1494,7 +1445,56 @@ bb0:;
 }
 
 #line 18 "programs/vectors.lyr"
-lyr_ty0_V lyr_main_V_mul(lyr_ty0_V *l0_this, int64_t l1_rhs) {
+lyr_ty0_V lyr_app_main_V_sub(lyr_ty0_V *l0_this, lyr_ty0_V l1_rhs) {
+    lyr_ty0_V t0_s = {0};
+    lyr_ty0_V *t0 = &t0_s;
+    int64_t t1 = 0;
+    lyr_ty0_V t2_s = {0};
+    lyr_ty0_V *t2 = &t2_s;
+    int64_t t3 = 0;
+    int64_t t4 = 0;
+    lyr_ty0_V t5_s = {0};
+    lyr_ty0_V *t5 = &t5_s;
+    int64_t t6 = 0;
+    lyr_ty0_V t7_s = {0};
+    lyr_ty0_V *t7 = &t7_s;
+    int64_t t8 = 0;
+    int64_t t9 = 0;
+    lyr_ty0_V t10_s = {0};
+    lyr_ty0_V *t10 = &t10_s;
+bb0:;
+#line 18
+    t0 = l0_this;
+#line 18
+    t1 = t0->f_x;
+#line 18
+    t2 = &l1_rhs;
+#line 18
+    t3 = t2->f_x;
+#line 18
+    t4 = LYR_CHECKED_SUB(t1, t3);
+#line 18
+    t5 = l0_this;
+#line 18
+    t6 = t5->f_y;
+#line 18
+    t7 = &l1_rhs;
+#line 18
+    t8 = t7->f_y;
+#line 18
+    t9 = LYR_CHECKED_SUB(t6, t8);
+#line 18
+    t10_s = (lyr_ty0_V){0}; t10 = &t10_s;
+#line 18
+    t10->f_x = t4;
+#line 18
+    t10->f_y = t9;
+#line 18
+    return *t10;
+}
+
+#line 19 "programs/vectors.lyr"
+lyr_ty0_V lyr_app_main_V_mul(lyr_ty0_V *l0_this, int64_t l1_rhs) {
     lyr_ty0_V t0_s = {0};
     lyr_ty0_V *t0 = &t0_s;
     int64_t t1 = 0;
@@ -1508,34 +1508,34 @@ lyr_ty0_V lyr_main_V_mul(lyr_ty0_V *l0_this, int64_t l1_rhs) {
     lyr_ty0_V t8_s = {0};
     lyr_ty0_V *t8 = &t8_s;
 bb0:;
-#line 18
+#line 19
     t0 = l0_this;
-#line 18
+#line 19
     t1 = t0->f_x;
-#line 18
+#line 19
     t2 = l1_rhs;
-#line 18
+#line 19
     t3 = LYR_CHECKED_MUL(t1, t2);
-#line 18
+#line 19
     t4 = l0_this;
-#line 18
+#line 19
     t5 = t4->f_y;
-#line 18
+#line 19
     t6 = l1_rhs;
-#line 18
+#line 19
     t7 = LYR_CHECKED_MUL(t5, t6);
-#line 18
+#line 19
     t8_s = (lyr_ty0_V){0}; t8 = &t8_s;
-#line 18
+#line 19
     t8->f_x = t3;
-#line 18
+#line 19
     t8->f_y = t7;
-#line 18
+#line 19
     return *t8;
 }
 
-#line 19 "programs/vectors.lyr"
-lyr_ty0_V lyr_main_V_neg(lyr_ty0_V *l0_this) {
+#line 20 "programs/vectors.lyr"
+lyr_ty0_V lyr_app_main_V_neg(lyr_ty0_V *l0_this) {
     lyr_ty0_V t0_s = {0};
     lyr_ty0_V *t0 = &t0_s;
     int64_t t1 = 0;
@@ -1547,30 +1547,30 @@ lyr_ty0_V lyr_main_V_neg(lyr_ty0_V *l0_this) {
     lyr_ty0_V t6_s = {0};
     lyr_ty0_V *t6 = &t6_s;
 bb0:;
-#line 19
+#line 20
     t0 = l0_this;
-#line 19
+#line 20
     t1 = t0->f_x;
-#line 19
+#line 20
     t2 = LYR_CHECKED_SUB((int64_t)0, t1);
-#line 19
+#line 20
     t3 = l0_this;
-#line 19
+#line 20
     t4 = t3->f_y;
-#line 19
+#line 20
     t5 = LYR_CHECKED_SUB((int64_t)0, t4);
-#line 19
+#line 20
     t6_s = (lyr_ty0_V){0}; t6 = &t6_s;
-#line 19
+#line 20
     t6->f_x = t2;
-#line 19
+#line 20
     t6->f_y = t5;
-#line 19
+#line 20
     return *t6;
 }
 
-#line 20 "programs/vectors.lyr"
-uint8_t lyr_main_V_equals(lyr_ty0_V *l0_this, lyr_ty0_V l1_o) {
+#line 21 "programs/vectors.lyr"
+uint8_t lyr_app_main_V_equals(lyr_ty0_V *l0_this, lyr_ty0_V l1_o) {
     uint8_t l2__and0 = 0;
     lyr_ty0_V t0_s = {0};
     lyr_ty0_V *t0 = &t0_s;
@@ -1588,44 +1588,44 @@ uint8_t lyr_main_V_equals(lyr_ty0_V *l0_this, lyr_ty0_V l1_o) {
     uint8_t t9 = 0;
     uint8_t t10 = 0;
 bb0:;
-#line 20
+#line 21
     t0 = l0_this;
-#line 20
+#line 21
     t1 = t0->f_x;
-#line 20
+#line 21
     t2 = &l1_o;
-#line 20
+#line 21
     t3 = t2->f_x;
-#line 20
+#line 21
     t4 = (uint8_t)(t1 == t3);
-#line 20
+#line 21
     l2__and0 = t4;
-#line 20
+#line 21
     if (t4) goto bb1; else goto bb2;
 bb1:;
-#line 20
+#line 21
     t5 = l0_this;
-#line 20
+#line 21
     t6 = t5->f_y;
-#line 20
+#line 21
     t7 = &l1_o;
-#line 20
+#line 21
     t8 = t7->f_y;
-#line 20
+#line 21
     t9 = (uint8_t)(t6 == t8);
-#line 20
+#line 21
     l2__and0 = t9;
-#line 20
+#line 21
     goto bb2;
 bb2:;
-#line 20
+#line 21
     t10 = l2__and0;
-#line 20
+#line 21
     return t10;
 }
 
-#line 22 "programs/vectors.lyr"
-lyr_ty1_Ordering lyr_main_V_compare(lyr_ty0_V *l0_this, lyr_ty0_V l1_o) {
+#line 23 "programs/vectors.lyr"
+lyr_ty1_Ordering lyr_app_main_V_compare(lyr_ty0_V *l0_this, lyr_ty0_V l1_o) {
     int64_t l2_a = 0;
     int64_t l3_b = 0;
     lyr_ty0_V t0_s = {0};
@@ -1677,96 +1677,96 @@ lyr_ty1_Ordering lyr_main_V_compare(lyr_ty0_V *l0_this, lyr_ty0_V l1_o) {
     lyr_ty1_Ordering t33_s = {0};
     lyr_ty1_Ordering *t33 = &t33_s;
 bb0:;
-#line 22
+#line 23
     t0 = l0_this;
-#line 22
+#line 23
     t1 = t0->f_x;
-#line 22
+#line 23
     t2 = l0_this;
-#line 22
+#line 23
     t3 = t2->f_x;
-#line 22
+#line 23
     t4 = LYR_CHECKED_MUL(t1, t3);
-#line 22
+#line 23
     t5 = l0_this;
-#line 22
+#line 23
     t6 = t5->f_y;
-#line 22
+#line 23
     t7 = l0_this;
-#line 22
+#line 23
     t8 = t7->f_y;
-#line 22
+#line 23
     t9 = LYR_CHECKED_MUL(t6, t8);
-#line 22
+#line 23
     t10 = LYR_CHECKED_ADD(t4, t9);
-#line 22
+#line 23
     l2_a = t10;
-#line 23
+#line 24
     t11 = &l1_o;
-#line 23
+#line 24
     t12 = t11->f_x;
-#line 23
+#line 24
     t13 = &l1_o;
-#line 23
+#line 24
     t14 = t13->f_x;
-#line 23
+#line 24
     t15 = LYR_CHECKED_MUL(t12, t14);
-#line 23
+#line 24
     t16 = &l1_o;
-#line 23
+#line 24
     t17 = t16->f_y;
-#line 23
+#line 24
     t18 = &l1_o;
-#line 23
+#line 24
     t19 = t18->f_y;
-#line 23
+#line 24
     t20 = LYR_CHECKED_MUL(t17, t19);
-#line 23
+#line 24
     t21 = LYR_CHECKED_ADD(t15, t20);
-#line 23
+#line 24
     l3_b = t21;
-#line 24
+#line 25
     t22 = l2_a;
-#line 24
+#line 25
     t23 = l3_b;
-#line 24
+#line 25
     t24 = (uint8_t)(t22 < t23);
-#line 24
+#line 25
     if (t24) goto bb1; else goto bb2;
 bb1:;
-#line 24
+#line 25
     t25_s = (lyr_ty1_Ordering){ .tag = 0 }; t25 = &t25_s;
-#line 24
+#line 25
     t26_s = *t25; t26 = &t26_s;
-#line 24
+#line 25
     return *t26;
 bb2:;
-#line 25
+#line 26
     t27 = l2_a;
-#line 25
+#line 26
     t28 = l3_b;
-#line 25
+#line 26
     t29 = (uint8_t)(t27 > t28);
-#line 25
+#line 26
     if (t29) goto bb3; else goto bb4;
 bb3:;
-#line 25
+#line 26
     t30_s = (lyr_ty1_Ordering){ .tag = 2 }; t30 = &t30_s;
-#line 25
+#line 26
     t31_s = *t30; t31 = &t31_s;
-#line 25
+#line 26
     return *t31;
 bb4:;
-#line 26
+#line 27
     t32_s = (lyr_ty1_Ordering){ .tag = 1 }; t32 = &t32_s;
-#line 26
+#line 27
     t33_s = *t32; t33 = &t33_s;
-#line 26
+#line 27
     return *t33;
 }
 
-#line 28 "programs/vectors.lyr"
-LyrStr * lyr_main_V_show(lyr_ty0_V *l0_this) {
+#line 29 "programs/vectors.lyr"
+LyrStr * lyr_app_main_V_show(lyr_ty0_V *l0_this) {
     LyrStr *t0 = NULL;
     lyr_ty0_V t1_s = {0};
     lyr_ty0_V *t1 = &t1_s;
@@ -1783,68 +1783,38 @@ LyrStr * lyr_main_V_show(lyr_ty0_V *l0_this) {
     LyrStr *t11 = NULL;
     LyrStr *t12 = NULL;
 bb0:;
-#line 28
+#line 29
     t0 = (LyrStr *)&lyr_lit15;
-#line 28
+#line 29
     t1 = l0_this;
-#line 28
+#line 29
     t2 = t1->f_x;
-#line 28
+#line 29
     t3 = lyr_str_from_int(t2);
-#line 28
+#line 29
     t4 = (LyrStr *)&lyr_lit16;
-#line 28
+#line 29
     t5 = l0_this;
-#line 28
+#line 29
     t6 = t5->f_y;
-#line 28
+#line 29
     t7 = lyr_str_from_int(t6);
-#line 28
+#line 29
     t8 = (LyrStr *)&lyr_lit17;
-#line 28
+#line 29
     t9 = lyr_str_concat(t0, t3);
-#line 28
+#line 29
     t10 = lyr_str_concat(t9, t4);
-#line 28
+#line 29
     t11 = lyr_str_concat(t10, t7);
-#line 28
+#line 29
     t12 = lyr_str_concat(t11, t8);
-#line 28
+#line 29
     return t12;
 }
 
-#line 38 "programs/vectors.lyr"
-lyr_ty5_Bits lyr_main_Bits_rem(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs) {
-    lyr_ty5_Bits t0_s = {0};
-    lyr_ty5_Bits *t0 = &t0_s;
-    int64_t t1 = 0;
-    lyr_ty5_Bits t2_s = {0};
-    lyr_ty5_Bits *t2 = &t2_s;
-    int64_t t3 = 0;
-    int64_t t4 = 0;
-    lyr_ty5_Bits t5_s = {0};
-    lyr_ty5_Bits *t5 = &t5_s;
-bb0:;
-#line 38
-    t0 = l0_this;
-#line 38
-    t1 = t0->f_n;
-#line 38
-    t2 = &l1_rhs;
-#line 38
-    t3 = t2->f_n;
-#line 38
-    t4 = LYR_CHECKED_REM(t1, t3);
-#line 38
-    t5_s = (lyr_ty5_Bits){0}; t5 = &t5_s;
-#line 38
-    t5->f_n = t4;
-#line 38
-    return *t5;
-}
-
 #line 39 "programs/vectors.lyr"
-lyr_ty5_Bits lyr_main_Bits_bitAnd(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs) {
+lyr_ty5_Bits lyr_app_main_Bits_rem(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs) {
     lyr_ty5_Bits t0_s = {0};
     lyr_ty5_Bits *t0 = &t0_s;
     int64_t t1 = 0;
@@ -1864,7 +1834,7 @@ bb0:;
 #line 39
     t3 = t2->f_n;
 #line 39
-    t4 = (int64_t)(t1 & t3);
+    t4 = LYR_CHECKED_REM(t1, t3);
 #line 39
     t5_s = (lyr_ty5_Bits){0}; t5 = &t5_s;
 #line 39
@@ -1874,7 +1844,7 @@ bb0:;
 }
 
 #line 40 "programs/vectors.lyr"
-lyr_ty5_Bits lyr_main_Bits_bitOr(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs) {
+lyr_ty5_Bits lyr_app_main_Bits_bitAnd(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs) {
     lyr_ty5_Bits t0_s = {0};
     lyr_ty5_Bits *t0 = &t0_s;
     int64_t t1 = 0;
@@ -1894,7 +1864,7 @@ bb0:;
 #line 40
     t3 = t2->f_n;
 #line 40
-    t4 = (int64_t)(t1 | t3);
+    t4 = (int64_t)(t1 & t3);
 #line 40
     t5_s = (lyr_ty5_Bits){0}; t5 = &t5_s;
 #line 40
@@ -1904,7 +1874,7 @@ bb0:;
 }
 
 #line 41 "programs/vectors.lyr"
-lyr_ty5_Bits lyr_main_Bits_bitXor(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs) {
+lyr_ty5_Bits lyr_app_main_Bits_bitOr(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs) {
     lyr_ty5_Bits t0_s = {0};
     lyr_ty5_Bits *t0 = &t0_s;
     int64_t t1 = 0;
@@ -1924,7 +1894,7 @@ bb0:;
 #line 41
     t3 = t2->f_n;
 #line 41
-    t4 = (int64_t)(t1 ^ t3);
+    t4 = (int64_t)(t1 | t3);
 #line 41
     t5_s = (lyr_ty5_Bits){0}; t5 = &t5_s;
 #line 41
@@ -1934,7 +1904,37 @@ bb0:;
 }
 
 #line 42 "programs/vectors.lyr"
-lyr_ty5_Bits lyr_main_Bits_bitNot(lyr_ty5_Bits *l0_this) {
+lyr_ty5_Bits lyr_app_main_Bits_bitXor(lyr_ty5_Bits *l0_this, lyr_ty5_Bits l1_rhs) {
+    lyr_ty5_Bits t0_s = {0};
+    lyr_ty5_Bits *t0 = &t0_s;
+    int64_t t1 = 0;
+    lyr_ty5_Bits t2_s = {0};
+    lyr_ty5_Bits *t2 = &t2_s;
+    int64_t t3 = 0;
+    int64_t t4 = 0;
+    lyr_ty5_Bits t5_s = {0};
+    lyr_ty5_Bits *t5 = &t5_s;
+bb0:;
+#line 42
+    t0 = l0_this;
+#line 42
+    t1 = t0->f_n;
+#line 42
+    t2 = &l1_rhs;
+#line 42
+    t3 = t2->f_n;
+#line 42
+    t4 = (int64_t)(t1 ^ t3);
+#line 42
+    t5_s = (lyr_ty5_Bits){0}; t5 = &t5_s;
+#line 42
+    t5->f_n = t4;
+#line 42
+    return *t5;
+}
+
+#line 43 "programs/vectors.lyr"
+lyr_ty5_Bits lyr_app_main_Bits_bitNot(lyr_ty5_Bits *l0_this) {
     lyr_ty5_Bits t0_s = {0};
     lyr_ty5_Bits *t0 = &t0_s;
     int64_t t1 = 0;
@@ -1942,48 +1942,22 @@ lyr_ty5_Bits lyr_main_Bits_bitNot(lyr_ty5_Bits *l0_this) {
     lyr_ty5_Bits t3_s = {0};
     lyr_ty5_Bits *t3 = &t3_s;
 bb0:;
-#line 42
+#line 43
     t0 = l0_this;
-#line 42
+#line 43
     t1 = t0->f_n;
-#line 42
+#line 43
     t2 = (int64_t)~t1;
-#line 42
+#line 43
     t3_s = (lyr_ty5_Bits){0}; t3 = &t3_s;
-#line 42
+#line 43
     t3->f_n = t2;
-#line 42
+#line 43
     return *t3;
 }
 
-#line 43 "programs/vectors.lyr"
-lyr_ty5_Bits lyr_main_Bits_shl(lyr_ty5_Bits *l0_this, int64_t l1_rhs) {
-    lyr_ty5_Bits t0_s = {0};
-    lyr_ty5_Bits *t0 = &t0_s;
-    int64_t t1 = 0;
-    int64_t t2 = 0;
-    int64_t t3 = 0;
-    lyr_ty5_Bits t4_s = {0};
-    lyr_ty5_Bits *t4 = &t4_s;
-bb0:;
-#line 43
-    t0 = l0_this;
-#line 43
-    t1 = t0->f_n;
-#line 43
-    t2 = l1_rhs;
-#line 43
-    t3 = LYR_CHECKED_SHL(int64_t, uint64_t, 64, t1, t2);
-#line 43
-    t4_s = (lyr_ty5_Bits){0}; t4 = &t4_s;
-#line 43
-    t4->f_n = t3;
-#line 43
-    return *t4;
-}
-
 #line 44 "programs/vectors.lyr"
-lyr_ty5_Bits lyr_main_Bits_shr(lyr_ty5_Bits *l0_this, int64_t l1_rhs) {
+lyr_ty5_Bits lyr_app_main_Bits_shl(lyr_ty5_Bits *l0_this, int64_t l1_rhs) {
     lyr_ty5_Bits t0_s = {0};
     lyr_ty5_Bits *t0 = &t0_s;
     int64_t t1 = 0;
@@ -1999,7 +1973,7 @@ bb0:;
 #line 44
     t2 = l1_rhs;
 #line 44
-    t3 = LYR_CHECKED_SHR(int64_t, uint64_t, 64, t1, t2);
+    t3 = LYR_CHECKED_SHL(int64_t, uint64_t, 64, t1, t2);
 #line 44
     t4_s = (lyr_ty5_Bits){0}; t4 = &t4_s;
 #line 44
@@ -2008,19 +1982,45 @@ bb0:;
     return *t4;
 }
 
-#line 50 "programs/vectors.lyr"
-lyr_ty1_Ordering lyr_main_Partial_compare(lyr_ty6_Partial *l0_this, lyr_ty6_Partial l1_o) {
+#line 45 "programs/vectors.lyr"
+lyr_ty5_Bits lyr_app_main_Bits_shr(lyr_ty5_Bits *l0_this, int64_t l1_rhs) {
+    lyr_ty5_Bits t0_s = {0};
+    lyr_ty5_Bits *t0 = &t0_s;
+    int64_t t1 = 0;
+    int64_t t2 = 0;
+    int64_t t3 = 0;
+    lyr_ty5_Bits t4_s = {0};
+    lyr_ty5_Bits *t4 = &t4_s;
+bb0:;
+#line 45
+    t0 = l0_this;
+#line 45
+    t1 = t0->f_n;
+#line 45
+    t2 = l1_rhs;
+#line 45
+    t3 = LYR_CHECKED_SHR(int64_t, uint64_t, 64, t1, t2);
+#line 45
+    t4_s = (lyr_ty5_Bits){0}; t4 = &t4_s;
+#line 45
+    t4->f_n = t3;
+#line 45
+    return *t4;
+}
+
+#line 51 "programs/vectors.lyr"
+lyr_ty1_Ordering lyr_app_main_Partial_compare(lyr_ty6_Partial *l0_this, lyr_ty6_Partial l1_o) {
     lyr_ty1_Ordering t0_s = {0};
     lyr_ty1_Ordering *t0 = &t0_s;
 bb0:;
-#line 50
+#line 51
     t0_s = (lyr_ty1_Ordering){ .tag = LYR_ENUM_NONE }; t0 = &t0_s;
-#line 50
+#line 51
     return *t0;
 }
 
-#line 33 "programs/vectors.lyr"
-double lyr_main__extend__V_mul_4e36db10(lyr_ty0_V *l0_this, double l1_rhs) {
+#line 34 "programs/vectors.lyr"
+double lyr_app_main__extend__V_mul_e861f035(lyr_ty0_V *l0_this, double l1_rhs) {
     lyr_ty0_V t0_s = {0};
     lyr_ty0_V *t0 = &t0_s;
     int64_t t1 = 0;
@@ -2028,17 +2028,17 @@ double lyr_main__extend__V_mul_4e36db10(lyr_ty0_V *l0_this, double l1_rhs) {
     double t3 = 0;
     double t4 = 0;
 bb0:;
-#line 33
+#line 34
     t0 = l0_this;
-#line 33
+#line 34
     t1 = t0->f_x;
-#line 33
+#line 34
     t2 = (double)t1;
-#line 33
+#line 34
     t3 = l1_rhs;
-#line 33
+#line 34
     t4 = (t2 * t3);
-#line 33
+#line 34
     return t4;
 }
 
@@ -2145,12 +2145,12 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }
 
-/* ==== unit: main.sum<V> ==== */
+/* ==== unit: app.main.sum<V> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.sum<V>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.sum<V>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -2163,11 +2163,11 @@ struct lyr_ty0_V {
 };
 
 /* prototypes */
-lyr_ty0_V lyr_main_V_add(lyr_ty0_V *l0_this, lyr_ty0_V l1_rhs);
-lyr_ty0_V lyr_main_sum_V__61e9f483(lyr_ty0_V l0_a, lyr_ty0_V l1_b, lyr_ty0_V l2_c);
+lyr_ty0_V lyr_app_main_V_add(lyr_ty0_V *l0_this, lyr_ty0_V l1_rhs);
+lyr_ty0_V lyr_app_main_sum_V__e119c522(lyr_ty0_V l0_a, lyr_ty0_V l1_b, lyr_ty0_V l2_c);
 
-#line 53 "programs/vectors.lyr"
-lyr_ty0_V lyr_main_sum_V__61e9f483(lyr_ty0_V l0_a, lyr_ty0_V l1_b, lyr_ty0_V l2_c) {
+#line 54 "programs/vectors.lyr"
+lyr_ty0_V lyr_app_main_sum_V__e119c522(lyr_ty0_V l0_a, lyr_ty0_V l1_b, lyr_ty0_V l2_c) {
     lyr_ty0_V t0_s = {0};
     lyr_ty0_V *t0 = &t0_s;
     lyr_ty0_V t1_s = {0};
@@ -2183,55 +2183,55 @@ lyr_ty0_V lyr_main_sum_V__61e9f483(lyr_ty0_V l0_a, lyr_ty0_V l1_b, lyr_ty0_V l2_
     lyr_ty0_V t6_s = {0};
     lyr_ty0_V *t6 = &t6_s;
 bb0:;
-#line 53
+#line 54
     t0 = &l2_c;
-#line 53
+#line 54
     t1_s = *t0; t1 = &t1_s;
-#line 53
+#line 54
     t2 = &l1_b;
-#line 53
+#line 54
     t3_s = *t2; t3 = &t3_s;
-#line 53
+#line 54
     t4 = &l0_a;
-#line 53
-    t5_s = lyr_main_V_add(t4, *t3); t5 = &t5_s;
-#line 53
-    t6_s = lyr_main_V_add(t5, *t1); t6 = &t6_s;
-#line 53
+#line 54
+    t5_s = lyr_app_main_V_add(t4, *t3); t5 = &t5_s;
+#line 54
+    t6_s = lyr_app_main_V_add(t5, *t1); t6 = &t6_s;
+#line 54
     return *t6;
 }
 
 
-/* ==== unit: main.sum<int> ==== */
+/* ==== unit: app.main.sum<int> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.sum<int>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.sum<int>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
 
 /* prototypes */
-int64_t lyr_main_sum_int__73495576(int64_t l0_a, int64_t l1_b, int64_t l2_c);
+int64_t lyr_app_main_sum_int__4e6866b3(int64_t l0_a, int64_t l1_b, int64_t l2_c);
 int64_t lyr_std_core__extend__int_add_cacbf113(int64_t l0_this, int64_t l1_rhs);
 
-#line 53 "programs/vectors.lyr"
-int64_t lyr_main_sum_int__73495576(int64_t l0_a, int64_t l1_b, int64_t l2_c) {
+#line 54 "programs/vectors.lyr"
+int64_t lyr_app_main_sum_int__4e6866b3(int64_t l0_a, int64_t l1_b, int64_t l2_c) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
     int64_t t3 = 0;
     int64_t t4 = 0;
 bb0:;
-#line 53
+#line 54
     t0 = l0_a;
-#line 53
+#line 54
     t1 = l1_b;
-#line 53
+#line 54
     t2 = lyr_std_core__extend__int_add_cacbf113(t0, t1);
-#line 53
+#line 54
     t3 = l2_c;
-#line 53
+#line 54
     t4 = lyr_std_core__extend__int_add_cacbf113(t2, t3);
-#line 53
+#line 54
     return t4;
 }
 

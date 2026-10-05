@@ -161,24 +161,24 @@ static const LyrStaticStr(7) lyr_lit3 = LYR_STR_INIT("fixed ");
 static const LyrStaticStr(8) lyr_lit4 = LYR_STR_INIT("nested ");
 
 /* prototypes */
-LYR_NOINLINE int64_t lyr_main_main(void);
-int64_t lyr_main_IntBox_first(lyr_ty0_IntBox *l0_this);
-int64_t lyr_main_IntBox_count(lyr_ty0_IntBox *l0_this);
-lyr_ty0_IntBox lyr_main_IntBox_mapped(lyr_ty0_IntBox *l0_this);
-int64_t lyr_main_firstOf_IntBox__69b5f155(lyr_ty0_IntBox l0_c);
-LyrStr * lyr_main_firstOf_StrBox__3f573447(lyr_ty1_StrBox l0_c);
-int64_t lyr_main_sumFirst_IntBox__fe85e115(lyr_ty0_IntBox l0_c);
-int64_t lyr_main_firstOf_Pair_int___a9e3a3c6(lyr_ty2_Pair_int_ l0_c);
-int64_t lyr_main_sumFirst_Pair_int___5f6c1e86(lyr_ty2_Pair_int_ l0_c);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+int64_t lyr_app_main_IntBox_first(lyr_ty0_IntBox *l0_this);
+int64_t lyr_app_main_IntBox_count(lyr_ty0_IntBox *l0_this);
+lyr_ty0_IntBox lyr_app_main_IntBox_mapped(lyr_ty0_IntBox *l0_this);
+int64_t lyr_app_main_firstOf_IntBox__60a293c6(lyr_ty0_IntBox l0_c);
+LyrStr * lyr_app_main_firstOf_StrBox__92f35094(lyr_ty1_StrBox l0_c);
+int64_t lyr_app_main_sumFirst_IntBox__2d87e4a8(lyr_ty0_IntBox l0_c);
+int64_t lyr_app_main_firstOf_Pair_int___b248145b(lyr_ty2_Pair_int_ l0_c);
+int64_t lyr_app_main_sumFirst_Pair_int___a12393d9(lyr_ty2_Pair_int_ l0_c);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
-LyrStr * lyr_main__extend__StrBox_first_9856d9aa(lyr_ty1_StrBox *l0_this);
-int64_t lyr_main_Pair_int__first_46ce75bf(lyr_ty2_Pair_int_ *l0_this);
-int64_t lyr_main_Pair_int__count_c6d6b47a(lyr_ty2_Pair_int_ *l0_this);
+LyrStr * lyr_app_main__extend__StrBox_first_04c16aad(lyr_ty1_StrBox *l0_this);
+int64_t lyr_app_main_Pair_int__first_f8dc7d58(lyr_ty2_Pair_int_ *l0_this);
+int64_t lyr_app_main_Pair_int__count_b5c4dd59(lyr_ty2_Pair_int_ *l0_this);
 
 #line 45 "programs/assoc.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty0_IntBox l0_a = {0};
     lyr_ty1_StrBox l1_b = {0};
     lyr_ty0_IntBox l2_m = {0};
@@ -273,7 +273,7 @@ bb0:;
 #line 47
     t6_s = *t5; t6 = &t6_s;
 #line 47
-    t7 = lyr_main_firstOf_IntBox__69b5f155(*t6);
+    t7 = lyr_app_main_firstOf_IntBox__60a293c6(*t6);
 #line 47
     t8 = lyr_str_from_int(t7);
 #line 47
@@ -283,7 +283,7 @@ bb0:;
 #line 47
     t11_s = *t10; t11 = &t11_s;
 #line 47
-    t12 = lyr_main_firstOf_StrBox__3f573447(*t11);
+    t12 = lyr_app_main_firstOf_StrBox__92f35094(*t11);
 #line 47
     t13 = lyr_str_concat(t4, t8);
 #line 47
@@ -307,7 +307,7 @@ bb0:;
 #line 50
     t20_s = *t19; t20 = &t20_s;
 #line 50
-    t21 = lyr_main_sumFirst_IntBox__fe85e115(*t20);
+    t21 = lyr_app_main_sumFirst_IntBox__2d87e4a8(*t20);
 #line 50
     t22 = lyr_str_from_int(t21);
 #line 50
@@ -315,7 +315,7 @@ bb0:;
 #line 50
     t24 = &l2_m;
 #line 50
-    t25_s = lyr_main_IntBox_mapped(t24); t25 = &t25_s;
+    t25_s = lyr_app_main_IntBox_mapped(t24); t25 = &t25_s;
 #line 50
     t26 = t25->f_v;
 #line 50
@@ -345,7 +345,7 @@ bb0:;
 #line 53
     t35_s = *t34; t35 = &t35_s;
 #line 53
-    t36 = lyr_main_firstOf_Pair_int___a9e3a3c6(*t35);
+    t36 = lyr_app_main_firstOf_Pair_int___b248145b(*t35);
 #line 53
     l4_n = t36;
 #line 54
@@ -361,7 +361,7 @@ bb0:;
 #line 54
     t42_s = *t41; t42 = &t42_s;
 #line 54
-    t43 = lyr_main_sumFirst_Pair_int___5f6c1e86(*t42);
+    t43 = lyr_app_main_sumFirst_Pair_int___a12393d9(*t42);
 #line 54
     t44 = lyr_str_from_int(t43);
 #line 54
@@ -379,7 +379,7 @@ bb0:;
 }
 
 #line 21 "programs/assoc.lyr"
-int64_t lyr_main_IntBox_first(lyr_ty0_IntBox *l0_this) {
+int64_t lyr_app_main_IntBox_first(lyr_ty0_IntBox *l0_this) {
     lyr_ty0_IntBox t0_s = {0};
     lyr_ty0_IntBox *t0 = &t0_s;
     int64_t t1 = 0;
@@ -393,7 +393,7 @@ bb0:;
 }
 
 #line 22 "programs/assoc.lyr"
-int64_t lyr_main_IntBox_count(lyr_ty0_IntBox *l0_this) {
+int64_t lyr_app_main_IntBox_count(lyr_ty0_IntBox *l0_this) {
     int64_t t0 = 0;
 bb0:;
 #line 22
@@ -403,7 +403,7 @@ bb0:;
 }
 
 #line 23 "programs/assoc.lyr"
-lyr_ty0_IntBox lyr_main_IntBox_mapped(lyr_ty0_IntBox *l0_this) {
+lyr_ty0_IntBox lyr_app_main_IntBox_mapped(lyr_ty0_IntBox *l0_this) {
     lyr_ty0_IntBox t0_s = {0};
     lyr_ty0_IntBox *t0 = &t0_s;
     int64_t t1 = 0;
@@ -514,7 +514,7 @@ bb0:;
 }
 
 #line 29 "programs/assoc.lyr"
-LyrStr * lyr_main__extend__StrBox_first_9856d9aa(lyr_ty1_StrBox *l0_this) {
+LyrStr * lyr_app_main__extend__StrBox_first_04c16aad(lyr_ty1_StrBox *l0_this) {
     lyr_ty1_StrBox t0_s = {0};
     lyr_ty1_StrBox *t0 = &t0_s;
     LyrStr *t1 = NULL;
@@ -529,12 +529,12 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }
 
-/* ==== unit: main.Pair<int> ==== */
+/* ==== unit: app.main.Pair<int> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.Pair<int>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.Pair<int>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -547,11 +547,11 @@ struct lyr_ty2_Pair_int_ {
 };
 
 /* prototypes */
-int64_t lyr_main_Pair_int__first_46ce75bf(lyr_ty2_Pair_int_ *l0_this);
-int64_t lyr_main_Pair_int__count_c6d6b47a(lyr_ty2_Pair_int_ *l0_this);
+int64_t lyr_app_main_Pair_int__first_f8dc7d58(lyr_ty2_Pair_int_ *l0_this);
+int64_t lyr_app_main_Pair_int__count_b5c4dd59(lyr_ty2_Pair_int_ *l0_this);
 
 #line 37 "programs/assoc.lyr"
-int64_t lyr_main_Pair_int__first_46ce75bf(lyr_ty2_Pair_int_ *l0_this) {
+int64_t lyr_app_main_Pair_int__first_f8dc7d58(lyr_ty2_Pair_int_ *l0_this) {
     lyr_ty2_Pair_int_ t0_s = {0};
     lyr_ty2_Pair_int_ *t0 = &t0_s;
     int64_t t1 = 0;
@@ -565,7 +565,7 @@ bb0:;
 }
 
 #line 38 "programs/assoc.lyr"
-int64_t lyr_main_Pair_int__count_c6d6b47a(lyr_ty2_Pair_int_ *l0_this) {
+int64_t lyr_app_main_Pair_int__count_b5c4dd59(lyr_ty2_Pair_int_ *l0_this) {
     int64_t t0 = 0;
 bb0:;
 #line 38
@@ -575,9 +575,9 @@ bb0:;
 }
 
 
-/* ==== unit: main.firstOf<IntBox> ==== */
+/* ==== unit: app.main.firstOf<IntBox> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.firstOf<IntBox>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.firstOf<IntBox>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -589,11 +589,11 @@ struct lyr_ty0_IntBox {
 };
 
 /* prototypes */
-int64_t lyr_main_IntBox_first(lyr_ty0_IntBox *l0_this);
-int64_t lyr_main_firstOf_IntBox__69b5f155(lyr_ty0_IntBox l0_c);
+int64_t lyr_app_main_IntBox_first(lyr_ty0_IntBox *l0_this);
+int64_t lyr_app_main_firstOf_IntBox__60a293c6(lyr_ty0_IntBox l0_c);
 
 #line 41 "programs/assoc.lyr"
-int64_t lyr_main_firstOf_IntBox__69b5f155(lyr_ty0_IntBox l0_c) {
+int64_t lyr_app_main_firstOf_IntBox__60a293c6(lyr_ty0_IntBox l0_c) {
     lyr_ty0_IntBox t0_s = {0};
     lyr_ty0_IntBox *t0 = &t0_s;
     int64_t t1 = 0;
@@ -601,15 +601,15 @@ bb0:;
 #line 41
     t0 = &l0_c;
 #line 41
-    t1 = lyr_main_IntBox_first(t0);
+    t1 = lyr_app_main_IntBox_first(t0);
 #line 41
     return t1;
 }
 
 
-/* ==== unit: main.firstOf<Pair<int>> ==== */
+/* ==== unit: app.main.firstOf<Pair<int>> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.firstOf<Pair<int>>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.firstOf<Pair<int>>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -622,11 +622,11 @@ struct lyr_ty2_Pair_int_ {
 };
 
 /* prototypes */
-int64_t lyr_main_firstOf_Pair_int___a9e3a3c6(lyr_ty2_Pair_int_ l0_c);
-int64_t lyr_main_Pair_int__first_46ce75bf(lyr_ty2_Pair_int_ *l0_this);
+int64_t lyr_app_main_firstOf_Pair_int___b248145b(lyr_ty2_Pair_int_ l0_c);
+int64_t lyr_app_main_Pair_int__first_f8dc7d58(lyr_ty2_Pair_int_ *l0_this);
 
 #line 41 "programs/assoc.lyr"
-int64_t lyr_main_firstOf_Pair_int___a9e3a3c6(lyr_ty2_Pair_int_ l0_c) {
+int64_t lyr_app_main_firstOf_Pair_int___b248145b(lyr_ty2_Pair_int_ l0_c) {
     lyr_ty2_Pair_int_ t0_s = {0};
     lyr_ty2_Pair_int_ *t0 = &t0_s;
     int64_t t1 = 0;
@@ -634,15 +634,15 @@ bb0:;
 #line 41
     t0 = &l0_c;
 #line 41
-    t1 = lyr_main_Pair_int__first_46ce75bf(t0);
+    t1 = lyr_app_main_Pair_int__first_f8dc7d58(t0);
 #line 41
     return t1;
 }
 
 
-/* ==== unit: main.firstOf<StrBox> ==== */
+/* ==== unit: app.main.firstOf<StrBox> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.firstOf<StrBox>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.firstOf<StrBox>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -654,11 +654,11 @@ struct lyr_ty1_StrBox {
 };
 
 /* prototypes */
-LyrStr * lyr_main_firstOf_StrBox__3f573447(lyr_ty1_StrBox l0_c);
-LyrStr * lyr_main__extend__StrBox_first_9856d9aa(lyr_ty1_StrBox *l0_this);
+LyrStr * lyr_app_main_firstOf_StrBox__92f35094(lyr_ty1_StrBox l0_c);
+LyrStr * lyr_app_main__extend__StrBox_first_04c16aad(lyr_ty1_StrBox *l0_this);
 
 #line 41 "programs/assoc.lyr"
-LyrStr * lyr_main_firstOf_StrBox__3f573447(lyr_ty1_StrBox l0_c) {
+LyrStr * lyr_app_main_firstOf_StrBox__92f35094(lyr_ty1_StrBox l0_c) {
     lyr_ty1_StrBox t0_s = {0};
     lyr_ty1_StrBox *t0 = &t0_s;
     LyrStr *t1 = NULL;
@@ -666,15 +666,15 @@ bb0:;
 #line 41
     t0 = &l0_c;
 #line 41
-    t1 = lyr_main__extend__StrBox_first_9856d9aa(t0);
+    t1 = lyr_app_main__extend__StrBox_first_04c16aad(t0);
 #line 41
     return t1;
 }
 
 
-/* ==== unit: main.sumFirst<IntBox> ==== */
+/* ==== unit: app.main.sumFirst<IntBox> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.sumFirst<IntBox>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.sumFirst<IntBox>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -686,12 +686,12 @@ struct lyr_ty0_IntBox {
 };
 
 /* prototypes */
-int64_t lyr_main_IntBox_first(lyr_ty0_IntBox *l0_this);
-int64_t lyr_main_IntBox_count(lyr_ty0_IntBox *l0_this);
-int64_t lyr_main_sumFirst_IntBox__fe85e115(lyr_ty0_IntBox l0_c);
+int64_t lyr_app_main_IntBox_first(lyr_ty0_IntBox *l0_this);
+int64_t lyr_app_main_IntBox_count(lyr_ty0_IntBox *l0_this);
+int64_t lyr_app_main_sumFirst_IntBox__2d87e4a8(lyr_ty0_IntBox l0_c);
 
 #line 42 "programs/assoc.lyr"
-int64_t lyr_main_sumFirst_IntBox__fe85e115(lyr_ty0_IntBox l0_c) {
+int64_t lyr_app_main_sumFirst_IntBox__2d87e4a8(lyr_ty0_IntBox l0_c) {
     lyr_ty0_IntBox t0_s = {0};
     lyr_ty0_IntBox *t0 = &t0_s;
     int64_t t1 = 0;
@@ -703,11 +703,11 @@ bb0:;
 #line 42
     t0 = &l0_c;
 #line 42
-    t1 = lyr_main_IntBox_first(t0);
+    t1 = lyr_app_main_IntBox_first(t0);
 #line 42
     t2 = &l0_c;
 #line 42
-    t3 = lyr_main_IntBox_count(t2);
+    t3 = lyr_app_main_IntBox_count(t2);
 #line 42
     t4 = LYR_CHECKED_ADD(t1, t3);
 #line 42
@@ -715,9 +715,9 @@ bb0:;
 }
 
 
-/* ==== unit: main.sumFirst<Pair<int>> ==== */
+/* ==== unit: app.main.sumFirst<Pair<int>> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.sumFirst<Pair<int>>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.sumFirst<Pair<int>>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -730,12 +730,12 @@ struct lyr_ty2_Pair_int_ {
 };
 
 /* prototypes */
-int64_t lyr_main_sumFirst_Pair_int___5f6c1e86(lyr_ty2_Pair_int_ l0_c);
-int64_t lyr_main_Pair_int__first_46ce75bf(lyr_ty2_Pair_int_ *l0_this);
-int64_t lyr_main_Pair_int__count_c6d6b47a(lyr_ty2_Pair_int_ *l0_this);
+int64_t lyr_app_main_sumFirst_Pair_int___a12393d9(lyr_ty2_Pair_int_ l0_c);
+int64_t lyr_app_main_Pair_int__first_f8dc7d58(lyr_ty2_Pair_int_ *l0_this);
+int64_t lyr_app_main_Pair_int__count_b5c4dd59(lyr_ty2_Pair_int_ *l0_this);
 
 #line 42 "programs/assoc.lyr"
-int64_t lyr_main_sumFirst_Pair_int___5f6c1e86(lyr_ty2_Pair_int_ l0_c) {
+int64_t lyr_app_main_sumFirst_Pair_int___a12393d9(lyr_ty2_Pair_int_ l0_c) {
     lyr_ty2_Pair_int_ t0_s = {0};
     lyr_ty2_Pair_int_ *t0 = &t0_s;
     int64_t t1 = 0;
@@ -747,11 +747,11 @@ bb0:;
 #line 42
     t0 = &l0_c;
 #line 42
-    t1 = lyr_main_Pair_int__first_46ce75bf(t0);
+    t1 = lyr_app_main_Pair_int__first_f8dc7d58(t0);
 #line 42
     t2 = &l0_c;
 #line 42
-    t3 = lyr_main_Pair_int__count_c6d6b47a(t2);
+    t3 = lyr_app_main_Pair_int__count_b5c4dd59(t2);
 #line 42
     t4 = LYR_CHECKED_ADD(t1, t3);
 #line 42

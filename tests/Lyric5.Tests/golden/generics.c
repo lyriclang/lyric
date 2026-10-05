@@ -178,29 +178,29 @@ static const LyrStaticStr(8) lyr_lit6 = LYR_STR_INIT("static ");
 static const LyrStaticStr(2) lyr_lit7 = LYR_STR_INIT("n");
 
 /* prototypes */
-int64_t lyr_main_apply(lyr_fn_i64_to_i64 l0_f, int64_t l1_x);
-int64_t lyr_main_inc(int64_t l0_n);
-LYR_NOINLINE int64_t lyr_main_main(void);
-int64_t lyr_main_ident_int__365390bd(int64_t l0_x);
-LyrStr * lyr_main_ident_string__7191eed5(LyrStr *l0_x);
-lyr_ty1_Pair_string__int_ lyr_main_swap_int__string__fc94ae2d(lyr_ty0_Pair_int__string_ l0_p);
-LyrStr * lyr_main_collect_int__string__048befea(int64_t l0_x, lyr_fn_i64_to_str l1_f);
-LyrStr * lyr_main_main__lambda0__1de246d4(int64_t l0_n);
-int64_t lyr_main_twice_int__8457f847(lyr_fn_i64_to_i64 l0_f, int64_t l1_x);
-lyr_ty2_Counter lyr_main_make_bool__03e961ae(uint8_t l0_seed, int64_t l1_n);
+int64_t lyr_app_main_apply(lyr_fn_i64_to_i64 l0_f, int64_t l1_x);
+int64_t lyr_app_main_inc(int64_t l0_n);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+int64_t lyr_app_main_ident_int__4edcf690(int64_t l0_x);
+LyrStr * lyr_app_main_ident_string__07dc6682(LyrStr *l0_x);
+lyr_ty1_Pair_string__int_ lyr_app_main_swap_int__string__50081e9a(lyr_ty0_Pair_int__string_ l0_p);
+LyrStr * lyr_app_main_collect_int__string__b422596b(int64_t l0_x, lyr_fn_i64_to_str l1_f);
+LyrStr * lyr_app_main_main__lambda0__06393d45(int64_t l0_n);
+int64_t lyr_app_main_twice_int__d2afcb46(lyr_fn_i64_to_i64 l0_f, int64_t l1_x);
+lyr_ty2_Counter lyr_app_main_make_bool__6f355457(uint8_t l0_seed, int64_t l1_n);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 /* thunks: a function as a value, without an environment */
-static int64_t lyr_thunk_main_inc(void *lyr_env, int64_t l0_n, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_inc(l0_n); }
-static int64_t lyr_thunk_main_ident_int__365390bd(void *lyr_env, int64_t l0_x, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_ident_int__365390bd(l0_x); }
-static LyrStr * lyr_thunk_main_ident_string__7191eed5(void *lyr_env, LyrStr *l0_x, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_ident_string__7191eed5(l0_x); }
-static LyrStr * lyr_thunk_main_main__lambda0__1de246d4(void *lyr_env, int64_t l0_n, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_main__lambda0__1de246d4(l0_n); }
-static lyr_ty2_Counter lyr_thunk_main_make_bool__03e961ae(void *lyr_env, uint8_t l0_seed, int64_t l1_n, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_main_make_bool__03e961ae(l0_seed, l1_n); }
+static int64_t lyr_thunk_app_main_inc(void *lyr_env, int64_t l0_n, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_app_main_inc(l0_n); }
+static int64_t lyr_thunk_app_main_ident_int__4edcf690(void *lyr_env, int64_t l0_x, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_app_main_ident_int__4edcf690(l0_x); }
+static LyrStr * lyr_thunk_app_main_ident_string__07dc6682(void *lyr_env, LyrStr *l0_x, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_app_main_ident_string__07dc6682(l0_x); }
+static LyrStr * lyr_thunk_app_main_main__lambda0__06393d45(void *lyr_env, int64_t l0_n, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_app_main_main__lambda0__06393d45(l0_n); }
+static lyr_ty2_Counter lyr_thunk_app_main_make_bool__6f355457(void *lyr_env, uint8_t l0_seed, int64_t l1_n, LyrErr **lyr_err) { (void)lyr_env; (void)lyr_err; return lyr_app_main_make_bool__6f355457(l0_seed, l1_n); }
 
 #line 14 "programs/generics.lyr"
-int64_t lyr_main_apply(lyr_fn_i64_to_i64 l0_f, int64_t l1_x) {
+int64_t lyr_app_main_apply(lyr_fn_i64_to_i64 l0_f, int64_t l1_x) {
     lyr_fn_i64_to_i64 t0 = {0};
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -216,7 +216,7 @@ bb0:;
 }
 
 #line 17 "programs/generics.lyr"
-int64_t lyr_main_inc(int64_t l0_n) {
+int64_t lyr_app_main_inc(int64_t l0_n) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -232,7 +232,7 @@ bb0:;
 }
 
 #line 20 "programs/generics.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_fn_i64_to_i64 l0_g = {0};
     lyr_fn_str_to_str l1_s = {0};
     LyrStr *l2_h = NULL;
@@ -356,11 +356,11 @@ LYR_NOINLINE int64_t lyr_main_main(void) {
     int64_t t96 = 0;
 bb0:;
 #line 20
-    t0 = (lyr_fn_i64_to_i64){ lyr_thunk_main_ident_int__365390bd, NULL };
+    t0 = (lyr_fn_i64_to_i64){ lyr_thunk_app_main_ident_int__4edcf690, NULL };
 #line 20
     l0_g = t0;
 #line 21
-    t1 = (lyr_fn_str_to_str){ lyr_thunk_main_ident_string__7191eed5, NULL };
+    t1 = (lyr_fn_str_to_str){ lyr_thunk_app_main_ident_string__07dc6682, NULL };
 #line 21
     l1_s = t1;
 #line 22
@@ -378,17 +378,17 @@ bb0:;
 #line 23
     t7 = (int64_t)INT64_C(4);
 #line 23
-    t8 = lyr_main_apply(t6, t7);
+    t8 = lyr_app_main_apply(t6, t7);
 #line 23
     t9 = lyr_str_from_int(t8);
 #line 23
     t10 = (LyrStr *)&lyr_lit2;
 #line 23
-    t11 = (lyr_fn_i64_to_i64){ lyr_thunk_main_ident_int__365390bd, NULL };
+    t11 = (lyr_fn_i64_to_i64){ lyr_thunk_app_main_ident_int__4edcf690, NULL };
 #line 23
     t12 = (int64_t)INT64_C(5);
 #line 23
-    t13 = lyr_main_apply(t11, t12);
+    t13 = lyr_app_main_apply(t11, t12);
 #line 23
     t14 = lyr_str_from_int(t13);
 #line 23
@@ -424,7 +424,7 @@ bb0:;
 #line 26
     t26_s = *t25; t26 = &t26_s;
 #line 26
-    t27_s = lyr_main_swap_int__string__fc94ae2d(*t26); t27 = &t27_s;
+    t27_s = lyr_app_main_swap_int__string__50081e9a(*t26); t27 = &t27_s;
 #line 26
     l4_q = *t27;
 #line 27
@@ -474,25 +474,25 @@ bb0:;
 #line 29
     t49 = (int64_t)INT64_C(7);
 #line 29
-    t50 = (lyr_fn_i64_to_str){ lyr_thunk_main_main__lambda0__1de246d4, NULL };
+    t50 = (lyr_fn_i64_to_str){ lyr_thunk_app_main_main__lambda0__06393d45, NULL };
 #line 29
-    t51 = lyr_main_collect_int__string__048befea(t49, t50);
+    t51 = lyr_app_main_collect_int__string__b422596b(t49, t50);
 #line 29
     l5_u = t51;
 #line 30
-    t52 = (lyr_fn_i64_to_i64){ lyr_thunk_main_ident_int__365390bd, NULL };
+    t52 = (lyr_fn_i64_to_i64){ lyr_thunk_app_main_ident_int__4edcf690, NULL };
 #line 30
     t53 = (int64_t)INT64_C(9);
 #line 30
-    t54 = lyr_main_twice_int__8457f847(t52, t53);
+    t54 = lyr_app_main_twice_int__d2afcb46(t52, t53);
 #line 30
     l6_t = t54;
 #line 31
-    t55 = (lyr_fn_i64_to_i64){ lyr_thunk_main_inc, NULL };
+    t55 = (lyr_fn_i64_to_i64){ lyr_thunk_app_main_inc, NULL };
 #line 31
     t56 = (int64_t)INT64_C(9);
 #line 31
-    t57 = lyr_main_twice_int__8457f847(t55, t56);
+    t57 = lyr_app_main_twice_int__d2afcb46(t55, t56);
 #line 31
     l7_d = t57;
 #line 32
@@ -524,7 +524,7 @@ bb0:;
 #line 32
     lyr_println(t70);
 #line 34
-    t71 = (lyr_fn_bool_i64_to_ty2){ lyr_thunk_main_make_bool__03e961ae, NULL };
+    t71 = (lyr_fn_bool_i64_to_ty2){ lyr_thunk_app_main_make_bool__6f355457, NULL };
 #line 34
     l8_m = t71;
 #line 35
@@ -592,7 +592,7 @@ bb0:;
 }
 
 #line 29 "programs/generics.lyr"
-LyrStr * lyr_main_main__lambda0__1de246d4(int64_t l0_n) {
+LyrStr * lyr_app_main_main__lambda0__06393d45(int64_t l0_n) {
     LyrStr *t0 = NULL;
     int64_t t1 = 0;
     LyrStr *t2 = NULL;
@@ -697,12 +697,12 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }
 
-/* ==== unit: main.collect<int, string> ==== */
+/* ==== unit: app.main.collect<int, string> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.collect<int, string>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.collect<int, string>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -712,10 +712,10 @@ typedef struct { LyrStr * (*fn)(void *, int64_t, LyrErr **); void *env; } lyr_fn
 _Static_assert(sizeof(lyr_fn_i64_to_str) == 16, "layout of lyr_fn_i64_to_str");
 
 /* prototypes */
-LyrStr * lyr_main_collect_int__string__048befea(int64_t l0_x, lyr_fn_i64_to_str l1_f);
+LyrStr * lyr_app_main_collect_int__string__b422596b(int64_t l0_x, lyr_fn_i64_to_str l1_f);
 
 #line 16 "programs/generics.lyr"
-LyrStr * lyr_main_collect_int__string__048befea(int64_t l0_x, lyr_fn_i64_to_str l1_f) {
+LyrStr * lyr_app_main_collect_int__string__b422596b(int64_t l0_x, lyr_fn_i64_to_str l1_f) {
     lyr_fn_i64_to_str t0 = {0};
     int64_t t1 = 0;
     LyrStr *t2 = NULL;
@@ -731,18 +731,18 @@ bb0:;
 }
 
 
-/* ==== unit: main.ident<int> ==== */
+/* ==== unit: app.main.ident<int> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.ident<int>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.ident<int>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
 
 /* prototypes */
-int64_t lyr_main_ident_int__365390bd(int64_t l0_x);
+int64_t lyr_app_main_ident_int__4edcf690(int64_t l0_x);
 
 #line 12 "programs/generics.lyr"
-int64_t lyr_main_ident_int__365390bd(int64_t l0_x) {
+int64_t lyr_app_main_ident_int__4edcf690(int64_t l0_x) {
     int64_t t0 = 0;
 bb0:;
 #line 12
@@ -752,18 +752,18 @@ bb0:;
 }
 
 
-/* ==== unit: main.ident<string> ==== */
+/* ==== unit: app.main.ident<string> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.ident<string>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.ident<string>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
 
 /* prototypes */
-LyrStr * lyr_main_ident_string__7191eed5(LyrStr *l0_x);
+LyrStr * lyr_app_main_ident_string__07dc6682(LyrStr *l0_x);
 
 #line 12 "programs/generics.lyr"
-LyrStr * lyr_main_ident_string__7191eed5(LyrStr *l0_x) {
+LyrStr * lyr_app_main_ident_string__07dc6682(LyrStr *l0_x) {
     LyrStr *t0 = NULL;
 bb0:;
 #line 12
@@ -773,9 +773,9 @@ bb0:;
 }
 
 
-/* ==== unit: main.make<bool> ==== */
+/* ==== unit: app.main.make<bool> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.make<bool>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.make<bool>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -787,10 +787,10 @@ struct lyr_ty2_Counter {
 };
 
 /* prototypes */
-lyr_ty2_Counter lyr_main_make_bool__03e961ae(uint8_t l0_seed, int64_t l1_n);
+lyr_ty2_Counter lyr_app_main_make_bool__6f355457(uint8_t l0_seed, int64_t l1_n);
 
 #line 10 "programs/generics.lyr"
-lyr_ty2_Counter lyr_main_make_bool__03e961ae(uint8_t l0_seed, int64_t l1_n) {
+lyr_ty2_Counter lyr_app_main_make_bool__6f355457(uint8_t l0_seed, int64_t l1_n) {
     int64_t t0 = 0;
     lyr_ty2_Counter t1_s = {0};
     lyr_ty2_Counter *t1 = &t1_s;
@@ -806,9 +806,9 @@ bb0:;
 }
 
 
-/* ==== unit: main.swap<int, string> ==== */
+/* ==== unit: app.main.swap<int, string> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.swap<int, string>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.swap<int, string>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -826,10 +826,10 @@ struct lyr_ty1_Pair_string__int_ {
 };
 
 /* prototypes */
-lyr_ty1_Pair_string__int_ lyr_main_swap_int__string__fc94ae2d(lyr_ty0_Pair_int__string_ l0_p);
+lyr_ty1_Pair_string__int_ lyr_app_main_swap_int__string__50081e9a(lyr_ty0_Pair_int__string_ l0_p);
 
 #line 15 "programs/generics.lyr"
-lyr_ty1_Pair_string__int_ lyr_main_swap_int__string__fc94ae2d(lyr_ty0_Pair_int__string_ l0_p) {
+lyr_ty1_Pair_string__int_ lyr_app_main_swap_int__string__50081e9a(lyr_ty0_Pair_int__string_ l0_p) {
     lyr_ty0_Pair_int__string_ t0_s = {0};
     lyr_ty0_Pair_int__string_ *t0 = &t0_s;
     LyrStr *t1 = NULL;
@@ -858,9 +858,9 @@ bb0:;
 }
 
 
-/* ==== unit: main.twice<int> ==== */
+/* ==== unit: app.main.twice<int> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.twice<int>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.twice<int>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -870,10 +870,10 @@ typedef struct { int64_t (*fn)(void *, int64_t, LyrErr **); void *env; } lyr_fn_
 _Static_assert(sizeof(lyr_fn_i64_to_i64) == 16, "layout of lyr_fn_i64_to_i64");
 
 /* prototypes */
-int64_t lyr_main_twice_int__8457f847(lyr_fn_i64_to_i64 l0_f, int64_t l1_x);
+int64_t lyr_app_main_twice_int__d2afcb46(lyr_fn_i64_to_i64 l0_f, int64_t l1_x);
 
 #line 13 "programs/generics.lyr"
-int64_t lyr_main_twice_int__8457f847(lyr_fn_i64_to_i64 l0_f, int64_t l1_x) {
+int64_t lyr_app_main_twice_int__d2afcb46(lyr_fn_i64_to_i64 l0_f, int64_t l1_x) {
     lyr_fn_i64_to_i64 t0 = {0};
     lyr_fn_i64_to_i64 t1 = {0};
     int64_t t2 = 0;

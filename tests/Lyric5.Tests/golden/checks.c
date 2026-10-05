@@ -141,17 +141,17 @@ uint64_t lyr_g5_lowBits = 0;
 uint64_t lyr_g6_highBits = 0;
 
 /* prototypes */
-int64_t lyr_main_add(int64_t l0_a, int64_t l1_b);
-int64_t lyr_main_div(int64_t l0_a, int64_t l1_b);
-int64_t lyr_main_rem(int64_t l0_a, int64_t l1_b);
-int64_t lyr_main_neg(int64_t l0_a);
-LYR_NOINLINE int64_t lyr_main_main(void);
+int64_t lyr_app_main_add(int64_t l0_a, int64_t l1_b);
+int64_t lyr_app_main_div(int64_t l0_a, int64_t l1_b);
+int64_t lyr_app_main_rem(int64_t l0_a, int64_t l1_b);
+int64_t lyr_app_main_neg(int64_t l0_a);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 2 "programs/checks.lyr"
-int64_t lyr_main_add(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_app_main_add(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -167,7 +167,7 @@ bb0:;
 }
 
 #line 3 "programs/checks.lyr"
-int64_t lyr_main_div(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_app_main_div(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -183,7 +183,7 @@ bb0:;
 }
 
 #line 4 "programs/checks.lyr"
-int64_t lyr_main_rem(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_app_main_rem(int64_t l0_a, int64_t l1_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -199,7 +199,7 @@ bb0:;
 }
 
 #line 5 "programs/checks.lyr"
-int64_t lyr_main_neg(int64_t l0_a) {
+int64_t lyr_app_main_neg(int64_t l0_a) {
     int64_t t0 = 0;
     int64_t t1 = 0;
 bb0:;
@@ -212,7 +212,7 @@ bb0:;
 }
 
 #line 8 "programs/checks.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     int64_t l0_v = 0;
     int64_t l1_bits = 0;
     int64_t t0 = 0;
@@ -254,7 +254,7 @@ bb0:;
 #line 8
     t1 = (int64_t)INT64_C(2);
 #line 8
-    t2 = lyr_main_add(t0, t1);
+    t2 = lyr_app_main_add(t0, t1);
 #line 8
     l0_v = t2;
 #line 9
@@ -266,7 +266,7 @@ bb0:;
 #line 9
     t6 = (int64_t)INT64_C(10);
 #line 9
-    t7 = lyr_main_div(t5, t6);
+    t7 = lyr_app_main_div(t5, t6);
 #line 9
     l0_v = t7;
 #line 10
@@ -278,15 +278,15 @@ bb0:;
 #line 10
     t11 = (int64_t)INT64_C(100);
 #line 10
-    t12 = lyr_main_rem(t10, t11);
+    t12 = lyr_app_main_rem(t10, t11);
 #line 10
     l0_v = t12;
 #line 11
     t13 = l0_v;
 #line 11
-    t14 = lyr_main_neg(t13);
+    t14 = lyr_app_main_neg(t13);
 #line 11
-    t15 = lyr_main_neg(t14);
+    t15 = lyr_app_main_neg(t14);
 #line 11
     t16 = (int64_t)INT64_C(42);
 #line 11
@@ -426,5 +426,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

@@ -162,14 +162,14 @@ static const LyrStaticStr(6) lyr_lit3 = LYR_STR_INIT("held ");
 static const LyrStaticStr(6) lyr_lit4 = LYR_STR_INIT("loop ");
 
 /* prototypes */
-int64_t lyr_main_width(lyr_ty0_Range_int_ l0_r);
-LYR_NOINLINE int64_t lyr_main_main(void);
+int64_t lyr_app_main_width(lyr_ty0_Range_int_ l0_r);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 13 "programs/ranges.lyr"
-int64_t lyr_main_width(lyr_ty0_Range_int_ l0_r) {
+int64_t lyr_app_main_width(lyr_ty0_Range_int_ l0_r) {
     lyr_ty0_Range_int_ t0_s = {0};
     lyr_ty0_Range_int_ *t0 = &t0_s;
     int64_t t1 = 0;
@@ -193,7 +193,7 @@ bb0:;
 }
 
 #line 16 "programs/ranges.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty0_Range_int_ l0_r = {0};
     lyr_ty1_RangeInclusive_int_ l1_inc = {0};
     lyr_ty2_Window l2_w = {0};
@@ -349,7 +349,7 @@ bb0:;
 #line 17
     t13_s = *t12; t13 = &t13_s;
 #line 17
-    t14 = lyr_main_width(*t13);
+    t14 = lyr_app_main_width(*t13);
 #line 17
     t15 = lyr_str_from_int(t14);
 #line 17
@@ -445,7 +445,7 @@ bb0:;
 #line 21
     t52_s = *t51; t52 = &t52_s;
 #line 21
-    t53 = lyr_main_width(*t52);
+    t53 = lyr_app_main_width(*t52);
 #line 21
     t54 = lyr_str_from_int(t53);
 #line 21
@@ -659,5 +659,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

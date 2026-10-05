@@ -12,6 +12,7 @@
 //   generator task cancelled     and the task's next wait throws
 //   woke 20 40 1 41 ... 19 59    sixty sleepers, every third cancelled from wherever it is in the
 //                                heap: the others wake by deadline, ties in the order they slept
+import std.core { arrayOf };
 import std.io { println };
 import std.task { spawn, sleep, yieldNow, Cancelled };
 import std.time { Duration };

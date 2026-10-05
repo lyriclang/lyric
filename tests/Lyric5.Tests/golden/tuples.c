@@ -49,7 +49,7 @@ struct lyr_ty3_Holder {
 };
 _Static_assert(sizeof(lyr_ty3_Holder) == 24, "layout of lyr_ty3_Holder");
 _Static_assert(offsetof(lyr_ty3_Holder, f_pos) == 8, "layout of lyr_ty3_Holder");
-const LyrDesc lyr_desc_ty3_Holder = { sizeof(lyr_ty3_Holder), 0, 0, 0, NULL, "main.Holder", NULL };
+const LyrDesc lyr_desc_ty3_Holder = { sizeof(lyr_ty3_Holder), 0, 0, 0, NULL, "app.main.Holder", NULL };
 struct lyr_ty6_ParseErrorKind_Empty {
     uint8_t lyr_unit;
 };
@@ -183,15 +183,15 @@ static const LyrStaticStr(7) lyr_lit12 = LYR_STR_INIT("match ");
 static const LyrStaticStr(10) lyr_lit13 = LYR_STR_INIT("optional ");
 
 /* prototypes */
-lyr_ty0__tuple_ lyr_main_minmax(int64_t l0_a, int64_t l1_b);
-int64_t lyr_main_norm(lyr_ty0__tuple_ l0_p);
-LYR_NOINLINE int64_t lyr_main_main(void);
+lyr_ty0__tuple_ lyr_app_main_minmax(int64_t l0_a, int64_t l1_b);
+int64_t lyr_app_main_norm(lyr_ty0__tuple_ l0_p);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 16 "programs/tuples.lyr"
-lyr_ty0__tuple_ lyr_main_minmax(int64_t l0_a, int64_t l1_b) {
+lyr_ty0__tuple_ lyr_app_main_minmax(int64_t l0_a, int64_t l1_b) {
     lyr_ty0__tuple_ l2__if0 = {0};
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -257,7 +257,7 @@ bb3:;
 }
 
 #line 18 "programs/tuples.lyr"
-int64_t lyr_main_norm(lyr_ty0__tuple_ l0_p) {
+int64_t lyr_app_main_norm(lyr_ty0__tuple_ l0_p) {
     lyr_ty0__tuple_ t0_s = {0};
     lyr_ty0__tuple_ *t0 = &t0_s;
     int64_t t1 = 0;
@@ -301,7 +301,7 @@ bb0:;
 }
 
 #line 21 "programs/tuples.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty1__tuple_ l0_pair = {0};
     lyr_ty0__tuple_ l1_p = {0};
     int64_t l2_lo = 0;
@@ -612,7 +612,7 @@ bb0:;
 #line 27
     t34 = (int64_t)INT64_C(2);
 #line 27
-    t35_s = lyr_main_minmax(t33, t34); t35 = &t35_s;
+    t35_s = lyr_app_main_minmax(t33, t34); t35 = &t35_s;
 #line 27
     t36 = t35->f_0;
 #line 27
@@ -756,7 +756,7 @@ bb0:;
 #line 35
     t90_s = *t89; t90 = &t90_s;
 #line 35
-    t91 = lyr_main_norm(*t90);
+    t91 = lyr_app_main_norm(*t90);
 #line 35
     t92 = lyr_str_from_int(t91);
 #line 35
@@ -826,7 +826,7 @@ bb0:;
 #line 38
     t119_s = *t118; t119 = &t119_s;
 #line 38
-    t120 = lyr_main_norm(*t119);
+    t120 = lyr_app_main_norm(*t119);
 #line 38
     t121 = lyr_str_from_int(t120);
 #line 38
@@ -1077,5 +1077,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

@@ -160,23 +160,23 @@ static const LyrStaticStr(12) lyr_lit3 = LYR_STR_INIT("constraint ");
 static const LyrStaticStr(9) lyr_lit4 = LYR_STR_INIT("default ");
 
 /* prototypes */
-LYR_NOINLINE int64_t lyr_main_main(void);
-uint8_t lyr_main_P_equals(lyr_ty0_P *l0_this, lyr_ty0_P l1_o);
-lyr_ty0_P lyr_main_P_parse(LyrStr *l0_s);
-lyr_ty0_P lyr_main_P_add(lyr_ty0_P *l0_this, lyr_ty0_P l1_o);
-lyr_ty0_P lyr_main_P_twin(lyr_ty0_P *l0_this);
-lyr_ty1_V lyr_main_V_add(lyr_ty1_V *l0_this, lyr_ty1_V l1_o);
-lyr_ty2_Q lyr_main_Q_add(lyr_ty2_Q *l0_this, int64_t l1_o);
-lyr_ty0_P lyr_main_make_P__ddfa640e(LyrStr *l0_s);
-uint8_t lyr_main_same_P__80095c1a(lyr_ty0_P l0_a, lyr_ty0_P l1_b);
-lyr_ty0_P lyr_main_plus_P__78257c6c(lyr_ty0_P l0_a, lyr_ty0_P l1_b);
-lyr_ty1_V lyr_main_plus_V__781671e2(lyr_ty1_V l0_a, lyr_ty1_V l1_b);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+uint8_t lyr_app_main_P_equals(lyr_ty0_P *l0_this, lyr_ty0_P l1_o);
+lyr_ty0_P lyr_app_main_P_parse(LyrStr *l0_s);
+lyr_ty0_P lyr_app_main_P_add(lyr_ty0_P *l0_this, lyr_ty0_P l1_o);
+lyr_ty0_P lyr_app_main_P_twin(lyr_ty0_P *l0_this);
+lyr_ty1_V lyr_app_main_V_add(lyr_ty1_V *l0_this, lyr_ty1_V l1_o);
+lyr_ty2_Q lyr_app_main_Q_add(lyr_ty2_Q *l0_this, int64_t l1_o);
+lyr_ty0_P lyr_app_main_make_P__99fdfdb1(LyrStr *l0_s);
+uint8_t lyr_app_main_same_P__970eee95(lyr_ty0_P l0_a, lyr_ty0_P l1_b);
+lyr_ty0_P lyr_app_main_plus_P__158e1f67(lyr_ty0_P l0_a, lyr_ty0_P l1_b);
+lyr_ty1_V lyr_app_main_plus_V__159d29f1(lyr_ty1_V l0_a, lyr_ty1_V l1_b);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 28 "programs/selfish.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty0_P l0_p = {0};
     lyr_ty0_P l1_three = {0};
     lyr_ty0_P l2_twin = {0};
@@ -317,7 +317,7 @@ bb0:;
 #line 30
     t4 = &l0_p;
 #line 30
-    t5_s = lyr_main_P_twin(t4); t5 = &t5_s;
+    t5_s = lyr_app_main_P_twin(t4); t5 = &t5_s;
 #line 30
     l2_twin = *t5;
 #line 31
@@ -329,7 +329,7 @@ bb0:;
 #line 31
     t9_s = *t8; t9 = &t9_s;
 #line 31
-    t10 = lyr_main_P_equals(t7, *t9);
+    t10 = lyr_app_main_P_equals(t7, *t9);
 #line 31
     t11 = lyr_str_from_bool(t10);
 #line 31
@@ -341,7 +341,7 @@ bb0:;
 #line 31
     t15_s = *t14; t15 = &t15_s;
 #line 31
-    t16 = lyr_main_P_equals(t13, *t15);
+    t16 = lyr_app_main_P_equals(t13, *t15);
 #line 31
     t17 = lyr_str_from_bool(t16);
 #line 31
@@ -367,7 +367,7 @@ bb0:;
 #line 33
     t27 = (LyrStr *)&lyr_lit2;
 #line 33
-    t28_s = lyr_main_make_P__ddfa640e(t27); t28 = &t28_s;
+    t28_s = lyr_app_main_make_P__99fdfdb1(t27); t28 = &t28_s;
 #line 33
     l3_parsed = *t28;
 #line 34
@@ -381,7 +381,7 @@ bb0:;
 #line 34
     t33_s = *t32; t33 = &t33_s;
 #line 34
-    t34 = lyr_main_same_P__80095c1a(*t31, *t33);
+    t34 = lyr_app_main_same_P__970eee95(*t31, *t33);
 #line 34
     t35 = lyr_str_from_bool(t34);
 #line 34
@@ -443,7 +443,7 @@ bb0:;
 #line 40
     t55_s = *t54; t55 = &t55_s;
 #line 40
-    t56_s = lyr_main_plus_P__78257c6c(*t53, *t55); t56 = &t56_s;
+    t56_s = lyr_app_main_plus_P__158e1f67(*t53, *t55); t56 = &t56_s;
 #line 40
     t57 = t56->f_n;
 #line 40
@@ -459,7 +459,7 @@ bb0:;
 #line 40
     t63_s = *t62; t63 = &t63_s;
 #line 40
-    t64_s = lyr_main_plus_V__781671e2(*t61, *t63); t64 = &t64_s;
+    t64_s = lyr_app_main_plus_V__159d29f1(*t61, *t63); t64 = &t64_s;
 #line 40
     t65 = t64->f_n;
 #line 40
@@ -471,7 +471,7 @@ bb0:;
 #line 40
     t69 = (int64_t)INT64_C(3);
 #line 40
-    t70_s = lyr_main_Q_add(t68, t69); t70 = &t70_s;
+    t70_s = lyr_app_main_Q_add(t68, t69); t70 = &t70_s;
 #line 40
     t71 = t70->f_n;
 #line 40
@@ -495,7 +495,7 @@ bb0:;
 }
 
 #line 14 "programs/selfish.lyr"
-uint8_t lyr_main_P_equals(lyr_ty0_P *l0_this, lyr_ty0_P l1_o) {
+uint8_t lyr_app_main_P_equals(lyr_ty0_P *l0_this, lyr_ty0_P l1_o) {
     lyr_ty0_P t0_s = {0};
     lyr_ty0_P *t0 = &t0_s;
     int64_t t1 = 0;
@@ -519,7 +519,7 @@ bb0:;
 }
 
 #line 15 "programs/selfish.lyr"
-lyr_ty0_P lyr_main_P_parse(LyrStr *l0_s) {
+lyr_ty0_P lyr_app_main_P_parse(LyrStr *l0_s) {
     int64_t t0 = 0;
     lyr_ty0_P t1_s = {0};
     lyr_ty0_P *t1 = &t1_s;
@@ -535,7 +535,7 @@ bb0:;
 }
 
 #line 16 "programs/selfish.lyr"
-lyr_ty0_P lyr_main_P_add(lyr_ty0_P *l0_this, lyr_ty0_P l1_o) {
+lyr_ty0_P lyr_app_main_P_add(lyr_ty0_P *l0_this, lyr_ty0_P l1_o) {
     lyr_ty0_P t0_s = {0};
     lyr_ty0_P *t0 = &t0_s;
     int64_t t1 = 0;
@@ -565,7 +565,7 @@ bb0:;
 }
 
 #line 17 "programs/selfish.lyr"
-lyr_ty0_P lyr_main_P_twin(lyr_ty0_P *l0_this) {
+lyr_ty0_P lyr_app_main_P_twin(lyr_ty0_P *l0_this) {
     lyr_ty0_P t0_s = {0};
     lyr_ty0_P *t0 = &t0_s;
     int64_t t1 = 0;
@@ -585,7 +585,7 @@ bb0:;
 }
 
 #line 20 "programs/selfish.lyr"
-lyr_ty1_V lyr_main_V_add(lyr_ty1_V *l0_this, lyr_ty1_V l1_o) {
+lyr_ty1_V lyr_app_main_V_add(lyr_ty1_V *l0_this, lyr_ty1_V l1_o) {
     lyr_ty1_V t0_s = {0};
     lyr_ty1_V *t0 = &t0_s;
     int64_t t1 = 0;
@@ -615,7 +615,7 @@ bb0:;
 }
 
 #line 21 "programs/selfish.lyr"
-lyr_ty2_Q lyr_main_Q_add(lyr_ty2_Q *l0_this, int64_t l1_o) {
+lyr_ty2_Q lyr_app_main_Q_add(lyr_ty2_Q *l0_this, int64_t l1_o) {
     lyr_ty2_Q t0_s = {0};
     lyr_ty2_Q *t0 = &t0_s;
     int64_t t1 = 0;
@@ -727,12 +727,12 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }
 
-/* ==== unit: main.make<P> ==== */
+/* ==== unit: app.main.make<P> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.make<P>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.make<P>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -744,11 +744,11 @@ struct lyr_ty0_P {
 };
 
 /* prototypes */
-lyr_ty0_P lyr_main_P_parse(LyrStr *l0_s);
-lyr_ty0_P lyr_main_make_P__ddfa640e(LyrStr *l0_s);
+lyr_ty0_P lyr_app_main_P_parse(LyrStr *l0_s);
+lyr_ty0_P lyr_app_main_make_P__99fdfdb1(LyrStr *l0_s);
 
 #line 24 "programs/selfish.lyr"
-lyr_ty0_P lyr_main_make_P__ddfa640e(LyrStr *l0_s) {
+lyr_ty0_P lyr_app_main_make_P__99fdfdb1(LyrStr *l0_s) {
     LyrStr *t0 = NULL;
     lyr_ty0_P t1_s = {0};
     lyr_ty0_P *t1 = &t1_s;
@@ -756,15 +756,15 @@ bb0:;
 #line 24
     t0 = l0_s;
 #line 24
-    t1_s = lyr_main_P_parse(t0); t1 = &t1_s;
+    t1_s = lyr_app_main_P_parse(t0); t1 = &t1_s;
 #line 24
     return *t1;
 }
 
 
-/* ==== unit: main.plus<P> ==== */
+/* ==== unit: app.main.plus<P> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.plus<P>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.plus<P>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -776,11 +776,11 @@ struct lyr_ty0_P {
 };
 
 /* prototypes */
-lyr_ty0_P lyr_main_P_add(lyr_ty0_P *l0_this, lyr_ty0_P l1_o);
-lyr_ty0_P lyr_main_plus_P__78257c6c(lyr_ty0_P l0_a, lyr_ty0_P l1_b);
+lyr_ty0_P lyr_app_main_P_add(lyr_ty0_P *l0_this, lyr_ty0_P l1_o);
+lyr_ty0_P lyr_app_main_plus_P__158e1f67(lyr_ty0_P l0_a, lyr_ty0_P l1_b);
 
 #line 25 "programs/selfish.lyr"
-lyr_ty0_P lyr_main_plus_P__78257c6c(lyr_ty0_P l0_a, lyr_ty0_P l1_b) {
+lyr_ty0_P lyr_app_main_plus_P__158e1f67(lyr_ty0_P l0_a, lyr_ty0_P l1_b) {
     lyr_ty0_P t0_s = {0};
     lyr_ty0_P *t0 = &t0_s;
     lyr_ty0_P t1_s = {0};
@@ -797,15 +797,15 @@ bb0:;
 #line 25
     t2 = &l0_a;
 #line 25
-    t3_s = lyr_main_P_add(t2, *t1); t3 = &t3_s;
+    t3_s = lyr_app_main_P_add(t2, *t1); t3 = &t3_s;
 #line 25
     return *t3;
 }
 
 
-/* ==== unit: main.plus<V> ==== */
+/* ==== unit: app.main.plus<V> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.plus<V>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.plus<V>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -817,11 +817,11 @@ struct lyr_ty1_V {
 };
 
 /* prototypes */
-lyr_ty1_V lyr_main_V_add(lyr_ty1_V *l0_this, lyr_ty1_V l1_o);
-lyr_ty1_V lyr_main_plus_V__781671e2(lyr_ty1_V l0_a, lyr_ty1_V l1_b);
+lyr_ty1_V lyr_app_main_V_add(lyr_ty1_V *l0_this, lyr_ty1_V l1_o);
+lyr_ty1_V lyr_app_main_plus_V__159d29f1(lyr_ty1_V l0_a, lyr_ty1_V l1_b);
 
 #line 25 "programs/selfish.lyr"
-lyr_ty1_V lyr_main_plus_V__781671e2(lyr_ty1_V l0_a, lyr_ty1_V l1_b) {
+lyr_ty1_V lyr_app_main_plus_V__159d29f1(lyr_ty1_V l0_a, lyr_ty1_V l1_b) {
     lyr_ty1_V t0_s = {0};
     lyr_ty1_V *t0 = &t0_s;
     lyr_ty1_V t1_s = {0};
@@ -838,15 +838,15 @@ bb0:;
 #line 25
     t2 = &l0_a;
 #line 25
-    t3_s = lyr_main_V_add(t2, *t1); t3 = &t3_s;
+    t3_s = lyr_app_main_V_add(t2, *t1); t3 = &t3_s;
 #line 25
     return *t3;
 }
 
 
-/* ==== unit: main.same<P> ==== */
+/* ==== unit: app.main.same<P> ==== */
 /* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'main.same<P>' (01 C3): its functions, the types they reach, and nothing else. */
+/* The unit of the generic instance 'app.main.same<P>' (01 C3): its functions, the types they reach, and nothing else. */
 #include "lyr/lyr.h"
 #include <stdint.h>
 #include <math.h>
@@ -858,11 +858,11 @@ struct lyr_ty0_P {
 };
 
 /* prototypes */
-uint8_t lyr_main_P_equals(lyr_ty0_P *l0_this, lyr_ty0_P l1_o);
-uint8_t lyr_main_same_P__80095c1a(lyr_ty0_P l0_a, lyr_ty0_P l1_b);
+uint8_t lyr_app_main_P_equals(lyr_ty0_P *l0_this, lyr_ty0_P l1_o);
+uint8_t lyr_app_main_same_P__970eee95(lyr_ty0_P l0_a, lyr_ty0_P l1_b);
 
 #line 23 "programs/selfish.lyr"
-uint8_t lyr_main_same_P__80095c1a(lyr_ty0_P l0_a, lyr_ty0_P l1_b) {
+uint8_t lyr_app_main_same_P__970eee95(lyr_ty0_P l0_a, lyr_ty0_P l1_b) {
     lyr_ty0_P t0_s = {0};
     lyr_ty0_P *t0 = &t0_s;
     lyr_ty0_P t1_s = {0};
@@ -878,7 +878,7 @@ bb0:;
 #line 23
     t2 = &l0_a;
 #line 23
-    t3 = lyr_main_P_equals(t2, *t1);
+    t3 = lyr_app_main_P_equals(t2, *t1);
 #line 23
     return t3;
 }

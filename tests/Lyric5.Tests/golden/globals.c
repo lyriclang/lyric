@@ -42,7 +42,7 @@ _Static_assert(sizeof(lyr_ty1_Log) == 24, "layout of lyr_ty1_Log");
 _Static_assert(offsetof(lyr_ty1_Log, f_lines) == 8, "layout of lyr_ty1_Log");
 _Static_assert(offsetof(lyr_ty1_Log, f_last) == 16, "layout of lyr_ty1_Log");
 static const uint64_t lyr_refmap_ty1[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_ty1_Log = { sizeof(lyr_ty1_Log), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty1, "main.Log", NULL };
+const LyrDesc lyr_desc_ty1_Log = { sizeof(lyr_ty1_Log), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty1, "app.main.Log", NULL };
 struct lyr_ty4_ParseErrorKind_Empty {
     uint8_t lyr_unit;
 };
@@ -144,8 +144,8 @@ struct lyr_ty21_FixedHasher {
 struct lyr_ty22_Fnv1a64 {
     uint64_t f_state;
 };
-_Static_assert(sizeof(lyr_ty0_Point) == 16, "layout of main.Point[]");
-const LyrDesc lyr_desc_arr_ty0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty0_Point), 0, NULL, "main.Point[]", NULL };
+_Static_assert(sizeof(lyr_ty0_Point) == 16, "layout of app.main.Point[]");
+const LyrDesc lyr_desc_arr_ty0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(lyr_ty0_Point), 0, NULL, "app.main.Point[]", NULL };
 _Static_assert(sizeof(uint8_t) == 1, "layout of u8[]");
 const LyrDesc lyr_desc_arr_u8 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(uint8_t), 0, NULL, "u8[]", NULL };
 
@@ -179,15 +179,15 @@ static const LyrStaticStr(2) lyr_lit9 = LYR_STR_INIT("!");
 static const LyrStaticStr(1) lyr_lit10 = LYR_STR_INIT("");
 
 /* prototypes */
-void lyr_main_bump(void);
-void lyr_main_note(LyrStr *l0_s);
-LYR_NOINLINE int64_t lyr_main_main(void);
+void lyr_app_main_bump(void);
+void lyr_app_main_note(LyrStr *l0_s);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 27 "programs/globals.lyr"
-void lyr_main_bump(void) {
+void lyr_app_main_bump(void) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -205,7 +205,7 @@ bb0:;
 }
 
 #line 30 "programs/globals.lyr"
-void lyr_main_note(LyrStr *l0_s) {
+void lyr_app_main_note(LyrStr *l0_s) {
     lyr_ty1_Log *t0 = NULL;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -234,7 +234,7 @@ bb0:;
 }
 
 #line 35 "programs/globals.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     int64_t l0_before = 0;
     int64_t l1_mid = 0;
     LyrStr *t0 = NULL;
@@ -357,11 +357,11 @@ bb0:;
 #line 36
     l0_before = t13;
 #line 37
-    lyr_main_bump();
+    lyr_app_main_bump();
 #line 38
-    lyr_main_bump();
+    lyr_app_main_bump();
 #line 39
-    lyr_main_bump();
+    lyr_app_main_bump();
 #line 40
     t14 = lyr_g11_counter;
 #line 40
@@ -441,11 +441,11 @@ bb0:;
 #line 44
     t48 = (LyrStr *)&lyr_lit5;
 #line 44
-    lyr_main_note(t48);
+    lyr_app_main_note(t48);
 #line 45
     t49 = (LyrStr *)&lyr_lit6;
 #line 45
-    lyr_main_note(t49);
+    lyr_app_main_note(t49);
 #line 46
     t50 = lyr_g13_points;
 #line 46
@@ -691,5 +691,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

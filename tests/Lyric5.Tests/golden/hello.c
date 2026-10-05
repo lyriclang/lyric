@@ -146,13 +146,13 @@ static const LyrStaticStr(8) lyr_lit1 = LYR_STR_INIT("Hello, ");
 static const LyrStaticStr(2) lyr_lit2 = LYR_STR_INIT("!");
 
 /* prototypes */
-LYR_NOINLINE int64_t lyr_main_main(void);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 4 "programs/hello.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     LyrStr *l0_name = NULL;
     LyrStr *t0 = NULL;
     LyrStr *t1 = NULL;
@@ -271,5 +271,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

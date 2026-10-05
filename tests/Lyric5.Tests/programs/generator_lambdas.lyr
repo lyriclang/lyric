@@ -13,6 +13,7 @@
 //   pulled 1
 //   closed cleaned             close() unwinds a lambda's body, its defer runs
 //   handed 1 2                 a function that returns a coroutine without yielding
+import std.core { sequence };
 import std.io { println };
 
 enum Bad :: [Error] { It;

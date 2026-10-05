@@ -143,17 +143,17 @@ uint64_t lyr_g5_lowBits = 0;
 uint64_t lyr_g6_highBits = 0;
 
 /* prototypes */
-int64_t lyr_main_firstEven(LyrArr *l0_xs);
-int64_t lyr_main_pairSum(int64_t l0_target);
-void lyr_main_countdown(int64_t l0_n);
-int64_t lyr_main_spin(void);
-LYR_NOINLINE void lyr_main_main(void);
+int64_t lyr_app_main_firstEven(LyrArr *l0_xs);
+int64_t lyr_app_main_pairSum(int64_t l0_target);
+void lyr_app_main_countdown(int64_t l0_n);
+int64_t lyr_app_main_spin(void);
+LYR_NOINLINE void lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 7 "programs/loops.lyr"
-int64_t lyr_main_firstEven(LyrArr *l0_xs) {
+int64_t lyr_app_main_firstEven(LyrArr *l0_xs) {
     int64_t l1_i = 0;
     int64_t l2_found = 0;
     int64_t l3__loop0 = 0;
@@ -254,7 +254,7 @@ bb6:;
 }
 
 #line 17 "programs/loops.lyr"
-int64_t lyr_main_pairSum(int64_t l0_target) {
+int64_t lyr_app_main_pairSum(int64_t l0_target) {
     int64_t l1_a = 0;
     int64_t l2_pair = 0;
     int64_t l3__loop0 = 0;
@@ -370,7 +370,7 @@ bb8:;
 }
 
 #line 31 "programs/loops.lyr"
-void lyr_main_countdown(int64_t l0_n) {
+void lyr_app_main_countdown(int64_t l0_n) {
     int64_t l1_k = 0;
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -423,7 +423,7 @@ bb4:;
 }
 
 #line 40 "programs/loops.lyr"
-int64_t lyr_main_spin(void) {
+int64_t lyr_app_main_spin(void) {
 bb0:;
 #line 40
     goto bb1;
@@ -433,7 +433,7 @@ bb1:;
 }
 
 #line 44 "programs/loops.lyr"
-LYR_NOINLINE void lyr_main_main(void) {
+LYR_NOINLINE void lyr_app_main_main(void) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -469,7 +469,7 @@ bb0:;
 #line 44
     t4 = lyr_alloc_array(&lyr_desc_arr_i64, 4); LYR_ARR_DATA(t4, int64_t)[0] = t0; LYR_ARR_DATA(t4, int64_t)[1] = t1; LYR_ARR_DATA(t4, int64_t)[2] = t2; LYR_ARR_DATA(t4, int64_t)[3] = t3;
 #line 44
-    t5 = lyr_main_firstEven(t4);
+    t5 = lyr_app_main_firstEven(t4);
 #line 44
     t6 = lyr_str_from_int(t5);
 #line 44
@@ -481,7 +481,7 @@ bb0:;
 #line 45
     t9 = lyr_alloc_array(&lyr_desc_arr_i64, 2); LYR_ARR_DATA(t9, int64_t)[0] = t7; LYR_ARR_DATA(t9, int64_t)[1] = t8;
 #line 45
-    t10 = lyr_main_firstEven(t9);
+    t10 = lyr_app_main_firstEven(t9);
 #line 45
     t11 = lyr_str_from_int(t10);
 #line 45
@@ -489,7 +489,7 @@ bb0:;
 #line 46
     t12 = (int64_t)INT64_C(12);
 #line 46
-    t13 = lyr_main_pairSum(t12);
+    t13 = lyr_app_main_pairSum(t12);
 #line 46
     t14 = lyr_str_from_int(t13);
 #line 46
@@ -497,13 +497,13 @@ bb0:;
 #line 47
     t15 = (int64_t)INT64_C(3);
 #line 47
-    lyr_main_countdown(t15);
+    lyr_app_main_countdown(t15);
 #line 49
     t16 = (int64_t)INT64_C(1);
 #line 49
     t17 = lyr_alloc_array(&lyr_desc_arr_i64, 1); LYR_ARR_DATA(t17, int64_t)[0] = t16;
 #line 49
-    t18 = lyr_main_firstEven(t17);
+    t18 = lyr_app_main_firstEven(t17);
 #line 49
     t19 = (int64_t)INT64_C(0);
 #line 49
@@ -512,7 +512,7 @@ bb0:;
     if (t20) goto bb1; else goto bb2;
 bb1:;
 #line 49
-    t21 = lyr_main_spin();
+    t21 = lyr_app_main_spin();
 #line 49
     t22 = lyr_str_from_int(t21);
 #line 49
@@ -611,5 +611,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); lyr_main_main(); return 0; }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); lyr_app_main_main(); return 0; }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

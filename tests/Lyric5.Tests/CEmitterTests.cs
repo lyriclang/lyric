@@ -22,13 +22,12 @@ public class CEmitterTests
     internal static IReadOnlyList<CEmitter.Unit> EmitC(string name)
     {
         var text = File.ReadAllText(Path.Combine(Programs, name + ".lyr"));
-        var options = new CompilerOptions { StdlibRoot = Path.Combine(Root, "stdlib5") };
-        var result = SourceCompiler.Lower(ScriptSource.FromBuffer($"programs/{name}.lyr", text), options);
+        var result = TestCompiler.Lower($"programs/{name}.lyr", text);
         var rendered = new StringWriter();
         result.Diagnostics.RenderText(rendered);
         Assert.True(result.Ok && result.Ir is not null, rendered.ToString());
         Assert.True(SubsetGate.Check(result.Ir!, result.Diagnostics), rendered.ToString());
-        return CEmitter.Emit(result.Ir!, result.Sources, options.StdlibRoot)
+        return CEmitter.Emit(result.Ir!, result.Sources, TestCompiler.Stdlib)
             .Select(u => u with { Text = u.Text.Replace("\r\n", "\n") }).ToList();
     }
 
@@ -262,21 +261,29 @@ public class CEmitterTests
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
+            // M8a's examples (13): the prelude's collections, the iterators, the format language.
+            // ExampleTests runs them through the driver as a user would; here they run in both
+            // profiles on the emitter's path.
+            data.Add("inventory", profile, 0,
+                "Bread (0 gold)\nSword (15 gold)\nAmulet (80 gold)\nGesamtwert: 95 gold\n"
+                + "Erstes im Budget (20): Bread\nBread gratis? true\n");
+            data.Add("stats", profile, 0, "Summe:        24\nMaximum:      9\nDurchschnitt: 4.80\n");
+            data.Add("stack", profile, 0, "Groesse: 3\nSpitze:  3\npop -> 3\npop -> 2\npop -> 1\n");
         }
         return data;
     }
 
     /// <summary>The cache unit a function belongs to (01 C3), read off its IR name.</summary>
     [Theory]
-    [InlineData("main.main", null)]
-    [InlineData("main.main.<lambda1>", null)]
+    [InlineData("app.main.main", null)]
+    [InlineData("app.main.main.<lambda1>", null)]
     [InlineData("<globals>", null)]
-    [InlineData("main.main.<bound_add1>", null)]
+    [InlineData("app.main.main.<bound_add1>", null)]
     [InlineData("std.core.arrayOf<int>", "std.core.arrayOf<int>")]
     [InlineData("std.core.arrayOf<int>.<lambda0>", "std.core.arrayOf<int>")]
     [InlineData("std.core.Range<int>.next<>", "std.core.Range<int>")]
-    [InlineData("main.Pair<Pair<int, string>>.swap<>", "main.Pair<Pair<int, string>>")]
-    [InlineData("main.collect<int, fn(int) -> string>", "main.collect<int, fn(int) -> string>")]
+    [InlineData("app.main.Pair<Pair<int, string>>.swap<>", "app.main.Pair<Pair<int, string>>")]
+    [InlineData("app.main.collect<int, fn(int) -> string>", "app.main.collect<int, fn(int) -> string>")]
     public void A_function_belongs_to_the_unit_of_its_instance(string irName, string? unit) =>
         Assert.Equal(unit, CEmitter.InstanceOf(irName));
 
@@ -286,16 +293,19 @@ public class CEmitterTests
         var units = EmitC("generics");
         Assert.Null(units[0].Instance);
         Assert.Equal(
-            ["main.collect<int, string>", "main.ident<int>", "main.ident<string>", "main.make<bool>",
-             "main.swap<int, string>", "main.twice<int>"],
+            ["app.main.collect<int, string>", "app.main.ident<int>", "app.main.ident<string>", "app.main.make<bool>",
+             "app.main.swap<int, string>", "app.main.twice<int>"],
             units.Skip(1).Select(u => u.Instance).ToArray());
 
         // The module's unit defines the descriptors and the entry, and holds no instance body;
         // an instance's unit holds its function, declares what it calls, and defines no descriptor.
         Assert.Contains("int main(int argc, char **argv)", units[0].Text);
-        Assert.DoesNotContain("lyr_main_ident_int__365390bd(int64_t l0_x) {", units[0].Text);
-        var twice = units.Single(u => u.Instance == "main.twice<int>").Text;
-        Assert.Contains("int64_t lyr_main_twice_int__8457f847(lyr_fn_i64_to_i64 l0_f, int64_t l1_x) {", twice);
+        Assert.DoesNotContain("lyr_app_main_ident_int__4edcf690(int64_t l0_x) {", units[0].Text);
+        // … and the same name IS a definition in its own unit: the line above cannot pass for a
+        // name nothing carries.
+        Assert.Contains("lyr_app_main_ident_int__4edcf690(int64_t l0_x) {", units.Single(u => u.Instance == "app.main.ident<int>").Text);
+        var twice = units.Single(u => u.Instance == "app.main.twice<int>").Text;
+        Assert.Contains("int64_t lyr_app_main_twice_int__d2afcb46(lyr_fn_i64_to_i64 l0_f, int64_t l1_x) {", twice);
         Assert.DoesNotContain("const LyrDesc lyr_desc", twice.Replace("extern const LyrDesc", ""));
         Assert.DoesNotContain("int main(", twice);
     }
@@ -388,7 +398,7 @@ public class CEmitterTests
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(first, lines[0]);
-        Assert.Matches($@"^    at lyr_main_\w+__body__\w+ \(.*programs[\\/]{name}\.lyr:{line}\)$", lines[1]);
+        Assert.Matches($@"^    at lyr_app_main_\w+__body__\w+ \(.*programs[\\/]{name}\.lyr:{line}\)$", lines[1]);
         Assert.True(lines.Length == 2, $"stderr:\n{result.Stderr}");
     }
 
@@ -411,8 +421,8 @@ public class CEmitterTests
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(first, lines[0]);
-        Assert.Matches($@"^    at lyr_main_emit \(.*programs[\\/]{name}\.lyr:{line}\)$", lines[1]);
-        Assert.Matches($@"^    at lyr_main_{caller} \(.*programs[\\/]{name}\.lyr:{callerLine}\)$", lines[2]);
+        Assert.Matches($@"^    at lyr_app_main_emit \(.*programs[\\/]{name}\.lyr:{line}\)$", lines[1]);
+        Assert.Matches($@"^    at lyr_app_main_{caller} \(.*programs[\\/]{name}\.lyr:{callerLine}\)$", lines[2]);
     }
 
     private const string TASKS_EXPECTED =
@@ -460,9 +470,9 @@ public class CEmitterTests
         Assert.Equal(stdout, result.Stdout.Replace("\r\n", "\n"));
         var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(first, lines[0]);
-        Assert.Matches($@"^    at lyr_main_\w+ \(.*programs[\\/]{name}\.lyr:\d+\)$", lines[1]);
+        Assert.Matches($@"^    at lyr_app_main_\w+ \(.*programs[\\/]{name}\.lyr:\d+\)$", lines[1]);
         if (name == "task_status")
-            Assert.Matches(@"^    at lyr_main_explode \(.*programs[\\/]task_status\.lyr:11\)$", lines[1]);
+            Assert.Matches(@"^    at lyr_app_main_explode \(.*programs[\\/]task_status\.lyr:11\)$", lines[1]);
     }
 
     /// <summary>
@@ -480,8 +490,8 @@ public class CEmitterTests
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal("panic [LYR-RT0008]: boom", lines[0]);
-        Assert.Matches(@"^    at lyr_main_boom \(.*programs[\\/]task_panic\.lyr:7\)$", lines[1]);
-        Assert.Matches(@"^    at lyr_main_main__lambda\d+__\w+ \(.*programs[\\/]task_panic\.lyr:11\)$", lines[2]);
+        Assert.Matches(@"^    at lyr_app_main_boom \(.*programs[\\/]task_panic\.lyr:7\)$", lines[1]);
+        Assert.Matches(@"^    at lyr_app_main_main__lambda\d+__\w+ \(.*programs[\\/]task_panic\.lyr:11\)$", lines[2]);
         Assert.Matches(@"^    at lyr_std_task_spawnDetached__lambda\d+__\w+ \(.*task\.lyr:\d+\)$", lines[3]);
         Assert.True(lines.Length == 4, $"stderr:\n{result.Stderr}");
     }
@@ -561,8 +571,8 @@ public class CEmitterTests
             Assert.Equal(2, lines.Length);
             return;
         }
-        Assert.Matches(@"^    at lyr_main_config \(.*programs[\\/]uncaught\.lyr:14\)$", lines[2]);
-        Assert.Matches(@"^    at lyr_main_main \(.*programs[\\/]uncaught\.lyr:19\)$", lines[3]);
+        Assert.Matches(@"^    at lyr_app_main_config \(.*programs[\\/]uncaught\.lyr:14\)$", lines[2]);
+        Assert.Matches(@"^    at lyr_app_main_main \(.*programs[\\/]uncaught\.lyr:19\)$", lines[3]);
     }
 
     /// <summary>A defer that fails while an error leaves main (design/v5/spec/05 E7, E6 O4): the first
@@ -579,7 +589,7 @@ public class CEmitterTests
         Assert.Equal(["error: first", "  suppressed: second"], lines.Take(2));
         // The trace is the first error's, where it was thrown — not the defer's.
         if (profile == Profile.Debug)
-            Assert.Matches(@"^    at lyr_main_main \(.*programs[\\/]uncaught_suppressed\.lyr:10\)$", lines[2]);
+            Assert.Matches(@"^    at lyr_app_main_main \(.*programs[\\/]uncaught_suppressed\.lyr:10\)$", lines[2]);
         else
             Assert.Equal(2, lines.Length);
     }
@@ -602,8 +612,8 @@ public class CEmitterTests
             return;
         }
         Assert.True(lines.Length == 5, $"stderr:\n{result.Stderr}");
-        Assert.Matches(@"^    at lyr_main_down \(.*programs[\\/]deep_error\.lyr:4\)$", lines[1]);
-        Assert.Matches(@"^    at lyr_main_down \(.*programs[\\/]deep_error\.lyr:5\)$", lines[2]);
+        Assert.Matches(@"^    at lyr_app_main_down \(.*programs[\\/]deep_error\.lyr:4\)$", lines[1]);
+        Assert.Matches(@"^    at lyr_app_main_down \(.*programs[\\/]deep_error\.lyr:5\)$", lines[2]);
         Assert.Matches(@"^    \.\.\. the frame above repeats \d+ more times$", lines[3]);
         Assert.Equal("    ... deeper frames not shown", lines[4]);
     }
@@ -630,7 +640,7 @@ public class CEmitterTests
         (string Function, int Line)[] frames = [("fail", 10), ("inner", 16), ("middle", 20), ("outer", 27), ("main", 34)];
         Assert.True(lines.Length == 2 + frames.Length, $"stderr:\n{result.Stderr}");
         for (var i = 0; i < frames.Length; i++)
-            Assert.Matches($@"^    at lyr_main_{frames[i].Function} \(.*programs[\\/]rethrow\.lyr:{frames[i].Line}\)$", lines[2 + i]);
+            Assert.Matches($@"^    at lyr_app_main_{frames[i].Function} \(.*programs[\\/]rethrow\.lyr:{frames[i].Line}\)$", lines[2 + i]);
     }
 
     /// <summary><c>try!</c> on an error (design/v5/spec/05 E4, E8): a panic, <c>LYR-RT0010</c>, with
@@ -646,7 +656,7 @@ public class CEmitterTests
         Assert.Equal("before\n", result.Stdout.Replace("\r\n", "\n"));
         var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal("panic [LYR-RT0010]: 'try!' on an error: boom", lines[0]);
-        Assert.Matches(@"^    at lyr_main_main \(.*programs[\\/]forced\.lyr:11\)$", lines[1]);
+        Assert.Matches(@"^    at lyr_app_main_main \(.*programs[\\/]forced\.lyr:11\)$", lines[1]);
     }
 
     [Theory]
@@ -658,7 +668,7 @@ public class CEmitterTests
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = result.Stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal("panic [LYR-RT0008]: 3 is too many", lines[0]);
-        Assert.Matches(@"^    at lyr_main_check \(.*programs[\\/]panic\.lyr:3\)$", lines[1]);
+        Assert.Matches(@"^    at lyr_app_main_check \(.*programs[\\/]panic\.lyr:3\)$", lines[1]);
     }
 
     public static TheoryData<string, Profile, string> Panics() => new()
@@ -711,7 +721,7 @@ public class CEmitterTests
         Assert.Equal(firstLine, lines[0]);
         // The path as the debug information resolved it: relative on Linux and macOS (DWARF keeps
         // what #line said), absolute on Windows (the PDB resolves it against the build directory).
-        Assert.Matches(@"^    at lyr_main_\w+ \(.*programs[\\/]" + name + @"\.lyr:2\)$", lines[1]);
-        Assert.Matches(@"^    at lyr_main_main \(.*programs[\\/]" + name + @"\.lyr:3\)$", lines[2]);
+        Assert.Matches(@"^    at lyr_app_main_\w+ \(.*programs[\\/]" + name + @"\.lyr:2\)$", lines[1]);
+        Assert.Matches(@"^    at lyr_app_main_main \(.*programs[\\/]" + name + @"\.lyr:3\)$", lines[2]);
     }
 }

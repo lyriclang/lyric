@@ -160,20 +160,20 @@ static const LyrStaticStr(10) lyr_lit4 = LYR_STR_INIT("variadic ");
 static const LyrStaticStr(9) lyr_lit5 = LYR_STR_INIT("factory ");
 
 /* prototypes */
-int64_t lyr_main_connect(int64_t l0_host, int64_t l1_port, int64_t l2_retries);
-int64_t lyr_main_span(int64_t l0_from, int64_t l1_to, int64_t l2_step);
-int64_t lyr_main_sum(int64_t l0_base, LyrArr *l1_xs);
-LYR_NOINLINE int64_t lyr_main_main(void);
-lyr_ty0_Color lyr_main_Color_of_1_7f597b30(int64_t l0_hex);
-lyr_ty0_Color lyr_main_Color_of_3_81597e56(int64_t l0_r, int64_t l1_g, int64_t l2_b);
-lyr_ty1_Point lyr_main_Point_new_2_0f8b3375(int64_t l0_x, int64_t l1_y);
-lyr_ty1_Point lyr_main_Point_new_1_0c8b2ebc(int64_t l0_d);
+int64_t lyr_app_main_connect(int64_t l0_host, int64_t l1_port, int64_t l2_retries);
+int64_t lyr_app_main_span(int64_t l0_from, int64_t l1_to, int64_t l2_step);
+int64_t lyr_app_main_sum(int64_t l0_base, LyrArr *l1_xs);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+lyr_ty0_Color lyr_app_main_Color_of_1_bcb9d77d(int64_t l0_hex);
+lyr_ty0_Color lyr_app_main_Color_of_3_bab9d457(int64_t l0_r, int64_t l1_g, int64_t l2_b);
+lyr_ty1_Point lyr_app_main_Point_new_2_6a2abf96(int64_t l0_x, int64_t l1_y);
+lyr_ty1_Point lyr_app_main_Point_new_1_692abe03(int64_t l0_d);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 23 "programs/calls.lyr"
-int64_t lyr_main_connect(int64_t l0_host, int64_t l1_port, int64_t l2_retries) {
+int64_t lyr_app_main_connect(int64_t l0_host, int64_t l1_port, int64_t l2_retries) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -195,7 +195,7 @@ bb0:;
 }
 
 #line 24 "programs/calls.lyr"
-int64_t lyr_main_span(int64_t l0_from, int64_t l1_to, int64_t l2_step) {
+int64_t lyr_app_main_span(int64_t l0_from, int64_t l1_to, int64_t l2_step) {
     int64_t t0 = 0;
 bb0:;
 #line 24
@@ -205,7 +205,7 @@ bb0:;
 }
 
 #line 26 "programs/calls.lyr"
-int64_t lyr_main_sum(int64_t l0_base, LyrArr *l1_xs) {
+int64_t lyr_app_main_sum(int64_t l0_base, LyrArr *l1_xs) {
     int64_t l2_s = 0;
     int64_t l3__range0 = 0;
     int64_t l4__last1 = 0;
@@ -288,7 +288,7 @@ bb4:;
 }
 
 #line 32 "programs/calls.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     int64_t l0_a = 0;
     int64_t l1_b = 0;
     int64_t l2_c = 0;
@@ -415,7 +415,7 @@ bb0:;
 #line 32
     t1 = (int64_t)INT64_C(7);
 #line 32
-    t2_s = lyr_main_Color_of_1_7f597b30(t1); t2 = &t2_s;
+    t2_s = lyr_app_main_Color_of_1_bcb9d77d(t1); t2 = &t2_s;
 #line 32
     t3 = t2->f_v;
 #line 32
@@ -429,7 +429,7 @@ bb0:;
 #line 32
     t8 = (int64_t)INT64_C(0);
 #line 32
-    t9_s = lyr_main_Color_of_3_81597e56(t6, t7, t8); t9 = &t9_s;
+    t9_s = lyr_app_main_Color_of_3_bab9d457(t6, t7, t8); t9 = &t9_s;
 #line 32
     t10 = t9->f_v;
 #line 32
@@ -443,7 +443,7 @@ bb0:;
 #line 32
     t15 = (int64_t)INT64_C(0);
 #line 32
-    t16_s = lyr_main_Color_of_3_81597e56(t13, t14, t15); t16 = &t16_s;
+    t16_s = lyr_app_main_Color_of_3_bab9d457(t13, t14, t15); t16 = &t16_s;
 #line 32
     t17 = t16->f_v;
 #line 32
@@ -467,7 +467,7 @@ bb0:;
 #line 33
     t26 = (int64_t)INT64_C(0);
 #line 33
-    t27 = lyr_main_connect(t24, t25, t26);
+    t27 = lyr_app_main_connect(t24, t25, t26);
 #line 33
     l0_a = t27;
 #line 34
@@ -477,7 +477,7 @@ bb0:;
 #line 34
     t30 = (int64_t)INT64_C(0);
 #line 34
-    t31 = lyr_main_connect(t28, t29, t30);
+    t31 = lyr_app_main_connect(t28, t29, t30);
 #line 34
     l1_b = t31;
 #line 35
@@ -487,7 +487,7 @@ bb0:;
 #line 35
     t34 = (int64_t)INT64_C(0);
 #line 35
-    t35 = lyr_main_connect(t32, t33, t34);
+    t35 = lyr_app_main_connect(t32, t33, t34);
 #line 35
     l2_c = t35;
 #line 36
@@ -531,7 +531,7 @@ bb0:;
 #line 24
     t54 = LYR_CHECKED_SUB(t53, t51);
 #line 37
-    t55 = lyr_main_span(t51, t53, t54);
+    t55 = lyr_app_main_span(t51, t53, t54);
 #line 37
     t56 = lyr_str_from_int(t55);
 #line 37
@@ -543,7 +543,7 @@ bb0:;
 #line 24
     t60 = LYR_CHECKED_SUB(t59, t58);
 #line 37
-    t61 = lyr_main_span(t58, t59, t60);
+    t61 = lyr_app_main_span(t58, t59, t60);
 #line 37
     t62 = lyr_str_from_int(t61);
 #line 37
@@ -557,7 +557,7 @@ bb0:;
 #line 37
     t67 = (int64_t)INT64_C(3);
 #line 37
-    t68 = lyr_main_span(t64, t66, t67);
+    t68 = lyr_app_main_span(t64, t66, t67);
 #line 37
     t69 = lyr_str_from_int(t68);
 #line 37
@@ -583,7 +583,7 @@ bb0:;
 #line 38
     t79 = lyr_alloc_array(&lyr_desc_arr_i64, 2); LYR_ARR_DATA(t79, int64_t)[0] = t77; LYR_ARR_DATA(t79, int64_t)[1] = t78;
 #line 38
-    t80 = lyr_main_sum(t76, t79);
+    t80 = lyr_app_main_sum(t76, t79);
 #line 38
     t81 = lyr_str_from_int(t80);
 #line 38
@@ -593,7 +593,7 @@ bb0:;
 #line 38
     t84 = lyr_alloc_array(&lyr_desc_arr_i64, 0);
 #line 38
-    t85 = lyr_main_sum(t83, t84);
+    t85 = lyr_app_main_sum(t83, t84);
 #line 38
     t86 = lyr_str_from_int(t85);
 #line 38
@@ -609,7 +609,7 @@ bb0:;
 #line 39
     t91 = (int64_t)INT64_C(2);
 #line 39
-    t92_s = lyr_main_Point_new_2_0f8b3375(t90, t91); t92 = &t92_s;
+    t92_s = lyr_app_main_Point_new_2_6a2abf96(t90, t91); t92 = &t92_s;
 #line 39
     l3_p = *t92;
 #line 40
@@ -631,7 +631,7 @@ bb0:;
 #line 40
     t101 = (int64_t)INT64_C(4);
 #line 40
-    t102_s = lyr_main_Point_new_1_0c8b2ebc(t101); t102 = &t102_s;
+    t102_s = lyr_app_main_Point_new_1_692abe03(t101); t102 = &t102_s;
 #line 40
     t103 = t102->f_y;
 #line 40
@@ -651,7 +651,7 @@ bb0:;
 }
 
 #line 12 "programs/calls.lyr"
-lyr_ty0_Color lyr_main_Color_of_1_7f597b30(int64_t l0_hex) {
+lyr_ty0_Color lyr_app_main_Color_of_1_bcb9d77d(int64_t l0_hex) {
     int64_t t0 = 0;
     lyr_ty0_Color t1_s = {0};
     lyr_ty0_Color *t1 = &t1_s;
@@ -667,7 +667,7 @@ bb0:;
 }
 
 #line 13 "programs/calls.lyr"
-lyr_ty0_Color lyr_main_Color_of_3_81597e56(int64_t l0_r, int64_t l1_g, int64_t l2_b) {
+lyr_ty0_Color lyr_app_main_Color_of_3_bab9d457(int64_t l0_r, int64_t l1_g, int64_t l2_b) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -707,7 +707,7 @@ bb0:;
 }
 
 #line 19 "programs/calls.lyr"
-lyr_ty1_Point lyr_main_Point_new_2_0f8b3375(int64_t l0_x, int64_t l1_y) {
+lyr_ty1_Point lyr_app_main_Point_new_2_6a2abf96(int64_t l0_x, int64_t l1_y) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     lyr_ty1_Point t2_s = {0};
@@ -728,7 +728,7 @@ bb0:;
 }
 
 #line 20 "programs/calls.lyr"
-lyr_ty1_Point lyr_main_Point_new_1_0c8b2ebc(int64_t l0_d) {
+lyr_ty1_Point lyr_app_main_Point_new_1_692abe03(int64_t l0_d) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     lyr_ty1_Point t2_s = {0};
@@ -835,5 +835,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

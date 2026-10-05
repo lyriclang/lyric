@@ -4,6 +4,7 @@
 //   match 2 7 0                      type patterns in a match, bound as the type; '_' for the rest
 //   any true false 5 3               'Any' holds a struct and a class undeclared; the downcast copies the struct out (D12)
 //   named true false circle          interface to interface: the conformance list behind the descriptor
+import std.core { Any };
 import std.io { println };
 
 interface Shape { fn area(): int; }

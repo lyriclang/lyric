@@ -141,13 +141,13 @@ uint64_t lyr_g5_lowBits = 0;
 uint64_t lyr_g6_highBits = 0;
 
 /* prototypes */
-LYR_NOINLINE int64_t lyr_main_main(void);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 #line 4 "programs/count.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     int64_t l0_total = 0;
     int64_t l1__range0 = 0;
     int64_t l2__last1 = 0;
@@ -410,5 +410,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }

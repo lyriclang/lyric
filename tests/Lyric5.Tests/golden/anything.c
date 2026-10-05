@@ -5,14 +5,14 @@
 
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_vt_ty0 lyr_vt_ty0;
-const char lyr_ifid_ty0[] = "main.Shape";
+const char lyr_ifid_ty0[] = "app.main.Shape";
 typedef struct lyr_ty1_Circle lyr_ty1_Circle;
 typedef struct lyr_ty2_Rect lyr_ty2_Rect;
 typedef struct lyr_ty3_Tri lyr_ty3_Tri;
 typedef struct lyr_vt_ty4 lyr_vt_ty4;
 const char lyr_ifid_ty4[] = "std.core.Any";
 typedef struct lyr_vt_ty5 lyr_vt_ty5;
-const char lyr_ifid_ty5[] = "main.Named";
+const char lyr_ifid_ty5[] = "app.main.Named";
 typedef struct lyr_ty6_ParseError lyr_ty6_ParseError;
 typedef struct lyr_ty7_ParseErrorKind lyr_ty7_ParseErrorKind;
 typedef struct lyr_ty8_ParseErrorKind_Empty lyr_ty8_ParseErrorKind_Empty;
@@ -52,7 +52,7 @@ _Static_assert(sizeof(lyr_ty2_Rect) == 24, "layout of lyr_ty2_Rect");
 _Static_assert(offsetof(lyr_ty2_Rect, f_w) == 8, "layout of lyr_ty2_Rect");
 _Static_assert(offsetof(lyr_ty2_Rect, f_h) == 16, "layout of lyr_ty2_Rect");
 extern const LyrItable lyr_itab_ty2[];
-const LyrDesc lyr_desc_ty2_Rect = { sizeof(lyr_ty2_Rect), 0, 0, 0, NULL, "main.Rect", lyr_itab_ty2 };
+const LyrDesc lyr_desc_ty2_Rect = { sizeof(lyr_ty2_Rect), 0, 0, 0, NULL, "app.main.Rect", lyr_itab_ty2 };
 struct lyr_ty3_Tri {
     int64_t f_b;
 };
@@ -166,21 +166,21 @@ struct lyr_ty25_FixedHasher {
 struct lyr_ty26_Fnv1a64 {
     uint64_t f_state;
 };
-_Static_assert(sizeof(LyrIface) == 16, "layout of main.Shape[]");
+_Static_assert(sizeof(LyrIface) == 16, "layout of app.main.Shape[]");
 static const uint64_t lyr_refmap_arr_iface0[] = { UINT64_C(0x1) };
-const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "main.Shape[]", NULL };
+const LyrDesc lyr_desc_arr_iface0 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS, sizeof(LyrIface), 1, lyr_refmap_arr_iface0, "app.main.Shape[]", NULL };
 _Static_assert(sizeof(uint8_t) == 1, "layout of u8[]");
 const LyrDesc lyr_desc_arr_u8 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(uint8_t), 0, NULL, "u8[]", NULL };
 typedef struct { LyrObj header; lyr_ty1_Circle value; } lyr_box_ty1_Circle;
 _Static_assert(sizeof(lyr_box_ty1_Circle) == 16, "layout of lyr_box_ty1_Circle");
 _Static_assert(offsetof(lyr_box_ty1_Circle, value) == 8, "layout of lyr_box_ty1_Circle");
 extern const LyrItable lyr_itab_ty1[];
-const LyrDesc lyr_desc_box_ty1_Circle = { sizeof(lyr_box_ty1_Circle), 0, 0, 0, NULL, "box<main.Circle>", lyr_itab_ty1 };
+const LyrDesc lyr_desc_box_ty1_Circle = { sizeof(lyr_box_ty1_Circle), 0, 0, 0, NULL, "box<app.main.Circle>", lyr_itab_ty1 };
 typedef struct { LyrObj header; lyr_ty3_Tri value; } lyr_box_ty3_Tri;
 _Static_assert(sizeof(lyr_box_ty3_Tri) == 16, "layout of lyr_box_ty3_Tri");
 _Static_assert(offsetof(lyr_box_ty3_Tri, value) == 8, "layout of lyr_box_ty3_Tri");
 extern const LyrItable lyr_itab_ty3[];
-const LyrDesc lyr_desc_box_ty3_Tri = { sizeof(lyr_box_ty3_Tri), 0, 0, 0, NULL, "box<main.Tri>", lyr_itab_ty3 };
+const LyrDesc lyr_desc_box_ty3_Tri = { sizeof(lyr_box_ty3_Tri), 0, 0, 0, NULL, "box<app.main.Tri>", lyr_itab_ty3 };
 typedef struct { LyrObj header; lyr_ty6_ParseError value; } lyr_box_ty6_ParseError;
 _Static_assert(sizeof(lyr_box_ty6_ParseError) == 16, "layout of lyr_box_ty6_ParseError");
 _Static_assert(offsetof(lyr_box_ty6_ParseError, value) == 8, "layout of lyr_box_ty6_ParseError");
@@ -263,27 +263,27 @@ static const LyrStaticStr(7) lyr_lit9 = LYR_STR_INIT("named ");
 static const LyrStaticStr(7) lyr_lit10 = LYR_STR_INIT("circle");
 
 /* prototypes */
-LyrStr * lyr_main_describe(LyrIface l0_s);
-int64_t lyr_main_kind(LyrIface l0_s);
-LYR_NOINLINE int64_t lyr_main_main(void);
-int64_t lyr_main_Circle_area(lyr_ty1_Circle *l0_this);
-LyrStr * lyr_main_Circle_name(lyr_ty1_Circle *l0_this);
-int64_t lyr_main_Rect_area(lyr_ty2_Rect *l0_this);
-int64_t lyr_main_Tri_area(lyr_ty3_Tri *l0_this);
+LyrStr * lyr_app_main_describe(LyrIface l0_s);
+int64_t lyr_app_main_kind(LyrIface l0_s);
+LYR_NOINLINE int64_t lyr_app_main_main(void);
+int64_t lyr_app_main_Circle_area(lyr_ty1_Circle *l0_this);
+LyrStr * lyr_app_main_Circle_name(lyr_ty1_Circle *l0_this);
+int64_t lyr_app_main_Rect_area(lyr_ty2_Rect *l0_this);
+int64_t lyr_app_main_Tri_area(lyr_ty3_Tri *l0_this);
 void lyr__globals__9ee5f9b5(void);
 double lyr_std_core__extend__float_fromBits_3825afc5(uint64_t l0_b);
 float lyr_std_core__extend__float32_fromBits_bc3641ce(uint64_t l0_b);
 
 /* interface tables: the descriptor, then the implementation of every slot */
-static int64_t lyr_vt_ty0_ty1_s0(LyrIface self) { return lyr_main_Circle_area(&((lyr_box_ty1_Circle *)self.data)->value); }
+static int64_t lyr_vt_ty0_ty1_s0(LyrIface self) { return lyr_app_main_Circle_area(&((lyr_box_ty1_Circle *)self.data)->value); }
 const lyr_vt_ty0 lyr_vt_ty0_ty1 = { &lyr_desc_box_ty1_Circle, lyr_vt_ty0_ty1_s0 };
 const lyr_vt_ty4 lyr_vt_ty4_ty1 = { &lyr_desc_box_ty1_Circle,  };
-static LyrStr * lyr_vt_ty5_ty1_s0(LyrIface self) { return lyr_main_Circle_name(&((lyr_box_ty1_Circle *)self.data)->value); }
+static LyrStr * lyr_vt_ty5_ty1_s0(LyrIface self) { return lyr_app_main_Circle_name(&((lyr_box_ty1_Circle *)self.data)->value); }
 const lyr_vt_ty5 lyr_vt_ty5_ty1 = { &lyr_desc_box_ty1_Circle, lyr_vt_ty5_ty1_s0 };
-static int64_t lyr_vt_ty0_ty2_s0(LyrIface self) { return lyr_main_Rect_area((lyr_ty2_Rect *)self.data); }
+static int64_t lyr_vt_ty0_ty2_s0(LyrIface self) { return lyr_app_main_Rect_area((lyr_ty2_Rect *)self.data); }
 const lyr_vt_ty0 lyr_vt_ty0_ty2 = { &lyr_desc_ty2_Rect, lyr_vt_ty0_ty2_s0 };
 const lyr_vt_ty4 lyr_vt_ty4_ty2 = { &lyr_desc_ty2_Rect,  };
-static int64_t lyr_vt_ty0_ty3_s0(LyrIface self) { return lyr_main_Tri_area(&((lyr_box_ty3_Tri *)self.data)->value); }
+static int64_t lyr_vt_ty0_ty3_s0(LyrIface self) { return lyr_app_main_Tri_area(&((lyr_box_ty3_Tri *)self.data)->value); }
 const lyr_vt_ty0 lyr_vt_ty0_ty3 = { &lyr_desc_box_ty3_Tri, lyr_vt_ty0_ty3_s0 };
 const lyr_vt_ty4 lyr_vt_ty4_ty3 = { &lyr_desc_box_ty3_Tri,  };
 const lyr_vt_ty4 lyr_vt_ty4_ty6 = { &lyr_desc_box_ty6_ParseError,  };
@@ -316,8 +316,8 @@ const LyrItable lyr_itab_ty24[] = { { lyr_ifid_ty4, &lyr_vt_ty4_ty24 } , { NULL,
 const LyrItable lyr_itab_ty25[] = { { lyr_ifid_ty4, &lyr_vt_ty4_ty25 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty26[] = { { lyr_ifid_ty4, &lyr_vt_ty4_ty26 } , { NULL, NULL } };
 
-#line 24 "programs/anything.lyr"
-LyrStr * lyr_main_describe(LyrIface l0_s) {
+#line 25 "programs/anything.lyr"
+LyrStr * lyr_app_main_describe(LyrIface l0_s) {
     LyrIface t0 = {0};
     uint8_t t1 = 0;
     LyrStr *t2 = NULL;
@@ -344,72 +344,72 @@ LyrStr * lyr_main_describe(LyrIface l0_s) {
     LyrStr *t22 = NULL;
     LyrStr *t23 = NULL;
 bb0:;
-#line 24
+#line 25
     t0 = l0_s;
-#line 24
+#line 25
     t1 = ((*(const LyrDesc *const *)t0.vt) == &lyr_desc_box_ty1_Circle);
-#line 24
+#line 25
     if (t1) goto bb1; else goto bb2;
 bb1:;
-#line 24
+#line 25
     t2 = (LyrStr *)&lyr_lit0;
-#line 24
+#line 25
     t3 = l0_s;
-#line 24
+#line 25
     t4_s = ((lyr_box_ty1_Circle *)t3.data)->value; t4 = &t4_s;
-#line 24
+#line 25
     t5 = t4->f_r;
-#line 24
+#line 25
     t6 = lyr_str_from_int(t5);
-#line 24
+#line 25
     t7 = lyr_str_concat(t2, t6);
-#line 24
+#line 25
     return t7;
 bb2:;
-#line 25
+#line 26
     t8 = l0_s;
-#line 25
+#line 26
     t9 = ((*(const LyrDesc *const *)t8.vt) == &lyr_desc_ty2_Rect);
-#line 25
+#line 26
     if (t9) goto bb3; else goto bb4;
 bb3:;
-#line 25
+#line 26
     t10 = (LyrStr *)&lyr_lit1;
-#line 25
+#line 26
     t11 = l0_s;
-#line 25
+#line 26
     t12 = (lyr_ty2_Rect *)t11.data;
-#line 25
+#line 26
     t13 = t12->f_w;
-#line 25
+#line 26
     t14 = lyr_str_from_int(t13);
-#line 25
+#line 26
     t15 = (LyrStr *)&lyr_lit2;
-#line 25
+#line 26
     t16 = l0_s;
-#line 25
+#line 26
     t17 = (lyr_ty2_Rect *)t16.data;
-#line 25
+#line 26
     t18 = t17->f_h;
-#line 25
+#line 26
     t19 = lyr_str_from_int(t18);
-#line 25
+#line 26
     t20 = lyr_str_concat(t10, t14);
-#line 25
+#line 26
     t21 = lyr_str_concat(t20, t15);
-#line 25
+#line 26
     t22 = lyr_str_concat(t21, t19);
-#line 25
+#line 26
     return t22;
 bb4:;
-#line 26
+#line 27
     t23 = (LyrStr *)&lyr_lit3;
-#line 26
+#line 27
     return t23;
 }
 
-#line 30 "programs/anything.lyr"
-int64_t lyr_main_kind(LyrIface l0_s) {
+#line 31 "programs/anything.lyr"
+int64_t lyr_app_main_kind(LyrIface l0_s) {
     int64_t l1__match0 = 0;
     lyr_ty1_Circle l2_c = {0};
     lyr_ty2_Rect *l3_r = NULL;
@@ -430,65 +430,65 @@ int64_t lyr_main_kind(LyrIface l0_s) {
     int64_t t12 = 0;
     int64_t t13 = 0;
 bb0:;
-#line 30
+#line 31
     t0 = l0_s;
-#line 30
+#line 31
     t1 = ((*(const LyrDesc *const *)t0.vt) == &lyr_desc_box_ty1_Circle);
-#line 30
+#line 31
     if (t1) goto bb1; else goto bb2;
 bb1:;
-#line 30
+#line 31
     t2_s = ((lyr_box_ty1_Circle *)t0.data)->value; t2 = &t2_s;
-#line 30
+#line 31
     l2_c = *t2;
-#line 30
+#line 31
     t3 = &l2_c;
-#line 30
+#line 31
     t4 = t3->f_r;
-#line 30
+#line 31
     l1__match0 = t4;
-#line 30
+#line 31
     goto bb3;
 bb2:;
-#line 30
+#line 31
     t5 = ((*(const LyrDesc *const *)t0.vt) == &lyr_desc_ty2_Rect);
-#line 30
+#line 31
     if (t5) goto bb4; else goto bb5;
 bb3:;
-#line 30
+#line 31
     t13 = l1__match0;
-#line 30
+#line 31
     return t13;
 bb4:;
-#line 30
+#line 31
     t6 = (lyr_ty2_Rect *)t0.data;
-#line 30
+#line 31
     l3_r = t6;
-#line 30
+#line 31
     t7 = l3_r;
-#line 30
+#line 31
     t8 = t7->f_w;
-#line 30
+#line 31
     t9 = l3_r;
-#line 30
+#line 31
     t10 = t9->f_h;
-#line 30
+#line 31
     t11 = LYR_CHECKED_ADD(t8, t10);
-#line 30
+#line 31
     l1__match0 = t11;
-#line 30
+#line 31
     goto bb3;
 bb5:;
-#line 30
+#line 31
     t12 = (int64_t)INT64_C(0);
-#line 30
+#line 31
     l1__match0 = t12;
-#line 30
+#line 31
     goto bb3;
 }
 
-#line 34 "programs/anything.lyr"
-LYR_NOINLINE int64_t lyr_main_main(void) {
+#line 35 "programs/anything.lyr"
+LYR_NOINLINE int64_t lyr_app_main_main(void) {
     LyrArr *l0_shapes = NULL;
     LyrIface l1_a = {0};
     LyrIface l2_b = {0};
@@ -628,326 +628,326 @@ LYR_NOINLINE int64_t lyr_main_main(void) {
     LyrStr *t124 = NULL;
     int64_t t125 = 0;
 bb0:;
-#line 34
+#line 35
     t0 = (int64_t)INT64_C(2);
-#line 34
+#line 35
     t1_s = (lyr_ty1_Circle){0}; t1 = &t1_s;
-#line 34
+#line 35
     t1->f_r = t0;
-#line 34
+#line 35
     { lyr_box_ty1_Circle *lyr_box = lyr_alloc(&lyr_desc_box_ty1_Circle); lyr_box->value = *t1; t2 = (LyrIface){ lyr_box, &lyr_vt_ty0_ty1 }; }
-#line 34
+#line 35
     t3 = (int64_t)INT64_C(3);
-#line 34
+#line 35
     t4 = (int64_t)INT64_C(4);
-#line 34
+#line 35
     t5 = (lyr_ty2_Rect *)lyr_alloc(&lyr_desc_ty2_Rect);
-#line 34
+#line 35
     t5->f_w = t3;
-#line 34
+#line 35
     t5->f_h = t4;
-#line 34
+#line 35
     t6 = (LyrIface){ t5, &lyr_vt_ty0_ty2 };
-#line 34
+#line 35
     t7 = (int64_t)INT64_C(9);
-#line 34
+#line 35
     t8_s = (lyr_ty3_Tri){0}; t8 = &t8_s;
-#line 34
+#line 35
     t8->f_b = t7;
-#line 34
+#line 35
     { lyr_box_ty3_Tri *lyr_box = lyr_alloc(&lyr_desc_box_ty3_Tri); lyr_box->value = *t8; t9 = (LyrIface){ lyr_box, &lyr_vt_ty0_ty3 }; }
-#line 34
+#line 35
     t10 = lyr_alloc_array(&lyr_desc_arr_iface0, 3); LYR_ARR_DATA(t10, LyrIface)[0] = t2; LYR_ARR_DATA(t10, LyrIface)[1] = t6; LYR_ARR_DATA(t10, LyrIface)[2] = t9;
-#line 34
+#line 35
     l0_shapes = t10;
-#line 35
+#line 36
     t11 = (LyrStr *)&lyr_lit4;
-#line 35
+#line 36
     t12 = l0_shapes;
-#line 35
+#line 36
     t13 = (int64_t)INT64_C(0);
-#line 35
+#line 36
     LYR_CHECK_INDEX(t13, t12->len); t14 = LYR_ARR_DATA(t12, LyrIface)[t13];
-#line 35
-    t15 = lyr_main_describe(t14);
-#line 35
+#line 36
+    t15 = lyr_app_main_describe(t14);
+#line 36
     t16 = (LyrStr *)&lyr_lit5;
-#line 35
+#line 36
     t17 = l0_shapes;
-#line 35
+#line 36
     t18 = (int64_t)INT64_C(1);
-#line 35
+#line 36
     LYR_CHECK_INDEX(t18, t17->len); t19 = LYR_ARR_DATA(t17, LyrIface)[t18];
-#line 35
-    t20 = lyr_main_describe(t19);
-#line 35
+#line 36
+    t20 = lyr_app_main_describe(t19);
+#line 36
     t21 = (LyrStr *)&lyr_lit5;
-#line 35
+#line 36
     t22 = l0_shapes;
-#line 35
+#line 36
     t23 = (int64_t)INT64_C(2);
-#line 35
+#line 36
     LYR_CHECK_INDEX(t23, t22->len); t24 = LYR_ARR_DATA(t22, LyrIface)[t23];
-#line 35
-    t25 = lyr_main_describe(t24);
-#line 35
+#line 36
+    t25 = lyr_app_main_describe(t24);
+#line 36
     t26 = lyr_str_concat(t11, t15);
-#line 35
+#line 36
     t27 = lyr_str_concat(t26, t16);
-#line 35
+#line 36
     t28 = lyr_str_concat(t27, t20);
-#line 35
+#line 36
     t29 = lyr_str_concat(t28, t21);
-#line 35
+#line 36
     t30 = lyr_str_concat(t29, t25);
-#line 35
+#line 36
     lyr_println(t30);
-#line 36
+#line 37
     t31 = (LyrStr *)&lyr_lit6;
-#line 36
+#line 37
     t32 = l0_shapes;
-#line 36
+#line 37
     t33 = (int64_t)INT64_C(0);
-#line 36
+#line 37
     LYR_CHECK_INDEX(t33, t32->len); t34 = LYR_ARR_DATA(t32, LyrIface)[t33];
-#line 36
-    t35 = lyr_main_kind(t34);
-#line 36
+#line 37
+    t35 = lyr_app_main_kind(t34);
+#line 37
     t36 = lyr_str_from_int(t35);
-#line 36
+#line 37
     t37 = (LyrStr *)&lyr_lit5;
-#line 36
+#line 37
     t38 = l0_shapes;
-#line 36
+#line 37
     t39 = (int64_t)INT64_C(1);
-#line 36
+#line 37
     LYR_CHECK_INDEX(t39, t38->len); t40 = LYR_ARR_DATA(t38, LyrIface)[t39];
-#line 36
-    t41 = lyr_main_kind(t40);
-#line 36
+#line 37
+    t41 = lyr_app_main_kind(t40);
+#line 37
     t42 = lyr_str_from_int(t41);
-#line 36
+#line 37
     t43 = (LyrStr *)&lyr_lit5;
-#line 36
+#line 37
     t44 = l0_shapes;
-#line 36
+#line 37
     t45 = (int64_t)INT64_C(2);
-#line 36
+#line 37
     LYR_CHECK_INDEX(t45, t44->len); t46 = LYR_ARR_DATA(t44, LyrIface)[t45];
-#line 36
-    t47 = lyr_main_kind(t46);
-#line 36
+#line 37
+    t47 = lyr_app_main_kind(t46);
+#line 37
     t48 = lyr_str_from_int(t47);
-#line 36
+#line 37
     t49 = lyr_str_concat(t31, t36);
-#line 36
+#line 37
     t50 = lyr_str_concat(t49, t37);
-#line 36
+#line 37
     t51 = lyr_str_concat(t50, t42);
-#line 36
+#line 37
     t52 = lyr_str_concat(t51, t43);
-#line 36
+#line 37
     t53 = lyr_str_concat(t52, t48);
-#line 36
+#line 37
     lyr_println(t53);
-#line 38
+#line 39
     t54 = (int64_t)INT64_C(5);
-#line 38
+#line 39
     t55_s = (lyr_ty1_Circle){0}; t55 = &t55_s;
-#line 38
+#line 39
     t55->f_r = t54;
-#line 38
+#line 39
     { lyr_box_ty1_Circle *lyr_box = lyr_alloc(&lyr_desc_box_ty1_Circle); lyr_box->value = *t55; t56 = (LyrIface){ lyr_box, &lyr_vt_ty4_ty1 }; }
-#line 38
+#line 39
     l1_a = t56;
-#line 39
+#line 40
     t57 = (int64_t)INT64_C(1);
-#line 39
+#line 40
     t58 = (int64_t)INT64_C(2);
-#line 39
+#line 40
     t59 = (lyr_ty2_Rect *)lyr_alloc(&lyr_desc_ty2_Rect);
-#line 39
+#line 40
     t59->f_w = t57;
-#line 39
+#line 40
     t59->f_h = t58;
-#line 39
+#line 40
     t60 = (LyrIface){ t59, &lyr_vt_ty4_ty2 };
-#line 39
+#line 40
     l2_b = t60;
-#line 40
+#line 41
     t61 = (int64_t)INT64_C(0);
-#line 40
+#line 41
     l3_n = t61;
-#line 41
+#line 42
     t62 = l1_a;
-#line 41
+#line 42
     t63 = ((*(const LyrDesc *const *)t62.vt) == &lyr_desc_box_ty1_Circle);
-#line 41
+#line 42
     if (t63) goto bb1; else goto bb2;
 bb1:;
-#line 41
+#line 42
     t64 = l1_a;
-#line 41
+#line 42
     t65_s = ((lyr_box_ty1_Circle *)t64.data)->value; t65 = &t65_s;
-#line 41
+#line 42
     t66 = t65->f_r;
-#line 41
+#line 42
     l3_n = t66;
-#line 41
+#line 42
     goto bb2;
 bb2:;
-#line 42
+#line 43
     t67 = (int64_t)INT64_C(0);
-#line 42
+#line 43
     l4_m = t67;
-#line 43
+#line 44
     t68 = l2_b;
-#line 43
+#line 44
     t69 = ((*(const LyrDesc *const *)t68.vt) == &lyr_desc_ty2_Rect);
-#line 43
+#line 44
     if (t69) goto bb3; else goto bb4;
 bb3:;
-#line 43
+#line 44
     t70 = l2_b;
-#line 43
+#line 44
     t71 = (lyr_ty2_Rect *)t70.data;
-#line 43
+#line 44
     t72 = t71->f_w;
-#line 43
+#line 44
     t73 = l2_b;
-#line 43
+#line 44
     t74 = (lyr_ty2_Rect *)t73.data;
-#line 43
+#line 44
     t75 = t74->f_h;
-#line 43
+#line 44
     t76 = LYR_CHECKED_ADD(t72, t75);
-#line 43
+#line 44
     l4_m = t76;
-#line 43
+#line 44
     goto bb4;
 bb4:;
-#line 44
+#line 45
     t77 = (LyrStr *)&lyr_lit7;
-#line 44
+#line 45
     t78 = l1_a;
-#line 44
+#line 45
     t79 = ((*(const LyrDesc *const *)t78.vt) == &lyr_desc_box_ty1_Circle);
-#line 44
+#line 45
     t80 = lyr_str_from_bool(t79);
-#line 44
+#line 45
     t81 = (LyrStr *)&lyr_lit5;
-#line 44
+#line 45
     t82 = l2_b;
-#line 44
+#line 45
     t83 = ((*(const LyrDesc *const *)t82.vt) == &lyr_desc_box_ty1_Circle);
-#line 44
+#line 45
     t84 = lyr_str_from_bool(t83);
-#line 44
+#line 45
     t85 = (LyrStr *)&lyr_lit5;
-#line 44
+#line 45
     t86 = l3_n;
-#line 44
+#line 45
     t87 = lyr_str_from_int(t86);
-#line 44
+#line 45
     t88 = (LyrStr *)&lyr_lit5;
-#line 44
+#line 45
     t89 = l4_m;
-#line 44
+#line 45
     t90 = lyr_str_from_int(t89);
-#line 44
+#line 45
     t91 = lyr_str_concat(t77, t80);
-#line 44
+#line 45
     t92 = lyr_str_concat(t91, t81);
-#line 44
+#line 45
     t93 = lyr_str_concat(t92, t84);
-#line 44
+#line 45
     t94 = lyr_str_concat(t93, t85);
-#line 44
+#line 45
     t95 = lyr_str_concat(t94, t87);
-#line 44
+#line 45
     t96 = lyr_str_concat(t95, t88);
-#line 44
+#line 45
     t97 = lyr_str_concat(t96, t90);
-#line 44
+#line 45
     lyr_println(t97);
-#line 46
+#line 47
     t98 = l0_shapes;
-#line 46
+#line 47
     t99 = (int64_t)INT64_C(0);
-#line 46
+#line 47
     LYR_CHECK_INDEX(t99, t98->len); t100 = LYR_ARR_DATA(t98, LyrIface)[t99];
-#line 46
+#line 47
     l5_s0 = t100;
-#line 47
+#line 48
     t101 = l0_shapes;
-#line 47
+#line 48
     t102 = (int64_t)INT64_C(1);
-#line 47
+#line 48
     LYR_CHECK_INDEX(t102, t101->len); t103 = LYR_ARR_DATA(t101, LyrIface)[t102];
-#line 47
+#line 48
     l6_s1 = t103;
-#line 48
+#line 49
     t104 = (LyrStr *)&lyr_lit8;
-#line 48
+#line 49
     l7_named = t104;
-#line 49
+#line 50
     t105 = l5_s0;
-#line 49
+#line 50
     t106 = (lyr_iface_find((*(const LyrDesc *const *)t105.vt), lyr_ifid_ty5) != NULL);
-#line 49
+#line 50
     if (t106) goto bb5; else goto bb6;
 bb5:;
-#line 49
+#line 50
     t107 = l5_s0;
-#line 49
+#line 50
     t108 = (LyrIface){ t107.data, lyr_iface_find((*(const LyrDesc *const *)t107.vt), lyr_ifid_ty5) };
-#line 49
+#line 50
     t109 = ((const lyr_vt_ty5 *)t108.vt)->s0(t108);
-#line 49
+#line 50
     l7_named = t109;
-#line 49
+#line 50
     goto bb6;
 bb6:;
-#line 50
+#line 51
     t110 = (LyrStr *)&lyr_lit9;
-#line 50
+#line 51
     t111 = l5_s0;
-#line 50
+#line 51
     t112 = (lyr_iface_find((*(const LyrDesc *const *)t111.vt), lyr_ifid_ty5) != NULL);
-#line 50
+#line 51
     t113 = lyr_str_from_bool(t112);
-#line 50
+#line 51
     t114 = (LyrStr *)&lyr_lit5;
-#line 50
+#line 51
     t115 = l6_s1;
-#line 50
+#line 51
     t116 = (lyr_iface_find((*(const LyrDesc *const *)t115.vt), lyr_ifid_ty5) != NULL);
-#line 50
+#line 51
     t117 = lyr_str_from_bool(t116);
-#line 50
+#line 51
     t118 = (LyrStr *)&lyr_lit5;
-#line 50
+#line 51
     t119 = l7_named;
-#line 50
+#line 51
     t120 = lyr_str_concat(t110, t113);
-#line 50
+#line 51
     t121 = lyr_str_concat(t120, t114);
-#line 50
+#line 51
     t122 = lyr_str_concat(t121, t117);
-#line 50
+#line 51
     t123 = lyr_str_concat(t122, t118);
-#line 50
+#line 51
     t124 = lyr_str_concat(t123, t119);
-#line 50
+#line 51
     lyr_println(t124);
-#line 51
+#line 52
     t125 = (int64_t)INT64_C(0);
-#line 51
+#line 52
     return t125;
 }
 
-#line 13 "programs/anything.lyr"
-int64_t lyr_main_Circle_area(lyr_ty1_Circle *l0_this) {
+#line 14 "programs/anything.lyr"
+int64_t lyr_app_main_Circle_area(lyr_ty1_Circle *l0_this) {
     int64_t t0 = 0;
     lyr_ty1_Circle t1_s = {0};
     lyr_ty1_Circle *t1 = &t1_s;
@@ -958,67 +958,67 @@ int64_t lyr_main_Circle_area(lyr_ty1_Circle *l0_this) {
     int64_t t5 = 0;
     int64_t t6 = 0;
 bb0:;
-#line 13
+#line 14
     t0 = (int64_t)INT64_C(3);
-#line 13
+#line 14
     t1 = l0_this;
-#line 13
+#line 14
     t2 = t1->f_r;
-#line 13
+#line 14
     t3 = LYR_CHECKED_MUL(t0, t2);
-#line 13
+#line 14
     t4 = l0_this;
-#line 13
+#line 14
     t5 = t4->f_r;
-#line 13
+#line 14
     t6 = LYR_CHECKED_MUL(t3, t5);
-#line 13
+#line 14
     return t6;
 }
 
-#line 14 "programs/anything.lyr"
-LyrStr * lyr_main_Circle_name(lyr_ty1_Circle *l0_this) {
+#line 15 "programs/anything.lyr"
+LyrStr * lyr_app_main_Circle_name(lyr_ty1_Circle *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
-#line 14
+#line 15
     t0 = (LyrStr *)&lyr_lit10;
-#line 14
+#line 15
     return t0;
 }
 
-#line 19 "programs/anything.lyr"
-int64_t lyr_main_Rect_area(lyr_ty2_Rect *l0_this) {
+#line 20 "programs/anything.lyr"
+int64_t lyr_app_main_Rect_area(lyr_ty2_Rect *l0_this) {
     lyr_ty2_Rect *t0 = NULL;
     int64_t t1 = 0;
     lyr_ty2_Rect *t2 = NULL;
     int64_t t3 = 0;
     int64_t t4 = 0;
 bb0:;
-#line 19
+#line 20
     t0 = l0_this;
-#line 19
+#line 20
     t1 = t0->f_w;
-#line 19
+#line 20
     t2 = l0_this;
-#line 19
+#line 20
     t3 = t2->f_h;
-#line 19
+#line 20
     t4 = LYR_CHECKED_MUL(t1, t3);
-#line 19
+#line 20
     return t4;
 }
 
-#line 21 "programs/anything.lyr"
-int64_t lyr_main_Tri_area(lyr_ty3_Tri *l0_this) {
+#line 22 "programs/anything.lyr"
+int64_t lyr_app_main_Tri_area(lyr_ty3_Tri *l0_this) {
     lyr_ty3_Tri t0_s = {0};
     lyr_ty3_Tri *t0 = &t0_s;
     int64_t t1 = 0;
 bb0:;
-#line 21
+#line 22
     t0 = l0_this;
-#line 21
+#line 22
     t1 = t0->f_b;
-#line 21
+#line 22
     return t1;
 }
 
@@ -1109,5 +1109,5 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_main_main(); }
+static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }
