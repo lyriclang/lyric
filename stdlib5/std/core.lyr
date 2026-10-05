@@ -397,8 +397,8 @@ extend int8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul
     fn bitOr(rhs: int8): int8 { return this | rhs; }
     fn bitXor(rhs: int8): int8 { return this ^ rhs; }
     fn bitNot(): int8 { return ~this; }
-    fn shl(rhs: int): int8 { return this << (rhs as int8); }
-    fn shr(rhs: int): int8 { return this >> (rhs as int8); }
+    fn shl(rhs: int): int8 { return this << rhs; }
+    fn shr(rhs: int): int8 { return this >> rhs; }
 }
 
 extend int16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, Neg, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
@@ -425,8 +425,8 @@ extend int16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mu
     fn bitOr(rhs: int16): int16 { return this | rhs; }
     fn bitXor(rhs: int16): int16 { return this ^ rhs; }
     fn bitNot(): int16 { return ~this; }
-    fn shl(rhs: int): int16 { return this << (rhs as int16); }
-    fn shr(rhs: int): int16 { return this >> (rhs as int16); }
+    fn shl(rhs: int): int16 { return this << rhs; }
+    fn shr(rhs: int): int16 { return this >> rhs; }
 }
 
 extend int32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, Neg, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
@@ -453,8 +453,8 @@ extend int32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mu
     fn bitOr(rhs: int32): int32 { return this | rhs; }
     fn bitXor(rhs: int32): int32 { return this ^ rhs; }
     fn bitNot(): int32 { return ~this; }
-    fn shl(rhs: int): int32 { return this << (rhs as int32); }
-    fn shr(rhs: int): int32 { return this >> (rhs as int32); }
+    fn shl(rhs: int): int32 { return this << rhs; }
+    fn shr(rhs: int): int32 { return this >> rhs; }
 }
 
 extend uint :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
@@ -480,8 +480,8 @@ extend uint :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul
     fn bitOr(rhs: uint): uint { return this | rhs; }
     fn bitXor(rhs: uint): uint { return this ^ rhs; }
     fn bitNot(): uint { return ~this; }
-    fn shl(rhs: int): uint { return this << (rhs as uint); }
-    fn shr(rhs: int): uint { return this >> (rhs as uint); }
+    fn shl(rhs: int): uint { return this << rhs; }
+    fn shr(rhs: int): uint { return this >> rhs; }
 }
 
 extend uint8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
@@ -507,8 +507,8 @@ extend uint8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mu
     fn bitOr(rhs: uint8): uint8 { return this | rhs; }
     fn bitXor(rhs: uint8): uint8 { return this ^ rhs; }
     fn bitNot(): uint8 { return ~this; }
-    fn shl(rhs: int): uint8 { return this << (rhs as uint8); }
-    fn shr(rhs: int): uint8 { return this >> (rhs as uint8); }
+    fn shl(rhs: int): uint8 { return this << rhs; }
+    fn shr(rhs: int): uint8 { return this >> rhs; }
 }
 
 extend uint16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
@@ -534,8 +534,8 @@ extend uint16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, M
     fn bitOr(rhs: uint16): uint16 { return this | rhs; }
     fn bitXor(rhs: uint16): uint16 { return this ^ rhs; }
     fn bitNot(): uint16 { return ~this; }
-    fn shl(rhs: int): uint16 { return this << (rhs as uint16); }
-    fn shr(rhs: int): uint16 { return this >> (rhs as uint16); }
+    fn shl(rhs: int): uint16 { return this << rhs; }
+    fn shr(rhs: int): uint16 { return this >> rhs; }
 }
 
 extend uint32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
@@ -561,8 +561,8 @@ extend uint32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, M
     fn bitOr(rhs: uint32): uint32 { return this | rhs; }
     fn bitXor(rhs: uint32): uint32 { return this ^ rhs; }
     fn bitNot(): uint32 { return ~this; }
-    fn shl(rhs: int): uint32 { return this << (rhs as uint32); }
-    fn shr(rhs: int): uint32 { return this >> (rhs as uint32); }
+    fn shl(rhs: int): uint32 { return this << rhs; }
+    fn shr(rhs: int): uint32 { return this >> rhs; }
 }
 
 extend float :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {

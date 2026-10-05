@@ -851,8 +851,10 @@ public static class IrVerifier
             var lhs = TypeOf(b.Lhs);
             var rhs = TypeOf(b.Rhs);
 
-            // Arithmetic is strict: no implicit widening.
-            if (!IrType.Equal(lhs, rhs))
+            // Arithmetic is strict: no implicit widening. A shift's COUNT is the one operand
+            // with a type of its own (lyric-spec 03 §1.6 rule 2): an integer of any type.
+            var count = b.Kind is IrBinKind.Shl or IrBinKind.Shr && IsInteger(lhs) && IsInteger(rhs);
+            if (!count && !IrType.Equal(lhs, rhs))
             {
                 Report(block, index,
                     $"operand types differ: {b.Lhs} is {Show(lhs)}, {b.Rhs} is {Show(rhs)}");

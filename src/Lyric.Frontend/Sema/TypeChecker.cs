@@ -4494,6 +4494,24 @@ public sealed class TypeChecker
         return CheckBinaryTyped(b, l, r, scope);
     }
 
+    /// <summary>
+    /// <c>a &lt;&lt; n</c> and <c>a &gt;&gt; n</c> on two integers (03 §1.6 rule 2; the review's
+    /// A9f — Rust and Go have it so): the count is an integer of ANY type, and the result has
+    /// the left operand's. The two sides are not unified as an operator's are. So the left is
+    /// what it would be without the shift: a literal is an <c>int</c> here — unified,
+    /// <c>1 &lt;&lt; n</c> took the COUNT's type, a <c>uint8</c> that panics at eight — and the
+    /// shift adapts as the literal would, wherever a literal adapts
+    /// (<see cref="LiteralAdaptsTo"/>). A literal count takes the left's type where it fits it
+    /// (nothing can tell, and the instruction has one type then); one that does not fit stays an
+    /// <c>int</c> and panics where it runs, as every count outside the width does.
+    /// </summary>
+    private LyrType ShiftOf(BinaryExpr b, LyrType l, LyrType r)
+    {
+        if (!LyrType.Equal(l, r) && l is PrimitiveType left && LiteralAdaptsTo(b.Right, left))
+            AdaptLiteralType(b.Right, left);
+        return l;
+    }
+
     private LyrType CheckBinaryTyped(BinaryExpr b, LyrType l, LyrType r, SymbolTable scope)
     {
         switch (b.Operator)
@@ -4523,7 +4541,9 @@ public sealed class TypeChecker
             case BinaryOp.BitAnd or BinaryOp.BitXor or BinaryOp.BitOr or BinaryOp.Shl or BinaryOp.Shr:
             {
                 if (TypeFacts.IsInteger(l) && TypeFacts.IsInteger(r))
-                    return UnifyNumeric(b.Left, l, b.Right, r) ?? BadBinary(b, l, r);
+                    return _comp.Lyric5Modules && b.Operator is BinaryOp.Shl or BinaryOp.Shr
+                        ? ShiftOf(b, l, r)
+                        : UnifyNumeric(b.Left, l, b.Right, r) ?? BadBinary(b, l, r);
                 var (bitIface, bitMethod, bitText) = b.Operator switch
                 {
                     BinaryOp.BitAnd => (_bitAnd, "bitAnd", "&"),
@@ -10776,6 +10796,13 @@ public sealed class TypeChecker
         // '-5' is UnaryExpr(Neg, IntLiteral 5); both nodes carry the adapted type.
         if (expr is UnaryExpr { Operator: UnaryOp.Neg } negated)
             _result.SetType(negated.Operand, target);
+        // A shift of a literal (03 §1.6 rule 2): the type is its left operand's, and a literal
+        // count follows it where it fits, as ShiftOf has it.
+        if (expr is BinaryExpr { Operator: BinaryOp.Shl or BinaryOp.Shr } shift)
+        {
+            AdaptLiteralType(shift.Left, target);
+            if (LiteralAdaptsTo(shift.Right, target)) AdaptLiteralType(shift.Right, target);
+        }
     }
 
 
@@ -11022,8 +11049,17 @@ public sealed class TypeChecker
                    NodeReaches(c, _currentModule?.Members ?? _comp.Builtins, target, to, EmptySubst, parameter));
     }
 
-    private static bool LiteralAdaptsTo(Expr expr, PrimitiveType target)
+    private bool LiteralAdaptsTo(Expr expr, PrimitiveType target)
     {
+        // A shift of an untyped literal is untyped as the literal is (03 §1.6 rule 2; Go's rule
+        // for a constant shifted by a variable): it is what its left operand would be without
+        // the shift, so it adapts wherever that literal would — 'flags & (1 << bit)' is the
+        // flags' type, whatever 'bit' is. The count has no say. Lyric 5: there the two sides
+        // of a shift are not unified.
+        if (_comp.Lyric5Modules && TypeFacts.IsInteger(target)
+            && expr is BinaryExpr { Operator: BinaryOp.Shl or BinaryOp.Shr, Left: var shifted })
+            return LiteralAdaptsTo(shifted, target);
+
         if (TryUntypedIntLiteral(expr, out var negative, out var magnitude))
         {
             if (TypeFacts.IsInteger(target)) return TypeFacts.IntLiteralFits(negative, magnitude, target.Kind);
