@@ -773,9 +773,10 @@ public class ParserTests
     [Fact]
     public void Bare_struct_init_at_statement_start_is_not_recognized()
     {
-        // The '{' disambiguation: 'Foo { … };' as a statement is NOT read as a struct initializer.
+        // The '{' disambiguation: 'Foo { … };' as a statement is NOT read as a struct initializer —
+        // it is refused in one message (PAR0055), and the braces are read past.
         var (stmt, de) = ParseStatement("Point { x = 1 };");
-        Assert.True(de.HasErrors);
-        Assert.IsType<IdentifierExpr>(Assert.IsType<ExprStmt>(stmt).Expr);
+        Assert.Equal("LYR-PAR0055", Assert.Single(de.Diagnostics).Code);
+        Assert.IsType<ErrorExpr>(Assert.IsType<ExprStmt>(stmt).Expr);
     }
 }

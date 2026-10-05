@@ -7794,6 +7794,15 @@ public sealed class TypeChecker
                     si.Path is [var single]
                         ? NameSuggestion.Note(single, NamesIn(scope, typesOnly: true))
                         : null);
+            // A name that is no type, before braces that read as an initializer's: 'run { x = 5 }'.
+            // It said nothing — the error type went on to the lowering, which stopped on it. The
+            // likeliest meaning is a trailing block whose assignment lacks its ';' (M6-2).
+            else
+                _de.Report("LYR-SEM0011", Severity.Error, si.Span,
+                    $"'{string.Join('.', si.Path)}' is no type, and '{{ {si.Fields.FirstOrDefault()?.Name ?? "…"} = … }}' "
+                    + "reads as an initializer's fields",
+                    new DiagnosticNote("a trailing block that assigns ends the assignment with ';' — "
+                        + $"'{si.Path[^1]} {{ {si.Fields.FirstOrDefault()?.Name ?? "x"} = …; }}'"));
             foreach (var f in si.Fields) CheckExpr(f.Value, scope);
             return LyrType.Error;
         }
