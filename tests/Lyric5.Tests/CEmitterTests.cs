@@ -79,6 +79,7 @@ public class CEmitterTests
     [InlineData("generator_lambdas")]
     [InlineData("dynamic_yields")]
     [InlineData("tasks")]
+    [InlineData("paths")]
     public void The_emission_matches_its_golden(string name)
     {
         var actual = CEmitter.Join(EmitC(name));
@@ -218,6 +219,10 @@ public class CEmitterTests
             data.Add("resources", profile, 0, RESOURCES_EXPECTED);
             data.Add("fn_throws", profile, 0, FN_THROWS_EXPECTED);
             data.Add("loops", profile, 0, "8\n-1\n39\n3\n2\n1\n");
+            // An operand that gives no value ends the path it stands on, and no other (06 §9).
+            data.Add("paths", profile, 0,
+                "if 5 match 5 guard 5\ncoalesce 5 and 5 or 5 chain 5\nassign 5 5 5\nnested 5 5\n"
+                + "held 5 5 5 5\nbound 5 5 5\ntry 5 5\nno\nother\n");
             data.Add("bank", profile, 0, BANK_EXPECTED);
             data.Add("generators", profile, 0, GENERATORS_EXPECTED);
             data.Add("generators_close", profile, 0, GENERATORS_CLOSE_EXPECTED);
@@ -707,6 +712,9 @@ public class CEmitterTests
         { "unreachable", Profile.Release, "panic [LYR-RT0012]: entered unreachable code" },
         { "todo", Profile.Debug, "panic [LYR-RT0013]: negative numbers" },
         { "todo", Profile.Release, "panic [LYR-RT0013]: negative numbers" },
+        // An operand that gives no value, on the path that is taken.
+        { "path_taken", Profile.Debug, "panic [LYR-RT0008]: taken" },
+        { "path_taken", Profile.Release, "panic [LYR-RT0008]: taken" },
     };
 
     /// <summary>The checks hold in the release profile too (03 T2: in every profile), and the
