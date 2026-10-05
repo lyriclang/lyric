@@ -329,6 +329,24 @@ Meldung nennt die Kette; Instanzlimit mit klarer Meldung; Instanzen whole-progra
 Sharing über Referenztypen als Optimierer-Tür (Bereich 11); der Cache (L7) hält Instanzen über
 Builds; der 4.x-Verifier-Anteil (Hälfte der ~0.5 ms je Instanz) entfällt unter C-Emission.
 
+## Review 2026-10-05 — Nachträge beim Bauen (M4–M8a)
+
+Entscheidungen des Maintainers aus der Durchsicht der offenen Punkte vor dem Abschluss von M8a.
+Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert oder schärft. Wo eine
+ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| M8a-2 | **Ein Initializer leitet Typargumente aus seinen Feldwerten ab** wie ein Aufruf aus seinen Argumenten (`Cell { v = 3 }` ist `Cell<int>`); der erwartete Typ hat Vorrang. Dasselbe gilt für **statische Member generischer Typen** (`Atomic.new(1)`): die Parameter des Typs unifizieren über die Argumente und den erwarteten Typ. Ein Parameter, den nichts nennt, bleibt ein Fehler mit Vorschlag | T8 |
+| M6-24 | **Lambdas haben Ortsparameter**: `{ &n => n += 1; }` und `(&n) => …`, ihr Typ ist `fn(&T) -> R`. Eine Closure im Rumpf fängt den Ort nicht | T12, T17 |
+| M4-2 | **Member von `T[N]`**: ein heap-residentes `T[N]` (Feld eines Objekts, Element eines `T[]`) reicht eine View herein und hat damit alle Slice-Member; auf einem lokalen `T[N]` sind sie ein Fehler mit dem Ausweg (`toArray()` kopiert). `length()`, `isEmpty()` und `toArray()` hat jedes `T[N]`. Ein `extend`-Block mit einem `T[N]`-Ziel ist ein Fehler | T13 A4 |
+| A9f | **Schiebezähler**: jeder Ganzzahltyp, unabhängig vom linken Operanden (`uint >> int`). Ein Zähler, der negativ ist oder die Breite erreicht, ist eine Panik | T2 |
+| M6-5 | **Geschriebenes `void`** ist erlaubt — ein Typ mit einem Wert (`?void`, `void[]`, `T = void`). Einen `void`-Wert an einen Namen zu binden oder einen Parameter vom Typ `void` zu schreiben warnt; generisch entsteht keine Warnung | — |
+| M6-16 | **`Task<T> throws E`** trägt seine Fehlermenge wie ein Funktionstyp und eine Koroutine: am Typ, nur statisch, ohne zweiten Typparameter | T17 |
+| M5-7, M6-6 | **`throws` hinter einem Rückgabetyp, der selbst eine Menge tragen kann** (Funktionstyp, `Task`, `Coroutine`), ist ohne Klammern ein Fehler: `(fn() -> int) throws E` oder `(fn() -> int throws E)`. Ausnahme: das `throws` einer Generatorfunktion gehört ihrem Generator | T17 |
+| M4-1 | Die **Wertform eines Interfaces mit fixiertem assoziiertem Typ** (`Iterator<Item = int>` als Wert) kommt mit M8c | T6 |
+| M4-5 | X3 bleibt, es gibt keine Orphan-Regel. Ein **Lint** (M12) warnt bei einer Konformanz, deren Typ und Interface beide aus anderen Paketen stammen | T7 X3 |
+
 ---
 
 **Bereich 3 ist damit vollständig entschieden** (T1–T19, 2026-09-28).

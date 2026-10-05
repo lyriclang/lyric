@@ -59,7 +59,7 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | K07 | `build.lyr` mit `executable("app", "src/main.lyr")`, `option`, `flag`, `Profile`, `packed`, `library` (guide 16) | `[[bin]]`, `[profile.*]` im Manifest; `packed` entfällt; Rest des Skripts bleibt (BS1) | R | — |
 | K08 | `stdlib-tests/`-Fremdkompilation | `tests/`-Root im Paket (V4) | H | — |
 | **Syntax** (Grammar §1.4, §3–7) | | | | |
-| S01 | `params xs: int[]` (§3.1) | `xs: int...` | M | — |
+| S01 | `params xs: int[]` (§3.1) | `xs: int...`; ein weitergereichtes Array bekommt an der Aufrufstelle `...` (`f(xs...)`, *Review 2026-10-05, A2*) | M | — |
 | S02 | `throws T` (ein Typ) / `throws` bar (§3.1, guide 10) | bleibt (`throws [A, B]` neu; Listenregel) | — | — |
 | S03 | `catch (e: T)`, `catch (e)`, `catch (_)` (§5) | bleiben (`catch (e in [A, B])` neu) | — | — |
 | S04 | `resume c` (Keyword; guide 11) | `c.next()!` (Panik bei Ende wie `resume`); `Coroutine<void>.next(): bool` bleibt | M | — |
@@ -95,7 +95,7 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | E03 | `xOrErr(a)`, `std.result { Result }` | `Result.of { try x(a) }`; `Result` im Prelude | M | — |
 | E04 | werfender Aufruf ohne Markierung | `try f()` an jeder werfenden Stelle (E4) | M | Sema |
 | E05 | `Throwable` (eingebaut), `class X :: [Throwable] { fn message() }` | `Error` (`message()`, `cause()`) | M | — |
-| E06 | `Exception { text = "…" }` (`std.core`, Feld `text`) | `Exception { message = "…" }` — **bleibt der Fertigtyp** (`:: Error`, `message`, `cause = null`), Feld heißt `message` | M | — |
+| E06 | `Exception { text = "…" }` (`std.core`, Feld `text`) | `Exception("…")` — **bleibt der Fertigtyp** (`:: Error`); die Felder `text` und `inner` bleiben, neu ist die Aufrufform mit `cause` (*Review 2026-10-05, M5-2*) | M | — |
 | E07 | `lastErrorKind()`/`lastErrorDetail()`-Rituale | entfällt (`IoError.kind`) | R | — |
 | E08 | `main` darf nicht `throws`; `catch` um alles | `main` darf werfen (O4) — Vorschlag: `throws` an `main`, Hülle weg | R | — |
 | E09 | `defer stream.close(f)` | `using let f = …` (Closeable, R1) — Vorschlag | R | Typ |

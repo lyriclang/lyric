@@ -37,8 +37,9 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M5 | Errors | M | **done** 2026-10-02 |
 | M6 | Coroutines, scheduler, threads | XL | **done** 2026-10-02 |
 | M7 | Modules and packages | L | **done** 2026-10-02 |
-| M8a | std core | XL | **in progress**: S1–S11a merged, measurement point 3 not met |
+| M8a | std core | XL | **in progress**: S1–S11a merged; closing after the review of 2026-10-05 (blocks R0–R9, then S12–S16) |
 | M8b | std I/O and system | L | — |
+| M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | — |
 | M9a | `comptime` (the IR interpreter) | L | — |
 | M9b | Macros | L | — |
 | M10 | std after rule D | XL | — |
@@ -535,11 +536,30 @@ In progress. Merged, slice by slice (each PR says what it did and how it was che
   bounds it — no inlining across translation units, the map's three arrays, f-string
   allocation — is in `bench/README.md`.
 
-Not built yet, of 13's list for M8a: `collect`/`FromIterator` and the
-collecting terminators; `StringView`, `Pattern`, the Unicode tables and `char`'s predicates;
-`showTo`/`debugTo` and f-strings writing into one builder (10 S6); `std.fmt.format` at run
-time; `@Bench` and `lyric bench`; `+`/`*` on collections. The open points of every slice are
-collected for the 5.0 review.
+**The review of 2026-10-05.** After S11a the maintainer went through the open points of M4 to
+M8a and decided them: 110 decisions, written into the area documents, each in a section "Review
+2026-10-05". They re-cut the milestone (13, the addendum there):
+
+- **M8a closes with** the review's decisions — blocks R0 (the spec pin, these texts, test
+  hygiene), R1 (the compiler's footing: a depth limit, the emitter's tests as packages, names
+  instead of numbers in the C, lowering only what is reached), R2 syntax, R3 names and modules,
+  R4 types and inference, R5 errors and generators, R6 concurrency, R7 std corrections, R8
+  packages and the command line, R9 performance — and then with what M8b needs of the library:
+  `StringView`, `Pattern`, `fromUtf8` (S12); `showTo`/`debugTo` and f-strings writing into one
+  builder (S13); containers' `Debug`, `Display` and `Equatable` (S14); `collect`/`FromIterator`
+  and `x in xs` (S15); the close with measurement point 3 measured again (S16).
+- **Not built, and M8a's to build:** everything in the line above from S12 on; the members of
+  `T[N]`; `copyInto`; `Heap.from`, `withCapacity`, `Deque`'s equality.
+- **Not built, and M8c's** (after M8b): the Unicode tables, `char`'s predicates, `toUpper` and
+  `toLower`; `mapNotNull`, `flatMap`, `flatten`, `chunks`, `windows`, `dedup`, `scan`,
+  `peekable`, `rev`, `cycle`, and lambdas that throw inside adapters; `toSet`/`toMap`/`sorted`
+  and the other collecting terminators beyond `collect`; the set operations, `map[k]`,
+  `list[a..b]`, `+` and `*` on collections; `Result`, `From`/`Into`; `std.fmt.format` at run time; an interface with a
+  fixed associated type as a value; `suppressed()` and `backtrace()` at a `catch` binding;
+  `@Bench` and `lyric bench`.
+- **Clocks the review set:** measurement point 3 holds its bound of 1.5× Go and is to be met
+  after M11, or decided again; the prologue's stack check and `Atomic` over a class come with
+  M11; the notes on hidden candidates and the lint for foreign conformances with M12.
 
 ## Design decisions
 
@@ -553,7 +573,7 @@ Claude plans **and** implements; the maintainer reviews (in force since the scop
 2026-08-02, confirmed for Lyric 5). Every slice is a PR of its own — the spec PR merged first —,
 merged once its CI is green; the milestones follow each other without a pause until 5.0 stands,
 and the last push toward 5.0 waits for the maintainer's review of the points collected on the
-way. Claude also merges, tags and releases. Anything that acts outside the repository — creating
+way (those of M4 to M8a were reviewed on 2026-10-05). Claude also merges, tags and releases. Anything that acts outside the repository — creating
 repositories, publishing releases, deleting published things — is laid out first and done on the
 maintainer's word.
 

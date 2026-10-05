@@ -96,7 +96,7 @@ ist Bereich 2.
 |---|---|---|
 | S1 | Lyric-Funktionen sind **C-Funktionen der Plattform-ABI** (SysV, Win64, AAPCS64); Structs by value, Tupel als Struct-Rückgabe; versteckte Parameter nur wo ein Feature sie braucht (Closure-Umgebung als erstes Argument, Fehlerslot nach L5). Jede exportierte Funktion ist ohne Adapter aus C aufrufbar. | eigene Konvention |
 | S2 | Locals sind C-Locals; kein Frame-Objekt, kein Pool, kein Operandenstapel | — |
-| S3 | **Überlauf = Stack-Pointer-Prüfung im Prolog** gegen eine thread-lokale Grenze (ein Vergleich, mit dem Safepoint-Poll verschmelzbar), **Guard-Page + Signal-Handler als Netz**; Überlauf ist eine **Panik mit Backtrace**, kein Segfault | Tiefenzähler (zählt Frames statt Bytes) |
+| S3 | **Überlauf = Stack-Pointer-Prüfung im Prolog** gegen eine thread-lokale Grenze (ein Vergleich, mit dem Safepoint-Poll verschmelzbar), **Guard-Page + Signal-Handler als Netz**; Überlauf ist eine **Panik mit Backtrace**, kein Segfault. *Review 2026-10-05 (M6-25): die Prolog-Prüfung kommt mit M11; bis dahin trägt das Netz allein* | Tiefenzähler (zählt Frames statt Bytes) |
 | S4 | **`main` auf dem OS-Stack**, Größe per Linker-Flag auf **8 MB** auf allen Plattformen, Grenzen beim Start ermittelt (`pthread_getattr_np`/`VirtualQuery`). Begründung: ein laufzeiteigener Hauptstack kauft Uniformität und zahlt mit TEB-Umschreibung unter Windows (SEH, `__chkstk`) und Reibung in gdb/ASan/valgrind — ausgerechnet dort, wo man am meisten debuggt | laufzeiteigener Hauptstack (zuerst empfohlen, revidiert) |
 | S5 | Tail Calls (`musttail`): Tür, kein Plan | — |
 
@@ -162,7 +162,7 @@ das Format von Lyric-Script.
 | # | Entscheidung | Verworfen |
 |---|---|---|
 | C1 | **C11** plus `__builtin_expect`, `__attribute__`, `restrict`, `_Thread_local`. **Kein MSVC** als Backend-Compiler; unter Windows `zig cc` oder clang | MSVC |
-| C2 | **eine `.c` je Lyric-Modul**; Debug ohne LTO. **ThinLTO im Release: Uhr** — entschieden nach Messpunkt 3 (M8a), wenn die Einheitengrenzen von C3 messbar kosten. Befund M3 S8 (2026-10-01): `zig cc -flto=thin` bricht den Cross-Link nach Windows (zigs mingw-Brücke verliert `frexpf`, `modfl`, `wmemchr`, …) und verzehnfacht die Link-Zeit der Suite; Messpunkt 2 hält ohne. Alternative zum LTO: kleine Instanzen `static inline` in der Einheit des Aufrufers | Unity-Build als Release-Option: Tür |
+| C2 | **eine `.c` je Lyric-Modul**; Debug ohne LTO. **ThinLTO im Release: Uhr** — entschieden nach Messpunkt 3 (M8a), wenn die Einheitengrenzen von C3 messbar kosten. Befund M3 S8 (2026-10-01): `zig cc -flto=thin` bricht den Cross-Link nach Windows (zigs mingw-Brücke verliert `frexpf`, `modfl`, `wmemchr`, …) und verzehnfacht die Link-Zeit der Suite; Messpunkt 2 hält ohne. Alternative zum LTO: kleine Instanzen `static inline` in der Einheit des Aufrufers. *Review 2026-10-05 (B11): die Uhr ist fällig, ThinLTO wird angestrebt* | Unity-Build als Release-Option: Tür |
 | C3 | generische Instanziierungen **whole-program gesammelt**, je Instanz eine Hash-benannte Cache-Einheit, einmal kompiliert (C hat kein COMDAT) | `static` je Einheit |
 | C4 | Mangling `lyr_<modul>_<name>` + kurzer Typ-Hash bei Überladung/Instanz; lesbar in gdb und perf | — |
 | C5 | Form: aus dem IR, Blöcke + `goto`, Werte in Locals; `if`/`while` wo der Block es hergibt; `__builtin_expect` auf Fehlerprüfungen | — |
@@ -214,6 +214,24 @@ GC-Vertrag umsonst (Go: kleine Runtime, Bibliothek in Go; Rust: `core` in Rust).
 | Profiling | `perf`, Instruments, VTune, Tracy nativ — **kein eigener Profiler**; lesbare Namen (C4) |
 | Sanitizer-Profil | `lyric build --profile asan` (ASan + UBSan, Koroutinen annotiert, GC-Fast-Path aus) |
 | Panik-Ausgabe | Meldung + Backtrace mit `.lyr`-Positionen; Debug immer, Release bei Panik (E8) |
+
+## Review 2026-10-05 — Nachträge beim Bauen (M4–M8a)
+
+Entscheidungen des Maintainers aus der Durchsicht der offenen Punkte vor dem Abschluss von M8a.
+Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert oder schärft. Wo eine
+ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| B10 | Der **IR-Optimierer** (Inliner, Skalarersetzung, Devirtualisierung) läuft im **Release-Profil**; Debug bleibt ohne. Vor dem Einschalten laufen alle Suiten und die Konformanz mit ihm | L8 |
+| B11 | **ThinLTO wird angestrebt**: die Uhr aus C2 ist mit Messpunkt 3 fällig geworden (die Einheitengrenzen kosten bei `sorting` 27 %). Scheitert der Cross-Link nach Windows erneut, wird neu entschieden — zwischen dem IR-Inliner allein, `static inline`-Kopien und einem Unity-Build | L8 C2 |
+| B13 | **Typbezeichner im C tragen den vollen Pfad** (07 K2), keine laufenden Nummern. **Gesenkt und emittiert wird nur, was das Programm erreicht** — Funktionen, Typen, Tabellen und Modul-Bindungen. Eine nie gelesene Bindung mit effektfreiem Initialisierer entfällt; jede andere Bindung eines erreichten Moduls bleibt (07 G2) | L8 C4, L11 |
+| B16 | **Kopier-Primitiv**: ein `memmove`-Intrinsic mit Elementgröße für `T[]` und `Slice<T>`; `copyInto`, das Wachstum von `List` und `Deque`, der Sortierpuffer und `toArray` laufen darüber | L9 |
+| M5-4 | **Unerreichbarer Boden**: wo der Emitter „unerreichbar“ schreibt, steht im Debug-Profil eine Panik `LYR-RT0017` mit Trace, im Release `__builtin_trap()`. Undefiniertes Verhalten gibt es an dieser Stelle in keinem Profil | L8 |
+| M5-12 | **Eine Funktionswert-ABI**: jeder Funktionswert führt den Fehlerzeiger, ob er wirft oder nicht | L5 |
+| M6-25 | **Die Prolog-Prüfung (S3) kommt mit M11**, verschmolzen mit dem Safepoint-Poll. Bis dahin gilt das Netz allein (Guard-Page und Handler): ein Überlauf beendet den Prozess mit Bericht, statt wie jede Panik nur den Task zu verlassen (05 E8) | L3 S3 |
+| M6-26 | `main` läuft nur dann als Task auf einem Koroutinen-Stack, wenn das Programm warten kann (06 T6); die Stackgröße von `main` ist in beiden Fällen gleich | L4 |
+| — | **Panik-Codes aus dem Review**: `LYR-RT0016` „changed while it was walked“ (10 I9), `LYR-RT0017` unerreichbarer Boden, `LYR-RT0018` „every task waits and nothing can wake one“ (06), `LYR-RT0019` vergiftetes Schloss (06) | L5 |
 
 ---
 
