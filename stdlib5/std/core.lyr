@@ -328,7 +328,7 @@ pub interface Index<K> {
     fn index(k: K): Self.Output;
 }
 
-/// `x[k] = v` is `x.setIndex(k, v)`. A compound assignment, `x[k] += 1`, is written out.
+/// `x[k] = v` is `x.setIndex(k, v)`; `x[k] += 1` reads and writes, `x` and `k` evaluated once.
 pub interface IndexSet<K> :: [Index<K>] {
     mut fn setIndex(k: K, v: Self.Output): void;
 }
