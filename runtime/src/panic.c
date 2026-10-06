@@ -159,6 +159,11 @@ void lyr_panic_deadlock(void) {
     lyr_panic(LYR_RT_DEADLOCK, "deadlock: every task waits, and nothing can wake one");
 }
 
+void lyr_panic_poisoned(const LyrStr *code, const LyrStr *message) {
+    lyr_panic(LYR_RT_POISONED, "lock poisoned by a panic: %.*s: %.*s", shown(code, 100), code->bytes,
+              shown(message, 1000), message->bytes);
+}
+
 void lyr_panic_floor(void) {
     lyr_panic(LYR_RT_FLOOR, "control reached code the compiler holds unreachable");
 }

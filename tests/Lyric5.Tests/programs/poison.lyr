@@ -1,0 +1,24 @@
+// A lock poisoned by a panic (design/v5/spec/06 G4, the review's M6-21; 10 §10 rule 6), across
+// threads: a task on another thread panics while it holds the mutex; main, parked for it, is woken
+// by the release and panics with the poison. Exit 101. Expected stdout:
+//   holder has it
+import std.io { println };
+import std.task { sleep, Thread, Mutex, Channel };
+import std.time { Duration };
+
+fn main(): void throws Error {
+    let m = Mutex<int>.new(0);
+    let taken = Channel<int>.new(1);
+    let t = Thread.spawn(() => {
+        try m.lock { &n =>
+            n = 1;
+            try taken.send(1);
+            try sleep(Duration.ofMillis(50));
+            panic("inside");
+        };
+    });
+    let _ = try taken.recv();
+    println("holder has it");
+    let v = try m.lock { &n => n };
+    println(f"not reached {v} {t.isDone()}");
+}
