@@ -596,6 +596,7 @@ public sealed class CEmitter
     {
         IrSliceType => $"{Temp(array)}.ptr",
         IrInlineArrayType => $"{Temp(array)}->v", // the temp aliases the value's storage
+        IrScalarType { Kind: IrScalar.String } => $"(uint8_t *){Temp(array)}->bytes", // a string's bytes (10 S1)
         _ => $"LYR_ARR_DATA({Temp(array)}, {CType(element)})",
     };
 
@@ -1753,7 +1754,9 @@ public sealed class CEmitter
         ArrayLen a => $"{Temp(a.Dest)} = {Length(a.Array)};",
         // A view (03 T13 A2): its bounds checked against the source, then a pointer into the
         // source's elements and a length — of an array, or of a view of one.
-        MakeSlice s => $"LYR_CHECK_RANGE({Temp(s.Low)}, {Temp(s.High)}, {Length(s.Array)}); "
+        MakeSlice s => (s.Chars
+                ? $"LYR_CHECK_CHAR_RANGE({Elements(s.Array, s.Element)}, {Temp(s.Low)}, {Temp(s.High)}, {Length(s.Array)}); "
+                : $"LYR_CHECK_RANGE({Temp(s.Low)}, {Temp(s.High)}, {Length(s.Array)}); ")
             + $"{Temp(s.Dest)} = ({CType(TypeOf(s.Dest))}){{ {Elements(s.Array, s.Element)} + {Temp(s.Low)}, {Temp(s.High)} - {Temp(s.Low)} }};",
         // An element is a place in the array (02 M3): a struct element is aliased where it lies,
         // a scalar or a reference read out. The check is the one of 03 T14 N5, in every profile.

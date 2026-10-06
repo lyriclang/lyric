@@ -52,8 +52,11 @@ public sealed record StoreElem(TempId Array, TempId Index, TempId Value, Span Sp
 public sealed record ArrayLen(TempId Dest, TempId Array, Span Span) : IrOp(Span);
 /// <summary>A view of the elements <c>[Low, High)</c> of an array or of a view (03 T13 A2): checked
 /// against the source's length, then a pointer and a length, no copy. <c>Array</c> is the source
-/// — an array or a slice — and loadelem, storeelem and arraylen take a slice too.</summary>
-public sealed record MakeSlice(TempId Dest, TempId Array, TempId Low, TempId High, IrType Element, Span Span) : IrOp(Span);
+/// — an array or a slice — and loadelem, storeelem and arraylen take a slice too. With
+/// <c>Chars</c> the source is a string's bytes or a view of them (10 S1): a bound inside a
+/// character panics as one outside does, and the source may be a string.</summary>
+public sealed record MakeSlice(TempId Dest, TempId Array, TempId Low, TempId High, IrType Element, Span Span,
+    bool Chars = false) : IrOp(Span);
 /// <summary>An inline array (03 T13 A4) built from its elements — <c>Length</c> of them, or one
 /// repeated when <c>Repeat</c> is set (<c>[x] * N</c>, 10 C7). A fresh value, like a struct.</summary>
 public sealed record NewInline(TempId Dest, IrType Element, int Length, TempId[] Elements, bool Repeat, Span Span) : IrOp(Span);

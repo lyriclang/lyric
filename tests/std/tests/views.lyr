@@ -1,0 +1,38 @@
+// std.core's StringView (design/v5/spec/10 S1; M8a S12): a view hashes as the string of its bytes,
+// orders by them, and a view of a view is a view of the same string.
+import std.hash { FixedHasher };
+import std.test { assertEq, assertFalse, assertTrue };
+
+fn hashOf<T :: [Hashable]>(v: T): uint64 {
+    var h = FixedHasher.new();
+    v.hash(&h);
+    return h.finish();
+}
+
+@Test
+fn aViewHashesAsTheStringOfItsBytes(): void {
+    assertEq(hashOf("abc"), hashOf("xabcx"[1..4]));
+    assertFalse(hashOf("ab") == hashOf("abc"[..3]));
+}
+
+@Test
+fn viewsOrderByTheirBytes(): void {
+    let words = "pear apple fig";
+    let p = words[..4];
+    let a = words[5..10];
+    let f = words[11..];
+    assertTrue(a < f);
+    assertTrue(f < p);
+    assertTrue(a == "apple");
+    assertFalse(p == a);
+}
+
+@Test
+fn aViewOfAViewViewsTheSameString(): void {
+    let s = "naïve café";
+    let v = s[4..];
+    let w = v[..3];
+    assertEq(v.length(), 8);
+    assertEq(w.toString(), "ve ");
+    assertEq(w[0], "v"[0]);
+}

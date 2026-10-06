@@ -3722,3 +3722,98 @@ pub fn cloneOptional<T :: [Clone]>(o: ?T): ?T {
 pub fn sequence<T>(body: fn() -> Coroutine<T>): Coroutine<T> {
     return body();
 }
+
+// --- StringView (10 S1, 03 A2; M8a S12): the view of a string's bytes --------------------------
+// A pointer into a string's bytes and a length, read and never written. `s[a..b]` takes one on
+// character boundaries, a string stands where one is expected, and `s[i]` is the character that
+// begins at a byte. The string's search and split members move onto it with S12b.
+
+/// `a == b` between a string and a view, or two views: the same bytes. The checker's for the
+/// operator; a program writes `==`.
+pub fn equalViews(a: StringView, b: StringView): bool {
+    return viewsHoldTheSameBytes(a, b);
+}
+
+/// `<`, `<=`, `>`, `>=` between a string and a view, or two views: byte by byte, which is the
+/// order of the code points. The checker's for the operators.
+pub fn compareViews(a: StringView, b: StringView): ?Ordering {
+    return a.totalCompare(b);
+}
+
+/// `s[i]`: the character that begins at byte `i`; outside the bytes, or at a byte that continues
+/// a character, a panic (LYR-RT0003). The checker's for the index.
+pub fn charAtByte(v: StringView, i: int): char {
+    return charOfView(v, i);
+}
+
+fn viewsHoldTheSameBytes(a: StringView, b: StringView): bool;
+/// Byte by byte, as `memcmp` and then the length: -1, 0 or 1.
+fn compareViewBytes(a: StringView, b: StringView): int;
+fn viewToString(v: StringView): string;
+fn charOfView(v: StringView, i: int): char;
+/// The view's bytes as the `Slice<uint8>` it is below the checker — read here, never written.
+fn viewBytes(v: StringView): Slice<uint8>;
+
+extend StringView {
+    /// Whether it holds no byte.
+    pub fn isEmpty(): bool {
+        return this.length() == 0;
+    }
+
+    /// Its bytes in a string of their own.
+    pub fn toString(): string {
+        return viewToString(this);
+    }
+}
+
+/// A view compares, hashes and orders by its bytes, as a string does: equal to the string it
+/// shows, hashing as it does (10 C8); it shows its text and debugs quoted.
+extend StringView :: [Equatable, Hashable, Ordered, TotalOrder, Display, Debug, Index<int>] {
+    type Output = char;
+
+    fn equals(o: StringView): bool {
+        return viewsHoldTheSameBytes(this, o);
+    }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        h.write(viewBytes(this));
+        h.writeByte(255);
+    }
+
+    fn compare(o: StringView): ?Ordering {
+        return this.totalCompare(o);
+    }
+
+    fn totalCompare(o: StringView): Ordering {
+        let c = compareViewBytes(this, o);
+        if (c < 0) {
+            return Ordering.Less;
+        }
+        if (c > 0) {
+            return Ordering.Greater;
+        }
+        return Ordering.Equal;
+    }
+
+    fn show(): string {
+        return viewToString(this);
+    }
+
+    fn debug(): string {
+        return viewToString(this).debug();
+    }
+
+    fn index(k: int): char {
+        return charOfView(this, k);
+    }
+}
+
+/// `s[i]` through `Index<int>` where a type parameter asks for it (04 D6): the character that
+/// begins at byte `i`.
+extend string :: [Index<int>] {
+    type Output = char;
+
+    fn index(k: int): char {
+        return charOfView(this, k);
+    }
+}

@@ -1562,6 +1562,9 @@ public static class IrVerifier
         if (TypeOf(array) is IrArrayType a) return a.Element;
         if (TypeOf(array) is IrSliceType s) return s.Element;
         if (TypeOf(array) is IrInlineArrayType ia) return ia.Element;
+        // A string's bytes (10 S1): what a view of it, and the length of it, read.
+        if (TypeOf(array) is IrScalarType { Kind: IrScalar.String } && what is "mkslice" or "arraylen")
+            return new IrScalarType(IrScalar.U8);
 
         Report(block, index, $"{what} expects {array} to be an array or a slice, found {Show(TypeOf(array))}");
         return null;

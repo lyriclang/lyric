@@ -39,6 +39,10 @@ public static class BuiltinTypes
         // std.core, visible without an import): the same way.
         scope.TryDeclare(new TypeSymbol("Slice", TypeSymbolKind.Builtin, Visibility.Public,
             new SymbolTable(), declaration: null));
+        // StringView, the view of a string's bytes (10 S1, 03 A2): the same way, with no
+        // parameter; its members come from std.core's blocks, as a string's do.
+        scope.TryDeclare(new TypeSymbol("StringView", TypeSymbolKind.Builtin, Visibility.Public,
+            new SymbolTable(), declaration: null));
         return scope;
     }
 

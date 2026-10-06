@@ -34,6 +34,7 @@ public abstract record LyrType
     public static readonly LyrType Char = new PrimitiveType(PrimitiveKind.Char);
     public static readonly LyrType String = new PrimitiveType(PrimitiveKind.String);
     public static readonly LyrType Void = new PrimitiveType(PrimitiveKind.Void);
+    public static readonly LyrType StringView = new StringViewType();
 
     /// <summary>Structural type equality.</summary>
     public static bool Equal(LyrType a, LyrType b) => (a, b) switch
@@ -52,6 +53,7 @@ public abstract record LyrType
         (Optional x, Optional y) => Equal(x.Inner, y.Inner),
         (ArrayOf x, ArrayOf y) => Equal(x.Element, y.Element),
         (SliceOf x, SliceOf y) => Equal(x.Element, y.Element),
+        (StringViewType, StringViewType) => true,
         (InlineArrayOf x, InlineArrayOf y) => x.Length == y.Length && Equal(x.Element, y.Element),
         (TupleOf x, TupleOf y) => SameSequence(x.Elements, y.Elements),
         // The thrown set counts (03 T17): 'fn() -> int' and 'fn() -> int throws E' are two types —
@@ -127,6 +129,9 @@ public sealed record AssocOf(LyrType Base, AssociatedTypeSymbol Member) : LyrTyp
 public sealed record Optional(LyrType Inner) : LyrType;              // ?T
 public sealed record ArrayOf(LyrType Element) : LyrType;             // T[]
 public sealed record SliceOf(LyrType Element) : LyrType;             // Slice<T>: a view of T[] (03 T13 A2)
+/// <summary><c>StringView</c>: a view of a string's bytes (10 S1, 03 A2) — read, never written; a
+/// <c>Slice&lt;uint8&gt;</c> below the checker.</summary>
+public sealed record StringViewType : LyrType;
 public sealed record InlineArrayOf(LyrType Element, int Length) : LyrType; // T[N]: N elements inline, a value (03 T13 A4)
 /// <summary>A tuple; the labels, if any, name elements for <c>.x</c> and are no part of the
 /// type's identity (03 T16): <c>(x: int, y: int)</c> and <c>(int, int)</c> are one type.</summary>
