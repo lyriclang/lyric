@@ -25,6 +25,7 @@
 #define LYR_RT_WALKED           "LYR-RT0016"  /* a collection changed while it was walked (10 I9) */
 #define LYR_RT_FLOOR            "LYR-RT0017"  /* control reached code the compiler holds unreachable: a bug in the compiler (05 E8) */
 #define LYR_RT_DEADLOCK         "LYR-RT0018"  /* every task of a thread waits, and nothing can wake one (06, M6-12) */
+#define LYR_RT_POISONED         "LYR-RT0019"  /* a lock a task panicked while holding, acquired again (06 G4, M6-21) */
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define LYR_NORETURN __attribute__((noreturn, cold, noinline))
@@ -75,6 +76,8 @@ LYR_NORETURN void lyr_panic_todo(const struct LyrStr *message);
 LYR_NORETURN void lyr_panic_walked(const struct LyrStr *what);
 /* A wait nothing can end (06, the review's M6-12): the scheduler's, raised in the waiting task. */
 LYR_NORETURN void lyr_panic_deadlock(void);
+/* An acquire on a poisoned lock (06 G4, the review's M6-21): the first panic's code and message. */
+LYR_NORETURN void lyr_panic_poisoned(const struct LyrStr *code, const struct LyrStr *message);
 
 /* Where the compiler knows control cannot arrive — behind a call that does not return, behind a
  * match that covers every case. That knowledge is the compiler's, and a compiler can be wrong: if

@@ -834,6 +834,14 @@ pub class Once {
     }
 }
 
+/// A lock a context holds (the review's M6-21): the lock's state, how — alone, or as one of its
+/// readers —, and the next one down.
+class Hold {
+    var state: ?LockState = null,
+    var alone: bool = false,
+    var next: ?Hold = null,
+}
+
 /// A lock's value, where the place its body takes lies.
 class Slot<T> {
     var value: T,
@@ -849,6 +857,18 @@ class LockState {
     var writersWaiting: int = 0,
     var done: bool = false,
     waiters: Waiters = Waiters { },
+    /// The panic of a task that held the lock when it panicked (the review's M6-21): from then on
+    /// every acquire panics, naming it. The lock itself was released by the scheduler.
+    var poisoned: ?PanicInfo = null,
+
+    /// The guard held: a poisoned lock refuses the running task — with its guard released and a
+    /// panic that names the first one.
+    mut fn refuseIfPoisoned(): void {
+        if (let p = this.poisoned) {
+            this.guard.release();
+            poisonedBy(p.code, p.message);
+        }
+    }
 
     /// The running task holds the lock alone, once no other holds it at all; a writer (`counting`)
     /// counts itself as waiting the while, which holds back readers that come after it.
@@ -857,6 +877,7 @@ class LockState {
         let me = s.running ?? panic("a lock where no task runs");
         if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         this.guard.acquire();
+        this.refuseIfPoisoned();
         if (counting) { this.writersWaiting += 1; }
         while (this.alone || this.readers > 0) {
             if (!this.awaitChange(s, me)) {
@@ -867,9 +888,11 @@ class LockState {
                 this.guard.release();
                 throw Cancelled { };
             }
+            this.refuseIfPoisoned();
         }
         if (counting) { this.writersWaiting -= 1; }
         this.alone = true;
+        me.took(this, true);
         this.guard.release();
     }
 
@@ -879,32 +902,58 @@ class LockState {
         let me = s.running ?? panic("a lock where no task runs");
         if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         this.guard.acquire();
+        this.refuseIfPoisoned();
         while (this.alone || this.writersWaiting > 0) {
             if (!this.awaitChange(s, me)) {
                 this.guard.release();
                 throw Cancelled { };
             }
+            this.refuseIfPoisoned();
         }
         this.readers += 1;
+        me.took(this, false);
         this.guard.release();
     }
 
+    /// The running task lets go of the lock it holds alone: the body's `defer`.
     mut fn releaseAlone(): void {
         let s = here();
+        let me = s.running ?? panic("a lock where no task runs");
+        me.released();
+        this.freeAlone(s, null);
+    }
+
+    /// The running task lets go of its share.
+    mut fn releaseShared(): void {
+        let s = here();
+        let me = s.running ?? panic("a lock where no task runs");
+        me.released();
+        this.freeShared(s, null);
+    }
+
+    /// The lock held alone comes free — and is poisoned where `panic` is the panic of the task
+    /// that held it (M6-21): the waiters wake, look, and see it.
+    mut fn freeAlone(s: Scheduler, panic: ?PanicInfo): void {
         this.guard.acquire();
         this.alone = false;
+        this.poison(panic);
         this.waiters.wakeAll(s);
         this.guard.release();
     }
 
-    mut fn releaseShared(): void {
-        let s = here();
+    mut fn freeShared(s: Scheduler, panic: ?PanicInfo): void {
         this.guard.acquire();
         this.readers -= 1;
-        if (this.readers == 0) {
+        this.poison(panic);
+        if (this.readers == 0 || panic != null) {
             this.waiters.wakeAll(s);
         }
         this.guard.release();
+    }
+
+    /// The guard held: the first panic stays.
+    mut fn poison(panic: ?PanicInfo): void {
+        if (this.poisoned == null) { this.poisoned = panic; }
     }
 
     /// A once's start: true for the task that does the work now, false where it is done — one that
@@ -914,23 +963,37 @@ class LockState {
         let me = s.running ?? panic("a once where no task runs");
         if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         this.guard.acquire();
+        this.refuseIfPoisoned();
         while (this.alone) {
             if (!this.awaitChange(s, me)) {
                 this.guard.release();
                 throw Cancelled { };
             }
+            this.refuseIfPoisoned();
         }
         let first = !this.done;
-        if (first) { this.alone = true; }
+        if (first) {
+            this.alone = true;
+            me.took(this, true);
+        }
         this.guard.release();
         return first;
     }
 
+    /// The task that does the work has ended it: done, or not — the body threw — for the next.
     mut fn endOnce(done: bool): void {
         let s = here();
+        let me = s.running ?? panic("a once where no task runs");
+        me.released();
+        this.freeOnce(s, done, null);
+    }
+
+    /// The work's end — undone and poisoned where `panic` is the panic of the task doing it.
+    mut fn freeOnce(s: Scheduler, done: bool, panic: ?PanicInfo): void {
         this.guard.acquire();
         this.alone = false;
         this.done = done;
+        this.poison(panic);
         this.waiters.wakeAll(s);
         this.guard.release();
     }
@@ -1339,10 +1402,52 @@ class Context {
     /// The wait it is in is for a task's end — an `await`, a scope's close: where every task of
     /// a thread waits, such a one waits for the reason and is not it.
     var awaits: bool = false,
+    /// The locks it holds, newest first (the review's M6-21): released and poisoned where it
+    /// panics, since a panic unwinds nothing. One node is kept for the next lock, so a lock that
+    /// nests in no other costs no allocation after the first.
+    var holds: ?Hold = null,
+    var spareHold: ?Hold = null,
 
     /// A wait begins: from here a waker may claim it — before it goes into any place a waker looks.
     mut fn beginWait(): void {
         atomicStore(&this.state, 1);
+    }
+
+    /// It holds `state` from here on — alone, or as one of its readers; a once's work counts as
+    /// alone — until it lets go of it, or panics.
+    mut fn took(state: LockState, alone: bool): void {
+        let hold = this.spareHold ?? Hold { };
+        this.spareHold = null;
+        hold.state = state;
+        hold.alone = alone;
+        hold.next = this.holds;
+        this.holds = hold;
+    }
+
+    /// It let go of the lock it took last.
+    mut fn released(): void {
+        if (let hold = this.holds) {
+            this.holds = hold.next;
+            hold.state = null;
+            hold.next = null;
+            this.spareHold = hold;
+        }
+    }
+
+    /// It panicked while it held locks (M6-21): each comes free, as the body's `defer` would have
+    /// made it — newest first —, and is poisoned with the panic where no earlier one poisoned it.
+    mut fn dropHeld(s: Scheduler, panic: PanicInfo): void {
+        while (let hold = this.holds) {
+            this.holds = hold.next;
+            if (let state = hold.state) {
+                // a once's work the same as a lock held alone: undone, and poisoned
+                if (hold.alone) {
+                    state.freeAlone(s, panic);
+                } else {
+                    state.freeShared(s, panic);
+                }
+            }
+        }
     }
 
     /// A waker ends its wait: true for the first, which readies it; false for every other, and
@@ -1768,6 +1873,7 @@ class Scheduler {
             message = panicMessage(c.body) ?? "",
             trace = panicTrace(c.body) ?? "",
         };
+        c.dropHeld(this, info);
         if (let handler = c.onPanic) {
             handler(info);
         } else {
@@ -2044,6 +2150,9 @@ fn park(): void;
 
 /// The panic of a wait nothing can end (the review's M6-12): `LYR-RT0018`.
 fn deadlocked(): never;
+
+/// The panic of an acquire on a poisoned lock (M6-21): `LYR-RT0019`, naming the first panic.
+fn poisonedBy(code: string, message: string): never;
 
 /// Resumes a task's context until it parks (0), its body returns (1) or it panics (2): a panic
 /// stays the context's, for the scheduler to settle (13 §1.6 rule 10).
