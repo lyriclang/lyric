@@ -130,9 +130,10 @@ public class ManifestTests
             + "units = { git = \"git@example.org:units.git\", branch = \"release/1\" }\n"
             + "io = { git = \"file:///srv/io\", rev = \"0123abc\" }\n"
             + "fmt = { git = \"ssh://example.org/fmt\" }\n"));
+        // read in the normal form (M7-10): the '.git' at the end dropped
         Assert.Equal(
-            [new GitSource("https://example.org/geo.git", GitRefKind.Tag, "v1.2.0"),
-             new GitSource("git@example.org:units.git", GitRefKind.Branch, "release/1"),
+            [new GitSource("https://example.org/geo", GitRefKind.Tag, "v1.2.0"),
+             new GitSource("git@example.org:units", GitRefKind.Branch, "release/1"),
              new GitSource("file:///srv/io", GitRefKind.Rev, "0123abc"),
              new GitSource("ssh://example.org/fmt", GitRefKind.Default, null)],
             m.Dependencies.Select(d => d.Git));

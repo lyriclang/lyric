@@ -14,8 +14,10 @@ namespace Lyric5.Tests;
 [Collection("console")]
 public class GitDependencyTests
 {
-    private static string Manifest(string name, string dependencies = "") =>
-        $"[package]\nname = \"{name}\"\nversion = \"0.1.0\"\n{(dependencies.Length > 0 ? "\n" + dependencies : "")}";
+    /// <summary>A manifest; a version a tag over it names (the package graph refuses a tag that is
+    /// another version, PackageRuleTests).</summary>
+    private static string Manifest(string name, string dependencies = "", string version = "0.1.0") =>
+        $"[package]\nname = \"{name}\"\nversion = \"{version}\"\n{(dependencies.Length > 0 ? "\n" + dependencies : "")}";
 
     private static string Shapes(string area) => $"pub fn area(w: int, h: int): int {{\n    return {area};\n}}\n";
 
@@ -26,9 +28,9 @@ public class GitDependencyTests
     private static TestRepo Geo(out string first, out string second)
     {
         var repo = new TestRepo();
-        first = repo.Commit(("lyric.toml", Manifest("geo")), ("src/shapes.lyr", Shapes("w * h")));
+        first = repo.Commit(("lyric.toml", Manifest("geo", version: "1.0.0")), ("src/shapes.lyr", Shapes("w * h")));
         repo.Tag("v1.0.0");
-        second = repo.Commit(("lyric.toml", Manifest("geo")), ("src/shapes.lyr", Shapes("w * h + 1")));
+        second = repo.Commit(("lyric.toml", Manifest("geo", version: "1.1.0")), ("src/shapes.lyr", Shapes("w * h + 1")));
         repo.Tag("v1.1.0");
         return repo;
     }
@@ -132,7 +134,7 @@ public class GitDependencyTests
     public void A_package_from_git_names_its_dependencies_by_git()
     {
         using var repo = new TestRepo();
-        repo.Commit(("lyric.toml", Manifest("geo", "[dependencies]\nunits = { path = \"../units\" }\n")), ("src/shapes.lyr", Shapes("w * h")));
+        repo.Commit(("lyric.toml", Manifest("geo", "[dependencies]\nunits = { path = \"../units\" }\n", "1.0.0")), ("src/shapes.lyr", Shapes("w * h")));
         repo.Tag("v1.0.0");
         var dir = App($"geo = {{ git = \"{repo.Url}\", tag = \"v1.0.0\" }}");
         var (exit, _, error) = Run("build", "-C", dir);
@@ -147,7 +149,7 @@ public class GitDependencyTests
     {
         using var repo = new TestRepo();
         var commit = repo.Commit(
-            ("lyric.toml", Manifest("geo").Replace("version = \"0.1.0\"\n", "version = \"0.1.0\"\nexclude = [\"src/draft.lyr\"]\n")),
+            ("lyric.toml", Manifest("geo", version: "1.0.0").Replace("version = \"1.0.0\"\n", "version = \"1.0.0\"\nexclude = [\"src/draft.lyr\"]\n")),
             ("src/shapes.lyr", Shapes("w * h")), ("src/draft.lyr", "pub fn later(): int {\n    return 0;\n}\n"),
             ("tests/shapes_test.lyr", "fn main(): void {\n}\n"), ("README.md", "geo\n"), ("notes.txt", "todo\n"));
         repo.Tag("v1.0.0");
