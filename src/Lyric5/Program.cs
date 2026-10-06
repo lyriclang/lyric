@@ -75,6 +75,8 @@ public static class Program
         output.WriteLine("  -C <dir>                       look for the package from <dir> instead of here");
         output.WriteLine("  --bin <name>                   the package's program to build, run or print");
         output.WriteLine("  --offline                      fetch nothing: packages from git come from the cache");
+        output.WriteLine("  --locked                       take lyric.lock as it is: build, run and test fail where");
+        output.WriteLine("                                 the manifests read otherwise, and write no lock");
         output.WriteLine();
         output.WriteLine("The Lyric 5 command line, in development (design/v5/spec/13).");
         return exit;
@@ -104,7 +106,7 @@ public static class Program
 
     /// <summary>The options without a value.</summary>
     private static readonly string[] Flags =
-        ["--offline", .. FieldFlags.SelectMany(f => new[] { "--" + f.Flag, "--no-" + f.Flag })];
+        ["--offline", "--locked", .. FieldFlags.SelectMany(f => new[] { "--" + f.Flag, "--no-" + f.Flag })];
 
     private static int Build(string[] args, bool run)
     {
@@ -151,6 +153,8 @@ public static class Program
         if (file is not null) file = Path.GetFullPath(file, baseDirectory);
         // '--offline' (11 W2 P9): what is read from git comes from the user's cache, nothing is fetched.
         var offline = flags.Contains("--offline");
+        // '--locked' (07 M7-9): the lock as it is — what it does not hold, or holds besides, refused.
+        var locked = flags.Contains("--locked");
 
         // The programs this command is about: a package's every one (P2), or the file's.
         List<Project> programs;
@@ -159,7 +163,7 @@ public static class Program
         {
             if (file is null)
             {
-                if (Project.ProgramsOf(baseDirectory, offline) is not { } package)
+                if (Project.ProgramsOf(baseDirectory, offline, locked) is not { } package)
                 {
                     Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
                     Console.Error.WriteLine($"  = help: lyric5 {verb} <file.lyr> builds one file alone");
@@ -175,7 +179,7 @@ public static class Program
                     Console.Error.WriteLine($"error[LYR-CLI0001]: no such file '{file}'");
                     return 2;
                 }
-                programs = [Project.ForFile(file, offline)];
+                programs = [Project.ForFile(file, offline, locked)];
             }
         }
         catch (ManifestException refused)
@@ -352,7 +356,7 @@ public static class Program
         Project project;
         try
         {
-            if (Project.TestsOf(baseDirectory, flags.Contains("--offline")) is not { } found)
+            if (Project.TestsOf(baseDirectory, flags.Contains("--offline"), flags.Contains("--locked")) is not { } found)
             {
                 Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
                 Console.Error.WriteLine("  = help: lyric5 test runs a package's tests");

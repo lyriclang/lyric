@@ -77,7 +77,7 @@ public sealed record Project(string Source, string Name, string Module, string R
     /// manifest; the manifest is read only for a module of the package.</summary>
     /// <param name="offline">Whether packages from git come from the user's cache alone (P9).</param>
     /// <exception cref="ManifestException">The package's manifest is refused.</exception>
-    public static Project ForFile(string path, bool offline = false)
+    public static Project ForFile(string path, bool offline = false, bool locked = false)
     {
         var full = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(full)!;
@@ -90,7 +90,7 @@ public sealed record Project(string Source, string Name, string Module, string R
             return new Project(full, stem, stem, root, null);
         var manifest = Manifest.Read(manifestFile);
         return ModulePathOf(manifest, full) is { } module
-            ? new Project(full, manifest.Name, module, manifest.Root, manifest) { Graph = Resolve(manifest, offline) }
+            ? new Project(full, manifest.Name, module, manifest.Root, manifest) { Graph = Resolve(manifest, offline, locked: locked) }
             : new Project(full, stem, stem, root, null);
     }
 
@@ -100,11 +100,12 @@ public sealed record Project(string Source, string Name, string Module, string R
     /// <param name="offline">Whether packages from git come from the user's cache alone (P9).</param>
     /// <exception cref="ManifestException">The manifest, or one of the graph's, is refused.</exception>
     /// <exception cref="LibraryException">The package has no program.</exception>
-    public static IReadOnlyList<Project>? ProgramsOf(string directory, bool offline = false)
+    /// <param name="locked">Whether the lock is taken as it is (<c>--locked</c>).</param>
+    public static IReadOnlyList<Project>? ProgramsOf(string directory, bool offline = false, bool locked = false)
     {
         if (FindManifest(Path.GetFullPath(directory)) is not { } manifestFile) return null;
         var manifest = Manifest.Read(manifestFile);
-        var graph = Resolve(manifest, offline);
+        var graph = Resolve(manifest, offline, locked: locked);
         var programs = new List<Project>();
         var main = Path.Combine(manifest.SourceRoot, "main.lyr");
         if (File.Exists(main))
@@ -129,29 +130,32 @@ public sealed record Project(string Source, string Name, string Module, string R
     /// library has one as well. <c>null</c> where there is no manifest.</summary>
     /// <param name="offline">Whether packages from git come from the user's cache alone (P9).</param>
     /// <exception cref="ManifestException">The manifest, or one of the graph's, is refused.</exception>
-    public static Project? TestsOf(string directory, bool offline = false)
+    /// <param name="locked">Whether the lock is taken as it is (<c>--locked</c>).</param>
+    public static Project? TestsOf(string directory, bool offline = false, bool locked = false)
     {
         if (FindManifest(Path.GetFullPath(directory)) is not { } manifestFile) return null;
         var manifest = Manifest.Read(manifestFile);
         return new Project(Path.Combine(manifest.Root, "tests", TestRun.DriverModule + ".lyr"), manifest.Name,
             $"{manifest.Name}.{TestRun.DriverModule}", manifest.Root, manifest)
         {
-            Graph = Resolve(manifest, offline),
+            Graph = Resolve(manifest, offline, locked: locked),
             Binary = manifest.Name,
             TestRoot = Path.Combine(manifest.Root, "tests"),
         };
     }
 
     /// <summary>The graph of <paramref name="manifest"/>'s program, read at the commits its
-    /// <c>lyric.lock</c> holds; the lock is written afterwards with what the graph read (07 P5).</summary>
+    /// <c>lyric.lock</c> holds; the lock is written afterwards with what the graph read (07 P5) —
+    /// or, <paramref name="locked"/>, taken as it is and not written (the review's M7-9).</summary>
     /// <exception cref="ManifestException">The graph, or the lock, is refused.</exception>
     public static PackageGraph Resolve(Manifest manifest, bool offline, Func<string, bool>? refresh = null,
-        Func<Locked, bool>? keep = null)
+        Func<Locked, bool>? keep = null, bool locked = false)
     {
         var lockFile = LockFile.For(manifest);
-        var locked = LockFile.Read(lockFile).Where(keep ?? (_ => true)).ToList();
-        var graph = PackageGraph.Resolve(manifest, GitCache.ForUser(offline, refresh), locked);
-        LockFile.Write(lockFile, graph.Locked);
+        var held = LockFile.Read(lockFile).Where(keep ?? (_ => true)).ToList();
+        var graph = PackageGraph.Resolve(manifest, GitCache.ForUser(offline, refresh), held, frozen: locked);
+        if (locked) LockFile.RefuseChange(lockFile, graph.Locked);
+        else LockFile.Write(lockFile, graph.Locked);
         return graph;
     }
 
