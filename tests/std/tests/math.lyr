@@ -87,9 +87,9 @@ fn exactAndClampingNarrowAtTheTarget(): void {
 
 @Test
 fn charsAndTheirCodePoints(): void {
-    assertEq('A'.toUint32(), 65);
+    assertEq('A' as uint32, 65);
     assertEq(assertNotNull(char.fromUint32(0x20AC)), '€');
-    assertEq(assertNotNull(char.fromUint32(0)).toUint32(), 0);
+    assertEq(assertNotNull(char.fromUint32(0)) as uint32, 0);
     assertNotNull(char.fromUint32(0x10FFFF));
     assertNull(char.fromUint32(0xD800));
     assertNull(char.fromUint32(0xDFFF));

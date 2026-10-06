@@ -1946,19 +1946,19 @@ bb0:;
     return;
 }
 
-#line 370 "stdlib5/std/core.lyr"
+#line 371 "stdlib5/std/core.lyr"
 int64_t lyr_std_core__extend__int_add_cacbf113(int64_t l0_this, int64_t l1_rhs) {
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
 bb0:;
-#line 370
+#line 371
     t0 = l0_this;
-#line 370
+#line 371
     t1 = l1_rhs;
-#line 370
+#line 371
     t2 = LYR_CHECKED_ADD(t0, t1);
-#line 370
+#line 371
     return t2;
 }
 

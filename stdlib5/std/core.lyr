@@ -260,8 +260,9 @@ pub interface Equatable {
     fn equals(o: Self): bool;
 }
 
-/// The answer of a comparison.
-pub enum Ordering { Less, Equal, Greater }
+/// The answer of a comparison; equatable, hashable and printable like any plain enum (the
+/// review's M8a-10).
+pub enum Ordering :: [Equatable, Hashable, Debug] { Less, Equal, Greater }
 
 /// `a < b`, `<=`, `>`, `>=` read `a.compare(b)` (04 D6): `.Less` for `<`, and `null` where the
 /// two are not ordered — `float` is partial, NaN compares with nothing — in which case every one
@@ -729,14 +730,10 @@ extend char :: [Debug, Clone] {
     fn clone(): char { return this; }
 }
 
-// A char's code point both ways (10 B5 Z8): outside the tower, and the way in answers `null`
-// where `as char` would panic — a number from data is no programmer's error (B3).
+// The way into a char (10 B5 Z8): it answers `null` where `as char` would panic — a number from
+// data is no programmer's error (B3). The way out is `c as uint32` (the review's A9e: a method
+// that said the same went).
 extend char {
-    /// The Unicode scalar value, 0…0x10FFFF.
-    pub fn toUint32(): uint32 {
-        return this as uint32;
-    }
-
     /// The character of a scalar value; `null` for a surrogate, 0xD800…0xDFFF, or beyond
     /// 0x10FFFF.
     pub static fn fromUint32(n: uint32): ?char {
@@ -1684,8 +1681,8 @@ extend string {
     }
 
     /// The characters, decoded from the bytes.
-    pub fn chars(): Chars {
-        return Chars { s = this, at = 0 };
+    pub fn chars(): CharsIter {
+        return CharsIter { s = this, at = 0 };
     }
 
     /// How many characters it holds, `O(n)`.
@@ -1768,11 +1765,11 @@ extend string {
 extend string {
     /// The parts between the separators, in order: `"a,b,,c".split(",")` gives `a`, `b`, ``, `c`.
     /// An empty separator panics.
-    pub fn split(sep: string): Split {
+    pub fn split(sep: string): SplitIter {
         if (byteCount(sep) == 0) {
             panic("split: an empty separator");
         }
-        return Split { s = this, sep = sep, at = 0, done = false };
+        return SplitIter { s = this, sep = sep, at = 0, done = false };
     }
 
     /// The part before the first `sep` and the part after it, or `null` where there is none.
@@ -1786,8 +1783,8 @@ extend string {
     }
 
     /// The lines: split at `\n`, a `\r` before it taken off, no empty line after a last `\n`.
-    pub fn lines(): Lines {
-        return Lines { s = this, at = 0 };
+    pub fn lines(): LinesIter {
+        return LinesIter { s = this, at = 0 };
     }
 
     /// Without the white space at both ends (ASCII's for now: space, tab, the line breaks, vertical
@@ -1893,7 +1890,7 @@ fn isAsciiSpace(b: int): bool {
 }
 
 /// A string's parts between a separator's occurrences.
-pub struct Split :: [Iterator] {
+pub struct SplitIter :: [Iterator] {
     type Item = string;
     s: string,
     sep: string,
@@ -1921,7 +1918,7 @@ pub struct Split :: [Iterator] {
 }
 
 /// A string's lines.
-pub struct Lines :: [Iterator] {
+pub struct LinesIter :: [Iterator] {
     type Item = string;
     s: string,
     var at: int,
@@ -1970,7 +1967,7 @@ pub class StringBuilder {
 
     /// `c` at the end, as its UTF-8 bytes.
     pub mut fn appendChar(c: char): void {
-        let code = c.toUint32() as int;
+        let code = (c as uint32) as int;
         this.reserve(4);
         if (code < 128) {
             this.put(code);
@@ -2153,7 +2150,7 @@ fn isDecimal(c: char): bool {
 }
 
 fn decimalOf(c: char): int {
-    return (c.toUint32() as int) - 48;
+    return ((c as uint32) as int) - 48;
 }
 
 /// `text` in the spec's width, counted in characters: the fill before it, after it, or around it
@@ -2239,7 +2236,7 @@ fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int
             break;
         }
         if (grouping != '\0' && placed % size == 0) {
-            bytes[at] = grouping.toUint32() as uint8;
+            bytes[at] = (grouping as uint32) as uint8;
             at = at - 1;
         }
     }
@@ -2388,7 +2385,7 @@ fn matchesAt(s: string, p: string, at: int): bool {
 }
 
 /// A string's characters, decoded from its UTF-8 bytes.
-pub struct Chars :: [Iterator] {
+pub struct CharsIter :: [Iterator] {
     type Item = char;
     s: string,
     var at: int,
@@ -2983,7 +2980,7 @@ fn siftDown<T :: [TotalOrder]>(xs: Slice<T>, root: int, end: int): void {
 
 /// `it.map(f)` (10 B6 I3, I4): the values of `it`, each through `f` — lazily, a pull at a time.
 /// Named for what it gives: `Map` is the collection's (C4).
-pub struct Mapped<I :: [Iterator], U> :: [Iterator] {
+pub struct MapIter<I :: [Iterator], U> :: [Iterator] {
     type Item = U;
     type Error = I.Error;
     var inner: I,
@@ -2999,7 +2996,7 @@ pub struct Mapped<I :: [Iterator], U> :: [Iterator] {
 }
 
 /// `it.filter(p)`: the values of `it` that `p` holds for.
-pub struct Filter<I :: [Iterator]> :: [Iterator] {
+pub struct FilterIter<I :: [Iterator]> :: [Iterator] {
     type Item = I.Item;
     type Error = I.Error;
     var inner: I,
@@ -3015,7 +3012,7 @@ pub struct Filter<I :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.take(n)`: the first `n` values of `it`, or all where it has fewer.
-pub struct Take<I :: [Iterator]> :: [Iterator] {
+pub struct TakeIter<I :: [Iterator]> :: [Iterator] {
     type Item = I.Item;
     type Error = I.Error;
     var inner: I,
@@ -3031,7 +3028,7 @@ pub struct Take<I :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.skip(n)`: the values of `it` after its first `n`.
-pub struct Skip<I :: [Iterator]> :: [Iterator] {
+pub struct SkipIter<I :: [Iterator]> :: [Iterator] {
     type Item = I.Item;
     type Error = I.Error;
     var inner: I,
@@ -3049,7 +3046,7 @@ pub struct Skip<I :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.takeWhile(p)`: the values of `it` up to the first `p` does not hold for.
-pub struct TakeWhile<I :: [Iterator]> :: [Iterator] {
+pub struct TakeWhileIter<I :: [Iterator]> :: [Iterator] {
     type Item = I.Item;
     type Error = I.Error;
     var inner: I,
@@ -3074,7 +3071,7 @@ pub struct TakeWhile<I :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.skipWhile(p)`: the values of `it` from the first `p` does not hold for.
-pub struct SkipWhile<I :: [Iterator]> :: [Iterator] {
+pub struct SkipWhileIter<I :: [Iterator]> :: [Iterator] {
     type Item = I.Item;
     type Error = I.Error;
     var inner: I,
@@ -3095,7 +3092,7 @@ pub struct SkipWhile<I :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.stepBy(n)`: the first value of `it`, then every `n`th.
-pub struct StepBy<I :: [Iterator]> :: [Iterator] {
+pub struct StepByIter<I :: [Iterator]> :: [Iterator] {
     type Item = I.Item;
     type Error = I.Error;
     var inner: I,
@@ -3119,7 +3116,7 @@ pub struct StepBy<I :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.enumerate()`: each value of `it` with its position, from 0.
-pub struct Enumerate<I :: [Iterator]> :: [Iterator] {
+pub struct EnumerateIter<I :: [Iterator]> :: [Iterator] {
     type Item = (int, I.Item);
     type Error = I.Error;
     var inner: I,
@@ -3136,7 +3133,7 @@ pub struct Enumerate<I :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.inspect(f)`: the values of `it`, each shown to `f` on its way through.
-pub struct Inspect<I :: [Iterator]> :: [Iterator] {
+pub struct InspectIter<I :: [Iterator]> :: [Iterator] {
     type Item = I.Item;
     type Error = I.Error;
     var inner: I,
@@ -3162,7 +3159,7 @@ pub struct Join<A :: [Error], B :: [Error]> :: [Error] {
 }
 
 /// `it.zip(other)`: each value beside the other's at its position, as long as both have one.
-pub struct Zip<A :: [Iterator], B :: [Iterator]> :: [Iterator] {
+pub struct ZipIter<A :: [Iterator], B :: [Iterator]> :: [Iterator] {
     type Item = (A.Item, B.Item);
     type Error = Join<A.Error, B.Error>;
     var a: A,
@@ -3182,7 +3179,7 @@ pub struct Zip<A :: [Iterator], B :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.chain(other)`: the values of `it`, then the other's.
-pub struct Chain<A :: [Iterator], B :: [Iterator<Item = A.Item>]> :: [Iterator] {
+pub struct ChainIter<A :: [Iterator], B :: [Iterator<Item = A.Item>]> :: [Iterator] {
     type Item = A.Item;
     type Error = Join<A.Error, B.Error>;
     var a: A,
@@ -3208,68 +3205,68 @@ pub struct Chain<A :: [Iterator], B :: [Iterator<Item = A.Item>]> :: [Iterator] 
 // (LYR-SEM0174). The two over two iterators close both; where both throw, the first error wins
 // and the second is suppressed into it (05 E7).
 
-extend<I :: [Iterator, Closeable], U> Mapped<I, U> :: [Closeable] {
+extend<I :: [Iterator, Closeable], U> MapIter<I, U> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> Filter<I> :: [Closeable] {
+extend<I :: [Iterator, Closeable]> FilterIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> Take<I> :: [Closeable] {
+extend<I :: [Iterator, Closeable]> TakeIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> Skip<I> :: [Closeable] {
+extend<I :: [Iterator, Closeable]> SkipIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> TakeWhile<I> :: [Closeable] {
+extend<I :: [Iterator, Closeable]> TakeWhileIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> SkipWhile<I> :: [Closeable] {
+extend<I :: [Iterator, Closeable]> SkipWhileIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> StepBy<I> :: [Closeable] {
+extend<I :: [Iterator, Closeable]> StepByIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> Enumerate<I> :: [Closeable] {
+extend<I :: [Iterator, Closeable]> EnumerateIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> Inspect<I> :: [Closeable] {
+extend<I :: [Iterator, Closeable]> InspectIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<A :: [Iterator, Closeable], B :: [Iterator, Closeable]> Zip<A, B> :: [Closeable] {
+extend<A :: [Iterator, Closeable], B :: [Iterator, Closeable]> ZipIter<A, B> :: [Closeable] {
     fn close(): void throws Join<A.Error, B.Error> {
         defer try this.b.close();
         try this.a.close();
     }
 }
 
-extend<A :: [Iterator, Closeable], B :: [Iterator<Item = A.Item>, Closeable]> Chain<A, B> :: [Closeable] {
+extend<A :: [Iterator, Closeable], B :: [Iterator<Item = A.Item>, Closeable]> ChainIter<A, B> :: [Closeable] {
     fn close(): void throws Join<A.Error, B.Error> {
         defer try this.b.close();
         try this.a.close();
@@ -3280,61 +3277,61 @@ extend<A :: [Iterator, Closeable], B :: [Iterator<Item = A.Item>, Closeable]> Ch
 // allocation, no interface value.
 extend<I :: [Iterator]> I {
     /// The values, each through `f`.
-    pub fn map<U>(f: fn(I.Item) -> U): Mapped<I, U> {
-        return Mapped<I, U> { inner = this, f = f };
+    pub fn map<U>(f: fn(I.Item) -> U): MapIter<I, U> {
+        return MapIter<I, U> { inner = this, f = f };
     }
 
     /// The values `p` holds for.
-    pub fn filter(p: fn(I.Item) -> bool): Filter<I> {
-        return Filter<I> { inner = this, p = p };
+    pub fn filter(p: fn(I.Item) -> bool): FilterIter<I> {
+        return FilterIter<I> { inner = this, p = p };
     }
 
     /// The first `n` values, or all where there are fewer.
-    pub fn take(n: int): Take<I> {
-        return Take<I> { inner = this, left = n };
+    pub fn take(n: int): TakeIter<I> {
+        return TakeIter<I> { inner = this, left = n };
     }
 
     /// The values after the first `n`.
-    pub fn skip(n: int): Skip<I> {
-        return Skip<I> { inner = this, n = n };
+    pub fn skip(n: int): SkipIter<I> {
+        return SkipIter<I> { inner = this, n = n };
     }
 
     /// The values up to the first `p` does not hold for.
-    pub fn takeWhile(p: fn(I.Item) -> bool): TakeWhile<I> {
-        return TakeWhile<I> { inner = this, p = p, done = false };
+    pub fn takeWhile(p: fn(I.Item) -> bool): TakeWhileIter<I> {
+        return TakeWhileIter<I> { inner = this, p = p, done = false };
     }
 
     /// The values from the first `p` does not hold for.
-    pub fn skipWhile(p: fn(I.Item) -> bool): SkipWhile<I> {
-        return SkipWhile<I> { inner = this, p = p, started = false };
+    pub fn skipWhile(p: fn(I.Item) -> bool): SkipWhileIter<I> {
+        return SkipWhileIter<I> { inner = this, p = p, started = false };
     }
 
     /// The first value, then every `n`th; `n` below 1 panics.
-    pub fn stepBy(n: int): StepBy<I> {
+    pub fn stepBy(n: int): StepByIter<I> {
         if (n < 1) {
             panic("stepBy needs a step of at least 1");
         }
-        return StepBy<I> { inner = this, step = n, first = true };
+        return StepByIter<I> { inner = this, step = n, first = true };
     }
 
     /// Each value with its position, from 0.
-    pub fn enumerate(): Enumerate<I> {
-        return Enumerate<I> { inner = this, i = 0 };
+    pub fn enumerate(): EnumerateIter<I> {
+        return EnumerateIter<I> { inner = this, i = 0 };
     }
 
     /// The values, each shown to `f` on its way through.
-    pub fn inspect(f: fn(I.Item) -> void): Inspect<I> {
-        return Inspect<I> { inner = this, f = f };
+    pub fn inspect(f: fn(I.Item) -> void): InspectIter<I> {
+        return InspectIter<I> { inner = this, f = f };
     }
 
     /// Each value beside the other's at its position, as long as both have one.
-    pub fn zip<B :: [Iterable]>(other: B): Zip<I, B.Iter> {
-        return Zip<I, B.Iter> { a = this, b = other.iter() };
+    pub fn zip<B :: [Iterable]>(other: B): ZipIter<I, B.Iter> {
+        return ZipIter<I, B.Iter> { a = this, b = other.iter() };
     }
 
     /// The values, then the other's — an iterator of the same items.
-    pub fn chain<B :: [Iterator<Item = I.Item>]>(other: B): Chain<I, B> {
-        return Chain<I, B> { a = this, b = other, second = false };
+    pub fn chain<B :: [Iterator<Item = I.Item>]>(other: B): ChainIter<I, B> {
+        return ChainIter<I, B> { a = this, b = other, second = false };
     }
 
     /// How many values there are, walking them all.

@@ -64,7 +64,7 @@ fn aDequeIndexOutsideItsValuesPanics(): void {
 }
 
 @Test
-fn aHeapGivesTheGreatestFirst(): void {
+fn aHeapGivesTheLeastFirst(): void {
     let h = Heap<int>.new();
     assertNull(h.pop());
     assertNull(h.peek());
@@ -72,12 +72,12 @@ fn aHeapGivesTheGreatestFirst(): void {
         h.push(v);
     }
     assertEq(h.length(), 11);
-    assertEq(h.peek() ?? -1, 9);
+    assertEq(h.peek() ?? -1, 0);
     var out = "";
     while (let v = h.pop()) {
         out = out + f"{v}";
     }
-    assertEq(out, "98876543210");
+    assertEq(out, "01234567889");
     assertTrue(h.isEmpty());
 }
 
@@ -91,11 +91,11 @@ fn aHeapOrdersAThousandValues(): void {
         h.push(state % 500);
         i = i + 1;
     }
-    var last = 1000;
+    var last = -1;
     var ordered = true;
     var n = 0;
     while (let v = h.pop()) {
-        if (v > last) {
+        if (v < last) {
             ordered = false;
         }
         last = v;

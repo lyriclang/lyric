@@ -16,7 +16,7 @@ fn theLengthIsInBytes(): void {
 fn charsDecodesEveryWidth(): void {
     var out = "";
     for (c in "añ€😀".chars()) {
-        out = out + f"[{c.toUint32()}]";
+        out = out + f"[{c as uint32}]";
     }
     assertEq(out, "[97][241][8364][128512]");
 }
