@@ -49,6 +49,21 @@ public static partial class ManifestEdit
         return Join(lines, newline);
     }
 
+    /// <summary><paramref name="text"/> with the tag on <c>name</c>'s line in <c>[dependencies]</c>
+    /// set to <paramref name="tag"/>, the rest of the line and of the file as it was (the review's
+    /// M7-8: <c>lyric update</c> raises a version). <c>null</c> where the line names no tag.</summary>
+    /// <exception cref="InvalidOperationException">The dependency is written in another form.</exception>
+    public static string? SetTag(string text, string name, string tag)
+    {
+        var (lines, newline) = Split(text);
+        Refuse(lines, name);
+        if (Table(lines) is not { } table || Line(lines, table, name) is not { } at) return null;
+        var value = TagValue().Match(lines[at]).Groups["value"];
+        if (!value.Success) return null;
+        lines[at] = lines[at][..value.Index] + Quote(tag) + lines[at][(value.Index + value.Length)..];
+        return Join(lines, newline);
+    }
+
     /// <summary>A string as TOML writes it.</summary>
     public static string Quote(string text) => "\"" + text.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
 
@@ -107,6 +122,10 @@ public static partial class ManifestEdit
 
     [GeneratedRegex(@"^\s*\[\s*dependencies\s*\]\s*(#.*)?$")]
     private static partial Regex DependenciesHeader();
+
+    /// <summary>The <c>tag = "…"</c> of an inline table, its string as written.</summary>
+    [GeneratedRegex(@"\btag\s*=\s*(?<value>""(?:[^""\\]|\\.)*"")")]
+    private static partial Regex TagValue();
 
     [GeneratedRegex(@"^\s*\[")]
     private static partial Regex AnyHeader();

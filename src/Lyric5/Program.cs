@@ -63,8 +63,9 @@ public static class Program
         output.WriteLine("                                 programs —, or the file, to binaries under out/");
         output.WriteLine("  run [<file.lyr>] [options] [-- args]");
         output.WriteLine("                                 build, then run the binary with the arguments");
-        output.WriteLine("  update [<package>…] [options]  read the packages from git anew — all, or those named —");
-        output.WriteLine("                                 and write lyric.lock (options: -C <dir>, --offline)");
+        output.WriteLine("  update [<package>…] [options]  read the packages from git anew — all, or those named —,");
+        output.WriteLine("                                 raise a tag to the newest of its line in lyric.toml, and write");
+        output.WriteLine("                                 lyric.lock (options: -C <dir>, --offline)");
         output.WriteLine("  add <name> --path <dir> | --git <url> [--tag|--branch|--rev <r>]");
         output.WriteLine("                                 write the dependency into lyric.toml (-C <dir>, --offline)");
         output.WriteLine("  remove <name>                  take the dependency out of lyric.toml (-C <dir>, --offline)");
@@ -393,8 +394,9 @@ public static class Program
     /// <summary>
     /// <c>lyric update [&lt;package&gt;…]</c> (design/v5/spec/07 P4, P5): the packages from git
     /// read anew — every one, or those named; the others stay at their locked commits — and
-    /// <c>lyric.lock</c> written. A branch moves to its head, a moved tag to its commit; a version
-    /// moves only with the manifests that ask for it.
+    /// <c>lyric.lock</c> written. A branch moves to its head, a moved tag to its commit; a tag of
+    /// the root manifest that is a version is raised to the newest of its line first, in the
+    /// manifest (the review's M7-8) — a dependency's own manifest is its own.
     /// </summary>
     private static int Update(string[] args)
     {
@@ -429,7 +431,17 @@ public static class Program
             var manifest = Manifest.Read(file);
             var before = LockFile.Read(LockFile.For(manifest));
             bool Named(string name) => names.Count == 0 || names.Contains(name);
-            var graph = Project.Resolve(manifest, offline, refresh: Named, keep: entry => !Named(entry.Name));
+            // the manifest as it was, written back where the raised one is refused — as 'add' does
+            var original = File.ReadAllText(file);
+            if (Raise(file, manifest, Named, offline) is not { } raised) return 2;
+            manifest = raised;
+            PackageGraph graph;
+            try { graph = Project.Resolve(manifest, offline, refresh: Named, keep: entry => !Named(entry.Name)); }
+            catch (ManifestException)
+            {
+                File.WriteAllText(file, original);
+                throw;
+            }
             ToolchainCheck.Check(graph, DisplayVersion());
             var unknown = names.Where(n => graph.Locked.All(entry => entry.Name != n)).ToList();
             if (unknown.Count > 0)
@@ -443,6 +455,36 @@ public static class Program
             Console.Error.WriteLine(refused.Render());
             return refused.Exit;
         }
+    }
+
+    /// <summary>The root manifest's tags that are versions, each raised to the newest tag of its
+    /// line the repository has (M7-8), the line rewritten in place; the manifest as read again.
+    /// <c>null</c> after refusing a dependency written as a table, which is the person's to edit.</summary>
+    private static Manifest? Raise(string file, Manifest manifest, Func<string, bool> named, bool offline)
+    {
+        var git = GitCache.ForUser(offline);
+        var text = File.ReadAllText(file);
+        var changed = false;
+        foreach (var dependency in manifest.Dependencies)
+        {
+            if (!named(dependency.Name) || dependency.Git is not { Kind: GitRefKind.Tag, Ref: { } tag }
+                || SemVer.OfTag(tag) is not { } current) continue;
+            if (SemVer.Newest(current, git.Tags(dependency, manifest.File)) is not { } newest) continue;
+            string? edited;
+            try { edited = ManifestEdit.SetTag(text, dependency.Name, newest); }
+            catch (InvalidOperationException other)
+            {
+                Console.Error.WriteLine($"error[LYR-CLI0008]: {other.Message}");
+                return null;
+            }
+            if (edited is null) continue;
+            text = edited;
+            changed = true;
+            Console.Out.WriteLine($"  raised   {dependency.Name} {tag} -> {newest} (lyric.toml)");
+        }
+        if (!changed) return manifest;
+        File.WriteAllText(file, text);
+        return Manifest.Read(file);
     }
 
     /// <summary>What the update changed in the lock, a line per revision of a repository.</summary>
