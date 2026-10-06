@@ -83,6 +83,7 @@ public sealed class TypeChecker
     private readonly FunctionSymbol? _same;  // the builtin identity test (02 M10)
     private readonly TypeSymbol? _coroutine; // the builtin Coroutine<T>, mapped to CoroutineOf
     private readonly TypeSymbol? _slice;     // the builtin Slice<T>, mapped to SliceOf
+    private readonly TypeSymbol? _stringView; // the builtin StringView, mapped to StringViewType
     private readonly TypeSymbol? _range, _rangeInclusive; // std.core's Range<T> and RangeInclusive<T> (03 A3)
 
     /// <summary>The <c>Iterator&lt;T&gt;</c> interface from <c>std.iter</c>, what <c>for-in</c> checks
@@ -136,6 +137,7 @@ public sealed class TypeChecker
         _same = comp.Builtins.LookupLocal("same") as FunctionSymbol;
         _coroutine = comp.Builtins.LookupLocal("Coroutine") as TypeSymbol;
         _slice = comp.Builtins.LookupLocal("Slice") as TypeSymbol;
+        _stringView = comp.Builtins.LookupLocal("StringView") as TypeSymbol;
 
         // 'Iterator<T>' lives in the stdlib rather than among the builtins: it is an ordinary
         // interface anyone can implement. The compiler only has to FIND it to check 'for-in'
@@ -1041,10 +1043,15 @@ public sealed class TypeChecker
 
     // `this` inside a method: for a generic type the self-instance Stack<T>, with the type parameters
     // as arguments; otherwise plainly the reference.
+    /// <summary>The type a built-in symbol stands for: a scalar by its name, or the view of a
+    /// string's bytes (10 S1) — the one built-in without parameters that is no scalar.</summary>
+    private static LyrType? BuiltinType(TypeSymbol builtin) =>
+        builtin.Name == "StringView" ? LyrType.StringView : TypeFacts.FromBuiltinName(builtin.Name);
+
     private static LyrType SelfType(TypeSymbol ts) =>
         // A builtin's 'Self' is the primitive ('extend int :: [Equatable]'): its symbol stands
         // in no type, the scalar does.
-        ts.Kind == TypeSymbolKind.Builtin && TypeFacts.FromBuiltinName(ts.Name) is { } primitive ? primitive
+        ts.Kind == TypeSymbolKind.Builtin && BuiltinType(ts) is { } primitive ? primitive
         : ts.Generics.Length == 0
             ? new NamedRef(ts)
             : new GenericInstance(ts, Array.ConvertAll(ts.Generics, g => (LyrType)new TypeParamType(g)));
@@ -1088,7 +1095,7 @@ public sealed class TypeChecker
         var thisType = block.Decl.Target is NamedType { TypeArguments.Length: > 0 }
             ? BlockTargetType(block)
             : block.Target!.Kind == TypeSymbolKind.Builtin
-                ? TypeFacts.FromBuiltinName(block.Target.Name)
+                ? BuiltinType(block.Target)
                 : new NamedRef(block.Target);
         foreach (var fn in block.Decl.Methods)
         {
@@ -4705,6 +4712,13 @@ public sealed class TypeChecker
                     return LyrType.Bool;
                 if (TypeFacts.IsChar(l) && TypeFacts.IsChar(r))
                     return LyrType.Bool;
+                // A view and a string, or two views (10 S1): their bytes, in order — std.core's
+                // 'compareViews', a string giving a view of itself at the argument.
+                if (ComparesAsViews(l, r))
+                {
+                    DesugarToFreeCall(b, "compareViews", scope, b.Left, b.Right);
+                    return LyrType.Bool;
+                }
                 CheckOrdered(b, l, r, scope);
                 return LyrType.Bool;
             case BinaryOp.Eq or BinaryOp.Ne:
@@ -4712,6 +4726,12 @@ public sealed class TypeChecker
                 if (OptionalEquality(l, r) is { } inner)
                 {
                     CheckOptionalEquality(b, inner, scope);
+                    return LyrType.Bool;
+                }
+                // A view and a string, or two views (10 S1): equal where they hold the same bytes.
+                if (ComparesAsViews(l, r))
+                {
+                    DesugarToFreeCall(b, "equalViews", scope, b.Left, b.Right);
                     return LyrType.Bool;
                 }
                 if (!LyrType.Equal(l, r) && UnifyNumeric(b.Left, l, b.Right, r) is null
@@ -4845,6 +4865,7 @@ public sealed class TypeChecker
         GenericInstance { Definition.Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }
             => true,
         TypeParamType => true,
+        StringViewType => true,
         _ => false,
     };
 
@@ -4881,7 +4902,7 @@ public sealed class TypeChecker
     /// resolves as any callee does — the scope first, <c>std.core</c> unasked — and the call is
     /// checked like one written, so inference binds the function's <c>T</c> from the operands.
     /// </summary>
-    private LyrType DesugarToFreeCall(BinaryExpr b, string function, SymbolTable scope, params Expr[] args)
+    private LyrType DesugarToFreeCall(Expr b, string function, SymbolTable scope, params Expr[] args)
     {
         var helper = new IdentifierExpr(function, b.Span);
         _compilerWritten.Add(helper); // std.core's helper, not a name of the program's that happens to match
@@ -4891,6 +4912,13 @@ public sealed class TypeChecker
         _result.DesugarOperator(b, call);
         return type;
     }
+
+    /// <summary>Whether <c>==</c> or an ordering compares the two as views of bytes (10 S1): a
+    /// view on one side, a view or a string on the other — two strings keep their own.</summary>
+    private static bool ComparesAsViews(LyrType l, LyrType r) =>
+        (l is StringViewType || r is StringViewType)
+        && l is StringViewType or PrimitiveType { Kind: PrimitiveKind.String }
+        && r is StringViewType or PrimitiveType { Kind: PrimitiveKind.String };
 
     /// <summary>The value type of an equality between optionals (design/v5/spec/03 O6): two
     /// optionals of one type, or an optional and a value of its type, which coerces up at the
@@ -5317,6 +5345,13 @@ public sealed class TypeChecker
     private LyrType CheckAssign(AssignExpr a, SymbolTable scope)
     {
         CheckExpr(a.Target, scope); // binds RefOf
+        // A string's characters are read and not written (10 S1): the string is immutable, and a
+        // view of it reads.
+        if (a.Target is IndexExpr { Index: not SliceRangeExpr } ofText
+            && _result.TypeOf(ofText.Target) is StringViewType or PrimitiveType { Kind: PrimitiveKind.String })
+            return Report(a.Span, "LYR-SEM0019",
+                $"'{TypeFacts.Display(_result.TypeOf(ofText.Target)!)}' is read by index and not written — "
+                + "a string is immutable, and a view of it reads");
         // 'x[k] = v' on a type's own index writes 'x.setIndex(k, v)' (04 D6), and a compound
         // 'x[k] op= v' reads and writes it with 'x' and 'k' evaluated ONCE (02 M8a-1, the
         // review's decision), as on an array's element: the lowering holds the two, and what is
@@ -5774,10 +5809,26 @@ public sealed class TypeChecker
                 ArrayOf a => new SliceOf(a.Element),
                 SliceOf s => s,
                 InlineArrayOf ia => ViewOfInline(ix.Target, ia, ix.Span),
+                // A string's bytes and a view's (10 S1): a view, no copy, on character boundaries.
+                StringViewType or PrimitiveType { Kind: PrimitiveKind.String } => LyrType.StringView,
                 ErrorType => LyrType.Error,
                 _ => Report(ix.Span, "LYR-SEM0007",
-                    $"'{TypeFacts.Display(target)}' has no view to take — a range indexes an array or a 'Slice<T>'"),
+                    $"'{TypeFacts.Display(target)}' has no view to take — a range indexes an array, a 'Slice<T>', "
+                    + "a string or a 'StringView'"),
             };
+        }
+
+        // A string's index is the character that begins at the byte (10 S1): built in as an
+        // array's is — std.core's 'charAtByte' on a view, the index checked there, in range and
+        // on a character's first byte.
+        if (target is StringViewType or PrimitiveType { Kind: PrimitiveKind.String })
+        {
+            // From the end a byte is rarely where a character begins: '^n' bounds a range only.
+            if (ix.Index is UnaryExpr { Operator: UnaryOp.FromEnd } fromEnd)
+                return Report(fromEnd.Span, "LYR-SEM0114",
+                    "a string's index is a byte counted from its start, where a character begins; "
+                    + "'^n' stands as a bound of a range — 's[^n..]'");
+            return DesugarToFreeCall(ix, "charAtByte", scope, ix.Target, ix.Index);
         }
 
         // A type's own index (04 D6): 'x[k]' reads 'x.index(k)' through Index<K>.
@@ -5790,18 +5841,6 @@ public sealed class TypeChecker
             ArrayOf a => a.Element,
             SliceOf s => s.Element,
             InlineArrayOf ia => ia.Element,
-
-            // A string has NO index operator. A code point position costs O(n) — a 'char' is a code
-            // point and the length counts the same units — so the obvious indexing loop would be
-            // quadratic without looking like it.
-            //
-            // The message names both ways out: 'charAt' is what the user is looking for right now,
-            // 'for-in' is what they usually want.
-            PrimitiveType { Kind: PrimitiveKind.String } =>
-                Report(ix.Span, "LYR-SEM0007",
-                    "a string cannot be indexed — a codepoint position costs O(n), so an index "
-                    + "loop would be quadratic. Use 's.charAt(i)' if you really need "
-                    + "one position, or 'for (c in s)' to walk all of them"),
 
             ErrorType => LyrType.Error,
 
@@ -5820,7 +5859,7 @@ public sealed class TypeChecker
     /// array's, a view's and an inline array's index is built in.</summary>
     private bool IndexesThrough(LyrType target, TypeSymbol iface) => target switch
     {
-        ArrayOf or SliceOf or InlineArrayOf or ErrorType or PrimitiveType => false,
+        ArrayOf or SliceOf or InlineArrayOf or ErrorType or PrimitiveType or StringViewType => false,
         TypeParamType tp => tp.Param.Constraints.Any(c => ConstraintInterface(c) is { } ci
             && Conformance.WithParents(ci, _binding).Any(p => ReferenceEquals(p, iface))),
         _ => TypeFacts.SymbolOf(target) is { } symbol && ConformsTo(symbol, iface),
@@ -5881,7 +5920,8 @@ public sealed class TypeChecker
             var n = CheckExpr(fromEnd.Operand, scope, LyrType.Int);
             if (!n.IsError) CheckAssignable(fromEnd.Operand, n, LyrType.Int, fromEnd.Operand.Span);
             _result.SetType(fromEnd, LyrType.Int);
-            if (target is not (ArrayOf or SliceOf or InlineArrayOf or ErrorType))
+            if (target is not (ArrayOf or SliceOf or InlineArrayOf or StringViewType or PrimitiveType { Kind: PrimitiveKind.String }
+                    or ErrorType))
                 _de.Report("LYR-SEM0114", Severity.Error, fromEnd.Span,
                     $"'^' counts from the end of a value that has a length; '{TypeFacts.Display(target)}' has none");
             return;
@@ -6628,7 +6668,7 @@ public sealed class TypeChecker
             return mem.IsOptional ? Optionalized(tuple.Elements[at]) : tuple.Elements[at];
         }
 
-        if (baseType is ArrayOf or SliceOf or InlineArrayOf && mem.Member == "length")
+        if (baseType is ArrayOf or SliceOf or InlineArrayOf or StringViewType && mem.Member == "length")
         {
             if (_calleePosition.Contains(mem)) return new FnType([], LyrType.Int);
             return Report(mem.MemberSpan, "LYR-SEM0012", "'length' is called: write 'length()'");
@@ -6705,6 +6745,8 @@ public sealed class TypeChecker
                 return BindMember(mem, MemberOfAssoc(assoc, mem.Member, span));
             case PrimitiveType p when BuiltinSymbol(p) is { } bs: // extensions on builtins, such as string.shout()
                 return BindMember(mem, InstanceMember(bs, mem.Member, span));
+            case StringViewType when _stringView is { } view: // std.core's blocks on the view (10 S1)
+                return BindMember(mem, InstanceMember(view, mem.Member, span));
             case ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf:
                 return ConstructorMember(baseType, mem, span);
             default:
@@ -6795,7 +6837,7 @@ public sealed class TypeChecker
     private (LyrType, Symbol?)? BlanketMember(LyrType receiver, string member, Span span)
     {
         if (receiver is not (NamedRef or GenericInstance or TypeParamType or AssocOf or CoroutineOf) && !IsShape(receiver)
-            && !(receiver is PrimitiveType primitive && BuiltinSymbol(primitive) is not null))
+            && !(receiver is PrimitiveType primitive && BuiltinSymbol(primitive) is not null) && receiver is not StringViewType)
             return null;
         foreach (var block in _comp.Extensions.Blocks)
         {
@@ -7022,6 +7064,7 @@ public sealed class TypeChecker
             case GenericInstance gi when member.Answer(gi.Definition, instance) is { } bound:
                 return Substitute(bound, SubstMap(gi));
             case PrimitiveType p when member.BuiltinAnswer(TypeFacts.Display(p), instance) is { } bound: return bound;
+            case StringViewType when member.BuiltinAnswer("StringView", instance) is { } bound: return bound;
             case CoroutineOf co when CoroutineAnswer(co, member) is { } answered: return answered;
             case ErrorType: return LyrType.Error;
             // A conformance a blanket or shape block gives (05 §13 rules 6, 8) answers there.
@@ -7726,6 +7769,9 @@ public sealed class TypeChecker
 
         PrimitiveType prim when BuiltinSymbol(prim) is { } builtin =>
             ImplementsWithExtensions(builtin, iface, wanted, EmptySubst),
+
+        // A view conforms through std.core's blocks on it, as a string does (10 S1).
+        StringViewType when _stringView is { } view => ImplementsWithExtensions(view, iface, wanted, EmptySubst),
 
         // 'never' has no value and so every conformance vacuously: 'E = never', what a set of
         // nothing binds (05 E2 K4), satisfies 'E :: [Error]'.
@@ -11086,6 +11132,8 @@ public sealed class TypeChecker
 
         if (coercionSite && to is SliceOf view && from is ArrayOf whole && LyrType.Equal(whole.Element, view.Element))
             return true;                                                                    // T[] to Slice<T>, A2
+        if (coercionSite && to is StringViewType && from is PrimitiveType { Kind: PrimitiveKind.String })
+            return true;                                                                    // string to StringView, 10 S1
         if (coercionSite && to is SliceOf viewOfInline && from is InlineArrayOf inlineArray
             && LyrType.Equal(inlineArray.Element, viewOfInline.Element))
         {
@@ -11317,6 +11365,13 @@ public sealed class TypeChecker
                             $"'Slice' expects exactly 1 type argument, got {n.TypeArguments.Length}");
                     return new SliceOf(ResolveType(n.TypeArguments[0], scope));
                 }
+                if (ReferenceEquals(sym, _stringView)) // StringView becomes the internal StringViewType
+                {
+                    if (n.TypeArguments.Length != 0)
+                        return Report(n.Span, "LYR-SEM0026",
+                            $"'StringView' takes no type argument, got {n.TypeArguments.Length}");
+                    return LyrType.StringView;
+                }
                 if (ReferenceEquals(sym, _coroutine)) // Coroutine<Y, R = void> becomes the internal CoroutineOf
                 {
                     if (n.TypeArguments.Length is not (1 or 2))
@@ -11413,7 +11468,7 @@ public sealed class TypeChecker
 
     private LyrType SymbolToType(Symbol sym, SymbolTable scope, Span span) => sym switch
     {
-        TypeSymbol { Kind: TypeSymbolKind.Builtin } t => TypeFacts.FromBuiltinName(t.Name) ?? LyrType.Error,
+        TypeSymbol { Kind: TypeSymbolKind.Builtin } t => BuiltinType(t) ?? LyrType.Error,
         TypeSymbol { Kind: TypeSymbolKind.Alias } t => ExpandAlias(t, scope),
         GenericParamSymbol g => new TypeParamType(g),
         TypeSymbol t => new NamedRef(t),

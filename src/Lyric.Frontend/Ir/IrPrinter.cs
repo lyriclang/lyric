@@ -165,7 +165,7 @@ public static class IrPrinter
         LoadElem e => $"{e.Dest}: {TypeStr(e.Element)} = loadelem {e.Array}, {e.Index}",
         StoreElem e => $"storeelem {e.Array}, {e.Index}, {e.Value}",
         ArrayLen a => $"{a.Dest}: i64 = arraylen {a.Array}",
-        MakeSlice s => $"{s.Dest}: {TypeStr(new IrSliceType(s.Element))} = mkslice {s.Array}, {s.Low}, {s.High}",
+        MakeSlice s => $"{s.Dest}: {TypeStr(new IrSliceType(s.Element))} = mkslice{(s.Chars ? ".chars" : "")} {s.Array}, {s.Low}, {s.High}",
         NewInline n => $"{n.Dest}: {TypeStr(new IrInlineArrayType(n.Element, n.Length))} = newinline "
                        + (n.Repeat ? $"{n.Elements[0]} * {n.Length}" : $"[{string.Join(", ", n.Elements)}]"),
         CopyValue c => $"{c.Dest}: {TypeStr(c.Type)} = copyvalue {c.Value}",

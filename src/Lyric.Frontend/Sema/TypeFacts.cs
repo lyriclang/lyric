@@ -272,6 +272,7 @@ public static class TypeFacts
             case ArrayOf a:
                 return (TakesTheSuffix(a.Element) ? $"({Render(a.Element, name)})" : Render(a.Element, name)) + "[]";
             case SliceOf s: return "Slice<" + Render(s.Element, name) + ">";
+            case StringViewType: return "StringView";
             case InlineArrayOf ia:
                 return (TakesTheSuffix(ia.Element) ? $"({Render(ia.Element, name)})" : Render(ia.Element, name)) + $"[{ia.Length}]";
             case TupleOf tu:

@@ -61,8 +61,8 @@ internal sealed class TypeTable
     /// and that is deliberate: on it hangs the boundary that a scalar does NOT fit into an interface
     /// slot, which would need boxing.</summary>
     public TypeSymbol? BuiltinSymbolOf(LyrType type) =>
-        type is PrimitiveType prim && Compilation is { } comp
-            ? comp.Builtins.LookupLocal(TypeFacts.Display(prim)) as TypeSymbol
+        type is PrimitiveType or StringViewType && Compilation is { } comp
+            ? comp.Builtins.LookupLocal(TypeFacts.Display(type)) as TypeSymbol
             : null;
 
     /// <summary>The <c>extend</c> block this method symbol belongs to, with the target name and the
@@ -890,6 +890,9 @@ internal sealed class TypeTable
     /// </summary>
     public static readonly IrType Unit = new IrScalarType(IrScalar.Bool);
 
+    /// <summary>A <c>StringView</c> below the checker (10 S1): a view of bytes.</summary>
+    public static readonly IrType ViewOfBytes = new IrSliceType(new IrScalarType(IrScalar.U8));
+
     /// <summary>A type as what holds a value of it: the <see cref="Unit"/> for <c>void</c>.</summary>
     public IrType LowerValue(LyrType type, Core.Span span) => ValueOf(Lower(type, span));
 
@@ -942,6 +945,7 @@ internal sealed class TypeTable
         // no named layout.
         ArrayOf a => new IrArrayType(LowerValue(a.Element, span)),
         SliceOf s => new IrSliceType(LowerValue(s.Element, span)),
+        StringViewType => ViewOfBytes,
         InlineArrayOf ia => new IrInlineArrayType(LowerValue(ia.Element, span), ia.Length),
 
         // ?T is not nestable. The sema already collapses '??T'; a boundary stands here all the same,
@@ -1021,6 +1025,10 @@ internal sealed class TypeTable
 
             var bound = _binding.Resolve(named);
             if (bound is ImportBindingSymbol import) bound = import.Target;
+
+            // 'StringView' (10 S1): a view of a string's bytes, a 'Slice<uint8>' in the IR.
+            if (bound is TypeSymbol { Kind: TypeSymbolKind.Builtin, Name: "StringView" })
+                return ViewOfBytes;
 
             // 'Coroutine<Y, R>' is a builtin, not a declared generic: it has no layout to intern.
             // The written form lowers exactly like the sema's CoroutineOf.
@@ -1215,6 +1223,7 @@ internal sealed class TypeTable
 
             var bound = _binding.Resolve(named);
             if (bound is ImportBindingSymbol import) bound = import.Target;
+            if (bound is TypeSymbol { Kind: TypeSymbolKind.Builtin, Name: "StringView" }) return LyrType.StringView;
 
             // As in Lower: an alias stands for what it names, here as a type ARGUMENT — 'List<Id>'
             // has to key the same instance as 'List<int>', or the two would intern separately.

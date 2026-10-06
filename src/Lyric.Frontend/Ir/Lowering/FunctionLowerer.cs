@@ -4373,6 +4373,15 @@ internal sealed class FunctionLowerer
             from = target;
         }
 
+        // A string where a 'StringView' is expected gives a view of its bytes, whole (10 S1). The
+        // sema lets a string stand for no other slice.
+        if (target is IrSliceType { Element: IrScalarType { Kind: IrScalar.U8 } } && source is IrScalarType { Kind: IrScalar.String }
+            && from is not IrOptionalType)
+        {
+            value = ViewOf(value, new IrScalarType(IrScalar.U8), span);
+            from = target;
+        }
+
         // An inline array is a value like a struct (A4): copied at its binding point.
         if (target is IrInlineArrayType inlineValue && from is not IrOptionalType && !_fresh.Contains(value))
         {
@@ -4863,7 +4872,9 @@ internal sealed class FunctionLowerer
     /// </summary>
     private TempId LowerSlice(IndexExpr expr, SliceRangeExpr range)
     {
-        if (ElementOf(TypeOfExpr(expr.Target)) is not { } element)
+        // A string's bytes or a view's (10 S1): the bounds checked on character boundaries too.
+        var chars = SubstituteType(_types.TypeOf(expr.Target)) is StringViewType or PrimitiveType { Kind: PrimitiveKind.String };
+        if ((chars ? new IrScalarType(IrScalar.U8) : ElementOf(TypeOfExpr(expr.Target))) is not { } element)
             throw NotSupported($"a view of a '{TypeFacts.Display(_types.TypeOf(expr.Target))}'", expr.Span);
         var i64 = new IrScalarType(IrScalar.I64);
         var source = LowerExpr(expr.Target);
@@ -4881,7 +4892,7 @@ internal sealed class FunctionLowerer
                 high = EmitBinary(IrBinKind.Add, i64, high, EmitConst(new IntConst(1), i64, range.Span), range.Span);
         }
         var dest = _slots.NewTemp(new IrSliceType(element));
-        _b.Emit(new MakeSlice(dest, source, low, high, element, expr.Span));
+        _b.Emit(new MakeSlice(dest, source, low, high, element, expr.Span, chars));
         return dest;
     }
 
@@ -6616,7 +6627,7 @@ internal sealed class FunctionLowerer
                 return LowerDefaultCall(member, builtinDefault, onBuiltin, expr);
 
             case MemberExpr member
-                when ReceiverType(member.Target) is PrimitiveType
+                when ReceiverType(member.Target) is PrimitiveType or StringViewType
                      && _types.RefOf(member) is FunctionSymbol:
                 calleeName = member.Member;
                 bound = _types.RefOf(member);

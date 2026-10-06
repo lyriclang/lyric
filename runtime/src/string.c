@@ -72,13 +72,37 @@ bool lyr_str_eq(const LyrStr *a, const LyrStr *b) {
 }
 
 LyrStr *lyr_str_slice(const LyrStr *s, int64_t from, int64_t to) {
-    if (from < 0 || to < from || to > s->len) lyr_panic_range(from, to, s->len);
-    if ((from < s->len && ((unsigned char)s->bytes[from] & 0xC0) == 0x80)
-        || (to < s->len && ((unsigned char)s->bytes[to] & 0xC0) == 0x80)) {
-        lyr_panic(LYR_RT_INDEX, "byte range %lld..%lld does not fall on character boundaries",
-                  (long long)from, (long long)to);
-    }
+    lyr_check_char_range((const uint8_t *)s->bytes, from, to, s->len);
     return lyr_str_from_bytes(s->bytes + from, to - from);
+}
+
+void lyr_panic_char_boundary(int64_t low, int64_t high) {
+    lyr_panic(LYR_RT_INDEX, "byte range %lld..%lld does not fall on character boundaries", (long long)low, (long long)high);
+}
+
+bool lyr_bytes_equal(const uint8_t *a, int64_t alen, const uint8_t *b, int64_t blen) {
+    return alen == blen && (alen == 0 || a == b || memcmp(a, b, (size_t)alen) == 0);
+}
+
+int lyr_bytes_compare(const uint8_t *a, int64_t alen, const uint8_t *b, int64_t blen) {
+    int64_t n = alen < blen ? alen : blen;
+    int c = n > 0 ? memcmp(a, b, (size_t)n) : 0;
+    if (c != 0) return c < 0 ? -1 : 1;
+    return alen < blen ? -1 : alen > blen ? 1 : 0;
+}
+
+/* The bytes are a string's, well-formed UTF-8: what begins at a first byte is a whole character. */
+uint32_t lyr_char_at(const uint8_t *bytes, int64_t len, int64_t at) {
+    LYR_CHECK_INDEX(at, len);
+    uint8_t b0 = bytes[at];
+    if (b0 < 0x80) return b0;
+    if ((b0 & 0xC0) == 0x80)
+        lyr_panic(LYR_RT_INDEX, "byte %lld does not begin a character", (long long)at);
+    if (b0 < 0xE0) return ((uint32_t)(b0 & 0x1F) << 6) | (bytes[at + 1] & 0x3F);
+    if (b0 < 0xF0)
+        return ((uint32_t)(b0 & 0x0F) << 12) | ((uint32_t)(bytes[at + 1] & 0x3F) << 6) | (bytes[at + 2] & 0x3F);
+    return ((uint32_t)(b0 & 0x07) << 18) | ((uint32_t)(bytes[at + 1] & 0x3F) << 12)
+           | ((uint32_t)(bytes[at + 2] & 0x3F) << 6) | (bytes[at + 3] & 0x3F);
 }
 
 LyrStr *lyr_str_from_byte_array(const LyrArr *bytes, int64_t count) {

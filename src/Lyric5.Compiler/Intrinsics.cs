@@ -99,6 +99,13 @@ public static class Intrinsics
         ["std.core.copyBytes"] = "lyr_bytes_copy",
         ["std.core.moveElements"] = "LYR_SLICE_MOVE",
         ["std.core.panicRange"] = "lyr_panic_range",
+        // StringView (10 S1, M8a S12): a view's bytes compared, copied and decoded at a byte, and
+        // read as the 'Slice<uint8>' it is below the checker.
+        ["std.core.viewsHoldTheSameBytes"] = "LYR_VIEW_EQ",
+        ["std.core.compareViewBytes"] = "LYR_VIEW_CMP",
+        ["std.core.viewToString"] = "LYR_VIEW_STR",
+        ["std.core.charOfView"] = "LYR_VIEW_CHAR",
+        ["std.core.viewBytes"] = "LYR_VIEW_BYTES",
     };
 
     /// <summary>The names the <see cref="SubsetGate"/> lets through as <c>CallImport</c>.</summary>

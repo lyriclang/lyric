@@ -29,6 +29,33 @@ int lyr_str_cmp(const LyrStr *a, const LyrStr *b);
  * character's boundary, a panic (LYR-RT0003). */
 LyrStr *lyr_str_slice(const LyrStr *s, int64_t from, int64_t to);
 
+/* A view of a string's bytes (10 S1, M8a S12): [low, high) of a string or of a view, checked as
+ * a view's bounds are and on character boundaries — neither bound may fall on a byte that
+ * continues a character; both panics are LYR-RT0003. What `mkslice.chars` is in C. */
+LYR_NORETURN void lyr_panic_char_boundary(int64_t low, int64_t high);
+
+static inline void lyr_check_char_range(const uint8_t *bytes, int64_t low, int64_t high, int64_t length) {
+    LYR_CHECK_RANGE(low, high, length);
+    if (LYR_UNLIKELY((low < length && (bytes[low] & 0xC0) == 0x80) || (high < length && (bytes[high] & 0xC0) == 0x80)))
+        lyr_panic_char_boundary(low, high);
+}
+
+#define LYR_CHECK_CHAR_RANGE(bytes, low, high, length)                                              \
+    lyr_check_char_range((const uint8_t *)(bytes), (int64_t)(low), (int64_t)(high), (int64_t)(length))
+
+/* std.core's view natives (M8a S12), over a view's pointer and length — the emitter lays a view
+ * out as { ptr, len }. Equal bytes; byte order, then the length (-1, 0, 1); the character that
+ * begins at a byte, outside the bytes or on one that continues a character a panic (LYR-RT0003). */
+bool lyr_bytes_equal(const uint8_t *a, int64_t alen, const uint8_t *b, int64_t blen);
+int lyr_bytes_compare(const uint8_t *a, int64_t alen, const uint8_t *b, int64_t blen);
+uint32_t lyr_char_at(const uint8_t *bytes, int64_t len, int64_t at);
+
+#define LYR_VIEW_EQ(a, b) lyr_bytes_equal((a).ptr, (a).len, (b).ptr, (b).len)
+#define LYR_VIEW_CMP(a, b) ((int64_t)lyr_bytes_compare((a).ptr, (a).len, (b).ptr, (b).len))
+#define LYR_VIEW_STR(v) lyr_str_from_bytes((v).ptr, (v).len)
+#define LYR_VIEW_CHAR(v, i) lyr_char_at((v).ptr, (v).len, (int64_t)(i))
+#define LYR_VIEW_BYTES(v) (v)
+
 /* A string of the first `count` bytes of a byte array (StringBuilder's): they are UTF-8, the
  * builder wrote them; `count` past the array is a panic. */
 LyrStr *lyr_str_from_byte_array(const LyrArr *bytes, int64_t count);
