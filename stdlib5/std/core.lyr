@@ -2028,6 +2028,13 @@ pub class StringBuilder {
 fn putBytes(bytes: uint8[], at: int, s: string): void;
 fn copyBytes(into: uint8[], from: uint8[], count: int): void;
 
+/// The copy primitive (10 C2; the review's B16): the first `count` elements of `from` into `into`,
+/// two views of one element type that may overlap either way — C's memmove. The counts are the
+/// caller's to check; `Slice.copyInto` does, and the collections call this where they have.
+fn moveElements<T>(into: Slice<T>, from: Slice<T>, count: int): void;
+/// The panic of a range `low..high` outside `length` (LYR-RT0003), as `xs[a..b]` raises it.
+fn panicRange(low: int, high: int, length: int): never;
+
 // --- the format language (08 Y7, 10 S7; spec 12 §2) ---------------------------------------------
 
 /// A type with formats of its own (10 S7): `{x:spec}` hands it the spec as written. The scalars
@@ -2594,6 +2601,17 @@ extend<T> Slice<T> {
         return this.length() == 0;
     }
 
+    /// The elements into `into`, which is at least as long: a shorter one panics (`LYR-RT0003`),
+    /// a longer one keeps its rest. The two may overlap either way, `xs[0..4].copyInto(xs[2..6])`
+    /// as well as the reverse (the review's B16b). One call to C's memmove.
+    pub fn copyInto(into: Slice<T>): void {
+        let n = this.length();
+        if (into.length() < n) {
+            panicRange(0, n, into.length());
+        }
+        moveElements(into, this, n);
+    }
+
     /// The element at `i`, or `null` outside `0 ≤ i < length()`.
     pub fn get(i: int): ?T {
         if (i < 0 || i >= this.length()) {
@@ -2735,7 +2753,7 @@ extend<T> Slice<T> {
         if (n <= 16) {
             return;
         }
-        let buffer = arrayOf(n, (i: int) => this[i]);
+        let buffer = sortBuffer(this);
         var width = 16;
         var inBuffer = false;
         while (width < n) {
@@ -2748,11 +2766,7 @@ extend<T> Slice<T> {
             width = width * 2;
         }
         if (inBuffer) {
-            var i = 0;
-            while (i < n) {
-                this[i] = buffer[i];
-                i = i + 1;
-            }
+            buffer[..].copyInto(this);
         }
     }
 
@@ -2777,7 +2791,7 @@ extend<T :: [TotalOrder]> Slice<T> {
         if (n <= 16) {
             return;
         }
-        let buffer = arrayOf(n, (i: int) => this[i]);
+        let buffer = sortBuffer(this);
         var width = 16;
         var inBuffer = false;
         while (width < n) {
@@ -2790,11 +2804,7 @@ extend<T :: [TotalOrder]> Slice<T> {
             width = width * 2;
         }
         if (inBuffer) {
-            var i = 0;
-            while (i < n) {
-                this[i] = buffer[i];
-                i = i + 1;
-            }
+            buffer[..].copyInto(this);
         }
     }
 
@@ -2835,6 +2845,15 @@ fn sortRun<T :: [TotalOrder]>(xs: Slice<T>): void {
 }
 
 /// `mergeRunsBy` under the type's own order.
+/// A copy of `xs` as the merges' second buffer: the slots made of its first element, then one
+/// copy — not an element at a time through a closure (B16).
+fn sortBuffer<T>(xs: Slice<T>): T[] {
+    let first = xs[0];
+    let buffer = arrayOf(xs.length(), (i: int) => first);
+    xs.copyInto(buffer[..]);
+    return buffer;
+}
+
 fn mergeRuns<T :: [TotalOrder]>(src: Slice<T>, dst: Slice<T>, width: int): void {
     let n = src.length();
     var lo = 0;
@@ -2854,16 +2873,10 @@ fn mergeRuns<T :: [TotalOrder]>(src: Slice<T>, dst: Slice<T>, width: int): void 
             }
             k = k + 1;
         }
-        while (i < mid) {
-            dst[k] = src[i];
-            i = i + 1;
-            k = k + 1;
-        }
-        while (j < hi) {
-            dst[k] = src[j];
-            j = j + 1;
-            k = k + 1;
-        }
+        // what one run has left goes over whole
+        src[i..mid].copyInto(dst[k..k + (mid - i)]);
+        k = k + (mid - i);
+        src[j..hi].copyInto(dst[k..k + (hi - j)]);
         lo = hi;
     }
 }
@@ -2905,16 +2918,9 @@ fn mergeRunsBy<T>(src: Slice<T>, dst: Slice<T>, width: int, cmp: fn(T, T) -> Ord
             }
             k = k + 1;
         }
-        while (i < mid) {
-            dst[k] = src[i];
-            i = i + 1;
-            k = k + 1;
-        }
-        while (j < hi) {
-            dst[k] = src[j];
-            j = j + 1;
-            k = k + 1;
-        }
+        src[i..mid].copyInto(dst[k..k + (mid - i)]);
+        k = k + (mid - i);
+        src[j..hi].copyInto(dst[k..k + (hi - j)]);
         lo = hi;
     }
 }

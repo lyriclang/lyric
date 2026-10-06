@@ -61,10 +61,16 @@ pub class List<T> :: [IndexSet<int>, Iterable] {
         return this.buffer[..this.count];
     }
 
-    /// The elements, copied into an array of their own.
+    /// The elements, copied into an array of their own — one copy (B16).
     pub fn toArray(): T[] {
         let n = this.count;
-        return arrayOf(n, (i: int) => this.buffer[i]);
+        if (n == 0) {
+            return [];
+        }
+        let first = this.buffer[0];
+        let out = arrayOf(n, (i: int) => first);
+        this.buffer[..n].copyInto(out[..]);
+        return out;
     }
 
     /// `v` at the end.
@@ -100,11 +106,8 @@ pub class List<T> :: [IndexSet<int>, Iterable] {
             panic(f"List.insert: index {i} outside 0..={this.count}");
         }
         this.push(v);
-        var j = this.count - 1;
-        while (j > i) {
-            this.buffer[j] = this.buffer[j - 1];
-            j = j - 1;
-        }
+        // the elements from `i` one place on: overlapping, backwards — memmove's business (B16)
+        this.buffer[i..this.count - 1].copyInto(this.buffer[i + 1..this.count]);
         this.buffer[i] = v;
     }
 
@@ -112,11 +115,7 @@ pub class List<T> :: [IndexSet<int>, Iterable] {
     /// a panic.
     pub mut fn removeAt(i: int): T {
         let taken = this.index(i);
-        var j = i;
-        while (j < this.count - 1) {
-            this.buffer[j] = this.buffer[j + 1];
-            j = j + 1;
-        }
+        this.buffer[i + 1..this.count].copyInto(this.buffer[i..this.count - 1]);
         this.count = this.count - 1;
         this.changes = this.changes + 1;
         return taken;
@@ -170,12 +169,13 @@ pub class List<T> :: [IndexSet<int>, Iterable] {
         return ListIter<T> { list = this, at = 0, changes = this.changes };
     }
 
-    /// Room for twice the elements, the slots past the length holding `filler`.
+    /// Room for twice the elements, the slots past the length holding `filler`: the new buffer
+    /// made of the filler, the elements over in one copy (B16).
     mut fn grow(filler: T): void {
         let room = if (this.buffer.length() == 0) 8 else this.buffer.length() * 2;
-        let old = this.buffer;
-        let n = this.count;
-        this.buffer = arrayOf(room, (i: int) => if (i < n) old[i] else filler);
+        let grown = arrayOf(room, (i: int) => filler);
+        this.buffer[..this.count].copyInto(grown[..]);
+        this.buffer = grown;
     }
 }
 
@@ -761,9 +761,14 @@ pub class Deque<T> :: [Index<int>, Iterable] {
         }
         let room = if (this.slots.length() == 0) 8 else this.slots.length() * 2;
         let old = this.slots;
-        let n = this.count;
-        let start = this.head;
-        this.slots = arrayOf(room, (i: int): ?T => if (i < n) old[(start + i) % old.length()] else null);
+        let grown = arrayOf(room, (i: int): ?T => null);
+        if (old.length() > 0) {
+            // the ring from its head to its end, then what wrapped to the front: two copies (B16)
+            let tail = old.length() - this.head;
+            old[this.head..old.length()].copyInto(grown[..tail]);
+            old[..this.head].copyInto(grown[tail..old.length()]);
+        }
+        this.slots = grown;
         this.head = 0;
     }
 }
