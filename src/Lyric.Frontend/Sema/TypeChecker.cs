@@ -6743,6 +6743,12 @@ public sealed class TypeChecker
                 return BindMember(mem, MemberOfTypeParam(tp.Param, mem.Member, span));
             case AssocOf assoc:
                 return BindMember(mem, MemberOfAssoc(assoc, mem.Member, span));
+            // A string reaches the members written once on its view (10 S1): where its own
+            // blocks give no member of the name, 's.m()' is the view's, on a view of all of it.
+            case PrimitiveType { Kind: PrimitiveKind.String } text
+                when BuiltinSymbol(text) is { } textSymbol && _stringView is { } ofText
+                     && !BlocksGive(textSymbol, mem.Member) && BlocksGive(ofText, mem.Member):
+                return BindMember(mem, InstanceMember(ofText, mem.Member, span));
             case PrimitiveType p when BuiltinSymbol(p) is { } bs: // extensions on builtins, such as string.shout()
                 return BindMember(mem, InstanceMember(bs, mem.Member, span));
             case StringViewType when _stringView is { } view: // std.core's blocks on the view (10 S1)
@@ -6855,6 +6861,14 @@ public sealed class TypeChecker
     // The builtin TypeSymbol for a primitive type, used for extension lookup on string, int and so on.
     private TypeSymbol? BuiltinSymbol(PrimitiveType p) =>
         _comp.Builtins.LookupLocal(TypeFacts.Display(p)) as TypeSymbol;
+
+    /// <summary>Whether a built-in's own blocks, seen from here, give a member of the name — what
+    /// a string asks before it reaches its view's (10 S1).</summary>
+    private bool BlocksGive(TypeSymbol builtin, string member) =>
+        builtin.Members.LookupLocal(member) is not null
+        || _comp.Extensions.Blocks.Any(block => ReferenceEquals(block.Target, builtin)
+            && (_currentModule is null || _comp.Sees(_currentModule, block.Module))
+            && block.MethodScope.LookupLocal(member) is FunctionSymbol);
 
     // Members on a type parameter T: what its constraint interfaces provide — the closure, since
     // a constraint on the child interface implies the parents' members too.

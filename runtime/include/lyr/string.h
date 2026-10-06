@@ -4,6 +4,8 @@
 #ifndef LYR_STRING_H
 #define LYR_STRING_H
 
+#include <string.h>
+
 #include "lyr/panic.h"
 #include "lyr/types.h"
 
@@ -83,7 +85,8 @@ LyrStr *lyr_str_float_text(double value, int64_t precision, int64_t form);
 /* A byte array's bulk copies, for std.core's StringBuilder: a string's bytes into `bytes` from
  * `at` on, and the first `count` bytes of one array into another — memcpy, the ranges checked as
  * an index is. */
-void lyr_bytes_put_str(LyrArr *bytes, int64_t at, const LyrStr *s);
+void lyr_bytes_put(LyrArr *bytes, int64_t at, const uint8_t *from, int64_t count);
+#define LYR_BYTES_PUT_VIEW(bytes, at, v) lyr_bytes_put((bytes), (int64_t)(at), (v).ptr, (v).len)
 void lyr_bytes_copy(LyrArr *into, const LyrArr *from, int64_t count);
 
 /* The float a text names, the nearest one (10 B5 Z6): a text whose form std.core checked — sign,
@@ -92,15 +95,19 @@ void lyr_bytes_copy(LyrArr *into, const LyrArr *from, int64_t count);
 double lyr_str_to_float64(const LyrStr *text);
 float lyr_str_to_float32(const LyrStr *text);
 
-/* A string's length and one byte of it (10 S1), for std.core until `StringView` gives the library
- * its bytes (M8a S8); the index is checked as `xs[i]` is. */
-#define LYR_STR_LEN(s) ((int64_t)(s)->len)
-#define LYR_STR_BYTE(s, i)                                                                          \
+/* A view's length and one byte of it (10 S1; M8a S12), the bytes std.core's string members read;
+ * the index is checked as `xs[i]` is. Whether `p`'s bytes stand in `s` at byte `at` (false where
+ * they would run past it). */
+#define LYR_VIEW_LEN(v) ((int64_t)(v).len)
+#define LYR_VIEW_BYTE(v, i)                                                                         \
     __extension__({                                                                                 \
-        const LyrStr *lyr_s_ = (s);                                                                 \
         const int64_t lyr_i_ = (i);                                                                 \
-        LYR_CHECK_INDEX(lyr_i_, lyr_s_->len);                                                       \
-        (int64_t)(unsigned char)lyr_s_->bytes[lyr_i_];                                              \
+        LYR_CHECK_INDEX(lyr_i_, (v).len);                                                           \
+        (int64_t)(v).ptr[lyr_i_];                                                                   \
     })
+static inline bool lyr_bytes_match_at(const uint8_t *s, int64_t slen, const uint8_t *p, int64_t plen, int64_t at) {
+    return at >= 0 && at <= slen - plen && (plen == 0 || memcmp(s + at, p, (size_t)plen) == 0);
+}
+#define LYR_VIEW_MATCHES_AT(s, p, at) lyr_bytes_match_at((s).ptr, (s).len, (p).ptr, (p).len, (int64_t)(at))
 
 #endif

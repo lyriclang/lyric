@@ -1912,7 +1912,10 @@ public static class IrVerifier
             // Identity: 'same(a, b)' compares two references (design/v5/spec/02 M10) — objects,
             // arrays, coroutines (03 §2.6). '==' never reaches here for them — the sema sends it
             // through 'Equatable'.
-            || type is IrRefType or IrArrayType or IrCoroutineType;
+            || type is IrRefType or IrArrayType or IrCoroutineType
+            // A view of bytes compares by its bytes: a StringView matched against a string
+            // literal (10 S1). '==' written between views is std.core's equalViews, never this.
+            || type is IrSliceType { Element: IrScalarType { Kind: IrScalar.U8 } };
 
         private static bool IsBitwiseOrShift(IrBinKind kind) => kind is
             IrBinKind.Shl or IrBinKind.Shr or

@@ -6632,6 +6632,11 @@ internal sealed class FunctionLowerer
                 calleeName = member.Member;
                 bound = _types.RefOf(member);
                 receiver = LowerExpr(member.Target);
+                // A string reaching a member written on its view (10 S1): a view of all of it.
+                if (ReceiverType(member.Target) is PrimitiveType { Kind: PrimitiveKind.String }
+                    && bound is FunctionSymbol onView
+                    && _typeTable.BlockOf(onView) is { Target: { Kind: TypeSymbolKind.Builtin, Name: "StringView" } })
+                    receiver = ViewOf(receiver.Value, new IrScalarType(IrScalar.U8), member.Span);
                 break;
 
             case MemberExpr member: // a type or module target: P.new(…), console.println(…)
