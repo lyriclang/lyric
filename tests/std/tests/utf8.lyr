@@ -1,0 +1,32 @@
+// std.core's bytes to text (design/v5/spec/10 S3; M8a S12): the ranges of well-formed UTF-8 the
+// lossy decoder keeps to, and a part of an array as the bytes.
+import std.core { Utf8Error };
+import std.test { assertEq };
+
+fn codes(bytes: uint8[]): string {
+    var out = "";
+    for (c in string.fromUtf8Lossy(bytes).chars()) {
+        out = out + f" {c as uint32}";
+    }
+    return out;
+}
+
+@Test
+fn theLossyDecodersRanges(): void {
+    assertEq(codes([237, 160, 128]), " 65533 65533 65533");
+    assertEq(codes([224, 128, 128]), " 65533 65533 65533");
+    assertEq(codes([244, 144, 128, 128]), " 65533 65533 65533 65533");
+    assertEq(codes([240, 159, 152, 128]), " 128512");
+}
+
+@Test
+fn aPartOfAnArray(): void {
+    let bytes: uint8[] = [120, 104, 105, 120];
+    var text = "";
+    try {
+        text = string.fromUtf8(bytes[1..3]);
+    } catch (e: Utf8Error) {
+        text = f"bad at {e.offset}";
+    }
+    assertEq(text, "hi");
+}

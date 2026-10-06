@@ -29,6 +29,7 @@ typedef struct lyr_ty_17_std_core_Ordering_Equal lyr_ty_17_std_core_Ordering_Equ
 typedef struct lyr_ty_17_std_core_Ordering_Greater lyr_ty_17_std_core_Ordering_Greater;
 typedef struct lyr_ty_std_core_Exception lyr_ty_std_core_Exception;
 typedef struct lyr_ty_std_core_LinesIter lyr_ty_std_core_LinesIter;
+typedef struct lyr_ty_std_core_Utf8Error lyr_ty_std_core_Utf8Error;
 typedef struct lyr_ty_std_hash_Sip lyr_ty_std_hash_Sip;
 typedef struct lyr_ty_std_hash_DefaultHasher lyr_ty_std_hash_DefaultHasher;
 typedef struct lyr_ty_std_hash_FixedHasher lyr_ty_std_hash_FixedHasher;
@@ -133,6 +134,9 @@ struct lyr_ty_std_core_LinesIter {
     lyr_slice_u8 f_s;
     int64_t f_at;
 };
+struct lyr_ty_std_core_Utf8Error {
+    int64_t f_offset;
+};
 struct lyr_ty_std_hash_Sip {
     uint64_t f_v0;
     uint64_t f_v1;
@@ -198,6 +202,11 @@ _Static_assert(offsetof(lyr_box_ty_std_core_LinesIter, value) == 8, "layout of l
 extern const LyrItable lyr_itab_ty_std_core_LinesIter[];
 static const uint64_t lyr_refmap_box22[] = { UINT64_C(0x2) };
 const LyrDesc lyr_desc_box_ty_std_core_LinesIter = { sizeof(lyr_box_ty_std_core_LinesIter), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box22, "box<std.core.LinesIter>", lyr_itab_ty_std_core_LinesIter };
+typedef struct { LyrObj header; lyr_ty_std_core_Utf8Error value; } lyr_box_ty_std_core_Utf8Error;
+_Static_assert(sizeof(lyr_box_ty_std_core_Utf8Error) == 16, "layout of lyr_box_ty_std_core_Utf8Error");
+_Static_assert(offsetof(lyr_box_ty_std_core_Utf8Error, value) == 8, "layout of lyr_box_ty_std_core_Utf8Error");
+extern const LyrItable lyr_itab_ty_std_core_Utf8Error[];
+const LyrDesc lyr_desc_box_ty_std_core_Utf8Error = { sizeof(lyr_box_ty_std_core_Utf8Error), 0, 0, 0, NULL, "box<std.core.Utf8Error>", lyr_itab_ty_std_core_Utf8Error };
 typedef struct { LyrObj header; lyr_ty_std_hash_Sip value; } lyr_box_ty_std_hash_Sip;
 _Static_assert(sizeof(lyr_box_ty_std_hash_Sip) == 64, "layout of lyr_box_ty_std_hash_Sip");
 _Static_assert(offsetof(lyr_box_ty_std_hash_Sip, value) == 8, "layout of lyr_box_ty_std_hash_Sip");
@@ -267,6 +276,7 @@ const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_22_std_core_StringBuilder = 
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_17_std_core_Ordering = { &lyr_desc_box_ty_std_core_Ordering,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_18_std_core_Exception = { &lyr_desc_ty_std_core_Exception,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_18_std_core_LinesIter = { &lyr_desc_box_ty_std_core_LinesIter,  };
+const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_18_std_core_Utf8Error = { &lyr_desc_box_ty_std_core_Utf8Error,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_12_std_hash_Sip = { &lyr_desc_box_ty_std_hash_Sip,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_22_std_hash_DefaultHasher = { &lyr_desc_box_ty_std_hash_DefaultHasher,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_20_std_hash_FixedHasher = { &lyr_desc_box_ty_std_hash_FixedHasher,  };
@@ -282,6 +292,7 @@ const LyrItable lyr_itab_ty_std_core_StringBuilder[] = { { lyr_ifid_ty_std_core_
 const LyrItable lyr_itab_ty_std_core_Ordering[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_17_std_core_Ordering } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_core_Exception[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_18_std_core_Exception } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_core_LinesIter[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_18_std_core_LinesIter } , { NULL, NULL } };
+const LyrItable lyr_itab_ty_std_core_Utf8Error[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_18_std_core_Utf8Error } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_hash_Sip[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_12_std_hash_Sip } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_hash_DefaultHasher[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_22_std_hash_DefaultHasher } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_hash_FixedHasher[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_20_std_hash_FixedHasher } , { NULL, NULL } };

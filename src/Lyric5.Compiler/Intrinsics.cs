@@ -107,6 +107,10 @@ public static class Intrinsics
         ["std.core.viewToString"] = "LYR_VIEW_STR",
         ["std.core.charOfView"] = "LYR_VIEW_CHAR",
         ["std.core.viewBytes"] = "LYR_VIEW_BYTES",
+        // Bytes to text (10 S3; M8a S12): checked, copied, decoded with replacement.
+        ["std.core.utf8Invalid"] = "LYR_UTF8_INVALID",
+        ["std.core.stringOfSlice"] = "LYR_STR_OF_SLICE",
+        ["std.core.stringOfUtf8Lossy"] = "LYR_STR_UTF8_LOSSY",
     };
 
     /// <summary>The names the <see cref="SubsetGate"/> lets through as <c>CallImport</c>.</summary>
