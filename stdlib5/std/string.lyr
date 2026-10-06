@@ -10,6 +10,9 @@ pub fn fromUint(value: uint): string;
 /// The shortest decimal text that reads back as the same value; `inf`, `-inf` and `NaN` for
 /// the values that are no number.
 pub fn fromFloat(value: float): string;
+/// A `float32`'s own shortest text (03 §1.7): `0.1`, not the `0.10000000149011612` of the `float`
+/// it widens to.
+pub fn fromFloat32(value: float32): string;
 /// The character as a one-character string.
 pub fn fromChar(value: char): string;
 pub fn fromBool(value: bool): string;

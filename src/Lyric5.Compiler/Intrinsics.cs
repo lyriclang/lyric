@@ -16,6 +16,8 @@ public static class Intrinsics
         ["std.string.fromUint"] = "lyr_str_from_uint",
         ["std.string.fromBool"] = "lyr_str_from_bool",
         ["std.string.fromFloat"] = "lyr_str_from_float",
+        ["std.string.fromFloat32"] = "lyr_str_from_float32",
+        ["std.core.shortestFloat32"] = "lyr_str_from_float32",
         ["std.string.fromChar"] = "lyr_str_from_char",
         ["std.core.panic"] = "lyr_panic_message",
         // The catalogue (05 E8): 'assert' a check at the call, so its trace starts in the program;

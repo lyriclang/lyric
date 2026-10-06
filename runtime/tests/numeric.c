@@ -113,6 +113,62 @@ static int64_t program(void) {
         CHECK(text_is(lyr_str_from_float(-nan_value), "nan"));
         CHECK(text_is(lyr_str_from_float(huge * huge), "inf"));
         CHECK(text_is(lyr_str_from_float(-huge * huge), "-inf"));
+
+        /* a float32's own shortest text (M8a-9) */
+        CHECK(text_is(lyr_str_from_float32(0.1f), "0.1"));
+        CHECK(text_is(lyr_str_from_float32(0.1f + 0.2f), "0.3"));
+        CHECK(text_is(lyr_str_from_float32(1.0f), "1.0"));
+        CHECK(text_is(lyr_str_from_float32(-0.0f), "-0.0"));
+        CHECK(text_is(lyr_str_from_float32(16777216.0f), "16777216.0"));
+        CHECK(text_is(lyr_str_from_float32(3.4028235e38f), "3.4028235e+38"));
+        CHECK(text_is(lyr_str_from_float32(1e-45f), "1e-45"));
+        CHECK(text_is(lyr_str_from_float32(1.17549435e-38f), "1.1754944e-38"));
+        CHECK(text_is(lyr_str_from_float32((float)(huge * huge)), "inf"));
+        CHECK(text_is(lyr_str_from_float32((float)nan_value), "nan"));
+
+        /* a precision rounds half away from zero on the exact binary digits (M8a-8), the same on
+         * every host: 0.125 and 2.5 are exact halves; 2.675 and 9.995 lie below theirs */
+        CHECK(text_is(lyr_str_float_text(0.125, 2, 0), "0.13"));
+        CHECK(text_is(lyr_str_float_text(-0.125, 2, 0), "-0.13"));
+        CHECK(text_is(lyr_str_float_text(2.5, 0, 0), "3"));
+        CHECK(text_is(lyr_str_float_text(-2.5, 0, 0), "-3"));
+        CHECK(text_is(lyr_str_float_text(0.5, 0, 0), "1"));
+        CHECK(text_is(lyr_str_float_text(1.5, 0, 0), "2"));
+        CHECK(text_is(lyr_str_float_text(2.675, 2, 0), "2.67"));
+        CHECK(text_is(lyr_str_float_text(9.995, 2, 0), "9.99"));
+        CHECK(text_is(lyr_str_float_text(1.005, 2, 0), "1.00"));
+        CHECK(text_is(lyr_str_float_text(0.045, 2, 0), "0.04"));
+        CHECK(text_is(lyr_str_float_text(9.99, 1, 0), "10.0"));
+        CHECK(text_is(lyr_str_float_text(0.0625, 1, 0), "0.1"));
+        CHECK(text_is(lyr_str_float_text(0.0, 0, 0), "0"));
+        CHECK(text_is(lyr_str_float_text(-0.0, 1, 0), "-0.0"));
+        CHECK(text_is(lyr_str_float_text(-0.001, 2, 0), "-0.00"));
+        CHECK(text_is(lyr_str_float_text(1e22, 2, 0), "10000000000000000000000.00"));
+        CHECK(text_is(lyr_str_float_text(0.1, 20, 0), "0.10000000000000000555"));
+        CHECK(text_is(lyr_str_float_text(5e-324, 3, 0), "0.000"));
+        CHECK(text_is(lyr_str_float_text(1234567.891, 2, 0), "1234567.89"));
+        CHECK(text_is(lyr_str_float_text(123.456, 0, 0), "123"));
+        CHECK(text_is(lyr_str_float_text(1.25, 1, 1), "1.3e+00"));
+        CHECK(text_is(lyr_str_float_text(9.95, 1, 1), "9.9e+00"));
+        CHECK(text_is(lyr_str_float_text(9.96, 1, 1), "1.0e+01"));
+        CHECK(text_is(lyr_str_float_text(0.000125, 2, 1), "1.25e-04"));
+        CHECK(text_is(lyr_str_float_text(1.0, 3, 1), "1.000e+00"));
+        CHECK(text_is(lyr_str_float_text(5e-324, 3, 1), "4.941e-324"));
+        CHECK(text_is(lyr_str_float_text(1234.5, 6, 1), "1.234500e+03"));
+        CHECK(text_is(lyr_str_float_text(1234.5, 2, 2), "1.23E+03"));
+        CHECK(text_is(lyr_str_float_text(0.0, 2, 1), "0.00e+00"));
+        CHECK(text_is(lyr_str_float_text(1e-100, 1, 1), "1.0e-100"));
+        CHECK(text_is(lyr_str_float_text(1.7976931348623157e308, 2, 1), "1.80e+308"));
+        CHECK(text_is(lyr_str_float_text(0.125, 0, 1), "1e-01"));
+        CHECK(text_is(lyr_str_float_text(9.5, 0, 1), "1e+01"));
+        CHECK(text_is(lyr_str_float_text(0.25, 1, 3), "25.0"));
+        CHECK(text_is(lyr_str_float_text(0.125, 0, 3), "13"));
+        CHECK(text_is(lyr_str_float_text(0.256, 1, 3), "25.6"));
+        CHECK(text_is(lyr_str_float_text(1.5, 0, 3), "150"));
+        CHECK(text_is(lyr_str_float_text(0.005, 0, 3), "1"));
+        CHECK(text_is(lyr_str_float_text(nan_value, 2, 2), "NAN"));
+        CHECK(text_is(lyr_str_float_text(huge * huge, 2, 2), "INF"));
+        CHECK(text_is(lyr_str_float_text(-huge * huge, 2, 0), "-inf"));
         CHECK(text_is(lyr_str_from_char('A'), "A"));
         CHECK(text_is(lyr_str_from_char(0xE9), "\xC3\xA9"));            /* é */
         CHECK(text_is(lyr_str_from_char(0x20AC), "\xE2\x82\xAC"));      /* € */

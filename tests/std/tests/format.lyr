@@ -44,7 +44,24 @@ fn floatsFixedAndWithAnExponent(): void {
     assertEq(f"{1234.5:e} {1234.5:.2E} {0.00012:.1e}", "1.234500e+03 1.23E+03 1.2e-04");
     assertEq(f"{0.25:%} {0.256:.1%} {1.5:.0%}", "25.000000% 25.6% 150%");
     let h: float32 = 0.1;
-    assertEq(f"{h:.3f} {h}", "0.100 0.10000000149011612");
+    assertEq(f"{h:.3f} {h} {h as float}", "0.100 0.1 0.10000000149011612");
+}
+
+@Test
+fn aHalfRoundsAwayFromZero(): void {
+    // on the exact binary digits: 0.125 and 2.5 are halves, 2.675 and 9.995 lie below theirs
+    assertEq(f"{0.125:.2f} {-0.125:.2f} {2.5:.0f} {-2.5:.0f} {0.5:.0f} {1.5:.0f}", "0.13 -0.13 3 -3 1 2");
+    assertEq(f"{2.675:.2f} {9.995:.2f} {1.005:.2f} {9.99:.1f}", "2.67 9.99 1.00 10.0");
+    assertEq(f"{1.25:.1e} {9.96:.1e} {0.125:.0E} {0.125:.0%} {0.005:.0%}", "1.3e+00 1.0e+01 1E-01 13% 1%");
+    // the percentage moves the point on the exact digits: 0.0015 is 0.0015000000000000000312...,
+    // a hundredfold 0.15000000000000000312... — above the half; multiplied first it would be 0.1
+    assertEq(f"{0.0015:.1%}", "0.2%");
+}
+
+@Test
+fn zerosAreGroupedWithTheDigits(): void {
+    assertEq(f"{1234:010,} {-1234:010,} {1234:08_}", "00,001,234 -0,001,234 0_001_234");
+    assertEq(f"{1234.5:010,.1f} {-1234.5:010,.1f} {255:#010_x}", "0,001,234.5 -001,234.5 0x000_00ff");
 }
 
 @Test

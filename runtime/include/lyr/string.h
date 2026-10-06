@@ -41,12 +41,17 @@ LyrStr *lyr_str_from_bool(bool value);
 /* The shortest decimal text that reads back as the same double (10 B5 Z5), as Python and Swift
  * write it: "1.0", "0.1", "-0.0", "100.0", "1e+16", "1.5e-07", "inf", "-inf", "nan". */
 LyrStr *lyr_str_from_float(double value);
+/* A float32's own shortest text (the review's M8a-9): "0.1", where the double it widens to reads
+ * "0.10000000149011612". */
+LyrStr *lyr_str_from_float32(float value);
 /* The character as a string of one code point, UTF-8 encoded. The value is a Unicode scalar
  * value by the type's invariant (numeric.h checks the one conversion that could break it). */
 LyrStr *lyr_str_from_char(uint32_t value);
-/* A float with a precision (08 Y7; spec 12 §2): form 0 fixed (`%.*f`), 1 with an exponent (`%.*e`),
- * 2 the same in upper case (`%.*E`) — rounded to nearest on the exact binary value. `nan` (`NAN`),
- * `inf` and `-inf` keep their words. */
+/* A float with a precision (08 Y7; spec 12 §2 rule 3): form 0 fixed, 1 with an exponent, 2 the
+ * same in upper case, 3 fixed with the point moved two places right (a percentage, its `%` the
+ * library's) — rounded half AWAY FROM ZERO on the exact binary value, by the runtime's own decimal
+ * expansion, the same on every host (the review's M8a-8). `nan` (`NAN`), `inf` and `-inf` keep
+ * their words. */
 LyrStr *lyr_str_float_text(double value, int64_t precision, int64_t form);
 /* A byte array's bulk copies, for std.core's StringBuilder: a string's bytes into `bytes` from
  * `at` on, and the first `count` bytes of one array into another — memcpy, the ranges checked as

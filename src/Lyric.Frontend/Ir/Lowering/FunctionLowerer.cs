@@ -7348,8 +7348,10 @@ internal sealed class FunctionLowerer
             IrScalar.String => value,
             IrScalar.Bool => CallHelper("std.string.fromBool", expr.Span, value),
             IrScalar.Char => CallHelper("std.string.fromChar", expr.Span, value),
-            IrScalar.F32 or IrScalar.F64 => CallHelper("std.string.fromFloat", expr.Span,
-                WidenForHelper(value, scalar.Kind, expr.Span)),
+            // A float32 has a converter of its own (the review's M8a-9): its shortest text is not
+            // the double's — '0.1', where the widened value reads '0.10000000149011612'.
+            IrScalar.F32 => CallHelper("std.string.fromFloat32", expr.Span, value),
+            IrScalar.F64 => CallHelper("std.string.fromFloat", expr.Span, value),
             // Unsigned first: 'fromInt' reinterprets a large uint as a negative number. Measured,
             // f"{u}" with u = uint64.MaxValue previously yielded "-1".
             _ when IsUnsignedScalar(scalar.Kind) => CallHelper("std.string.fromUint", expr.Span,
@@ -7367,7 +7369,8 @@ internal sealed class FunctionLowerer
     /// <para>The converters in <c>std.string</c> and <c>std.fmt</c> are called <c>fromInt</c> and
     /// <c>fromFloat</c>, singular, because Lyric has no overloading. There is therefore exactly ONE
     /// signature per kind, and it takes the widest type. Whoever passes an <c>int8</c> has to widen it
-    /// first.</para>
+    /// first. The exception is <c>float32</c> in a hole: <c>fromFloat32</c> is its own, since its
+    /// shortest text is not the double's (the review's M8a-9).</para>
     ///
     /// <para>Without this step <c>f"{x}"</c> with <c>x: int8</c> crashes the compiler in the IR verifier
     /// ("arg 0 is i8, expected i64") — with a stack trace instead of a diagnostic, and for every type
