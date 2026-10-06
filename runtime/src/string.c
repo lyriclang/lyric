@@ -76,6 +76,65 @@ LyrStr *lyr_str_slice(const LyrStr *s, int64_t from, int64_t to) {
     return lyr_str_from_bytes(s->bytes + from, to - from);
 }
 
+int64_t lyr_utf8_invalid_at(const uint8_t *bytes, int64_t len) {
+    int64_t offset = 0;
+    return lyr_utf8_valid(bytes, len, &offset) ? -1 : offset;
+}
+
+/* One step of a decode (Unicode 3.9, table 3-7): the length of the well-formed sequence at `i`, or —
+ * `*ok` false — the length of the maximal part of one that is not, at least one byte. */
+static int64_t utf8_step(const uint8_t *b, int64_t n, int64_t i, bool *ok) {
+    uint8_t c = b[i];
+    if (c < 0x80) { *ok = true; return 1; }
+    int need;
+    uint8_t lo = 0x80, hi = 0xBF;
+    if (c >= 0xC2 && c <= 0xDF) need = 1;
+    else if (c == 0xE0) { need = 2; lo = 0xA0; }
+    else if ((c >= 0xE1 && c <= 0xEC) || c == 0xEE || c == 0xEF) need = 2;
+    else if (c == 0xED) { need = 2; hi = 0x9F; }
+    else if (c == 0xF0) { need = 3; lo = 0x90; }
+    else if (c >= 0xF1 && c <= 0xF3) need = 3;
+    else if (c == 0xF4) { need = 3; hi = 0x8F; }
+    else { *ok = false; return 1; }
+    for (int64_t k = 1; k <= need; k++) {
+        if (i + k >= n) { *ok = false; return k; }
+        uint8_t d = b[i + k];
+        if (d < (k == 1 ? lo : 0x80) || d > (k == 1 ? hi : 0xBF)) { *ok = false; return k; }
+    }
+    *ok = true;
+    return need + 1;
+}
+
+LyrStr *lyr_str_from_utf8_lossy(const uint8_t *bytes, int64_t len) {
+    int64_t out = 0;
+    for (int64_t i = 0; i < len;) {
+        bool ok;
+        int64_t step = utf8_step(bytes, len, i, &ok);
+        out += ok ? step : 3;
+        i += step;
+    }
+    if (out == len) return lyr_str_from_bytes(bytes, len);
+    uint8_t *text = malloc((size_t)out);
+    if (text == NULL) lyr_panic(LYR_RT_OUT_OF_MEMORY, "out of memory decoding %lld bytes", (long long)len);
+    int64_t at = 0;
+    for (int64_t i = 0; i < len;) {
+        bool ok;
+        int64_t step = utf8_step(bytes, len, i, &ok);
+        if (ok) {
+            memcpy(text + at, bytes + i, (size_t)step);
+            at += step;
+        } else {
+            text[at++] = 0xEF;
+            text[at++] = 0xBF;
+            text[at++] = 0xBD;
+        }
+        i += step;
+    }
+    LyrStr *result = lyr_str_from_bytes(text, out);
+    free(text);
+    return result;
+}
+
 void lyr_panic_char_boundary(int64_t low, int64_t high) {
     lyr_panic(LYR_RT_INDEX, "byte range %lld..%lld does not fall on character boundaries", (long long)low, (long long)high);
 }

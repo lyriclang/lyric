@@ -58,6 +58,15 @@ uint32_t lyr_char_at(const uint8_t *bytes, int64_t len, int64_t at);
 #define LYR_VIEW_CHAR(v, i) lyr_char_at((v).ptr, (v).len, (int64_t)(i))
 #define LYR_VIEW_BYTES(v) (v)
 
+/* Bytes to text (10 S3; M8a S12), over a Slice<uint8>'s pointer and length: the offset of the
+ * first byte that is no well-formed UTF-8, or -1; the bytes as a string; the bytes decoded with
+ * each maximal part of a sequence that is not well-formed replaced by U+FFFD. */
+int64_t lyr_utf8_invalid_at(const uint8_t *bytes, int64_t len);
+LyrStr *lyr_str_from_utf8_lossy(const uint8_t *bytes, int64_t len);
+#define LYR_UTF8_INVALID(v) lyr_utf8_invalid_at((v).ptr, (v).len)
+#define LYR_STR_OF_SLICE(v) lyr_str_from_bytes((v).ptr, (v).len)
+#define LYR_STR_UTF8_LOSSY(v) lyr_str_from_utf8_lossy((v).ptr, (v).len)
+
 /* A string of the first `count` bytes of a byte array (StringBuilder's): they are UTF-8, the
  * builder wrote them; `count` past the array is a panic. */
 LyrStr *lyr_str_from_byte_array(const LyrArr *bytes, int64_t count);

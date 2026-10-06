@@ -4011,3 +4011,39 @@ extend string :: [Index<int>] {
         return charOfView(this, k);
     }
 }
+
+// --- bytes to text (10 S3; M8a S12) -----------------------------------------------------------
+
+/// What `string.fromUtf8` throws (10 S3, B3: the bytes are the data's, so it throws): they are no
+/// well-formed UTF-8 from `offset` on — an overlong form, a surrogate, beyond U+10FFFF, a byte
+/// that begins nothing, a sequence cut short.
+pub struct Utf8Error :: [Error] {
+    /// The first byte that is no well-formed UTF-8.
+    pub offset: int,
+
+    pub fn message(): string {
+        return f"the bytes are no UTF-8 from byte {this.offset} on";
+    }
+}
+
+extend string {
+    /// The text the bytes are, copied; `Utf8Error` where they are no well-formed UTF-8.
+    pub static fn fromUtf8(bytes: Slice<uint8>): string throws Utf8Error {
+        let bad = utf8Invalid(bytes);
+        if (bad >= 0) {
+            throw Utf8Error { offset = bad };
+        }
+        return stringOfSlice(bytes);
+    }
+
+    /// The text the bytes are, each maximal part of a sequence that is not well-formed replaced by
+    /// U+FFFD — the Unicode Standard's recommended practice (3.9), WHATWG's decoding.
+    pub static fn fromUtf8Lossy(bytes: Slice<uint8>): string {
+        return stringOfUtf8Lossy(bytes);
+    }
+}
+
+/// -1 where the bytes are well-formed UTF-8, else the offset of the first that is not.
+fn utf8Invalid(bytes: Slice<uint8>): int;
+fn stringOfSlice(bytes: Slice<uint8>): string;
+fn stringOfUtf8Lossy(bytes: Slice<uint8>): string;
