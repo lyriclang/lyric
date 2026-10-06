@@ -245,6 +245,9 @@ pub class Channel<T> {
     /// The tasks waiting to send, each with its value, and those waiting to receive.
     senders: WaitQueue<T>,
     receivers: WaitQueue<T>,
+    /// What else ends with the channel: the signal hub's subscription (M6-28). Run once, after
+    /// the close, outside the guard.
+    var closer: ?fn() -> void = null,
 
     /// A channel that holds up to `capacity` values no task has received yet; 0 — the default —
     /// holds none: a send meets a receive.
@@ -350,7 +353,10 @@ pub class Channel<T> {
         while (let w = this.senders.take()) {
             s.wakeUp(w.context);
         }
+        let closer = this.closer;
+        this.closer = null;
         this.guard.release();
+        if (let f = closer) { f(); }
     }
 
     /// `value` into the channel where that needs no wait — to a task waiting to receive, or into the
@@ -1042,6 +1048,12 @@ pub fn signals(wanted: Signal...): Channel<Signal> {
     }
     if (mask != 0) {
         signalHub.subscribe(channel, mask);
+        // Closed, the channel ends its subscription at once (the review's M6-28): a signal that
+        // comes after the close is the system's again, not swallowed by a watcher that finds the
+        // channel closed.
+        channel.closer = () => {
+            signalHub.unsubscribe(channel);
+        };
     }
     return channel;
 }
@@ -1076,6 +1088,32 @@ class SignalHub {
                 signalHub.watch();
             });
         }
+    }
+
+    /// `channel` closed (M6-28): its subscription ends now, and a signal no channel asks for any
+    /// more is the system's again.
+    mut fn unsubscribe(channel: Channel<Signal>): void {
+        this.guard.acquire();
+        var before: ?Subscription = null;
+        var at = this.first;
+        var still = 0;
+        while (let sub = at) {
+            at = sub.next;
+            if (same(sub.channel, channel)) {
+                if (let b = before) {
+                    b.next = sub.next;
+                } else {
+                    this.first = sub.next;
+                }
+            } else {
+                still = still | sub.mask;
+                before = sub;
+            }
+        }
+        let dropped = this.caught & ~still;
+        this.caught = still;
+        this.guard.release();
+        catchAll(dropped, false);
     }
 
     /// The watcher's loop: what was caught goes out, then it waits for more.
@@ -1518,8 +1556,14 @@ class Waiters {
 pub class Pool :: [Closeable] {
     workers: Worker,
     size: int,
-    var picks: int = 0, // atomic
-    var closed: bool = false, // atomic
+    /// The guard holds from the check of `closed` to the raising of a worker's count, and while
+    /// the pool closes (the review's M6-27): a task given while the pool closes is on a worker
+    /// that will run it — counted before the worker may look again — or refused; never on one
+    /// that has ended. Without it the check and the count were two steps, and a close between
+    /// them lost the task.
+    guard: SpinLock = SpinLock { },
+    var picks: int = 0,
+    var closed: bool = false,
 
     /// A pool of `threads` threads — one at least — each with a scheduler of its own.
     pub static fn new(threads: int): Pool {
@@ -1537,9 +1581,15 @@ pub class Pool :: [Closeable] {
     /// Runs `body` as a task on one of the pool's threads and gives its handle (06 T1): `await()`
     /// waits for it from any thread. A closed pool takes no task: that is a panic.
     pub mut fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
-        if (atomicLoad(&this.closed)) { panic("a task given to a closed pool"); }
+        this.guard.acquire();
+        if (this.closed) {
+            this.guard.release();
+            panic("a task given to a closed pool");
+        }
         let w = this.pick();
         atomicFetchAndAdd(&w.active, 1);
+        this.guard.release();
+        // counted, the worker stays for it; the hand-over itself needs no guard
         return launchOn(w.scheduler, body, () => {
             atomicFetchAndAdd(&w.active, -1);
         });
@@ -1553,7 +1603,9 @@ pub class Pool :: [Closeable] {
         // Through the reference, not through 'this': 'Closeable.close' is no 'mut fn', and an
         // implementation's 'mut' is the member's (LYR-SEM0042) — on a class too.
         let me = this;
-        atomicStore(&me.closed, true);
+        me.guard.acquire();
+        me.closed = true;
+        me.guard.release();
         var at: ?Worker = this.workers;
         while (let w = at) {
             w.close();
@@ -1566,9 +1618,10 @@ pub class Pool :: [Closeable] {
         }
     }
 
-    /// The next thread in turn.
+    /// The next thread in turn; under the guard.
     mut fn pick(): Worker {
-        var k = atomicFetchAndAdd(&this.picks, 1) % this.size;
+        var k = this.picks % this.size;
+        this.picks = this.picks +% 1;
         if (k < 0) { k = -k; }
         var at: ?Worker = this.workers;
         while (let w = at) {

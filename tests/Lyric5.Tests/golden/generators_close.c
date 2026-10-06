@@ -245,6 +245,9 @@ _Static_assert(offsetof(lyr_ty_std_task_Subscription, f_mask) == 16, "layout of 
 _Static_assert(offsetof(lyr_ty_std_task_Subscription, f_next) == 24, "layout of lyr_ty_std_task_Subscription");
 static const uint64_t lyr_refmap_ty_std_task_Subscription[] = { UINT64_C(0xa) };
 const LyrDesc lyr_desc_ty_std_task_Subscription = { sizeof(lyr_ty_std_task_Subscription), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_task_Subscription, "std.task.Subscription", NULL };
+typedef struct { void (*fn)(void *, LyrErr **); void *env; } lyr_fn_to_void;
+_Static_assert(sizeof(lyr_fn_to_void) == 16, "layout of lyr_fn_to_void");
+typedef struct { lyr_fn_to_void value; uint8_t has; } lyr_opt_fn_to_void;
 struct lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00 {
     LyrObj header;
     int64_t f_capacity;
@@ -256,8 +259,9 @@ struct lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00 {
     uint8_t f_closed;
     lyr_ty_std_task_WaitQueue_std_task_Signal__bc0d7a21 *f_senders;
     lyr_ty_std_task_WaitQueue_std_task_Signal__bc0d7a21 *f_receivers;
+    lyr_opt_fn_to_void f_closer;
 };
-_Static_assert(sizeof(lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00) == 80, "layout of lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00");
+_Static_assert(sizeof(lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00) == 104, "layout of lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00");
 _Static_assert(offsetof(lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00, f_capacity) == 8, "layout of lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00");
 _Static_assert(offsetof(lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00, f_id) == 16, "layout of lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00");
 _Static_assert(offsetof(lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00, f_guard) == 24, "layout of lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00");
@@ -267,7 +271,8 @@ _Static_assert(offsetof(lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00, f_las
 _Static_assert(offsetof(lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00, f_closed) == 56, "layout of lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00");
 _Static_assert(offsetof(lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00, f_senders) == 64, "layout of lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00");
 _Static_assert(offsetof(lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00, f_receivers) == 72, "layout of lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00");
-static const uint64_t lyr_refmap_ty_std_task_Channel_std_task_Signal__3fc3fe00[] = { UINT64_C(0x368) };
+_Static_assert(offsetof(lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00, f_closer) == 80, "layout of lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00");
+static const uint64_t lyr_refmap_ty_std_task_Channel_std_task_Signal__3fc3fe00[] = { UINT64_C(0xb68) };
 const LyrDesc lyr_desc_ty_std_task_Channel_std_task_Signal__3fc3fe00 = { sizeof(lyr_ty_std_task_Channel_std_task_Signal__3fc3fe00), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_task_Channel_std_task_Signal__3fc3fe00, "std.task.Channel<std.task.Signal>", NULL };
 struct lyr_ty_15_std_task_Signal_Interrupt {
     uint8_t lyr_unit;
@@ -1200,53 +1205,53 @@ bb0:;
     t2 = (uint64_t)UINT64_C(9259542123273814144);
 #line 249
     lyr_g_std_collections_highBits = t2;
-#line 1620 "stdlib5/std/task.lyr"
+#line 1673 "stdlib5/std/task.lyr"
     t3 = 0;
-#line 1059
+#line 1071
     t4 = (lyr_ty_std_task_SpinLock *)lyr_alloc(&lyr_desc_ty_std_task_SpinLock);
-#line 1059
+#line 1071
     t4->f_held = t3;
-#line 1060
+#line 1072
     t5 = NULL;
-#line 1061
+#line 1073
     t6 = (int64_t)INT64_C(0);
-#line 1062
+#line 1074
     t7 = 0;
-#line 1130
+#line 1168
     t8 = (lyr_ty_std_task_SignalHub *)lyr_alloc(&lyr_desc_ty_std_task_SignalHub);
-#line 1130
+#line 1168
     LYR_WRITE_BARRIER(t8, &t8->f_guard, t4);
-#line 1130
+#line 1168
     LYR_WRITE_BARRIER(t8, &t8->f_first, t5);
-#line 1130
+#line 1168
     t8->f_caught = t6;
-#line 1130
+#line 1168
     t8->f_watching = t7;
-#line 1130
+#line 1168
     lyr_g_std_task_signalHub = t8;
-#line 1620
+#line 1673
     t9 = 0;
-#line 2008
+#line 2061
     t10 = (lyr_ty_std_task_SpinLock *)lyr_alloc(&lyr_desc_ty_std_task_SpinLock);
-#line 2008
+#line 2061
     t10->f_held = t9;
-#line 2009
+#line 2062
     t11 = NULL;
-#line 2010
+#line 2063
     t12 = (int64_t)INT64_C(0);
-#line 2053
+#line 2106
     t13 = (lyr_ty_std_task_Living *)lyr_alloc(&lyr_desc_ty_std_task_Living);
-#line 2053
+#line 2106
     LYR_WRITE_BARRIER(t13, &t13->f_guard, t10);
-#line 2053
+#line 2106
     LYR_WRITE_BARRIER(t13, &t13->f_first, t11);
-#line 2053
+#line 2106
     t13->f_count = t12;
-#line 2053
+#line 2106
     lyr_g_std_task_living = t13;
-#line 2065
+#line 2118
     t14 = (int64_t)INT64_C(0);
-#line 2065
+#line 2118
     lyr_g_std_task_channelIds = t14;
     return;
 }
