@@ -748,6 +748,11 @@ public static class ModuleLowerer
             else
             {
                 var lowered = NativeType(node, host, typeTable, function);
+                // A place parameter of one of the library's own natives (03 §2.3a) is the place
+                // itself on the wire. An 'extern' takes none this way: what a place is to the C
+                // ABI, 13 does not say.
+                if (function.Parameters[i].IsPlace && function.Extern is null)
+                    lowered = new IrPlaceType(lowered);
                 shape[i] = new ImportParam(lowered, null, []);
                 flattened.Add(lowered);
             }

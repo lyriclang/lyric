@@ -6,8 +6,6 @@
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_ty_std_task_Scheduler lyr_ty_std_task_Scheduler;
 typedef struct lyr_ty_std_task_Context lyr_ty_std_task_Context;
-typedef struct lyr_ty_std_sync_Atomic_int__e9cb3e5b lyr_ty_std_sync_Atomic_int__e9cb3e5b;
-typedef struct lyr_ty_std_sync_Atomic_bool__e2e4bd9c lyr_ty_std_sync_Atomic_bool__e2e4bd9c;
 typedef struct lyr_ty_std_task_PanicInfo lyr_ty_std_task_PanicInfo;
 typedef struct lyr_ty_std_task_TaskScope lyr_ty_std_task_TaskScope;
 typedef struct lyr_vt_ty_std_core_Error lyr_vt_ty_std_core_Error;
@@ -65,7 +63,7 @@ struct lyr_ty_std_task_Context {
     lyr_ty_std_task_Scheduler *f_home;
     lyr_ty_std_task_Context *f_next;
     lyr_ty_std_task_Context *f_prev;
-    lyr_ty_std_sync_Atomic_int__e9cb3e5b *f_state;
+    int64_t f_state;
     uint8_t f_listed;
     lyr_ty_std_task_Context *f_listNext;
     lyr_ty_std_task_Context *f_listPrev;
@@ -76,7 +74,7 @@ struct lyr_ty_std_task_Context {
     lyr_ty_std_task_Context *f_right;
     lyr_ty_std_task_Context *f_up;
     int64_t f_rank;
-    lyr_ty_std_sync_Atomic_bool__e2e4bd9c *f_cancelled;
+    uint8_t f_cancelled;
     lyr_opt_fn_ref18_std_task_PanicInfo_to_void f_onPanic;
     lyr_ty_std_task_TaskScope *f_scope;
     lyr_ty_std_task_Context *f_nextChild;
@@ -103,22 +101,8 @@ _Static_assert(offsetof(lyr_ty_std_task_Context, f_onPanic) == 136, "layout of l
 _Static_assert(offsetof(lyr_ty_std_task_Context, f_scope) == 160, "layout of lyr_ty_std_task_Context");
 _Static_assert(offsetof(lyr_ty_std_task_Context, f_nextChild) == 168, "layout of lyr_ty_std_task_Context");
 _Static_assert(offsetof(lyr_ty_std_task_Context, f_prevChild) == 176, "layout of lyr_ty_std_task_Context");
-static const uint64_t lyr_refmap_ty_std_task_Context[] = { UINT64_C(0x7571be) };
+static const uint64_t lyr_refmap_ty_std_task_Context[] = { UINT64_C(0x74719e) };
 const LyrDesc lyr_desc_ty_std_task_Context = { sizeof(lyr_ty_std_task_Context), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_task_Context, "std.task.Context", NULL };
-struct lyr_ty_std_sync_Atomic_int__e9cb3e5b {
-    LyrObj header;
-    int64_t f_value;
-};
-_Static_assert(sizeof(lyr_ty_std_sync_Atomic_int__e9cb3e5b) == 16, "layout of lyr_ty_std_sync_Atomic_int__e9cb3e5b");
-_Static_assert(offsetof(lyr_ty_std_sync_Atomic_int__e9cb3e5b, f_value) == 8, "layout of lyr_ty_std_sync_Atomic_int__e9cb3e5b");
-const LyrDesc lyr_desc_ty_std_sync_Atomic_int__e9cb3e5b = { sizeof(lyr_ty_std_sync_Atomic_int__e9cb3e5b), 0, 0, 0, NULL, "std.sync.Atomic<int>", NULL };
-struct lyr_ty_std_sync_Atomic_bool__e2e4bd9c {
-    LyrObj header;
-    uint8_t f_value;
-};
-_Static_assert(sizeof(lyr_ty_std_sync_Atomic_bool__e2e4bd9c) == 16, "layout of lyr_ty_std_sync_Atomic_bool__e2e4bd9c");
-_Static_assert(offsetof(lyr_ty_std_sync_Atomic_bool__e2e4bd9c, f_value) == 8, "layout of lyr_ty_std_sync_Atomic_bool__e2e4bd9c");
-const LyrDesc lyr_desc_ty_std_sync_Atomic_bool__e2e4bd9c = { sizeof(lyr_ty_std_sync_Atomic_bool__e2e4bd9c), 0, 0, 0, NULL, "std.sync.Atomic<bool>", NULL };
 struct lyr_ty_std_task_PanicInfo {
     LyrObj header;
     LyrStr *f_code;
@@ -167,12 +151,11 @@ static const uint64_t lyr_refmap_ty_std_task_Waiters[] = { UINT64_C(0x6) };
 const LyrDesc lyr_desc_ty_std_task_Waiters = { sizeof(lyr_ty_std_task_Waiters), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_task_Waiters, "std.task.Waiters", NULL };
 struct lyr_ty_std_task_SpinLock {
     LyrObj header;
-    lyr_ty_std_sync_Atomic_bool__e2e4bd9c *f_held;
+    uint8_t f_held;
 };
 _Static_assert(sizeof(lyr_ty_std_task_SpinLock) == 16, "layout of lyr_ty_std_task_SpinLock");
 _Static_assert(offsetof(lyr_ty_std_task_SpinLock, f_held) == 8, "layout of lyr_ty_std_task_SpinLock");
-static const uint64_t lyr_refmap_ty_std_task_SpinLock[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_ty_std_task_SpinLock = { sizeof(lyr_ty_std_task_SpinLock), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_task_SpinLock, "std.task.SpinLock", NULL };
+const LyrDesc lyr_desc_ty_std_task_SpinLock = { sizeof(lyr_ty_std_task_SpinLock), 0, 0, 0, NULL, "std.task.SpinLock", NULL };
 struct lyr_ty_std_task_SignalHub {
     LyrObj header;
     lyr_ty_std_task_SpinLock *f_guard;
@@ -303,7 +286,7 @@ uint64_t lyr_g_std_collections_emptyGroup = 0;
 uint64_t lyr_g_std_collections_lowBits = 0;
 uint64_t lyr_g_std_collections_highBits = 0;
 lyr_ty_std_task_SignalHub *lyr_g_std_task_signalHub = NULL;
-lyr_ty_std_sync_Atomic_int__e9cb3e5b *lyr_g_std_task_channelIds = NULL;
+int64_t lyr_g_std_task_channelIds = 0;
 
 /* string literals */
 static const LyrStaticStr(22) lyr_lit0 = LYR_STR_INIT("closed helper cleaned");
@@ -340,8 +323,6 @@ void lyr_app_main_pairs__body__9daa2c88(LyrErr **lyr_err);
 void lyr_app_main_word__body__b36d5889(LyrErr **lyr_err);
 void lyr_app_main_outer__body__8d46c412(LyrErr **lyr_err);
 void lyr_app_main_patient__body__917c67cc(LyrErr **lyr_err);
-lyr_ty_std_sync_Atomic_int__e9cb3e5b * lyr_std_sync_Atomic_int__new_67eb632f(int64_t l0_value);
-lyr_ty_std_sync_Atomic_bool__e2e4bd9c * lyr_std_sync_Atomic_bool__new_3915f520(uint8_t l0_value);
 void lyr__globals__9ee5f9b5(void);
 
 /* coroutines: the environment a body starts from, and the body as the runtime runs it */
@@ -1142,13 +1123,13 @@ bb0:;
     return *t0;
 }
 
-#line 18 "stdlib5/std/task.lyr"
+#line 17 "stdlib5/std/task.lyr"
 LyrStr * lyr_std_task_Cancelled_message(lyr_ty_std_task_Cancelled *l0_this) {
     LyrStr *t0 = NULL;
 bb0:;
-#line 18
+#line 17
     t0 = (LyrStr *)&lyr_lit9;
-#line 18
+#line 17
     return t0;
 }
 
@@ -1332,14 +1313,12 @@ void lyr__globals__9ee5f9b5(void) {
     uint64_t t1 = 0;
     uint64_t t2 = 0;
     uint8_t t3 = 0;
-    lyr_ty_std_sync_Atomic_bool__e2e4bd9c *t4 = NULL;
-    lyr_ty_std_task_SpinLock *t5 = NULL;
-    lyr_ty_std_task_Subscription *t6 = NULL;
-    int64_t t7 = 0;
-    uint8_t t8 = 0;
-    lyr_ty_std_task_SignalHub *t9 = NULL;
-    int64_t t10 = 0;
-    lyr_ty_std_sync_Atomic_int__e9cb3e5b *t11 = NULL;
+    lyr_ty_std_task_SpinLock *t4 = NULL;
+    lyr_ty_std_task_Subscription *t5 = NULL;
+    int64_t t6 = 0;
+    uint8_t t7 = 0;
+    lyr_ty_std_task_SignalHub *t8 = NULL;
+    int64_t t9 = 0;
 bb0:;
 #line 247
     t0 = (uint64_t)UINT64_C(9259542123273814144);
@@ -1353,38 +1332,34 @@ bb0:;
     t2 = (uint64_t)UINT64_C(9259542123273814144);
 #line 249
     lyr_g_std_collections_highBits = t2;
-#line 1486 "stdlib5/std/task.lyr"
+#line 1488 "stdlib5/std/task.lyr"
     t3 = 0;
-#line 1486
-    t4 = lyr_std_sync_Atomic_bool__new_3915f520(t3);
+#line 994
+    t4 = (lyr_ty_std_task_SpinLock *)lyr_alloc(&lyr_desc_ty_std_task_SpinLock);
+#line 994
+    t4->f_held = t3;
 #line 995
-    t5 = (lyr_ty_std_task_SpinLock *)lyr_alloc(&lyr_desc_ty_std_task_SpinLock);
-#line 995
-    LYR_WRITE_BARRIER(t5, &t5->f_held, t4);
+    t5 = NULL;
 #line 996
-    t6 = NULL;
+    t6 = (int64_t)INT64_C(0);
 #line 997
-    t7 = (int64_t)INT64_C(0);
-#line 998
-    t8 = 0;
-#line 1066
-    t9 = (lyr_ty_std_task_SignalHub *)lyr_alloc(&lyr_desc_ty_std_task_SignalHub);
-#line 1066
-    LYR_WRITE_BARRIER(t9, &t9->f_guard, t5);
-#line 1066
-    LYR_WRITE_BARRIER(t9, &t9->f_first, t6);
-#line 1066
-    t9->f_caught = t7;
-#line 1066
-    t9->f_watching = t8;
-#line 1066
-    lyr_g_std_task_signalHub = t9;
-#line 1764
-    t10 = (int64_t)INT64_C(0);
-#line 1764
-    t11 = lyr_std_sync_Atomic_int__new_67eb632f(t10);
-#line 1764
-    lyr_g_std_task_channelIds = t11;
+    t7 = 0;
+#line 1065
+    t8 = (lyr_ty_std_task_SignalHub *)lyr_alloc(&lyr_desc_ty_std_task_SignalHub);
+#line 1065
+    LYR_WRITE_BARRIER(t8, &t8->f_guard, t4);
+#line 1065
+    LYR_WRITE_BARRIER(t8, &t8->f_first, t5);
+#line 1065
+    t8->f_caught = t6;
+#line 1065
+    t8->f_watching = t7;
+#line 1065
+    lyr_g_std_task_signalHub = t8;
+#line 1766
+    t9 = (int64_t)INT64_C(0);
+#line 1766
+    lyr_g_std_task_channelIds = t9;
     return;
 }
 
@@ -1392,75 +1367,3 @@ bb0:;
 /* the program */
 static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }
-
-/* ==== unit: std.sync.Atomic<bool> ==== */
-/* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'std.sync.Atomic<bool>' (01 C3): its functions, the types they reach, and nothing else. */
-#include "lyr/lyr.h"
-#include <stdint.h>
-#include <math.h>
-
-/* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
-typedef struct lyr_ty_std_sync_Atomic_bool__e2e4bd9c lyr_ty_std_sync_Atomic_bool__e2e4bd9c;
-struct lyr_ty_std_sync_Atomic_bool__e2e4bd9c {
-    LyrObj header;
-    uint8_t f_value;
-};
-_Static_assert(sizeof(lyr_ty_std_sync_Atomic_bool__e2e4bd9c) == 16, "layout of lyr_ty_std_sync_Atomic_bool__e2e4bd9c");
-_Static_assert(offsetof(lyr_ty_std_sync_Atomic_bool__e2e4bd9c, f_value) == 8, "layout of lyr_ty_std_sync_Atomic_bool__e2e4bd9c");
-extern const LyrDesc lyr_desc_ty_std_sync_Atomic_bool__e2e4bd9c;
-
-/* prototypes */
-lyr_ty_std_sync_Atomic_bool__e2e4bd9c * lyr_std_sync_Atomic_bool__new_3915f520(uint8_t l0_value);
-
-#line 20 "stdlib5/std/sync.lyr"
-lyr_ty_std_sync_Atomic_bool__e2e4bd9c * lyr_std_sync_Atomic_bool__new_3915f520(uint8_t l0_value) {
-    uint8_t t0 = 0;
-    lyr_ty_std_sync_Atomic_bool__e2e4bd9c *t1 = NULL;
-bb0:;
-#line 20
-    t0 = l0_value;
-#line 20
-    t1 = (lyr_ty_std_sync_Atomic_bool__e2e4bd9c *)lyr_alloc(&lyr_desc_ty_std_sync_Atomic_bool__e2e4bd9c);
-#line 20
-    t1->f_value = t0;
-#line 20
-    return t1;
-}
-
-
-/* ==== unit: std.sync.Atomic<int> ==== */
-/* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
-/* The unit of the generic instance 'std.sync.Atomic<int>' (01 C3): its functions, the types they reach, and nothing else. */
-#include "lyr/lyr.h"
-#include <stdint.h>
-#include <math.h>
-
-/* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
-typedef struct lyr_ty_std_sync_Atomic_int__e9cb3e5b lyr_ty_std_sync_Atomic_int__e9cb3e5b;
-struct lyr_ty_std_sync_Atomic_int__e9cb3e5b {
-    LyrObj header;
-    int64_t f_value;
-};
-_Static_assert(sizeof(lyr_ty_std_sync_Atomic_int__e9cb3e5b) == 16, "layout of lyr_ty_std_sync_Atomic_int__e9cb3e5b");
-_Static_assert(offsetof(lyr_ty_std_sync_Atomic_int__e9cb3e5b, f_value) == 8, "layout of lyr_ty_std_sync_Atomic_int__e9cb3e5b");
-extern const LyrDesc lyr_desc_ty_std_sync_Atomic_int__e9cb3e5b;
-
-/* prototypes */
-lyr_ty_std_sync_Atomic_int__e9cb3e5b * lyr_std_sync_Atomic_int__new_67eb632f(int64_t l0_value);
-
-#line 20 "stdlib5/std/sync.lyr"
-lyr_ty_std_sync_Atomic_int__e9cb3e5b * lyr_std_sync_Atomic_int__new_67eb632f(int64_t l0_value) {
-    int64_t t0 = 0;
-    lyr_ty_std_sync_Atomic_int__e9cb3e5b *t1 = NULL;
-bb0:;
-#line 20
-    t0 = l0_value;
-#line 20
-    t1 = (lyr_ty_std_sync_Atomic_int__e9cb3e5b *)lyr_alloc(&lyr_desc_ty_std_sync_Atomic_int__e9cb3e5b);
-#line 20
-    t1->f_value = t0;
-#line 20
-    return t1;
-}
-

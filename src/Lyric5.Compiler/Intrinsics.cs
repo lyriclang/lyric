@@ -54,13 +54,14 @@ public static class Intrinsics
         ["std.task.catchSignal"] = "lyr_signal_catch",
         ["std.task.attachSignals"] = "lyr_signal_attach",
         ["std.task.takeSignals"] = "lyr_signal_take",
-        // std.sync's atomics (06 G4, K6; N7 P2): the C11 builtins on an Atomic's field, as macros
-        // that serve every T.
-        ["std.sync.atomicLoad"] = "LYR_ATOMIC_LOAD",
-        ["std.sync.atomicStore"] = "LYR_ATOMIC_STORE",
-        ["std.sync.atomicExchange"] = "LYR_ATOMIC_EXCHANGE",
-        ["std.sync.atomicCompareAndSet"] = "LYR_ATOMIC_CAS",
-        ["std.sync.atomicFetchAndAdd"] = "LYR_ATOMIC_FETCH_ADD",
+        // The atomic operations (06 G4, K6; N7 P2; the review's M7-5): the C11 builtins on a
+        // place — a field of the scheduler's, the value of std.sync's Atomic<T> —, as macros that
+        // serve every T.
+        ["std.task.atomicLoad"] = "LYR_ATOMIC_LOAD",
+        ["std.task.atomicStore"] = "LYR_ATOMIC_STORE",
+        ["std.task.atomicExchange"] = "LYR_ATOMIC_EXCHANGE",
+        ["std.task.atomicCompareAndSet"] = "LYR_ATOMIC_CAS",
+        ["std.task.atomicFetchAndAdd"] = "LYR_ATOMIC_FETCH_ADD",
         // std.core's numbers (10 B5): whether + - * leave the type, the bit counts and the
         // rotation, as macros that serve every integer width.
         ["std.core.addOverflows"] = "LYR_ADD_OVERFLOWS",

@@ -7051,8 +7051,12 @@ internal sealed class FunctionLowerer
         for (var i = 0; i < symbol.Generics.Length; i++)
             mapping[symbol.Generics[i].Name] = typeArguments[i];
 
+        // A place parameter (03 §2.3a) is the place itself on the wire: the runtime gets where
+        // the caller's variable, field or element lies — what an atomic operation works on.
         var parameters = decl.Parameters
-            .Select(p => LowerDeclaredUnder(p.Type, mapping, p.Span))
+            .Select(p => p.IsPlace
+                ? new IrPlaceType(LowerDeclaredUnder(p.Type, mapping, p.Span))
+                : LowerDeclaredUnder(p.Type, mapping, p.Span))
             .ToArray();
         var returnType = decl.ReturnType is null
             ? new IrScalarType(IrScalar.Void)

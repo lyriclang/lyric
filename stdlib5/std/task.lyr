@@ -8,7 +8,6 @@
 /// signals `std.os`'s (10 Q9, Q10), here until M7 lets another module reach the scheduler.
 
 
-import std.sync { Atomic };
 import std.time { Duration };
 
 /// What a suspended `yield` throws when `close()` unwinds its coroutine (06 A5), and what a wait
@@ -97,7 +96,7 @@ pub class Task<T> {
     /// throws is read off the handle's type at the call (10 §2), the declared `Error` stands for it.
     pub mut fn await(): T throws Error {
         let me = here().running ?? panic("an await where no task runs");
-        if (me.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         this.guard.acquire();
         while (!this.done) {
             me.beginWait();
@@ -108,7 +107,7 @@ pub class Task<T> {
             me.endWait();
             this.guard.acquire();
             this.waiters.remove(me);
-            if (me.cancelled.load()) {
+            if (atomicLoad(&me.cancelled)) {
                 this.guard.release();
                 throw Cancelled { };
             }
@@ -250,7 +249,7 @@ pub class Channel<T> {
     pub static fn new(capacity: int = 0): Channel<T> {
         return Channel<T> {
             capacity = if (capacity > 0) capacity else 0,
-            id = channelIds.addAndFetch(1),
+            id = atomicFetchAndAdd(&channelIds, 1) +% 1,
             guard = SpinLock { },
             senders = WaitQueue<T> { },
             receivers = WaitQueue<T> { },
@@ -264,7 +263,7 @@ pub class Channel<T> {
     pub mut fn send(value: T): void throws [ChannelClosed, Cancelled] {
         let s = here();
         let me = s.running ?? panic("a send where no task runs");
-        if (me.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         this.guard.acquire();
         if (this.closed) {
             this.guard.release();
@@ -296,7 +295,7 @@ pub class Channel<T> {
         let settled = w.settled;
         this.guard.release();
         if (settled) { return; }
-        if (me.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         throw ChannelClosed { };
     }
 
@@ -306,7 +305,7 @@ pub class Channel<T> {
     pub mut fn recv(): ?T throws Cancelled {
         let s = here();
         let me = s.running ?? panic("a receive where no task runs");
-        if (me.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         this.guard.acquire();
         if (let item = this.takeNow(s)) {
             this.guard.release();
@@ -329,7 +328,7 @@ pub class Channel<T> {
         let value = w.value;
         this.guard.release();
         if (settled) { return value; }
-        if (me.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         return null;
     }
 
@@ -534,7 +533,7 @@ pub class Selection {
     pub mut fn run(): void throws Error {
         let s = here();
         let me = s.running ?? panic("a select where no task runs");
-        if (me.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         if (this.guards == null) {
             this.guards = this.orderGuards();
         }
@@ -575,7 +574,7 @@ pub class Selection {
             }
             at = n.next;
         }
-        if (chosen == null && !me.cancelled.load()) {
+        if (chosen == null && !atomicLoad(&me.cancelled)) {
             chosen = this.takeReady(s);
         }
         this.unlockAll();
@@ -583,7 +582,7 @@ pub class Selection {
             try n.entry.finish();
             return;
         }
-        if (me.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         try this.timedOut();
     }
 
@@ -854,7 +853,7 @@ class LockState {
     mut fn acquireAlone(counting: bool): void throws Cancelled {
         let s = here();
         let me = s.running ?? panic("a lock where no task runs");
-        if (me.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         this.guard.acquire();
         if (counting) { this.writersWaiting += 1; }
         while (this.alone || this.readers > 0) {
@@ -876,7 +875,7 @@ class LockState {
     mut fn acquireShared(): void throws Cancelled {
         let s = here();
         let me = s.running ?? panic("a lock where no task runs");
-        if (me.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         this.guard.acquire();
         while (this.alone || this.writersWaiting > 0) {
             if (!this.awaitChange(s, me)) {
@@ -911,7 +910,7 @@ class LockState {
     mut fn beginOnce(): bool throws Cancelled {
         let s = here();
         let me = s.running ?? panic("a once where no task runs");
-        if (me.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
         this.guard.acquire();
         while (this.alone) {
             if (!this.awaitChange(s, me)) {
@@ -944,7 +943,7 @@ class LockState {
         me.endWait();
         this.guard.acquire();
         this.waiters.remove(me);
-        return !me.cancelled.load();
+        return !atomicLoad(&me.cancelled);
     }
 }
 
@@ -1160,7 +1159,7 @@ pub class TaskScope :: [Closeable] {
         let s = here();
         let me = s.running ?? panic("a scope closed where no task runs");
         while (this.open > 0) {
-            if (me.cancelled.load()) {
+            if (atomicLoad(&me.cancelled)) {
                 this.cancel();
             }
             s.parkIn(this.closing);
@@ -1296,8 +1295,8 @@ class Context {
     var next: ?Context = null,
     var prev: ?Context = null,
     /// 0 running or ready; 1 waiting — any waker may claim it —; 2 claimed. Atomic, for wakers on
-    /// other threads.
-    state: Atomic<int> = Atomic<int>.new(0),
+    /// other threads: read and written through the atomic operations alone.
+    var state: int = 0,
     /// The links of the waiting list it is in, a task's or a scope's.
     var listed: bool = false,
     var listNext: ?Context = null,
@@ -1315,7 +1314,7 @@ class Context {
     var rank: int = 0,
     /// Cancelled (06 N9 X1): every wait from here on throws `Cancelled`. Atomic: a cancel may come
     /// from another thread.
-    cancelled: Atomic<bool> = Atomic<bool>.new(false),
+    var cancelled: bool = false,
     /// What becomes of a panic of it (06 T4): its handle's — a context without one, main's or a
     /// detached task's, ends the process with the panic.
     var onPanic: ?fn(PanicInfo) -> void = null,
@@ -1325,19 +1324,19 @@ class Context {
     var prevChild: ?Context = null,
 
     /// A wait begins: from here a waker may claim it — before it goes into any place a waker looks.
-    fn beginWait(): void {
-        this.state.store(1);
+    mut fn beginWait(): void {
+        atomicStore(&this.state, 1);
     }
 
     /// A waker ends its wait: true for the first, which readies it; false for every other, and
     /// where it does not wait.
-    fn claim(): bool {
-        return this.state.compareAndSet(1, 2);
+    mut fn claim(): bool {
+        return atomicCompareAndSet(&this.state, 1, 2);
     }
 
     /// It runs again after a wait; the places it waited in it leaves next.
-    fn endWait(): void {
-        this.state.store(0);
+    mut fn endWait(): void {
+        atomicStore(&this.state, 0);
     }
 }
 
@@ -1392,8 +1391,8 @@ class Waiters {
 pub class Pool :: [Closeable] {
     workers: Worker,
     size: int,
-    picks: Atomic<int> = Atomic<int>.new(0),
-    closed: Atomic<bool> = Atomic<bool>.new(false),
+    var picks: int = 0, // atomic
+    var closed: bool = false, // atomic
 
     /// A pool of `threads` threads — one at least — each with a scheduler of its own.
     pub static fn new(threads: int): Pool {
@@ -1410,19 +1409,22 @@ pub class Pool :: [Closeable] {
 
     /// Runs `body` as a task on one of the pool's threads and gives its handle (06 T1): `await()`
     /// waits for it from any thread. A closed pool takes no task: that is a panic.
-    pub fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
-        if (this.closed.load()) { panic("a task given to a closed pool"); }
+    pub mut fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
+        if (atomicLoad(&this.closed)) { panic("a task given to a closed pool"); }
         let w = this.pick();
-        w.active.fetchAndAdd(1);
+        atomicFetchAndAdd(&w.active, 1);
         return launchOn(w.scheduler, body, () => {
-            w.active.fetchAndAdd(-1);
+            atomicFetchAndAdd(&w.active, -1);
         });
     }
 
     /// Waits until every task given to the pool has ended, then ends its threads. Closing a closed
     /// pool waits for nothing. A wait: in a cancelled task it throws `Cancelled`.
     pub fn close(): void throws Error {
-        this.closed.store(true);
+        // Through the reference, not through 'this': 'Closeable.close' is no 'mut fn', and an
+        // implementation's 'mut' is the member's (LYR-SEM0042) — on a class too.
+        let me = this;
+        atomicStore(&me.closed, true);
         var at: ?Worker = this.workers;
         while (let w = at) {
             w.close();
@@ -1436,8 +1438,8 @@ pub class Pool :: [Closeable] {
     }
 
     /// The next thread in turn.
-    fn pick(): Worker {
-        var k = this.picks.fetchAndAdd(1) % this.size;
+    mut fn pick(): Worker {
+        var k = atomicFetchAndAdd(&this.picks, 1) % this.size;
         if (k < 0) { k = -k; }
         var at: ?Worker = this.workers;
         while (let w = at) {
@@ -1453,8 +1455,8 @@ pub class Pool :: [Closeable] {
 /// then its `finished` closes.
 class Worker {
     scheduler: Scheduler,
-    active: Atomic<int> = Atomic<int>.new(0),
-    closing: Atomic<bool> = Atomic<bool>.new(false),
+    var active: int = 0, // atomic
+    var closing: bool = false, // atomic
     finished: Channel<void> = Channel<void>.new(),
     var next: ?Worker = null,
 
@@ -1464,7 +1466,7 @@ class Worker {
         startThread(() => {
             setCurrentScheduler(s);
             s.started();
-            while (!(w.closing.load() && w.active.load() == 0)) {
+            while (!(atomicLoad(&w.closing) && atomicLoad(&w.active) == 0)) {
                 s.step();
             }
             w.finished.close();
@@ -1474,8 +1476,8 @@ class Worker {
     }
 
     /// The pool closes: the thread looks again, and ends once its tasks have.
-    fn close(): void {
-        this.closing.store(true);
+    mut fn close(): void {
+        atomicStore(&this.closing, true);
         this.scheduler.nudge();
     }
 }
@@ -1483,16 +1485,16 @@ class Worker {
 /// A lock for the short sections where threads meet — an inbox, a task's end: it spins while
 /// another thread holds it, and guards nothing that waits.
 class SpinLock {
-    held: Atomic<bool> = Atomic<bool>.new(false),
+    var held: bool = false, // atomic
 
-    fn acquire(): void {
-        while (!this.held.compareAndSet(false, true)) {
+    mut fn acquire(): void {
+        while (!atomicCompareAndSet(&this.held, false, true)) {
             spin();
         }
     }
 
-    fn release(): void {
-        this.held.store(false);
+    mut fn release(): void {
+        atomicStore(&this.held, false);
     }
 }
 
@@ -1576,14 +1578,14 @@ class Scheduler {
 
     mut fn sleep(nanos: int): void throws Cancelled {
         let c = this.running ?? panic("a sleep where no task runs");
-        if (c.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&c.cancelled)) { throw Cancelled { }; }
         c.beginWait();
         this.fallAsleep(c, nanos);
         this.wakeIfCancelled(c);
         park();
         c.endWait();
         this.unsleep(c);
-        if (c.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&c.cancelled)) { throw Cancelled { }; }
     }
 
     /// `c` goes into the sleepers' heap, to wake once `nanos` have passed.
@@ -1602,7 +1604,7 @@ class Scheduler {
     /// and its park — the mark and the claim are atomic, so of the cancel and the wait one sees the
     /// other.
     mut fn wakeIfCancelled(c: Context): void {
-        if (c.cancelled.load()) {
+        if (atomicLoad(&c.cancelled)) {
             this.wakeUp(c);
         }
     }
@@ -1658,10 +1660,10 @@ class Scheduler {
 
     mut fn yieldNow(): void throws Cancelled {
         let c = this.running ?? panic("a yield where no task runs");
-        if (c.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&c.cancelled)) { throw Cancelled { }; }
         this.ready(c);
         park();
-        if (c.cancelled.load()) { throw Cancelled { }; }
+        if (atomicLoad(&c.cancelled)) { throw Cancelled { }; }
     }
 
     /// The running context waits in `list` until it is woken — a wait that ignores the mark: its
@@ -1677,7 +1679,7 @@ class Scheduler {
 
     /// Cancels a context (06 N9 X1): the mark, and the end of the wait it is in now, if any.
     mut fn cancel(c: Context): void {
-        c.cancelled.store(true);
+        atomicStore(&c.cancelled, true);
         this.wakeUp(c);
     }
 
@@ -1760,8 +1762,8 @@ class Scheduler {
     }
 }
 
-/// The ids of the channels, in the order they were made: the order of their locks.
-let channelIds = Atomic<int>.new(0);
+/// The ids of the channels, in the order they were made: the order of their locks. Atomic.
+var channelIds: int = 0;
 
 /// The running thread's scheduler: there is one wherever a task runs.
 fn here(): Scheduler {
@@ -1886,3 +1888,17 @@ fn signalKind(number: int): int;
 fn catchSignal(number: int, on: bool): bool;
 fn attachSignals(): void;
 fn takeSignals(): int;
+
+/// The atomic operations (06 G4, K6; N7 P2 — lyr/atomic.h), each on a PLACE: a field of the
+/// scheduler's own (the review's M7-5), or the value of std.sync's `Atomic<T>`, which is built on
+/// these. Sequentially consistent, and one for every type the machine reads and writes in one
+/// step. A place one of them writes is read and written through them alone.
+fn atomicLoad<T>(&at: T): T;
+fn atomicStore<T>(&at: T, value: T): void;
+fn atomicExchange<T>(&at: T, value: T): T;
+
+/// True, and `desired` written, where the place held `expected`: one step.
+fn atomicCompareAndSet<T>(&at: T, expected: T, desired: T): bool;
+
+/// Adds `n` and gives the value before. It wraps around, as `+%` does.
+fn atomicFetchAndAdd(&at: int, n: int): int;

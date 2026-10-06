@@ -679,6 +679,13 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0099", Severity.Error, fn.Throws.Span, $"'{fn.Name}' is a C function, and a C function throws nothing");
         foreach (var p in fn.Parameters)
         {
+            // A place (03 §2.3a) is an address, and what a pointer is to C is the type table's
+            // (M14): until then no place crosses. It was taken here, and the lowering — which
+            // has no wire for it — stopped the toolchain.
+            if (p.IsPlace)
+                _de.Report("LYR-SEM0099", Severity.Error, p.Span,
+                    $"parameter '{p.Name}' of extern '{fn.Name}' takes a place ('&'), which does not cross into C in "
+                    + "this stage — integers, floats and bool do, by value");
             var type = ResolveType(p.Type, module.Members);
             if (!CrossesC(type, asReturn: false))
                 _de.Report("LYR-SEM0099", Severity.Error, p.Type.Span,
