@@ -24,6 +24,17 @@ LyrArr *lyr_arr_repeat(const LyrDesc *desc, const LyrArr *array, int64_t count) 
     }
     LyrArr *result = lyr_alloc_array(desc, array->len * count);
     size_t chunk = (size_t)array->len * desc->elem_size;
-    for (int64_t i = 0; i < count; i++) memcpy(result->data + (size_t)i * chunk, array->data, chunk);
+    size_t total = chunk * (size_t)count;
+    if (total == 0) return result;
+    /* A byte is a fill; anything else is copied once and the copy doubled until the array is
+     * full — log2(count) copies, where a copy per element made `[zero] * n`, every builder's
+     * buffer, a call per byte (M8a S13). */
+    if (chunk == 1) {
+        memset(result->data, array->data[0], total);
+        return result;
+    }
+    memcpy(result->data, array->data, chunk);
+    for (size_t filled = chunk; filled < total; filled *= 2)
+        memcpy(result->data + filled, result->data, filled < total - filled ? filled : total - filled);
     return result;
 }

@@ -98,6 +98,11 @@ void lyr_bytes_put(LyrArr *bytes, int64_t at, const uint8_t *from, int64_t count
 #define LYR_BYTES_PUT_VIEW(bytes, at, v) lyr_bytes_put((bytes), (int64_t)(at), (v).ptr, (v).len)
 void lyr_bytes_copy(LyrArr *into, const LyrArr *from, int64_t count);
 
+/* An integer's decimal digits into an array from `at` on — an f-string's builder (10 S6; M8a
+ * S13): how many; the room, twenty bytes, is the caller's to have reserved, else a panic. */
+int64_t lyr_bytes_put_int(LyrArr *bytes, int64_t at, int64_t value);
+int64_t lyr_bytes_put_uint(LyrArr *bytes, int64_t at, uint64_t value);
+
 /* The float a text names, the nearest one (10 B5 Z6): a text whose form std.core checked — sign,
  * digits, '.', exponent, `inf`, `nan` — with the '_' between digits skipped; strtod and strtof round
  * correctly. A value beyond the range is an infinity, one below it a zero or a subnormal. */

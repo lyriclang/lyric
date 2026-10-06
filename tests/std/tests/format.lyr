@@ -1,6 +1,6 @@
 // The format language (design/v5/spec/08 Y7, 10 S7; spec 12 §2): a hole's spec, checked where it
 // is written, applied by std.core — numbers, text, Debug, a Display type, a type's own formats.
-import std.core { Format, formatted };
+import std.core { Format, fstringStart, fstringFormatted, fstringEnd };
 import std.string { StringBuilder };
 import std.test { assertEq };
 
@@ -121,5 +121,50 @@ fn debugDisplayAndOwnFormats(): void {
 
 @Test
 fn theHelpersAreStdCores(): void {
-    assertEq(formatted(255, "#x"), "0xff");
+    var out = fstringStart(4);
+    fstringFormatted(&out, 255, "#x");
+    assertEq(fstringEnd(out), "0xff");
+}
+
+@Test
+fn showToWritesEachScalarsText(): void {
+    // each scalar's own writer, the string's and the view's (10 S6; M8a S13), at the extremes
+    let least = int.min;
+    let most: uint = 18446744073709551615;
+    let small: int8 = -128;
+    let zero = 0;
+    let tenth: float32 = 0.1;
+    let half = -2.5;
+    let o = 'ö';
+    let no = false;
+    var b = StringBuilder.new();
+    least.showTo(&b);
+    b.appendChar(' ');
+    most.showTo(&b);
+    b.appendChar(' ');
+    small.showTo(&b);
+    b.appendChar(' ');
+    zero.showTo(&b);
+    b.appendChar(' ');
+    tenth.showTo(&b);
+    b.appendChar(' ');
+    half.showTo(&b);
+    b.appendChar(' ');
+    o.showTo(&b);
+    b.appendChar(' ');
+    no.showTo(&b);
+    b.appendChar(' ');
+    "text".showTo(&b);
+    b.appendChar(' ');
+    "a view"[2..].showTo(&b);
+    assertEq(b.toString(), "-9223372036854775808 18446744073709551615 -128 0 0.1 -2.5 ö false text view");
+}
+
+@Test
+fn aBuilderAppendsThroughShowTo(): void {
+    let b = StringBuilder.new();
+    b.append(-5);
+    b.append('|');
+    b.append(1.5);
+    assertEq(b.toString(), "-5|1.5");
 }

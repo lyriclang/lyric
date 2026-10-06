@@ -167,3 +167,21 @@ fn copyIntoOfNothingDoesNothing(): void {
     more[1].n = 9;
     assertEq(cells[0].n, 9);
 }
+
+@Test
+fn aRepeatFillsEveryElement(): void {
+    // one byte is a fill, a wider element a copy doubled — the last copy shorter (M8a S13)
+    let seven: uint8 = 7;
+    let bytes = [seven] * 5;
+    assertEq(bytes.length(), 5);
+    assertEq(bytes[0], seven);
+    assertEq(bytes[4], seven);
+    let minusOne: int8 = -1;
+    assertEq(([minusOne] * 3)[2], minusOne);
+    assertTrue(([true] * 9)[8]);
+    assertEq(([seven] * 0).length(), 0);
+    let pairs = [1, 2] * 5;
+    assertEq(pairs.length(), 10);
+    assertEq(pairs[6], 1);
+    assertEq(pairs[9], 2);
+}

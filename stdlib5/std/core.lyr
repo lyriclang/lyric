@@ -351,6 +351,12 @@ pub interface Contains<T> {
 /// here so a constraint `T :: [Display]` takes them.
 pub interface Display {
     fn show(): string;
+
+    /// The text written into `out` (10 S6): what f-strings and the containers call, so a text is
+    /// built in one buffer. The default appends `show()`; a type that can write itself does.
+    fn showTo(&out: StringBuilder): void {
+        out.appendStr(this.show());
+    }
 }
 
 // --- the scalars ------------------------------------------------------------------------------
@@ -368,6 +374,7 @@ extend int :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul,
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
     fn show(): string { return f"{this}"; }
+    fn showTo(&out: StringBuilder): void { out.putInt(this); }
     fn add(rhs: int): int { return this + rhs; }
     fn sub(rhs: int): int { return this - rhs; }
     fn mul(rhs: int): int { return this * rhs; }
@@ -396,6 +403,7 @@ extend int8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
     fn show(): string { return f"{this}"; }
+    fn showTo(&out: StringBuilder): void { out.putInt(this); }
     fn add(rhs: int8): int8 { return this + rhs; }
     fn sub(rhs: int8): int8 { return this - rhs; }
     fn mul(rhs: int8): int8 { return this * rhs; }
@@ -424,6 +432,7 @@ extend int16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mu
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
     fn show(): string { return f"{this}"; }
+    fn showTo(&out: StringBuilder): void { out.putInt(this); }
     fn add(rhs: int16): int16 { return this + rhs; }
     fn sub(rhs: int16): int16 { return this - rhs; }
     fn mul(rhs: int16): int16 { return this * rhs; }
@@ -452,6 +461,7 @@ extend int32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mu
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
     fn show(): string { return f"{this}"; }
+    fn showTo(&out: StringBuilder): void { out.putInt(this); }
     fn add(rhs: int32): int32 { return this + rhs; }
     fn sub(rhs: int32): int32 { return this - rhs; }
     fn mul(rhs: int32): int32 { return this * rhs; }
@@ -480,6 +490,7 @@ extend uint :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
     fn show(): string { return f"{this}"; }
+    fn showTo(&out: StringBuilder): void { out.putUint(this); }
     fn add(rhs: uint): uint { return this + rhs; }
     fn sub(rhs: uint): uint { return this - rhs; }
     fn mul(rhs: uint): uint { return this * rhs; }
@@ -507,6 +518,7 @@ extend uint8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mu
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
     fn show(): string { return f"{this}"; }
+    fn showTo(&out: StringBuilder): void { out.putUint(this); }
     fn add(rhs: uint8): uint8 { return this + rhs; }
     fn sub(rhs: uint8): uint8 { return this - rhs; }
     fn mul(rhs: uint8): uint8 { return this * rhs; }
@@ -534,6 +546,7 @@ extend uint16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, M
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
     fn show(): string { return f"{this}"; }
+    fn showTo(&out: StringBuilder): void { out.putUint(this); }
     fn add(rhs: uint16): uint16 { return this + rhs; }
     fn sub(rhs: uint16): uint16 { return this - rhs; }
     fn mul(rhs: uint16): uint16 { return this * rhs; }
@@ -561,6 +574,7 @@ extend uint32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, M
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
     fn show(): string { return f"{this}"; }
+    fn showTo(&out: StringBuilder): void { out.putUint(this); }
     fn add(rhs: uint32): uint32 { return this + rhs; }
     fn sub(rhs: uint32): uint32 { return this - rhs; }
     fn mul(rhs: uint32): uint32 { return this * rhs; }
@@ -583,6 +597,7 @@ extend float :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
         return null;
     }
     fn show(): string { return f"{this}"; }
+    fn showTo(&out: StringBuilder): void { out.appendStr(textOfFloat(this)); }
     fn add(rhs: float): float { return this + rhs; }
     fn sub(rhs: float): float { return this - rhs; }
     fn mul(rhs: float): float { return this * rhs; }
@@ -600,6 +615,7 @@ extend float32 :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
         return null;
     }
     fn show(): string { return f"{this}"; }
+    fn showTo(&out: StringBuilder): void { out.appendStr(textOfFloat32(this)); }
     fn add(rhs: float32): float32 { return this + rhs; }
     fn sub(rhs: float32): float32 { return this - rhs; }
     fn mul(rhs: float32): float32 { return this * rhs; }
@@ -612,6 +628,7 @@ extend bool :: [Equatable, Hashable, Display] {
     fn equals(o: bool): bool { return this == o; }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeByte(if (this) 1 else 0); }
     fn show(): string { return f"{this}"; }
+    fn showTo(&out: StringBuilder): void { out.appendStr(if (this) "true" else "false"); }
 }
 
 extend char :: [Equatable, Ordered, TotalOrder, Hashable, Display] {
@@ -628,11 +645,13 @@ extend char :: [Equatable, Ordered, TotalOrder, Hashable, Display] {
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeUint((this as uint32) as uint64); }
     fn show(): string { return f"{this}"; }
+    fn showTo(&out: StringBuilder): void { out.appendChar(this); }
 }
 
 extend string :: [Equatable, Display, Add] {
     fn equals(o: string): bool { return this == o; }
     fn show(): string { return this; }
+    fn showTo(&out: StringBuilder): void { out.appendStr(this); }
     fn add(rhs: string): string { return this + rhs; }
 }
 
@@ -646,6 +665,11 @@ extend string :: [Equatable, Display, Add] {
 /// has one, written or synthesized (04 D7); a string renders quoted.
 pub interface Debug {
     fn debug(): string;
+
+    /// The debug text written into `out` (10 S6), as `showTo` is `show()`'s.
+    fn debugTo(&out: StringBuilder): void {
+        out.appendStr(this.debug());
+    }
 }
 
 /// A copy of the value: value fields copied, reference fields cloned (04 D13). Synthesized for a
@@ -2174,6 +2198,24 @@ pub class StringBuilder {
         this.count = this.count + n;
     }
 
+    /// `v`'s decimal digits at the end, written in place — an f-string's integer (10 S6).
+    mut fn putInt(v: int): void {
+        this.reserve(20);
+        this.count = this.count + putIntDigits(this.bytes, this.count, v);
+    }
+
+    /// `v`'s decimal digits at the end, written in place.
+    mut fn putUint(v: uint): void {
+        this.reserve(20);
+        this.count = this.count + putUintDigits(this.bytes, this.count, v);
+    }
+
+    /// An empty builder with room for `room` bytes — an f-string's, sized for its text.
+    static fn sized(room: int): StringBuilder {
+        let zero: uint8 = 0;
+        return StringBuilder { bytes = [zero] * room, count = 0 };
+    }
+
     /// `c` at the end, as its UTF-8 bytes.
     pub mut fn appendChar(c: char): void {
         let code = (c as uint32) as int;
@@ -2197,7 +2239,9 @@ pub class StringBuilder {
 
     /// `v`'s text at the end.
     pub mut fn append<T :: [Display]>(v: T): void {
-        this.appendStr(f"{v}");
+        // A class's 'this' is no place to hand on (LYR-SEM0156); the reference is, the same builder.
+        var me = this;
+        v.showTo(&me);
     }
 
     /// Every byte taken out; the room stays.
@@ -2251,29 +2295,6 @@ fn panicRange(low: int, high: int, length: int): never;
 /// is a view (10 A3), and a string stands for one.
 pub interface Format {
     fn format(spec: StringView, &out: StringBuilder): void;
-}
-
-/// What `{x:spec}` compiles to for a `Format` type (12 §2 rule 4): `x` in the spec's format.
-pub fn formatted<T :: [Format]>(value: T, spec: StringView): string {
-    var out = StringBuilder.new();
-    value.format(spec, &out);
-    return out.toString();
-}
-
-/// What `{x:spec}` compiles to for another `Display` type (12 §2 rule 4): `show()` in the spec's
-/// width, alignment and fill.
-pub fn padded<T :: [Display]>(value: T, spec: StringView): string {
-    var out = StringBuilder.new();
-    pad(value.show(), readSpec(spec), '<', &out);
-    return out.toString();
-}
-
-/// What `{x:?}` compiles to (12 §2 rule 4): `debug()` in the width, alignment and fill before the
-/// `?`.
-pub fn debugged<T :: [Debug]>(value: T, spec: StringView): string {
-    var out = StringBuilder.new();
-    pad(value.debug(), readSpec(spec), '<', &out);
-    return out.toString();
 }
 
 /// A spec read (12 §2 rule 1): `[[fill]align][sign][#][0][width][grouping][.precision][type]`.
@@ -3993,6 +4014,10 @@ extend StringView :: [Equatable, Hashable, Ordered, TotalOrder, Display, Debug, 
         return viewToString(this);
     }
 
+    fn showTo(&out: StringBuilder): void {
+        out.appendStr(this);
+    }
+
     fn debug(): string {
         return viewToString(this).debug();
     }
@@ -4047,3 +4072,85 @@ extend string {
 fn utf8Invalid(bytes: Slice<uint8>): int;
 fn stringOfSlice(bytes: Slice<uint8>): string;
 fn stringOfUtf8Lossy(bytes: Slice<uint8>): string;
+
+// --- f-strings into one builder (10 S6; M8a S13) -----------------------------------------------
+// What an f-string compiles to (12 §2 rule 4): a builder sized for its text, each piece appended in
+// order, the text taken — one buffer, no string per piece. The checker writes these calls.
+
+pub fn fstringStart(room: int): StringBuilder {
+    return StringBuilder.sized(room);
+}
+
+pub fn fstringEnd(out: StringBuilder): string {
+    return out.toString();
+}
+
+pub fn fstringText(&out: StringBuilder, text: StringView): void {
+    out.appendStr(text);
+}
+
+pub fn fstringInt(&out: StringBuilder, value: int): void {
+    out.putInt(value);
+}
+
+pub fn fstringUint(&out: StringBuilder, value: uint): void {
+    out.putUint(value);
+}
+
+pub fn fstringFloat(&out: StringBuilder, value: float): void {
+    out.appendStr(textOfFloat(value));
+}
+
+pub fn fstringFloat32(&out: StringBuilder, value: float32): void {
+    out.appendStr(textOfFloat32(value));
+}
+
+pub fn fstringBool(&out: StringBuilder, value: bool): void {
+    out.appendStr(if (value) "true" else "false");
+}
+
+pub fn fstringChar(&out: StringBuilder, value: char): void {
+    out.appendChar(value);
+}
+
+/// A `Display` type's hole: through `showTo`.
+pub fn fstringShown<T :: [Display]>(&out: StringBuilder, value: T): void {
+    value.showTo(&out);
+}
+
+/// A `Format` type's hole with a spec: the type reads the spec (10 S7).
+pub fn fstringFormatted<T :: [Format]>(&out: StringBuilder, value: T, spec: StringView): void {
+    value.format(spec, &out);
+}
+
+/// Another `Display` type's hole with a spec: what `showTo` writes, in its width, alignment and
+/// fill — without a width straight into `out`.
+pub fn fstringPadded<T :: [Display]>(&out: StringBuilder, value: T, spec: StringView): void {
+    let s = readSpec(spec);
+    if (s.width == 0) {
+        value.showTo(&out);
+        return;
+    }
+    var text = StringBuilder.sized(s.width);
+    value.showTo(&text);
+    pad(text.toString(), s, '<', &out);
+}
+
+/// A hole under `?`: what `debugTo` writes, in the width, alignment and fill before it.
+pub fn fstringDebugged<T :: [Debug]>(&out: StringBuilder, value: T, spec: StringView): void {
+    let s = readSpec(spec);
+    if (s.width == 0) {
+        value.debugTo(&out);
+        return;
+    }
+    var text = StringBuilder.sized(s.width);
+    value.debugTo(&text);
+    pad(text.toString(), s, '<', &out);
+}
+
+/// A float's shortest text (12 §1), as `std.string.fromFloat` gives it.
+fn textOfFloat(value: float): string;
+fn textOfFloat32(value: float32): string;
+/// An integer's decimal digits into `bytes` from `at` on: how many; the room is the caller's.
+fn putIntDigits(bytes: uint8[], at: int, value: int): int;
+fn putUintDigits(bytes: uint8[], at: int, value: uint): int;

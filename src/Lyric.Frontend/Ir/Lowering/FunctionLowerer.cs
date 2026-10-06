@@ -7264,12 +7264,24 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// An f-string becomes a chain of <c>concat</c> and the <c>fromXxx</c> converters. No arrays and no
+    /// An f-string runs the checker's plan where there is one (10 S6; M8a S13): the builder's local
+    /// made, the pieces appended in order, the text taken — the calls the checker wrote and
+    /// checked. Without one — the 4.x tools, whose stdlib has no builder, or a text without a hole —
+    /// it becomes a chain of <c>concat</c> and the <c>fromXxx</c> converters. No arrays and no
     /// varargs — the IR can do neither, and this way it does not need to. Roslyn does the same for
     /// <c>$"…"</c> without a format spec.
     /// </summary>
     private TempId LowerInterpolatedString(InterpolatedStringExpr expr)
     {
+        if (_types.InterpolationOf(expr) is { } plan)
+        {
+            var made = LowerExpr(plan.Start);
+            var builder = _slots.DeclareFor(plan.Builder, LowerType(SubstituteType(plan.Builder.Type), expr.Span));
+            _b.Emit(new StoreLocal(builder, made, expr.Span));
+            foreach (var piece in plan.Pieces) LowerCall(piece);
+            return LowerCall(plan.Finish) ?? throw Bug("an f-string's builder gave no text");
+        }
+
         var stringType = new IrScalarType(IrScalar.String);
         var parts = new List<TempId>();
         var pendingText = new System.Text.StringBuilder();
