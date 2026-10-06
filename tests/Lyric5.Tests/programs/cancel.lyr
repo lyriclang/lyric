@@ -26,7 +26,7 @@ fn ticks(): Coroutine<int> {
     yield 2;
 }
 
-fn main(): void throws Cancelled {
+fn main(): void {
     let sleeper = spawn(() => {
         defer println("sleeper cleans up");
         try sleep(Duration.ofSecs(30));

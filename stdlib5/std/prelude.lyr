@@ -35,6 +35,7 @@ pub import std.core {
     Index,
     IndexSet,
     Test,
-    callerExpr
+    callerExpr,
+    sequence
 };
 pub import std.collections { List, Map, Set };

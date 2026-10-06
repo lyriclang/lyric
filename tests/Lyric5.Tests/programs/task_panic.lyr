@@ -7,7 +7,7 @@ fn boom(): void {
     panic("boom");
 }
 
-fn main(): void throws Cancelled {
+fn main(): void {
     spawnDetached(() => { boom(); });
     try yieldNow();
 }

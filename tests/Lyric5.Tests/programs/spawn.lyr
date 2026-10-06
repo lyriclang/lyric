@@ -23,7 +23,7 @@ fn later(n: int, ms: int): int throws Cancelled {
     return n;
 }
 
-fn main(): void throws [Oops, Cancelled] {
+fn main(): void throws Oops {
     let a = spawn(() => 5);
     let b = spawn(() => try risky(false));
     let c = spawn(() => try risky(true));

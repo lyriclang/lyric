@@ -28,7 +28,7 @@ fn numbers(): Coroutine<int> {
     yield 2;
 }
 
-fn main(): void throws Cancelled {
+fn main(): void {
     spawnDetached(() => { note("a"); });
     spawnDetached(() => { note("b"); });
     spawnDetached(() => { note("c"); });

@@ -197,6 +197,16 @@ public sealed class TypeResult
 
     public LyrType[] DeclaredThrows(FunctionDecl fn) => _declaredThrows.GetValueOrDefault(fn) ?? [];
 
+    /// <summary>The program's <c>main</c> throws <paramref name="thrown"/> although it does not
+    /// say so (06 M6-4: <c>Cancelled</c>, which it covers itself): from here on its set holds
+    /// it, and its call may throw — what the lowering asks for the error slot.</summary>
+    public void RecordEntryThrows(FunctionDecl main, LyrType thrown)
+    {
+        var declared = DeclaredThrows(main);
+        if (!declared.Any(t => LyrType.Equal(t, thrown))) _declaredThrows[main] = [.. declared, thrown];
+        _throwsAtCall.Add(main);
+    }
+
     private readonly HashSet<FunctionDecl> _throwsAtCall = new(ReferenceEqualityComparer.Instance);
 
     public void RecordThrowsAtCall(FunctionDecl fn) => _throwsAtCall.Add(fn);

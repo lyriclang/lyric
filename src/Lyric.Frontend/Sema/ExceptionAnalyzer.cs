@@ -60,6 +60,10 @@ internal sealed class ExceptionAnalyzer
         /// <summary>What the context walks: where an unmarked site looks for a mark that stands
         /// behind it in its expression.</summary>
         public Node? Body { get; init; }
+
+        /// <summary>The program's <c>main</c>, where the context is its body (06 M6-4): it covers
+        /// <c>Cancelled</c> itself, as a generator's body does.</summary>
+        public FunctionDecl? Entry { get; init; }
     }
 
     /// <summary>An open <c>try</c>: a mark over an expression, a block or an expression with its
@@ -160,9 +164,19 @@ internal sealed class ExceptionAnalyzer
                 InContext(new Context([], "a parameter's default", canDeclare: false) { Body = value }, () => AnalyzeExpr(value));
 
         if (fn.Body is not { } body) return;
-        InContext(new Context(BodyCovers(_types.DeclaredThrows(fn), CoroutineShape.IsCoroutine(fn)), $"'{fn.Name}'", canDeclare: true) { Body = body },
+        InContext(new Context(BodyCovers(_types.DeclaredThrows(fn), CoroutineShape.IsCoroutine(fn)), $"'{fn.Name}'", canDeclare: true)
+            {
+                Body = body,
+                Entry = IsEntry(fn) ? fn : null,
+            },
             () => AnalyzeStmt(body));
     }
+
+    /// <summary>The program's <c>main</c>: the function of that name at the top of the entry
+    /// module (07 M7).</summary>
+    private bool IsEntry(FunctionDecl fn) =>
+        fn.Name == "main" && _comp.Lyric5Modules && _comp.Entry is { } entry && ReferenceEquals(entry, _module)
+        && _comp.AstOf(entry).Declarations.Contains(fn);
 
     private void InContext(Context context, Action walk)
     {
@@ -481,6 +495,14 @@ internal sealed class ExceptionAnalyzer
         foreach (var t in thrown)
         {
             if (Taken(t) || _context.Declared.Any(d => _covers(t, d, _module))) continue;
+            // 'main' covers 'Cancelled' itself (06 M6-4): nobody above it can answer a
+            // cancellation, so the clause said nothing. It is noted — 'main' throws it from here
+            // on as though it were written, and an error that leaves 'main' is reported (05 E6 O4).
+            if (_context.Entry is { } main && _cancelled is { } cancelled && LyrType.Equal(t, cancelled))
+            {
+                _types.RecordEntryThrows(main, cancelled);
+                continue;
+            }
             _de.Report("LYR-SEM0034", Severity.Error, at, _context.CanDeclare
                 ? $"{what} throws '{TypeFacts.Display(t)}', which no 'catch' here and no 'throws' of "
                   + $"{_context.Name} covers — catch it, or add it to the 'throws'"
