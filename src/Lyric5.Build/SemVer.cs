@@ -23,6 +23,17 @@ public sealed partial record SemVer(long Major, long Minor, long Patch, string? 
     /// <summary>The version a tag names, <c>v1.2.0</c> or <c>1.2.0</c>; <c>null</c> for another tag.</summary>
     public static SemVer? OfTag(string tag) => Parse(tag.StartsWith('v') ? tag[1..] : tag);
 
+    /// <summary>Of <paramref name="tags"/>, the one naming the greatest version of
+    /// <paramref name="current"/>'s line above it (the review's M7-8): never another major — below
+    /// 1, another minor —, and a pre-release only where the current one is one. <c>null</c> where
+    /// none is greater.</summary>
+    public static string? Newest(SemVer current, IEnumerable<string> tags) =>
+        tags.Select(t => (Tag: t, Version: OfTag(t)))
+            .Where(t => t.Version is { } v && v.Line == current.Line && (v.Pre is null || current.Pre is not null)
+                        && v.CompareTo(current) > 0)
+            .MaxBy(t => t.Version)
+            .Tag;
+
     /// <summary>The versions a requirement accepts besides its own, Cargo's caret (07 P2): the same
     /// major version; below 1, the same minor; below 0.1, itself alone. Two versions of one line
     /// are one package for a program, two lines are two (P3).</summary>

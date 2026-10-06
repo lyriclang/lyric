@@ -68,6 +68,23 @@ public sealed partial class GitCache(string root, bool offline, Func<string, boo
             + $"holds — 'lyric update {dependency.Name}' resolves it anew");
     }
 
+    /// <summary>The repository's tags — fetched first, unless offline: then the cache's (the
+    /// review's M7-8, where <c>lyric update</c> looks for the newest version of a line).</summary>
+    /// <exception cref="ManifestException">As <see cref="Checkout"/>: the repository cannot be
+    /// reached, or offline the cache does not hold it (<c>LYR-PKG0007</c>).</exception>
+    public IReadOnlyList<string> Tags(Dependency dependency, string declaring)
+    {
+        var db = Path.Combine(root, "db", Id(dependency.Git!.Url));
+        if (!Directory.Exists(db))
+        {
+            if (offline) throw NotCached(dependency, declaring);
+            Clone(dependency, db, declaring);
+        }
+        else if (!offline) Fetch(dependency, db, declaring);
+        var listed = Invoke(dependency, declaring, ["--git-dir", db, "for-each-ref", "--format=%(refname:short)", "refs/tags"], LocalTime);
+        return listed.Exit == 0 ? listed.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) : [];
+    }
+
     /// <summary>The commit the lock holds, from the cache; fetched when the cache lacks it.</summary>
     private string Locate(Dependency dependency, string db, string commit, string declaring)
     {
