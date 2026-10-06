@@ -5784,6 +5784,7 @@ public sealed class TypeChecker
     /// </summary>
     private LyrType CheckInterpolation(InterpolatedStringExpr fs, SymbolTable scope)
     {
+        var errors = _de.ErrorCount;
         var holes = new List<LyrType>();
         foreach (var seg in fs.Segments)
             if (seg is InterpHole h) holes.Add(CheckExpr(h.Expr, scope));
@@ -5809,6 +5810,7 @@ public sealed class TypeChecker
         Expr Output() => new UnaryExpr(UnaryOp.Place, new IdentifierExpr("$fstring", span), span);
 
         var pieces = new List<CallExpr>();
+        var failed = new List<CallExpr>();
         var whole = true;
         var at = 0;
         foreach (var seg in fs.Segments)
@@ -5826,9 +5828,20 @@ public sealed class TypeChecker
                 if (seg is InterpHole) whole = false;
                 continue;
             }
-            if (CheckExpr(piece, inner).IsError) whole = false;
-            else pieces.Add(piece);
+            // A piece checks its hole's expression a second time: muted, so what the hole reported
+            // — an error it recovered from, a warning — is reported once.
+            LyrType type;
+            using (_de.Mute()) type = CheckExpr(piece, inner);
+            if (!type.IsError) pieces.Add(piece);
+            else
+            {
+                whole = false;
+                failed.Add(piece);
+            }
         }
+        // A piece that failed where nothing was reported fails on its own account: said unmuted.
+        if (_de.ErrorCount == errors)
+            foreach (var piece in failed) CheckExpr(piece, inner);
         var finish = Piece("fstringEnd", span, new IdentifierExpr("$fstring", span));
         if (whole && !CheckExpr(finish, inner).IsError)
             _result.RecordInterpolation(fs, new TypeResult.InterpolationPlan(builder, start, pieces.ToArray(), finish));
