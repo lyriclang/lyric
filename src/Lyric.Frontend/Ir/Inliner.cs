@@ -27,6 +27,12 @@ namespace Lyric.Ir;
 /// bounds everything before that.</item>
 /// <item>Dynamic calls — <c>callvirt</c>, <c>callind</c>, imports. Their target is not in the
 /// instruction.</item>
+/// <item>A method of a value (<see cref="IrFunction.ReceiverByRef"/>) whose receiver is not a
+/// local of the caller. Its <c>this</c> is the caller's place, not a copy: spliced, the callee's
+/// receiver IS the caller's local — every load, address and store of it goes there. A receiver
+/// that lies in a field or behind an optional has no local to stand for it, and the call stays.
+/// (Copied into a local of its own, as the other parameters are, it lost every write — the
+/// review's B10.)</item>
 /// </list>
 ///
 /// <para>The spliced instructions KEEP THE CALLEE'S SPANS: a panic then names the right line in
@@ -77,8 +83,14 @@ internal static class Inliner
 
                 var callee = module.Functions[call.Target.Value];
                 if (ReferenceEquals(callee, caller) || !Inlinable(callee)) continue;
+                LocalId? receiver = null;
+                if (callee.ReceiverByRef)
+                {
+                    if (ReceiverLocal(block, ii, call) is not { } local) continue;
+                    receiver = local;
+                }
 
-                Splice(caller, block, ii, call, callee);
+                Splice(caller, block, ii, call, callee, receiver);
                 sites++;
                 changed = true;
                 // The block was cut at the call; its tail lives in the continuation block at the
@@ -89,6 +101,16 @@ internal static class Inliner
         }
 
         return changed;
+    }
+
+    /// <summary>The caller's local a value method's receiver argument loads, where that load stands
+    /// in the same block before the call; <c>null</c> otherwise.</summary>
+    private static LocalId? ReceiverLocal(IrBlock block, int at, Call call)
+    {
+        if (call.Args.Length == 0) return null;
+        for (var i = at - 1; i >= 0; i--)
+            if (block.Insts[i] is LoadLocal load && load.Dest == call.Args[0]) return load.Local;
+        return null;
     }
 
     private static bool Inlinable(IrFunction callee)
@@ -131,17 +153,26 @@ internal static class Inliner
     /// the pair is noise.</para>
     /// </summary>
     private static void Splice(IrFunction caller, IrBlock block, int at, Call call,
-        IrFunction callee)
+        IrFunction callee, LocalId? receiver)
     {
         if (call.Args.Length != callee.ParamCount)
             throw new InternalCompilationException(
                 $"ir: call to '{callee.Name}' carries {call.Args.Length} argument(s), " +
                 $"the function declares {callee.ParamCount}");
 
-        var localBase = caller.Locals.Count;
-        foreach (var source in callee.Locals)
-            caller.Locals.Add(new IrLocal(new LocalId(caller.Locals.Count),
-                $"__inl_{source.Name}", source.Type));
+        // Each callee local a local of the caller's — the receiver of a value method the caller's
+        // own local the call loaded, every other one a new slot.
+        var locals = new LocalId[callee.Locals.Count];
+        for (var i = 0; i < callee.Locals.Count; i++)
+        {
+            if (i == 0 && receiver is { } place)
+            {
+                locals[i] = place;
+                continue;
+            }
+            locals[i] = new LocalId(caller.Locals.Count);
+            caller.Locals.Add(new IrLocal(locals[i], $"__inl_{callee.Locals[i].Name}", callee.Locals[i].Type));
+        }
 
         var tempBase = caller.Temps.Count;
         foreach (var source in callee.Temps)
@@ -158,7 +189,7 @@ internal static class Inliner
         var continuationId = new BlockId(blockBase + callee.Blocks.Count);
 
         TempId MapTemp(TempId id) => new(tempBase + id.Value);
-        LocalId MapLocal(LocalId id) => new(localBase + id.Value);
+        LocalId MapLocal(LocalId id) => locals[id.Value];
         BlockId MapBlock(BlockId id) => new(blockBase + id.Value);
 
         foreach (var source in callee.Blocks)
@@ -201,10 +232,12 @@ internal static class Inliner
         caller.Blocks.Add(continuation);
 
         // The cut head: feed the parameters, enter the copy. Argument order is parameter order,
-        // the same convention the frame construction followed.
+        // the same convention the frame construction followed. A by-ref receiver is fed by being
+        // the caller's local already.
         block.Insts.RemoveRange(at, block.Insts.Count - at);
         for (var i = 0; i < call.Args.Length; i++)
-            block.Insts.Add(new StoreLocal(new LocalId(localBase + i), call.Args[i], call.Span));
+            if (i != 0 || receiver is null)
+                block.Insts.Add(new StoreLocal(locals[i], call.Args[i], call.Span));
         block.Terminator = new Branch(new BlockId(blockBase + callee.Entry.Value), call.Span);
     }
 }

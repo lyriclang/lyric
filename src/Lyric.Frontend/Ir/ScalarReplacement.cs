@@ -115,7 +115,8 @@ internal static class ScalarReplacement
 
         var forwardable = new HashSet<int>();
         foreach (var (local, count) in storeCount)
-            if (count == 1 && local >= function.ParamCount && !addressed.Contains(local))
+            if (count == 1 && local >= function.ParamCount && !addressed.Contains(local)
+                && (!Aggregate(function.Locals[local].Type) || Fresh(function, storedValue[local])))
                 forwardable.Add(local);
         if (forwardable.Count == 0) return false;
 
@@ -185,6 +186,44 @@ internal static class ScalarReplacement
 
     /// <summary>The locals whose place an <c>addr</c> takes (03 T12): no longer frame-private,
     /// since whoever holds the place reads and writes them.</summary>
+    /// <summary>A type whose temps are places, not values: a struct, an enum, an inline array, an
+    /// optional — the emitter names where the value lies, and a store copies it (CEmitter's
+    /// IsAggregate; an optional of a reference is a value there, which this counts as a place
+    /// all the same: a forwarding forgone, nothing worse).</summary>
+    private static bool Aggregate(IrType type) =>
+        type is IrStructType or IrEnumType or IrInlineArrayType or IrOptionalType;
+
+    /// <summary>Whether an aggregate's stored temp may stand for the local it is stored into: fresh
+    /// storage — an allocation, a variant, a copy —, used by nothing but the writes that fill it
+    /// before the store, and the store. Anything else is a place another name reaches — another
+    /// local, a field, an element —, and the local is a copy of it, which forwarding would make
+    /// an alias (the review's B10: 'let q = p;' read p through q).</summary>
+    private static bool Fresh(IrFunction function, TempId stored)
+    {
+        foreach (var block in function.Blocks)
+        {
+            var defined = -1;
+            var store = -1;
+            for (var i = 0; i < block.Insts.Count; i++)
+            {
+                var op = block.Insts[i];
+                if (IrShape.DestOf(op) == stored)
+                {
+                    if (op is not (NewObject or NewVariant or StructCopy)) return false;
+                    defined = i;
+                    continue;
+                }
+                if (op is StoreLocal s && s.Value == stored) { store = i; continue; }
+                if (!IrShape.OperandsOf(op).Contains(stored)) continue;
+                if (op is not StoreField f || f.Object != stored || f.Value == stored) return false;
+                if (store >= 0) return false;   // a write after the store: the copy must not see it
+            }
+            if (block.Terminator is { } terminator && IrShape.OperandsOf(terminator).Contains(stored)) return false;
+            if (defined >= 0 && store < 0) return false;   // stored in another block than made
+        }
+        return true;
+    }
+
     private static HashSet<int> Addressed(IrFunction function) =>
         function.Blocks.SelectMany(b => b.Insts).OfType<AddrLocal>().Select(a => a.Local.Value).ToHashSet();
 

@@ -24,7 +24,10 @@ public static class Pipeline
     public static string StdlibRoot => Path.Combine(AppContext.BaseDirectory, "stdlib5");
 
     /// <summary>The front end and the gate on a project's source: the IR, or <c>null</c> after
-    /// reporting. A profile that denies warnings (11 W2 P3) fails a compilation that warns.</summary>
+    /// reporting. A profile that denies warnings (11 W2 P3) fails a compilation that warns. The IR
+    /// optimizer — inlining, scalar replacement, devirtualization — runs where the profile
+    /// optimizes C at <c>-O2</c> and above (design/v5/spec/01 B10): release, and a profile of the
+    /// manifest's that asks as much; debug and the sanitizers' profiles see the code as written.</summary>
     public static CompileResult? Compile(Project project, TextWriter error, BuildProfile? profile = null)
     {
         // A package's modules by their paths, a single file with std alone (07 M1, 11 C8).
@@ -33,6 +36,7 @@ public static class Pipeline
             StdlibRoot = StdlibRoot, PackageRoots = project.PackageRoots,
             PackageDependencies = project.DeclaredDependencies,
             PackageTestRoots = project.TestRoot is { } tests ? new Dictionary<string, string> { [project.Name] = tests } : null,
+            Optimize = profile is { Opt: >= 2 },
         };
         var source = project.EntryText is { } text
             ? ScriptSource.FromText(project.Module, text)
