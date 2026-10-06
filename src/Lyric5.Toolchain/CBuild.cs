@@ -239,7 +239,11 @@ public sealed class CBuild
         arguments.AddRange(Target.Os switch
         {
             TargetOs.MacOs => ["-Wl,-dead_strip"],
-            TargetOs.Windows => ["-Wl,--gc-sections"],
+            // The thread's stack as large as the main task's (runtime/include/lyr/task.h,
+            // LYR_MAIN_TASK_STACK): what main has as a task it has on the thread (M6-26). zig's
+            // default for a Windows image is 16 MiB (MSVC's 1 MiB); a POSIX thread's comes from
+            // the system's limit, 8 MiB as a rule.
+            TargetOs.Windows => ["-Wl,--gc-sections", "-Wl,--stack," + MainThreadStack],
             _ => ["-Wl,--gc-sections", "-lpthread", "-lm"],
         });
         if (Target.Os == TargetOs.MacOs && !debugMap) arguments.Add("-Wl,-S");
@@ -251,6 +255,10 @@ public sealed class CBuild
             throw new CBuildException($"linking {output} for {Target} ({Profile.Name}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
         }
     }
+
+    /// <summary>The main task's stack, in bytes (<c>LYR_MAIN_TASK_STACK</c>), asked of the linker for
+    /// the thread's stack where the linker sets it.</summary>
+    private const string MainThreadStack = "8388608";
 
     /// <summary>The longest command line passed as it is. Windows takes 32767 characters at most, and
     /// a program of many modules links more object files than that holds ("The filename or

@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using Lyric5.Compiler;
 using Lyric5.Toolchain;
 
@@ -47,6 +48,21 @@ public class RuntimeBuildTests
         var result = RunTest("gc_smoke", profile);
         Assert.Equal(0, result.ExitCode);
         Assert.Equal("gc ok\n", result.Stdout.Replace("\r\n", "\n"));
+    }
+
+    /// <summary>M6-26 on Windows: <c>main</c> on the thread's stack has what it has as a task. The
+    /// link asks for the main task's 8 MiB (<c>LYR_MAIN_TASK_STACK</c>); zig's default for a
+    /// Windows image is 16 MiB (MSVC's 1 MiB), so a recursion went twice as deep on the thread as
+    /// in a task. Read off the image's optional header (PE32+: SizeOfStackReserve at 72).</summary>
+    [Fact]
+    public void A_programs_thread_stack_is_the_main_tasks_size_on_windows()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var image = File.ReadAllBytes(BuildC([Path.Combine(Root, "runtime", "tests", "hello.c")], "hello-stack", Profile.Release, null));
+        var coff = BinaryPrimitives.ReadInt32LittleEndian(image.AsSpan(0x3C)) + 4;
+        var optional = coff + 20;
+        Assert.Equal(0x20B, BinaryPrimitives.ReadUInt16LittleEndian(image.AsSpan(optional)));
+        Assert.Equal(8UL * 1024 * 1024, BinaryPrimitives.ReadUInt64LittleEndian(image.AsSpan(optional + 72)));
     }
 
     /// <param name="binary">The executable's own name in <c>bin/</c> when another test class

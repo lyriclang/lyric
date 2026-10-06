@@ -5,7 +5,8 @@
  * course, so the process ends the way the operating system reports that signal. A stack overflow
  * is a panic (RT0006): until the emitter checks the stack pointer in every prologue (M2), the
  * guard page below each stack is the only net, and its fault is told apart by its address.
- * Windows has the same two paths through an unhandled-exception filter. */
+ * Windows has the same two paths through an unhandled-exception filter — and, on a coroutine's
+ * stack, through a vectored handler, since the filter is never reached from there. */
 #if defined(__linux__) && !defined(_GNU_SOURCE)
 #  define _GNU_SOURCE 1
 #elif defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
@@ -13,6 +14,7 @@
 #endif
 
 #include "internal.h"
+#include "lyr/coro.h"
 #include "lyr/init.h"
 
 #include <stdatomic.h>
@@ -201,9 +203,8 @@ void lyr_crash_install(void) {
 #include <windows.h>
 #include <signal.h>
 
-/* What the overflowing thread keeps for the filter after its guard page is spent: the trace needs
- * DbgHelp, which is not frugal. */
-static const ULONG STACK_GUARANTEE = 128 * 1024;
+/* What the overflowing thread keeps for the filter after its guard page is spent (internal.h). */
+static const ULONG STACK_GUARANTEE = LYR_STACK_GUARANTEE;
 
 void lyr_crash_thread_start(void) {
     if (!installed) return;
@@ -244,6 +245,23 @@ static LONG WINAPI lyr_crash_on_exception(EXCEPTION_POINTERS *pointers) {
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
+/* A coroutine's stack has no frame of the system's below it: the chain ends at lyr_coro_start,
+ * which has no unwind data, so the dispatcher's walk finds no handler there — not even the
+ * process's last one, which calls the filter — and the thread dies with the exception's code and
+ * no line (the review's R6e). A vectored handler sees the exception before the walk; on a
+ * coroutine's stack it does what the filter does, for the faults the filter names. On the thread's
+ * own stack it leaves the exception to the chain, as before. Last among the vectored handlers:
+ * whoever handles a fault of its own comes first. */
+static LONG WINAPI lyr_crash_on_coroutine_stack(EXCEPTION_POINTERS *pointers) {
+    DWORD code = pointers->ExceptionRecord->ExceptionCode;
+    if (code != EXCEPTION_STACK_OVERFLOW && code != EXCEPTION_ACCESS_VIOLATION
+        && code != EXCEPTION_ILLEGAL_INSTRUCTION && code != EXCEPTION_INT_DIVIDE_BY_ZERO) {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    if (lyr_coro_current() == NULL) return EXCEPTION_CONTINUE_SEARCH;
+    return lyr_crash_on_exception(pointers);
+}
+
 /* abort() raises SIGABRT through the C library; after this handler the UCRT ends the process with
  * a fast fail (0xC0000409). */
 static void lyr_crash_on_abort(int sig) {
@@ -257,6 +275,7 @@ static void lyr_crash_on_abort(int sig) {
 void lyr_crash_install(void) {
     if (installed) return;
     SetUnhandledExceptionFilter(lyr_crash_on_exception);
+    AddVectoredExceptionHandler(0, lyr_crash_on_coroutine_stack);
     signal(SIGABRT, lyr_crash_on_abort);
     installed = 1;
     lyr_crash_thread_start();

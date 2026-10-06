@@ -110,14 +110,15 @@ public class RuntimeProgramTests
     }
 
     /// <summary>A coroutine's stack overflow (01 S3, K1): its guard page makes it a panic with the
-    /// coroutine's frames. POSIX only: on Windows the exception dispatch has no stack to run on
-    /// below a coroutine's guard page (STATUS keeps it open).</summary>
+    /// coroutine's frames. On Windows too (the review's R6e): the coroutine's stack is laid out
+    /// as a thread's, and the kernel raises the overflow with room for the filter — before, the
+    /// dispatch had no stack to run on below the guard page, and the process ended without a
+    /// line.</summary>
     [Theory]
     [InlineData(Profile.Debug)]
     [InlineData(Profile.Release)]
     public void A_coroutine_that_overflows_its_stack_panics(Profile profile)
     {
-        if (OperatingSystem.IsWindows()) return;
         var result = RuntimeBuildTests.RunTest("coro_overflow", profile);
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         Assert.StartsWith("panic [LYR-RT0006]: stack overflow", result.Stderr);
