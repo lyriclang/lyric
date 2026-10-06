@@ -825,7 +825,7 @@ bb8:;
 #line 75
     t77 = l11_x;
 #line 75
-    lyr_coro_close(t77); lyr_e = lyr_coro_take_error(t77); if (lyr_e != NULL && *(const LyrDesc *const *)lyr_e->value.vt == &lyr_desc_ty_std_task_Cancelled) lyr_e = NULL;
+    lyr_coro_close(t77); lyr_e = lyr_coro_take_error(t77); if (lyr_e != NULL && *(const LyrDesc *const *)lyr_e->value.vt == &lyr_desc_ty_std_task_Cancelled) lyr_e = lyr_err_unsuppress(lyr_e);
 #line 75
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb4; goto bb9;
 bb9:;
@@ -870,7 +870,7 @@ bb13:;
 #line 81
     t89 = l11_x;
 #line 81
-    lyr_coro_close(t89); lyr_e = lyr_coro_take_error(t89); if (lyr_e != NULL && *(const LyrDesc *const *)lyr_e->value.vt == &lyr_desc_ty_std_task_Cancelled) lyr_e = NULL;
+    lyr_coro_close(t89); lyr_e = lyr_coro_take_error(t89); if (lyr_e != NULL && *(const LyrDesc *const *)lyr_e->value.vt == &lyr_desc_ty_std_task_Cancelled) lyr_e = lyr_err_unsuppress(lyr_e);
 #line 81
     if (LYR_UNLIKELY(lyr_e != NULL)) goto bb14; goto bb15;
 bb14:;

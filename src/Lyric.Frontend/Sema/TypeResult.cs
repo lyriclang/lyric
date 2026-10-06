@@ -68,6 +68,11 @@ public sealed class TypeResult
     /// member's name — the sema's answer at the instance the lowering reached.</summary>
     public Func<LyrType, FunctionSymbol, (ExtensionBlock Block, FunctionSymbol? Method)?>? ConformanceBlock { get; internal set; }
 
+    /// <summary>Whether a type conforms to an interface — the sema's answer at an instance the
+    /// lowering reached, for a question the checked code could not settle: is the concrete
+    /// iterator of a generic loop Closeable (the review's M8a-4).</summary>
+    public Func<LyrType, TypeSymbol, bool>? Satisfies { get; internal set; }
+
     /// <summary>Whether an interface can be the type of a value (04 D9) — only such a one has a
     /// table, and only its defaults are lowered once for it.</summary>
     public Func<TypeSymbol, bool>? ValueInterface { get; internal set; }
@@ -319,12 +324,18 @@ public sealed class TypeResult
     {
         /// <summary>The close of a Closeable iterator (10 B6 I6), a defer of the loop's own.</summary>
         public DeferStmt? Close { get; init; }
+
+        /// <summary>The close stands for an iterator whose type names a type parameter (the
+        /// review's M8a-4): whether it is Closeable is the INSTANCE's to say — the lowering keeps
+        /// the close where the concrete iterator is one, and drops it otherwise.</summary>
+        public bool CloseIfCloseable { get; init; }
     }
 
     private readonly Dictionary<ForInStmt, ForInProtocol> _forIns = new(ReferenceEqualityComparer.Instance);
 
-    public void RecordForIn(ForInStmt loop, CallExpr iter, CallExpr next, LocalSymbol cursor, DeferStmt? close = null) =>
-        _forIns[loop] = new ForInProtocol(iter, next, cursor) { Close = close };
+    public void RecordForIn(ForInStmt loop, CallExpr iter, CallExpr next, LocalSymbol cursor, DeferStmt? close = null,
+        bool closeIfCloseable = false) =>
+        _forIns[loop] = new ForInProtocol(iter, next, cursor) { Close = close, CloseIfCloseable = closeIfCloseable };
 
     public ForInProtocol? ForInOf(ForInStmt loop) => _forIns.TryGetValue(loop, out var p) ? p : null;
 

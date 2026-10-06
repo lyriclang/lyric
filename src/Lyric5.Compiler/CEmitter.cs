@@ -1194,9 +1194,11 @@ public sealed class CEmitter
     {
         var co = Temp(c.Coroutine);
         var cancelled = $"&{DescriptorName(c.Cancelled)}";
+        // The Cancelled the body ended with is dropped — but not what a defer threw on the way
+        // out, which was suppressed into it: the first of those goes on (the review's M6-10).
         return c.Throws
             ? $"lyr_coro_close({co}); lyr_e = lyr_coro_take_error({co}); "
-              + $"if (lyr_e != NULL && *(const LyrDesc *const *)lyr_e->value.vt == {cancelled}) lyr_e = NULL;"
+              + $"if (lyr_e != NULL && *(const LyrDesc *const *)lyr_e->value.vt == {cancelled}) lyr_e = lyr_err_unsuppress(lyr_e);"
             : $"lyr_coro_close({co}); (void)lyr_coro_take_error({co});";
     }
 

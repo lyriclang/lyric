@@ -126,6 +126,7 @@ public sealed class TypeChecker
         _de = de;
         _result.SourceText = comp.TextOf;
         _result.ConformanceBlock = ConformanceBlockFor;
+        _result.Satisfies = SatisfiesAt;
         _result.ValueInterface = iface => ValueUsable(iface, out _);
         _result.Lyric5Modules = comp.Lyric5Modules;
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
@@ -1366,6 +1367,8 @@ public sealed class TypeChecker
                     if (SignatureMismatch(want, im, found, self) is { } reason)
                         _de.Report("LYR-SEM0042", Severity.Error, found.Declaration?.Span ?? NodeSpan(node),
                             $"'{name}.{im.Name}' does not match interface '{iface.Name}'{implied}: {reason}");
+                    else
+                        CheckCloseWithinError(self, iface, im, found, name, NodeSpan(node));
                 }
                 foreach (var st in idecl.Statics)
                     _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
@@ -2022,6 +2025,7 @@ public sealed class TypeChecker
                         _result.RecordConformanceImpl(implementer, iface, im.Name,
                             InstanceOfConformance(iface, subst), satisfying);
                         CheckWitnessWord(satisfying, implementer, iface, name, NodeSpan(node));
+                        CheckCloseWithinError(at, iface, im, satisfying, name, NodeSpan(node));
                         continue;
                     }
 
@@ -2241,6 +2245,31 @@ public sealed class TypeChecker
                     + "an inherited member keeps its declaring interface; rename this one",
                     new DiagnosticNote(have.Fn.Declaration?.Span ?? default,
                         $"'{m.Name}' is declared here"));
+    }
+
+    /// <summary>A type that is an <c>Iterator</c> and <c>Closeable</c> throws in <c>close()</c> only
+    /// what its <c>Error</c> allows (the review's M8a-4): a loop over a generic iterator closes the
+    /// instance's iterator where it is Closeable, and the one clause that covers the loop's
+    /// <c>next()</c> covers that close too. Asked where a conformance to <c>Closeable</c> was
+    /// verified — in the type's own list or in a block —, of the type that conforms.</summary>
+    private void CheckCloseWithinError(LyrType at, TypeSymbol iface, FunctionDecl im, FunctionSymbol impl, string name, Span where)
+    {
+        if (_coreIterator is null || _closeable is null || !ReferenceEquals(iface, _closeable) || im.Name != "close") return;
+        if (at.IsError || !Satisfies(at, _coreIterator, new NamedRef(_coreIterator))) return;
+        if (FnSym(_coreIterator, "next") is not { } next) return;
+        var allowed = ((FnType)Substitute(FnTypeOf(next), WithSelf(EmptySubst, _coreIterator, at))).Throws;
+        if (allowed.Any(a => a.IsError)) return;
+        foreach (var thrown in FnTypeOf(impl).Throws)
+        {
+            if (thrown.IsError || allowed.Any(a => ThrownCoveredBy(thrown, a, _currentModule))) continue;
+            var error = allowed.Length == 0 ? "'never'" : string.Join(", ", allowed.Select(a => $"'{TypeFacts.Display(a)}'"));
+            _de.Report("LYR-SEM0174", Severity.Error, impl.Declaration?.Span ?? where,
+                $"'{name}.close' throws '{TypeFacts.Display(thrown)}', and the Error of the iterator '{name}' is {error} — "
+                + "a Closeable iterator's close() throws only what its Error allows, so a loop that closes it is covered "
+                + "by the clause that covers its next()",
+                new DiagnosticNote(where, $"'{name}' is an Iterator and Closeable here"));
+            return;
+        }
     }
 
     /// <summary>Own methods plus visible extension methods, by name; the own one first.
@@ -2773,6 +2802,7 @@ public sealed class TypeChecker
         // A Closeable iterator is closed on every way out but a panic (10 B6 I6, 05 E7 R7), as a
         // 'using' binding closes what it binds — asked of the type the checked code knows.
         DeferStmt? close = null;
+        var closeIfCloseable = false;
         if (cursorType is CoroutineOf && _cancelled is not null
             || _closeable is not null && ThrownCoveredBy(cursorType, new NamedRef(_closeable), _currentModule))
         {
@@ -2780,7 +2810,31 @@ public sealed class TypeChecker
             CheckExpr(closeCall, cursorScope);
             close = new DeferStmt(new ExprStmt(closeCall, span), span);
         }
-        _result.RecordForIn(fo, iterCall, nextCall, cursor, close);
+        // The iterator's type names a type parameter: whether it is Closeable is known only where
+        // the loop is lowered for a concrete type, and there the INSTANCE closes (the review's
+        // M8a-4). The call is built here, bound to Closeable's member — the lowering resolves it
+        // on the concrete type, or drops it where that type is no Closeable. It throws what the
+        // loop's next() throws, the iterator's Error: the rule at the declaration (LYR-SEM0174)
+        // holds every Closeable iterator's close() to that, so one clause covers both calls.
+        else if (_closeable is not null && MentionsTypeParam(cursorType)
+                 && _closeable.Members.LookupLocal("close") is FunctionSymbol promisedClose)
+        {
+            var at = new IdentifierExpr("$iterator", span);
+            _result.BindRef(at, cursor);
+            _result.SetType(at, cursorType);
+            var member = new MemberExpr(at, "close", IsOptional: false, span) { MemberSpan = default };
+            _typedReceiver.Add(member);
+            _operatorTarget[member] = (FnTypeOf(promisedClose), promisedClose);
+            _result.BindRef(member, promisedClose);
+            _result.SetType(member, FnTypeOf(promisedClose));
+            var closeCall = new CallExpr(member, [], span);
+            _result.SetType(closeCall, LyrType.Void);
+            var thrownByNext = _result.CallThrows(nextCall);
+            if (thrownByNext.Length > 0) _result.RecordCallThrows(closeCall, thrownByNext);
+            close = new DeferStmt(new ExprStmt(closeCall, span), span);
+            closeIfCloseable = true;
+        }
+        _result.RecordForIn(fo, iterCall, nextCall, cursor, close, closeIfCloseable);
         return produced is Optional item ? item.Inner : produced;
     }
 
@@ -6223,6 +6277,15 @@ public sealed class TypeChecker
         var thrownHere = AwaitedTask(call) is { } awaited && CancelledType is { } stopped
             ? ThrownAfter(awaited.Throws is { } failure ? [failure, stopped] : [stopped])
             : substituted.Throws;
+        // 'close()' of an Iterator that is Closeable throws what its Error allows (the review's
+        // M8a-4): the rule at the declaration (LYR-SEM0174) holds every such type to it, so a
+        // generic body that closes the iterator it holds needs no clause for 'Error'.
+        if (fsym is not null && _closeable is not null && _coreIterator is not null && fsym.Name == "close"
+            && ReferenceEquals(_closeable.Members.LookupLocal("close"), fsym)
+            && call.Callee is MemberExpr { Target: var closedExpr } && _result.TypeOf(closedExpr) is { } closedType
+            && !closedType.IsError && Satisfies(closedType, _coreIterator, new NamedRef(_coreIterator))
+            && FnSym(_coreIterator, "next") is { } nextOfClosed)
+            thrownHere = ((FnType)Substitute(FnTypeOf(nextOfClosed), WithSelf(EmptySubst, _coreIterator, closedType))).Throws;
         if (thrownHere.Length > 0) _result.RecordCallThrows(call, thrownHere);
 
         // If the receiver was optional the result is too, collapsed, because optionals do not nest.
@@ -7858,6 +7921,16 @@ public sealed class TypeChecker
     /// <see cref="Satisfies"/> asks first as well. Asked again rather than read from a record:
     /// a generic body records its parameters, not what an instance made of them.
     /// </summary>
+    /// <summary>The conformance question at an instance the lowering reached (the review's
+    /// M8a-4): asked outside every module, as <see cref="ConformanceBlockFor"/> is.</summary>
+    private bool SatisfiesAt(LyrType concrete, TypeSymbol iface)
+    {
+        var saved = _currentModule;
+        _currentModule = null;
+        try { return Satisfies(concrete, iface, new NamedRef(iface)); }
+        finally { _currentModule = saved; }
+    }
+
     private (ExtensionBlock Block, FunctionSymbol? Method)? ConformanceBlockFor(LyrType concrete, FunctionSymbol promised)
     {
         var saved = _currentModule;
