@@ -1168,12 +1168,12 @@ extend int :: [Num, Signed, Integer] {
     static let isSigned: bool = true;
 
     /// The decimal integer a text names (`Parse`).
-    static fn parse(s: string): int throws ParseError {
+    static fn parse(s: StringView): int throws ParseError {
         return try parseInteger(s, 10);
     }
 
     /// The integer a text names in `radix`, 2…36.
-    static fn parse(s: string, radix: int): int throws ParseError {
+    static fn parse(s: StringView, radix: int): int throws ParseError {
         return try parseInteger(s, radix);
     }
 
@@ -1197,12 +1197,12 @@ extend int8 :: [Num, Signed, Integer] {
     static let isSigned: bool = true;
 
     /// The decimal integer a text names (`Parse`).
-    static fn parse(s: string): int8 throws ParseError {
+    static fn parse(s: StringView): int8 throws ParseError {
         return try parseInteger(s, 10);
     }
 
     /// The integer a text names in `radix`, 2…36.
-    static fn parse(s: string, radix: int): int8 throws ParseError {
+    static fn parse(s: StringView, radix: int): int8 throws ParseError {
         return try parseInteger(s, radix);
     }
 
@@ -1226,12 +1226,12 @@ extend int16 :: [Num, Signed, Integer] {
     static let isSigned: bool = true;
 
     /// The decimal integer a text names (`Parse`).
-    static fn parse(s: string): int16 throws ParseError {
+    static fn parse(s: StringView): int16 throws ParseError {
         return try parseInteger(s, 10);
     }
 
     /// The integer a text names in `radix`, 2…36.
-    static fn parse(s: string, radix: int): int16 throws ParseError {
+    static fn parse(s: StringView, radix: int): int16 throws ParseError {
         return try parseInteger(s, radix);
     }
 
@@ -1255,12 +1255,12 @@ extend int32 :: [Num, Signed, Integer] {
     static let isSigned: bool = true;
 
     /// The decimal integer a text names (`Parse`).
-    static fn parse(s: string): int32 throws ParseError {
+    static fn parse(s: StringView): int32 throws ParseError {
         return try parseInteger(s, 10);
     }
 
     /// The integer a text names in `radix`, 2…36.
-    static fn parse(s: string, radix: int): int32 throws ParseError {
+    static fn parse(s: StringView, radix: int): int32 throws ParseError {
         return try parseInteger(s, radix);
     }
 
@@ -1284,12 +1284,12 @@ extend uint :: [Num, Integer] {
     static let isSigned: bool = false;
 
     /// The decimal integer a text names (`Parse`).
-    static fn parse(s: string): uint throws ParseError {
+    static fn parse(s: StringView): uint throws ParseError {
         return try parseInteger(s, 10);
     }
 
     /// The integer a text names in `radix`, 2…36.
-    static fn parse(s: string, radix: int): uint throws ParseError {
+    static fn parse(s: StringView, radix: int): uint throws ParseError {
         return try parseInteger(s, radix);
     }
 
@@ -1313,12 +1313,12 @@ extend uint8 :: [Num, Integer] {
     static let isSigned: bool = false;
 
     /// The decimal integer a text names (`Parse`).
-    static fn parse(s: string): uint8 throws ParseError {
+    static fn parse(s: StringView): uint8 throws ParseError {
         return try parseInteger(s, 10);
     }
 
     /// The integer a text names in `radix`, 2…36.
-    static fn parse(s: string, radix: int): uint8 throws ParseError {
+    static fn parse(s: StringView, radix: int): uint8 throws ParseError {
         return try parseInteger(s, radix);
     }
 
@@ -1342,12 +1342,12 @@ extend uint16 :: [Num, Integer] {
     static let isSigned: bool = false;
 
     /// The decimal integer a text names (`Parse`).
-    static fn parse(s: string): uint16 throws ParseError {
+    static fn parse(s: StringView): uint16 throws ParseError {
         return try parseInteger(s, 10);
     }
 
     /// The integer a text names in `radix`, 2…36.
-    static fn parse(s: string, radix: int): uint16 throws ParseError {
+    static fn parse(s: StringView, radix: int): uint16 throws ParseError {
         return try parseInteger(s, radix);
     }
 
@@ -1371,12 +1371,12 @@ extend uint32 :: [Num, Integer] {
     static let isSigned: bool = false;
 
     /// The decimal integer a text names (`Parse`).
-    static fn parse(s: string): uint32 throws ParseError {
+    static fn parse(s: StringView): uint32 throws ParseError {
         return try parseInteger(s, 10);
     }
 
     /// The integer a text names in `radix`, 2…36.
-    static fn parse(s: string, radix: int): uint32 throws ParseError {
+    static fn parse(s: StringView, radix: int): uint32 throws ParseError {
         return try parseInteger(s, radix);
     }
 
@@ -1406,9 +1406,9 @@ extend float :: [Num, Signed, Float] {
     }
 
     /// The float a text names, the nearest one (`Parse`).
-    static fn parse(s: string): float throws ParseError {
+    static fn parse(s: StringView): float throws ParseError {
         try checkFloatText(s);
-        return floatOfText(s);
+        return floatOfText(s.toString());
     }
 }
 
@@ -1427,9 +1427,9 @@ extend float32 :: [Num, Signed, Float] {
     }
 
     /// The float a text names, the nearest one (`Parse`).
-    static fn parse(s: string): float32 throws ParseError {
+    static fn parse(s: StringView): float32 throws ParseError {
         try checkFloatText(s);
-        return float32OfText(s);
+        return float32OfText(s.toString());
     }
 }
 
@@ -1460,12 +1460,12 @@ pub struct ParseError :: [Error] {
 /// A type read from a text: `T.parse(s)`, throwing `ParseError` with the reason. The number types
 /// conform through `Num`, and `bool`.
 pub interface Parse {
-    static fn parse(s: string): Self throws ParseError;
+    static fn parse(s: StringView): Self throws ParseError;
 }
 
 extend bool :: [Parse] {
     /// `true` or `false`, exactly.
-    static fn parse(s: string): bool throws ParseError {
+    static fn parse(s: StringView): bool throws ParseError {
         if (s == "true") {
             return true;
         }
@@ -1480,7 +1480,7 @@ extend bool :: [Parse] {
 /// between two of them, nothing else. A radix outside 2…36 is the program's error and panics (B3).
 /// A byte outside the form is `Invalid` however many digits run before it — only a well-formed
 /// number is an `Overflow`. Negative numbers accumulate downward, so `min` is reached.
-fn parseInteger<T :: [Integer]>(s: string, radix: int): T throws ParseError {
+fn parseInteger<T :: [Integer]>(s: StringView, radix: int): T throws ParseError {
     if (radix < 2 || radix > 36) {
         panic(f"radix {radix} is outside 2..36");
     }
@@ -1571,7 +1571,7 @@ fn isDigit(b: int): bool {
 /// A float's form (10 B5 Z6), thrown where the text is not of it: an optional sign, then `inf`,
 /// `nan`, or digits with an optional `.` and fraction — one digit at least — and an optional
 /// exponent, `e` or `E` with its own sign and digits; `_` between two digits, nothing else.
-fn checkFloatText(s: string): void throws ParseError {
+fn checkFloatText(s: StringView): void throws ParseError {
     let n = byteCount(s);
     if (n == 0) {
         throw ParseError { kind = ParseErrorKind.Empty };
@@ -1631,15 +1631,17 @@ fn checkFloatText(s: string): void throws ParseError {
 }
 
 /// Whether the three bytes at `i` are `a`, `b`, `c`.
-fn isWord(s: string, i: int, a: int, b: int, c: int): bool {
+fn isWord(s: StringView, i: int, a: int, b: int, c: int): bool {
     return byteAt(s, i) == a && byteAt(s, i + 1) == b && byteAt(s, i + 2) == c;
 }
 
-// The natives parsing stands on: a string's length and bytes until `StringView` gives the library
-// its bytes (M8a S8), a number converted as `as` converts it (03 T1d) to the type of `like` where
-// that is a parameter's, a float's text read by C (`strtod`, `strtof`) once its form is checked.
-fn byteCount(s: string): int;
-fn byteAt(s: string, i: int): int;
+// The natives the text stands on: a view's length and bytes (10 S1), which a string gives at the
+// argument; a number converted as `as` converts it (03 T1d) to the type of `like` where that is a
+// parameter's; a float's text read by C (`strtod`, `strtof`) once its form is checked.
+fn byteCount(s: StringView): int;
+fn byteAt(s: StringView, i: int): int;
+/// Whether `p`'s bytes stand in `s` from byte `at` on — memcmp; false where they would run past it.
+fn viewMatchesAt(s: StringView, p: StringView, at: int): bool;
 /// Byte by byte, as `memcmp` and then the length: -1, 0 or 1.
 fn compareBytes(a: string, b: string): int;
 /// The bytes from..to as a string; out of bounds or off a character's boundary, a panic.
@@ -1647,9 +1649,9 @@ fn byteSlice(s: string, from: int, to: int): string;
 /// A string of the array's first `count` bytes.
 fn stringOfBytes(bytes: uint8[], count: int): string;
 // --- strings (10 B9 S1–S3) ----------------------------------------------------------------------
-// UTF-8, immutable, the length in bytes. Written over the string's bytes until `StringView` gives
-// the library its views (M8a S8): the search takes a string for its pattern — `Pattern` (S2) comes
-// with the views.
+// UTF-8, immutable, the length in bytes. The members stand once on `StringView` (S1), which a
+// string reaches through a view of all of itself (M8a S12): what cuts gives a view, no copy; what
+// builds gives a string. The search takes a view for its pattern until `Pattern` (S2) comes.
 
 extend string :: [Ordered, TotalOrder] {
     /// Byte by byte (S1), which is the order of the code points.
@@ -1679,7 +1681,9 @@ extend string {
     pub fn isEmpty(): bool {
         return byteCount(this) == 0;
     }
+}
 
+extend StringView {
     /// The characters, decoded from the bytes.
     pub fn chars(): CharsIter {
         return CharsIter { s = this, at = 0 };
@@ -1700,27 +1704,27 @@ extend string {
     }
 
     /// Whether `p` stands in it.
-    pub fn contains(p: string): bool {
+    pub fn contains(p: StringView): bool {
         return this.find(p) != null;
     }
 
     /// Whether it begins with `p`.
-    pub fn startsWith(p: string): bool {
-        return matchesAt(this, p, 0);
+    pub fn startsWith(p: StringView): bool {
+        return viewMatchesAt(this, p, 0);
     }
 
     /// Whether it ends with `p`.
-    pub fn endsWith(p: string): bool {
+    pub fn endsWith(p: StringView): bool {
         let at = byteCount(this) - byteCount(p);
-        return at >= 0 && matchesAt(this, p, at);
+        return at >= 0 && viewMatchesAt(this, p, at);
     }
 
     /// The byte index of the first `p`, or `null`; an empty `p` stands at 0.
-    pub fn find(p: string): ?int {
+    pub fn find(p: StringView): ?int {
         let last = byteCount(this) - byteCount(p);
         var at = 0;
         while (at <= last) {
-            if (matchesAt(this, p, at)) {
+            if (viewMatchesAt(this, p, at)) {
                 return at;
             }
             at = at + 1;
@@ -1729,10 +1733,10 @@ extend string {
     }
 
     /// The byte index of the last `p`, or `null`; an empty `p` stands at the length.
-    pub fn rfind(p: string): ?int {
+    pub fn rfind(p: StringView): ?int {
         var at = byteCount(this) - byteCount(p);
         while (at >= 0) {
-            if (matchesAt(this, p, at)) {
+            if (viewMatchesAt(this, p, at)) {
                 return at;
             }
             at = at - 1;
@@ -1742,7 +1746,7 @@ extend string {
 
     /// How many times `p` stands in it, none overlapping another; an empty `p` stands between
     /// every two characters and at both ends.
-    pub fn count(p: string): int {
+    pub fn count(p: StringView): int {
         let step = byteCount(p);
         if (step == 0) {
             return this.charCount() + 1;
@@ -1751,7 +1755,7 @@ extend string {
         var n = 0;
         var at = 0;
         while (at <= last) {
-            if (matchesAt(this, p, at)) {
+            if (viewMatchesAt(this, p, at)) {
                 n = n + 1;
                 at = at + step;
             } else {
@@ -1760,12 +1764,10 @@ extend string {
         }
         return n;
     }
-}
 
-extend string {
-    /// The parts between the separators, in order: `"a,b,,c".split(",")` gives `a`, `b`, ``, `c`.
-    /// An empty separator panics.
-    pub fn split(sep: string): SplitIter {
+    /// The parts between the separators, in order: `"a,b,,c".split(",")` gives `a`, `b`, ``, `c` —
+    /// views, no copies. An empty separator panics.
+    pub fn split(sep: StringView): SplitIter {
         if (byteCount(sep) == 0) {
             panic("split: an empty separator");
         }
@@ -1773,12 +1775,12 @@ extend string {
     }
 
     /// The part before the first `sep` and the part after it, or `null` where there is none.
-    pub fn splitOnce(sep: string): ?(string, string) {
+    pub fn splitOnce(sep: StringView): ?(StringView, StringView) {
         let at = this.find(sep);
         if (at == null) {
             return null;
         }
-        let parts: (string, string) = (byteSlice(this, 0, at), byteSlice(this, at + byteCount(sep), byteCount(this)));
+        let parts: (StringView, StringView) = (this[..at], this[at + byteCount(sep)..]);
         return parts;
     }
 
@@ -1789,47 +1791,47 @@ extend string {
 
     /// Without the white space at both ends (ASCII's for now: space, tab, the line breaks, vertical
     /// tab and form feed).
-    pub fn trim(): string {
+    pub fn trim(): StringView {
         return this.trimStart().trimEnd();
     }
 
     /// Without the white space at the start.
-    pub fn trimStart(): string {
+    pub fn trimStart(): StringView {
         let n = byteCount(this);
         var i = 0;
         while (i < n && isAsciiSpace(byteAt(this, i))) {
             i = i + 1;
         }
-        return byteSlice(this, i, n);
+        return this[i..];
     }
 
     /// Without the white space at the end.
-    pub fn trimEnd(): string {
+    pub fn trimEnd(): StringView {
         var n = byteCount(this);
         while (n > 0 && isAsciiSpace(byteAt(this, n - 1))) {
             n = n - 1;
         }
-        return byteSlice(this, 0, n);
+        return this[..n];
     }
 
     /// The rest after `p` where it begins with `p`, or `null` (10 S2: absence is information).
-    pub fn stripPrefix(p: string): ?string {
+    pub fn stripPrefix(p: StringView): ?StringView {
         if (!this.startsWith(p)) {
             return null;
         }
-        return byteSlice(this, byteCount(p), byteCount(this));
+        return this[byteCount(p)..];
     }
 
     /// The rest before `p` where it ends with `p`, or `null`.
-    pub fn stripSuffix(p: string): ?string {
+    pub fn stripSuffix(p: StringView): ?StringView {
         if (!this.endsWith(p)) {
             return null;
         }
-        return byteSlice(this, 0, byteCount(this) - byteCount(p));
+        return this[..byteCount(this) - byteCount(p)];
     }
 
     /// Every `p` replaced by `with`, none overlapping another; an empty `p` panics.
-    pub fn replace(p: string, with: string): string {
+    pub fn replace(p: StringView, with: StringView): string {
         let step = byteCount(p);
         if (step == 0) {
             panic("replace: an empty pattern");
@@ -1839,8 +1841,8 @@ extend string {
         var from = 0;
         var at = 0;
         while (at + step <= n) {
-            if (matchesAt(this, p, at)) {
-                out.appendStr(byteSlice(this, from, at));
+            if (viewMatchesAt(this, p, at)) {
+                out.appendStr(this[from..at]);
                 out.appendStr(with);
                 at = at + step;
                 from = at;
@@ -1848,7 +1850,7 @@ extend string {
                 at = at + 1;
             }
         }
-        out.appendStr(byteSlice(this, from, n));
+        out.appendStr(this[from..]);
         return out.toString();
     }
 
@@ -1856,7 +1858,7 @@ extend string {
     pub fn padStart(width: int, fill: char = ' '): string {
         let missing = width - this.charCount();
         if (missing <= 0) {
-            return this;
+            return this.toString();
         }
         let out = StringBuilder.new();
         var i = 0;
@@ -1872,7 +1874,7 @@ extend string {
     pub fn padEnd(width: int, fill: char = ' '): string {
         let missing = width - this.charCount();
         if (missing <= 0) {
-            return this;
+            return this.toString();
         }
         let out = StringBuilder.new();
         out.appendStr(this);
@@ -1889,15 +1891,15 @@ fn isAsciiSpace(b: int): bool {
     return b == 32 || (b >= 9 && b <= 13);
 }
 
-/// A string's parts between a separator's occurrences.
+/// A text's parts between a separator's occurrences: views of it.
 pub struct SplitIter :: [Iterator] {
-    type Item = string;
-    s: string,
-    sep: string,
+    type Item = StringView;
+    s: StringView,
+    sep: StringView,
     var at: int,
     var done: bool,
 
-    pub mut fn next(): ?string {
+    pub mut fn next(): ?StringView {
         if (this.done) {
             return null;
         }
@@ -1905,25 +1907,25 @@ pub struct SplitIter :: [Iterator] {
         let step = byteCount(this.sep);
         var i = this.at;
         while (i + step <= n) {
-            if (matchesAt(this.s, this.sep, i)) {
-                let part = byteSlice(this.s, this.at, i);
+            if (viewMatchesAt(this.s, this.sep, i)) {
+                let part = this.s[this.at..i];
                 this.at = i + step;
                 return part;
             }
             i = i + 1;
         }
         this.done = true;
-        return byteSlice(this.s, this.at, n);
+        return this.s[this.at..n];
     }
 }
 
-/// A string's lines.
+/// A text's lines: views of it.
 pub struct LinesIter :: [Iterator] {
-    type Item = string;
-    s: string,
+    type Item = StringView;
+    s: StringView,
     var at: int,
 
-    pub mut fn next(): ?string {
+    pub mut fn next(): ?StringView {
         let n = byteCount(this.s);
         if (this.at >= n) {
             return null;
@@ -1936,7 +1938,7 @@ pub struct LinesIter :: [Iterator] {
         if (end > this.at && byteAt(this.s, end - 1) == 13) {
             end = end - 1;
         }
-        let line = byteSlice(this.s, this.at, end);
+        let line = this.s[this.at..end];
         this.at = i + 1;
         return line;
     }
@@ -1957,8 +1959,8 @@ pub class StringBuilder {
         return this.count;
     }
 
-    /// `s` at the end.
-    pub mut fn appendStr(s: string): void {
+    /// `s` at the end — a string, or a view of one.
+    pub mut fn appendStr(s: StringView): void {
         let n = byteCount(s);
         this.reserve(n);
         putBytes(this.bytes, this.count, s);
@@ -2025,7 +2027,7 @@ pub class StringBuilder {
 
 /// `s`'s bytes into `bytes` from `at` on, and the first `count` bytes of `from` into `into` — C's
 /// memcpy (measurement point 3), the ranges checked as an index is.
-fn putBytes(bytes: uint8[], at: int, s: string): void;
+fn putBytes(bytes: uint8[], at: int, s: StringView): void;
 fn copyBytes(into: uint8[], from: uint8[], count: int): void;
 
 /// The copy primitive (10 C2; the review's B16): the first `count` elements of `from` into `into`,
@@ -2038,14 +2040,14 @@ fn panicRange(low: int, high: int, length: int): never;
 // --- the format language (08 Y7, 10 S7; spec 12 §2) ---------------------------------------------
 
 /// A type with formats of its own (10 S7): `{x:spec}` hands it the spec as written. The scalars
-/// conform with the format language, which the compiler checks where a spec is written; `string`
-/// stands where `StringView` will.
+/// conform with the format language, which the compiler checks where a spec is written; the spec
+/// is a view (10 A3), and a string stands for one.
 pub interface Format {
-    fn format(spec: string, &out: StringBuilder): void;
+    fn format(spec: StringView, &out: StringBuilder): void;
 }
 
 /// What `{x:spec}` compiles to for a `Format` type (12 §2 rule 4): `x` in the spec's format.
-pub fn formatted<T :: [Format]>(value: T, spec: string): string {
+pub fn formatted<T :: [Format]>(value: T, spec: StringView): string {
     var out = StringBuilder.new();
     value.format(spec, &out);
     return out.toString();
@@ -2053,7 +2055,7 @@ pub fn formatted<T :: [Format]>(value: T, spec: string): string {
 
 /// What `{x:spec}` compiles to for another `Display` type (12 §2 rule 4): `show()` in the spec's
 /// width, alignment and fill.
-pub fn padded<T :: [Display]>(value: T, spec: string): string {
+pub fn padded<T :: [Display]>(value: T, spec: StringView): string {
     var out = StringBuilder.new();
     pad(value.show(), readSpec(spec), '<', &out);
     return out.toString();
@@ -2061,7 +2063,7 @@ pub fn padded<T :: [Display]>(value: T, spec: string): string {
 
 /// What `{x:?}` compiles to (12 §2 rule 4): `debug()` in the width, alignment and fill before the
 /// `?`.
-pub fn debugged<T :: [Debug]>(value: T, spec: string): string {
+pub fn debugged<T :: [Debug]>(value: T, spec: StringView): string {
     var out = StringBuilder.new();
     pad(value.debug(), readSpec(spec), '<', &out);
     return out.toString();
@@ -2082,7 +2084,7 @@ struct FormatSpec {
 }
 
 /// The spec in `text`. The compiler checked a spec an f-string writes; what is no spec panics.
-fn readSpec(text: string): FormatSpec {
+fn readSpec(text: StringView): FormatSpec {
     let cs = text.chars().toArray();
     let n = cs.length();
     var i = 0;
@@ -2199,7 +2201,7 @@ fn finishNumber(sign: string, prefix: string, digits: string, s: FormatSpec, &ou
 
 /// An integer by its sign and magnitude (12 §2 rule 3): the radix `b`, `o`, `x` or `X` names, the
 /// prefix under `#`, the digits grouped by three (decimal) or four (another radix).
-fn formatInteger(negative: bool, magnitude: uint, spec: string, &out: StringBuilder): void {
+fn formatInteger(negative: bool, magnitude: uint, spec: StringView, &out: StringBuilder): void {
     let s = readSpec(spec);
     let radix = if (s.kind == 'b') 2 else if (s.kind == 'o') 8 else if (s.kind == 'x' || s.kind == 'X') 16 else 10;
     var prefix = "";
@@ -2231,7 +2233,7 @@ fn digitsFor(width: int, size: int): int {
 }
 
 /// A signed integer: its magnitude in `uint`, where `int`'s least value has one.
-fn formatSigned(v: int, spec: string, &out: StringBuilder): void {
+fn formatSigned(v: int, spec: StringView, &out: StringBuilder): void {
     let magnitude = if (v < 0) (-(v + 1)) as uint + 1 else v as uint;
     formatInteger(v < 0, magnitude, spec, &out);
 }
@@ -2273,7 +2275,7 @@ fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int
 /// `float32`'s own where `narrow` says so; fixed with a precision; `e`/`E` with an exponent; `%` a
 /// hundredfold and fixed, the point moved on the exact digits — six digits where those three name
 /// none. Its sign, the integer part grouped (the zeros of `0` with it), padded.
-fn formatFloat(v: float, narrow: bool, spec: string, &out: StringBuilder): void {
+fn formatFloat(v: float, narrow: bool, spec: StringView, &out: StringBuilder): void {
     let s = readSpec(spec);
     let digits = if (s.precision < 0) 6 else s.precision;
     var text = "";
@@ -2364,83 +2366,68 @@ fn floatText(value: float, precision: int, form: int): string;
 fn shortestFloat32(value: float32): string;
 
 extend int :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { formatSigned(this, spec, &out); }
+    fn format(spec: StringView, &out: StringBuilder): void { formatSigned(this, spec, &out); }
 }
 
 extend int8 :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { formatSigned(this as int, spec, &out); }
+    fn format(spec: StringView, &out: StringBuilder): void { formatSigned(this as int, spec, &out); }
 }
 
 extend int16 :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { formatSigned(this as int, spec, &out); }
+    fn format(spec: StringView, &out: StringBuilder): void { formatSigned(this as int, spec, &out); }
 }
 
 extend int32 :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { formatSigned(this as int, spec, &out); }
+    fn format(spec: StringView, &out: StringBuilder): void { formatSigned(this as int, spec, &out); }
 }
 
 extend uint :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { formatInteger(false, this, spec, &out); }
+    fn format(spec: StringView, &out: StringBuilder): void { formatInteger(false, this, spec, &out); }
 }
 
 extend uint8 :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { formatInteger(false, this as uint, spec, &out); }
+    fn format(spec: StringView, &out: StringBuilder): void { formatInteger(false, this as uint, spec, &out); }
 }
 
 extend uint16 :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { formatInteger(false, this as uint, spec, &out); }
+    fn format(spec: StringView, &out: StringBuilder): void { formatInteger(false, this as uint, spec, &out); }
 }
 
 extend uint32 :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { formatInteger(false, this as uint, spec, &out); }
+    fn format(spec: StringView, &out: StringBuilder): void { formatInteger(false, this as uint, spec, &out); }
 }
 
 extend float :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { formatFloat(this, false, spec, &out); }
+    fn format(spec: StringView, &out: StringBuilder): void { formatFloat(this, false, spec, &out); }
 }
 
 /// A `float32` is formatted as the `float` it widens to — the same value exactly —, its shortest
 /// text its own (03 §1.7; the review's M8a-9).
 extend float32 :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { formatFloat(this as float, true, spec, &out); }
+    fn format(spec: StringView, &out: StringBuilder): void { formatFloat(this as float, true, spec, &out); }
 }
 
 /// A string: fill, alignment, width, and the precision as the most characters it keeps.
 extend string :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void {
+    fn format(spec: StringView, &out: StringBuilder): void {
         let s = readSpec(spec);
         pad(if (s.precision >= 0) firstChars(this, s.precision) else this, s, '<', &out);
     }
 }
 
 extend char :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { pad(f"{this}", readSpec(spec), '<', &out); }
+    fn format(spec: StringView, &out: StringBuilder): void { pad(f"{this}", readSpec(spec), '<', &out); }
 }
 
 extend bool :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { pad(f"{this}", readSpec(spec), '<', &out); }
+    fn format(spec: StringView, &out: StringBuilder): void { pad(f"{this}", readSpec(spec), '<', &out); }
 }
 
-/// Whether `p`'s bytes stand in `s` from byte `at` on.
-fn matchesAt(s: string, p: string, at: int): bool {
-    let n = byteCount(p);
-    if (at < 0 || at + n > byteCount(s)) {
-        return false;
-    }
-    var i = 0;
-    while (i < n) {
-        if (byteAt(s, at + i) != byteAt(p, i)) {
-            return false;
-        }
-        i = i + 1;
-    }
-    return true;
-}
 
 /// A string's characters, decoded from its UTF-8 bytes.
 pub struct CharsIter :: [Iterator] {
     type Item = char;
-    s: string,
+    s: StringView,
     var at: int,
 
     pub mut fn next(): ?char {
@@ -3726,7 +3713,7 @@ pub fn sequence<T>(body: fn() -> Coroutine<T>): Coroutine<T> {
 // --- StringView (10 S1, 03 A2; M8a S12): the view of a string's bytes --------------------------
 // A pointer into a string's bytes and a length, read and never written. `s[a..b]` takes one on
 // character boundaries, a string stands where one is expected, and `s[i]` is the character that
-// begins at a byte. The string's search and split members move onto it with S12b.
+// begins at a byte. The string's search and split members stand on it (the strings, above).
 
 /// `a == b` between a string and a view, or two views: the same bytes. The checker's for the
 /// operator; a program writes `==`.

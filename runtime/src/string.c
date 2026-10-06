@@ -434,9 +434,9 @@ LyrStr *lyr_str_float_text(double value, int64_t precision, int64_t form) {
     return result;
 }
 
-void lyr_bytes_put_str(LyrArr *bytes, int64_t at, const LyrStr *s) {
-    if (at < 0 || at > bytes->len - s->len) lyr_panic_range(at, at + s->len, bytes->len);
-    memcpy(bytes->data + at, s->bytes, (size_t)s->len);
+void lyr_bytes_put(LyrArr *bytes, int64_t at, const uint8_t *from, int64_t count) {
+    if (at < 0 || at > bytes->len - count) lyr_panic_range(at, at + count, bytes->len);
+    if (count > 0) memcpy(bytes->data + at, from, (size_t)count);
 }
 
 void lyr_bytes_copy(LyrArr *into, const LyrArr *from, int64_t count) {

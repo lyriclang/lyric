@@ -1986,6 +1986,11 @@ public sealed class CEmitter
             // comparison would ask whether they are one object).
             IrBinKind.Eq when IsString(TypeOf(b.Lhs)) => $"(uint8_t)lyr_str_eq({lhs}, {rhs})",
             IrBinKind.Ne when IsString(TypeOf(b.Lhs)) => $"(uint8_t)!lyr_str_eq({lhs}, {rhs})",
+            // A view of bytes by its bytes — a StringView matched against a literal (10 S1).
+            IrBinKind.Eq when TypeOf(b.Lhs) is IrSliceType { Element: IrScalarType { Kind: IrScalar.U8 } }
+                => $"(uint8_t)LYR_VIEW_EQ({lhs}, {rhs})",
+            IrBinKind.Ne when TypeOf(b.Lhs) is IrSliceType { Element: IrScalarType { Kind: IrScalar.U8 } }
+                => $"(uint8_t)!LYR_VIEW_EQ({lhs}, {rhs})",
             IrBinKind.Eq => $"(uint8_t)({lhs} == {rhs})",
             IrBinKind.Ne => $"(uint8_t)({lhs} != {rhs})",
             _ => throw new InvalidOperationException($"the C emitter has no case for '{b.Kind}'; the gate let it through"),

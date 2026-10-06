@@ -3,7 +3,7 @@
 import std.string { StringBuilder };
 import std.test { assertEq, assertNull, assertTrue };
 
-fn joined<I :: [Iterator<Item = string, Error = never>]>(it: I): string {
+fn joined<I :: [Iterator<Item = StringView, Error = never>]>(it: I): string {
     let out = StringBuilder.new();
     var first = true;
     for (part in it) {
@@ -22,8 +22,7 @@ fn splitKeepsEmptyParts(): void {
     assertEq(joined("abc".split(",")), "abc");
     assertEq(joined(",a,".split(",")), "|a|");
     assertEq(joined("a::b".split("::")), "a|b");
-    let pair = "key=value=more".splitOnce("=") ?? ("", "");
-    let (k, v) = pair;
+    let (k, v) = "key=value=more".splitOnce("=")!;
     assertEq(k, "key");
     assertEq(v, "value=more");
     assertTrue("plain".splitOnce("=") == null);

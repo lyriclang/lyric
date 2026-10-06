@@ -78,10 +78,11 @@ public static class Intrinsics
         ["std.core.countTrailingZeros"] = "LYR_CTZ",
         ["std.core.countOnes"] = "LYR_POPCOUNT",
         ["std.core.rotateBitsLeft"] = "LYR_ROTL",
-        // Parsing (10 B5 Z6): a string's length and bytes until StringView (M8a S8), the
-        // conversion of `as` toward a type parameter, a float's text read by C.
-        ["std.core.byteCount"] = "LYR_STR_LEN",
-        ["std.core.byteAt"] = "LYR_STR_BYTE",
+        // A view's length and bytes (10 S1; M8a S12) — a string's through the view it gives —,
+        // the conversion of `as` toward a type parameter, a float's text read by C.
+        ["std.core.byteCount"] = "LYR_VIEW_LEN",
+        ["std.core.byteAt"] = "LYR_VIEW_BYTE",
+        ["std.core.viewMatchesAt"] = "LYR_VIEW_MATCHES_AT",
         ["std.core.compareBytes"] = "lyr_str_cmp",
         ["std.core.byteSlice"] = "lyr_str_slice",
         ["std.core.stringOfBytes"] = "lyr_str_from_byte_array",
@@ -95,7 +96,7 @@ public static class Intrinsics
         // The format language (08 Y7, 12 §2): a float with a precision, rounded by C.
         ["std.core.floatText"] = "lyr_str_float_text",
         // The StringBuilder's bulk copies (measurement point 3): memcpy.
-        ["std.core.putBytes"] = "lyr_bytes_put_str",
+        ["std.core.putBytes"] = "LYR_BYTES_PUT_VIEW",
         ["std.core.copyBytes"] = "lyr_bytes_copy",
         ["std.core.moveElements"] = "LYR_SLICE_MOVE",
         ["std.core.panicRange"] = "lyr_panic_range",
