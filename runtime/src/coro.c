@@ -98,7 +98,8 @@ __asm__(
 #elif defined(__x86_64__) && defined(_WIN32)
 /* Win64: rbx, rbp, rdi, rsi, r12–r15, xmm6–xmm15, the control words — and the thread's stack as
  * the TEB records it (StackBase, StackLimit, DeallocationStack), which the system's stack checks
- * and the exception dispatcher read. */
+ * and the exception dispatcher read. The frame's layout is read back in two places: initial_frame
+ * writes it, saved_stack_limit reads the StackLimit off it (176 bytes above the xmm area). */
 __asm__(
     ".text\n"
     FUNC(lyr_ctx_switch)
@@ -216,7 +217,14 @@ __asm__(
 /* --- stacks (01 K1) -----------------------------------------------------------------------------
  * A coroutine's stack is mapped at its first resume: one guard page at the low end, never
  * accessible, and above it the stack, reserved — its pages cost memory once touched. A stack whose
- * coroutine ended goes to a small pool for the next one of the default size. */
+ * coroutine ended goes to a small pool for the next one of the default size.
+ *
+ * Windows lays it out as the system lays a thread's stack: the top committed, a PAGE_GUARD region
+ * below it, the rest reserved. The switch gives the TEB the coroutine's bounds, so the kernel
+ * commits page by page as the stack grows into the guard region, and raises STATUS_STACK_OVERFLOW
+ * — which the crash net reports — once what is left is the thread's guarantee, kept below the
+ * stack for that (LYR_STACK_GUARANTEE). Committed whole, as before, a stack cost its whole size at
+ * once, and an overflow was an access violation at the floor, with no stack for the dispatcher. */
 
 /* Any thread may ask first; each finds the same answer. */
 static size_t page_bytes(void) {
@@ -236,16 +244,65 @@ static size_t page_bytes(void) {
     return page;
 }
 
-static void *map_stack(size_t mapping_size, size_t guard) {
 #ifdef _WIN32
+/* What a stack has committed before it grows: enough for the frames below lyr_coro_start and a
+ * body that calls little; a small stack is committed whole. */
+enum { WIN_COMMIT = 64 * 1024 };
+
+static size_t commit_bytes(size_t stack_size) { return stack_size < WIN_COMMIT ? stack_size : WIN_COMMIT; }
+
+/* The guard region below what is committed: as the system lays it below a thread's stack once the
+ * thread has a guarantee (SetThreadStackGuarantee), the guarantee and a page, all PAGE_GUARD. At a
+ * hit the kernel commits the page touched and lays the region again below it; where no whole region
+ * fits above DeallocationStack it commits what is left as plain pages — the guaranteed room — and
+ * raises STATUS_STACK_OVERFLOW. One guard page instead left the dispatcher a page at most, and the
+ * exception frame did not always fit: an access violation, no report. */
+static int arm_guard(char *mapping, size_t mapping_size, size_t stack_size) {
+    size_t page = page_bytes();
+    char *first = mapping + mapping_size - commit_bytes(stack_size);
+    char *floor = mapping + page;
+    char *from = first - (LYR_STACK_GUARANTEE + page);
+    if (from < floor) from = floor;
+    return VirtualAlloc(from, (size_t)(first - from), MEM_COMMIT, PAGE_READWRITE | PAGE_GUARD) != NULL;
+}
+
+/* The top of the mapping committed, the guard region below it. */
+static int arm_stack(char *mapping, size_t mapping_size, size_t stack_size) {
+    size_t commit = commit_bytes(stack_size);
+    char *top = mapping + mapping_size;
+    if (VirtualAlloc(top - commit, commit, MEM_COMMIT, PAGE_READWRITE) == NULL) return 0;
+    return arm_guard(mapping, mapping_size, stack_size);
+}
+
+/* A stack that grew, laid out again as it was mapped, for the next coroutine from the pool: the
+ * pages it grew into decommitted, the guard region back below the top. `limit` is the TEB's
+ * StackLimit as the coroutine left it — the lowest page the kernel committed as plain. */
+static int rearm_stack(char *mapping, size_t mapping_size, size_t stack_size, char *limit) {
+    char *top = mapping + mapping_size;
+    char *first = top - commit_bytes(stack_size);
+    if (limit >= first) return 1;
+    size_t page = page_bytes();
+    if (!VirtualFree(mapping + page, (size_t)(first - (mapping + page)), MEM_DECOMMIT)) return 0;
+    return arm_guard(mapping, mapping_size, stack_size);
+}
+
+/* The TEB's StackLimit as the switch saved it in a stack's frame: above the xmm area, between
+ * DeallocationStack and StackBase (lyr_ctx_switch, initial_frame). */
+static char *saved_stack_limit(void *sp) { return *(char **)((char *)sp + 176); }
+#endif
+
+static void *map_stack(size_t mapping_size, size_t guard, size_t stack_size) {
+#ifdef _WIN32
+    (void)guard;
     char *mapping = VirtualAlloc(NULL, mapping_size, MEM_RESERVE, PAGE_NOACCESS);
     if (mapping == NULL) return NULL;
-    if (VirtualAlloc(mapping + guard, mapping_size - guard, MEM_COMMIT, PAGE_READWRITE) == NULL) {
+    if (!arm_stack(mapping, mapping_size, stack_size)) {
         VirtualFree(mapping, 0, MEM_RELEASE);
         return NULL;
     }
     return mapping;
 #else
+    (void)stack_size;
     int flags = MAP_PRIVATE | MAP_ANON;
 #  ifdef MAP_NORESERVE
     flags |= MAP_NORESERVE;
@@ -284,7 +341,17 @@ static void lock_pool(void) {
 
 static void unlock_pool(void) { atomic_flag_clear_explicit(&pool_lock, memory_order_release); }
 
-static size_t mapping_bytes(size_t stack_size) { return stack_size + page_bytes(); }
+/* Below the stack: the guard page — and on Windows the room the thread's guarantee keeps for the
+ * overflow report, which the kernel commits only then. */
+static size_t below_bytes(void) {
+#ifdef _WIN32
+    return page_bytes() + LYR_STACK_GUARANTEE;
+#else
+    return page_bytes();
+#endif
+}
+
+static size_t mapping_bytes(size_t stack_size) { return stack_size + below_bytes(); }
 
 /* The collector paces itself by its own heap and sees nothing of these stacks: a program that
  * starts coroutines and drops them while it keeps a large heap would pile their stacks up between
@@ -410,7 +477,7 @@ static void *initial_frame(LyrCoro *co, void *mapping, char *top) {
     for (int i = 0; i < 4; i++) *--sp = NULL;   /* r12–r15 */
 #  ifdef _WIN32
     *--sp = co->ctx.base;                       /* TEB StackBase */
-    *--sp = co->ctx.low;                        /* TEB StackLimit */
+    *--sp = (char *)co->ctx.base - commit_bytes(co->stack_size);  /* TEB StackLimit: what is committed */
     *--sp = mapping;                            /* TEB DeallocationStack */
     char *bytes = (char *)sp - 168;             /* xmm6–xmm15, MXCSR, x87 control word */
     memset(bytes, 0, 168);
@@ -447,11 +514,11 @@ static void acquire_stack(LyrCoro *co) {
         if (pool_count > 0) mapping = pool[--pool_count];
         unlock_pool();
     }
-    if (mapping == NULL) mapping = map_stack(mapping_size, page_bytes());
+    if (mapping == NULL) mapping = map_stack(mapping_size, page_bytes(), co->stack_size);
     if (mapping == NULL) {
         lyr_panic(LYR_RT_OUT_OF_MEMORY, "out of memory reserving a coroutine stack of %zu bytes", co->stack_size);
     }
-    char *low = (char *)mapping + page_bytes();
+    char *low = (char *)mapping + below_bytes();
     co->mapping_size = mapping_size;
     co->ctx.low = low;
     co->ctx.base = low + co->stack_size;
@@ -474,6 +541,9 @@ static void release_stack(LyrCoro *co) {
     void *mapping = co->mapping;
     if (mapping == NULL) return;
     co->mapping = NULL;
+#ifdef _WIN32
+    char *limit = saved_stack_limit(co->ctx.sp);
+#endif
     co->ctx.sp = NULL;
 #ifdef LYR_TSAN
     __tsan_destroy_fiber(co->ctx.tsan_fiber);
@@ -484,7 +554,13 @@ static void release_stack(LyrCoro *co) {
     __asan_unpoison_memory_region(co->ctx.low, co->stack_size);
 #endif
     int pooled = 0;
-    if (co->stack_size == LYR_CORO_STACK_DEFAULT) {
+#ifdef _WIN32
+    /* a stack of another size is unmapped below: not laid out again for nothing */
+    int as_mapped = co->stack_size != LYR_CORO_STACK_DEFAULT || rearm_stack(mapping, co->mapping_size, co->stack_size, limit);
+#else
+    int as_mapped = 1;
+#endif
+    if (co->stack_size == LYR_CORO_STACK_DEFAULT && as_mapped) {
         lock_pool();
         if (pool_count < POOL_MAX) {
             pool[pool_count++] = mapping;

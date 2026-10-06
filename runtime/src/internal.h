@@ -72,6 +72,13 @@ int lyr_signals_allowed(void);
 
 /* crash.c — the address range whose fault is a stack overflow, for the stack the thread runs on:
  * a coroutine switch swaps it (nothing on Windows, where the system tells an overflow apart). */
+
+/* Windows: what a thread keeps for the exception filter once its stack is spent
+ * (SetThreadStackGuarantee, crash.c) — the trace needs DbgHelp, which is not frugal. The system
+ * reads it off the TEB at every guard-page fault, so it holds for a coroutine's stack too while
+ * the coroutine runs (coro.c swaps the TEB's bounds): a coroutine's mapping reserves as much below
+ * its stack, and the kernel commits it only for the report. */
+#define LYR_STACK_GUARANTEE (128 * 1024)
 void lyr_crash_get_guard(uintptr_t *low, uintptr_t *high);
 void lyr_crash_set_guard(uintptr_t low, uintptr_t high);
 

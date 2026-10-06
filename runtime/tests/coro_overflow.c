@@ -1,7 +1,9 @@
 /* A coroutine's stack overflow (01 S3, K1): its guard page turns a recursion without end into a
  * panic, LYR-RT0006, with the coroutine's frames — not a crash, and not a write into whatever lies
  * below the stack. Expected: exit 101, "panic [LYR-RT0006]: stack overflow" on stderr, nothing on
- * stdout. (On POSIX: the handler runs on the thread's alternate stack.) */
+ * stdout. (On POSIX the handler runs on the thread's alternate stack; on Windows the kernel raises
+ * STATUS_STACK_OVERFLOW on the coroutine's stack, whose TEB bounds are the coroutine's, with the
+ * thread's guarantee left for the filter.) */
 #include "lyr/lyr.h"
 #include "check.h"
 
