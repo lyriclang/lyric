@@ -97,6 +97,8 @@ public static class Intrinsics
         // The StringBuilder's bulk copies (measurement point 3): memcpy.
         ["std.core.putBytes"] = "lyr_bytes_put_str",
         ["std.core.copyBytes"] = "lyr_bytes_copy",
+        ["std.core.moveElements"] = "LYR_SLICE_MOVE",
+        ["std.core.panicRange"] = "lyr_panic_range",
     };
 
     /// <summary>The names the <see cref="SubsetGate"/> lets through as <c>CallImport</c>.</summary>

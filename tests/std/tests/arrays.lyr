@@ -1,7 +1,7 @@
 // std.core's members of arrays and views (design/v5/spec/10 C2): written on the view, reached on
 // the array; the writes reach the array.
 import std.core { arrayOf };
-import std.test { assertEq, assertFalse, assertNull, assertTrue };
+import std.test { assertEq, assertFalse, assertNull, assertPanics, assertTrue };
 
 class Cell :: [Clone] {
     var n: int,
@@ -110,4 +110,60 @@ fn arrayOfCallsInOrderOncePerIndex(): void {
     assertEq(arrayOf(1, (i) => i + 7).join(","), "7");
     assertEq(arrayOf(6, (i) => i).join(","), "0,1,2,3,4,5");
     assertEq(arrayOf(1000, (i) => i)[999], 999);
+}
+
+// --- copyInto (the review's B16b): fits, longer keeps its rest, shorter panics, overlaps ------------
+
+@Test
+fn copyIntoFillsAViewAsLong(): void {
+    let from = [1, 2, 3, 4];
+    let into = [0, 0, 0, 0];
+    from[..].copyInto(into[..]);
+    assertEq(into[0], 1);
+    assertEq(into[3], 4);
+}
+
+@Test
+fn copyIntoALongerViewKeepsItsRest(): void {
+    let from = [7, 8];
+    let into = [1, 2, 3, 4, 5];
+    from[..].copyInto(into[1..]);
+    assertEq(into[0], 1);
+    assertEq(into[1], 7);
+    assertEq(into[2], 8);
+    assertEq(into[3], 4);
+    assertEq(into[4], 5);
+}
+
+@Test
+fn copyIntoAShorterViewPanics(): void {
+    let from = [1, 2, 3];
+    let into = [0, 0];
+    assertPanics(() => { from[..].copyInto(into[..]); });
+}
+
+@Test
+fn copyIntoOverlapsEitherWay(): void {
+    // forwards: the elements move up by two; the source is read before it is written
+    let up = [1, 2, 3, 4, 5, 6];
+    up[0..4].copyInto(up[2..6]);
+    assertEq(up[..].join(" "), "1 2 1 2 3 4");
+    // backwards: down by two
+    let down = [1, 2, 3, 4, 5, 6];
+    down[2..6].copyInto(down[0..4]);
+    assertEq(down[..].join(" "), "3 4 5 6 5 6");
+}
+
+@Test
+fn copyIntoOfNothingDoesNothing(): void {
+    let from: int[] = [];
+    let into = [1, 2];
+    from[..].copyInto(into[..]);
+    assertEq(into[0], 1);
+    let cells = [Cell { n = 1 }, Cell { n = 2 }];
+    let more = [Cell { n = 0 }, Cell { n = 0 }, Cell { n = 0 }];
+    cells[..].copyInto(more[1..]);
+    // a reference element is copied as the reference: the same cell in both
+    more[1].n = 9;
+    assertEq(cells[0].n, 9);
 }
