@@ -171,6 +171,14 @@ public static class TypeFacts
                 for (var i = 0; i < pt.Elements.Length; i++)
                     if (!Match(pt.Elements[i], at.Elements[i], map)) return false;
                 return true;
+            // A function type (05 §13 rule 6): its parameters, its places, its return and its set.
+            case FnType pf when actual is FnType af && pf.Parameters.Length == af.Parameters.Length
+                                && pf.Throws.Length == af.Throws.Length && FnType.SamePlaces(pf, af):
+                for (var i = 0; i < pf.Parameters.Length; i++)
+                    if (!Match(pf.Parameters[i], af.Parameters[i], map)) return false;
+                for (var i = 0; i < pf.Throws.Length; i++)
+                    if (!Match(pf.Throws[i], af.Throws[i], map)) return false;
+                return Match(pf.Return, af.Return, map);
             default:
                 return LyrType.Equal(pattern, actual);
         }
@@ -190,6 +198,9 @@ public static class TypeFacts
         if (a is Optional oa && b is Optional ob) return Overlaps(oa.Inner, ob.Inner);
         if (a is TupleOf ta && b is TupleOf tb)
             return ta.Elements.Length == tb.Elements.Length && ta.Elements.Zip(tb.Elements).All(p => Overlaps(p.First, p.Second));
+        if (a is FnType fa && b is FnType fb)
+            return fa.Parameters.Length == fb.Parameters.Length && fa.Throws.Length == fb.Throws.Length
+                && fa.Parameters.Zip(fb.Parameters).All(p => Overlaps(p.First, p.Second)) && Overlaps(fa.Return, fb.Return);
         return LyrType.Equal(a, b);
     }
 
