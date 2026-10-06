@@ -47,6 +47,20 @@ void lyr_err_suppress(LyrErr *into, const LyrErr *err) {
     into->suppressed = grown;
 }
 
+LyrErr *lyr_err_unsuppress(const LyrErr *dropped) {
+    if (dropped->suppressed == NULL || dropped->suppressed->len == 0) return NULL;
+    int64_t count = dropped->suppressed->len;
+    const LyrIface *all = (const LyrIface *)dropped->suppressed->data;
+    LyrErr *err = (lyr_err_new)(all[0]);
+    if (count > 1) {
+        LyrArr *rest = lyr_alloc_array(&suppressed_desc, count - 1);
+        memcpy(rest->data, all + 1, (size_t)(count - 1) * sizeof(LyrIface));
+        err->suppressed = rest;
+    }
+    err->trace = dropped->trace;
+    return err;
+}
+
 static void write_line(const char *prefix, const LyrStr *text) {
     lyr_write_stderr(prefix, strlen(prefix));
     if (text != NULL) lyr_write_stderr(text->bytes, (size_t)text->len);

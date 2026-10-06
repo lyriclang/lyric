@@ -3201,6 +3201,81 @@ pub struct Chain<A :: [Iterator], B :: [Iterator<Item = A.Item>]> :: [Iterator] 
     }
 }
 
+// Closing through an adapter (I6; the review's M8a-4): an adapter over a Closeable iterator is
+// Closeable itself and passes `close()` on, so a loop that leaves early closes the generator
+// behind `gen().map(f)`. Its `close()` throws what the inner one's may — the inner's Error, which
+// is the adapter's own —, as the rule at the declaration asks of every Closeable iterator
+// (LYR-SEM0174). The two over two iterators close both; where both throw, the first error wins
+// and the second is suppressed into it (05 E7).
+
+extend<I :: [Iterator, Closeable], U> Mapped<I, U> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable]> Filter<I> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable]> Take<I> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable]> Skip<I> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable]> TakeWhile<I> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable]> SkipWhile<I> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable]> StepBy<I> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable]> Enumerate<I> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable]> Inspect<I> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<A :: [Iterator, Closeable], B :: [Iterator, Closeable]> Zip<A, B> :: [Closeable] {
+    fn close(): void throws Join<A.Error, B.Error> {
+        defer try this.b.close();
+        try this.a.close();
+    }
+}
+
+extend<A :: [Iterator, Closeable], B :: [Iterator<Item = A.Item>, Closeable]> Chain<A, B> :: [Closeable] {
+    fn close(): void throws Join<A.Error, B.Error> {
+        defer try this.b.close();
+        try this.a.close();
+    }
+}
+
 // The adapters (I3): members of every iterator, each a struct of its own — monomorphized, no
 // allocation, no interface value.
 extend<I :: [Iterator]> I {

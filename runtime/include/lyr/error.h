@@ -37,6 +37,12 @@ LyrErr *lyr_err_new_traced(LyrIface value);
  * appended to its suppressed errors. */
 void lyr_err_suppress(LyrErr *into, const LyrErr *err);
 
+/* `close()` drops the Cancelled a coroutine's body ended with (06 A5); what a defer threw on the
+ * way out was suppressed into it and would go with it. The FIRST of those goes on instead (the
+ * review's M6-10), as a record of its own with the rest suppressed into it and the dropped
+ * record's trace; NULL where nothing was suppressed. */
+LyrErr *lyr_err_unsuppress(const LyrErr *dropped);
+
 /* `main`'s report (05 E6 O4): `error: <message>`, then `  caused by: <message>` for each cause and
  * `  suppressed: <message>` for each suppressed error, on the error writer; the answer is the exit
  * code, 1. The emitted entry passes the two members of

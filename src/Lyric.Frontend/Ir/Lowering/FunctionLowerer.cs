@@ -1954,10 +1954,26 @@ internal sealed class FunctionLowerer
 
         // A Closeable iterator's close (10 B6 I6): a defer in a scope of the loop's own, below
         // the loop's depth, so break and continue stay inside it — the exit runs it once, a return
-        // or an error leaving the loop unwinds it.
+        // or an error leaving the loop unwinds it. Where the iterator's type named a type
+        // parameter, the INSTANCE decides (the review's M8a-4): the close stays where the
+        // concrete iterator is Closeable, and goes where it is not.
+        if (protocol.CloseIfCloseable && !InstanceIsCloseable(SubstituteType(protocol.Cursor.Type)))
+            protocol = protocol with { Close = null };
         if (protocol.Close is { } close) _defers.Push(new List<DeferStmt> { close });
         try { return LowerProtocolLoop(stmt, protocol, loopVar, cursor, cursorType); }
         finally { if (protocol.Close is not null) _defers.Pop(); }
+    }
+
+    /// <summary>Whether the concrete iterator of a generic loop is Closeable (the review's
+    /// M8a-4): a coroutine always is; everything else the sema answers at the instance.</summary>
+    private bool InstanceIsCloseable(LyrType concrete)
+    {
+        if (concrete is CoroutineOf) return true;
+        if (_typeTable.Compilation?.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") is not TypeSymbol { Kind: TypeSymbolKind.Interface } closeable)
+            return false;
+        if (TypeFacts.SymbolOf(concrete) is { } declared && Conformance.Implements(declared, closeable, _typeTable.Binding))
+            return true;
+        return _types.Satisfies?.Invoke(concrete, closeable) ?? false;
     }
 
     private bool LowerProtocolLoop(ForInStmt stmt, TypeResult.ForInProtocol protocol, LocalSymbol loopVar,
@@ -3187,11 +3203,14 @@ internal sealed class FunctionLowerer
     /// <c>Cancelled</c> its body ends with is dropped; what else escapes the body comes out here, on
     /// the error path like a pull's.
     /// </summary>
-    private void LowerCoroutineClose(MemberExpr member, Core.Span span)
+    private void LowerCoroutineClose(MemberExpr member, CallExpr call, Core.Span span)
     {
         var coroutine = LowerExpr(member.Target);
         var cancelled = CancelledClass() ?? throw Bug("'close()' of a coroutine checked without std.task's Cancelled");
-        var throws = _types.ThrownByPull(member) is { } thrown && ThrownHere([thrown]).Length > 0;
+        // What the close may throw: the coroutine's set, as the checker noted at the pull — or,
+        // for the close of a generic loop's iterator that an instance made a coroutine (M8a-4),
+        // what it recorded for the call itself.
+        var throws = (_types.ThrownByPull(member) is { } thrown ? ThrownHere([thrown]) : ThrownHere(_types.CallThrows(call))).Length > 0;
         _b.Emit(new CoroutineClose(coroutine, ((IrRefType)_typeTable.RefTo(cancelled)).Type, span) { Throws = throws });
         if (throws && !_b.IsSealed) ErrorEdge(span);
     }
@@ -6323,7 +6342,7 @@ internal sealed class FunctionLowerer
         if (expr.Callee is MemberExpr { Member: "close" } closed
             && SubstituteType(_types.TypeOf(closed.Target)) is CoroutineOf)
         {
-            LowerCoroutineClose(closed, expr.Span);
+            LowerCoroutineClose(closed, expr, expr.Span);
             return null;
         }
 
