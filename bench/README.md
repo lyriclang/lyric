@@ -92,3 +92,10 @@ the IR optimizer runs in release and inlines those calls inside the program's un
 Windows now (the flag at compile time only, 01 B11); on top of the optimizer its gain measured
 within the noise (`sorting` +5 %, `maps` −5 %, `strings` none) and its cost 27–90 % more build
 time per program, so the release profile goes without it — `lto = true` is a manifest's choice.
+
+After R9d (01 B14, 2026-10-06): a map's keys and values lie side by side in one array of slots
+beside the control words, and an empty table is filled by repetition, not by `arrayOf`'s joined
+blocks — `maps` 0.333 → 0.267 s, 1.79× → 1.43× Go (minima of three alternating rounds of seven
+runs; cachegrind's LL misses 10.4 M → 3.3 M). A lookup that misses — most of them here — reads
+only the control words, small enough to stay in the cache; a hit reads one slot. What remains is
+the hasher: SipHash-1-3 (10 K2) is a fifth of the time, Go's AES hash 3–4 %.

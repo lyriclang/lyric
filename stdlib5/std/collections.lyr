@@ -255,12 +255,13 @@ fn emptiesOf(word: uint64): uint64 {
 
 /// A map from keys to values, by the keys' hashes (10 C4): what it holds in no order of its own,
 /// the same key once. `H` hashes the keys — `DefaultHasher` under the process's key unless the map
-/// is given another; a hasher is a value, copied fresh for every key.
+/// is given another; a hasher is a value, copied fresh for every key. The control words lie in an
+/// array of their own, small enough to stay in a cache where the slots do not: a lookup that misses
+/// reads no slot. A slot holds its key and its value side by side: a hit reads one (01 B14).
 pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
     type Iter = MapEntriesIter<K, V, H>;
     var controls: uint64[],
-    var slotKeys: (?K)[],
-    var slotValues: (?V)[],
+    var slots: (?MapSlot<K, V>)[],
     var count: int,
     var free: int,
     var changes: int,
@@ -269,7 +270,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
     /// An empty map hashing with `seed`: `Map<string, int, FixedHasher>.withHasher(FixedHasher.new())`
     /// is the same in every run.
     pub static fn withHasher(seed: H): Map<K, V, H> {
-        return Map<K, V, H> { controls = [], slotKeys = [], slotValues = [], count = 0, free = 0, changes = 0, seed = seed };
+        return Map<K, V, H> { controls = [], slots = [], count = 0, free = 0, changes = 0, seed = seed };
     }
 
     /// How many keys it holds.
@@ -288,7 +289,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         if (at < 0) {
             return null;
         }
-        return this.slotValues[at];
+        return this.slots[at]!.value;
     }
 
     /// Whether it holds `k`.
@@ -301,8 +302,8 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         let hash = this.hashOf(k);
         let at = this.find(k, hash);
         if (at >= 0) {
-            let old = this.slotValues[at];
-            this.slotValues[at] = v;
+            let old = this.slots[at]!.value;
+            this.slots[at] = MapSlot<K, V> { key = k, value = v };
             return old;
         }
         if (this.free == 0) {
@@ -331,9 +332,8 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
             this.free = this.free + 1;
         }
         this.controls[g] = (word & ~((255 as uint64) << shift)) | (mark << shift);
-        let old = this.slotValues[at];
-        this.slotKeys[at] = null;
-        this.slotValues[at] = null;
+        let old = this.slots[at]!.value;
+        this.slots[at] = null;
         this.count = this.count - 1;
         this.changes = this.changes + 1;
         return old;
@@ -345,7 +345,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         if (at < 0) {
             return otherwise;
         }
-        return this.slotValues[at]!;
+        return this.slots[at]!.value;
     }
 
     /// The value under `k`; where there is none, `make()`'s, inserted first.
@@ -353,7 +353,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         let hash = this.hashOf(k);
         let at = this.find(k, hash);
         if (at >= 0) {
-            return this.slotValues[at]!;
+            return this.slots[at]!.value;
         }
         let made = make();
         if (this.free == 0) {
@@ -371,7 +371,8 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         if (at < 0) {
             return false;
         }
-        this.slotValues[at] = f(this.slotValues[at]!);
+        let slot = this.slots[at]!;
+        this.slots[at] = MapSlot<K, V> { key = slot.key, value = f(slot.value) };
         return true;
     }
 
@@ -379,11 +380,12 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
     pub mut fn retain(p: fn(K, V) -> bool): int {
         var gone = 0;
         var at = 0;
-        while (at < this.slotKeys.length()) {
-            let k = this.slotKeys[at];
-            if (k != null && !p(k, this.slotValues[at]!)) {
-                this.remove(k);
-                gone = gone + 1;
+        while (at < this.slots.length()) {
+            if (let slot = this.slots[at]) {
+                if (!p(slot.key, slot.value)) {
+                    this.remove(slot.key);
+                    gone = gone + 1;
+                }
             }
             at = at + 1;
         }
@@ -409,8 +411,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
     /// Every key taken out.
     pub mut fn clear(): void {
         this.controls = [];
-        this.slotKeys = [];
-        this.slotValues = [];
+        this.slots = [];
         this.count = 0;
         this.free = 0;
         this.changes = this.changes + 1;
@@ -439,8 +440,8 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
             while (hits != 0) {
                 let slot = g * 8 + hits.trailingZeros() / 8;
                 // unwrapped: the key's own equality, not the optionals' (measurement point 3)
-                if (let key = this.slotKeys[slot]) {
-                    if (key == k) {
+                if (let full = this.slots[slot]) {
+                    if (full.key == k) {
                         return slot;
                     }
                 }
@@ -456,7 +457,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
     }
 
     /// `k` and `v` into the first slot along the probe that is not full; `k` is not there.
-    mut fn place(k: K, v: ?V, hash: uint64): void {
+    mut fn place(k: K, v: V, hash: uint64): void {
         let mask = this.controls.length() - 1;
         let tag = hash & 127;
         var g = ((hash >> 7) as int) & mask;
@@ -471,8 +472,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
                     this.free = this.free - 1;
                 }
                 this.controls[g] = (word & ~((255 as uint64) << shift)) | (tag << shift);
-                this.slotKeys[g * 8 + j] = k;
-                this.slotValues[g * 8 + j] = v;
+                this.slots[g * 8 + j] = MapSlot<K, V> { key = k, value = v };
                 return;
             }
             step = step + 1;
@@ -489,21 +489,27 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         if (groups > 0) {
             next = if (this.count * 16 < groups * 56) groups else groups * 2;
         }
-        let oldKeys = this.slotKeys;
-        let oldValues = this.slotValues;
+        let old = this.slots;
         this.controls = [emptyGroup] * next;
-        this.slotKeys = arrayOf(next * 8, (i: int): ?K => null);
-        this.slotValues = arrayOf(next * 8, (i: int): ?V => null);
+        // by repetition: one allocation and a copy a slot (arrayOf joins blocks, then calls a
+        // function a slot — the most of maps' cache misses before, B14)
+        let empty: ?MapSlot<K, V> = null;
+        this.slots = [empty] * (next * 8);
         this.free = next * 7;
         var i = 0;
-        while (i < oldKeys.length()) {
-            let k = oldKeys[i];
-            if (k != null) {
-                this.place(k, oldValues[i], this.hashOf(k));
+        while (i < old.length()) {
+            if (let slot = old[i]) {
+                this.place(slot.key, slot.value, this.hashOf(slot.key));
             }
             i = i + 1;
         }
     }
+}
+
+/// A full slot of a map's table: a key and its value side by side.
+struct MapSlot<K, V> {
+    key: K,
+    value: V,
 }
 
 /// A map's entries, `(K, V)`, slot by slot.
@@ -519,11 +525,11 @@ pub struct MapEntriesIter<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
         if (this.map.changes != this.changes) {
             changedWhileWalked(this.label);
         }
-        while (this.at < this.map.slotKeys.length()) {
-            let k = this.map.slotKeys[this.at];
+        while (this.at < this.map.slots.length()) {
+            let slot = this.map.slots[this.at];
             this.at = this.at + 1;
-            if (k != null) {
-                let entry: (K, V) = (k, this.map.slotValues[this.at - 1]!);
+            if (let full = slot) {
+                let entry: (K, V) = (full.key, full.value);
                 return entry;
             }
         }

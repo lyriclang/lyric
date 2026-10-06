@@ -363,6 +363,8 @@ public class CEmitterTests
     [InlineData("globals_gc", Profile.Release, "kept 499500 item-999999 anchor")]
     [InlineData("generators_gc", Profile.Debug, "kept item-7:0 item-7:1 item-7:2 true 7 item-199999:1 200000")]
     [InlineData("generators_gc", Profile.Release, "kept item-7:0 item-7:1 item-7:2 true 7 item-199999:1 200000")]
+    [InlineData("maps_gc", Profile.Debug, "kept 1500 2000 value-999999 1500")]
+    [InlineData("maps_gc", Profile.Release, "kept 1500 2000 value-999999 1500")]
     public void A_class_graph_survives_collections(string name, Profile profile, string line)
     {
         var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC(name), name, profile);
