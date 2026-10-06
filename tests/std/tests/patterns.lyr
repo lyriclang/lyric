@@ -1,0 +1,56 @@
+// std.core's Pattern (design/v5/spec/10 S2; M8a S12): one signature per operation takes a view or
+// a string, or a character — over characters of more than one byte too —; splitN, replaceN and
+// matches at their edges.
+import std.test { assertEq, assertFalse, assertNull, assertTrue };
+
+fn joined<I :: [Iterator<Item = StringView, Error = never>]>(it: I): string {
+    var out = "";
+    var first = true;
+    for (part in it) {
+        if (!first) {
+            out = out + "|";
+        }
+        first = false;
+        out = out + part.toString();
+    }
+    return out;
+}
+
+@Test
+fn aCharacterOfMoreThanOneByte(): void {
+    let s = "größe/maß";
+    assertEq(s.find('ß') ?? -1, 4);
+    assertEq(s.rfind('ß') ?? -1, 10);
+    assertEq(s.count('ß'), 2);
+    assertEq(joined(s.split('/')), "größe|maß");
+    assertEq(s.replace('ß', "ss"), "grösse/mass");
+    assertTrue(s.endsWith('ß'));
+    assertFalse(s.startsWith('ß'));
+    assertEq(s.stripSuffix('ß') ?? "none", "größe/ma");
+}
+
+@Test
+fn splitNAndReplaceNAtTheirEdges(): void {
+    assertEq(joined("a,b,c".splitN(',', 1)), "a,b,c");
+    assertEq(joined("a,b,c".splitN(',', 3)), "a|b|c");
+    assertEq(joined("a,b,c".splitN(',', 9)), "a|b|c");
+    assertEq(joined("a,b,c".splitN(',', 0)), "");
+    assertEq("a,b,c".replaceN(',', ";", 0), "a,b,c");
+    assertEq("a,b,c".replaceN(',', ";", -1), "a;b;c");
+}
+
+@Test
+fn aViewAsThePattern(): void {
+    let pattern = "abc"[2..];
+    assertEq("xabc".find(pattern) ?? -1, 3);
+    assertEq("xabcc".count(pattern), 2);
+    assertTrue("xyc".contains(pattern));
+}
+
+@Test
+fn theMatches(): void {
+    assertEq(joined("banana".matches("an")), "an|an");
+    assertEq(joined("banana".matches('a')), "a|a|a");
+    assertEq(joined("banana".matches("x")), "");
+    assertNull("banana".stripPrefix('x'));
+}

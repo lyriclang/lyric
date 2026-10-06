@@ -1651,7 +1651,7 @@ fn stringOfBytes(bytes: uint8[], count: int): string;
 // --- strings (10 B9 S1–S3) ----------------------------------------------------------------------
 // UTF-8, immutable, the length in bytes. The members stand once on `StringView` (S1), which a
 // string reaches through a view of all of itself (M8a S12): what cuts gives a view, no copy; what
-// builds gives a string. The search takes a view for its pattern until `Pattern` (S2) comes.
+// builds gives a string. The search takes a `Pattern` (S2): a view or a string, a character.
 
 extend string :: [Ordered, TotalOrder] {
     /// Byte by byte (S1), which is the order of the code points.
@@ -1683,6 +1683,154 @@ extend string {
     }
 }
 
+/// What a text is searched for (10 S2): a view or a string, a character, a test of characters.
+/// One signature per operation takes any of them (D4: no overloading by type) — `contains(p)`,
+/// `split(p)`, `stripPrefix(p)` … Two primitives, over byte indices of `text`: a match that begins
+/// at `at`, its end; a match that ends at `end`, its start — `null` where there is none. `at` and
+/// `end` are a character's first byte or the text's length. A third, `nextIn`, finds where the next
+/// match begins; its default walks the first bytes with `matchAt`, and a pattern that can find
+/// faster — a view, a string — says so.
+pub interface Pattern {
+    fn matchAt(text: StringView, at: int): ?int;
+    fn matchBefore(text: StringView, end: int): ?int;
+
+    /// The first byte at or after `from` — a character's first byte or the length — where a
+    /// match begins, or `null`.
+    fn nextIn(text: StringView, from: int): ?int {
+        let n = byteCount(text);
+        var at = from;
+        while (at <= n) {
+            if (this.matchAt(text, at) != null) {
+                return at;
+            }
+            at = nextChar(text, at);
+        }
+        return null;
+    }
+}
+
+/// A view's bytes, where they stand.
+extend StringView :: [Pattern] {
+    fn matchAt(text: StringView, at: int): ?int {
+        if (viewMatchesAt(text, this, at)) {
+            return at + byteCount(this);
+        }
+        return null;
+    }
+
+    fn matchBefore(text: StringView, end: int): ?int {
+        let start = end - byteCount(this);
+        if (viewMatchesAt(text, this, start)) {
+            return start;
+        }
+        return null;
+    }
+
+    fn nextIn(text: StringView, from: int): ?int {
+        let last = byteCount(text) - byteCount(this);
+        var at = from;
+        while (at <= last) {
+            if (viewMatchesAt(text, this, at)) {
+                return at;
+            }
+            at = at + 1;
+        }
+        return null;
+    }
+}
+
+/// A string's bytes, as its view's (a constraint is no coercion site: the string conforms itself).
+extend string :: [Pattern] {
+    fn matchAt(text: StringView, at: int): ?int {
+        if (viewMatchesAt(text, this, at)) {
+            return at + byteCount(this);
+        }
+        return null;
+    }
+
+    fn matchBefore(text: StringView, end: int): ?int {
+        let start = end - byteCount(this);
+        if (viewMatchesAt(text, this, start)) {
+            return start;
+        }
+        return null;
+    }
+
+    fn nextIn(text: StringView, from: int): ?int {
+        let last = byteCount(text) - byteCount(this);
+        var at = from;
+        while (at <= last) {
+            if (viewMatchesAt(text, this, at)) {
+                return at;
+            }
+            at = at + 1;
+        }
+        return null;
+    }
+}
+
+/// The character, where it stands.
+extend char :: [Pattern] {
+    fn matchAt(text: StringView, at: int): ?int {
+        if (at >= byteCount(text) || charOfView(text, at) != this) {
+            return null;
+        }
+        return at + utf8Width(this);
+    }
+
+    fn matchBefore(text: StringView, end: int): ?int {
+        if (end <= 0) {
+            return null;
+        }
+        let start = previousChar(text, end);
+        if (charOfView(text, start) != this) {
+            return null;
+        }
+        return start;
+    }
+}
+
+/// The first byte of the character after the one at `at` — or one past the length, where `at`
+/// is the length: a walk over the characters' first bytes ends there.
+fn nextChar(text: StringView, at: int): int {
+    let n = byteCount(text);
+    var i = at + 1;
+    while (i < n && (byteAt(text, i) & 192) == 128) {
+        i = i + 1;
+    }
+    return i;
+}
+
+/// The first byte of the character that ends at `end` — -1 at the start.
+fn previousChar(text: StringView, end: int): int {
+    var i = end - 1;
+    while (i > 0 && (byteAt(text, i) & 192) == 128) {
+        i = i - 1;
+    }
+    return i;
+}
+
+/// How many bytes UTF-8 gives `c`.
+fn utf8Width(c: char): int {
+    let code = c as uint32;
+    if (code < 128) {
+        return 1;
+    }
+    if (code < 2048) {
+        return 2;
+    }
+    if (code < 65536) {
+        return 3;
+    }
+    return 4;
+}
+
+/// Whether `p` matches the empty text — a separator or a pattern to replace that would stand
+/// everywhere.
+fn matchesNothing<P :: [Pattern]>(p: P): bool {
+    return p.matchAt("", 0) != null;
+}
+
 extend StringView {
     /// The characters, decoded from the bytes.
     pub fn chars(): CharsIter {
@@ -1704,84 +1852,88 @@ extend StringView {
     }
 
     /// Whether `p` stands in it.
-    pub fn contains(p: StringView): bool {
+    pub fn contains<P :: [Pattern]>(p: P): bool {
         return this.find(p) != null;
     }
 
     /// Whether it begins with `p`.
-    pub fn startsWith(p: StringView): bool {
-        return viewMatchesAt(this, p, 0);
+    pub fn startsWith<P :: [Pattern]>(p: P): bool {
+        return p.matchAt(this, 0) != null;
     }
 
     /// Whether it ends with `p`.
-    pub fn endsWith(p: StringView): bool {
-        let at = byteCount(this) - byteCount(p);
-        return at >= 0 && viewMatchesAt(this, p, at);
+    pub fn endsWith<P :: [Pattern]>(p: P): bool {
+        return p.matchBefore(this, byteCount(this)) != null;
     }
 
     /// The byte index of the first `p`, or `null`; an empty `p` stands at 0.
-    pub fn find(p: StringView): ?int {
-        let last = byteCount(this) - byteCount(p);
-        var at = 0;
-        while (at <= last) {
-            if (viewMatchesAt(this, p, at)) {
-                return at;
-            }
-            at = at + 1;
-        }
-        return null;
+    pub fn find<P :: [Pattern]>(p: P): ?int {
+        return p.nextIn(this, 0);
     }
 
     /// The byte index of the last `p`, or `null`; an empty `p` stands at the length.
-    pub fn rfind(p: StringView): ?int {
-        var at = byteCount(this) - byteCount(p);
-        while (at >= 0) {
-            if (viewMatchesAt(this, p, at)) {
-                return at;
+    pub fn rfind<P :: [Pattern]>(p: P): ?int {
+        var end = byteCount(this);
+        while (end >= 0) {
+            if (let start = p.matchBefore(this, end)) {
+                return start;
             }
-            at = at - 1;
+            end = previousChar(this, end);
         }
         return null;
     }
 
     /// How many times `p` stands in it, none overlapping another; an empty `p` stands between
     /// every two characters and at both ends.
-    pub fn count(p: StringView): int {
-        let step = byteCount(p);
-        if (step == 0) {
-            return this.charCount() + 1;
-        }
-        let last = byteCount(this) - step;
-        var n = 0;
-        var at = 0;
-        while (at <= last) {
-            if (viewMatchesAt(this, p, at)) {
-                n = n + 1;
-                at = at + step;
+    pub fn count<P :: [Pattern]>(p: P): int {
+        let n = byteCount(this);
+        var count = 0;
+        var from = 0;
+        while (from <= n) {
+            if (let at = p.nextIn(this, from)) {
+                let end = p.matchAt(this, at)!;
+                count = count + 1;
+                from = if (end > at) end else nextChar(this, at);
             } else {
-                at = at + 1;
+                return count;
             }
         }
-        return n;
+        return count;
     }
 
     /// The parts between the separators, in order: `"a,b,,c".split(",")` gives `a`, `b`, ``, `c` —
-    /// views, no copies. An empty separator panics.
-    pub fn split(sep: StringView): SplitIter {
-        if (byteCount(sep) == 0) {
-            panic("split: an empty separator");
+    /// views, no copies. A separator that matches the empty text panics.
+    pub fn split<P :: [Pattern]>(sep: P): SplitIter<P> {
+        if (matchesNothing(sep)) {
+            panic("split: a separator that matches the empty text");
         }
-        return SplitIter { s = this, sep = sep, at = 0, done = false };
+        return SplitIter<P> { s = this, sep = sep, at = 0, left = -1 };
+    }
+
+    /// At most `n` parts: the first `n - 1` separators split, the rest is the last part. `n` of 0
+    /// gives none.
+    pub fn splitN<P :: [Pattern]>(sep: P, n: int): SplitIter<P> {
+        if (matchesNothing(sep)) {
+            panic("splitN: a separator that matches the empty text");
+        }
+        if (n < 0) {
+            panic(f"splitN: {n} parts");
+        }
+        return SplitIter<P> { s = this, sep = sep, at = if (n == 0) -1 else 0, left = n };
     }
 
     /// The part before the first `sep` and the part after it, or `null` where there is none.
-    pub fn splitOnce(sep: StringView): ?(StringView, StringView) {
-        let at = this.find(sep);
-        if (at == null) {
-            return null;
+    pub fn splitOnce<P :: [Pattern]>(sep: P): ?(StringView, StringView) {
+        if (let at = sep.nextIn(this, 0)) {
+            let parts: (StringView, StringView) = (this[..at], this[sep.matchAt(this, at)!..]);
+            return parts;
         }
-        let parts: (StringView, StringView) = (this[..at], this[at + byteCount(sep)..]);
-        return parts;
+        return null;
+    }
+
+    /// The matches of `p`, in order, none overlapping another — views.
+    pub fn matches<P :: [Pattern]>(p: P): MatchesIter<P> {
+        return MatchesIter<P> { s = this, p = p, at = 0 };
     }
 
     /// The lines: split at `\n`, a `\r` before it taken off, no empty line after a last `\n`.
@@ -1815,39 +1967,45 @@ extend StringView {
     }
 
     /// The rest after `p` where it begins with `p`, or `null` (10 S2: absence is information).
-    pub fn stripPrefix(p: StringView): ?StringView {
-        if (!this.startsWith(p)) {
-            return null;
+    pub fn stripPrefix<P :: [Pattern]>(p: P): ?StringView {
+        if (let end = p.matchAt(this, 0)) {
+            return this[end..];
         }
-        return this[byteCount(p)..];
+        return null;
     }
 
     /// The rest before `p` where it ends with `p`, or `null`.
-    pub fn stripSuffix(p: StringView): ?StringView {
-        if (!this.endsWith(p)) {
-            return null;
+    pub fn stripSuffix<P :: [Pattern]>(p: P): ?StringView {
+        if (let start = p.matchBefore(this, byteCount(this))) {
+            return this[..start];
         }
-        return this[..byteCount(this) - byteCount(p)];
+        return null;
     }
 
-    /// Every `p` replaced by `with`, none overlapping another; an empty `p` panics.
-    pub fn replace(p: StringView, with: StringView): string {
-        let step = byteCount(p);
-        if (step == 0) {
-            panic("replace: an empty pattern");
+    /// Every `p` replaced by `with`, none overlapping another; a `p` that matches the empty text
+    /// panics.
+    pub fn replace<P :: [Pattern]>(p: P, with: StringView): string {
+        return this.replaceN(p, with, -1);
+    }
+
+    /// The first `n` of `p` replaced by `with` — all of them where `n` is negative.
+    pub fn replaceN<P :: [Pattern]>(p: P, with: StringView, n: int): string {
+        if (matchesNothing(p)) {
+            panic("replace: a pattern that matches the empty text");
         }
         let out = StringBuilder.new();
-        let n = byteCount(this);
+        let length = byteCount(this);
+        var left = n;
         var from = 0;
-        var at = 0;
-        while (at + step <= n) {
-            if (viewMatchesAt(this, p, at)) {
+        while (from < length && left != 0) {
+            if (let at = p.nextIn(this, from)) {
+                let end = p.matchAt(this, at)!;
                 out.appendStr(this[from..at]);
                 out.appendStr(with);
-                at = at + step;
-                from = at;
+                from = end;
+                left = left - 1;
             } else {
-                at = at + 1;
+                left = 0;
             }
         }
         out.appendStr(this[from..]);
@@ -1891,31 +2049,54 @@ fn isAsciiSpace(b: int): bool {
     return b == 32 || (b >= 9 && b <= 13);
 }
 
-/// A text's parts between a separator's occurrences: views of it.
-pub struct SplitIter :: [Iterator] {
+/// A text's parts between a pattern's matches: views of it. `at` is where the next part begins,
+/// -1 once the last was given; `left` how many parts `splitN` still gives, -1 without a bound.
+pub struct SplitIter<P :: [Pattern]> :: [Iterator] {
     type Item = StringView;
     s: StringView,
-    sep: StringView,
+    sep: P,
     var at: int,
-    var done: bool,
+    var left: int,
 
     pub mut fn next(): ?StringView {
-        if (this.done) {
+        if (this.at < 0) {
             return null;
         }
         let n = byteCount(this.s);
-        let step = byteCount(this.sep);
-        var i = this.at;
-        while (i + step <= n) {
-            if (viewMatchesAt(this.s, this.sep, i)) {
+        if (this.left != 1) {
+            if (let i = this.sep.nextIn(this.s, this.at)) {
                 let part = this.s[this.at..i];
-                this.at = i + step;
+                this.at = this.sep.matchAt(this.s, i)!;
+                if (this.left > 0) {
+                    this.left = this.left - 1;
+                }
                 return part;
             }
-            i = i + 1;
         }
-        this.done = true;
-        return this.s[this.at..n];
+        let rest = this.s[this.at..n];
+        this.at = -1;
+        return rest;
+    }
+}
+
+/// A pattern's matches in a text, none overlapping another: views of it.
+pub struct MatchesIter<P :: [Pattern]> :: [Iterator] {
+    type Item = StringView;
+    s: StringView,
+    p: P,
+    var at: int,
+
+    pub mut fn next(): ?StringView {
+        if (this.at > byteCount(this.s)) {
+            return null;
+        }
+        if (let begin = this.p.nextIn(this.s, this.at)) {
+            let end = this.p.matchAt(this.s, begin)!;
+            this.at = if (end > begin) end else nextChar(this.s, begin);
+            return this.s[begin..end];
+        }
+        this.at = byteCount(this.s) + 1;
+        return null;
     }
 }
 

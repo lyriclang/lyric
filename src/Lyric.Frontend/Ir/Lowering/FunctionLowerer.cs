@@ -6736,6 +6736,11 @@ internal sealed class FunctionLowerer
             var builtinReceiver = receiverOwner is null && receiver is not null && expr.Callee is MemberExpr { Target: var on }
                 ? SubstituteType(ReceiverType(on))
                 : null;
+            // A string reaching a generic member of its view (10 S1): the view is the 'this' —
+            // the receiver passed is a view of the string already.
+            if (builtinReceiver is PrimitiveType { Kind: PrimitiveKind.String }
+                && _typeTable.BlockOf(symbol) is { Target: { Kind: TypeSymbolKind.Builtin, Name: "StringView" } })
+                builtinReceiver = LyrType.StringView;
             target = _instances.Request(symbol, generic, instanceName, receiverOwner,
                 typeArguments, _typeTable, expr.Span, receiverType: builtinReceiver);
         }
