@@ -100,6 +100,7 @@ pub class Task<T> {
         this.guard.acquire();
         while (!this.done) {
             me.beginWait();
+            me.awaits = true;
             this.waiters.add(me);
             this.guard.release();
             here().wakeIfCancelled(me);
@@ -148,6 +149,7 @@ pub class Task<T> {
         this.guard.acquire();
         while (!this.done) {
             me.beginWait();
+            me.awaits = true;
             this.waiters.add(me);
             this.guard.release();
             park();
@@ -1240,10 +1242,13 @@ fn launchOn<T, E :: [Error]>(s: Scheduler, body: fn() -> T throws E, ended: ?fn(
 pub class Thread {
     /// Starts a thread with a scheduler of its own (06 G2): `body` runs there as its first task,
     /// whose handle this gives — `await()` waits for its end from any thread, and what it did
-    /// happens before (N7 P1). The thread ends with that task, as the program does with main (T6):
-    /// the tasks still ready or asleep there then never run again.
+    /// happens before (N7 P1). The handle is done when that task ends. The thread then CANCELS
+    /// what still lives on it and runs until all of it has ended (the review's M6-20b): the
+    /// `defer`s run, the locks come free, and whoever awaits one of those tasks goes on. Only the
+    /// program ends with its first task and leaves the rest where it stands (T6).
     pub static fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
         let s = Scheduler { };
+        enlist(s);
         let task = launchOn(s, body, null);
         startThread(() => {
             setCurrentScheduler(s);
@@ -1251,7 +1256,9 @@ pub class Thread {
             while (!task.isDone()) {
                 s.step();
             }
+            s.wind();
             s.stopped();
+            living.leave(s);
             setCurrentScheduler(null);
         });
         return task;
@@ -1322,6 +1329,16 @@ class Context {
     var scope: ?TaskScope = null,
     var nextChild: ?Context = null,
     var prevChild: ?Context = null,
+    /// The links of its scheduler's register of the contexts that LIVE (the review's M6-12,
+    /// M6-20b): from its first turn to its end.
+    var live: bool = false,
+    var liveNext: ?Context = null,
+    var livePrev: ?Context = null,
+    /// Its scheduler found that nothing can end the wait it is in (M6-12), and woke it to say so.
+    var stuck: bool = false,
+    /// The wait it is in is for a task's end — an `await`, a scope's close: where every task of
+    /// a thread waits, such a one waits for the reason and is not it.
+    var awaits: bool = false,
 
     /// A wait begins: from here a waker may claim it — before it goes into any place a waker looks.
     mut fn beginWait(): void {
@@ -1334,9 +1351,14 @@ class Context {
         return atomicCompareAndSet(&this.state, 1, 2);
     }
 
-    /// It runs again after a wait; the places it waited in it leaves next.
+    /// It runs again after a wait; the places it waited in it leaves next. Every wait passes
+    /// here once it woke — so this is where a wait that nothing could have ended ends (the
+    /// review's M6-12): by a panic in the waiting task's own stack, whose trace names the wait.
+    /// The context stays in the places it waited in; no waker can claim it there any more.
     mut fn endWait(): void {
         atomicStore(&this.state, 0);
+        this.awaits = false;
+        if (this.stuck) { deadlocked(); }
     }
 }
 
@@ -1418,8 +1440,10 @@ pub class Pool :: [Closeable] {
         });
     }
 
-    /// Waits until every task given to the pool has ended, then ends its threads. Closing a closed
-    /// pool waits for nothing. A wait: in a cancelled task it throws `Cancelled`.
+    /// Waits until every task given to the pool has ended, then ends its threads — each as a
+    /// thread ends (the review's M6-20b): what those tasks started and left there is cancelled, and
+    /// has ended when this returns. Closing a closed pool waits for nothing. A wait: in a cancelled
+    /// task it throws `Cancelled`.
     pub fn close(): void throws Error {
         // Through the reference, not through 'this': 'Closeable.close' is no 'mut fn', and an
         // implementation's 'mut' is the member's (LYR-SEM0042) — on a class too.
@@ -1463,14 +1487,17 @@ class Worker {
     fn start(): void {
         let s = this.scheduler;
         let w = this;
+        enlist(s);
         startThread(() => {
             setCurrentScheduler(s);
             s.started();
             while (!(atomicLoad(&w.closing) && atomicLoad(&w.active) == 0)) {
                 s.step();
             }
+            s.wind();
             w.finished.close();
             s.stopped();
+            living.leave(s);
             setCurrentScheduler(null);
         });
     }
@@ -1513,6 +1540,17 @@ class Scheduler {
     var poller: int = 0,
     /// The signals' watcher where it waits for the poller to wake (lyr/signal.h).
     var pollerWaiter: ?Context = null,
+    /// The register (the review's M6-12, M6-20b): the contexts that live on this thread, oldest
+    /// first — each from its first turn to its end. The thread's own: no other touches it.
+    var liveFirst: ?Context = null,
+    var liveLast: ?Context = null,
+    /// The thread is in its last turns: what lives on it is cancelled, and what begins now is.
+    var ending: bool = false,
+    /// Whether it is in the list of the schedulers that live (`living`), and its links there —
+    /// under that list's guard.
+    var joined: bool = false,
+    var nextLiving: ?Scheduler = null,
+    var prevLiving: ?Scheduler = null,
 
     /// The thread begins to run this scheduler: from here a waker on another thread wakes it.
     mut fn started(): void {
@@ -1671,6 +1709,7 @@ class Scheduler {
     mut fn parkIn(list: Waiters): void {
         let me = this.running ?? panic("a wait where no task runs");
         me.beginWait();
+        me.awaits = true;
         list.add(me);
         park();
         me.endWait();
@@ -1742,9 +1781,11 @@ class Scheduler {
         this.takeInbox();
         if (this.sleepers != null) { this.wakeSleepers(monotonicNanos()); }
         if (let c = this.takeReady()) {
+            if (!c.live) { this.admit(c); }
             this.running = c;
             let state = resumeContext(c.body);
             this.running = null;
+            if (state != 0) { this.dismiss(c); }
             if (state == 2) {
                 this.panicked(c);
             }
@@ -1752,6 +1793,7 @@ class Scheduler {
         }
         let top = this.sleepers;
         if (top == null) {
+            if (this.deadlock()) { return; }
             waitOnPoller(-1);
             this.pollerWoke();
             return;
@@ -1760,6 +1802,157 @@ class Scheduler {
         waitOnPoller(if (left > 0) left else 0);
         this.pollerWoke();
     }
+
+    /// `c` has its first turn: from here it lives on this thread. On a thread in its last turns
+    /// it is cancelled as it begins.
+    mut fn admit(c: Context): void {
+        c.live = true;
+        c.livePrev = this.liveLast;
+        c.liveNext = null;
+        if (let tail = this.liveLast) {
+            tail.liveNext = c;
+        } else {
+            this.liveFirst = c;
+        }
+        this.liveLast = c;
+        if (this.ending) { atomicStore(&c.cancelled, true); }
+    }
+
+    /// `c` has ended — its body returned, or it panicked.
+    mut fn dismiss(c: Context): void {
+        c.live = false;
+        if (let p = c.livePrev) {
+            p.liveNext = c.liveNext;
+        } else {
+            this.liveFirst = c.liveNext;
+        }
+        if (let n = c.liveNext) {
+            n.livePrev = c.livePrev;
+        } else {
+            this.liveLast = c.livePrev;
+        }
+        c.livePrev = null;
+        c.liveNext = null;
+    }
+
+    /// Whether another thread has handed a context over that this one has not taken yet.
+    fn pending(): bool {
+        this.inboxLock.acquire();
+        let some = this.inboxFirst != null;
+        this.inboxLock.release();
+        return some;
+    }
+
+    /// Nothing is ready and nothing sleeps (the review's M6-12). Where no other thread lives
+    /// either, and none has handed anything over, nothing can end a wait of this thread any more:
+    /// one of its waiting tasks is marked and woken, and panics in its wait — true then. The
+    /// oldest that waits for something other than a task's end: its panic passes to whoever
+    /// awaits it, with the frames of the wait that is the reason. Where each waits for another,
+    /// the oldest.
+    ///
+    /// The count is read BEFORE the inbox: a thread that ends hands its last wake-ups over before
+    /// it leaves the count, so with the count at one they are all there to be seen. (A wait on the
+    /// system — a file, a socket — has to count here once there is one: M8b.)
+    mut fn deadlock(): bool {
+        if (this.liveFirst == null || living.others(this) || this.pending()) { return false; }
+        var at = this.liveFirst;
+        while (let c = at) {
+            if (!c.awaits && this.wakeStuck(c)) { return true; }
+            at = c.liveNext;
+        }
+        at = this.liveFirst;
+        while (let c = at) {
+            if (this.wakeStuck(c)) { return true; }
+            at = c.liveNext;
+        }
+        return false;
+    }
+
+    /// Marks `c` and ends its wait: true where it waited and nothing else ended the wait first.
+    mut fn wakeStuck(c: Context): bool {
+        c.stuck = true;
+        if (this.wakeUp(c)) { return true; }
+        c.stuck = false;
+        return false;
+    }
+
+    /// The thread's last turns (the review's M6-20b), once its first task has ended: what still
+    /// lives on it is cancelled — and what begins now, as it begins —, and the thread runs until
+    /// all of it has ended.
+    mut fn wind(): void {
+        this.ending = true;
+        var at = this.liveFirst;
+        while (let c = at) {
+            at = c.liveNext;
+            this.cancel(c);
+        }
+        while (this.liveFirst != null || this.first != null || this.pending()) {
+            this.step();
+        }
+    }
+}
+
+/// The schedulers that live beside another — the threads that run tasks, once there is more than
+/// one — and how many (the review's M6-12): a thread that finds itself the only one, with nothing
+/// ready and nothing asleep, knows that no wait of its tasks can end. One is added by whoever
+/// STARTS its thread, before the thread runs — a thread that waits for one it just started is not
+/// alone —, and takes itself out at its end; it then nudges the others, which may be asleep on
+/// their pollers, to look again.
+class Living {
+    guard: SpinLock = SpinLock { },
+    var first: ?Scheduler = null,
+    var count: int = 0, // atomic: written under the guard, read without it
+
+    mut fn join(s: Scheduler): void {
+        if (s.joined) { return; }
+        this.guard.acquire();
+        s.joined = true;
+        s.prevLiving = null;
+        s.nextLiving = this.first;
+        if (let head = this.first) { head.prevLiving = s; }
+        this.first = s;
+        atomicFetchAndAdd(&this.count, 1);
+        this.guard.release();
+    }
+
+    mut fn leave(s: Scheduler): void {
+        this.guard.acquire();
+        if (let p = s.prevLiving) {
+            p.nextLiving = s.nextLiving;
+        } else {
+            this.first = s.nextLiving;
+        }
+        if (let n = s.nextLiving) { n.prevLiving = s.prevLiving; }
+        s.prevLiving = null;
+        s.nextLiving = null;
+        s.joined = false;
+        atomicFetchAndAdd(&this.count, -1);
+        var at = this.first;
+        while (let other = at) {
+            other.nudge();
+            at = other.nextLiving;
+        }
+        this.guard.release();
+    }
+
+    /// Whether a scheduler lives beside `s`, which asks: one that never joined — the program's
+    /// only thread so far — is not in the count. (Through the reference: a load writes nothing,
+    /// and a place of 'this' is a 'mut fn''s to hand on.)
+    fn others(s: Scheduler): bool {
+        let me = this;
+        return atomicLoad(&me.count) > (if (s.joined) 1 else 0);
+    }
+}
+
+let living = Living { };
+
+/// A thread is about to start on `s`: `s` lives from here on, and so does the scheduler of the
+/// task that starts it. The main thread's joins this way, with the first thread the program
+/// starts — `runMain` cannot do it: it runs before the module's bindings are filled (07 V5 G2),
+/// and `living` is one of them.
+fn enlist(s: Scheduler): void {
+    if (let mine = currentScheduler()) { living.join(mine); }
+    living.join(s);
 }
 
 /// The ids of the channels, in the order they were made: the order of their locks. Atomic.
@@ -1825,6 +2018,9 @@ fn rankOf(c: ?Context): int {
 /// The program's scheduler loop where `main` is a task (06 T6), which the runtime calls with main's
 /// context: it runs until that context is done — the program ends with main, and what is still
 /// ready or asleep then never runs again.
+///
+/// It runs BEFORE the module-level bindings are filled: those are filled at the start of main's
+/// first turn (07 V5 G2), inside the first `step`. Nothing above that turn reads one.
 fn runMain(main: Coroutine<void>): void {
     let s = Scheduler { };
     setCurrentScheduler(s);
@@ -1845,6 +2041,9 @@ fn startContext(body: fn() -> void, stack: int): Coroutine<void>;
 
 /// Parks the running chain at the scheduler (13 §1.6 rule 7).
 fn park(): void;
+
+/// The panic of a wait nothing can end (the review's M6-12): `LYR-RT0018`.
+fn deadlocked(): never;
 
 /// Resumes a task's context until it parks (0), its body returns (1) or it panics (2): a panic
 /// stays the context's, for the scheduler to settle (13 §1.6 rule 10).

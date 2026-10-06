@@ -1,0 +1,68 @@
+// A thread's end (design/v5/spec/06 G2, the review's M6-20b; 10 §9): the thread cancels what
+// still lives on it and runs until that has ended. Expected stdout:
+//   parked: the defer ran      a task parked in its wait when the thread's first task ended
+//   parked: cancelled
+//   fresh: the defer ran       one that had not had a turn yet
+//   fresh: cancelled
+//   detached ended true        a detached task of the thread, asleep
+//   pool: the defer ran        a pool's thread the same, when the pool closes
+//   pool: cancelled
+import std.io { println };
+import std.task { spawn, spawnDetached, sleep, Thread, Pool, Channel, Cancelled, TaskStatus };
+import std.time { Duration };
+
+fn waiter(name: string, never: Channel<int>): int throws Cancelled {
+    defer println(f"{name}: the defer ran");
+    let v = try never.recv();
+    return v ?? 0;
+}
+
+fn told(name: string, status: TaskStatus<int>): void {
+    println(match (status) {
+        .Cancelled => f"{name}: cancelled",
+        .Running => f"{name}: running",
+        _ => f"{name}: another status",
+    });
+}
+
+fn main(): void throws Error {
+    let never = Channel<int>.new();
+
+    let slow = Thread.spawn(() => {
+        let inner = spawn(() => try waiter("parked", never));
+        try sleep(Duration.ofMillis(20));
+        return inner;
+    });
+    let parked = try slow.await();
+    try {
+        parked.await();
+    } catch (_: Cancelled) {
+    }
+    told("parked", parked.status());
+
+    let quick = Thread.spawn(() => spawn(() => try waiter("fresh", never)));
+    let fresh = try quick.await();
+    try {
+        fresh.await();
+    } catch (_: Cancelled) {
+    }
+    told("fresh", fresh.status());
+
+    let gone = Channel<int>.new();
+    let host = Thread.spawn(() => {
+        spawnDetached(() => {
+            defer gone.close();
+            try sleep(Duration.ofSecs(30));
+        });
+        return 1;
+    });
+    try host.await();
+    let end = try gone.recv();
+    println(f"detached ended {end == null}");
+
+    let pool = Pool.new(2);
+    let given = pool.spawn(() => spawn(() => try waiter("pool", never)));
+    let third = try given.await();
+    try pool.close();
+    told("pool", third.status());
+}

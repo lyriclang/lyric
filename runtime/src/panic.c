@@ -155,6 +155,10 @@ void lyr_panic_walked(const LyrStr *what) {
     lyr_panic(LYR_RT_WALKED, "%.*s: changed while it was walked", shown(what, 100), what->bytes);
 }
 
+void lyr_panic_deadlock(void) {
+    lyr_panic(LYR_RT_DEADLOCK, "deadlock: every task waits, and nothing can wake one");
+}
+
 void lyr_panic_floor(void) {
     lyr_panic(LYR_RT_FLOOR, "control reached code the compiler holds unreachable");
 }

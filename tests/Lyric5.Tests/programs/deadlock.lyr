@@ -1,0 +1,25 @@
+// A wait nothing can end (design/v5/spec/06, the review's M6-12; 10 §2): every task of the
+// program's one thread waits, nothing sleeps, no other thread lives - the oldest task that
+// waits for something other than a task panics in its wait, LYR-RT0018; main, which awaits it,
+// panics again and takes the program along. Exit 101.
+// Expected stdout:
+//   before
+import std.io { println };
+import std.task { spawn, Channel };
+
+fn main(): void throws Error {
+    let a = Channel<int>.new();
+    let b = Channel<int>.new();
+    let first = spawn(() => {
+        let v = try a.recv();
+        try b.send(v ?? 0);
+    });
+    let second = spawn(() => {
+        let v = try b.recv();
+        try a.send(v ?? 0);
+    });
+    println("before");
+    try first.await();
+    try second.await();
+    println("not reached");
+}
