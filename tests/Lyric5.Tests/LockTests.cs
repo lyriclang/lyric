@@ -86,10 +86,12 @@ public class LockTests
     [Fact]
     public void A_moved_tag_stays_where_the_lock_holds_it()
     {
-        using var repo = Geo(out _, out var second);
+        using var repo = Geo(out _, out _);
         var dir = App($"geo = {{ git = \"{repo.Url}\", tag = \"v1.0.0\" }}\n");
         Assert.Equal("12\n", BuildAndRun(dir, "app", "build", "-C", dir));
-        repo.Git("tag", "-f", "v1.0.0", second);
+        // the tag moved to a fix that is still 1.0.0: a tag names the version its manifest gives
+        var fix = repo.Commit(("lyric.toml", Manifest("geo", version: "1.0.0")), ("src/shapes.lyr", Shapes("w * h + 1")));
+        repo.Git("tag", "-f", "v1.0.0", fix);
         // A fresh copy of the repository sees the moved tag; the lock keeps the commit it read.
         TestRepo.DeleteTree(Path.Combine(UserCache.Root, "git", "db", GitCache.Id(repo.Url)));
         Assert.Equal("12\n", BuildAndRun(dir, "app", "build", "-C", dir));
@@ -238,8 +240,9 @@ public class LockTests
     public void Versions_of_two_lines_are_two_packages(string mine, string theirs)
     {
         using var repo = new TestRepo();
-        repo.Commit(("lyric.toml", Manifest("geo")), ("src/shapes.lyr", Shapes("w * h")));
+        repo.Commit(("lyric.toml", Manifest("geo", version: mine[1..])), ("src/shapes.lyr", Shapes("w * h")));
         repo.Tag(mine);
+        repo.Commit(("lyric.toml", Manifest("geo", version: theirs[1..])), ("src/shapes.lyr", Shapes("w * h")));
         repo.Tag(theirs);
         var dir = Package(
             ("lyric.toml", Manifest("app", $"geo = {{ git = \"{repo.Url}\", tag = \"{mine}\" }}\nsquare = {{ path = \"deps/square\" }}\n")),
@@ -296,7 +299,9 @@ public class LockTests
         };
         var file = Path.Combine(Package(("x", "")), LockFile.FileName);
         LockFile.Write(file, entries);
-        Assert.Equal(LockFile.Sorted(entries), LockFile.Read(file));
+        // read back in the normal form (M7-10): 'git@example.org:geo.git' is 'git@example.org:geo'
+        Assert.Equal(LockFile.Sorted(entries.Select(e => e with { Git = e.Git with { Url = GitSource.Normalize(e.Git.Url) } })),
+            LockFile.Read(file));
         Assert.StartsWith("# Written by lyric", File.ReadAllText(file));
     }
 

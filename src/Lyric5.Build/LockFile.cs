@@ -48,7 +48,8 @@ public static partial class LockFile
                 : throw new ManifestException("LYR-PKG0002", file, package.Line, 1, $"a locked package needs a string '{key}'");
             var name = Field("name");
             var packageVersion = Field("version");
-            var url = Field("git");
+            // a lock an earlier toolchain wrote may hold a URL as the manifest spelled it (M7-10)
+            var url = GitSource.Normalize(Field("git"));
             var revisions = new[] { "tag", "branch", "rev" }.Where(package.Contains).ToList();
             if (revisions.Count > 1)
                 throw new ManifestException("LYR-PKG0002", file, package.Line, 1, $"'{name}' is locked at one revision");

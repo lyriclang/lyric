@@ -17,6 +17,33 @@ public sealed record Dependency(string Name, string? Path, GitSource? Git, int L
 /// branch, a commit — or, none named, the branch the repository's <c>HEAD</c> names.</summary>
 public sealed record GitSource(string Url, GitRefKind Kind, string? Ref)
 {
+    /// <summary>The form a repository's URL is compared, cached and locked in (design/v5/spec/07
+    /// M7-10): a <c>/</c> and a <c>.git</c> at the end dropped, the scheme and the host in lower
+    /// case — <c>HTTPS://Example.com/org/geo.git/</c> is <c>https://example.com/org/geo</c>. The
+    /// rest keeps its case, a user's name as a path's; <c>https</c> and <c>ssh</c> to one host stay
+    /// two URLs. Git reaches a repository through this form too: a local one by its suffixes, a
+    /// host by its own rule.</summary>
+    public static string Normalize(string url)
+    {
+        var text = url;
+        var scheme = text.IndexOf("://", StringComparison.Ordinal);
+        if (scheme > 0)
+        {
+            var start = scheme + 3;
+            var end = text.IndexOf('/', start);
+            if (end < 0) end = text.Length;
+            var host = start + text[start..end].LastIndexOf('@') + 1;   // after a user, if there is one
+            text = text[..scheme].ToLowerInvariant() + text[scheme..host] + text[host..end].ToLowerInvariant() + text[end..];
+        }
+        else if (text.IndexOf('@') is var at and >= 0 && text.IndexOf(':', at + 1) is var colon and > 0)
+        {
+            text = text[..(at + 1)] + text[(at + 1)..colon].ToLowerInvariant() + text[colon..];   // user@host:path
+        }
+        text = text.TrimEnd('/');
+        if (text.EndsWith(".git", StringComparison.Ordinal)) text = text[..^4].TrimEnd('/');
+        return text;
+    }
+
     public string Revision => Kind switch
     {
         GitRefKind.Tag => $"tag '{Ref}'",
@@ -307,6 +334,8 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     /// <summary>The git form: a URL git reads, and at most one revision of the repository.</summary>
     private static GitSource GitForm(string name, string url, TomlTable spec, List<string> revisions, string file, int line)
     {
+        // the normal form first (M7-10): a scheme in capitals is the scheme
+        url = GitSource.Normalize(url);
         if (!GitUrlPattern().IsMatch(url))
             throw new ManifestException("LYR-PKG0002", file, line, 1,
                 $"'{url}' is no git repository: https://, http://, ssh://, git://, file:// or user@host:path");

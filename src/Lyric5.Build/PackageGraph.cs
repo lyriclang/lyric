@@ -15,6 +15,10 @@ namespace Lyric5.Build;
 ///
 /// <para>What is read from git is read at the commit <c>lyric.lock</c> holds for it, and must be
 /// the content the lock holds (P5); <see cref="Locked"/> is what the lock holds afterwards.</para>
+///
+/// <para>No package depends on itself, at once or through others (the review's M7-6): a cycle is
+/// refused with its path. A tag that is a semantic version names the version the repository's
+/// manifest gives there — the selection chooses by the tag, the lock writes the manifest's.</para>
 /// </summary>
 /// <param name="Root">The package the program is built from.</param>
 /// <param name="Packages">Every package of the graph by name, the root's included.</param>
@@ -87,6 +91,7 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
         var chosen = read.ToDictionary(r => r.Key,
             r => r.Value.MaxBy(n => n.At.Git is { Kind: GitRefKind.Tag } g ? SemVer.OfTag(g.Ref!) : null)!,
             StringComparer.Ordinal);
+        RefuseCycles(root.Name, chosen.ToDictionary(c => c.Key, c => c.Value.Manifest, StringComparer.Ordinal));
         var revisions = read.Values.SelectMany(nodes => nodes).Select(n => n.Revision).OfType<Locked>();
         return new PackageGraph(root, chosen.ToDictionary(c => c.Key, c => c.Value.Manifest, StringComparer.Ordinal))
         {
@@ -117,7 +122,41 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
         if (manifest.Name != name)
             throw new ManifestException("LYR-PKG0004", declaring, at.Line, 1,
                 $"the package at {at.Describe()} is named '{manifest.Name}', not '{name}'");
+        // A tag that is a version is the version the manifest there gives: the selection reads the
+        // one, the lock the other, and they must be the same.
+        if (at.Git is { Kind: GitRefKind.Tag, Ref: { } tag } && SemVer.OfTag(tag) is { } tagged
+            && SemVer.Parse(manifest.Version) is { } carried && tagged.CompareTo(carried) != 0)
+            throw new ManifestException("LYR-PKG0006", declaring, at.Line, 1,
+                $"tag '{tag}' of {at.Git.Url} holds '{name}' at version {manifest.Version} — a tag that is a version "
+                + "names the version the package's manifest gives, by which the build chooses among versions (07 P4)");
         return new Node(at, manifest, revision is null ? null : revision with { Version = manifest.Version });
+    }
+
+    /// <summary>No package of the graph depends on itself, at once or through others (the review's
+    /// M7-6): the first cycle a walk from the root meets, refused at the dependency that closes it,
+    /// with its path — <c>app -> geo -> app</c>. A package's dependencies are built before it, and a
+    /// cycle has no first one.</summary>
+    private static void RefuseCycles(string root, IReadOnlyDictionary<string, Manifest> packages)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal) { root };
+        var path = new List<string>();
+        void Visit(string name)
+        {
+            var manifest = packages[name];
+            path.Add(name);
+            foreach (var dependency in manifest.Dependencies)
+            {
+                if (!packages.ContainsKey(dependency.Name)) continue;
+                var at = path.IndexOf(dependency.Name);
+                if (at >= 0)
+                    throw new ManifestException("LYR-PKG0010", manifest.File, dependency.Line, 1,
+                        $"the packages depend on each other in a cycle: {string.Join(" -> ", path.Skip(at).Append(dependency.Name))} "
+                        + "— a package's dependencies are built before it, and a cycle has no first one");
+                if (seen.Add(dependency.Name)) Visit(dependency.Name);
+            }
+            path.RemoveAt(path.Count - 1);
+        }
+        Visit(root);
     }
 
     /// <summary>One directory, or one revision of one repository, as written.</summary>
