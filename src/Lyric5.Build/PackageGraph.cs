@@ -50,7 +50,10 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
     /// <exception cref="ManifestException">A dependency is refused: no package there, another name,
     /// a second source for one name, a revision that cannot be read, content that is not what the
     /// lock holds.</exception>
-    public static PackageGraph Resolve(Manifest root, GitCache? git = null, IReadOnlyList<Locked>? locked = null)
+    /// <param name="frozen">The lock is taken as it is (<c>--locked</c>, the review's M7-9): a
+    /// revision it does not hold is refused, before anything is fetched.</param>
+    public static PackageGraph Resolve(Manifest root, GitCache? git = null, IReadOnlyList<Locked>? locked = null,
+        bool frozen = false)
     {
         var overrides = root.Overrides.ToDictionary(o => o.Name, StringComparer.Ordinal);
         var locks = (locked ?? []).GroupBy(l => (l.Name, l.Git)).ToDictionary(g => g.Key, g => g.First());
@@ -81,7 +84,7 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
                     if (!OneLine(sources[0].At, at))
                         throw new ManifestException("LYR-PKG0005", declaring, at.Line, 1, Conflict(dependency.Name, sources[0].At, at, root.Name));
                 }
-                var found = Read(dependency.Name, at, declaring, git ??= GitCache.ForUser(offline: false), locks);
+                var found = Read(dependency.Name, at, declaring, git ??= GitCache.ForUser(offline: false), locks, frozen);
                 (read.TryGetValue(dependency.Name, out var list) ? list : read[dependency.Name] = []).Add(found);
                 pending.Enqueue(found);
             }
@@ -103,12 +106,16 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
 
     /// <summary>The package <paramref name="at"/> names, from its directory or its revision.</summary>
     private static Node Read(string name, Dependency at, string declaring, GitCache git,
-        Dictionary<(string, GitSource), Locked> locks)
+        Dictionary<(string, GitSource), Locked> locks, bool frozen)
     {
         Locked? revision = null;
         string directory;
         if (at.Git is not null)
         {
+            if (frozen && !locks.ContainsKey((name, at.Git)))
+                throw new ManifestException("LYR-PKG0011", declaring, at.Line, 1,
+                    $"'{name}' is read from {at.Git}, which {LockFile.FileName} does not hold — --locked takes the lock "
+                    + "as it is; a build without it writes the lock");
             var (checkout, commit, hash) = git.Checkout(at, declaring, locks.GetValueOrDefault((name, at.Git)));
             directory = checkout;
             revision = new Locked(name, "", at.Git, commit, hash);

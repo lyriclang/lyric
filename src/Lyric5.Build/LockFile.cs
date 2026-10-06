@@ -86,6 +86,21 @@ public static partial class LockFile
         return text.ToString();
     }
 
+    /// <summary>Under <c>--locked</c> (the review's M7-9): the lock is what the graph read — no
+    /// entry more, none less, none other — or the build is refused; nothing is written. A program
+    /// that reads nothing from git needs no lock.</summary>
+    /// <exception cref="ManifestException"><c>LYR-PKG0011</c>.</exception>
+    public static void RefuseChange(string file, IReadOnlyList<Locked> entries)
+    {
+        var held = File.Exists(file) ? Read(file) : [];
+        if (Sorted(held).SequenceEqual(Sorted(entries))) return;
+        var why = Sorted(held).Except(entries).FirstOrDefault() is { } stale
+            ? $"it holds '{stale.Name}' ({stale.Git}) at {stale.Commit[..12]}, which the graph does not read so"
+            : File.Exists(file) ? "it lacks a revision the graph reads" : "there is none, and the program reads from git";
+        throw new ManifestException("LYR-PKG0011", file, 1, 1,
+            $"{FileName} is not what the manifests read: {why} — --locked takes the lock as it is; a build without it writes the lock");
+    }
+
     /// <summary>Writes the lock when its text changes: a resolution that read nothing new leaves
     /// the file alone. No lock is begun for a program that reads nothing from git.</summary>
     public static void Write(string file, IReadOnlyList<Locked> entries)
