@@ -562,8 +562,9 @@ public sealed class Resolver
             // A named target, plain or an instance ('List<T>', 'Box<int>' — 03 T7 X1); an array,
             // an optional or a tuple leaves Target null until S7b, and the sema says so.
             block.Target = block.Decl.Target is NamedType ? sym as TypeSymbol : null;
-            // 'extend<T> T[]', 'extend<T> ?T', a tuple (03 T7 X2): a shape, no symbol.
-            block.IsConstructorTarget = block.Decl.Target is ArrayType or NullableType or AST.TupleType;
+            // 'extend<T> T[]', 'extend<T> ?T', a tuple, a function type (03 T7 X2; 05 §13 rule 6):
+            // a shape, no symbol.
+            block.IsConstructorTarget = block.Decl.Target is ArrayType or NullableType or AST.TupleType or AST.FunctionType;
             // 'extend<T :: [I]> T' (04 D15): the target is the block's own parameter — a blanket
             // block, which every type its constraints admit receives.
             block.IsBlanketTarget = block.Decl.Target is NamedType { TypeArguments.Length: 0 }

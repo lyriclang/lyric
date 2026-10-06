@@ -122,8 +122,10 @@ public class GenericExtendTests
 
     // ------------------------------------------------------------------ the target
 
-    // The array became a target with S7b (03 T7 X2; ConstructorExtendTests); a function type stays none.
+    // The array became a target with S7b (03 T7 X2; ConstructorExtendTests), a function type with
+    // M8a S12 — generic, the value's type binding the parameter.
     [Fact]
-    public void A_function_type_is_no_target() =>
-        Rejected("extend fn(int) -> int { fn len(): int { return 0; } }\nfn f(): int { return 0; }", "LYR-SEM0047");
+    public void A_generic_function_type_is_a_target() =>
+        Allowed("extend<T> fn(T) -> T { fn twice(x: T): T { return this(this(x)); } }\n"
+            + "fn f(): int { let inc = (x: int): int => x + 1; return inc.twice(1); }");
 }

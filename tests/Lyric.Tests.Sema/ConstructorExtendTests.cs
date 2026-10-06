@@ -97,9 +97,11 @@ public class ConstructorExtendTests
             + "extend<T> T[] :: [Describe] { fn describe(): string { return \"xs\"; } }\n"
             + "fn f(): int { let d: Describe = [1, 2]; return 0; }", "LYR-SEM0047");
 
+    // A function type is a shape since M8a S12 (05 §13 rule 6): `this` is the function.
     [Fact]
-    public void A_function_type_is_no_target() =>
-        Rejected("extend fn(int) -> int { fn twice(): int { return 0; } }\nfn f(): int { return 0; }", "LYR-SEM0047");
+    public void A_function_type_is_a_target() =>
+        Allowed("extend fn(int) -> int { fn twice(x: int): int { return this(this(x)); } }\n"
+            + "fn f(): int { let inc = (x: int): int => x + 1; return inc.twice(1); }");
 
     [Fact]
     public void Length_stays_the_primitive() =>

@@ -1160,7 +1160,7 @@ public sealed class TypeChecker
                 // non-extendable one — a function type, an alias. Only the latter reports SEM0047.
                 if (block.Decl.Target is not NamedType || _binding.Resolve(block.Decl.Target) is not (null or ErrorSymbol))
                     _de.Report("LYR-SEM0047", Severity.Error, block.Decl.Target.Span,
-                        "an extend target is a named type, plain or an instance, or a built-in constructor — an array, an optional, a tuple; a function type is not one");
+                        "an extend target is a named type, plain or an instance, or a built-in constructor — an array, an optional, a tuple, a function type");
                 continue; // without a target there is no useful body check
             }
 
@@ -6754,7 +6754,7 @@ public sealed class TypeChecker
                 return BindMember(mem, InstanceMember(bs, mem.Member, span));
             case StringViewType when _stringView is { } view: // std.core's blocks on the view (10 S1)
                 return BindMember(mem, InstanceMember(view, mem.Member, span));
-            case ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf:
+            case ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType:
                 return ConstructorMember(baseType, mem, span);
             default:
                 return null;
@@ -7812,7 +7812,7 @@ public sealed class TypeChecker
 
         // A shape conforms through a block that names the interface, and no other way (05 §13
         // rule 6): what passed every constraint here before failed in the lowering.
-        ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf => BlockConforms(arg, iface, wanted, shapes: true),
+        ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType => BlockConforms(arg, iface, wanted, shapes: true),
 
         // An OPAQUE alias satisfies nothing: it has no conformance list, and falling into the
         // permissive default below would let 'Map<Entity, V>' compile against members the type
@@ -7919,7 +7919,7 @@ public sealed class TypeChecker
         return BlockConforms(self, iface, wanted, shapes: false);
     }
 
-    private static bool IsShape(LyrType type) => type is ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf;
+    private static bool IsShape(LyrType type) => type is ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType;
 
     /// <summary>Does the type conform to the interface through a shape's block or a blanket block
     /// alone (05 §13 rules 6, 8)? A shape conforms no other way; a named type might by its own

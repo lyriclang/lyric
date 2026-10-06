@@ -1651,7 +1651,8 @@ fn stringOfBytes(bytes: uint8[], count: int): string;
 // --- strings (10 B9 S1–S3) ----------------------------------------------------------------------
 // UTF-8, immutable, the length in bytes. The members stand once on `StringView` (S1), which a
 // string reaches through a view of all of itself (M8a S12): what cuts gives a view, no copy; what
-// builds gives a string. The search takes a `Pattern` (S2): a view or a string, a character.
+// builds gives a string. The search takes a `Pattern` (S2): a view or a string, a character, a
+// test of characters.
 
 extend string :: [Ordered, TotalOrder] {
     /// Byte by byte (S1), which is the order of the code points.
@@ -1766,6 +1767,31 @@ extend string :: [Pattern] {
             at = at + 1;
         }
         return null;
+    }
+}
+
+/// A test of characters: the character where it holds (05 §13 rule 6: a function type's block).
+extend fn(char) -> bool :: [Pattern] {
+    fn matchAt(text: StringView, at: int): ?int {
+        if (at >= byteCount(text)) {
+            return null;
+        }
+        let c = charOfView(text, at);
+        if (!this(c)) {
+            return null;
+        }
+        return at + utf8Width(c);
+    }
+
+    fn matchBefore(text: StringView, end: int): ?int {
+        if (end <= 0) {
+            return null;
+        }
+        let start = previousChar(text, end);
+        if (!this(charOfView(text, start))) {
+            return null;
+        }
+        return start;
     }
 }
 

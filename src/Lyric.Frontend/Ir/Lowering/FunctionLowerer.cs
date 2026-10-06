@@ -6569,7 +6569,7 @@ internal sealed class FunctionLowerer
                 when _types.RefOf(member) is FunctionSymbol shapeMember
                      && _typeTable.BlockOf(shapeMember) is { } shapeBlock
                      && (shapeBlock.IsConstructorTarget || shapeBlock.Target is { Kind: TypeSymbolKind.Builtin, Name: "Slice" })
-                     && SubstituteType(ReceiverType(member.Target)) is ArrayOf or SliceOf or InlineArrayOf or Optional or Sema.TupleOf:
+                     && SubstituteType(ReceiverType(member.Target)) is ArrayOf or SliceOf or InlineArrayOf or Optional or Sema.TupleOf or FnType:
             {
                 // A view's member on an array (03 §5.2 rule 4): the array gives a view of itself.
                 var shapeReceiver = SubstituteType(ReceiverType(member.Target));
