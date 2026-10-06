@@ -36,7 +36,7 @@ public class ProfileTests
     public void A_field_is_a_flag()
     {
         var release = BuildProfile.Of(Profile.Release) with { Opt = 3, DebugInfo = false, Lto = true, FastMath = true };
-        Assert.Equal(["-O3", "-g0", "-DNDEBUG", "-flto"], release.Codegen);
+        Assert.Equal(["-O3", "-g0", "-DNDEBUG", "-flto=thin"], release.Codegen);
         Assert.Equal(["-ffast-math", "-ffp-contract=fast"], release.ProgramFlags);
     }
 
