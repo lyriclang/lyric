@@ -2200,8 +2200,27 @@ fn formatInteger(negative: bool, magnitude: uint, spec: string, &out: StringBuil
         prefix = if (s.kind == 'b') "0b" else if (s.kind == 'o') "0o" else if (s.kind == 'X') "0X" else "0x";
     }
     let sign = if (negative) "-" else if (s.plus) "+" else "";
-    let digits = digitsOf(magnitude, radix as uint, s.kind == 'X', s.grouping, if (radix == 10) 3 else 4);
+    let size = if (radix == 10) 3 else 4;
+    // under `0` with a grouping, the zeros are grouped with the digits and the width counts the
+    // separators (12 §2 rule 1; the review's A4): as many digits as fill the width, at least
+    let least = if (zeroGrouped(s)) digitsFor(s.width - byteCount(sign) - byteCount(prefix), size) else 0;
+    let digits = digitsOf(magnitude, radix as uint, s.kind == 'X', s.grouping, size, least);
     finishNumber(sign, prefix, digits, s, &out);
+}
+
+/// Whether the spec fills with zeros after the sign and groups: the zeros then count as digits.
+fn zeroGrouped(s: FormatSpec): bool {
+    return s.fill == '0' && s.align == '=' && s.grouping != '\0';
+}
+
+/// The fewest digits that, grouped by `size`, fill `width` characters — a minimum: where no count
+/// fits exactly, the next one; no separator leads.
+fn digitsFor(width: int, size: int): int {
+    var n = 1;
+    while (n + (n - 1) / size < width) {
+        n = n + 1;
+    }
+    return n;
 }
 
 /// A signed integer: its magnitude in `uint`, where `int`'s least value has one.
@@ -2211,13 +2230,16 @@ fn formatSigned(v: int, spec: string, &out: StringBuilder): void {
 }
 
 /// The digits of `magnitude` in `radix`, most significant first, `grouping` between each `size`
-/// of them from the right.
-fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int): string {
+/// of them from the right; `least` digits at least, zeros before the first.
+fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int, least: int): string {
     var count = 1;
     var rest = magnitude / radix;
     while (rest != 0) {
         count = count + 1;
         rest = rest / radix;
+    }
+    if (count < least) {
+        count = least;
     }
     let separators = if (grouping == '\0') 0 else (count - 1) / size;
     let total = count + separators;
@@ -2226,16 +2248,13 @@ fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int
     var at = total - 1;
     var value = magnitude;
     var placed = 0;
-    while (true) {
+    while (placed < count) {
         let d = (value % radix) as int;
         bytes[at] = (if (d < 10) 48 + d else if (upper) 55 + d else 87 + d) as uint8;
         at = at - 1;
         placed = placed + 1;
         value = value / radix;
-        if (value == 0) {
-            break;
-        }
-        if (grouping != '\0' && placed % size == 0) {
+        if (placed < count && grouping != '\0' && placed % size == 0) {
             bytes[at] = (grouping as uint32) as uint8;
             at = at - 1;
         }
@@ -2243,10 +2262,11 @@ fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int
     return stringOfBytes(bytes, total);
 }
 
-/// A float (12 §2 rule 3): its shortest text without a precision or a type (03 §1.7); fixed with a
-/// precision; `e`/`E` with an exponent; `%` a hundredfold and fixed — six digits where those three
-/// name none. Its sign, the integer part grouped, padded.
-fn formatFloat(v: float, spec: string, &out: StringBuilder): void {
+/// A float (12 §2 rule 3): its shortest text without a precision or a type (03 §1.7) — a
+/// `float32`'s own where `narrow` says so; fixed with a precision; `e`/`E` with an exponent; `%` a
+/// hundredfold and fixed, the point moved on the exact digits — six digits where those three name
+/// none. Its sign, the integer part grouped (the zeros of `0` with it), padded.
+fn formatFloat(v: float, narrow: bool, spec: string, &out: StringBuilder): void {
     let s = readSpec(spec);
     let digits = if (s.precision < 0) 6 else s.precision;
     var text = "";
@@ -2255,34 +2275,57 @@ fn formatFloat(v: float, spec: string, &out: StringBuilder): void {
     } else if (s.kind == 'E') {
         text = floatText(v, digits, 2);
     } else if (s.kind == '%') {
-        text = floatText(v * 100.0, digits, 0) + "%";
+        text = floatText(v, digits, 3) + "%";
     } else if (s.kind == 'f' || s.precision >= 0) {
         text = floatText(v, digits, 0);
+    } else if (narrow) {
+        text = shortestFloat32(v as float32);
     } else {
         text = f"{v}";
     }
     let negative = text.startsWith("-");
     let body = if (negative) byteSlice(text, 1, byteCount(text)) else text;
-    finishNumber(if (negative) "-" else if (s.plus) "+" else "", "", grouped(body, s.grouping), s, &out);
+    let sign = if (negative) "-" else if (s.plus) "+" else "";
+    var least = 0;
+    if (zeroGrouped(s) && integerDigits(body) > 0) {
+        // the width less the sign and what follows the integer part: that many characters of
+        // digits and separators, at least (nothing for `nan` and `inf`, which have no digits)
+        least = digitsFor(s.width - byteCount(sign) - (byteCount(body) - integerDigits(body)), 3);
+    }
+    finishNumber(sign, "", grouped(body, s.grouping, least), s, &out);
 }
 
-/// `body`'s leading digits, a float's integer part, with `grouping` between each three.
-fn grouped(body: string, grouping: char): string {
+/// How many digits lead `body`: a float's integer part.
+fn integerDigits(body: string): int {
     let n = byteCount(body);
     var end = 0;
     while (end < n && byteAt(body, end) >= 48 && byteAt(body, end) <= 57) {
         end = end + 1;
     }
-    if (grouping == '\0' || end <= 3) {
+    return end;
+}
+
+/// `body`'s leading digits, a float's integer part, `least` of them at least (zeros before the
+/// first), with `grouping` between each three.
+fn grouped(body: string, grouping: char, least: int): string {
+    let n = byteCount(body);
+    let end = integerDigits(body);
+    let count = if (end < least) least else end;
+    if (grouping == '\0' && count == end) {
         return body;
     }
     let out = StringBuilder.new();
     var i = 0;
-    while (i < end) {
-        if (i > 0 && (end - i) % 3 == 0) {
+    while (i < count) {
+        if (i > 0 && grouping != '\0' && (count - i) % 3 == 0) {
             out.appendChar(grouping);
         }
-        out.appendStr(byteSlice(body, i, i + 1));
+        let from = i - (count - end);
+        if (from < 0) {
+            out.appendChar('0');
+        } else {
+            out.appendStr(byteSlice(body, from, from + 1));
+        }
         i = i + 1;
     }
     out.appendStr(byteSlice(body, end, n));
@@ -2307,9 +2350,11 @@ fn firstChars(text: string, count: int): string {
     return text;
 }
 
-/// A float with a precision, rounded by C (12 §2 rule 3): `form` 0 fixed, 1 with an exponent, 2 the
-/// same upper case.
+/// A float with a precision (12 §2 rule 3), rounded half away from zero on its exact binary digits
+/// by the runtime: `form` 0 fixed, 1 with an exponent, 2 the same upper case, 3 fixed a hundredfold.
 fn floatText(value: float, precision: int, form: int): string;
+/// A `float32`'s own shortest text (03 §1.7).
+fn shortestFloat32(value: float32): string;
 
 extend int :: [Format] {
     fn format(spec: string, &out: StringBuilder): void { formatSigned(this, spec, &out); }
@@ -2344,12 +2389,13 @@ extend uint32 :: [Format] {
 }
 
 extend float :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { formatFloat(this, spec, &out); }
+    fn format(spec: string, &out: StringBuilder): void { formatFloat(this, false, spec, &out); }
 }
 
-/// A `float32` is written as the `float` it widens to (03 §1.7).
+/// A `float32` is formatted as the `float` it widens to — the same value exactly —, its shortest
+/// text its own (03 §1.7; the review's M8a-9).
 extend float32 :: [Format] {
-    fn format(spec: string, &out: StringBuilder): void { formatFloat(this as float, spec, &out); }
+    fn format(spec: string, &out: StringBuilder): void { formatFloat(this as float, true, spec, &out); }
 }
 
 /// A string: fill, alignment, width, and the precision as the most characters it keeps.
