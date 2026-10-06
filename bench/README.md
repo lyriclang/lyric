@@ -85,3 +85,10 @@ non-generic functions — `int.totalCompare`, `isLess`, the hasher's steps — i
 inlines none of them without link-time optimization (ThinLTO is off: it breaks the cross-link
 to Windows). `strings` spends 40 % in the collector's allocation: every f-string piece is a
 string of its own until f-strings write into one builder (10 S6, `showTo`).
+
+After the review's R9a and R9b (2026-10-06; the machine noisy, minima over alternating rounds):
+the IR optimizer runs in release and inlines those calls inside the program's unit — `sorting`
+1.66–1.69× → 1.19–1.35× Go, under the bound; `maps` and `strings` stay over it. ThinLTO links to
+Windows now (the flag at compile time only, 01 B11); on top of the optimizer its gain measured
+within the noise (`sorting` +5 %, `maps` −5 %, `strings` none) and its cost 27–90 % more build
+time per program, so the release profile goes without it — `lto = true` is a manifest's choice.

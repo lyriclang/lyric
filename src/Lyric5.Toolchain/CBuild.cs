@@ -74,7 +74,9 @@ public sealed class CBuild
         // zig cc turns UBSan on by itself at -O0, with zig's own runtime and report format. The
         // sanitizers belong to their profiles (01 C7), which compile with clang; debug is plain.
         if (Compiler.Kind == CCompilerKind.Zig) flags.Add("-fno-sanitize=undefined");
-        flags.AddRange(Profile.Codegen);
+        // LTO is bitcode in the objects; zig 0.16 links Mach-O with a linker of its own that takes
+        // none ("LTO requires using LLD"), so a build for macOS goes without (the review's B11).
+        flags.AddRange(Target.Os == TargetOs.MacOs ? Profile.Codegen.Where(f => !IsLto(f)) : Profile.Codegen);
         if (unit.Instrument) flags.AddRange(Profile.Instrumentation);
         foreach (var define in unit.Defines) flags.Add("-D" + define);
         foreach (var include in unit.IncludeDirs) { flags.Add("-I"); flags.Add(include); }
@@ -231,7 +233,10 @@ public sealed class CBuild
     private void Link(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries, bool debugMap)
     {
         var arguments = Driver();
-        arguments.AddRange(Profile.Codegen);
+        // No LTO flag at the link: lld runs LTO over bitcode inputs by itself, and with the flag
+        // zig builds its own C library as bitcode too — for Windows its mingw part, whose own
+        // symbols then went missing (frexpf, wmemcpy, __DENORM …; the review's B11).
+        arguments.AddRange(Profile.Codegen.Where(f => !IsLto(f)));
         arguments.AddRange(Profile.Instrumentation);
         arguments.AddRange(inputs);
         foreach (var library in libraries ?? []) arguments.Add("-l" + library);
@@ -259,6 +264,8 @@ public sealed class CBuild
     /// <summary>The main task's stack, in bytes (<c>LYR_MAIN_TASK_STACK</c>), asked of the linker for
     /// the thread's stack where the linker sets it.</summary>
     private const string MainThreadStack = "8388608";
+
+    private static bool IsLto(string flag) => flag.StartsWith("-flto", StringComparison.Ordinal);
 
     /// <summary>The longest command line passed as it is. Windows takes 32767 characters at most, and
     /// a program of many modules links more object files than that holds ("The filename or

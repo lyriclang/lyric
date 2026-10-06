@@ -10,7 +10,10 @@ namespace Lyric5.Toolchain;
 /// <param name="Base">The built-in profile it comes from.</param>
 /// <param name="Opt">The C optimization level, 0 to 3.</param>
 /// <param name="DebugInfo">Debug information in the binary.</param>
-/// <param name="Lto">Link-time optimization over the program and the runtime.</param>
+/// <param name="Lto">Link-time optimization over the program and the runtime — ThinLTO; no
+/// built-in profile asks for it (the review's B11: after the IR optimizer its gain was within the
+/// noise, its cost a third more build time). <see cref="CBuild"/> keeps it off the link line and
+/// off macOS.</param>
 /// <param name="DenyWarnings">A warning fails the build.</param>
 /// <param name="OverflowChecks">Integer overflow panics (03 T2); off only where a profile says so
 /// — then <c>+ - *</c> and negation wrap.</param>
@@ -54,7 +57,7 @@ public sealed record BuildProfile(string Name, Profile Base, int Opt, bool Debug
             var flags = new List<string> { $"-O{Opt}", DebugInfo ? "-g" : "-g0" };
             if (Base == Profile.Release) flags.Add("-DNDEBUG");
             if (Base is Profile.Asan or Profile.Tsan) flags.Add("-fno-omit-frame-pointer");
-            if (Lto) flags.Add("-flto");
+            if (Lto) flags.Add("-flto=thin");
             return flags;
         }
     }
