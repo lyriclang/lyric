@@ -54,6 +54,24 @@ fn anOptionalHashesItsMarkAndValue(): void {
 }
 
 @Test
+fn orderingIsEquatableHashableAndDebug(): void {
+    assertTrue(Ordering.Less == Ordering.Less);
+    assertFalse(Ordering.Less == Ordering.Greater);
+    assertTrue(Ordering.Equal != Ordering.Greater);
+    assertEq(f"{Ordering.Less:?} {Ordering.Equal:?} {Ordering.Greater:?}", "Ordering.Less Ordering.Equal Ordering.Greater");
+    assertEq(hashOfOrdering(Ordering.Less), hashOfOrdering(Ordering.Less));
+    assertTrue(hashOfOrdering(Ordering.Less) != hashOfOrdering(Ordering.Greater));
+    let one = 1;
+    assertEq(one.totalCompare(2), Ordering.Less);
+}
+
+fn hashOfOrdering(o: Ordering): uint64 {
+    var h = FixedHasher.new();
+    o.hash(&h);
+    return h.finish();
+}
+
+@Test
 fn aRepeatedArrayClonesEachSlot(): void {
     let xs = repeatArray(["a", "b"], 2);
     assertEq(xs.length(), 4);

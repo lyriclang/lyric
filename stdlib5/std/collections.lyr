@@ -257,7 +257,7 @@ fn emptiesOf(word: uint64): uint64 {
 /// the same key once. `H` hashes the keys — `DefaultHasher` under the process's key unless the map
 /// is given another; a hasher is a value, copied fresh for every key.
 pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
-    type Iter = MapEntries<K, V, H>;
+    type Iter = MapEntriesIter<K, V, H>;
     var controls: uint64[],
     var slotKeys: (?K)[],
     var slotValues: (?V)[],
@@ -392,18 +392,18 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
 
     /// The entries, in no order of the map's own (10 I8): a change of the map while they are walked
     /// panics at the next pull (I9).
-    pub fn iter(): MapEntries<K, V, H> {
-        return MapEntries<K, V, H> { map = this, at = 0, changes = this.changes };
+    pub fn iter(): MapEntriesIter<K, V, H> {
+        return MapEntriesIter<K, V, H> { map = this, at = 0, changes = this.changes };
     }
 
     /// The keys, in the entries' order.
-    pub fn keys(): MapKeys<K, V, H> {
-        return MapKeys<K, V, H> { entries = this.iter() };
+    pub fn keys(): MapKeysIter<K, V, H> {
+        return MapKeysIter<K, V, H> { entries = this.iter() };
     }
 
     /// The values, in the entries' order.
-    pub fn values(): MapValues<K, V, H> {
-        return MapValues<K, V, H> { entries = this.iter() };
+    pub fn values(): MapValuesIter<K, V, H> {
+        return MapValuesIter<K, V, H> { entries = this.iter() };
     }
 
     /// Every key taken out.
@@ -507,7 +507,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
 }
 
 /// A map's entries, `(K, V)`, slot by slot.
-pub struct MapEntries<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
+pub struct MapEntriesIter<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
     type Item = (K, V);
     map: Map<K, V, H>,
     var at: int,
@@ -532,9 +532,9 @@ pub struct MapEntries<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
 }
 
 /// A map's keys.
-pub struct MapKeys<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
+pub struct MapKeysIter<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
     type Item = K;
-    var entries: MapEntries<K, V, H>,
+    var entries: MapEntriesIter<K, V, H>,
 
     pub mut fn next(): ?K {
         let e = this.entries.next();
@@ -547,9 +547,9 @@ pub struct MapKeys<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
 }
 
 /// A map's values.
-pub struct MapValues<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
+pub struct MapValuesIter<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
     type Item = V;
-    var entries: MapEntries<K, V, H>,
+    var entries: MapEntriesIter<K, V, H>,
 
     pub mut fn next(): ?V {
         let e = this.entries.next();
@@ -569,7 +569,7 @@ fn changedWhileWalked(what: string): never;
 
 /// The values it holds, each once, in no order of its own — a map's keys, by the same table.
 pub class Set<T :: [Hashable], H :: [Hasher] = DefaultHasher> :: [Iterable] {
-    type Iter = MapKeys<T, bool, H>;
+    type Iter = MapKeysIter<T, bool, H>;
     var table: Map<T, bool, H>,
 
     /// An empty set hashing with `seed`.
@@ -608,9 +608,9 @@ pub class Set<T :: [Hashable], H :: [Hasher] = DefaultHasher> :: [Iterable] {
     }
 
     /// The values, in no order of the set's own.
-    pub fn iter(): MapKeys<T, bool, H> {
-        return MapKeys<T, bool, H> {
-            entries = MapEntries<T, bool, H> { map = this.table, at = 0, changes = this.table.changes, label = "Set" },
+    pub fn iter(): MapKeysIter<T, bool, H> {
+        return MapKeysIter<T, bool, H> {
+            entries = MapEntriesIter<T, bool, H> { map = this.table, at = 0, changes = this.table.changes, label = "Set" },
         };
     }
 }
@@ -788,11 +788,12 @@ pub struct DequeIter<T> :: [Iterator] {
 }
 
 // --- Heap (10 C1) --------------------------------------------------------------------------------
-// A binary tree laid out in a list: the children of `i` at `2i + 1` and `2i + 2`, no value greater
+// A binary tree laid out in a list: the children of `i` at `2i + 1` and `2i + 2`, no value less
 // than its parent.
 
-/// A binary heap (10 C1): the greatest value first — `push`, `pop` and `peek` — each in `log n`
-/// steps, over a list. Not safe across threads (C11).
+/// A binary heap (10 C1): the least value first (the review's A1) — `push`, `pop` and `peek` —
+/// each in `log n` steps, over a list. Not safe across threads (C11). The greatest first: a heap
+/// of a type whose order is reversed.
 pub class Heap<T :: [TotalOrder]> {
     var items: List<T>,
 
@@ -811,7 +812,7 @@ pub class Heap<T :: [TotalOrder]> {
         return this.items.isEmpty();
     }
 
-    /// The greatest value, or `null` where there is none.
+    /// The least value, or `null` where there is none.
     pub fn peek(): ?T {
         return this.items.get(0);
     }
@@ -822,7 +823,7 @@ pub class Heap<T :: [TotalOrder]> {
         var at = this.items.length() - 1;
         while (at > 0) {
             let parent = (at - 1) / 2;
-            if (!greater(this.items[at], this.items[parent])) {
+            if (!less(this.items[at], this.items[parent])) {
                 break;
             }
             this.items.swap(at, parent);
@@ -830,8 +831,8 @@ pub class Heap<T :: [TotalOrder]> {
         }
     }
 
-    /// The greatest value taken off, or `null` where there is none: the last one put at the top
-    /// and sunk to its place.
+    /// The least value taken off, or `null` where there is none: the last one put at the top and
+    /// sunk to its place.
     pub mut fn pop(): ?T {
         let n = this.items.length();
         if (n == 0) {
@@ -847,10 +848,10 @@ pub class Heap<T :: [TotalOrder]> {
                 break;
             }
             var child = left;
-            if (left + 1 < m && greater(this.items[left + 1], this.items[left])) {
+            if (left + 1 < m && less(this.items[left + 1], this.items[left])) {
                 child = left + 1;
             }
-            if (!greater(this.items[child], this.items[at])) {
+            if (!less(this.items[child], this.items[at])) {
                 break;
             }
             this.items.swap(at, child);
@@ -860,10 +861,10 @@ pub class Heap<T :: [TotalOrder]> {
     }
 }
 
-/// Whether `a` comes after `b` in their order.
-fn greater<T :: [TotalOrder]>(a: T, b: T): bool {
+/// Whether `a` comes before `b` in their order.
+fn less<T :: [TotalOrder]>(a: T, b: T): bool {
     return match (a.totalCompare(b)) {
-        .Greater => true,
+        .Less => true,
         _ => false,
     };
 }
