@@ -1,6 +1,6 @@
 /// The containers (design/v5/spec/10 B7). Not safe across threads (C11): a `Mutex` holds one
 /// that is shared.
-import std.core { arrayOf, Hasher, StringBuilder };
+import std.core { arrayOf, FromIterator, Hasher, StringBuilder };
 import std.hash { DefaultHasher };
 
 // --- List (10 C3) --------------------------------------------------------------------------------
@@ -1124,5 +1124,70 @@ extend<T :: [TotalOrder, Debug]> Heap<T> :: [Debug] {
 
     fn debugTo(&out: StringBuilder): void {
         this.items.debugTo(&out);
+    }
+}
+
+// --- built from an iterator (10 B6, I4; M8a S15) ------------------------------------------------
+// Each container is a `FromIterator`: `collect()` into it, the values in the iterator's order — a
+// set's and a map's keys once each, a later value of a key replacing the earlier one.
+
+extend<T> List<T> :: [FromIterator<T>] {
+    static fn fromIter<I :: [Iterator<Item = T>]>(it: I): List<T> throws I.Error {
+        return try it.toList();
+    }
+}
+
+extend<T> Deque<T> :: [FromIterator<T>] {
+    static fn fromIter<I :: [Iterator<Item = T>]>(it: I): Deque<T> throws I.Error {
+        let out = Deque<T>.new();
+        var walk = it;
+        var x = try walk.next();
+        while (x != null) {
+            out.pushBack(x);
+            x = try walk.next();
+        }
+        return out;
+    }
+}
+
+extend<T :: [Hashable]> Set<T, DefaultHasher> :: [FromIterator<T>] {
+    static fn fromIter<I :: [Iterator<Item = T>]>(it: I): Set<T, DefaultHasher> throws I.Error {
+        let out = Set<T, DefaultHasher>.new();
+        var walk = it;
+        var x = try walk.next();
+        while (x != null) {
+            out.insert(x);
+            x = try walk.next();
+        }
+        return out;
+    }
+}
+
+extend<K :: [Hashable], V> Map<K, V, DefaultHasher> :: [FromIterator<(K, V)>] {
+    static fn fromIter<I :: [Iterator<Item = (K, V)>]>(it: I): Map<K, V, DefaultHasher> throws I.Error {
+        let out = Map<K, V, DefaultHasher>.new();
+        var walk = it;
+        var x = try walk.next();
+        while (x != null) {
+            let (k, v) = x;
+            out.insert(k, v);
+            x = try walk.next();
+        }
+        return out;
+    }
+}
+
+extend<T :: [TotalOrder]> Heap<T> :: [FromIterator<T>] {
+    /// The values heaped at once, as `of` does an array's.
+    static fn fromIter<I :: [Iterator<Item = T>]>(it: I): Heap<T> throws I.Error {
+        return Heap<T>.of(try it.toArray());
+    }
+}
+
+extend<I :: [Iterator<Item = T>], T :: [Hashable]> I {
+    /// The values in a set of their own, each once.
+    pub fn toSet(): Set<T> throws I.Error {
+        let out: Set<T> = try this.collect();
+        return out;
     }
 }

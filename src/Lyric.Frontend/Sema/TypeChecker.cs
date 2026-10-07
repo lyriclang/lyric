@@ -7316,6 +7316,51 @@ public sealed class TypeChecker
 
     /// <summary>The associated types of a type parameter's constraint, fixed at the constraint
     /// (<c>T :: [Iterator&lt;Item = int&gt;]</c>): <c>T.Item</c> is <c>int</c> wherever it stands.</summary>
+    /// <summary>Whether an associated type stands anywhere in the type.</summary>
+    private static bool MentionsAssoc(LyrType type) => type switch
+    {
+        AssocOf => true,
+        Optional o => MentionsAssoc(o.Inner),
+        ArrayOf ar => MentionsAssoc(ar.Element),
+        SliceOf s => MentionsAssoc(s.Element),
+        InlineArrayOf ia => MentionsAssoc(ia.Element),
+        TupleOf tu => tu.Elements.Any(MentionsAssoc),
+        FnType f => f.Parameters.Any(MentionsAssoc) || MentionsAssoc(f.Return),
+        GenericInstance g => g.Arguments.Any(MentionsAssoc),
+        _ => false,
+    };
+
+    /// <summary>The type with every associated type of a type parameter replaced where one of the
+    /// parameter's constraints fixes it (05 §8 rule 5): under <c>I :: [Iterator&lt;Item = T&gt;]</c> an
+    /// <c>I.Item[]</c> is a <c>T[]</c>, as a member called through the constraint already reads it.</summary>
+    private LyrType ReduceFixed(LyrType type)
+    {
+        LyrType Fix(LyrType t) => t switch
+        {
+            AssocOf { Base: TypeParamType tp } a when FixedAnswer(tp.Param, a.Member) is { } answer => answer,
+            Optional o => new Optional(Fix(o.Inner)),
+            ArrayOf ar => new ArrayOf(Fix(ar.Element)),
+            SliceOf s => new SliceOf(Fix(s.Element)),
+            InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
+            TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws, Places = f.Places },
+            GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations, Throws = g.Throws },
+            _ => t,
+        };
+        return Fix(type);
+    }
+
+    /// <summary>What a constraint of <paramref name="gp"/> fixes <paramref name="member"/> to, or
+    /// <c>null</c>.</summary>
+    private LyrType? FixedAnswer(GenericParamSymbol gp, AssociatedTypeSymbol member)
+    {
+        foreach (var constraint in gp.Constraints)
+            if (constraint is NamedType nt)
+                foreach (var (fixedMember, answer) in FixationsOf(nt, gp))
+                    if (ReferenceEquals(fixedMember, member)) return answer;
+        return null;
+    }
+
     private static LyrType ApplyFixations(LyrType type, GenericParamSymbol gp,
         (AssociatedTypeSymbol Member, LyrType Type)[] fixations)
     {
@@ -7922,6 +7967,10 @@ public sealed class TypeChecker
     private bool Satisfies(LyrType arg, TypeSymbol iface, LyrType wanted)
     {
         StackGuard.Check("checking a constraint");
+        // An associated type a constraint fixes is its answer in the instance asked for too (05 §8
+        // rule 5): 'FromIterator<I.Item>' under 'I :: [Iterator<Item = T>]' is 'FromIterator<T>'.
+        if (MentionsAssoc(wanted) && ReduceFixed(wanted) is var reduced && !LyrType.Equal(reduced, wanted))
+            wanted = reduced;
         return SatisfiesOnce(arg, iface, wanted);
     }
 
@@ -11292,6 +11341,13 @@ public sealed class TypeChecker
         if (from.IsError || to.IsError) return true;      // poison: no follow-up errors
         if (from is NeverType) return true;               // the bottom type: panic(...) fits anywhere
         if (LyrType.Equal(from, to)) return true;
+        // An associated type a constraint fixes is its answer inside any type (05 §8 rule 5).
+        if (MentionsAssoc(from) || MentionsAssoc(to))
+        {
+            var (fixedFrom, fixedTo) = (ReduceFixed(from), ReduceFixed(to));
+            if (!LyrType.Equal(fixedFrom, from) || !LyrType.Equal(fixedTo, to))
+                return IsAssignable(expr, fixedFrom, fixedTo, coercionSite);
+        }
         if (to is Optional inner)                          // T to ?T, widening
             return from is NullType || IsAssignable(expr, from, inner.Inner, coercionSite);
         if (from is NullType) return false;
