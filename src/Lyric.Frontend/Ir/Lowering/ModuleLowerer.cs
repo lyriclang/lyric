@@ -590,6 +590,11 @@ public static class ModuleLowerer
         // for this reason.
         if (verifies) Timed(timings, () => IrVerifier.VerifyOrThrow(result, "after the lowering"));
 
+        // 01 B13: a module binding nothing reads, whose initializer only gives its value, goes —
+        // here, while the init function is as the lowering wrote it, so its ranges hold. A program's
+        // only: a library keeps what it declares.
+        var prunedGlobals = entry is not null && GlobalPruning.Run(result, globals.InitRanges);
+
         // Inlining BEFORE the pruning: a body spliced into its last caller leaves a function
         // nobody calls, and the pruning that follows deletes it in the same run. Scalar
         // replacement BEHIND the inliner, because a returned value escapes its own function but
@@ -630,7 +635,7 @@ public static class ModuleLowerer
         // none of them enabled the module is what the first run already accepted, and a second pass
         // over it would buy nothing for 90% of the lowering time. That is why the debug profile —
         // which optimizes nothing — still verifies exactly once.
-        if (verifies && enabled != IrPasses.None)
+        if (verifies && (enabled != IrPasses.None || prunedGlobals))
             Timed(timings, () => IrVerifier.VerifyOrThrow(result, "after the optimizations"));
 
         return result;

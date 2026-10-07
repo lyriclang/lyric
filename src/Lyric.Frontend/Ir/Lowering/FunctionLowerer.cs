@@ -5123,8 +5123,14 @@ internal sealed class FunctionLowerer
     private void LowerGlobalInit(GlobalInitStmt stmt)
     {
         var (id, type) = _globals.Resolve(stmt.Symbol, stmt.Span);
+        var block = _b.CurrentId;
+        var start = _b.CurrentCount;
         var value = LowerExprAs(stmt.Binding.Initializer!, type);
         _b.Emit(new StoreGlobal(id, value, stmt.Span));
+        // An initializer that only gives its value is straight code: its range in this block is what
+        // GlobalPruning removes where nothing reads the global (01 B13).
+        if (_globals.IsEffectFree(stmt.Symbol) && _b.CurrentId == block)
+            _globals.NoteInit(id, block, start, _b.CurrentCount);
     }
 
     private GlobalSymbol? GlobalOf(IdentifierExpr expr)

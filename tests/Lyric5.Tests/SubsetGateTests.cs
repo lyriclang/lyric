@@ -9,7 +9,8 @@ namespace Lyric5.Tests;
 /// what it refuses with the milestone that brings it. Programs compile against <c>stdlib5/</c>,
 /// the seed of the Lyric 5 standard library, never against the 4.x <c>stdlib/</c> — the copy
 /// beside the tests, which carries the test-only <c>std.notyet</c>: since M6 S2d the gate takes
-/// every instruction, and a native without an intrinsic is the refusal left to show (M8a).
+/// every instruction, and a native without an intrinsic is the refusal left to show — one no
+/// milestone lifts, since a program reaches C through <c>extern "C"</c>.
 /// </summary>
 public class SubsetGateTests
 {
@@ -63,7 +64,7 @@ public class SubsetGateTests
     // element without 'Clone' (LYR-SEM0136) and desugars the rest, so no such instruction
     // reaches the gate — OptionalEqualityAndRepeatTests pins it.
     [Theory]
-    [InlineData("import std.notyet { tick };\nfn main(): int { return tick(); }", "the native function 'std.notyet.tick'", "M8a")]
+    [InlineData("import std.notyet { tick };\nfn main(): int { return tick(); }", "the native function 'std.notyet.tick'", "no milestone: a function without a body is the standard library's — a program reaches C through 'extern \"C\"'")]
     public void A_construct_outside_the_core_names_its_milestone(string source, string what, string milestone)
     {
         var refusals = Refusals(source);

@@ -192,6 +192,63 @@ internal sealed class GlobalTable
     public (Expr Literal, IrType Type)? ConstantOf(GlobalSymbol symbol) =>
         _constants.TryGetValue(symbol, out var constant) ? constant : null;
 
+    private readonly HashSet<GlobalSymbol> _effectFree = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<int, (int Block, int Start, int End)> _initRanges = new();
+
+    /// <summary>Whether a global's initializer does nothing a program could see but give its value
+    /// (01 B13): such a global goes where nothing reads it (<see cref="GlobalPruning"/>).</summary>
+    public bool IsEffectFree(GlobalSymbol symbol) => _effectFree.Contains(symbol);
+
+    /// <summary>Where the init function computes and stores an effect-free global: its block and the
+    /// range of its instructions, the store included.</summary>
+    public void NoteInit(GlobalId id, BlockId block, int start, int end) =>
+        _initRanges[id.Value] = (block.Value, start, end);
+
+    /// <summary>The effect-free globals' ranges in the init function, by slot.</summary>
+    public IReadOnlyDictionary<int, (int Block, int Start, int End)> InitRanges => _initRanges;
+
+    /// <summary>
+    /// An initializer that only gives its value (01 B13): a literal, <c>null</c>, another global
+    /// read, or an array, a tuple, a struct or a class built of such — the type's field defaults
+    /// included. Nothing that calls or computes: an operator may panic, a call may do anything.
+    /// </summary>
+    private static bool EffectFree(Expr? e, TypeResult types, int depth)
+    {
+        if (depth > 8) return false;
+        switch (e)
+        {
+            case IntLiteralExpr or FloatLiteralExpr or BoolLiteralExpr or CharLiteralExpr or StringLiteralExpr
+                or NullLiteralExpr:
+                return true;
+            case UnaryExpr { Operator: UnaryOp.Neg, Operand: IntLiteralExpr or FloatLiteralExpr }:
+                return true;
+            case IdentifierExpr id:
+                var bound = types.RefOf(id);
+                if (bound is ImportBindingSymbol import) bound = import.Target;
+                return bound is GlobalSymbol;
+            case ArrayLitExpr array:
+                return array.Elements.All(x => EffectFree(x, types, depth + 1));
+            case TupleLitExpr tuple:
+                return tuple.Elements.All(x => EffectFree(x, types, depth + 1));
+            case StructInitExpr init:
+                if (!init.Fields.All(f => EffectFree(f.Value, types, depth + 1))) return false;
+                var members = TypeFacts.SymbolOf(types.TypeOf(init))?.Declaration switch
+                {
+                    StructDecl s => s.Members,
+                    ClassDecl c => c.Members,
+                    _ => null,
+                };
+                if (members is null) return false;
+                foreach (var field in members.OfType<FieldDecl>())
+                    if (field.Default is { } written && !Array.Exists(init.Fields, f => f.Name == field.Name)
+                        && !EffectFree(written, types, depth + 1))
+                        return false;
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private static bool IsLiteral(Expr? initializer) => initializer switch
     {
         IntLiteralExpr or FloatLiteralExpr or BoolLiteralExpr or CharLiteralExpr or StringLiteralExpr => true,
@@ -217,6 +274,7 @@ internal sealed class GlobalTable
         _assigned[symbol] = new GlobalId(_defs.Count);
         _defs.Add(new IrGlobal(name, type) { Module = module.FullName });
         _pending.Add((symbol, binding, module));
+        if (EffectFree(binding.Initializer, types, 0)) _effectFree.Add(symbol);
     }
 
     /// <summary>

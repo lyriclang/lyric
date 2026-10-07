@@ -56,7 +56,7 @@ internal static class ScalarReplacement
     /// <summary>Rebuilds the temp table from the definitions that remain and renumbers every
     /// reference, so the two invariants the verifier checks — density, defined exactly once —
     /// survive the deletions above.</summary>
-    private static void CompactTemps(IrFunction function)
+    internal static void CompactTemps(IrFunction function)
     {
         var map = new Dictionary<int, TempId>();
         var kept = new List<IrTemp>();

@@ -1,5 +1,5 @@
 // A program the front end accepts and the subset gate refuses: a native the C emitter has no
-// intrinsic for — std.notyet is a test-only module beside the shipped stdlib5 (M8a).
+// intrinsic for — std.notyet is a test-only module beside the shipped stdlib5.
 import std.notyet { tick };
 
 fn main(): int {

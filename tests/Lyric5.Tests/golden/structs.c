@@ -15,11 +15,6 @@ struct lyr_ty_app_main_Segment {
     lyr_ty_app_main_Point f_b;
 };
 
-/* module-level bindings */
-uint64_t lyr_g_std_collections_emptyGroup = 0;
-uint64_t lyr_g_std_collections_lowBits = 0;
-uint64_t lyr_g_std_collections_highBits = 0;
-
 /* prototypes */
 lyr_ty_app_main_Point lyr_app_main_shift(lyr_ty_app_main_Point l0_p, int64_t l1_dx);
 LYR_NOINLINE int64_t lyr_app_main_main(void);
@@ -198,24 +193,8 @@ bb2:;
     return t27;
 }
 
-#line 254 "stdlib5/std/collections.lyr"
 void lyr__globals__9ee5f9b5(void) {
-    uint64_t t0 = 0;
-    uint64_t t1 = 0;
-    uint64_t t2 = 0;
 bb0:;
-#line 254
-    t0 = (uint64_t)UINT64_C(9259542123273814144);
-#line 254
-    lyr_g_std_collections_emptyGroup = t0;
-#line 255
-    t1 = (uint64_t)UINT64_C(72340172838076673);
-#line 255
-    lyr_g_std_collections_lowBits = t1;
-#line 256
-    t2 = (uint64_t)UINT64_C(9259542123273814144);
-#line 256
-    lyr_g_std_collections_highBits = t2;
     return;
 }
 

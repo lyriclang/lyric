@@ -32,11 +32,6 @@ _Static_assert(sizeof(lyr_slice_u8) == 16, "layout of lyr_slice_u8");
 _Static_assert(sizeof(uint8_t) == 1, "layout of u8[]");
 const LyrDesc lyr_desc_arr_u8 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(uint8_t), 0, NULL, "u8[]", NULL };
 
-/* module-level bindings */
-uint64_t lyr_g_std_collections_emptyGroup = 0;
-uint64_t lyr_g_std_collections_lowBits = 0;
-uint64_t lyr_g_std_collections_highBits = 0;
-
 /* string literals */
 static const LyrStaticStr(6) lyr_lit0 = LYR_STR_INIT("self ");
 static const LyrStaticStr(2) lyr_lit1 = LYR_STR_INIT(" ");
@@ -1123,24 +1118,8 @@ bb8:;
     return;
 }
 
-#line 254 "stdlib5/std/collections.lyr"
 void lyr__globals__9ee5f9b5(void) {
-    uint64_t t0 = 0;
-    uint64_t t1 = 0;
-    uint64_t t2 = 0;
 bb0:;
-#line 254
-    t0 = (uint64_t)UINT64_C(9259542123273814144);
-#line 254
-    lyr_g_std_collections_emptyGroup = t0;
-#line 255
-    t1 = (uint64_t)UINT64_C(72340172838076673);
-#line 255
-    lyr_g_std_collections_lowBits = t1;
-#line 256
-    t2 = (uint64_t)UINT64_C(9259542123273814144);
-#line 256
-    lyr_g_std_collections_highBits = t2;
     return;
 }
 

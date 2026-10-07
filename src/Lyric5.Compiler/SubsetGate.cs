@@ -115,7 +115,7 @@ public static class SubsetGate
                     Refuse(span, $"host types, {where}", "M14");
                     break;
                 default:
-                    Refuse(span, $"the type {type}, {where}", "M3");
+                    Refuse(span, $"the type {type}, {where}", "no milestone: a compiler bug");
                     break;
             }
         }
@@ -141,7 +141,10 @@ public static class SubsetGate
                 case CallImport i:
                     if (!Intrinsics.Contains(module.Imports[i.Target.Value].Name)
                         && !Compiler.Intrinsics.IsForeign(module.Imports[i.Target.Value].Name))
-                        Refuse(op.Span, $"the native function '{module.Imports[i.Target.Value].Name}'", "M8a");
+                        // M8a was named here, as if it would bring a program's own natives; nothing
+                        // does — a program declares 'extern "C"' (N1b)
+                        Refuse(op.Span, $"the native function '{module.Imports[i.Target.Value].Name}'",
+                            "no milestone: a function without a body is the standard library's — a program reaches C through 'extern \"C\"'");
                     break;
                 case NewObject n:
                     Type(n.Result, op.Span, "the object");

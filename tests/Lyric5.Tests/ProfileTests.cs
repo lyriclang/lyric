@@ -110,6 +110,26 @@ public class ProfileTests
         Assert.DoesNotContain("LYR_CHECKED_ADD", output);
     }
 
+    /// <summary>11 M7-12: without overflow checks the arithmetic wraps, and division, remainder and
+    /// shifts stay checked — a zero divisor, a count past the width (the audit of 2026-10-07 found
+    /// that half without a test).</summary>
+    [Theory]
+    [InlineData("7 / zero", "LYR-RT0001")]
+    [InlineData("7 % zero", "LYR-RT0001")]
+    [InlineData("1 << (zero + 64)", "LYR-RT0002")]
+    public void Without_overflow_checks_division_and_shifts_stay_checked(string expression, string code)
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr",
+            $"import std.io {{ println }};\n\nfn main(): void {{\n    var zero = 0;\n    zero = zero * 1;\n    println(f\"{{{expression}}}\");\n}}\n"));
+        var (exit, _, error) = Run("build", "-C", dir, "--no-overflow-checks");
+        Assert.True(exit == 0, error);
+        var host = Lyric5.Toolchain.Target.Host;
+        var ran = Lyric5.Toolchain.ProcessRunner.Run(
+            Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix), [], TimeSpan.FromMinutes(1));
+        Assert.True(ran.ExitCode == 101, $"exit {ran.ExitCode}\nstderr:\n{ran.Stderr}");
+        Assert.Contains(code, ran.Stderr);
+    }
+
     /// <summary>A profile that denies warnings fails a build that warns: the warnings stay
     /// warnings, one error says why.</summary>
     [Fact]
