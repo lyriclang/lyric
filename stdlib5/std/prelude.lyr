@@ -32,6 +32,7 @@ pub import std.core {
     Float,
     Iterator,
     Iterable,
+    FromIterator,
     Index,
     IndexSet,
     Test,

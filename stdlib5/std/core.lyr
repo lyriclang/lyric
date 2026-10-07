@@ -3726,15 +3726,9 @@ extend<I :: [Iterator]> I {
         }
     }
 
-    /// The values in an array, in order.
+    /// The values in an array, in order — the array's own `fromIter`, in one pass.
     pub fn toArray(): I.Item[] throws I.Error {
-        var it = this;
-        var out: I.Item[] = [];
-        var x = try it.next();
-        while (x != null) {
-            out = out + [x];
-            x = try it.next();
-        }
+        let out: I.Item[] = try this.collect();
         return out;
     }
 }
@@ -4221,4 +4215,49 @@ fn debugText<T :: [Debug]>(xs: Slice<T>): string {
     var out = StringBuilder.new();
     debugElements(xs, &out);
     return out.toString();
+}
+
+// --- collecting (10 B6, I4; M8a S15) -------------------------------------------------------------
+// `collect()` builds what the expected type is, through its `FromIterator`: `let xs: List<int> =
+// it.collect();`. An array is one; the containers of std.collections are the others.
+
+/// A type built from an iterator's values (10 B6): `collect()` calls `fromIter`, the type's own.
+pub interface FromIterator<T> {
+    static fn fromIter<I :: [Iterator<Item = T>]>(it: I): Self throws I.Error;
+}
+
+extend<T> T[] :: [FromIterator<T>] {
+    /// The values in an array, in order: a buffer that doubles, its first value for the slots
+    /// not yet written, then one copy of the length — one pass.
+    static fn fromIter<I :: [Iterator<Item = T>]>(it: I): T[] throws I.Error {
+        var walk = it;
+        let first = try walk.next();
+        if (first == null) {
+            return [];
+        }
+        var buffer = arrayOf(8, (i: int) => first);
+        var count = 1;
+        var x = try walk.next();
+        while (x != null) {
+            if (count == buffer.length()) {
+                let grown = arrayOf(count * 2, (i: int) => first);
+                buffer[..count].copyInto(grown[..]);
+                buffer = grown;
+            }
+            buffer[count] = x;
+            count = count + 1;
+            x = try walk.next();
+        }
+        let out = arrayOf(count, (i: int) => first);
+        buffer[..count].copyInto(out[..]);
+        return out;
+    }
+}
+
+extend<I :: [Iterator]> I {
+    /// The values in a value of the expected type, built through its `FromIterator` (10 I4):
+    /// `let names: Set<string> = words.iter().collect();`.
+    pub fn collect<C :: [FromIterator<I.Item>]>(): C throws I.Error {
+        return try C.fromIter(this);
+    }
 }

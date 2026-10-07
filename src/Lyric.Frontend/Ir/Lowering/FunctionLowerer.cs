@@ -5919,6 +5919,49 @@ internal sealed class FunctionLowerer
         return result;
     }
 
+    /// <summary>The static of the name that a generic block or a block on a built-in constructor
+    /// gives <paramref name="concrete"/>: the block whose target matches it, its parameters bound
+    /// by the match.</summary>
+    private (FunctionSymbol Method, ExtensionBlock Block, Dictionary<GenericParamSymbol, LyrType> Map)? BlockStatic(
+        LyrType concrete, string name)
+    {
+        if (_typeTable.Compilation is not { } compilation) return null;
+        foreach (var block in compilation.Extensions.Blocks)
+        {
+            if (block.Generics.Length == 0 && !block.IsConstructorTarget) continue;
+            if (block.MethodScope.LookupLocal(name) is not FunctionSymbol { IsStatic: true } method) continue;
+            var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+            if (block.TargetType is { } pattern && TypeFacts.Match(pattern, concrete, map)) return (method, block, map);
+        }
+        return null;
+    }
+
+    /// <summary>A block's static on the type a constraint's parameter stands for: an instance of its
+    /// own under the block's parameters, bound by the type, and the method's, bound by the call —
+    /// as a block member's call through a receiver is (<see cref="LowerBlockMethodCall"/>), with no
+    /// receiver.</summary>
+    private TempId? LowerBlockStaticCall(MemberExpr member, FunctionSymbol method, ExtensionBlock block,
+        Dictionary<GenericParamSymbol, LyrType> map, LyrType concrete, CallExpr expr)
+    {
+        if (method.Declaration is not FunctionDecl decl || decl.Body is null)
+            throw NotSupported($"the static '{member.Member}' of the block on '{TypeFacts.Display(concrete)}' has no body", expr.Span);
+        var own = method.Generics.Length > 0 ? SubstitutedTypeArguments(expr) : [];
+        for (var i = 0; i < method.Generics.Length && i < own.Length; i++) map[method.Generics[i]] = own[i];
+        var target = _instances.RequestExtension(method, decl, block, map, concrete, expr.Span, own);
+        var byName = map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal);
+        var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span, byName);
+        var resultType = TypeOfExpr(expr);
+        if (IsVoid(resultType))
+        {
+            _b.Emit(new Call(null, target, passed, expr.Span));
+            return null;
+        }
+        var result = _slots.NewTemp(resultType);
+        _b.Emit(new Call(result, target, passed, expr.Span));
+        _fresh.Add(result);
+        return result;
+    }
+
     /// <summary>The static member the constraint promised, on the type the parameter stands for:
     /// the type's own, or a static of a visible extend block — a builtin's through its symbol. Of
     /// several of the name (08 §1.2: `parse(s)` beside `parse(s, radix)`) the one the conformance
@@ -5933,6 +5976,11 @@ internal sealed class FunctionLowerer
         var function = chosen
                        ?? owner?.Members.LookupLocal(member.Member) as FunctionSymbol
                        ?? (owner is null ? null : _typeTable.ExtensionMethod(owner, member.Member));
+        // A static a generic block or a shape's block gives (05 §13 rules 3, 6; M8a S15:
+        // 'C.fromIter(it)' with 'C = List<int>' or 'int[]'): the block matched against the type.
+        if ((function is null || _typeTable.BlockOf(function) is { } found && (found.Generics.Length > 0 || found.IsConstructorTarget))
+            && BlockStatic(concrete, member.Member) is { } fromBlock)
+            return LowerBlockStaticCall(member, fromBlock.Method, fromBlock.Block, fromBlock.Map, concrete, expr);
         if (function is not { IsStatic: true, Declaration: FunctionDecl declaration })
             throw NotSupported($"the static '{member.Member}' of '{TypeFacts.Display(concrete)}' through a constraint", expr.Span);
 

@@ -1049,7 +1049,18 @@ internal sealed class TypeTable
             // instance ('Box<T>' in 'Pair<T>').
             if (named.TypeArguments.Length > 0 && bound is TypeSymbol generic)
             {
-                var arguments = named.TypeArguments.Select(a => Resolve(a, span)).ToArray();
+                var arguments = named.TypeArguments.Select(a => Resolve(a, span)).ToList();
+                // A default the use leaves out (03 §9.1 rule 5): 'Set<T>' is 'Set<T, DefaultHasher>',
+                // the default read under the parameters before it, as the sema fills it.
+                for (var i = arguments.Count; i < generic.Generics.Length; i++)
+                {
+                    if (generic.Generics[i].Declaration is not GenericParam { Default: { } fallback }) break;
+                    var earlier = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+                    for (var j = 0; j < i; j++) earlier[generic.Generics[j].Name] = arguments[j];
+                    _substitutions.Push(earlier);
+                    try { arguments.Add(Resolve(fallback, span)); }
+                    finally { _substitutions.Pop(); }
+                }
                 var id = Intern(generic, arguments);
                 return generic.Kind switch
                 {
