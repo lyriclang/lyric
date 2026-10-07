@@ -87,10 +87,12 @@ promise. This entry fills with the milestones.
   `zip`, `chain`, …) and terminators, `collect()` into whatever the position expects through
   `FromIterator`; arrays' and views' members, stable `sort` and `sortUnstable`; `Hasher` with
   SipHash-1-3, `Hashable`; `List`, `Map` (a Swiss table), `Set`, `Deque`, `Heap` (the least first),
-  each with `withCapacity`, compared with `==` and printed by `{xs}` — a set and a map in any
-  order —, and `x in xs`/`x !in xs` through `Contains<T>` on ranges, arrays, containers and text;
-  `StringView` and `Pattern` (`char`, `string`, a view, a predicate) for search, split, replace and
-  trim, `string.fromUtf8`; `StringBuilder`, f-strings writing into one builder, `Display.showTo`;
+  each with `withCapacity`; all but the heap compared with `==` and printed by `{xs}` — a set and a
+  map in any order —, the heap printed by `{h:?}`; `x in xs`/`x !in xs` through `Contains<T>` on
+  ranges, arrays and containers, and on text by the operator alone (its `Contains<char>` comes with
+  M8c); `StringView` and `Pattern` (`char`, `string`, a view, a predicate) for search, split and
+  replace, `trim` for whitespace, `string.fromUtf8`; `StringBuilder`, f-strings writing into one
+  builder, `Display.showTo`;
   the format language (`{x:>8}`, `{n:#x}`, `{f:.2f}`, `{v:?}`), checked where a spec is written.
   Of the review of 2026-10-05 besides: the depth limit, `lyric.lock` with `--locked`,
   `lyric update` raising a tag's line, the IR optimizer in the release profile, `lto` on every

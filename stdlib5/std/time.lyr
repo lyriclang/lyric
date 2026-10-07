@@ -1,5 +1,5 @@
 /// Time (design/v5/spec/10 Q1). M6 seed: `Duration`, which `std.task`'s `sleep` takes; `Instant`,
-/// `Monotonic`, the calendar and the formats come with M8b.
+/// `Monotonic`, the calendar and the formats come with M8b S5, the time zones with M10.
 
 
 /// A span of time in whole nanoseconds, negative or not (10 Q1, N3). A constructor whose span does

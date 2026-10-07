@@ -2,8 +2,8 @@ namespace Lyric5.Compiler;
 
 /// <summary>
 /// The natively backed functions of <c>stdlib5/</c> and the runtime call each becomes (M2 S3).
-/// A provisional table with a date: M8a rewrites <c>std</c> in Lyric, source-first, and what the
-/// runtime keeps in C (01 L9) is reached through the C ABI from then on.
+/// A provisional table with a date: M8a wrote <c>std</c> in Lyric, source-first, and what the
+/// runtime keeps in C (01 L9) is reached through <c>extern "C"</c> from M14 on (M8b P1).
 /// </summary>
 public static class Intrinsics
 {

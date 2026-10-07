@@ -4,9 +4,9 @@ name: Docs
 
 # Publishes one version of the documentation site.
 #
-# A release tag publishes a frozen '/vX.Y.Z/'; a finished nightly replaces '/nightly/'. The two
-# never collide, because a build only ever writes its own version directory and merges the version
-# index rather than replacing it.
+# A release tag publishes a frozen '/vX.Y.Z/'; a dispatched run replaces '/nightly/'. The two never
+# collide, because a build only ever writes its own version directory and merges the version index
+# rather than replacing it.
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
@@ -24,9 +24,6 @@ concurrency:
 jobs:
   verify:
     name: Verify (${{ matrix.os }})
-    # A nightly that failed already says the state is broken; documenting it would publish pages
-    # describing a build that does not work.
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true
@@ -83,7 +80,7 @@ jobs:
             find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           fi
 
-      # A tag names its own version and is a release; everything else is the nightly.
+      # A tag names its own version and is a release; a dispatch publishes the nightly.
       - name: Decide what is being published
         id: target
         run: |

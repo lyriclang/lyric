@@ -781,7 +781,7 @@ internal sealed class TypeTable
             if (member.IsPrivateHelper) continue;
             // A member typed by an ASSOCIATED type (03 T6), 'fn first(): Self.Item', has one C
             // signature per conformer: no slot can hold it. It is reached through a constraint
-            // only (04 D9); the value form comes with M8a.
+            // only (04 D9); the value form comes with M8c (03 M4-1).
             if (member.Parameters.Any(p => MentionsAssociated(p.Type))
                 || (member.ReturnType is { } returns && MentionsAssociated(returns))) continue;
             if (!slots.Contains(member.Name))

@@ -30,7 +30,7 @@ namespace Lyric5.Compiler;
 /// </summary>
 public sealed class CEmitter
 {
-    /// <summary>What the gate lets through but this emitter cannot translate yet, within M2: the
+    /// <summary>What the gate lets through but this emitter cannot translate yet: the
     /// driver reports it like a gate refusal (<see cref="SubsetGate.NotYet"/>).</summary>
     public sealed class NotYetException(string what, string milestone)
         : Exception($"not yet in Lyric 5: {what} ({milestone})")
