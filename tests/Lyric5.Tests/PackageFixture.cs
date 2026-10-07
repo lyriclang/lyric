@@ -1,30 +1,60 @@
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The test run's temporary directories, removed when the test process ends. Left behind, one per
-/// test, they filled a tmpfs <c>/tmp</c> within a day, and a build then failed for want of space.
+/// The test run's temporary directories: all under one root of this process, removed when the
+/// process ends. Left behind, one per test, they filled a tmpfs <c>/tmp</c> within a day, and a
+/// build then failed for want of space.
 /// </summary>
+/// <remarks>
+/// A test process that is killed — a timeout does that — runs no exit handler. So a process also
+/// removes, when it starts, the roots that are older than <see cref="DeadAfter"/>: nothing that
+/// still runs is that old.
+/// </remarks>
 internal static class TestDirectories
 {
-    private static readonly System.Collections.Concurrent.ConcurrentBag<string> Made = new();
+    /// <summary>The roots of every test process, under the system's temporary directory.</summary>
+    private static readonly string Roots = Path.Combine(Path.GetTempPath(), "lyric5-tests");
 
-    static TestDirectories() => AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+    private static readonly TimeSpan DeadAfter = TimeSpan.FromDays(1);
+
+    private static readonly string Root = Path.Combine(Roots, Guid.NewGuid().ToString("N")[..8]);
+
+    static TestDirectories()
     {
-        foreach (var dir in Made)
-        {
-            try { Directory.Delete(dir, recursive: true); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
-        }
-    };
+        RemoveOlder(Roots, DateTime.UtcNow - DeadAfter);
+        Directory.CreateDirectory(Root);
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => Remove(Root);
+    }
 
-    /// <summary>A new directory under the system's temporary one, named with the prefix.</summary>
+    /// <summary>A new directory under this process's root, named with the prefix.</summary>
     public static string Fresh(string prefix)
     {
-        var dir = Path.Combine(Path.GetTempPath(), prefix + Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(Root, prefix + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
-        Made.Add(dir);
         return dir;
+    }
+
+    /// <summary>Removes the directories directly under <paramref name="parent"/> that were last
+    /// written before <paramref name="limit"/>; how many went.</summary>
+    internal static int RemoveOlder(string parent, DateTime limit)
+    {
+        if (!Directory.Exists(parent)) return 0;
+        var removed = 0;
+        try
+        {
+            foreach (var dir in Directory.EnumerateDirectories(parent))
+                if (Directory.GetLastWriteTimeUtc(dir) < limit && Remove(dir)) removed++;
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        return removed;
+    }
+
+    private static bool Remove(string dir)
+    {
+        try { Directory.Delete(dir, recursive: true); return true; }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
     }
 }
 

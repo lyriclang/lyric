@@ -16,6 +16,52 @@ public class RuntimeBuildTests
     /// <summary>Stable across runs, so the collector is compiled once per machine, not per test run.</summary>
     private static readonly string Cache = Path.Combine(Path.GetTempPath(), "lyric5-test-cache");
 
+    /// <summary>How long a file of the cache may go unused before a test run removes it.</summary>
+    private static readonly TimeSpan CacheAge = TimeSpan.FromDays(7);
+
+    /// <summary>
+    /// The cache had no eviction: every program a test ever emitted stayed, for every version of
+    /// the compiler — 2.6 GB on a tmpfs after some weeks, and a link then failed for want of space.
+    /// Once per test process, before anything is built, the files nobody has read or written for
+    /// <see cref="CacheAge"/> go, and the directories that emptied.
+    /// </summary>
+    static RuntimeBuildTests() => PruneCache(Cache, DateTime.UtcNow - CacheAge);
+
+    /// <summary>Removes the files under <paramref name="cache"/> last read and last written before
+    /// <paramref name="limit"/>, then the directories left empty; how many files went. A file that
+    /// is in use, or gone already, is passed over: what a build needs again it builds again.</summary>
+    internal static int PruneCache(string cache, DateTime limit)
+    {
+        if (!Directory.Exists(cache)) return 0;
+        var removed = 0;
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(cache, "*", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    var info = new FileInfo(file);
+                    var used = info.LastAccessTimeUtc > info.LastWriteTimeUtc ? info.LastAccessTimeUtc : info.LastWriteTimeUtc;
+                    if (used >= limit) continue;
+                    info.Delete();
+                    removed++;
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+            // The deepest first, so a directory that held only empty ones goes too.
+            foreach (var dir in Directory.EnumerateDirectories(cache, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length))
+            {
+                try { if (!Directory.EnumerateFileSystemEntries(dir).Any()) Directory.Delete(dir); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        return removed;
+    }
+
     private static CCompiler Zig() =>
         CCompiler.Locate(CCompilerKind.Zig)
         ?? throw new InvalidOperationException("zig is required to build the Lyric 5 runtime (tooling/zig-version names the version)");

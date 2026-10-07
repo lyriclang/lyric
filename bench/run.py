@@ -3,9 +3,10 @@
 (after M3); a Map, a sort and string work (after M8a) — Lyric against C, Go and C# on the same
 machine. Builds every twin, checks that all print the same checksum, times each as the minimum of
 several runs, prints a table, and with --ratchet fails when Lyric is slower than 3x C or 1.5x Go
-(the plan's bounds; point 3 has no C twin).
+(the plan's bounds; point 3 has no C twin). --bound X is the wide fence for a shared CI runner,
+whose timings are too noisy for the ratchet: it fails when Lyric is slower than X times Go.
 
-    python3 bench/run.py [--runs 5] [--lyric5 <exe>] [--ratchet]
+    python3 bench/run.py [--runs 5] [--lyric5 <exe>] [--ratchet] [--bound 3.0]
 
 C is built by the same compiler with the flags of Lyric's release profile (-O2, no contraction),
 Go by 'go build', C# by 'dotnet build -c Release' and run through the host (its JIT start is in
@@ -73,10 +74,14 @@ def main():
     ap.add_argument('--runs', type=int, default=5)
     ap.add_argument('--lyric5', default=str(ROOT / 'src' / 'Lyric5' / 'bin' / 'Release' / 'net10.0' / 'lyric5'))
     ap.add_argument('--ratchet', action='store_true', help='exit 1 when Lyric exceeds 3x C or 1.5x Go')
+    ap.add_argument('--bound', type=float, help='exit 1 when Lyric exceeds this many times Go (needs Go)')
     ap.add_argument('benches', nargs='*', help='the programs to measure (default: all)')
     args = ap.parse_args()
 
-    rows, bad = [], []
+    if args.bound is not None and not shutil.which('go'):
+        print('--bound compares with Go, and there is no go on the PATH', file=sys.stderr); return 2
+
+    rows, bad, beyond = [], [], []
     for name in args.benches or BENCHES:
         twins = {'Lyric': build_lyric(name, args.lyric5), 'C': build_c(name), 'Go': build_go(name), 'C#': build_cs(name)}
         times, outputs = {}, {}
@@ -88,6 +93,8 @@ def main():
         rows.append((name, outputs['Lyric'], times))
         if 'C' in times and times['Lyric'] > 3.0 * times['C']: bad.append(f'{name}: Lyric {times["Lyric"]:.3f} s > 3x C {times["C"]:.3f} s')
         if 'Go' in times and times['Lyric'] > 1.5 * times['Go']: bad.append(f'{name}: Lyric {times["Lyric"]:.3f} s > 1.5x Go {times["Go"]:.3f} s')
+        if args.bound is not None and times['Lyric'] > args.bound * times['Go']:
+            beyond.append(f'{name}: Lyric {times["Lyric"]:.3f} s > {args.bound:g}x Go {times["Go"]:.3f} s')
 
     langs = ['Lyric', 'C', 'Go', 'C#']
     print('| bench | checksum | ' + ' | '.join(langs) + ' | Lyric / C | Lyric / Go |')
@@ -101,6 +108,9 @@ def main():
     if bad:
         print('\nratchet ' + ('FAILED' if args.ratchet else 'exceeded (not enforced)') + ':\n  ' + '\n  '.join(bad))
         if args.ratchet: return 1
+    if beyond:
+        print(f'\nbound of {args.bound:g}x Go FAILED:\n  ' + '\n  '.join(beyond))
+        return 1
     return 0
 
 if __name__ == '__main__':

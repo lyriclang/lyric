@@ -27,7 +27,7 @@ public class MeasurementTests
 
     private static string Fresh()
     {
-        var dir = Directory.CreateTempSubdirectory("lyric5-measure").FullName;
+        var dir = TestDirectories.Fresh("lyric5-measure-");
         File.Copy(Path.Combine(Root, "tests", "Lyric5.Tests", "programs", "hello.lyr"), Path.Combine(dir, "hello.lyr"));
         return dir;
     }
@@ -85,7 +85,7 @@ public class MeasurementTests
     public void A_bench_program_runs_within_3x_of_its_C_twin(string name)
     {
         if (!OperatingSystem.IsLinux()) return;
-        var dir = Directory.CreateTempSubdirectory("lyric5-bench").FullName;
+        var dir = TestDirectories.Fresh("lyric5-bench-");
         var bench = Path.Combine(Root, "bench", name);
         File.Copy(Path.Combine(bench, name + ".lyr"), Path.Combine(dir, name + ".lyr"));
         Assert.Equal(0, Quiet("build", Path.Combine(dir, name + ".lyr"), "--profile", "release"));

@@ -902,7 +902,13 @@ internal sealed class TypeTable
     private static IrType ValueOf(IrType lowered) =>
         lowered is IrScalarType { Kind: IrScalar.Void } ? Unit : lowered;
 
-    public IrType Lower(LyrType type, Core.Span span) => type switch
+    public IrType Lower(LyrType type, Core.Span span)
+    {
+        Core.StackGuard.Check("lowering a type");
+        return LowerOnce(type, span);
+    }
+
+    private IrType LowerOnce(LyrType type, Core.Span span) => type switch
     {
         // Host type BEFORE the ordinary class: an empty class in a native module is a reference to a host
         // object rather than to a module layout. 'HostTypes' answers the question for both places where
@@ -960,12 +966,35 @@ internal sealed class TypeTable
 
         // 'T.Item' with T known is the conformer's answer (03 T6); with T open it is the
         // same gap as the parameter itself.
-        AssocOf { Base: not (TypeParamType or AssocOf) } a => Lower(TypeChecker.ResolveAssociated(a.Base, a.Member), span),
+        AssocOf { Base: not (TypeParamType or AssocOf) } a => LowerAnswer(a, span),
         AssocOf a => throw new UnsupportedConstructException(
             $"associated type '{TypeFacts.Display(a)}' reached lowering unsubstituted", span),
 
         _ => TypeLowering.Lower(type)
     };
+
+    /// <summary>
+    /// <c>T.Item</c> at a known <c>T</c>: the type the conformer answers with.
+    /// </summary>
+    /// <remarks>
+    /// A type WITHOUT an answer gets its own question back, and asking again changes nothing. This
+    /// place once asked again all the same: the compiler ended in a stack overflow (exit 134)
+    /// without a word about the program. The type checker refuses every conformer that leaves an
+    /// associated type open (<c>LYR-SEM0128</c>), so no program gets here — a change to the
+    /// compiler that loses an answer does, and then this is the message it gets.
+    /// </remarks>
+    private IrType LowerAnswer(AssocOf open, Core.Span span)
+    {
+        var answer = TypeChecker.ResolveAssociated(open.Base, open.Member);
+        if (answer is AssocOf { Base: not (TypeParamType or AssocOf) })
+        {
+            var asked = open.Member.Owner is { } owner ? $"{owner.Name}.{open.Member.Name}" : open.Member.Name;
+            throw new UnsupportedConstructException(
+                $"'{TypeFacts.Display(open.Base)}' answers no '{asked}'", span,
+                "the type checker lets no type through that leaves an associated type open (LYR-SEM0128), and this one came through: a bug in the compiler, please report it");
+        }
+        return Lower(answer, span);
+    }
 
     /// <summary>'?T' around whatever <c>T</c> is — an optional included: '??T' is a type since
     /// Lyric 5 (design/v5/spec/03 T4 O1), and a generic '?T' at 'T = ?int' is exactly that.</summary>
