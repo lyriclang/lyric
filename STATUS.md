@@ -562,7 +562,17 @@ M8a and decided them: 110 decisions, written into the area documents, each in a 
   a call's receiver evaluated before its arguments (S15b).
 - **Measurement point 3 again (S16):** maps 1.36×, sorting 1.21×, strings 1.70× Go
   (S10c: 1.90, 1.53, 2.53), ahead of C# in all three; maps and sorting within the bound, strings
-  over it. The numbers and what moved them are in `bench/README.md`.
+  over it — on the CI runner 0.99×, 1.09× and 1.80×. The numbers and what moved them are in
+  `bench/README.md`.
+- **The open points, decided (2026-10-07):** what the run R0–S16 collected, gone through with the
+  maintainer — in the design documents 01, 03, 04, 10 and 11, each in a section "Review
+  2026-10-07", with their clocks (M8c, M12, M10/M11). Built at once: release traces stated as best
+  effort (spec 13 §1.4), CI's platform jobs and benchmarks on `main` only, `strings` under the
+  common fence; `arrayOf` filling in one allocation, the `spawn` test waiting instead of sleeping.
+- **Found at the close (S16):** no map over objects compiled since R9d — its table filled by
+  `[empty] * n`, which a generic body passed and every instance over an object refused as a
+  compiler bug (`LYR-CG0001`); no test held one. Now a generic `[x] * n` asks for `Clone` (03 §5.1),
+  and the containers fill through std's own `filled`, shared, one allocation.
 - **Not built, and M8c's** (after M8b): the Unicode tables, `char`'s predicates, `toUpper` and
   `toLower`; `mapNotNull`, `flatMap`, `flatten`, `chunks`, `windows`, `dedup`, `scan`,
   `peekable`, `rev`, `cycle`, and lambdas that throw inside adapters; `toMap`/`sorted` and the
@@ -587,7 +597,8 @@ Claude plans **and** implements; the maintainer reviews (in force since the scop
 2026-08-02, confirmed for Lyric 5). Every slice is a PR of its own — the spec PR merged first —,
 merged once its CI is green; the milestones follow each other without a pause until 5.0 stands,
 and the last push toward 5.0 waits for the maintainer's review of the points collected on the
-way (those of M4 to M8a were reviewed on 2026-10-05). Claude also merges, tags and releases. Anything that acts outside the repository — creating
+way (those of M4 to M8a were reviewed on 2026-10-05, those of the run that closed M8a on
+2026-10-07). Claude also merges, tags and releases. Anything that acts outside the repository — creating
 repositories, publishing releases, deleting published things — is laid out first and done on the
 maintainer's word.
 

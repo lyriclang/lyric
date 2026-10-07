@@ -251,6 +251,18 @@ Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert 
 | M7-12 | **Interface-Helfer** (`private fn` mit Rumpf, 07 S4): aufrufbar nur aus den Defaults desselben Interfaces, dort auch auf anderen Werten des Interfaces; ein Kind-Interface ruft ihn nicht | D14 |
 | M8a-10 | `static let` steht auch im Rumpf eines Enums. Konstanten generischer Typen: 07 V5 | — |
 
+## Review 2026-10-07 — die offenen Punkte nach M8a
+
+Entscheidungen des Maintainers aus der gemeinsamen Durchsicht der offenen Punkte, die der Lauf
+R0–S16 gesammelt hat. Die Kennung ist der Slice, der den Punkt fand; „Betrifft“ nennt, was die
+Zeile ändert oder schärft; die Uhr steht in der Zeile. Wo eine ältere Zeile dieses Dokuments dem
+widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| R4a3 | **Arität über Rumpf und Blöcke, wie die Spec sagt** (08 §1.2 Regel 1: die Member eines Typs sind ein Scope samt seinen Blöcken): zwei Funktionen eines Namens mit verschiedener Anzahl dürfen im Rumpf, in einem inhärenten Block eines deklarierten Typs, über Rumpf und Block und über zwei Blöcke stehen. Heute nimmt der Compiler nur Rumpf, Konformanzblock und den Block auf einem Builtin und lehnt die übrigen ab (`LYR-SEM0121`, dazu zwei Folgefehler an den Aufrufen). Spec 05 §3 Regel 1 heißt dann „eine Funktion je Name und Anzahl“. Uhr: M12 | D2, D4 |
+| R4b | **Delegation gilt auch für generische Member**: ein an ein Feld delegiertes abstraktes generisches Member (`Outer :: [Tagger by inner]`, `fn tag<U>(u: U)`) bekommt einen synthetisierten generischen Weiterleiter, eine Funktion je Instanz. Heute `LYR-IR0001` mit Stelle. Verworfen: generische Member von der Delegation ausnehmen — eine Ausnahme in Spec 05 §5 für eine Lücke der Senkung. Uhr: M12 | D1 |
+
 ---
 
 **Bereich 4 ist damit vollständig entschieden** (D1–D15, 2026-09-28).

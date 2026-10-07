@@ -120,3 +120,7 @@ optimizer inlining inside the program's unit (R9a), the map's slots beside its c
 (R9d), f-strings writing into one builder with `[x] * n` filling by doubling (S13 — `strings`
 had become 45 % slower until the repetition stopped copying an element at a time). What remains
 in `strings` is not measured apart here; the hasher's share of `maps` is as above.
+
+The CI runner, same commit: maps 0.99×, sorting 1.09×, strings 1.80× Go. Since the review of
+2026-10-07 the job runs on `main` and by hand, not on every pull request, and `strings` stands
+under the common fence of 3× Go.

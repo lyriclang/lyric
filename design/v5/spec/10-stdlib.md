@@ -422,6 +422,21 @@ Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert 
 | M8a-11 | **`lyric test`**: `@Test`-Funktionen sind nicht `private`; Testmodule heißen `<paket>.tests.<pfad>`; die Ausgabe ist `ok`/`FAIL`/`skip` je Test und eine Zählzeile; ein Timeout beendet den Lauf | B12 |
 | M6-20, M6-31 | `Thread.spawn` gibt einen Task-Handle; von den Weckern gehört nur `Semaphore` zu 5.0 (06) | B11 Q10 |
 
+## Review 2026-10-07 — die offenen Punkte nach M8a
+
+Entscheidungen des Maintainers aus der gemeinsamen Durchsicht der offenen Punkte, die der Lauf
+R0–S16 gesammelt hat. Die Kennung ist der Slice, der den Punkt fand; „Betrifft“ nennt, was die
+Zeile ändert oder schärft; die Uhr steht in der Zeile. Wo eine ältere Zeile dieses Dokuments dem
+widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| S14 | **`Debug` eines Textes maskiert wie Rust** (`escape_debug`): `\"` und `\\` im Text, `\'` im `char`, `\n`, `\r`, `\t`, `\0`, andere nicht druckbare Zeichen als `\u{…}`. `["a\"b", "c"]` druckt so, wie es geschrieben ist — die Grenzen, die C9 mit den Anführungszeichen zieht, bleiben auch bei einem `"` im Text. Heute maskiert er nichts. Verworfen: Pythons Wechsel des Anführungszeichens (zwei Formen für einen Wert). Uhr: M8c, mit den Unicode-Tabellen (was druckbar ist) | C9 |
+| S13 | **`&` fällt aus den Builder-Signaturen**: `showTo(out: StringBuilder)`, `debugTo(out: StringBuilder)`, `format(spec: StringView, out: StringBuilder)`. Der Builder ist eine Klasse und schreibt schon über die Referenz; `&` gab dem Gerufenen nur das Recht, die Referenz als Ganzes zu ersetzen, und kostete jeden Aufrufer ein `var` — in einer Methode des Builders selbst ist `&this` kein Ort, `append` ging über `var me = this`. Uhr: M8c, mit `std.fmt.format` | S6, S7, 04 D6, 08 A3 |
+| S12c | **Trimmen mit Muster unter eigenem Namen**: `trimMatches(p)`, `trimStartMatches(p)`, `trimEndMatches(p)` (Rust); `trim()`, `trimStart()`, `trimEnd()` bleiben ohne Muster und nehmen Leerraum. Ersetzt `trim(p = whitespace)` — einen Vorgabewert für einen generischen Parameter (`P :: [Pattern]`) gibt es in der Sprache nicht, und er käme nur hierfür. Uhr: M8c | S2 |
+| S12d | **`toBytes(): uint8[]` statt `asBytes(): Slice<uint8>`**: eine Kopie. Ein `Slice<uint8>` schreibt durch, ein `string` ist unveränderlich — als View herausgegeben wäre es ein Loch. Verworfen: ein eigener, nur lesender Byte-View — ein Typ mehr für einen Fall, den die Kopie deckt. Uhr: M8c | S1 |
+| R9c | **SipHash-1-3 bleibt der Vorgabe-Hasher**: fest gegen Hash-Flooding, wie in Rusts std. Er kostet 21 % von `maps` (Gos AES-Hash 3–4 %); Messpunkt 3 hält nach M8a trotzdem (1,36× Go, auf dem CI-Runner 0,99×). Verworfen für jetzt: ein schneller Hash mit Prozessschlüssel als Vorgabe (Gos Weg — schützt nur ungefähr) und zwei Vorgaben (`Map` schnell, eine zweite fest — zwei Namen für eine Sache). Uhr: neu entscheiden, wenn M10 (HTTP, fremde Schlüssel) den Bedarf zeigt, spätestens mit Messpunkt 3 in M11 | K2 |
+
 ---
 
 **Bereich 10 ist damit vollständig entschieden** (B1–B13, 2026-09-29). Nachträge in anderen
