@@ -2838,6 +2838,21 @@ internal sealed class FunctionLowerer
             return built;
         }
 
+        // 'x in xs' (05 §12 rule 10): 'xs.contains(x)' with 'x' evaluated first — the operands go
+        // left to right (08), the call's receiver is the right one; held for the call as a '?.'
+        // chain holds its receiver. '!in' is the negation.
+        if (expr.Operator is BinaryOp.In or BinaryOp.NotIn && _types.OperatorCallOf(expr) is { } contains)
+        {
+            _chainReceivers[expr.Left] = LowerExpr(expr.Left);
+            TempId found;
+            try { found = LowerCall(contains) ?? throw Bug("'contains' returned no value"); }
+            finally { _chainReceivers.Remove(expr.Left); }
+            if (expr.Operator is BinaryOp.In) return found;
+            var outside = _slots.NewTemp(BoolType);
+            _b.Emit(new UnOp(outside, IrUnKind.Not, BoolType, found, expr.Span));
+            return outside;
+        }
+
         if (_types.OperatorCallOf(expr) is { } desugared)
         {
             var value = LowerCall(desugared)
@@ -5898,9 +5913,9 @@ internal sealed class FunctionLowerer
             target = _instances.RequestExtension(symbol, decl, block, map, receiver, expr.Span, own);
             byName = map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal);
         }
-        var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span, byName);
-        var all = new TempId[passed.Length + 1];
-        all[0] = viewed
+        // The receiver before the arguments: left to right everywhere (04 D6), as a type's own
+        // member's call has it (M8a S15: the arguments came first here).
+        var self = viewed
             ? ViewOf(LowerExpr(member.Target), TypeOfExpr(member.Target) switch
             {
                 IrArrayType wholeArray => wholeArray.Element,
@@ -5908,6 +5923,9 @@ internal sealed class FunctionLowerer
                 var other => throw Bug($"a view of all of a '{other}' at {member.Span}"),
             }, member.Span)
             : LowerExpr(member.Target);
+        var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span, byName);
+        var all = new TempId[passed.Length + 1];
+        all[0] = self;
         passed.CopyTo(all, 1);
         var resultType = TypeOfExpr(expr);
         if (IsVoid(resultType))

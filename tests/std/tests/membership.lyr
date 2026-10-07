@@ -1,0 +1,47 @@
+// Membership (design/v5/spec/04 D6, 10 C12; spec 05 §12 rule 10): 'x in xs' is 'xs.contains(x)'
+// through Contains<T>, '!in' its negation.
+import std.collections { List, Map, Set };
+import std.test { assertFalse, assertTrue };
+
+@Test
+fn aRangeHoldsWhatLiesBetweenItsBounds(): void {
+    assertTrue(0 in 0..3);
+    assertFalse(3 in 0..3);
+    assertTrue(3 in 0..=3);
+    assertFalse(-1 in 0..=3);
+    assertFalse(0 in 0..0);
+    assertTrue(0 in 0..=0);
+    let nan = 0.0 / 0.0;
+    assertFalse(nan in 0.0..1.0);
+}
+
+@Test
+fn theContainersHoldTheirValues(): void {
+    let empty = List<string>.new();
+    assertTrue("x" !in empty);
+    let xs = List<string>.of(["a", "b"]);
+    assertTrue("b" in xs);
+    let s = Set<int>.new();
+    for (i in 0..50) {
+        s.insert(i * 3);
+    }
+    assertTrue(147 in s);
+    assertTrue(148 !in s);
+    let m = Map<int, string>.new();
+    m.insert(7, "seven");
+    assertTrue(7 in m);
+    assertFalse(8 in m);
+    let view = [5, 6, 7][1..];
+    assertTrue(6 in view);
+    assertTrue(5 !in view);
+}
+
+@Test
+fn aTextHoldsAnyPattern(): void {
+    let text = "membership";
+    assertTrue('m' in text);
+    assertTrue("ship" in text);
+    assertTrue("ships" !in text);
+    assertTrue(((c: char) => c == 'h') in text);
+    assertTrue("mem" in text[..3]);
+}

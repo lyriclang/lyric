@@ -968,6 +968,13 @@ public sealed class Lexer
                 _pos++;
                 return new Token(TokenKind.Caret, new Span(_file, operatorStart, _pos));
             case '!':
+                // '!in' (08 Y-table, 04 D6): one token where 'in' follows as a word of its own —
+                // '!inside' stays '!' and a name, 'x! in xs' an unwrap before 'in'.
+                if (PeekAt(1) == 'i' && PeekAt(2) == 'n' && !IsIdentifierCont(PeekAt(3)))
+                {
+                    _pos += 3;
+                    return new Token(TokenKind.NotIn, new Span(_file, operatorStart, _pos));
+                }
                 if (PeekAt(1) == '=')
                 {
                     _pos += 2;

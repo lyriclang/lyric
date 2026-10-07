@@ -780,6 +780,8 @@ public sealed class AstFormatter
         BinaryOp.Le => ("<=", 11),
         BinaryOp.Gt => (">", 11),
         BinaryOp.Ge => (">=", 11),
+        BinaryOp.In => ("in", 11),
+        BinaryOp.NotIn => ("!in", 11),
         BinaryOp.Eq => ("==", 12),
         BinaryOp.Ne => ("!=", 12),
         BinaryOp.LogicalAnd => ("&&", 13),

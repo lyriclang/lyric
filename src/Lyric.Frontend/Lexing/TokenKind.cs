@@ -124,6 +124,7 @@ public enum TokenKind
     //Comparison
     EqualEqual, // ==
     ExclamationEqual, // !=
+    NotIn, // !in — one token where 'in' follows as a word of its own (08 Y-table)
     Less, // <
     LessEqual, // <=
     Greater, // >

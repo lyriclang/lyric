@@ -706,10 +706,10 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_slice_u8 t127 = {0};
     int64_t t128 = 0;
     lyr_ty_std_core_StringBuilder * *t129 = NULL;
-    LyrStr *t130 = NULL;
+    lyr_ty_app_main_Pair_string__80f539ca t130_s = {0};
+    lyr_ty_app_main_Pair_string__80f539ca *t130 = &t130_s;
     LyrStr *t131 = NULL;
-    lyr_ty_app_main_Pair_string__80f539ca t132_s = {0};
-    lyr_ty_app_main_Pair_string__80f539ca *t132 = &t132_s;
+    LyrStr *t132 = NULL;
     lyr_ty_app_main_Pair_string__80f539ca t133_s = {0};
     lyr_ty_app_main_Pair_string__80f539ca *t133 = &t133_s;
     uint8_t t134 = 0;
@@ -1009,9 +1009,9 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_slice_u8 t385 = {0};
     int64_t t386 = 0;
     lyr_ty_std_core_StringBuilder * *t387 = NULL;
-    int64_t t388 = 0;
-    lyr_ty_app_main_Opt_int__52a0a7e1 t389_s = {0};
-    lyr_ty_app_main_Opt_int__52a0a7e1 *t389 = &t389_s;
+    lyr_ty_app_main_Opt_int__52a0a7e1 t388_s = {0};
+    lyr_ty_app_main_Opt_int__52a0a7e1 *t388 = &t388_s;
+    int64_t t389 = 0;
     lyr_ty_app_main_Opt_int__52a0a7e1 t390_s = {0};
     lyr_ty_app_main_Opt_int__52a0a7e1 *t390 = &t390_s;
     uint8_t t391 = 0;
@@ -1771,19 +1771,19 @@ bb6:;
 #line 49
     t129 = &l10__fstring;
 #line 49
-    t130 = (LyrStr *)&lyr_lit7;
+    t130 = &l9_pa;
 #line 49
-    t131 = (LyrStr *)&lyr_lit8;
+    t131 = (LyrStr *)&lyr_lit7;
 #line 49
-    t132_s = (lyr_ty_app_main_Pair_string__80f539ca){0}; t132 = &t132_s;
+    t132 = (LyrStr *)&lyr_lit8;
 #line 49
-    LYR_WRITE_BARRIER(t132, &t132->f_a, t130);
+    t133_s = (lyr_ty_app_main_Pair_string__80f539ca){0}; t133 = &t133_s;
 #line 49
-    LYR_WRITE_BARRIER(t132, &t132->f_b, t131);
+    LYR_WRITE_BARRIER(t133, &t133->f_a, t131);
 #line 49
-    t133 = &l9_pa;
+    LYR_WRITE_BARRIER(t133, &t133->f_b, t132);
 #line 49
-    t134 = lyr_app_main__extend__app_main_Pair_string__equals_0db1a5a1(t133, *t132);
+    t134 = lyr_app_main__extend__app_main_Pair_string__equals_0db1a5a1(t130, *t133);
 #line 49
     lyr_std_core_fstringBool(t129, t134);
 #line 49
@@ -2473,13 +2473,13 @@ bb12:;
 #line 65
     t387 = &l27__fstring;
 #line 65
-    t388 = (int64_t)INT64_C(1);
+    t388 = &l26_s1;
 #line 65
-    t389_s = (lyr_ty_app_main_Opt_int__52a0a7e1){ .tag = 1, .as.v1 = { .f_0 = t388 } }; t389 = &t389_s;
+    t389 = (int64_t)INT64_C(1);
 #line 65
-    t390 = &l26_s1;
+    t390_s = (lyr_ty_app_main_Opt_int__52a0a7e1){ .tag = 1, .as.v1 = { .f_0 = t389 } }; t390 = &t390_s;
 #line 65
-    t391 = lyr_app_main__extend__app_main_Opt_int__equals_f1ebeea0(t390, *t389);
+    t391 = lyr_app_main__extend__app_main_Opt_int__equals_f1ebeea0(t388, *t390);
 #line 65
     lyr_std_core_fstringBool(t387, t391);
 #line 65
@@ -2497,11 +2497,11 @@ bb12:;
 #line 65
     t397 = &l27__fstring;
 #line 65
-    t398_s = (lyr_ty_app_main_Opt_int__52a0a7e1){ .tag = 0 }; t398 = &t398_s;
+    t398 = &l26_s1;
 #line 65
-    t399 = &l26_s1;
+    t399_s = (lyr_ty_app_main_Opt_int__52a0a7e1){ .tag = 0 }; t399 = &t399_s;
 #line 65
-    t400 = lyr_app_main__extend__app_main_Opt_int__equals_f1ebeea0(t399, *t398);
+    t400 = lyr_app_main__extend__app_main_Opt_int__equals_f1ebeea0(t398, *t399);
 #line 65
     lyr_std_core_fstringBool(t397, t400);
 #line 65
@@ -2523,7 +2523,7 @@ bb12:;
 #line 65
     t408_s = (lyr_ty_app_main_Opt_int__52a0a7e1){ .tag = 0 }; t408 = &t408_s;
 #line 65
-    t409 = lyr_app_main__extend__app_main_Opt_int__equals_f1ebeea0(t408, *t407);
+    t409 = lyr_app_main__extend__app_main_Opt_int__equals_f1ebeea0(t407, *t408);
 #line 65
     lyr_std_core_fstringBool(t406, t409);
 #line 65
@@ -7945,23 +7945,23 @@ bb0:;
     return t29;
 }
 
-#line 260 "stdlib5/std/collections.lyr"
+#line 255 "stdlib5/std/collections.lyr"
 void lyr__globals__9ee5f9b5(void) {
     uint64_t t0 = 0;
     uint64_t t1 = 0;
     uint64_t t2 = 0;
 bb0:;
-#line 260
+#line 255
     t0 = (uint64_t)UINT64_C(9259542123273814144);
-#line 260
+#line 255
     lyr_g_std_collections_emptyGroup = t0;
-#line 261
+#line 256
     t1 = (uint64_t)UINT64_C(72340172838076673);
-#line 261
+#line 256
     lyr_g_std_collections_lowBits = t1;
-#line 262
+#line 257
     t2 = (uint64_t)UINT64_C(9259542123273814144);
-#line 262
+#line 257
     lyr_g_std_collections_highBits = t2;
     return;
 }

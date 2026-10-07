@@ -88,6 +88,7 @@ public sealed partial class Parser
         TokenKind.Caret => (15, 16),
         TokenKind.Pipe => (13, 14),
         TokenKind.Less or TokenKind.LessEqual or TokenKind.Greater or TokenKind.GreaterEqual => (11, 12),
+        TokenKind.In or TokenKind.NotIn => (11, 12), // membership, at the comparisons' level (08 line 11)
         TokenKind.EqualEqual or TokenKind.ExclamationEqual => (9, 10),
         TokenKind.AmpAmp => (7, 8),
         TokenKind.PipePipe => (5, 6),

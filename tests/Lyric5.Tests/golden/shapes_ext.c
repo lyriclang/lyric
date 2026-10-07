@@ -127,9 +127,9 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_slice_u8 t40 = {0};
     int64_t t41 = 0;
     lyr_ty_std_core_StringBuilder * *t42 = NULL;
-    int64_t t43 = 0;
-    lyr_opt_i64 t44_s = {0};
-    lyr_opt_i64 *t44 = &t44_s;
+    lyr_opt_i64 t43_s = {0};
+    lyr_opt_i64 *t43 = &t43_s;
+    int64_t t44 = 0;
     int64_t t45 = 0;
     lyr_ty_std_core_StringBuilder * *t46 = NULL;
     LyrStr *t47 = NULL;
@@ -137,9 +137,9 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_slice_u8 t49 = {0};
     int64_t t50 = 0;
     lyr_ty_std_core_StringBuilder * *t51 = NULL;
-    int64_t t52 = 0;
-    lyr_opt_i64 t53_s = {0};
-    lyr_opt_i64 *t53 = &t53_s;
+    lyr_opt_i64 t52_s = {0};
+    lyr_opt_i64 *t52 = &t52_s;
+    int64_t t53 = 0;
     int64_t t54 = 0;
     lyr_ty_std_core_StringBuilder * *t55 = NULL;
     LyrStr *t56 = NULL;
@@ -320,11 +320,11 @@ bb0:;
 #line 48
     t42 = &l4__fstring;
 #line 48
-    t43 = (int64_t)INT64_C(0);
+    t43 = &l2_o;
 #line 48
-    t44 = &l2_o;
+    t44 = (int64_t)INT64_C(0);
 #line 48
-    t45 = lyr_app_main__extend___int_orElse_a0192043(*t44, t43);
+    t45 = lyr_app_main__extend___int_orElse_a0192043(*t43, t44);
 #line 48
     lyr_std_core_fstringInt(t42, t45);
 #line 48
@@ -342,11 +342,11 @@ bb0:;
 #line 48
     t51 = &l4__fstring;
 #line 48
-    t52 = (int64_t)INT64_C(0);
+    t52 = &l3_n;
 #line 48
-    t53 = &l3_n;
+    t53 = (int64_t)INT64_C(0);
 #line 48
-    t54 = lyr_app_main__extend___int_orElse_a0192043(*t53, t52);
+    t54 = lyr_app_main__extend___int_orElse_a0192043(*t52, t53);
 #line 48
     lyr_std_core_fstringInt(t51, t54);
 #line 48
@@ -1162,23 +1162,23 @@ bb0:;
     return t3;
 }
 
-#line 260 "stdlib5/std/collections.lyr"
+#line 255 "stdlib5/std/collections.lyr"
 void lyr__globals__9ee5f9b5(void) {
     uint64_t t0 = 0;
     uint64_t t1 = 0;
     uint64_t t2 = 0;
 bb0:;
-#line 260
+#line 255
     t0 = (uint64_t)UINT64_C(9259542123273814144);
-#line 260
+#line 255
     lyr_g_std_collections_emptyGroup = t0;
-#line 261
+#line 256
     t1 = (uint64_t)UINT64_C(72340172838076673);
-#line 261
+#line 256
     lyr_g_std_collections_lowBits = t1;
-#line 262
+#line 257
     t2 = (uint64_t)UINT64_C(9259542123273814144);
-#line 262
+#line 257
     lyr_g_std_collections_highBits = t2;
     return;
 }
