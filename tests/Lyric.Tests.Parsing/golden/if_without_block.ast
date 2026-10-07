@@ -6,11 +6,7 @@ If [0..11)
         Ident b [7..8)
 
 === diagnostics ===
-if_without_block.lyr:1:8: error[LYR-PAR0017]: expected '{' to open block
+if_without_block.lyr:1:8: error[LYR-PAR0017]: the body of 'if' is a block — write 'if (…) { … }', braces even around one statement
 if (a) b();
        ^
-
-if_without_block.lyr:1:12: error[LYR-PAR0018]: expected '}' to close block
-if (a) b();
-           ^
 

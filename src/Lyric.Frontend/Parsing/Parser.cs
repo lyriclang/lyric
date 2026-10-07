@@ -234,10 +234,37 @@ public sealed partial class Parser
             _buffer.Advance();
             var right = op == TokenKind.QuestionQuestion && _buffer.Check(TokenKind.LBrace) ? ParseValueBlock() : ParseExpr(rightBp);
             left = new BinaryExpr(left, Operators.MapBinary(op), right, Span.Union(Whole(left), Whole(right)));
+
+            // A comparison and an equality do not chain (08 Y4): 'a < b < c' compared a bool with
+            // 'c' and was a type error far from the point, 'a == b == c' was taken in silence. Said
+            // once, at the second operator; the rest of the chain is read and set aside, so nothing
+            // else is said about it.
+            if (ChainLevel(op) is { } level && ChainLevel(_buffer.Current.TokenKind) == level)
+            {
+                _de.Report("LYR-PAR0059", Severity.Error, _buffer.Current.Span, level == 1
+                    ? "a comparison does not chain — 'a < b < c' would compare a bool with 'c'; write 'a < b && b < c'"
+                    : "'==' and '!=' do not chain — compare twice and join with '&&', or group one: '(a == b) == c'");
+                while (ChainLevel(_buffer.Current.TokenKind) == level)
+                {
+                    _buffer.Advance();
+                    var rest = ParseExpr(rightBp);
+                    left = new ErrorExpr(Span.Union(Whole(left), Whole(rest)));
+                }
+            }
         }
 
         return left;
     }
+
+    /// <summary>The non-associative levels of 08 Y4: 1 the comparisons and the membership tests,
+    /// 2 the equalities; <c>null</c> for an operator that chains.</summary>
+    private static int? ChainLevel(TokenKind op) => op switch
+    {
+        TokenKind.Less or TokenKind.LessEqual or TokenKind.Greater or TokenKind.GreaterEqual
+            or TokenKind.In or TokenKind.NotIn => 1,
+        TokenKind.EqualEqual or TokenKind.ExclamationEqual => 2,
+        _ => null,
+    };
 
     // ---------------------------------------------------------------------
     // Prefix and postfix levels.

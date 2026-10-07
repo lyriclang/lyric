@@ -154,6 +154,21 @@ public sealed partial class Parser
     /// 'match' or a 'loop' (§6.9, 08 Y4). The flag holds for the block's OWN statements only: a
     /// nested statement block resets it, so a tail can stand exactly where its value has
     /// somewhere to go.</summary>
+    /// <summary>
+    /// The body of <c>if</c>, <c>else</c>, <c>while</c>, <c>do</c> and <c>for</c> (08 Y5 S1): a block,
+    /// always. A statement written without the braces is refused once, with the form, and read as
+    /// the block it belongs in — "expected '}'" behind it was the same mistake said again.
+    /// </summary>
+    private Block ParseBody(string keyword)
+    {
+        if (_buffer.Check(TokenKind.LBrace)) return ParseBlock();
+        var at = _buffer.Current.Span;
+        _de.Report("LYR-PAR0017", Severity.Error, at,
+            $"the body of '{keyword}' is a block — write '{keyword} {(keyword is "do" or "else" ? "" : "(…) ")}{{ … }}', braces even around one statement");
+        var single = ParseStmt();
+        return new Block([single], Span.Union(at, single.Span));
+    }
+
     private Block ParseBlock(bool valueBlock = false)
     {
         var open = _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open block");
@@ -339,13 +354,13 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'if'");
         var cond = ParseCondition();
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after if-condition");
-        var then = ParseBlock();
+        var then = ParseBody("if");
 
         Stmt? elseBranch = null;
         var end = then.Span;
         if (_buffer.Match(TokenKind.Else))
         {
-            elseBranch = _buffer.Check(TokenKind.If) ? ParseIf() : ParseBlock(); // else-if kettet
+            elseBranch = _buffer.Check(TokenKind.If) ? ParseIf() : ParseBody("else"); // else-if kettet
             end = elseBranch.Span;
         }
         return new IfStmt(cond, then, elseBranch, Span.Union(kw.Span, end));
@@ -411,14 +426,14 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'while'");
         var cond = ParseCondition();
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after while-condition");
-        var body = ParseBlock();
+        var body = ParseBody("while");
         return new WhileStmt(cond, body, Span.Union(kw.Span, body.Span));
     }
 
     private Stmt ParseDoWhile()
     {
         var kw = _buffer.Advance(); // do
-        var body = ParseBlock();
+        var body = ParseBody("do");
         _buffer.Expect(TokenKind.While, "LYR-PAR0022", "expected 'while' after do-block");
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'while'");
         var cond = ParseExpr(0);
@@ -443,7 +458,7 @@ public sealed partial class Parser
             _buffer.Expect(TokenKind.In, "LYR-PAR0021", "expected 'in' in for-loop");
             var patternIter = ParseExpr(0);
             _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after for-loop header");
-            var patternBody = ParseBlock();
+            var patternBody = ParseBody("for");
             return new ForInStmt("_", patternIter, patternBody, Span.Union(kw.Span, patternBody.Span))
                 { NameSpan = patternStart, Pattern = pattern };
         }
@@ -453,7 +468,7 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.In, "LYR-PAR0021", "expected 'in' in for-loop");
         var iter = ParseExpr(0);
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after for-loop header");
-        var body = ParseBlock();
+        var body = ParseBody("for");
         return new ForInStmt(_sm.Slice(varTok.Span).ToString(), iter, body, Span.Union(kw.Span, body.Span))
             { NameSpan = varTok.Span };
     }

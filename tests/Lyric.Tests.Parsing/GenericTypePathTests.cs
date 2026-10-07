@@ -95,15 +95,16 @@ public class GenericTypePathTests
     /// <summary>
     /// The nasty form: a comparison chain really followed by a dot. <c>a &lt; b &gt; c.d</c> has only
     /// type-like tokens between the <c>&lt;</c> and the <c>&gt;</c>, but what follows is <c>c</c> rather
-    /// than <c>.</c>, so it stays a comparison.
+    /// than <c>.</c>, so it stays a comparison — a chain of two, which 08 Y4 refuses (N3b): one
+    /// error, and no type path read.
     /// </summary>
     [Fact]
     public void A_comparison_chain_followed_by_a_member_access_stays_a_comparison()
     {
         var (ast, diagnostics) = Parse("fn main(): int { let c = a < b > c.d; return 0; }");
 
-        Assert.Empty(diagnostics);
-        Assert.IsType<BinaryExpr>(FirstInitializer(ast));
+        Assert.Equal(["LYR-PAR0059"], diagnostics.Select(d => d.Code));
+        Assert.IsType<ErrorExpr>(FirstInitializer(ast));
     }
 
     /// <summary>A struct initializer stays a struct initializer: there a <c>{</c> follows rather than a
