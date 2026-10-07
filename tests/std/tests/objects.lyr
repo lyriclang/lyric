@@ -1,0 +1,66 @@
+// Containers over objects (M8a S16): a map, a deque and a list whose elements are objects, each
+// slot its own. Since R9d every map over objects was refused ('[x] * n' over an object in the
+// table's fill, LYR-CG0001) and no test held one.
+import std.collections { Deque, List, Map };
+import std.core { arrayOf };
+import std.test { assertEq, assertTrue };
+
+class Cell {
+    var v: int,
+}
+
+@Test
+fn aMapHoldsObjects(): void {
+    let m = Map<int, Cell>.new();
+    var i = 0;
+    // past the first table: the rebuild fills the slots again
+    while (i < 40) {
+        m.insert(i, Cell { v = i });
+        i = i + 1;
+    }
+    assertEq(m.length(), 40);
+    let last = m.get(39)!;
+    last.v = 7;
+    assertEq(m.get(39)!.v, 7);
+    assertEq(m.get(38)!.v, 38);
+}
+
+@Test
+fn aMapWithCapacityHoldsLists(): void {
+    let m = Map<string, List<int>>.withCapacity(20);
+    m.insert("a", List<int>.of([1]));
+    m.get("a")!.push(2);
+    assertEq(m.get("a")!.length(), 2);
+}
+
+@Test
+fn aDequeAndAListHoldObjects(): void {
+    let d = Deque<Cell>.withCapacity(2);
+    let l = List<Cell>.new();
+    var i = 0;
+    while (i < 20) {
+        d.pushBack(Cell { v = i });
+        l.push(Cell { v = i });
+        i = i + 1;
+    }
+    assertEq(d.length(), 20);
+    assertEq(d.peekBack()!.v, 19);
+    let a = l.toArray();
+    a[0].v = 99;
+    assertEq(a[1].v, 1);
+    assertEq(l.get(19)!.v, 19);
+}
+
+@Test
+fn arrayOfGivesEverySlotItsOwn(): void {
+    let calls = List<int>.new();
+    let cells = arrayOf(5, (i: int) => {
+        calls.push(i);
+        return Cell { v = i };
+    });
+    assertEq(calls.length(), 5);
+    assertEq(calls.get(4)!, 4);
+    cells[0].v = 9;
+    assertEq(cells[1].v, 1);
+    assertTrue(cells.length() == 5);
+}

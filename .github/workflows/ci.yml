@@ -15,6 +15,8 @@ on:
     branches: [main, 'feature/**', 'fix/**']
   pull_request:
     branches: [main]
+  # The whole set by hand — on main before a tag, or on a branch whose platform code changed.
+  workflow_dispatch:
 
 # THE IR VERIFIER, ON. It is a debug build's by default, and every job here builds
 # --configuration Release -- so until this line the verifier ran on no path that went through
@@ -36,6 +38,15 @@ permissions:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
+
+# WHERE THE PLATFORMS RUN (design/v5/spec/11, review 2026-10-07). A pull request checks on Linux
+# x86-64 — the C toolchain with its sanitizers, one NativeAOT binary, the conformance gate — and
+# builds and tests on Windows too; ARM Linux, Windows and macOS for the C toolchain and the native
+# binaries, and the benchmarks, run on main and in a dispatched run. GitHub gave this repository
+# about five runners at once, a run here has thirteen jobs, and a job that waits fifteen minutes
+# for a runner is cancelled: about one pull request an hour got through, and main showed red runs
+# with no red test. The price: a fault on one of those platforms shows after the merge, on main —
+# where every tag waits for green anyway.
 
 jobs:
   # Every job is capped well above its normal running time (about 5 minutes). The default cap
@@ -84,7 +95,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
+        # Every Tier 1 runner on main and by hand, Linux x86-64 alone otherwise (the head of the file).
+        os: ${{ fromJSON((github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && '["ubuntu-latest", "ubuntu-24.04-arm", "windows-latest", "macos-latest"]' || '["ubuntu-latest"]') }}
 
     steps:
       - name: Checkout
@@ -125,12 +137,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { rid: linux-x64,   os: ubuntu-latest,    run: true }
-          - { rid: linux-arm64, os: ubuntu-24.04-arm, run: true }
-          - { rid: win-x64,     os: windows-latest,   run: true }
-          - { rid: osx-arm64,   os: macos-latest,     run: true }
-          - { rid: osx-x64,     os: macos-latest,     run: false }
+        # Every Tier 1 target on main and by hand, linux-x64 alone otherwise (the head of the file):
+        # linux-x64, linux-arm64, win-x64 and osx-arm64 built and run, osx-x64 built only.
+        include: >-
+          ${{ fromJSON((github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+          && '[{"rid": "linux-x64", "os": "ubuntu-latest", "run": true}, {"rid": "linux-arm64", "os": "ubuntu-24.04-arm", "run": true}, {"rid": "win-x64", "os": "windows-latest", "run": true}, {"rid": "osx-arm64", "os": "macos-latest", "run": true}, {"rid": "osx-x64", "os": "macos-latest", "run": false}]'
+          || '[{"rid": "linux-x64", "os": "ubuntu-latest", "run": true}]') }}
 
     steps:
       - name: Checkout
@@ -191,12 +203,12 @@ jobs:
     # Measurement points 2 and 3 (design/v5/spec/13) on this runner, for the record: the table
     # goes into the run's summary. A shared runner is too noisy for the plan's ratchet (1.5x Go),
     # which stays a measurement by hand at each milestone; what fails here is a wide fence of
-    # 3x Go — a regression nobody would call noise. 'strings' has a fence of its own, 5x: it
-    # stands at 3.6x on this runner (2.3x to 2.7x on a quiet machine), because an f-string
-    # allocates a string per piece until f-strings write into one builder (10 S6). When that is
-    # built it joins the others. Go is the runner's own; nothing is downloaded for it (see the
-    # head of this file).
+    # 3x Go — a regression nobody would call noise. 'strings' had a fence of its own, 5x, until
+    # f-strings wrote into one builder (M8a S13; it stood at 1.80x on this runner after). The job
+    # runs on main and by hand, not on a pull request (the head of the file). Go is the runner's
+    # own; nothing is downloaded for it (see the head of this file).
     name: Benchmarks
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -215,9 +227,7 @@ jobs:
         run: |
           set -o pipefail
           go version
-          python3 bench/run.py --runs 5 --bound 3.0 loops arith structs maps sorting | tee -a "$GITHUB_STEP_SUMMARY"
-          echo >> "$GITHUB_STEP_SUMMARY"
-          python3 bench/run.py --runs 5 --bound 5.0 strings | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 bench/run.py --runs 5 --bound 3.0 loops arith structs maps sorting strings | tee -a "$GITHUB_STEP_SUMMARY"
 
   conformance:
     # The specification's suite (lyriclang/lyric-spec) against the WORKING TREE, in both profiles:

@@ -347,6 +347,19 @@ Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert 
 | M4-1 | Die **Wertform eines Interfaces mit fixiertem assoziiertem Typ** (`Iterator<Item = int>` als Wert) kommt mit M8c | T6 |
 | M4-5 | X3 bleibt, es gibt keine Orphan-Regel. Ein **Lint** (M12) warnt bei einer Konformanz, deren Typ und Interface beide aus anderen Paketen stammen | T7 X3 |
 
+## Review 2026-10-07 — die offenen Punkte nach M8a
+
+Entscheidungen des Maintainers aus der gemeinsamen Durchsicht der offenen Punkte, die der Lauf
+R0–S16 gesammelt hat. Die Kennung ist der Slice, der den Punkt fand; „Betrifft“ nennt, was die
+Zeile ändert oder schärft; die Uhr steht in der Zeile. Wo eine ältere Zeile dieses Dokuments dem
+widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| S15a | **Explizite Typargumente am Methodenaufruf**: `it.collect<List<int>>()`, wie an einer Funktion (`empty<int>()`, Spec 03 §9.2 Regel 4) und ohne Rusts `::<>` — wie C# und Kotlin. Heute liest der Parser das `<` als Vergleich (`LYR-PAR0002`), und `collect()` geht nur über den erwarteten Typ. Uhr: M12 | T8 |
+| S15a | **Eine Funktion bindet einen Typparameter über die Fixierung eines anderen**, wie ein Block (Spec 05 §13 Regel 2): `fn f<I :: [Iterator<Item = T>], T>(it: I)` leitet `T` aus `I` ab, obwohl `T` in keinem Parametertyp steht. Heute `LYR-SEM0060` an jedem Aufruf (03 §9.2 Regel 1 — spec-konform, aber eine Ungleichheit zwischen Funktion und Block). Uhr: M12 | T8, T6 |
+| S15b | **`char`-Bereiche**: `'a'..'z'` und `'a'..='z'` sind Bereiche über `char` wie in Kotlin — für `c in 'a'..='z'` und überall, wo ein Bereich steht. Heute nur über Zahlen (`LYR-SEM0003`). Ob ein `char`-Bereich iteriert, entscheidet M8c mit. Uhr: M8c, mit den `char`-Prädikaten | A3, T13 |
+
 ---
 
 **Bereich 3 ist damit vollständig entschieden** (T1–T19, 2026-09-28).

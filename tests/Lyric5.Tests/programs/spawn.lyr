@@ -6,7 +6,7 @@
 //   waiters first second           the tasks awaiting one task run in the order they came
 //   typed 7 3                      a written 'Task<int> throws Oops', and a plain task in it
 import std.io { println };
-import std.task { spawn, spawnDetached, sleep, Task, Cancelled };
+import std.task { spawn, spawnDetached, sleep, yieldNow, Task, Cancelled };
 import std.time { Duration };
 
 enum Oops :: [Error] { Bad; fn message(): string { return "oops"; } }
@@ -48,7 +48,11 @@ fn main(): void throws Oops {
         let v = try? shared.await();
         log = log + " second";
     });
-    try sleep(Duration.ofMillis(40));
+    // The two begin to wait before main does, so they run again first: main waits for the same
+    // task, not for a time a slow runner may not keep (it slept 40 ms here, and once on Windows in
+    // CI that was not enough).
+    try yieldNow();
+    let done = try shared.await();
     println("waiters" + log);
 
     let typed: Task<int> throws Oops = spawn(() => try risky(false));

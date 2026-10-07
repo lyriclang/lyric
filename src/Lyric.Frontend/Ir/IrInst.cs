@@ -65,7 +65,9 @@ public sealed record CopyValue(TempId Dest, TempId Value, IrType Type, Span Span
 
 // xs + ys and xs * n — built-in language semantics, not a library. Both yield a NEW array.
 public sealed record ArrayConcat(TempId Dest, TempId Left, TempId Right, IrType Element, Span Span) : IrOp(Span);
-public sealed record ArrayRepeat(TempId Dest, TempId Array, TempId Count, IrType Element, Span Span) : IrOp(Span);
+/// <summary><c>Shares</c>: the one value in every slot, an object included — std.core's
+/// <c>filled</c> (M8a S16), never the language's <c>[x] * n</c>, which clones an object (03 §5.1).</summary>
+public sealed record ArrayRepeat(TempId Dest, TempId Array, TempId Count, IrType Element, Span Span, bool Shares = false) : IrOp(Span);
 
 // Optionals. '??', '??=' and '?.' are NOT here: they evaluate their right side conditionally and
 // lower to branches over OptIsSome, like && and ||.

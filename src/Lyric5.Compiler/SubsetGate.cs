@@ -160,8 +160,8 @@ public static class SubsetGate
                 // anyone able to tell, a class or an array — held directly or inside the element
                 // — would be one object in every slot. The sema desugars that case to
                 // std.core's 'repeatArray' under 'Clone' (M4 S9); an instruction over objects
-                // here is one it missed.
-                case ArrayRepeat r when HoldsObject(r.Element):
+                // here is one it missed — unless it shares on purpose, std.core's 'filled' (S16).
+                case ArrayRepeat r when HoldsObject(r.Element) && !r.Shares:
                     Refuse(op.Span, "'[x] * n' with an element that is or holds an object as an instruction — the sema desugars it through 'Clone'", "no milestone: a compiler bug");
                     break;
                 case ArrayRepeat:

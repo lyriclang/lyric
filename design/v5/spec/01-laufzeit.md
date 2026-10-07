@@ -234,6 +234,18 @@ Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert 
 | M6-26 | `main` läuft nur dann als Task auf einem Koroutinen-Stack, wenn das Programm warten kann (06 T6); die Stackgröße von `main` ist in beiden Fällen gleich | L4 |
 | — | **Panik-Codes aus dem Review**: `LYR-RT0016` „changed while it was walked“ (10 I9), `LYR-RT0017` unerreichbarer Boden, `LYR-RT0018` „every task waits and nothing can wake one“ (06), `LYR-RT0019` vergiftetes Schloss (06) | L5 |
 
+## Review 2026-10-07 — die offenen Punkte nach M8a
+
+Entscheidungen des Maintainers aus der gemeinsamen Durchsicht der offenen Punkte, die der Lauf
+R0–S16 gesammelt hat. Die Kennung ist der Slice, der den Punkt fand; „Betrifft“ nennt, was die
+Zeile ändert oder schärft; die Uhr steht in der Zeile. Wo eine ältere Zeile dieses Dokuments dem
+widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| S13 | **Release-Traces sind bestmöglich.** Im Release-Profil kann ein Rahmen fehlen: der einer Funktion, die der IR-Inliner in ihren Rufer einbettet (B10), und der einer Funktion, die mit einem Aufruf endet — der C-Compiler setzt den Rahmen des Gerufenen an ihre Stelle (Sibling-Call): `fn main(): int { return check(3); }` zeigt nur `check`. Debug zeigt jeden Rahmen. So hält es Rust im Release; Go eliminiert keine Endaufrufe. Verworfen: `-fno-optimize-sibling-calls` im Release — Kosten für jedes Programm, für einen Rahmen, den Debug ohnehin zeigt. Die Spec sagt es in 13 §1.4 Regel 2 (S16) | E8, B10 |
+| S13 | **Der Wachstumspfad des `StringBuilder` steht aus der Reihe**: eine eigene Funktion (Rusts `#[cold]`-Muster, `do_reserve_and_handle`); eingebettet wird nur die Prüfung auf Platz. Sonst spleißt der IR-Inliner (≤ 24 Ops je Gerufenem, ≤ 64 Stellen je Rufer) den ganzen Pfad in jeden f-String — `synth`: C 208 → 403 KB, Bau 4,08 → 4,61 s. Verworfen: das Budget je Rufer an der Größe statt an den Stellen messen — es ändert den Code jedes Programms und braucht eine neue Vermessung. Uhr: M8c | B10, 10 S6 |
+
 ---
 
 **Bereich 1 ist damit vollständig entschieden** (L1–L12, 2026-09-28).

@@ -281,6 +281,18 @@ Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert 
 | M5-8 | Das Konformanz-Gate liest die Spec an dem Commit, den `spec.pin` nennt (13) | W9 |
 | D4 | Ein CI-Job misst Messpunkt 3 berichtend, mit einer weiten Sperre (3× Go); 1,5× bleibt die Handprüfung je Meilenstein | — |
 
+## Review 2026-10-07 — die offenen Punkte nach M8a
+
+Entscheidungen des Maintainers aus der gemeinsamen Durchsicht der offenen Punkte, die der Lauf
+R0–S16 gesammelt hat. Die Kennung ist der Slice, der den Punkt fand; „Betrifft“ nennt, was die
+Zeile ändert oder schärft; die Uhr steht in der Zeile. Wo eine ältere Zeile dieses Dokuments dem
+widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| CI | **Die Plattform-Jobs laufen auf `main` und in einem von Hand gestarteten Lauf**, nicht je PR: die C-Toolchain samt Laufzeittests und die NativeAOT-Binaries auf ARM-Linux, Windows und macOS. Ein PR prüft auf Linux x86-64 — C-Toolchain mit Sanitizern, ein AOT-Binary, das Gate —, Build und Tests auch unter Windows. Vor einem Tag läuft der volle Satz ohnehin auf `main`. Grund: rund fünf Runner zugleich, 13 Jobs je Lauf, Abbruch nach 15 Minuten ohne Runner — etwa ein PR pro Stunde und rote `main`-Läufe ohne roten Test. Ein Plattformfehler fällt so erst nach dem Merge auf. Verworfen: auf `main` nur Gate und Build — der Merge-Commit ist ein neuer Stand, und `main` ist die Stelle der Plattform-Jobs | — |
+| CI | **Die Benchmarks laufen auf `main` und von Hand**, nicht je PR; 1,5× Go bleibt die Handmessung je Meilenstein. `strings` hat seit M8a S13 (f-Strings in einen Builder) keinen eigenen Zaun mehr: 3× Go für alle (auf dem Runner 1,80×) | D4 |
+
 ---
 
 **Bereich 11 ist damit vollständig entschieden** (W1–W9, 2026-09-29). Es bleibt 12 (Migration).
