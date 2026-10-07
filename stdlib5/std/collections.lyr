@@ -1,6 +1,6 @@
 /// The containers (design/v5/spec/10 B7). Not safe across threads (C11): a `Mutex` holds one
 /// that is shared.
-import std.core { arrayOf, FromIterator, Hasher, StringBuilder };
+import std.core { arrayOf, Contains, FromIterator, Hasher, StringBuilder };
 import std.hash { DefaultHasher };
 
 // --- List (10 C3) --------------------------------------------------------------------------------
@@ -193,11 +193,6 @@ pub class List<T> :: [IndexSet<int>, Iterable] {
 }
 
 extend<T :: [Equatable]> List<T> {
-    /// Whether an element equals `x`.
-    pub fn contains(x: T): bool {
-        return this.asSlice().contains(x);
-    }
-
     /// The first element equal to `x` taken out; whether there was one.
     pub mut fn remove(x: T): bool {
         let at = this.asSlice().indexOf(x);
@@ -606,7 +601,7 @@ fn changedWhileWalked(what: string): never;
 // --- Set (10 C5): a Map's keys -----------------------------------------------------------------
 
 /// The values it holds, each once, in no order of its own — a map's keys, by the same table.
-pub class Set<T :: [Hashable], H :: [Hasher] = DefaultHasher> :: [Iterable] {
+pub class Set<T :: [Hashable], H :: [Hasher] = DefaultHasher> :: [Iterable, Contains<T>] {
     type Iter = MapKeysIter<T, bool, H>;
     var table: Map<T, bool, H>,
 
@@ -1189,5 +1184,22 @@ extend<I :: [Iterator<Item = T>], T :: [Hashable]> I {
     pub fn toSet(): Set<T> throws I.Error {
         let out: Set<T> = try this.collect();
         return out;
+    }
+}
+
+// --- membership (05 §12 rule 10; 10 C12; M8a S15) -----------------------------------------------
+// A list and a set hold their values, a map its keys: `k in map` is `map.containsKey(k)`.
+
+extend<T :: [Equatable]> List<T> :: [Contains<T>] {
+    /// Whether an element equals `x`.
+    fn contains(x: T): bool {
+        return this.asSlice().contains(x);
+    }
+}
+
+extend<K :: [Hashable], V, H :: [Hasher]> Map<K, V, H> :: [Contains<K>] {
+    /// Whether `k` is one of the keys.
+    fn contains(k: K): bool {
+        return this.containsKey(k);
     }
 }

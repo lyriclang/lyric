@@ -4261,3 +4261,20 @@ extend<I :: [Iterator]> I {
         return try C.fromIter(this);
     }
 }
+
+// --- membership (05 §12 rule 10; 10 C12; M8a S15) -----------------------------------------------
+// `x in xs` is `xs.contains(x)`: a range holds what lies between its bounds.
+
+extend<T :: [Ordered]> Range<T> :: [Contains<T>] {
+    /// Whether `x` lies from `start` up to, not including, `end`.
+    fn contains(x: T): bool {
+        return this.start <= x && x < this.end;
+    }
+}
+
+extend<T :: [Ordered]> RangeInclusive<T> :: [Contains<T>] {
+    /// Whether `x` lies from `start` to `end`, both included.
+    fn contains(x: T): bool {
+        return this.start <= x && x <= this.end;
+    }
+}

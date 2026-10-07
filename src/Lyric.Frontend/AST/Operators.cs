@@ -11,6 +11,8 @@ namespace Lyric.AST
         AddWrap, SubWrap, MulWrap,
         Shl, Shr, BitAnd, BitXor, BitOr,
         Lt, Le, Gt, Ge, Eq, Ne,
+        // 'x in xs', 'x !in xs' (04 D6): 'xs.contains(x)' through 'Contains<T>', and its negation.
+        In, NotIn,
         LogicalAnd, LogicalOr,
         Coalesce
     }
@@ -54,6 +56,8 @@ namespace Lyric.AST
             TokenKind.GreaterEqual => BinaryOp.Ge,
             TokenKind.EqualEqual => BinaryOp.Eq,
             TokenKind.ExclamationEqual => BinaryOp.Ne,
+            TokenKind.In => BinaryOp.In,
+            TokenKind.NotIn => BinaryOp.NotIn,
             TokenKind.AmpAmp => BinaryOp.LogicalAnd,
             TokenKind.PipePipe => BinaryOp.LogicalOr,
             TokenKind.QuestionQuestion => BinaryOp.Coalesce,

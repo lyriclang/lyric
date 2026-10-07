@@ -2130,6 +2130,24 @@ public class LexerTests
         Assert.False(diag.HasErrors);
     }
 
+    /// <summary>'!in' (08 Y-table, 04 D6): one token where 'in' follows the '!' as a word of its
+    /// own; '!inside' is '!' and a name, and 'x! in' an unwrap before 'in'.</summary>
+    [Fact]
+    public void Not_in_is_one_token_against_a_word()
+    {
+        static TokenKind[] Kinds(string text)
+        {
+            var (tokens, diag) = Tokenize(text);
+            Assert.False(diag.HasErrors);
+            return tokens.Select(t => t.TokenKind).ToArray();
+        }
+        Assert.Equal(new[] { TokenKind.Identifier, TokenKind.NotIn, TokenKind.Identifier, TokenKind.Eof }, Kinds("x !in xs"));
+        Assert.Equal(new[] { TokenKind.Identifier, TokenKind.NotIn, TokenKind.LParen, TokenKind.Identifier, TokenKind.RParen, TokenKind.Eof }, Kinds("x!in(xs)"));
+        Assert.Equal(new[] { TokenKind.Exclamation, TokenKind.Identifier, TokenKind.Eof }, Kinds("!inside"));
+        Assert.Equal(new[] { TokenKind.Exclamation, TokenKind.Identifier, TokenKind.Eof }, Kinds("!in2"));
+        Assert.Equal(new[] { TokenKind.Identifier, TokenKind.Exclamation, TokenKind.In, TokenKind.Identifier, TokenKind.Eof }, Kinds("x! in xs"));
+    }
+
     [Fact]
     public void Comparison_and_logical_chain()
     {

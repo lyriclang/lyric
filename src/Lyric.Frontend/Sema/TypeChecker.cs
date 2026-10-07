@@ -107,6 +107,8 @@ public sealed class TypeChecker
     // 'fstringStart' (10 S6): std.core declaring it is Lyric 5's f-string — one builder, each hole a
     // piece of it (12 §2 rule 4); the 4.x tools keep their converters and concat chain.
     private readonly bool _fstringBuilder;
+    // 'Contains<T>' (04 D6): what 'x in xs' asks of the right operand's type.
+    private readonly TypeSymbol? _coreContains;
 
     private LyrType _currentReturn = LyrType.Void;
     private LyrType? _currentYield; // the yield type when the current function is a coroutine
@@ -182,6 +184,8 @@ public sealed class TypeChecker
         _debug = comp.FindModule(["std", "core"])?.Members.LookupLocal("Debug")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } debug ? debug : null;
         _fstringBuilder = comp.FindModule(["std", "core"])?.Members.LookupLocal("fstringStart") is not null;
+        _coreContains = comp.FindModule(["std", "core"])?.Members.LookupLocal("Contains")
+            is TypeSymbol { Kind: TypeSymbolKind.Interface } coreContains ? coreContains : null;
 
         // 'Equatable<T>' is what '==' desugars through on a user type, 'Ordered<T>' what the four
         // comparisons desugar through — the same pattern as 'Iterator' for 'for-in': the compiler
@@ -4666,6 +4670,7 @@ public sealed class TypeChecker
     {
         switch (b.Operator)
         {
+            case BinaryOp.In or BinaryOp.NotIn: return CheckMembership(b, r, scope);
             case BinaryOp.Add: return CheckAdd(b, l, r, scope);
             case BinaryOp.Mul: return CheckMul(b, l, r, scope);
             case BinaryOp.Sub:
@@ -4746,6 +4751,60 @@ public sealed class TypeChecker
             default: // Coalesce
                 return CheckCoalesce(b, l, r);
         }
+    }
+
+    /// <summary>
+    /// Membership (05 §12 rule 10; 04 D6, 10 C12): <c>x in xs</c> is <c>xs.contains(x)</c> through
+    /// <c>Contains&lt;T&gt;</c> — a range, an array, a view, a list, a set, a map's keys — and on a
+    /// text any <c>Pattern</c>, through the text's own <c>contains</c>; <c>!in</c> is the negation.
+    /// The call is checked as written and recorded for the lowering, which evaluates <c>x</c> before
+    /// the container: the operands go left to right, and the call's receiver is the right one.
+    /// </summary>
+    private LyrType CheckMembership(BinaryExpr b, LyrType r, SymbolTable scope)
+    {
+        var op = b.Operator is BinaryOp.In ? "in" : "!in";
+        // 'x in []': the container gives the element its type, and an empty literal has none.
+        if (b.Right is ArrayLitExpr { Elements.Length: 0 })
+        {
+            _de.Report("LYR-SEM0060", Severity.Error, b.Right.Span,
+                $"'[]' fixes no type of its own, and '{op}' asks the container for one — write it: 'let none: int[] = [];'");
+            return LyrType.Bool;
+        }
+        var text = r is StringViewType || TypeFacts.IsString(r);
+        if (!text && (_coreContains is not { } contains || ContainsElement(r, contains) is null))
+        {
+            _de.Report("LYR-SEM0059", Severity.Error, b.Span,
+                $"'{op}' is not defined for '{TypeFacts.Display(r)}' — membership comes from "
+                + "'Contains<T>' ('fn contains(x: T): bool'): a range, an array, a view, a list, a set, "
+                + "a map's keys and a text have it");
+            return LyrType.Bool;
+        }
+        // MemberSpan stays invalid: the operator text carries no member name.
+        var member = new MemberExpr(b.Right, "contains", IsOptional: false, b.Span) { MemberSpan = default };
+        if (TakesTheOtherSidesType(b.Right)) _typedReceiver.Add(member);
+        var call = new CallExpr(member, [b.Left], b.Span);
+        if (!CheckExpr(call, scope).IsError) _result.DesugarOperator(b, call);
+        return LyrType.Bool;
+    }
+
+    /// <summary>The element a container is a <c>Contains</c> of: an array's or a view's through
+    /// std.core's blocks, a named type's through its conformance — its own list or a block.</summary>
+    private LyrType? ContainsElement(LyrType container, TypeSymbol contains)
+    {
+        LyrType? element = container switch
+        {
+            ArrayOf a => a.Element,
+            SliceOf s => s.Element,
+            InlineArrayOf ia => ia.Element,
+            _ => null,
+        };
+        if (element is not null)
+            return Satisfies(container, contains, new GenericInstance(contains, [element])) ? element : null;
+        if (TypeSymbolOf(container) is not { } ts) return null;
+        var ofInstance = container is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+        foreach (var (instance, _) in ConformancesTo(ts, contains, ofInstance))
+            if (instance is GenericInstance { Arguments: [var x] }) return x;
+        return null;
     }
 
     /// <summary>
@@ -5511,6 +5570,8 @@ public sealed class TypeChecker
         BinaryOp.Ge => ">=",
         BinaryOp.Eq => "==",
         BinaryOp.Ne => "!=",
+        BinaryOp.In => "in",
+        BinaryOp.NotIn => "!in",
         BinaryOp.LogicalAnd => "&&",
         BinaryOp.LogicalOr => "||",
         BinaryOp.Coalesce => "??",
