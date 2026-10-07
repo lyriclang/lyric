@@ -1787,9 +1787,10 @@ public sealed class TypeChecker
     {
         var covered = new HashSet<TypeSymbol>(ReferenceEqualityComparer.Instance);
         foreach (var p in pats)
-            if (p is TypePattern { Type: NamedType nt } && _binding.Resolve(nt) is { } bound
-                && (bound is ImportBindingSymbol ib ? ib.Target : bound) is TypeSymbol tested)
-                covered.Add(tested);
+            foreach (var node in p switch { TypePattern tp => new[] { tp.Type }, TypeSetPattern ts => ts.Types, _ => [] })
+                if (node is NamedType nt && _binding.Resolve(nt) is { } bound
+                    && (bound is ImportBindingSymbol ib ? ib.Target : bound) is TypeSymbol tested)
+                    covered.Add(tested);
         return SealedConformers(iface).Where(c => !covered.Contains(c)).Select(c => $"_: {c.Name}").ToList();
     }
 
@@ -4462,6 +4463,72 @@ public sealed class TypeChecker
     }
 
     /// <summary>
+    /// <c>Point { v }</c> (02 I3): a trailing block holding one name, after a struct, a class or a
+    /// struct variant, is the shorthand initializer it reads as, <c>Point { v = v }</c>. The parser
+    /// cannot tell it from <c>run { v }</c> and reads a trailing block; what the callee names
+    /// decides here. A type with a trailing block was an error before — its factory, if any, is
+    /// called with parentheses — so no program that compiled changes its meaning. The name's read
+    /// is the block's own node, so every walk over the written call sees it. <c>null</c> where the
+    /// call is no such thing. Resolved without a mark or a report: the initializer does that.
+    /// </summary>
+    private StructInitExpr? ShorthandInitOf(CallExpr call, SymbolTable scope, LyrType? expected)
+    {
+        if (call.TypeArguments is not null
+            || call.Arguments is not [LambdaExpr { Form: LambdaForm.Trailing, Body: IdentifierExpr field } block]
+            || block.Parameters.Any(p => !p.Implicit))
+            return null;
+
+        static bool Fielded(Symbol? s) =>
+            s is TypeSymbol { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class }
+                or EnumVariantSymbol { Declaration: EnumVariant { StructFields: not null } };
+
+        string[] path;
+        Span nameSpan;
+        var implicitly = false;
+        switch (call.Callee)
+        {
+            case ImplicitMemberExpr im:
+                if (EnumFromExpected(expected) is not { } target || !Fielded(target.def.Members.LookupLocal(im.Name))) return null;
+                path = [im.Name];
+                nameSpan = im.Span with { Start = im.Span.End - im.Name.Length };
+                implicitly = true;
+                break;
+            case IdentifierExpr or MemberExpr when NamePath(call.Callee) is { } names:
+            {
+                var cur = scope.Lookup(names[0]) ?? ImplicitType(call.Span.File, names[0]);
+                for (var i = 1; i < names.Length && cur is not null; i++)
+                    cur = (cur is ImportBindingSymbol through ? through.Target : cur) switch
+                    {
+                        ModuleSymbol mod => mod.Members.LookupLocal(names[i]),
+                        TypeSymbol t => t.Members.LookupLocal(names[i]),
+                        _ => null,
+                    };
+                if (cur is ImportBindingSymbol reached) cur = reached.Target;
+                // 'Triangle { v }' where an enum is expected names its variant, as in an initializer.
+                var contextual = cur is null && names.Length == 1 && EnumFromExpected(expected) is { } ex
+                    && Fielded(ex.def.Members.LookupLocal(names[0]));
+                if (!contextual && !Fielded(cur)) return null;
+                path = names;
+                nameSpan = call.Callee is MemberExpr m ? m.MemberSpan : call.Callee.Span;
+                break;
+            }
+            default:
+                return null;
+        }
+        return new StructInitExpr(path, [],
+            [new StructInitField(field.Name, field, field.Span) { NameSpan = field.Span, IsShorthand = true }], call.Span)
+            { NameSpan = nameSpan, IsImplicit = implicitly };
+    }
+
+    /// <summary>The names of a callee written as a path, <c>geo.Shape.Rect</c>; <c>null</c> for anything else.</summary>
+    private static string[]? NamePath(Expr callee) => callee switch
+    {
+        IdentifierExpr id => [id.Name],
+        MemberExpr { IsOptional: false } m when NamePath(m.Target) is { } head => [.. head, m.Member],
+        _ => null,
+    };
+
+    /// <summary>
     /// <c>Point(1, 2)</c> is <c>Point.new(1, 2)</c> (design/v5/spec/08 Y9, 04 D11): a type name
     /// in call position means the type's factory, and <c>new</c> is an ordinary static
     /// function — there are no constructors, so there is no half-built <c>this</c>, and a
@@ -6306,6 +6373,11 @@ public sealed class TypeChecker
         if (call.Callee is IdentifierExpr identity && _same is not null
             && ReferenceEquals(calleeScope.Lookup(identity.Name), _same))
             return CheckSame(call, identity, scope);
+        if (ShorthandInitOf(call, calleeScope, expected) is { } shorthand)
+        {
+            _result.DesugarShorthand(call, shorthand);
+            return CheckExpr(shorthand, scope, expected);
+        }
         if (ConstructedType(call.Callee, calleeScope) is { } constructed)
             return CheckConstruction(call, constructed, scope, calleeScope, expected);
 
@@ -9333,6 +9405,15 @@ public sealed class TypeChecker
                     si.Path is [var single]
                         ? NameSuggestion.Note(single, NamesIn(scope, typesOnly: true))
                         : null);
+            // Names alone after a name that is no type: 'run { a, b }' meant the parameters of a
+            // trailing block, which end with '=>'.
+            else if (si.Fields.Any(f => f.IsShorthand))
+            {
+                var names = string.Join(", ", si.Fields.Select(f => f.Name));
+                _de.Report("LYR-SEM0011", Severity.Error, si.Span,
+                    $"'{string.Join('.', si.Path)}' is no type, and '{{ {names} }}' reads as an initializer's fields",
+                    new DiagnosticNote($"a trailing block names its parameters before '=>': '{si.Path[^1]} {{ {names} => … }}'"));
+            }
             // A name that is no type, before braces that read as an initializer's: 'run { x = 5 }'.
             // It said nothing — the error type went on to the lowering, which stopped on it. The
             // likeliest meaning is a trailing block whose assignment lacks its ';' (M6-2).
@@ -10064,7 +10145,11 @@ public sealed class TypeChecker
         scrutinee is IdentifierExpr id && _result.RefOf(id) is LocalSymbol { Declaration: CatchClause clause } binding
         // A binding of ONE type is that type (M5-6), and is matched as a value of it.
         && (_error is null || binding.Type is NamedRef { Symbol: var root } && ReferenceEquals(root, _error))
-            ? _result.CatchSet(clause) : null;
+            ? _result.CatchSet(clause)
+            // A type-set pattern's 'let' binding carries its set as a clause's does (08 Y6).
+            : scrutinee is IdentifierExpr held
+              && _result.RefOf(held) is LocalSymbol { Declaration: TypeSetPattern { Types.Length: > 1 } pattern, IsMutable: false }
+                ? _result.TypeSet(pattern) : null;
 
     /// <summary>What the arms leave of a catch binding's set (K7): every type of the set no
     /// unguarded type pattern covers — the type itself, or an interface it conforms to — as the
@@ -10072,7 +10157,8 @@ public sealed class TypeChecker
     private List<string> MissingFromSet(LyrType[] set, List<Pattern> pats, LyrType scrutinee)
     {
         if (pats.Any(p => IsIrrefutable(p, scrutinee, nested: false))) return [];
-        var tested = pats.OfType<TypePattern>().Select(p => _result.TypeTested(p)).OfType<LyrType>().ToList();
+        var tested = pats.OfType<TypePattern>().Select(p => _result.TypeTested(p)).OfType<LyrType>()
+            .Concat(pats.OfType<TypeSetPattern>().SelectMany(p => _result.TypeSet(p) ?? [])).ToList();
         return set.Where(t => !tested.Any(u => ThrownCoveredBy(t, u, _currentModule)))
             .Select(t => $"_: {TypeFacts.Display(t)}").ToList();
     }
@@ -10468,6 +10554,34 @@ public sealed class TypeChecker
                 return;
             }
 
+            case TypeSetPattern ts:
+            {
+                // 's in [Circle, Rect]' (08 Y6): one of the types, the form of 'catch (e in [A, B])'.
+                // A set of one binds as its type; a larger one as what the scrutinee holds, an
+                // interface value carrying the set (K7) — a match over it covers the set, a rethrow
+                // throws it.
+                var interfaceValue = TypeFacts.SymbolOf(scrutinee) is { Kind: TypeSymbolKind.Interface };
+                var set = new List<LyrType>();
+                foreach (var node in ts.Types)
+                {
+                    var tested = ResolveType(node, scope);
+                    set.Add(tested);
+                    if (!tested.IsError && !scrutinee.IsError && interfaceValue) CheckTestTarget(tested, node.Span);
+                }
+                if (!scrutinee.IsError && !interfaceValue && set.Any(t => !t.IsError))
+                    _de.Report("LYR-SEM0131", Severity.Error, ts.Span,
+                        $"a type pattern asks an interface value what it holds; a '{TypeFacts.Display(scrutinee)}' is known already");
+                _result.RecordTypeSet(ts, set.ToArray());
+                if (ts.Name is { } bound)
+                {
+                    var held = set is [var one] ? one : scrutinee is Optional maybe ? maybe.Inner : scrutinee;
+                    var tsl = new LocalSymbol(bound, held, mutable, ts);
+                    DeclareBinding(scope, tsl, ts.NameSpan);
+                    _result.BindRef(ts, tsl);
+                }
+                return;
+            }
+
             case BindingPattern b:
                 // A bare name is a binding, always (08 Y6). One that spells a variant of the
                 // scrutinee's enum would match everything under the variant's name: refused,
@@ -10804,6 +10918,9 @@ public sealed class TypeChecker
             case TypePattern tp when _result.RefOf(tp) is LocalSymbol tl:
                 if (canonical.Find(c => c.Name == tl.Name) is { } ctp) _result.BindRef(tp, ctp);
                 return;
+            case TypeSetPattern tsp when _result.RefOf(tsp) is LocalSymbol tsl:
+                if (canonical.Find(c => c.Name == tsl.Name) is { } cts) _result.BindRef(tsp, cts);
+                return;
             case FieldPattern { Pattern: null } f when _result.RefOf(f) is LocalSymbol l:
                 if (canonical.Find(c => c.Name == l.Name) is { } cf) _result.BindRef(f, cf);
                 return;
@@ -10868,6 +10985,11 @@ public sealed class TypeChecker
                 var ltp = new LocalSymbol(tname, LyrType.Error, false, tp);
                 scope.TryDeclare(ltp);
                 _result.BindRef(tp, ltp);
+                return;
+            case TypeSetPattern { Name: { } sname } tsp:
+                var lts = new LocalSymbol(sname, LyrType.Error, false, tsp);
+                scope.TryDeclare(lts);
+                _result.BindRef(tsp, lts);
                 return;
             case VariantPattern v:
                 foreach (var sub in v.TupleElements ?? []) BindPoison(sub, scope);

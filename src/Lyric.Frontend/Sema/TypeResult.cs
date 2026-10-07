@@ -246,6 +246,21 @@ public sealed class TypeResult
 
     public LyrType? TypeTested(TypePattern pattern) => _typesTested.GetValueOrDefault(pattern);
 
+    private readonly Dictionary<TypeSetPattern, LyrType[]> _typeSets = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The types a type-set pattern tests, resolved (08 Y6) — the set its binding carries.</summary>
+    public void RecordTypeSet(TypeSetPattern pattern, LyrType[] set) => _typeSets[pattern] = set;
+
+    public LyrType[]? TypeSet(TypeSetPattern pattern) => _typeSets.GetValueOrDefault(pattern);
+
+    private readonly Dictionary<CallExpr, StructInitExpr> _shorthands = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary><c>Point { v }</c>, read as a call with a trailing block, which the checker found to be
+    /// the shorthand initializer (02 I3): checked as that, and lowered as that.</summary>
+    public void DesugarShorthand(CallExpr call, StructInitExpr init) => _shorthands[call] = init;
+
+    public StructInitExpr? ShorthandOf(CallExpr call) => _shorthands.GetValueOrDefault(call);
+
     public Symbol? RefOf(Node node) => _refs.TryGetValue(node, out var s) ? s : null;
 
     /// <summary>

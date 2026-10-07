@@ -1110,8 +1110,9 @@ public sealed class AstFormatter
             Doc.LineOrSpace, Doc.From("}"));
     }
 
-    private Doc InitFieldDoc(StructInitField field) =>
-        Doc.Of(Doc.From($"{field.Name} = "), ExprDoc(field.Value, Assign));
+    private Doc InitFieldDoc(StructInitField field) => field.IsShorthand
+        ? Doc.From(field.Name)
+        : Doc.Of(Doc.From($"{field.Name} = "), ExprDoc(field.Value, Assign));
 
     /// <summary><c>p with { x = 1, pos.y = 2 }</c>: the postfix and its fields like an initializer's.</summary>
     private Doc WithDoc(WithExpr with)
@@ -1137,6 +1138,10 @@ public sealed class AstFormatter
         LiteralPattern l => LiteralPatternDoc(l),
         BindingPattern b => Doc.From(b.Name),
         TypePattern tp => Doc.Of(Doc.From((tp.Name ?? "_") + ": "), TypeDoc(tp.Type)),
+        // One type bare, several in brackets: the list rule, as on a catch clause.
+        TypeSetPattern { Types: [var only] } ts => Doc.Of(Doc.From((ts.Name ?? "_") + " in "), TypeDoc(only)),
+        TypeSetPattern ts => Doc.Of(Doc.From((ts.Name ?? "_") + " in ["),
+            Doc.Join(Doc.From(", "), ts.Types.Select(TypeDoc).ToArray()), Doc.From("]")),
         VariantPattern v => VariantPatternDoc(v),
         TuplePattern t => Doc.Of(Doc.From("("),
             Doc.Join(Doc.From(", "), t.Elements.Select(PatternDoc).ToArray()), Doc.From(")")),

@@ -536,6 +536,9 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   `Identity` compares by the object and hashes its address (02 M10), and the prelude passes
   `Identity` on. A coroutine's `Identity` (06 A7) is N2d's: blocks on `Coroutine` have gaps of
   their own.
+  **N2c**: a name alone is its field, `Point { x, y }` (02 I3) — after a type one name alone
+  too, where the parser reads a trailing block and the checker decides; a pattern takes a type
+  set, `s in [Circle, Rect] =>` (08 Y6), whose binding carries the set as a catch binding's does.
 
 ### M8a — done (2026-10-07)
 

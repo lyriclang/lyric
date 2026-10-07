@@ -90,6 +90,7 @@ internal sealed class FlowAnalyzer
         {
             case BindingPattern: yield return pattern; break;
             case TypePattern { Name: not null }: yield return pattern; break;
+            case TypeSetPattern { Name: not null }: yield return pattern; break;
             case TuplePattern t:
                 foreach (var element in t.Elements)
                     foreach (var inner in BoundNames(element)) yield return inner;
@@ -394,6 +395,7 @@ internal sealed class FlowAnalyzer
         {
             case BindingPattern b: if (_types.RefOf(b) is { } s) set.Add(s); return;
             case TypePattern tp: if (_types.RefOf(tp) is { } ts) set.Add(ts); return;
+            case TypeSetPattern tsp: if (_types.RefOf(tsp) is { } tss) set.Add(tss); return;
             case VariantPattern v:
                 foreach (var sub in v.TupleElements ?? []) AddPatternBindings(sub, set);
                 foreach (var f in v.StructFields ?? [])

@@ -434,6 +434,40 @@ public class ParserTests
         Assert.IsType<StructInitExpr>(Assert.IsType<ThrowStmt>(Assert.Single(body.Statements)).Value);
     }
 
+    // 02 I3 (N2c): names before a ',' are an initializer's shorthand, mixed with written fields;
+    // the same names before '=>' are a trailing block's parameters; one name alone stays a block's
+    // here — the sema decides by what the callee names.
+    [Fact]
+    public void A_name_list_is_an_initializers_shorthand()
+    {
+        var (expr, de) = Parse("Point { x, y = 2, z }");
+        Assert.Empty(de.Diagnostics);
+        var init = Assert.IsType<StructInitExpr>(expr);
+        Assert.Equal([true, false, true], init.Fields.Select(f => f.IsShorthand));
+        Assert.Equal("x", Assert.IsType<IdentifierExpr>(init.Fields[0].Value).Name);
+    }
+
+    [Fact]
+    public void Names_before_an_arrow_are_a_trailing_blocks_parameters()
+    {
+        var (expr, de) = Parse("xs.fold(0) { acc, x => acc + x }");
+        Assert.Empty(de.Diagnostics);
+        var lambda = Assert.IsType<LambdaExpr>(Assert.IsType<CallExpr>(expr).Arguments[^1]);
+        Assert.Equal(["acc", "x"], lambda.Parameters.Select(p => p.Name));
+    }
+
+    [Fact]
+    public void One_name_alone_is_a_trailing_block_except_after_type_arguments()
+    {
+        var (call, de) = Parse("run { v }");
+        Assert.Empty(de.Diagnostics);
+        Assert.IsType<LambdaExpr>(Assert.IsType<CallExpr>(call).Arguments[^1]);
+
+        var (init, de2) = Parse("Box<int> { v }");
+        Assert.Empty(de2.Diagnostics);
+        Assert.True(Assert.Single(Assert.IsType<StructInitExpr>(init).Fields).IsShorthand);
+    }
+
     [Fact]
     public void Match_statement_parses_arms()
     {
@@ -638,6 +672,31 @@ public class ParserTests
         var de = new DiagnosticEngine(sm);
         var pattern = new Parser(sm, id, de).ParsePattern();
         return (pattern, de);
+    }
+
+    // 08 Y6 (N2c): 's in [A, B]', '_ in [A, B]', one type bare; inside a tuple the ',' after a
+    // bare type is the next element.
+    [Fact]
+    public void A_type_set_pattern_parses()
+    {
+        var named = Assert.IsType<TypeSetPattern>(ParsePattern("s in [Circle, Rect]").pattern);
+        Assert.Equal("s", named.Name);
+        Assert.Equal(2, named.Types.Length);
+        var unnamed = Assert.IsType<TypeSetPattern>(ParsePattern("_ in Circle").pattern);
+        Assert.Null(unnamed.Name);
+        Assert.Single(unnamed.Types);
+        var (tuple, de) = ParsePattern("(s in Circle, n)");
+        Assert.Empty(de.Diagnostics);
+        var elements = Assert.IsType<TuplePattern>(tuple).Elements;
+        Assert.IsType<TypeSetPattern>(elements[0]);
+        Assert.IsType<BindingPattern>(elements[1]);
+    }
+
+    [Fact]
+    public void An_empty_type_set_is_refused()
+    {
+        var (_, de) = ParsePattern("s in []");
+        Assert.Equal(["LYR-PAR0049"], de.Diagnostics.Select(d => d.Code));
     }
 
     [Fact]
