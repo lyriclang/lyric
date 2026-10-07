@@ -1,6 +1,6 @@
 /// The containers (design/v5/spec/10 B7). Not safe across threads (C11): a `Mutex` holds one
 /// that is shared.
-import std.core { arrayOf, Hasher };
+import std.core { arrayOf, Hasher, StringBuilder };
 import std.hash { DefaultHasher };
 
 // --- List (10 C3) --------------------------------------------------------------------------------
@@ -878,4 +878,178 @@ fn less<T :: [TotalOrder]>(a: T, b: T): bool {
         .Less => true,
         _ => false,
     };
+}
+
+// --- equality and display (10 C9; M8a S14) -------------------------------------------------------
+// A list and a deque compare element by element in order, a set by its values and a map by its
+// entries, in any order; each writes its debug text — `[1, 2]`, `{1, 2}`, `{"a": 1}` — and shows
+// the same (C9). A heap writes its values in its own order, which no program may rely on.
+
+extend<T :: [Equatable]> List<T> :: [Equatable] {
+    fn equals(o: List<T>): bool {
+        return this.asSlice() == o.asSlice();
+    }
+}
+
+extend<T :: [Debug]> List<T> :: [Debug, Display] {
+    fn debug(): string {
+        return this.asSlice().debug();
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        this.asSlice().debugTo(&out);
+    }
+
+    fn show(): string {
+        return this.asSlice().debug();
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        this.asSlice().debugTo(&out);
+    }
+}
+
+extend<T :: [Equatable]> Deque<T> :: [Equatable] {
+    fn equals(o: Deque<T>): bool {
+        if (this.count != o.count) {
+            return false;
+        }
+        for (i in 0..this.count) {
+            if (!(this[i] == o[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+extend<T :: [Debug]> Deque<T> :: [Debug, Display] {
+    fn debug(): string {
+        var out = StringBuilder.new();
+        this.debugTo(&out);
+        return out.toString();
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        out.appendChar('[');
+        for (i in 0..this.count) {
+            if (i > 0) {
+                out.appendStr(", ");
+            }
+            this[i].debugTo(&out);
+        }
+        out.appendChar(']');
+    }
+
+    fn show(): string {
+        return this.debug();
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        this.debugTo(&out);
+    }
+}
+
+extend<T :: [Hashable], H :: [Hasher]> Set<T, H> :: [Equatable] {
+    fn equals(o: Set<T, H>): bool {
+        if (this.length() != o.length()) {
+            return false;
+        }
+        for (v in this) {
+            if (!o.contains(v)) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+extend<T :: [Hashable, Debug], H :: [Hasher]> Set<T, H> :: [Debug, Display] {
+    fn debug(): string {
+        var out = StringBuilder.new();
+        this.debugTo(&out);
+        return out.toString();
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        out.appendChar('{');
+        var first = true;
+        for (v in this) {
+            if (!first) {
+                out.appendStr(", ");
+            }
+            first = false;
+            v.debugTo(&out);
+        }
+        out.appendChar('}');
+    }
+
+    fn show(): string {
+        return this.debug();
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        this.debugTo(&out);
+    }
+}
+
+extend<K :: [Hashable], V :: [Equatable], H :: [Hasher]> Map<K, V, H> :: [Equatable] {
+    fn equals(o: Map<K, V, H>): bool {
+        if (this.length() != o.length()) {
+            return false;
+        }
+        for (entry in this) {
+            let (k, v) = entry;
+            let theirs = o.get(k);
+            if (theirs == null) {
+                return false;
+            }
+            if (!(theirs == v)) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+extend<K :: [Hashable, Debug], V :: [Debug], H :: [Hasher]> Map<K, V, H> :: [Debug, Display] {
+    fn debug(): string {
+        var out = StringBuilder.new();
+        this.debugTo(&out);
+        return out.toString();
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        out.appendChar('{');
+        var first = true;
+        for (entry in this) {
+            let (k, v) = entry;
+            if (!first) {
+                out.appendStr(", ");
+            }
+            first = false;
+            k.debugTo(&out);
+            out.appendStr(": ");
+            v.debugTo(&out);
+        }
+        out.appendChar('}');
+    }
+
+    fn show(): string {
+        return this.debug();
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        this.debugTo(&out);
+    }
+}
+
+extend<T :: [TotalOrder, Debug]> Heap<T> :: [Debug] {
+    fn debug(): string {
+        return this.items.debug();
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        this.items.debugTo(&out);
+    }
 }

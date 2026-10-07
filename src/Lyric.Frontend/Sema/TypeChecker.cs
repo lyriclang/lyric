@@ -1069,6 +1069,14 @@ public sealed class TypeChecker
     /// </summary>
     private void ProbeImplicitBlocks()
     {
+        // A type that writes its Debug in a block has written one (05 §14 rule 7): the implicit
+        // one stands back — std's containers write theirs under a constraint (10 C9; M8a S14).
+        if (_debug is { } debug)
+            foreach (var block in _comp.Extensions.Blocks.Where(b => b.IsImplicit && b.Target is not null).ToArray())
+                if (_comp.Extensions.Blocks.Any(other => !other.IsImplicit && ReferenceEquals(other.Target, block.Target)
+                        && other.Decl.Interfaces.Any(node => ReferenceEquals(Conformance.InterfaceOf(node, _binding), debug))))
+                    _comp.Extensions.Withdraw(block);
+
         bool withdrew;
         do
         {
@@ -4509,6 +4517,10 @@ public sealed class TypeChecker
     }
 
     /// <summary>The forms that read the type they belong to from their position (Y9).</summary>
+    /// <summary>A side of <c>==</c> that is typed by the other: an implicit member (08 Y9), an
+    /// array literal — <c>[]</c> fixes no type of its own.</summary>
+    private static bool TakesTheOtherSidesType(Expr e) => IsImplicitForm(e) || e is ArrayLitExpr;
+
     private static bool IsImplicitForm(Expr e) =>
         e is ImplicitMemberExpr or CallExpr { Callee: ImplicitMemberExpr } or StructInitExpr { IsImplicit: true };
 
@@ -4588,9 +4600,10 @@ public sealed class TypeChecker
 
     private LyrType CheckBinary(BinaryExpr b, SymbolTable scope)
     {
-        // 'x == .Red': the implicit member takes the other side's type (08 Y9). When the
-        // implicit side is the left one, the right side goes first and lends its type.
-        if (b.Operator is BinaryOp.Eq or BinaryOp.Ne && IsImplicitForm(b.Left) && !IsImplicitForm(b.Right))
+        // 'x == .Red': the implicit member takes the other side's type (08 Y9), and so does an
+        // array literal, 'xs == []' (M8a S14: arrays compare). When the side that needs the type
+        // is the left one, the right side goes first and lends its type.
+        if (b.Operator is BinaryOp.Eq or BinaryOp.Ne && TakesTheOtherSidesType(b.Left) && !TakesTheOtherSidesType(b.Right))
         {
             var rightFirst = CheckExpr(b.Right, scope);
             var leftAfter = CheckExpr(b.Left, scope, rightFirst.IsError ? null : rightFirst);
@@ -4614,7 +4627,7 @@ public sealed class TypeChecker
         }
         else
         {
-            r = CheckExpr(b.Right, scope, b.Operator is BinaryOp.Eq or BinaryOp.Ne && IsImplicitForm(b.Right) && !l.IsError ? l : null);
+            r = CheckExpr(b.Right, scope, b.Operator is BinaryOp.Eq or BinaryOp.Ne && TakesTheOtherSidesType(b.Right) && !l.IsError ? l : null);
         }
 
         if (l.IsError || r.IsError) return LyrType.Error;
@@ -4762,6 +4775,14 @@ public sealed class TypeChecker
     private void CheckEquatable(BinaryExpr b, LyrType l, LyrType r, SymbolTable scope)
     {
         if (l is NullType || r is NullType) { CheckNullTest(b, l, r); return; }
+
+        // '[] == []': each side takes the other's type, and neither has one (M8a S14).
+        if (b.Left is ArrayLitExpr { Elements.Length: 0 } && b.Right is ArrayLitExpr { Elements.Length: 0 })
+        {
+            _de.Report("LYR-SEM0060", Severity.Error, b.Span,
+                "'[]' fixes no type of its own, and the other side gives it none — write one: 'let none: int[] = [];'");
+            return;
+        }
         if (l is PrimitiveType or ErrorType) return;
 
         // Two values of the SAME opaque alias compare like their underlying — a handle must be
@@ -4782,6 +4803,14 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0059", Severity.Error, b.Span,
                 $"'{op}' is not defined for '{TypeFacts.Display(l)}' — an optional compares "
                 + "against 'null'; narrow it first, then compare the value");
+            return;
+        }
+
+        // A shape compares through the Equatable its block gives (05 §13 rule 6) — an array or a
+        // view through std.core's, element by element (10 C9; M8a S14); else it has no '=='.
+        if (IsShape(l) && _equatable is { } shapeEquatable && Satisfies(l, shapeEquatable, SelfInstance(shapeEquatable, l)))
+        {
+            DesugarToMethodCall(b, "equals", scope);
             return;
         }
 
@@ -4874,7 +4903,7 @@ public sealed class TypeChecker
             { MemberSpan = default };
         var call = new CallExpr(member, [b.Right], b.Span);
         if (target is { } t) _operatorTarget[member] = t;
-        if (IsImplicitForm(b.Left)) _typedReceiver.Add(member);
+        if (TakesTheOtherSidesType(b.Left)) _typedReceiver.Add(member);
 
         var type = CheckExpr(call, scope);
         if (type.IsError) return LyrType.Error;
@@ -5691,7 +5720,7 @@ public sealed class TypeChecker
         var conforms = _display is { } display
                        && (type is NamedRef { Symbol.Kind: TypeSymbolKind.Interface } iface
                            ? Conformance.WithParents(iface.Symbol, _binding).Any(i => ReferenceEquals(i, display))
-                           : CanConform(type) && Satisfies(type, display, new NamedRef(display)));
+                           : (CanConform(type) || IsShape(type)) && Satisfies(type, display, new NamedRef(display)));
         if (!conforms)
         {
             _de.Report("LYR-SEM0006", Severity.Error, hole.Expr.Span,
@@ -5912,7 +5941,7 @@ public sealed class TypeChecker
     private bool RendersThrough(LyrType type, TypeSymbol iface) =>
         type is NamedRef { Symbol.Kind: TypeSymbolKind.Interface } value
             ? Conformance.WithParents(value.Symbol, _binding).Any(i => ReferenceEquals(i, iface))
-            : CanConform(type) && Satisfies(type, iface, new NamedRef(iface));
+            : (CanConform(type) || IsShape(type)) && Satisfies(type, iface, new NamedRef(iface));
 
     private LyrType CheckIndex(IndexExpr ix, SymbolTable scope)
     {
@@ -7929,7 +7958,18 @@ public sealed class TypeChecker
         // permissive default below would let 'Map<Entity, V>' compile against members the type
         // walled off. Convert to the underlying where a constraint is needed.
         OpaqueRef => false,
-        _ => true // external or error: pass through opaquely
+
+        // 'null' alone is no type a constraint could hold for: bound as a type argument it passed
+        // every one and failed in the lowering (M8a S14). A name that is no value is reported
+        // where it stands.
+        NullType or NonValueType => false,
+
+        // An error was reported where it arose. A primitive without std.core's blocks and the
+        // internal range type are the 4.x tools' (their stdlib conforms neither).
+        ErrorType or PrimitiveType or RangeOf => true,
+
+        // Nothing else passes unasked.
+        _ => false,
     };
 
     /// <summary>std.core's <c>Join</c> of each compilation, with the root it reduces to.</summary>

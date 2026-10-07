@@ -1,0 +1,88 @@
+// Equality and display of arrays, views and the containers (design/v5/spec/10 C9; spec 12):
+// element by element in order, a set's and a map's in any order; the debug text, the same shown.
+import std.collections { Deque, Heap, List, Map, Set };
+import std.test { assertEq, assertFalse, assertTrue };
+
+@Test
+fn arraysAndViewsCompareElementByElement(): void {
+    let a = [1, 2, 3];
+    assertTrue(a == [1, 2, 3]);
+    assertFalse(a == [1, 2]);
+    assertFalse(a == [1, 2, 4]);
+    assertTrue(a[1..] == [5, 2, 3][1..]);
+    let none: int[] = [];
+    assertTrue(none == []);
+    assertTrue([] == none);
+    assertFalse(a == []);
+    assertTrue([[1], [2, 3]] == [[1], [2, 3]]);
+    assertFalse([[1], [2, 3]] == [[1], [2]]);
+}
+
+@Test
+fn aSetComparesInAnyOrder(): void {
+    let up = Set<int>.new();
+    let down = Set<int>.new();
+    for (i in 0..100) {
+        up.insert(i);
+        down.insert(99 - i);
+    }
+    assertTrue(up == down);
+    down.insert(100);
+    assertFalse(up == down);
+    assertFalse(down == up);
+    down.remove(100);
+    down.remove(50);
+    assertFalse(up == down);
+}
+
+@Test
+fn aMapComparesItsKeysAndValues(): void {
+    let a = Map<string, int>.new();
+    let b = Map<string, int>.new();
+    for (i in 0..50) {
+        a.insert(f"k{i}", i);
+        b.insert(f"k{49 - i}", 49 - i);
+    }
+    assertTrue(a == b);
+    b.insert("k7", 8);
+    assertFalse(a == b);
+    b.insert("k7", 7);
+    assertTrue(a == b);
+    b.remove("k7");
+    b.insert("k50", 7);
+    assertFalse(a == b);
+}
+
+@Test
+fn aDequeComparesWhereverItsRingBegins(): void {
+    let front = Deque<int>.new();
+    let back = Deque<int>.new();
+    for (i in 0..20) {
+        front.pushFront(19 - i);
+        back.pushBack(i);
+    }
+    assertTrue(front == back);
+    assertEq(f"{front}", f"{back}");
+    back.popBack();
+    assertFalse(front == back);
+}
+
+@Test
+fn theDebugTextOfEach(): void {
+    let quoted = ["a, b", "c"];
+    assertEq(f"{quoted}", "[\"a, b\", \"c\"]");
+    assertEq(f"{List<List<int>>.of([List<int>.of([1]), List<int>.new()])}", "[[1], []]");
+    let d = Deque<char>.new();
+    d.pushBack('x');
+    assertEq(f"{d:?}", "['x']");
+    let m = Map<int, string>.new();
+    m.insert(1, "one");
+    assertEq(f"{m}", "{1: \"one\"}");
+    assertEq(m.debug(), m.show());
+    let h = Heap<int>.new();
+    h.push(2);
+    h.push(1);
+    assertEq(h.debug(), "[1, 2]");
+    h.pop();
+    assertEq(f"{h:?}", "[2]");
+}
