@@ -606,9 +606,7 @@ public sealed partial class Parser
                 var name = _buffer.Advance();
                 var text = _sm.Slice(name.Span).ToString();
                 var span = Span.Union(cur.Span, name.Span);
-                if (_allowStructInit && _buffer.Check(TokenKind.LBrace)
-                    && (_buffer.Peek(1).TokenKind == TokenKind.RBrace
-                        || (_buffer.Peek(1).TokenKind == TokenKind.Identifier && _buffer.Peek(2).TokenKind == TokenKind.Equal)))
+                if (_allowStructInit && _buffer.Check(TokenKind.LBrace) && InitializerBodyAhead(0))
                     return ParseStructInitFields([text], [], span, name.Span, implicitMember: true);
                 return new ImplicitMemberExpr(text, span);
             }
@@ -847,10 +845,12 @@ public sealed partial class Parser
         while (_buffer.Peek(i).TokenKind == TokenKind.Dot
                && _buffer.Peek(i + 1).TokenKind == TokenKind.Identifier)
             i += 2;
+        var withArguments = false;
         if (_buffer.Peek(i).TokenKind == TokenKind.Less)
         {
             i = SkipTypeArgs(i);
             if (i < 0) return false;
+            withArguments = true;
 
             // One more segment may follow the arguments: in 'Ev<int>.Hit { … }' the arguments
             // belong to the enum and the variant hangs off the back. Without this line a struct
@@ -859,8 +859,11 @@ public sealed partial class Parser
                 && _buffer.Peek(i + 1).TokenKind == TokenKind.Identifier)
                 i += 2;
         }
-        // The body decides the rest.
-        return _buffer.Peek(i).TokenKind == TokenKind.LBrace && InitializerBodyAhead(i);
+        // The body decides the rest. After type arguments one name alone is the shorthand too,
+        // 'Box<int> { v }': nothing with arguments takes a trailing block.
+        return _buffer.Peek(i).TokenKind == TokenKind.LBrace
+            && (InitializerBodyAhead(i) || withArguments && _buffer.Peek(i + 1).TokenKind == TokenKind.Identifier
+                && _buffer.Peek(i + 2).TokenKind == TokenKind.RBrace);
     }
 
     /// <summary>
@@ -877,7 +880,22 @@ public sealed partial class Parser
     {
         var after = _buffer.Peek(open + 1).TokenKind;
         if (after == TokenKind.RBrace) return true;
-        if (after != TokenKind.Identifier || _buffer.Peek(open + 2).TokenKind != TokenKind.Equal) return false;
+        if (after != TokenKind.Identifier) return false;
+
+        // 'S { v, w }', 'S { v, w = 2 }' (02 I3): names before a ',' are an initializer's
+        // shorthand — unless a '=>' follows them, the parameters of a trailing block
+        // ('{ acc, x => … }', 08 Y11 F2). One name alone, 'S { v }', stays a trailing block's
+        // here: whether 'S' is a type that makes it the shorthand is the sema's to say.
+        if (_buffer.Peek(open + 2).TokenKind == TokenKind.Comma)
+        {
+            var at = open + 1;
+            while (_buffer.Peek(at).TokenKind == TokenKind.Identifier && _buffer.Peek(at + 1).TokenKind == TokenKind.Comma)
+                at += 2;
+            return _buffer.Peek(at).TokenKind == TokenKind.RBrace
+                || _buffer.Peek(at).TokenKind == TokenKind.Identifier
+                    && _buffer.Peek(at + 1).TokenKind is TokenKind.RBrace or TokenKind.Equal;
+        }
+        if (_buffer.Peek(open + 2).TokenKind != TokenKind.Equal) return false;
         var depth = 0;
         for (var i = open + 3; ; i++)
         {
@@ -1013,9 +1031,18 @@ public sealed partial class Parser
         {
             var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
                 $"expected field name, got {_buffer.Current.TokenKind}");
+            var fieldName = _sm.Slice(nameTok.Span).ToString();
+            // 'S { v, w }' (02 I3): a name alone is 'v = v', the field from the binding of its name.
+            if (nameTok.TokenKind == TokenKind.Identifier && _buffer.Current.TokenKind is TokenKind.Comma or TokenKind.RBrace)
+            {
+                fields.Add(new StructInitField(fieldName, new IdentifierExpr(fieldName, nameTok.Span), nameTok.Span)
+                    { NameSpan = nameTok.Span, IsShorthand = true });
+                if (!_buffer.Match(TokenKind.Comma)) break;
+                continue;
+            }
             _buffer.Expect(TokenKind.Equal, "LYR-PAR0037", "expected '=' in struct initializer (':' is only for types)");
             var value = ParseSubExpr();
-            fields.Add(new StructInitField(_sm.Slice(nameTok.Span).ToString(), value,
+            fields.Add(new StructInitField(fieldName, value,
                 Span.Union(nameTok.Span, Whole(value))) { NameSpan = nameTok.Span });
             if (!_buffer.Match(TokenKind.Comma)) break;
         }

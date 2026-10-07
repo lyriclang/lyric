@@ -406,6 +406,9 @@ public static class AstChildren
             case TypePattern tp:
                 yield return tp.Type;
                 break;
+            case TypeSetPattern ts:
+                foreach (var t in ts.Types) yield return t;
+                break;
             case WildcardPattern:
             case BindingPattern:
             case RestPattern:

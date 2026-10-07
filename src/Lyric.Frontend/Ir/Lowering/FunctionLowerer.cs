@@ -3877,6 +3877,43 @@ internal sealed class FunctionLowerer
                 return;
             }
 
+            // 's in [Circle, Rect]' (08 Y6): a test per type, the first that holds matching. A set of
+            // one binds as its type, as 'c: Circle' does; a larger one binds the interface value itself.
+            case TypeSetPattern ts:
+            {
+                if (valueType is IrOptionalType optionalIface)
+                    value = UnwrapPresent(value, optionalIface, onFail, assumeMatch, ts.Span);
+                var ifaceType = valueType is IrOptionalType oi ? oi.Inner : valueType;
+                if (ifaceType is not IrInterfaceType)
+                    throw NotSupported("a type pattern on a value that is no interface value", ts.Span);
+                var targets = ts.Types.Select(t => _typeTable.Lower(t)).ToArray();
+                if (!assumeMatch)
+                {
+                    var matched = _b.NewBlock();
+                    for (var k = 0; k < targets.Length; k++)
+                    {
+                        var holds = _slots.NewTemp(BoolType);
+                        _b.Emit(new TypeTest(holds, value, TargetIdOf(targets[k], ts.Types[k].Span), ts.Span));
+                        var next = k == targets.Length - 1 ? onFail() : _b.NewBlock();
+                        _b.Seal(new CondBranch(holds, matched, next, ts.Span));
+                        if (k < targets.Length - 1) _b.SwitchTo(next);
+                    }
+                    _b.SwitchTo(matched);
+                }
+                if (ts.Name is not null && _types.RefOf(ts) is LocalSymbol held)
+                {
+                    if (targets is [var one])
+                    {
+                        var cast = _slots.NewTemp(one);
+                        _b.Emit(new Downcast(cast, value, TargetIdOf(one, ts.Types[0].Span), one, ts.Span));
+                        if (one is IrStructType) _fresh.Add(cast);
+                        BindLocal(ts, held, cast, one, ts.Span);
+                    }
+                    else BindLocal(ts, held, value, ifaceType, ts.Span);
+                }
+                return;
+            }
+
             // 'null' as a pattern is NO comparison but the question of a value's presence — the same
             // answer as for 'x == null' (TryLowerNullTest). A real equality comparison would need a
             // null value as an operand, and there is none.
@@ -6404,6 +6441,10 @@ internal sealed class FunctionLowerer
         // operators, for a callee that names a type.
         if (_types.OperatorCallOf(expr) is { } factory)
             return LowerCall(factory);
+
+        // 'Point { v }' is the shorthand initializer the sema found it to be (02 I3), not a call.
+        if (_types.ShorthandOf(expr) is { } shorthand)
+            return LowerExpr(shorthand);
 
         // 'same(a, b)': identity is the comparison of two references (02 M10). The symbol is
         // the builtin exactly when no module declares it; a user function of the name shadows.

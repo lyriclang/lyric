@@ -453,6 +453,13 @@ internal sealed class ExceptionAnalyzer
             Site(set, span, "'throw'", needsMark: false);
             return;
         }
+        // So does a type-set pattern's binding of several types (08 Y6): what it may hold is the set.
+        if (value is IdentifierExpr held && _types.RefOf(held) is LocalSymbol { Declaration: TypeSetPattern { Types.Length: > 1 } pattern, IsMutable: false }
+            && _types.TypeSet(pattern) is { } tested)
+        {
+            Site(tested, span, "'throw'", needsMark: false);
+            return;
+        }
         var thrown = _types.TypeOf(value);
         if (thrown is null || thrown.IsError) return;
         // What is no Error was refused where it is thrown (SEM0030); covering it is no question.

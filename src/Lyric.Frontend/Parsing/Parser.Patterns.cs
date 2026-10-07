@@ -65,6 +65,7 @@ public sealed partial class Parser
                         var tested = ParseType();
                         return new TypePattern(null, tested, Span.Union(cur.Span, tested.Span)) { NameSpan = cur.Span };
                     }
+                    if (_buffer.Check(TokenKind.In)) return FinishTypeSet(null, cur);
                     return new WildcardPattern(cur.Span);
                 }
                 return ParsePathPattern();
@@ -148,9 +149,38 @@ public sealed partial class Parser
                 var tested = ParseType();
                 return new TypePattern(path[0], tested, Span.Union(first.Span, tested.Span)) { NameSpan = first.Span };
             }
+            if (_buffer.Check(TokenKind.In)) return FinishTypeSet(path[0], first);
             return new BindingPattern(path[0], first.Span);
         }
         return FinishVariantPattern(path, first, last, implicitMember: false);
+    }
+
+    /// <summary>
+    /// <c>s in [Circle, Rect]</c> (08 Y6), after the name: one type bare, several in brackets — the
+    /// list rule (D5/D6), as on <c>catch (e in [A, B])</c>. Unlike the clause, no bracket-less list
+    /// is read as the set meant: a ',' after the type is the next element of the pattern around
+    /// it, <c>(s in Circle, n)</c>.
+    /// </summary>
+    private Pattern FinishTypeSet(string? name, Token first)
+    {
+        _buffer.Advance(); // 'in'
+        if (!_buffer.Check(TokenKind.LBracket))
+        {
+            var one = ParseType();
+            return new TypeSetPattern(name, [one], Span.Union(first.Span, one.Span)) { NameSpan = first.Span };
+        }
+        var open = _buffer.Advance();
+        var listed = new List<TypeNode>();
+        while (!_buffer.Check(TokenKind.RBracket) && !_buffer.AtEnd)
+        {
+            listed.Add(ParseType());
+            if (!_buffer.Match(TokenKind.Comma)) break;
+        }
+        var close = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close the pattern's types");
+        if (listed.Count == 0)
+            _de.Report("LYR-PAR0049", Severity.Error, Span.Union(open.Span, close.Span),
+                "a type set names its types — '_' is the pattern that matches everything");
+        return new TypeSetPattern(name, listed.ToArray(), Span.Union(first.Span, close.Span)) { NameSpan = first.Span };
     }
 
     /// <summary>The payload of a variant pattern after its name: <c>(…)</c>, <c>{ … }</c>, or none.</summary>

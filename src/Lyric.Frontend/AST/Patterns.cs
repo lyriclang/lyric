@@ -22,6 +22,16 @@ public sealed record TypePattern(string? Name, TypeNode Type, Span Span) : Patte
 
     string INamedDecl.Name => Name ?? "_";
 }
+/// <summary><c>s in [Circle, Rect]</c>, <c>_ in [A, B]</c>, <c>s in Circle</c> (08 Y6): the scrutinee,
+/// an interface value, holds a value of one of the types — the form of <c>catch (e in [A, B])</c>.
+/// <see cref="Name"/> binds it as the one type of a set of one, as the scrutinee's type otherwise,
+/// carrying the set (K7); <c>null</c> for <c>_</c>.</summary>
+public sealed record TypeSetPattern(string? Name, TypeNode[] Types, Span Span) : Pattern(Span), INamedDecl
+{
+    public required Span NameSpan { get; init; }
+
+    string INamedDecl.Name => Name ?? "_";
+}
 public sealed record VariantPattern(string[] Path, Pattern[]? TupleElements, FieldPattern[]? StructFields, Span Span) : Pattern(Span)
 {
     /// <summary><c>.Red</c>, <c>.Num(v)</c>, <c>.Rect { w = 0 }</c>: the variant of the

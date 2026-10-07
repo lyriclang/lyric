@@ -477,6 +477,10 @@ public static class AstDumper
                 Line(sb, indent, $"TypePattern {n.Name ?? "_"}", n.Span);
                 Write(n.Type, indent + 1, sb);
                 break;
+            case TypeSetPattern n:
+                Line(sb, indent, $"TypeSetPattern {n.Name ?? "_"}", n.Span);
+                foreach (var t in n.Types) Write(t, indent + 1, sb);
+                break;
             case BindingPattern n:
                 Line(sb, indent, $"BindPattern {n.Name}", n.Span);
                 break;
@@ -520,7 +524,7 @@ public static class AstDumper
                 foreach (var f in n.Fields) Write(f, indent + 1, sb);
                 break;
             case StructInitField n:
-                Line(sb, indent, $"InitField {n.Name}", n.Span);
+                Line(sb, indent, $"InitField {n.Name}{(n.IsShorthand ? " shorthand" : "")}", n.Span);
                 Write(n.Value, indent + 1, sb);
                 break;
             case WithExpr n:

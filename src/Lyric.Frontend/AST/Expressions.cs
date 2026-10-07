@@ -275,6 +275,10 @@ public sealed record StructInitField(string Name, Expr Value, Span Span) : Node(
     /// <summary>Where the field name alone stands; <see cref="Node.Span"/> covers
     /// <c>name = value</c>.</summary>
     public required Span NameSpan { get; init; }
+
+    /// <summary><c>S { v }</c> (02 I3): the name alone, <c>v = v</c> — <see cref="Value"/> is the
+    /// read of the name, at the name's own span. The formatter writes it back alone.</summary>
+    public bool IsShorthand { get; init; }
 }
 
 // --- recovery ---

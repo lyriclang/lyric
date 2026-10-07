@@ -706,6 +706,25 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_shorthand_initializer_and_a_type_set_round_trip()
+    {
+        // 02 I3, 08 Y6 (N2c): a name alone stays alone; a set of one is written bare, several in brackets.
+        var formatted = Format("""
+            fn f(s: Shape): Point {
+                match (s) {
+                    x in [ Circle,Rect ] => {}
+                    _ in [Tri] => {}
+                    _ => {}
+                }
+                return Point { x,y = 2 };
+            }
+            """);
+        Assert.Contains("x in [Circle, Rect] =>", formatted);
+        Assert.Contains("_ in Tri =>", formatted);
+        Assert.Contains("return Point { x, y = 2 };", formatted);
+    }
+
+    [Fact]
     public void A_generic_type_alias_round_trips()
     {
         // 03 T15 (N2b): the parameters stand between the name and '=', as on any declaration.
