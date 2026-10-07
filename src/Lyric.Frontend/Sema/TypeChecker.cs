@@ -1804,7 +1804,9 @@ public sealed class TypeChecker
     /// </summary>
     private TypeNode[] RequireIdentityOfAnObject(TypeSymbol implementer, TypeNode[] interfaces, string name)
     {
-        if (_identity is null || implementer.Kind is TypeSymbolKind.Class or TypeSymbolKind.Interface) return interfaces;
+        // A coroutine is an object too (06 A7): std.core's block gives it Identity.
+        if (_identity is null || implementer.Kind is TypeSymbolKind.Class or TypeSymbolKind.Interface
+            || ReferenceEquals(implementer, _coroutine)) return interfaces;
         bool Refused(TypeNode node) => Conformance.InterfaceOf(node, _binding) is { } iface
             && Conformance.WithParents(iface, _binding).Any(p => ReferenceEquals(p, _identity));
         foreach (var node in interfaces.Where(Refused))
@@ -4984,7 +4986,7 @@ public sealed class TypeChecker
 
         // A shape compares through the Equatable its block gives (05 §13 rule 6) — an array or a
         // view through std.core's, element by element (10 C9; M8a S14); else it has no '=='.
-        if (IsShape(l) && _equatable is { } shapeEquatable && Satisfies(l, shapeEquatable, SelfInstance(shapeEquatable, l)))
+        if ((IsShape(l) || l is CoroutineOf) && _equatable is { } shapeEquatable && Satisfies(l, shapeEquatable, SelfInstance(shapeEquatable, l)))
         {
             DesugarToMethodCall(b, "equals", scope);
             return;
@@ -7094,7 +7096,7 @@ public sealed class TypeChecker
                 return BindMember(mem, InstanceMember(bs, mem.Member, span));
             case StringViewType when _stringView is { } view: // std.core's blocks on the view (10 S1)
                 return BindMember(mem, InstanceMember(view, mem.Member, span));
-            case ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType:
+            case ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType or CoroutineOf:
                 return ConstructorMember(baseType, mem, span);
             default:
                 return null;
@@ -7158,7 +7160,7 @@ public sealed class TypeChecker
     {
         foreach (var block in _comp.Extensions.Blocks)
         {
-            if (!(block.IsConstructorTarget || (block.Target is { } t && ReferenceEquals(t, _slice)))) continue;
+            if (!IsShapeBlock(block)) continue;
             if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
             if (block.MethodScope.LookupLocal(mem.Member) is not FunctionSymbol found) continue;
             if (BlockSubstitution(block, receiver) is not { } map)
@@ -7170,7 +7172,17 @@ public sealed class TypeChecker
             _result.BindRef(mem, found);
             if (found.IsStatic)
                 return Report(span, "LYR-SEM0074", $"'{mem.Member}' is a static extension and belongs to the type — the instance form is an error");
-            return Substitute(FnTypeOf(found), map);
+            var member = Substitute(FnTypeOf(found), map);
+            // A block on 'Coroutine<Y, R>' reaches a coroutine whatever its pulls throw (06 A7): where
+            // its member names the target, 'equals(o: Coroutine<Y, R>)', it names the receiver, or
+            // two throwing coroutines would not compare.
+            if (receiver is CoroutineOf { Throws: not null } && Substitute(BlockTargetType(block), map) is CoroutineOf { Throws: null } written
+                && member is FnType signature)
+            {
+                LyrType Widened(LyrType type) => LyrType.Equal(type, written) ? receiver : type;
+                member = signature with { Parameters = signature.Parameters.Select(Widened).ToArray(), Return = Widened(signature.Return) };
+            }
+            return member;
         }
         return null;
     }
@@ -8197,7 +8209,7 @@ public sealed class TypeChecker
         // A coroutine is an iterator of what it yields and Closeable (10 B6 I7), built in — the
         // blanket block makes it Iterable — and conforms to nothing else: it passed every
         // constraint here before.
-        CoroutineOf co => CoroutineConforms(co, iface, wanted) || BlockConforms(co, iface, wanted, shapes: false),
+        CoroutineOf co => CoroutineConforms(co, iface, wanted) || BlockConforms(co, iface, wanted, shapes: true),
 
         // A shape conforms through a block that names the interface, and no other way (05 §13
         // rule 6): what passed every constraint here before failed in the lowering.
@@ -8376,9 +8388,10 @@ public sealed class TypeChecker
     }
 
     /// <summary>A block on a shape: a built-in constructor (03 T7 X2), or the builtin
-    /// <c>Slice</c> a view maps to.</summary>
+    /// <c>Slice</c> a view maps to, or <c>Coroutine</c> (06 A7, N2d) — types with a symbol and no
+    /// declaration, whose instances the sema writes as shapes.</summary>
     private bool IsShapeBlock(ExtensionBlock block) =>
-        block.IsConstructorTarget || (block.Target is { } t && ReferenceEquals(t, _slice));
+        block.IsConstructorTarget || (block.Target is { } t && (ReferenceEquals(t, _slice) || ReferenceEquals(t, _coroutine)));
 
     private readonly Dictionary<ExtensionBlock, HashSet<TypeSymbol>> _givenBeside = new(ReferenceEqualityComparer.Instance);
 
@@ -8488,7 +8501,8 @@ public sealed class TypeChecker
         {
             foreach (var block in _comp.Extensions.Blocks)
             {
-                if (block.Decl.Interfaces.Length == 0 || !(block.IsBlanketTarget || (IsShape(concrete) && IsShapeBlock(block))))
+                if (block.Decl.Interfaces.Length == 0
+                    || !(block.IsBlanketTarget || ((IsShape(concrete) || concrete is CoroutineOf) && IsShapeBlock(block))))
                     continue;
                 if (BlockSubstitution(block, concrete) is not { } map) continue;
                 foreach (var node in block.Decl.Interfaces)
