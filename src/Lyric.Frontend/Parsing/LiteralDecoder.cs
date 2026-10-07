@@ -3,6 +3,7 @@ using Lyric.Core;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace Lyric.Parsing
@@ -115,7 +116,107 @@ namespace Lyric.Parsing
 
         public static string DecodeString(ReadOnlySpan<char> lexme, Span span, DiagnosticEngine de)
         {
-            return ResolveEscapes(StripQuotes(lexme.ToString()));
+            var text = lexme.ToString();
+            // 'r"…"', 'r#"…"#', 'r"""…"""' (08 Y7 L5, L6): the text as written, no escape.
+            if (text.StartsWith('r'))
+            {
+                var hashes = 0;
+                while (1 + hashes < text.Length && text[1 + hashes] == '#') hashes++;
+                var body = text[(1 + hashes)..];
+                if (hashes == 0 && body.StartsWith("\"\"\"", StringComparison.Ordinal))
+                    return Dedent(Between(body, 3, 0), span, de);
+                return Between(body, 1, hashes);
+            }
+            // '"""…"""' (L6): the lines first, then the escapes — an escaped '\n' is no line.
+            if (text.StartsWith("\"\"\"", StringComparison.Ordinal))
+                return ResolveEscapes(Dedent(Between(text, 3, 0), span, de));
+            return ResolveEscapes(StripQuotes(text));
+        }
+
+        /// <summary>The text between the opening quotes and the closing ones with their hashes — what
+        /// of them stands: an unterminated literal was reported by the lexer.</summary>
+        private static string Between(string text, int quotes, int hashes)
+        {
+            var start = Math.Min(quotes, text.Length);
+            var closing = new string('"', quotes) + new string('#', hashes);
+            var end = text.Length - start >= closing.Length && text.EndsWith(closing, StringComparison.Ordinal)
+                ? text.Length - closing.Length : text.Length;
+            return text[start..Math.Max(start, end)];
+        }
+
+        /// <summary>
+        /// The lines of a multi-line string (08 Y7 L6, Swift's rule): the text begins on the line after
+        /// the opening <c>"""</c> and ends on the line before the closing one, which stands on a line of
+        /// its own; its indentation is taken off every line, and a line indented less is refused. A
+        /// blank line may be indented less. The line breaks are <c>\n</c>, whatever the file has.
+        /// </summary>
+        public static string Dedent(string content, Span span, DiagnosticEngine de)
+        {
+            content = content.Replace("\r\n", "\n", StringComparison.Ordinal);
+            if (!content.StartsWith('\n'))
+            {
+                de.Report("LYR-LEX0014", Severity.Error, span,
+                    "a multi-line string begins on the line after its opening '\"\"\"', which ends its own line");
+                return content;
+            }
+            content = content[1..];
+            var last = content.LastIndexOf('\n');
+            var indent = last < 0 ? content : content[(last + 1)..];
+            if (indent.Any(c => c is not (' ' or '\t')))
+            {
+                de.Report("LYR-LEX0014", Severity.Error, span,
+                    "a multi-line string ends with its closing '\"\"\"' on a line of its own");
+                return content;
+            }
+            if (last < 0) return "";
+            var lines = content[..last].Split('\n');
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (lines[i].All(c => c is ' ' or '\t')) { lines[i] = ""; continue; }
+                if (lines[i].StartsWith(indent, StringComparison.Ordinal)) { lines[i] = lines[i][indent.Length..]; continue; }
+                de.Report("LYR-LEX0015", Severity.Error, span,
+                    $"line {i + 1} of a multi-line string is indented less than its closing '\"\"\"' — "
+                    + "every line takes the closing line's indentation, which is cut off");
+                return content;
+            }
+            return string.Join('\n', lines);
+        }
+
+        /// <summary><c>b"…"</c> (08 Y7 L7): ASCII text and the escapes, <c>\xNN</c> any byte. What
+        /// is no byte was reported by the lexer and is left out.</summary>
+        public static byte[] DecodeBytes(ReadOnlySpan<char> lexme, Span span, DiagnosticEngine de)
+        {
+            var body = StripQuotes(lexme.ToString()[1..]);
+            var bytes = new List<byte>(body.Length);
+            for (var i = 0; i < body.Length; i++)
+            {
+                var c = body[i];
+                if (c != '\\')
+                {
+                    if (c <= (char)0x7F) bytes.Add((byte)c);
+                    continue;
+                }
+                if (++i >= body.Length) break;
+                switch (body[i])
+                {
+                    case 'n': bytes.Add(0x0A); break;
+                    case 'r': bytes.Add(0x0D); break;
+                    case 't': bytes.Add(0x09); break;
+                    case '0': bytes.Add(0x00); break;
+                    case '\\': bytes.Add(0x5C); break;
+                    case '"': bytes.Add(0x22); break;
+                    case '\'': bytes.Add(0x27); break;
+                    case 'x':
+                        // The two digits after it, which the lexer checked.
+                        if (i + 2 < body.Length && byte.TryParse(body.AsSpan(i + 1, 2), NumberStyles.AllowHexSpecifier, null, out var b))
+                        {
+                            bytes.Add(b);
+                            i += 2;
+                        }
+                        break;
+                }
+            }
+            return bytes.ToArray();
         }
 
         public static int DecodeChar(ReadOnlySpan<char> lexme, Span span, DiagnosticEngine de)

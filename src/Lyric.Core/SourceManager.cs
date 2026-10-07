@@ -4,6 +4,11 @@ namespace Lyric.Core;
 
 public sealed class SourceManager
 {
+    /// <summary>The language line its files are read for: Lyric 5 refuses what only the 4.x grammar
+    /// has — a <c>\x</c> escape outside a byte string (design/v5/spec/08 Y7 L4). Set by the compiler
+    /// that compiles Lyric 5 packages; the 4.x front end, which the tree still builds, leaves it.</summary>
+    public bool Lyric5 { get; set; }
+
     private record class FileEntry
     {
         public required string Path { get; init; }

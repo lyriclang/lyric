@@ -630,6 +630,23 @@ public class ParserTests
     }
 
     [Fact]
+    public void A_multi_line_string_loses_its_closing_indentation()
+    {
+        // 08 Y7 L6 (N2e): the closing line's indentation comes off every line; escapes after.
+        var (expr, de) = Parse("\"\"\"\n    a\n      b\\t\n\n    \"\"\"");
+        Assert.Empty(de.Diagnostics);
+        Assert.Equal("a\n  b\t\n", Assert.IsType<StringLiteralExpr>(expr).Value);
+    }
+
+    [Fact]
+    public void A_byte_string_is_its_bytes()
+    {
+        var (expr, de) = Parse("b\"A\\x00\\xff\\n\"");
+        Assert.Empty(de.Diagnostics);
+        Assert.Equal(new byte[] { 0x41, 0x00, 0xFF, 0x0A }, Assert.IsType<ByteStringExpr>(expr).Bytes);
+    }
+
+    [Fact]
     public void Type_alias_parses()
     {
         var (m, de) = ParseModule("type Id = int;");

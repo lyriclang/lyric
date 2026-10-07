@@ -820,7 +820,7 @@ public sealed class AstFormatter
     {
         // Spelling lives in the source, not in the node.
         IntLiteralExpr or FloatLiteralExpr or StringLiteralExpr or CharLiteralExpr
-            or InterpolatedStringExpr => Src(expr.Span),
+            or InterpolatedStringExpr or ByteStringExpr => Src(expr.Span),
         BoolLiteralExpr b => Doc.From(b.Value ? "true" : "false"),
         NullLiteralExpr => Doc.From("null"),
         ThisExpr => Doc.From("this"),

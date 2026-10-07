@@ -2328,4 +2328,81 @@ public class LexerTests
         Assert.Equal(TokenKind.BadChar, tokens[0].TokenKind);
         Assert.True(diag.HasErrors); // LYR-LEX0012: the '@[' token is adjacent by definition
     }
+
+    // ─── 08 Y7 L4–L8, Y1 (N2e) ─────────────────────────────────────────────
+
+    private static (List<Token> tokens, DiagnosticEngine diag) Tokenize5(string source, bool lyric5)
+    {
+        var sm = new SourceManager { Lyric5 = lyric5 };
+        var id = sm.AddVirtual("<test>", source);
+        var de = new DiagnosticEngine(sm);
+        var lexer = new Lexer(sm, id, de);
+        var tokens = new List<Token>();
+        Token t;
+        do
+        {
+            t = lexer.Next();
+            tokens.Add(t);
+        } while (t.TokenKind != TokenKind.Eof);
+        return (tokens, de);
+    }
+
+    [Fact]
+    public void A_raw_string_with_hashes_holds_quotes()
+    {
+        var (tokens, de) = Tokenize("r#\"say \"hi\"\"#");
+        Assert.Empty(de.Diagnostics);
+        Assert.Equal([TokenKind.StringLiteral, TokenKind.Eof], tokens.Select(t => t.TokenKind));
+    }
+
+    [Fact]
+    public void A_name_r_before_a_spaced_string_stays_a_name()
+    {
+        var (tokens, _) = Tokenize("r \"x\"");
+        Assert.Equal([TokenKind.Identifier, TokenKind.StringLiteral, TokenKind.Eof], tokens.Select(t => t.TokenKind));
+    }
+
+    [Fact]
+    public void A_multi_line_string_is_one_token_over_lines()
+    {
+        var (tokens, de) = Tokenize("\"\"\"\n  a \" b\n  \"\"\"");
+        Assert.Empty(de.Diagnostics);
+        Assert.Equal([TokenKind.StringLiteral, TokenKind.Eof], tokens.Select(t => t.TokenKind));
+    }
+
+    [Fact]
+    public void A_byte_string_is_a_token_of_its_own()
+    {
+        var (tokens, de) = Tokenize("b\"AB\\xFF\"");
+        Assert.Empty(de.Diagnostics);
+        Assert.Equal([TokenKind.ByteStringLiteral, TokenKind.Eof], tokens.Select(t => t.TokenKind));
+    }
+
+    [Fact]
+    public void The_f_string_prefixes_open_one_f_string()
+    {
+        var (raw, de) = Tokenize("fr\"a\\t{x}\"");
+        Assert.Empty(de.Diagnostics);
+        Assert.Equal([TokenKind.FStringStart, TokenKind.FStringChunk, TokenKind.FStringInterpStart, TokenKind.Identifier,
+            TokenKind.FStringInterpEnd, TokenKind.FStringEnd, TokenKind.Eof], raw.Select(t => t.TokenKind));
+        var (lines, de2) = Tokenize("f\"\"\"\n  a\n  \"\"\"");
+        Assert.Empty(de2.Diagnostics);
+        Assert.Equal([TokenKind.FStringStart, TokenKind.FStringChunk, TokenKind.FStringEnd, TokenKind.Eof], lines.Select(t => t.TokenKind));
+    }
+
+    [Fact]
+    public void A_byte_escape_outside_a_byte_string_is_refused_in_Lyric_5_alone()
+    {
+        Assert.Equal(["LYR-LEX0013"], Tokenize5("\"\\x41\"", lyric5: true).diag.Diagnostics.Select(d => d.Code));
+        Assert.Empty(Tokenize5("\"\\x41\"", lyric5: false).diag.Diagnostics);
+    }
+
+    [Fact]
+    public void Module_and_params_are_names_in_Lyric_5()
+    {
+        Assert.Equal([TokenKind.Identifier, TokenKind.Identifier, TokenKind.Eof],
+            Tokenize5("module params", lyric5: true).tokens.Select(t => t.TokenKind));
+        Assert.Equal([TokenKind.Module, TokenKind.Params, TokenKind.Eof],
+            Tokenize5("module params", lyric5: false).tokens.Select(t => t.TokenKind));
+    }
 }

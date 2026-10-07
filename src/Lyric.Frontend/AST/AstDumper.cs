@@ -35,6 +35,9 @@ public static class AstDumper
             case StringLiteralExpr n:
                 Line(sb, indent, $"String {Quote(n.Value)}", n.Span);
                 break;
+            case ByteStringExpr n:
+                Line(sb, indent, $"Bytes [{string.Join(", ", n.Bytes)}]", n.Span);
+                break;
             case CharLiteralExpr n:
                 Line(sb, indent, $"Char {n.CodePoint}", n.Span);
                 break;

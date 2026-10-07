@@ -75,6 +75,7 @@ public enum TokenKind
     IntLiteral ,     // all bases: dec, hex, bin, oct, with or without an integer suffix
     FloatLiteral,    // decimal with a '.', with an exponent, or with a float suffix
     StringLiteral,
+    ByteStringLiteral,
     CharLiteral,
     
     // FStrings

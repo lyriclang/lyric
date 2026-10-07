@@ -541,6 +541,9 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   set, `s in [Circle, Rect] =>` (08 Y6), whose binding carries the set as a catch binding's does.
   **N2d**: a coroutine is `Identity` (06 A7) — `==` is `same`, a set of coroutines finds one twice,
   whatever its pulls throw; a block on `Coroutine<Y, R>` is a shape's block, as one on `Slice<T>`.
+  **N2e**: the literals 08 Y7 decided — raw strings `r"…"`/`r#"…"#`, multi-line `"""…"""` without
+  the closing line's indentation, byte strings `b"…"` (a `uint8[]`), `fr"…"`/`f"""…"""`; `\x` is a
+  byte string's alone; `module` and `params` are names; spec chapter 01 written (15 cases).
 
 ### M8a — done (2026-10-07)
 

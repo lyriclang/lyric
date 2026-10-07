@@ -21,6 +21,8 @@ public abstract record Expr(Span Span) : Node(Span);
 public sealed record IntLiteralExpr(ulong Value, IntSuffix? Suffix, Span Span) : Expr(Span);
 public sealed record FloatLiteralExpr(double Value, FloatSuffix? Suffix, Span Span) : Expr(Span);
 public sealed record StringLiteralExpr(string Value, Span Span) : Expr(Span);
+/// <summary><c>b"…"</c> (08 Y7 L7): a <c>uint8[]</c> of these bytes, a new array each time it is evaluated.</summary>
+public sealed record ByteStringExpr(byte[] Bytes, Span Span) : Expr(Span);
 public sealed record CharLiteralExpr(int CodePoint, Span Span) : Expr(Span);
 public sealed record BoolLiteralExpr(bool Value, Span Span) : Expr(Span);
 public sealed record NullLiteralExpr(Span Span) : Expr(Span);
@@ -161,7 +163,19 @@ public sealed record TupleLitExpr(Expr[] Elements, Span Span) : Expr(Span);
 // --- f-strings ---
 public sealed record InterpolatedStringExpr(InterpSegment[] Segments, Span Span) : Expr(Span);
 public abstract record InterpSegment(Span Span) : Node(Span);
-public sealed record InterpText(string Text, Span Span) : InterpSegment(Span);                     // raw text, escapes NOT resolved
+public sealed record InterpText(string Text, Span Span) : InterpSegment(Span)                       // raw text, escapes NOT resolved
+{
+    private readonly string? _value;
+
+    /// <summary>What the text stands for: <c>{{</c> and <c>}}</c> folded to one brace, the escapes
+    /// resolved — not in a raw <c>fr"…"</c> —, a multi-line <c>f"""…"""</c>'s indentation taken off
+    /// (08 Y7 L6, L8). The parser sets it; a text made elsewhere is read in the plain form.</summary>
+    public string Value
+    {
+        get => _value ?? Escapes.Resolve(Text.Replace("{{", "{").Replace("}}", "}"));
+        init => _value = value;
+    }
+}
 public sealed record InterpHole(Expr Expr, string? FormatSpec, Span Span) : InterpSegment(Span);   // {expr} and {expr:spec}
 
 // --- lambdas ---

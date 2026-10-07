@@ -3827,6 +3827,7 @@ public sealed class TypeChecker
             case IntLiteralExpr il: return il.Suffix is { } isx ? IntSuffixType(isx) : LyrType.Int;
             case FloatLiteralExpr fl: return fl.Suffix is { } fsx ? FloatSuffixType(fsx) : LyrType.Float;
             case StringLiteralExpr: return LyrType.String;
+            case ByteStringExpr: return new ArrayOf(new PrimitiveType(PrimitiveKind.Uint8));
             case CharLiteralExpr: return LyrType.Char;
             case BoolLiteralExpr: return LyrType.Bool;
             case NullLiteralExpr: return LyrType.Null;
@@ -6035,9 +6036,10 @@ public sealed class TypeChecker
         {
             CallExpr? piece = seg switch
             {
-                // The parser keeps a text raw; '{{' and '}}' fold to one brace, the escapes resolve.
-                InterpText text when text.Text.Length > 0 => Piece("fstringText", text.Span, Output(),
-                    new StringLiteralExpr(Escapes.Resolve(text.Text.Replace("{{", "{").Replace("}}", "}")), text.Span)),
+                // The parser decoded the text (InterpText.Value): braces folded, escapes resolved, a
+                // multi-line f-string's indentation off.
+                InterpText text when text.Value.Length > 0 => Piece("fstringText", text.Span, Output(),
+                    new StringLiteralExpr(text.Value, text.Span)),
                 InterpHole hole => HolePiece(hole, holes[at++], Output),
                 _ => null,
             };
