@@ -6,7 +6,8 @@
 //   spawn after close: panicked   a closed pool takes no task
 import std.io { println };
 import std.sync { Atomic };
-import std.task { spawn, sleep, yieldNow, Channel, Pool, TaskStatus };
+import std.task { spawn, sleep, yieldNow, Channel, TaskStatus };
+import std.thread { Pool };
 import std.time { Duration };
 
 class Oops :: [Error] {

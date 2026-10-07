@@ -515,7 +515,11 @@ poller and an I/O pool (P2), the console (P3), handles (P4), the platforms (P5),
 chapter 12 (P6), and the slices S1–S14 with their artefacts. Approved like M8a: no halt until the
 close, each slice merged on green CI, the open points collected for the report at the close.
 
-Merged, slice by slice: none yet.
+Merged, slice by slice (each PR says what it did and how it was checked):
+
+- **S1, the module cut** (10 Q9, Q10): the locks in `std.sync`, with `Semaphore` (06 K4, the one
+  waker of 5.0); `Thread` and `Pool` in `std.thread`, with `parallelMap` (06 P5) on the program's
+  own pool; the signals in `std.os`. What they stand on stays in `std.task`, internal to std.
 
 ### M8a — done (2026-10-07)
 

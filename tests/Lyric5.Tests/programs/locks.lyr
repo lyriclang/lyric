@@ -7,7 +7,9 @@
 //   attempts 2                        a run that threw leaves the work to the next call
 import std.io { println };
 import std.sync { Atomic };
-import std.task { spawn, sleep, yieldNow, Thread, Mutex, RwLock, Once };
+import std.task { spawn, sleep, yieldNow };
+import std.sync { Mutex, RwLock, Once };
+import std.thread { Thread };
 import std.time { Duration };
 
 class Oops :: [Error] {

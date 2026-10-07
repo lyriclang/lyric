@@ -63,7 +63,7 @@ public class ReceiverInferenceRunTests
         Assert.Equal("1 2 1 1 5 0\n", Output("""
             import std.io { println };
             import std.sync { Atomic };
-            import std.task { Mutex };
+            import std.sync { Mutex };
 
             fn main(): void throws Error {
                 let a = Atomic.new(1);

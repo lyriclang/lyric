@@ -6,7 +6,8 @@
 //   timed out                                   its timeout while no thread sends
 //   closed elsewhere true                       a close on another thread wakes a receiver
 import std.io { println };
-import std.task { sleep, Thread, Channel, ChannelClosed, Select };
+import std.task { sleep, Channel, ChannelClosed, Select };
+import std.thread { Thread };
 import std.time { Duration };
 
 fn produce(numbers: Channel<int>, from: int): void throws Error {

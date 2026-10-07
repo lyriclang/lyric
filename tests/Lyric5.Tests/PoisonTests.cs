@@ -16,7 +16,7 @@ namespace Lyric5.Tests;
 [Collection("console")]
 public class PoisonTests
 {
-    private const string Head = "import std.io { println };\nimport std.task { spawn, sleep, yieldNow, Mutex, RwLock, Once, TaskStatus };\nimport std.time { Duration };\n\n"
+    private const string Head = "import std.io { println };\nimport std.task { spawn, sleep, yieldNow, TaskStatus };\nimport std.sync { Mutex, RwLock, Once };\nimport std.time { Duration };\n\n"
         + "fn said(s: TaskStatus<void>): string {\n    return match (s) {\n        .Panicked(info) => f\"panicked {info.code}\",\n        .Done(_) => \"done\",\n        .Failed(_) => \"failed\",\n        .Cancelled => \"cancelled\",\n        .Running => \"running\",\n    };\n}\n\n";
 
     /// <summary>What a program that builds does within ten seconds.</summary>

@@ -1,0 +1,55 @@
+// std.sync and std.thread (M8b S1): a semaphore woken from another thread, parallelMap's results
+// each an object of its own, its first failure in order.
+import std.sync { Semaphore };
+import std.thread { parallelMap, Thread };
+import std.test { assertEq };
+
+class Cell {
+    var v: int,
+}
+
+class Odd :: [Error] {
+    n: int,
+
+    fn message(): string {
+        return f"odd {this.n}";
+    }
+}
+
+fn checked(x: int): int throws Odd {
+    if (x % 2 == 1) {
+        throw Odd { n = x };
+    }
+    return x;
+}
+
+@Test
+fn aReleaseOnAnotherThreadWakesTheWaiter(): void throws Error {
+    let sem = Semaphore.new(0);
+    let other = Thread.spawn(() => {
+        sem.release();
+    });
+    try sem.acquire();
+    try other.await();
+    assertEq(sem.available(), 0);
+}
+
+@Test
+fn parallelMapGivesEachElementItsOwnObject(): void throws Error {
+    let cells = try parallelMap([1, 2, 3, 4, 5], (x: int) => Cell { v = x });
+    cells[0].v = 10;
+    assertEq(cells[1].v, 2);
+    assertEq(cells[4].v, 5);
+}
+
+@Test
+fn parallelMapThrowsTheFirstFailureInOrder(): void throws Error {
+    var at = 0;
+    try {
+        let all = parallelMap([2, 3, 4, 5, 7], (x: int) => try checked(x));
+        assertEq(all.length(), -1);
+    } catch (e: Odd) {
+        at = e.n;
+    }
+    assertEq(at, 3);
+}

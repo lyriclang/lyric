@@ -3,7 +3,9 @@
 // by the release and panics with the poison. Exit 101. Expected stdout:
 //   holder has it
 import std.io { println };
-import std.task { sleep, Thread, Mutex, Channel };
+import std.task { sleep, Channel };
+import std.sync { Mutex };
+import std.thread { Thread };
 import std.time { Duration };
 
 fn main(): void throws Error {
