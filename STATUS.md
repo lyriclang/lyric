@@ -38,7 +38,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M6 | Coroutines, scheduler, threads | XL | **done** 2026-10-02 |
 | M7 | Modules and packages | L | **done** 2026-10-02 |
 | M8a | std core | XL | **done** 2026-10-07 |
-| M8b | std I/O and system | L | — |
+| M8b | std I/O and system | L | **in progress**: planned 2026-10-07 (S1–S14) |
 | M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | — |
 | M9a | `comptime` (the IR interpreter) | L | — |
 | M9b | Macros | L | — |
@@ -507,6 +507,15 @@ at its repository's root only (no monorepos); MVS counting every version read; `
 raising no version and no `--locked`; `extern "C"`'s stage-1 types; the `lyric5` CLI codes beside
 the 4.x catalogue; reproducibility checked on one machine at a time (zig's own libunwind keeps
 the directory zig built it in; gcc maps the working directory, into its cache keys).
+
+### M8b — in progress
+
+The plan is design 13's addendum of 2026-10-07: the boundary to C (P1), waiting through the
+poller and an I/O pool (P2), the console (P3), handles (P4), the platforms (P5), the spec's
+chapter 12 (P6), and the slices S1–S14 with their artefacts. Approved like M8a: no halt until the
+close, each slice merged on green CI, the open points collected for the report at the close.
+
+Merged, slice by slice: none yet.
 
 ### M8a — done (2026-10-07)
 

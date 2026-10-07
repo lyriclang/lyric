@@ -127,6 +127,73 @@ Nach M8a S11a hat der Maintainer die offenen Punkte aus M4 bis M8a durchgesehen 
 | **Abgeschlossen** | 2026-10-07: R0–R9 (#308–#362), S12–S16 (#363–#373) gemergt; Messpunkt 3 nach M8a: maps 1,36×, sorting 1,21×, strings 1,70× Go (vorher 1,90/1,53/2,53) |
 | **Durchsicht 2026-10-07** | Die offenen Punkte des Laufs R0–S16, mit dem Maintainer entschieden: in 01, 03, 04, 10, 11 je im Abschnitt „Review 2026-10-07“. Uhren: M8c — `Debug` eines Textes maskiert, `&` aus den Builder-Signaturen, `trimMatches`, `toBytes`, `char`-Bereiche, das Builder-Wachstum aus der Reihe · M12 — Typargumente am Methodenaufruf, Fixierung in Funktionen, Arität über Blöcke, der generische Weiterleiter · M10/M11 — der Vorgabe-Hasher. Die Plattform-Jobs und die Benchmarks der CI laufen auf `main` |
 
+## Nachtrag 2026-10-07 — der Plan für M8b
+
+M8b nach seiner Zeile oben (B8, B11, 06 S2–S4, W3). Freigegeben am 2026-10-07 „wie M8a“: ohne
+Halt bis zum Abschluss, Merge bei grüner CI, offene Punkte gesammelt, Bericht am Ende; vor M8c
+wird neu gefragt. Die Slices heißen **M8b S1–S14**; jeder ist ein PR, sein Regel-PR in der Spec
+geht voran (Spec-Pin).
+
+### Architektur
+
+| # | Entscheidung | Warum — und warum nicht die Alternativen |
+|---|---|---|
+| P1 | **Die Grenze std ↔ C** bleibt die der Laufzeit-Natives: rumpflose std-Funktionen über die Intrinsics-Tabelle (wie `waitOnPoller`, `putBytes`). Dazu dünne C-Hüllen in `runtime/src/{fs,net,process,os}.c`, **ein Systemaufruf je Hülle**: `EINTR` wird dort wiederholt (O1), `errno`/`GetLastError` wird ein Code, aus dem `std.io` die `IoErrorKind` macht (O3). Texte gehen als `LyrStr*` (NUL-terminiert, 11 X3; Windows wandelt nach UTF-16), Puffer als `Slice<uint8>` | Die Nutzer-FFI (`Ptr`, `CStr`, `unsafe`) ist M14; sie vorzuziehen hieße M14 in M8b. Gos Weg (Systemaufrufe in Go selbst) braucht `Ptr`. Rusts `sys`-Schicht ist genau diese Form: dünne Plattform-Hüllen unter einer plattformfreien API. **Uhr: M14** — mit `Ptr`/`CStr` ziehen die Hüllen nach `extern "C"`, die Tabelle behält nur, was Compiler-Semantik ist |
+| P2 | **Warten auf I/O**: Sockets und POSIX-Pipes sind nicht blockierend und melden sich über den Poller (06 S2): `register(fd, lesen \| schreiben)`, einmal feuernd (epoll `EPOLLONESHOT`, kqueue `EV_ONESHOT`, unter Windows eine AFD-Poll-Anfrage je Warten). Der Scheduler parkt den Task bis zur Meldung und versucht dann erneut. **Reguläre Dateien, DNS, das Lesen der Konsole und Windows-Pipes** laufen über einen std-internen **I/O-Pool** (06 S3, S4): ein `Pool` aus `std.thread`, beim ersten Gebrauch gestartet | io_uring und das Completion-Modell von IOCP sind verworfen (06 S2: zwei Modelle in der stdlib). Gos Übergabe des P bei einem blockierenden Aufruf setzt einen M:N-Scheduler voraus, den es nicht gibt. Der Pool ist der Weg von libuv und tokio |
+| P3 | **Konsole**: `stdout()`/`stderr()` sind gepufferte `Writer` (O9). Ein Flush schreibt über den Pool, wenn auf dem Thread ein Scheduler läuft, sonst direkt — ohne Scheduler gibt es keinen zweiten Task, den ein blockierender Write aufhielte. Die Frage „läuft hier einer“ zählt nicht für die Erreichbarkeit: `main` wird davon kein Task (M6-26), Messpunkt 1 bleibt | Alles über den Pool hieße: jedes `println`-Programm startet Scheduler und Pool-Thread. Immer direkt zu schreiben verletzte S4 |
+| P4 | **Handles** sind Klassen (O4) mit einem Zustand `closed`; eine Operation nach `close()` wirft `IoError { kind: Closed }`. Gelesen und geschrieben wird nur über `Slice<uint8>`, nie über eine Kopie | O4; die Kopie ist für einen Strom die Hälfte des Durchsatzes |
+| P5 | **Plattformen**: jeder Slice baut POSIX (Linux, macOS) und Windows, außer dem Netz — Windows' Poller über AFD und Winsock sind ein eigener Slice (S11); bis dahin sind die Netz-Tests unter Windows übersprungen und sagen warum. Ein Slice, der Plattform-Code ändert, läuft vor dem Merge **einmal von Hand auf allen Plattformen** (`workflow_dispatch`, 11 Review 2026-10-07), da ein PR nur noch Linux x86-64 und Windows-Tests prüft | Die CI-Entscheidung vom 2026-10-07 verschiebt Plattformfehler auf `main`; für Plattform-Code ist das zu spät |
+| P6 | **Spec**: Kapitel 12 bekommt je Slice seinen Abschnitt (I/O, Puffer und Text, Encoding/Zufall/Krypto, Zeit, Dateien und Pfade, Konsole und System, Netz, Prozesse); die Fälle liegen unter `conformance/cases/12-stdlib/`. Fälle mit Dateien arbeiten im temporären Arbeitsverzeichnis des Läufers, Netz nur über `127.0.0.1` innerhalb eines Programms | Ein Fall, der das Netz außerhalb braucht, prüft das Netz, nicht die Sprache |
+
+### Slices
+
+| Slice | Inhalt | Artefakt, Prüfung |
+|---|---|---|
+| **S1** Modulschnitt | 10 Q10: `Mutex`, `RwLock`, `Once` nach `std.sync`, dazu **`Semaphore`**; `Thread`, `Pool` nach `std.thread`, dazu **`parallelMap`**; `Signal`/`signals` nach `std.os` (Q9) | Fälle für `Semaphore` und `parallelMap`; alle M6-Fälle mit den neuen Importen |
+| **S2** io-Kern | O1, O3: `IoError`, `IoErrorKind`, `Reader`/`Writer`/`Seek`, `SeekFrom`, die Defaults (`readExact`, `readToEnd`, `readToString`, `writeAll`, `writeString`), `io.copy`; die Speicherströme `ByteReader` und `ByteBuffer` | EOF nur bei 0, ein leerer Slice gibt 0 sofort, ein partieller `write` |
+| **S3** Puffer und Text | O2: `BufReader`, `BufWriter` (die R3-Warnung, wenn ungeschlossen), `TextReader` (`readLine`, `lines`, `readToEnd`, `chars`, `skipBom`; ein geteilter Codepunkt bleibt im Decoder, ungültiges UTF-8 wirft `InvalidData`), `TextWriter` | ein Codepunkt über die Puffergrenze, ein BOM, eine letzte Zeile ohne Umbruch |
+| **S4** Encoding, Zufall, Krypto | Q5: `Base64`, `Base64Url`, `Hex`, `Utf16`, die Byte-Getter auf `Slice<uint8>`, `int.fromBytesLE` & Co. (`std.bytes` geht auf); Q2: `Random` (ChaCha8, Strom innerhalb des Majors zugesagt), die freien Kurzformen; Q4: `Sha256`, `Sha512`, `Sha1`, `Md5`, `Hmac`, `randomBytes`, `randomUint64`, `constantTimeEq` | die Testvektoren der RFCs und NIST; der Strom von `Random.seeded` als Fall |
+| **S5** Zeit | Q1 ohne Zonen-Datenbank und UTS #35: `Instant` (Wanduhr), `Monotonic`, `Duration` mit `Display`/`Parse`/Operatoren, `Date`, `Time`, `DateTime`, `Zone.utc`, `Zone.fixed`, RFC 3339 | Schaltjahre, Grenzen von `Duration`, RFC-3339-Beispiele |
+| **S6** Dateien | O4, O5 (erster Teil), O6, P1–P2: die fd-Hüllen (POSIX, Windows), der I/O-Pool, `File` (`open`, `create`, `openWith`; `Reader`, `Writer`, `Seek`, `Closeable`), `fs.readText`/`readBytes`/`lines`/`writeText`/`writeBytes`/`appendText`; `std.path` | jede `IoErrorKind`, die eine Datei geben kann; TSan über den Pool |
+| **S7** Verzeichnisse | O5 (Rest): `exists`, `metadata`, `remove`, `removeDir`, `removeAll`, `createDir(All)`, `copy`, `rename`, `readDir`, `walk`, `canonicalize`, `absolute`, `tempDir`, `tempFile` | ein Baum angelegt, gelaufen, entfernt — auf jeder Plattform |
+| **S8** Konsole | O9, P3: `stdin()`, `stdout()`, `stderr()`, `print<T :: [Display]>`, `println`, `eprint`, `eprintln`, `flush`, der Flush am Programmende | Messpunkt 1 hält; zeilenweise am Terminal, blockweise sonst |
+| **S9** System | Q9: `args`, `env`/`envs`/`setEnv`, `cwd`/`setCwd`, `exit`, `platform`/`arch`, `homeDir`, `tempDir`, `hostname`, `cpuCount`, `pid` | — |
+| **S10** Netz (POSIX) | O7, P2: die Bereitschaft im Poller (epoll, kqueue), `IpAddr`/`SocketAddr` mit `Parse`, `resolve` über den Pool, `TcpListener`, `TcpStream`, `UdpSocket` | **Echo-Server über `std.net`**; viele Verbindungen auf einem Thread |
+| **S11** Netz (Windows) | 06 S2: der Poller über AFD (eigene Anbindung, Review M6-29), Winsock | die Netz-Tests von S10 auch unter Windows |
+| **S12** Prozesse | O8: `Command`, `Stdio`, `Child`, `ExitStatus`, `Output`; `posix_spawn` mit `SIGCHLD` intern (Q9), `CreateProcessW`; die Pipes über den Poller (POSIX) oder den Pool (Windows) | **Prozess-Pipeline-Beispiel** |
+| **S13** `build.lyr` | W3 BS1–BS6: das Skript vor dem Compile, `std.build`, der eigene Modulraum, `rerunIfChanged`, `gen/`, die Vertrauensregel | ein Paket, dessen Skript Code erzeugt |
+| **S14** Abschluss | **Datei-Werkzeug** als Beispiel; Dogfood (die std-Tests und die Beispiele auf dem Stand von M8b); I/O-Messung berichtend (eine Datei kopieren, Echo-Durchsatz, gegen Go); STATUS, CHANGELOG | die Zeile oben erfüllt |
+
+**Nicht in M8b**: `Zone.load`/`Zone.local` und UTS #35 (M10), `std.uri`, `http`, `term`, `compress` (M10). Die
+Prüfsummen von Q3 (`crc32`, `crc32c`, `adler32`) standen in keiner Zeile — **Uhr: M8c**.
+
+### Tests
+
+Je Slice: die Regel-Fälle der Spec (rot gegen den Compiler davor — dort fehlt die API), die
+std-Tests unter `tests/std` (Dateien in `fs.tempDir()`), für Netz und Prozesse Programme in
+`Lyric5.Tests` mit einer **Frist je Lauf** (ein hängender Test ist ein roter Job, kein verbrannter
+Abend), TSan über Poller und Pool (`SanitizerTests`), je Regel eine Mutationskontrolle, die
+rot werden muss (EOF-Semantik, partieller Write, geteilter Codepunkt, `EINTR`), und für
+Plattform-Slices der Lauf von Hand (P5).
+
+### Umfang
+
+Laufzeit in C etwa 2500 Zeilen (davon AFD etwa 600), std in Lyric etwa 4000, der Compiler wenig
+(die neuen Natives in der Tabelle, `print<T>`). Groß: S6, S10, S11, S12; mittel: S2–S5, S7,
+S13, S14; klein: S1, S8, S9.
+
+### Reflexion
+
+- **Go** (`io`, `os`, `net`): die Form der Schnittstellen (O1) und der Netpoller mit parkenden
+  Goroutinen ist das Vorbild. Gos Übergabe des P bei blockierenden Aufrufen ist es nicht — sie
+  braucht den M:N-Scheduler, und der Pool (P2) erreicht dasselbe für die wenigen blockierenden Fälle.
+- **Rust** (`std::io`, `std::sys`): die Plattform-Schicht unter einer plattformfreien API (P1) und die
+  eine Fehlerart mit `kind` (O3). Rusts `std` blockiert; Lyric parkt (O10), ohne Färbung (08 D11) —
+  kein `async`-Zwilling jeder API wie bei tokio.
+- **libuv, tokio**: Bereitschaft für Sockets, ein Thread-Pool für Dateien — dieselbe Teilung wie P2.
+- **Zig** (`std.os`, die neue `Io`-Schnittstelle): ebenfalls dünne Hüllen je Systemaufruf; Zigs Weg,
+  das Warten als Parameter durchzureichen, ist hier unnötig, weil jede Koroutine parken kann.
+
 ---
 
 **Damit ist die Runde vollständig** (Bereiche 0–12 entschieden, 2026-09-28/29). Die Dokumente
