@@ -3857,25 +3857,15 @@ extend<T :: [Integer]> RangeInclusive<T> :: [Iterator, DoubleEnded] {
     }
 }
 
-/// The debug rendering of an array, element by element — the shape has no conformance of its
-/// own yet (05 §13.6), so a synthesized `debug()` reaches for this.
+/// The debug rendering of an array — what a synthesized `debug()` reaches for, the array's own
+/// (10 C9).
 pub fn debugArray<T :: [Debug]>(xs: T[]): string {
-    var out = "[";
-    for (i in 0..xs.length()) {
-        if (i > 0) { out = out + ", "; }
-        out = out + xs[i].debug();
-    }
-    return out + "]";
+    return debugText(xs);
 }
 
 /// The same for a view.
 pub fn debugSlice<T :: [Debug]>(xs: Slice<T>): string {
-    var out = "[";
-    for (i in 0..xs.length()) {
-        if (i > 0) { out = out + ", "; }
-        out = out + xs[i].debug();
-    }
-    return out + "]";
+    return debugText(xs);
 }
 
 /// The same for an optional: `null`, or the value.
@@ -3884,22 +3874,15 @@ pub fn debugOptional<T :: [Debug]>(o: ?T): string {
     return o.debug();
 }
 
-/// Equality of two arrays, element by element — a synthesized `equals` reaches for it.
+/// Equality of two arrays, element by element — what a synthesized `equals` reaches for, the
+/// arrays' own (10 C9).
 pub fn equalArrays<T :: [Equatable]>(a: T[], b: T[]): bool {
-    if (a.length() != b.length()) { return false; }
-    for (i in 0..a.length()) {
-        if (!(a[i] == b[i])) { return false; }
-    }
-    return true;
+    return sameElements(a, b);
 }
 
 /// The same for two views.
 pub fn equalSlices<T :: [Equatable]>(a: Slice<T>, b: Slice<T>): bool {
-    if (a.length() != b.length()) { return false; }
-    for (i in 0..a.length()) {
-        if (!(a[i] == b[i])) { return false; }
-    }
-    return true;
+    return sameElements(a, b);
 }
 
 /// Equality of two optionals: both absent, or both present and equal (03 O6).
@@ -4154,3 +4137,88 @@ fn textOfFloat32(value: float32): string;
 /// An integer's decimal digits into `bytes` from `at` on: how many; the room is the caller's.
 fn putIntDigits(bytes: uint8[], at: int, value: int): int;
 fn putUintDigits(bytes: uint8[], at: int, value: uint): int;
+
+// --- equality and display of arrays and views (10 C9; M8a S14) ----------------------------------
+// Element by element. The debug text is `[1, 2, 3]`, each element in its own debug text — a string
+// quoted, `["a", "b"]`, where its bounds would be lost unquoted —, and the display text is the
+// same, so an f-string prints a container (C9). Written into the caller's builder (10 S6).
+
+extend<T :: [Equatable]> T[] :: [Equatable] {
+    fn equals(o: T[]): bool {
+        return sameElements(this, o);
+    }
+}
+
+extend<T :: [Equatable]> Slice<T> :: [Equatable] {
+    fn equals(o: Slice<T>): bool {
+        return sameElements(this, o);
+    }
+}
+
+extend<T :: [Debug]> T[] :: [Debug, Display] {
+    fn debug(): string {
+        return debugText(this);
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        debugElements(this, &out);
+    }
+
+    fn show(): string {
+        return debugText(this);
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        debugElements(this, &out);
+    }
+}
+
+extend<T :: [Debug]> Slice<T> :: [Debug, Display] {
+    fn debug(): string {
+        return debugText(this);
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        debugElements(this, &out);
+    }
+
+    fn show(): string {
+        return debugText(this);
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        debugElements(this, &out);
+    }
+}
+
+/// Whether two views hold equal elements in the same order.
+fn sameElements<T :: [Equatable]>(a: Slice<T>, b: Slice<T>): bool {
+    if (a.length() != b.length()) {
+        return false;
+    }
+    for (i in 0..a.length()) {
+        if (!(a[i] == b[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/// The elements' debug texts in brackets, `, ` between each two, into `out`.
+fn debugElements<T :: [Debug]>(xs: Slice<T>, &out: StringBuilder): void {
+    out.appendChar('[');
+    for (i in 0..xs.length()) {
+        if (i > 0) {
+            out.appendStr(", ");
+        }
+        xs[i].debugTo(&out);
+    }
+    out.appendChar(']');
+}
+
+/// The same as a string of its own.
+fn debugText<T :: [Debug]>(xs: Slice<T>): string {
+    var out = StringBuilder.new();
+    debugElements(xs, &out);
+    return out.toString();
+}
