@@ -4798,6 +4798,31 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    /// <summary>Is this std.core's <c>filled</c>, the standard library's own fill?</summary>
+    private bool IsCoreFilled(FunctionSymbol symbol) =>
+        _typeTable.Compilation?.FindModule(["std", "core"])?.Members.LookupLocal("filled") is FunctionSymbol filled
+        && ReferenceEquals(symbol, filled);
+
+    /// <summary>
+    /// <c>filled(n, x)</c>: <c>n</c> slots of the one value <c>x</c>, in one allocation — the
+    /// instruction of <c>[x] * n</c>, but SHARED where the element is an object (M8a S16). The
+    /// standard library's tables start so: <c>null</c> in every slot of a map, a deque, and
+    /// <c>arrayOf</c>, which writes every slot after. <c>internal</c> to std; a program's
+    /// repetition clones (03 §5.1).
+    /// </summary>
+    private TempId LowerFilled(CallExpr expr)
+    {
+        if (TypeOfExpr(expr) is not IrArrayType type || expr.Arguments.Length != 2)
+            throw Bug($"'filled' without an array type or two arguments at {expr.Span}");
+        var count = LowerExprAs(expr.Arguments[0], new IrScalarType(IrScalar.I64));
+        var value = LowerExprAs(expr.Arguments[1], type.Element);
+        var pattern = _slots.NewTemp(type);
+        _b.Emit(new NewArray(pattern, type.Element, [value], expr.Span));
+        var built = _slots.NewTemp(type);
+        _b.Emit(new ArrayRepeat(built, pattern, count, type.Element, expr.Span, Shares: true));
+        return built;
+    }
+
     private TempId LowerIndexRead(IndexExpr expr)
     {
         // A type's own index (04 D6): the call the sema desugared, 'x.index(k)'.
@@ -6728,6 +6753,9 @@ internal sealed class FunctionLowerer
 
         if (bound is not FunctionSymbol symbol)
             throw NotSupported($"call to '{calleeName}' (not a function or method)", expr.Span);
+
+        // std.core's 'filled(n, x)' (M8a S16): the repetition's instruction, sharing.
+        if (IsCoreFilled(symbol)) return LowerFilled(expr);
 
         // Natively backed, by the stdlib or the host: its own instruction type and its own index space.
         //

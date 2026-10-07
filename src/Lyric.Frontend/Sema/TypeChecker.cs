@@ -107,6 +107,11 @@ public sealed class TypeChecker
     // 'fstringStart' (10 S6): std.core declaring it is Lyric 5's f-string — one builder, each hole a
     // piece of it (12 §2 rule 4); the 4.x tools keep their converters and concat chain.
     private readonly bool _fstringBuilder;
+    /// <summary>Lyric 5's std.core, which fills its own tables through <c>filled</c> (M8a S16):
+    /// there a type parameter counts as maybe an object where <c>[x] * n</c> asks (03 §5.1). The
+    /// 4.x library the shared front end still checks repeats type parameters natively, as 4.x
+    /// did.</summary>
+    private readonly bool _repeatAsksTypeParameters;
     // 'Contains<T>' (04 D6): what 'x in xs' asks of the right operand's type.
     private readonly TypeSymbol? _coreContains;
 
@@ -184,6 +189,7 @@ public sealed class TypeChecker
         _debug = comp.FindModule(["std", "core"])?.Members.LookupLocal("Debug")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } debug ? debug : null;
         _fstringBuilder = comp.FindModule(["std", "core"])?.Members.LookupLocal("fstringStart") is not null;
+        _repeatAsksTypeParameters = comp.FindModule(["std", "core"])?.Members.LookupLocal("filled") is FunctionSymbol;
         _coreContains = comp.FindModule(["std", "core"])?.Members.LookupLocal("Contains")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreContains ? coreContains : null;
 
@@ -5027,10 +5033,14 @@ public sealed class TypeChecker
     /// <summary>Does a value of this type hold an object — a class, an array, a view, a closure,
     /// an interface value — directly or inside a struct, an enum payload, a tuple, an optional
     /// or an inline array? A string does not count: shared, nobody can tell. What <c>[x] * n</c>
-    /// asks before it clones.</summary>
+    /// asks before it clones. A type parameter and an associated type count (03 §5.1): an
+    /// instance may make them an object, and a generic body is checked once — counted as none, a
+    /// body repeated natively and the instance over an object refused it as a compiler bug (M8a
+    /// S16: every map over objects, since R9d filled its slots so).</summary>
     private bool HoldsReference(LyrType type) => type switch
     {
         ArrayOf or SliceOf or FnType or CoroutineOf => true,
+        TypeParamType or AssocOf => _repeatAsksTypeParameters,
         Optional o => HoldsReference(o.Inner),
         InlineArrayOf ia => HoldsReference(ia.Element),
         TupleOf t => t.Elements.Any(HoldsReference),
@@ -5136,8 +5146,9 @@ public sealed class TypeChecker
                 && _clone is not null && Satisfies(la.Element, _clone, SelfInstance(_clone, la.Element));
             if (!cloneable)
                 return Report(b.Span, "LYR-SEM0136",
-                    $"'[x] * n' with an element of type '{TypeFacts.Display(la.Element)}', which is or holds "
-                    + "an object, clones every slot — declare the element type with ':: [Clone]', or build "
+                    $"'[x] * n' with an element of type '{TypeFacts.Display(la.Element)}', which "
+                    + (MentionsTypeParam(la.Element) ? "an instance may make an object" : "is or holds an object")
+                    + ", clones every slot — declare the element type with ':: [Clone]', or build "
                     + "the array with 'arrayOf(n, (i) => …)'");
             return DesugarToFreeCall(b, "repeatArray", scope, b.Left, b.Right);
         }

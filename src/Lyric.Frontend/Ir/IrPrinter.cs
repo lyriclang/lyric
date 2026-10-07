@@ -170,7 +170,7 @@ public static class IrPrinter
                        + (n.Repeat ? $"{n.Elements[0]} * {n.Length}" : $"[{string.Join(", ", n.Elements)}]"),
         CopyValue c => $"{c.Dest}: {TypeStr(c.Type)} = copyvalue {c.Value}",
         ArrayConcat c => $"{c.Dest}: {TypeStr(new IrArrayType(c.Element))} = arrcat {c.Left}, {c.Right}",
-        ArrayRepeat r => $"{r.Dest}: {TypeStr(new IrArrayType(r.Element))} = arrrep {r.Array}, {r.Count}",
+        ArrayRepeat r => $"{r.Dest}: {TypeStr(new IrArrayType(r.Element))} = arrrep{(r.Shares ? " shared" : "")} {r.Array}, {r.Count}",
 
         OptNone n => $"{n.Dest}: {TypeStr(new IrOptionalType(n.Inner))} = optnone",
         OptSome s => $"{s.Dest}: {TypeStr(new IrOptionalType(s.Inner))} = optsome {s.Value}",

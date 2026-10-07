@@ -68,21 +68,11 @@ pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[] {
     if (n == 0) {
         return [];
     }
-    // Built in linear time: the blocks of the length's binary digits, each twice the last, joined
-    // — every slot holds the first value until its own is written.
+    // One allocation, every slot the first value until its own is written. (Joined from the
+    // blocks of the length's binary digits, as before, it allocated once per digit and copied
+    // every element several times — the most of maps' cache misses, R9c.)
     let first = f(0);
-    var whole: T[] = [];
-    var block: T[] = [first];
-    var left = n;
-    while (left > 0) {
-        if (left % 2 == 1) {
-            whole = whole + block;
-        }
-        left = left / 2;
-        if (left > 0) {
-            block = block + block;
-        }
-    }
+    let whole = filled(n, first);
     var i = 1;
     while (i < n) {
         whole[i] = f(i);
@@ -90,6 +80,12 @@ pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[] {
     }
     return whole;
 }
+
+/// `n` slots of the one value `x`, an object SHARED — the repetition's instruction without its
+/// clone (M8a S16): the standard library's empty tables (`null` in every slot) and `arrayOf`, which
+/// writes every slot after. Internal: a program's `[x] * n` clones an object (03 §5.1). A negative
+/// `n` panics, as the repetition does.
+internal fn filled<T>(n: int, x: T): T[];
 
 /// `[x] * n` over an element that is or holds an object (03 §5.1, 10 C7): every slot a `clone()`
 /// of the pattern's element, so no object is shared into several slots. The compiler desugars
