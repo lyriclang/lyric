@@ -285,6 +285,11 @@ public sealed class SemaRules
                 break;
             case InterfaceDecl i: foreach (var m in i.Members) { CheckSignature(m, true); RunBody(m); } break;
             case ExtendDecl x: foreach (var m in x.Methods) { CheckSignature(m, true); RunBody(m); } break;
+            // A generic alias is Lyric 5's (03 T15); the 4.x grammar the shared parser also serves has none.
+            case TypeAliasDecl { Generics: [var first, ..] } a when !_comp.Lyric5Modules:
+                _de.Report("LYR-SEM0177", Severity.Error, first.Span,
+                    $"the type alias '{a.Name}' takes no type parameters — a generic alias is a form of Lyric 5");
+                break;
         }
     }
 

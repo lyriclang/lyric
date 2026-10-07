@@ -20,12 +20,13 @@ namespace Lyric.Resolver;
 /// </summary>
 internal static class Synthesis
 {
-    private static readonly string[] Names = ["Equatable", "Hashable", "Ordered", "TotalOrder", "Clone", "Default", "Display", "Debug"];
+    private static readonly string[] Names = ["Equatable", "Hashable", "Ordered", "TotalOrder", "Clone", "Default", "Display", "Debug", "Identity"];
 
+    // 'Identity' has no member of its own: what it gives are its parents'.
     private static string MethodOf(string iface) => iface switch
     {
         "Equatable" => "equals", "Hashable" => "hash", "Ordered" => "compare", "TotalOrder" => "totalCompare",
-        "Clone" => "clone", "Default" => "default", "Display" => "show", _ => "debug",
+        "Clone" => "clone", "Default" => "default", "Display" => "show", "Identity" => "", _ => "debug",
     };
 
     /// <summary>The parents an interface of the family implies (<c>Ordered :: [Equatable]</c>):
@@ -34,45 +35,78 @@ internal static class Synthesis
     {
         "Hashable" or "Ordered" => ["Equatable"],
         "TotalOrder" => ["Ordered", "Equatable"],
+        "Identity" => ["Equatable", "Hashable"],
         _ => [],
     };
 
     /// <summary>The constraint a parameter needs for the synthesized member to compile.</summary>
     private static string BoundOf(string iface) => iface == "Display" ? "Debug" : iface;
 
-    public readonly record struct Request(string Interface, TypeNode? Node);
+    /// <param name="ByIdentity">An <c>Equatable</c> or <c>Hashable</c> a class's <c>Identity</c>
+    /// answers: by the object, not by its fields.</param>
+    /// <param name="Contradicted">For <c>Identity</c>: the member of those two the type writes
+    /// itself, a second answer to the question <c>Identity</c> answers.</param>
+    public readonly record struct Request(string Interface, TypeNode? Node, bool ByIdentity = false, string? Contradicted = null);
 
     /// <summary>What a type asks to have synthesized: the listed interfaces of the family without
     /// the member written, the parents those imply when neither listed nor written, and
-    /// <c>Debug</c> unasked where <c>std.core</c> declares it.</summary>
-    public static List<Request> RequestsOf(TypeNode[] interfaces, IEnumerable<FunctionDecl> methods, bool coreHasDebug)
+    /// <c>Debug</c> unasked where <c>std.core</c> declares it. A class listing <c>Identity</c>
+    /// (02 M10) has its <c>Equatable</c> and <c>Hashable</c> by identity, listed beside it or not.</summary>
+    public static List<Request> RequestsOf(TypeNode[] interfaces, IEnumerable<FunctionDecl> methods, bool coreHasDebug,
+        bool coreHasIdentity = false, bool isClass = false)
     {
         var written = new HashSet<string>(methods.Select(m => m.Name), StringComparer.Ordinal);
         var listed = new HashSet<string>(StringComparer.Ordinal);
         var requests = new List<Request>();
+        var identity = coreHasIdentity && isClass
+            && interfaces.Any(n => n is NamedType { Path: ["Identity"], TypeArguments.Length: 0 });
         foreach (var node in interfaces)
-            if (node is NamedType { Path: [var name], TypeArguments.Length: 0 } && Names.Contains(name) && listed.Add(name)
-                && !written.Contains(MethodOf(name)))
-                requests.Add(new Request(name, node));
+            if (node is NamedType { Path: [var name], TypeArguments.Length: 0 } && Names.Contains(name)
+                && (name != "Identity" || coreHasIdentity) && listed.Add(name) && !written.Contains(MethodOf(name)))
+                requests.Add(new Request(name, node, identity && name is "Equatable" or "Hashable",
+                    name == "Identity" ? new[] { "equals", "hash" }.FirstOrDefault(written.Contains) : null));
         foreach (var request in requests.ToArray())
             foreach (var parent in ParentsOf(request.Interface))
-                if (!listed.Contains(parent) && !written.Contains(MethodOf(parent)) && requests.All(r => r.Interface != parent))
-                    requests.Add(new Request(parent, request.Node));
+                if (!listed.Contains(parent) && !written.Contains(MethodOf(parent)) && requests.All(r => r.Interface != parent)
+                    && (request.Interface != "Identity" || identity && request.Contradicted is null))
+                    requests.Add(new Request(parent, request.Node, identity && parent is "Equatable" or "Hashable"));
         if (coreHasDebug && !written.Contains("debug") && !listed.Contains("Debug"))
             requests.Add(new Request("Debug", null));
         return requests;
     }
 
+    /// <summary>The refusal of <c>Identity</c> to a struct or an enum, said alike where the
+    /// synthesis meets it and where a block written by hand does.</summary>
+    public static string IdentityOfAValue(string name) =>
+        $"'Identity' is an object's, and '{name}' is a value, which has none — it compares by its fields with ':: [Equatable]'";
+
     /// <summary>The block for one request, as source; <c>null</c> where the form is not written
     /// yet (reported by the caller).</summary>
-    public static string? Block(string iface, string name, GenericParam[] generics, FieldDecl[] fields,
-        EnumVariant[]? variants, SourceManager sm, bool streamsHash, out string? refusal)
+    public static string? Block(Request request, string name, GenericParam[] generics, FieldDecl[] fields,
+        EnumVariant[]? variants, bool isClass, SourceManager sm, bool streamsHash, out string? refusal)
     {
         refusal = null;
+        var iface = request.Interface;
+        var identity = request.ByIdentity || iface == "Identity";
         var typeText = generics.Length == 0 ? name : $"{name}<{string.Join(", ", generics.Select(g => g.Name))}>";
+        // By identity the parameters are asked nothing: the object is compared, not what it holds.
         var head = generics.Length == 0
             ? $"extend {typeText} :: [{iface}] {{\n"
-            : $"extend<{string.Join(", ", generics.Select(g => $"{g.Name} :: [{BoundOf(iface)}]"))}> {typeText} :: [{iface}] {{\n";
+            : identity
+                ? $"extend<{string.Join(", ", generics.Select(g => g.Name))}> {typeText} :: [{iface}] {{\n"
+                : $"extend<{string.Join(", ", generics.Select(g => $"{g.Name} :: [{BoundOf(iface)}]"))}> {typeText} :: [{iface}] {{\n";
+        if (iface == "Identity")
+        {
+            if (!isClass) refusal = IdentityOfAValue(name);
+            else if (request.Contradicted is { } member)
+                refusal = $"'Identity' compares '{name}' by the object and hashes its address, and the '{member}' "
+                    + "it writes would be a second answer — write neither, or leave 'Identity' out";
+            return refusal is null ? head + "}\n" : null;
+        }
+        if (request.ByIdentity)
+            return head + (iface == "Equatable"
+                ? $"    fn equals(o: {typeText}): bool {{\n        return same(this, o);\n    }}\n"
+                : "    fn hash<H :: [Hasher]>(&h: H): void {\n        hashIdentityInto(this, &h);\n    }\n") + "}\n";
         string Text(TypeNode t) => sm.Slice(t.Span).ToString();
         var body = variants is null
             ? StructBody(iface, name, typeText, fields, Text, streamsHash, out refusal)

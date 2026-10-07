@@ -20,6 +20,7 @@ pub import std.core {
     RangeFull,
     Equatable,
     Hashable,
+    Identity,
     Ordered,
     TotalOrder,
     Display,

@@ -603,6 +603,16 @@ public class ParserTests
         Assert.Equal("Id", Assert.IsType<TypeAliasDecl>(m.Declarations[0]).Name);
     }
 
+    [Fact]
+    public void A_generic_type_alias_parses()
+    {
+        var (m, de) = ParseModule("type Pair<T> = (T, T);");
+        Assert.False(de.HasErrors);
+        var alias = Assert.IsType<TypeAliasDecl>(m.Declarations[0]);
+        Assert.Equal(["T"], alias.Generics.Select(g => g.Name));
+        Assert.IsType<TupleType>(alias.Aliased);
+    }
+
     [Theory]
     [InlineData("fn")]
     [InlineData("fn f(")]

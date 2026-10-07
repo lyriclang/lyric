@@ -326,6 +326,13 @@ pub interface Hashable :: [Equatable] {
     fn hash<H :: [Hasher]>(&h: H): void;
 }
 
+/// An object compared by itself and hashed by where it lives (02 M10, 04 D7): `class Node ::
+/// [Identity]` is given an `equals` that is `same(this, o)` and a `hash` of its address, so a
+/// `Map<Node, X>` keys by the object without a member written. A class's alone — a value has no
+/// identity. Nothing on the heap moves (01 L1), so an object keeps its address while it lives.
+pub interface Identity :: [Hashable] {
+}
+
 /// `x[k]` is `x.index(k)` (04 D6, 03 T14): the element a key or a position names, of the type the
 /// conformer answers. An array's and a view's index is built in.
 pub interface Index<K> {
@@ -3892,6 +3899,14 @@ pub fn hashOptionalInto<T :: [Hashable], H :: [Hasher]>(o: ?T, &h: H): void {
     h.writeByte(1);
     o.hash(&h);
 }
+
+/// An object's identity into a hasher: its address, what the `hash` of an `Identity` writes.
+pub fn hashIdentityInto<T :: [Identity], H :: [Hasher]>(o: T, &h: H): void {
+    h.writeInt(identityOf(o));
+}
+
+/// The address of an object, as a number.
+fn identityOf<T>(o: T): int;
 
 /// A copy of an array with every element cloned — the clone of a reference field (04 D13).
 pub fn cloneArray<T :: [Clone]>(xs: T[]): T[] {

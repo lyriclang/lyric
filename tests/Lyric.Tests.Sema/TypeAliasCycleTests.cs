@@ -33,6 +33,27 @@ public class TypeAliasCycleTests
         de.Diagnostics.Select(d => d.Code).ToArray();
 
     [Fact]
+    public void A_generic_alias_is_refused_outside_Lyric_5()
+    {
+        // 03 T15 gives Lyric 5 generic aliases; the 4.x grammar this frontend also serves has none,
+        // and an alias's parameters are refused there once, at the first.
+        var sm = new SourceManager();
+        var id = sm.AddVirtual("test.lyr", "type Pair<T, U> = (T, U);\nfn main(): int { return 0; }");
+        var de = new DiagnosticEngine(sm);
+        var comp = new Compilation(sm, de);
+        comp.AddModule(new Parser(sm, id, de).ParseModule());
+        Semantics.Analyze(comp, comp.Resolve(), de);
+        Assert.Equal(["LYR-SEM0177"], Codes(de));
+    }
+
+    [Fact]
+    public void A_generic_alias_inside_its_own_argument_is_no_cycle()
+    {
+        var de = Check("type Pair<T> = (T, T);\nfn f(x: Pair<Pair<int>>): int { return x.1.0; }\nfn main(): int { return 0; }");
+        Assert.Empty(Codes(de));
+    }
+
+    [Fact]
     public void An_alias_defined_through_itself_is_reported()
     {
         var de = Check("type A = A;\nfn f(x: A): int { return 0; }\nfn main(): int { return 0; }");

@@ -62,9 +62,11 @@ public sealed class Resolver
         var streamsHash = _comp.Modules.Any(m => m.FullName == "std.core"
             && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Hashable" } h
                 && h.Members.Any(f => f.Name == "hash" && f.Generics.Length == 1)));
+        var coreHasIdentity = _comp.Modules.Any(m => m.FullName == "std.core"
+            && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Identity" }));
         for (var k = 0; k < declarations.Length; k++)
         {
-            declarations[k] = Synthesize(module, declarations[k], coreHasDebug, streamsHash);
+            declarations[k] = Synthesize(module, declarations[k], coreHasDebug, streamsHash, coreHasIdentity);
             var decl = declarations[k];
             switch (decl)
             {
@@ -73,8 +75,15 @@ public sealed class Resolver
                 case EnumDecl e: DeclareEnum(module, e); break;
                 case InterfaceDecl i: DeclareInterface(module, i); break;
                 case TypeAliasDecl a:
-                    DeclareTop(module, new TypeSymbol(a.Name, TypeSymbolKind.Alias, Vis(a.Visibility), new SymbolTable(), a), a);
+                {
+                    // The alias's own scope holds its parameters (03 T15), under the module's: the
+                    // aliased type and a parameter's default are bound there.
+                    var aliasScope = new SymbolTable(module.Members);
+                    var aliasSymbol = new TypeSymbol(a.Name, TypeSymbolKind.Alias, Vis(a.Visibility), aliasScope, a) { Generics = MakeGenerics(a.Generics) };
+                    DeclareGenerics(aliasScope, aliasSymbol.Generics);
+                    DeclareTop(module, aliasSymbol, a);
                     break;
+                }
                 case FunctionDecl fn:
                     DeclareTop(module, Fn(fn, fn.Visibility), fn);
                     break;
@@ -94,7 +103,7 @@ public sealed class Resolver
     /// leaves the type's own list (one conformance per type and interface, 03 T7 X3). The
     /// declaration comes back without those nodes; the AST holds the result.
     /// </summary>
-    private Decl Synthesize(ModuleSymbol module, Decl decl, bool coreHasDebug, bool streamsHash)
+    private Decl Synthesize(ModuleSymbol module, Decl decl, bool coreHasDebug, bool streamsHash, bool coreHasIdentity)
     {
         string name; GenericParam[] generics; TypeNode[] interfaces; FieldDecl[] fields; EnumVariant[]? variants; IEnumerable<FunctionDecl> methods;
         switch (decl)
@@ -104,17 +113,18 @@ public sealed class Resolver
             case EnumDecl e: (name, generics, interfaces, fields, variants, methods) = (e.Name, e.Generics, e.Interfaces, [], e.Variants, e.Methods); break;
             default: return decl;
         }
-        var requests = Synthesis.RequestsOf(interfaces, methods, coreHasDebug);
+        var requests = Synthesis.RequestsOf(interfaces, methods, coreHasDebug, coreHasIdentity, decl is ClassDecl);
         if (requests.Count == 0) return decl;
 
         var taken = new HashSet<TypeNode>(ReferenceEqualityComparer.Instance);
         foreach (var request in requests)
         {
-            var text = Synthesis.Block(request.Interface, name, generics, fields, variants, _sm, streamsHash, out var refusal);
+            var text = Synthesis.Block(request, name, generics, fields, variants, decl is ClassDecl, _sm, streamsHash, out var refusal);
             if (text is null)
             {
                 _de.Report("LYR-SEM0135", Severity.Error, request.Node?.Span ?? decl.Span,
-                    $"'{request.Interface}' is not synthesized for '{name}': {refusal} — write the member");
+                    request.Interface == "Identity" ? refusal!
+                        : $"'{request.Interface}' is not synthesized for '{name}': {refusal} — write the member");
                 if (request.Node is not null) taken.Add(request.Node);
                 continue;
             }
@@ -538,7 +548,11 @@ public sealed class Resolver
                 break;
             // ExtendDecl goes to ResolveExtensionTargets, which needs the block method scope for
             // generics.
-            case TypeAliasDecl a: BindType(a.Aliased, scope); break;
+            case TypeAliasDecl a:
+                var asc = MemberScope(scope, a.Name);
+                BindGenerics(a.Generics, asc);
+                BindType(a.Aliased, asc);
+                break;
             case GlobalBindingDecl g:
                 if (g.Binding.Type is not null) BindType(g.Binding.Type, scope);
                 break;

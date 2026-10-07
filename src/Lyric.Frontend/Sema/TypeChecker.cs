@@ -73,6 +73,7 @@ public sealed class TypeChecker
     /// <summary>What a <c>using let</c> binding closes: <c>std.core</c>'s <c>Closeable</c>
     /// (design/v5/spec/05 E7 R1, 10 K1). Null without a standard library.</summary>
     private readonly TypeSymbol? _closeable;
+    private readonly TypeSymbol? _identity;
 
     /// <summary>What a coroutine's suspended <c>yield</c> throws when <c>close()</c> unwinds it:
     /// <c>std.task</c>'s <c>Cancelled</c> (design/v5/spec/06 A5, 10 Q10), which the compilation
@@ -144,6 +145,7 @@ public sealed class TypeChecker
         _result.Lyric5Modules = comp.Lyric5Modules;
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
         _closeable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") as TypeSymbol is { Kind: TypeSymbolKind.Interface } closeable ? closeable : null;
+        _identity = comp.FindModule(["std", "core"])?.Members.LookupLocal("Identity") as TypeSymbol is { Kind: TypeSymbolKind.Interface } identity ? identity : null;
         _cancelled = comp.FindModule(["std", "task"])?.Members.LookupLocal("Cancelled") as TypeSymbol is { Kind: TypeSymbolKind.Class } cancelled ? cancelled : null;
         _task = comp.FindModule(["std", "task"])?.Members.LookupLocal("Task") as TypeSymbol is { Kind: TypeSymbolKind.Class } task ? task : null;
         _same = comp.Builtins.LookupLocal("same") as FunctionSymbol;
@@ -1793,6 +1795,22 @@ public sealed class TypeChecker
 
     // --- interface conformance with a signature match ---
 
+    /// <summary>
+    /// <c>Identity</c> is an object's (02 M10): the equality it gives is the object itself, its
+    /// hash the address. A struct or an enum is a value and has neither — refused where the
+    /// synthesis meets it, and here for a block that writes the conformance by hand. The list comes
+    /// back without what was refused: the members of a conformance that cannot be are not asked.
+    /// </summary>
+    private TypeNode[] RequireIdentityOfAnObject(TypeSymbol implementer, TypeNode[] interfaces, string name)
+    {
+        if (_identity is null || implementer.Kind is TypeSymbolKind.Class or TypeSymbolKind.Interface) return interfaces;
+        bool Refused(TypeNode node) => Conformance.InterfaceOf(node, _binding) is { } iface
+            && Conformance.WithParents(iface, _binding).Any(p => ReferenceEquals(p, _identity));
+        foreach (var node in interfaces.Where(Refused))
+            _de.Report("LYR-SEM0135", Severity.Error, NodeSpan(node), Synthesis.IdentityOfAValue(name));
+        return interfaces.Where(n => !Refused(n)).ToArray();
+    }
+
     private void CheckTypeConformance(string typeName, TypeNode[] interfaces, ModuleSymbol module, string?[]? delegates = null)
     {
         if (module.Members.LookupLocal(typeName) is TypeSymbol ts)
@@ -1813,6 +1831,7 @@ public sealed class TypeChecker
     {
         if (interfaces.Length == 0) return;
         RequireSealedInModule(interfaces, module, name);
+        interfaces = RequireIdentityOfAnObject(implementer, interfaces, name);
         var candidates = CandidateMethods(implementer, module);
 
         // Of several candidates of one name, those written where THIS conformance is declared
@@ -11800,6 +11819,9 @@ public sealed class TypeChecker
                     return new CoroutineOf(ResolveType(n.TypeArguments[0], scope))
                         { Result = n.TypeArguments.Length == 2 ? ResolveType(n.TypeArguments[1], scope) : LyrType.Void };
                 }
+                // 'Pair<int>' of 'type Pair<T> = (T, T)' (03 T15) is '(int, int)'.
+                if (sym is TypeSymbol { Kind: TypeSymbolKind.Alias } aliasSymbol)
+                    return ExpandAlias(aliasSymbol, scope, n, n.Span);
                 if (sym is TypeSymbol { Kind: not (TypeSymbolKind.Builtin or TypeSymbolKind.Alias) } gts
                     && (gts.Generics.Length > 0 || n.TypeArguments.Length > 0))
                 {
@@ -11857,10 +11879,21 @@ public sealed class TypeChecker
     /// was not a diagnostic but a STACK OVERFLOW — which .NET cannot catch, so the compiler process
     /// died instead of the compilation failing. Reported once per alias: the cycle is a property of
     /// the declaration, and one message per use site would be the same fault repeated.</para>
+    ///
+    /// <para>A generic alias (03 T15) names its type with the arguments of the use in place of
+    /// its parameters. They are resolved before the guard is taken: <c>Pair&lt;Pair&lt;int&gt;&gt;</c>
+    /// expands the alias inside its own argument, and that is no cycle.</para>
     /// </summary>
-    private LyrType ExpandAlias(TypeSymbol alias, SymbolTable scope)
+    private LyrType ExpandAlias(TypeSymbol alias, SymbolTable scope, NamedType? use, Span span)
     {
         if (alias.Declaration is not TypeAliasDecl decl) return LyrType.Error;
+
+        Dictionary<GenericParamSymbol, LyrType>? arguments = null;
+        if (alias.Generics.Length > 0 || use is { TypeArguments.Length: > 0 })
+        {
+            if (AliasArguments(alias, use, scope, span) is not { } given) return LyrType.Error;
+            arguments = given;
+        }
 
         if (!_expanding.Add(alias))
         {
@@ -11874,6 +11907,7 @@ public sealed class TypeChecker
         try
         {
             var underlying = ResolveType(decl.Aliased, scope);
+            if (arguments is not null && !underlying.IsError) underlying = Substitute(underlying, arguments);
             if (!decl.IsOpaque) return underlying;
             if (underlying.IsError) return LyrType.Error;
 
@@ -11886,10 +11920,36 @@ public sealed class TypeChecker
         finally { _expanding.Remove(alias); }
     }
 
+    /// <summary>
+    /// The arguments of a generic alias's use, by parameter: as for any generic declaration, their
+    /// number — a default filling the trailing ones — and their constraints (03 §9.1 rules 3, 5).
+    /// An alias has no associated type, so a named argument fixes nothing. <c>null</c> where reported.
+    /// </summary>
+    private Dictionary<GenericParamSymbol, LyrType>? AliasArguments(TypeSymbol alias, NamedType? use, SymbolTable scope, Span span)
+    {
+        var written = use?.TypeArguments ?? [];
+        if (use?.ArgumentNames is { } names && names.Any(fixes => fixes is not null))
+        {
+            Report(span, "LYR-SEM0128", $"the alias '{alias.Name}' declares no associated type to fix — it names a type, and fixes go to that one");
+            return null;
+        }
+        var args = FillDefaults(alias, written.Select(a => ResolveType(a, scope)).ToArray());
+        if (args.Length != alias.Generics.Length)
+        {
+            Report(span, "LYR-SEM0026", $"the type alias '{alias.Name}' expects {alias.Generics.Length} type argument(s), got {args.Length}");
+            return null;
+        }
+        if (args.Any(ContainsError)) return null;
+        CheckConstraints(alias.Generics, args, span);
+        var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        for (var i = 0; i < args.Length; i++) map[alias.Generics[i]] = args[i];
+        return map;
+    }
+
     private LyrType SymbolToType(Symbol sym, SymbolTable scope, Span span) => sym switch
     {
         TypeSymbol { Kind: TypeSymbolKind.Builtin } t => BuiltinType(t) ?? LyrType.Error,
-        TypeSymbol { Kind: TypeSymbolKind.Alias } t => ExpandAlias(t, scope),
+        TypeSymbol { Kind: TypeSymbolKind.Alias } t => ExpandAlias(t, scope, null, span),
         GenericParamSymbol g => new TypeParamType(g),
         TypeSymbol t => new NamedRef(t),
         ImportBindingSymbol ib => SymbolToType(ib.Target, scope, span),

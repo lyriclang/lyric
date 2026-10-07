@@ -241,8 +241,8 @@ public sealed class AstFormatter
         GlobalBindingDecl d => Doc.Of(Pub(d.Visibility), StmtDoc(d.Binding)),
         StaticBindingDecl d => Doc.Of(Pub(d.Visibility), Doc.From("static "), StmtDoc(d.Binding)),
         TypeAliasDecl d => Doc.Of(Pub(d.Visibility),
-            Doc.From($"{(d.IsOpaque ? "opaque " : "")}type {d.Name} = "), TypeDoc(d.Aliased),
-            Doc.From(";")),
+            Doc.From($"{(d.IsOpaque ? "opaque " : "")}type {d.Name}"), GenericsDoc(d.Generics), Doc.From(" = "),
+            TypeDoc(d.Aliased), Doc.From(";")),
         // 'type Item;' declares, 'type Item = int;' answers or defaults (03 T6); 'type Iter ::
         // [Iterator];' bounds (10 B6).
         AssociatedTypeDecl d => Doc.Of(Doc.From($"type {d.Name}"),

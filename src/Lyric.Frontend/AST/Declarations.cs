@@ -306,6 +306,9 @@ public sealed record TypeAliasDecl(VisibilityWord Visibility, bool IsOpaque, str
     public bool IsPublic => Visibility == VisibilityWord.Pub;
 
     public required Span NameSpan { get; init; }
+
+    /// <summary>The parameters of a generic alias, <c>type Pair&lt;T&gt; = (T, T)</c> (03 T15).</summary>
+    public GenericParam[] Generics { get; init; } = [];
 }
 
 public sealed record ErrorDecl(Span Span) : Decl(Span); // recovery placeholder

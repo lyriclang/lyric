@@ -1073,6 +1073,13 @@ internal sealed class TypeTable
                 && named.TypeArguments.Length == 1)
                 return new IrSliceType(Lower(named.TypeArguments[0], named.TypeArguments[0].Span));
 
+            // A generic alias (03 T15) is what it names, its arguments in place of its parameters:
+            // 'Pair<int>' of 'type Pair<T> = (T, T)' lowers as '(int, int)'. The arguments are read
+            // under the substitution of the use, the aliased type under theirs alone.
+            if (bound is TypeSymbol { Kind: TypeSymbolKind.Alias, Generics.Length: > 0, Declaration: TypeAliasDecl generalized } aliasSymbol)
+                using (PushSubstitution(AliasArguments(aliasSymbol, named, span)))
+                    return Lower(generalized.Aliased, span);
+
             // Written type arguments ('Box<int>' as a field or parameter type) are lowered BEFORE the
             // instance is interned: an argument may itself be a type parameter of the surrounding
             // instance ('Box<T>' in 'Pair<T>').
@@ -1160,6 +1167,37 @@ internal sealed class TypeTable
     /// <c>fn make&lt;T&gt;(x: T): Box&lt;T&gt;</c> is not lowerable — the return type gets resolved without
     /// a substitution and <c>T</c> finds nothing.</para>
     /// </summary>
+    /// <summary>The generic alias a written name is bound to — not a type parameter of the
+    /// substitution that shares its name, which is asked first everywhere else too.</summary>
+    private TypeSymbol? GenericAliasOf(NamedType named)
+    {
+        if (named.TypeArguments.Length == 0 && _substitutions.Count > 0 && _substitutions.Peek().ContainsKey(named.Path[^1])) return null;
+        var bound = _binding.Resolve(named);
+        if (bound is ImportBindingSymbol import) bound = import.Target;
+        return bound is TypeSymbol { Kind: TypeSymbolKind.Alias, Generics.Length: > 0 } alias ? alias : null;
+    }
+
+    /// <summary>A generic alias's parameters by name, at the arguments of a use: written, or the
+    /// declaration's defaults read under the parameters before them (03 §9.1 rule 5), as for a
+    /// generic type below. The sema reported a count that does not fit.</summary>
+    private Dictionary<string, LyrType> AliasArguments(TypeSymbol alias, NamedType use, Core.Span span)
+    {
+        var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+        for (var i = 0; i < alias.Generics.Length; i++)
+        {
+            if (i < use.TypeArguments.Length)
+            {
+                mapping[alias.Generics[i].Name] = Resolve(use.TypeArguments[i], span);
+                continue;
+            }
+            if (alias.Generics[i].Declaration is not GenericParam { Default: { } fallback }) break;
+            _substitutions.Push(new Dictionary<string, LyrType>(mapping, StringComparer.Ordinal));
+            try { mapping[alias.Generics[i].Name] = Resolve(fallback, span); }
+            finally { _substitutions.Pop(); }
+        }
+        return mapping;
+    }
+
     public IDisposable PushSubstitution(IReadOnlyDictionary<string, LyrType> mapping)
     {
         _substitutions.Push(mapping);
@@ -1251,6 +1289,11 @@ internal sealed class TypeTable
 
     private LyrType Resolve(TypeNode node, Core.Span span)
     {
+        // A generic alias, as in Lower.
+        if (node is NamedType aliasUse && GenericAliasOf(aliasUse) is { Declaration: TypeAliasDecl generalized } aliasSymbol)
+            using (PushSubstitution(AliasArguments(aliasSymbol, aliasUse, span)))
+                return Resolve(generalized.Aliased, span);
+
         if (node is NamedType { TypeArguments.Length: 0 } named)
         {
             if (AssociatedOf(named) is { } associated) return associated;
