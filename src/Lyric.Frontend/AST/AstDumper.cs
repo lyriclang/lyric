@@ -306,6 +306,7 @@ public static class AstDumper
             case TypeAliasDecl n:
                 Line(sb, indent,
                     $"TypeAlias {n.Name}{(n.IsOpaque ? " opaque" : "")}{Vis(n.Visibility)}", n.Span);
+                foreach (var g in n.Generics) Write(g, indent + 1, sb);
                 Write(n.Aliased, indent + 1, sb);
                 break;
             case ErrorDecl n:

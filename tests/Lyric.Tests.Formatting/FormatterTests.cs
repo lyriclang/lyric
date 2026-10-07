@@ -706,6 +706,18 @@ public class FormatterTests
     }
 
     [Fact]
+    public void A_generic_type_alias_round_trips()
+    {
+        // 03 T15 (N2b): the parameters stand between the name and '=', as on any declaration.
+        Assert.Equal("""
+            type Pair<T> = (T, T);
+
+            pub type Table<K, V = int> = Map<K, V>;
+
+            """, Format("type Pair< T >=(T,T);\npub type Table<K,V=int> = Map<K, V>;"));
+    }
+
+    [Fact]
     public void An_interface_parent_list_round_trips()
     {
         Assert.Equal("""

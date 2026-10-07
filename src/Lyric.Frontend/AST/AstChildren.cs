@@ -140,6 +140,7 @@ public static class AstChildren
                 if (assoc.Type is not null) yield return assoc.Type;
                 break;
             case TypeAliasDecl a:
+                foreach (var g in a.Generics) yield return g;
                 yield return a.Aliased;
                 break;
 

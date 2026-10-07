@@ -89,6 +89,8 @@ public static class Intrinsics
         ["std.core.byteSlice"] = "lyr_str_slice",
         ["std.core.stringOfBytes"] = "lyr_str_from_byte_array",
         ["std.core.asTypeOf"] = "LYR_CONVERT",
+        // An object's address, the hash of an 'Identity' (N2b).
+        ["std.core.identityOf"] = "LYR_IDENTITY",
         // Float (10 B5): the bits of either width and IEEE's total order as a key.
         ["std.core.floatBits"] = "LYR_FLOAT_BITS",
         ["std.core.floatFromBits"] = "LYR_FLOAT_FROM_BITS",

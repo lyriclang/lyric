@@ -936,11 +936,13 @@ public sealed partial class Parser
     {
         _buffer.Advance(); // contextual 'type'
         var name = ExpectNamed("LYR-PAR0026", "type alias name");
+        // 'type Pair<T> = (T, T);' (03 T15): parameters as on any generic declaration.
+        var generics = _buffer.Check(TokenKind.Less) ? ParseGenericParams() : [];
         _buffer.Expect(TokenKind.Equal, "LYR-PAR0028", "expected '=' in type alias");
         var aliased = ParseType();
         var semi = ExpectSemicolon();
         return new TypeAliasDecl(isPublic, isOpaque, name.Name, aliased, Span.Union(start, semi.Span))
-            { NameSpan = name.Span };
+            { NameSpan = name.Span, Generics = generics };
     }
 
     // --- generics ---
@@ -973,7 +975,9 @@ public sealed partial class Parser
             parameters.Add(new GenericParam(_sm.Slice(nameTok.Span).ToString(), constraints,
                 Span.Union(nameTok.Span, end)) { NameSpan = nameTok.Span, Default = fallback });
         } while (_buffer.Match(TokenKind.Comma));
-        // A generic parameter list always closes with a plain '>', never a '>>'.
+        // A generic parameter list closes with a plain '>', never a '>>' — but an alias's may meet
+        // its '=' unspaced, 'type Pair<T>= (T, T);', and the lexer reads that '>='.
+        if (_buffer.Current.TokenKind == TokenKind.GreaterEqual) _buffer.SplitCurrentGreater();
         _buffer.Expect(TokenKind.Greater, "LYR-PAR0009", "expected '>' to close type parameters");
         return parameters.ToArray();
     }

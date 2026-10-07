@@ -53,6 +53,10 @@ void lyr_unregister_stack(void *low, void *high);
 #define lyr_pin(object) ((void)(object))
 #define lyr_unpin(object) ((void)(object))
 
+/* An object's identity as a number: its address, which does not change while it lives, since
+ * nothing moves. std.core hashes an `Identity` by it (02 M10). */
+#define LYR_IDENTITY(object) ((int64_t)(uintptr_t)(object))
+
 /* Weak references with a callback after death, in the Cleaner form (01 L1): the callback never
  * sees the object, only its context, so it cannot bring the object back. Callbacks run on the
  * allocating thread at the next allocation or explicit collection after the object died. */

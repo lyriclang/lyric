@@ -532,6 +532,10 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   **N2a**: tuples of two to eight elements compare, hash and print where their elements do;
   optionals are Equatable and Hashable; arrays and the containers are Clone — a shape's block
   may now leave a parent interface to another block on the same shape (05 §13 rule 6).
+  **N2b**: an alias takes type parameters, `type Pair<T> = (T, T)` (03 T15); a class listing
+  `Identity` compares by the object and hashes its address (02 M10), and the prelude passes
+  `Identity` on. A coroutine's `Identity` (06 A7) is N2d's: blocks on `Coroutine` have gaps of
+  their own.
 
 ### M8a — done (2026-10-07)
 
