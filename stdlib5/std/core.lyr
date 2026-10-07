@@ -1,6 +1,6 @@
-/// What the language itself binds without an import (std.core, design/v5/spec/10 U-series).
-/// M2 seed: `panic` only; the interfaces the built-in types satisfy come with M4, the rest with
-/// M8a.
+/// What the language itself binds without an import (std.core, design/v5/spec/10 U-series; spec
+/// chapter 12): the core interfaces, the number tower, the iterator protocol and the members of the
+/// built-in types.
 
 
 /// Ends the process with a message and a backtrace, exit 101 (05 E8): `LYR-RT0008`. Its type is

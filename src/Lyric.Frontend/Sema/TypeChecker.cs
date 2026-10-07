@@ -4197,8 +4197,8 @@ public sealed class TypeChecker
     /// </summary>
     private LyrType CoroutineThrowsOf(FunctionDecl fn, LyrType declared, SymbolTable scope) =>
         fn.Throws is { } clause && declared is CoroutineOf co && co.Throws is null && CoroutineShape.IsCoroutine(fn)
-            // A coroutine's type carries one thrown type until area 6 gives it a set (M6): one
-            // named stays itself, several join to the root, as composed sets do (05 K7 Nachtrag).
+            // A coroutine's type carries one thrown type, its pulls' (06 A1): one named stays
+            // itself, several join to the root, as composed sets do (05 K7 Nachtrag).
             ? co with { Throws = ThrownTypeOf(clause.Types is [var one] ? one : null, scope) }
             : declared;
 
@@ -4378,8 +4378,9 @@ public sealed class TypeChecker
             return null;
         }
 
-        // An own member and an extension of one count: the member, as since extensions exist.
-        // 04 D2 makes the pair a declaration error (M4 S3); until then the member wins.
+        // An own member and an extension of one name: 04 D2 makes the pair a declaration error
+        // (LYR-SEM0121, where the block is checked), and the call takes the member, saying
+        // nothing twice.
         if (fitting.Count > 1 && fitting.Any(f => !f.FromExtension))
             fitting = fitting.Where(f => !f.FromExtension).ToList();
 
@@ -11767,7 +11768,7 @@ public sealed class TypeChecker
             foreach (var symbol in part.Members.Symbols)
             {
                 // A value of it would need the associated type fixed, 'Iterator<Item = int>' (03
-                // T6, 04 D9); such values come with the iterators of M8a. Asked before 'Self',
+                // T6, 04 D9); such values come with M8c (03 M4-1). Asked before 'Self',
                 // which 'Self.Item' mentions as well.
                 if (symbol is AssociatedTypeSymbol assoc)
                 { reason = $"it declares the associated type '{assoc.Name}', and a value of it would fix that type — not yet"; return false; }

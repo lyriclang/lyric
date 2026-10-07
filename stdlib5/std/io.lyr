@@ -1,5 +1,5 @@
 /// Console output (design/v5/spec/10 U5, O9): `import std.io { println }`. M2 seed: one argument,
-/// a string — the `Display`-generic form and the readers and writers come with M8a.
+/// a string — the readers and writers come with M8b S2 and S3, the `Display`-generic form with S8.
 
 
 pub fn print(text: string): void;
