@@ -520,6 +520,13 @@ Merged, slice by slice (each PR says what it did and how it was checked):
 - **S1, the module cut** (10 Q9, Q10): the locks in `std.sync`, with `Semaphore` (06 K4, the one
   waker of 5.0); `Thread` and `Pool` in `std.thread`, with `parallelMap` (06 P5) on the program's
   own pool; the signals in `std.os`. What they stand on stays in `std.task`, internal to std.
+- **Before S2, the catch-up block N.** An audit of M0–M8a against `main` (2026-10-07) found what
+  the earlier milestones decided and did not build, or built wrong — mostly decisions of the area
+  documents that never reached a plan row or a list, so they had no clock. N builds them: N1 the
+  faults, N2 the language's gaps from M3/M4, N3 the texts; the rest got a clock each, decided with
+  the maintainer. **N1a**: `s * n` on text, `opaque type` refused, a generator without a yield
+  closeable, a closed scope takes no task, a name bound once in a scope — a parameter counting as
+  bound in the body's block.
 
 ### M8a — done (2026-10-07)
 

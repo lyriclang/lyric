@@ -107,6 +107,8 @@ public sealed class TypeChecker
     // 'fstringStart' (10 S6): std.core declaring it is Lyric 5's f-string — one builder, each hole a
     // piece of it (12 §2 rule 4); the 4.x tools keep their converters and concat chain.
     private readonly bool _fstringBuilder;
+    /// <summary>Lyric 5's std.core, whose <c>repeatText</c> is what <c>"x" * n</c> means (10 C7).</summary>
+    private readonly bool _coreRepeatText;
     /// <summary>Lyric 5's std.core, which fills its own tables through <c>filled</c> (M8a S16):
     /// there a type parameter counts as maybe an object where <c>[x] * n</c> asks (03 §5.1). The
     /// 4.x library the shared front end still checks repeats type parameters natively, as 4.x
@@ -189,6 +191,7 @@ public sealed class TypeChecker
         _debug = comp.FindModule(["std", "core"])?.Members.LookupLocal("Debug")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } debug ? debug : null;
         _fstringBuilder = comp.FindModule(["std", "core"])?.Members.LookupLocal("fstringStart") is not null;
+        _coreRepeatText = comp.FindModule(["std", "core"])?.Members.LookupLocal("repeatText") is FunctionSymbol;
         _repeatAsksTypeParameters = comp.FindModule(["std", "core"])?.Members.LookupLocal("filled") is FunctionSymbol;
         _coreContains = comp.FindModule(["std", "core"])?.Members.LookupLocal("Contains")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreContains ? coreContains : null;
@@ -2633,7 +2636,21 @@ public sealed class TypeChecker
         else { _de.Report("LYR-SEM0010", Severity.Error, bnd.Span, $"binding '{bnd.Name}' needs a type or an initializer"); type = LyrType.Error; }
 
         var local = new LocalSymbol(bnd.Name, type, bnd.IsMutable, bnd);
-        scope.TryDeclare(local);
+        // A name is bound once in a scope (Lyric 5; decided 2026-10-07, N1a). The table kept the first
+        // binding and refused the second without a word, so the name went on meaning the first; a
+        // block's own binding may still hide an outer one — another scope. A parameter counts as
+        // bound in the body's own block, whose table is the parameters' child (decided the same day,
+        // as C#, Java and Go have it): a 'let' of its name there hid it in silence.
+        var fresh = scope.TryDeclare(local);
+        if (_comp.Lyric5Modules)
+        {
+            if (!fresh)
+                _de.Report("LYR-SEM0176", Severity.Error, bnd.Span,
+                    $"'{bnd.Name}' is bound in this scope already — give the second binding another name, or a block of its own");
+            else if (scope.Parent?.LookupLocal(bnd.Name) is ParameterSymbol)
+                _de.Report("LYR-SEM0176", Severity.Error, bnd.Span,
+                    $"'{bnd.Name}' is a parameter, bound in this block already — give the binding another name, or a block of its own");
+        }
         _result.BindRef(bnd, local); // for definite-assignment analysis
 
         // 'using let' (05 E7 R1–R6): what it binds is Closeable (R6), and the close it owes its
@@ -5131,8 +5148,12 @@ public sealed class TypeChecker
     private LyrType CheckMul(BinaryExpr b, LyrType l, LyrType r, SymbolTable scope)
     {
         if (UnifyNumeric(b.Left, l, b.Right, r) is { } n) return n;
-        if (TypeFacts.IsString(l) && TypeFacts.IsInteger(r)) return LyrType.String;   // "x" * 3
-        if (TypeFacts.IsString(r) && TypeFacts.IsInteger(l)) return LyrType.String;   // 3 * "x"
+        // "x" * 3 (10 C7) is std.core's repetition of a text in Lyric 5, in the one order:
+        // '3 * "x"' is refused, as 'n * [x]' is. Until N1a the checker took both and the lowering
+        // called a helper only the 4.x library has (LYR-IR0001). The 4.x path keeps its helper.
+        if (TypeFacts.IsString(l) && TypeFacts.IsInteger(r))
+            return _coreRepeatText ? DesugarToFreeCall(b, "repeatText", scope, b.Left, b.Right) : LyrType.String;
+        if (TypeFacts.IsString(r) && TypeFacts.IsInteger(l) && !_coreRepeatText) return LyrType.String;
         // '[x] * n' repeats (10 C7); 'n * [x]' does not — one order, as for a string.
         if (l is ArrayOf la && TypeFacts.IsInteger(r))
         {

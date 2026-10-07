@@ -150,16 +150,18 @@ struct lyr_ty_std_task_TaskScope {
     int64_t f_open;
     lyr_opt_iface14_std_core_Error f_failure;
     lyr_ty_std_task_PanicInfo *f_crash;
+    uint8_t f_closed;
     lyr_ty_std_task_Waiters *f_closing;
 };
-_Static_assert(sizeof(lyr_ty_std_task_TaskScope) == 72, "layout of lyr_ty_std_task_TaskScope");
+_Static_assert(sizeof(lyr_ty_std_task_TaskScope) == 80, "layout of lyr_ty_std_task_TaskScope");
 _Static_assert(offsetof(lyr_ty_std_task_TaskScope, f_firstChild) == 8, "layout of lyr_ty_std_task_TaskScope");
 _Static_assert(offsetof(lyr_ty_std_task_TaskScope, f_lastChild) == 16, "layout of lyr_ty_std_task_TaskScope");
 _Static_assert(offsetof(lyr_ty_std_task_TaskScope, f_open) == 24, "layout of lyr_ty_std_task_TaskScope");
 _Static_assert(offsetof(lyr_ty_std_task_TaskScope, f_failure) == 32, "layout of lyr_ty_std_task_TaskScope");
 _Static_assert(offsetof(lyr_ty_std_task_TaskScope, f_crash) == 56, "layout of lyr_ty_std_task_TaskScope");
-_Static_assert(offsetof(lyr_ty_std_task_TaskScope, f_closing) == 64, "layout of lyr_ty_std_task_TaskScope");
-static const uint64_t lyr_refmap_ty_std_task_TaskScope[] = { UINT64_C(0x196) };
+_Static_assert(offsetof(lyr_ty_std_task_TaskScope, f_closed) == 64, "layout of lyr_ty_std_task_TaskScope");
+_Static_assert(offsetof(lyr_ty_std_task_TaskScope, f_closing) == 72, "layout of lyr_ty_std_task_TaskScope");
+static const uint64_t lyr_refmap_ty_std_task_TaskScope[] = { UINT64_C(0x296) };
 const LyrDesc lyr_desc_ty_std_task_TaskScope = { sizeof(lyr_ty_std_task_TaskScope), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_task_TaskScope, "std.task.TaskScope", NULL };
 struct lyr_ty_std_task_Waiters {
     LyrObj header;
@@ -2310,29 +2312,29 @@ bb0:;
     t2 = (uint64_t)UINT64_C(9259542123273814144);
 #line 256
     lyr_g_std_collections_highBits = t2;
-#line 1259 "stdlib5/std/task.lyr"
+#line 1269 "stdlib5/std/task.lyr"
     t3 = 0;
-#line 1647
+#line 1657
     t4 = (lyr_ty_std_task_SpinLock *)lyr_alloc(&lyr_desc_ty_std_task_SpinLock);
-#line 1647
+#line 1657
     t4->f_held = t3;
-#line 1648
+#line 1658
     t5 = NULL;
-#line 1649
+#line 1659
     t6 = (int64_t)INT64_C(0);
-#line 1692
+#line 1702
     t7 = (lyr_ty_std_task_Living *)lyr_alloc(&lyr_desc_ty_std_task_Living);
-#line 1692
+#line 1702
     LYR_WRITE_BARRIER(t7, &t7->f_guard, t4);
-#line 1692
+#line 1702
     LYR_WRITE_BARRIER(t7, &t7->f_first, t5);
-#line 1692
+#line 1702
     t7->f_count = t6;
-#line 1692
+#line 1702
     lyr_g_std_task_living = t7;
-#line 1704
+#line 1714
     t8 = (int64_t)INT64_C(0);
-#line 1704
+#line 1714
     lyr_g_std_task_channelIds = t8;
     return;
 }
