@@ -2421,7 +2421,7 @@ bb0:;
     return t0;
 }
 
-#line 247 "stdlib5/std/collections.lyr"
+#line 260 "stdlib5/std/collections.lyr"
 void lyr__globals__9ee5f9b5(void) {
     uint64_t t0 = 0;
     uint64_t t1 = 0;
@@ -2439,17 +2439,17 @@ void lyr__globals__9ee5f9b5(void) {
     lyr_ty_std_task_Living *t13 = NULL;
     int64_t t14 = 0;
 bb0:;
-#line 247
+#line 260
     t0 = (uint64_t)UINT64_C(9259542123273814144);
-#line 247
+#line 260
     lyr_g_std_collections_emptyGroup = t0;
-#line 248
+#line 261
     t1 = (uint64_t)UINT64_C(72340172838076673);
-#line 248
+#line 261
     lyr_g_std_collections_lowBits = t1;
-#line 249
+#line 262
     t2 = (uint64_t)UINT64_C(9259542123273814144);
-#line 249
+#line 262
     lyr_g_std_collections_highBits = t2;
 #line 1673 "stdlib5/std/task.lyr"
     t3 = 0;
