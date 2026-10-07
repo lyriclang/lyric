@@ -37,7 +37,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M5 | Errors | M | **done** 2026-10-02 |
 | M6 | Coroutines, scheduler, threads | XL | **done** 2026-10-02 |
 | M7 | Modules and packages | L | **done** 2026-10-02 |
-| M8a | std core | XL | **in progress**: S1–S11a merged; closing after the review of 2026-10-05 (blocks R0–R9, then S12–S16) |
+| M8a | std core | XL | **done** 2026-10-07 |
 | M8b | std I/O and system | L | — |
 | M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | — |
 | M9a | `comptime` (the IR interpreter) | L | — |
@@ -508,9 +508,11 @@ raising no version and no `--locked`; `extern "C"`'s stage-1 types; the `lyric5`
 the 4.x catalogue; reproducibility checked on one machine at a time (zig's own libunwind keeps
 the directory zig built it in; gcc maps the working directory, into its cache keys).
 
-### M8a — std core
+### M8a — done (2026-10-07)
 
-In progress. Merged, slice by slice (each PR says what it did and how it was checked):
+Merged as #261–#307 (S1–S11a) and, after the review of 2026-10-05, #308–#373 (the blocks R0–R9,
+then S12–S16); the spec side is lyric-spec#122 onward. Slice by slice (each PR says what it did
+and how it was checked):
 
 - **Tests:** `lyric test`, `@Test`, `std.test` with `@callerExpr`, subtests, the watchdog (S1).
 - **Language the library needs:** `&x: T` (S2a), `static let` in interfaces and blocks (S2b),
@@ -525,7 +527,7 @@ In progress. Merged, slice by slice (each PR says what it did and how it was che
 - **Hashing (K2, C4, C5):** `Hasher` with SipHash-1-3 and FNV, `Hashable` streaming into a
   hasher, `Map` as a Swiss table (S6).
 - **Collections:** `Index`/`IndexSet` (B4), `List` (C3), a map's walks, `Set`, `toList` (S7);
-  `Deque` (C6) and `Heap` (C1), the greatest first (S11a).
+  `Deque` (C6) and `Heap` (C1) (S11a; the least first since the review's A1).
 - **Strings, first and second part (B9 S1–S3):** search, split, trim, replace, pad,
   `StringBuilder`; a `char` literal beyond the basic plane (S8).
 - **The prelude naming the collections (B2)** (S9a); **the format language (08 Y7, 10 S7)**,
@@ -548,16 +550,28 @@ M8a and decided them: 110 decisions, written into the area documents, each in a 
   `StringView`, `Pattern`, `fromUtf8` (S12); `showTo`/`debugTo` and f-strings writing into one
   builder (S13); containers' `Debug`, `Display` and `Equatable` (S14); `collect`/`FromIterator`
   and `x in xs` (S15); the close with measurement point 3 measured again (S16).
-- **Not built, and M8a's to build:** everything in the line above from S12 on; the members of
-  `T[N]`; `copyInto`; `Heap.from`, `withCapacity`, `Deque`'s equality.
+- **Built from the list the review left M8a** — all of it: the members of `T[N]` (R4e),
+  `copyInto` (R7c); text as a view, `StringView` and its members, `Pattern` (`char`, `string`, a
+  view, `fn(char) -> bool`) for search, split and replace, `string.fromUtf8`, `Utf8Error`,
+  `fromUtf8Lossy`, function types as extend targets (S12); `Display.showTo` and `Debug.debugTo`,
+  f-strings writing into one builder, `[x] * n` by doubling (S13); `==`, `Debug` and `Display` for
+  arrays, views and every container — a set and a map equal in any order —, a shape conforming
+  through its block comparing and rendering (S14a); `withCapacity` on every container, `Heap.of`
+  (N3's name for the review's `Heap.from`, S14b); `FromIterator`, `collect()`, `toSet()`, a fixed
+  associated type read inside every type (S15a); `x in xs` and `x !in xs` through `Contains<T>`,
+  a call's receiver evaluated before its arguments (S15b).
+- **Measurement point 3 again (S16):** maps 1.36×, sorting 1.21×, strings 1.70× Go
+  (S10c: 1.90, 1.53, 2.53), ahead of C# in all three; maps and sorting within the bound, strings
+  over it. The numbers and what moved them are in `bench/README.md`.
 - **Not built, and M8c's** (after M8b): the Unicode tables, `char`'s predicates, `toUpper` and
   `toLower`; `mapNotNull`, `flatMap`, `flatten`, `chunks`, `windows`, `dedup`, `scan`,
-  `peekable`, `rev`, `cycle`, and lambdas that throw inside adapters; `toSet`/`toMap`/`sorted`
-  and the other collecting terminators beyond `collect`; the set operations, `map[k]`,
+  `peekable`, `rev`, `cycle`, and lambdas that throw inside adapters; `toMap`/`sorted` and the
+  other collecting terminators beyond `collect` and `toSet`; the set operations, `map[k]`,
   `list[a..b]`, `+` and `*` on collections; `Result`, `From`/`Into`; `std.fmt.format` at run time; an interface with a
   fixed associated type as a value; `suppressed()` and `backtrace()` at a `catch` binding;
   `@Bench` and `lyric bench`.
-- **Clocks the review set:** measurement point 3 holds its bound of 1.5× Go and is to be met
+- **Clocks the review set:** measurement point 3 (at the close of M8a: maps and sorting within it,
+  strings at 1.70×) holds its bound of 1.5× Go and is to be met
   after M11, or decided again; the prologue's stack check and `Atomic` over a class come with
   M11; the notes on hidden candidates and the lint for foreign conformances with M12.
 

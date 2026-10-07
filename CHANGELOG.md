@@ -18,6 +18,24 @@ promise. This entry fills with the milestones.
 
 - **The Lyric 5 migration warnings are gone** (`LYR-SEM0107`–`SEM0110`, added for 4.6): the
   design decided a hard cut with no 4.x warning stages toward 5.
+- **A runtime in C (M1** — `design/v5/spec/01`, spec chapter 13 §1**):** a program links
+  `liblyr.a`, built by the toolchain for every Tier 1 target: objects behind a header with a
+  descriptor, a collector (Boehm, conservative, behind the allocation API), strings and arrays,
+  roots and weak references; a panic prints its code and a backtrace with the `.lyr` lines, a
+  stack overflow is a panic, and a crash is reported, on Linux, Windows and macOS.
+- **The first native programs (M2** — spec chapter 14 §1**):** `lyric5 build <file>` and
+  `lyric5 run <file> [-- args]` compile through C with `zig cc` into a binary under
+  `out/<profile>/<target>/`; `--profile`, `--target` for a cross build, `--emit ir|c`; checked
+  integer arithmetic, `#line` into the source; an unchanged program compiles nothing twice.
+  Hello is 1.2 MB with its debug information and starts in about 2 ms.
+- **The value model and the type system (M3** — `design/v5/spec/02`, `03`, spec chapters 03 and
+  09**):** the number tower with `int64`/`uint64`/`float64` as aliases, lossless widening only,
+  the wrap operators `+% -% *%`; classes as objects, structs as values whose methods write the
+  caller's place; optionals (`?T`, `x!`, narrowing), enums with payloads, patterns where a bare
+  name binds and `.Red` takes the expected enum; `T[]`, `Slice<T>` views and inline `T[N]`;
+  tuples, ranges, `with`, module-level `let`/`var`; function values and lambdas with captures;
+  generics by monomorphization with `_` placeholders and the expected type binding what the
+  arguments leave open.
 - **Interfaces and abstraction (M4** — `design/v5/spec/04`, spec chapter 05**):** interface
   values as fat pointers with a table per conformance; one method set per type, overloading by
   arity and arguments by name; `Self`, static members through a constraint, associated types;
@@ -62,6 +80,21 @@ promise. This entry fills with the milestones.
   `[native]` C sources and libraries with `extern "C"` for scalars; the same bytes wherever a
   package lies and whenever it is built, on every platform — the PDB and the `.dSYM` beside the
   binary.
+- **The standard library's core (M8a** — `design/v5/spec/10`, spec chapter 12**):** `lyric test`
+  with `@Test`, `std.test` and subtests; the number tower `Num`/`Signed`/`Integer`/`Float` with
+  checked, saturating and wrapping arithmetic, `parse` and the shortest float text; the iterator
+  protocol (`Iterator`, `Iterable`, a walk's `Error`), the adapters (`map`, `filter`, `take`,
+  `zip`, `chain`, …) and terminators, `collect()` into whatever the position expects through
+  `FromIterator`; arrays' and views' members, stable `sort` and `sortUnstable`; `Hasher` with
+  SipHash-1-3, `Hashable`; `List`, `Map` (a Swiss table), `Set`, `Deque`, `Heap` (the least first),
+  each with `withCapacity`, compared with `==` and printed by `{xs}` — a set and a map in any
+  order —, and `x in xs`/`x !in xs` through `Contains<T>` on ranges, arrays, containers and text;
+  `StringView` and `Pattern` (`char`, `string`, a view, a predicate) for search, split, replace and
+  trim, `string.fromUtf8`; `StringBuilder`, f-strings writing into one builder, `Display.showTo`;
+  the format language (`{x:>8}`, `{n:#x}`, `{f:.2f}`, `{v:?}`), checked where a spec is written.
+  Of the review of 2026-10-05 besides: the depth limit, `lyric.lock` with `--locked`,
+  `lyric update` raising a tag's line, the IR optimizer in the release profile, `lto` on every
+  target.
 
 ---
 

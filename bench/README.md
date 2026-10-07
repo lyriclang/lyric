@@ -105,3 +105,18 @@ blocks — `maps` 0.333 → 0.267 s, 1.79× → 1.43× Go (minima of three alter
 runs; cachegrind's LL misses 10.4 M → 3.3 M). A lookup that misses — most of them here — reads
 only the control words, small enough to stay in the cache; a hit reads one slot. What remains is
 the hasher: SipHash-1-3 (10 K2) is a fifth of the time, Go's AES hash 3–4 %.
+
+At the close of M8a (S16, 2026-10-07; minima over 4 alternating rounds of 7 runs, the machine noisy —
+Go's `maps` alone moved between 0.193 and 0.222 s):
+
+| bench | Lyric | Go | C# | Lyric / Go |
+|---|---|---|---|---|
+| maps | 0.262 s | 0.193 s | 0.223 s | 1.36 |
+| sorting | 0.094 s | 0.078 s | 0.171 s | 1.21 |
+| strings | 0.046 s | 0.027 s | 0.071 s | 1.70 |
+
+`maps` and `sorting` are within the bound, `strings` over it. What moved them since S10c: the IR
+optimizer inlining inside the program's unit (R9a), the map's slots beside its control words
+(R9d), f-strings writing into one builder with `[x] * n` filling by doubling (S13 — `strings`
+had become 45 % slower until the repetition stopped copying an element at a time). What remains
+in `strings` is not measured apart here; the hasher's share of `maps` is as above.
