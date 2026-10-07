@@ -7,7 +7,7 @@
   </ItemGroup>
   <ItemGroup>
     <!-- A test-only module beside the shipped stdlib5: a native the C emitter has no intrinsic
-         for, the one refusal of the subset gate a program can still reach (M8a). -->
+         for, the one refusal of the subset gate a program can still reach. -->
     <None Update="notyet\std\notyet.lyr" Link="stdlib5\std\notyet.lyr" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

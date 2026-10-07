@@ -35,6 +35,9 @@ internal sealed class BlockBuilder
 
     public BlockId CurrentId => _current.Id;
 
+    /// <summary>How many instructions the current block holds: where the next one lands.</summary>
+    public int CurrentCount => _current.Insts.Count;
+
     /// <summary>Is the current block closed? If so, control flow ends at this point and everything
     /// following is unreachable.</summary>
     public bool IsSealed => _current.Terminator is not null;

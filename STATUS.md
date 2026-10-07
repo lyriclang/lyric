@@ -526,7 +526,9 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   faults, N2 the language's gaps from M3/M4, N3 the texts; the rest got a clock each, decided with
   the maintainer. **N1a**: `s * n` on text, `opaque type` refused, a generator without a yield
   closeable, a closed scope takes no task, a name bound once in a scope — a parameter counting as
-  bound in the body's block.
+  bound in the body's block. **N1b**: a module binding nothing reads goes when its initializer
+  only gives its value (01 B13 — hello has no global any more); a panic's trace starts at the
+  program's text, whatever its package is called; no message names a finished milestone.
 
 ### M8a — done (2026-10-07)
 

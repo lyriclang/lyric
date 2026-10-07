@@ -354,6 +354,12 @@ static int is_runtime_frame(const Frame *frame) {
            starts_with(frame->function, "lyr_coro_panic") || starts_with(frame->function, "lyr_coro_repanic");
 }
 
+/* A frame of the program's text: its line is in a '.lyr' file (the '#line' of the emitted C). */
+static int is_lyric_frame(const Frame *frame) {
+    size_t n = frame->file ? strlen(frame->file) : 0;
+    return n > 4 && strcmp(frame->file + n - 4, ".lyr") == 0;
+}
+
 static int same_text(const char *a, const char *b) {
     return a == b || (a && b && strcmp(a, b) == 0);
 }
@@ -415,6 +421,16 @@ static size_t emit(char *out, size_t capacity, uintptr_t fault_pc) {
     if (fault_pc != 0) {
         for (int i = 0; i < trace.count && start < 0; i++) {
             if (trace.frames[i].pc == fault_pc || trace.frames[i].pc == fault_pc - 1) start = i;
+        }
+    }
+    /* Below the runtime's own frames — the panic machinery, and the runtime function that raised
+     * it, as lyr_arr_repeat raises RT0007: the first frame of the program's text, a '.lyr' file, is
+     * where the trace starts. Names cannot tell them apart: the program's functions are named
+     * lyr_<module>_…, and a module called 'trace' or 'panic' looked like the runtime and lost every
+     * frame (N1b). Without line information the names are all there is. */
+    if (start < 0) {
+        for (int i = 0; i < trace.count && start < 0; i++) {
+            if (is_lyric_frame(&trace.frames[i])) start = i;
         }
     }
     if (start < 0) {

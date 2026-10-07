@@ -124,7 +124,7 @@ internal static class Reachability
     /// function at runtime. Throwing away less than possible is the right trade; the free functions this
     /// is about (<c>parseInt</c>, <c>replace</c>, …) are not virtual anyway.</para>
     /// </remarks>
-    private static HashSet<int> Collect(IrModule module)
+    internal static HashSet<int> Collect(IrModule module)
     {
         var erreichbar = new HashSet<int>();
         var offen = new Stack<int>();

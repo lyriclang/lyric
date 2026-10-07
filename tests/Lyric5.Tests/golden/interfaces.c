@@ -106,11 +106,6 @@ _Static_assert(offsetof(lyr_box_ty_app_main_Square, value) == 8, "layout of lyr_
 extern const LyrItable lyr_itab_ty_app_main_Square[];
 const LyrDesc lyr_desc_box_ty_app_main_Square = { sizeof(lyr_box_ty_app_main_Square), 0, 0, 0, NULL, "box<app.main.Square>", lyr_itab_ty_app_main_Square };
 
-/* module-level bindings */
-uint64_t lyr_g_std_collections_emptyGroup = 0;
-uint64_t lyr_g_std_collections_lowBits = 0;
-uint64_t lyr_g_std_collections_highBits = 0;
-
 /* string literals */
 static const LyrStaticStr(6) lyr_lit0 = LYR_STR_INIT("alive");
 static const LyrStaticStr(5) lyr_lit1 = LYR_STR_INIT("down");
@@ -1837,24 +1832,8 @@ bb8:;
     return;
 }
 
-#line 254 "stdlib5/std/collections.lyr"
 void lyr__globals__9ee5f9b5(void) {
-    uint64_t t0 = 0;
-    uint64_t t1 = 0;
-    uint64_t t2 = 0;
 bb0:;
-#line 254
-    t0 = (uint64_t)UINT64_C(9259542123273814144);
-#line 254
-    lyr_g_std_collections_emptyGroup = t0;
-#line 255
-    t1 = (uint64_t)UINT64_C(72340172838076673);
-#line 255
-    lyr_g_std_collections_lowBits = t1;
-#line 256
-    t2 = (uint64_t)UINT64_C(9259542123273814144);
-#line 256
-    lyr_g_std_collections_highBits = t2;
     return;
 }
 

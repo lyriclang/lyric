@@ -128,8 +128,9 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     private static readonly Dictionary<string, string> LaterSections = new(StringComparer.Ordinal)
     {
         ["lints"] = "M12",
-        ["build-dependencies"] = "M7 S7",
-        ["trust"] = "M7 S7",
+        // build.lyr moved behind M8b's I/O (13; it was "M7 S7", a slice M7 never had)
+        ["build-dependencies"] = "M8b S13",
+        ["trust"] = "M8b S13",
     };
 
     /// <summary>Reads and checks <paramref name="file"/>.</summary>

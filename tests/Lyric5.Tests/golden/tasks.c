@@ -262,11 +262,7 @@ _Static_assert(sizeof(uint8_t) == 1, "layout of u8[]");
 const LyrDesc lyr_desc_arr_u8 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(uint8_t), 0, NULL, "u8[]", NULL };
 
 /* module-level bindings */
-uint64_t lyr_g_std_collections_emptyGroup = 0;
-uint64_t lyr_g_std_collections_lowBits = 0;
-uint64_t lyr_g_std_collections_highBits = 0;
 lyr_ty_std_task_Living *lyr_g_std_task_living = NULL;
-int64_t lyr_g_std_task_channelIds = 0;
 LyrStr *lyr_g_app_main_log = NULL;
 
 /* string literals */
@@ -5805,59 +5801,39 @@ bb6:;
     return;
 }
 
-#line 254 "stdlib5/std/collections.lyr"
-void lyr__globals__9ee5f9b5(void) {
-    uint64_t t0 = 0;
-    uint64_t t1 = 0;
-    uint64_t t2 = 0;
-    uint8_t t3 = 0;
-    lyr_ty_std_task_SpinLock *t4 = NULL;
-    lyr_ty_std_task_Scheduler *t5 = NULL;
-    int64_t t6 = 0;
-    lyr_ty_std_task_Living *t7 = NULL;
-    int64_t t8 = 0;
-    LyrStr *t9 = NULL;
-bb0:;
-#line 254
-    t0 = (uint64_t)UINT64_C(9259542123273814144);
-#line 254
-    lyr_g_std_collections_emptyGroup = t0;
-#line 255
-    t1 = (uint64_t)UINT64_C(72340172838076673);
-#line 255
-    lyr_g_std_collections_lowBits = t1;
-#line 256
-    t2 = (uint64_t)UINT64_C(9259542123273814144);
-#line 256
-    lyr_g_std_collections_highBits = t2;
 #line 1269 "stdlib5/std/task.lyr"
-    t3 = 0;
+void lyr__globals__9ee5f9b5(void) {
+    uint8_t t0 = 0;
+    lyr_ty_std_task_SpinLock *t1 = NULL;
+    lyr_ty_std_task_Scheduler *t2 = NULL;
+    int64_t t3 = 0;
+    lyr_ty_std_task_Living *t4 = NULL;
+    LyrStr *t5 = NULL;
+bb0:;
+#line 1269
+    t0 = 0;
 #line 1657
-    t4 = (lyr_ty_std_task_SpinLock *)lyr_alloc(&lyr_desc_ty_std_task_SpinLock);
+    t1 = (lyr_ty_std_task_SpinLock *)lyr_alloc(&lyr_desc_ty_std_task_SpinLock);
 #line 1657
-    t4->f_held = t3;
+    t1->f_held = t0;
 #line 1658
-    t5 = NULL;
+    t2 = NULL;
 #line 1659
-    t6 = (int64_t)INT64_C(0);
+    t3 = (int64_t)INT64_C(0);
 #line 1702
-    t7 = (lyr_ty_std_task_Living *)lyr_alloc(&lyr_desc_ty_std_task_Living);
+    t4 = (lyr_ty_std_task_Living *)lyr_alloc(&lyr_desc_ty_std_task_Living);
 #line 1702
-    LYR_WRITE_BARRIER(t7, &t7->f_guard, t4);
+    LYR_WRITE_BARRIER(t4, &t4->f_guard, t1);
 #line 1702
-    LYR_WRITE_BARRIER(t7, &t7->f_first, t5);
+    LYR_WRITE_BARRIER(t4, &t4->f_first, t2);
 #line 1702
-    t7->f_count = t6;
+    t4->f_count = t3;
 #line 1702
-    lyr_g_std_task_living = t7;
-#line 1714
-    t8 = (int64_t)INT64_C(0);
-#line 1714
-    lyr_g_std_task_channelIds = t8;
+    lyr_g_std_task_living = t4;
 #line 14 "programs/tasks.lyr"
-    t9 = (LyrStr *)&lyr_lit0;
+    t5 = (LyrStr *)&lyr_lit0;
 #line 14
-    lyr_g_app_main_log = t9;
+    lyr_g_app_main_log = t5;
     return;
 }
 
