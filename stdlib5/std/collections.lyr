@@ -16,15 +16,25 @@ pub class List<T> :: [IndexSet<int>, Iterable] {
     var buffer: T[],
     var count: int,
     var changes: int,
+    reserved: int,
 
     /// An empty list.
     pub static fn new(): List<T> {
-        return List<T> { buffer = [], count = 0, changes = 0 };
+        return List<T> { buffer = [], count = 0, changes = 0, reserved = 0 };
+    }
+
+    /// An empty list with room for `n` elements before it grows (10 N3); a negative `n` panics. The
+    /// room is taken at the first push — a list holds no value it has not been given.
+    pub static fn withCapacity(n: int): List<T> {
+        if (n < 0) {
+            panic(f"List.withCapacity: a negative capacity {n}");
+        }
+        return List<T> { buffer = [], count = 0, changes = 0, reserved = n };
     }
 
     /// A list of the array's elements, copied.
     pub static fn of(xs: T[]): List<T> {
-        return List<T> { buffer = arrayOf(xs.length(), (i: int) => xs[i]), count = xs.length(), changes = 0 };
+        return List<T> { buffer = arrayOf(xs.length(), (i: int) => xs[i]), count = xs.length(), changes = 0, reserved = 0 };
     }
 
     /// How many elements it holds.
@@ -172,7 +182,10 @@ pub class List<T> :: [IndexSet<int>, Iterable] {
     /// Room for twice the elements, the slots past the length holding `filler`: the new buffer
     /// made of the filler, the elements over in one copy (B16).
     mut fn grow(filler: T): void {
-        let room = if (this.buffer.length() == 0) 8 else this.buffer.length() * 2;
+        var room = if (this.buffer.length() == 0) 8 else this.buffer.length() * 2;
+        if (room < this.reserved) {
+            room = this.reserved;
+        }
         let grown = arrayOf(room, (i: int) => filler);
         this.buffer[..this.count].copyInto(grown[..]);
         this.buffer = grown;
@@ -481,6 +494,25 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         panic("Map: a full table");
     }
 
+    /// Room for `n` keys in an empty table: the fewest groups, a power of two, whose seven slots in
+    /// eight hold them.
+    mut fn makeRoom(n: int): void {
+        if (n < 0) {
+            panic(f"Map.withCapacity: a negative capacity {n}");
+        }
+        if (n == 0) {
+            return;
+        }
+        var groups = 1;
+        while (groups * 7 < n) {
+            groups = groups * 2;
+        }
+        this.controls = [emptyGroup] * groups;
+        let empty: ?MapSlot<K, V> = null;
+        this.slots = [empty] * (groups * 8);
+        this.free = groups * 7;
+    }
+
     /// The table built anew, every key placed again: twice the groups — one where there was none —
     /// or as many where fewer than half the slots the load allows hold keys, the rest deletions.
     mut fn rebuild(): void {
@@ -626,6 +658,11 @@ extend<T :: [Hashable]> Set<T, DefaultHasher> {
     pub static fn new(): Set<T, DefaultHasher> {
         return Set<T, DefaultHasher>.withHasher(DefaultHasher.new());
     }
+
+    /// An empty set with room for `n` values before it grows (10 N3); a negative `n` panics.
+    pub static fn withCapacity(n: int): Set<T, DefaultHasher> {
+        return Set<T, DefaultHasher> { table = Map<T, bool, DefaultHasher>.withCapacity(n) };
+    }
 }
 
 // --- from iterators (10 I4) ----------------------------------------------------------------------
@@ -649,6 +686,13 @@ extend<K :: [Hashable], V> Map<K, V, DefaultHasher> {
     pub static fn new(): Map<K, V, DefaultHasher> {
         return Map<K, V, DefaultHasher>.withHasher(DefaultHasher.new());
     }
+
+    /// An empty map with room for `n` keys before it grows (10 N3); a negative `n` panics.
+    pub static fn withCapacity(n: int): Map<K, V, DefaultHasher> {
+        let map = Map<K, V, DefaultHasher>.withHasher(DefaultHasher.new());
+        map.makeRoom(n);
+        return map;
+    }
 }
 
 // --- Deque (10 C6) -------------------------------------------------------------------------------
@@ -669,6 +713,14 @@ pub class Deque<T> :: [Index<int>, Iterable] {
     /// An empty deque.
     pub static fn new(): Deque<T> {
         return Deque<T> { slots = [], head = 0, count = 0, changes = 0 };
+    }
+
+    /// An empty deque with room for `n` values before it grows (10 N3); a negative `n` panics.
+    pub static fn withCapacity(n: int): Deque<T> {
+        if (n < 0) {
+            panic(f"Deque.withCapacity: a negative capacity {n}");
+        }
+        return Deque<T> { slots = arrayOf(n, (i: int): ?T => null), head = 0, count = 0, changes = 0 };
     }
 
     /// How many values it holds.
@@ -813,6 +865,23 @@ pub class Heap<T :: [TotalOrder]> {
         return Heap<T> { items = List<T>.new() };
     }
 
+    /// An empty heap with room for `n` values before it grows (10 N3); a negative `n` panics.
+    pub static fn withCapacity(n: int): Heap<T> {
+        return Heap<T> { items = List<T>.withCapacity(n) };
+    }
+
+    /// A heap of the array's values, copied: each parent sunk to its place from the last one up —
+    /// in linear time, where pushing them one by one takes `n log n` (Floyd).
+    pub static fn of(xs: T[]): Heap<T> {
+        let heap = Heap<T> { items = List<T>.of(xs) };
+        var at = xs.length() / 2 - 1;
+        while (at >= 0) {
+            heap.sink(at, xs.length());
+            at = at - 1;
+        }
+        return heap;
+    }
+
     /// How many values it holds.
     pub fn length(): int {
         return this.items.length();
@@ -851,8 +920,13 @@ pub class Heap<T :: [TotalOrder]> {
         }
         this.items.swap(0, n - 1);
         let top = this.items.pop();
-        let m = n - 1;
-        var at = 0;
+        this.sink(0, n - 1);
+        return top;
+    }
+
+    /// The value at `at` sunk below every child less than it, among the first `m` values.
+    mut fn sink(from: int, m: int): void {
+        var at = from;
         while (true) {
             let left = 2 * at + 1;
             if (left >= m) {
@@ -868,7 +942,6 @@ pub class Heap<T :: [TotalOrder]> {
             this.items.swap(at, child);
             at = child;
         }
-        return top;
     }
 }
 

@@ -1,0 +1,72 @@
+// Capacities and a heap of an array (design/v5/spec/10 N3, C1, C3; spec 12 §Collections).
+import std.collections { Deque, Heap, List, Map, Set };
+import std.test { assertEq, assertPanics };
+
+fn drained(h: Heap<int>): string {
+    var out = "";
+    while (let top = h.pop()) {
+        out = out + f"{top},";
+    }
+    return out;
+}
+
+@Test
+fn aHeapOfAnArrayPopsAsPushingDoes(): void {
+    let values = [7, 3, 9, 3, 1, 8, 2, 6, 5, 4, 0, 11, 10];
+    let pushed = Heap<int>.new();
+    for (v in values) {
+        pushed.push(v);
+    }
+    assertEq(drained(Heap<int>.of(values)), drained(pushed));
+    assertEq(drained(Heap<int>.of([4])), "4,");
+    assertEq(drained(Heap<int>.of([2, 2, 2])), "2,2,2,");
+    assertEq(values[0], 7);
+}
+
+@Test
+fn aListTakesItsRoomAtTheFirstPush(): void {
+    // room for twelve: past the eight a list starts with, so the view stays on the buffer
+    let xs = List<string>.withCapacity(12);
+    assertEq(xs.length(), 0);
+    xs.push("a");
+    let v = xs.asSlice();
+    for (_ in 0..11) {
+        xs.push("b");
+    }
+    xs[0] = "z";
+    assertEq(v[0], "z");
+    xs.push("c");
+    xs[0] = "y";
+    assertEq(v[0], "z");
+    assertEq(xs.length(), 13);
+}
+
+@Test
+fn everyContainerTakesACapacity(): void {
+    let d = Deque<int>.withCapacity(2);
+    for (i in 0..5) {
+        d.pushFront(i);
+    }
+    assertEq(f"{d}", "[4, 3, 2, 1, 0]");
+    let m = Map<int, int>.withCapacity(7);
+    for (i in 0..20) {
+        m.insert(i, i * i);
+    }
+    assertEq(m.get(19) ?? -1, 361);
+    let s = Set<int>.withCapacity(8);
+    s.insert(1);
+    assertEq(s.length(), 1);
+    let h = Heap<int>.withCapacity(1);
+    h.push(2);
+    h.push(1);
+    assertEq(h.peek() ?? -1, 1);
+}
+
+@Test
+fn aNegativeCapacityPanics(): void {
+    assertPanics(() => { List<int>.withCapacity(-1); });
+    assertPanics(() => { Deque<int>.withCapacity(-1); });
+    assertPanics(() => { Map<int, int>.withCapacity(-1); });
+    assertPanics(() => { Set<int>.withCapacity(-1); });
+    assertPanics(() => { Heap<int>.withCapacity(-1); });
+}
