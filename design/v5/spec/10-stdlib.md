@@ -116,7 +116,7 @@ erscheint, wo geschnitten wird (Tokenizer, Parser, `split`/`lines`) — C++ `str
 |---|---|
 | Funktionen | `panic`, `assert`, `unreachable`, `todo`, `same`, `sequence` |
 | Typen | `Error`, `Exception`, `Result`, `Box`, `Slice`, `StringView`, `Range`/`RangeInclusive`/`RangeFrom`/`RangeTo`/`RangeFull`, `Ordering`, `List`, `Map`, `Set` (Sammlungsvokabular der Sprache; Rust hat `Vec`, nicht `HashMap` — wir alle drei) |
-| Interfaces | `Equatable`, `Hashable`, `Ordered`, `TotalOrder`, `Display`, `Debug`, `Default`, `Clone`, `Iterator`, `Iterable`, `FromIterator`, `Into`, `From`, `Index`, `IndexSet`, `Closeable`, `Num`, `Integer`, `Float` |
+| Interfaces | `Equatable`, `Hashable`, `Identity` (N2b: es steht in Konformanzlisten wie die beiden), `Ordered`, `TotalOrder`, `Display`, `Debug`, `Default`, `Clone`, `Iterator`, `Iterable`, `FromIterator`, `Into`, `From`, `Index`, `IndexSet`, `Closeable`, `Num`, `Integer`, `Float` |
 | Attribute | die geschlossene Art-2-Liste (09 A11): `@Test`, `@Deprecated`, `@Allow`, `@Inline`-Familie, `@MustUse`, … |
 | **nicht** | `print`-Familie (U5), Operator-Interfaces `Add`…`Not` (Rust `std::ops`), `spawn`/`Task`, `min`/`max` |
 

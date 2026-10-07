@@ -3,7 +3,7 @@
  * A fault signal — SEGV, BUS, FPE, ILL, ABRT — is a crash, not a panic: the runtime writes
  * `crash: …` and the backtrace of the faulting thread, then lets the signal take its default
  * course, so the process ends the way the operating system reports that signal. A stack overflow
- * is a panic (RT0006): until the emitter checks the stack pointer in every prologue (M2), the
+ * is a panic (RT0006): until the emitter checks the stack pointer in every prologue (M11), the
  * guard page below each stack is the only net, and its fault is told apart by its address.
  * Windows has the same two paths through an unhandled-exception filter — and, on a coroutine's
  * stack, through a vectored handler, since the filter is never reached from there. */
