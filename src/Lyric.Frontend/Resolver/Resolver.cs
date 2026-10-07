@@ -574,7 +574,8 @@ public sealed class Resolver
             var sym = _binding.Resolve(block.Decl.Target);
             if (sym is ImportBindingSymbol ib) sym = ib.Target;
             // A named target, plain or an instance ('List<T>', 'Box<int>' — 03 T7 X1); an array,
-            // an optional or a tuple leaves Target null until S7b, and the sema says so.
+            // an optional, a tuple or a function type has no symbol and leaves Target null — the
+            // constructor target below says what it is (X2).
             block.Target = block.Decl.Target is NamedType ? sym as TypeSymbol : null;
             // 'extend<T> T[]', 'extend<T> ?T', a tuple, a function type (03 T7 X2; 05 §13 rule 6):
             // a shape, no symbol.

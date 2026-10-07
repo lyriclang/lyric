@@ -146,11 +146,13 @@ every Tier 1 target; measurement point 1 holds (below).
    renders them until the website round. The tree stays at 4.6.0: the 29 CLI tests a 5.0.0
    claim turned red are gone, but the 4.x `stdlib` carries `@Deprecated(until = "5.0")`
    promises that a 5.0.0 toolchain would turn into build errors (`DeprecationPromise`); that
-   ends with M8a, when `std` is rewritten.
+   ends when the 4.x front end and its `stdlib/` leave `main` (M17 — not M8a, which wrote
+   `stdlib5/` and left the shared front end; the audit of 2026-10-07).
 2. S1: `lyric5 build <file> --emit ir` — the 4.x front end behind the subset gate
    (`Lyric5.Compiler`, `LYR-CG0001` "not yet in Lyric 5: … (M<n>)"), compiling against
    `stdlib5/`, the seed of the Lyric 5 standard library (`std.core`, `std.string`, `std.io`, as
-   natively backed declarations — the provisional intrinsic table, which falls with M8a). The
+   natively backed declarations — the provisional intrinsic table, which `extern "C"` replaces
+   with M14 as M8b's plan decided (P1); it outlived M8a, which wrote `std` in Lyric). The
    NativeAOT risk is gone: the front end publishes without a trim warning, 5.3 MB, and the
    binary emits hello's IR in CI on every Tier 1 runner. Found on the way: `for` over a range
    lowers through the 4.x iterator classes and optionals; S2 gives range literals a counted-loop
@@ -383,7 +385,7 @@ Open from M5, collected for the 5.0 review (not in the plan): `e.suppressed()` a
 `e.backtrace()` in Lyric (the record is not reachable from a caught value); the error slot on
 every function value (one pointer per indirect call) to confirm; `?never` decided as an error
 even in a return position; `assert` evaluates its message eagerly until `inline` (M9);
-`std.core`'s higher-order functions pass no set yet (M8a); a block expression at the end of a
+`std.core`'s higher-order functions pass no set yet (M8c); a block expression at the end of a
 value block — `if`, `match`, `loop` alike — is a statement, not the block's value; spec 07 past
 §1 and the grammar chapter are still to write.
 
@@ -438,9 +440,9 @@ out, as with M1's open thread below, and the single-threaded ones are in.
 
 Not done from the plan, decided on the way: generators as iterators (I7: `for (x in co)`,
 `Coroutine :: [Iterator]`) move to M8a, where `for` learns every iterable at once (S2e); the
-Windows poller has no sockets until M8b (AFD — downloading wepoll waits for the maintainer's
-word). `Thread`, `Pool`, the locks and the signals live in `std.task` until M7 lets `std.thread`,
-`std.sync` and `std.os` reach the scheduler.
+Windows poller has no sockets until M8b S11 (a binding to AFD of its own; wepoll was dropped,
+06 M6-29). `Thread`, `Pool`, the locks and the signals lived in `std.task` until M8b S1 cut
+`std.thread`, `std.sync` and `std.os` out of it.
 
 Conformance: 549 cases (03-types 151, 04-modules 4, 05-interfaces 98, 06-errors 88,
 07-statements 18, 08-expressions 17, 09-patterns 36, 10-concurrency 137), all `since: 5.0.0`,
@@ -541,6 +543,9 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   set, `s in [Circle, Rect] =>` (08 Y6), whose binding carries the set as a catch binding's does.
   **N2d**: a coroutine is `Identity` (06 A7) — `==` is `same`, a set of coroutines finds one twice,
   whatever its pulls throw; a block on `Coroutine<Y, R>` is a shape's block, as one on `Slice<T>`.
+  **N3a**: the texts — comments that promised a finished milestone, the CHANGELOG's M8a entry,
+  this file's claims about M8a and wepoll, design 01/04/10/13; the audit's clocks stand in 13
+  ("Nachtrag 2026-10-07 — Prüfung M0–M8a und der Nachholblock N").
 
 ### M8a — done (2026-10-07)
 

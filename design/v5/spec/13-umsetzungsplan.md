@@ -41,7 +41,7 @@ Zeilen**, Meilensteine M0–M18.
 | **M3 Wertmodell und Typsystem** | 02/03 vollständig: Structs inline, Klassen (Header, GC), Felder `var`/unveränderlich, `with`, `?T` mit Niche (V5), `??T`, `T[]`/`T[N]`/`Slice<T>`/`StringView` (A2), Tupel, Enums (V6), Ranges als Structs, `int`-Aliase, Koerzionen (T1c/T3), **Überlaufprüfung** (T2, `+%`), `as`, Generics durch **Monomorphisierung** mit Cache-Einheiten (C3), Typ-Patterns, Pattern-Matching (08 Y-Reihe) | `arith/arrays/structs/enums/tuples/optionals/patterns/generics`-Beispiele nativ; Konformanz 02/03; **Messpunkt 2** `bench/`: Schleifen/Arith/Struct-Arrays gegen Go/C# (Ziel Faktor 1,2–3 zu C) | XL |
 | **M4 Interfaces und Abstraktion** | 04: Fat Pointer + VTables (V7), Boxing beim Übergang, generische Extends (X1/X2) auf `T[]`/`?T`/Interfaces, assoziierte Typen, Operator-Interfaces (D6), `by`-Delegation, Überladung nach Arität, benannte Argumente, `Display`/**`Debug` fest im Compiler** (D7), `Point(1, 2)`-Zucker, `sealed`; Synthese von `Equatable`/`Hashable`/`Clone`/`Default` **vorläufig im Compiler**, wandert in M9 nach `std.core` | `interfaces/shapes/objects/vectors/closures/lambdas` nativ; Konformanz 04 | L |
 | **M5 Fehler** | 05 + L5: versteckter Fehlerslot (E1–E3), `throws`-Mengen, `try`/`try?`/`try!`, `catch`-Patterns und `in [A, B]`, `Error`-Wurzel + `Exception`, `defer`-Cleanup-Kette (E4), `using let`/`Closeable` (R-Reihe), `main throws`, Paniken (E5, 101), Backtrace-Profil (E8), `never` | `bank.lyr`/`errors`-Beispiele; Konformanz 05; Sanitizer-Lauf über Wurfpfade | M |
-| **M6 Koroutinen, Scheduler, Threads** | L4 + 06: Assembler-Switch je ABI (K2), Stacks mit Guard-Pages (K1), Fremd-Frame-Zähler (K4), `park`/`unpark`, Scheduler je Thread (G1), Poller in C (S2: epoll/kqueue/wepoll), `spawn`/`Task`/`TaskScope`/`spawnDetached`, `Channel`/`Select`/`Timer`/`sleep`/`timeout`, `Cancelled`, Threads (G2) + `Mutex`/`RwLock`/`Once`/`Atomic`, **Generatoren als Iteratoren** (I7, `Coroutine :: Closeable`), Signale als Kanal (Q9) | `generator.lyr`, Channel-Pingpong, Thread-Pool-Test, Ctrl+C-Shutdown-Beispiel; Konformanz 06; TSan-Profil grün | XL |
+| **M6 Koroutinen, Scheduler, Threads** | L4 + 06: Assembler-Switch je ABI (K2), Stacks mit Guard-Pages (K1), Fremd-Frame-Zähler (K4), `park`/`unpark`, Scheduler je Thread (G1), Poller in C (S2: epoll/kqueue/AFD — Windows' Sockets mit M8b S11, wepoll verworfen: Review M6-29), `spawn`/`Task`/`TaskScope`/`spawnDetached`, `Channel`/`Select`/`Timer`/`sleep`/`timeout`, `Cancelled`, Threads (G2) + `Mutex`/`RwLock`/`Once`/`Atomic`, **Generatoren als Iteratoren** (I7, `Coroutine :: Closeable`), Signale als Kanal (Q9) | `generator.lyr`, Channel-Pingpong, Thread-Pool-Test, Ctrl+C-Shutdown-Beispiel; Konformanz 06; TSan-Profil grün | XL |
 
 ### Phase 2 — Bibliothek und Module
 
@@ -51,7 +51,7 @@ Zeilen**, Meilensteine M0–M18.
 | **M8a std-Kern** | B2–B7, B9, B12: `core` (Kern-Interfaces, `Num`-Turm, `Result`, `Box`, `Slice`/`StringView`/`T[]`-Member, Ranges), `iter` (Adapter als Extends, `Error`-Typ, `collect`), `collections` (`List`, Swiss-Table `Map`/`Set`, `Deque`, `Heap`, `+`/`*`), `string` (`StringView`, `Pattern`, `StringBuilder`; die Unicode-Tabellen: M8c), `fmt` (Formatsprache, f-String-Lowerung über `showTo`), `math`, `hash` (`Hasher`, SipHash), `test` (Assertions, `@callerExpr`, Subtests, `lyric test`; `@Bench`: M8c); dazu die Entscheidungen des Reviews vom 2026-10-05 (Nachtrag unten) | `lyric test` läuft die std-Tests; `inventory/stats/stack`-Beispiele; **Messpunkt 3**: Map/Sort/String-Benchmarks gegen Go/C# | XL |
 | **M8b std I/O und System** | B8, B11: `io` (Reader/Writer/Seek, Puffer/Text, `ByteBuffer`, Konsole), `fs`, `path`, `net`, `process`, `os`, `time` (Duration/Instant/Monotonic/Date; Zone später M10), `random` (ChaCha8), `encoding`, `crypto` (Digests, HMAC, `randomBytes`), `sync`/`thread`-Feinschliff (Modulumzug nach 10 Q10, `Semaphore`, `parallelMap`), der **Windows-Poller über AFD** (06 S2), danach `build.lyr` | Echo-Server über `std.net`, Prozess-Pipeline-Beispiel, Datei-Werkzeug; **hier ist Lyric 5 für Alltagswerkzeuge benutzbar** (Dogfood: `stdlib-tests` und Beispiele vollständig) | L |
 | **M8c std-Rest** | Was der Zuschnitt vom 2026-10-05 aus M8a herausnimmt: Unicode-Tabellen aus UCD-Dateien, `char`-Prädikate, `toUpper`/`toLower`; die übrigen Adapter und Terminatoren (`flatMap`, `chunks`, `peekable`, `rev`, …) mit werfenden Lambdas; Set-Operationen, `map[k]`, `list[a..b]`, List-Extras; `Result`, `From`/`Into`; `std.fmt.format`; die Wertform `Iterator<Item = T>`; `suppressed()`/`backtrace()` an der `catch`-Bindung (05 O3); `@Bench` und `lyric bench` | Wortzähler über Unicode-Text; `lyric bench` läuft die std-Benchmarks | L |
-| **M9a `comptime`** | 09 A-Reihe: **IR-Interpreter** (die L7-Tür, hier gebaut) mit Budget, `comptime`-Ausdrücke/Blöcke/`if`/`for`, `std.meta` (R1–R6), `embed`, `@When`, Attribute Art 1/2 (`@Deprecated`, `@Allow`, `@MustUse`, `@Inline`-Familie, `@Layout`), **Synthese nach A5** (`Equatable`/`Hashable`/`Ordered`/`Clone`/`Default` als `comptime`-Defaults in `std.core`, M4-Provisorium fällt), Enum-Reflexion (R5) | `constants.lyr`, Synthese-Konformanzfälle; `comptime`-Tabellen-Beispiel | L |
+| **M9a `comptime`** | 09 A-Reihe: **IR-Interpreter** (die L7-Tür, hier gebaut) mit Budget, `comptime`-Ausdrücke/Blöcke/`if`/`for`, `std.meta` (R1–R6), `embed`, `@When`, Attribute Art 1/2 (`@Deprecated`, `@Allow`, `@MustUse`, `@Inline`-Familie mit `inline fn` und lokalen `fn`, `@Layout`, `@Shared`), **Synthese nach A5** (`Equatable`/`Hashable`/`Ordered`/`Clone`/`Default` als `comptime`-Defaults in `std.core`, M4-Provisorium fällt), Enum-Reflexion (R5) | `constants.lyr`, Synthese-Konformanzfälle; `comptime`-Tabellen-Beispiel | L |
 | **M9b Makros** | 09 A8 + 08 Q-Reihe: `std.syntax`, `quote`/`#{}`, `macro`, `name!()`/`name! {}`, Attribut-Makros, Hygiene, `lyric expand`, Fehler mit Span (G12) | `examples/macros` migriert; `retry!`, `@Builder` | L |
 | **M10 std nach Regel D** | B10, B11: `codec` + `json` + `toml` (mit `@Codec`-Synthese), `regex` (Pike-VM/lazy DFA), `uri`, `http` (Client + Server), `compress`, `term`, Zeitzonen (TZif) + UTS #35, `crypto`-Türen bleiben zu | HTTP-Server liefert JSON, Client holt es; Log-Filter mit Regex; **Messpunkt 4**: HTTP-Durchsatz, JSON-Codierung gegen Go | XL |
 | **M11 Eigener GC** | L1 Stufen 2–3: nicht bewegender Immix, präziser Heap/konservativer Stack, Safepoints, Weak-Refs mit Rückruf, dann Sticky-Mark-Bit-Generational; Boehm bleibt als Profil zum Vergleich; mit den Safepoints die **Stack-Prüfung im Prolog** (01 S3) und `Atomic<Klasse>` (06) | **Messpunkt 5**: Allokationsdurchsatz, Pausen, Speicher gegen Boehm und Go; `bench/gc/` | XL |
@@ -100,7 +100,7 @@ nach M8b.
 |---|---|---|---|
 | 1 | M2 | Start, Binary, `lyric run` warm | < 5 ms, < 2 MB, ≤ 50 ms über Programmstart |
 | 2 | M3 | Arithmetik, Schleifen, Struct-Arrays | ≤ 3× C, ≤ 1,5× Go |
-| 3 | M8a | `Map` einfügen/suchen, Sort, String-Ops | ≤ 1,5× Go — bei M8a verfehlt (1,5× bis 2,5×); Ratchet mit Uhr: erreicht nach M11, sonst neu entscheiden (Review C3) |
+| 3 | M8a | `Map` einfügen/suchen, Sort, String-Ops | ≤ 1,5× Go — nach M8a: maps 1,36×, sorting 1,21×, strings 1,70×; Ratchet mit Uhr: erreicht nach M11, sonst neu entscheiden (Nachtrag 2026-10-05, Uhren) |
 | 4 | M10 | HTTP-Durchsatz, JSON | ≤ 2× Go `net/http` |
 | 5 | M11 | Allokationsdurchsatz, Pausen, RSS | besser als Boehm in allen drei; Pausen < 10 ms bei 1 GB |
 
@@ -193,6 +193,35 @@ S13, S14; klein: S1, S8, S9.
 - **libuv, tokio**: Bereitschaft für Sockets, ein Thread-Pool für Dateien — dieselbe Teilung wie P2.
 - **Zig** (`std.os`, die neue `Io`-Schnittstelle): ebenfalls dünne Hüllen je Systemaufruf; Zigs Weg,
   das Warten als Parameter durchzureichen, ist hier unnötig, weil jede Koroutine parken kann.
+
+## Nachtrag 2026-10-07 — Prüfung M0–M8a und der Nachholblock N
+
+Der Maintainer hat am 2026-10-07 nach dem Abschluss von M8a geprüft, ob alles aus den bisherigen
+Meilensteinen gebaut ist. Etwa 95 % waren es. Entscheidungen der Bereichsdokumente ohne Zeile im
+Plan hatten aber keine Uhr: fünf Fehler, Tupel-`==`, `Identity`, generische Aliase und weitere.
+Entschieden: ein **Nachholblock vor M8b S2**, alle übrigen Punkte bekommen eine Uhr.
+
+| Block | Inhalt |
+|---|---|
+| **N1** Fehler und halbe Entscheidungen | `"x" * n` und `n * "x"`, `opaque type` (SEM0175), ein Generator ohne `yield`, ein geschlossener `TaskScope`, ein Name zweimal gebunden (SEM0176) — N1a; 01 B13 ganz (`GlobalPruning`), Traces ab dem ersten `.lyr`-Rahmen, keine Meldung nennt einen erledigten Meilenstein — N1b |
+| **N2** Sprachlücken aus M3/M4 | Tupel `Equatable`/`Hashable`/`Debug`/`Display`, `?T :: [Equatable, Hashable]`, `T[]` und die Container `Clone` — N2a; generische Aliase, `Identity` für Klassen — N2b; Feldkurzform, Typmengen-Pattern — N2c; `Coroutine :: [Identity]` (06 A7) — N2d |
+| **N3** Texte | veraltete Kommentare, CHANGELOG, STATUS, diese Dokumente — N3a; die Spec-Kapitel 01 (lexikalisch), Kernregeln 07/08, 04 Init-Reihenfolge — N3b |
+
+| Was | Uhr |
+|---|---|
+| Interface-Wert aus Shape/Blanket (SEM0047), A8 generische Interfaces (SEM0082), Delegation an ein Kind-Interface-Feld | M12, mit dem generischen Weiterleiter (04 R4b) |
+| `lyric check` (mit `--locked`) | M12 |
+| 03 T8 Unifikation mit Literal, T19 Kettenmeldung, `it`-Verdeckungswarnung (08 F4), 07 K4/K7 | M12 |
+| `inline fn`, lokale `fn` | M9a, mit der `@Inline`-Familie (Zeile oben) |
+| `@Shared` | M9a (Zeile oben) |
+| kleine std-APIs (`Map.from`, `Map.entries`, `FromArrayLiteral`, `toBytesLE`, `charIndices`, `isBlank`, `fromChars`, `parse<T>()`, `assertContains`, `assertEmpty`, String-Diff, `@Test{parallel}`, `chars()` als `DoubleEnded`, `sizeHint` in `collect`, die List-Extras), höhere std-Funktionen mit Fehlermenge, `string`/`StringView :: [Contains<char>]` | M8c |
+| 01 K4 Fremdrahmen bei Abbruch und GC | M14 (Callbacks) |
+| `x86_64-macos` ausführen, das `dev`-Archiv; bis dahin „gebaut, nicht ausgeführt“ in STATUS | M15 |
+| 01 C2: eine `.c` je Programm und je Instanz (Abweichung in 01 festgehalten) | neu entscheiden bei Bauzeit-Bedarf, spätestens M15 (Messpunkt 1 kalt) |
+| 01 E8: der Release hält keinen Fehler-Trace, „wenn der Typ es verlangt“ ist eine Tür | entschieden |
+| `fibonacci` in Koroutinen-Form | M16 (Beispiele) |
+| die 4.x-`stdlib/`, Version 4.6.0 | M17 (das Frontend ist bis dahin geteilt) |
+| die Intrinsics-Tabelle → `extern "C"` | M14 (M8b P1) |
 
 ---
 

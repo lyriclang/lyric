@@ -101,8 +101,9 @@ void *lyr_coro_arg(const LyrCoro *co);
 LyrCoro *lyr_coro_current(void);
 
 /* Foreign frames (01 K4): C code that may call back into Lyric — and so may yield with its frames
- * on a coroutine's stack — brackets itself with these. A cancellation asks the count before it
- * unwinds a stack: C frames cannot be unwound. On a thread's own stack they do nothing. */
+ * on a coroutine's stack — brackets itself with these, and the coroutine keeps the count. Nothing
+ * asks it yet: what a cancellation or the collector does with C frames on a stack comes with the
+ * callbacks (M14). On a thread's own stack they do nothing. */
 void lyr_coro_enter_foreign(void);
 void lyr_coro_leave_foreign(void);
 int lyr_coro_foreign_depth(const LyrCoro *co);

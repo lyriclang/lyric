@@ -329,7 +329,7 @@ public class ExtendConformanceTests
     // --- an unsupported extend target (SEM0047) ---
 
     [Fact]
-    // A block on an instance is a target since S7a (03 T7 X1); the array stays refused until X2.
+    // A block on an instance is a target since S7a (03 T7 X1), as an array is since X2 (S7b).
     public void A_block_on_an_instance_is_a_target()
     {
         Assert.DoesNotContain(Diags("""
