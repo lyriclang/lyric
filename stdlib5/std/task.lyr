@@ -952,6 +952,8 @@ pub class TaskScope :: [Closeable] {
     var open: int = 0,
     var failure: ?Error = null,
     var crash: ?PanicInfo = null,
+    /// Set once `close()` has waited for the scope's tasks (the review's M6-27).
+    var closed: bool = false,
     /// The task waiting in `close()`.
     closing: Waiters = Waiters { },
 
@@ -962,7 +964,12 @@ pub class TaskScope :: [Closeable] {
 
     /// `spawn` (06 T1), the task belonging to this scope: `close()` waits for it, and a failure of
     /// it cancels the other tasks of the scope.
+    /// A closed scope takes no task: that is a panic (M6-27) — none would wait for it. A task given
+    /// while `close()` waits is a child like any, and the wait takes it in.
     pub mut fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
+        if (this.closed) {
+            panic("a task given to a closed scope");
+        }
         let task = launch(body);
         if (let c = task.context) {
             c.scope = this;
@@ -999,6 +1006,9 @@ pub class TaskScope :: [Closeable] {
             }
             s.parkIn(this.closing);
         }
+        // through the reference: 'Closeable.close' is no 'mut fn' (as Pool's close)
+        let scope = this;
+        scope.closed = true;
         if (let p = this.crash) {
             repanic(p.code, p.message, p.trace);
         }

@@ -78,6 +78,10 @@ public sealed class SemaRules
                         BindingType(g.Binding, gs, gs.Visibility);
                         break;
                     case TypeAliasDecl a when module.Members.LookupLocal(a.Name) is TypeSymbol alias:
+                        // 'opaque type' is no form of Lyric 5 (03 T15; N1a: it was taken in silence)
+                        if (a.IsOpaque)
+                            _de.Report("LYR-SEM0175", Severity.Error, a.Span,
+                                $"'opaque type' is no form of Lyric 5 — a struct of one field has the layout of its field: 'struct {a.Name} {{ value: … }}'");
                         Names(a.Aliased, alias.Visibility, $"'{a.Name}'");
                         break;
                     case StructDecl s when module.Members.LookupLocal(s.Name) is TypeSymbol st:

@@ -315,8 +315,10 @@ public sealed class Compilation
         }
     }
 
-    /// <summary>Whether a module yields anywhere: every coroutine does (08 D11) — a function that
-    /// only returns one, as <c>std.core</c>'s <c>sequence</c> does, makes none.</summary>
+    /// <summary>Whether a module holds a coroutine: a yield, or a generator that yields nowhere —
+    /// a body that returns no value, or only throws (06 M6-3; N1a: such a generator found no
+    /// std.task, so its <c>using</c> and its <c>close()</c> were refused). A function that only
+    /// returns one, as <c>std.core</c>'s <c>sequence</c> does, makes none.</summary>
     private static bool UsesCoroutines(Module ast)
     {
         var pending = new Stack<Node>();
@@ -324,7 +326,7 @@ public sealed class Compilation
         while (pending.Count > 0)
         {
             var node = pending.Pop();
-            if (node is YieldStmt) return true;
+            if (node is YieldStmt || node is FunctionDecl fn && CoroutineShape.IsCoroutine(fn)) return true;
             foreach (var child in AstChildren.Of(node)) pending.Push(child);
         }
         return false;

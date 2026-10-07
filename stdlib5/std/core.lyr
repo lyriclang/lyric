@@ -4274,3 +4274,17 @@ extend<T :: [Ordered]> RangeInclusive<T> :: [Contains<T>] {
         return this.start <= x && x <= this.end;
     }
 }
+
+/// `s * n` (10 C7): the text `s`, `n` times over — `""` for none. `n * s` is refused, the one order
+/// of `[x] * n`, and a negative `n` panics as an array's repetition does (`LYR-RT0007`): the count
+/// goes through it. The compiler desugars the operator to this call (N1a).
+pub fn repeatText(s: string, n: int): string {
+    if (n < 0) {
+        let _ = [s] * n;
+    }
+    var out = StringBuilder.new();
+    for (_ in 0..n) {
+        out.appendStr(s);
+    }
+    return out.toString();
+}
