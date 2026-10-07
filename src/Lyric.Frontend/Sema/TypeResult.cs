@@ -333,6 +333,17 @@ public sealed class TypeResult
 
     private readonly Dictionary<ForInStmt, ForInProtocol> _forIns = new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>An f-string written into one builder (10 S6; M8a S13): the builder's local, the call
+    /// that makes it, the calls that append the pieces in order, the call that takes the text.</summary>
+    public sealed record InterpolationPlan(LocalSymbol Builder, CallExpr Start, CallExpr[] Pieces, CallExpr Finish);
+
+    private readonly Dictionary<InterpolatedStringExpr, InterpolationPlan> _interpolations = new(ReferenceEqualityComparer.Instance);
+
+    public void RecordInterpolation(InterpolatedStringExpr text, InterpolationPlan plan) => _interpolations[text] = plan;
+
+    public InterpolationPlan? InterpolationOf(InterpolatedStringExpr text) =>
+        _interpolations.TryGetValue(text, out var plan) ? plan : null;
+
     public void RecordForIn(ForInStmt loop, CallExpr iter, CallExpr next, LocalSymbol cursor, DeferStmt? close = null,
         bool closeIfCloseable = false) =>
         _forIns[loop] = new ForInProtocol(iter, next, cursor) { Close = close, CloseIfCloseable = closeIfCloseable };

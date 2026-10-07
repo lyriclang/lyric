@@ -104,6 +104,9 @@ public sealed class TypeChecker
     // the hole a call of std.core's (12 §2); the 4.x tools keep their std.fmt converters.
     private readonly TypeSymbol? _coreFormat;
     private readonly TypeSymbol? _debug;  // and IndexSet<K>: 'x[k] = v'
+    // 'fstringStart' (10 S6): std.core declaring it is Lyric 5's f-string — one builder, each hole a
+    // piece of it (12 §2 rule 4); the 4.x tools keep their converters and concat chain.
+    private readonly bool _fstringBuilder;
 
     private LyrType _currentReturn = LyrType.Void;
     private LyrType? _currentYield; // the yield type when the current function is a coroutine
@@ -178,6 +181,7 @@ public sealed class TypeChecker
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreFormat ? coreFormat : null;
         _debug = comp.FindModule(["std", "core"])?.Members.LookupLocal("Debug")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } debug ? debug : null;
+        _fstringBuilder = comp.FindModule(["std", "core"])?.Members.LookupLocal("fstringStart") is not null;
 
         // 'Equatable<T>' is what '==' desugars through on a user type, 'Ordered<T>' what the four
         // comparisons desugar through — the same pattern as 'Iterator' for 'for-in': the compiler
@@ -3793,24 +3797,7 @@ public sealed class TypeChecker
             case WithExpr w: return CheckWith(w, scope);
             case TupleLitExpr tu: return CheckTupleLiteral(tu, scope, expected);
             case InterpolatedStringExpr fs:
-                foreach (var seg in fs.Segments)
-                    if (seg is InterpHole h)
-                    {
-                        var hole = CheckExpr(h.Expr, scope);
-                        // An opaque value does not render: the converter would print the
-                        // underlying and leak exactly what the wall hides. The way through is
-                        // explicit, like every other crossing.
-                        if (hole is OpaqueRef opaque)
-                            _de.Report("LYR-SEM0006", Severity.Error, h.Expr.Span,
-                                $"'{TypeFacts.Display(hole)}' is opaque and does not render in "
-                                + "an f-string — convert explicitly: "
-                                + $"'{{value as {TypeFacts.Display(opaque.Underlying)}}}'");
-                        else if (_coreFormat is { } format && h.FormatSpec is not null && !hole.IsError)
-                            CheckFormattedHole(h, hole, format, scope);
-                        else if (hole is not PrimitiveType && !hole.IsError)
-                            CheckDisplayHole(h, hole, scope);
-                    }
-                return LyrType.String;
+                return CheckInterpolation(fs, scope);
             case ErrorExpr: return LyrType.Error;
 
             case CallExpr call: return CheckCall(call, scope, expected);
@@ -5692,7 +5679,13 @@ public sealed class TypeChecker
     /// silently ignoring one would be the classic "it printed, but not what I asked for". What does
     /// not conform stays the error it was, with the conformance named instead of the converter.</para>
     /// </summary>
-    private void CheckDisplayHole(InterpHole hole, LyrType type, SymbolTable scope)
+    private CallExpr? DisplayPiece(InterpHole hole, LyrType type, Func<Expr> output) =>
+        // Through 'showTo' into the builder (10 S6): no string of its own.
+        RendersInAHole(hole, type) ? Piece("fstringShown", hole.Span, output(), hole.Expr) : null;
+
+    /// <summary>Whether a value that is no scalar renders in a hole — through <c>Display</c>, and
+    /// without a spec, which <c>Display</c> does not read — else refused, the conformance named.</summary>
+    private bool RendersInAHole(InterpHole hole, LyrType type)
     {
         // An interface VALUE renders through its vtable when the interface reaches Display —
         // 'd.show()' on a 'd: Display' is a dispatch, not a conformance question.
@@ -5706,20 +5699,16 @@ public sealed class TypeChecker
                 $"'{TypeFacts.Display(type)}' does not render in an f-string — a value renders "
                 + "through 'Display': give the type the conformance ':: [Display]' with a "
                 + "'fn show(): string', or narrow and convert it explicitly");
-            return;
+            return false;
         }
         if (hole.FormatSpec is { } spec)
         {
             _de.Report("LYR-SEM0006", Severity.Error, hole.Span,
                 $"a format specifier ':{spec}' does not apply to '{TypeFacts.Display(type)}' — "
                 + "'Display' renders one way; format the text 'show()' answers instead");
-            return;
+            return false;
         }
-        // MemberSpan stays invalid, as on the operator desugar: '{p}' writes no 'show'.
-        var member = new MemberExpr(hole.Expr, "show", IsOptional: false, hole.Expr.Span)
-            { MemberSpan = default };
-        var call = new CallExpr(member, [], hole.Expr.Span);
-        if (!CheckExpr(call, scope).IsError) _result.DesugarOperator(hole, call);
+        return true;
     }
 
     /// <summary>
@@ -5729,7 +5718,7 @@ public sealed class TypeChecker
     /// here; another type reads its own specs), <c>padded</c> for another <c>Display</c> type,
     /// <c>debugged</c> under <c>?</c>.
     /// </summary>
-    private void CheckFormattedHole(InterpHole hole, LyrType type, TypeSymbol format, SymbolTable scope)
+    private CallExpr? FormattedPiece(InterpHole hole, LyrType type, TypeSymbol format, Func<Expr> output)
     {
         var text = hole.FormatSpec!;
         var spec = FormatSpec.Read(text, out var malformed);
@@ -5742,21 +5731,21 @@ public sealed class TypeChecker
             {
                 _de.Report("LYR-SEM0006", Severity.Error, hole.Expr.Span,
                     $"'{TypeFacts.Display(type)}' has no 'Debug' for '?' to render through");
-                return;
+                return null;
             }
-            helper = "debugged";
+            helper = "fstringDebugged";
             misfit = spec.MisfitForPadding("'?'");
         }
         else if (type is not PrimitiveType && RendersThrough(type, format))
-            helper = "formatted"; // formats of its own: the type reads the spec as written (10 S7)
+            helper = "fstringFormatted"; // formats of its own: the type reads the spec as written (10 S7)
         else if (spec is null)
         {
             _de.Report("LYR-SEM0164", Severity.Error, hole.Span, $"':{text}' is no format: {malformed}");
-            return;
+            return null;
         }
         else if (type is PrimitiveType primitive)
         {
-            helper = "formatted";
+            helper = "fstringFormatted";
             misfit = TypeFacts.IsInteger(type) ? spec.MisfitForInteger()
                 : TypeFacts.IsFloat(type) ? spec.MisfitForFloat()
                 : primitive.Kind is PrimitiveKind.String ? spec.MisfitForString()
@@ -5764,7 +5753,7 @@ public sealed class TypeChecker
         }
         else if (_display is { } display && RendersThrough(type, display))
         {
-            helper = "padded";
+            helper = "fstringPadded";
             misfit = spec.MisfitForPadding($"'{TypeFacts.Display(type)}', a 'Display' type,");
         }
         else
@@ -5773,19 +5762,150 @@ public sealed class TypeChecker
                 $"'{TypeFacts.Display(type)}' does not render in an f-string — a value renders "
                 + "through 'Display': give the type the conformance ':: [Display]' with a "
                 + "'fn show(): string', or narrow and convert it explicitly");
-            return;
+            return null;
         }
 
         if (misfit is not null)
         {
             _de.Report("LYR-SEM0164", Severity.Error, hole.Span, $"':{text}' does not apply here — {misfit}");
-            return;
+            return null;
         }
 
-        var function = new IdentifierExpr(helper, hole.Span);
-        _compilerWritten.Add(function); // std.core's, whatever the program names so
-        var call = new CallExpr(function, [hole.Expr, new StringLiteralExpr(text, hole.Span)], hole.Span);
+        return Piece(helper, hole.Span, output(), hole.Expr, new StringLiteralExpr(text, hole.Span));
+    }
+
+    /// <summary>
+    /// An f-string (08 Y7; 10 S6, M8a S13): one builder for the whole text, sized for it, each piece
+    /// appended in order, the text taken — no string per piece and no chain of concatenations. The
+    /// pieces are calls of std.core's <c>fstring…</c> helpers, written by the compiler and checked
+    /// as written — a scalar through its own writer (its <c>show()</c> is an f-string itself, so
+    /// never through <c>Display</c>), another type through <c>showTo</c>, a hole with a spec through
+    /// <c>format</c> or the padding —, recorded for the lowering with the builder's local, as a
+    /// <c>for</c> records its <c>$iterator</c>. A text without a hole stays a constant.
+    /// </summary>
+    private LyrType CheckInterpolation(InterpolatedStringExpr fs, SymbolTable scope)
+    {
+        var errors = _de.ErrorCount;
+        var holes = new List<LyrType>();
+        foreach (var seg in fs.Segments)
+            if (seg is InterpHole h) holes.Add(CheckExpr(h.Expr, scope));
+        if (holes.Count == 0) return LyrType.String;
+        if (!_fstringBuilder)
+        {
+            var index = 0;
+            foreach (var seg in fs.Segments)
+                if (seg is InterpHole h) ShownHole(h, holes[index++], scope);
+            return LyrType.String;
+        }
+
+        var span = fs.Span;
+        // Twenty bytes a hole: what an integer's digits reserve, so a text of numbers is built
+        // without the builder growing; a longer piece grows it, as any append does.
+        var room = fs.Segments.OfType<InterpText>().Sum(text => text.Text.Length) + 20 * holes.Count;
+        var start = Piece("fstringStart", span, new IntLiteralExpr((ulong)room, null, span));
+        var builderType = CheckExpr(start, scope);
+        if (builderType.IsError) return LyrType.String;
+        var builder = new LocalSymbol("$fstring", builderType, true, fs);
+        var inner = new SymbolTable(scope);
+        inner.TryDeclare(builder);
+        Expr Output() => new UnaryExpr(UnaryOp.Place, new IdentifierExpr("$fstring", span), span);
+
+        var pieces = new List<CallExpr>();
+        var failed = new List<CallExpr>();
+        var whole = true;
+        var at = 0;
+        foreach (var seg in fs.Segments)
+        {
+            CallExpr? piece = seg switch
+            {
+                // The parser keeps a text raw; '{{' and '}}' fold to one brace, the escapes resolve.
+                InterpText text when text.Text.Length > 0 => Piece("fstringText", text.Span, Output(),
+                    new StringLiteralExpr(Escapes.Resolve(text.Text.Replace("{{", "{").Replace("}}", "}")), text.Span)),
+                InterpHole hole => HolePiece(hole, holes[at++], Output),
+                _ => null,
+            };
+            if (piece is null)
+            {
+                if (seg is InterpHole) whole = false;
+                continue;
+            }
+            // A piece checks its hole's expression a second time: muted, so what the hole reported
+            // — an error it recovered from, a warning — is reported once.
+            LyrType type;
+            using (_de.Mute()) type = CheckExpr(piece, inner);
+            if (!type.IsError) pieces.Add(piece);
+            else
+            {
+                whole = false;
+                failed.Add(piece);
+            }
+        }
+        // A piece that failed where nothing was reported fails on its own account: said unmuted.
+        if (_de.ErrorCount == errors)
+            foreach (var piece in failed) CheckExpr(piece, inner);
+        var finish = Piece("fstringEnd", span, new IdentifierExpr("$fstring", span));
+        if (whole && !CheckExpr(finish, inner).IsError)
+            _result.RecordInterpolation(fs, new TypeResult.InterpolationPlan(builder, start, pieces.ToArray(), finish));
+        return LyrType.String;
+    }
+
+    /// <summary>A hole of the 4.x tools, whose stdlib has no builder: refused as
+    /// <see cref="HolePiece"/> refuses; a scalar stays the lowering's converters, another value is
+    /// the <c>show()</c> recorded on the hole.</summary>
+    private void ShownHole(InterpHole hole, LyrType type, SymbolTable scope)
+    {
+        if (type.IsError || OpaqueRefused(hole, type) || type is PrimitiveType || !RendersInAHole(hole, type)) return;
+        // MemberSpan stays invalid, as on the operator desugar: '{p}' writes no 'show'.
+        var member = new MemberExpr(hole.Expr, "show", IsOptional: false, hole.Expr.Span) { MemberSpan = default };
+        var call = new CallExpr(member, [], hole.Expr.Span);
         if (!CheckExpr(call, scope).IsError) _result.DesugarOperator(hole, call);
+    }
+
+    /// <summary>An opaque value does not render: the converter would print the underlying and leak
+    /// exactly what the wall hides. The way through is explicit, like every other crossing.</summary>
+    private bool OpaqueRefused(InterpHole hole, LyrType type)
+    {
+        if (type is not OpaqueRef opaque) return false;
+        _de.Report("LYR-SEM0006", Severity.Error, hole.Expr.Span,
+            $"'{TypeFacts.Display(type)}' is opaque and does not render in an f-string — convert explicitly: "
+            + $"'{{value as {TypeFacts.Display(opaque.Underlying)}}}'");
+        return true;
+    }
+
+    /// <summary>What a hole appends: by its value's kind, through its spec, or refused.</summary>
+    private CallExpr? HolePiece(InterpHole hole, LyrType type, Func<Expr> output)
+    {
+        if (type.IsError || OpaqueRefused(hole, type)) return null;
+        if (_coreFormat is { } format && hole.FormatSpec is not null) return FormattedPiece(hole, type, format, output);
+        if (type is PrimitiveType primitive)
+        {
+            var writer = primitive.Kind switch
+            {
+                PrimitiveKind.String => "fstringText",
+                PrimitiveKind.Bool => "fstringBool",
+                PrimitiveKind.Char => "fstringChar",
+                PrimitiveKind.Float => "fstringFloat",
+                PrimitiveKind.Float32 => "fstringFloat32",
+                PrimitiveKind.Uint or PrimitiveKind.Uint8 or PrimitiveKind.Uint16 or PrimitiveKind.Uint32 => "fstringUint",
+                PrimitiveKind.Void => null,
+                _ => "fstringInt",
+            };
+            if (writer is null)
+            {
+                _de.Report("LYR-SEM0006", Severity.Error, hole.Expr.Span, "'void' is no value and does not render in an f-string");
+                return null;
+            }
+            return Piece(writer, hole.Span, output(), hole.Expr);
+        }
+        return DisplayPiece(hole, type, output);
+    }
+
+    /// <summary>A call of std.core's <paramref name="helper"/>, written by the compiler.</summary>
+    private CallExpr Piece(string helper, Span span, params Expr[] arguments)
+    {
+        var function = new IdentifierExpr(helper, span);
+        _compilerWritten.Add(function); // std.core's, whatever the program names so
+        return new CallExpr(function, arguments, span);
     }
 
     /// <summary>Whether a value of <paramref name="type"/> renders through <paramref name="iface"/>:

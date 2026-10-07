@@ -176,31 +176,47 @@ int lyr_str_cmp(const LyrStr *a, const LyrStr *b) {
     return a->len < b->len ? -1 : a->len > b->len ? 1 : 0;
 }
 
-LyrStr *lyr_str_from_int(int64_t value) {
-    char digits[24];
+/* An integer's decimal digits into `digits`, the last first: how many. In the negative range, so
+ * INT64_MIN needs no case of its own. The converters and the builder's writers share them. */
+static int int_digits_reversed(char digits[24], int64_t value) {
     int n = 0;
-    /* Work in the negative range so INT64_MIN needs no special case. */
     int64_t v = value < 0 ? value : -value;
     do {
         digits[n++] = (char)('0' - (v % 10));
         v /= 10;
     } while (v != 0);
     if (value < 0) digits[n++] = '-';
-
-    LyrStr *text = lyr_alloc_string(n);
-    for (int i = 0; i < n; i++) text->bytes[i] = digits[n - 1 - i];
-    return text;
+    return n;
 }
 
-LyrStr *lyr_str_from_uint(uint64_t value) {
-    char digits[24];
+static int uint_digits_reversed(char digits[24], uint64_t value) {
     int n = 0;
     do {
         digits[n++] = (char)('0' + value % 10);
         value /= 10;
     } while (value != 0);
+    return n;
+}
+
+/* `n` digits, the last first, into `into` in their order. */
+static void unreverse(void *into, const char *reversed, int n) {
+    char *out = into;
+    for (int i = 0; i < n; i++) out[i] = reversed[n - 1 - i];
+}
+
+LyrStr *lyr_str_from_int(int64_t value) {
+    char digits[24];
+    int n = int_digits_reversed(digits, value);
     LyrStr *text = lyr_alloc_string(n);
-    for (int i = 0; i < n; i++) text->bytes[i] = digits[n - 1 - i];
+    unreverse(text->bytes, digits, n);
+    return text;
+}
+
+LyrStr *lyr_str_from_uint(uint64_t value) {
+    char digits[24];
+    int n = uint_digits_reversed(digits, value);
+    LyrStr *text = lyr_alloc_string(n);
+    unreverse(text->bytes, digits, n);
     return text;
 }
 
@@ -496,6 +512,24 @@ LyrStr *lyr_str_float_text(double value, int64_t precision, int64_t form) {
 void lyr_bytes_put(LyrArr *bytes, int64_t at, const uint8_t *from, int64_t count) {
     if (at < 0 || at > bytes->len - count) lyr_panic_range(at, at + count, bytes->len);
     if (count > 0) memcpy(bytes->data + at, from, (size_t)count);
+}
+
+static int64_t put_digits(LyrArr *bytes, int64_t at, const char *reversed, int n) {
+    if (at < 0 || at > bytes->len - n) lyr_panic_range(at, at + n, bytes->len);
+    unreverse(bytes->data + at, reversed, n);
+    return n;
+}
+
+int64_t lyr_bytes_put_int(LyrArr *bytes, int64_t at, int64_t value) {
+    char digits[24];
+    int n = int_digits_reversed(digits, value);
+    return put_digits(bytes, at, digits, n);
+}
+
+int64_t lyr_bytes_put_uint(LyrArr *bytes, int64_t at, uint64_t value) {
+    char digits[24];
+    int n = uint_digits_reversed(digits, value);
+    return put_digits(bytes, at, digits, n);
 }
 
 void lyr_bytes_copy(LyrArr *into, const LyrArr *from, int64_t count) {

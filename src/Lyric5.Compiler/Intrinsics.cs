@@ -109,6 +109,11 @@ public static class Intrinsics
         ["std.core.viewBytes"] = "LYR_VIEW_BYTES",
         // Bytes to text (10 S3; M8a S12): checked, copied, decoded with replacement.
         ["std.core.utf8Invalid"] = "LYR_UTF8_INVALID",
+        // f-strings into one builder (10 S6; M8a S13): a float's text, an integer's digits in place.
+        ["std.core.textOfFloat"] = "lyr_str_from_float",
+        ["std.core.textOfFloat32"] = "lyr_str_from_float32",
+        ["std.core.putIntDigits"] = "lyr_bytes_put_int",
+        ["std.core.putUintDigits"] = "lyr_bytes_put_uint",
         ["std.core.stringOfSlice"] = "LYR_STR_OF_SLICE",
         ["std.core.stringOfUtf8Lossy"] = "LYR_STR_UTF8_LOSSY",
     };

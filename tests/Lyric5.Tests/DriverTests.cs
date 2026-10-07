@@ -68,7 +68,9 @@ public class DriverTests
         // A single file is a package of its own, named after the file (07 M1, 11 C8).
         Assert.Contains("fn hello.main -> i64", output);
         Assert.Contains("callimport std.io.println", output);
-        Assert.Contains("callimport std.string.concat", output);
+        // An f-string writes into one builder (10 S6; M8a S13), no chain of concat.
+        Assert.Contains("call std.core.fstringEnd(", output);
+        Assert.DoesNotContain("std.string.concat", output);
     }
 
     [Fact]

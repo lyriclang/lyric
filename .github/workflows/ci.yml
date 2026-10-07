@@ -235,7 +235,9 @@ jobs:
     # a compiler against cases it was never meant to meet.
     name: Conformance gate
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Both profiles, one after the other: 28.7 minutes for 1012 cases (S12d), and 30 cancelled the
+    # run of 1014 (S13). Room for the suite to grow until it is split per profile.
+    timeout-minutes: 45
 
     steps:
       - name: Checkout

@@ -1,3 +1,3 @@
-// A false 'assert' ends the program with its message (05 E8): LYR-RT0011, exit 101.
+// A false 'assert' ends the program with its message (05 E8): LYR-RT0011, exit 101 (main does not end in the call: a tail call would leave no frame of it).
 fn check(n: int): int { assert(n < 3, f"{n} is too many"); return n; }
-fn main(): int { return check(3); }
+fn main(): int { return check(3) - 1; }
