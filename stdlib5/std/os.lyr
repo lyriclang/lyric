@@ -1,0 +1,204 @@
+/// The operating system (design/v5/spec/10 Q9). M8b S1: the signals, std.task's until the module cut
+/// (10 Q10); the rest of Q9 — the arguments, the environment, the working directory — comes with S9.
+/// A signal's watcher is a thread of its own, whose one task hands each caught signal on.
+import std.task { Channel, here, Scheduler, SpinLock };
+import std.thread { Thread };
+
+/// A signal of the system (10 Q9, 06 K5), by an abstract name: Windows knows `Interrupt` (Ctrl+C,
+/// Ctrl+Break) and `Terminate` (its console closes) only. `Other(n)` is the system's number `n`.
+pub enum Signal {
+    Interrupt,
+    Terminate,
+    Hangup,
+    Quit,
+    User1,
+    User2,
+    WindowChange,
+    Other(int),
+}
+
+/// A channel the given signals come in on (10 Q9, 06 K5): from here on they no longer do what the
+/// system does with them — end the program, mostly — but arrive here. Each comes to every channel
+/// that asked for it. A signal is no counter: two that come before the first went out may arrive as
+/// one, and one that finds the channel's buffer full — sixteen — is lost for it. Closing the channel
+/// ends the subscription at once (the review's M6-28): a signal no channel asks for any more is the
+/// system's again from the close on. KILL, STOP and the faults never come.
+pub fn signals(wanted: Signal...): Channel<Signal> {
+    let channel = Channel<Signal>.new(16);
+    var mask = 0;
+    for (i in 0..wanted.length()) {
+        let n = numberOf(wanted[i]);
+        if (n >= 1 && n <= 63) {
+            mask = mask | (1 << (n - 1));
+        }
+    }
+    if (mask != 0) {
+        signalHub.subscribe(channel, mask);
+        // Closed, the channel ends its subscription at once (the review's M6-28): a signal that
+        // comes after the close is the system's again, not swallowed by a watcher that finds the
+        // channel closed.
+        channel.closer = () => {
+            signalHub.unsubscribe(channel);
+        };
+    }
+    return channel;
+}
+
+/// A channel's subscription to signals: the bits of their numbers.
+class Subscription {
+    channel: Channel<Signal>,
+    mask: int,
+    var next: ?Subscription = null,
+}
+
+/// The subscriptions to signals and their watcher: a thread whose one task hands each caught signal
+/// to the channels that asked for it — the runtime's handler never runs Lyric code (lyr/signal.h).
+class SignalHub {
+    guard: SpinLock = SpinLock { },
+    var first: ?Subscription = null,
+    var caught: int = 0,
+    var watching: bool = false,
+
+    /// `channel` gets the signals of `mask` from here on; the first subscription starts the watcher.
+    mut fn subscribe(channel: Channel<Signal>, mask: int): void {
+        this.guard.acquire();
+        this.first = Subscription { channel = channel, mask = mask, next = this.first };
+        let added = mask & ~this.caught;
+        this.caught = this.caught | mask;
+        let start = !this.watching;
+        this.watching = true;
+        this.guard.release();
+        catchAll(added, true);
+        if (start) {
+            Thread.spawn(() => {
+                signalHub.watch();
+            });
+        }
+    }
+
+    /// `channel` closed (M6-28): its subscription ends now, and a signal no channel asks for any
+    /// more is the system's again.
+    mut fn unsubscribe(channel: Channel<Signal>): void {
+        this.guard.acquire();
+        var before: ?Subscription = null;
+        var at = this.first;
+        var still = 0;
+        while (let sub = at) {
+            at = sub.next;
+            if (same(sub.channel, channel)) {
+                if (let b = before) {
+                    b.next = sub.next;
+                } else {
+                    this.first = sub.next;
+                }
+            } else {
+                still = still | sub.mask;
+                before = sub;
+            }
+        }
+        let dropped = this.caught & ~still;
+        this.caught = still;
+        this.guard.release();
+        catchAll(dropped, false);
+    }
+
+    /// The watcher's loop: what was caught goes out, then it waits for more.
+    mut fn watch(): void {
+        attachSignals();
+        let s = here();
+        while (true) {
+            let caught = takeSignals();
+            if (caught == 0) {
+                s.awaitPoller();
+            } else {
+                this.deliver(s, caught);
+            }
+        }
+    }
+
+    /// Each signal of `caught` to every channel that asked for it, where it has room; a closed
+    /// channel's subscription ends, and a signal no channel asks for any more is the system's again.
+    mut fn deliver(s: Scheduler, caught: int): void {
+        this.guard.acquire();
+        var before: ?Subscription = null;
+        var at = this.first;
+        var still = 0;
+        while (let sub = at) {
+            at = sub.next;
+            var open = true;
+            var bits = caught & sub.mask;
+            var n = 1;
+            while (bits != 0 && open) {
+                if ((bits & 1) != 0) {
+                    open = sub.channel.offer(s, signalOf(n)) >= 0;
+                }
+                bits = bits >> 1;
+                n += 1;
+            }
+            if (open) {
+                still = still | sub.mask;
+                before = sub;
+            } else if (let b = before) {
+                b.next = sub.next;
+            } else {
+                this.first = sub.next;
+            }
+        }
+        let dropped = this.caught & ~still;
+        this.caught = still;
+        this.guard.release();
+        catchAll(dropped, false);
+    }
+}
+
+let signalHub = SignalHub { };
+
+/// The handler on, or off, for each signal of `mask`.
+fn catchAll(mask: int, on: bool): void {
+    var bits = mask;
+    var n = 1;
+    while (bits != 0) {
+        if ((bits & 1) != 0) {
+            catchSignal(n, on);
+        }
+        bits = bits >> 1;
+        n += 1;
+    }
+}
+
+/// The system's number of a signal; -1 where it has none.
+fn numberOf(signal: Signal): int {
+    return match (signal) {
+        Signal.Interrupt => signalNumber(0),
+        Signal.Terminate => signalNumber(1),
+        Signal.Hangup => signalNumber(2),
+        Signal.Quit => signalNumber(3),
+        Signal.User1 => signalNumber(4),
+        Signal.User2 => signalNumber(5),
+        Signal.WindowChange => signalNumber(6),
+        Signal.Other(n) => n,
+    };
+}
+
+/// The signal of the system's number.
+fn signalOf(number: int): Signal {
+    return match (signalKind(number)) {
+        0 => Signal.Interrupt,
+        1 => Signal.Terminate,
+        2 => Signal.Hangup,
+        3 => Signal.Quit,
+        4 => Signal.User1,
+        5 => Signal.User2,
+        6 => Signal.WindowChange,
+        _ => Signal.Other(number),
+    };
+}
+
+/// Signals (lyr/signal.h): the system's number of an abstract signal and back — -1 where it has
+/// none —; the handler on or off — false where the runtime may not catch it —; this thread as the
+/// watcher, whose poller a caught signal wakes; the caught ones as a mask, taken.
+fn signalNumber(kind: int): int;
+fn signalKind(number: int): int;
+fn catchSignal(number: int, on: bool): bool;
+fn attachSignals(): void;
+fn takeSignals(): int;

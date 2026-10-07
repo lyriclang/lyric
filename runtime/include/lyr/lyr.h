@@ -17,5 +17,6 @@
 #include "lyr/atomic.h"
 #include "lyr/signal.h"
 #include "lyr/random.h"
+#include "lyr/os.h"
 
 #endif

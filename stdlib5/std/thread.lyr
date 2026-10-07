@@ -1,0 +1,234 @@
+/// Threads and pools of them (design/v5/spec/06 G1, G2, T1, P5; 10 Q10). M6 S5-S6: `Thread` and
+/// `Pool`, std.task's until the module cut (M8b S1), which also brought `parallelMap`. They stand
+/// on std.task's scheduler: `launchOn`, the registry of the living schedulers, the start of a thread.
+import std.core { filled };
+import std.task { atomicFetchAndAdd, atomicLoad, atomicStore, Cancelled, Channel, enlist, launchOn, living,
+    Scheduler, setCurrentScheduler, SpinLock, startThread, Task };
+
+/// Threads (06 G1, G2). Each runs a scheduler of its own, and a task never moves to another thread.
+/// Threads run at the same time: what they share, they share through a channel, an atomic or a
+/// lock (N7 P1) — anything else is a data race (G3).
+pub class Thread {
+    /// Starts a thread with a scheduler of its own (06 G2): `body` runs there as its first task,
+    /// whose handle this gives — `await()` waits for its end from any thread, and what it did
+    /// happens before (N7 P1). The handle is done when that task ends. The thread then CANCELS
+    /// what still lives on it and runs until all of it has ended (the review's M6-20b): the
+    /// `defer`s run, the locks come free, and whoever awaits one of those tasks goes on. Only the
+    /// program ends with its first task and leaves the rest where it stands (T6).
+    pub static fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
+        let s = Scheduler { };
+        enlist(s);
+        let task = launchOn(s, body, null);
+        startThread(() => {
+            setCurrentScheduler(s);
+            s.started();
+            while (!task.isDone()) {
+                s.step();
+            }
+            s.wind();
+            s.stopped();
+            living.leave(s);
+            setCurrentScheduler(null);
+        });
+        return task;
+    }
+}
+
+/// A pool of threads (06 G2, T1, P5): `spawn` runs a task on one of them — each in turn — and gives
+/// its handle; `close()` waits until the tasks given to the pool have ended, then ends its threads.
+/// A pool is `Closeable`: `using let pool = Pool.new(4);`.
+pub class Pool :: [Closeable] {
+    workers: Worker,
+    size: int,
+    /// The guard holds from the check of `closed` to the raising of a worker's count, and while
+    /// the pool closes (the review's M6-27): a task given while the pool closes is on a worker
+    /// that will run it — counted before the worker may look again — or refused; never on one
+    /// that has ended. Without it the check and the count were two steps, and a close between
+    /// them lost the task.
+    guard: SpinLock = SpinLock { },
+    var picks: int = 0,
+    var closed: bool = false,
+
+    /// A pool of `threads` threads — one at least — each with a scheduler of its own.
+    pub static fn new(threads: int): Pool {
+        let n = if (threads > 0) threads else 1;
+        var head = Worker { scheduler = Scheduler { } };
+        head.start();
+        for (_ in 1..n) {
+            let w = Worker { scheduler = Scheduler { }, next = head };
+            w.start();
+            head = w;
+        }
+        return Pool { workers = head, size = n };
+    }
+
+    /// Runs `body` as a task on one of the pool's threads and gives its handle (06 T1): `await()`
+    /// waits for it from any thread. A closed pool takes no task: that is a panic.
+    pub mut fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
+        this.guard.acquire();
+        if (this.closed) {
+            this.guard.release();
+            panic("a task given to a closed pool");
+        }
+        let w = this.pick();
+        atomicFetchAndAdd(&w.active, 1);
+        this.guard.release();
+        // counted, the worker stays for it; the hand-over itself needs no guard
+        return launchOn(w.scheduler, body, () => {
+            atomicFetchAndAdd(&w.active, -1);
+        });
+    }
+
+    /// Waits until every task given to the pool has ended, then ends its threads — each as a
+    /// thread ends (the review's M6-20b): what those tasks started and left there is cancelled, and
+    /// has ended when this returns. Closing a closed pool waits for nothing. A wait: in a cancelled
+    /// task it throws `Cancelled`.
+    pub fn close(): void throws Error {
+        // Through the reference, not through 'this': 'Closeable.close' is no 'mut fn', and an
+        // implementation's 'mut' is the member's (LYR-SEM0042) — on a class too.
+        let me = this;
+        me.guard.acquire();
+        me.closed = true;
+        me.guard.release();
+        var at: ?Worker = this.workers;
+        while (let w = at) {
+            w.close();
+            at = w.next;
+        }
+        at = this.workers;
+        while (let w = at) {
+            try w.finished.recv();
+            at = w.next;
+        }
+    }
+
+    /// The next thread in turn; under the guard.
+    mut fn pick(): Worker {
+        var k = this.picks % this.size;
+        this.picks = this.picks +% 1;
+        if (k < 0) { k = -k; }
+        var at: ?Worker = this.workers;
+        while (let w = at) {
+            if (k == 0) { return w; }
+            k -= 1;
+            at = w.next;
+        }
+        return this.workers;
+    }
+}
+
+/// A thread of a pool. It runs until the pool is closed and none of the pool's tasks on it is left;
+/// then its `finished` closes.
+class Worker {
+    scheduler: Scheduler,
+    var active: int = 0, // atomic
+    var closing: bool = false, // atomic
+    finished: Channel<void> = Channel<void>.new(),
+    var next: ?Worker = null,
+
+    fn start(): void {
+        let s = this.scheduler;
+        let w = this;
+        enlist(s);
+        startThread(() => {
+            setCurrentScheduler(s);
+            s.started();
+            while (!(atomicLoad(&w.closing) && atomicLoad(&w.active) == 0)) {
+                s.step();
+            }
+            s.wind();
+            w.finished.close();
+            s.stopped();
+            living.leave(s);
+            setCurrentScheduler(null);
+        });
+    }
+
+    /// The pool closes: the thread looks again, and ends once its tasks have.
+    mut fn close(): void {
+        atomicStore(&this.closing, true);
+        this.scheduler.nudge();
+    }
+}
+
+/// `f` over every element of `xs` on threads (06 P5): an array of the results, in the elements'
+/// order. The program's pool does the work — a thread for each processor, started at the first
+/// call and there until the program ends — in pieces, four for each thread; the first element's
+/// call runs here, on the caller's thread. `f` runs on other threads: what it shares, it shares as
+/// threads do (06 N7). Where calls throw, the error of the first element, in order, whose call
+/// throws comes out here once every piece has ended; a piece stops at its first error, so a later
+/// element of that piece may go uncalled. A wait: a cancelled caller cancels the pieces and throws
+/// `Cancelled`.
+pub fn parallelMap<T, U, E :: [Error]>(xs: Slice<T>, f: fn(T) -> U throws E): U[] throws [E, Cancelled] {
+    let n = xs.length();
+    if (n == 0) {
+        return [];
+    }
+    let first = try f(xs[0]);
+    // every slot the first result until its own is written: an array of U needs a value of U
+    let out = filled(n, first);
+    if (n == 1) {
+        return out;
+    }
+    let pool = programPool();
+    var count = pool.size * 4;
+    if (count > n - 1) {
+        count = n - 1;
+    }
+    let pieces = count;
+    // piece k computes the elements from bound(k) up to bound(k + 1), in order, and stops at its
+    // first error
+    let bound = (k: int): int => 1 + k * (n - 1) / pieces;
+    let run = (low: int, high: int) => {
+        var i = low;
+        while (i < high) {
+            out[i] = try f(xs[i]);
+            i += 1;
+        }
+    };
+    let head = pool.spawn(() => try run(bound(0), bound(1)));
+    let tasks = filled(pieces, head);
+    for (k in 1..pieces) {
+        let low = bound(k);
+        let high = bound(k + 1);
+        tasks[k] = pool.spawn(() => try run(low, high));
+    }
+    // every piece to its end, a failed one too; then the first failed one, in order, again — its
+    // error is the error of the first element whose call threw
+    var failed = -1;
+    for (k in 0..pieces) {
+        try {
+            tasks[k].await();
+        } catch (c: Cancelled) {
+            for (t in tasks) {
+                t.cancel();
+            }
+            throw c;
+        } catch (_) {
+            if (failed < 0) {
+                failed = k;
+            }
+        }
+    }
+    if (failed >= 0) {
+        try tasks[failed].await();
+    }
+    return out;
+}
+
+/// The program's pool for `parallelMap`, made at its first call: a thread for each processor.
+var sharedPool: ?Pool = null;
+let sharedPoolGuard = SpinLock { };
+
+fn programPool(): Pool {
+    sharedPoolGuard.acquire();
+    if (sharedPool == null) {
+        sharedPool = Pool.new(processorCount());
+    }
+    let p = sharedPool!;
+    sharedPoolGuard.release();
+    return p;
+}
+
+/// The processors the system runs the process on, one at least (lyr/os.h).
+fn processorCount(): int;

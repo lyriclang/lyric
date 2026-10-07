@@ -1,6 +1,8 @@
-/// Synchronization between threads (design/v5/spec/06 G4, K6, N7; 10 Q10). M6 S6a: `Atomic<T>`.
-/// `Mutex`, `RwLock` and `Once` come with S6c.
-import std.task { atomicLoad, atomicStore, atomicExchange, atomicCompareAndSet, atomicFetchAndAdd };
+/// Synchronization between threads (design/v5/spec/06 G4, K4, K6, N7; 10 Q10). M6 S6a: `Atomic<T>`;
+/// M8b S1: `Mutex`, `RwLock` and `Once` — std.task's until the module cut, whose lock state, held by
+/// the scheduler that releases a panicked task's locks, stays there — and `Semaphore`.
+import std.task { atomicLoad, atomicStore, atomicExchange, atomicCompareAndSet, atomicFetchAndAdd,
+    Cancelled, here, LockState, park, Slot, SpinLock, Waiters };
 
 /// The types an `Atomic` holds: those the machine reads and writes in one step — `int` and `bool`.
 /// Sealed: no other type becomes one.
@@ -58,5 +60,173 @@ extend Atomic<int> {
     /// Adds `n` and gives the value after. It wraps around, as `+%` does.
     pub mut fn addAndFetch(n: int): int {
         return atomicFetchAndAdd(&this.value, n) +% n;
+    }
+}
+
+/// A value that one task at a time holds (06 G4, K6): `lock` gives it to its body only, as a
+/// place — `m.lock { &n => n += 1; }` — which ends with the body, so nothing reaches the value
+/// outside the lock. A task that finds it held waits, parked, while the other tasks of its thread
+/// run; across threads, and on one thread wherever a body waits.
+pub class Mutex<T> {
+    slot: Slot<T>,
+    state: LockState,
+
+    /// A mutex that holds `value`.
+    pub static fn new(value: T): Mutex<T> {
+        return Mutex<T> { slot = Slot<T> { value = value }, state = LockState { } };
+    }
+
+    /// Runs `body` while the running task holds the mutex, and gives what it gives: the task waits
+    /// until no other holds it. The body takes the value's place, `{ &v => … }`: it reads and
+    /// writes the value itself, and the place is the call's — it ends with the body, and no
+    /// closure in it holds it. A wait: in a cancelled task it throws `Cancelled` (N9 X1).
+    pub fn lock<R, E :: [Error]>(body: fn(&T) -> R throws E): R throws [E, Cancelled] {
+        try this.state.acquireAlone(false);
+        defer this.state.releaseAlone();
+        return try body(&this.slot.value);
+    }
+}
+
+/// A value that readers share and a writer holds alone (06 K6). A writer that waits goes first:
+/// readers that come after it wait for it.
+pub class RwLock<T> {
+    slot: Slot<T>,
+    state: LockState,
+
+    /// A lock that holds `value`.
+    pub static fn new(value: T): RwLock<T> {
+        return RwLock<T> { slot = Slot<T> { value = value }, state = LockState { } };
+    }
+
+    /// Runs `body` with the value while no writer holds the lock — other readers may — and gives
+    /// what it gives. A wait: in a cancelled task it throws `Cancelled`.
+    pub fn read<R, E :: [Error]>(body: fn(T) -> R throws E): R throws [E, Cancelled] {
+        try this.state.acquireShared();
+        defer this.state.releaseShared();
+        return try body(this.slot.value);
+    }
+
+    /// Runs `body` while the running task alone holds the lock — no reader, no other writer — and
+    /// gives what it gives; the body takes the value's place, as a mutex's does. A wait, as
+    /// `read` is.
+    pub fn write<R, E :: [Error]>(body: fn(&T) -> R throws E): R throws [E, Cancelled] {
+        try this.state.acquireAlone(true);
+        defer this.state.releaseAlone();
+        return try body(&this.slot.value);
+    }
+}
+
+/// Work done once (06 N10): the first `run` does it, every later one returns at once, and one that
+/// comes while it runs waits until it has ended.
+pub class Once {
+    state: LockState,
+
+    /// Work not done yet.
+    pub static fn new(): Once {
+        return Once { state = LockState { } };
+    }
+
+    /// Runs `body` where it has not run to its end yet — and not where another task runs it now:
+    /// then it waits for that one. Where `body` throws, the error comes out here, and the next `run`
+    /// runs it again. A wait: in a cancelled task it throws `Cancelled`.
+    pub fn run<E :: [Error]>(body: fn() -> void throws E): void throws [E, Cancelled] {
+        let first = try this.state.beginOnce();
+        if (!first) { return; }
+        var done = false;
+        defer {
+            this.state.endOnce(done);
+        }
+        try body();
+        done = true;
+    }
+}
+
+/// Permits that tasks take and give back (06 K4; the review's M6-31) — a waker: `release()`, from
+/// any task on any thread, ends the wait of those that `acquire()`, and nobody needs to hold a
+/// permit to give one back. A permit is no hold, so a panic poisons no semaphore.
+pub class Semaphore {
+    state: PermitState,
+
+    /// A semaphore of `permits` permits; a negative count panics.
+    pub static fn new(permits: int): Semaphore {
+        if (permits < 0) {
+            panic(f"Semaphore.new: a negative count {permits}");
+        }
+        return Semaphore { state = PermitState { permits = permits } };
+    }
+
+    /// Takes a permit, waiting while none is left. A wait: in a cancelled task it throws
+    /// `Cancelled` and takes none.
+    pub fn acquire(): void throws Cancelled {
+        try this.state.acquire();
+    }
+
+    /// Takes a permit where one is left — true — and waits for none.
+    pub fn tryAcquire(): bool {
+        return this.state.tryAcquire();
+    }
+
+    /// Gives a permit back, and wakes the tasks that wait for one.
+    pub fn release(): void {
+        this.state.release();
+    }
+
+    /// The permits left now — another thread may take or give one the next moment.
+    pub fn available(): int {
+        return this.state.available();
+    }
+}
+
+/// A semaphore's count behind a spin lock, and the tasks that wait for a permit — each of which a
+/// release wakes to look again.
+class PermitState {
+    guard: SpinLock = SpinLock { },
+    var permits: int,
+    waiters: Waiters = Waiters { },
+
+    mut fn acquire(): void throws Cancelled {
+        let s = here();
+        let me = s.running ?? panic("a semaphore where no task runs");
+        if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
+        this.guard.acquire();
+        while (this.permits == 0) {
+            me.beginWait();
+            this.waiters.add(me);
+            this.guard.release();
+            s.wakeIfCancelled(me);
+            park();
+            me.endWait();
+            this.guard.acquire();
+            this.waiters.remove(me);
+            if (atomicLoad(&me.cancelled)) {
+                this.guard.release();
+                throw Cancelled { };
+            }
+        }
+        this.permits -= 1;
+        this.guard.release();
+    }
+
+    mut fn tryAcquire(): bool {
+        this.guard.acquire();
+        let took = this.permits > 0;
+        if (took) { this.permits -= 1; }
+        this.guard.release();
+        return took;
+    }
+
+    mut fn release(): void {
+        let s = here();
+        this.guard.acquire();
+        this.permits += 1;
+        this.waiters.wakeAll(s);
+        this.guard.release();
+    }
+
+    mut fn available(): int {
+        this.guard.acquire();
+        let n = this.permits;
+        this.guard.release();
+        return n;
     }
 }

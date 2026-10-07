@@ -75,7 +75,9 @@ public class LambdaPlaceRunTests
     {
         Assert.Equal("counted 4000\nwritten 9 10\nlog a1 a2 b1 b2\n", Output("""
             import std.io { println };
-            import std.task { spawn, sleep, yieldNow, Thread, Mutex, RwLock };
+            import std.task { spawn, sleep, yieldNow };
+            import std.sync { Mutex, RwLock };
+            import std.thread { Thread };
             import std.time { Duration };
 
             fn add(m: Mutex<int>): void throws Error {

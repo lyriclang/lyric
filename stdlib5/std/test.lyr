@@ -6,7 +6,8 @@
 /// value comes first (N13).
 
 import std.io { println };
-import std.task { spawn, sleep, Thread, PanicInfo, TaskStatus, Cancelled, monotonicNanos };
+import std.task { spawn, sleep, PanicInfo, TaskStatus, Cancelled, monotonicNanos };
+import std.thread { Thread };
 import std.sync { Atomic };
 import std.time { Duration };
 

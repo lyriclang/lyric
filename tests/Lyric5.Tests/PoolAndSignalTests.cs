@@ -43,7 +43,8 @@ public class PoolAndSignalTests
     {
         var exe = Built("""
             import std.io { println };
-            import std.task { sleep, yieldNow, Thread, Pool, Channel, TaskStatus };
+            import std.task { sleep, yieldNow, Channel, TaskStatus };
+            import std.thread { Thread, Pool };
             import std.time { Duration };
 
             fn main(): void throws Error {
@@ -98,7 +99,8 @@ public class PoolAndSignalTests
         if (OperatingSystem.IsWindows()) return;
         var exe = Built("""
             import std.io { println };
-            import std.task { sleep, Signal, signals };
+            import std.task { sleep };
+            import std.os { Signal, signals };
             import std.time { Duration };
 
             fn main(): void throws Error {

@@ -8,7 +8,8 @@
 //   pool: the defer ran        a pool's thread the same, when the pool closes
 //   pool: cancelled
 import std.io { println };
-import std.task { spawn, spawnDetached, sleep, Thread, Pool, Channel, Cancelled, TaskStatus };
+import std.task { spawn, spawnDetached, sleep, Channel, Cancelled, TaskStatus };
+import std.thread { Thread, Pool };
 import std.time { Duration };
 
 fn waiter(name: string, never: Channel<int>): int throws Cancelled {

@@ -48,16 +48,18 @@ public static class Intrinsics
         // Threads (06 G1, G2): a thread around a function value; the thread's poller as a number
         // another thread wakes; the pause of a spinning lock.
         ["std.task.startThread"] = "LYR_THREAD_START",
+        // The processors, for the program's pool (std.thread's parallelMap, M8b S1).
+        ["std.thread.processorCount"] = "lyr_os_cpu_count",
         ["std.task.currentPoller"] = "lyr_task_poller",
         ["std.task.wakePoller"] = "lyr_task_wake",
         ["std.task.spin"] = "lyr_task_spin",
         // Signals as a channel (10 Q9, 06 K5): the abstract names and the system's numbers, the
         // handler on or off, the watcher's poller, the caught ones.
-        ["std.task.signalNumber"] = "lyr_signal_number",
-        ["std.task.signalKind"] = "lyr_signal_kind",
-        ["std.task.catchSignal"] = "lyr_signal_catch",
-        ["std.task.attachSignals"] = "lyr_signal_attach",
-        ["std.task.takeSignals"] = "lyr_signal_take",
+        ["std.os.signalNumber"] = "lyr_signal_number",
+        ["std.os.signalKind"] = "lyr_signal_kind",
+        ["std.os.catchSignal"] = "lyr_signal_catch",
+        ["std.os.attachSignals"] = "lyr_signal_attach",
+        ["std.os.takeSignals"] = "lyr_signal_take",
         // The atomic operations (06 G4, K6; N7 P2; the review's M7-5): the C11 builtins on a
         // place — a field of the scheduler's, the value of std.sync's Atomic<T> —, as macros that
         // serve every T.

@@ -3,7 +3,8 @@
 // twice, then Interrupt, each once the line before it came. Expected stdout: ready, got User1,
 // got User1, interrupted: shutting down, worker stopped, done — and exit 0.
 import std.io { println };
-import std.task { spawn, sleep, Select, Signal, signals, Cancelled };
+import std.task { spawn, sleep, Select, Cancelled };
+import std.os { Signal, signals };
 import std.time { Duration };
 
 fn main(): void throws Error {

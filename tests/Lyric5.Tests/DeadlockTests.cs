@@ -25,7 +25,7 @@ namespace Lyric5.Tests;
 [Collection("console")]
 public class DeadlockTests
 {
-    private const string Head = "import std.io { println };\nimport std.task { spawn, spawnDetached, sleep, Thread, Pool, Channel, Cancelled };\nimport std.time { Duration };\n\n";
+    private const string Head = "import std.io { println };\nimport std.task { spawn, spawnDetached, sleep, Channel, Cancelled };\nimport std.thread { Thread, Pool };\nimport std.time { Duration };\n\n";
 
     /// <summary>What a program that builds does within ten seconds.</summary>
     private static Lyric5.Toolchain.ProcessRunner.Result Ran(string main)
@@ -59,7 +59,7 @@ public class DeadlockTests
         Assert.Equal("before\n", Printed(ran));
         Assert.Equal("panic [LYR-RT0018]: deadlock: every task waits, and nothing can wake one", FirstLine(ran));
         // the trace is the waiting task's own: the call that waits, in the program
-        Assert.Contains("main.lyr:8", ran.Stderr);
+        Assert.Contains("main.lyr:9", ran.Stderr);
     }
 
     [Fact]
@@ -88,8 +88,8 @@ public class DeadlockTests
         // The task that panics is the oldest that waits for something other than a task: the
         // first one's receive (line 9), whose panic main's await passes on with its frames —
         // not main, which only waits for it (line 16).
-        Assert.Contains("main.lyr:9", ran.Stderr);
-        Assert.DoesNotContain("main.lyr:16", ran.Stderr);
+        Assert.Contains("main.lyr:10", ran.Stderr);
+        Assert.DoesNotContain("main.lyr:17", ran.Stderr);
     }
 
     /// <summary>Where something can still wake a task, nothing is said: a sleeper of the thread,

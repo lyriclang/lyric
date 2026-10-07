@@ -102,7 +102,8 @@ public class InstanceOfADeclarationTests
 
     private static string Spawns(bool threadFirst) => $$"""
         import std.io { println };
-        import std.task { spawn, Thread };
+        import std.task { spawn };
+        import std.thread { Thread };
 
         fn one(): int { return 1; }
 
@@ -127,8 +128,8 @@ public class InstanceOfADeclarationTests
         var (exit, ir, error) = Run("build", "-C", dir, "--emit", "ir");
         Assert.True(exit == 0, error);
         Assert.Contains("= call std.task.spawn<int, never>(", ir);
-        Assert.Contains("= call std.task.Thread.spawn<int, never>(", ir);
-        Assert.Contains("fn std.task.Thread.spawn<int, never> ", ir);
+        Assert.Contains("= call std.thread.Thread.spawn<int, never>(", ir);
+        Assert.Contains("fn std.thread.Thread.spawn<int, never> ", ir);
         // One thread is started: in the body of 'Thread.spawn', and nowhere in the task's.
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(ir, @"callimport std\.task\.startThread\("));
         Assert.Equal("1 1\n", BuildAndRun(dir, "app", "build", "-C", dir));
