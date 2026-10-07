@@ -4288,3 +4288,454 @@ pub fn repeatText(s: string, n: int): string {
     }
     return out.toString();
 }
+
+// --- optionals and arrays (N2a) --------------------------------------------------------------
+
+/// An optional is Equatable where its value's type is (03 O6): `null` equals `null` only — what
+/// `==` on two optionals already did, now a conformance a constraint finds (`Set<?int>`).
+extend<T :: [Equatable]> ?T :: [Equatable] {
+    fn equals(o: ?T): bool {
+        return equalOptionals(this, o);
+    }
+}
+
+/// An optional is Hashable where its value's type is: `null` and a value hash apart.
+extend<T :: [Hashable]> ?T :: [Hashable] {
+    fn hash<H :: [Hasher]>(&h: H): void {
+        hashOptionalInto(this, &h);
+    }
+}
+
+/// An array is Clone where its element is (10 K5): a new array of the elements' clones.
+extend<T :: [Clone]> T[] :: [Clone] {
+    fn clone(): T[] {
+        return cloneArray(this);
+    }
+}
+
+// --- tuples (03 T16, 04 D7; N2a) --------------------------------------------------------------
+//
+// A tuple is Equatable, Hashable, Debug and Display where its elements are — the conditional
+// synthesis D7 gives structs, written here for each arity from 2 to 8 (a generator wrote them;
+// Rust's own impls stop at 12). Equality and hash take the elements in order; Debug writes
+// `(1, "x")`, Display `(1, x)`.
+
+extend<T0 :: [Equatable], T1 :: [Equatable]> (T0, T1) :: [Equatable] {
+    fn equals(o: (T0, T1)): bool {
+        return this.0 == o.0 && this.1 == o.1;
+    }
+}
+
+extend<T0 :: [Hashable], T1 :: [Hashable]> (T0, T1) :: [Hashable] {
+    fn hash<H :: [Hasher]>(&h: H): void {
+        this.0.hash(&h);
+        this.1.hash(&h);
+    }
+}
+
+extend<T0 :: [Debug], T1 :: [Debug]> (T0, T1) :: [Debug] {
+    fn debug(): string {
+        var out = StringBuilder.new();
+        this.debugTo(&out);
+        return out.toString();
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.debugTo(&out);
+        out.appendStr(", ");
+        this.1.debugTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Display], T1 :: [Display]> (T0, T1) :: [Display] {
+    fn show(): string {
+        var out = StringBuilder.new();
+        this.showTo(&out);
+        return out.toString();
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.showTo(&out);
+        out.appendStr(", ");
+        this.1.showTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable]> (T0, T1, T2) :: [Equatable] {
+    fn equals(o: (T0, T1, T2)): bool {
+        return this.0 == o.0 && this.1 == o.1 && this.2 == o.2;
+    }
+}
+
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable]> (T0, T1, T2) :: [Hashable] {
+    fn hash<H :: [Hasher]>(&h: H): void {
+        this.0.hash(&h);
+        this.1.hash(&h);
+        this.2.hash(&h);
+    }
+}
+
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug]> (T0, T1, T2) :: [Debug] {
+    fn debug(): string {
+        var out = StringBuilder.new();
+        this.debugTo(&out);
+        return out.toString();
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.debugTo(&out);
+        out.appendStr(", ");
+        this.1.debugTo(&out);
+        out.appendStr(", ");
+        this.2.debugTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display]> (T0, T1, T2) :: [Display] {
+    fn show(): string {
+        var out = StringBuilder.new();
+        this.showTo(&out);
+        return out.toString();
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.showTo(&out);
+        out.appendStr(", ");
+        this.1.showTo(&out);
+        out.appendStr(", ");
+        this.2.showTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable]> (T0, T1, T2, T3) :: [Equatable] {
+    fn equals(o: (T0, T1, T2, T3)): bool {
+        return this.0 == o.0 && this.1 == o.1 && this.2 == o.2 && this.3 == o.3;
+    }
+}
+
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable]> (T0, T1, T2, T3) :: [Hashable] {
+    fn hash<H :: [Hasher]>(&h: H): void {
+        this.0.hash(&h);
+        this.1.hash(&h);
+        this.2.hash(&h);
+        this.3.hash(&h);
+    }
+}
+
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug]> (T0, T1, T2, T3) :: [Debug] {
+    fn debug(): string {
+        var out = StringBuilder.new();
+        this.debugTo(&out);
+        return out.toString();
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.debugTo(&out);
+        out.appendStr(", ");
+        this.1.debugTo(&out);
+        out.appendStr(", ");
+        this.2.debugTo(&out);
+        out.appendStr(", ");
+        this.3.debugTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display]> (T0, T1, T2, T3) :: [Display] {
+    fn show(): string {
+        var out = StringBuilder.new();
+        this.showTo(&out);
+        return out.toString();
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.showTo(&out);
+        out.appendStr(", ");
+        this.1.showTo(&out);
+        out.appendStr(", ");
+        this.2.showTo(&out);
+        out.appendStr(", ");
+        this.3.showTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable]> (T0, T1, T2, T3, T4) :: [Equatable] {
+    fn equals(o: (T0, T1, T2, T3, T4)): bool {
+        return this.0 == o.0 && this.1 == o.1 && this.2 == o.2 && this.3 == o.3 && this.4 == o.4;
+    }
+}
+
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable]> (T0, T1, T2, T3, T4) :: [Hashable] {
+    fn hash<H :: [Hasher]>(&h: H): void {
+        this.0.hash(&h);
+        this.1.hash(&h);
+        this.2.hash(&h);
+        this.3.hash(&h);
+        this.4.hash(&h);
+    }
+}
+
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]> (T0, T1, T2, T3, T4) :: [Debug] {
+    fn debug(): string {
+        var out = StringBuilder.new();
+        this.debugTo(&out);
+        return out.toString();
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.debugTo(&out);
+        out.appendStr(", ");
+        this.1.debugTo(&out);
+        out.appendStr(", ");
+        this.2.debugTo(&out);
+        out.appendStr(", ");
+        this.3.debugTo(&out);
+        out.appendStr(", ");
+        this.4.debugTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display]> (T0, T1, T2, T3, T4) :: [Display] {
+    fn show(): string {
+        var out = StringBuilder.new();
+        this.showTo(&out);
+        return out.toString();
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.showTo(&out);
+        out.appendStr(", ");
+        this.1.showTo(&out);
+        out.appendStr(", ");
+        this.2.showTo(&out);
+        out.appendStr(", ");
+        this.3.showTo(&out);
+        out.appendStr(", ");
+        this.4.showTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable]> (T0, T1, T2, T3, T4, T5) :: [Equatable] {
+    fn equals(o: (T0, T1, T2, T3, T4, T5)): bool {
+        return this.0 == o.0 && this.1 == o.1 && this.2 == o.2 && this.3 == o.3 && this.4 == o.4 && this.5 == o.5;
+    }
+}
+
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable]> (T0, T1, T2, T3, T4, T5) :: [Hashable] {
+    fn hash<H :: [Hasher]>(&h: H): void {
+        this.0.hash(&h);
+        this.1.hash(&h);
+        this.2.hash(&h);
+        this.3.hash(&h);
+        this.4.hash(&h);
+        this.5.hash(&h);
+    }
+}
+
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug]> (T0, T1, T2, T3, T4, T5) :: [Debug] {
+    fn debug(): string {
+        var out = StringBuilder.new();
+        this.debugTo(&out);
+        return out.toString();
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.debugTo(&out);
+        out.appendStr(", ");
+        this.1.debugTo(&out);
+        out.appendStr(", ");
+        this.2.debugTo(&out);
+        out.appendStr(", ");
+        this.3.debugTo(&out);
+        out.appendStr(", ");
+        this.4.debugTo(&out);
+        out.appendStr(", ");
+        this.5.debugTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display]> (T0, T1, T2, T3, T4, T5) :: [Display] {
+    fn show(): string {
+        var out = StringBuilder.new();
+        this.showTo(&out);
+        return out.toString();
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.showTo(&out);
+        out.appendStr(", ");
+        this.1.showTo(&out);
+        out.appendStr(", ");
+        this.2.showTo(&out);
+        out.appendStr(", ");
+        this.3.showTo(&out);
+        out.appendStr(", ");
+        this.4.showTo(&out);
+        out.appendStr(", ");
+        this.5.showTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable], T6 :: [Equatable]> (T0, T1, T2, T3, T4, T5, T6) :: [Equatable] {
+    fn equals(o: (T0, T1, T2, T3, T4, T5, T6)): bool {
+        return this.0 == o.0 && this.1 == o.1 && this.2 == o.2 && this.3 == o.3 && this.4 == o.4 && this.5 == o.5 && this.6 == o.6;
+    }
+}
+
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable], T6 :: [Hashable]> (T0, T1, T2, T3, T4, T5, T6) :: [Hashable] {
+    fn hash<H :: [Hasher]>(&h: H): void {
+        this.0.hash(&h);
+        this.1.hash(&h);
+        this.2.hash(&h);
+        this.3.hash(&h);
+        this.4.hash(&h);
+        this.5.hash(&h);
+        this.6.hash(&h);
+    }
+}
+
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug], T6 :: [Debug]> (T0, T1, T2, T3, T4, T5, T6) :: [Debug] {
+    fn debug(): string {
+        var out = StringBuilder.new();
+        this.debugTo(&out);
+        return out.toString();
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.debugTo(&out);
+        out.appendStr(", ");
+        this.1.debugTo(&out);
+        out.appendStr(", ");
+        this.2.debugTo(&out);
+        out.appendStr(", ");
+        this.3.debugTo(&out);
+        out.appendStr(", ");
+        this.4.debugTo(&out);
+        out.appendStr(", ");
+        this.5.debugTo(&out);
+        out.appendStr(", ");
+        this.6.debugTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display], T6 :: [Display]> (T0, T1, T2, T3, T4, T5, T6) :: [Display] {
+    fn show(): string {
+        var out = StringBuilder.new();
+        this.showTo(&out);
+        return out.toString();
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.showTo(&out);
+        out.appendStr(", ");
+        this.1.showTo(&out);
+        out.appendStr(", ");
+        this.2.showTo(&out);
+        out.appendStr(", ");
+        this.3.showTo(&out);
+        out.appendStr(", ");
+        this.4.showTo(&out);
+        out.appendStr(", ");
+        this.5.showTo(&out);
+        out.appendStr(", ");
+        this.6.showTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable], T6 :: [Equatable], T7 :: [Equatable]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Equatable] {
+    fn equals(o: (T0, T1, T2, T3, T4, T5, T6, T7)): bool {
+        return this.0 == o.0 && this.1 == o.1 && this.2 == o.2 && this.3 == o.3 && this.4 == o.4 && this.5 == o.5 && this.6 == o.6 && this.7 == o.7;
+    }
+}
+
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable], T6 :: [Hashable], T7 :: [Hashable]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Hashable] {
+    fn hash<H :: [Hasher]>(&h: H): void {
+        this.0.hash(&h);
+        this.1.hash(&h);
+        this.2.hash(&h);
+        this.3.hash(&h);
+        this.4.hash(&h);
+        this.5.hash(&h);
+        this.6.hash(&h);
+        this.7.hash(&h);
+    }
+}
+
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug], T6 :: [Debug], T7 :: [Debug]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Debug] {
+    fn debug(): string {
+        var out = StringBuilder.new();
+        this.debugTo(&out);
+        return out.toString();
+    }
+
+    fn debugTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.debugTo(&out);
+        out.appendStr(", ");
+        this.1.debugTo(&out);
+        out.appendStr(", ");
+        this.2.debugTo(&out);
+        out.appendStr(", ");
+        this.3.debugTo(&out);
+        out.appendStr(", ");
+        this.4.debugTo(&out);
+        out.appendStr(", ");
+        this.5.debugTo(&out);
+        out.appendStr(", ");
+        this.6.debugTo(&out);
+        out.appendStr(", ");
+        this.7.debugTo(&out);
+        out.appendChar(')');
+    }
+}
+
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display], T6 :: [Display], T7 :: [Display]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Display] {
+    fn show(): string {
+        var out = StringBuilder.new();
+        this.showTo(&out);
+        return out.toString();
+    }
+
+    fn showTo(&out: StringBuilder): void {
+        out.appendChar('(');
+        this.0.showTo(&out);
+        out.appendStr(", ");
+        this.1.showTo(&out);
+        out.appendStr(", ");
+        this.2.showTo(&out);
+        out.appendStr(", ");
+        this.3.showTo(&out);
+        out.appendStr(", ");
+        this.4.showTo(&out);
+        out.appendStr(", ");
+        this.5.showTo(&out);
+        out.appendStr(", ");
+        this.6.showTo(&out);
+        out.appendStr(", ");
+        this.7.showTo(&out);
+        out.appendChar(')');
+    }
+}

@@ -1310,7 +1310,8 @@ public sealed class TypeChecker
             foreach (var node in block.Decl.Interfaces)
             {
                 if (Conformance.InterfaceOf(node, _binding) is not { } iface) continue;
-                var reached = Conformance.WithParents(iface, _binding).ToList();
+                var beside = ParentsGivenBeside(block);
+                var reached = Conformance.WithParents(iface, _binding).Where(r => !beside.Contains(r)).ToList();
                 TypeSymbol? SharedWith(IEnumerable<TypeSymbol> other) =>
                     other.FirstOrDefault(p => reached.Any(r => ReferenceEquals(r, p)));
                 string? clash = null;
@@ -1380,6 +1381,8 @@ public sealed class TypeChecker
                 if (seen.Any(t => LyrType.Equal(t, instance))) continue;
                 seen.Add(instance);
                 if (iface.Declaration is not InterfaceDecl idecl) continue;
+                // a parent another block on the shape gives is that block's to answer (N2a)
+                if (ParentsGivenBeside(block).Contains(iface)) continue;
                 var subst = instance is GenericInstance gi ? SubstMap(gi) : EmptySubst;
                 var implied = ReferenceEquals(iface, direct) ? "" : $" (implied by '{direct.Name}')";
                 foreach (var im in idecl.Members)
@@ -1858,6 +1861,10 @@ public sealed class TypeChecker
         // One instance list across the walk: a parent written out beside its child is checked
         // once, while two instances of one interface are still two conformances to check.
         var seen = new List<LyrType>();
+        // A parent another block on the same shape gives, under constraints this block entails, is
+        // that block's to answer, not this one's (N2a; ParentsGivenBeside).
+        if (from is not null)
+            foreach (var parent in ParentsGivenBeside(from)) seen.Add(WithoutFixations(new NamedRef(parent)));
 
         // A GENERIC member of an interface may not be overridden (2.17). It has no slot, so a call
         // picks its target by the receiver's STATIC type: through the interface it would find the
@@ -5161,9 +5168,9 @@ public sealed class TypeChecker
             // shared: the array is built by std.core's 'repeatArray' under 'T :: [Clone]'. A
             // value element copies natively.
             if (!HoldsReference(la.Element)) return new ArrayOf(la.Element); // [0] * 5
-            // A shape — 'int[]', '?C', a tuple, a function — has no conformance of its own yet
-            // (05 §13.6), and 'Satisfies' passes it through opaquely; asked here, not there.
-            var cloneable = la.Element is NamedRef or GenericInstance or TypeParamType
+            // A shape — 'int[]', '?C', a tuple — conforms through its block (05 §13.6): 'int[]' is
+            // Clone since N2a, so '[[1, 2]] * 3' clones each row. A function value conforms to nothing.
+            var cloneable = (la.Element is NamedRef or GenericInstance or TypeParamType || IsShape(la.Element) && la.Element is not FnType)
                 && _clone is not null && Satisfies(la.Element, _clone, SelfInstance(_clone, la.Element));
             if (!cloneable)
                 return Report(b.Span, "LYR-SEM0136",
@@ -8282,6 +8289,86 @@ public sealed class TypeChecker
     private bool IsShapeBlock(ExtensionBlock block) =>
         block.IsConstructorTarget || (block.Target is { } t && ReferenceEquals(t, _slice));
 
+    private readonly Dictionary<ExtensionBlock, HashSet<TypeSymbol>> _givenBeside = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// The parents a shape's block leaves to another block on the same shape (N2a): a block giving
+    /// <c>Hashable</c> to a tuple, whose parent <c>Equatable</c> another block gives the tuple under
+    /// constraints this block's entail — 04 D7 synthesizes each interface under its own condition,
+    /// so a tuple of floats compares and a tuple of strings hashes as well. Such a parent is no part
+    /// of this block's chain: its members are not asked of it, coherence does not count it twice,
+    /// and a call through it is answered by the other block. A non-generic parent only.
+    /// </summary>
+    private HashSet<TypeSymbol> ParentsGivenBeside(ExtensionBlock block)
+    {
+        if (_givenBeside.TryGetValue(block, out var known)) return known;
+        var given = new HashSet<TypeSymbol>(ReferenceEqualityComparer.Instance);
+        _givenBeside[block] = given;
+        if (!IsShapeBlock(block) || block.Decl.Interfaces.Length == 0) return given;
+        var own = block.Decl.Interfaces.Select(n => Conformance.InterfaceOf(n, _binding)).OfType<TypeSymbol>().ToList();
+        var parents = own.SelectMany(i => Conformance.WithParents(i, _binding))
+            .Where(p => !own.Any(o => ReferenceEquals(o, p))).ToList();
+        if (parents.Count == 0) return given;
+        var target = BlockTargetType(block);
+        foreach (var other in _comp.Extensions.Blocks)
+        {
+            if (ReferenceEquals(other, block) || !IsShapeBlock(other) || other.Decl.Interfaces.Length == 0) continue;
+            if (ParameterMap(BlockTargetType(other), target) is not { } map || !Entailed(map)) continue;
+            foreach (var node in other.Decl.Interfaces)
+                if (Conformance.InterfaceOf(node, _binding) is { Generics.Length: 0 } parent
+                    && parents.Any(p => ReferenceEquals(p, parent)))
+                    given.Add(parent);
+        }
+        return given;
+    }
+
+    /// <summary>How another block's target lies on this one's: each of its type parameters to the
+    /// type at the same place; <c>null</c> where the two differ anywhere else.</summary>
+    private static Dictionary<GenericParamSymbol, LyrType>? ParameterMap(LyrType from, LyrType to)
+    {
+        var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        bool Walk(LyrType a, LyrType b)
+        {
+            switch (a, b)
+            {
+                case (TypeParamType p, _):
+                    if (map.TryGetValue(p.Param, out var bound)) return LyrType.Equal(bound, b);
+                    map[p.Param] = b;
+                    return true;
+                case (TupleOf x, TupleOf y):
+                    return x.Elements.Length == y.Elements.Length
+                        && x.Elements.Zip(y.Elements).All(e => Walk(e.First, e.Second));
+                case (Optional x, Optional y):
+                    return Walk(x.Inner, y.Inner);
+                case (ArrayOf x, ArrayOf y):
+                    return Walk(x.Element, y.Element);
+                case (SliceOf x, SliceOf y):
+                    return Walk(x.Element, y.Element);
+                default:
+                    return LyrType.Equal(a, b);
+            }
+        }
+        return Walk(from, to) ? map : null;
+    }
+
+    /// <summary>Whether the other block's constraints hold wherever this one's do: each of its type
+    /// parameters, at the type this block has there, meets each of its constraints — a type
+    /// parameter of this block through its own constraints and their parents.</summary>
+    private bool Entailed(Dictionary<GenericParamSymbol, LyrType> map)
+    {
+        foreach (var (param, type) in map)
+            foreach (var constraint in param.Constraints)
+            {
+                if (Conformance.InterfaceOf(constraint, _binding) is not { Generics.Length: 0 } wanted) return false;
+                var holds = type is TypeParamType here
+                    ? here.Param.Constraints.Any(c => Conformance.InterfaceOf(c, _binding) is { } has
+                        && Conformance.WithParents(has, _binding).Any(x => ReferenceEquals(x, wanted)))
+                    : SatisfiesAt(type, wanted);
+                if (!holds) return false;
+            }
+        return true;
+    }
+
     /// <summary>
     /// For the lowering: the block a call through a constraint reaches on a concrete type where
     /// no symbol of the type holds the conformance (05 §13 rules 6, 8) — a shape's block or a
@@ -8319,6 +8406,7 @@ public sealed class TypeChecker
                     foreach (var (iface, instance) in InterfaceClosure(direct, ResolveType(node, block.MethodScope)))
                     {
                         if (!ReferenceEquals(iface.Members.LookupLocal(promised.Name), promised)) continue;
+                        if (ParentsGivenBeside(block).Contains(iface)) continue;
                         var given = Substitute(Substitute(instance, SelfMap(iface, concrete)), map);
                         bool own;
                         _withoutBlocks = true;
