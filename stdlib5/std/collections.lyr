@@ -1205,3 +1205,51 @@ extend<K :: [Hashable], V, H :: [Hasher]> Map<K, V, H> :: [Contains<K>] {
         return this.containsKey(k);
     }
 }
+
+// --- Clone (10 K5; N2a) ------------------------------------------------------------------------
+//
+// A container is Clone where its elements are: a new container of their clones, as deep as the
+// element type owns (K5) — a map keeps its hasher, a heap its order, a deque its order from the
+// front.
+
+extend<T :: [Clone]> List<T> :: [Clone] {
+    fn clone(): List<T> {
+        let out = List<T>.withCapacity(this.length());
+        for (x in this) {
+            out.push(x.clone());
+        }
+        return out;
+    }
+}
+
+extend<K :: [Hashable, Clone], V :: [Clone], H :: [Hasher]> Map<K, V, H> :: [Clone] {
+    fn clone(): Map<K, V, H> {
+        let out = Map<K, V, H>.withHasher(this.seed);
+        for (entry in this) {
+            out.insert(entry.0.clone(), entry.1.clone());
+        }
+        return out;
+    }
+}
+
+extend<T :: [Hashable, Clone], H :: [Hasher]> Set<T, H> :: [Clone] {
+    fn clone(): Set<T, H> {
+        return Set<T, H> { table = this.table.clone() };
+    }
+}
+
+extend<T :: [Clone]> Deque<T> :: [Clone] {
+    fn clone(): Deque<T> {
+        let out = Deque<T>.withCapacity(this.length());
+        for (x in this) {
+            out.pushBack(x.clone());
+        }
+        return out;
+    }
+}
+
+extend<T :: [TotalOrder, Clone]> Heap<T> :: [Clone] {
+    fn clone(): Heap<T> {
+        return Heap<T> { items = this.items.clone() };
+    }
+}

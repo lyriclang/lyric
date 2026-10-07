@@ -529,6 +529,9 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   bound in the body's block. **N1b**: a module binding nothing reads goes when its initializer
   only gives its value (01 B13 — hello has no global any more); a panic's trace starts at the
   program's text, whatever its package is called; no message names a finished milestone.
+  **N2a**: tuples of two to eight elements compare, hash and print where their elements do;
+  optionals are Equatable and Hashable; arrays and the containers are Clone — a shape's block
+  may now leave a parent interface to another block on the same shape (05 §13 rule 6).
 
 ### M8a — done (2026-10-07)
 

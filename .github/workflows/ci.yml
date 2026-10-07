@@ -91,7 +91,8 @@ jobs:
     # planted faults. The zig version is pinned in one file.
     name: C toolchain (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # macOS takes about 17 minutes of this, its runtime tests the most: the cap is for a hang
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
