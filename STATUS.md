@@ -539,6 +539,8 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   **N2c**: a name alone is its field, `Point { x, y }` (02 I3) — after a type one name alone
   too, where the parser reads a trailing block and the checker decides; a pattern takes a type
   set, `s in [Circle, Rect] =>` (08 Y6), whose binding carries the set as a catch binding's does.
+  **N2d**: a coroutine is `Identity` (06 A7) — `==` is `same`, a set of coroutines finds one twice,
+  whatever its pulls throw; a block on `Coroutine<Y, R>` is a shape's block, as one on `Slice<T>`.
 
 ### M8a — done (2026-10-07)
 

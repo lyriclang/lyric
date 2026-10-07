@@ -171,6 +171,12 @@ public static class TypeFacts
                 for (var i = 0; i < pt.Elements.Length; i++)
                     if (!Match(pt.Elements[i], at.Elements[i], map)) return false;
                 return true;
+            // A coroutine (06 A7, N2d): what it yields and returns. What a pull throws binds only
+            // where the pattern names it — a block on 'Coroutine<Y, R>' reaches every coroutine of
+            // those, as identity asks nothing of the pulls.
+            case CoroutineOf pc when actual is CoroutineOf ac:
+                return Match(pc.Yield, ac.Yield, map) && Match(pc.Result, ac.Result, map)
+                    && (pc.Throws is null || ac.Throws is { } thrown && Match(pc.Throws, thrown, map));
             // A function type (05 §13 rule 6): its parameters, its places, its return and its set.
             case FnType pf when actual is FnType af && pf.Parameters.Length == af.Parameters.Length
                                 && pf.Throws.Length == af.Throws.Length && FnType.SamePlaces(pf, af):
@@ -201,6 +207,8 @@ public static class TypeFacts
         if (a is FnType fa && b is FnType fb)
             return fa.Parameters.Length == fb.Parameters.Length && fa.Throws.Length == fb.Throws.Length
                 && fa.Parameters.Zip(fb.Parameters).All(p => Overlaps(p.First, p.Second)) && Overlaps(fa.Return, fb.Return);
+        if (a is CoroutineOf ca && b is CoroutineOf cb)
+            return Overlaps(ca.Yield, cb.Yield) && Overlaps(ca.Result, cb.Result);
         return LyrType.Equal(a, b);
     }
 

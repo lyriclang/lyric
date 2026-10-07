@@ -4754,3 +4754,16 @@ extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 ::
         out.appendChar(')');
     }
 }
+
+/// A coroutine is an object, compared by itself and hashed by its address (06 A7): the same
+/// coroutine met twice is found — in a set of those running, at a second `spawn`. What a pull
+/// throws asks nothing of it, so the block reaches every coroutine of a yield and a result type.
+extend<Y, R> Coroutine<Y, R> :: [Identity] {
+    fn equals(o: Coroutine<Y, R>): bool {
+        return same(this, o);
+    }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        hashIdentityInto(this, &h);
+    }
+}

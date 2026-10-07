@@ -31,12 +31,14 @@ public class PhaseTimingTests
         return error.ToString();
     }
 
-    private static double MillisecondsIn(string row)
+    // Decimal, so a sum of rows is the sum of what they print: as doubles, two rows summed to
+    // 41.900000000000006 and stood over the total of 41.9 they make (N2c's CI run).
+    private static decimal MillisecondsIn(string row)
     {
         // "  parse    test.lyr        30.2 ms"
         var text = row.Trim();
         var ms = text[..text.LastIndexOf(" ms", StringComparison.Ordinal)];
-        return double.Parse(ms[(ms.LastIndexOf(' ') + 1)..], System.Globalization.CultureInfo.InvariantCulture);
+        return decimal.Parse(ms[(ms.LastIndexOf(' ') + 1)..], System.Globalization.CultureInfo.InvariantCulture);
     }
 
     /// <summary>
@@ -61,7 +63,7 @@ public class PhaseTimingTests
             l => l.Contains("parse", StringComparison.Ordinal));
 
         var reported = MillisecondsIn(row);
-        Assert.InRange(reported, 5.0, 5_000.0);
+        Assert.InRange(reported, 5.0m, 5_000.0m);
     }
 
     /// <summary>
@@ -88,9 +90,14 @@ public class PhaseTimingTests
             .Where(l => l.Contains(" ms", StringComparison.Ordinal)).ToArray();
 
         var total = MillisecondsIn(lines[^1]);
-        var phases = lines[..^1].Sum(MillisecondsIn);
+        var rows = lines[..^1];
+        var phases = rows.Sum(MillisecondsIn);
 
-        Assert.True(phases <= total,
+        // Each number is rounded to a tenth on its own, so the printed rows may pass the printed
+        // total by half a tenth each, and the total fall short by half a tenth; a phase measured
+        // on another clock or in another unit passes it by far more.
+        var rounding = 0.05m * (rows.Length + 1);
+        Assert.True(phases <= total + rounding,
             $"the phase rows sum to {phases} ms under a total of {total} ms");
     }
 }
