@@ -549,6 +549,9 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   **N2e**: the literals 08 Y7 decided — raw strings `r"…"`/`r#"…"#`, multi-line `"""…"""` without
   the closing line's indentation, byte strings `b"…"` (a `uint8[]`), `fr"…"`/`f"""…"""`; `\x` is a
   byte string's alone; `module` and `params` are names; spec chapter 01 written (15 cases).
+  **N3b**: the spec's core rules — 08 precedence (a comparison and an equality do not chain, now
+  a parse error), evaluation order, `++`/`--`; 07 `if`/`while`/`do` (a body without braces said
+  once); 04 the order across modules; the chapter heads.
 
 ### M8a — done (2026-10-07)
 

@@ -646,6 +646,40 @@ public class ParserTests
         Assert.Equal(new byte[] { 0x41, 0x00, 0xFF, 0x0A }, Assert.IsType<ByteStringExpr>(expr).Bytes);
     }
 
+    [Theory]
+    [InlineData("a < b < c")]
+    [InlineData("a <= b > c")]
+    [InlineData("x in xs in ys")]
+    [InlineData("a == b == c")]
+    [InlineData("a != b == c")]
+    public void A_comparison_or_an_equality_does_not_chain(string source)
+    {
+        // 08 Y4 (N3b): no associativity on these levels — one error, the chain set aside.
+        var (expr, de) = Parse(source);
+        Assert.Equal(["LYR-PAR0059"], de.Diagnostics.Select(d => d.Code));
+        Assert.IsType<ErrorExpr>(expr);
+    }
+
+    [Theory]
+    [InlineData("(a == b) == c")]
+    [InlineData("a < b == c < d")]
+    [InlineData("a < b && b < c")]
+    public void Grouped_or_mixed_levels_chain(string source)
+    {
+        var (_, de) = Parse(source);
+        Assert.Empty(de.Diagnostics);
+    }
+
+    [Fact]
+    public void A_statements_body_without_braces_is_one_error()
+    {
+        // 08 Y5 S1 (N3b): refused once, and read as the block it belongs in.
+        var (stmt, de) = ParseStatement("if (c) f(); else g();");
+        Assert.Equal(["LYR-PAR0017", "LYR-PAR0017"], de.Diagnostics.Select(d => d.Code));
+        var branch = Assert.IsType<IfStmt>(stmt);
+        Assert.Single(branch.Then.Statements);
+    }
+
     [Fact]
     public void Type_alias_parses()
     {
