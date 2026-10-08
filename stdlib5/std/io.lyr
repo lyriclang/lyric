@@ -1,7 +1,7 @@
 /// Input and output (design/v5/spec/10 O1–O4, U5, O9): `import std.io { println }`. The console's
 /// two functions take one string; the `Display`-generic form comes with M8b S8. M8b S2: the core —
-/// one error type, the three interfaces and their defaults, `copy`, and two streams over memory. The
-/// buffers and the text come with S3, the files with S6, the console's streams with S8.
+/// one error type, the three interfaces and their defaults, `copy`, and two streams over memory. S3:
+/// the buffers and the text. The files come with S6, the console's streams with S8.
 import std.core { Utf8Error, viewBytes };
 
 pub fn print(text: string): void;
@@ -93,9 +93,13 @@ pub interface Reader {
 }
 
 /// A sink of bytes (10 O1). `write` takes from the front of the slice and answers how many bytes
-/// it took — **maybe fewer** than it was handed; `writeAll` takes the rest.
+/// it took — **maybe fewer** than it was handed; `writeAll` takes the rest. `flush` hands on what a
+/// writer holds back; one that holds nothing back keeps the default, which does nothing.
 pub interface Writer {
     mut fn write(from: Slice<uint8>): int throws IoError;
+
+    mut fn flush(): void throws IoError {
+    }
 }
 
 /// Where a position moves to (10 O1): from the start, from the end, from where it stands.
@@ -286,5 +290,294 @@ pub class ByteBuffer :: [Reader, Writer] {
         }
         from.copyInto(this.data[this.end..]);
         this.end = this.end + from.length();
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The buffers and the text (10 O2). The decision has the buffers as structs with the bytes inline;
+// a frame's inline array has no view (03 §5.3), and every read hands the inner reader a view of
+// the buffer, so they are classes over 8 KiB on the heap — a struct over the same array would
+// share it between copies, each with a position of its own.
+// ---------------------------------------------------------------------------------------------
+
+/// The size of a buffer's own buffer (10 O2).
+let bufferSize = 8192;
+
+/// A `Reader` with a buffer of its own (10 O2): it reads its inner reader 8 KiB at a time, so that
+/// small reads do not each reach it. A read at least as large as the buffer, while the buffer is
+/// empty, goes to the inner reader directly.
+pub class BufReader<R :: [Reader]> :: [Reader] {
+    var inner: R,
+    held: uint8[],
+    var start: int = 0,
+    var end: int = 0,
+
+    pub static fn new(inner: R): BufReader<R> {
+        return BufReader { inner = inner, held = [0u8] * bufferSize };
+    }
+
+    pub mut fn read(into: Slice<uint8>): int throws IoError {
+        if (into.isEmpty()) {
+            return 0;
+        }
+        if (this.start == this.end) {
+            if (into.length() >= this.held.length()) {
+                return try this.inner.read(into);
+            }
+            if (try this.more() == 0) {
+                return 0;
+            }
+        }
+        let held = this.end - this.start;
+        let n = if (into.length() < held) into.length() else held;
+        this.held[this.start..this.start + n].copyInto(into);
+        this.start = this.start + n;
+        return n;
+    }
+
+    /// One read of the inner reader into the room after what is held, which moves to the front
+    /// first; answers how many bytes came — 0 at the end.
+    mut fn more(): int throws IoError {
+        if (this.start > 0) {
+            this.held[this.start..this.end].copyInto(this.held[..]);
+            this.end = this.end - this.start;
+            this.start = 0;
+        }
+        let n = try this.inner.read(this.held[this.end..]);
+        this.end = this.end + n;
+        return n;
+    }
+
+    /// Whether `n` bytes are held — a few, for a codepoint or a BOM —, reading for them while the
+    /// inner reader has some.
+    mut fn hold(n: int): bool throws IoError {
+        while (this.end - this.start < n) {
+            if (try this.more() == 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+/// A `Writer` with a buffer of its own (10 O2): what it is handed waits there until 8 KiB are
+/// together, a `flush()` or a `close()`. A write at least as large as the buffer goes to the inner
+/// writer directly. It is `Closeable`, and one nothing closes is warned about (R3): its last bytes
+/// would stay in the buffer. Closing flushes and leaves the inner writer open — it is the caller's
+/// (`using let f = …; using let w = BufWriter.new(f);` closes `w` first).
+pub class BufWriter<W :: [Writer]> :: [Writer, Closeable] {
+    var inner: W,
+    held: uint8[],
+    var used: int = 0,
+    var sent: int = 0,
+
+    pub static fn new(inner: W): BufWriter<W> {
+        return BufWriter { inner = inner, held = [0u8] * bufferSize };
+    }
+
+    pub mut fn write(from: Slice<uint8>): int throws IoError {
+        if (this.used + from.length() > this.held.length()) {
+            try this.handOn();
+        }
+        if (from.length() >= this.held.length()) {
+            return try this.inner.write(from);
+        }
+        from.copyInto(this.held[this.used..]);
+        this.used = this.used + from.length();
+        return from.length();
+    }
+
+    /// Writes what is held, then flushes the inner writer.
+    pub mut fn flush(): void throws IoError {
+        try this.handOn();
+        try this.inner.flush();
+    }
+
+    /// `flush()`.
+    pub fn close(): void throws IoError {
+        // through the reference: 'Closeable.close' is no 'mut fn' (as Pool's close)
+        let me = this;
+        try me.flush();
+    }
+
+    /// Writes what is held. A write that throws leaves what it did not take held, for the next.
+    mut fn handOn(): void throws IoError {
+        while (this.sent < this.used) {
+            let n = try this.inner.write(this.held[this.sent..this.used]);
+            if (n == 0) {
+                throw IoError { kind = .Other { code = 0 }, detail = f"the writer took none of {this.used - this.sent} bytes" };
+            }
+            this.sent = this.sent + n;
+        }
+        this.sent = 0;
+        this.used = 0;
+    }
+}
+
+/// A reader of UTF-8 text (10 O2): a `BufReader` and a decoder. A codepoint split between two reads
+/// of the inner reader waits in the buffer for its rest; bytes that are no UTF-8 throw
+/// `InvalidData`, a `Utf8Error` as the cause with the offset counted from the reader's start. A
+/// byte order mark is text like any other, unless `skipBom` drops it from the front.
+pub class TextReader<R :: [Reader]> {
+    source: BufReader<R>,
+    var bom: bool,
+    var taken: int = 0,
+
+    pub static fn new(inner: R, skipBom: bool = false): TextReader<R> {
+        return TextReader { source = BufReader.new(inner), bom = skipBom };
+    }
+
+    /// The next line without its end — a `\n` or a `\r\n` —, or `null` at the end. A last line
+    /// without an end is a line; the end of the last one starts none.
+    pub mut fn readLine(): ?string throws IoError {
+        try this.dropBom();
+        let s = this.source;
+        var line: ?ByteBuffer = null;
+        loop {
+            if (s.start == s.end && try s.more() == 0) {
+                if (let l = line) {
+                    return try this.text(l.toArray()[..], 0);
+                }
+                return null;
+            }
+            let held = s.held[s.start..s.end];
+            if (let i = held.indexOf(10u8)) {
+                s.start = s.start + i + 1;
+                if (let l = line) {
+                    l.append(held[..i]);
+                    return try this.text(l.toArray()[..], 1);
+                }
+                return try this.text(held[..i], 1);
+            }
+            let l = line ?? ByteBuffer.new();
+            l.append(held);
+            line = l;
+            s.start = s.end;
+        }
+    }
+
+    /// The lines to the end, as `readLine` gives them.
+    pub fn lines(): TextLinesIter<R> {
+        return TextLinesIter { reader = this };
+    }
+
+    /// The characters to the end, one codepoint at a time.
+    pub fn chars(): TextCharsIter<R> {
+        return TextCharsIter { reader = this };
+    }
+
+    /// Everything to the end, as text.
+    pub mut fn readToEnd(): string throws IoError {
+        try this.dropBom();
+        let bytes = try this.source.readToEnd();
+        return try this.text(bytes[..], 0);
+    }
+
+    /// The next codepoint, or `null` at the end.
+    mut fn readChar(): ?char throws IoError {
+        try this.dropBom();
+        let s = this.source;
+        if (!(try s.hold(1))) {
+            return null;
+        }
+        let lead = s.held[s.start] as int;
+        let size = if (lead < 0x80) 1 else if (lead < 0xC0) 0 else if (lead < 0xE0) 2 else if (lead < 0xF0) 3 else if (lead < 0xF8) 4 else 0;
+        if (size == 0 || !(try s.hold(size))) {
+            throw invalidAt(this.taken);
+        }
+        var code = if (size == 1) lead else lead & (0x7F >> size);
+        var k = 1;
+        while (k < size) {
+            let b = s.held[s.start + k] as int;
+            if ((b & 0xC0) != 0x80) {
+                throw invalidAt(this.taken);
+            }
+            code = (code << 6) | (b & 0x3F);
+            k = k + 1;
+        }
+        // the shortest form only: two bytes from 0x80, three from 0x800, four from 0x10000
+        let least = if (size == 2) 0x80 else if (size == 3) 0x800 else if (size == 4) 0x10000 else 0;
+        let c = if (code < least) null else char.fromUint32(code as uint32);
+        if (c == null) {
+            throw invalidAt(this.taken);
+        }
+        s.start = s.start + size;
+        this.taken = this.taken + size;
+        return c;
+    }
+
+    /// The bytes of a line as text, a `\r` before its end dropped; `ends` bytes of the end follow
+    /// them in the stream.
+    mut fn text(bytes: Slice<uint8>, ends: int): string throws IoError {
+        let at = this.taken;
+        this.taken = at + bytes.length() + ends;
+        var n = bytes.length();
+        if (ends > 0 && n > 0 && bytes[n - 1] == 13u8) {
+            n = n - 1;
+        }
+        return try string.fromUtf8(bytes[..n]) catch (e: Utf8Error) throw invalidAt(at + e.offset);
+    }
+
+    /// Drops a byte order mark from the front, once, where `skipBom` asked for it.
+    mut fn dropBom(): void throws IoError {
+        if (!this.bom) {
+            return;
+        }
+        this.bom = false;
+        let s = this.source;
+        if (try s.hold(3)) {
+            if (s.held[s.start] == 0xEFu8 && s.held[s.start + 1] == 0xBBu8 && s.held[s.start + 2] == 0xBFu8) {
+                s.start = s.start + 3;
+                this.taken = 3;
+            }
+        }
+    }
+}
+
+/// `InvalidData` for bytes that are no UTF-8 from `offset` on.
+fn invalidAt(offset: int): IoError {
+    return IoError { kind = .InvalidData, detail = "the bytes are no UTF-8", inner = Utf8Error { offset = offset } };
+}
+
+/// A `TextReader`'s lines (10 O2).
+pub struct TextLinesIter<R :: [Reader]> :: [Iterator] {
+    type Item = string;
+    type Error = IoError;
+    reader: TextReader<R>,
+
+    pub mut fn next(): ?string throws IoError {
+        return try this.reader.readLine();
+    }
+}
+
+/// A `TextReader`'s characters (10 O2).
+pub struct TextCharsIter<R :: [Reader]> :: [Iterator] {
+    type Item = char;
+    type Error = IoError;
+    reader: TextReader<R>,
+
+    pub mut fn next(): ?char throws IoError {
+        return try this.reader.readChar();
+    }
+}
+
+/// A writer of text (10 O2): its UTF-8, to the inner writer as it comes. It holds nothing back; a
+/// `BufWriter` beneath it does, and is closed by its own name: `using let b = BufWriter.new(f);
+/// let t = TextWriter.new(b);`.
+pub class TextWriter<W :: [Writer]> {
+    var inner: W,
+
+    pub static fn new(inner: W): TextWriter<W> {
+        return TextWriter { inner = inner };
+    }
+
+    pub mut fn write(s: StringView): void throws IoError {
+        try this.inner.writeString(s);
+    }
+
+    /// `s`, then a `\n` — on every system.
+    pub mut fn writeLine(s: StringView): void throws IoError {
+        try this.inner.writeString(s);
+        try this.inner.writeString("\n");
     }
 }

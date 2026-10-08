@@ -1,0 +1,235 @@
+// std.io's buffers and text (design/v5/spec/10 O2; M8b S3): a codepoint split between reads, the
+// line ends, a BOM only when asked, invalid UTF-8 as InvalidData, a BufWriter holding back until a
+// flush or its close, a BufReader reading its inner reader in blocks.
+import std.io { BufReader, BufWriter, ByteBuffer, ByteReader, IoError, Reader, TextReader, TextWriter, Writer };
+import std.test { assertEq, assertNull, assertTrue, fail };
+
+/// Hands out at most one byte a read, and counts the reads.
+class Drip :: [Reader] {
+    bytes: uint8[],
+    var at: int = 0,
+    var reads: int = 0,
+
+    mut fn read(into: Slice<uint8>): int throws IoError {
+        this.reads = this.reads + 1;
+        if (this.at >= this.bytes.length() || into.isEmpty()) {
+            return 0;
+        }
+        into[0] = this.bytes[this.at];
+        this.at = this.at + 1;
+        return 1;
+    }
+}
+
+/// Takes at most `most` bytes a write and keeps them; throws once, on the write numbered `failAt`;
+/// counts the writes and the flushes.
+class Sink :: [Writer] {
+    most: int = 1 << 30,
+    failAt: int = -1,
+    var writes: int = 0,
+    var flushes: int = 0,
+    var taken: ByteBuffer = ByteBuffer.new(),
+
+    mut fn write(from: Slice<uint8>): int throws IoError {
+        this.writes = this.writes + 1;
+        if (this.writes == this.failAt) {
+            throw IoError { kind = .BrokenPipe };
+        }
+        let n = if (from.length() < this.most) from.length() else this.most;
+        try this.taken.write(from[..n]);
+        return n;
+    }
+
+    mut fn flush(): void throws IoError {
+        this.flushes = this.flushes + 1;
+    }
+}
+
+fn utf8(s: string): uint8[] {
+    let b = ByteBuffer.new();
+    try! b.writeString(s);
+    return b.toArray();
+}
+
+fn textOf(s: string): TextReader<ByteReader> {
+    return TextReader.new(ByteReader.new(utf8(s)[..]));
+}
+
+@Test
+fn aCodepointSplitBetweenReadsWaitsForItsRest(): void throws IoError {
+    let t = TextReader.new(Drip { bytes = utf8("é€😀\nzwei") });
+    var codes: int[] = [];
+    for (c in try t.chars()) {
+        if (c == '\n') {
+            break;
+        }
+        codes = codes + [(c as uint32) as int];
+    }
+    assertEq(codes, [233, 8364, 128512]);
+    assertEq(try t.readLine() ?? "<end>", "zwei");
+    assertNull(try t.readLine());
+}
+
+@Test
+fn aLineOverTheBufferIsOneLine(): void throws IoError {
+    let t = textOf("a" * 8191 + "é\nx");
+    let first = try t.readLine() ?? "";
+    assertEq(first.length(), 8193);
+    assertTrue(first.endsWith("é"));
+    assertEq(try t.readLine() ?? "<end>", "x");
+}
+
+@Test
+fn linesEndInLfOrCrLfAndTheLastNeedsNoEnd(): void throws IoError {
+    var seen: string[] = [];
+    for (line in try textOf("a\nb\r\n\nc\r").lines()) {
+        seen = seen + [line];
+    }
+    assertEq(seen, ["a", "b", "", "c\r"]);
+    assertEq(try textOf("a\n").readLine() ?? "<end>", "a");
+    let one = textOf("a\n");
+    try one.readLine();
+    assertNull(try one.readLine());
+    assertNull(try textOf("").readLine());
+}
+
+@Test
+fn aBomIsTextUnlessSkipped(): void throws IoError {
+    let withBom: uint8[] = [0xEFu8, 0xBBu8, 0xBFu8, 0x68u8, 0x69u8];
+    let kept = try TextReader.new(ByteReader.new(withBom[..])).readToEnd();
+    assertEq(kept.length(), 5);
+    assertTrue(kept.startsWith("\u{FEFF}"));
+    assertEq(try TextReader.new(ByteReader.new(withBom[..]), skipBom: true).readToEnd(), "hi");
+    let none: uint8[] = [0x68u8, 0x69u8];
+    assertEq(try TextReader.new(ByteReader.new(none[..]), skipBom: true).readLine() ?? "<end>", "hi");
+}
+
+@Test
+fn invalidUtf8IsInvalidDataAtItsOffset(): void throws IoError {
+    let bad: uint8[] = [0x61u8, 0x0Au8, 0x62u8, 0xFFu8, 0x0Au8, 0x63u8];
+    let t = TextReader.new(ByteReader.new(bad[..]));
+    assertEq(try t.readLine() ?? "<end>", "a");
+    try {
+        t.readLine();
+        fail("a line with 0xFF decoded");
+    } catch (e: IoError) {
+        assertTrue(e.kind == .InvalidData);
+        assertEq(e.cause()?.message() ?? "", "the bytes are no UTF-8 from byte 3 on");
+    }
+    assertEq(try t.readLine() ?? "<end>", "c");
+}
+
+@Test
+fn charsRefuseWhatFromUtf8Refuses(): void {
+    let cases: uint8[][] = [
+        [0xC0u8, 0x80u8],
+        [0xEDu8, 0xA0u8, 0x80u8],
+        [0xF4u8, 0x90u8, 0x80u8, 0x80u8],
+        [0xE0u8, 0x9Fu8, 0xBFu8],
+        [0xE2u8, 0x82u8, 0x41u8],
+        [0xF8u8],
+        [0x80u8],
+        [0xE2u8, 0x82u8],
+    ];
+    for (bytes in cases) {
+        try {
+            for (c in TextReader.new(ByteReader.new(bytes[..])).chars()) {
+                fail(f"{c as uint32} decoded from bytes that are no UTF-8");
+            }
+            fail("bytes that are no UTF-8 ended without an error");
+        } catch (e: IoError) {
+            assertTrue(e.kind == .InvalidData);
+        }
+    }
+}
+
+@Test
+fn aBufWriterHoldsBackUntilItsClose(): void throws IoError {
+    let into = Sink { };
+    let w = BufWriter.new(into);
+    for (_ in 0..100) {
+        try w.writeString("xy");
+    }
+    assertEq(into.writes, 0);
+    try w.close();
+    assertEq(into.writes, 1);
+    assertEq(into.taken.length(), 200);
+    assertEq(into.flushes, 1);
+}
+
+@Test
+fn aLargeWritePassesTheBuffer(): void throws IoError {
+    let into = Sink { };
+    using let w = BufWriter.new(into);
+    try w.writeString("ab");
+    let big: uint8[] = [1u8] * 10000;
+    try w.writeAll(big[..]);
+    assertEq(into.writes, 2);
+    assertEq(into.taken.length(), 10002);
+}
+
+@Test
+fn aFlushThatThrowsLosesNothingAndRepeatsNothing(): void throws IoError {
+    let into = Sink { most = 3, failAt = 2 };
+    using let w = BufWriter.new(into);
+    try w.writeString("abcdefgh");
+    try {
+        w.flush();
+        fail("a broken pipe flushed");
+    } catch (e: IoError) {
+        assertTrue(e.kind == .BrokenPipe);
+    }
+    assertEq(into.taken.length(), 3);
+    try w.flush();
+    assertEq(try into.taken.readToString(), "abcdefgh");
+}
+
+@Test
+fn aBufReaderReadsItsInnerReaderInBlocks(): void throws IoError {
+    let data: uint8[] = [5u8] * 20000;
+    let r = BufReader.new(ByteReader.new(data[..]));
+    let into: uint8[] = [0u8] * 9000;
+    assertEq(try r.read(into[..]), 9000);
+    assertEq(try r.read(into[..1]), 1);
+    assertEq(try r.read(into[..]), 8191);
+    // twenty reads of a byte: one read of the inner reader, and the one that finds its end
+    let bytes: uint8[] = [7u8] * 20;
+    let counted = Counted { inner = ByteReader.new(bytes[..]) };
+    let small = BufReader.new(counted);
+    let one: uint8[] = [0u8];
+    var n = 0;
+    while (try small.read(one[..]) > 0) {
+        n = n + 1;
+    }
+    assertEq(n, 20);
+    assertEq(counted.reads, 2);
+}
+
+/// Passes reads on to a `ByteReader`, and counts them.
+class Counted :: [Reader] {
+    var inner: ByteReader,
+    var reads: int = 0,
+
+    mut fn read(into: Slice<uint8>): int throws IoError {
+        this.reads = this.reads + 1;
+        return try this.inner.read(into);
+    }
+}
+
+@Test
+fn aTextWriterWritesTextAndLines(): void throws IoError {
+    let into = ByteBuffer.new();
+    let t = TextWriter.new(into);
+    try t.write("a");
+    try t.writeLine("b");
+    try t.writeLine("ü");
+    assertEq(try into.readToString(), "ab\nü\n");
+}
+
+@Test
+fn aWritersFlushDoesNothingByDefault(): void throws IoError {
+    let b = ByteBuffer.new();
+    try b.writeString("x");
+    try b.flush();
+    assertEq(b.length(), 1);
+}
