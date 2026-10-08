@@ -585,6 +585,11 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   checked against Python's `datetime`; RFC 3339, read strictly, for `Instant` and `DateTime`.
   Spec 12 "Time" rules 5–8, five cases. **S5 is done**; `Zone.load`, `Zone.local` and the format
   patterns are M10's.
+- **S6a** paths (10 O6): `std.path` as Go's `path/filepath`, lexically — `join`, `normalize`,
+  `fileName`, `parent`, `extension`, `stem`, `withExtension`, `isAbsolute`, `relative`,
+  `components`, `separator` —, Windows' volumes and both separators included; checked against
+  `go run` on POSIX. The runtime says which system it was built for (`lyr_os_platform`, with a
+  runtime test). Spec 12 "Paths", four cases.
 
 ### M8a — done (2026-10-07)
 

@@ -34,6 +34,7 @@ public class RuntimeProgramTests
             data.Add("coro_storm", profile, 0, "coro storm ok\n", []);
             data.Add("random", profile, 0, "random ok\n", []);
             data.Add("clock", profile, 0, "clock ok\n", []);
+            data.Add("platform", profile, 0, "platform ok\n", []);
         }
         return data;
     }

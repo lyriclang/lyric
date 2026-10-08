@@ -16,3 +16,15 @@ int64_t lyr_os_cpu_count(void) {
 #endif
     return n > 0 ? (int64_t)n : 1;
 }
+
+int64_t lyr_os_platform(void) {
+#if defined(_WIN32)
+    return 3;
+#elif defined(__APPLE__)
+    return 2;
+#elif defined(__linux__)
+    return 1;
+#else
+    return 0;
+#endif
+}

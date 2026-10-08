@@ -1,0 +1,317 @@
+/// Paths as strings (design/v5/spec/10 O6): no `Path` type — a path is the text the system takes,
+/// and these functions take it apart and put it together, lexically, as Go's `path/filepath` does:
+/// `join`, `normalize` (Go's `Clean`), `fileName` (`Base`), `parent` (`Dir`), `extension` (`Ext`),
+/// `stem`, `withExtension`, `isAbsolute` (`IsAbs`), `relative` (`Rel`), `components`, `separator`.
+/// None of them asks the file system; `fs.absolute(p)`, which needs the working directory, does.
+///
+/// On Windows both `\` and `/` separate, a path may start with a volume — a drive, `C:`, or a UNC
+/// share, `\\server\share` — and names compare without regard to the case of ASCII letters; what
+/// these functions build, they build with `\`. Elsewhere `/` separates and names compare exactly.
+import std.core { arrayOf, viewBytes };
+
+extern "C" fn lyr_os_platform(): int;
+
+let onWindows = lyr_os_platform() == 3;
+
+/// The separator the system writes: `\` on Windows, `/` elsewhere.
+pub let separator: string = if (onWindows) "\\" else "/";
+
+/// `parts` joined by the separator, the empty ones left out, the result normalized; nothing for no
+/// part that is not empty. On Windows a drive alone, `C:`, joins without a separator — `C:a`, the
+/// directory current on that drive.
+pub fn join(parts: string...): string {
+    var joined = "";
+    var any = false;
+    for (part in parts) {
+        if (part.isEmpty()) {
+            continue;
+        }
+        if (!any) {
+            joined = part;
+        } else if (onWindows && isDriveOnly(viewBytes(joined))) {
+            joined = joined + part;
+        } else {
+            joined = joined + separator + part;
+        }
+        any = true;
+    }
+    return if (any) normalize(joined) else "";
+}
+
+/// The shortest path that names what `p` names, lexically (Go's `Clean`): separators run together,
+/// `.` elements dropped, a `..` taking the element before it away — above the root it stays there,
+/// in a relative path it is kept —, no separator at the end but the root's; `.` for nothing.
+pub fn normalize(p: StringView): string {
+    let b = viewBytes(p);
+    let vol = volumeLength(b);
+    let volume = withSeparators(b[..vol]);
+    let rest = b[vol..];
+    if (rest.isEmpty()) {
+        // a UNC share alone is a path; a drive alone, or nothing, names its current directory
+        return if (vol > 2) volume else volume + ".";
+    }
+    let rooted = isSep(rest[0]);
+    var kept: string[] = [];
+    for (e in elementsOf(rest)) {
+        if (e == "..") {
+            if (kept.length() > 0 && kept[kept.length() - 1] != "..") {
+                let n = kept.length() - 1;
+                kept = arrayOf(n, (i) => kept[i]);
+            } else if (!rooted) {
+                kept = kept + [e];
+            }
+        } else {
+            kept = kept + [e];
+        }
+    }
+    let out = volume + (if (rooted) separator else "") + kept[..].join(separator);
+    return if (out.isEmpty()) "." else out;
+}
+
+/// The last element (Go's `Base`): the separators at the end dropped first; `.` for nothing, the
+/// separator for a path of separators alone.
+pub fn fileName(p: StringView): string {
+    let b = viewBytes(p);
+    if (b.isEmpty()) {
+        return ".";
+    }
+    var end = b.length();
+    while (end > 0 && isSep(b[end - 1])) {
+        end = end - 1;
+    }
+    let start = volumeLength(b[..end]);
+    var i = end - 1;
+    while (i >= start && !isSep(b[i])) {
+        i = i - 1;
+    }
+    let name = b[(if (i >= start) i + 1 else start)..end];
+    return if (name.isEmpty()) separator else text(name);
+}
+
+/// All but the last element, normalized (Go's `Dir`): `.` where there is no directory before it,
+/// the root for an element under it.
+pub fn parent(p: StringView): string {
+    let b = viewBytes(p);
+    let vol = volumeLength(b);
+    var i = b.length() - 1;
+    while (i >= vol && !isSep(b[i])) {
+        i = i - 1;
+    }
+    let dir = normalize(text(b[vol..i + 1]));
+    if (dir == "." && vol > 2) {
+        // a UNC share and an element under it: the share
+        return withSeparators(b[..vol]);
+    }
+    return withSeparators(b[..vol]) + dir;
+}
+
+/// The last element's extension with its dot, `.txt` of `notes.txt`, or nothing (Go's `Ext`): from
+/// the last dot of the last element — of `.bashrc` that is all of it.
+pub fn extension(p: StringView): string {
+    let b = viewBytes(p);
+    var i = b.length() - 1;
+    while (i >= 0 && !isSep(b[i])) {
+        if (b[i] == 46u8) {
+            return text(b[i..]);
+        }
+        i = i - 1;
+    }
+    return "";
+}
+
+/// The last element without its extension: `notes` of `a/notes.txt`.
+pub fn stem(p: StringView): string {
+    let name = fileName(p);
+    let ext = extension(name);
+    return text(viewBytes(name)[..name.length() - ext.length()]);
+}
+
+/// `p` with its extension `ext` — with its dot, which is added where it is missing —, or with none
+/// for an empty `ext`: `withExtension("a/notes.txt", ".md")` is `a/notes.md`.
+pub fn withExtension(p: StringView, ext: StringView): string {
+    let b = viewBytes(p);
+    let old = extension(p);
+    let base = text(b[..b.length() - old.length()]);
+    let e = ext.toString();
+    if (e.isEmpty()) {
+        return base;
+    }
+    return if (e.startsWith(".")) base + e else base + "." + e;
+}
+
+/// Whether `p` names the same place from every working directory (Go's `IsAbs`): it starts with
+/// the root; on Windows with a drive and the root, or a UNC share — `\a` alone is relative there,
+/// to the current drive.
+pub fn isAbsolute(p: StringView): bool {
+    let b = viewBytes(p);
+    if (!onWindows) {
+        return !b.isEmpty() && b[0] == 47u8;
+    }
+    let vol = volumeLength(b);
+    if (vol == 0) {
+        return false;
+    }
+    if (vol > 2) {
+        return true;
+    }
+    return b.length() > vol && isSep(b[vol]);
+}
+
+/// The path that names `target` from `base`, lexically (Go's `Rel`): `relative("/a", "/a/b/c")` is
+/// `b/c`, `relative("/a", "/b")` is `../b`; `.` for the same place. `null` where there is none — one
+/// absolute and the other not, two volumes, or a base that climbs above where the target is.
+pub fn relative(base: StringView, target: StringView): ?string {
+    let bb = viewBytes(base);
+    let tb = viewBytes(target);
+    let baseVolume = withSeparators(bb[..volumeLength(bb)]);
+    let targetVolume = withSeparators(tb[..volumeLength(tb)]);
+    let b = normalize(base);
+    let t = normalize(target);
+    if (sameWord(b, t)) {
+        return ".";
+    }
+    if (!sameWord(baseVolume, targetVolume)) {
+        return null;
+    }
+    let bRest = viewBytes(b)[baseVolume.length()..];
+    let tRest = viewBytes(t)[targetVolume.length()..];
+    let bRooted = !bRest.isEmpty() && isSep(bRest[0]);
+    let tRooted = !tRest.isEmpty() && isSep(tRest[0]);
+    if (bRooted != tRooted && !(baseVolume.length() > 2)) {
+        return null;
+    }
+    let bParts = elementsOf(bRest);
+    let tParts = elementsOf(tRest);
+    var k = 0;
+    while (k < bParts.length() && k < tParts.length() && sameWord(bParts[k], tParts[k])) {
+        k = k + 1;
+    }
+    if (k < bParts.length() && bParts[k] == "..") {
+        return null;
+    }
+    var out: string[] = [];
+    var up = k;
+    while (up < bParts.length()) {
+        out = out + [".."];
+        up = up + 1;
+    }
+    out = out + arrayOf(tParts.length() - k, (i) => tParts[k + i]);
+    return if (out.isEmpty()) "." else out[..].join(separator);
+}
+
+/// The parts of `p` in order, lexically and without normalizing: the root first where there is
+/// one — `/`, on Windows the volume with it, `C:\` —, then each element, the empty ones and `.`
+/// left out, `..` kept.
+pub fn components(p: StringView): string[] {
+    let b = viewBytes(p);
+    let vol = volumeLength(b);
+    let rest = b[vol..];
+    var out: string[] = [];
+    if (!rest.isEmpty() && isSep(rest[0])) {
+        out = [withSeparators(b[..vol]) + separator];
+    } else if (vol > 0) {
+        out = [withSeparators(b[..vol])];
+    }
+    return out + elementsOf(rest);
+}
+
+// --- the pieces -------------------------------------------------------------------------------
+
+fn isSep(c: uint8): bool {
+    return c == 47u8 || (onWindows && c == 92u8);
+}
+
+/// Bytes cut between ASCII separators are UTF-8.
+fn text(b: Slice<uint8>): string {
+    return try! string.fromUtf8(b);
+}
+
+/// A volume's text with the system's separator in it — `//server/share` is `\\server\share`.
+fn withSeparators(b: Slice<uint8>): string {
+    if (!onWindows) {
+        return text(b);
+    }
+    return text(b).replace("/", "\\");
+}
+
+/// The length of the volume at the front of a path: on Windows a drive, `C:`, or a UNC share,
+/// `\\server\share`; 0 elsewhere and where there is none.
+fn volumeLength(b: Slice<uint8>): int {
+    if (!onWindows) {
+        return 0;
+    }
+    let n = b.length();
+    if (n >= 2 && b[1] == 58u8 && isLetter(b[0])) {
+        return 2;
+    }
+    if (n >= 5 && isSep(b[0]) && isSep(b[1]) && !isSep(b[2]) && b[2] != 46u8) {
+        var at = 3;
+        while (at < n && !isSep(b[at])) {
+            at = at + 1;
+        }
+        if (at < n) {
+            at = at + 1;
+            if (at < n && !isSep(b[at])) {
+                while (at < n && !isSep(b[at])) {
+                    at = at + 1;
+                }
+                return at;
+            }
+        }
+    }
+    return 0;
+}
+
+fn isDriveOnly(b: Slice<uint8>): bool {
+    return b.length() == 2 && b[1] == 58u8 && isLetter(b[0]);
+}
+
+fn isLetter(c: uint8): bool {
+    return (c >= 65u8 && c <= 90u8) || (c >= 97u8 && c <= 122u8);
+}
+
+/// The elements between separators, the empty ones and `.` left out.
+fn elementsOf(b: Slice<uint8>): string[] {
+    var out: string[] = [];
+    var at = 0;
+    while (at < b.length()) {
+        while (at < b.length() && isSep(b[at])) {
+            at = at + 1;
+        }
+        let start = at;
+        while (at < b.length() && !isSep(b[at])) {
+            at = at + 1;
+        }
+        if (at > start) {
+            let e = text(b[start..at]);
+            if (e != ".") {
+                out = out + [e];
+            }
+        }
+    }
+    return out;
+}
+
+/// Two names alike: exactly, and on Windows without regard to the case of ASCII letters.
+fn sameWord(a: string, b: string): bool {
+    if (!onWindows) {
+        return a == b;
+    }
+    let x = viewBytes(a);
+    let y = viewBytes(b);
+    if (x.length() != y.length()) {
+        return false;
+    }
+    var i = 0;
+    while (i < x.length()) {
+        if (lower(x[i]) != lower(y[i])) {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
+}
+
+fn lower(c: uint8): uint8 {
+    return if (c >= 65u8 && c <= 90u8) c + 32u8 else c;
+}
