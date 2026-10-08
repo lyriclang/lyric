@@ -603,6 +603,12 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   a loop leaves it; the decoder's `InvalidData` gets the path. The kinds a file can give, each
   checked with its path; checked on Windows for real through WSL interop. Spec 12 "Files" rules
   6–7, three cases. **S6 is done.**
+- **S7a** directories, first part (10 O5): the runtime's directory calls (`fs.c`, POSIX and
+  Windows: stat through links, mkdir, rmdir, unlink, rename, a directory's entries, realpath and
+  `GetFinalPathNameByHandleW`, the working directory); `fs.metadata` (`Metadata`), `exists`,
+  `createDir`, `remove`, `removeDir`, `rename`, `readDir` (`DirEntry`, a `Closeable`
+  `ReadDirIter`), `canonicalize`, `absolute`. Checked on Windows for real through WSL interop.
+  Spec 12 "Directories", four cases. S7b: what is put together from these.
 
 ### M8a — done (2026-10-07)
 

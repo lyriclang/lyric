@@ -24,6 +24,7 @@
 #define LYR_IO_IS_DIRECTORY 4
 #define LYR_IO_NOT_DIRECTORY 5
 #define LYR_IO_INVALID_INPUT 6
+#define LYR_IO_INVALID_DATA 7
 
 /* `path` (UTF-8, NUL-terminated; Windows takes it as UTF-16) opened as `how` says: the handle. */
 int64_t lyr_fs_open(const LyrStr *path, int64_t how);
@@ -41,8 +42,52 @@ int64_t lyr_fs_seek(int64_t file, int64_t offset, int64_t whence);
 /* The file closed: 0. */
 int64_t lyr_fs_close(int64_t file);
 
-/* A Slice<uint8> of emitted code, `lyr_slice_u8`, is a pointer and a length (CEmitter). */
+/* The directories (M8b S7a). What a path names, for lyr_fs_stat's first slot and a directory
+ * entry's kind. */
+#define LYR_FS_KIND_FILE 1
+#define LYR_FS_KIND_DIRECTORY 2
+#define LYR_FS_KIND_LINK 3
+#define LYR_FS_KIND_OTHER 4
+
+/* What `path` names, through links, into `into` (five slots): its kind (a file, a directory, 0
+ * for neither), its size in bytes, when it was last written (nanoseconds since 1970), 1 where
+ * it cannot be written, and 1 where `path` itself is a link. A link that leads nowhere is not
+ * found, as stat(2) says. 0. */
+int64_t lyr_fs_stat(const LyrStr *path, int64_t *into, int64_t n);
+
+/* A directory made, an empty one removed, a file removed, a file or directory renamed — over a
+ * file `to` names, which it replaces: 0. */
+int64_t lyr_fs_mkdir(const LyrStr *path);
+int64_t lyr_fs_rmdir(const LyrStr *path);
+int64_t lyr_fs_unlink(const LyrStr *path);
+int64_t lyr_fs_rename(const LyrStr *from, const LyrStr *to);
+
+/* A directory opened to read its entries: the handle. */
+int64_t lyr_fs_dir_open(const LyrStr *path);
+
+/* The next entry's name (UTF-8) into `into`: its length | its kind << 32, 0 at the end; `.` and
+ * `..` are not given. A name longer than `n` answers its length and kind without a byte written,
+ * and comes again at the next call. */
+int64_t lyr_fs_dir_next(int64_t dir, uint8_t *into, int64_t n);
+
+/* The directory let go: 0. */
+int64_t lyr_fs_dir_close(int64_t dir);
+
+/* `path` absolute, its links resolved (realpath; GetFinalPathNameByHandleW, without `\\?\`),
+ * into `into`: its length. A length beyond `n` says the room it needs; nothing is written then. */
+int64_t lyr_fs_canonical(const LyrStr *path, uint8_t *into, int64_t n);
+
+/* `path` absolute by the working directory and nothing else — no link resolved, nothing asked of
+ * the file system (GetFullPathNameW) —, into `into` as lyr_fs_canonical. */
+int64_t lyr_fs_absolute(const LyrStr *path, uint8_t *into, int64_t n);
+
+/* A Slice<uint8> of emitted code, `lyr_slice_u8`, is a pointer and a length (CEmitter); a
+ * Slice<int> the same. */
 #define LYR_FS_READ(file, slice) lyr_fs_read((file), (slice).ptr, (slice).len)
 #define LYR_FS_WRITE(file, slice) lyr_fs_write((file), (slice).ptr, (slice).len)
+#define LYR_FS_STAT(path, slice) lyr_fs_stat((path), (slice).ptr, (slice).len)
+#define LYR_FS_DIR_NEXT(dir, slice) lyr_fs_dir_next((dir), (slice).ptr, (slice).len)
+#define LYR_FS_CANONICAL(path, slice) lyr_fs_canonical((path), (slice).ptr, (slice).len)
+#define LYR_FS_ABSOLUTE(path, slice) lyr_fs_absolute((path), (slice).ptr, (slice).len)
 
 #endif

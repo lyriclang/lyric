@@ -262,6 +262,12 @@ pub struct Instant :: [Equatable, Ordered, TotalOrder, Hashable, Add<Duration>, 
 
 let nanosPerDay = 86400000000000;
 
+/// The moment `ns` nanoseconds after 1970 — for the library's own, as std.fs's file times; Q1
+/// gives `Instant` no public constructor from a count.
+fn instantOfEpochNanos(ns: int): Instant {
+    return Instant { ns = ns };
+}
+
 fn floorDiv(a: int, b: int): int {
     let q = a / b;
     return if (a % b < 0) q - 1 else q;
