@@ -9,9 +9,12 @@
 /// goes on with the other tasks. A call on a regular file ends in a bounded time and is no wait in
 /// the sense of 10 §1 rule 7: a cancellation is seen at the task's next wait. Reads and writes go
 /// through the caller's slice, never a copy (P4).
+import std.collections { List };
 import std.core { Utf8Error };
+import std.crypto { randomUint64 };
+import std.io;
 import std.io { IoError, IoErrorKind, Reader, Seek, SeekFrom, TextReader, Writer };
-import std.path { join, normalize };
+import std.path { join, normalize, parent };
 import std.task { SpinLock, schedulerRuns };
 import std.thread { Pool };
 import std.time { Instant, instantOfEpochNanos };
@@ -21,7 +24,7 @@ fn fsRead(file: int, into: Slice<uint8>): int;
 fn fsWrite(file: int, from: Slice<uint8>): int;
 fn fsSeek(file: int, offset: int, whence: int): int;
 fn fsClose(file: int): int;
-fn fsStat(path: string, into: Slice<int>): int;
+fn fsStat(path: string, follow: int, into: Slice<int>): int;
 fn fsMakeDir(path: string): int;
 fn fsRemoveDir(path: string): int;
 fn fsRemove(path: string): int;
@@ -31,6 +34,7 @@ fn fsDirNext(dir: int, into: Slice<uint8>): int;
 fn fsDirClose(dir: int): int;
 fn fsCanonical(path: string, into: Slice<uint8>): int;
 fn fsAbsolute(path: string, into: Slice<uint8>): int;
+fn fsTempRoot(into: Slice<uint8>): int;
 
 /// How a file is opened (10 O5): to read, to write, to append at its end, created where it is not
 /// there, cut to nothing where it is. A file that is neither read nor written, or created or cut
@@ -441,10 +445,255 @@ pub class ReadDirIter :: [Iterator, Closeable] {
     }
 }
 
-/// What `name` names (lyr/fs.h's five slots).
-fn statOf(name: string): Metadata throws IoError {
+// ---------------------------------------------------------------------------------------------
+// What is put together from those (10 O5; M8b S7b): trees made, walked, copied and removed, and
+// the temporary ones.
+// ---------------------------------------------------------------------------------------------
+
+/// Makes the directory `path` and every one above it that is not there (Go's `MkdirAll`). Where
+/// `path` is a directory already there is nothing to do; where it is something else, it is
+/// `NotDirectory`.
+pub fn createDirAll(path: StringView): void throws IoError {
+    try makeAll(path.toString());
+}
+
+/// Removes `path` and all that is in it (Go's `RemoveAll`): a link is removed, never followed
+/// into, and nothing there is nothing to do. It removes all it can, and throws the first error it
+/// met.
+pub fn removeAll(path: StringView): void throws IoError {
+    let name = path.toString();
+    if (let own = try statOrNothing(name, false)) {
+        if (let e = takeAway(name, own.isDir, own.isSymlink)) {
+            throw e;
+        }
+    }
+}
+
+/// The bytes of the file `from` as the file `to` — made, or cut where it is there —; answers how
+/// many. Onto itself it is refused (`InvalidInput`): the cut would lose what it copies. What is not
+/// a file is not copied, and rights and times stay behind (rights are a door, 10 O5).
+pub fn copy(from: StringView, to: StringView): int throws IoError {
+    let source = from.toString();
+    let target = to.toString();
+    let what = try statOf(source);
+    if (!what.isFile) {
+        throw IoError { kind = if (what.isDir) .IsDirectory else .InvalidInput, path = source, detail = "copied: no file" };
+    }
+    if (exists(target) && (try canonicalize(source)) == (try canonicalize(target))) {
+        throw IoError { kind = .InvalidInput, path = source, detail = f"copied onto itself, {target}" };
+    }
+    using let r = try File.open(source);
+    using let w = try File.create(target);
+    return try io.copy(r, w);
+}
+
+/// The entries under `path`, depth first — a directory before what is in it —, each directory's
+/// in the byte order of their names (Go's `WalkDir`); `path` itself is not among them, and a link
+/// is not followed. Each directory is read whole and let go before its first entry is given, so
+/// the walk holds nothing open. An error ends it.
+pub fn walk(path: StringView): WalkIter throws IoError {
+    let it = WalkIter { frames = List.new() };
+    try it.enter(path.toString());
+    return it;
+}
+
+/// A new directory of its own under the system's directory for temporary files: its path (Go's
+/// `MkdirTemp`). Nothing removes it but `removeAll`. The system's directory itself is `os.tempDir`.
+pub fn tempDir(): string throws IoError {
+    let root = try tempRoot();
+    var tries = 0;
+    loop {
+        let name = join(root, f"lyric-{randomUint64()}");
+        let answer = onPool(() => fsMakeDir(name));
+        if (answer >= 0) {
+            return name;
+        }
+        let e = failure(answer, name, "made");
+        tries = tries + 1;
+        if (e.kind != IoErrorKind.AlreadyExists || tries == 100) {
+            throw e;
+        }
+    }
+}
+
+/// A new empty file of its own under the system's directory for temporary files: its path (Go's
+/// `CreateTemp`), for `File.openWith` and the conveniences to take from there. Nothing removes it
+/// but `remove`.
+pub fn tempFile(): string throws IoError {
+    let root = try tempRoot();
+    var tries = 0;
+    loop {
+        let name = join(root, f"lyric-{randomUint64()}");
+        // to write, made, and only where nothing is there (lyr/fs.h's bits)
+        let handle = onPool(() => fsOpen(name, 2 | 8 | 32));
+        if (handle >= 0) {
+            let closed = onPool(() => fsClose(handle));
+            if (closed < 0) {
+                throw failure(closed, name, "closed");
+            }
+            return name;
+        }
+        let e = failure(handle, name, "made");
+        tries = tries + 1;
+        if (e.kind != IoErrorKind.AlreadyExists || tries == 100) {
+            throw e;
+        }
+    }
+}
+
+/// The entries under a directory (`fs.walk`). After its end or an error it gives no more.
+pub class WalkIter :: [Iterator] {
+    type Item = DirEntry;
+    type Error = IoError;
+    frames: List<WalkFrame>,
+    var below: ?string = null,
+    var done: bool = false,
+
+    pub mut fn next(): ?DirEntry throws IoError {
+        if (this.done) {
+            return null;
+        }
+        // the directory given last is entered now: what reading it throws comes after its entry
+        if (let dir = this.below) {
+            this.below = null;
+            try {
+                this.enter(dir);
+            } catch (e: IoError) {
+                this.done = true;
+                throw e;
+            }
+        }
+        loop {
+            if (this.frames.isEmpty()) {
+                this.done = true;
+                return null;
+            }
+            let frame = this.frames[this.frames.length() - 1];
+            if (frame.at == frame.entries.length()) {
+                let _ = this.frames.pop();
+                continue;
+            }
+            let e = frame.entries[frame.at];
+            frame.at = frame.at + 1;
+            if (e.isDir) {
+                this.below = e.path;
+            }
+            return e;
+        }
+    }
+
+    /// The entries of `dir`, sorted by name, as the walk's next to give.
+    mut fn enter(dir: string): void throws IoError {
+        let entries: List<DirEntry> = List.new();
+        for (e in try readDir(dir)) {
+            entries.push(e);
+        }
+        let sorted = entries.toArray();
+        sorted.sortByKey((e) => e.name);
+        this.frames.push(WalkFrame { entries = sorted });
+    }
+}
+
+/// A directory of a walk: its entries, and how many were given.
+class WalkFrame {
+    entries: DirEntry[],
+    var at: int = 0,
+}
+
+/// `name` made, and the directories above it that are not there first.
+fn makeAll(name: string): void throws IoError {
+    if (let m = try statOrNothing(name)) {
+        if (m.isDir) {
+            return;
+        }
+        throw IoError { kind = .NotDirectory, path = name, detail = "made" };
+    }
+    let up = parent(name);
+    if (up != name && up != ".") {
+        try makeAll(up);
+    }
+    let answer = onPool(() => fsMakeDir(name));
+    if (answer < 0) {
+        let e = failure(answer, name, "made");
+        // made meanwhile by another: done, where it is a directory
+        if (e.kind == IoErrorKind.AlreadyExists) {
+            if (let m = try statOrNothing(name)) {
+                if (m.isDir) {
+                    return;
+                }
+            }
+        }
+        throw e;
+    }
+}
+
+/// `name` taken away — a directory with all that is in it —: the first error met, or null.
+fn takeAway(name: string, isDir: bool, isLink: bool): ?IoError {
+    if (!isDir) {
+        try {
+            remove(name);
+        } catch (e: IoError) {
+            // a link to a directory is a directory to Windows' DeleteFileW
+            if (isLink) {
+                try {
+                    removeDir(name);
+                    return null;
+                } catch (_: IoError) {
+                }
+            }
+            return e;
+        }
+        return null;
+    }
+    var first: ?IoError = null;
+    let entries: List<DirEntry> = List.new();
+    try {
+        for (e in readDir(name)) {
+            entries.push(e);
+        }
+    } catch (e: IoError) {
+        first = e;
+    }
+    for (e in entries) {
+        if (let error = takeAway(e.path, e.isDir, e.isSymlink)) {
+            if (first == null) {
+                first = error;
+            }
+        }
+    }
+    try {
+        removeDir(name);
+    } catch (e: IoError) {
+        if (first == null) {
+            first = e;
+        }
+    }
+    return first;
+}
+
+/// What `name` names, or `null` where nothing is there; any other error is thrown.
+fn statOrNothing(name: string, follow: bool = true): ?Metadata throws IoError {
+    try {
+        return statOf(name, follow);
+    } catch (e: IoError) {
+        if (e.kind == IoErrorKind.NotFound) {
+            return null;
+        }
+        throw e;
+    }
+}
+
+/// The system's directory for temporary files (`os.tempDir`'s, M8b S9).
+fn tempRoot(): string throws IoError {
+    return try pathFrom("", "the directory for temporary files looked up", (into) => fsTempRoot(into));
+}
+
+/// What `name` names (lyr/fs.h's five slots): through links, or the path itself where `follow` is
+/// false — a link then neither file nor directory.
+fn statOf(name: string, follow: bool = true): Metadata throws IoError {
     let slots: int[] = [0] * 5;
-    let answer = onPool(() => fsStat(name, slots[..]));
+    let through = if (follow) 1 else 0;
+    let answer = onPool(() => fsStat(name, through, slots[..]));
     if (answer < 0) {
         throw failure(answer, name, "looked at");
     }

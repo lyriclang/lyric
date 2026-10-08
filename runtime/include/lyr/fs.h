@@ -16,6 +16,8 @@
 #define LYR_FS_APPEND_BIT 4
 #define LYR_FS_CREATE_BIT 8
 #define LYR_FS_TRUNCATE_BIT 16
+/* With create: fails where the file is there (O_EXCL, CREATE_NEW) — std.fs's tempFile, M8b S7b. */
+#define LYR_FS_EXCLUSIVE_BIT 32
 
 /* The kinds, as std.io's IoErrorKind counts them from 1. */
 #define LYR_IO_NOT_FOUND 1
@@ -49,11 +51,12 @@ int64_t lyr_fs_close(int64_t file);
 #define LYR_FS_KIND_LINK 3
 #define LYR_FS_KIND_OTHER 4
 
-/* What `path` names, through links, into `into` (five slots): its kind (a file, a directory, 0
- * for neither), its size in bytes, when it was last written (nanoseconds since 1970), 1 where
- * it cannot be written, and 1 where `path` itself is a link. A link that leads nowhere is not
- * found, as stat(2) says. 0. */
-int64_t lyr_fs_stat(const LyrStr *path, int64_t *into, int64_t n);
+/* What `path` names into `into` (five slots): its kind (a file, a directory, 0 for neither), its
+ * size in bytes, when it was last written (nanoseconds since 1970), 1 where it cannot be written,
+ * and 1 where `path` itself is a link. Through links where `follow` is 1 — a link that leads
+ * nowhere is not found, as stat(2) says —; of the path itself where it is 0, a link neither file
+ * nor directory (lstat(2)). 0. */
+int64_t lyr_fs_stat(const LyrStr *path, int64_t follow, int64_t *into, int64_t n);
 
 /* A directory made, an empty one removed, a file removed, a file or directory renamed — over a
  * file `to` names, which it replaces: 0. */
@@ -81,11 +84,16 @@ int64_t lyr_fs_canonical(const LyrStr *path, uint8_t *into, int64_t n);
  * the file system (GetFullPathNameW) —, into `into` as lyr_fs_canonical. */
 int64_t lyr_fs_absolute(const LyrStr *path, uint8_t *into, int64_t n);
 
+/* The system's directory for temporary files — TMPDIR where it is set and not empty, else /tmp;
+ * GetTempPathW —, without a separator at its end, into `into` as lyr_fs_canonical (M8b S7b). */
+int64_t lyr_fs_temp_root(uint8_t *into, int64_t n);
+
 /* A Slice<uint8> of emitted code, `lyr_slice_u8`, is a pointer and a length (CEmitter); a
  * Slice<int> the same. */
 #define LYR_FS_READ(file, slice) lyr_fs_read((file), (slice).ptr, (slice).len)
 #define LYR_FS_WRITE(file, slice) lyr_fs_write((file), (slice).ptr, (slice).len)
-#define LYR_FS_STAT(path, slice) lyr_fs_stat((path), (slice).ptr, (slice).len)
+#define LYR_FS_STAT(path, follow, slice) lyr_fs_stat((path), (follow), (slice).ptr, (slice).len)
+#define LYR_FS_TEMP_ROOT(slice) lyr_fs_temp_root((slice).ptr, (slice).len)
 #define LYR_FS_DIR_NEXT(dir, slice) lyr_fs_dir_next((dir), (slice).ptr, (slice).len)
 #define LYR_FS_CANONICAL(path, slice) lyr_fs_canonical((path), (slice).ptr, (slice).len)
 #define LYR_FS_ABSOLUTE(path, slice) lyr_fs_absolute((path), (slice).ptr, (slice).len)

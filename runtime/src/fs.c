@@ -100,7 +100,8 @@ int64_t lyr_fs_open(const LyrStr *path, int64_t how) {
     if (how & LYR_FS_APPEND_BIT) access |= FILE_APPEND_DATA;
     else if (how & LYR_FS_WRITE_BIT) access |= GENERIC_WRITE;
     DWORD disposition;
-    if (how & LYR_FS_CREATE_BIT) disposition = (how & LYR_FS_TRUNCATE_BIT) ? CREATE_ALWAYS : OPEN_ALWAYS;
+    if ((how & LYR_FS_CREATE_BIT) && (how & LYR_FS_EXCLUSIVE_BIT)) disposition = CREATE_NEW;
+    else if (how & LYR_FS_CREATE_BIT) disposition = (how & LYR_FS_TRUNCATE_BIT) ? CREATE_ALWAYS : OPEN_ALWAYS;
     else disposition = (how & LYR_FS_TRUNCATE_BIT) ? TRUNCATE_EXISTING : OPEN_EXISTING;
     HANDLE file = CreateFileW(name, access, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
                               disposition, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -156,7 +157,7 @@ static HANDLE handle_of(const wchar_t *name) {
                        FILE_FLAG_BACKUP_SEMANTICS, NULL);
 }
 
-int64_t lyr_fs_stat(const LyrStr *path, int64_t *into, int64_t n) {
+int64_t lyr_fs_stat(const LyrStr *path, int64_t follow, int64_t *into, int64_t n) {
     if (n < 5) return failure(LYR_IO_INVALID_INPUT, 0);
     int64_t failed;
     wchar_t *name = wide_of(path->bytes, 0, &failed);
@@ -164,13 +165,24 @@ int64_t lyr_fs_stat(const LyrStr *path, int64_t *into, int64_t n) {
     WIN32_FIND_DATAW own;
     HANDLE found = FindFirstFileW(name, &own);
     if (found == INVALID_HANDLE_VALUE) {
-        /* a root, `C:\`, has no entry to find; its attributes come through the handle */
+        /* a root, `C:\`, has no entry to find (and is no link); its attributes come through the
+         * handle */
         own.dwFileAttributes = 0;
         own.dwReserved0 = 0;
     } else {
         FindClose(found);
     }
     int link = is_link(own.dwFileAttributes, own.dwReserved0);
+    if (!follow && found != INVALID_HANDLE_VALUE) {
+        /* the path itself, as its directory's entry says it */
+        free(name);
+        into[0] = link ? 0 : (own.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? LYR_FS_KIND_DIRECTORY : LYR_FS_KIND_FILE;
+        into[1] = (int64_t)(((uint64_t)own.nFileSizeHigh << 32) | own.nFileSizeLow);
+        into[2] = nanos_of(own.ftLastWriteTime);
+        into[3] = (own.dwFileAttributes & FILE_ATTRIBUTE_READONLY) != 0;
+        into[4] = link;
+        return 0;
+    }
     HANDLE file = handle_of(name);
     free(name);
     if (file == INVALID_HANDLE_VALUE) return last_failure();
@@ -342,6 +354,15 @@ int64_t lyr_fs_absolute(const LyrStr *path, uint8_t *into, int64_t n) {
     return result;
 }
 
+int64_t lyr_fs_temp_root(uint8_t *into, int64_t n) {
+    wchar_t dir[MAX_PATH + 1];
+    DWORD len = GetTempPathW(MAX_PATH + 1, dir);
+    if (len == 0 || len > MAX_PATH) return last_failure();
+    /* its separator at the end goes, a drive's own (`C:\`) stays */
+    if (len > 3 && dir[len - 1] == L'\\') len--;
+    return give_wide(dir, (int)len, into, n);
+}
+
 #else
 #  include <dirent.h>
 #  include <errno.h>
@@ -382,6 +403,7 @@ int64_t lyr_fs_open(const LyrStr *path, int64_t how) {
     int flags = read && write ? O_RDWR : write ? O_WRONLY : O_RDONLY;
     if (how & LYR_FS_APPEND_BIT) flags |= O_APPEND;
     if (how & LYR_FS_CREATE_BIT) flags |= O_CREAT;
+    if ((how & LYR_FS_CREATE_BIT) && (how & LYR_FS_EXCLUSIVE_BIT)) flags |= O_EXCL;
     if (how & LYR_FS_TRUNCATE_BIT) flags |= O_TRUNC;
     flags |= O_CLOEXEC;
     int fd;
@@ -428,7 +450,7 @@ int64_t lyr_fs_close(int64_t file) {
 #    define LYR_MTIME(st) ((int64_t)(st).st_mtim.tv_sec * 1000000000 + (st).st_mtim.tv_nsec)
 #  endif
 
-int64_t lyr_fs_stat(const LyrStr *path, int64_t *into, int64_t n) {
+int64_t lyr_fs_stat(const LyrStr *path, int64_t follow, int64_t *into, int64_t n) {
     if (n < 5) return failure(LYR_IO_INVALID_INPUT, 0);
     struct stat own, st;
     int r;
@@ -437,7 +459,7 @@ int64_t lyr_fs_stat(const LyrStr *path, int64_t *into, int64_t n) {
     } while (r < 0 && errno == EINTR);
     if (r < 0) return last_failure();
     int link = S_ISLNK(own.st_mode);
-    if (link) {
+    if (link && follow) {
         do {
             r = stat(path->bytes, &st);
         } while (r < 0 && errno == EINTR);
@@ -594,5 +616,14 @@ int64_t lyr_fs_absolute(const LyrStr *path, uint8_t *into, int64_t n) {
     }
     free(cwd);
     return len;
+}
+
+int64_t lyr_fs_temp_root(uint8_t *into, int64_t n) {
+    /* getenv beside a setenv on another thread is a race; std.os's setEnv (M8b S9) says so */
+    const char *dir = getenv("TMPDIR");
+    if (dir == NULL || dir[0] == 0) dir = "/tmp";
+    size_t len = strlen(dir);
+    while (len > 1 && dir[len - 1] == '/') len--;
+    return give(dir, len, into, n);
 }
 #endif

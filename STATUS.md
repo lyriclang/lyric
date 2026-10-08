@@ -609,6 +609,12 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   `createDir`, `remove`, `removeDir`, `rename`, `readDir` (`DirEntry`, a `Closeable`
   `ReadDirIter`), `canonicalize`, `absolute`. Checked on Windows for real through WSL interop.
   Spec 12 "Directories", four cases. S7b: what is put together from these.
+- **S7b** trees (10 O5's rest): `createDirAll`, `removeAll` (links removed, never followed),
+  `copy` (refused onto itself), `walk` (depth first, by name, nothing held open), `tempDir` and
+  `tempFile` (new and the program's own, their paths; the lookup is S9's `os.tempDir`). The
+  runtime: `stat` without following, an exclusive create, the system's temporary directory. The
+  plan's check — a tree made, walked and removed — in the std tests on every platform they run on
+  and as a case. Spec 12 "Directories" rules 5–8, three cases. **S7 is done.**
 
 ### M8a — done (2026-10-07)
 
