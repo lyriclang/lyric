@@ -1,0 +1,125 @@
+// std.random (design/v5/spec/10 Q2; M8b S4c): the seeded stream — the same in every 5.x —, each
+// drawing method's use of it, the free forms over the thread's generator, the panics. The seeded
+// values come from a reference of the stream (Python, checked against openssl's ChaCha20).
+import std.core { arrayOf };
+import std.random;
+import std.random { Random };
+import std.test { assertEq, assertPanics, assertTrue };
+
+@Test
+fn aSeedNamesItsStream(): void {
+    let r = Random.seeded(0);
+    let got = arrayOf(9, (i) => r.nextUint64());
+    assertEq(got, [13804888775535289832u64, 4211859015901796865u64, 4415496932110364166u64, 1713244878998487631u64, 6692990728071973259u64, 785888715741328994u64, 6858711743081713853u64, 10796604925839515679u64, 1239024447360315208u64]);
+    let again = Random.seeded(0);
+    assertEq(again.nextUint64(), 13804888775535289832u64);
+}
+
+@Test
+fn nextIntIsTheDrawAsAnInt(): void {
+    let r = Random.seeded(12345);
+    assertEq(arrayOf(4, (i) => r.nextInt()), [3192928694849931527, 413646854545440538, -6449572774746238618, 1682560787029495770]);
+}
+
+@Test
+fn nextInRangeStaysInItsRange(): void {
+    let r = Random.seeded(9);
+    assertEq(arrayOf(12, (i) => r.nextInRange(1..7)), [3, 1, 2, 5, 3, 3, 2, 1, 5, 2, 6, 2]);
+    let wide = Random.seeded(10);
+    for (_ in 0..1000) {
+        let n = wide.nextInRange(-3..3);
+        assertTrue(n >= -3 && n < 3);
+    }
+}
+
+@Test
+fn theDrawsAreEvenlySpread(): void {
+    let r = Random.seeded(11);
+    let buckets: int[] = [0] * 6;
+    for (_ in 0..60000) {
+        let n = r.nextInRange(0..6);
+        buckets[n] = buckets[n] + 1;
+    }
+    for (b in buckets) {
+        assertTrue(b > 9500 && b < 10500);
+    }
+    var trues = 0;
+    var below = 0;
+    for (_ in 0..10000) {
+        if (r.nextBool()) {
+            trues = trues + 1;
+        }
+        let f = r.nextFloat();
+        assertTrue(f >= 0.0 && f < 1.0);
+        if (f < 0.25) {
+            below = below + 1;
+        }
+    }
+    assertTrue(trues > 4700 && trues < 5300);
+    assertTrue(below > 2300 && below < 2700);
+}
+
+@Test
+fn theNormalDistributionHasItsMeanAndSpread(): void {
+    let r = Random.seeded(7);
+    var total = 0.0;
+    var squares = 0.0;
+    for (_ in 0..50000) {
+        let x = r.nextNormal(mean: 5.0, stdDev: 2.0);
+        total = total + x;
+        squares = squares + x * x;
+    }
+    let mean = total / 50000.0;
+    let variance = squares / 50000.0 - mean * mean;
+    assertTrue(mean > 4.95 && mean < 5.05);
+    assertTrue(variance > 3.9 && variance < 4.1);
+}
+
+@Test
+fn shuffleSampleAndChoiceDrawFromTheStream(): void {
+    let xs = arrayOf(8, (i) => i);
+    Random.seeded(3).shuffle(xs[..]);
+    assertEq(xs, [3, 1, 4, 6, 2, 5, 0, 7]);
+    let pool = arrayOf(10, (i) => 20 + i);
+    assertEq(Random.seeded(4).sample(pool[..], 5), [20, 26, 27, 23, 21]);
+    let none: int[] = [];
+    assertTrue(Random.seeded(5).choice(none[..]) == null);
+    let one: int[] = [9];
+    assertEq(Random.seeded(5).choice(one[..]) ?? -1, 9);
+    assertEq(Random.seeded(6).sample(pool[..], 0).length(), 0);
+}
+
+@Test
+fn nextBytesFillsTheSliceFromTheDraws(): void {
+    let r = Random.seeded(8);
+    let bytes: uint8[] = [0u8] * 10;
+    r.nextBytes(bytes[..]);
+    let check = Random.seeded(8);
+    let x = check.nextUint64();
+    assertEq(bytes[0], (x & 0xFFu64) as uint8);
+    assertEq(bytes[7], (x >> 56) as uint8);
+    let y = check.nextUint64();
+    assertEq(bytes[9], ((y >> 8) & 0xFFu64) as uint8);
+}
+
+@Test
+fn freshGeneratorsAndTheFreeFormsDrawFromTheSystem(): void {
+    assertTrue(Random.fresh().nextUint64() != Random.fresh().nextUint64());
+    for (_ in 0..100) {
+        let n = random.nextInRange(10..20);
+        assertTrue(n >= 10 && n < 20);
+        let f = random.nextFloat();
+        assertTrue(f >= 0.0 && f < 1.0);
+    }
+    let xs: int[] = [1, 2, 3, 4];
+    random.shuffle(xs[..]);
+    assertEq(xs[0] + xs[1] + xs[2] + xs[3], 10);
+}
+
+@Test
+fn anEmptyRangeAndAnOversizedSamplePanic(): void {
+    let r = Random.seeded(1);
+    assertPanics(() => { r.nextInRange(4..4); });
+    let xs: int[] = [1, 2];
+    assertPanics(() => { r.sample(xs[..], 3); });
+}

@@ -1,0 +1,237 @@
+/// Random numbers (design/v5/spec/10 Q2): `Random`, a ChaCha8 generator — seeded, a stream that
+/// stays the same through every 5.x, or fresh from the system —, and the free forms over the
+/// running thread's own generator. Not for secrets: those come from `std.crypto`'s `randomBytes`.
+///
+/// The stream (spec 12): the key from the seed through SplitMix64 — four outputs, eight words, the
+/// low half of each first —, the nonce zero, a 64-bit block counter from zero in words 12 and 13,
+/// each block's sixteen words in order, two of them a `uint64`, the first the low half.
+import std.core { arrayOf };
+import std.crypto { randomBytes };
+import std.task { keepThreadRandomState, threadRandomState };
+
+/// The state's layout: the key, the block counter (low, high), the block, how many of its words
+/// are used (16: all of them, a new block is due).
+let keyAt = 0;
+let counterAt = 8;
+let blockAt = 10;
+let usedAt = 26;
+let stateWords = 27;
+
+/// A generator of random numbers (10 Q2): ChaCha8 (eight rounds), 64 bits a draw.
+pub class Random {
+    state: uint32[],
+
+    /// The generator whose stream `seed` names — the same in every 5.x.
+    pub static fn seeded(seed: uint64): Random {
+        let state: uint32[] = [0u32] * stateWords;
+        var mix = seed;
+        var i = 0;
+        while (i < 4) {
+            mix = mix +% 0x9E3779B97F4A7C15u64;
+            var z = mix;
+            z = (z ^ (z >> 30)) *% 0xBF58476D1CE4E5B9u64;
+            z = (z ^ (z >> 27)) *% 0x94D049BB133111EBu64;
+            z = z ^ (z >> 31);
+            state[keyAt + 2 * i] = (z & 0xFFFFFFFFu64) as uint32;
+            state[keyAt + 2 * i + 1] = (z >> 32) as uint32;
+            i = i + 1;
+        }
+        state[usedAt] = 16u32;
+        return Random { state = state };
+    }
+
+    /// A generator keyed from the system's random bytes: a stream no run repeats.
+    pub static fn fresh(): Random {
+        let key = randomBytes(32);
+        let state: uint32[] = [0u32] * stateWords;
+        var i = 0;
+        while (i < 8) {
+            state[keyAt + i] = (key[4 * i] as uint32) | ((key[4 * i + 1] as uint32) << 8)
+                | ((key[4 * i + 2] as uint32) << 16) | ((key[4 * i + 3] as uint32) << 24);
+            i = i + 1;
+        }
+        state[usedAt] = 16u32;
+        return Random { state = state };
+    }
+
+    /// The next 64 bits.
+    pub mut fn nextUint64(): uint64 {
+        if (this.state[usedAt] >= 16u32) {
+            chacha8(this.state);
+        }
+        let at = blockAt + (this.state[usedAt] as int);
+        this.state[usedAt] = this.state[usedAt] + 2u32;
+        return (this.state[at] as uint64) | ((this.state[at + 1] as uint64) << 32);
+    }
+
+    /// The next 64 bits as an `int`: `int.min` to `int.max`, all alike.
+    pub mut fn nextInt(): int {
+        return this.nextUint64() as int;
+    }
+
+    /// An integer of `r`, each alike: draws below the largest multiple of the range's length are
+    /// taken, the rest drawn again. An empty range panics.
+    pub mut fn nextInRange(r: Range<int>): int {
+        if (r.end <= r.start) {
+            panic(f"a number from the empty range {r.start}..{r.end}");
+        }
+        let span = (r.end -% r.start) as uint64;
+        // 2^64 mod span: the draws below it would make the low results likelier
+        let zero: uint64 = 0;
+        let rejected = (zero -% span) % span;
+        loop {
+            let x = this.nextUint64();
+            if (x >= rejected) {
+                return r.start +% ((x % span) as int);
+            }
+        }
+    }
+
+    /// A float in [0, 1): the high 53 bits of a draw, each value of that grid alike.
+    pub mut fn nextFloat(): float {
+        return ((this.nextUint64() >> 11) as float) * (1.0 / 9007199254740992.0);
+    }
+
+    /// `true` or `false`, alike: the high bit of a draw.
+    pub mut fn nextBool(): bool {
+        return (this.nextUint64() >> 63) == 1u64;
+    }
+
+    /// `into` filled: eight bytes a draw, the low byte first; a tail of fewer takes a draw's low
+    /// bytes.
+    pub mut fn nextBytes(into: Slice<uint8>): void {
+        var i = 0;
+        while (i < into.length()) {
+            let x = this.nextUint64();
+            var k = 0;
+            while (k < 8 && i < into.length()) {
+                into[i] = ((x >> (8 * k)) & 0xFFu64) as uint8;
+                i = i + 1;
+                k = k + 1;
+            }
+        }
+    }
+
+    /// A normally distributed float (Marsaglia's polar method): two draws a try, a try taken
+    /// inside the unit circle, one of the pair it makes kept.
+    pub mut fn nextNormal(mean: float = 0.0, stdDev: float = 1.0): float {
+        loop {
+            let u = 2.0 * this.nextFloat() - 1.0;
+            let v = 2.0 * this.nextFloat() - 1.0;
+            let s = u * u + v * v;
+            if (s > 0.0 && s < 1.0) {
+                return mean + stdDev * u * (-2.0 * s.ln() / s).sqrt();
+            }
+        }
+    }
+
+    /// `s` in an order each of its orders alike (Fisher–Yates, from the back).
+    pub mut fn shuffle<T>(s: Slice<T>): void {
+        var i = s.length() - 1;
+        while (i > 0) {
+            s.swap(i, this.nextInRange(0..i + 1));
+            i = i - 1;
+        }
+    }
+
+    /// An element of `s`, each alike; `null` for an empty one, which draws nothing.
+    pub mut fn choice<T>(s: Slice<T>): ?T {
+        if (s.isEmpty()) {
+            return null;
+        }
+        return s[this.nextInRange(0..s.length())];
+    }
+
+    /// `k` elements of `s` at `k` different places, in a random order. More than `s` holds, or
+    /// fewer than none, panics.
+    pub mut fn sample<T>(s: Slice<T>, k: int): T[] {
+        if (k < 0 || k > s.length()) {
+            panic(f"a sample of {k} from {s.length()}");
+        }
+        let places = arrayOf(s.length(), (i) => i);
+        var i = 0;
+        while (i < k) {
+            places[..].swap(i, this.nextInRange(i..s.length()));
+            i = i + 1;
+        }
+        return arrayOf(k, (j) => s[places[j]]);
+    }
+}
+
+/// One ChaCha8 block (RFC 8439 §2.3, eight rounds) from the key and the counter into the state's
+/// block, the counter moved on, the block's words unused.
+fn chacha8(state: uint32[]): void {
+    let x: uint32[] = [0x61707865u32, 0x3320646eu32, 0x79622d32u32, 0x6b206574u32,
+        state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7],
+        state[counterAt], state[counterAt + 1], 0u32, 0u32];
+    let input = x.clone();
+    var round = 0;
+    while (round < 4) {
+        quarter(x, 0, 4, 8, 12);
+        quarter(x, 1, 5, 9, 13);
+        quarter(x, 2, 6, 10, 14);
+        quarter(x, 3, 7, 11, 15);
+        quarter(x, 0, 5, 10, 15);
+        quarter(x, 1, 6, 11, 12);
+        quarter(x, 2, 7, 8, 13);
+        quarter(x, 3, 4, 9, 14);
+        round = round + 1;
+    }
+    var i = 0;
+    while (i < 16) {
+        state[blockAt + i] = x[i] +% input[i];
+        i = i + 1;
+    }
+    state[counterAt] = state[counterAt] +% 1u32;
+    if (state[counterAt] == 0u32) {
+        state[counterAt + 1] = state[counterAt + 1] +% 1u32;
+    }
+    state[usedAt] = 0u32;
+}
+
+fn quarter(x: uint32[], a: int, b: int, c: int, d: int): void {
+    x[a] = x[a] +% x[b];
+    x[d] = rotl(x[d] ^ x[a], 16);
+    x[c] = x[c] +% x[d];
+    x[b] = rotl(x[b] ^ x[c], 12);
+    x[a] = x[a] +% x[b];
+    x[d] = rotl(x[d] ^ x[a], 8);
+    x[c] = x[c] +% x[d];
+    x[b] = rotl(x[b] ^ x[c], 7);
+}
+
+fn rotl(x: uint32, n: int): uint32 {
+    return (x << n) | (x >> (32 - n));
+}
+
+// ---------------------------------------------------------------------------------------------
+// The free forms (10 Q2), over the running thread's generator — its own, fresh from the system at
+// its first use there, kept with the thread's scheduler: no lock, and no stream shared between
+// threads. Q2 names them `random.int(0..10)` and `random.float()`; no declaration takes a builtin
+// type's name (07 K5), so they carry the names `Random`'s methods have.
+// ---------------------------------------------------------------------------------------------
+
+/// The running thread's generator.
+fn thread(): Random {
+    if (let state = threadRandomState()) {
+        return Random { state = state };
+    }
+    let fresh = Random.fresh();
+    keepThreadRandomState(fresh.state);
+    return fresh;
+}
+
+/// An integer of `r` from the thread's generator: `random.nextInRange(0..10)`.
+pub fn nextInRange(r: Range<int>): int {
+    return thread().nextInRange(r);
+}
+
+/// A float in [0, 1) from the thread's generator.
+pub fn nextFloat(): float {
+    return thread().nextFloat();
+}
+
+/// `s` shuffled by the thread's generator.
+pub fn shuffle<T>(s: Slice<T>): void {
+    thread().shuffle(s);
+}

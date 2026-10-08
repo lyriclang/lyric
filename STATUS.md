@@ -571,6 +571,11 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   constant), `Sha256`, `Sha512`, `Sha1`, `Md5`, `sha256(bytes): uint8[32]`, `Hmac<D>`,
   `randomBytes`, `randomUint64`, `constantTimeEq`; the constants computed from their definitions,
   the vectors checked against Python's hashlib. Spec 12 "Cryptography", five cases.
+- **S4c** random numbers (10 Q2): `std.random` with `Random` (ChaCha8; `seeded`, its stream fixed
+  by spec 12 for every 5.x; `fresh`), its draws, `shuffle`, `choice`, `sample`, and the free forms
+  over the thread's own generator, kept with its scheduler in `std.task`. Q2's `random.int` and
+  `random.float` are names 07 K5 gives no declaration; the free forms carry `Random`'s names.
+  Spec 12 "Random numbers", six cases. **S4 is done.**
 
 ### M8a — done (2026-10-07)
 
