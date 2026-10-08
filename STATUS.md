@@ -562,6 +562,10 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   their offset), `TextWriter`, and `Writer.flush()` (B8). **Classes, not O2's structs with inline
   bytes**: every read hands the inner reader a view of the buffer, and a frame's inline array
   has none (03 §5.3). Spec 12 rules 6–8, nine cases.
+- **S4a** encodings (10 Q5): `std.encoding` with `EncodingError { offset, detail }`, `Base64`,
+  `Base64Url` (RFC 4648, padded, decoded strictly), `Hex`, `Utf16`; `fromBytesLE`/`fromBytesBE`
+  on every integer type and the twelve getters on `Slice<uint8>`. 4.x's `std.bytes` goes up in
+  it. Spec 12 "Encodings", seven cases.
 
 ### M8a — done (2026-10-07)
 

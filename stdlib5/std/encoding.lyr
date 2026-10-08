@@ -1,0 +1,335 @@
+/// Bytes as text and back (design/v5/spec/10 Q5): Base64 and its URL-safe alphabet (RFC 4648 §4,
+/// §5), hexadecimal (§8), UTF-16; the integers of a byte slice, either end first. Each encoding is
+/// a struct of static members — a name space, `Base64.encode(bytes)`. 4.x's `std.bytes` goes up in
+/// this module.
+///
+/// The decoders are strict, as the RFC allows them to be (§3.3, §3.5): Base64 asks for its padding
+/// and for zero bits past the last byte, and takes no whitespace; what is not the encoding throws
+/// an `EncodingError` at the first offset that is wrong.
+import std.core { StringBuilder, viewBytes };
+
+/// Text that is not the encoding it was decoded as (10 Q5): where — a byte of the text, a unit of
+/// UTF-16 — and what is wrong there.
+pub struct EncodingError :: [Error] {
+    pub offset: int,
+    pub detail: string,
+
+    pub fn message(): string {
+        return f"{this.detail} at offset {this.offset}";
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Base64 (RFC 4648 §4, §5).
+// ---------------------------------------------------------------------------------------------
+
+let standardDigits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+let urlDigits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+let standardValues = valuesOf(standardDigits);
+let urlValues = valuesOf(urlDigits);
+
+/// Base64 with RFC 4648's alphabet (§4), `+` and `/`, padded with `=` to a multiple of four.
+pub struct Base64 {
+    pub static fn encode(bytes: Slice<uint8>): string {
+        return encode64(bytes, standardDigits);
+    }
+
+    pub static fn decode(s: StringView): uint8[] throws EncodingError {
+        return try decode64(s, standardValues);
+    }
+}
+
+/// Base64 with the URL- and file-safe alphabet (RFC 4648 §5), `-` and `_`, padded as `Base64` is.
+pub struct Base64Url {
+    pub static fn encode(bytes: Slice<uint8>): string {
+        return encode64(bytes, urlDigits);
+    }
+
+    pub static fn decode(s: StringView): uint8[] throws EncodingError {
+        return try decode64(s, urlValues);
+    }
+}
+
+/// Each byte's value as a digit of `digits`, or -1.
+fn valuesOf(digits: string): int[] {
+    let values: int[] = [-1] * 256;
+    let bytes = viewBytes(digits);
+    var i = 0;
+    while (i < bytes.length()) {
+        values[bytes[i] as int] = i;
+        i = i + 1;
+    }
+    return values;
+}
+
+fn encode64(bytes: Slice<uint8>, alphabet: string): string {
+    let digits = viewBytes(alphabet);
+    let out: uint8[] = [0u8] * ((bytes.length() + 2) / 3 * 4);
+    var i = 0;
+    var o = 0;
+    while (i < bytes.length()) {
+        let left = bytes.length() - i;
+        var n = (bytes[i] as int) << 16;
+        if (left > 1) {
+            n = n | ((bytes[i + 1] as int) << 8);
+        }
+        if (left > 2) {
+            n = n | (bytes[i + 2] as int);
+        }
+        out[o] = digits[(n >> 18) & 63];
+        out[o + 1] = digits[(n >> 12) & 63];
+        out[o + 2] = if (left > 1) digits[(n >> 6) & 63] else 61u8;
+        out[o + 3] = if (left > 2) digits[n & 63] else 61u8;
+        i = i + 3;
+        o = o + 4;
+    }
+    // what it built is ASCII
+    return try! string.fromUtf8(out[..]);
+}
+
+fn decode64(s: StringView, values: int[]): uint8[] throws EncodingError {
+    let text = viewBytes(s);
+    let n = text.length();
+    if (n % 4 != 0) {
+        throw EncodingError { offset = n, detail = "the text ends inside a group of four" };
+    }
+    // the padding: '=' twice, once or not at all, and only at the end
+    var pad = 0;
+    if (n > 0 && text[n - 1] == 61u8) {
+        pad = if (text[n - 2] == 61u8) 2 else 1;
+    }
+    let out: uint8[] = [0u8] * (n / 4 * 3 - pad);
+    var i = 0;
+    var o = 0;
+    while (i < n) {
+        let last = i + 4 == n;
+        let digits = if (last) 4 - pad else 4;
+        var group = 0;
+        var k = 0;
+        while (k < 4) {
+            var v = 0;
+            if (k < digits) {
+                v = values[text[i + k] as int];
+                if (v < 0) {
+                    throw EncodingError { offset = i + k, detail = "no Base64 digit" };
+                }
+            }
+            group = (group << 6) | v;
+            k = k + 1;
+        }
+        // the bits past the last byte are zero in the one encoding of it (§3.5)
+        if ((digits == 2 && (group & 0xFFFF) != 0) || (digits == 3 && (group & 0xFF) != 0)) {
+            throw EncodingError { offset = i + digits - 1, detail = "bits past the last byte" };
+        }
+        out[o] = ((group >> 16) & 0xFF) as uint8;
+        if (digits > 2) {
+            out[o + 1] = ((group >> 8) & 0xFF) as uint8;
+        }
+        if (digits > 3) {
+            out[o + 2] = (group & 0xFF) as uint8;
+        }
+        i = i + 4;
+        o = o + digits - 1;
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Hexadecimal (RFC 4648 §8, in small letters).
+// ---------------------------------------------------------------------------------------------
+
+/// Two hexadecimal digits a byte: `encode` writes small letters, `decode` reads either.
+pub struct Hex {
+    pub static fn encode(bytes: Slice<uint8>): string {
+        let digits = viewBytes("0123456789abcdef");
+        let out: uint8[] = [0u8] * (bytes.length() * 2);
+        var i = 0;
+        while (i < bytes.length()) {
+            let b = bytes[i] as int;
+            out[2 * i] = digits[b >> 4];
+            out[2 * i + 1] = digits[b & 15];
+            i = i + 1;
+        }
+        return try! string.fromUtf8(out[..]);
+    }
+
+    pub static fn decode(s: StringView): uint8[] throws EncodingError {
+        let text = viewBytes(s);
+        let out: uint8[] = [0u8] * (text.length() / 2);
+        var i = 0;
+        while (i < text.length()) {
+            let high = hexValue(text[i]);
+            if (high < 0) {
+                throw EncodingError { offset = i, detail = "no hexadecimal digit" };
+            }
+            if (i + 1 == text.length()) {
+                throw EncodingError { offset = i + 1, detail = "the text ends inside a pair" };
+            }
+            let low = hexValue(text[i + 1]);
+            if (low < 0) {
+                throw EncodingError { offset = i + 1, detail = "no hexadecimal digit" };
+            }
+            out[i / 2] = ((high << 4) | low) as uint8;
+            i = i + 2;
+        }
+        return out;
+    }
+}
+
+fn hexValue(b: uint8): int {
+    let c = b as int;
+    if (c >= 48 && c <= 57) {
+        return c - 48;
+    }
+    if (c >= 97 && c <= 102) {
+        return c - 87;
+    }
+    if (c >= 65 && c <= 70) {
+        return c - 55;
+    }
+    return -1;
+}
+
+// ---------------------------------------------------------------------------------------------
+// UTF-16 (RFC 2781), as code units: no byte order and no mark.
+// ---------------------------------------------------------------------------------------------
+
+/// Text as UTF-16 code units and back. A unit that is half of a surrogate pair without its other
+/// half is no UTF-16.
+pub struct Utf16 {
+    pub static fn encode(s: StringView): uint16[] {
+        var count = 0;
+        for (c in s.chars()) {
+            count = count + (if ((c as uint32) >= 0x10000) 2 else 1);
+        }
+        let out: uint16[] = [0u16] * count;
+        var o = 0;
+        for (c in s.chars()) {
+            let code = (c as uint32) as int;
+            if (code >= 0x10000) {
+                let v = code - 0x10000;
+                out[o] = (0xD800 + (v >> 10)) as uint16;
+                out[o + 1] = (0xDC00 + (v & 0x3FF)) as uint16;
+                o = o + 2;
+            } else {
+                out[o] = code as uint16;
+                o = o + 1;
+            }
+        }
+        return out;
+    }
+
+    pub static fn decode(units: Slice<uint16>): string throws EncodingError {
+        let text = StringBuilder.new();
+        var i = 0;
+        while (i < units.length()) {
+            let u = units[i] as int;
+            var code = u;
+            if (u >= 0xD800 && u <= 0xDBFF) {
+                let next = if (i + 1 < units.length()) units[i + 1] as int else -1;
+                if (next < 0xDC00 || next > 0xDFFF) {
+                    throw EncodingError { offset = i, detail = "a high surrogate without its low one" };
+                }
+                code = 0x10000 + ((u - 0xD800) << 10) + (next - 0xDC00);
+                i = i + 1;
+            } else if (u >= 0xDC00 && u <= 0xDFFF) {
+                throw EncodingError { offset = i, detail = "a low surrogate without its high one" };
+            }
+            text.appendChar((code as uint32) as char);
+            i = i + 1;
+        }
+        return text.toString();
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The integers of bytes (10 Q5; the counterpart of Z1's toBytesLE, which comes with M8c). Each
+// takes exactly its width in bytes, else it panics, as an index out of range does.
+// ---------------------------------------------------------------------------------------------
+
+/// The `width` bytes of `s`, the first the lowest.
+fn littleEnd(s: Slice<uint8>, width: int): uint {
+    holdsWidth(s, width);
+    var v: uint = 0;
+    var i = width - 1;
+    while (i >= 0) {
+        v = (v << 8) | (s[i] as uint);
+        i = i - 1;
+    }
+    return v;
+}
+
+/// The `width` bytes of `s`, the first the highest.
+fn bigEnd(s: Slice<uint8>, width: int): uint {
+    holdsWidth(s, width);
+    var v: uint = 0;
+    var i = 0;
+    while (i < width) {
+        v = (v << 8) | (s[i] as uint);
+        i = i + 1;
+    }
+    return v;
+}
+
+fn holdsWidth(s: Slice<uint8>, width: int): void {
+    if (s.length() != width) {
+        panic(f"a number of {width} bytes from a slice of {s.length()}");
+    }
+}
+
+extend int8 {
+    pub static fn fromBytesLE(s: Slice<uint8>): int8 { return littleEnd(s, 1) as int8; }
+    pub static fn fromBytesBE(s: Slice<uint8>): int8 { return bigEnd(s, 1) as int8; }
+}
+
+extend int16 {
+    pub static fn fromBytesLE(s: Slice<uint8>): int16 { return littleEnd(s, 2) as int16; }
+    pub static fn fromBytesBE(s: Slice<uint8>): int16 { return bigEnd(s, 2) as int16; }
+}
+
+extend int32 {
+    pub static fn fromBytesLE(s: Slice<uint8>): int32 { return littleEnd(s, 4) as int32; }
+    pub static fn fromBytesBE(s: Slice<uint8>): int32 { return bigEnd(s, 4) as int32; }
+}
+
+extend int {
+    pub static fn fromBytesLE(s: Slice<uint8>): int { return littleEnd(s, 8) as int; }
+    pub static fn fromBytesBE(s: Slice<uint8>): int { return bigEnd(s, 8) as int; }
+}
+
+extend uint8 {
+    pub static fn fromBytesLE(s: Slice<uint8>): uint8 { return littleEnd(s, 1) as uint8; }
+    pub static fn fromBytesBE(s: Slice<uint8>): uint8 { return bigEnd(s, 1) as uint8; }
+}
+
+extend uint16 {
+    pub static fn fromBytesLE(s: Slice<uint8>): uint16 { return littleEnd(s, 2) as uint16; }
+    pub static fn fromBytesBE(s: Slice<uint8>): uint16 { return bigEnd(s, 2) as uint16; }
+}
+
+extend uint32 {
+    pub static fn fromBytesLE(s: Slice<uint8>): uint32 { return littleEnd(s, 4) as uint32; }
+    pub static fn fromBytesBE(s: Slice<uint8>): uint32 { return bigEnd(s, 4) as uint32; }
+}
+
+extend uint {
+    pub static fn fromBytesLE(s: Slice<uint8>): uint { return littleEnd(s, 8); }
+    pub static fn fromBytesBE(s: Slice<uint8>): uint { return bigEnd(s, 8); }
+}
+
+/// The integers in a byte slice, at a byte offset (10 Q5): the slice must hold the width there,
+/// else it panics.
+extend Slice<uint8> {
+    pub fn getUint16LE(at: int): uint16 { return uint16.fromBytesLE(this[at..at + 2]); }
+    pub fn getUint16BE(at: int): uint16 { return uint16.fromBytesBE(this[at..at + 2]); }
+    pub fn getUint32LE(at: int): uint32 { return uint32.fromBytesLE(this[at..at + 4]); }
+    pub fn getUint32BE(at: int): uint32 { return uint32.fromBytesBE(this[at..at + 4]); }
+    pub fn getUint64LE(at: int): uint { return uint.fromBytesLE(this[at..at + 8]); }
+    pub fn getUint64BE(at: int): uint { return uint.fromBytesBE(this[at..at + 8]); }
+    pub fn getInt16LE(at: int): int16 { return int16.fromBytesLE(this[at..at + 2]); }
+    pub fn getInt16BE(at: int): int16 { return int16.fromBytesBE(this[at..at + 2]); }
+    pub fn getInt32LE(at: int): int32 { return int32.fromBytesLE(this[at..at + 4]); }
+    pub fn getInt32BE(at: int): int32 { return int32.fromBytesBE(this[at..at + 4]); }
+    pub fn getInt64LE(at: int): int { return int.fromBytesLE(this[at..at + 8]); }
+    pub fn getInt64BE(at: int): int { return int.fromBytesBE(this[at..at + 8]); }
+}

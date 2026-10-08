@@ -1,0 +1,135 @@
+// std.encoding (design/v5/spec/10 Q5; M8b S4a): RFC 4648's test vectors for Base64 and Base16,
+// the URL-safe alphabet, the strict decoders' offsets, UTF-16 with a surrogate pair, the integers
+// of a byte slice.
+import std.encoding { Base64, Base64Url, EncodingError, Hex, Utf16 };
+import std.io { ByteBuffer };
+import std.test { assertEq, assertPanics, assertTrue, fail };
+
+fn utf8(s: string): uint8[] {
+    let b = ByteBuffer.new();
+    try! b.writeString(s);
+    return b.toArray();
+}
+
+fn decodeFails(s: string): int {
+    try {
+        let bytes = Base64.decode(s);
+        fail(f"'{s}' decoded to {bytes.length()} bytes");
+    } catch (e: EncodingError) {
+        return e.offset;
+    }
+}
+
+@Test
+fn base64KeepsRfc4648sVectors(): void throws EncodingError {
+    let words = ["", "f", "fo", "foo", "foob", "fooba", "foobar"];
+    let encoded = ["", "Zg==", "Zm8=", "Zm9v", "Zm9vYg==", "Zm9vYmE=", "Zm9vYmFy"];
+    var i = 0;
+    while (i < words.length()) {
+        assertEq(Base64.encode(utf8(words[i])[..]), encoded[i]);
+        assertEq(try Base64.decode(encoded[i]), utf8(words[i]));
+        i = i + 1;
+    }
+}
+
+@Test
+fn base16KeepsRfc4648sVectorsInSmallLetters(): void throws EncodingError {
+    assertEq(Hex.encode(utf8("foobar")[..]), "666f6f626172");
+    assertEq(try Hex.decode("666F6F626172"), utf8("foobar"));
+    assertEq(try Hex.decode("666f6F"), utf8("foo"));
+    assertEq(Hex.encode(utf8("")[..]), "");
+}
+
+@Test
+fn theUrlSafeAlphabetTakesDashAndUnderscore(): void throws EncodingError {
+    let bytes: uint8[] = [0xFBu8, 0xFFu8, 0xBFu8];
+    assertEq(Base64.encode(bytes[..]), "+/+/");
+    assertEq(Base64Url.encode(bytes[..]), "-_-_");
+    assertEq(try Base64Url.decode("-_-_"), bytes);
+    try {
+        Base64Url.decode("+/+/");
+        fail("the standard alphabet decoded as the URL-safe one");
+    } catch (e: EncodingError) {
+        assertEq(e.offset, 0);
+    }
+}
+
+@Test
+fn theDecodersAreStrict(): void {
+    assertEq(decodeFails("Zg="), 3);
+    assertEq(decodeFails("Zg"), 2);
+    assertEq(decodeFails("Zh=="), 1);
+    assertEq(decodeFails("Zm9="), 2);
+    assertEq(decodeFails("Z!=="), 1);
+    assertEq(decodeFails("Zg==Zg=="), 2);
+    assertEq(decodeFails("Zm9v\nYmF"), 4);
+    assertEq(decodeFails("===="), 0);
+    try {
+        Hex.decode("abc");
+        fail("an odd count of digits decoded");
+    } catch (e: EncodingError) {
+        assertEq(e.offset, 3);
+    }
+    try {
+        Hex.decode("0g");
+        fail("a 'g' decoded");
+    } catch (e: EncodingError) {
+        assertEq(e.offset, 1);
+        assertEq(e.message(), "no hexadecimal digit at offset 1");
+    }
+}
+
+@Test
+fn utf16PairsWhatLiesBeyondTheBasicPlane(): void throws EncodingError {
+    let units = Utf16.encode("aé😀");
+    assertEq(units, [0x61u16, 0xE9u16, 0xD83Du16, 0xDE00u16]);
+    assertEq(try Utf16.decode(units[..]), "aé😀");
+    let empty: uint16[] = [];
+    assertEq(try Utf16.decode(empty[..]), "");
+}
+
+@Test
+fn halfASurrogatePairIsNoUtf16(): void {
+    let cases: uint16[][] = [[0xD83Du16], [0xD83Du16, 0x61u16], [0x61u16, 0xDE00u16]];
+    let offsets = [0, 0, 1];
+    var i = 0;
+    while (i < cases.length()) {
+        try {
+            let s = Utf16.decode(cases[i][..]);
+            fail(f"half a pair decoded to '{s}'");
+        } catch (e: EncodingError) {
+            assertEq(e.offset, offsets[i]);
+        }
+        i = i + 1;
+    }
+}
+
+@Test
+fn theIntegersOfAByteSlice(): void {
+    let b: uint8[] = [1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8];
+    let s = b[..];
+    assertEq(s.getUint16LE(0), 0x0201u16);
+    assertEq(s.getUint16BE(6), 0x0708u16);
+    assertEq(s.getUint32LE(4), 0x08070605u32);
+    assertEq(s.getUint32BE(0), 0x01020304u32);
+    assertEq(s.getUint64LE(0), 0x0807060504030201u64);
+    assertEq(s.getInt64BE(0), 0x0102030405060708);
+    let ff: uint8[] = [0xFFu8] * 8;
+    assertEq(ff[..].getInt16BE(0), -1i16);
+    assertEq(ff[..].getInt32LE(4), -1i32);
+    assertEq(ff[..].getInt64LE(0), -1);
+    assertEq(ff[..].getUint64BE(0), 0xFFFFFFFFFFFFFFFFu64);
+    let high: uint8[] = [0x80u8, 0u8];
+    assertEq(int8.fromBytesLE(high[..1]), -128i8);
+    assertEq(int16.fromBytesBE(high[..]), -32768i16);
+    assertEq(int16.fromBytesLE(high[..]), 128i16);
+    assertEq(uint8.fromBytesBE(high[..1]), 128u8);
+}
+
+@Test
+fn aNumberTakesExactlyItsWidth(): void {
+    let four: uint8[] = [0u8] * 4;
+    assertPanics(() => { int.fromBytesLE(four[..]); });
+    assertPanics(() => { four[..].getUint32LE(1); });
+    assertTrue(uint32.fromBytesBE(four[..]) == 0u32);
+}
