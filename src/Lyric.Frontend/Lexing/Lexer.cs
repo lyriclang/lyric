@@ -37,6 +37,12 @@ public sealed class Lexer
         /// <summary>Is the expression at the top level — does a '}' here really end the
         /// interpolation, and does a ':' really separate the format specifier?</summary>
         public bool AtTopLevel => BraceDepth == 0 && ParenDepth == 0 && BracketDepth == 0;
+
+        /// <summary>For FStringText: <c>fr"…"</c> takes a backslash as itself (08 Y7 L5, L8).</summary>
+        public bool Raw { get; init; }
+
+        /// <summary>For FStringText: <c>f"""…"""</c> runs over lines and ends at <c>"""</c> (L6, L8).</summary>
+        public bool Triple { get; init; }
     }
 
     private readonly Stack<ModeFrame> _modeStack = new();
@@ -219,9 +225,21 @@ public sealed class Lexer
             }
         }
 
-        if (Current == 'f' && PeekAt(1) == '"')
+        // 'f"…"', 'fr"…"', 'f"""…"""', 'fr"""…"""' (08 Y7 L8). Each of the prefixed forms was an
+        // identifier before a string before — a syntax error, so no program changes meaning.
+        if (Current == 'f' && (PeekAt(1) == '"' || PeekAt(1) == 'r' && PeekAt(2) == '"'))
         {
             return ScanFStringStart();
+        }
+
+        // 'r"…"', 'r#"…"#', 'r"""…"""' (L5, L6) and 'b"…"' (L7).
+        if (Current == 'r' && (PeekAt(1) == '"' || PeekAt(1) == '#' && HashesThenQuote(1)))
+        {
+            return ScanRawString(_pos);
+        }
+        if (Current == 'b' && PeekAt(1) == '"')
+        {
+            return ScanByteString(_pos);
         }
 
         if (Current == '\0')
@@ -251,7 +269,7 @@ public sealed class Lexer
 
         if (Current == '"')
         {
-            return ScanString(_pos);
+            return PeekAt(1) == '"' && PeekAt(2) == '"' ? ScanMultilineString(_pos, prefix: 0, raw: false) : ScanString(_pos);
         }
 
         if (Current == '\'')
@@ -351,7 +369,9 @@ public sealed class Lexer
         }
 
         var lexme = _source.Substring(identifierStart, _pos - identifierStart);
-        if (Keywords.TryGetValue(lexme, out var kind))
+        // Lyric 5 drops 'module' and 'params' as words (08 Y1): names, which the parser still reads
+        // at the two places the words stood, to say what replaced them.
+        if (Keywords.TryGetValue(lexme, out var kind) && !(_sources.Lyric5 && kind is TokenKind.Module or TokenKind.Params))
             return new Token(kind, new Span(_file, identifierStart, _pos));
 
         return new Token(TokenKind.Identifier, new Span(_file, identifierStart, _pos));
@@ -564,6 +584,112 @@ public sealed class Lexer
         return new Token(TokenKind.StringLiteral, new Span(_file, stringStart, _pos));
     }
 
+    /// <summary>Is <c>'#'</c>* then <c>'"'</c> ahead from <paramref name="offset"/>?</summary>
+    private bool HashesThenQuote(int offset)
+    {
+        while (PeekAt(offset) == '#') offset++;
+        return PeekAt(offset) == '"';
+    }
+
+    /// <summary>
+    /// <c>r"…"</c>, <c>r#"…"#</c> (08 Y7 L5): no escape — the backslash is itself — and the text ends
+    /// at the first <c>"</c> followed by as many <c>#</c> as opened it, so <c>r#"say "hi""#</c> holds
+    /// quotes. One line, as a plain string is; <c>r"""…"""</c> is the multi-line raw form (L6).
+    /// </summary>
+    private Token ScanRawString(int start)
+    {
+        _pos++; // 'r'
+        var hashes = 0;
+        while (Current == '#') { hashes++; _pos++; }
+        if (hashes == 0 && PeekAt(1) == '"' && PeekAt(2) == '"')
+            return ScanMultilineString(start, prefix: 1, raw: true);
+        _pos++; // '"'
+        while (Current is not ('\0' or '\n'))
+        {
+            if (Current == '"' && ClosesWithHashes(hashes))
+            {
+                _pos += 1 + hashes;
+                return new Token(TokenKind.StringLiteral, new Span(_file, start, _pos));
+            }
+            _pos++;
+        }
+        _diagnostics.Report(new Diagnostic("LYR-LEX0009", Severity.Error,
+            new Span(_file, start, _pos), "unterminated string literal"));
+        return new Token(TokenKind.StringLiteral, new Span(_file, start, _pos));
+    }
+
+    private bool ClosesWithHashes(int hashes)
+    {
+        for (var i = 1; i <= hashes; i++)
+            if (PeekAt(i) != '#') return false;
+        return true;
+    }
+
+    /// <summary>
+    /// <c>"""…"""</c> and <c>r"""…"""</c> (08 Y7 L6): over lines, to the next <c>"""</c>; a <c>\"</c>
+    /// does not end it in the escaped form. Its lines and their indentation are the decoder's to
+    /// read (<see cref="Lyric.Parsing.LiteralDecoder"/>), which reports what is wrong with them.
+    /// </summary>
+    private Token ScanMultilineString(int start, int prefix, bool raw)
+    {
+        _pos = start + prefix + 3; // the prefix and '"""'
+        while (Current != '\0')
+        {
+            if (Current == '"' && PeekAt(1) == '"' && PeekAt(2) == '"')
+            {
+                _pos += 3;
+                return new Token(TokenKind.StringLiteral, new Span(_file, start, _pos));
+            }
+            if (Current == '\\' && !raw)
+            {
+                ConsumeEscapeSequence();
+                continue;
+            }
+            _pos++;
+        }
+        _diagnostics.Report(new Diagnostic("LYR-LEX0009", Severity.Error,
+            new Span(_file, start, _pos), "unterminated multi-line string literal"));
+        return new Token(TokenKind.StringLiteral, new Span(_file, start, _pos));
+    }
+
+    /// <summary>
+    /// <c>b"…"</c> (08 Y7 L7): bytes, a <c>uint8[]</c> — ASCII text and the escapes, <c>\xNN</c> any
+    /// byte. A character beyond ASCII has no one byte, and <c>\u{…}</c> names a character, not a
+    /// byte: both are refused here (<c>LYR-LEX0012</c>).
+    /// </summary>
+    private Token ScanByteString(int start)
+    {
+        _pos += 2; // 'b"'
+        while (Current is not ('\0' or '\n'))
+        {
+            if (Current == '"')
+            {
+                _pos++;
+                return new Token(TokenKind.ByteStringLiteral, new Span(_file, start, _pos));
+            }
+            if (Current == '\\')
+            {
+                if (PeekAt(1) == 'u')
+                    _diagnostics.Report(new Diagnostic("LYR-LEX0012", Severity.Error, new Span(_file, _pos, _pos + 2),
+                        "a byte string holds bytes, and '\\u{…}' names a character — write its bytes as '\\xNN'"));
+                ConsumeEscapeSequence(inBytes: true);
+                continue;
+            }
+            if (Current > (char)0x7F)
+            {
+                var pair = char.IsHighSurrogate(Current) && char.IsLowSurrogate(PeekAt(1));
+                _diagnostics.Report(new Diagnostic("LYR-LEX0012", Severity.Error, new Span(_file, _pos, _pos + (pair ? 2 : 1)),
+                    $"a byte string holds ASCII, and '{_source.Substring(_pos, pair ? 2 : 1)}' is none — write its bytes as '\\xNN'"));
+                _pos += pair ? 2 : 1;
+                continue;
+            }
+            _pos++;
+        }
+        _diagnostics.Report(new Diagnostic("LYR-LEX0009", Severity.Error,
+            new Span(_file, start, _pos), "unterminated byte string literal"));
+        return new Token(TokenKind.ByteStringLiteral, new Span(_file, start, _pos));
+    }
+
     private Token ScanChar(int charStart)
     {
         _pos++; //Consume '''
@@ -605,10 +731,15 @@ public sealed class Lexer
         }
     }
 
-    private void ConsumeEscapeSequence()
+    private void ConsumeEscapeSequence(bool inBytes = false)
     {
         _pos++; //Consume '\'
         if (Current is '\0' or '\n') return;
+        // '\xNN' is a byte (08 Y7 L4): a byte string's alone in Lyric 5. In a string or a character
+        // it named a Latin-1 character by its byte, which reads like UTF-8 and is not.
+        if (Current == 'x' && !inBytes && _sources.Lyric5)
+            _diagnostics.Report(new Diagnostic("LYR-LEX0013", Severity.Error, new Span(_file, _pos - 1, _pos + 1),
+                "'\\x' writes a byte, for a byte string 'b\"…\"' — a character is '\\u{…}'"));
         switch (Current)
         {
             case 'n':
@@ -710,21 +841,31 @@ public sealed class Lexer
 
     #region FStrings
 
+    /// <summary><c>f"</c>, <c>fr"</c>, <c>f"""</c> or <c>fr"""</c> (08 Y7 L8): the start token covers the
+    /// prefix and the quotes, so the parser reads the form off its text.</summary>
     private Token ScanFStringStart()
     {
-        _pos += 2; //Consume 'f"'
-        _modeStack.Push(new ModeFrame { Mode = LexMode.FStringText });
-        return new Token(TokenKind.FStringStart, new Span(_file, _pos - 2, _pos));
+        var start = _pos;
+        _pos++; // 'f'
+        var raw = Current == 'r';
+        if (raw) _pos++;
+        var triple = PeekAt(1) == '"' && PeekAt(2) == '"';
+        _pos += triple ? 3 : 1;
+        _modeStack.Push(new ModeFrame { Mode = LexMode.FStringText, Raw = raw, Triple = triple });
+        return new Token(TokenKind.FStringStart, new Span(_file, start, _pos));
     }
+
+    private bool AtFStringEnd => CurrentFrame.Triple ? Current == '"' && PeekAt(1) == '"' && PeekAt(2) == '"' : Current == '"';
 
     private Token ScanFStringText()
     {
-        if (Current is '\0' or '\n') return HandleUnterminatedFString();
-        if (Current == '"')
+        if (Current == '\0' || Current == '\n' && !CurrentFrame.Triple) return HandleUnterminatedFString();
+        if (AtFStringEnd)
         {
-            _pos++;
+            var width = CurrentFrame.Triple ? 3 : 1;
+            _pos += width;
             _modeStack.Pop();
-            return new Token(TokenKind.FStringEnd, new Span(_file, _pos - 1, _pos));
+            return new Token(TokenKind.FStringEnd, new Span(_file, _pos - width, _pos));
         }
 
         // '{{' is a literal brace and belongs to the CHUNK (the lowering folds the pair); a
@@ -738,14 +879,16 @@ public sealed class Lexer
         }
 
         var chunkStart = _pos;
-        while (Current is not ('"' or '\0' or '\n'))
+        var triple = CurrentFrame.Triple;
+        var raw = CurrentFrame.Raw;
+        while (Current != '\0' && !(Current == '\n' && !triple) && !AtFStringEnd)
         {
             if (Current == '{')
             {
                 if (PeekAt(1) == '{') { _pos += 2; continue; }
                 break;
             }
-            if (Current == '\\') ConsumeEscapeSequence();
+            if (Current == '\\' && !raw) ConsumeEscapeSequence();
             else _pos++;
         }
 

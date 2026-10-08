@@ -557,7 +557,7 @@ public sealed partial class Parser
     /// its successor: 'comptime x' is the prefix, 'comptime + 1' is a name.</summary>
     private static bool BeginsExpression(TokenKind kind) => kind is TokenKind.Identifier
         or TokenKind.IntLiteral or TokenKind.FloatLiteral or TokenKind.StringLiteral
-        or TokenKind.CharLiteral or TokenKind.FStringStart or TokenKind.True or TokenKind.False
+        or TokenKind.ByteStringLiteral or TokenKind.CharLiteral or TokenKind.FStringStart or TokenKind.True or TokenKind.False
         or TokenKind.LParen or TokenKind.LBracket or TokenKind.Minus or TokenKind.Exclamation
         or TokenKind.Tilde or TokenKind.If or TokenKind.Match;
 
@@ -584,6 +584,12 @@ public sealed partial class Parser
                 var value = LiteralDecoder.DecodeString(_sm.Slice(cur.Span), cur.Span, _de);
                 _buffer.Advance();
                 return new StringLiteralExpr(value, cur.Span);
+            }
+            case TokenKind.ByteStringLiteral:
+            {
+                var bytes = LiteralDecoder.DecodeBytes(_sm.Slice(cur.Span), cur.Span, _de);
+                _buffer.Advance();
+                return new ByteStringExpr(bytes, cur.Span);
             }
             case TokenKind.CharLiteral:
             {
@@ -1093,7 +1099,44 @@ public sealed partial class Parser
             break;
         }
 
-        return new InterpolatedStringExpr(segments.ToArray(), Span.Union(start.Span, end.Span));
+        var whole = Span.Union(start.Span, end.Span);
+        return new InterpolatedStringExpr(DecodeTexts(segments, _sm.Slice(start.Span).ToString(), whole), whole);
+    }
+
+    /// <summary>
+    /// The value of every text of an f-string, from its start token's form (08 Y7 L8): <c>fr"</c>
+    /// resolves no escape, <c>f"""</c> takes the lines' indentation off as a multi-line string does
+    /// (L6) — over the texts as one, a hole standing for what it holds, so a line that begins with
+    /// a hole is indented like any other.
+    /// </summary>
+    private InterpSegment[] DecodeTexts(List<InterpSegment> segments, string opening, Span whole)
+    {
+        var raw = opening.StartsWith("fr", StringComparison.Ordinal);
+        var triple = opening.EndsWith("\"\"\"", StringComparison.Ordinal);
+        string Fold(string text) => text.Replace("{{", "{").Replace("}}", "}");
+        if (!triple)
+            return segments.Select(s => s is InterpText t ? t with { Value = raw ? Fold(t.Text) : Escapes.Resolve(Fold(t.Text)) } : s).ToArray();
+
+        // A hole stands as '\0', which no text holds — the lexer ends a source at it.
+        var joined = string.Concat(segments.Select(s => s is InterpText t ? t.Text : "\0"));
+        var pieces = LiteralDecoder.Dedent(joined, whole, _de).Split('\0');
+        var decoded = new List<InterpSegment>(segments.Count);
+        var at = 0;
+        for (var i = 0; i < segments.Count; i++)
+        {
+            if (segments[i] is InterpText text)
+            {
+                var piece = at < pieces.Length ? pieces[at] : "";
+                decoded.Add(text with { Value = raw ? Fold(piece) : Escapes.Resolve(Fold(piece)) });
+            }
+            else
+            {
+                // A hole ends the piece before it, written or not.
+                decoded.Add(segments[i]);
+                at++;
+            }
+        }
+        return decoded.ToArray();
     }
 
     // ---------------------------------------------------------------------

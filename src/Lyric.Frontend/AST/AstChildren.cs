@@ -246,6 +246,7 @@ public static class AstChildren
             case IntLiteralExpr:
             case FloatLiteralExpr:
             case StringLiteralExpr:
+            case ByteStringExpr:
             case CharLiteralExpr:
             case BoolLiteralExpr:
             case NullLiteralExpr:

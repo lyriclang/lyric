@@ -50,7 +50,7 @@ public static class SourceCompiler
     private static CompileResult Run(ScriptSource source, Stage stage, CompilerOptions options)
     {
         var report = options.Progress;
-        var sources = new SourceManager();
+        var sources = new SourceManager { Lyric5 = options.PackageRoots is not null };
         var diagnostics = new DiagnosticEngine(sources);
 
         report?.BeginPhase(Phase.Read, source.DisplayName);
@@ -272,7 +272,7 @@ public static class SourceCompiler
         IReadOnlyList<ScriptSource> roots, CompilerOptions? options = null)
     {
         options ??= new CompilerOptions();
-        var sources = new SourceManager();
+        var sources = new SourceManager { Lyric5 = options.PackageRoots is not null };
         var diagnostics = new DiagnosticEngine(sources);
 
         var loader = BuildModuleLoader(sources, diagnostics, options,

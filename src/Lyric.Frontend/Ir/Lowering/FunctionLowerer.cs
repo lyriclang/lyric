@@ -2505,6 +2505,7 @@ internal sealed class FunctionLowerer
         BoolLiteralExpr e => EmitConst(new BoolConst(e.Value), TypeOfExpr(e), e.Span),
         CharLiteralExpr e => EmitConst(new CharConst(e.CodePoint), TypeOfExpr(e), e.Span),
         StringLiteralExpr e => EmitConst(new StringConst(e.Value), TypeOfExpr(e), e.Span),
+        ByteStringExpr e => LowerByteString(e),
         IdentifierExpr e => LowerIdentifier(e),
         TypePathExpr e => LowerInstantiatedFunction(e),
         ImplicitMemberExpr e => LowerImplicitMember(e),
@@ -4804,6 +4805,16 @@ internal sealed class FunctionLowerer
 
     /// <summary><c>[a, b, c]</c> — one instruction rather than three stores. The values lie on the stack
     /// in source order at the <c>newarr</c>.</summary>
+    /// <summary><c>b"…"</c> (08 Y7 L7): a new <c>uint8[]</c> of its bytes, as an array literal of them is.</summary>
+    private TempId LowerByteString(ByteStringExpr expr)
+    {
+        var u8 = new IrScalarType(IrScalar.U8);
+        var bytes = expr.Bytes.Select(b => EmitConst(new IntConst(b), u8, expr.Span)).ToArray();
+        var dest = _slots.NewTemp(new IrArrayType(u8));
+        _b.Emit(new NewArray(dest, u8, bytes, expr.Span));
+        return dest;
+    }
+
     private TempId LowerArrayLiteral(ArrayLitExpr expr)
     {
         // '[a, b, c]' as a 'T[3]' (03 T13 A4): the inline array, a fresh value.
@@ -7441,12 +7452,10 @@ internal sealed class FunctionLowerer
             switch (segment)
             {
                 case InterpText text:
-                    // The parser stores the text pieces raw (see InterpText); the escapes are resolved
-                    // here, and the doubled braces of the f-string form fold to one — '{{' and '}}'
-                    // are the grammar's literal-brace escape, and they exist only in THESE chunks.
+                    // The parser decoded the text (InterpText.Value): the doubled braces folded, the
+                    // escapes resolved — not in a raw f-string —, a multi-line one's indentation off.
                     // Adjacent pieces collect into one constant.
-                    pendingText.Append(Escapes.Resolve(
-                        text.Text.Replace("{{", "{").Replace("}}", "}")));
+                    pendingText.Append(text.Value);
                     break;
 
                 case InterpHole hole:

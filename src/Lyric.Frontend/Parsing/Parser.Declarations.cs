@@ -46,10 +46,10 @@ public sealed partial class Parser
         var leading = ParseAttributeList();
         AttributeNode[] moduleAttributes = [];
         AttributeNode[] pending = [];
-        if (_buffer.Check(TokenKind.Module)) moduleAttributes = leading;
+        if (AtModuleHeader) moduleAttributes = leading;
         else pending = leading;
 
-        ModulePath? header = _buffer.Check(TokenKind.Module) ? ParseModuleHeader() : null;
+        ModulePath? header = AtModuleHeader ? ParseModuleHeader() : null;
 
         var decls = new List<Decl>();
         while (!_buffer.AtEnd)
@@ -181,6 +181,11 @@ public sealed partial class Parser
         return new AttributeNode(path.ToArray(), fields.ToArray(), Span.Union(first.Span, end))
             { PathSpan = Span.Union(first.Span, pathEnd), NameSpan = nameSpan, Positional = positional };
     }
+
+    /// <summary>A <c>module</c> header ahead: the word, or in Lyric 5 the name <c>module</c> before a
+    /// path (08 Y1) — read as the header still, for the resolver to refuse it (LYR-RES0008).</summary>
+    private bool AtModuleHeader => _buffer.Check(TokenKind.Module)
+        || AtContextual("module") && _buffer.Peek(1).TokenKind == TokenKind.Identifier;
 
     private ModulePath ParseModuleHeader()
     {
@@ -548,6 +553,14 @@ public sealed partial class Parser
             var attributes = ParseAttributeList();
 
             var isParams = _buffer.Match(TokenKind.Params);
+            // In Lyric 5 'params' is a name (08 Y1); before a parameter's name it is still Lyric 4's
+            // word, which the sema refuses with the form that replaced it (LYR-SEM0024).
+            if (!isParams && AtContextual("params") && _buffer.Peek(1).TokenKind == TokenKind.Identifier
+                && _buffer.Peek(2).TokenKind == TokenKind.Colon)
+            {
+                _buffer.Advance();
+                isParams = true;
+            }
             // '&x: T' (design/v5/spec/03 T12): the mark at the parameter, never at the type.
             var isPlace = _buffer.Match(TokenKind.Amp);
             var name = ExpectNamed("LYR-PAR0026", "parameter name");

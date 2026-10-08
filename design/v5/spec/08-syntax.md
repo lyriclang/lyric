@@ -57,6 +57,14 @@ stehen kann. `quote {` und `comptime {` sähen aus wie ein Trailing-Lambda-Aufru
 | **Bibliothek, keine Wörter** | `wait`, `await`, `spawn`, `select`, `panic`, `assert`, `new`, `main`, `it` |
 | **Bewusst nicht** | `const`, `async`/`await`, `unsafe`, `where`, `override`/`abstract`/`super`/`virtual`, `impl`, `switch`/`case`/`goto`/`finally`, `ref`, `inout`, `params` |
 
+*Prüfung 2026-10-07 (N2e):* die Zählung „31“ war falsch — die Liste nennt 39. **`loop`** und
+**`using`** hat die Spec kontextuell entschieden (07 §1 Regel 1: ein Wort nur vor seinem `{`;
+06 §7: nur vor `let`/`var`; je mit Fall) — sie stehen weiter in der Liste, gelten aber als
+kontextuell. **`quote`** und **`comptime`** werden mit M9a reserviert, wenn ihre Formen kommen
+(`comptime e` ist bis dahin ein kontextuelles Präfix). **`module`** und **`params`** sind in Lyric 5
+Namen; an ihrer alten Stelle liest der Parser sie noch, um sie abzulehnen (`LYR-RES0008`,
+`LYR-SEM0024`).
+
 **Zeichen statt Wörter** (Maintainer): **`&x: T` + Aufruf `&x`** statt `inout` — das Zeichen am
 Parameter, nicht am Typ (geändert 2026-09-30, vorher `x: &T`; Begründung in 03 T12; Präfix-`&`
 war frei) · **`nums: int...`** statt `params` (Java/Go) · **`throws [A, B]`** — die Liste in

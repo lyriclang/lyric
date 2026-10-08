@@ -154,9 +154,12 @@ namespace Lyric.Parsing
             var c = Current;
             if (!Check(kind))
             {
-                _de.Report(new Diagnostic(code, Severity.Error, Current.Span, message,
-                    ReservedWordNote(kind, c.TokenKind)));
-                return c;
+                var note = ReservedWordNote(kind, c.TokenKind);
+                _de.Report(new Diagnostic(code, Severity.Error, Current.Span, message, note));
+                // A keyword where a name belongs is taken as the name: the parse goes on as the
+                // writer meant it, and the one error stands alone. 'let match = 1;' read the rest as
+                // a match expression and reported six more.
+                return note is not null ? Advance() : c;
             }
             return Advance();
         }

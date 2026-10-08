@@ -546,6 +546,9 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   **N3a**: the texts — comments that promised a finished milestone, the CHANGELOG's M8a entry,
   this file's claims about M8a and wepoll, design 01/04/10/13; the audit's clocks stand in 13
   ("Nachtrag 2026-10-07 — Prüfung M0–M8a und der Nachholblock N").
+  **N2e**: the literals 08 Y7 decided — raw strings `r"…"`/`r#"…"#`, multi-line `"""…"""` without
+  the closing line's indentation, byte strings `b"…"` (a `uint8[]`), `fr"…"`/`f"""…"""`; `\x` is a
+  byte string's alone; `module` and `params` are names; spec chapter 01 written (15 cases).
 
 ### M8a — done (2026-10-07)
 
