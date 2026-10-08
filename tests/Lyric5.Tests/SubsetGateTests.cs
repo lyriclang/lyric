@@ -99,7 +99,7 @@ public class SubsetGateTests
     [Fact]
     public void A_native_function_outside_the_intrinsic_table_is_refused()
     {
-        Assert.Contains("std.io.println", SubsetGate.Intrinsics);
+        Assert.Contains("std.io.consolePut", SubsetGate.Intrinsics);
         Assert.DoesNotContain("std.io.console.println", SubsetGate.Intrinsics);
     }
 }

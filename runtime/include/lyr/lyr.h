@@ -19,5 +19,6 @@
 #include "lyr/random.h"
 #include "lyr/os.h"
 #include "lyr/fs.h"
+#include "lyr/console.h"
 
 #endif

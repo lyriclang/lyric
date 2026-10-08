@@ -1,8 +1,9 @@
 // Ctrl+C shuts the program down (design/v5/spec/06 K5; 10 Q9, §12) — the plan's M6 example. A
 // worker runs until the program is told to stop; User1 only asks how it goes. The test sends User1
 // twice, then Interrupt, each once the line before it came. Expected stdout: ready, got User1,
-// got User1, interrupted: shutting down, worker stopped, done — and exit 0.
-import std.io { println };
+// got User1, interrupted: shutting down, worker stopped, done — and exit 0. Its stdout is a pipe,
+// held a block at a time (10 O9): each line the test waits for while it runs is flushed.
+import std.io { flush, println };
 import std.task { spawn, sleep, Select, Cancelled };
 import std.os { Signal, signals };
 import std.time { Duration };
@@ -20,10 +21,12 @@ fn main(): void throws Error {
         }
     });
     println("ready");
+    flush();
     var running = true;
     while (running) {
         try Select.on(user) {
             println("got User1");
+            flush();
         }.on(stop) {
             println("interrupted: shutting down");
             running = false;

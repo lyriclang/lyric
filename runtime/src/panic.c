@@ -1,5 +1,6 @@
 /* The panic path (05 E8): message, backtrace, hook, exit 101. */
 #include "internal.h"
+#include "lyr/console.h"
 #include "lyr/init.h"
 #include "lyr/types.h"
 
@@ -54,6 +55,9 @@ LYR_NORETURN static void report_and_end(const char *code, const char *message, c
     }
     this_thread_panicking = 1;
     if (atomic_exchange(&panicking, 1)) lyr_panic_wait();
+    /* what the program wrote before, ahead of the report (10 O9); a stream another thread holds is
+     * left, and none in a signal handler, where no lock is to be taken */
+    if (!in_handler) lyr_console_flush_all(0);
 
     snprintf(message_copy, sizeof message_copy, "%s", message);
     int n = snprintf(report, sizeof report, "panic [%s]: %s\n", code, message_copy);

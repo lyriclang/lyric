@@ -1,0 +1,14 @@
+// What was written before an error leaves main comes out ahead of its report (10 O9; M8b S8a):
+// stdout "before error", then "error: gone" on stderr, exit 1.
+import std.io { println };
+
+struct Gone :: [Error] {
+    fn message(): string {
+        return "gone";
+    }
+}
+
+fn main(): void throws Error {
+    println("before error");
+    throw Gone { };
+}

@@ -9,8 +9,10 @@ public static class Intrinsics
 {
     private static readonly IReadOnlyDictionary<string, string> Runtime = new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        ["std.io.print"] = "lyr_print",
-        ["std.io.println"] = "lyr_println",
+        // The console's buffers (M8b S8a, lyr/console.h): std.io's print family puts, and flushes
+        // where a flush is due — on the I/O pool where a scheduler runs.
+        ["std.io.consolePut"] = "LYR_CONSOLE_PUT",
+        ["std.io.consoleFlush"] = "lyr_console_flush",
         ["std.string.concat"] = "lyr_str_concat",
         ["std.string.fromInt"] = "lyr_str_from_int",
         ["std.string.fromUint"] = "lyr_str_from_uint",

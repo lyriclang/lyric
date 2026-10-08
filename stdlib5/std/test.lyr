@@ -5,7 +5,7 @@
 /// it, and names the expression it got it from (X1): `xs.length() = 2, expected 3`. The actual
 /// value comes first (N13).
 
-import std.io { println };
+import std.io { flush, println };
 import std.task { spawn, sleep, PanicInfo, TaskStatus, Cancelled, monotonicNanos };
 import std.thread { Thread };
 import std.sync { Atomic };
@@ -21,8 +21,8 @@ pub struct TestCase {
     pub timeout: int = 60,
 }
 
-/// Ends the process at once — no handler runs, nothing is left to flush: the runtime writes
-/// unbuffered. The watchdog's way out of a test that does not stop.
+/// Ends the process at once — no handler runs, and nothing flushes what the console holds: the
+/// watchdog flushes first (M8b S8a). Its way out of a test that does not stop.
 extern "C" fn _exit(status: int32): void;
 
 /// The running test, for the watchdog on a thread of its own (X3): which, and until when it may
@@ -121,6 +121,7 @@ fn guard(cases: TestCase[]): void throws Cancelled {
             let c = cases[watch.current.load()];
             println(f"FAIL  {c.name}");
             println(f"      timed out after {c.timeout} s — the run ends here");
+            flush();
             _exit(1);
         }
     }

@@ -98,7 +98,7 @@ public class PoolAndSignalTests
     {
         if (OperatingSystem.IsWindows()) return;
         var exe = Built("""
-            import std.io { println };
+            import std.io { flush, println };
             import std.task { sleep };
             import std.os { Signal, signals };
             import std.time { Duration };
@@ -108,6 +108,7 @@ public class PoolAndSignalTests
                 println("ready");
                 user.close();
                 println("closed");
+                flush();
                 try sleep(Duration.ofSecs(3));
                 println("still here");
             }

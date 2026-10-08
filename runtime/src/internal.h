@@ -59,6 +59,10 @@ size_t lyr_trace_format_pcs(char *out, size_t capacity, const uintptr_t *pcs, in
  * handler (in_handler: leave through _Exit, not exit). */
 LYR_NORETURN void lyr_panic_report(const char *code, const char *message, const LyrFault *fault, int in_handler);
 
+/* init.c — whether a host's writer takes the stream (1 or 2): console.c holds it a line at a time
+ * then (M8b S8a). */
+int lyr_stream_hooked(int fd);
+
 /* crash.c — handlers for fault signals (10 Q9: a crash, not a panic) and for stack overflow (a
  * panic, 01 S3), installed only when the configuration asks (a host owns its signals). Every
  * thread that runs Lyric code needs its own alternate signal stack: the thread functions set it

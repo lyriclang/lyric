@@ -17,6 +17,9 @@ int lyr_test_run_main(int argc, char **argv, int64_t (*program_main)(void)) {
     config.install_signal_handlers = 1;
     if (lyr_init(&config) != 0) return 3;
     int64_t result = program_main();
+    /* the program's output is held in the console's buffers (lyr/console.h): out first, so the
+     * line below comes after it */
+    lyr_console_flush_all(1);
     char line[64];
     int n = snprintf(line, sizeof line, "collections %zu\n", lyr_gc_collections());
     lyr_write_stdout(line, (size_t)n);
