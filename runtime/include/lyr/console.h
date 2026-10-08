@@ -1,9 +1,10 @@
 /* The console's two buffered streams (design/v5/spec/10 O9; 13 M8b P3): the standard output (1)
- * and the standard error (2), 8 KiB each under a lock of their own. A stream holds a line at a
+ * and the standard error (2), 8 KiB each under a lock of their own. The output holds a line at a
  * time where it is a terminal or a host's writer takes it (11 W5 H1), a block otherwise — decided
- * at its first put. std.io puts and, where a flush is due, decides where it runs: on the I/O pool
- * where a scheduler runs, on the thread otherwise. Every end of the program flushes both: the
- * runtime's stop, a panic's report, an error that leaves main.
+ * at its first put; the error always a line (10 Review 2026-10-08). std.io puts and, where a flush
+ * is due, decides where it runs: on the I/O pool where a scheduler runs, on the thread otherwise.
+ * Every end of the program flushes both: the runtime's stop, a panic's report, an error that
+ * leaves main.
  *
  * The buffers are the runtime's, not the library's: only the runtime sees every end. lyr_print,
  * lyr_println and lyr_write_* (lyr/init.h) stay a host's unbuffered way to the same streams. */
@@ -26,6 +27,16 @@ int64_t lyr_console_flush(int64_t stream);
 /* Both streams written, failures dropped — at every end of the program. With `waiting` 0 a stream
  * another thread holds is left as it is (a panic must not wait on a write that blocks). */
 void lyr_console_flush_all(int waiting);
+
+/* Both streams written at the runtime's stop — print's last flush, so a standard output nobody
+ * reads ends the program as lyr_console_gone does. */
+void lyr_console_finish(void);
+
+/* A print's flush found nobody reading the standard output (10 Review 2026-10-08, Go's way): the
+ * program ends quietly of SIGPIPE, as the signal would have ended it — the standard error written
+ * first. Only where the runtime owns the process's signals; a host decides itself, and Windows,
+ * without the signal, goes on as Go goes on there. A Writer of stdout() throws BrokenPipe still. */
+void lyr_console_gone(void);
 
 /* At most `n` bytes of the standard input into `into` (M8b S8b): how many, 0 at its end, or a
  * failure as lyr/fs.h writes one. A Windows console is read as UTF-16 and given as UTF-8 — at

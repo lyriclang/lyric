@@ -22,6 +22,7 @@ typedef SRWLOCK ConsoleLock;
 #else
 #  include <errno.h>
 #  include <pthread.h>
+#  include <signal.h>
 #  include <unistd.h>
 typedef pthread_mutex_t ConsoleLock;
 #  define CONSOLE_LOCK_INIT PTHREAD_MUTEX_INITIALIZER
@@ -45,8 +46,10 @@ static Stream streams[2] = { { CONSOLE_LOCK_INIT, UNDECIDED, 0, { 0 } }, { CONSO
 
 static Stream *stream_of(int64_t stream) { return &streams[stream == 2 ? 1 : 0]; }
 
+/* The standard error always a line at a time (Review 2026-10-08, Python's way): a diagnostic in a
+ * log or a CI job comes out when it is written, not 8 KiB later. */
 static int a_line_at_a_time(int fd) {
-    if (lyr_stream_hooked(fd)) return 1;
+    if (fd == 2 || lyr_stream_hooked(fd)) return 1;
 #if defined(_WIN32)
     DWORD mode;
     return GetConsoleMode(GetStdHandle(fd == 1 ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE), &mode) != 0;
@@ -123,6 +126,22 @@ void lyr_console_flush_all(int waiting) {
         s->used = 0;
         console_unlock(&s->lock);
     }
+}
+
+void lyr_console_finish(void) {
+    int64_t out = lyr_console_flush(1);
+    (void)lyr_console_flush(2);
+    if (out < 0 && (-out) >> 32 == LYR_IO_BROKEN_PIPE) lyr_console_gone();
+}
+
+void lyr_console_gone(void) {
+#if !defined(_WIN32)
+    if (!lyr_signals_allowed()) return;
+    (void)lyr_console_flush(2);
+    signal(SIGPIPE, SIG_DFL);
+    raise(SIGPIPE);
+    _exit(128 + SIGPIPE);
+#endif
 }
 
 #if defined(_WIN32)

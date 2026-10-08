@@ -9,13 +9,15 @@ import std.thread { Pool };
 
 // ---------------------------------------------------------------------------------------------
 // The console's output (10 O9; 13 M8b P3, S8a): the standard output and the standard error, each
-// buffered in the runtime (lyr/console.h) — a line at a time where it is a terminal, a block
-// otherwise — and flushed at every end of the program: its last line, a panic's report, an error
-// that leaves main. One argument each: an f-string formats more, `println(f"{n} left")`.
+// buffered in the runtime (lyr/console.h) — the output a line at a time where it is a terminal, a
+// block otherwise; the error always a line (Review 2026-10-08) — and flushed at every end of the
+// program: its last line, a panic's report, an error that leaves main. One argument each: an
+// f-string formats more, `println(f"{n} left")`.
 // ---------------------------------------------------------------------------------------------
 
 fn consolePut(stream: int, from: Slice<uint8>): int;
 fn consoleFlush(stream: int): int;
+fn consoleGone(): void;
 
 /// `v`'s text on the standard output.
 pub fn print<T :: [Display]>(v: T): void {
@@ -47,7 +49,7 @@ pub fn flush(): void {
 }
 
 /// `text` into the stream's buffer, and a flush wherever one is due. A failed write is dropped, as
-/// Go's `fmt.Print` drops it.
+/// Go's `fmt.Print` drops it — but a standard output nobody reads ends the program (`drop`).
 fn put(stream: int, text: StringView): void {
     var rest = viewBytes(text);
     while (!rest.isEmpty()) {
@@ -59,9 +61,14 @@ fn put(stream: int, text: StringView): void {
     }
 }
 
-/// The stream's buffer written, a failure dropped.
+/// The stream's buffer written, a failure dropped. A `BrokenPipe` on the standard output ends the
+/// program quietly, as SIGPIPE would have ended it (Review 2026-10-08, Go's way): `prog | head -1`
+/// stops when `head` does. Not on Windows, which has no such signal — Go goes on there too.
 fn drop(stream: int): void {
-    let _ = flushed(stream);
+    let answer = flushed(stream);
+    if (stream == 1 && answer < 0 && ((-answer) >> 32) == 13) {
+        consoleGone();
+    }
 }
 
 /// The stream's buffer written: on the I/O pool where a scheduler runs, so a blocked write parks

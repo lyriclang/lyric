@@ -5,9 +5,10 @@ namespace Lyric5.Tests;
 
 /// <summary>
 /// The console's output (design/v5/spec/10 O9; 13 M8b P3, S8a): print, println, eprint and eprintln
-/// over <c>Display</c>, each stream buffered in the runtime — a line at a time at a terminal, a block
-/// otherwise — and flushed at every end of the program. The order of the two streams in ONE pipe
-/// is what tells the modes apart: the harness captures them apart, a shell or a pty joins them.
+/// over <c>Display</c>, each stream buffered in the runtime — the output a line at a time at a
+/// terminal and a block otherwise, the error always a line (10 Review 2026-10-08, S8c) — and
+/// flushed at every end of the program. The order of the two streams in ONE pipe is what tells the
+/// modes apart: the harness captures them apart, a shell or a pty joins them.
 /// </summary>
 public class ConsoleTests
 {
@@ -24,13 +25,13 @@ public class ConsoleTests
     }
 
     [Fact]
-    public void Through_one_pipe_each_stream_comes_a_block_at_a_time_the_output_first()
+    public void Through_one_pipe_the_output_comes_a_block_at_a_time_and_the_error_a_line()
     {
         if (OperatingSystem.IsWindows()) return;
         var program = RuntimeBuildTests.BuildEmitted(CEmitterTests.EmitC("console"), "console-pipe", Profile.Debug);
         var joined = ProcessRunner.Run("/bin/sh", ["-c", $"'{program}' 2>&1"], TimeSpan.FromSeconds(30));
         Assert.Equal(0, joined.ExitCode);
-        Assert.Equal(Out + Err, joined.Stdout);
+        Assert.Equal(Err + Out, joined.Stdout);
     }
 
     [Fact]
@@ -87,5 +88,24 @@ public class ConsoleTests
         var program = RuntimeBuildTests.BuildEmitted(CEmitterTests.EmitC("console_pipe"), "console_pipe", Profile.Debug);
         var result = ProcessRunner.Run("/bin/sh", ["-c", $"env --default-signal=PIPE '{program}' | true"], TimeSpan.FromSeconds(30));
         Assert.Equal("broken pipe (written to the standard output)\n", result.Stderr);
+    }
+
+    /// <summary>
+    /// print into a pipe nobody reads ends the program as SIGPIPE would (10 Review 2026-10-08, Go's
+    /// way; S8c): `prog | head -1` stops when head does, while a Writer of stdout() still hears
+    /// BrokenPipe (above). A print's own flush, or the end's, which writes what print left. The
+    /// shell reports the program's status itself: 128 + 13. Linux only, as above; Windows has no
+    /// such signal and goes on, as Go does there.
+    /// </summary>
+    [Theory]
+    [InlineData("console_gone")]
+    [InlineData("console_gone_at_end")]
+    public void Print_into_a_pipe_nobody_reads_ends_the_program_as_the_signal_would(string name)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        var program = RuntimeBuildTests.BuildEmitted(CEmitterTests.EmitC(name), name, Profile.Debug);
+        var result = ProcessRunner.Run("/bin/sh", ["-c", $"{{ env --default-signal=PIPE '{program}'; echo $? >&2; }} | true"],
+            TimeSpan.FromSeconds(30));
+        Assert.Equal("141\n", result.Stderr);
     }
 }

@@ -1,0 +1,12 @@
+// A standard output nobody reads ends a printing program (design/v5/spec/10 Review 2026-10-08,
+// Go's way): the print whose flush finds the pipe gone ends it quietly of SIGPIPE — what it
+// prints after never comes. Run as `program | true`: a megabyte is more than any pipe holds, so
+// a flush fails whether or not `true` has gone yet. Expected: no stderr, killed by SIGPIPE.
+import std.io { eprintln, println };
+
+fn main(): void {
+    for (i in 0..100000) {
+        println(f"line {i}");
+    }
+    eprintln("still here");
+}

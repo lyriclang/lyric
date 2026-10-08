@@ -14,6 +14,7 @@ public static class Intrinsics
         ["std.io.consolePut"] = "LYR_CONSOLE_PUT",
         ["std.io.consoleFlush"] = "lyr_console_flush",
         ["std.io.consoleRead"] = "LYR_CONSOLE_READ",
+        ["std.io.consoleGone"] = "lyr_console_gone",
         ["std.string.concat"] = "lyr_str_concat",
         ["std.string.fromInt"] = "lyr_str_from_int",
         ["std.string.fromUint"] = "lyr_str_from_uint",
