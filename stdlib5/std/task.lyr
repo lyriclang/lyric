@@ -1305,6 +1305,9 @@ class Scheduler {
     var joined: bool = false,
     var nextLiving: ?Scheduler = null,
     var prevLiving: ?Scheduler = null,
+    /// The thread's random generator's state (10 Q2), `std.random`'s to lay out and to fill: made
+    /// at its first use on the thread, as an array, so this module names no type of that one.
+    var randomState: ?uint32[] = null,
 
     /// The thread begins to run this scheduler: from here a waker on another thread wakes it.
     mut fn started(): void {
@@ -1716,6 +1719,16 @@ var channelIds: int = 0;
 /// The running thread's scheduler: there is one wherever a task runs.
 fn here(): Scheduler {
     return currentScheduler() ?? panic("a wait where no task runs");
+}
+
+/// The running thread's random generator's state, if it has one yet (std.random's free forms).
+fn threadRandomState(): ?uint32[] {
+    return here().randomState;
+}
+
+/// Keeps `state` as the running thread's random generator's.
+fn keepThreadRandomState(state: uint32[]): void {
+    here().randomState = state;
 }
 
 /// The two heaps of sleepers as one: the earlier root on top, the other merged down its right
