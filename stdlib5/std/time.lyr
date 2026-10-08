@@ -207,8 +207,9 @@ fn unitNanos(name: string): uint {
 }
 
 /// A moment on the wall clock, in nanoseconds since 1970-01-01T00:00:00Z — POSIX time, no leap
-/// seconds counted (10 Q1). Two compare and order as the moments they are.
-pub struct Instant :: [Equatable, Ordered, TotalOrder, Hashable, Add<Duration>] {
+/// seconds counted (10 Q1): the years 1677 to 2262. Two compare and order as the moments they are.
+/// Its text is RFC 3339 in UTC, `2026-10-08T12:34:56.5Z`, the fraction without trailing zeros.
+pub struct Instant :: [Equatable, Ordered, TotalOrder, Hashable, Add<Duration>, Display, Parse] {
     ns: int,
 
     /// Now, on the system's wall clock — which the system may set back: for how long something
@@ -237,7 +238,29 @@ pub struct Instant :: [Equatable, Ordered, TotalOrder, Hashable, Add<Duration>] 
     pub fn since(earlier: Instant): Duration {
         return Duration.ofNanos(this.ns - earlier.ns);
     }
+
+    /// The date, the time of day and the offset this moment is in `zone`.
+    pub fn toDateTime(zone: Zone): DateTime {
+        let local = this.ns + zone.offset().nanos();
+        let days = floorDiv(local, nanosPerDay);
+        let rest = local - days * nanosPerDay;
+        let time = Time { h = rest / 3600000000000, mi = rest / 60000000000 % 60,
+            s = rest / 1000000000 % 60, n = rest % 1000000000 };
+        return DateTime { d = fromDays(days), t = time, off = zone.offset().nanos() };
+    }
+
+    /// RFC 3339 in UTC.
+    pub fn show(): string {
+        return this.toDateTime(Zone.utc).show();
+    }
+
+    /// An RFC 3339 date-time at any offset, the moment it names.
+    pub static fn parse(s: StringView): Instant throws ParseError {
+        return (try DateTime.parse(s)).toInstant();
+    }
 }
+
+let nanosPerDay = 86400000000000;
 
 fn floorDiv(a: int, b: int): int {
     let q = a / b;
@@ -257,4 +280,336 @@ pub struct Monotonic {
     pub fn elapsed(): Duration {
         return Duration.ofNanos(lyr_clock_monotonic_ns() - this.ns);
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The calendar (10 Q1; M8b S5b): the proleptic Gregorian one, every year an `int` holds. A day is
+// counted from 1970-01-01 through Howard Hinnant's civil algorithms ("chrono-Compatible Low-Level
+// Date Algorithms"). The time zones are fixed offsets here; their database comes with M10.
+// ---------------------------------------------------------------------------------------------
+
+/// What is no date, no time of day, no offset (10 Q1): February 30th, 24:00, an offset of 90
+/// seconds.
+pub struct TimeError :: [Error] {
+    pub detail: string,
+
+    pub fn message(): string {
+        return this.detail;
+    }
+}
+
+/// The days of the week, Monday first (ISO 8601).
+pub enum Weekday :: [Equatable, Debug] {
+    Monday,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday,
+    Sunday,
+}
+
+extend Weekday :: [Display] {
+    fn show(): string {
+        return match (this) {
+            .Monday => "Monday",
+            .Tuesday => "Tuesday",
+            .Wednesday => "Wednesday",
+            .Thursday => "Thursday",
+            .Friday => "Friday",
+            .Saturday => "Saturday",
+            .Sunday => "Sunday",
+        };
+    }
+}
+
+/// A day of the proleptic Gregorian calendar (10 Q1). Its text is ISO 8601's, `2026-10-08`; a year
+/// outside 0000–9999 shows its sign and its digits, `+10000-01-01`, which RFC 3339 does not read
+/// back.
+pub struct Date :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
+    y: int,
+    m: int,
+    d: int,
+
+    /// The date `year-month-day`, or a `TimeError` where there is none — a month outside 1–12, a
+    /// day beyond the month's.
+    pub static fn of(year: int, month: int, day: int): Date throws TimeError {
+        if (month < 1 || month > 12) {
+            throw TimeError { detail = f"there is no month {month}" };
+        }
+        if (day < 1 || day > daysIn(year, month)) {
+            throw TimeError { detail = f"there is no day {day} in {yearText(year)}-{twoDigits(month)}" };
+        }
+        return Date { y = year, m = month, d = day };
+    }
+
+    pub fn year(): int { return this.y; }
+    pub fn month(): int { return this.m; }
+    pub fn day(): int { return this.d; }
+
+    /// Whether the date's year has a February 29th: divisible by 4, and by 400 where by 100.
+    pub fn isLeapYear(): bool {
+        return isLeap(this.y);
+    }
+
+    pub fn dayOfWeek(): Weekday {
+        // 1970-01-01 was a Thursday: day 0 is weekday 3 counted from Monday as 0
+        let k = (floorRem(daysOf(this) + 3, 7));
+        return match (k) {
+            0 => .Monday,
+            1 => .Tuesday,
+            2 => .Wednesday,
+            3 => .Thursday,
+            4 => .Friday,
+            5 => .Saturday,
+            _ => .Sunday,
+        };
+    }
+
+    /// The date `n` days later — earlier for a negative `n`.
+    pub fn plusDays(n: int): Date {
+        return fromDays(daysOf(this) + n);
+    }
+
+    pub fn show(): string {
+        return f"{yearText(this.y)}-{twoDigits(this.m)}-{twoDigits(this.d)}";
+    }
+
+    /// RFC 3339's full-date: `YYYY-MM-DD`, four digits of year, a date that exists.
+    pub static fn parse(s: StringView): Date throws ParseError {
+        let b = viewBytes(s);
+        if (b.isEmpty()) {
+            throw ParseError { kind = .Empty };
+        }
+        if (b.length() != 10) {
+            throw ParseError { kind = .Invalid };
+        }
+        return try readDate(b);
+    }
+}
+
+/// A time of day (10 Q1): hours 0–23, minutes and seconds 0–59 — no leap second, which POSIX time
+/// does not count —, nanoseconds. Its text is `HH:MM:SS` and the fraction, without trailing zeros.
+pub struct Time :: [Equatable, Ordered, TotalOrder, Hashable, Display] {
+    h: int,
+    mi: int,
+    s: int,
+    n: int,
+
+    /// The time of day, or a `TimeError` where there is none.
+    pub static fn of(hour: int, minute: int, second: int, nano: int = 0): Time throws TimeError {
+        if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59
+            || nano < 0 || nano > 999999999) {
+            throw TimeError { detail = f"there is no time of day with hour {hour}, minute {minute}, second {second}, nanosecond {nano}" };
+        }
+        return Time { h = hour, mi = minute, s = second, n = nano };
+    }
+
+    pub fn hour(): int { return this.h; }
+    pub fn minute(): int { return this.mi; }
+    pub fn second(): int { return this.s; }
+    pub fn nano(): int { return this.n; }
+
+    pub fn show(): string {
+        let (_, fraction) = splitFraction(this.n as uint, 9);
+        return f"{twoDigits(this.h)}:{twoDigits(this.mi)}:{twoDigits(this.s)}{fraction}";
+    }
+}
+
+/// A fixed offset from UTC (10 Q1): `Zone.utc`, `Zone.fixed(offset)`. The zones of a database —
+/// `Zone.load("Europe/Berlin")`, `Zone.local()` — come with M10.
+pub struct Zone :: [Equatable] {
+    off: int,
+
+    pub static let utc: Zone = Zone { off = 0 };
+
+    /// The zone `offset` east of UTC — west for a negative one —: whole minutes, under 24 hours,
+    /// as RFC 3339 writes an offset.
+    pub static fn fixed(offset: Duration): Zone throws TimeError {
+        let ns = offset.nanos();
+        if (ns % 60000000000 != 0 || ns <= -nanosPerDay || ns >= nanosPerDay) {
+            throw TimeError { detail = f"an offset is whole minutes under a day; {offset} is not" };
+        }
+        return Zone { off = ns };
+    }
+
+    pub fn offset(): Duration {
+        return Duration.ofNanos(this.off);
+    }
+}
+
+/// A date and a time of day at an offset from UTC (10 Q1): the moment it names, and how it was
+/// written. Its text is RFC 3339, `2026-10-08T12:34:56.5+02:00`, `Z` for no offset. Two compare
+/// field by field: the same moment at two offsets is two date-times — `toInstant()` compares them
+/// as moments.
+pub struct DateTime :: [Equatable, Display, Parse] {
+    d: Date,
+    t: Time,
+    off: int,
+
+    pub static fn of(date: Date, time: Time, zone: Zone): DateTime {
+        return DateTime { d = date, t = time, off = zone.offset().nanos() };
+    }
+
+    pub fn date(): Date { return this.d; }
+    pub fn time(): Time { return this.t; }
+    pub fn offset(): Duration { return Duration.ofNanos(this.off); }
+
+    /// The moment this names. One outside the years an `Instant` reaches panics (RT0002).
+    pub fn toInstant(): Instant {
+        let t = this.t;
+        let ofDay = ((t.h * 60 + t.mi) * 60 + t.s) * 1000000000 + t.n;
+        return Instant { ns = daysOf(this.d) * nanosPerDay + ofDay - this.off };
+    }
+
+    pub fn show(): string {
+        return f"{this.d}T{this.t}{offsetText(this.off)}";
+    }
+
+    /// RFC 3339's date-time (§5.6), strictly: `T` or `t` between the date and the time, a fraction
+    /// of any length — cut to nanoseconds —, `Z`, `z` or `±hh:mm`; no space for the `T`, no second
+    /// 60. A date or a time that does not exist is `Invalid`.
+    pub static fn parse(s: StringView): DateTime throws ParseError {
+        let b = viewBytes(s);
+        let n = b.length();
+        if (n == 0) {
+            throw ParseError { kind = .Empty };
+        }
+        if (n < 20 || (b[10] != 84u8 && b[10] != 116u8)) {
+            throw ParseError { kind = .Invalid };
+        }
+        let date = try readDate(b[..10]);
+        if (b[13] != 58u8 || b[16] != 58u8) {
+            throw ParseError { kind = .Invalid };
+        }
+        let hour = try twoDigitsAt(b, 11);
+        let minute = try twoDigitsAt(b, 14);
+        let second = try twoDigitsAt(b, 17);
+        var at = 19;
+        var nano = 0;
+        if (b[at] == 46u8) {
+            at = at + 1;
+            var digits = 0;
+            while (at < n && isDigit(b[at])) {
+                if (digits < 9) {
+                    nano = nano * 10 + ((b[at] - 48u8) as int);
+                }
+                digits = digits + 1;
+                at = at + 1;
+            }
+            if (digits == 0) {
+                throw ParseError { kind = .Invalid };
+            }
+            while (digits < 9) {
+                nano = nano * 10;
+                digits = digits + 1;
+            }
+        }
+        if (at >= n) {
+            throw ParseError { kind = .Invalid };
+        }
+        var offset = 0;
+        if (b[at] == 90u8 || b[at] == 122u8) {
+            at = at + 1;
+        } else if ((b[at] == 43u8 || b[at] == 45u8) && at + 6 == n && b[at + 3] == 58u8) {
+            let hours = try twoDigitsAt(b, at + 1);
+            let minutes = try twoDigitsAt(b, at + 4);
+            if (hours > 23 || minutes > 59) {
+                throw ParseError { kind = .Invalid };
+            }
+            offset = (hours * 60 + minutes) * 60000000000;
+            if (b[at] == 45u8) {
+                offset = -offset;
+            }
+            at = at + 6;
+        } else {
+            throw ParseError { kind = .Invalid };
+        }
+        if (at != n) {
+            throw ParseError { kind = .Invalid };
+        }
+        let time = try Time.of(hour, minute, second, nano) catch (e: TimeError) throw ParseError { kind = .Invalid };
+        return DateTime { d = date, t = time, off = offset };
+    }
+}
+
+/// `YYYY-MM-DD` at the front of `b`, a date that exists.
+fn readDate(b: Slice<uint8>): Date throws ParseError {
+    if (b[4] != 45u8 || b[7] != 45u8) {
+        throw ParseError { kind = .Invalid };
+    }
+    let year = (try twoDigitsAt(b, 0)) * 100 + (try twoDigitsAt(b, 2));
+    let month = try twoDigitsAt(b, 5);
+    let day = try twoDigitsAt(b, 8);
+    return try Date.of(year, month, day) catch (e: TimeError) throw ParseError { kind = .Invalid };
+}
+
+fn twoDigitsAt(b: Slice<uint8>, at: int): int throws ParseError {
+    if (!isDigit(b[at]) || !isDigit(b[at + 1])) {
+        throw ParseError { kind = .Invalid };
+    }
+    return ((b[at] - 48u8) as int) * 10 + ((b[at + 1] - 48u8) as int);
+}
+
+fn offsetText(off: int): string {
+    if (off == 0) {
+        return "Z";
+    }
+    let minutes = (if (off < 0) -off else off) / 60000000000;
+    let sign = if (off < 0) "-" else "+";
+    return f"{sign}{twoDigits(minutes / 60)}:{twoDigits(minutes % 60)}";
+}
+
+fn twoDigits(n: int): string {
+    return if (n < 10) f"0{n}" else f"{n}";
+}
+
+/// Four digits at least; a sign where the year is outside 0000–9999 (ISO 8601's expanded form).
+fn yearText(y: int): string {
+    var text = f"{if (y < 0) -y else y}";
+    while (text.length() < 4) {
+        text = "0" + text;
+    }
+    return if (y < 0) "-" + text else if (y > 9999) "+" + text else text;
+}
+
+fn isLeap(y: int): bool {
+    return y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+}
+
+fn daysIn(year: int, month: int): int {
+    return match (month) {
+        2 => if (isLeap(year)) 29 else 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+}
+
+fn floorRem(a: int, b: int): int {
+    let r = a % b;
+    return if (r < 0) r + b else r;
+}
+
+/// The days from 1970-01-01 to `date` (Hinnant's days_from_civil).
+fn daysOf(date: Date): int {
+    let y = if (date.m <= 2) date.y - 1 else date.y;
+    let era = (if (y >= 0) y else y - 399) / 400;
+    let yearOfEra = y - era * 400;
+    let dayOfYear = (153 * (if (date.m > 2) date.m - 3 else date.m + 9) + 2) / 5 + date.d - 1;
+    let dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear;
+    return era * 146097 + dayOfEra - 719468;
+}
+
+/// The date `days` after 1970-01-01 (Hinnant's civil_from_days).
+fn fromDays(days: int): Date {
+    let z = days + 719468;
+    let era = (if (z >= 0) z else z - 146096) / 146097;
+    let dayOfEra = z - era * 146097;
+    let yearOfEra = (dayOfEra - dayOfEra / 1460 + dayOfEra / 36524 - dayOfEra / 146096) / 365;
+    let dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100);
+    let mp = (5 * dayOfYear + 2) / 153;
+    let day = dayOfYear - (153 * mp + 2) / 5 + 1;
+    let month = if (mp < 10) mp + 3 else mp - 9;
+    let year = yearOfEra + era * 400 + (if (month <= 2) 1 else 0);
+    return Date { y = year, m = month, d = day };
 }

@@ -1,0 +1,165 @@
+// std.time's calendar (design/v5/spec/10 Q1; M8b S5b): days counted against Python's datetime,
+// the proleptic Gregorian calendar, a dense walk over 4400 years, RFC 3339 both ways, what is no
+// date and no time.
+import std.core { ParseError };
+import std.test { assertEq, assertFalse, assertTrue, fail };
+import std.time { Date, DateTime, Duration, Instant, Time, TimeError, Weekday, Zone };
+
+fn epoch(): Date {
+    return try! Date.of(1970, 1, 1);
+}
+
+@Test
+fn theDaysAreTheCalendars(): void throws TimeError {
+    let known: (int, int, int, int, Weekday)[] = [
+        (1775, 11, 15, -70904, .Wednesday),
+        (2400, 1, 24, 157077, .Monday),
+        (1673, 8, 2, -108263, .Wednesday),
+        (1949, 2, 20, -7620, .Sunday),
+        (1752, 4, 7, -79526, .Friday),
+        (2294, 3, 4, 118401, .Sunday),
+        (2228, 3, 22, 94313, .Saturday),
+        (2260, 11, 19, 106243, .Monday),
+        (2127, 12, 2, 57678, .Tuesday),
+        (1884, 5, 18, -31273, .Sunday),
+        (1717, 9, 24, -92140, .Friday),
+        (2283, 4, 18, 114428, .Wednesday),
+        (1623, 9, 10, -126487, .Sunday),
+        (2142, 7, 21, 63023, .Saturday),
+        (2204, 3, 20, 85545, .Tuesday),
+        (1586, 1, 9, -140245, .Thursday),
+        (2222, 5, 2, 92162, .Thursday),
+        (1965, 4, 21, -1716, .Wednesday),
+        (1911, 5, 19, -21412, .Friday),
+        (1729, 9, 28, -87753, .Wednesday),
+        (1600, 2, 29, -135081, .Tuesday),
+        (1700, 2, 28, -98557, .Sunday),
+        (2000, 12, 31, 11322, .Sunday),
+        (2100, 3, 1, 47541, .Monday),
+    ];
+    for ((y, m, d, days, weekday) in known) {
+        let date = try Date.of(y, m, d);
+        assertTrue(epoch().plusDays(days) == date);
+        assertTrue(date.plusDays(-days) == epoch());
+        assertTrue(date.dayOfWeek() == weekday);
+    }
+}
+
+@Test
+fn aWalkOverTheCenturiesKeepsItsOrder(): void throws ParseError {
+    var k = -800000;
+    while (k <= 800000) {
+        let d = epoch().plusDays(k);
+        let next = d.plusDays(1);
+        assertTrue(next > d);
+        assertTrue(next.plusDays(-1) == d);
+        assertTrue(next.day() == 1 || next.day() == d.day() + 1);
+        if (d.year() >= 0 && d.year() <= 9999) {
+            assertTrue((try Date.parse(f"{d}")) == d);
+        }
+        k = k + 997;
+    }
+}
+
+@Test
+fn theLeapYearsAreTheGregorianOnes(): void throws TimeError {
+    for (y in [1600, 2000, 2024, 4, 0, -4]) {
+        assertTrue((try Date.of(y, 1, 1)).isLeapYear());
+        assertEq((try Date.of(y, 2, 29)).plusDays(1).month(), 3);
+    }
+    for (y in [1700, 1900, 2100, 2023, 1, -1]) {
+        assertFalse((try Date.of(y, 1, 1)).isLeapYear());
+    }
+}
+
+@Test
+fn aDateShowsItselfAsIso8601(): void throws TimeError {
+    assertEq(f"{try Date.of(2026, 1, 5)}", "2026-01-05");
+    assertEq(f"{try Date.of(12, 3, 4)}", "0012-03-04");
+    assertEq(f"{try Date.of(-1, 12, 31)}", "-0001-12-31");
+    assertEq(f"{try Date.of(12345, 6, 7)}", "+12345-06-07");
+    assertEq(f"{try Time.of(7, 5, 3)}", "07:05:03");
+    assertEq(f"{try Time.of(23, 59, 59, 120000000)}", "23:59:59.12");
+}
+
+@Test
+fn whatIsNoDateOrTimeThrows(): void {
+    for ((y, m, d) in [(2026, 2, 29), (2026, 4, 31), (2026, 13, 1), (2026, 0, 1), (2026, 1, 0), (1900, 2, 29)]) {
+        try {
+            let date = Date.of(y, m, d);
+            fail(f"{date} was made");
+        } catch (e: TimeError) {
+            assertFalse(e.message().isEmpty());
+        }
+    }
+    for ((h, m, s, n) in [(24, 0, 0, 0), (0, 60, 0, 0), (0, 0, 60, 0), (0, 0, 0, 1000000000), (-1, 0, 0, 0)]) {
+        try {
+            let time = Time.of(h, m, s, n);
+            fail(f"{time} was made");
+        } catch (e: TimeError) {
+            assertFalse(e.message().isEmpty());
+        }
+    }
+}
+
+@Test
+fn rfc3339ReadsAndWritesInstants(): void throws ParseError {
+    assertEq(f"{try Instant.parse("2026-10-08T12:34:56Z")}", "2026-10-08T12:34:56Z");
+    assertEq(f"{try Instant.parse("2026-10-08T12:34:56.123456Z")}", "2026-10-08T12:34:56.123456Z");
+    assertEq(f"{try Instant.parse("2026-10-08T12:34:56.100000000Z")}", "2026-10-08T12:34:56.1Z");
+    assertEq(f"{try Instant.parse("1999-12-31T23:59:59-08:00")}", "2000-01-01T07:59:59Z");
+    assertEq(f"{try Instant.parse("2000-02-29T00:00:00+14:00")}", "2000-02-28T10:00:00Z");
+    assertEq(f"{try Instant.parse("1900-01-01T00:00:00Z")}", "1900-01-01T00:00:00Z");
+    assertEq(f"{try Instant.parse("2262-04-11T23:47:16Z")}", "2262-04-11T23:47:16Z");
+    assertEq((try Instant.parse("2026-10-08T12:34:56Z")).epochMillis(), 1791462896000);
+    assertEq((try Instant.parse("2026-10-08T12:34:56.123456Z")).epochMillis(), 1791462896123);
+    assertEq((try Instant.parse("2026-10-08T12:34:56.100000000Z")).epochMillis(), 1791462896100);
+    assertEq((try Instant.parse("1999-12-31T23:59:59-08:00")).epochMillis(), 946713599000);
+    assertEq((try Instant.parse("2000-02-29T00:00:00+14:00")).epochMillis(), 951732000000);
+}
+
+@Test
+fn rfc3339IsReadStrictly(): void {
+    let refused = ["2026-10-08", "2026-10-08T12:00Z", "2026-10-08 12:00:00Z", "2026-10-08T12:00:00",
+        "2026-10-08T12:00:00+0200", "2026-10-08T12:00:00+24:00", "2026-10-08T12:00:00.Z", "26-10-08T12:00:00Z",
+        "2026-10-08T12:00:00ZZ", "2026-10-08T23:59:60Z"];
+    for (s in refused) {
+        try {
+            let i = Instant.parse(s);
+            fail(f"'{s}' read as {i}");
+        } catch (e: ParseError) {
+            assertTrue(e.kind == .Invalid);
+        }
+    }
+}
+
+@Test
+fn aDateTimeKeepsItsOffset(): void throws Error {
+    let text = "2026-10-08T12:34:56.789+02:00";
+    let local = try DateTime.parse(text);
+    assertEq(f"{local}", text);
+    assertEq(local.offset(), Duration.ofHours(2));
+    assertEq(local.time().hour(), 12);
+    assertEq(local.date().day(), 8);
+    let moment = local.toInstant();
+    let utc = moment.toDateTime(Zone.utc);
+    assertEq(f"{utc}", "2026-10-08T10:34:56.789Z");
+    assertFalse(utc == local);
+    assertTrue(utc.toInstant() == local.toInstant());
+    let made = DateTime.of(try Date.of(2026, 10, 8), try Time.of(12, 34, 56, 789000000), try Zone.fixed(Duration.ofHours(2)));
+    assertTrue(made == local);
+}
+
+@Test
+fn aZoneIsAFixedOffsetInWholeMinutes(): void throws TimeError {
+    assertEq((try Zone.fixed(Duration.ofMinutes(-330))).offset(), Duration.ofMinutes(-330));
+    assertTrue(Zone.utc.offset() == Duration.ofNanos(0));
+    for (bad in [Duration.ofSecs(90), Duration.ofHours(24), Duration.ofHours(-24), Duration.ofMillis(1)]) {
+        try {
+            Zone.fixed(bad);
+            fail(f"a zone at {bad}");
+        } catch (e: TimeError) {
+            assertTrue(e.message().endsWith("is not"));
+        }
+    }
+}
