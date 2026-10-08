@@ -1,13 +1,14 @@
-/// The file system (design/v5/spec/10 O4, O5; M8b S6b): `File`, a handle on a file — a class with
-/// its identity and a `closed` state — that reads, writes and seeks through `std.io`'s interfaces.
-/// S6c: the conveniences, `fs.readText` and its kin; S7: the directories.
+/// The file system (design/v5/spec/10 O4, O5; M8b S6b, S6c): `File`, a handle on a file — a class
+/// with its identity and a `closed` state — that reads, writes and seeks through `std.io`'s
+/// interfaces; the conveniences that read or write a file whole, or its lines one by one. S7: the
+/// directories.
 ///
 /// Every call on a file runs on the program's I/O pool (13 M8b P2; 06 S3): a few threads, started
 /// at the first use, do the system's call while the running task is parked — the thread it runs on
 /// goes on with the other tasks. A call on a regular file ends in a bounded time and is no wait in
 /// the sense of 10 §1 rule 7: a cancellation is seen at the task's next wait. Reads and writes go
 /// through the caller's slice, never a copy (P4).
-import std.io { IoError, IoErrorKind, Reader, Seek, SeekFrom, Writer };
+import std.io { IoError, IoErrorKind, Reader, Seek, SeekFrom, TextReader, Writer };
 import std.task { SpinLock, schedulerRuns };
 import std.thread { Pool };
 
@@ -149,6 +150,93 @@ fn failure(answer: int, path: string, doing: string): IoError {
         _ => .Other { code = raw },
     };
     return IoError { kind = kind, path = path, detail = doing };
+}
+
+/// `e` with the file's path, where it names none — the decoder's `InvalidData` names none.
+fn withPath(e: IoError, path: string): IoError {
+    return if (e.path == null) e with { path = path } else e;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The conveniences (10 O5; M8b S6c): a file read or written whole, or its lines one by one. Each
+// opens the file, does its work and closes it on every way out; what the close throws counts
+// where nothing went wrong before (05 R4).
+// ---------------------------------------------------------------------------------------------
+
+/// The file at `path`, all of it, as UTF-8 text. Bytes that are no UTF-8 throw `InvalidData` with
+/// the path. A byte order mark is text like any other (10 O2).
+pub fn readText(path: StringView): string throws IoError {
+    using let f = try File.open(path);
+    return try f.readToString() catch (e: IoError) throw withPath(e, f.name);
+}
+
+/// The file at `path`, all of it.
+pub fn readBytes(path: StringView): uint8[] throws IoError {
+    using let f = try File.open(path);
+    return try f.readToEnd();
+}
+
+/// The lines of the file at `path`, one by one, as `TextReader.readLine` gives them: without
+/// their ends, a last line without an end a line all the same. The iterator closes the file at
+/// its end and at an error; a `for` that leaves it early closes it (05 R7), and so does `close()`.
+pub fn lines(path: StringView): FileLinesIter throws IoError {
+    let f = try File.open(path);
+    return FileLinesIter { file = f, reader = TextReader.new(f) };
+}
+
+/// `text` as the file at `path`, made where it is not there, cut to nothing where it is.
+pub fn writeText(path: StringView, text: StringView): void throws IoError {
+    using let f = try File.create(path);
+    try f.writeString(text);
+}
+
+/// `bytes` as the file at `path`, made where it is not there, cut to nothing where it is.
+pub fn writeBytes(path: StringView, bytes: Slice<uint8>): void throws IoError {
+    using let f = try File.create(path);
+    try f.writeAll(bytes);
+}
+
+/// `text` at the end of the file at `path`, made where it is not there.
+pub fn appendText(path: StringView, text: StringView): void throws IoError {
+    using let f = try File.openWith(path, OpenOptions { append = true, create = true });
+    try f.writeString(text);
+}
+
+/// The lines of a file (`fs.lines`). After its end or an error it gives no more; after `close()`
+/// a call throws `Closed`, as the file's would.
+pub class FileLinesIter :: [Iterator, Closeable] {
+    type Item = string;
+    type Error = IoError;
+    file: File,
+    reader: TextReader<File>,
+    var done: bool = false,
+
+    pub mut fn next(): ?string throws IoError {
+        if (this.done) {
+            return null;
+        }
+        // the reader holds what it read ahead: a closed file is seen here, not at its next read
+        try this.file.stillOpen("read");
+        var line: ?string = null;
+        try {
+            line = this.reader.readLine();
+        } catch (e: IoError) {
+            this.done = true;
+            // the first error wins, the close's is attached to it (05 E7)
+            defer { try this.file.close(); }
+            throw withPath(e, this.file.name);
+        }
+        if (line == null) {
+            this.done = true;
+            try this.file.close();
+        }
+        return line;
+    }
+
+    /// Lets the file go before the end. A second close does nothing.
+    pub fn close(): void throws IoError {
+        try this.file.close();
+    }
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -1,0 +1,158 @@
+// std.fs's conveniences (design/v5/spec/10 O5; M8b S6c): a file read and written whole, appended
+// to, its lines one by one — the lines' iterator closed at its end, at an error, and by a loop that
+// leaves early —; and the plan's check for M8b S6, every kind a file can give, each with its path.
+// The files lie in the test run's working directory.
+import std.crypto { randomUint64 };
+import std.fs;
+import std.fs { File, OpenOptions };
+import std.io { IoError, IoErrorKind };
+import std.path;
+import std.test { assertEq, assertNull, assertTrue };
+
+fn posix(): bool {
+    return path.separator == "/";
+}
+
+/// What `f` throws, or `null`.
+fn thrown(f: fn() -> void throws IoError): ?IoError {
+    try {
+        f();
+        return null;
+    } catch (e: IoError) {
+        return e;
+    }
+}
+
+/// The kind and the message of what `f` throws.
+fn said(f: fn() -> void throws IoError): string {
+    if (let e = thrown(f)) {
+        return e.message();
+    }
+    return "nothing thrown";
+}
+
+@Test
+fn aFileIsReadAndWrittenWhole(): void throws IoError {
+    try fs.writeText("conv-a.txt", "héllo, file\nsecond line\n");
+    assertEq(try fs.readText("conv-a.txt"), "héllo, file\nsecond line\n");
+    assertEq((try fs.readBytes("conv-a.txt")).length(), 25);
+    let bytes: uint8[] = [0u8, 255u8, 10u8, 13u8];
+    try fs.writeBytes("conv-b.bin", bytes[..]);
+    let back = try fs.readBytes("conv-b.bin");
+    assertEq(back.length(), 4);
+    assertEq(back[1], 255u8);
+    // a write cuts what was there
+    try fs.writeText("conv-a.txt", "x");
+    assertEq(try fs.readText("conv-a.txt"), "x");
+    try fs.writeText("conv-empty.txt", "");
+    assertEq(try fs.readText("conv-empty.txt"), "");
+}
+
+@Test
+fn appendTextWritesAtTheEndAndMakesTheFile(): void throws IoError {
+    try fs.writeText("conv-log.txt", "one");
+    try fs.appendText("conv-log.txt", " two");
+    try fs.appendText("conv-log.txt", " three");
+    assertEq(try fs.readText("conv-log.txt"), "one two three");
+    // where it is not there, the first append makes it: a name of its own each run, as the working
+    // directory a run leaves behind is the next one's (the files' removal is S7's)
+    let made = f"conv-made-{randomUint64()}.txt";
+    try fs.appendText(made, "made");
+    assertEq(try fs.readText(made), "made");
+}
+
+@Test
+fn aByteOrderMarkIsText(): void throws IoError {
+    let marked: uint8[] = [0xEFu8, 0xBBu8, 0xBFu8, 0x61u8];
+    try fs.writeBytes("conv-bom.txt", marked[..]);
+    let text = try fs.readText("conv-bom.txt");
+    assertEq(text.length(), 4);
+    assertEq(text.charCount(), 2);
+}
+
+@Test
+fn linesGivesTheLinesWithoutTheirEnds(): void throws IoError {
+    try fs.writeText("conv-lines.txt", "a\nb\r\n\nc");
+    var seen = "";
+    for (line in try fs.lines("conv-lines.txt")) {
+        seen = seen + "[" + line + "]";
+    }
+    assertEq(seen, "[a][b][][c]");
+    let all = try fs.lines("conv-lines.txt").toList();
+    assertEq(all.length(), 4);
+    try fs.writeText("conv-none.txt", "");
+    assertEq((try fs.lines("conv-none.txt").toList()).length(), 0);
+}
+
+@Test
+fn theLinesCloseTheirFile(): void throws IoError {
+    try fs.writeText("conv-lines.txt", "a\nb\nc\n");
+    // a loop that leaves early closes it: what the reader read ahead is not given
+    let early = try fs.lines("conv-lines.txt");
+    for (line in try early) {
+        assertEq(line, "a");
+        break;
+    }
+    let e = thrown(() => { try early.next(); });
+    assertTrue(e != null);
+    assertTrue(e!.kind == IoErrorKind.Closed);
+    // at its end it closes itself and gives no more, and a close after it does nothing
+    let whole = try fs.lines("conv-lines.txt");
+    var n = 0;
+    loop {
+        if (try whole.next() == null) {
+            break;
+        }
+        n = n + 1;
+    }
+    assertEq(n, 3);
+    assertNull(try whole.next());
+    try whole.close();
+    // closed by hand before the end
+    let manual = try fs.lines("conv-lines.txt");
+    assertEq(try manual.next() ?? "", "a");
+    try manual.close();
+    assertTrue(thrown(() => { try manual.next(); })!.kind == IoErrorKind.Closed);
+}
+
+@Test
+fn bytesThatAreNoUtf8AreSaidWithThePath(): void throws IoError {
+    let bad: uint8[] = [0x61u8, 0x0Au8, 0xFFu8, 0x0Au8];
+    try fs.writeBytes("conv-bad.txt", bad[..]);
+    assertEq(said(() => { try fs.readText("conv-bad.txt"); }), "invalid data: conv-bad.txt (the bytes are no UTF-8)");
+    let it = try fs.lines("conv-bad.txt");
+    assertEq(try it.next() ?? "", "a");
+    let e = thrown(() => { try it.next(); });
+    assertTrue(e!.kind == IoErrorKind.InvalidData);
+    assertEq(e!.path ?? "", "conv-bad.txt");
+    // after its error it gives no more, and its file is closed already
+    assertNull(try it.next());
+    try it.close();
+}
+
+/// The plan's check for M8b S6: each kind a file can give, with its path and what was done.
+/// `AlreadyExists` needs a file opened to be new, which 10 O5 does not have, `PermissionDenied`
+/// rights, a door (O5), or a system's own refusal — Windows's for a directory.
+@Test
+fn everyKindAFileCanGive(): void throws IoError {
+    try fs.writeText("conv-kinds.txt", "abc");
+    assertEq(said(() => { try fs.readText("conv-no-such.txt"); }), "not found: conv-no-such.txt (opened to read)");
+    if (posix()) {
+        // POSIX opens a directory; its read says what it is
+        assertEq(said(() => { try fs.readText("."); }), "is a directory: . (read)");
+        assertEq(said(() => { try fs.readText("conv-kinds.txt/x"); }), "not a directory: conv-kinds.txt/x (opened to read)");
+        assertEq(said(() => { try fs.writeText(".", "x"); }), "is a directory: . (opened to write)");
+    } else {
+        assertEq(said(() => { try fs.readText("."); }), "permission denied: . (opened to read)");
+        assertEq(said(() => { try fs.readText("conv-kinds.txt/x"); }), "not found: conv-kinds.txt/x (opened to read)");
+    }
+    assertEq(said(() => { using let f = try File.openWith("conv-kinds.txt", OpenOptions { }); }), "invalid input: conv-kinds.txt (opened neither to read nor to write)");
+    assertEq(said(() => {
+        using let f = try File.open("conv-kinds.txt");
+        let four: uint8[] = [0u8] * 4;
+        try f.readExact(four[..]);
+    }), "unexpected end of input (3 of 4 bytes)");
+    let closed = try File.open("conv-kinds.txt");
+    try closed.close();
+    assertEq(said(() => { try closed.readToString(); }), "closed: conv-kinds.txt (read)");
+}

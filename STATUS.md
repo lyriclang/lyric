@@ -597,6 +597,12 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   a file's call is no cancellation point (`awaitThrough` in `std.task`). Asking whether a scheduler
   runs makes no task of `main` (`schedulerRuns`; the compiler's walk for M6-26 leaves its yes
   out). A program over the pool runs under ASan and, locally, TSan. Spec 12 "Files", five cases.
+- **S6c** the conveniences (10 O5): `fs.readText`, `readBytes`, `writeText`, `writeBytes`,
+  `appendText` — each closes its file on every way out — and `fs.lines(path)`, a
+  `FileLinesIter :: [Iterator, Closeable]` that closes its file at its end, at its error and when
+  a loop leaves it; the decoder's `InvalidData` gets the path. The kinds a file can give, each
+  checked with its path; checked on Windows for real through WSL interop. Spec 12 "Files" rules
+  6–7, three cases. **S6 is done.**
 
 ### M8a — done (2026-10-07)
 
