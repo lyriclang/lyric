@@ -566,6 +566,11 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   `Base64Url` (RFC 4648, padded, decoded strictly), `Hex`, `Utf16`; `fromBytesLE`/`fromBytesBE`
   on every integer type and the twelve getters on `Slice<uint8>`. 4.x's `std.bytes` goes up in
   it. Spec 12 "Encodings", seven cases.
+- **S4b** cryptography (10 Q4): `std.crypto` with `Digest` (`size`, `blockSize`, `new`, `update`,
+  `finish(): uint8[]` — Q4's `uint8[N]` names a length no interface can, 5.0 having no generic
+  constant), `Sha256`, `Sha512`, `Sha1`, `Md5`, `sha256(bytes): uint8[32]`, `Hmac<D>`,
+  `randomBytes`, `randomUint64`, `constantTimeEq`; the constants computed from their definitions,
+  the vectors checked against Python's hashlib. Spec 12 "Cryptography", five cases.
 
 ### M8a — done (2026-10-07)
 
