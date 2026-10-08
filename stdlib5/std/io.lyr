@@ -1,6 +1,290 @@
-/// Console output (design/v5/spec/10 U5, O9): `import std.io { println }`. M2 seed: one argument,
-/// a string — the readers and writers come with M8b S2 and S3, the `Display`-generic form with S8.
-
+/// Input and output (design/v5/spec/10 O1–O4, U5, O9): `import std.io { println }`. The console's
+/// two functions take one string; the `Display`-generic form comes with M8b S8. M8b S2: the core —
+/// one error type, the three interfaces and their defaults, `copy`, and two streams over memory. The
+/// buffers and the text come with S3, the files with S6, the console's streams with S8.
+import std.core { Utf8Error, viewBytes };
 
 pub fn print(text: string): void;
 pub fn println(text: string): void;
+
+// ---------------------------------------------------------------------------------------------
+// The error (10 O3).
+// ---------------------------------------------------------------------------------------------
+
+/// What went wrong in an input or an output (10 O3) — a file's, a socket's, a process's, memory's
+/// alike. *(The decision marks it `@NonExhaustive`, which comes with the rest of the compiler's
+/// attributes, M9a: a `match` over it should write a `_`, as a later kind would need one.)*
+pub enum IoErrorKind :: [Equatable] {
+    NotFound,
+    PermissionDenied,
+    AlreadyExists,
+    IsDirectory,
+    NotDirectory,
+    InvalidInput,
+    InvalidData,
+    UnexpectedEof,
+    TimedOut,
+    ConnectionRefused,
+    ConnectionReset,
+    AddrInUse,
+    BrokenPipe,
+    Closed,
+    Unsupported,
+    /// A code of the system that no kind above names.
+    Other { code: int },
+}
+
+/// The error every input and output throws (10 O3): its kind, the path it concerns, what more is
+/// known, and what caused it. The decision names the last field `cause`; `Error` asks for a method
+/// of that name, and a type's members do not share one, so it is `inner`, as `Exception`'s is.
+pub struct IoError :: [Error] {
+    pub kind: IoErrorKind,
+    pub path: ?string,
+    pub detail: string = "",
+    pub inner: ?Error,
+
+    /// The kind in words, then the path and the detail where there are any: `not found: data.txt`.
+    pub fn message(): string {
+        var text = kindText(this.kind);
+        if (let p = this.path) {
+            text = f"{text}: {p}";
+        }
+        if (!this.detail.isEmpty()) {
+            text = f"{text} ({this.detail})";
+        }
+        return text;
+    }
+
+    pub fn cause(): ?Error {
+        return this.inner;
+    }
+}
+
+fn kindText(kind: IoErrorKind): string {
+    return match (kind) {
+        .NotFound => "not found",
+        .PermissionDenied => "permission denied",
+        .AlreadyExists => "already exists",
+        .IsDirectory => "is a directory",
+        .NotDirectory => "not a directory",
+        .InvalidInput => "invalid input",
+        .InvalidData => "invalid data",
+        .UnexpectedEof => "unexpected end of input",
+        .TimedOut => "timed out",
+        .ConnectionRefused => "connection refused",
+        .ConnectionReset => "connection reset",
+        .AddrInUse => "address in use",
+        .BrokenPipe => "broken pipe",
+        .Closed => "closed",
+        .Unsupported => "unsupported",
+        .Other { code } => f"system error {code}",
+    };
+}
+
+// ---------------------------------------------------------------------------------------------
+// The interfaces (10 O1, Go's form: the caller hands the buffer).
+// ---------------------------------------------------------------------------------------------
+
+/// A source of bytes (10 O1). `read` fills the slice it is handed from the front and answers how
+/// many bytes it put there: **0 only at the end**, and at once for an empty slice — fewer than the
+/// slice holds is no end.
+pub interface Reader {
+    mut fn read(into: Slice<uint8>): int throws IoError;
+}
+
+/// A sink of bytes (10 O1). `write` takes from the front of the slice and answers how many bytes
+/// it took — **maybe fewer** than it was handed; `writeAll` takes the rest.
+pub interface Writer {
+    mut fn write(from: Slice<uint8>): int throws IoError;
+}
+
+/// Where a position moves to (10 O1): from the start, from the end, from where it stands.
+pub enum SeekFrom :: [Equatable] {
+    Start(int),
+    End(int),
+    Current(int),
+}
+
+/// A stream with a position (10 O1): `seek` moves it and answers where it then stands, counted
+/// from the start.
+pub interface Seek {
+    mut fn seek(to: SeekFrom): int throws IoError;
+}
+
+/// What every reader can do with its `read` (10 O1).
+extend<R :: [Reader]> R {
+    /// Fills `into` whole, reading as often as it takes. A source that ends before throws
+    /// `UnexpectedEof`, the bytes that came in the detail.
+    pub mut fn readExact(into: Slice<uint8>): void throws IoError {
+        var at = 0;
+        while (at < into.length()) {
+            let n = try this.read(into[at..]);
+            if (n == 0) {
+                throw IoError { kind = .UnexpectedEof, detail = f"{at} of {into.length()} bytes" };
+            }
+            at = at + n;
+        }
+    }
+
+    /// Everything to the end, in one new array.
+    pub mut fn readToEnd(): uint8[] throws IoError {
+        let held = ByteBuffer.new();
+        let chunk: uint8[] = [0u8] * 8192;
+        loop {
+            let n = try this.read(chunk[..]);
+            if (n == 0) {
+                return held.toArray();
+            }
+            held.append(chunk[..n]);
+        }
+    }
+
+    /// Everything to the end, as UTF-8 text. Bytes that are no UTF-8 throw `InvalidData`, with the
+    /// decoder's error as the cause.
+    pub mut fn readToString(): string throws IoError {
+        let bytes = try this.readToEnd();
+        return try string.fromUtf8(bytes[..]) catch (e: Utf8Error)
+            throw IoError { kind = .InvalidData, detail = "the bytes are no UTF-8", inner = e };
+    }
+}
+
+/// What every writer can do with its `write` (10 O1).
+extend<W :: [Writer]> W {
+    /// All of `from`, writing as often as it takes. A writer that takes no byte of a slice that has
+    /// some would be asked forever; it throws `Other { code = 0 }` instead.
+    pub mut fn writeAll(from: Slice<uint8>): void throws IoError {
+        var at = 0;
+        while (at < from.length()) {
+            let n = try this.write(from[at..]);
+            if (n == 0) {
+                throw IoError { kind = .Other { code = 0 }, detail = f"the writer took none of {from.length() - at} bytes" };
+            }
+            at = at + n;
+        }
+    }
+
+    /// The bytes of `s`, all of them (its UTF-8).
+    pub mut fn writeString(s: StringView): void throws IoError {
+        try this.writeAll(viewBytes(s));
+    }
+}
+
+/// Everything `r` holds, into `w`, through a buffer of its own; answers how many bytes it copied
+/// (10 O1, B2). The two are read and written as the values handed in — the handles and the
+/// streams here are classes, so that is the object itself; a reader that is a struct is read
+/// through a copy, and its position does not move for the caller.
+pub fn copy<R :: [Reader], W :: [Writer]>(r: R, w: W): int throws IoError {
+    var from = r;
+    var into = w;
+    let chunk: uint8[] = [0u8] * 8192;
+    var total = 0;
+    loop {
+        let n = try from.read(chunk[..]);
+        if (n == 0) {
+            return total;
+        }
+        try into.writeAll(chunk[..n]);
+        total = total + n;
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The streams over memory (10 O2). They say `throws IoError` as every reader and writer does, and
+// throw nothing.
+// ---------------------------------------------------------------------------------------------
+
+/// A `Reader` over bytes in memory (10 O2): it reads them from the front, and `seek` moves it. A
+/// position past the end reads nothing; one before the start is the program's error and panics.
+pub class ByteReader :: [Reader, Seek] {
+    bytes: Slice<uint8>,
+    var at: int = 0,
+
+    pub static fn new(bytes: Slice<uint8>): ByteReader {
+        return ByteReader { bytes = bytes };
+    }
+
+    pub mut fn read(into: Slice<uint8>): int throws IoError {
+        let rest = if (this.at < this.bytes.length()) this.bytes.length() - this.at else 0;
+        let n = if (into.length() < rest) into.length() else rest;
+        if (n == 0) {
+            return 0;
+        }
+        this.bytes[this.at..this.at + n].copyInto(into);
+        this.at = this.at + n;
+        return n;
+    }
+
+    pub mut fn seek(to: SeekFrom): int throws IoError {
+        let target = match (to) {
+            .Start(n) => n,
+            .End(n) => this.bytes.length() + n,
+            .Current(n) => this.at + n,
+        };
+        if (target < 0) {
+            panic(f"a seek to {target}, before the start");
+        }
+        this.at = target;
+        return target;
+    }
+
+    /// The position, counted from the start.
+    pub fn position(): int {
+        return this.at;
+    }
+}
+
+/// A growing buffer of bytes in memory (10 O2): a `Writer` that appends, a `Reader` that takes from
+/// the front what was written and not yet read.
+pub class ByteBuffer :: [Reader, Writer] {
+    var data: uint8[] = [],
+    var start: int = 0,
+    var end: int = 0,
+
+    pub static fn new(): ByteBuffer {
+        return ByteBuffer { };
+    }
+
+    /// Appends all of `from`; answers how many bytes, which is all of them.
+    pub mut fn write(from: Slice<uint8>): int throws IoError {
+        this.append(from);
+        return from.length();
+    }
+
+    pub mut fn read(into: Slice<uint8>): int throws IoError {
+        let held = this.end - this.start;
+        let n = if (into.length() < held) into.length() else held;
+        this.data[this.start..this.start + n].copyInto(into);
+        this.start = this.start + n;
+        return n;
+    }
+
+    /// The bytes it holds, not yet read, in a new array.
+    pub fn toArray(): uint8[] {
+        let out: uint8[] = [0u8] * (this.end - this.start);
+        this.data[this.start..this.end].copyInto(out[..]);
+        return out;
+    }
+
+    /// How many bytes it holds, not yet read.
+    pub fn length(): int {
+        return this.end - this.start;
+    }
+
+    /// Appends all of `from` — `write` that cannot throw, for the readers' own use.
+    mut fn append(from: Slice<uint8>): void {
+        let need = this.end - this.start + from.length();
+        if (this.end + from.length() > this.data.length()) {
+            var size = if (this.data.length() == 0) 64 else this.data.length() * 2;
+            while (size < need) {
+                size = size * 2;
+            }
+            let grown: uint8[] = [0u8] * size;
+            this.data[this.start..this.end].copyInto(grown[..]);
+            this.end = this.end - this.start;
+            this.start = 0;
+            this.data = grown;
+        }
+        from.copyInto(this.data[this.end..]);
+        this.end = this.end + from.length();
+    }
+}

@@ -32,6 +32,30 @@ typedef struct lyr_vt_ty_std_core_Debug lyr_vt_ty_std_core_Debug;
 const char lyr_ifid_ty_std_core_Debug[] = "std.core.Debug";
 typedef struct lyr_ty_std_core_LinesIter lyr_ty_std_core_LinesIter;
 typedef struct lyr_ty_std_core_Utf8Error lyr_ty_std_core_Utf8Error;
+typedef struct lyr_ty_std_io_IoErrorKind lyr_ty_std_io_IoErrorKind;
+typedef struct lyr_ty_18_std_io_IoErrorKind_NotFound lyr_ty_18_std_io_IoErrorKind_NotFound;
+typedef struct lyr_ty_18_std_io_IoErrorKind_PermissionDenied lyr_ty_18_std_io_IoErrorKind_PermissionDenied;
+typedef struct lyr_ty_18_std_io_IoErrorKind_AlreadyExists lyr_ty_18_std_io_IoErrorKind_AlreadyExists;
+typedef struct lyr_ty_18_std_io_IoErrorKind_IsDirectory lyr_ty_18_std_io_IoErrorKind_IsDirectory;
+typedef struct lyr_ty_18_std_io_IoErrorKind_NotDirectory lyr_ty_18_std_io_IoErrorKind_NotDirectory;
+typedef struct lyr_ty_18_std_io_IoErrorKind_InvalidInput lyr_ty_18_std_io_IoErrorKind_InvalidInput;
+typedef struct lyr_ty_18_std_io_IoErrorKind_InvalidData lyr_ty_18_std_io_IoErrorKind_InvalidData;
+typedef struct lyr_ty_18_std_io_IoErrorKind_UnexpectedEof lyr_ty_18_std_io_IoErrorKind_UnexpectedEof;
+typedef struct lyr_ty_18_std_io_IoErrorKind_TimedOut lyr_ty_18_std_io_IoErrorKind_TimedOut;
+typedef struct lyr_ty_18_std_io_IoErrorKind_ConnectionRefused lyr_ty_18_std_io_IoErrorKind_ConnectionRefused;
+typedef struct lyr_ty_18_std_io_IoErrorKind_ConnectionReset lyr_ty_18_std_io_IoErrorKind_ConnectionReset;
+typedef struct lyr_ty_18_std_io_IoErrorKind_AddrInUse lyr_ty_18_std_io_IoErrorKind_AddrInUse;
+typedef struct lyr_ty_18_std_io_IoErrorKind_BrokenPipe lyr_ty_18_std_io_IoErrorKind_BrokenPipe;
+typedef struct lyr_ty_18_std_io_IoErrorKind_Closed lyr_ty_18_std_io_IoErrorKind_Closed;
+typedef struct lyr_ty_18_std_io_IoErrorKind_Unsupported lyr_ty_18_std_io_IoErrorKind_Unsupported;
+typedef struct lyr_ty_18_std_io_IoErrorKind_Other lyr_ty_18_std_io_IoErrorKind_Other;
+typedef struct lyr_ty_std_io_IoError lyr_ty_std_io_IoError;
+typedef struct lyr_ty_std_io_ByteReader lyr_ty_std_io_ByteReader;
+typedef struct lyr_ty_std_io_SeekFrom lyr_ty_std_io_SeekFrom;
+typedef struct lyr_ty_15_std_io_SeekFrom_Start lyr_ty_15_std_io_SeekFrom_Start;
+typedef struct lyr_ty_15_std_io_SeekFrom_End lyr_ty_15_std_io_SeekFrom_End;
+typedef struct lyr_ty_15_std_io_SeekFrom_Current lyr_ty_15_std_io_SeekFrom_Current;
+typedef struct lyr_ty_std_io_ByteBuffer lyr_ty_std_io_ByteBuffer;
 typedef struct lyr_ty_std_hash_Sip lyr_ty_std_hash_Sip;
 typedef struct lyr_ty_std_hash_DefaultHasher lyr_ty_std_hash_DefaultHasher;
 typedef struct lyr_ty_std_hash_FixedHasher lyr_ty_std_hash_FixedHasher;
@@ -144,6 +168,97 @@ struct lyr_ty_std_core_LinesIter {
 struct lyr_ty_std_core_Utf8Error {
     int64_t f_offset;
 };
+struct lyr_ty_18_std_io_IoErrorKind_NotFound {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_PermissionDenied {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_AlreadyExists {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_IsDirectory {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_NotDirectory {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_InvalidInput {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_InvalidData {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_UnexpectedEof {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_TimedOut {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_ConnectionRefused {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_ConnectionReset {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_AddrInUse {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_BrokenPipe {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_Closed {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_Unsupported {
+    uint8_t lyr_unit;
+};
+struct lyr_ty_18_std_io_IoErrorKind_Other {
+    int64_t f_code;
+};
+struct lyr_ty_std_io_IoErrorKind { uint32_t tag; union { lyr_ty_18_std_io_IoErrorKind_Other v15; } as; };
+_Static_assert(sizeof(lyr_ty_std_io_IoErrorKind) == 16, "layout of lyr_ty_std_io_IoErrorKind");
+struct lyr_ty_std_io_IoError {
+    lyr_ty_std_io_IoErrorKind f_kind;
+    LyrStr *f_path;
+    LyrStr *f_detail;
+    lyr_opt_iface14_std_core_Error f_inner;
+};
+struct lyr_ty_std_io_ByteReader {
+    LyrObj header;
+    lyr_slice_u8 f_bytes;
+    int64_t f_at;
+};
+_Static_assert(sizeof(lyr_ty_std_io_ByteReader) == 32, "layout of lyr_ty_std_io_ByteReader");
+_Static_assert(offsetof(lyr_ty_std_io_ByteReader, f_bytes) == 8, "layout of lyr_ty_std_io_ByteReader");
+_Static_assert(offsetof(lyr_ty_std_io_ByteReader, f_at) == 24, "layout of lyr_ty_std_io_ByteReader");
+extern const LyrItable lyr_itab_ty_std_io_ByteReader[];
+static const uint64_t lyr_refmap_ty_std_io_ByteReader[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_ty_std_io_ByteReader = { sizeof(lyr_ty_std_io_ByteReader), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_io_ByteReader, "std.io.ByteReader", lyr_itab_ty_std_io_ByteReader };
+struct lyr_ty_15_std_io_SeekFrom_Start {
+    int64_t f_0;
+};
+struct lyr_ty_15_std_io_SeekFrom_End {
+    int64_t f_0;
+};
+struct lyr_ty_15_std_io_SeekFrom_Current {
+    int64_t f_0;
+};
+struct lyr_ty_std_io_SeekFrom { uint32_t tag; union { lyr_ty_15_std_io_SeekFrom_Start v0; lyr_ty_15_std_io_SeekFrom_End v1; lyr_ty_15_std_io_SeekFrom_Current v2; } as; };
+_Static_assert(sizeof(lyr_ty_std_io_SeekFrom) == 16, "layout of lyr_ty_std_io_SeekFrom");
+struct lyr_ty_std_io_ByteBuffer {
+    LyrObj header;
+    LyrArr *f_data;
+    int64_t f_start;
+    int64_t f_end;
+};
+_Static_assert(sizeof(lyr_ty_std_io_ByteBuffer) == 32, "layout of lyr_ty_std_io_ByteBuffer");
+_Static_assert(offsetof(lyr_ty_std_io_ByteBuffer, f_data) == 8, "layout of lyr_ty_std_io_ByteBuffer");
+_Static_assert(offsetof(lyr_ty_std_io_ByteBuffer, f_start) == 16, "layout of lyr_ty_std_io_ByteBuffer");
+_Static_assert(offsetof(lyr_ty_std_io_ByteBuffer, f_end) == 24, "layout of lyr_ty_std_io_ByteBuffer");
+extern const LyrItable lyr_itab_ty_std_io_ByteBuffer[];
+static const uint64_t lyr_refmap_ty_std_io_ByteBuffer[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_ty_std_io_ByteBuffer = { sizeof(lyr_ty_std_io_ByteBuffer), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_io_ByteBuffer, "std.io.ByteBuffer", lyr_itab_ty_std_io_ByteBuffer };
 struct lyr_ty_std_hash_Sip {
     uint64_t f_v0;
     uint64_t f_v1;
@@ -214,6 +329,22 @@ _Static_assert(sizeof(lyr_box_ty_std_core_Utf8Error) == 16, "layout of lyr_box_t
 _Static_assert(offsetof(lyr_box_ty_std_core_Utf8Error, value) == 8, "layout of lyr_box_ty_std_core_Utf8Error");
 extern const LyrItable lyr_itab_ty_std_core_Utf8Error[];
 const LyrDesc lyr_desc_box_ty_std_core_Utf8Error = { sizeof(lyr_box_ty_std_core_Utf8Error), 0, 0, 0, NULL, "box<std.core.Utf8Error>", lyr_itab_ty_std_core_Utf8Error };
+typedef struct { LyrObj header; lyr_ty_std_io_IoErrorKind value; } lyr_box_ty_std_io_IoErrorKind;
+_Static_assert(sizeof(lyr_box_ty_std_io_IoErrorKind) == 24, "layout of lyr_box_ty_std_io_IoErrorKind");
+_Static_assert(offsetof(lyr_box_ty_std_io_IoErrorKind, value) == 8, "layout of lyr_box_ty_std_io_IoErrorKind");
+extern const LyrItable lyr_itab_ty_std_io_IoErrorKind[];
+const LyrDesc lyr_desc_box_ty_std_io_IoErrorKind = { sizeof(lyr_box_ty_std_io_IoErrorKind), 0, 0, 0, NULL, "box<std.io.IoErrorKind>", lyr_itab_ty_std_io_IoErrorKind };
+typedef struct { LyrObj header; lyr_ty_std_io_IoError value; } lyr_box_ty_std_io_IoError;
+_Static_assert(sizeof(lyr_box_ty_std_io_IoError) == 64, "layout of lyr_box_ty_std_io_IoError");
+_Static_assert(offsetof(lyr_box_ty_std_io_IoError, value) == 8, "layout of lyr_box_ty_std_io_IoError");
+extern const LyrItable lyr_itab_ty_std_io_IoError[];
+static const uint64_t lyr_refmap_box43[] = { UINT64_C(0x38) };
+const LyrDesc lyr_desc_box_ty_std_io_IoError = { sizeof(lyr_box_ty_std_io_IoError), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box43, "box<std.io.IoError>", lyr_itab_ty_std_io_IoError };
+typedef struct { LyrObj header; lyr_ty_std_io_SeekFrom value; } lyr_box_ty_std_io_SeekFrom;
+_Static_assert(sizeof(lyr_box_ty_std_io_SeekFrom) == 24, "layout of lyr_box_ty_std_io_SeekFrom");
+_Static_assert(offsetof(lyr_box_ty_std_io_SeekFrom, value) == 8, "layout of lyr_box_ty_std_io_SeekFrom");
+extern const LyrItable lyr_itab_ty_std_io_SeekFrom[];
+const LyrDesc lyr_desc_box_ty_std_io_SeekFrom = { sizeof(lyr_box_ty_std_io_SeekFrom), 0, 0, 0, NULL, "box<std.io.SeekFrom>", lyr_itab_ty_std_io_SeekFrom };
 typedef struct { LyrObj header; lyr_ty_std_hash_Sip value; } lyr_box_ty_std_hash_Sip;
 _Static_assert(sizeof(lyr_box_ty_std_hash_Sip) == 64, "layout of lyr_box_ty_std_hash_Sip");
 _Static_assert(offsetof(lyr_box_ty_std_hash_Sip, value) == 8, "layout of lyr_box_ty_std_hash_Sip");
@@ -310,6 +441,11 @@ const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_17_std_core_Ordering = { &ly
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_18_std_core_Exception = { &lyr_desc_ty_std_core_Exception,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_18_std_core_LinesIter = { &lyr_desc_box_ty_std_core_LinesIter,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_18_std_core_Utf8Error = { &lyr_desc_box_ty_std_core_Utf8Error,  };
+const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_18_std_io_IoErrorKind = { &lyr_desc_box_ty_std_io_IoErrorKind,  };
+const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_14_std_io_IoError = { &lyr_desc_box_ty_std_io_IoError,  };
+const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_17_std_io_ByteReader = { &lyr_desc_ty_std_io_ByteReader,  };
+const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_15_std_io_SeekFrom = { &lyr_desc_box_ty_std_io_SeekFrom,  };
+const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_17_std_io_ByteBuffer = { &lyr_desc_ty_std_io_ByteBuffer,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_12_std_hash_Sip = { &lyr_desc_box_ty_std_hash_Sip,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_22_std_hash_DefaultHasher = { &lyr_desc_box_ty_std_hash_DefaultHasher,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_20_std_hash_FixedHasher = { &lyr_desc_box_ty_std_hash_FixedHasher,  };
@@ -326,6 +462,11 @@ const LyrItable lyr_itab_ty_std_core_Ordering[] = { { lyr_ifid_ty_std_core_Any, 
 const LyrItable lyr_itab_ty_std_core_Exception[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_18_std_core_Exception } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_core_LinesIter[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_18_std_core_LinesIter } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_core_Utf8Error[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_18_std_core_Utf8Error } , { NULL, NULL } };
+const LyrItable lyr_itab_ty_std_io_IoErrorKind[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_18_std_io_IoErrorKind } , { NULL, NULL } };
+const LyrItable lyr_itab_ty_std_io_IoError[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_14_std_io_IoError } , { NULL, NULL } };
+const LyrItable lyr_itab_ty_std_io_ByteReader[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_17_std_io_ByteReader } , { NULL, NULL } };
+const LyrItable lyr_itab_ty_std_io_SeekFrom[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_15_std_io_SeekFrom } , { NULL, NULL } };
+const LyrItable lyr_itab_ty_std_io_ByteBuffer[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_17_std_io_ByteBuffer } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_hash_Sip[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_12_std_hash_Sip } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_hash_DefaultHasher[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_22_std_hash_DefaultHasher } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_hash_FixedHasher[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_20_std_hash_FixedHasher } , { NULL, NULL } };

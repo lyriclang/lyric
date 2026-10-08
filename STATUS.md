@@ -551,7 +551,11 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   byte string's alone; `module` and `params` are names; spec chapter 01 written (15 cases).
   **N3b**: the spec's core rules — 08 precedence (a comparison and an equality do not chain, now
   a parse error), evaluation order, `++`/`--`; 07 `if`/`while`/`do` (a body without braces said
-  once); 04 the order across modules; the chapter heads.
+  once); 04 the order across modules; the chapter heads. **The catch-up block is done.**
+- **S2** io core: `IoError`/`IoErrorKind` (10 O3; the field `cause` is `inner`, as `Exception`'s),
+  `Reader`/`Writer`/`Seek`/`SeekFrom`, the defaults (`readExact`, `readToEnd`, `readToString`,
+  `writeAll`, `writeString`), `copy`, `ByteReader` and `ByteBuffer` — all in Lyric; spec 12
+  "Input and output", seven cases.
 
 ### M8a — done (2026-10-07)
 
