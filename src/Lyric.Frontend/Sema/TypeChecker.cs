@@ -319,6 +319,7 @@ public sealed class TypeChecker
 
     private TypeResult CheckInner()
     {
+        var errorsAtStart = _de.ErrorCount;
         _result.IteratorInterface = _iterator;
         _result.ArrayIterator = _arrayIterator;
         _result.RangeIterator = _rangeIterator;
@@ -358,6 +359,7 @@ public sealed class TypeChecker
         CheckExtensionBlocks(); // extend bodies, conformance
         CheckMethodSets();      // one name, one function per type (04 D2, D3)
         CheckStaticSets();      // one constant of a name per type (05 §6)
+        JudgeContextless(errorsAtStart); // the '[]' outside every function body
         _currentModule = null;
         new FlowAnalyzer(_comp, _result, _de).Run(); // definite assignment
         return _result;
@@ -2431,8 +2433,11 @@ public sealed class TypeChecker
         var savedYield = _currentYield;
         var savedThis = _currentThis;
         var savedNarrowed = _narrowed;
+        var savedContextless = _contextless;
+        var errorsBefore = _de.ErrorCount;
         _currentThis = thisType;
         _narrowed = new(ReferenceEqualityComparer.Instance);
+        _contextless = [];
 
         var scope = new SymbolTable(outerScope);
         // The function's own type parameters (fn map<U>) go into the body scope. Signature types are
@@ -2497,10 +2502,37 @@ public sealed class TypeChecker
                         : $"not all code paths of '{fn.Name}' return a value");
         }
 
+        JudgeContextless(errorsBefore);
+        _contextless = savedContextless;
         _currentReturn = savedReturn;
         _currentYield = savedYield;
         _currentThis = savedThis;
         _narrowed = savedNarrowed;
+    }
+
+    /// <summary>The empty array literals of the unit being checked — a function, or the rest of the
+    /// program: globals, constants, defaults — that no position gave an element type while they
+    /// were checked. A later step may still give one (an argument's, through
+    /// <see cref="AdaptEmptyArray"/>), so they are judged when the unit is done.</summary>
+    private List<ArrayLitExpr> _contextless = [];
+
+    /// <summary>
+    /// A <c>[]</c> whose position gives it no element type is refused at the literal (03 §5.1
+    /// rule 2): the target of an index or a member, an operand of <c>+</c>, a hole of an f-string,
+    /// a <c>for</c>'s iterable. Its type stayed an array of the error type, which no one had
+    /// reported — and the lowering died on it as an internal exception.
+    /// <para>Only where the unit is otherwise sound: a binding says <c>LYR-SEM0010</c> of its own
+    /// <c>[]</c>, an inference or <c>[] == []</c> <c>LYR-SEM0060</c>, and any error stops the build
+    /// before the lowering anyway — a second line would be about the same mistake.</para>
+    /// </summary>
+    private void JudgeContextless(int errorsBefore)
+    {
+        if (_de.ErrorCount != errorsBefore) return;
+        // A literal checked twice — the target of a call, a hole of an f-string — is one literal.
+        foreach (var literal in _contextless.Distinct(ReferenceEqualityComparer.Instance).Cast<ArrayLitExpr>())
+            if (Unfixed(_result.TypeOf(literal)) is not null)
+                _de.Report("LYR-SEM0060", Severity.Error, literal.Span,
+                    "'[]' fixes no type of its own, and nothing here gives it one — write one: 'let none: int[] = [];'");
     }
 
     // --- statements ---
@@ -2594,6 +2626,9 @@ public sealed class TypeChecker
                 _statementValue = es.Expr;
                 CheckExpr(es.Expr, scope);
                 _statementValue = savedStatement;
+                // '[];' has no effect, which is what SemaRules says of it (LYR-SEM0022); the
+                // missing type is the same mistake.
+                if (es.Expr is ArrayLitExpr { Elements.Length: 0 } dropped) _contextless.RemoveAll(l => ReferenceEquals(l, dropped));
                 break;
             }
             case ThrowStmt t:
@@ -5501,9 +5536,13 @@ public sealed class TypeChecker
     {
         while (to is Optional optional) to = optional.Inner;
 
-        if (expr is not ArrayLitExpr { Elements.Length: 0 } || to is not ArrayOf) return false;
+        if (expr is not ArrayLitExpr { Elements.Length: 0 }) return false;
+        // A view takes the array of its element type, which stands as a view of itself (03 §5.2
+        // rule 4): 'take([])' with 'take(s: Slice<uint8>)'.
+        LyrType? array = to switch { ArrayOf => to, SliceOf view => new ArrayOf(view.Element), _ => null };
+        if (array is null) return false;
 
-        _result.SetType(expr, to);
+        _result.SetType(expr, array);
         return true;
     }
 
@@ -6323,7 +6362,13 @@ public sealed class TypeChecker
 
         var elemExpected = expected is ArrayOf ea ? ea.Element : null;
         if (arr.Elements.Length == 0)
-            return new ArrayOf(elemExpected ?? LyrType.Error); // empty: the element type comes from the context alone
+        {
+            // Empty: the element type comes from the context alone. Without one it is open — a
+            // coercion site may still close it (AdaptEmptyArray), a view's among them —, and it is
+            // judged when the unit is done (JudgeContextless).
+            if (elemExpected is null) _contextless.Add(arr);
+            return new ArrayOf(elemExpected ?? LyrType.Error);
+        }
         // With a context the elements check AGAINST it (§3.1 since 2.1): an unsuffixed literal
         // adapts, a misfit is the ordinary assignment error per element, and the array has the
         // context's element type. Without one the elements unify among themselves, as always.
