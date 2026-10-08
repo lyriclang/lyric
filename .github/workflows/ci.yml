@@ -248,8 +248,10 @@ jobs:
     name: Conformance gate
     runs-on: ubuntu-latest
     # Both profiles, one after the other: 28.7 minutes for 1012 cases (S12d), and 30 cancelled the
-    # run of 1014 (S13). Room for the suite to grow until it is split per profile.
-    timeout-minutes: 45
+    # run of 1014 (S13). 1166 cases (M8b S8a) took 27 minutes in a pull request's run and more than
+    # 40 in a dispatched one, beside a dozen other jobs, and 45 cancelled M8b S8b's: 60 until the
+    # suite is split per profile — which renames the job's check, so it waits for the maintainer.
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
