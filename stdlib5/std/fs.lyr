@@ -1,22 +1,36 @@
-/// The file system (design/v5/spec/10 O4, O5; M8b S6b, S6c): `File`, a handle on a file — a class
-/// with its identity and a `closed` state — that reads, writes and seeks through `std.io`'s
-/// interfaces; the conveniences that read or write a file whole, or its lines one by one. S7: the
-/// directories.
+/// The file system (design/v5/spec/10 O4, O5; M8b S6b, S6c, S7a): `File`, a handle on a file — a
+/// class with its identity and a `closed` state — that reads, writes and seeks through `std.io`'s
+/// interfaces; the conveniences that read or write a file whole, or its lines one by one; what a
+/// path names, the directories and their entries. S7b: what is put together from those —
+/// `createDirAll`, `removeAll`, `copy`, `walk`, `tempDir`, `tempFile`.
 ///
 /// Every call on a file runs on the program's I/O pool (13 M8b P2; 06 S3): a few threads, started
 /// at the first use, do the system's call while the running task is parked — the thread it runs on
 /// goes on with the other tasks. A call on a regular file ends in a bounded time and is no wait in
 /// the sense of 10 §1 rule 7: a cancellation is seen at the task's next wait. Reads and writes go
 /// through the caller's slice, never a copy (P4).
+import std.core { Utf8Error };
 import std.io { IoError, IoErrorKind, Reader, Seek, SeekFrom, TextReader, Writer };
+import std.path { join, normalize };
 import std.task { SpinLock, schedulerRuns };
 import std.thread { Pool };
+import std.time { Instant, instantOfEpochNanos };
 
 fn fsOpen(path: string, how: int): int;
 fn fsRead(file: int, into: Slice<uint8>): int;
 fn fsWrite(file: int, from: Slice<uint8>): int;
 fn fsSeek(file: int, offset: int, whence: int): int;
 fn fsClose(file: int): int;
+fn fsStat(path: string, into: Slice<int>): int;
+fn fsMakeDir(path: string): int;
+fn fsRemoveDir(path: string): int;
+fn fsRemove(path: string): int;
+fn fsRename(from: string, to: string): int;
+fn fsDirOpen(path: string): int;
+fn fsDirNext(dir: int, into: Slice<uint8>): int;
+fn fsDirClose(dir: int): int;
+fn fsCanonical(path: string, into: Slice<uint8>): int;
+fn fsAbsolute(path: string, into: Slice<uint8>): int;
 
 /// How a file is opened (10 O5): to read, to write, to append at its end, created where it is not
 /// there, cut to nothing where it is. A file that is neither read nor written, or created or cut
@@ -147,6 +161,7 @@ fn failure(answer: int, path: string, doing: string): IoError {
         4 => .IsDirectory,
         5 => .NotDirectory,
         6 => .InvalidInput,
+        7 => .InvalidData,
         _ => .Other { code = raw },
     };
     return IoError { kind = kind, path = path, detail = doing };
@@ -236,6 +251,228 @@ pub class FileLinesIter :: [Iterator, Closeable] {
     /// Lets the file go before the end. A second close does nothing.
     pub fn close(): void throws IoError {
         try this.file.close();
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// What a path names, the directories and their entries (10 O5; M8b S7a): one call of the
+// system's each, on the I/O pool; what it cannot do is an IoError with the path, as a file's is.
+// ---------------------------------------------------------------------------------------------
+
+/// What a path names (10 O5), through links: its size in bytes, when it was last written, whether
+/// it is a file or a directory — neither, for a device or a socket —, whether it cannot be written;
+/// and whether the path itself is a link. A link that leads nowhere is not found.
+pub struct Metadata {
+    pub size: int,
+    pub modified: Instant,
+    pub isFile: bool,
+    pub isDir: bool,
+    pub isSymlink: bool,
+    pub readonly: bool,
+}
+
+/// What `path` names.
+pub fn metadata(path: StringView): Metadata throws IoError {
+    return try statOf(path.toString());
+}
+
+/// Whether `path` names anything — false where it cannot be told, and for a link that leads
+/// nowhere, as Rust's `Path::exists` answers.
+pub fn exists(path: StringView): bool {
+    try {
+        let _ = statOf(path.toString());
+        return true;
+    } catch (_: IoError) {
+        return false;
+    }
+}
+
+/// Makes the directory `path`; the one it is in must be there.
+pub fn createDir(path: StringView): void throws IoError {
+    let name = path.toString();
+    let answer = onPool(() => fsMakeDir(name));
+    if (answer < 0) {
+        throw failure(answer, name, "made");
+    }
+}
+
+/// Removes the file `path`; a directory is `removeDir`'s.
+pub fn remove(path: StringView): void throws IoError {
+    let name = path.toString();
+    let answer = onPool(() => fsRemove(name));
+    if (answer < 0) {
+        throw failure(answer, name, "removed");
+    }
+}
+
+/// Removes the directory `path`, which must be empty. One that is not is `Other` with the system's
+/// code: 10 O3 names no kind for it.
+pub fn removeDir(path: StringView): void throws IoError {
+    let name = path.toString();
+    let answer = onPool(() => fsRemoveDir(name));
+    if (answer < 0) {
+        throw failure(answer, name, "removed");
+    }
+}
+
+/// Renames `from` to `to`, a file there replaced — on one file system; across two it fails.
+pub fn rename(from: StringView, to: StringView): void throws IoError {
+    let source = from.toString();
+    let target = to.toString();
+    let answer = onPool(() => fsRename(source, target));
+    if (answer < 0) {
+        throw failure(answer, source, f"renamed to {target}");
+    }
+}
+
+/// The entries of the directory `path`, one by one, in the order the system keeps them; `.` and
+/// `..` are not among them. The iterator holds the directory open: it lets it go at its end and at
+/// its first error, a loop that leaves it early lets it go (05 R7), and so does `close()`.
+pub fn readDir(path: StringView): ReadDirIter throws IoError {
+    let name = path.toString();
+    let handle = onPool(() => fsDirOpen(name));
+    if (handle < 0) {
+        throw failure(handle, name, "opened to read");
+    }
+    return ReadDirIter { handle = handle, dir = name, room = [0u8] * 1024 };
+}
+
+/// `path` absolute, its links resolved and its `.` and `..` taken out: where the system says the
+/// file is. It must be there.
+pub fn canonicalize(path: StringView): string throws IoError {
+    let name = path.toString();
+    return try pathFrom(name, "resolved", (into) => fsCanonical(name, into));
+}
+
+/// `path` made absolute by the working directory (10 O6), then normalized: nothing else is asked
+/// of the file system, and a link in it stays.
+pub fn absolute(path: StringView): string throws IoError {
+    let name = path.toString();
+    return normalize(try pathFrom(name, "made absolute", (into) => fsAbsolute(name, into)));
+}
+
+/// An entry of a directory (`fs.readDir`): its name, its path — the directory's joined with the
+/// name —, and what the entry is itself: a link is a link, not what it leads to (Go's `DirEntry`).
+pub struct DirEntry {
+    pub name: string,
+    pub path: string,
+    pub isFile: bool,
+    pub isDir: bool,
+    pub isSymlink: bool,
+
+    /// What the entry names, through a link (`fs.metadata`).
+    pub fn metadata(): Metadata throws IoError {
+        return try statOf(this.path);
+    }
+}
+
+/// A directory's entries (`fs.readDir`). After its end or an error it gives no more; after
+/// `close()` a call throws `Closed`.
+pub class ReadDirIter :: [Iterator, Closeable] {
+    type Item = DirEntry;
+    type Error = IoError;
+    handle: int,
+    dir: string,
+    var room: uint8[],
+    var done: bool = false,
+    var closed: bool = false,
+
+    pub mut fn next(): ?DirEntry throws IoError {
+        if (this.done) {
+            return null;
+        }
+        if (this.closed) {
+            throw IoError { kind = .Closed, path = this.dir, detail = "read" };
+        }
+        let h = this.handle;
+        let first = this.room;
+        var answer = onPool(() => fsDirNext(h, first[..]));
+        if (answer > 0 && (answer & 0xFFFFFFFF) > first.length()) {
+            // a name longer than the room: room for it, and the same entry again
+            let more: uint8[] = [0u8] * (answer & 0xFFFFFFFF);
+            this.room = more;
+            answer = onPool(() => fsDirNext(h, more[..]));
+        }
+        if (answer == 0) {
+            this.done = true;
+            try this.letGo();
+            return null;
+        }
+        var entry: ?DirEntry = null;
+        var error: ?IoError = null;
+        if (answer < 0) {
+            error = failure(answer, this.dir, "read");
+        } else {
+            let length = answer & 0xFFFFFFFF;
+            let kind = answer >> 32;
+            try {
+                let name = string.fromUtf8(this.room[..length]);
+                entry = DirEntry { name = name, path = join(this.dir, name), isFile = kind == 1, isDir = kind == 2, isSymlink = kind == 3 };
+            } catch (e: Utf8Error) {
+                error = IoError { kind = .InvalidData, path = this.dir, detail = "a name in it is no UTF-8", inner = e };
+            }
+        }
+        if (let e = error) {
+            this.done = true;
+            // the first error wins, the close's is attached to it (05 E7)
+            defer { try this.letGo(); }
+            throw e;
+        }
+        return entry;
+    }
+
+    /// Lets the directory go before the end. A second close does nothing.
+    pub fn close(): void throws IoError {
+        try this.letGo();
+    }
+
+    fn letGo(): void throws IoError {
+        // through the reference: 'Closeable.close' is no 'mut fn' (as File's close)
+        let me = this;
+        if (me.closed) {
+            return;
+        }
+        me.closed = true;
+        let h = me.handle;
+        let answer = onPool(() => fsDirClose(h));
+        if (answer < 0) {
+            throw failure(answer, me.dir, "closed");
+        }
+    }
+}
+
+/// What `name` names (lyr/fs.h's five slots).
+fn statOf(name: string): Metadata throws IoError {
+    let slots: int[] = [0] * 5;
+    let answer = onPool(() => fsStat(name, slots[..]));
+    if (answer < 0) {
+        throw failure(answer, name, "looked at");
+    }
+    return Metadata {
+        size = slots[1],
+        modified = instantOfEpochNanos(slots[2]),
+        isFile = slots[0] == 1,
+        isDir = slots[0] == 2,
+        isSymlink = slots[4] == 1,
+        readonly = slots[3] == 1,
+    };
+}
+
+/// A path the system writes into a buffer (`call`): the room it answers it needs, where the first
+/// was too small, and once more.
+fn pathFrom(name: string, doing: string, call: fn(Slice<uint8>) -> int): string throws IoError {
+    var room = 1024;
+    loop {
+        let buffer: uint8[] = [0u8] * room;
+        let answer = onPool(() => call(buffer[..]));
+        if (answer < 0) {
+            throw failure(answer, name, doing);
+        }
+        if (answer <= room) {
+            return try string.fromUtf8(buffer[..answer]) catch (e: Utf8Error)
+                throw IoError { kind = .InvalidData, path = name, detail = doing, inner = e };
+        }
+        room = answer;
     }
 }
 
