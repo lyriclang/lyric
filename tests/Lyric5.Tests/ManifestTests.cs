@@ -99,7 +99,6 @@ public class ManifestTests
     }
 
     [Theory]
-    [InlineData("[build-dependencies]\ngen = { path = \"gen\" }", "comes with M8b S13")]
     [InlineData("[lints]\ndeny = []", "comes with M12")]
     [InlineData("[workspace]\nmembers = []", "no part of a manifest")]
     public void A_section_the_toolchain_does_not_read_is_refused(string section, string why)
@@ -109,6 +108,24 @@ public class ManifestTests
         Assert.Equal("LYR-PKG0003", e.Code);
         Assert.Contains(why, e.Message);
         Assert.Equal(5, e.Line);
+    }
+
+    /// <summary>A build script's sections (11 W3 BS3, BS5; M8b S13): its own dependencies — the name
+    /// `build` its own module, no package's —, and the packages whose scripts the root trusts.</summary>
+    [Fact]
+    public void A_build_scripts_dependencies_and_the_trust_rule_are_read()
+    {
+        var m = Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[build-dependencies]\ntools = { path = \"../tools\" }\n\n[trust]\nbuild-scripts = [\"geo\", \"geo\"]\n"));
+        Assert.Equal("tools", Assert.Single(m.BuildDependencies).Name);
+        Assert.Empty(m.Dependencies);
+        Assert.Equal(["geo"], m.TrustedScripts);
+        var e = Assert.Throws<ManifestException>(() =>
+            Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[build-dependencies]\nbuild = { path = \"../b\" }\n")));
+        Assert.Equal("LYR-PKG0002", e.Code);
+        Assert.Contains("the build script's own module", e.Message);
+        var t = Assert.Throws<ManifestException>(() =>
+            Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[trust]\nscripts = []\n")));
+        Assert.Equal("LYR-PKG0003", t.Code);
     }
 
     [Fact]

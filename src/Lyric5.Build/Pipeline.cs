@@ -36,6 +36,7 @@ public static class Pipeline
             StdlibRoot = StdlibRoot, PackageRoots = project.PackageRoots,
             PackageDependencies = project.DeclaredDependencies,
             PackageTestRoots = project.TestRoot is { } tests ? new Dictionary<string, string> { [project.Name] = tests } : null,
+            PackageGenRoots = GenRoots(project),
             Optimize = profile is { Opt: >= 2 },
         };
         var source = project.EntryText is { } text
@@ -53,6 +54,13 @@ public static class Pipeline
     /// profile has it emitted.</summary>
     public static int Emit(Project project, string what, TextWriter output, TextWriter error, BuildProfile? profile = null)
     {
+        // the scripts first, for gen/ (11 W3 BS4); their C is the build's, not the emission's
+        if (CCompiler.Locate() is { } compiler)
+        {
+            var (ran, _) = BuildScripts.Run(project, Target.Host, profile ?? BuildProfile.Of(Lyric5.Toolchain.Profile.Debug), compiler,
+                ScriptVersion, error);
+            if (ran != 0) return ran;
+        }
         var result = Compile(project, error, profile);
         if (result is null) return 1;
         output.Write(what == "ir"
@@ -78,6 +86,12 @@ public static class Pipeline
         // One build at a time writes into out/ (11 W2 P5); a second one waits here.
         using var held = OutLock.Take(project.OutDir, error);
         Directory.CreateDirectory(project.CacheDir);
+
+        // The packages' build scripts before anything is compiled (11 W3 BS4): what they write into
+        // gen/ is a source of the program, what they ask is the build's.
+        var (scripted, directives) = BuildScripts.Run(project, request.Target, request.Profile, request.Compiler,
+            request.ToolchainVersion, error);
+        if (directives is null) return (scripted, null);
 
         // The C, keyed by the sources, the toolchain and the compiler that emits it: the same
         // program emits the same C, so the front end runs only for a program that changed. The
@@ -118,7 +132,10 @@ public static class Pipeline
             var units = sources.Select(path => new CUnit(path, [], [RuntimeLayout.IncludeDir(runtimeRoot)],
                 ExtraFlags: [.. request.Profile.ProgramFlags, .. paths])).ToList();
             var (native, libraries) = Native(project, request.Target, paths);
-            var objects = build.Compile([.. units, .. native]);
+            foreach (var library in directives.Libraries)
+                if (!libraries.Contains(library)) libraries.Add(library);
+            var scripts = directives.Sources.Select(unit => unit with { ExtraFlags = [.. unit.ExtraFlags ?? [], .. paths] }).ToList();
+            var objects = build.Compile([.. units, .. native, .. scripts]);
             var executable = project.Executable(request.Profile, request.Target);
             if (!UpToDate(executable, [.. objects, archive])) build.LinkExecutable([.. objects, archive], executable, libraries);
             return (0, executable);
@@ -192,6 +209,17 @@ public static class Pipeline
     /// emitter's. A deterministic build gives the same bytes the same id, so a compiler that
     /// changed keys new C even where no version string moved — a change to the lowering alone
     /// once reused the old C — and an unchanged one finds what it emitted before.</summary>
+    /// <summary>The compiler's identity, for what else is keyed by it — a build script's state.</summary>
+    internal static string CompilerKey => CompilerIdentity;
+
+    /// <summary>The version a build script's key carries where no request names one (<c>--emit</c>).</summary>
+    private const string ScriptVersion = "emit";
+
+    /// <summary>Every package's <c>gen/</c> that is there, by name (11 W3 BS6).</summary>
+    internal static IReadOnlyDictionary<string, string>? GenRoots(Project project) =>
+        project.Graph?.Packages.Where(p => !p.Value.IsScript && Directory.Exists(p.Value.GenRoot))
+            .ToDictionary(p => p.Key, p => p.Value.GenRoot, StringComparer.Ordinal);
+
     private static readonly string CompilerIdentity = string.Join(",",
         typeof(SourceCompiler).Assembly.ManifestModule.ModuleVersionId,
         typeof(CEmitter).Assembly.ManifestModule.ModuleVersionId);
@@ -211,13 +239,23 @@ public static class Pipeline
             {
                 parts.Add(name);
                 parts.Add(File.ReadAllText(manifest.File));
-                AddTree(parts, manifest.SourceRoot);
+                if (!manifest.IsScript) AddTree(parts, manifest.SourceRoot);
+                if (!manifest.IsScript && Directory.Exists(manifest.GenRoot))
+                {
+                    parts.Add("gen/");
+                    AddTree(parts, manifest.GenRoot);
+                }
             }
         }
-        else
-        {
-            parts.Add(File.ReadAllText(project.Source));
-        }
+        // A single file — a build script among them, with a graph of its own or none — is its own
+        // entry, outside every package's src/, and its module spaces beside it (11 W3 BS3).
+        if (project.Graph is null || project.Manifest is null) parts.Add(File.ReadAllText(project.Source));
+        if (project.ModuleRoots is { } modules)
+            foreach (var (name, root) in modules.OrderBy(m => m.Key, StringComparer.Ordinal))
+            {
+                parts.Add(name);
+                if (Directory.Exists(root)) AddTree(parts, root);
+            }
         // The test program: what the toolchain wrote, and the package's tests/ it reads.
         if (project.EntryText is { } text) parts.Add(text);
         if (project.TestRoot is { } tests)
@@ -252,7 +290,7 @@ public static class Pipeline
         return result.Render(error) && !Denied(result, profile, error) ? 0 : 1;
     }
 
-    private static void AddTree(List<string> parts, string root)
+    internal static void AddTree(List<string> parts, string root)
     {
         if (!Directory.Exists(root)) return;
         foreach (var file in Directory.EnumerateFiles(root, "*.lyr", SearchOption.AllDirectories)
@@ -284,7 +322,7 @@ public static class Pipeline
         return inputs.All(input => File.GetLastWriteTimeUtc(input) <= linked);
     }
 
-    private static string Key(params string[] parts)
+    internal static string Key(params string[] parts)
     {
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         foreach (var part in parts)

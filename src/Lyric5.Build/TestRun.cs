@@ -33,6 +33,9 @@ public static class TestRun
     public static int Run(Project project, BuildProfile profile, CCompiler compiler, string version, string? filter,
         TextWriter output, TextWriter error)
     {
+        // the scripts first, so that a test may import what they generate (11 W3 BS4, BS6)
+        var (ran, _) = BuildScripts.Run(project, Target.Host, profile, compiler, version, error);
+        if (ran != 0) return ran;
         var tests = Discover(project, error);
         if (tests is null) return 1;
         var chosen = filter is null ? tests : tests.Where(t => t.Name.Contains(filter, StringComparison.Ordinal)).ToList();
@@ -78,6 +81,7 @@ public static class TestRun
             StdlibRoot = Pipeline.StdlibRoot, PackageRoots = project.PackageRoots,
             PackageDependencies = project.DeclaredDependencies,
             PackageTestRoots = new Dictionary<string, string> { [manifest.Name] = testRoot },
+            PackageGenRoots = Pipeline.GenRoots(project),
         };
         var result = SourceCompiler.CheckProject(roots, options);
         // The warnings are the build's to report, which compiles the program again: once is enough.

@@ -632,6 +632,12 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   `env`, `envs`, `setEnv`, `cwd`, `setCwd`, `exit` (the console flushed, nothing else run),
   `platform()`/`arch()` (`Platform`, `Arch`), `homeDir`, `tempDir` (which `fs.tempDir` now asks),
   `hostname`, `cpuCount`, `pid`. Spec 12 "The system", six cases.
+- **S13** the build script (11 W3 BS1–BS6): a package's `build.lyr` built as a program of its
+  own (`build`, `build/`, its `[build-dependencies]` as a graph of its own in the same lock) and
+  run before the compile; `std.build` (`target`, `profile`, `outDir`, `genDir`, `rerunIfChanged`,
+  `linkLib`, `cFlags`, `compileC`, `warn`), the directives through a file; `gen/` the module
+  space `app.gen.*`; a cache over the script, its dependencies, its inputs and `gen/`; a
+  dependency's script only with the root's `[trust] build-scripts`. Spec 15 §8, five cases.
 
 ### M8a — done (2026-10-07)
 

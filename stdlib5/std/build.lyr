@@ -1,0 +1,82 @@
+/// The build script's view of its build (design/v5/spec/11 W3 BS1, BS2; M8b S13a). A package's
+/// `build.lyr` is an ordinary program that `lyric5` runs before it compiles the package: it does
+/// things — writes modules into `gen/`, names C to compile and libraries to link — and defines
+/// nothing (P1). What it asks of the toolchain goes back as directives, a line each, into the file
+/// the toolchain names; what the build is comes from the environment the toolchain sets. Outside a
+/// build script these functions panic.
+import std.fs;
+import std.io { IoError };
+import std.os;
+
+/// The target the package is built for: its triple, `x86_64-linux-gnu`. The script itself runs on
+/// the host.
+pub fn target(): string {
+    return given("LYRIC_BUILD_TARGET");
+}
+
+/// The profile the package is built in: `debug`, `release`, or one of the manifest's.
+pub fn profile(): string {
+    return given("LYRIC_BUILD_PROFILE");
+}
+
+/// The package's `out/`, for what the script keeps between its runs.
+pub fn outDir(): string {
+    return given("LYRIC_BUILD_OUT_DIR");
+}
+
+/// The package's `gen/` (BS6): a module the script writes there, `gen/schema.lyr`, is the
+/// package's module `<package>.gen.schema`. The toolchain makes the directory before the script runs.
+pub fn genDir(): string {
+    return given("LYRIC_BUILD_GEN_DIR");
+}
+
+/// The script runs again where one of these files — paths from the package's root — has changed
+/// (BS4); else the toolchain keeps what the last run left. A script that names none runs again
+/// where it changed itself.
+pub fn rerunIfChanged(paths: string...): void {
+    for (i in 0..paths.length()) {
+        direct("rerun-if-changed", paths[i]);
+    }
+}
+
+/// The C library `name` linked into the program: `linkLib("m")` is `-lm`.
+pub fn linkLib(name: string): void {
+    direct("link-lib", name);
+}
+
+/// Flags for the C this script names with `compileC`: `cFlags("-DLEVEL=2", "-Iinclude")`.
+pub fn cFlags(flags: string...): void {
+    for (i in 0..flags.length()) {
+        direct("c-flag", flags[i]);
+    }
+}
+
+/// C sources — paths from the package's root — compiled with the program and linked into it.
+pub fn compileC(sources: string...): void {
+    for (i in 0..sources.length()) {
+        direct("compile-c", sources[i]);
+    }
+}
+
+/// A warning the toolchain shows with the build's diagnostics.
+pub fn warn(message: string): void {
+    direct("warn", message);
+}
+
+/// The value the toolchain gave the script; a panic where there is none — no build script runs.
+fn given(name: string): string {
+    if (let value = os.env(name)) {
+        return value;
+    }
+    panic(f"std.build is a build script's: {name} is not set — this program runs outside a build (11 W3 BS2)");
+}
+
+/// One directive, a line: its word, a tab, its text with its line ends taken out.
+fn direct(word: string, text: string): void {
+    let line = f"{word}\t{text.replace("\r", " ").replace("\n", " ")}\n";
+    try {
+        fs.appendText(given("LYRIC_BUILD_DIRECTIVES"), line);
+    } catch (e: IoError) {
+        panic(f"std.build: the directive could not be written: {e.message()}");
+    }
+}
