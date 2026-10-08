@@ -1,0 +1,16 @@
+// A file's calls in a program that never waits (design/v5/spec/06 M6-26; 13 M8b P2, P3): asking
+// whether a scheduler runs, as std.fs does before it parks a call on the I/O pool, makes no task of
+// main — no scheduler, no pool; the calls run on the thread itself. Expected stdout:
+//   kept alone 10
+import std.fs { File };
+import std.io { println };
+
+fn main(): void throws Error {
+    let out = try File.create("emitted-file-alone.tmp");
+    try out.writeString("kept alone");
+    try out.close();
+    let back = try File.open("emitted-file-alone.tmp");
+    let text = try back.readToString();
+    try back.close();
+    println(f"{text} {text.length()}");
+}

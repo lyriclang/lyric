@@ -590,6 +590,13 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   `components`, `separator` —, Windows' volumes and both separators included; checked against
   `go run` on POSIX. The runtime says which system it was built for (`lyr_os_platform`, with a
   runtime test). Spec 12 "Paths", four cases.
+- **S6b** files (10 O4, O5; P1, P2, P4): the runtime's file calls (`runtime/src/fs.c`, POSIX and
+  Windows — one system call each, EINTR taken again, the system's error as a kind and a code);
+  `std.fs` with `File` (`open`, `create`, `openWith(OpenOptions)`; `Reader`, `Writer`, `Seek`,
+  `Closeable`; `closed` throws `Closed`) whose calls run on the program's I/O pool, the task parked;
+  a file's call is no cancellation point (`awaitThrough` in `std.task`). Asking whether a scheduler
+  runs makes no task of `main` (`schedulerRuns`; the compiler's walk for M6-26 leaves its yes
+  out). A program over the pool runs under ASan and, locally, TSan. Spec 12 "Files", five cases.
 
 ### M8a — done (2026-10-07)
 

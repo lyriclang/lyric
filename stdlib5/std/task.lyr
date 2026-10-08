@@ -123,6 +123,34 @@ pub class Task<T> {
         return this.value!;
     }
 
+    /// The body's value once it has ended, waited for through a cancellation (M8b P2): std.fs's
+    /// calls on a regular file run on the I/O pool, in the caller's buffer, and end in a bounded
+    /// time — a caller that left before the end would take the buffer back while the pool still
+    /// wrote into it. No wait in the sense of 10 §1 rule 7: the cancellation stays the task's, for
+    /// its next wait to throw.
+    mut fn awaitThrough(): T throws Error {
+        let me = here().running ?? panic("an await where no task runs");
+        this.guard.acquire();
+        while (!this.done) {
+            me.beginWait();
+            me.awaits = true;
+            this.waiters.add(me);
+            this.guard.release();
+            park();
+            me.endWait();
+            this.guard.acquire();
+            this.waiters.remove(me);
+        }
+        this.guard.release();
+        if (let p = this.crash) {
+            repanic(p.code, p.message, p.trace);
+        }
+        if (let e = this.failure) {
+            throw e;
+        }
+        return this.value!;
+    }
+
     /// Cancels the task (06 N9 X1): its next wait throws `Cancelled` — at once, where it waits now
     /// — and so does every wait after it (X5). A task that has ended stays as it ended.
     pub fn cancel(): void {
@@ -1831,6 +1859,13 @@ fn repanic(code: string, message: string, trace: string): never;
 /// The running thread's scheduler, as `runMain` set it.
 fn currentScheduler(): ?Scheduler;
 fn setCurrentScheduler(s: ?Scheduler): void;
+
+/// Whether a scheduler runs on this thread — the question the I/O pool's callers ask (13 M8b P2,
+/// P3): where one runs, a blocking call goes to the pool and the task parks; where none runs,
+/// nothing else waits on the thread and the call runs on it. **Asking makes no task of `main`**
+/// (06 M6-26): the compiler's walk for that decision does not follow the branch this answers yes,
+/// so a program that only reads a file keeps main off the scheduler.
+fn schedulerRuns(): bool;
 
 /// Waits on the thread's poller (13 §1.7) for `nanos` at most, a negative one without end: true
 /// when woken.

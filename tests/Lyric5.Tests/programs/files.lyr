@@ -1,0 +1,39 @@
+// Files through the I/O pool (design/v5/spec/10 O4, O5; 13 M8b P2, S6): four tasks, each writing a
+// file of its own and reading it back, all at once on the pool's threads — the program the
+// sanitizers run over the pool. The files lie in the working directory and are written anew each
+// run (the directories, and with them removing a file, are S7's). Expected stdout:
+//   written 4
+//   read 4000 4000 4000 4000
+import std.fs { File };
+import std.io { println };
+import std.task { spawn };
+
+fn round(k: int): int throws Error {
+    let name = f"emitted-files-{k}.tmp";
+    let out = try File.create(name);
+    let chunk: uint8[] = [(48 + k) as uint8] * 100;
+    for (_ in 0..40) {
+        try out.writeAll(chunk[..]);
+    }
+    try out.close();
+    let back = try File.open(name);
+    let all = try back.readToEnd();
+    try back.close();
+    var same = 0;
+    for (b in all) {
+        if (b == (48 + k) as uint8) {
+            same = same + 1;
+        }
+    }
+    return same;
+}
+
+fn main(): void throws Error {
+    let tasks = [spawn(() => try round(0)), spawn(() => try round(1)), spawn(() => try round(2)), spawn(() => try round(3))];
+    var line = "read";
+    for (t in tasks) {
+        line = f"{line} {try t.await()}";
+    }
+    println(f"written {tasks.length()}");
+    println(line);
+}

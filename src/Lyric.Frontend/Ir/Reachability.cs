@@ -100,16 +100,53 @@ internal static class Reachability
     }
 
     /// <summary>Whether a function reachable from the roots calls the native of that name.</summary>
-    public static bool CallsImport(IrModule module, string name)
+    /// <remarks>With <paramref name="unless"/>, a native answering a <c>bool</c>, what runs only
+    /// where it answers yes does not count: a block that ends on a branch over that call's answer
+    /// leads on through its no alone, here and for every function reached. That is how asking
+    /// whether a scheduler runs makes no task of <c>main</c> (06 M6-26, 13 M8b P3) — the branch
+    /// that parks on the I/O pool runs only where one runs already. The pruning walks everything:
+    /// a spawned task takes that branch.</remarks>
+    public static bool CallsImport(IrModule module, string name, string? unless = null)
     {
         var target = module.Imports.FindIndex(import => import.Name == name);
         if (target < 0) return false;
-        foreach (var function in Collect(module))
-            foreach (var block in module.Functions[function].Blocks)
+        var guard = unless is null ? -1 : module.Imports.FindIndex(import => import.Name == unless);
+        foreach (var function in Collect(module, guard))
+            foreach (var block in BlocksOf(module.Functions[function], guard))
                 foreach (var op in block.Insts)
                     if (op is CallImport call && call.Target.Value == target)
                         return true;
         return false;
+    }
+
+    /// <summary>The blocks of <paramref name="function"/> — all of them, or, with a
+    /// <paramref name="guard"/> (an import's index, -1 for none), those that run where it answers
+    /// no.</summary>
+    private static IEnumerable<IrBlock> BlocksOf(IrFunction function, int guard)
+    {
+        if (guard < 0)
+        {
+            foreach (var block in function.Blocks) yield return block;
+            yield break;
+        }
+        var byId = function.Blocks.ToDictionary(b => b.Id.Value);
+        var seen = new HashSet<int>();
+        var open = new Stack<int>();
+        open.Push(function.Entry.Value);
+        while (open.Count > 0)
+        {
+            var at = open.Pop();
+            if (!seen.Add(at) || !byId.TryGetValue(at, out var block)) continue;
+            yield return block;
+            if (block.Terminator is null) continue;
+            if (block.Terminator is CondBranch branch && block.Insts.Any(op =>
+                    op is CallImport call && call.Target.Value == guard && call.Dest == branch.Cond))
+            {
+                open.Push(branch.IfFalse.Value);
+                continue;
+            }
+            foreach (var next in IrShape.SuccessorsOf(block.Terminator)) open.Push(next.Value);
+        }
     }
 
     /// <summary>
@@ -124,7 +161,7 @@ internal static class Reachability
     /// function at runtime. Throwing away less than possible is the right trade; the free functions this
     /// is about (<c>parseInt</c>, <c>replace</c>, …) are not virtual anyway.</para>
     /// </remarks>
-    internal static HashSet<int> Collect(IrModule module)
+    internal static HashSet<int> Collect(IrModule module, int guard = -1)
     {
         var erreichbar = new HashSet<int>();
         var offen = new Stack<int>();
@@ -156,7 +193,7 @@ internal static class Reachability
             if (offen.Count == 0) continue;
 
             var current = module.Functions[offen.Pop()];
-            foreach (var block in current.Blocks)
+            foreach (var block in BlocksOf(current, guard))
             {
                 foreach (var op in block.Insts)
                     switch (op)
