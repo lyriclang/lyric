@@ -551,7 +551,17 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   byte string's alone; `module` and `params` are names; spec chapter 01 written (15 cases).
   **N3b**: the spec's core rules — 08 precedence (a comparison and an equality do not chain, now
   a parse error), evaluation order, `++`/`--`; 07 `if`/`while`/`do` (a body without braces said
-  once); 04 the order across modules; the chapter heads.
+  once); 04 the order across modules; the chapter heads. **The catch-up block is done.**
+- **S2** io core: `IoError`/`IoErrorKind` (10 O3; the field `cause` is `inner`, as `Exception`'s),
+  `Reader`/`Writer`/`Seek`/`SeekFrom`, the defaults (`readExact`, `readToEnd`, `readToString`,
+  `writeAll`, `writeString`), `copy`, `ByteReader` and `ByteBuffer` — all in Lyric; spec 12
+  "Input and output", seven cases.
+- **S3** buffers and text (10 O2): `BufReader`, `BufWriter` (`Closeable`, `close()` flushes; the
+  R3 warning when nothing closes it), `TextReader` (`readLine`, `lines`, `chars`, `readToEnd`,
+  `skipBom`; a split codepoint waits for its rest, bytes that are no UTF-8 throw `InvalidData` at
+  their offset), `TextWriter`, and `Writer.flush()` (B8). **Classes, not O2's structs with inline
+  bytes**: every read hands the inner reader a view of the buffer, and a frame's inline array
+  has none (03 §5.3). Spec 12 rules 6–8, nine cases.
 
 ### M8a — done (2026-10-07)
 
