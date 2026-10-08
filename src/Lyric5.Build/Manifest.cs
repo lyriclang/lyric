@@ -77,6 +77,14 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     /// <summary><c>[dependencies]</c>: the packages this one imports from (P6).</summary>
     public IReadOnlyList<Dependency> Dependencies { get; init; } = [];
 
+    /// <summary><c>[build-dependencies]</c> (11 W3 BS3): what the package's build script imports from —
+    /// a graph of the script's own, which the package's program does not see.</summary>
+    public IReadOnlyList<Dependency> BuildDependencies { get; init; } = [];
+
+    /// <summary>The root of a build script's own graph (BS3): the package's manifest seen as the
+    /// script's — its dependencies the package's build dependencies —, with no script of its own.</summary>
+    public bool IsScript { get; init; }
+
     /// <summary><c>[override]</c> (07 P7): a package of the graph read from another directory,
     /// wherever it is asked for — the root manifest's alone count.</summary>
     public IReadOnlyList<Dependency> Overrides { get; init; } = [];
@@ -97,6 +105,27 @@ public sealed partial record Manifest(string File, string Name, string Version, 
 
     /// <summary><c>toolchain</c> (P12): the least toolchain that builds the package; <c>null</c> for any.</summary>
     public ToolchainPin? Toolchain { get; init; }
+
+    /// <summary><c>[trust] build-scripts</c> (11 W3 BS5): the packages of the graph whose
+    /// <c>build.lyr</c> may run — the root manifest's alone count; the root's own script always runs.</summary>
+    public IReadOnlyList<string> TrustedScripts { get; init; } = [];
+
+    /// <summary>The package's build script (BS1): <c>build.lyr</c> at its root, where there is one.</summary>
+    public string? BuildScript => !IsScript && System.IO.File.Exists(System.IO.Path.Combine(Root, "build.lyr"))
+        ? System.IO.Path.Combine(Root, "build.lyr") : null;
+
+    /// <summary>The root of the build script's own graph (BS3): <c>build</c>, its dependencies the
+    /// package's build dependencies, the root package's trust carried over.</summary>
+    public Manifest ScriptRoot(Manifest root) => new(File, "build", Version, Edition)
+    {
+        Dependencies = BuildDependencies,
+        TrustedScripts = root.TrustedScripts,
+        IsScript = true,
+    };
+
+    /// <summary>Where its script writes the package's generated modules (BS6): <c>gen/</c>, the module
+    /// space <c>&lt;package&gt;.gen</c>.</summary>
+    public string GenRoot => System.IO.Path.Combine(Root, "gen");
 
     /// <summary><c>[native]</c> (07 B5): the native part every target gets.</summary>
     public NativePart Native { get; init; } = NativePart.None;
@@ -128,9 +157,6 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     private static readonly Dictionary<string, string> LaterSections = new(StringComparer.Ordinal)
     {
         ["lints"] = "M12",
-        // build.lyr moved behind M8b's I/O (13; it was "M7 S7", a slice M7 never had)
-        ["build-dependencies"] = "M8b S13",
-        ["trust"] = "M8b S13",
     };
 
     /// <summary>Reads and checks <paramref name="file"/>.</summary>
@@ -154,7 +180,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
 
         foreach (var key in document.Keys)
         {
-            if (key is "package" or "dependencies" or "override" or "profile" or "bin" or "native") continue;
+            if (key is "package" or "dependencies" or "build-dependencies" or "override" or "profile" or "bin" or "native" or "trust") continue;
             document.TryGet(key, out var section);
             var line = section switch
             {
@@ -206,13 +232,49 @@ public sealed partial record Manifest(string File, string Name, string Version, 
             Native = native,
             NativePerSystem = nativePerSystem,
             Dependencies = ReadDependencies(document, "dependencies", file),
+            BuildDependencies = ReadBuildDependencies(document, file),
             Overrides = ReadDependencies(document, "override", file),
             Include = Patterns(package, "include", file),
             Exclude = Patterns(package, "exclude", file) ?? [],
             Profiles = global::Lyric5.Build.Profiles.Read(document, file),
             Binaries = ReadBinaries(document, file, name),
             Toolchain = ReadToolchain(package, file),
+            TrustedScripts = ReadTrust(document, file),
         };
+    }
+
+    /// <summary><c>[build-dependencies]</c> (11 W3 BS3): read as <c>[dependencies]</c> is; the name
+    /// <c>build</c> is the script's own module and no package of its graph.</summary>
+    private static IReadOnlyList<Dependency> ReadBuildDependencies(TomlTable document, string file)
+    {
+        var dependencies = ReadDependencies(document, "build-dependencies", file);
+        if (dependencies.FirstOrDefault(d => d.Name == "build") is { } clash)
+            throw new ManifestException("LYR-PKG0002", file, clash.Line, 1,
+                "'build' is the build script's own module (11 W3 BS3), and no package its script can import from");
+        return dependencies;
+    }
+
+    /// <summary><c>[trust] build-scripts = ["geo"]</c> (11 W3 BS5): the packages whose build scripts
+    /// may run, by name — pnpm 10's rule, against Cargo's and npm's running every one.</summary>
+    private static List<string> ReadTrust(TomlTable document, string file)
+    {
+        var names = new List<string>();
+        if (!document.TryGet("trust", out var found)) return names;
+        if (found is not TomlTable trust)
+            throw new ManifestException("LYR-PKG0002", file, 1, 1, "[trust] is a table: [trust] build-scripts = [\"geo\"]");
+        foreach (var key in trust.Keys)
+            if (key != "build-scripts")
+                throw new ManifestException("LYR-PKG0003", file, trust.Line, 1, $"[trust] has no key '{key}'");
+        if (!trust.TryGet("build-scripts", out var given)) return names;
+        if (given is not TomlArray list || list.Any(n => n is not string))
+            throw new ManifestException("LYR-PKG0002", file, trust.Line, 1, "build-scripts is an array of package names");
+        foreach (string name in list)
+        {
+            if (!NamePattern().IsMatch(name))
+                throw new ManifestException("LYR-PKG0002", file, trust.Line, 1, $"'{name}' is no package name");
+            if (!names.Contains(name)) names.Add(name);
+        }
+        return names;
     }
 
     /// <summary><c>toolchain = "5.1"</c> or <c>">=5.1"</c>: the least toolchain that builds the

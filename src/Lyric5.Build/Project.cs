@@ -65,11 +65,19 @@ public sealed record Project(string Source, string Name, string Module, string R
     /// <summary>Every package's source root by name, for the module loader — none for a single file,
     /// whose only module is its own.</summary>
     public IReadOnlyDictionary<string, string> PackageRoots =>
-        Graph?.SourceRoots ?? new Dictionary<string, string>();
+        Graph is null ? ModuleRoots ?? new Dictionary<string, string>()
+        : ModuleRoots is null ? Graph.SourceRoots
+        : Graph.SourceRoots.Where(r => !ModuleRoots.ContainsKey(r.Key)).Concat(ModuleRoots).ToDictionary(r => r.Key, r => r.Value, StringComparer.Ordinal);
 
-    /// <summary>What each package declares it imports from (07 P6).</summary>
+    /// <summary>What each package declares it imports from (07 P6) — a module space of a
+    /// build script's own imports from none.</summary>
     public IReadOnlyDictionary<string, IReadOnlySet<string>> DeclaredDependencies =>
-        Graph?.Declared ?? new Dictionary<string, IReadOnlySet<string>>();
+        Graph?.Declared ?? ModuleRoots?.ToDictionary(m => m.Key, _ => (IReadOnlySet<string>)new HashSet<string>(), StringComparer.Ordinal)
+        ?? new Dictionary<string, IReadOnlySet<string>>();
+
+    /// <summary>A single file's own module spaces by name — a build script's <c>build/</c> (11 W3
+    /// BS3) —; <c>null</c> for every other.</summary>
+    public IReadOnlyDictionary<string, string>? ModuleRoots { get; init; }
 
     /// <summary>The project a file belongs to: the package whose <c>src/</c> holds it — the file is
     /// its entry then —, else the file alone. A file beside a package's modules rather than among
@@ -153,10 +161,18 @@ public sealed record Project(string Source, string Name, string Module, string R
     {
         var lockFile = LockFile.For(manifest);
         var held = LockFile.Read(lockFile).Where(keep ?? (_ => true)).ToList();
-        var graph = PackageGraph.Resolve(manifest, GitCache.ForUser(offline, refresh), held, frozen: locked);
-        if (locked) LockFile.RefuseChange(lockFile, graph.Locked);
-        else LockFile.Write(lockFile, graph.Locked);
-        return graph;
+        var git = GitCache.ForUser(offline, refresh);
+        var graph = PackageGraph.Resolve(manifest, git, held, frozen: locked);
+        // Each build script with dependencies of its own: a graph of its own (11 W3 BS3), read
+        // at the commits the same lock holds, and held in it beside the program's.
+        var scripts = new Dictionary<string, PackageGraph>(StringComparer.Ordinal);
+        foreach (var package in graph.Packages.Values.OrderBy(p => p.Name, StringComparer.Ordinal))
+            if (package.BuildScript is not null && package.BuildDependencies.Count > 0)
+                scripts[package.Name] = PackageGraph.Resolve(package.ScriptRoot(manifest), git, held, frozen: locked);
+        var entries = LockFile.Sorted(graph.Locked.Concat(scripts.Values.SelectMany(s => s.Locked)).Distinct()).ToList();
+        if (locked) LockFile.RefuseChange(lockFile, entries);
+        else LockFile.Write(lockFile, entries);
+        return graph with { Scripts = scripts };
     }
 
     /// <summary>The module path of a file under a package's <c>src/</c> (07 M1), or <c>null</c>

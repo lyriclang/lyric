@@ -38,6 +38,10 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
     /// ones read on the way — with its commit and content hash: the lock's entries (07 P5).</summary>
     public IReadOnlyList<Locked> Locked { get; init; } = [];
 
+    /// <summary>The build scripts' own graphs (11 W3 BS3), by the package whose script it is — for
+    /// a script with <c>[build-dependencies]</c>.</summary>
+    public IReadOnlyDictionary<string, PackageGraph> Scripts { get; init; } = new Dictionary<string, PackageGraph>();
+
     /// <summary>The revision each package read from git is, by name — the chosen one.</summary>
     public IReadOnlyDictionary<string, Locked> Revisions { get; init; } = new Dictionary<string, Locked>();
 

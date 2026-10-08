@@ -197,6 +197,13 @@ public static class SourceCompiler
             entry => (Root: entry.Value,
                 Load: StdlibLoader.ForProject(entry.Value, sources, diagnostics, options.SourceOverlay)),
             StringComparer.Ordinal);
+        // A package's gen/ (design/v5/spec/11 W3 BS6): 'app.gen.x' is gen/x.lyr, what its build
+        // script wrote — a module of the package as any other.
+        var generated = options.PackageGenRoots?.ToDictionary(
+            entry => entry.Key,
+            entry => (Root: entry.Value,
+                Load: StdlibLoader.ForProject(entry.Value, sources, diagnostics, options.SourceOverlay)),
+            StringComparer.Ordinal);
 
         var loader = (string[] modulePath) =>
         {
@@ -209,6 +216,10 @@ public static class SourceCompiler
                     && tests.TryGetValue(owner, out var testRoot) && NamedExactly(testRoot.Root, modulePath[2..])
                     && File.Exists(Path.Combine([testRoot.Root, .. modulePath[2..^1], modulePath[^1] + ".lyr"])))
                     return testRoot.Load(modulePath[2..]);
+                if (modulePath is [var maker, "gen", _, ..] && generated is not null
+                    && generated.TryGetValue(maker, out var genRoot) && NamedExactly(genRoot.Root, modulePath[2..])
+                    && File.Exists(Path.Combine([genRoot.Root, .. modulePath[2..^1], modulePath[^1] + ".lyr"])))
+                    return genRoot.Load(modulePath[2..]);
                 if (modulePath.Length == 0 || !packages.TryGetValue(modulePath[0], out var package)) return null;
                 // The root module (07 M1, the review's M7-1): 'src/lib.lyr' is the module of the
                 // package's own name, and there is no module '<package>.lib' beside it.
@@ -499,6 +510,13 @@ public sealed record CompilerOptions
     /// <c>lyric test</c> names them; a build of a program reaches no test.
     /// </summary>
     public IReadOnlyDictionary<string, string>? PackageTestRoots { get; init; }
+
+    /// <summary>
+    /// A package's <c>gen/</c> (design/v5/spec/11 W3 BS6), by the package's name: what its build
+    /// script wrote, modules of the package — <c>gen/schema.lyr</c> in <c>app</c> is
+    /// <c>app.gen.schema</c>.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? PackageGenRoots { get; init; }
 
     /// <summary>
     /// Text to use instead of what lies on disk, by absolute file path. A module found at one of
