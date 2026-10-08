@@ -572,11 +572,13 @@ public static class ModuleLowerer
 
         // main is a task where the program waits (06 T6): when what it reaches asks for its
         // thread's scheduler, std.task's loop runs main's context. A program that never waits runs
-        // main on the thread's own stack, and cannot tell.
+        // main on the thread's own stack, and cannot tell. Asking whether one runs is no wait
+        // (M6-26, 13 M8b P3): what runs only where std.task's schedulerRuns says yes — a file's
+        // call parked on the I/O pool — does not count.
         if (entry is not null
             && compilation.FindModule(["std", "task"])?.Members.LookupLocal("runMain") is FunctionSymbol loop
             && ids.TryGetValue(loop, out var loopId)
-            && Reachability.CallsImport(result, "std.task.currentScheduler"))
+            && Reachability.CallsImport(result, "std.task.currentScheduler", unless: "std.task.schedulerRuns"))
             result.TaskMain = loopId;
 
         var verifies = verify ?? VerifyByDefault;

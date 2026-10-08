@@ -36,6 +36,9 @@ public static class Intrinsics
         ["std.task.poisonedBy"] = "lyr_panic_poisoned",
         ["std.task.currentScheduler"] = "lyr_task_scheduler",
         ["std.task.setCurrentScheduler"] = "lyr_task_set_scheduler",
+        // The question whether one runs, apart from currentScheduler: asking makes no task of
+        // main (06 M6-26, M8b P3; Reachability.CallsImport's `unless`).
+        ["std.task.schedulerRuns"] = "LYR_TASK_SCHEDULER_RUNS",
         ["std.task.waitOnPoller"] = "lyr_task_wait",
         ["std.task.monotonicNanos"] = "lyr_clock_monotonic_ns",
         // A task's panic (05 E8, 06 T4): the scheduler's resume, which keeps a panic the
@@ -50,6 +53,13 @@ public static class Intrinsics
         ["std.task.startThread"] = "LYR_THREAD_START",
         // The processors, for the program's pool (std.thread's parallelMap, M8b S1).
         ["std.thread.processorCount"] = "lyr_os_cpu_count",
+        // The file system's calls (M8b P1, lyr/fs.h): one system call each, run on std.fs's I/O
+        // pool; a view crosses as its pointer and length.
+        ["std.fs.fsOpen"] = "lyr_fs_open",
+        ["std.fs.fsRead"] = "LYR_FS_READ",
+        ["std.fs.fsWrite"] = "LYR_FS_WRITE",
+        ["std.fs.fsSeek"] = "lyr_fs_seek",
+        ["std.fs.fsClose"] = "lyr_fs_close",
         ["std.task.currentPoller"] = "lyr_task_poller",
         ["std.task.wakePoller"] = "lyr_task_wake",
         ["std.task.spin"] = "lyr_task_spin",

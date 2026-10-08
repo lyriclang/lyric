@@ -240,6 +240,8 @@ public class CEmitterTests
                 + "waiter cancelled true\n");
             data.Add("pool", profile, 0,
                 "sum 500500\ndoubled 42\nfailed: oops\nclose waited true\nspawn after close: panicked\n");
+            data.Add("files", profile, 0, "written 4\nread 4000 4000 4000 4000\n");
+            data.Add("file_alone", profile, 0, "kept alone 10\n");
             data.Add("locks", profile, 0,
                 "counted 4000\nin turn a1 a2 b1 b2\nreaders at once 2\nwritten 9\n"
                 + "once ran 1\nattempts 2\n");
@@ -323,6 +325,20 @@ public class CEmitterTests
         Assert.Contains("int64_t lyr_app_main_twice_int__d2afcb46(lyr_fn_i64_to_i64 l0_f, int64_t l1_x) {", twice);
         Assert.DoesNotContain("const LyrDesc lyr_desc", twice.Replace("extern const LyrDesc", ""));
         Assert.DoesNotContain("int main(", twice);
+    }
+
+    /// <summary>
+    /// Asking whether a scheduler runs is no wait (06 M6-26, 13 M8b P3): a program whose only
+    /// file calls ask it before they park on the I/O pool keeps main off the scheduler, and one
+    /// whose tasks read files does not — the same std.fs, the walk telling the two apart.
+    /// </summary>
+    [Fact]
+    public void A_program_that_only_touches_a_file_keeps_main_off_the_scheduler()
+    {
+        var alone = EmitC("file_alone")[0].Text;
+        Assert.Contains("return lyr_run_main(argc, argv, lyr_entry);", alone);
+        Assert.DoesNotContain("lyr_run_main_task(", alone);
+        Assert.Contains("lyr_run_main_task(", EmitC("files")[0].Text);
     }
 
     [Theory]

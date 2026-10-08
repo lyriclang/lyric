@@ -1,0 +1,142 @@
+// std.fs's File (design/v5/spec/10 O4, O5; 13 M8b P2, P4; M8b S6b): written, read back, sought,
+// appended to, cut; the kinds a file gives; closed is closed; tasks reading at once through the I/O
+// pool; a cancellation seen at the task's next wait, not inside a file's call. The files lie in the
+// test run's working directory.
+import std.fs { File, OpenOptions };
+import std.io { IoError, IoErrorKind };
+import std.task { Cancelled, sleep, spawn };
+import std.test { assertEq, assertTrue, fail };
+import std.time { Duration };
+
+fn writeText(name: string, text: string): void throws IoError {
+    let f = try File.create(name);
+    try f.writeString(text);
+    try f.close();
+}
+
+fn readText(name: string): string throws IoError {
+    let f = try File.open(name);
+    let text = try f.readToString();
+    try f.close();
+    return text;
+}
+
+fn kindOf(f: fn() -> void throws IoError): ?IoErrorKind {
+    try {
+        f();
+        return null;
+    } catch (e: IoError) {
+        return e.kind;
+    }
+}
+
+@Test
+fn aFileReadsBackWhatWasWritten(): void throws IoError {
+    try writeText("files-a.txt", "hello, file\nsecond line\n");
+    assertEq(try readText("files-a.txt"), "hello, file\nsecond line\n");
+    let big: uint8[] = [7u8] * 100000;
+    let out = try File.create("files-big.bin");
+    try out.writeAll(big[..]);
+    try out.close();
+    let back = try File.open("files-big.bin");
+    assertEq((try back.readToEnd()).length(), 100000);
+    try back.close();
+}
+
+@Test
+fn aFileSeeksFromEachEnd(): void throws IoError {
+    try writeText("files-seek.txt", "0123456789");
+    let f = try File.open("files-seek.txt");
+    assertEq(try f.seek(.Start(3)), 3);
+    let two: uint8[] = [0u8] * 2;
+    try f.readExact(two[..]);
+    assertEq(two[0], 51u8);
+    assertEq(try f.seek(.Current(2)), 7);
+    assertEq(try f.seek(.End(-1)), 9);
+    try f.readExact(two[..1]);
+    assertEq(two[0], 57u8);
+    assertEq(try f.read(two[..]), 0);
+    try f.close();
+}
+
+@Test
+fn appendWritesAtTheEndAndCreateCuts(): void throws IoError {
+    try writeText("files-log.txt", "one\n");
+    let more = try File.openWith("files-log.txt", OpenOptions { append = true });
+    try more.writeString("two\n");
+    try more.close();
+    assertEq(try readText("files-log.txt"), "one\ntwo\n");
+    try writeText("files-log.txt", "x");
+    assertEq(try readText("files-log.txt"), "x");
+    let both = try File.openWith("files-log.txt", OpenOptions { read = true, write = true });
+    try both.writeString("y");
+    try both.seek(.Start(0));
+    assertEq(try both.readToString(), "y");
+    try both.close();
+}
+
+@Test
+fn whatAFileCannotDoIsSaidWithItsPath(): void {
+    try {
+        using let f = File.open("files-no-such-file.txt");
+        fail("a file that is not there opened");
+    } catch (e: IoError) {
+        assertTrue(e.kind == .NotFound);
+        assertEq(e.path ?? "", "files-no-such-file.txt");
+        assertEq(e.message(), "not found: files-no-such-file.txt (opened to read)");
+    }
+    assertTrue(kindOf(() => { using let f = try File.openWith("x", OpenOptions { }); }) == IoErrorKind.InvalidInput);
+    assertTrue(kindOf(() => { using let f = try File.openWith("x", OpenOptions { read = true, truncate = true }); }) == IoErrorKind.InvalidInput);
+    assertTrue(kindOf(() => { using let f = try File.openWith("x", OpenOptions { read = true, create = true }); }) == IoErrorKind.InvalidInput);
+    assertTrue(kindOf(() => { using let f = try File.openWith("files-missing-dir/x.txt", OpenOptions { write = true, create = true }); }) == IoErrorKind.NotFound);
+}
+
+@Test
+fn aClosedFileIsClosed(): void throws IoError {
+    try writeText("files-closed.txt", "abc");
+    let f = try File.open("files-closed.txt");
+    try f.close();
+    try f.close();
+    let one: uint8[] = [0u8];
+    for (call in [() => { try f.read(one[..]); }, () => { try f.write(one[..]); }, () => { try f.seek(.Start(0)); }]) {
+        assertTrue(kindOf(call) == IoErrorKind.Closed);
+    }
+}
+
+@Test
+fn tasksReadAtOnceThroughThePool(): void throws Error {
+    for (k in 0..4) {
+        try writeText(f"files-task-{k}.txt", "z" * (1000 * (k + 1)));
+    }
+    let tasks = [spawn(() => (try readText("files-task-0.txt")).length()), spawn(() => (try readText("files-task-1.txt")).length()),
+        spawn(() => (try readText("files-task-2.txt")).length()), spawn(() => (try readText("files-task-3.txt")).length())];
+    var sum = 0;
+    for (t in tasks) {
+        sum = sum + try t.await();
+    }
+    assertEq(sum, 10000);
+}
+
+/// What the cancelled task got as far as.
+class Reached {
+    var text: string = "",
+}
+
+@Test
+fn aCancelledTaskSeesItAtItsNextWaitNotInAFileCall(): void throws Error {
+    try writeText("files-cancel.txt", "kept");
+    let reached = Reached { };
+    let task = spawn(() => {
+        // cancelled before it runs: the file's calls run to their ends all the same
+        reached.text = try readText("files-cancel.txt");
+        try sleep(Duration.ofMillis(1));
+        return reached.text;
+    });
+    task.cancel();
+    try {
+        let text = task.await();
+        fail(f"a cancelled task returned '{text}'");
+    } catch (_: Cancelled) {
+        assertEq(reached.text, "kept");
+    }
+}

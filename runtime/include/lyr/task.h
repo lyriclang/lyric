@@ -22,6 +22,10 @@ LyrCoro *lyr_task_start(void (*code)(void *env, LyrErr **error), void *env, int6
 /* The running thread's scheduler: a Lyric object, which std.task keeps alive on the thread's own
  * stack while it runs. NULL where none runs. */
 void *lyr_task_scheduler(void);
+
+/* Whether one runs: std.task's schedulerRuns, a native of its own so that the compiler can tell
+ * the question from a wait (06 M6-26; M8b P3). */
+#define LYR_TASK_SCHEDULER_RUNS() (lyr_task_scheduler() != NULL)
 void lyr_task_set_scheduler(void *scheduler);
 
 /* Waits on the thread's poller (lyr/poll.h) for `timeout_ns` at most, a negative one without end:

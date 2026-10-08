@@ -1,0 +1,182 @@
+/// The file system (design/v5/spec/10 O4, O5; M8b S6b): `File`, a handle on a file — a class with
+/// its identity and a `closed` state — that reads, writes and seeks through `std.io`'s interfaces.
+/// S6c: the conveniences, `fs.readText` and its kin; S7: the directories.
+///
+/// Every call on a file runs on the program's I/O pool (13 M8b P2; 06 S3): a few threads, started
+/// at the first use, do the system's call while the running task is parked — the thread it runs on
+/// goes on with the other tasks. A call on a regular file ends in a bounded time and is no wait in
+/// the sense of 10 §1 rule 7: a cancellation is seen at the task's next wait. Reads and writes go
+/// through the caller's slice, never a copy (P4).
+import std.io { IoError, IoErrorKind, Reader, Seek, SeekFrom, Writer };
+import std.task { SpinLock, schedulerRuns };
+import std.thread { Pool };
+
+fn fsOpen(path: string, how: int): int;
+fn fsRead(file: int, into: Slice<uint8>): int;
+fn fsWrite(file: int, from: Slice<uint8>): int;
+fn fsSeek(file: int, offset: int, whence: int): int;
+fn fsClose(file: int): int;
+
+/// How a file is opened (10 O5): to read, to write, to append at its end, created where it is not
+/// there, cut to nothing where it is. A file that is neither read nor written, or created or cut
+/// without being written, is refused (`InvalidInput`), as Rust's `OpenOptions` refuses it.
+pub struct OpenOptions {
+    pub read: bool = false,
+    pub write: bool = false,
+    pub append: bool = false,
+    pub create: bool = false,
+    pub truncate: bool = false,
+}
+
+/// A file opened (10 O4): read from where its position stands, written there — at the end, where
+/// it was opened to append —, its position moved. `close()` lets it go; a call after it throws
+/// `Closed`, and a second `close()` does nothing.
+pub class File :: [Reader, Writer, Seek, Closeable] {
+    var handle: int,
+    name: string,
+    var closed: bool = false,
+
+    /// `path` opened to read.
+    pub static fn open(path: StringView): File throws IoError {
+        return try File.openWith(path, OpenOptions { read = true });
+    }
+
+    /// `path` opened to write: made where it is not there, cut to nothing where it is.
+    pub static fn create(path: StringView): File throws IoError {
+        return try File.openWith(path, OpenOptions { write = true, create = true, truncate = true });
+    }
+
+    /// `path` opened as `options` says.
+    pub static fn openWith(path: StringView, options: OpenOptions): File throws IoError {
+        let name = path.toString();
+        if (!options.read && !options.write && !options.append) {
+            throw IoError { kind = .InvalidInput, path = name, detail = "opened neither to read nor to write" };
+        }
+        if (options.truncate && (!options.write || options.append)) {
+            throw IoError { kind = .InvalidInput, path = name, detail = "cut to nothing without being written from the start" };
+        }
+        if (options.create && !options.write && !options.append) {
+            throw IoError { kind = .InvalidInput, path = name, detail = "created without being written" };
+        }
+        var how = 0;
+        if (options.read) { how = how | 1; }
+        if (options.write) { how = how | 2; }
+        if (options.append) { how = how | 4; }
+        if (options.create) { how = how | 8; }
+        if (options.truncate) { how = how | 16; }
+        let flags = how;
+        let handle = onPool(() => fsOpen(name, flags));
+        if (handle < 0) {
+            throw failure(handle, name, if (options.write || options.append) "opened to write" else "opened to read");
+        }
+        return File { handle = handle, name = name };
+    }
+
+    pub mut fn read(into: Slice<uint8>): int throws IoError {
+        try this.stillOpen("read");
+        if (into.isEmpty()) {
+            return 0;
+        }
+        let h = this.handle;
+        let n = onPool(() => fsRead(h, into));
+        if (n < 0) {
+            throw failure(n, this.name, "read");
+        }
+        return n;
+    }
+
+    pub mut fn write(from: Slice<uint8>): int throws IoError {
+        try this.stillOpen("written");
+        if (from.isEmpty()) {
+            return 0;
+        }
+        let h = this.handle;
+        let n = onPool(() => fsWrite(h, from));
+        if (n < 0) {
+            throw failure(n, this.name, "written");
+        }
+        return n;
+    }
+
+    pub mut fn seek(to: SeekFrom): int throws IoError {
+        try this.stillOpen("sought");
+        let (offset, whence) = match (to) {
+            .Start(n) => (n, 0),
+            .Current(n) => (n, 1),
+            .End(n) => (n, 2),
+        };
+        let h = this.handle;
+        let at = onPool(() => fsSeek(h, offset, whence));
+        if (at < 0) {
+            throw failure(at, this.name, "sought");
+        }
+        return at;
+    }
+
+    /// Lets the file go. A second close does nothing.
+    pub fn close(): void throws IoError {
+        // through the reference: 'Closeable.close' is no 'mut fn' (as Pool's close)
+        let me = this;
+        if (me.closed) {
+            return;
+        }
+        me.closed = true;
+        let h = me.handle;
+        let result = onPool(() => fsClose(h));
+        if (result < 0) {
+            throw failure(result, me.name, "closed");
+        }
+    }
+
+    fn stillOpen(doing: string): void throws IoError {
+        if (this.closed) {
+            throw IoError { kind = .Closed, path = this.name, detail = doing };
+        }
+    }
+}
+
+/// What a call's negative answer says (lyr/fs.h): -(kind << 32 | raw).
+fn failure(answer: int, path: string, doing: string): IoError {
+    let code = -answer;
+    let raw = code & 0xFFFFFFFF;
+    let kind: IoErrorKind = match (code >> 32) {
+        1 => .NotFound,
+        2 => .PermissionDenied,
+        3 => .AlreadyExists,
+        4 => .IsDirectory,
+        5 => .NotDirectory,
+        6 => .InvalidInput,
+        _ => .Other { code = raw },
+    };
+    return IoError { kind = kind, path = path, detail = doing };
+}
+
+// ---------------------------------------------------------------------------------------------
+// The I/O pool (13 M8b P2): four threads — libuv's count —, made at the first call and there
+// until the program ends, as the program's pool for parallelMap is.
+// ---------------------------------------------------------------------------------------------
+
+var ioPool: ?Pool = null;
+let ioPoolGuard = SpinLock { };
+
+fn pool(): Pool {
+    ioPoolGuard.acquire();
+    if (ioPool == null) {
+        ioPool = Pool.new(4);
+    }
+    let p = ioPool!;
+    ioPoolGuard.release();
+    return p;
+}
+
+/// `call` on the I/O pool, the running task parked until it has run: its answer. Where no
+/// scheduler runs — a program that never waits, whose main is no task (06 M6-26), or a module's
+/// binding filled before `main` — no other task waits on this thread, and the call runs here.
+fn onPool(call: fn() -> int): int {
+    // the question as the branch's own condition: the compiler's walk for M6-26 leaves its yes out
+    if (schedulerRuns()) {
+        let task = pool().spawn(call);
+        return try! task.awaitThrough();
+    }
+    return call();
+}
