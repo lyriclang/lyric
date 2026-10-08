@@ -67,7 +67,9 @@ public class DriverTests
         Assert.True(exit == 0, err);
         // A single file is a package of its own, named after the file (07 M1, 11 C8).
         Assert.Contains("fn hello.main -> i64", output);
-        Assert.Contains("callimport std.io.println", output);
+        // println is std.io's, a Lyric function over the console's buffer (M8b S8a)
+        Assert.Contains("call std.io.println<string>(", output);
+        Assert.Contains("callimport std.io.consolePut(", output);
         // An f-string writes into one builder (10 S6; M8a S13), no chain of concat.
         Assert.Contains("call std.core.fstringEnd(", output);
         Assert.DoesNotContain("std.string.concat", output);
@@ -98,7 +100,7 @@ public class DriverTests
         var manifest = Directory.EnumerateFiles(project.CacheDir, "generics-*.units")
             .OrderByDescending(File.GetLastWriteTimeUtc).First();
         var units = File.ReadAllLines(manifest).Where(line => line.Length > 0).ToList();
-        Assert.Equal(7, units.Count); // the module and six instances
+        Assert.Equal(9, units.Count); // the module, six instances, println<string> and its byte view's extend
         Assert.StartsWith("generics-", Path.GetFileName(units[0]));
         Assert.All(units.Skip(1), unit => Assert.StartsWith("inst-", Path.GetFileName(unit)));
         Assert.All(units, unit => Assert.True(File.Exists(unit), unit));
@@ -115,7 +117,8 @@ public class DriverTests
     {
         var (exit, output, err) = Run("build", Program_("hello.lyr"), "--emit", "c");
         Assert.True(exit == 0, err);
-        Assert.Contains("lyr_println(", output);
+        Assert.Contains("lyr_std_io_println_string_", output);
+        Assert.Contains("LYR_CONSOLE_PUT(", output);
         Assert.Contains("LYR_STR_INIT(\"Hello, \")", output);
     }
 

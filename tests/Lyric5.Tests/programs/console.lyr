@@ -1,0 +1,28 @@
+// The console's output (design/v5/spec/10 O9; 13 M8b P3, S8a): print, println, eprint, eprintln over
+// Display, on two streams buffered in the runtime. Apart:
+//   stdout: a12.5 / true / c / P(3) / 42 left
+//   stderr: to err / e
+// Through one pipe (a block each, flushed at the end, the output first): stdout's, then stderr's.
+// At a terminal (a line at a time): in the order written.
+import std.io { eprint, eprintln, print, println };
+
+struct P :: [Display] {
+    x: int,
+
+    fn show(): string {
+        return f"P({this.x})";
+    }
+}
+
+fn main(): void {
+    print("a");
+    print(1);
+    println(2.5);
+    println(true);
+    println('c');
+    println(P { x = 3 });
+    eprintln("to err");
+    eprint("e");
+    eprintln("");
+    println(f"{40 + 2} left");
+}

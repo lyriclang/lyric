@@ -1,5 +1,6 @@
 /* Runtime start and stop, the configured writers, and the main of an emitted program. */
 #include "lyr/init.h"
+#include "lyr/console.h"
 #include "lyr/gc.h"
 #include "internal.h"
 
@@ -33,8 +34,12 @@ int lyr_init(const LyrConfig *given) {
 }
 
 void lyr_shutdown(void) {
+    /* the console's buffers out first (10 O9: flushed at the program's end) */
+    lyr_console_flush_all(1);
     started = 0;
 }
+
+int lyr_stream_hooked(int fd) { return fd == 2 ? config.stderr_write != NULL : config.stdout_write != NULL; }
 
 int lyr_signals_allowed(void) { return started && config.install_signal_handlers; }
 

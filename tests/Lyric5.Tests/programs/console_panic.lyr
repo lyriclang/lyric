@@ -1,0 +1,9 @@
+// What was written before a panic comes out ahead of its report (10 O9; M8b S8a): stdout
+// "before panic", then the panic's report on stderr, exit 101 — through a pipe, where the output
+// is held a block at a time.
+import std.io { println };
+
+fn main(): void {
+    println("before panic");
+    panic("boom");
+}

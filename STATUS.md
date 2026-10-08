@@ -615,6 +615,13 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   runtime: `stat` without following, an exclusive create, the system's temporary directory. The
   plan's check — a tree made, walked and removed — in the std tests on every platform they run on
   and as a case. Spec 12 "Directories" rules 5–8, three cases. **S7 is done.**
+- **S8a** the console's output (10 O9; P3): `print`, `println`, `eprint`, `eprintln` over
+  `Display`, `flush()`; both streams buffered in the runtime (`runtime/src/console.c`, 8 KiB each
+  under a lock — a line at a time at a terminal or a host's writer, a block otherwise) and
+  flushed at every end: `main`'s return, a panic's report, an error leaving `main`. The flush runs
+  on the I/O pool (moved to `std.io`) where a scheduler runs. A program that sets no scheduler
+  keeps nothing of the pool (`SchedulerFree`, a compiler pass): hello stays at 1.35 MB. Spec 12
+  "The console", four cases. S8b: `stdin()`, the streams as `Reader`/`Writer`s.
 
 ### M8a — done (2026-10-07)
 

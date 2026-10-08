@@ -130,8 +130,20 @@ public class InstanceOfADeclarationTests
         Assert.Contains("= call std.task.spawn<int, never>(", ir);
         Assert.Contains("= call std.thread.Thread.spawn<int, never>(", ir);
         Assert.Contains("fn std.thread.Thread.spawn<int, never> ", ir);
-        // One thread is started: in the body of 'Thread.spawn', and nowhere in the task's.
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(ir, @"callimport std\.task\.startThread\("));
+        // A thread is started in the body of 'Thread.spawn', and nowhere in the task's. (The program
+        // has its I/O pool besides — a scheduler runs, so the console's flush may park on it, M8b
+        // S8a — and the pool starts its threads in a body of its own.)
+        Assert.Contains("callimport std.task.startThread(", Body(ir, "std.thread.Thread.spawn<int, never>"));
+        Assert.DoesNotContain("callimport std.task.startThread(", Body(ir, "std.task.spawn<int, never>"));
         Assert.Equal("1 1\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    /// <summary>The IR text of one function: from its header to the next function's.</summary>
+    private static string Body(string ir, string name)
+    {
+        var at = ir.IndexOf($"fn {name} ", StringComparison.Ordinal);
+        Assert.True(at >= 0, $"no function {name} in the IR");
+        var next = ir.IndexOf("\nfn ", at + 1, StringComparison.Ordinal);
+        return next < 0 ? ir[at..] : ir[at..next];
     }
 }

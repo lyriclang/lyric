@@ -4,19 +4,18 @@
 /// path names, the directories and their entries. S7b: what is put together from those —
 /// `createDirAll`, `removeAll`, `copy`, `walk`, `tempDir`, `tempFile`.
 ///
-/// Every call on a file runs on the program's I/O pool (13 M8b P2; 06 S3): a few threads, started
-/// at the first use, do the system's call while the running task is parked — the thread it runs on
-/// goes on with the other tasks. A call on a regular file ends in a bounded time and is no wait in
+/// Every call on a file runs on the program's I/O pool (std.io's; 13 M8b P2; 06 S3) where a
+/// scheduler runs: a few threads, started at the first use, do the system's call while the running
+/// task is parked — the thread it runs on goes on with the other tasks; where none runs, on the
+/// thread itself. A call on a regular file ends in a bounded time and is no wait in
 /// the sense of 10 §1 rule 7: a cancellation is seen at the task's next wait. Reads and writes go
 /// through the caller's slice, never a copy (P4).
 import std.collections { List };
 import std.core { Utf8Error };
 import std.crypto { randomUint64 };
 import std.io;
-import std.io { IoError, IoErrorKind, Reader, Seek, SeekFrom, TextReader, Writer };
+import std.io { IoError, IoErrorKind, Reader, Seek, SeekFrom, TextReader, Writer, onPool };
 import std.path { join, normalize, parent };
-import std.task { SpinLock, schedulerRuns };
-import std.thread { Pool };
 import std.time { Instant, instantOfEpochNanos };
 
 fn fsOpen(path: string, how: int): int;
@@ -723,34 +722,4 @@ fn pathFrom(name: string, doing: string, call: fn(Slice<uint8>) -> int): string 
         }
         room = answer;
     }
-}
-
-// ---------------------------------------------------------------------------------------------
-// The I/O pool (13 M8b P2): four threads — libuv's count —, made at the first call and there
-// until the program ends, as the program's pool for parallelMap is.
-// ---------------------------------------------------------------------------------------------
-
-var ioPool: ?Pool = null;
-let ioPoolGuard = SpinLock { };
-
-fn pool(): Pool {
-    ioPoolGuard.acquire();
-    if (ioPool == null) {
-        ioPool = Pool.new(4);
-    }
-    let p = ioPool!;
-    ioPoolGuard.release();
-    return p;
-}
-
-/// `call` on the I/O pool, the running task parked until it has run: its answer. Where no
-/// scheduler runs — a program that never waits, whose main is no task (06 M6-26), or a module's
-/// binding filled before `main` — no other task waits on this thread, and the call runs here.
-fn onPool(call: fn() -> int): int {
-    // the question as the branch's own condition: the compiler's walk for M6-26 leaves its yes out
-    if (schedulerRuns()) {
-        let task = pool().spawn(call);
-        return try! task.awaitThrough();
-    }
-    return call();
 }

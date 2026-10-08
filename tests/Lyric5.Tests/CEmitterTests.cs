@@ -311,7 +311,7 @@ public class CEmitterTests
         Assert.Null(units[0].Instance);
         Assert.Equal(
             ["app.main.Counter.make<bool>", "app.main.collect<int, string>", "app.main.ident<int>", "app.main.ident<string>",
-             "app.main.swap<int, string>", "app.main.twice<int>"],
+             "app.main.swap<int, string>", "app.main.twice<int>", "std.core.<extend>.Slice<uint8>", "std.io.println<string>"],
             units.Skip(1).Select(u => u.Instance).ToArray());
 
         // The module's unit defines the descriptors and the entry, and holds no instance body;
@@ -339,6 +339,24 @@ public class CEmitterTests
         Assert.Contains("return lyr_run_main(argc, argv, lyr_entry);", alone);
         Assert.DoesNotContain("lyr_run_main_task(", alone);
         Assert.Contains("lyr_run_main_task(", EmitC("files")[0].Text);
+    }
+
+    /// <summary>
+    /// A program that sets no scheduler answers no wherever it asks whether one runs (M6-26, 13
+    /// M8b P3; <c>SchedulerFree</c>): what only the yes runs — the I/O pool, std.thread's Pool, the
+    /// scheduler — is not in it. The program whose tasks read files keeps all of it.
+    /// </summary>
+    [Fact]
+    public void A_program_that_sets_no_scheduler_carries_no_pool()
+    {
+        var alone = CEmitter.Join(EmitC("file_alone"));
+        // the question is still asked; only what its yes would run is gone
+        Assert.Contains("LYR_TASK_SCHEDULER_RUNS()", alone);
+        Assert.DoesNotContain("std_thread_Pool", alone);
+        Assert.DoesNotContain("lyr_task_set_scheduler", alone);
+        var tasks = CEmitter.Join(EmitC("files"));
+        Assert.Contains("std_thread_Pool", tasks);
+        Assert.Contains("lyr_task_set_scheduler", tasks);
     }
 
     [Theory]

@@ -592,6 +592,11 @@ public static class ModuleLowerer
         // for this reason.
         if (verifies) Timed(timings, () => IrVerifier.VerifyOrThrow(result, "after the lowering"));
 
+        // A program that never sets a scheduler answers no wherever it asks whether one runs
+        // (M6-26, 13 M8b P3): what only the yes would run — the I/O pool's park — goes before the
+        // global pruning, so the pool's bindings can go with it. A program's only.
+        var narrowed = entry is not null && SchedulerFree.Run(result);
+
         // 01 B13: a module binding nothing reads, whose initializer only gives its value, goes —
         // here, while the init function is as the lowering wrote it, so its ranges hold. A program's
         // only: a library keeps what it declares.
@@ -637,7 +642,7 @@ public static class ModuleLowerer
         // none of them enabled the module is what the first run already accepted, and a second pass
         // over it would buy nothing for 90% of the lowering time. That is why the debug profile —
         // which optimizes nothing — still verifies exactly once.
-        if (verifies && (enabled != IrPasses.None || prunedGlobals))
+        if (verifies && (enabled != IrPasses.None || prunedGlobals || narrowed))
             Timed(timings, () => IrVerifier.VerifyOrThrow(result, "after the optimizations"));
 
         return result;

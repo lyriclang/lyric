@@ -1,5 +1,6 @@
 /* The error record and main's report (design/v5/spec/05 E6 O3/O4, 01 L5 E1-E2). */
 #include "lyr/error.h"
+#include "lyr/console.h"
 #include "lyr/gc.h"
 #include "lyr/init.h"
 #include "lyr/panic.h"
@@ -68,6 +69,8 @@ static void write_line(const char *prefix, const LyrStr *text) {
 }
 
 int lyr_err_report(const LyrErr *err, LyrErrMessage message, LyrErrCause cause) {
+    /* what the program wrote before, ahead of the report (10 O9) */
+    lyr_console_flush_all(1);
     if (message == NULL) {
         write_line("error: ", NULL);
         return 1;
