@@ -14,7 +14,7 @@ import std.collections { List };
 import std.core { Utf8Error };
 import std.crypto { randomUint64 };
 import std.io;
-import std.io { IoError, IoErrorKind, Reader, Seek, SeekFrom, TextReader, Writer, onPool };
+import std.io { IoError, IoErrorKind, Reader, Seek, SeekFrom, TextReader, Writer, failure, onPool };
 import std.path { join, normalize, parent };
 import std.time { Instant, instantOfEpochNanos };
 
@@ -151,23 +151,6 @@ pub class File :: [Reader, Writer, Seek, Closeable] {
             throw IoError { kind = .Closed, path = this.name, detail = doing };
         }
     }
-}
-
-/// What a call's negative answer says (lyr/fs.h): -(kind << 32 | raw).
-fn failure(answer: int, path: string, doing: string): IoError {
-    let code = -answer;
-    let raw = code & 0xFFFFFFFF;
-    let kind: IoErrorKind = match (code >> 32) {
-        1 => .NotFound,
-        2 => .PermissionDenied,
-        3 => .AlreadyExists,
-        4 => .IsDirectory,
-        5 => .NotDirectory,
-        6 => .InvalidInput,
-        7 => .InvalidData,
-        _ => .Other { code = raw },
-    };
-    return IoError { kind = kind, path = path, detail = doing };
 }
 
 /// `e` with the file's path, where it names none — the decoder's `InvalidData` names none.

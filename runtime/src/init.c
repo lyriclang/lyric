@@ -11,6 +11,7 @@
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 #else
+#  include <signal.h>
 #  include <unistd.h>
 #endif
 
@@ -24,7 +25,14 @@ int lyr_init(const LyrConfig *given) {
     if (given) config = *given;
     lyr_gc_init();
     if (config.heap_limit) lyr_gc_set_heap_limit(config.heap_limit);
-    if (config.install_signal_handlers) lyr_crash_install();
+    if (config.install_signal_handlers) {
+        lyr_crash_install();
+#ifndef _WIN32
+        /* a write into a pipe nobody reads fails — std.io's BrokenPipe — instead of ending the
+         * process (10 Q9: SIGPIPE ignored); a host owns its signals and decides itself */
+        signal(SIGPIPE, SIG_IGN);
+#endif
+    }
 #ifdef _WIN32
     /* Strings are UTF-8; the console shows them as such only in this code page. */
     SetConsoleOutputCP(CP_UTF8);

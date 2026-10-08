@@ -1397,22 +1397,22 @@ bb0:;
     return t3;
 }
 
-#line 99 "stdlib5/std/io.lyr"
+#line 221 "stdlib5/std/io.lyr"
 int64_t lyr_std_io_onPool(lyr_fn_to_i64 l0_call) {
     uint8_t t0 = 0;
     lyr_fn_to_i64 t1 = {0};
     int64_t t2 = 0;
 bb0:;
-#line 99
+#line 221
     t0 = LYR_TASK_SCHEDULER_RUNS();
-#line 99
+#line 221
     goto bb1;
 bb1:;
-#line 103
+#line 225
     t1 = l0_call;
-#line 103
+#line 225
     t2 = t1.fn(t1.env, NULL);
-#line 103
+#line 225
     return t2;
 }
 

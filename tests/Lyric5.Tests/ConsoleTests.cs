@@ -54,4 +54,38 @@ public class ConsoleTests
         Assert.Equal(stdout, result.Stdout.Replace("\r\n", "\n"));
         Assert.StartsWith(report, result.Stderr);
     }
+
+    /// <summary>
+    /// The standard input (S8b): a line at a time, raw bytes from the same buffer between, the
+    /// rest by lines, null at its end, and one stdin() for the program; the output and the error
+    /// as Writers over print's buffers. Fed through a pipe by a shell, so POSIX only here: Windows'
+    /// pipe was run by hand (a Windows process through WSL interop), and a console's ReadConsoleW
+    /// needs a person typing at it.
+    /// </summary>
+    [Fact]
+    public void The_standard_input_is_read_a_line_at_a_time()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var program = RuntimeBuildTests.BuildEmitted(CEmitterTests.EmitC("console_in"), "console_in", Profile.Debug);
+        var result = ProcessRunner.Run("/bin/sh", ["-c", $"printf 'first\\nsecond\\r\\nthird\\nfourth' | '{program}'"],
+            TimeSpan.FromSeconds(30));
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal("1 first sec ond\n2 [third][fourth]\n3 <end> same\n4 written and printed\n", result.Stdout);
+        Assert.Equal("5 to err\n", result.Stderr);
+    }
+
+    /// <summary>
+    /// A pipe nobody reads is BrokenPipe (10 Q9: SIGPIPE ignored; O9): the program writes after its
+    /// reader is gone and hears of it, instead of dying of the signal. The test host ignores
+    /// SIGPIPE itself (.NET does) and a child inherits that across exec, so the program is started
+    /// with the signal's default, as a shell gives it — GNU env's --default-signal; Linux only.
+    /// </summary>
+    [Fact]
+    public void A_pipe_nobody_reads_is_a_broken_pipe()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        var program = RuntimeBuildTests.BuildEmitted(CEmitterTests.EmitC("console_pipe"), "console_pipe", Profile.Debug);
+        var result = ProcessRunner.Run("/bin/sh", ["-c", $"env --default-signal=PIPE '{program}' | true"], TimeSpan.FromSeconds(30));
+        Assert.Equal("broken pipe (written to the standard output)\n", result.Stderr);
+    }
 }
