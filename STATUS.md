@@ -628,6 +628,10 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   console through `ReadConsoleW` as UTF-8. `stdout()`/`stderr()` are `Writer`s over print's
   buffers. One map of the runtime's failures to all fifteen kinds, in `std.io`. The conformance
   runner learned `//! stdin:`. Spec 12 "The console" rules 4–5, three cases. **S8 is done.**
+- **S9** the system (10 Q9's rest): `os.args()` (on Windows from the command line as UTF-16),
+  `env`, `envs`, `setEnv`, `cwd`, `setCwd`, `exit` (the console flushed, nothing else run),
+  `platform()`/`arch()` (`Platform`, `Arch`), `homeDir`, `tempDir` (which `fs.tempDir` now asks),
+  `hostname`, `cpuCount`, `pid`. Spec 12 "The system", six cases.
 
 ### M8a — done (2026-10-07)
 

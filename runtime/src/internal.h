@@ -63,6 +63,11 @@ LYR_NORETURN void lyr_panic_report(const char *code, const char *message, const 
  * then (M8b S8a). */
 int lyr_stream_hooked(int fd);
 
+/* init.c — whether the arguments are the process's own: an emitted program's main handed them to
+ * lyr_run_main (or its task form) before lyr_init; a host's are taken as it gives them (M8b S9). */
+void lyr_mark_process_args(void);
+int lyr_process_args(void);
+
 /* crash.c — handlers for fault signals (10 Q9: a crash, not a panic) and for stack overflow (a
  * panic, 01 S3), installed only when the configuration asks (a host owns its signals). Every
  * thread that runs Lyric code needs its own alternate signal stack: the thread functions set it

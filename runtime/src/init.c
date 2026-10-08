@@ -49,6 +49,10 @@ void lyr_shutdown(void) {
 
 int lyr_stream_hooked(int fd) { return fd == 2 ? config.stderr_write != NULL : config.stdout_write != NULL; }
 
+static int process_args;
+void lyr_mark_process_args(void) { process_args = 1; }
+int lyr_process_args(void) { return process_args; }
+
 int lyr_signals_allowed(void) { return started && config.install_signal_handlers; }
 
 int lyr_argc(void) { return config.argc; }
@@ -102,6 +106,7 @@ int lyr_run_main(int argc, char **argv, int64_t (*program_main)(void)) {
     defaults.argc = argc;
     defaults.argv = argv;
     defaults.install_signal_handlers = 1;
+    lyr_mark_process_args();
     lyr_init(&defaults);
     int64_t result = program_main();
     lyr_shutdown();

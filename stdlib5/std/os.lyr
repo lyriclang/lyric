@@ -1,8 +1,242 @@
 /// The operating system (design/v5/spec/10 Q9). M8b S1: the signals, std.task's until the module cut
-/// (10 Q10); the rest of Q9 — the arguments, the environment, the working directory — comes with S9.
-/// A signal's watcher is a thread of its own, whose one task hands each caught signal on.
+/// (10 Q10); a signal's watcher is a thread of its own, whose one task hands each caught signal on.
+/// S9: the program and its system — the arguments, the environment, the working directory, the
+/// end, and the machine's facts.
+import std.collections { List, Map };
+import std.io { IoError, failure };
 import std.task { Channel, here, Scheduler, SpinLock };
-import std.thread { Thread };
+import std.thread { Thread, processorCount };
+
+// ---------------------------------------------------------------------------------------------
+// The program and its system (10 Q9; M8b S9). A text comes from the runtime through a buffer
+// (lyr/os.h); one that is no UTF-8 — a POSIX system's bytes may be anything — is taken with U+FFFD
+// for its bad bytes, as `string.fromUtf8Lossy` takes it: a program does not die of its environment.
+// ---------------------------------------------------------------------------------------------
+
+/// The system a program runs on (10 Q9), as the target triples name it: one of the Tier 1
+/// targets', `Other` for another POSIX system the runtime was built for.
+pub enum Platform :: [Equatable, Debug] {
+    Linux,
+    MacOS,
+    Windows,
+    Other,
+}
+
+extend Platform :: [Display] {
+    fn show(): string {
+        return match (this) {
+            .Linux => "linux",
+            .MacOS => "macos",
+            .Windows => "windows",
+            .Other => "other",
+        };
+    }
+}
+
+/// The machine a program runs on (10 Q9), as the target triples name it.
+pub enum Arch :: [Equatable, Debug] {
+    X86_64,
+    Aarch64,
+    Other,
+}
+
+extend Arch :: [Display] {
+    fn show(): string {
+        return match (this) {
+            .X86_64 => "x86_64",
+            .Aarch64 => "aarch64",
+            .Other => "other",
+        };
+    }
+}
+
+/// The program's arguments, its own name first, as C, Go and Rust give them; a new array each call.
+/// On Windows they are read from the command line as UTF-16, so a name that is not ASCII comes as
+/// it was typed.
+pub fn args(): string[] {
+    let count = osArgCount();
+    var all: List<string> = List.new();
+    for (i in 0..count) {
+        all.push(textOf((into) => osArg(i, into)) ?? "");
+    }
+    return all.toArray();
+}
+
+/// The value of the environment's variable `name`, or `null` where it is not set.
+pub fn env(name: StringView): ?string {
+    let key = name.toString();
+    return textOf((into) => osEnv(key, into));
+}
+
+/// The whole environment, a snapshot: its names to their values.
+pub fn envs(): Map<string, string> {
+    let all: Map<string, string> = Map.new();
+    let (bytes, length) = viewOf((into) => osEnvs(into));
+    let block = bytes[..length];
+    var at = 0;
+    while (at < block.length()) {
+        let end = at + (block[at..].indexOf(0u8) ?? (block.length() - at));
+        let entry = block[at..end];
+        // the name ends at the first '=' after its first byte (Windows' own entries begin with one)
+        if (let eq = entry[1..].indexOf(61u8)) {
+            let _ = all.insert(string.fromUtf8Lossy(entry[..(eq + 1)]), string.fromUtf8Lossy(entry[(eq + 2)..]));
+        }
+        at = end + 1;
+    }
+    return all;
+}
+
+/// The environment's variable `name` set to `value`, for this process and the processes it starts.
+/// A name that is empty or holds `=` or a NUL is the program's mistake: it panics. Another thread
+/// reading the environment through C at the same time is a race the system does not guard (Rust
+/// marks its `set_var` unsafe for it): set it before the threads start.
+pub fn setEnv(name: StringView, value: StringView): void {
+    let key = name.toString();
+    if (key.isEmpty() || key.contains('=') || key.contains('\0') || value.contains('\0')) {
+        panic(f"os.setEnv: '{key}' cannot be an environment variable's name, or its value holds a NUL");
+    }
+    let answer = osSetEnv(key, value.toString());
+    if (answer < 0) {
+        panic(f"os.setEnv: {failure(answer, null, f"{key} set").message()}");
+    }
+}
+
+/// The working directory.
+pub fn cwd(): string throws IoError {
+    return try textFrom("the working directory looked up", (into) => osCwd(into));
+}
+
+/// The working directory moved to `path`.
+pub fn setCwd(path: StringView): void throws IoError {
+    let dir = path.toString();
+    let answer = osSetCwd(dir);
+    if (answer < 0) {
+        throw failure(answer, dir, "made the working directory");
+    }
+}
+
+/// The program ended at once with `code` (07 M7f): what the console holds is written, no `defer`
+/// and no `using` run, no other task is waited for.
+pub fn exit(code: int): never {
+    osExit(code);
+}
+
+/// The system the program runs on.
+pub fn platform(): Platform {
+    return match (osPlatform()) {
+        1 => .Linux,
+        2 => .MacOS,
+        3 => .Windows,
+        _ => .Other,
+    };
+}
+
+/// The machine the program runs on.
+pub fn arch(): Arch {
+    return match (osArch()) {
+        1 => .X86_64,
+        2 => .Aarch64,
+        _ => .Other,
+    };
+}
+
+/// The user's home directory — `HOME`, on Windows `USERPROFILE` —, or `null` where it is not set
+/// (Go's `UserHomeDir`).
+pub fn homeDir(): ?string {
+    if (let home = env(if (osPlatform() == 3) "USERPROFILE" else "HOME")) {
+        if (!home.isEmpty()) {
+            return home;
+        }
+    }
+    return null;
+}
+
+/// The system's directory for temporary files: `TMPDIR` where it is set and not empty, else `/tmp`;
+/// on Windows `GetTempPathW`'s. It does not fail (Go's `TempDir`); `fs.tempDir()` makes a new
+/// directory in it.
+pub fn tempDir(): string {
+    try {
+        return textFrom("the directory for temporary files looked up", (into) => osTempRoot(into));
+    } catch (e: IoError) {
+        panic(f"os.tempDir: {e.message()}");
+    }
+}
+
+/// The machine's name.
+pub fn hostname(): string throws IoError {
+    return try textFrom("the machine's name looked up", (into) => osHostname(into));
+}
+
+/// The processors the system runs the program on — those online —, one at least.
+pub fn cpuCount(): int {
+    return processorCount();
+}
+
+/// The process's own number.
+pub fn pid(): int {
+    return osPid();
+}
+
+/// A text the runtime writes into a buffer (lyr/os.h); a failure thrown.
+fn textFrom(doing: string, call: fn(Slice<uint8>) -> int): string throws IoError {
+    let (bytes, length) = try bytesFrom(doing, call);
+    return string.fromUtf8Lossy(bytes[..length]);
+}
+
+/// A text the runtime writes into a buffer, or `null` for any failure — a variable not set, an
+/// argument that is not there.
+fn textOf(call: fn(Slice<uint8>) -> int): ?string {
+    try {
+        return textFrom("read", call);
+    } catch (_: IoError) {
+        return null;
+    }
+}
+
+/// The bytes the runtime writes into a buffer and how many, none for a failure.
+fn viewOf(call: fn(Slice<uint8>) -> int): (uint8[], int) {
+    try {
+        return bytesFrom("read", call);
+    } catch (_: IoError) {
+        let none: uint8[] = [];
+        return (none, 0);
+    }
+}
+
+/// The bytes the runtime writes into a buffer, and how many: the room it answers it needs where the
+/// first was too small, and once more.
+fn bytesFrom(doing: string, call: fn(Slice<uint8>) -> int): (uint8[], int) throws IoError {
+    var room = 512;
+    loop {
+        let buffer: uint8[] = [0u8] * room;
+        let answer = call(buffer[..]);
+        if (answer < 0) {
+            throw failure(answer, null, doing);
+        }
+        if (answer <= room) {
+            return (buffer, answer);
+        }
+        room = answer;
+    }
+}
+
+fn osPlatform(): int;
+fn osArch(): int;
+fn osPid(): int;
+fn osArgCount(): int;
+fn osArg(i: int, into: Slice<uint8>): int;
+fn osEnv(name: string, into: Slice<uint8>): int;
+fn osEnvs(into: Slice<uint8>): int;
+fn osSetEnv(name: string, value: string): int;
+fn osCwd(into: Slice<uint8>): int;
+fn osSetCwd(path: string): int;
+fn osHostname(into: Slice<uint8>): int;
+fn osExit(code: int): never;
+fn osTempRoot(into: Slice<uint8>): int;
+
+// ---------------------------------------------------------------------------------------------
+// The signals (10 Q9, 06 K5; M8b S1).
+// ---------------------------------------------------------------------------------------------
 
 /// A signal of the system (10 Q9, 06 K5), by an abstract name: Windows knows `Interrupt` (Ctrl+C,
 /// Ctrl+Break) and `Terminate` (its console closes) only. `Other(n)` is the system's number `n`.
