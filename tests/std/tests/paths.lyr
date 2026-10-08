@@ -1,0 +1,127 @@
+// std.path (design/v5/spec/10 O6; M8b S6a): Go's path/filepath, lexically — on POSIX its documented
+// examples and the cases Go itself answers (checked against `go run` when written); on Windows the
+// volumes, both separators, and names alike without regard to case.
+import std.path;
+import std.test { assertEq, assertFalse, assertNull, assertTrue };
+
+fn posix(): bool {
+    return path.separator == "/";
+}
+
+@Test
+fn normalizeIsGosClean(): void {
+    if (posix()) {
+        assertEq(path.normalize(""), ".");
+        assertEq(path.normalize("a//c"), "a/c");
+        assertEq(path.normalize("a/c/b/.."), "a/c");
+        assertEq(path.normalize("/../a/b/../././/c"), "/a/c");
+        assertEq(path.normalize("../a/../../b"), "../../b");
+        assertEq(path.normalize("/a/b/"), "/a/b");
+        assertEq(path.normalize("//"), "/");
+    } else {
+        assertEq(path.normalize("a\\b\\..\\c"), "a\\c");
+        assertEq(path.normalize("a/b"), "a\\b");
+        assertEq(path.normalize("C:\\a\\..\\b"), "C:\\b");
+        assertEq(path.normalize("C:"), "C:.");
+        assertEq(path.normalize("\\\\server\\share\\a\\.."), "\\\\server\\share\\");
+    }
+}
+
+@Test
+fn joinLeavesTheEmptyOutAndNormalizes(): void {
+    if (posix()) {
+        assertEq(path.join("a", "b", "c"), "a/b/c");
+        assertEq(path.join("a/b", "/c"), "a/b/c");
+        assertEq(path.join("a/b", "../../../xyz"), "../xyz");
+        assertEq(path.join("", "a"), "a");
+        assertEq(path.join("", ""), "");
+        assertEq(path.join(), "");
+    } else {
+        assertEq(path.join("a", "b"), "a\\b");
+        assertEq(path.join("C:", "a"), "C:a");
+        assertEq(path.join("C:\\", "a"), "C:\\a");
+    }
+}
+
+@Test
+fn fileNameAndParentAreGosBaseAndDir(): void {
+    if (posix()) {
+        assertEq(path.fileName("/foo/bar/baz.js"), "baz.js");
+        assertEq(path.fileName("/foo/bar/baz/"), "baz");
+        assertEq(path.fileName("/"), "/");
+        assertEq(path.fileName(""), ".");
+        assertEq(path.parent("/foo/bar/baz/"), "/foo/bar/baz");
+        assertEq(path.parent("/dirty//path///"), "/dirty/path");
+        assertEq(path.parent("dev.txt"), ".");
+        assertEq(path.parent("/"), "/");
+    } else {
+        assertEq(path.fileName("C:\\a\\b.txt"), "b.txt");
+        assertEq(path.fileName("C:\\"), "\\");
+        assertEq(path.parent("C:\\a\\b.txt"), "C:\\a");
+        assertEq(path.parent("C:\\a"), "C:\\");
+        assertEq(path.parent("\\\\server\\share\\a"), "\\\\server\\share\\");
+    }
+}
+
+@Test
+fn theExtensionKeepsItsDot(): void {
+    assertEq(path.extension("index.js"), ".js");
+    assertEq(path.extension("main.test.js"), ".js");
+    assertEq(path.extension("index"), "");
+    assertEq(path.extension(".bashrc"), ".bashrc");
+    assertEq(path.extension("a.b/c"), "");
+    assertEq(path.stem("a/notes.txt"), "notes");
+    assertEq(path.stem("a.tar.gz"), "a.tar");
+    assertEq(path.stem(".bashrc"), "");
+    assertEq(path.withExtension("a/notes.txt", ".md"), "a/notes.md");
+    assertEq(path.withExtension("a/notes.txt", "md"), "a/notes.md");
+    assertEq(path.withExtension("a/notes", ".md"), "a/notes.md");
+    assertEq(path.withExtension("a/notes.txt", ""), "a/notes");
+}
+
+@Test
+fn anAbsolutePathNamesOnePlace(): void {
+    if (posix()) {
+        assertTrue(path.isAbsolute("/a"));
+        assertTrue(path.isAbsolute("//a"));
+        assertFalse(path.isAbsolute("a"));
+        assertFalse(path.isAbsolute(""));
+    } else {
+        assertTrue(path.isAbsolute("C:\\a"));
+        assertTrue(path.isAbsolute("C:/a"));
+        assertTrue(path.isAbsolute("\\\\server\\share"));
+        assertFalse(path.isAbsolute("\\a"));
+        assertFalse(path.isAbsolute("C:a"));
+        assertFalse(path.isAbsolute("/a"));
+    }
+}
+
+@Test
+fn relativeIsGosRel(): void {
+    if (posix()) {
+        assertEq(path.relative("/a", "/a/b/c") ?? "null", "b/c");
+        assertEq(path.relative("/a", "/b/c") ?? "null", "../b/c");
+        assertEq(path.relative("a/b/c", "a/x/y") ?? "null", "../../x/y");
+        assertEq(path.relative("/a/b", "/a/b") ?? "null", ".");
+        assertEq(path.relative("a", "../b") ?? "null", "../../b");
+        assertNull(path.relative("/a", "./b/c"));
+        assertNull(path.relative("../a", "b"));
+    } else {
+        assertEq(path.relative("C:\\a", "C:\\a\\b") ?? "null", "b");
+        assertEq(path.relative("C:\\A", "c:\\a\\B") ?? "null", "B");
+        assertNull(path.relative("C:\\a", "D:\\b"));
+    }
+}
+
+@Test
+fn theComponentsAreTheRootAndTheElements(): void {
+    let sep = path.separator;
+    assertEq(path.components("a//b/./c/.."), ["a", "b", "c", ".."]);
+    assertEq(path.components(""), []);
+    if (posix()) {
+        assertEq(path.components("/a/b"), ["/", "a", "b"]);
+    } else {
+        assertEq(path.components("C:\\a"), ["C:" + sep, "a"]);
+        assertEq(path.components("C:a"), ["C:", "a"]);
+    }
+}
