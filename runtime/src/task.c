@@ -151,6 +151,7 @@ int lyr_run_main_task(int argc, char **argv, int64_t (*program_main)(void), void
     defaults.argc = argc;
     defaults.argv = argv;
     defaults.install_signal_handlers = 1;
+    lyr_mark_process_args();
     lyr_init(&defaults);
     MainTask main_task = { program_main, 0 };  /* on this stack, which outlives main's context */
     LyrCoro *co = lyr_coro_new(&task_desc, lyr_task_main, &main_task, LYR_MAIN_TASK_STACK);

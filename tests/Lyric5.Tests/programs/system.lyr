@@ -1,0 +1,21 @@
+// The program and its system (design/v5/spec/10 Q9; 13 M8b S9): its arguments, its environment
+// read and set, its platform, and its end through os.exit, the console flushed first. Run as
+// `system one "zwei é"` with LYRIC_TEST_SYSTEM=set. Expected stdout, and exit 3:
+//   2 one|zwei é
+//   set <none> after
+//   <the platform> <the arch>
+//   before exit
+import std.io { println };
+import std.os;
+
+fn main(): void {
+    let a = os.args();
+    println(f"{a.length() - 1} {a[1]}|{a[2]}");
+    let before = os.env("LYRIC_TEST_SYSTEM") ?? "<none>";
+    let missing = os.env("LYRIC_TEST_SYSTEM_NOT_SET") ?? "<none>";
+    os.setEnv("LYRIC_TEST_SYSTEM", "after");
+    println(f"{before} {missing} {os.env("LYRIC_TEST_SYSTEM") ?? "<none>"}");
+    println(f"{os.platform()} {os.arch()}");
+    println("before exit");
+    os.exit(3);
+}

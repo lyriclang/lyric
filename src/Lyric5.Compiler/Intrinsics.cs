@@ -73,7 +73,6 @@ public static class Intrinsics
         ["std.fs.fsDirClose"] = "lyr_fs_dir_close",
         ["std.fs.fsCanonical"] = "LYR_FS_CANONICAL",
         ["std.fs.fsAbsolute"] = "LYR_FS_ABSOLUTE",
-        ["std.fs.fsTempRoot"] = "LYR_FS_TEMP_ROOT",
         ["std.task.currentPoller"] = "lyr_task_poller",
         ["std.task.wakePoller"] = "lyr_task_wake",
         ["std.task.spin"] = "lyr_task_spin",
@@ -84,6 +83,20 @@ public static class Intrinsics
         ["std.os.catchSignal"] = "lyr_signal_catch",
         ["std.os.attachSignals"] = "lyr_signal_attach",
         ["std.os.takeSignals"] = "lyr_signal_take",
+        // The system (10 Q9, M8b S9; lyr/os.h): a text through the caller's buffer.
+        ["std.os.osPlatform"] = "lyr_os_platform",
+        ["std.os.osArch"] = "lyr_os_arch",
+        ["std.os.osPid"] = "lyr_os_pid",
+        ["std.os.osArgCount"] = "lyr_os_arg_count",
+        ["std.os.osArg"] = "LYR_OS_ARG",
+        ["std.os.osEnv"] = "LYR_OS_ENV",
+        ["std.os.osEnvs"] = "LYR_OS_ENVS",
+        ["std.os.osSetEnv"] = "lyr_os_set_env",
+        ["std.os.osCwd"] = "LYR_OS_CWD",
+        ["std.os.osSetCwd"] = "lyr_os_set_cwd",
+        ["std.os.osHostname"] = "LYR_OS_HOSTNAME",
+        ["std.os.osExit"] = "lyr_os_exit",
+        ["std.os.osTempRoot"] = "LYR_FS_TEMP_ROOT",
         // The atomic operations (06 G4, K6; N7 P2; the review's M7-5): the C11 builtins on a
         // place — a field of the scheduler's, the value of std.sync's Atomic<T> —, as macros that
         // serve every T.

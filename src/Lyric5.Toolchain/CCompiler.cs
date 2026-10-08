@@ -91,6 +91,11 @@ public static class ProcessRunner
 {
     public sealed record Result(int ExitCode, string Stdout, string Stderr);
 
+    /// <summary>What a captured stream is read as: UTF-8, what a Lyric program writes (10 S1) and
+    /// the C toolchain too. Left to the default, Windows read it in the console's code page, and
+    /// a program's 'é' came back as two characters of CP437 (M8b S9).</summary>
+    private static readonly System.Text.Encoding Utf8 = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
     public static Result Run(string file, IEnumerable<string> arguments, TimeSpan timeout, string? workingDirectory = null,
         IReadOnlyDictionary<string, string>? environment = null)
     {
@@ -98,6 +103,8 @@ public static class ProcessRunner
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            StandardOutputEncoding = Utf8,
+            StandardErrorEncoding = Utf8,
             UseShellExecute = false,
             WorkingDirectory = workingDirectory ?? Environment.CurrentDirectory,
         };
@@ -143,6 +150,8 @@ public static class ProcessRunner
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            StandardOutputEncoding = Utf8,
+            StandardErrorEncoding = Utf8,
             UseShellExecute = false,
         };
         foreach (var argument in arguments) info.ArgumentList.Add(argument);
