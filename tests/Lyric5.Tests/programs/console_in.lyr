@@ -1,0 +1,28 @@
+// The console's input and its streams (design/v5/spec/10 O9; 13 M8b S8b): the standard input read
+// a line at a time, raw bytes between, the rest by lines, its end; the output and the error as
+// Writers over print's buffers. Fed "first\nsecond\r\nthird\nfourth" through a pipe. Expected:
+//   stdout: 1 first sec ond / 2 [third][fourth] / 3 <end> same / 4 written and printed
+//   stderr: 5 to err
+import std.io { println, stderr, stdin, stdout };
+
+fn main(): void throws Error {
+    let input = stdin();
+    let a = try input.readLine();
+    let three: uint8[] = [0u8] * 3;
+    let n = try input.read(three[..]);
+    let b = try input.readLine();
+    println(f"1 {a ?? "<end>"} {try string.fromUtf8(three[..n])} {b ?? "<end>"}");
+    var rest = "";
+    for (line in try input.lines()) {
+        rest = rest + "[" + line + "]";
+    }
+    println(f"2 {rest}");
+    let again = stdin();
+    println(f"3 {(try again.readLine()) ?? "<end>"} {if (same(again, input)) "same" else "another"}");
+    let out = stdout();
+    try out.writeString("4 written ");
+    println("and printed");
+    let err = stderr();
+    try err.writeString("5 to err\n");
+    try out.flush();
+}

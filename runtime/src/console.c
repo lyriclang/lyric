@@ -4,6 +4,7 @@
 #endif
 
 #include "lyr/console.h"
+#include "lyr/fs.h"
 #include "lyr/init.h"
 #include "internal.h"
 
@@ -122,4 +123,63 @@ void lyr_console_flush_all(int waiting) {
         s->used = 0;
         console_unlock(&s->lock);
     }
+}
+
+#if defined(_WIN32)
+/* A console's characters as UTF-8 (M8b S8b): at most n / 3 UTF-16 units a read — each becomes at
+ * most three bytes, a pair four —, a high surrogate at the end held for the next read; one reader
+ * at a time. */
+static ConsoleLock reading = CONSOLE_LOCK_INIT;
+static wchar_t held_unit;
+
+static int64_t read_console(HANDLE in, uint8_t *into, int64_t n) {
+    wchar_t units[1024];
+    int64_t room = n / 3 < 1023 ? n / 3 : 1023;
+    if (room < 2) return failure(LYR_IO_INVALID_INPUT, 0);
+    console_lock(&reading);
+    int have = 0;
+    if (held_unit) {
+        units[have++] = held_unit;
+        held_unit = 0;
+    }
+    for (;;) {
+        DWORD got = 0;
+        if (!ReadConsoleW(in, units + have, (DWORD)(room - have), &got, NULL)) {
+            DWORD error = GetLastError();
+            console_unlock(&reading);
+            return failure(0, (int64_t)error);
+        }
+        have += (int)got;
+        if (got == 0 || !IS_HIGH_SURROGATE(units[have - 1])) break;
+        /* half a pair: alone, read on for its other half; after others, keep it for the next */
+        if (have == 1) continue;
+        held_unit = units[--have];
+        break;
+    }
+    int bytes = have == 0 ? 0 : WideCharToMultiByte(CP_UTF8, 0, units, have, (char *)into, (int)n, NULL, NULL);
+    console_unlock(&reading);
+    return bytes;
+}
+#endif
+
+int64_t lyr_console_read(uint8_t *into, int64_t n) {
+#if defined(_WIN32)
+    HANDLE in = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD mode;
+    if (GetConsoleMode(in, &mode)) return read_console(in, into, n);
+    DWORD want = n > 0x40000000 ? 0x40000000 : (DWORD)n, got = 0;
+    if (!ReadFile(in, into, want, &got, NULL)) {
+        DWORD error = GetLastError();
+        if (error == ERROR_BROKEN_PIPE || error == ERROR_HANDLE_EOF) return 0;
+        return failure(0, (int64_t)error);
+    }
+    return (int64_t)got;
+#else
+    ssize_t got;
+    do {
+        got = read(0, into, (size_t)n);
+    } while (got < 0 && errno == EINTR);
+    if (got < 0) return failure(0, errno);
+    return (int64_t)got;
+#endif
 }

@@ -1,0 +1,22 @@
+// A pipe nobody reads (design/v5/spec/10 Q9, O9; 13 M8b S8b): SIGPIPE is ignored, so the write
+// fails and the program hears of it — BrokenPipe — instead of dying of the signal. Run as
+// `program | true`: the reader is gone by the time anything is written. Expected stderr:
+//   broken pipe (written to the standard output)
+import std.io { IoError, eprintln, stdout };
+import std.task { sleep };
+import std.time { Duration };
+
+fn main(): void throws Error {
+    try sleep(Duration.ofMillis(300));
+    let out = stdout();
+    let chunk: uint8[] = [120u8] * 65536;
+    try {
+        for (_ in 0..64) {
+            out.writeAll(chunk[..]);
+        }
+        out.flush();
+        eprintln("written");
+    } catch (e: IoError) {
+        eprintln(e.message());
+    }
+}

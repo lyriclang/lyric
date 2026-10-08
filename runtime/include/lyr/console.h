@@ -27,7 +27,13 @@ int64_t lyr_console_flush(int64_t stream);
  * another thread holds is left as it is (a panic must not wait on a write that blocks). */
 void lyr_console_flush_all(int waiting);
 
+/* At most `n` bytes of the standard input into `into` (M8b S8b): how many, 0 at its end, or a
+ * failure as lyr/fs.h writes one. A Windows console is read as UTF-16 and given as UTF-8 — at
+ * most n / 3 characters a read, so they fit; half a surrogate pair waits for the next read. */
+int64_t lyr_console_read(uint8_t *into, int64_t n);
+
 /* A Slice<uint8> of emitted code is a pointer and a length (CEmitter). */
 #define LYR_CONSOLE_PUT(stream, slice) lyr_console_put((stream), (slice).ptr, (slice).len)
+#define LYR_CONSOLE_READ(slice) lyr_console_read((slice).ptr, (slice).len)
 
 #endif

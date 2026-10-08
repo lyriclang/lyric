@@ -77,8 +77,8 @@ typedef struct { LyrObj header; lyr_ty_app_main_Pair_string__string__246b3e39 va
 _Static_assert(sizeof(lyr_box_ty_app_main_Pair_string__string__246b3e39) == 24, "layout of lyr_box_ty_app_main_Pair_string__string__246b3e39");
 _Static_assert(offsetof(lyr_box_ty_app_main_Pair_string__string__246b3e39, value) == 8, "layout of lyr_box_ty_app_main_Pair_string__string__246b3e39");
 extern const LyrItable lyr_itab_ty_app_main_Pair_string__string__246b3e39[];
-static const uint64_t lyr_refmap_box21[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_box_ty_app_main_Pair_string__string__246b3e39 = { sizeof(lyr_box_ty_app_main_Pair_string__string__246b3e39), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box21, "box<app.main.Pair<string, string>>", lyr_itab_ty_app_main_Pair_string__string__246b3e39 };
+static const uint64_t lyr_refmap_box25[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_box_ty_app_main_Pair_string__string__246b3e39 = { sizeof(lyr_box_ty_app_main_Pair_string__string__246b3e39), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box25, "box<app.main.Pair<string, string>>", lyr_itab_ty_app_main_Pair_string__string__246b3e39 };
 
 /* string literals */
 static const LyrStaticStr(2) lyr_lit0 = LYR_STR_INIT("a");
@@ -1097,22 +1097,22 @@ bb0:;
     return t3;
 }
 
-#line 99 "stdlib5/std/io.lyr"
+#line 221 "stdlib5/std/io.lyr"
 int64_t lyr_std_io_onPool(lyr_fn_to_i64 l0_call) {
     uint8_t t0 = 0;
     lyr_fn_to_i64 t1 = {0};
     int64_t t2 = 0;
 bb0:;
-#line 99
+#line 221
     t0 = LYR_TASK_SCHEDULER_RUNS();
-#line 99
+#line 221
     goto bb1;
 bb1:;
-#line 103
+#line 225
     t1 = l0_call;
-#line 103
+#line 225
     t2 = t1.fn(t1.env, NULL);
-#line 103
+#line 225
     return t2;
 }
 

@@ -622,6 +622,12 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   on the I/O pool (moved to `std.io`) where a scheduler runs. A program that sets no scheduler
   keeps nothing of the pool (`SchedulerFree`, a compiler pass): hello stays at 1.35 MB. Spec 12
   "The console", four cases. S8b: `stdin()`, the streams as `Reader`/`Writer`s.
+- **S8b** the console's input and streams (10 O9; P2): `stdin()` — one for the program, made at
+  the first call, a `Reader` with `readLine()` and `lines()` through a buffer of its own, read on
+  the I/O pool where a scheduler runs; the runtime reads a pipe or a file as bytes and a Windows
+  console through `ReadConsoleW` as UTF-8. `stdout()`/`stderr()` are `Writer`s over print's
+  buffers. One map of the runtime's failures to all fifteen kinds, in `std.io`. The conformance
+  runner learned `//! stdin:`. Spec 12 "The console" rules 4–5, three cases. **S8 is done.**
 
 ### M8a — done (2026-10-07)
 

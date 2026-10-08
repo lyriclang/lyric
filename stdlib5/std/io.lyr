@@ -72,6 +72,128 @@ fn flushed(stream: int): int {
 }
 
 // ---------------------------------------------------------------------------------------------
+// The console's streams (10 O9; 13 M8b P2, S8b): the standard input as a `Reader` read a line at a
+// time; the standard output and error as `Writer`s over the buffers print writes into.
+// ---------------------------------------------------------------------------------------------
+
+fn consoleRead(into: Slice<uint8>): int;
+
+var theStdin: ?Stdin = null;
+let stdinGuard = SpinLock { };
+
+/// The program's standard input (10 O9): one for the program, made at the first call. Its reads go
+/// through a buffer of its own, so `readLine`, `lines` and `read` take turns on it without a byte
+/// lost — on the I/O pool where a scheduler runs (P2).
+pub fn stdin(): Stdin {
+    stdinGuard.acquire();
+    if (theStdin == null) {
+        theStdin = Stdin { text = TextReader.new(ConsoleReader { }) };
+    }
+    let s = theStdin!;
+    stdinGuard.release();
+    return s;
+}
+
+/// The standard output as a `Writer`: the buffer print writes into, so the two keep their order.
+pub fn stdout(): ConsoleWriter {
+    return ConsoleWriter { stream = 1 };
+}
+
+/// The standard error as a `Writer`: the buffer eprint writes into.
+pub fn stderr(): ConsoleWriter {
+    return ConsoleWriter { stream = 2 };
+}
+
+/// The standard input (`stdin()`): a `Reader`, and its text a line at a time.
+pub class Stdin :: [Reader] {
+    text: TextReader<ConsoleReader>,
+
+    /// The next line without its end — a `\n` or a `\r\n` —, or `null` at the end of the input.
+    pub mut fn readLine(): ?string throws IoError {
+        return try this.text.readLine();
+    }
+
+    /// The lines to the end of the input, as `readLine` gives them.
+    pub fn lines(): TextLinesIter<ConsoleReader> {
+        return this.text.lines();
+    }
+
+    /// Bytes — what a line's read left in the buffer first.
+    pub mut fn read(into: Slice<uint8>): int throws IoError {
+        return try this.text.source.read(into);
+    }
+}
+
+/// The console's input as bytes, unbuffered (lyr/console.h): what `stdin()` reads through its
+/// buffer. A second one beside it would take bytes the buffer is owed: read through `stdin()`.
+pub class ConsoleReader :: [Reader] {
+    pub mut fn read(into: Slice<uint8>): int throws IoError {
+        if (into.isEmpty()) {
+            return 0;
+        }
+        let n = onPool(() => consoleRead(into));
+        if (n < 0) {
+            throw failure(n, null, "read from the standard input");
+        }
+        return n;
+    }
+}
+
+/// One of the console's output streams as a `Writer` (`stdout()`, `stderr()`). What it takes goes
+/// into the same buffer as print's; a flush that fails throws — a pipe nobody reads is
+/// `BrokenPipe`. Not `Closeable`: the console is not the program's to close.
+pub class ConsoleWriter :: [Writer] {
+    stream: int,
+
+    /// All of `from`, into the buffer — flushed wherever a flush is due.
+    pub mut fn write(from: Slice<uint8>): int throws IoError {
+        var rest = from;
+        while (!rest.isEmpty()) {
+            let answer = consolePut(this.stream, rest);
+            if ((answer >> 32) != 0) {
+                try this.flush();
+            }
+            rest = rest[(answer & 0xFFFFFFFF)..];
+        }
+        return from.length();
+    }
+
+    /// What the stream holds, written now.
+    pub mut fn flush(): void throws IoError {
+        let answer = flushed(this.stream);
+        if (answer < 0) {
+            throw failure(answer, null, if (this.stream == 2) "written to the standard error" else "written to the standard output");
+        }
+    }
+}
+
+/// What a runtime call's negative answer says (lyr/fs.h): -(kind << 32 | raw), the kinds counted
+/// as `IoErrorKind`'s from 1 — `Other` with the system's code for one it has no name for.
+fn failure(answer: int, path: ?string, doing: string): IoError {
+    let code = -answer;
+    let raw = code & 0xFFFFFFFF;
+    let kind: IoErrorKind = match (code >> 32) {
+        1 => .NotFound,
+        2 => .PermissionDenied,
+        3 => .AlreadyExists,
+        4 => .IsDirectory,
+        5 => .NotDirectory,
+        6 => .InvalidInput,
+        7 => .InvalidData,
+        8 => .UnexpectedEof,
+        9 => .TimedOut,
+        10 => .ConnectionRefused,
+        11 => .ConnectionReset,
+        12 => .AddrInUse,
+        13 => .BrokenPipe,
+        14 => .Closed,
+        15 => .Unsupported,
+        _ => .Other { code = raw },
+    };
+    return IoError { kind = kind, path = path, detail = doing };
+}
+
+// ---------------------------------------------------------------------------------------------
 // The I/O pool (13 M8b P2): four threads — libuv's count —, made at the first call and there
 // until the program ends, as the program's pool for parallelMap is. std.fs's calls and the
 // console's flushes run on it.
