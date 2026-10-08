@@ -1,0 +1,149 @@
+// std.fs's trees and temporary places (design/v5/spec/10 O5; M8b S7b): createDirAll, removeAll,
+// copy, walk, tempDir, tempFile — and the plan's check for S7, a tree made, walked and removed.
+// Each test works in a directory of its own from fs.tempDir() and removes it.
+import std.fs;
+import std.io { IoError, IoErrorKind };
+import std.path;
+import std.test { assertEq, assertFalse, assertTrue };
+
+fn kindOf(f: fn() -> void throws IoError): ?IoErrorKind {
+    try {
+        f();
+        return null;
+    } catch (e: IoError) {
+        return e.kind;
+    }
+}
+
+/// The walk under `root`, each entry relative to it with `/` between names, and `/` after a
+/// directory's.
+fn walked(root: string): string throws IoError {
+    var out = "";
+    for (e in try fs.walk(root)) {
+        let rel = (path.relative(root, e.path) ?? e.path).replace("\\", "/");
+        out = out + (if (out.isEmpty()) "" else " ") + rel + (if (e.isDir) "/" else "");
+    }
+    return out;
+}
+
+@Test
+fn aTempDirAndATempFileAreNewAndTheirOwn(): void throws IoError {
+    let one = try fs.tempDir();
+    let two = try fs.tempDir();
+    assertTrue(one != two);
+    assertTrue((try fs.metadata(one)).isDir);
+    assertEq(path.parent(one), path.parent(two));
+    assertTrue(path.isAbsolute(one));
+    let f = try fs.tempFile();
+    let g = try fs.tempFile();
+    assertTrue(f != g);
+    assertEq((try fs.metadata(f)).size, 0);
+    assertEq(path.parent(f), path.parent(one));
+    try fs.removeDir(one);
+    try fs.removeDir(two);
+    try fs.remove(f);
+    try fs.remove(g);
+}
+
+@Test
+fn createDirAllMakesWhatIsNotThere(): void throws IoError {
+    let t = try fs.tempDir();
+    let deep = path.join(t, "a", "b", "c");
+    try fs.createDirAll(deep);
+    assertTrue((try fs.metadata(deep)).isDir);
+    // there already: nothing to do
+    try fs.createDirAll(deep);
+    try fs.createDirAll(t);
+    try fs.writeText(path.join(t, "f"), "");
+    assertTrue(kindOf(() => { try fs.createDirAll(path.join(t, "f")); }) == IoErrorKind.NotDirectory);
+    assertTrue(kindOf(() => { try fs.createDirAll(path.join(t, "f", "g")); }) != null);
+    try fs.removeAll(t);
+}
+
+@Test
+fn aWalkGoesDepthFirstInTheOrderOfTheNames(): void throws IoError {
+    let t = try fs.tempDir();
+    for (d in ["b", "b/c", "a"]) {
+        try fs.createDirAll(path.join(t, d));
+    }
+    for (f in ["z.txt", "b/y.txt", "b/c/x.txt", "a.txt", "A.md"]) {
+        try fs.writeText(path.join(t, f), f);
+    }
+    // the bytes' order — `A` before `a`, a name before the longer one it starts —, whatever order
+    // the system keeps them in
+    assertEq(try walked(t), "A.md a/ a.txt b/ b/c/ b/c/x.txt b/y.txt z.txt");
+    // an empty directory walks to nothing; one that is not there throws
+    assertEq(try walked(path.join(t, "a")), "");
+    assertTrue(kindOf(() => { let _ = try walked(path.join(t, "none")); }) == IoErrorKind.NotFound);
+    try fs.removeAll(t);
+}
+
+@Test
+fn copyCopiesTheBytes(): void throws IoError {
+    let t = try fs.tempDir();
+    let big: uint8[] = [42u8] * 100000;
+    try fs.writeBytes(path.join(t, "big.bin"), big[..]);
+    assertEq(try fs.copy(path.join(t, "big.bin"), path.join(t, "copy.bin")), 100000);
+    assertEq((try fs.readBytes(path.join(t, "copy.bin"))).length(), 100000);
+    // over a file that is there: cut, then written
+    try fs.writeText(path.join(t, "small.txt"), "small");
+    assertEq(try fs.copy(path.join(t, "small.txt"), path.join(t, "copy.bin")), 5);
+    assertEq(try fs.readText(path.join(t, "copy.bin")), "small");
+    // onto itself, from a directory, from nothing
+    let s = path.separator;
+    assertTrue(kindOf(() => { let _ = try fs.copy(path.join(t, "small.txt"), f"{t}{s}.{s}small.txt"); }) == IoErrorKind.InvalidInput);
+    assertEq(try fs.readText(path.join(t, "small.txt")), "small");
+    assertTrue(kindOf(() => { let _ = try fs.copy(t, path.join(t, "d")); }) == IoErrorKind.IsDirectory);
+    assertFalse(fs.exists(path.join(t, "d")));
+    assertTrue(kindOf(() => { let _ = try fs.copy(path.join(t, "none"), path.join(t, "e")); }) == IoErrorKind.NotFound);
+    try fs.removeAll(t);
+}
+
+@Test
+fn removeAllTakesAllThatIsThere(): void throws IoError {
+    let t = try fs.tempDir();
+    try fs.createDirAll(path.join(t, "x", "y", "z"));
+    for (k in 0..20) {
+        try fs.writeText(path.join(t, "x", "y", f"{k}.txt"), "k");
+    }
+    try fs.writeText(path.join(t, "x", "top.txt"), "t");
+    try fs.removeAll(path.join(t, "x"));
+    assertFalse(fs.exists(path.join(t, "x")));
+    // nothing there is nothing to do; a file is a file
+    try fs.removeAll(path.join(t, "x"));
+    try fs.writeText(path.join(t, "lone.txt"), "");
+    try fs.removeAll(path.join(t, "lone.txt"));
+    assertFalse(fs.exists(path.join(t, "lone.txt")));
+    try fs.removeAll(t);
+    assertFalse(fs.exists(t));
+}
+
+/// The plan's check for M8b S7: a tree made, walked and removed — on every platform the std tests
+/// run on.
+@Test
+fn aTreeIsMadeWalkedAndRemoved(): void throws IoError {
+    let t = try fs.tempDir();
+    let root = path.join(t, "tree");
+    for (k in 0..3) {
+        for (j in 0..2) {
+            try fs.createDirAll(path.join(root, f"d{k}", f"e{j}"));
+            try fs.writeText(path.join(root, f"d{k}", f"e{j}", "leaf.txt"), f"{k}{j}");
+        }
+    }
+    var dirs = 0;
+    var files = 0;
+    var bytes = 0;
+    for (e in try fs.walk(root)) {
+        if (e.isDir) {
+            dirs = dirs + 1;
+        } else if (e.isFile) {
+            files = files + 1;
+            bytes = bytes + (try e.metadata()).size;
+        }
+    }
+    assertEq(dirs, 9);
+    assertEq(files, 6);
+    assertEq(bytes, 12);
+    try fs.removeAll(t);
+    assertFalse(fs.exists(t));
+}

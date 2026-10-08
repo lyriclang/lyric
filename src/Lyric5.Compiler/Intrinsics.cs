@@ -70,6 +70,7 @@ public static class Intrinsics
         ["std.fs.fsDirClose"] = "lyr_fs_dir_close",
         ["std.fs.fsCanonical"] = "LYR_FS_CANONICAL",
         ["std.fs.fsAbsolute"] = "LYR_FS_ABSOLUTE",
+        ["std.fs.fsTempRoot"] = "LYR_FS_TEMP_ROOT",
         ["std.task.currentPoller"] = "lyr_task_poller",
         ["std.task.wakePoller"] = "lyr_task_wake",
         ["std.task.spin"] = "lyr_task_spin",
