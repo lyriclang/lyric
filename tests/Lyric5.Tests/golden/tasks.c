@@ -5231,23 +5231,23 @@ bb3:;
     return t9;
 }
 
-#line 10 "stdlib5/std/time.lyr"
+#line 18 "stdlib5/std/time.lyr"
 lyr_ty_std_time_Duration lyr_std_time_Duration_ofNanos(int64_t l0_n) {
     int64_t t0 = 0;
     lyr_ty_std_time_Duration t1_s = {0};
     lyr_ty_std_time_Duration *t1 = &t1_s;
 bb0:;
-#line 10
+#line 18
     t0 = l0_n;
-#line 10
+#line 18
     t1_s = (lyr_ty_std_time_Duration){0}; t1 = &t1_s;
-#line 10
+#line 18
     t1->f_ns = t0;
-#line 10
+#line 18
     return *t1;
 }
 
-#line 12 "stdlib5/std/time.lyr"
+#line 20 "stdlib5/std/time.lyr"
 lyr_ty_std_time_Duration lyr_std_time_Duration_ofMillis(int64_t l0_n) {
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -5255,21 +5255,21 @@ lyr_ty_std_time_Duration lyr_std_time_Duration_ofMillis(int64_t l0_n) {
     lyr_ty_std_time_Duration t3_s = {0};
     lyr_ty_std_time_Duration *t3 = &t3_s;
 bb0:;
-#line 12
+#line 20
     t0 = l0_n;
-#line 12
+#line 20
     t1 = (int64_t)INT64_C(1000000);
-#line 12
+#line 20
     t2 = LYR_CHECKED_MUL(t0, t1);
-#line 12
+#line 20
     t3_s = (lyr_ty_std_time_Duration){0}; t3 = &t3_s;
-#line 12
+#line 20
     t3->f_ns = t2;
-#line 12
+#line 20
     return *t3;
 }
 
-#line 13 "stdlib5/std/time.lyr"
+#line 21 "stdlib5/std/time.lyr"
 lyr_ty_std_time_Duration lyr_std_time_Duration_ofSecs(int64_t l0_n) {
     int64_t t0 = 0;
     int64_t t1 = 0;
@@ -5277,31 +5277,31 @@ lyr_ty_std_time_Duration lyr_std_time_Duration_ofSecs(int64_t l0_n) {
     lyr_ty_std_time_Duration t3_s = {0};
     lyr_ty_std_time_Duration *t3 = &t3_s;
 bb0:;
-#line 13
+#line 21
     t0 = l0_n;
-#line 13
+#line 21
     t1 = (int64_t)INT64_C(1000000000);
-#line 13
+#line 21
     t2 = LYR_CHECKED_MUL(t0, t1);
-#line 13
+#line 21
     t3_s = (lyr_ty_std_time_Duration){0}; t3 = &t3_s;
-#line 13
+#line 21
     t3->f_ns = t2;
-#line 13
+#line 21
     return *t3;
 }
 
-#line 18 "stdlib5/std/time.lyr"
+#line 26 "stdlib5/std/time.lyr"
 int64_t lyr_std_time_Duration_nanos(lyr_ty_std_time_Duration *l0_this) {
     lyr_ty_std_time_Duration t0_s = {0};
     lyr_ty_std_time_Duration *t0 = &t0_s;
     int64_t t1 = 0;
 bb0:;
-#line 18
+#line 26
     t0 = l0_this;
-#line 18
+#line 26
     t1 = t0->f_ns;
-#line 18
+#line 26
     return t1;
 }
 

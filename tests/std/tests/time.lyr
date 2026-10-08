@@ -1,0 +1,106 @@
+// std.time's spans and clocks (design/v5/spec/10 Q1; M8b S5a): Duration's arithmetic, order, Go's
+// text and its parsing; Instant on the wall clock; Monotonic, which only moves forward.
+import std.core { ParseError, ParseErrorKind };
+import std.task { sleep };
+import std.test { assertEq, assertFalse, assertTrue, fail };
+import std.time { Duration, Instant, Monotonic };
+
+fn kindOf(s: string): ParseErrorKind {
+    try {
+        let d = Duration.parse(s);
+        fail(f"'{s}' parsed to {d}");
+    } catch (e: ParseError) {
+        return e.kind;
+    }
+}
+
+@Test
+fn aDurationIsCountedInNanoseconds(): void {
+    assertEq(Duration.ofHours(1).nanos(), 3600000000000);
+    assertEq(Duration.ofMinutes(2).secs(), 120);
+    assertEq(Duration.ofMicros(1500).millis(), 1);
+    assertEq(Duration.ofMillis(-1500).secs(), -1);
+    assertEq(Duration.ofMillis(2500).asSecsFloat(), 2.5);
+    assertEq(Duration.default().nanos(), 0);
+}
+
+@Test
+fn durationsAddScaleAndOrder(): void {
+    assertEq(Duration.ofSecs(1) + Duration.ofMillis(500), Duration.ofMillis(1500));
+    assertEq(Duration.ofSecs(1) - Duration.ofSecs(3), Duration.ofSecs(-2));
+    assertEq(Duration.ofSecs(3) * 4, Duration.ofSecs(12));
+    assertEq(Duration.ofSecs(7) / 2, Duration.ofMillis(3500));
+    assertTrue(Duration.ofSecs(1) < Duration.ofSecs(2));
+    assertTrue(Duration.ofSecs(-1) < Duration.ofNanos(0));
+    assertFalse(Duration.ofMillis(1000) != Duration.ofSecs(1));
+}
+
+@Test
+fn aDurationShowsItselfAsGoDoes(): void {
+    assertEq(f"{Duration.ofNanos(0)}", "0s");
+    assertEq(f"{Duration.ofNanos(7)}", "7ns");
+    assertEq(f"{Duration.ofNanos(1500)}", "1.5µs");
+    assertEq(f"{Duration.ofMicros(250)}", "250µs");
+    assertEq(f"{Duration.ofMillis(1)}", "1ms");
+    assertEq(f"{Duration.ofNanos(1234567)}", "1.234567ms");
+    assertEq(f"{Duration.ofMillis(1500)}", "1.5s");
+    assertEq(f"{Duration.ofSecs(90)}", "1m30s");
+    assertEq(f"{Duration.ofSecs(3600)}", "1h0m0s");
+    assertEq(f"{Duration.ofHours(26) + Duration.ofMinutes(3) + Duration.ofMillis(500)}", "26h3m0.5s");
+    assertEq(f"{Duration.ofMillis(-1500)}", "-1.5s");
+    assertEq(f"{Duration.ofNanos(-9223372036854775807 - 1)}", "-2562047h47m16.854775808s");
+}
+
+@Test
+fn aDurationParsesAsGoParsesIt(): void throws ParseError {
+    assertEq(try Duration.parse("1h30m"), Duration.ofMinutes(90));
+    assertEq(try Duration.parse("1.5h"), Duration.ofMinutes(90));
+    assertEq(try Duration.parse("300ms"), Duration.ofMillis(300));
+    assertEq(try Duration.parse("-2m3s"), Duration.ofSecs(-123));
+    assertEq(try Duration.parse("+5us"), Duration.ofMicros(5));
+    assertEq(try Duration.parse("1µs"), Duration.ofMicros(1));
+    assertEq(try Duration.parse("1μs"), Duration.ofMicros(1));
+    assertEq(try Duration.parse(".5s"), Duration.ofMillis(500));
+    assertEq(try Duration.parse("0"), Duration.ofNanos(0));
+    assertEq(try Duration.parse("-0"), Duration.ofNanos(0));
+    assertEq(try Duration.parse("1h1m1s1ms1us1ns"), Duration.ofNanos(3661001001001));
+    // what it shows, it reads back
+    for (d in [Duration.ofNanos(1500), Duration.ofMillis(-1500), Duration.ofSecs(3600), Duration.ofNanos(93784005006007)]) {
+        assertEq(try Duration.parse(f"{d}"), d);
+    }
+}
+
+@Test
+fn whatIsNoDurationIsSaidWhy(): void {
+    assertTrue(kindOf("") == .Empty);
+    assertTrue(kindOf("1") == .Invalid);
+    assertTrue(kindOf("1x") == .Invalid);
+    assertTrue(kindOf("h") == .Invalid);
+    assertTrue(kindOf("1.") == .Invalid);
+    assertTrue(kindOf("-") == .Invalid);
+    assertTrue(kindOf("1h 30m") == .Invalid);
+    assertTrue(kindOf("9999999999h") == .Overflow);
+    assertTrue(kindOf("9223372036854775808ns") == .Overflow);
+}
+
+@Test
+fn anInstantIsAMomentOnTheWallClock(): void {
+    let now = Instant.now();
+    // 2025-01-01T00:00:00Z
+    assertTrue(now.epochSecs() > 1735689600);
+    assertEq(now.epochMillis() / 1000, now.epochSecs());
+    let later = now + Duration.ofMillis(1500);
+    assertEq(later.since(now), Duration.ofMillis(1500));
+    assertEq(now.since(later), Duration.ofMillis(-1500));
+    assertTrue(now < later);
+    assertTrue(later == now + Duration.ofSecs(1) + Duration.ofMillis(500));
+}
+
+@Test
+fn theMonotonicClockMovesForward(): void throws Error {
+    let start = Monotonic.now();
+    try sleep(Duration.ofMillis(10));
+    let first = start.elapsed();
+    assertTrue(first >= Duration.ofMillis(10));
+    assertTrue(start.elapsed() >= first);
+}

@@ -576,6 +576,10 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   over the thread's own generator, kept with its scheduler in `std.task`. Q2's `random.int` and
   `random.float` are names 07 K5 gives no declaration; the free forms carry `Random`'s names.
   Spec 12 "Random numbers", six cases. **S4 is done.**
+- **S5a** clocks and spans (10 Q1, first half): the runtime's wall clock (`lyr_clock_realtime_ns`:
+  `CLOCK_REALTIME`, `GetSystemTimePreciseAsFileTime`); `Duration` complete — arithmetic, order,
+  hash, default, Go's text and Go's `ParseDuration`; `Instant` (`now`, `epochSecs`/`epochMillis`,
+  `+ Duration`, `since`) and `Monotonic` (`now`, `elapsed`). Spec 12 "Time", five cases.
 
 ### M8a — done (2026-10-07)
 
