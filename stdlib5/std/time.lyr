@@ -1,10 +1,18 @@
-/// Time (design/v5/spec/10 Q1). M6 seed: `Duration`, which `std.task`'s `sleep` takes; `Instant`,
-/// `Monotonic`, the calendar and the formats come with M8b S5, the time zones with M10.
+/// Time (design/v5/spec/10 Q1): `Duration`, a span; `Instant`, a moment on the wall clock in UTC;
+/// `Monotonic`, a moment on the clock that only moves forward, for what takes how long. M8b S5a;
+/// the calendar and RFC 3339 come with S5b, the time zones' database and the format patterns with
+/// M10. `sleep` and the timers are `std.task`'s (K3).
+///
+/// The clocks are the runtime's (lyr/time.h), reached through C — `std.task` imports this module,
+/// so the way back to its own reading of the monotonic clock would close a cycle.
+import std.core { Add, Div, Mul, Parse, ParseError, Sub, viewBytes };
 
+extern "C" fn lyr_clock_realtime_ns(): int;
+extern "C" fn lyr_clock_monotonic_ns(): int;
 
-/// A span of time in whole nanoseconds, negative or not (10 Q1, N3). A constructor whose span does
-/// not fit — some 292 years either way — panics with an overflow (RT0002).
-pub struct Duration {
+/// A span of time in whole nanoseconds, negative or not (10 Q1, N3): some 292 years either way.
+/// Arithmetic that leaves that range panics with an overflow (RT0002), as `int`'s does.
+pub struct Duration :: [Equatable, Ordered, TotalOrder, Hashable, Default, Display, Parse, Add, Sub, Mul<int>, Div<int>] {
     ns: int,
 
     pub static fn ofNanos(n: int): Duration { return Duration { ns = n }; }
@@ -22,4 +30,231 @@ pub struct Duration {
 
     /// The span in whole seconds, rounded toward zero.
     pub fn secs(): int { return this.ns / 1000000000; }
+
+    /// The span in seconds, with their fraction.
+    pub fn asSecsFloat(): float { return (this.ns as float) / 1000000000.0; }
+
+    pub fn add(rhs: Duration): Duration { return Duration { ns = this.ns + rhs.ns }; }
+    pub fn sub(rhs: Duration): Duration { return Duration { ns = this.ns - rhs.ns }; }
+    pub fn mul(rhs: int): Duration { return Duration { ns = this.ns * rhs }; }
+    /// Rounded toward zero; by zero it panics (RT0001).
+    pub fn div(rhs: int): Duration { return Duration { ns = this.ns / rhs }; }
+
+    /// Go's form of a duration: `0s`; under a second one unit — `ns`, `µs`, `ms` — with the
+    /// fraction, its trailing zeros dropped (`1.5µs`, `500ms`); from a second on hours, minutes and
+    /// seconds with their fraction, the larger ones from the first that is not zero (`1.5s`,
+    /// `1m30s`, `1h0m0s`); a minus in front of a negative one.
+    pub fn show(): string {
+        if (this.ns == 0) {
+            return "0s";
+        }
+        let zero: uint = 0;
+        let u = if (this.ns < 0) zero -% (this.ns as uint) else this.ns as uint;
+        var text = "";
+        if (u < 1000000000) {
+            let unit = if (u < 1000) "ns" else if (u < 1000000) "µs" else "ms";
+            let precision = if (u < 1000) 0 else if (u < 1000000) 3 else 6;
+            let (whole, fraction) = splitFraction(u, precision);
+            text = f"{whole}{fraction}{unit}";
+        } else {
+            let (secs, fraction) = splitFraction(u, 9);
+            let minutes = secs / 60;
+            let hours = minutes / 60;
+            text = if (hours > 0) f"{hours}h{minutes % 60}m{secs % 60}{fraction}s"
+                else if (minutes > 0) f"{minutes}m{secs % 60}{fraction}s"
+                else f"{secs}{fraction}s";
+        }
+        return if (this.ns < 0) "-" + text else text;
+    }
+
+    /// Go's `ParseDuration`: an optional sign, then one or more numbers each with its unit — `ns`,
+    /// `us` (or `µs`, `μs`), `ms`, `s`, `m`, `h` —, a number with a fraction allowed: `1h30m`,
+    /// `1.5h`, `-300ms`. `0` alone is zero. A fraction is taken as Go takes it, through a float:
+    /// the nanoseconds of `1.5h` are exact, those of a long fraction of an hour Go's.
+    pub static fn parse(s: StringView): Duration throws ParseError {
+        let b = viewBytes(s);
+        let n = b.length();
+        if (n == 0) {
+            throw ParseError { kind = .Empty };
+        }
+        var i = 0;
+        var negative = false;
+        if (b[0] == 45u8 || b[0] == 43u8) {
+            negative = b[0] == 45u8;
+            i = 1;
+        }
+        if (n - i == 1 && b[i] == 48u8) {
+            return Duration { ns = 0 };
+        }
+        if (i == n) {
+            throw ParseError { kind = .Invalid };
+        }
+        let limit: uint = 9223372036854775808;
+        var total: uint = 0;
+        while (i < n) {
+            // the number: digits, then a fraction
+            let start = i;
+            var whole: uint = 0;
+            while (i < n && isDigit(b[i])) {
+                if (whole > (limit - 1) / 10) {
+                    throw ParseError { kind = .Overflow };
+                }
+                whole = whole * 10 + ((b[i] - 48u8) as uint);
+                i = i + 1;
+            }
+            let digitsBefore = i > start;
+            var fraction: uint = 0;
+            var scale = 1.0;
+            var digitsAfter = false;
+            if (i < n && b[i] == 46u8) {
+                i = i + 1;
+                let fractionStart = i;
+                var full = false;
+                while (i < n && isDigit(b[i])) {
+                    // digits past what 63 bits hold add nothing a nanosecond sees
+                    if (!full && fraction <= (limit - 1) / 10) {
+                        fraction = fraction * 10 + ((b[i] - 48u8) as uint);
+                        scale = scale * 10.0;
+                    } else {
+                        full = true;
+                    }
+                    i = i + 1;
+                }
+                digitsAfter = i > fractionStart;
+            }
+            if (!digitsBefore && !digitsAfter) {
+                throw ParseError { kind = .Invalid };
+            }
+            // the unit: everything up to the next number; a unit is ASCII or a micro sign, so the
+            // slice ends between characters
+            let unitStart = i;
+            while (i < n && !isDigit(b[i]) && b[i] != 46u8) {
+                i = i + 1;
+            }
+            let unit = unitNanos(try! string.fromUtf8(b[unitStart..i]));
+            if (unit == 0) {
+                throw ParseError { kind = .Invalid };
+            }
+            if (whole > limit / unit) {
+                throw ParseError { kind = .Overflow };
+            }
+            var value = whole * unit;
+            if (fraction > 0) {
+                value = value + (((fraction as float) * ((unit as float) / scale)) as uint);
+                if (value > limit) {
+                    throw ParseError { kind = .Overflow };
+                }
+            }
+            total = total + value;
+            if (total > limit) {
+                throw ParseError { kind = .Overflow };
+            }
+        }
+        if (negative) {
+            let zero: uint = 0;
+            return Duration { ns = (zero -% total) as int };
+        }
+        if (total > limit - 1) {
+            throw ParseError { kind = .Overflow };
+        }
+        return Duration { ns = total as int };
+    }
+}
+
+fn isDigit(c: uint8): bool {
+    return c >= 48u8 && c <= 57u8;
+}
+
+/// `v` over 10^`precision`: the whole part, and the fraction as `.ddd` without its trailing zeros
+/// (nothing where it is zero).
+fn splitFraction(v: uint, precision: int): (uint, string) {
+    var scale: uint = 1;
+    var k = 0;
+    while (k < precision) {
+        scale = scale * 10;
+        k = k + 1;
+    }
+    let whole = v / scale;
+    var rest = v % scale;
+    if (rest == 0) {
+        return (whole, "");
+    }
+    var digits = precision;
+    while (rest % 10 == 0) {
+        rest = rest / 10;
+        digits = digits - 1;
+    }
+    var text = f"{rest}";
+    while (text.length() < digits) {
+        text = "0" + text;
+    }
+    return (whole, "." + text);
+}
+
+/// The nanoseconds of a unit's name, or 0 for no unit.
+fn unitNanos(name: string): uint {
+    return match (name) {
+        "ns" => 1,
+        "us" => 1000,
+        "µs" => 1000,
+        "μs" => 1000,
+        "ms" => 1000000,
+        "s" => 1000000000,
+        "m" => 60000000000,
+        "h" => 3600000000000,
+        _ => 0,
+    };
+}
+
+/// A moment on the wall clock, in nanoseconds since 1970-01-01T00:00:00Z — POSIX time, no leap
+/// seconds counted (10 Q1). Two compare and order as the moments they are.
+pub struct Instant :: [Equatable, Ordered, TotalOrder, Hashable, Add<Duration>] {
+    ns: int,
+
+    /// Now, on the system's wall clock — which the system may set back: for how long something
+    /// took, `Monotonic` measures.
+    pub static fn now(): Instant {
+        return Instant { ns = lyr_clock_realtime_ns() };
+    }
+
+    /// The whole seconds since the epoch, rounded down (a moment before 1970 gives a negative
+    /// count).
+    pub fn epochSecs(): int {
+        return floorDiv(this.ns, 1000000000);
+    }
+
+    /// The whole milliseconds since the epoch, rounded down.
+    pub fn epochMillis(): int {
+        return floorDiv(this.ns, 1000000);
+    }
+
+    /// The moment `d` later — earlier for a negative `d`.
+    pub fn add(d: Duration): Instant {
+        return Instant { ns = this.ns + d.nanos() };
+    }
+
+    /// How long after `earlier` this is — negative where it is before.
+    pub fn since(earlier: Instant): Duration {
+        return Duration.ofNanos(this.ns - earlier.ns);
+    }
+}
+
+fn floorDiv(a: int, b: int): int {
+    let q = a / b;
+    return if (a % b < 0) q - 1 else q;
+}
+
+/// A moment on the clock that only moves forward (10 Q1): for how long something takes, never for
+/// the time of day.
+pub struct Monotonic {
+    ns: int,
+
+    pub static fn now(): Monotonic {
+        return Monotonic { ns = lyr_clock_monotonic_ns() };
+    }
+
+    /// How long ago this was taken.
+    pub fn elapsed(): Duration {
+        return Duration.ofNanos(lyr_clock_monotonic_ns() - this.ns);
+    }
 }
