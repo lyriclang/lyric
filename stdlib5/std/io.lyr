@@ -2,9 +2,10 @@
 /// core — one error type, the three interfaces and their defaults, `copy`, and two streams over
 /// memory. S3: the buffers and the text. S6: the I/O pool, which std.fs's calls run on. S8a: the
 /// console's output — `print`, `println`, `eprint`, `eprintln`, `flush`; S8b: `stdin()` and the
-/// console's streams as a `Reader` and `Writer`s.
-import std.core { Utf8Error, viewBytes };
-import std.task { SpinLock, schedulerRuns };
+/// console's streams as a `Reader` and `Writer`s. S10a: a reader's and a writer's call may be
+/// cancelled (10 Review 2026-10-08).
+import std.core { Join, Utf8Error, viewBytes };
+import std.task { Cancelled, SpinLock, schedulerRuns };
 import std.thread { Pool };
 
 // ---------------------------------------------------------------------------------------------
@@ -117,17 +118,32 @@ pub class Stdin :: [Reader] {
 
     /// The next line without its end — a `\n` or a `\r\n` —, or `null` at the end of the input.
     pub mut fn readLine(): ?string throws IoError {
-        return try this.text.readLine();
+        let text = this.text;
+        return try uncancelled(() => try text.readLine());
     }
 
     /// The lines to the end of the input, as `readLine` gives them.
-    pub fn lines(): TextLinesIter<ConsoleReader> {
-        return this.text.lines();
+    pub fn lines(): StdinLinesIter {
+        return StdinLinesIter { input = this };
     }
 
     /// Bytes — what a line's read left in the buffer first.
     pub mut fn read(into: Slice<uint8>): int throws IoError {
-        return try this.text.source.read(into);
+        let source = this.text.source;
+        return try uncancelled(() => try source.read(into));
+    }
+}
+
+/// The standard input's lines (`stdin().lines()`). Its `Error` is `IoError` alone: the console's
+/// read is never cancelled (`uncancelled`), where a `TextReader`'s lines over any reader are told
+/// `Error`.
+pub struct StdinLinesIter :: [Iterator] {
+    type Item = string;
+    type Error = IoError;
+    input: Stdin,
+
+    pub mut fn next(): ?string throws IoError {
+        return try this.input.readLine();
     }
 }
 
@@ -232,6 +248,19 @@ fn onPool(call: fn() -> int): int {
     return call();
 }
 
+/// What a call on a stream that is never cancelled throws: its `IoError`s (10 Review 2026-10-08).
+/// A file's calls and the console's run on the pool above and end in bounded time — no point of
+/// cancellation (10's S6b row) —, so the `Cancelled` that a default or a buffer over them declares,
+/// for any reader it might wrap, cannot come from them. std.fs and `Stdin` keep `throws IoError`
+/// through this.
+fn uncancelled<T>(call: fn() -> T throws [IoError, Cancelled]): T throws IoError {
+    try {
+        return call();
+    } catch (e: Cancelled) {
+        unreachable("a file's or the console's call is no point of cancellation");
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // The error (10 O3).
 // ---------------------------------------------------------------------------------------------
@@ -313,17 +342,31 @@ fn kindText(kind: IoErrorKind): string {
 /// A source of bytes (10 O1). `read` fills the slice it is handed from the front and answers how
 /// many bytes it put there: **0 only at the end**, and at once for an empty slice — fewer than the
 /// slice holds is no end.
+///
+/// **Why a read throws `Cancelled`** (10 Review 2026-10-08): a read from a socket or a pipe waits
+/// for as long as nothing comes — without bound. A cancel must be able to end it, so `withTimeout`
+/// and the end of a task's scope stop a task that waits there, and it ends with the error every
+/// other wait of the language ends with. Not an `IoErrorKind`: a `catch (e: IoError)` would take the
+/// cancel for a failure of the stream, and a loop that reads again after one would never stop. A
+/// reader that never waits without bound — memory, a file, the console, whose calls end in bounded
+/// time (the S6b row) — declares `throws IoError` alone: an implementation throws at most what the
+/// member allows (06 §2). Code over any reader (`R :: [Reader]`) is told both.
 pub interface Reader {
-    mut fn read(into: Slice<uint8>): int throws IoError;
+    mut fn read(into: Slice<uint8>): int throws [IoError, Cancelled];
 }
 
 /// A sink of bytes (10 O1). `write` takes from the front of the slice and answers how many bytes
 /// it took — **maybe fewer** than it was handed; `writeAll` takes the rest. `flush` hands on what a
 /// writer holds back; one that holds nothing back keeps the default, which does nothing.
+///
+/// **Why a write throws `Cancelled`**, as a read does (`Reader`): a write into a socket or a pipe
+/// waits for as long as its reader takes nothing — without bound —, and a cancel must be able to
+/// end that wait with the language's error for it, not with an `IoError` a handler would take for
+/// the stream's. A writer that never waits without bound declares `throws IoError` alone.
 pub interface Writer {
-    mut fn write(from: Slice<uint8>): int throws IoError;
+    mut fn write(from: Slice<uint8>): int throws [IoError, Cancelled];
 
-    mut fn flush(): void throws IoError {
+    mut fn flush(): void throws [IoError, Cancelled] {
     }
 }
 
@@ -340,11 +383,12 @@ pub interface Seek {
     mut fn seek(to: SeekFrom): int throws IoError;
 }
 
-/// What every reader can do with its `read` (10 O1).
+/// What every reader can do with its `read` (10 O1). It throws what any reader's `read` may —
+/// `Cancelled` too, over a reader that never throws it (`Reader`).
 extend<R :: [Reader]> R {
     /// Fills `into` whole, reading as often as it takes. A source that ends before throws
     /// `UnexpectedEof`, the bytes that came in the detail.
-    pub mut fn readExact(into: Slice<uint8>): void throws IoError {
+    pub mut fn readExact(into: Slice<uint8>): void throws [IoError, Cancelled] {
         var at = 0;
         while (at < into.length()) {
             let n = try this.read(into[at..]);
@@ -356,7 +400,7 @@ extend<R :: [Reader]> R {
     }
 
     /// Everything to the end, in one new array.
-    pub mut fn readToEnd(): uint8[] throws IoError {
+    pub mut fn readToEnd(): uint8[] throws [IoError, Cancelled] {
         let held = ByteBuffer.new();
         let chunk: uint8[] = [0u8] * 8192;
         loop {
@@ -370,18 +414,18 @@ extend<R :: [Reader]> R {
 
     /// Everything to the end, as UTF-8 text. Bytes that are no UTF-8 throw `InvalidData`, with the
     /// decoder's error as the cause.
-    pub mut fn readToString(): string throws IoError {
+    pub mut fn readToString(): string throws [IoError, Cancelled] {
         let bytes = try this.readToEnd();
         return try string.fromUtf8(bytes[..]) catch (e: Utf8Error)
             throw IoError { kind = .InvalidData, detail = "the bytes are no UTF-8", inner = e };
     }
 }
 
-/// What every writer can do with its `write` (10 O1).
+/// What every writer can do with its `write` (10 O1), throwing what any writer's `write` may.
 extend<W :: [Writer]> W {
     /// All of `from`, writing as often as it takes. A writer that takes no byte of a slice that has
     /// some would be asked forever; it throws `Other { code = 0 }` instead.
-    pub mut fn writeAll(from: Slice<uint8>): void throws IoError {
+    pub mut fn writeAll(from: Slice<uint8>): void throws [IoError, Cancelled] {
         var at = 0;
         while (at < from.length()) {
             let n = try this.write(from[at..]);
@@ -393,7 +437,7 @@ extend<W :: [Writer]> W {
     }
 
     /// The bytes of `s`, all of them (its UTF-8).
-    pub mut fn writeString(s: StringView): void throws IoError {
+    pub mut fn writeString(s: StringView): void throws [IoError, Cancelled] {
         try this.writeAll(viewBytes(s));
     }
 }
@@ -402,7 +446,7 @@ extend<W :: [Writer]> W {
 /// (10 O1, B2). The two are read and written as the values handed in — the handles and the
 /// streams here are classes, so that is the object itself; a reader that is a struct is read
 /// through a copy, and its position does not move for the caller.
-pub fn copy<R :: [Reader], W :: [Writer]>(r: R, w: W): int throws IoError {
+pub fn copy<R :: [Reader], W :: [Writer]>(r: R, w: W): int throws [IoError, Cancelled] {
     var from = r;
     var into = w;
     let chunk: uint8[] = [0u8] * 8192;
@@ -418,8 +462,8 @@ pub fn copy<R :: [Reader], W :: [Writer]>(r: R, w: W): int throws IoError {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The streams over memory (10 O2). They say `throws IoError` as every reader and writer does, and
-// throw nothing.
+// The streams over memory (10 O2). They say `throws IoError` and throw nothing; never waiting,
+// they leave `Cancelled` out (Review 2026-10-08).
 // ---------------------------------------------------------------------------------------------
 
 /// A `Reader` over bytes in memory (10 O2): it reads them from the front, and `seek` moves it. A
@@ -530,7 +574,7 @@ let bufferSize = 8192;
 
 /// A `Reader` with a buffer of its own (10 O2): it reads its inner reader 8 KiB at a time, so that
 /// small reads do not each reach it. A read at least as large as the buffer, while the buffer is
-/// empty, goes to the inner reader directly.
+/// empty, goes to the inner reader directly. It throws what its inner reader may (`Reader`).
 pub class BufReader<R :: [Reader]> :: [Reader] {
     var inner: R,
     held: uint8[],
@@ -541,7 +585,7 @@ pub class BufReader<R :: [Reader]> :: [Reader] {
         return BufReader { inner = inner, held = [0u8] * bufferSize };
     }
 
-    pub mut fn read(into: Slice<uint8>): int throws IoError {
+    pub mut fn read(into: Slice<uint8>): int throws [IoError, Cancelled] {
         if (into.isEmpty()) {
             return 0;
         }
@@ -562,7 +606,7 @@ pub class BufReader<R :: [Reader]> :: [Reader] {
 
     /// One read of the inner reader into the room after what is held, which moves to the front
     /// first; answers how many bytes came — 0 at the end.
-    mut fn more(): int throws IoError {
+    mut fn more(): int throws [IoError, Cancelled] {
         if (this.start > 0) {
             this.held[this.start..this.end].copyInto(this.held[..]);
             this.end = this.end - this.start;
@@ -575,7 +619,7 @@ pub class BufReader<R :: [Reader]> :: [Reader] {
 
     /// Whether `n` bytes are held — a few, for a codepoint or a BOM —, reading for them while the
     /// inner reader has some.
-    mut fn hold(n: int): bool throws IoError {
+    mut fn hold(n: int): bool throws [IoError, Cancelled] {
         while (this.end - this.start < n) {
             if (try this.more() == 0) {
                 return false;
@@ -589,7 +633,8 @@ pub class BufReader<R :: [Reader]> :: [Reader] {
 /// together, a `flush()` or a `close()`. A write at least as large as the buffer goes to the inner
 /// writer directly. It is `Closeable`, and one nothing closes is warned about (R3): its last bytes
 /// would stay in the buffer. Closing flushes and leaves the inner writer open — it is the caller's
-/// (`using let f = …; using let w = BufWriter.new(f);` closes `w` first).
+/// (`using let f = …; using let w = BufWriter.new(f);` closes `w` first). It throws what its inner
+/// writer may (`Writer`).
 pub class BufWriter<W :: [Writer]> :: [Writer, Closeable] {
     var inner: W,
     held: uint8[],
@@ -600,7 +645,7 @@ pub class BufWriter<W :: [Writer]> :: [Writer, Closeable] {
         return BufWriter { inner = inner, held = [0u8] * bufferSize };
     }
 
-    pub mut fn write(from: Slice<uint8>): int throws IoError {
+    pub mut fn write(from: Slice<uint8>): int throws [IoError, Cancelled] {
         if (this.used + from.length() > this.held.length()) {
             try this.handOn();
         }
@@ -613,20 +658,20 @@ pub class BufWriter<W :: [Writer]> :: [Writer, Closeable] {
     }
 
     /// Writes what is held, then flushes the inner writer.
-    pub mut fn flush(): void throws IoError {
+    pub mut fn flush(): void throws [IoError, Cancelled] {
         try this.handOn();
         try this.inner.flush();
     }
 
     /// `flush()`.
-    pub fn close(): void throws IoError {
+    pub fn close(): void throws [IoError, Cancelled] {
         // through the reference: 'Closeable.close' is no 'mut fn' (as Pool's close)
         let me = this;
         try me.flush();
     }
 
     /// Writes what is held. A write that throws leaves what it did not take held, for the next.
-    mut fn handOn(): void throws IoError {
+    mut fn handOn(): void throws [IoError, Cancelled] {
         while (this.sent < this.used) {
             let n = try this.inner.write(this.held[this.sent..this.used]);
             if (n == 0) {
@@ -642,7 +687,8 @@ pub class BufWriter<W :: [Writer]> :: [Writer, Closeable] {
 /// A reader of UTF-8 text (10 O2): a `BufReader` and a decoder. A codepoint split between two reads
 /// of the inner reader waits in the buffer for its rest; bytes that are no UTF-8 throw
 /// `InvalidData`, a `Utf8Error` as the cause with the offset counted from the reader's start. A
-/// byte order mark is text like any other, unless `skipBom` drops it from the front.
+/// byte order mark is text like any other, unless `skipBom` drops it from the front. It throws what
+/// its inner reader may (`Reader`).
 pub class TextReader<R :: [Reader]> {
     source: BufReader<R>,
     var bom: bool,
@@ -654,7 +700,7 @@ pub class TextReader<R :: [Reader]> {
 
     /// The next line without its end — a `\n` or a `\r\n` —, or `null` at the end. A last line
     /// without an end is a line; the end of the last one starts none.
-    pub mut fn readLine(): ?string throws IoError {
+    pub mut fn readLine(): ?string throws [IoError, Cancelled] {
         try this.dropBom();
         let s = this.source;
         var line: ?ByteBuffer = null;
@@ -692,14 +738,14 @@ pub class TextReader<R :: [Reader]> {
     }
 
     /// Everything to the end, as text.
-    pub mut fn readToEnd(): string throws IoError {
+    pub mut fn readToEnd(): string throws [IoError, Cancelled] {
         try this.dropBom();
         let bytes = try this.source.readToEnd();
         return try this.text(bytes[..], 0);
     }
 
     /// The next codepoint, or `null` at the end.
-    mut fn readChar(): ?char throws IoError {
+    mut fn readChar(): ?char throws [IoError, Cancelled] {
         try this.dropBom();
         let s = this.source;
         if (!(try s.hold(1))) {
@@ -744,7 +790,7 @@ pub class TextReader<R :: [Reader]> {
     }
 
     /// Drops a byte order mark from the front, once, where `skipBom` asked for it.
-    mut fn dropBom(): void throws IoError {
+    mut fn dropBom(): void throws [IoError, Cancelled] {
         if (!this.bom) {
             return;
         }
@@ -764,24 +810,25 @@ fn invalidAt(offset: int): IoError {
     return IoError { kind = .InvalidData, detail = "the bytes are no UTF-8", inner = Utf8Error { offset = offset } };
 }
 
-/// A `TextReader`'s lines (10 O2).
+/// A `TextReader`'s lines (10 O2). An iterator's `Error` is one type, so the two a reader may throw
+/// are joined (10 I5), which an instance reads as `Error`: a loop over them is told `Error`.
 pub struct TextLinesIter<R :: [Reader]> :: [Iterator] {
     type Item = string;
-    type Error = IoError;
+    type Error = Join<IoError, Cancelled>;
     reader: TextReader<R>,
 
-    pub mut fn next(): ?string throws IoError {
+    pub mut fn next(): ?string throws Join<IoError, Cancelled> {
         return try this.reader.readLine();
     }
 }
 
-/// A `TextReader`'s characters (10 O2).
+/// A `TextReader`'s characters (10 O2), their `Error` joined as the lines' is.
 pub struct TextCharsIter<R :: [Reader]> :: [Iterator] {
     type Item = char;
-    type Error = IoError;
+    type Error = Join<IoError, Cancelled>;
     reader: TextReader<R>,
 
-    pub mut fn next(): ?char throws IoError {
+    pub mut fn next(): ?char throws Join<IoError, Cancelled> {
         return try this.reader.readChar();
     }
 }
@@ -796,12 +843,12 @@ pub class TextWriter<W :: [Writer]> {
         return TextWriter { inner = inner };
     }
 
-    pub mut fn write(s: StringView): void throws IoError {
+    pub mut fn write(s: StringView): void throws [IoError, Cancelled] {
         try this.inner.writeString(s);
     }
 
     /// `s`, then a `\n` — on every system.
-    pub mut fn writeLine(s: StringView): void throws IoError {
+    pub mut fn writeLine(s: StringView): void throws [IoError, Cancelled] {
         try this.inner.writeString(s);
         try this.inner.writeString("\n");
     }

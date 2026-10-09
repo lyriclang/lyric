@@ -3,6 +3,7 @@
 // flush or its close, a BufReader reading its inner reader in blocks.
 import std.io { BufReader, BufWriter, ByteBuffer, ByteReader, IoError, Reader, TextReader, TextWriter, Writer };
 import std.test { assertEq, assertNull, assertTrue, fail };
+import std.task { Cancelled };
 
 /// Hands out at most one byte a read, and counts the reads.
 class Drip :: [Reader] {
@@ -56,7 +57,7 @@ fn textOf(s: string): TextReader<ByteReader> {
 }
 
 @Test
-fn aCodepointSplitBetweenReadsWaitsForItsRest(): void throws IoError {
+fn aCodepointSplitBetweenReadsWaitsForItsRest(): void throws Error {
     let t = TextReader.new(Drip { bytes = utf8("é€😀\nzwei") });
     var codes: int[] = [];
     for (c in try t.chars()) {
@@ -71,7 +72,7 @@ fn aCodepointSplitBetweenReadsWaitsForItsRest(): void throws IoError {
 }
 
 @Test
-fn aLineOverTheBufferIsOneLine(): void throws IoError {
+fn aLineOverTheBufferIsOneLine(): void throws [IoError, Cancelled] {
     let t = textOf("a" * 8191 + "é\nx");
     let first = try t.readLine() ?? "";
     assertEq(first.length(), 8193);
@@ -80,7 +81,7 @@ fn aLineOverTheBufferIsOneLine(): void throws IoError {
 }
 
 @Test
-fn linesEndInLfOrCrLfAndTheLastNeedsNoEnd(): void throws IoError {
+fn linesEndInLfOrCrLfAndTheLastNeedsNoEnd(): void throws Error {
     var seen: string[] = [];
     for (line in try textOf("a\nb\r\n\nc\r").lines()) {
         seen = seen + [line];
@@ -94,7 +95,7 @@ fn linesEndInLfOrCrLfAndTheLastNeedsNoEnd(): void throws IoError {
 }
 
 @Test
-fn aBomIsTextUnlessSkipped(): void throws IoError {
+fn aBomIsTextUnlessSkipped(): void throws [IoError, Cancelled] {
     let withBom: uint8[] = [0xEFu8, 0xBBu8, 0xBFu8, 0x68u8, 0x69u8];
     let kept = try TextReader.new(ByteReader.new(withBom[..])).readToEnd();
     assertEq(kept.length(), 5);
@@ -105,7 +106,7 @@ fn aBomIsTextUnlessSkipped(): void throws IoError {
 }
 
 @Test
-fn invalidUtf8IsInvalidDataAtItsOffset(): void throws IoError {
+fn invalidUtf8IsInvalidDataAtItsOffset(): void throws [IoError, Cancelled] {
     let bad: uint8[] = [0x61u8, 0x0Au8, 0x62u8, 0xFFu8, 0x0Au8, 0x63u8];
     let t = TextReader.new(ByteReader.new(bad[..]));
     assertEq(try t.readLine() ?? "<end>", "a");
@@ -120,7 +121,7 @@ fn invalidUtf8IsInvalidDataAtItsOffset(): void throws IoError {
 }
 
 @Test
-fn charsRefuseWhatFromUtf8Refuses(): void {
+fn charsRefuseWhatFromUtf8Refuses(): void throws Error {
     let cases: uint8[][] = [
         [0xC0u8, 0x80u8],
         [0xEDu8, 0xA0u8, 0x80u8],
@@ -144,7 +145,7 @@ fn charsRefuseWhatFromUtf8Refuses(): void {
 }
 
 @Test
-fn aBufWriterHoldsBackUntilItsClose(): void throws IoError {
+fn aBufWriterHoldsBackUntilItsClose(): void throws [IoError, Cancelled] {
     let into = Sink { };
     let w = BufWriter.new(into);
     for (_ in 0..100) {
@@ -158,7 +159,7 @@ fn aBufWriterHoldsBackUntilItsClose(): void throws IoError {
 }
 
 @Test
-fn aLargeWritePassesTheBuffer(): void throws IoError {
+fn aLargeWritePassesTheBuffer(): void throws [IoError, Cancelled] {
     let into = Sink { };
     using let w = BufWriter.new(into);
     try w.writeString("ab");
@@ -169,7 +170,7 @@ fn aLargeWritePassesTheBuffer(): void throws IoError {
 }
 
 @Test
-fn aFlushThatThrowsLosesNothingAndRepeatsNothing(): void throws IoError {
+fn aFlushThatThrowsLosesNothingAndRepeatsNothing(): void throws [IoError, Cancelled] {
     let into = Sink { most = 3, failAt = 2 };
     using let w = BufWriter.new(into);
     try w.writeString("abcdefgh");
@@ -185,7 +186,7 @@ fn aFlushThatThrowsLosesNothingAndRepeatsNothing(): void throws IoError {
 }
 
 @Test
-fn aBufReaderReadsItsInnerReaderInBlocks(): void throws IoError {
+fn aBufReaderReadsItsInnerReaderInBlocks(): void throws [IoError, Cancelled] {
     let data: uint8[] = [5u8] * 20000;
     let r = BufReader.new(ByteReader.new(data[..]));
     let into: uint8[] = [0u8] * 9000;
@@ -217,7 +218,7 @@ class Counted :: [Reader] {
 }
 
 @Test
-fn aTextWriterWritesTextAndLines(): void throws IoError {
+fn aTextWriterWritesTextAndLines(): void throws [IoError, Cancelled] {
     let into = ByteBuffer.new();
     let t = TextWriter.new(into);
     try t.write("a");
@@ -227,7 +228,7 @@ fn aTextWriterWritesTextAndLines(): void throws IoError {
 }
 
 @Test
-fn aWritersFlushDoesNothingByDefault(): void throws IoError {
+fn aWritersFlushDoesNothingByDefault(): void throws [IoError, Cancelled] {
     let b = ByteBuffer.new();
     try b.writeString("x");
     try b.flush();

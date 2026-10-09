@@ -639,6 +639,12 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   `env`, `envs`, `setEnv`, `cwd`, `setCwd`, `exit` (the console flushed, nothing else run),
   `platform()`/`arch()` (`Platform`, `Arch`), `homeDir`, `tempDir` (which `fs.tempDir` now asks),
   `hostname`, `cpuCount`, `pid`. Spec 12 "The system", six cases.
+- **S10a** a reader's and a writer's call may be cancelled (10 "Review 2026-10-08", 1j): `Reader`,
+  `Writer` throw `[IoError, Cancelled]`, their doc comments say why; the defaults, `copy`, the
+  buffers and the text throw both, a `TextReader`'s lines `Error = Join<IoError, Cancelled>`. What
+  never waits without bound declares `IoError` alone (memory, `File`, the console); `std.fs` and
+  `stdin()` keep `IoError` (`uncancelled`, a `StdinLinesIter`). Spec 12 rules 2–8 of "Input and
+  output", "Files" 5, "The console" 4; four cases.
 - **S13** the build script (11 W3 BS1–BS6): a package's `build.lyr` built as a program of its
   own (`build`, `build/`, its `[build-dependencies]` as a graph of its own in the same lock) and
   run before the compile; `std.build` (`target`, `profile`, `outDir`, `genDir`, `rerunIfChanged`,
