@@ -3,8 +3,8 @@
 /// the names a resolver knows. A call that would block parks the task until the thread's poller
 /// says the socket is ready (06 S2), then asks again; a cancel ends that wait with `Cancelled` (10
 /// Review 2026-10-08), and a close — on any thread — with `Closed`. There are no socket timeouts:
-/// `withTimeout` is the one way (O7). POSIX; on Windows every call throws `Unsupported` until its
-/// poller and Winsock (S11).
+/// `withTimeout` is the one way (O7). POSIX's sockets over epoll or kqueue, Windows' (S11) over
+/// Winsock and an AFD poll request a socket on the thread's completion port.
 import std.collections { List };
 import std.core { Parse, ParseError, StringBuilder, viewBytes };
 import std.io { IoError, Reader, Writer, failure, onPool };

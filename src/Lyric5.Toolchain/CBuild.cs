@@ -248,8 +248,9 @@ public sealed class CBuild
             // LYR_MAIN_TASK_STACK): what main has as a task it has on the thread (M6-26). zig's
             // default for a Windows image is 16 MiB (MSVC's 1 MiB); a POSIX thread's comes from
             // the system's limit, 8 MiB as a rule. shell32 for CommandLineToArgvW: the arguments as
-            // UTF-16 (runtime/src/os.c, M8b S9).
-            TargetOs.Windows => ["-Wl,--gc-sections", "-Wl,--stack," + MainThreadStack, "-lshell32"],
+            // UTF-16 (runtime/src/os.c, M8b S9); ws2_32 for Winsock (runtime/src/net.c, M8b S11).
+            // ntdll's AFD calls are looked up at run time (runtime/src/poll.c), as wepoll does.
+            TargetOs.Windows => ["-Wl,--gc-sections", "-Wl,--stack," + MainThreadStack, "-lshell32", "-lws2_32"],
             _ => ["-Wl,--gc-sections", "-lpthread", "-lm"],
         });
         if (Target.Os == TargetOs.MacOs && !debugMap) arguments.Add("-Wl,-S");

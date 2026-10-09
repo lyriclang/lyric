@@ -35,7 +35,7 @@ void lyr_poller_watch(LyrPoller *poller, int fd);
  * again; the other stays as it is. `token` (> 0) is the caller's: a wait that sees the readiness
  * returns 1, as a wake does, and lyr_poller_take gives the token. An error or a hang-up counts as
  * readiness both ways — the next call on the descriptor says what it is. 0, or a failure as
- * lyr/fs.h writes one; Windows answers Unsupported until its poller (S11). Each of these is the
+ * lyr/fs.h writes one; on Windows an AFD poll request (S11). Each of these is the
  * poller's own thread's, as its waits are. */
 #define LYR_POLL_READ 1
 #define LYR_POLL_WRITE 2

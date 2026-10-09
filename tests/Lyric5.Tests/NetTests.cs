@@ -7,8 +7,9 @@ namespace Lyric5.Tests;
 /// The network (design/v5/spec/10 O7; 13 M8b P2, S10b): TCP within one program on 127.0.0.1, every
 /// wait a socket's on the thread's poller — an echo, 100 connections at once on one thread, the
 /// waits a cancel or a close end, a refused connection, both ways of one socket waiting at once,
-/// and a thread too busy to be idle that still sees a socket's readiness. POSIX only: Windows' poller and Winsock come with S11 (P5), and until
-/// then its calls throw Unsupported, which the last test pins. Each run has a deadline (13 M8b's
+/// and a thread too busy to be idle that still sees a socket's readiness; UDP, the resolver, a
+/// close across threads (S10c). On every platform since S11 — Windows' poller over AFD, Winsock —
+/// but the echo server's, whose Interrupt a POSIX kill sends. Each run has a deadline (13 M8b's
 /// tests: a hanging test is a red job).
 /// </summary>
 public class NetTests
@@ -25,21 +26,18 @@ public class NetTests
     [Fact]
     public void A_stream_echoes_within_one_program()
     {
-        if (OperatingSystem.IsWindows()) return;
         Assert.Equal("hello over tcp\n127.0.0.1 true\n", Run("net_echo"));
     }
 
     [Fact]
     public void A_hundred_connections_wait_on_one_thread()
     {
-        if (OperatingSystem.IsWindows()) return;
         Assert.Equal("100 echoed, 4950 summed\n", Run("net_many"));
     }
 
     [Fact]
     public void A_cancel_a_close_and_a_refusal_end_a_sockets_wait()
     {
-        if (OperatingSystem.IsWindows()) return;
         Assert.Equal("accept: timed out\nread: timed out\nclosed while accepting: closed (accepted)\nrefused: connection refused\n",
             Run("net_ends"));
     }
@@ -47,7 +45,6 @@ public class NetTests
     [Fact]
     public void Both_ways_of_one_socket_wait_at_once()
     {
-        if (OperatingSystem.IsWindows()) return;
         Assert.Equal("4194304 back, all of them right\n", Run("net_duplex"));
     }
 
@@ -59,35 +56,24 @@ public class NetTests
     [Fact]
     public void One_way_firing_leaves_the_other_ways_wait_armed()
     {
-        if (OperatingSystem.IsWindows()) return;
         Assert.Equal("1 byte read, then 33554432 written\n", Run("net_one_way"));
     }
 
     [Fact]
     public void A_busy_thread_still_sees_a_sockets_readiness()
     {
-        if (OperatingSystem.IsWindows()) return;
         Assert.Equal("read while busy\n", Run("net_busy"));
-    }
-
-    [Fact]
-    public void Windows_throws_unsupported_until_its_poller()
-    {
-        if (!OperatingSystem.IsWindows()) return;
-        Assert.Equal("unsupported: 127.0.0.1:0 (bound)\n", Run("net_unsupported"));
     }
 
     [Fact]
     public void A_datagram_goes_there_and_back_and_a_receive_ends_at_a_cancel()
     {
-        if (OperatingSystem.IsWindows()) return;
         Assert.Equal("ping from the client's port\npong from the server's port\nreceive: timed out\n", Run("net_udp"));
     }
 
     [Fact]
     public void The_resolver_knows_localhost_and_an_addresss_own_text()
     {
-        if (OperatingSystem.IsWindows()) return;
         Assert.Equal("localhost: a loopback\n127.0.0.1: [127.0.0.1]\n", Run("net_resolve"));
     }
 
@@ -96,14 +82,14 @@ public class NetTests
     [Fact]
     public void A_close_on_one_thread_ends_a_wait_on_another()
     {
-        if (OperatingSystem.IsWindows()) return;
         Assert.Equal("closed (read)\n", Run("net_threads"));
     }
 
     /// <summary>
     /// The echo server, M8b S10's artifact: three clients of the test's own — .NET's sockets —
     /// each get their lines back; one of them stays connected and idle while Interrupt comes, and
-    /// the server cancels its task, waits for it, and ends with 0.
+    /// the server cancels its task, waits for it, and ends with 0. POSIX: a console control event
+    /// reaches no child without a console of its own (as SignalTests).
     /// </summary>
     [Fact]
     public void The_echo_server_echoes_until_interrupted()
