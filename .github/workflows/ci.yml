@@ -245,13 +245,19 @@ jobs:
     # repositories a race: a spec merge that came before its compiler turned this main red
     # (2026-10-03, 777 of 778 cases), and a gate that started a moment before a spec merge checked
     # a compiler against cases it was never meant to meet.
-    name: Conformance gate
+    name: Conformance gate (${{ matrix.profile }})
     runs-on: ubuntu-latest
-    # Both profiles, one after the other: 28.7 minutes for 1012 cases (S12d), and 30 cancelled the
-    # run of 1014 (S13). 1166 cases (M8b S8a) took 27 minutes in a pull request's run and more than
-    # 40 in a dispatched one, beside a dozen other jobs, and 45 cancelled M8b S8b's: 60 until the
-    # suite is split per profile — which renames the job's check, so it waits for the maintainer.
-    timeout-minutes: 60
+    # One job per profile (design 11 "Review 2026-10-09" CI; M8c S19): both profiles one after the
+    # other took 28.7 minutes for 1012 cases (S12d), 27 for 1166 in a pull request's run and more
+    # than 40 in a dispatched one, and 25 for 1184 (M8b S10a) — the timeout went from 30 to 60
+    # with the suite. Apart, each job is one profile's half and the two may run side by side.
+    # The check is named per profile; main requires no check by name (no branch rule), so only
+    # the scripts that read the gate's result follow the name.
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [debug, release]
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -290,11 +296,9 @@ jobs:
       - name: Build the compiler
         run: dotnet build src/Lyric5/Lyric5.csproj --configuration Release
 
-      - name: Run the suite against the working tree, both profiles
+      - name: Run the suite against the working tree, ${{ matrix.profile }}
         run: |
           lyric5="$PWD/src/Lyric5/bin/Release/net10.0/lyric5"
           version=$("$lyric5" --version | head -1 | awk '{print $2}' | cut -d+ -f1)
           echo "working tree claims $version"
-          for profile in debug release; do
-            python3 spec-repo/tools/run_conformance.py --lyric5 "$lyric5" --profile "$profile" --toolchain-version "$version"
-          done
+          python3 spec-repo/tools/run_conformance.py --lyric5 "$lyric5" --profile "${{ matrix.profile }}" --toolchain-version "$version"
