@@ -1,0 +1,45 @@
+// The echo server (design/v5/spec/13, M8b S10's artifact): std.net's TCP over the poller, a task
+// for each connection in one scope, and Ctrl+C to stop (06 K5, 10 Q9). It listens on 127.0.0.1 at
+// a port the system chooses, says which, and gives each connection back each line it sends. At
+// Interrupt or Terminate it stops accepting, cancels the connections it serves — a cancel ends
+// their reads — and waits for them. Its stdout is a pipe, held a block at a time (10 O9): the line
+// the test waits for is flushed.
+import std.io { TextReader, flush, println };
+import std.net { IpAddr, SocketAddr, TcpListener, TcpStream };
+import std.os { Signal, signals };
+import std.task { Cancelled, TaskScope, spawn };
+
+/// Each line of `conn` back to it, until its end.
+fn serve(conn: TcpStream): void throws Error {
+    for (line in try TextReader.new(conn).lines()) {
+        try conn.writeString(f"{line}\n");
+    }
+    try conn.close();
+}
+
+fn main(): void throws Error {
+    let stop = signals(Signal.Interrupt, Signal.Terminate);
+    let listener = try TcpListener.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 });
+    let at = try listener.localAddr();
+    println(f"listening on {at}");
+    flush();
+    var served = 0;
+    let acceptor = spawn(() => {
+        // a cancel of the acceptor cancels the connections' tasks, and the scope waits for them
+        using let connections = TaskScope.new();
+        loop {
+            let conn = try listener.accept();
+            served += 1;
+            let _ = connections.spawn(() => try serve(conn));
+        }
+    });
+    let _ = try stop.recv();
+    println("stopping");
+    acceptor.cancel();
+    try {
+        acceptor.await();
+    } catch (_: Cancelled) {
+    }
+    try listener.close();
+    println(f"served {served} connections");
+}

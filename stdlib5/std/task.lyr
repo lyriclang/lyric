@@ -1308,6 +1308,64 @@ class SpinLock {
     }
 }
 
+/// The tasks that wait on one socket (13 M8b S10c): a reader and a writer at most, so that its
+/// close ends their waits on whichever thread they wait — Go's `pollDesc`. The guard holds while a
+/// task comes or goes and while the close takes them, so a task that comes after the close turns
+/// back, and one that came before is woken: no wake falls between the two.
+class Waits {
+    guard: SpinLock = SpinLock { },
+    var reading: ?Context = null,
+    var writing: ?Context = null,
+    var closed: bool = false,
+
+    /// `c` waits here, to read (1) or to write (2) — false where the socket was closed first.
+    mut fn enter(c: Context, interest: int): bool {
+        this.guard.acquire();
+        let open = !this.closed;
+        if (open) {
+            if (interest == 1) {
+                this.reading = c;
+            } else {
+                this.writing = c;
+            }
+        }
+        this.guard.release();
+        return open;
+    }
+
+    /// `c` waits here no more.
+    mut fn leave(c: Context, interest: int): void {
+        this.guard.acquire();
+        if (interest == 1) {
+            if (let r = this.reading) {
+                if (same(r, c)) { this.reading = null; }
+            }
+        } else {
+            if (let w = this.writing) {
+                if (same(w, c)) { this.writing = null; }
+            }
+        }
+        this.guard.release();
+    }
+
+    /// The socket closes: no task waits here from now on, and those that do run again.
+    mut fn close(): void {
+        this.guard.acquire();
+        this.closed = true;
+        let r = this.reading;
+        let w = this.writing;
+        this.reading = null;
+        this.writing = null;
+        this.guard.release();
+        if (r == null && w == null) {
+            return;
+        }
+        let s = here();
+        if (let c = r) { s.wakeUp(c); }
+        if (let c = w) { s.wakeUp(c); }
+    }
+}
+
 class Scheduler {
     var first: ?Context = null,
     var last: ?Context = null,
@@ -1429,8 +1487,10 @@ class Scheduler {
     /// (lyr/poll.h; M8b S10b): a socket's call that would block. A cancel ends the wait with
     /// `Cancelled` (06 N9; 10 Review 2026-10-08). 0, or the poller's failure as lyr/fs.h writes
     /// one. The descriptor is armed before the wait begins: its readiness is seen only after the
-    /// task has parked, by this thread's next turn, and a failed arm leaves no wait behind.
-    mut fn awaitReady(fd: int, interest: int): int throws Cancelled {
+    /// task has parked, by this thread's next turn, and a failed arm leaves no wait behind. The
+    /// task is in the socket's `waits` while it waits (S10c), so a close on any thread ends the
+    /// wait; where the close came first, there is none.
+    mut fn awaitReady(fd: int, interest: int, waits: Waits): int throws Cancelled {
         let c = this.running ?? panic("a wait where no task runs");
         if (atomicLoad(&c.cancelled)) { throw Cancelled { }; }
         let token = this.ioEnter(c);
@@ -1440,9 +1500,14 @@ class Scheduler {
             return armed;
         }
         c.beginWait();
+        if (!waits.enter(c, interest)) {
+            // closed before the wait: it ends at once, as a cancel's does
+            this.wakeUp(c);
+        }
         this.wakeIfCancelled(c);
         park();
         c.endWait();
+        waits.leave(c, interest);
         this.ioLeave(token);
         if (atomicLoad(&c.cancelled)) { throw Cancelled { }; }
         return 0;
@@ -1858,9 +1923,10 @@ fn here(): Scheduler {
 }
 
 /// The running task waits until `fd` is ready to read (1) or to write (2) — std.net's sockets
-/// (M8b S10b): 0, or the poller's failure as lyr/fs.h writes one; a cancel throws `Cancelled`.
-fn awaitDescriptor(fd: int, interest: int): int throws Cancelled {
-    return try here().awaitReady(fd, interest);
+/// (M8b S10b), `waits` the socket's (S10c): 0, or the poller's failure as lyr/fs.h writes one; a
+/// cancel throws `Cancelled`, and a close ends the wait as a readiness does.
+fn awaitDescriptor(fd: int, interest: int, waits: Waits): int throws Cancelled {
+    return try here().awaitReady(fd, interest, waits);
 }
 
 /// `fd` out of the running thread's poller, before it is closed: a task of the thread that waits

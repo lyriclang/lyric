@@ -1,0 +1,23 @@
+// The resolver (design/v5/spec/10 O7; 13 M8b S10c): `localhost` names a loopback address, and an
+// address's own text names the address — on the I/O pool, each address once. Expected stdout:
+//   localhost: a loopback
+//   127.0.0.1: [127.0.0.1]
+import std.io { println };
+import std.net { IpAddr, resolve };
+
+fn main(): void throws Error {
+    let named = try resolve("localhost");
+    var loopback = false;
+    for (a in named) {
+        if (a == IpAddr.V4(127, 0, 0, 1) || a == IpAddr.V6(0, 0, 0, 0, 0, 0, 0, 1)) {
+            loopback = true;
+        }
+    }
+    println(f"localhost: {if (loopback) "a loopback" else "none of the loopbacks"}");
+    let literal = try resolve("127.0.0.1");
+    var text = "";
+    for (a in literal) {
+        text = if (text.isEmpty()) a.show() else f"{text}, {a}";
+    }
+    println(f"127.0.0.1: [{text}]");
+}

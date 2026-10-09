@@ -1,0 +1,24 @@
+// A task whose body never returns (M8b S10c: the echo server's acceptor found it): spawn's T is
+// `never`, and launchOn's store of the body's result diverges at that instance — the lowering read
+// the generic `T` and took the call for one that gives a value (an ICE until then). The task is
+// cancelled; its await throws Cancelled, and nothing comes after it in the try.
+import std.io { println };
+import std.task { Cancelled, sleep, spawn };
+import std.time { Duration };
+
+fn main(): void throws Error {
+    var turns = 0;
+    let forever = spawn(() => {
+        loop {
+            try sleep(Duration.ofMillis(5));
+            turns += 1;
+        }
+    });
+    try sleep(Duration.ofMillis(50));
+    forever.cancel();
+    try {
+        forever.await();
+    } catch (_: Cancelled) {
+        println(if (turns >= 3) "cancelled after 3 turns or more" else f"cancelled after {turns}");
+    }
+}

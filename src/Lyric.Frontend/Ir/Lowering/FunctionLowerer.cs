@@ -1191,8 +1191,10 @@ internal sealed class FunctionLowerer
 
     /// <summary>Does this expression have the type 'never' — a 'throw', a call to 'panic' or to a
     /// function declared 'never', an 'if' or 'match' whose every arm diverges? Such an expression
-    /// seals the block when lowered, and the position holding it must not store or branch after it.</summary>
-    private bool Diverges(Expr expr) => _types.TypeOf(expr) is NeverType;
+    /// seals the block when lowered, and the position holding it must not store or branch after it.
+    /// Read at the instance: a generic body's `body()` of type `T` diverges where `T` is `never` —
+    /// `spawn` of a task that never returns (M8b S10c's echo server found it).</summary>
+    private bool Diverges(Expr expr) => _types.TypeOf(expr) is { } type && SubstituteType(type) is NeverType;
 
     /// <summary>Lowers a diverging expression for its effect. After it the block is sealed; a
     /// lowering that did not seal (a never-declared user function, whose call is an ordinary

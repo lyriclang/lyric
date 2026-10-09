@@ -654,6 +654,14 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   `TcpListener`, `TcpStream`, `Shutdown`; a close wakes the waiters of its thread with `Closed`.
   100 connections on one thread. Spec 12 "The network", five cases. S10c: UDP, `resolve`, the echo
   server.
+- **S10c** UDP, the resolver, the echo server (10 O7): `UdpSocket` (`bind`, `sendTo`, `recvFrom`
+  with the sender, `localAddr`); `resolve(host)` through `getaddrinfo` on the I/O pool, each address
+  once; a socket's `Waits` (std.task) holds its reader and writer, so a close on any thread ends
+  their waits (the M8b open point 1t). **The echo server** — S10's artifact — serves each connection
+  in a task of one scope and stops at Ctrl+C. It found a compiler bug: a task whose body never
+  returns (`spawn` with `T = never`) failed in the lowering, which read the generic `T` — fixed
+  (`Diverges` at the instance). Spec 12 "The network" rules 5, 7, 8 and 10's never-returning task,
+  four cases. **S10 is done.**
 - **S13** the build script (11 W3 BS1–BS6): a package's `build.lyr` built as a program of its
   own (`build`, `build/`, its `[build-dependencies]` as a graph of its own in the same lock) and
   run before the compile; `std.build` (`target`, `profile`, `outDir`, `genDir`, `rerunIfChanged`,

@@ -10,6 +10,8 @@
 
 #include <stdint.h>
 
+#include "lyr/types.h"
+
 /* The call would block: wait for the readiness its direction needs, then call again. No kind of
  * IoErrorKind's: std.net sees it before a failure is made. */
 #define LYR_NET_WOULD_BLOCK (-(INT64_C(64) << 32))
@@ -62,11 +64,27 @@ int64_t lyr_net_name(int64_t fd, int64_t peer, uint8_t *into, int64_t n);
 /* The socket closed: 0, or the failure the system's close gave — the socket is gone either way. */
 int64_t lyr_net_close(int64_t fd);
 
+/* A datagram (M8b S10c): at most `n` bytes of `from` sent to the address — how many; and the next
+ * datagram received, at most `n` of its bytes into `into` — how many, the rest of a longer one
+ * lost — with its sender into `sender` as lyr_net_name writes an address. */
+int64_t lyr_net_sendto(int64_t fd, const uint8_t *from, int64_t n, int64_t family, const uint8_t *address, int64_t port);
+int64_t lyr_net_recvfrom(int64_t fd, uint8_t *into, int64_t n, uint8_t *sender, int64_t room);
+
+/* The addresses `host` names (M8b S10c, getaddrinfo — a blocking call, which std.net makes on the
+ * I/O pool): each as LYR_NET_HOST_BYTES — its family, its 16 bytes — into `into`, each once, in the
+ * resolver's order; how many there are, which may be more than fit: then call again with room. A
+ * name nobody knows is NotFound. */
+#define LYR_NET_HOST_BYTES 17
+int64_t lyr_net_resolve(const LyrStr *host, uint8_t *into, int64_t n);
+
 /* A Slice<uint8> of emitted code is a pointer and a length (CEmitter). */
 #define LYR_NET_BIND(fd, family, address, port, reuse) lyr_net_bind((fd), (family), (address).ptr, (port), (reuse))
 #define LYR_NET_CONNECT(fd, family, address, port) lyr_net_connect((fd), (family), (address).ptr, (port))
 #define LYR_NET_RECV(fd, slice) lyr_net_recv((fd), (slice).ptr, (slice).len)
 #define LYR_NET_SEND(fd, slice) lyr_net_send((fd), (slice).ptr, (slice).len)
 #define LYR_NET_NAME(fd, peer, slice) lyr_net_name((fd), (peer), (slice).ptr, (slice).len)
+#define LYR_NET_SENDTO(fd, slice, family, address, port) lyr_net_sendto((fd), (slice).ptr, (slice).len, (family), (address).ptr, (port))
+#define LYR_NET_RECVFROM(fd, slice, sender) lyr_net_recvfrom((fd), (slice).ptr, (slice).len, (sender).ptr, (sender).len)
+#define LYR_NET_RESOLVE(host, slice) lyr_net_resolve((host), (slice).ptr, (slice).len)
 
 #endif
