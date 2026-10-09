@@ -34,6 +34,10 @@ int64_t lyr_process_spawn(const LyrStr *program, const uint8_t *args, int64_t ar
  * as it wakes — so the reaper asks every child it waits for at each wake, and at its start). */
 void lyr_process_attach(void);
 
+/* The reaper woken as a child's end wakes it, to ask its children again: a child registered after
+ * its fork may have ended before, and its end's wake been taken by a look at a list without it. */
+void lyr_process_nudge(void);
+
 /* The child's end, where it has ended: its exit code (0 to 255), or 256 plus the number of the
  * signal that ended it; -1 while it runs. The child is reaped then — asked once more it is gone. */
 int64_t lyr_process_reap(int64_t pid);

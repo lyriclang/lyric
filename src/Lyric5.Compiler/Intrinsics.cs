@@ -100,6 +100,7 @@ public static class Intrinsics
         // Processes (M8b S12, lyr/process.h): a child started, reaped, signalled; its pipes.
         ["std.process.processSpawn"] = "LYR_PROCESS_SPAWN",
         ["std.process.processAttach"] = "lyr_process_attach",
+        ["std.process.processNudge"] = "lyr_process_nudge",
         ["std.process.processReap"] = "lyr_process_reap",
         ["std.process.processSignal"] = "lyr_process_signal",
         ["std.process.processRead"] = "LYR_PROCESS_READ",

@@ -31,6 +31,7 @@ int64_t lyr_process_spawn(const LyrStr *program, const uint8_t *args, int64_t ar
 }
 
 void lyr_process_attach(void) {}
+void lyr_process_nudge(void) {}
 
 int64_t lyr_process_reap(int64_t pid) {
     (void)pid;
@@ -193,6 +194,14 @@ static void watch_children(void) {
     action.sa_handler = on_child;
     action.sa_flags = SA_RESTART | SA_NOCLDSTOP;
     if (sigaction(SIGCHLD, &action, NULL) != 0) lyr_panic(LYR_RT_SYSTEM, "the system refused the children's signal: %s", strerror(errno));
+}
+
+/* A byte into the pipe, as the handler writes one: before the reaper watches it, the byte waits there. */
+void lyr_process_nudge(void) {
+    pthread_once(&child_once, watch_children);
+    char byte = 1;
+    ssize_t written = write(child_pipe[1], &byte, 1);  /* a full pipe wakes the reaper already */
+    (void)written;
 }
 
 void lyr_process_attach(void) {

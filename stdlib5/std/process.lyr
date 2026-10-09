@@ -14,6 +14,7 @@ import std.thread { Thread };
 
 fn processSpawn(program: string, args: Slice<uint8>, argc: int, env: Slice<uint8>, envc: int, cwd: string, modes: int, ends: Slice<int>): int;
 fn processAttach(): void;
+fn processNudge(): void;
 fn processReap(pid: int): int;
 fn processSignal(pid: int, number: int): int;
 fn processRead(fd: int, into: Slice<uint8>): int;
@@ -337,7 +338,10 @@ class Reaper {
     children: List<ChildState>,
     var started: bool = false,
 
-    /// `c` is waited for from now on; the first child starts the reaper's thread.
+    /// `c` is waited for from now on; the first child starts the reaper's thread. A later one
+    /// wakes the reaper: it was forked before it was registered, and if it has ended in between,
+    /// its end's wake may have gone to a look at a list without it — then nothing wakes the
+    /// reaper for it again (the processes test hung so, 5 runs in 120 under load).
     mut fn register(c: ChildState): void {
         this.guard.acquire();
         this.children.push(c);
@@ -348,6 +352,8 @@ class Reaper {
             Thread.spawn(() => {
                 reaper.watch();
             });
+        } else {
+            processNudge();
         }
     }
 
