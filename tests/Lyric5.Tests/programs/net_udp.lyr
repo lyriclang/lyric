@@ -1,0 +1,38 @@
+// UDP within one program (design/v5/spec/10 O7; 13 M8b S10c): a datagram there and one back, each
+// with its sender's address; and a receive nobody sends to, which withTimeout's cancel ends.
+// Expected stdout:
+//   ping from the client's port
+//   pong from the server's port
+//   receive: timed out
+import std.io { println };
+import std.net { IpAddr, SocketAddr, UdpSocket };
+import std.task { TimedOut, withTimeout };
+import std.time { Duration };
+
+fn main(): void throws Error {
+    let local = IpAddr.V4(127, 0, 0, 1);
+    var server = try UdpSocket.bind(SocketAddr { ip = local, port = 0 });
+    var client = try UdpSocket.bind(SocketAddr { ip = local, port = 0 });
+    let serverAt = try server.localAddr();
+    let clientAt = try client.localAddr();
+    let ping: uint8[] = [112u8, 105u8, 110u8, 103u8];
+    let sent = try client.sendTo(ping[..], serverAt);
+    let buf: uint8[] = [0u8] * 16;
+    let (n, from) = try server.recvFrom(buf[..]);
+    println(f"{string.fromUtf8Lossy(buf[..n])} from {if (from == clientAt) "the client's port" else from.show()}");
+    let pong: uint8[] = [112u8, 111u8, 110u8, 103u8];
+    let sentBack = try server.sendTo(pong[..], from);
+    let (m, back) = try client.recvFrom(buf[..]);
+    println(f"{string.fromUtf8Lossy(buf[..m])} from {if (back == serverAt) "the server's port" else back.show()}");
+    if (sent != 4 || sentBack != 4) {
+        println(f"sent {sent} and {sentBack}");
+    }
+    try {
+        let _ = withTimeout(Duration.ofMillis(50), () => try client.recvFrom(buf[..]));
+        println("receive: came");
+    } catch (_: TimedOut) {
+        println("receive: timed out");
+    }
+    try client.close();
+    try server.close();
+}

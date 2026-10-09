@@ -80,9 +80,25 @@ int64_t lyr_net_close(int64_t fd) {
     return 0;
 }
 
+int64_t lyr_net_sendto(int64_t fd, const uint8_t *from, int64_t n, int64_t family, const uint8_t *address, int64_t port) {
+    (void)fd; (void)from; (void)n; (void)family; (void)address; (void)port;
+    return failure(LYR_IO_UNSUPPORTED, 0);
+}
+
+int64_t lyr_net_recvfrom(int64_t fd, uint8_t *into, int64_t n, uint8_t *sender, int64_t room) {
+    (void)fd; (void)into; (void)n; (void)sender; (void)room;
+    return failure(LYR_IO_UNSUPPORTED, 0);
+}
+
+int64_t lyr_net_resolve(const LyrStr *host, uint8_t *into, int64_t n) {
+    (void)host; (void)into; (void)n;
+    return failure(LYR_IO_UNSUPPORTED, 0);
+}
+
 #else
 #  include <errno.h>
 #  include <fcntl.h>
+#  include <netdb.h>
 #  include <netinet/in.h>
 #  include <netinet/tcp.h>
 #  include <sys/socket.h>
@@ -266,29 +282,36 @@ int64_t lyr_net_set_nodelay(int64_t fd, int64_t on) {
     return 0;
 }
 
+/* The system's address as lyr/net.h writes one: LYR_NET_ADDRESS_BYTES, or 0 for a family that is
+ * neither. */
+static int64_t write_address(const struct sockaddr_storage *at, uint8_t *into) {
+    memset(into, 0, LYR_NET_ADDRESS_BYTES);
+    uint16_t port;
+    if (at->ss_family == AF_INET) {
+        const struct sockaddr_in *v4 = (const struct sockaddr_in *)at;
+        into[0] = 4;
+        port = ntohs(v4->sin_port);
+        memcpy(into + 3, &v4->sin_addr, 4);
+    } else if (at->ss_family == AF_INET6) {
+        const struct sockaddr_in6 *v6 = (const struct sockaddr_in6 *)at;
+        into[0] = 6;
+        port = ntohs(v6->sin6_port);
+        memcpy(into + 3, &v6->sin6_addr, 16);
+    } else {
+        return 0;
+    }
+    into[1] = (uint8_t)(port >> 8);
+    into[2] = (uint8_t)(port & 0xFF);
+    return LYR_NET_ADDRESS_BYTES;
+}
+
 int64_t lyr_net_name(int64_t fd, int64_t peer, uint8_t *into, int64_t n) {
     if (n < LYR_NET_ADDRESS_BYTES) return failure(LYR_IO_INVALID_INPUT, 0);
     struct sockaddr_storage at;
     socklen_t length = sizeof at;
     int done = peer ? getpeername((int)fd, (struct sockaddr *)&at, &length) : getsockname((int)fd, (struct sockaddr *)&at, &length);
     if (done != 0) return failed();
-    memset(into, 0, LYR_NET_ADDRESS_BYTES);
-    uint16_t port;
-    if (at.ss_family == AF_INET) {
-        struct sockaddr_in *v4 = (struct sockaddr_in *)&at;
-        into[0] = 4;
-        port = ntohs(v4->sin_port);
-        memcpy(into + 3, &v4->sin_addr, 4);
-    } else if (at.ss_family == AF_INET6) {
-        struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)&at;
-        into[0] = 6;
-        port = ntohs(v6->sin6_port);
-        memcpy(into + 3, &v6->sin6_addr, 16);
-    } else {
-        return failure(LYR_IO_UNSUPPORTED, 0);
-    }
-    into[1] = (uint8_t)(port >> 8);
-    into[2] = (uint8_t)(port & 0xFF);
+    if (write_address(&at, into) == 0) return failure(LYR_IO_UNSUPPORTED, 0);
     return LYR_NET_ADDRESS_BYTES;
 }
 
@@ -296,5 +319,84 @@ int64_t lyr_net_close(int64_t fd) {
     /* never taken again: after an EINTR the descriptor is gone on Linux, maybe not elsewhere */
     if (close((int)fd) != 0 && errno != EINTR) return failed();
     return 0;
+}
+
+int64_t lyr_net_sendto(int64_t fd, const uint8_t *from, int64_t n, int64_t family, const uint8_t *address, int64_t port) {
+    struct sockaddr_storage at;
+    socklen_t length = address_of(family, address, port, &at);
+    if (length == 0) return failure(LYR_IO_INVALID_INPUT, 0);
+#  ifdef MSG_NOSIGNAL
+    int flags = MSG_NOSIGNAL;
+#  else
+    int flags = 0;
+#  endif
+    ssize_t sent;
+    do {
+        sent = sendto((int)fd, from, (size_t)n, flags, (struct sockaddr *)&at, length);
+    } while (sent < 0 && errno == EINTR);
+    if (sent < 0) return failed();
+    return (int64_t)sent;
+}
+
+int64_t lyr_net_recvfrom(int64_t fd, uint8_t *into, int64_t n, uint8_t *sender, int64_t room) {
+    if (room < LYR_NET_ADDRESS_BYTES) return failure(LYR_IO_INVALID_INPUT, 0);
+    struct sockaddr_storage at;
+    socklen_t length;
+    ssize_t got;
+    do {
+        length = sizeof at;
+        got = recvfrom((int)fd, into, (size_t)n, 0, (struct sockaddr *)&at, &length);
+    } while (got < 0 && errno == EINTR);
+    if (got < 0) return failed();
+    if (write_address(&at, sender) == 0) return failure(LYR_IO_UNSUPPORTED, 0);
+    return (int64_t)got;
+}
+
+/* What getaddrinfo's answer says, as a failure: a name nobody knows NotFound (Rust's and Go's
+ * reading), the system's error by errno, any other with the resolver's own number. */
+static int64_t unresolved(int code) {
+    switch (code) {
+    case EAI_NONAME:
+#  ifdef EAI_NODATA
+#    if EAI_NODATA != EAI_NONAME
+    case EAI_NODATA:
+#    endif
+#  endif
+        return failure(LYR_IO_NOT_FOUND, code);
+    case EAI_SYSTEM: return failed();
+    default: return failure(0, code);
+    }
+}
+
+int64_t lyr_net_resolve(const LyrStr *host, uint8_t *into, int64_t n) {
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;  /* one entry an address, not one a kind of socket */
+    struct addrinfo *found = NULL;
+    int code = getaddrinfo(host->bytes, NULL, &hints, &found);
+    if (code != 0) return unresolved(code);
+    int64_t count = 0;
+    for (struct addrinfo *at = found; at != NULL; at = at->ai_next) {
+        uint8_t entry[LYR_NET_HOST_BYTES] = { 0 };
+        if (at->ai_family == AF_INET) {
+            entry[0] = 4;
+            memcpy(entry + 1, &((struct sockaddr_in *)at->ai_addr)->sin_addr, 4);
+        } else if (at->ai_family == AF_INET6) {
+            entry[0] = 6;
+            memcpy(entry + 1, &((struct sockaddr_in6 *)at->ai_addr)->sin6_addr, 16);
+        } else {
+            continue;
+        }
+        /* each once: a resolver may give an address again */
+        int seen = 0;
+        int64_t held = count * LYR_NET_HOST_BYTES <= n ? count : n / LYR_NET_HOST_BYTES;
+        for (int64_t k = 0; k < held && !seen; k++) seen = memcmp(into + k * LYR_NET_HOST_BYTES, entry, LYR_NET_HOST_BYTES) == 0;
+        if (seen) continue;
+        if ((count + 1) * LYR_NET_HOST_BYTES <= n) memcpy(into + count * LYR_NET_HOST_BYTES, entry, LYR_NET_HOST_BYTES);
+        count++;
+    }
+    freeaddrinfo(found);
+    return count;
 }
 #endif

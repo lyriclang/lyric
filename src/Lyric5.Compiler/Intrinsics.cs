@@ -94,6 +94,9 @@ public static class Intrinsics
         ["std.net.netSetNoDelay"] = "lyr_net_set_nodelay",
         ["std.net.netName"] = "LYR_NET_NAME",
         ["std.net.netClose"] = "lyr_net_close",
+        ["std.net.netSendTo"] = "LYR_NET_SENDTO",
+        ["std.net.netRecvFrom"] = "LYR_NET_RECVFROM",
+        ["std.net.netResolve"] = "LYR_NET_RESOLVE",
         ["std.task.spin"] = "lyr_task_spin",
         // Signals as a channel (10 Q9, 06 K5): the abstract names and the system's numbers, the
         // handler on or off, the watcher's poller, the caught ones.

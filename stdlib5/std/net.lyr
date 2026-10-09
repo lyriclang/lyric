@@ -1,12 +1,14 @@
-/// The network (design/v5/spec/10 O7; 13 M8b P1, P2, S10b): IP addresses and socket addresses,
-/// and TCP — a listener that accepts, a stream that is a `Reader` and a `Writer`. A call that would
-/// block parks the task until the thread's poller says the socket is ready (06 S2), then asks
-/// again; a cancel ends that wait with `Cancelled` (10 Review 2026-10-08). There are no socket
-/// timeouts: `withTimeout` is the one way (O7). POSIX; on Windows every call throws `Unsupported`
-/// until its poller and Winsock (S11). S10c: UDP and the resolver.
+/// The network (design/v5/spec/10 O7; 13 M8b P1, P2, S10b, S10c): IP addresses and socket
+/// addresses, TCP — a listener that accepts, a stream that is a `Reader` and a `Writer` —, UDP, and
+/// the names a resolver knows. A call that would block parks the task until the thread's poller
+/// says the socket is ready (06 S2), then asks again; a cancel ends that wait with `Cancelled` (10
+/// Review 2026-10-08), and a close — on any thread — with `Closed`. There are no socket timeouts:
+/// `withTimeout` is the one way (O7). POSIX; on Windows every call throws `Unsupported` until its
+/// poller and Winsock (S11).
+import std.collections { List };
 import std.core { Parse, ParseError, StringBuilder, viewBytes };
-import std.io { IoError, Reader, Writer, failure };
-import std.task { Cancelled, awaitDescriptor, forgetDescriptor };
+import std.io { IoError, Reader, Writer, failure, onPool };
+import std.task { Cancelled, Waits, awaitDescriptor, forgetDescriptor };
 
 fn netSocket(family: int, kind: int): int;
 fn netBind(fd: int, family: int, address: Slice<uint8>, port: int, reuse: int): int;
@@ -20,6 +22,9 @@ fn netShutdown(fd: int, how: int): int;
 fn netSetNoDelay(fd: int, on: int): int;
 fn netName(fd: int, peer: int, into: Slice<uint8>): int;
 fn netClose(fd: int): int;
+fn netSendTo(fd: int, from: Slice<uint8>, family: int, address: Slice<uint8>, port: int): int;
+fn netRecvFrom(fd: int, into: Slice<uint8>, sender: Slice<uint8>): int;
+fn netResolve(host: string, into: Slice<uint8>): int;
 
 /// What a call that would block answers (lyr/net.h).
 let wouldBlock = -(64 << 32);
@@ -409,9 +414,10 @@ fn netFailure(answer: int, addr: ?SocketAddr, doing: string): IoError {
     return failure(answer, path, doing);
 }
 
-/// The running task waits until `fd` is ready as `interest` says (1 to read, 2 to write).
-fn waitFor(fd: int, interest: int, doing: string): void throws [IoError, Cancelled] {
-    let armed = try awaitDescriptor(fd, interest);
+/// The running task waits until `fd` is ready as `interest` says (1 to read, 2 to write), in the
+/// socket's `waits` — so a close on any thread ends the wait (S10c).
+fn waitFor(fd: int, interest: int, waits: Waits, doing: string): void throws [IoError, Cancelled] {
+    let armed = try awaitDescriptor(fd, interest, waits);
     if (armed < 0) {
         throw failure(armed, null, doing);
     }
@@ -431,6 +437,7 @@ fn socketFor(addr: SocketAddr, kind: int, doing: string): int throws IoError {
 pub class TcpListener :: [Closeable] {
     fd: int,
     var closed: bool = false,
+    waits: Waits = Waits { },
 
     /// A listener on `addr`; port 0 asks the system for a free one, which `localAddr` says. A port
     /// that a closed listener's connections still hold (TIME_WAIT) is taken all the same.
@@ -459,7 +466,7 @@ pub class TcpListener :: [Closeable] {
             if (fd != wouldBlock) {
                 throw failure(fd, null, "accepted");
             }
-            try waitFor(this.fd, 1, "accepted");
+            try waitFor(this.fd, 1, this.waits, "accepted");
         }
     }
 
@@ -477,7 +484,7 @@ pub class TcpListener :: [Closeable] {
             return;
         }
         me.closed = true;
-        try closeSocket(me.fd);
+        try closeSocket(me.fd, me.waits);
     }
 
     fn stillOpen(doing: string): void throws IoError {
@@ -499,16 +506,18 @@ pub enum Shutdown :: [Equatable, Debug] {
 pub class TcpStream :: [Reader, Writer, Closeable] {
     fd: int,
     var closed: bool = false,
+    waits: Waits = Waits { },
 
     /// A connection to `addr`: waits until it is made, or refused.
     pub static fn connect(addr: SocketAddr): TcpStream throws [IoError, Cancelled] {
         let fd = try socketFor(addr, 1, "connected");
         let bytes = bytesOf(addr.ip);
         let started = netConnect(fd, familyOf(addr.ip), bytes[..], addr.port as int);
+        let waits = Waits { };
         var answer = started;
         if (started == wouldBlock) {
             try {
-                waitFor(fd, 2, "connected");
+                waitFor(fd, 2, waits, "connected");
             } catch (e: IoError) {
                 let _ = netClose(fd);
                 throw e;
@@ -524,7 +533,7 @@ pub class TcpStream :: [Reader, Writer, Closeable] {
             let _ = netClose(fd);
             throw netFailure(answer, addr, "connected");
         }
-        return TcpStream { fd = fd };
+        return TcpStream { fd = fd, waits = waits };
     }
 
     /// Bytes from the connection: waits until some come; 0 once the peer has ended its writing.
@@ -541,7 +550,7 @@ pub class TcpStream :: [Reader, Writer, Closeable] {
             if (n != wouldBlock) {
                 throw failure(n, null, "read");
             }
-            try waitFor(this.fd, 1, "read");
+            try waitFor(this.fd, 1, this.waits, "read");
         }
     }
 
@@ -560,7 +569,7 @@ pub class TcpStream :: [Reader, Writer, Closeable] {
             if (n != wouldBlock) {
                 throw failure(n, null, "written");
             }
-            try waitFor(this.fd, 2, "written");
+            try waitFor(this.fd, 2, this.waits, "written");
         }
     }
 
@@ -607,7 +616,7 @@ pub class TcpStream :: [Reader, Writer, Closeable] {
             return;
         }
         me.closed = true;
-        try closeSocket(me.fd);
+        try closeSocket(me.fd, me.waits);
     }
 
     fn stillOpen(doing: string): void throws IoError {
@@ -627,11 +636,132 @@ fn nameOf(fd: int, peer: int): SocketAddr throws IoError {
     return addressFrom(into[..]);
 }
 
-/// The socket out of the poller — its waiters run again and find it closed — and closed.
-fn closeSocket(fd: int): void throws IoError {
+/// The socket's waiters woken, on whatever thread they wait — they find it closed (S10c) —, the
+/// socket out of this thread's poller, and closed.
+fn closeSocket(fd: int, waits: Waits): void throws IoError {
+    let w = waits;
+    w.close();
     forgetDescriptor(fd);
     let answer = netClose(fd);
     if (answer < 0) {
         throw failure(answer, null, "closed");
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// UDP and the resolver (10 O7; M8b S10c).
+// ---------------------------------------------------------------------------------------------
+
+/// A UDP socket (10 O7): datagrams sent to an address, and received with their sender's.
+pub class UdpSocket :: [Closeable] {
+    fd: int,
+    var closed: bool = false,
+    waits: Waits = Waits { },
+
+    /// A socket bound to `addr`; port 0 asks the system for a free one, which `localAddr` says.
+    pub static fn bind(addr: SocketAddr): UdpSocket throws IoError {
+        let fd = try socketFor(addr, 2, "bound");
+        let bytes = bytesOf(addr.ip);
+        let answer = netBind(fd, familyOf(addr.ip), bytes[..], addr.port as int, 0);
+        if (answer < 0) {
+            let _ = netClose(fd);
+            throw netFailure(answer, addr, "bound");
+        }
+        return UdpSocket { fd = fd };
+    }
+
+    /// `from` as one datagram to `addr`: waits until the system takes it, and answers how many
+    /// bytes went — all of them, a datagram goes whole or not at all.
+    pub mut fn sendTo(from: Slice<uint8>, addr: SocketAddr): int throws [IoError, Cancelled] {
+        let bytes = bytesOf(addr.ip);
+        loop {
+            try this.stillOpen("sent");
+            let n = netSendTo(this.fd, from, familyOf(addr.ip), bytes[..], addr.port as int);
+            if (n >= 0) {
+                return n;
+            }
+            if (n != wouldBlock) {
+                throw netFailure(n, addr, "sent");
+            }
+            try waitFor(this.fd, 2, this.waits, "sent");
+        }
+    }
+
+    /// The next datagram: waits until one comes, and answers how many of its bytes went into
+    /// `into` — the rest of a longer one is lost — and who sent it.
+    pub mut fn recvFrom(into: Slice<uint8>): (int, SocketAddr) throws [IoError, Cancelled] {
+        let sender: uint8[] = [0u8] * 19;
+        loop {
+            try this.stillOpen("received");
+            let n = netRecvFrom(this.fd, into, sender[..]);
+            if (n >= 0) {
+                return (n, addressFrom(sender[..]));
+            }
+            if (n != wouldBlock) {
+                throw failure(n, null, "received");
+            }
+            try waitFor(this.fd, 1, this.waits, "received");
+        }
+    }
+
+    /// The address it is bound to — with the port the system chose, where `bind` asked for 0.
+    pub fn localAddr(): SocketAddr throws IoError {
+        try this.stillOpen("asked its address");
+        return try nameOf(this.fd, 0);
+    }
+
+    /// Lets the socket go; a task that waits in a call of it throws `Closed`. A second close does
+    /// nothing.
+    pub fn close(): void throws IoError {
+        let me = this;
+        if (me.closed) {
+            return;
+        }
+        me.closed = true;
+        try closeSocket(me.fd, me.waits);
+    }
+
+    fn stillOpen(doing: string): void throws IoError {
+        if (this.closed) {
+            throw IoError { kind = .Closed, detail = doing };
+        }
+    }
+}
+
+/// The addresses `host` names (10 O7): a name the system's resolver knows — `localhost`,
+/// `example.org` — or an address's own text; each address once, in the resolver's order. It runs
+/// on the I/O pool (13 M8b P2), as a file's call does, so it is no point of cancellation: a cancel
+/// shows at the task's next wait. A name nobody knows is `NotFound`, the name as the path.
+pub fn resolve(host: StringView): List<IpAddr> throws IoError {
+    let name = host.toString();
+    var room = 8;
+    loop {
+        let into: uint8[] = [0u8] * (room * 17);
+        let n = onPool(() => netResolve(name, into[..]));
+        if (n < 0) {
+            throw failure(n, name, "resolved");
+        }
+        if (n <= room) {
+            let found = List<IpAddr>.new();
+            var k = 0;
+            while (k < n) {
+                let e = into[k * 17..k * 17 + 17];
+                if (e[0] == 4u8) {
+                    found.push(IpAddr.V4(e[1], e[2], e[3], e[4]));
+                } else {
+                    let groups: uint16[] = [0u16] * 8;
+                    var g = 0;
+                    while (g < 8) {
+                        groups[g] = ((e[1 + 2 * g] as int) * 256 + (e[2 + 2 * g] as int)) as uint16;
+                        g += 1;
+                    }
+                    found.push(IpAddr.V6(groups[0], groups[1], groups[2], groups[3], groups[4], groups[5], groups[6], groups[7]));
+                }
+                k += 1;
+            }
+            return found;
+        }
+        // more than fit: again, with room for them all
+        room = n;
     }
 }

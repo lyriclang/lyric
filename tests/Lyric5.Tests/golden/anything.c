@@ -85,6 +85,7 @@ typedef struct lyr_ty_std_hash_DefaultHasher lyr_ty_std_hash_DefaultHasher;
 typedef struct lyr_ty_std_hash_FixedHasher lyr_ty_std_hash_FixedHasher;
 typedef struct lyr_ty_std_hash_Fnv1a64 lyr_ty_std_hash_Fnv1a64;
 typedef struct lyr_ty_std_time_Duration lyr_ty_std_time_Duration;
+typedef struct lyr_ty_std_task_Waits lyr_ty_std_task_Waits;
 typedef struct lyr_ty_std_task_Cancelled lyr_ty_std_task_Cancelled;
 typedef struct lyr_ty_std_task_TimedOut lyr_ty_std_task_TimedOut;
 typedef struct lyr_ty_std_task_ChannelClosed lyr_ty_std_task_ChannelClosed;
@@ -742,6 +743,21 @@ struct lyr_ty_std_hash_Fnv1a64 {
 struct lyr_ty_std_time_Duration {
     int64_t f_ns;
 };
+struct lyr_ty_std_task_Waits {
+    LyrObj header;
+    lyr_ty_std_task_SpinLock *f_guard;
+    lyr_ty_std_task_Context *f_reading;
+    lyr_ty_std_task_Context *f_writing;
+    uint8_t f_closed;
+};
+_Static_assert(sizeof(lyr_ty_std_task_Waits) == 40, "layout of lyr_ty_std_task_Waits");
+_Static_assert(offsetof(lyr_ty_std_task_Waits, f_guard) == 8, "layout of lyr_ty_std_task_Waits");
+_Static_assert(offsetof(lyr_ty_std_task_Waits, f_reading) == 16, "layout of lyr_ty_std_task_Waits");
+_Static_assert(offsetof(lyr_ty_std_task_Waits, f_writing) == 24, "layout of lyr_ty_std_task_Waits");
+_Static_assert(offsetof(lyr_ty_std_task_Waits, f_closed) == 32, "layout of lyr_ty_std_task_Waits");
+extern const LyrItable lyr_itab_ty_std_task_Waits[];
+static const uint64_t lyr_refmap_ty_std_task_Waits[] = { UINT64_C(0xe) };
+const LyrDesc lyr_desc_ty_std_task_Waits = { sizeof(lyr_ty_std_task_Waits), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_task_Waits, "std.task.Waits", lyr_itab_ty_std_task_Waits };
 struct lyr_ty_std_task_Cancelled {
     LyrObj header;
 };
@@ -986,8 +1002,8 @@ typedef struct { LyrObj header; lyr_ty_std_time_TimeError value; } lyr_box_ty_st
 _Static_assert(sizeof(lyr_box_ty_std_time_TimeError) == 16, "layout of lyr_box_ty_std_time_TimeError");
 _Static_assert(offsetof(lyr_box_ty_std_time_TimeError, value) == 8, "layout of lyr_box_ty_std_time_TimeError");
 extern const LyrItable lyr_itab_ty_std_time_TimeError[];
-static const uint64_t lyr_refmap_box96[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_box_ty_std_time_TimeError = { sizeof(lyr_box_ty_std_time_TimeError), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box96, "box<std.time.TimeError>", lyr_itab_ty_std_time_TimeError };
+static const uint64_t lyr_refmap_box97[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_box_ty_std_time_TimeError = { sizeof(lyr_box_ty_std_time_TimeError), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box97, "box<std.time.TimeError>", lyr_itab_ty_std_time_TimeError };
 typedef struct { LyrObj header; lyr_ty_std_time_DateTime value; } lyr_box_ty_std_time_DateTime;
 _Static_assert(sizeof(lyr_box_ty_std_time_DateTime) == 72, "layout of lyr_box_ty_std_time_DateTime");
 _Static_assert(offsetof(lyr_box_ty_std_time_DateTime, value) == 8, "layout of lyr_box_ty_std_time_DateTime");
@@ -1125,6 +1141,7 @@ const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_22_std_hash_DefaultHasher = 
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_20_std_hash_FixedHasher = { &lyr_desc_box_ty_std_hash_FixedHasher,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_16_std_hash_Fnv1a64 = { &lyr_desc_box_ty_std_hash_Fnv1a64,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_17_std_time_Duration = { &lyr_desc_box_ty_std_time_Duration,  };
+const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_14_std_task_Waits = { &lyr_desc_ty_std_task_Waits,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_18_std_task_Cancelled = { &lyr_desc_ty_std_task_Cancelled,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_17_std_task_TimedOut = { &lyr_desc_ty_std_task_TimedOut,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_22_std_task_ChannelClosed = { &lyr_desc_ty_std_task_ChannelClosed,  };
@@ -1183,6 +1200,7 @@ const LyrItable lyr_itab_ty_std_hash_DefaultHasher[] = { { lyr_ifid_ty_std_core_
 const LyrItable lyr_itab_ty_std_hash_FixedHasher[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_20_std_hash_FixedHasher } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_hash_Fnv1a64[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_16_std_hash_Fnv1a64 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_time_Duration[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_17_std_time_Duration } , { NULL, NULL } };
+const LyrItable lyr_itab_ty_std_task_Waits[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_14_std_task_Waits } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_task_Cancelled[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_18_std_task_Cancelled } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_task_TimedOut[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_17_std_task_TimedOut } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_task_ChannelClosed[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_22_std_task_ChannelClosed } , { NULL, NULL } };

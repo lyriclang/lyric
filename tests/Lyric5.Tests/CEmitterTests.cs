@@ -271,6 +271,7 @@ public class CEmitterTests
                 + "woke 20 40 1 41 2 22 23 43 4 44 5 25 26 46 7 47 8 28 29 49 10 50 11 31 32 52 13 53 14 34 35 55 16 56 17 37 38 58 19 59\n");
             data.Add("spawn", profile, 0,
                 "started false\nvoid body\ngot 5 7 true 1 2 true\nwaiters first second\ntyped 7 3\n");
+            data.Add("spawn_never", profile, 0, "cancelled after 3 turns or more\n");
             data.Add("void_values", profile, 0,
                 "side\nagain\nagain\nbound\npassed\nwrapped\ntuple\n5 true true 1 true 2 1\n");
             data.Add("durations", profile, 0,
