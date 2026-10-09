@@ -21,5 +21,6 @@
 #include "lyr/fs.h"
 #include "lyr/console.h"
 #include "lyr/net.h"
+#include "lyr/process.h"
 
 #endif

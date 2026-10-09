@@ -1,0 +1,395 @@
+/// Processes (design/v5/spec/10 O8, Q9; 13 M8b S12): a `Command` says what to start, `spawn` starts
+/// it as a `Child` — its standard streams pipes where the command asked for them —, and `wait` waits
+/// for its end; `output` and `status` do it all at once. A child's end comes as SIGCHLD, which the
+/// runtime keeps for itself (Q9): a reaper on a thread of its own asks each child that has not been
+/// seen to end (lyr/process.h), and an end wakes every task that waits for it, on any thread. A
+/// wait is a wait (10 §1 rule 7): a cancel ends it. POSIX; Windows comes with S12b.
+import std.collections { List };
+import std.core { StringBuilder, viewBytes };
+import std.io { IoError, Reader, Writer, failure };
+import std.os { Signal, numberOf, signalOf };
+import std.task;
+import std.task { Cancelled, Channel, SpinLock, Waits, awaitDescriptor, forgetDescriptor, here };
+import std.thread { Thread };
+
+fn processSpawn(program: string, args: Slice<uint8>, argc: int, env: Slice<uint8>, envc: int, cwd: string, modes: int, ends: Slice<int>): int;
+fn processAttach(): void;
+fn processReap(pid: int): int;
+fn processSignal(pid: int, number: int): int;
+fn processRead(fd: int, into: Slice<uint8>): int;
+fn processWrite(fd: int, from: Slice<uint8>): int;
+fn processClose(fd: int): int;
+
+/// What a call that would block answers (lyr/net.h).
+let wouldBlock = -(64 << 32);
+
+/// What a child's standard stream is (10 O8): the parent's, a pipe to the parent, or nothing.
+pub enum Stdio :: [Equatable, Debug] {
+    Inherit,
+    Piped,
+    Null,
+}
+
+/// What to start (10 O8, an options struct, N12): the program — a path, or a name looked up on
+/// PATH —, its arguments, its working directory (the parent's where `null`), variables set over the
+/// parent's environment, and its three standard streams.
+pub struct Command {
+    pub program: string,
+    pub args: string[] = [],
+    pub cwd: ?string = null,
+    pub env: (string, string)[] = [],
+    pub stdin: Stdio = Stdio.Inherit,
+    pub stdout: Stdio = Stdio.Inherit,
+    pub stderr: Stdio = Stdio.Inherit,
+
+    /// The child, started. A program that is not there is `NotFound`, one that may not run
+    /// `PermissionDenied` — each with the program as the path.
+    pub fn spawn(): Child throws IoError {
+        let nul = char.fromUint32(0u32)!;
+        let args = StringBuilder.new();
+        try appendPart(args, this.program, nul);
+        for (a in this.args) {
+            try appendPart(args, a, nul);
+        }
+        let env = StringBuilder.new();
+        for (pair in this.env) {
+            let (name, value) = pair;
+            if (name.isEmpty() || name.contains("=")) {
+                throw IoError { kind = .InvalidInput, path = this.program, detail = f"a variable named '{name}'" };
+            }
+            try appendPart(env, f"{name}={value}", nul);
+        }
+        let modes = modeOf(this.stdin) | (modeOf(this.stdout) << 2) | (modeOf(this.stderr) << 4);
+        let ends: int[] = [-1, -1, -1];
+        let argBytes = args.toString();
+        let envBytes = env.toString();
+        let pid = processSpawn(this.program, viewBytes(argBytes), this.args.length() + 1, viewBytes(envBytes),
+            this.env.length(), this.cwd ?? "", modes, ends[..]);
+        if (pid < 0) {
+            throw failure(pid, this.program, "started");
+        }
+        let state = ChildState { pid = pid };
+        reaper.register(state);
+        return Child {
+            state = state,
+            stdin = if (ends[0] >= 0) PipeWriter { fd = ends[0] } else null,
+            stdout = if (ends[1] >= 0) PipeReader { fd = ends[1] } else null,
+            stderr = if (ends[2] >= 0) PipeReader { fd = ends[2] } else null,
+        };
+    }
+
+    /// Starts the child with its output and its errors piped and nothing to read, takes both to
+    /// their ends — at once, so a child that fills one pipe while the other waits does not stop —,
+    /// and waits for its end.
+    pub fn output(): Output throws [IoError, Cancelled] {
+        var child = try (this with { stdin = Stdio.Null, stdout = Stdio.Piped, stderr = Stdio.Piped }).spawn();
+        var errors = child.stderr!;
+        let taken = task.spawn(() => {
+            let bytes = try errors.readToEnd();
+            try errors.close();
+            return bytes;
+        });
+        var out = child.stdout!;
+        let bytes = try out.readToEnd();
+        try out.close();
+        // the task's two errors join to `Error` in its handle (06 §8 rule 6): sorted out again here
+        var errorBytes: uint8[] = [];
+        try {
+            errorBytes = taken.await();
+        } catch (e: IoError) {
+            throw e;
+        } catch (e: Cancelled) {
+            throw e;
+        } catch (_) {
+            unreachable("the reading task throws an IoError or Cancelled, nothing else");
+        }
+        return Output { status = try child.wait(), stdout = bytes, stderr = errorBytes };
+    }
+
+    /// Starts the child with the parent's streams, and waits for its end.
+    pub fn status(): ExitStatus throws [IoError, Cancelled] {
+        var child = try this.spawn();
+        return try child.wait();
+    }
+}
+
+/// `part` and a NUL into `into`: a NUL within it is refused.
+fn appendPart(into: StringBuilder, part: string, nul: char): void throws IoError {
+    if (part.contains(nul)) {
+        throw IoError { kind = .InvalidInput, detail = "a NUL in an argument or a variable" };
+    }
+    let b = into;
+    b.appendStr(part);
+    b.appendChar(nul);
+}
+
+fn modeOf(s: Stdio): int {
+    return match (s) {
+        .Inherit => 0,
+        .Piped => 1,
+        .Null => 2,
+    };
+}
+
+/// A child started (10 O8): its standard streams where the command piped them, its end, a signal
+/// to it.
+pub class Child {
+    state: ChildState,
+    /// The child's standard input, where the command piped it: close it to say the end.
+    pub var stdin: ?PipeWriter,
+    /// The child's standard output, where the command piped it.
+    pub stdout: ?PipeReader,
+    /// The child's standard error, where the command piped it.
+    pub stderr: ?PipeReader,
+
+    /// Waits until the child has ended, and answers how. Its standard input is closed first, as
+    /// Rust's `wait` does: a child reading it would wait for the parent, the parent for the child.
+    pub mut fn wait(): ExitStatus throws [IoError, Cancelled] {
+        if (let w = this.stdin) {
+            this.stdin = null;
+            try w.close();
+        }
+        let _ = try this.state.ended.recv();
+        let end = this.state.end;
+        if (end < -1) {
+            throw failure(end, null, "waited for");
+        }
+        return ExitStatus { raw = end };
+    }
+
+    /// Ends the child now — SIGKILL on POSIX. A child that has ended already is not touched: its
+    /// number may be another process's by then.
+    pub fn kill(): void throws IoError {
+        try this.signal(Signal.Other(9));
+    }
+
+    /// `s` to the child (Q9), where it has not ended.
+    pub fn signal(s: Signal): void throws IoError {
+        let number = numberOf(s);
+        if (number < 0) {
+            throw IoError { kind = .Unsupported, detail = "a signal this system has not" };
+        }
+        let answer = reaper.signal(this.state, number);
+        if (answer < 0) {
+            throw failure(answer, null, "signalled");
+        }
+    }
+}
+
+/// How a child ended (10 O8): with an exit code, or — POSIX — by a signal.
+pub struct ExitStatus :: [Equatable, Debug] {
+    /// The runtime's answer (lyr/process.h): the code, or 256 plus the signal's number.
+    raw: int,
+
+    /// Whether it ended with code 0.
+    pub fn success(): bool {
+        return this.raw == 0;
+    }
+
+    /// Its exit code, where it ended with one.
+    pub fn code(): ?int {
+        return if (this.raw < 256) this.raw else null;
+    }
+
+    /// The signal that ended it, where one did.
+    pub fn signal(): ?Signal {
+        return if (this.raw >= 256) signalOf(this.raw - 256) else null;
+    }
+}
+
+extend ExitStatus :: [Display] {
+    /// `exit code 3`, or `signal 9`.
+    fn show(): string {
+        return if (this.raw < 256) f"exit code {this.raw}" else f"signal {this.raw - 256}";
+    }
+}
+
+/// What `Command.output` gives: how the child ended, and all it wrote on its two streams.
+pub struct Output {
+    pub status: ExitStatus,
+    pub stdout: uint8[],
+    pub stderr: uint8[],
+}
+
+// ---------------------------------------------------------------------------------------------
+// The pipes (13 M8b P2): non-blocking, waited for on the thread's poller as a socket is.
+// ---------------------------------------------------------------------------------------------
+
+/// The running task waits until `fd` is ready as `interest` says, in `waits`.
+fn waitFor(fd: int, interest: int, waits: Waits, doing: string): void throws [IoError, Cancelled] {
+    let armed = try awaitDescriptor(fd, interest, waits);
+    if (armed < 0) {
+        throw failure(armed, null, doing);
+    }
+}
+
+/// The pipe's end out of the poller — its waiters run again and find it closed — and closed.
+fn closePipe(fd: int, waits: Waits): void throws IoError {
+    let w = waits;
+    w.close();
+    forgetDescriptor(fd);
+    let answer = processClose(fd);
+    if (answer < 0) {
+        throw failure(answer, null, "closed");
+    }
+}
+
+/// The parent's end of a child's output or error pipe: a `Reader` that waits until bytes come, and
+/// answers 0 once the child has closed its end.
+pub class PipeReader :: [Reader, Closeable] {
+    fd: int,
+    var closed: bool = false,
+    waits: Waits = Waits { },
+
+    pub mut fn read(into: Slice<uint8>): int throws [IoError, Cancelled] {
+        loop {
+            try this.stillOpen("read");
+            if (into.isEmpty()) {
+                return 0;
+            }
+            let n = processRead(this.fd, into);
+            if (n >= 0) {
+                return n;
+            }
+            if (n != wouldBlock) {
+                throw failure(n, null, "read");
+            }
+            try waitFor(this.fd, 1, this.waits, "read");
+        }
+    }
+
+    /// Lets the pipe go; a task that waits in a read throws `Closed`. A second close does nothing.
+    pub fn close(): void throws IoError {
+        let me = this;
+        if (me.closed) {
+            return;
+        }
+        me.closed = true;
+        try closePipe(me.fd, me.waits);
+    }
+
+    fn stillOpen(doing: string): void throws IoError {
+        if (this.closed) {
+            throw IoError { kind = .Closed, detail = doing };
+        }
+    }
+}
+
+/// The parent's end of a child's input pipe: a `Writer` that waits until the pipe takes some; one
+/// whose child has closed its end is `BrokenPipe`. Closing it is the end of the child's input.
+pub class PipeWriter :: [Writer, Closeable] {
+    fd: int,
+    var closed: bool = false,
+    waits: Waits = Waits { },
+
+    pub mut fn write(from: Slice<uint8>): int throws [IoError, Cancelled] {
+        loop {
+            try this.stillOpen("written");
+            if (from.isEmpty()) {
+                return 0;
+            }
+            let n = processWrite(this.fd, from);
+            if (n >= 0) {
+                return n;
+            }
+            if (n != wouldBlock) {
+                throw failure(n, null, "written");
+            }
+            try waitFor(this.fd, 2, this.waits, "written");
+        }
+    }
+
+    /// Lets the pipe go — the child reads the end of its input; a task that waits in a write throws
+    /// `Closed`. A second close does nothing.
+    pub fn close(): void throws IoError {
+        let me = this;
+        if (me.closed) {
+            return;
+        }
+        me.closed = true;
+        try closePipe(me.fd, me.waits);
+    }
+
+    fn stillOpen(doing: string): void throws IoError {
+        if (this.closed) {
+            throw IoError { kind = .Closed, detail = doing };
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The reaper (Q9: SIGCHLD the runtime's own).
+// ---------------------------------------------------------------------------------------------
+
+/// A child the reaper waits for: its end once seen (lyr/process.h's answer, -1 before), and a
+/// channel closed then — every task waiting in `wait` receives its close, on any thread.
+class ChildState {
+    pid: int,
+    var end: int = -1,
+    ended: Channel<int> = Channel.new(),
+}
+
+/// The children not seen to end, and the thread that watches for their ends: started with the
+/// first child, it asks each of them at every SIGCHLD — never waitpid(-1), which would take a
+/// host's children too.
+class Reaper {
+    guard: SpinLock = SpinLock { },
+    children: List<ChildState>,
+    var started: bool = false,
+
+    /// `c` is waited for from now on; the first child starts the reaper's thread.
+    mut fn register(c: ChildState): void {
+        this.guard.acquire();
+        this.children.push(c);
+        let start = !this.started;
+        this.started = true;
+        this.guard.release();
+        if (start) {
+            Thread.spawn(() => {
+                reaper.watch();
+            });
+        }
+    }
+
+    /// The reaper's loop: every child asked, then a wait for the next SIGCHLD.
+    mut fn watch(): void {
+        processAttach();
+        let s = here();
+        while (true) {
+            this.reapAll();
+            s.awaitPoller();
+        }
+    }
+
+    /// Each child asked whether it has ended; those that have, out, their channels closed.
+    mut fn reapAll(): void {
+        this.guard.acquire();
+        let ended = List<ChildState>.new();
+        var i = 0;
+        while (i < this.children.length()) {
+            let c = this.children[i];
+            let answer = processReap(c.pid);
+            if (answer == -1) {
+                i += 1;
+            } else {
+                c.end = answer;
+                ended.push(this.children.removeAt(i));
+            }
+        }
+        this.guard.release();
+        for (c in ended) {
+            c.ended.close();
+        }
+    }
+
+    /// The signal numbered `number` to `c`, where it has not ended — under the guard, so the reaper
+    /// cannot take its end, and its number, between the look and the signal.
+    mut fn signal(c: ChildState, number: int): int {
+        this.guard.acquire();
+        let answer = if (c.end == -1) processSignal(c.pid, number) else 0;
+        this.guard.release();
+        return answer;
+    }
+}
+
+let reaper = Reaper { children = List.new() };

@@ -1,0 +1,34 @@
+// The process pipeline (design/v5/spec/13, M8b S12's artifact): `printf | sort | uniq`, three
+// children whose pipes the program joins itself — a task copies each child's output into the next
+// one's input and closes it at the end, as a shell's pipe would. Expected stdout:
+//   apple
+//   banana
+//   cherry
+//   3 children: exit code 0, exit code 0, exit code 0
+import std.io { copy, println };
+import std.process { Child, Command, Stdio };
+import std.task { spawn };
+
+/// `from`'s output into `into`'s input, the input closed at the end.
+fn join(from: Child, into: Child): void throws Error {
+    var source = from.stdout!;
+    var sink = into.stdin!;
+    let _ = try copy(source, sink);
+    try source.close();
+    try sink.close();
+}
+
+fn main(): void throws Error {
+    var produce = try Command { program = "printf", args = ["cherry\napple\nbanana\napple\ncherry\n"], stdout = Stdio.Piped }.spawn();
+    var order = try Command { program = "sort", stdin = Stdio.Piped, stdout = Stdio.Piped }.spawn();
+    var once = try Command { program = "uniq", stdin = Stdio.Piped, stdout = Stdio.Piped }.spawn();
+    let first = spawn(() => try join(produce, order));
+    let second = spawn(() => try join(order, once));
+    var out = once.stdout!;
+    let text = try out.readToString();
+    try out.close();
+    try first.await();
+    try second.await();
+    println(text.trimEnd());
+    println(f"3 children: {try produce.wait()}, {try order.wait()}, {try once.wait()}");
+}
