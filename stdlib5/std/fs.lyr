@@ -14,7 +14,7 @@ import std.collections { List };
 import std.core { Utf8Error };
 import std.crypto { randomUint64 };
 import std.io;
-import std.io { IoError, IoErrorKind, Reader, Seek, SeekFrom, TextReader, Writer, failure, onPool };
+import std.io { IoError, IoErrorKind, Reader, Seek, SeekFrom, TextReader, Writer, failure, onPool, uncancelled };
 import std.os;
 import std.path { join, normalize, parent };
 import std.time { Instant, instantOfEpochNanos };
@@ -161,20 +161,21 @@ fn withPath(e: IoError, path: string): IoError {
 // ---------------------------------------------------------------------------------------------
 // The conveniences (10 O5; M8b S6c): a file read or written whole, or its lines one by one. Each
 // opens the file, does its work and closes it on every way out; what the close throws counts
-// where nothing went wrong before (05 R4).
+// where nothing went wrong before (05 R4). A file's call is never cancelled, so the `Cancelled`
+// that io's defaults declare for any reader stays out (`uncancelled`, 10 Review 2026-10-08).
 // ---------------------------------------------------------------------------------------------
 
 /// The file at `path`, all of it, as UTF-8 text. Bytes that are no UTF-8 throw `InvalidData` with
 /// the path. A byte order mark is text like any other (10 O2).
 pub fn readText(path: StringView): string throws IoError {
     using let f = try File.open(path);
-    return try f.readToString() catch (e: IoError) throw withPath(e, f.name);
+    return try uncancelled(() => try f.readToString()) catch (e: IoError) throw withPath(e, f.name);
 }
 
 /// The file at `path`, all of it.
 pub fn readBytes(path: StringView): uint8[] throws IoError {
     using let f = try File.open(path);
-    return try f.readToEnd();
+    return try uncancelled(() => try f.readToEnd());
 }
 
 /// The lines of the file at `path`, one by one, as `TextReader.readLine` gives them: without
@@ -188,19 +189,19 @@ pub fn lines(path: StringView): FileLinesIter throws IoError {
 /// `text` as the file at `path`, made where it is not there, cut to nothing where it is.
 pub fn writeText(path: StringView, text: StringView): void throws IoError {
     using let f = try File.create(path);
-    try f.writeString(text);
+    try uncancelled(() => try f.writeString(text));
 }
 
 /// `bytes` as the file at `path`, made where it is not there, cut to nothing where it is.
 pub fn writeBytes(path: StringView, bytes: Slice<uint8>): void throws IoError {
     using let f = try File.create(path);
-    try f.writeAll(bytes);
+    try uncancelled(() => try f.writeAll(bytes));
 }
 
 /// `text` at the end of the file at `path`, made where it is not there.
 pub fn appendText(path: StringView, text: StringView): void throws IoError {
     using let f = try File.openWith(path, OpenOptions { append = true, create = true });
-    try f.writeString(text);
+    try uncancelled(() => try f.writeString(text));
 }
 
 /// The lines of a file (`fs.lines`). After its end or an error it gives no more; after `close()`
@@ -219,8 +220,9 @@ pub class FileLinesIter :: [Iterator, Closeable] {
         // the reader holds what it read ahead: a closed file is seen here, not at its next read
         try this.file.stillOpen("read");
         var line: ?string = null;
+        let reader = this.reader;
         try {
-            line = this.reader.readLine();
+            line = uncancelled(() => try reader.readLine());
         } catch (e: IoError) {
             this.done = true;
             // the first error wins, the close's is attached to it (05 E7)
@@ -466,7 +468,7 @@ pub fn copy(from: StringView, to: StringView): int throws IoError {
     }
     using let r = try File.open(source);
     using let w = try File.create(target);
-    return try io.copy(r, w);
+    return try uncancelled(() => try io.copy(r, w));
 }
 
 /// The entries under `path`, depth first — a directory before what is in it —, each directory's

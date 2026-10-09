@@ -1,6 +1,7 @@
 // std.io's core (design/v5/spec/10 O1–O3; M8b S2): the readers' and the writers' defaults, copy,
 // and the two streams over memory — the end only at 0, an empty slice at once, a partial write.
 import std.io { ByteBuffer, ByteReader, IoError, IoErrorKind, Reader, Writer, copy };
+import std.task { Cancelled };
 import std.test { assertEq, assertFalse, assertTrue, fail };
 
 /// A writer that takes at most `most` bytes a call: the partial write O1 allows.
@@ -32,7 +33,7 @@ class Drip :: [Reader] {
 }
 
 @Test
-fn aReaderEndsOnlyAtZero(): void throws IoError {
+fn aReaderEndsOnlyAtZero(): void throws [IoError, Cancelled] {
     let data: uint8[] = [1u8, 2u8, 3u8];
     let r = ByteReader.new(data[..]);
     let one: uint8[] = [0u8];
@@ -46,7 +47,7 @@ fn aReaderEndsOnlyAtZero(): void throws IoError {
 }
 
 @Test
-fn readExactFillsOrThrowsUnexpectedEof(): void throws IoError {
+fn readExactFillsOrThrowsUnexpectedEof(): void throws [IoError, Cancelled] {
     let d = Drip { left = 3 };
     let three: uint8[] = [0u8] * 3;
     try d.readExact(three[..]);
@@ -62,7 +63,7 @@ fn readExactFillsOrThrowsUnexpectedEof(): void throws IoError {
 }
 
 @Test
-fn writeAllTakesTheRestOfAPartialWrite(): void throws IoError {
+fn writeAllTakesTheRestOfAPartialWrite(): void throws [IoError, Cancelled] {
     let data: uint8[] = [1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8];
     let t = Trickle { most = 3 };
     try t.writeAll(data[..]);
@@ -71,7 +72,7 @@ fn writeAllTakesTheRestOfAPartialWrite(): void throws IoError {
 }
 
 @Test
-fn aWriterThatTakesNothingThrows(): void {
+fn aWriterThatTakesNothingThrows(): void throws Cancelled {
     let data: uint8[] = [1u8];
     let t = Trickle { most = 0 };
     try {
@@ -83,7 +84,7 @@ fn aWriterThatTakesNothingThrows(): void {
 }
 
 @Test
-fn copyMovesEverything(): void throws IoError {
+fn copyMovesEverything(): void throws [IoError, Cancelled] {
     let d = Drip { left = 5 };
     let into = ByteBuffer.new();
     assertEq(try copy(d, into), 5);
@@ -92,7 +93,7 @@ fn copyMovesEverything(): void throws IoError {
 }
 
 @Test
-fn aByteBufferReadsWhatWasWritten(): void throws IoError {
+fn aByteBufferReadsWhatWasWritten(): void throws [IoError, Cancelled] {
     let b = ByteBuffer.new();
     try b.writeString("abc");
     let two: uint8[] = [0u8] * 2;
@@ -109,7 +110,7 @@ fn aByteBufferReadsWhatWasWritten(): void throws IoError {
 }
 
 @Test
-fn aByteReaderSeeksFromEitherEnd(): void throws IoError {
+fn aByteReaderSeeksFromEitherEnd(): void throws [IoError, Cancelled] {
     let data: uint8[] = [10u8, 20u8, 30u8, 40u8];
     let r = ByteReader.new(data[..]);
     assertEq(try r.seek(.End(-1)), 3);
@@ -122,7 +123,7 @@ fn aByteReaderSeeksFromEitherEnd(): void throws IoError {
 }
 
 @Test
-fn textThatIsNoUtf8IsInvalidData(): void {
+fn textThatIsNoUtf8IsInvalidData(): void throws Cancelled {
     let bad: uint8[] = [0x66u8, 0xFFu8];
     try {
         let s = ByteReader.new(bad[..]).readToString();

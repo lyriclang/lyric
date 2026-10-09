@@ -1,0 +1,63 @@
+// A reader's and a writer's call may be cancelled (design/v5/spec/10 Review 2026-10-08; M8b S10a):
+// a stream of the test's own that waits without bound — on a channel nobody sends on, or whose
+// receiver never takes — ends at withTimeout's cancel, and its Cancelled passes every wrapper of
+// std.io: TimedOut comes out.
+import std.io { BufWriter, IoError, Reader, TextReader, TextWriter, Writer, copy };
+import std.task { Cancelled, Channel, ChannelClosed, TimedOut, withTimeout };
+import std.test { assertTrue };
+import std.time { Duration };
+
+/// A reader whose read waits for a value nobody sends.
+class Waiting :: [Reader] {
+    var ch: Channel<int>,
+
+    mut fn read(into: Slice<uint8>): int throws [IoError, Cancelled] {
+        let got = try this.ch.recv();
+        return got ?? 0;
+    }
+}
+
+/// A writer whose write waits for a receiver nobody is.
+class Stuck :: [Writer] {
+    var ch: Channel<int>,
+
+    mut fn write(from: Slice<uint8>): int throws [IoError, Cancelled] {
+        try {
+            this.ch.send(from.length());
+        } catch (_: ChannelClosed) {
+            throw IoError { kind = .BrokenPipe };
+        }
+        return from.length();
+    }
+}
+
+/// Whether `body` ended in withTimeout's TimedOut.
+fn timedOut(body: fn() -> void throws [IoError, Cancelled]): bool throws Error {
+    try {
+        withTimeout(Duration.ofMillis(30), body);
+        return false;
+    } catch (_: TimedOut) {
+        return true;
+    }
+}
+
+@Test
+fn aCancelEndsAReadThroughTheBufferAndTheText(): void throws Error {
+    let text = TextReader.new(Waiting { ch = Channel.new() });
+    assertTrue(try timedOut(() => { let _ = try text.readLine(); }));
+}
+
+@Test
+fn aCancelEndsAWriteThroughTheBufferAndTheText(): void throws Error {
+    // the buffer within the body: its close, in a task cancelled, throws Cancelled at once again
+    assertTrue(try timedOut(() => {
+        using let held = BufWriter.new(Stuck { ch = Channel.new() });
+        try TextWriter.new(held).writeLine("held back");
+        try held.flush();
+    }));
+}
+
+@Test
+fn aCancelEndsACopy(): void throws Error {
+    assertTrue(try timedOut(() => { let _ = try copy(Waiting { ch = Channel.new() }, Stuck { ch = Channel.new() }); }));
+}

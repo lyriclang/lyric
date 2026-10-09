@@ -7,24 +7,28 @@ import std.fs;
 import std.fs { File, OpenOptions };
 import std.io { IoError, IoErrorKind };
 import std.path;
-import std.test { assertEq, assertNull, assertTrue };
+import std.task { Cancelled };
+import std.test { assertEq, assertNull, assertTrue, fail };
 
 fn posix(): bool {
     return path.separator == "/";
 }
 
-/// What `f` throws, or `null`.
-fn thrown(f: fn() -> void throws IoError): ?IoError {
+/// What `f` throws, or `null`. A default called on a `File` declares `Cancelled`, as it does for any
+/// reader; nothing here cancels, so one would be the test's failure.
+fn thrown(f: fn() -> void throws [IoError, Cancelled]): ?IoError {
     try {
         f();
         return null;
     } catch (e: IoError) {
         return e;
+    } catch (_: Cancelled) {
+        fail("cancelled, where nothing cancels");
     }
 }
 
 /// The kind and the message of what `f` throws.
-fn said(f: fn() -> void throws IoError): string {
+fn said(f: fn() -> void throws [IoError, Cancelled]): string {
     if (let e = thrown(f)) {
         return e.message();
     }
