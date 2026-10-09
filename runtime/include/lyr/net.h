@@ -4,7 +4,7 @@
  * the socket's readiness, then asks again. A failure is as lyr/fs.h writes one. An address crosses
  * as its family (4 or 6), its 16 bytes — an IPv4 address in the first four — and its port.
  *
- * Windows answers Unsupported to all of them until its poller and Winsock (S11). */
+ * Windows' sockets are Winsock's (S11): a SOCKET in the int64_t, waited for by AFD (lyr/poll.h). */
 #ifndef LYR_NET_H
 #define LYR_NET_H
 

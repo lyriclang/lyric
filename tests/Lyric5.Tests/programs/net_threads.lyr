@@ -9,12 +9,12 @@ import std.time { Duration };
 
 fn main(): void throws Error {
     let listener = try TcpListener.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 });
-    var client = try TcpStream.connect(try listener.localAddr());
-    var conn = try listener.accept();
+    var client = try TcpStream.connect(listener.localAddr());
+    let conn = try listener.accept();
     let reader = Thread.spawn(() => {
         let buf: uint8[] = [0u8] * 8;
         try {
-            let _ = try client.read(buf[..]);
+            let _ = client.read(buf[..]);
             return "read";
         } catch (e: IoError) {
             return e.message();

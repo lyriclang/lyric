@@ -662,6 +662,12 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   returns (`spawn` with `T = never`) failed in the lowering, which read the generic `T` — fixed
   (`Diverges` at the instance). Spec 12 "The network" rules 5, 7, 8 and 10's never-returning task,
   four cases. **S10 is done.**
+- **S11** the network on Windows (06 S2, the review's M6-29): the poller a completion port a
+  thread — `PostQueuedCompletionStatus` wakes it — and a socket's wait an AFD poll request, one a
+  socket for every way armed on it (wepoll's and mio's rule; one a way hung where a socket waits
+  both ways), cancelled and asked again on its completion when more ways come; ntdll's calls looked
+  up at run time. `net.c` is POSIX's and Winsock's in one file. Every network test runs on Windows
+  now, the echo server's Interrupt aside (a POSIX `kill`).
 - **S13** the build script (11 W3 BS1–BS6): a package's `build.lyr` built as a program of its
   own (`build`, `build/`, its `[build-dependencies]` as a graph of its own in the same lock) and
   run before the compile; `std.build` (`target`, `profile`, `outDir`, `genDir`, `rerunIfChanged`,
