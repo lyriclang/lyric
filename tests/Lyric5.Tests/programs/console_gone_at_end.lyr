@@ -1,0 +1,11 @@
+// The program's end is print's last flush (design/v5/spec/10 Review 2026-10-08): one line, held
+// in the buffer — a pipe takes a block —, written at the end into a pipe nobody reads any more.
+// Run as `program | true`, the reader gone after the sleep. Expected: no stderr, killed by SIGPIPE.
+import std.io { println };
+import std.task { sleep };
+import std.time { Duration };
+
+fn main(): void throws Error {
+    try sleep(Duration.ofMillis(300));
+    println("one line");
+}

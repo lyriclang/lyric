@@ -360,6 +360,16 @@ widerspricht, gilt die Zeile hier.
 | S15a | **Eine Funktion bindet einen Typparameter über die Fixierung eines anderen**, wie ein Block (Spec 05 §13 Regel 2): `fn f<I :: [Iterator<Item = T>], T>(it: I)` leitet `T` aus `I` ab, obwohl `T` in keinem Parametertyp steht. Heute `LYR-SEM0060` an jedem Aufruf (03 §9.2 Regel 1 — spec-konform, aber eine Ungleichheit zwischen Funktion und Block). Uhr: M12 | T8, T6 |
 | S15b | **`char`-Bereiche**: `'a'..'z'` und `'a'..='z'` sind Bereiche über `char` wie in Kotlin — für `c in 'a'..='z'` und überall, wo ein Bereich steht. Heute nur über Zahlen (`LYR-SEM0003`). Ob ein `char`-Bereich iteriert, entscheidet M8c mit. Uhr: M8c, mit den `char`-Prädikaten | A3, T13 |
 
+## Review 2026-10-08 — die offenen Punkte aus M8b
+
+Entscheidungen des Maintainers („alle Empfehlungen“) zu den offenen Punkten, die M8b S2–S9
+gesammelt hat; Kennung, „Betrifft“ und Uhr wie im Abschnitt davor.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| N2b | **Geschriebene Typen prüfen ihre Schranken** (Spec 03 §9.1 Regel 3: „written or inferred alike“): ein Durchgang über Signaturen, Felder und Annotationen prüft jede geschriebene Instanz gegen die Schranken ihrer Deklaration, wie Rusts WF-Prüfung. Heute kompiliert `fn f(s: Set<NoHash>)`, und erst ein Aufruf, der eine Instanz baut (`Set.new()`), meldet `LYR-SEM0028`; generische Aliase prüfen ihre Argumente schon am Gebrauch. Uhr: M12, mit den Diagnosen | T8 |
+| S3 | **Ein Literal an einer View-Stelle bekommt den Elementtyp des Views**: `take([1, 2])` mit `take(s: Slice<uint8>)` prüft die Elemente gegen `uint8` wie `let a: uint8[] = [1, 2]` (Spec 03 §5.2 Regel 4, §5.1 Regel 2). Heute `LYR-SEM0001 cannot assign 'int[]' to 'Slice<uint8>'`; das leere `take([])` geht seit dem Fix nach S3. Uhr: M8c | T13 |
+
 ---
 
 **Bereich 3 ist damit vollständig entschieden** (T1–T19, 2026-09-28).

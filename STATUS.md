@@ -628,6 +628,13 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   console through `ReadConsoleW` as UTF-8. `stdout()`/`stderr()` are `Writer`s over print's
   buffers. One map of the runtime's failures to all fifteen kinds, in `std.io`. The conformance
   runner learned `//! stdin:`. Spec 12 "The console" rules 4–5, three cases. **S8 is done.**
+- **S8c** the console after the review of 2026-10-08 (10 "Review 2026-10-08", the maintainer's
+  decisions on M8b's open points, recorded there and in 03 and 13): the standard error a line at a
+  time wherever it goes; a flush of `print`, `println`, `flush()` or the one when `main` returns
+  that finds the standard output a pipe nobody reads ends the program as SIGPIPE would (POSIX,
+  where the runtime owns the signals; Windows goes on, as Go does), while a `Writer` of `stdout()`
+  still throws `BrokenPipe`. Spec 12 "The console" rules 2, 3, 6; no case (the runner sees
+  neither), `ConsoleTests` do.
 - **S9** the system (10 Q9's rest): `os.args()` (on Windows from the command line as UTF-16),
   `env`, `envs`, `setEnv`, `cwd`, `setCwd`, `exit` (the console flushed, nothing else run),
   `platform()`/`arch()` (`Platform`, `Arch`), `homeDir`, `tempDir` (which `fs.tempDir` now asks),

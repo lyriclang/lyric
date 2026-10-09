@@ -43,7 +43,7 @@ int lyr_init(const LyrConfig *given) {
 
 void lyr_shutdown(void) {
     /* the console's buffers out first (10 O9: flushed at the program's end) */
-    lyr_console_flush_all(1);
+    lyr_console_finish();
     started = 0;
 }
 
