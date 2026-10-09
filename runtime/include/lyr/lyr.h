@@ -20,5 +20,6 @@
 #include "lyr/os.h"
 #include "lyr/fs.h"
 #include "lyr/console.h"
+#include "lyr/net.h"
 
 #endif

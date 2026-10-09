@@ -1,0 +1,14 @@
+// The network on Windows before its poller (13 M8b P5, S11): every call throws Unsupported.
+// Expected stdout: "unsupported: 127.0.0.1:0 (bound)" — the error names the address.
+import std.io { IoError, println };
+import std.net { IpAddr, SocketAddr, TcpListener };
+
+fn main(): void throws Error {
+    try {
+        let listener = try TcpListener.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 });
+        try listener.close();
+        println("bound");
+    } catch (e: IoError) {
+        println(e.message());
+    }
+}

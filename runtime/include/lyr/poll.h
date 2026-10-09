@@ -30,4 +30,23 @@ void lyr_poller_release(void);
 void lyr_poller_watch(LyrPoller *poller, int fd);
 #endif
 
+/* A descriptor's readiness (13 M8b P2, S10b): `fd` armed for reading (LYR_POLL_READ) or writing
+ * (LYR_POLL_WRITE), once — the readiness that comes disarms that direction until it is armed
+ * again; the other stays as it is. `token` (> 0) is the caller's: a wait that sees the readiness
+ * returns 1, as a wake does, and lyr_poller_take gives the token. An error or a hang-up counts as
+ * readiness both ways — the next call on the descriptor says what it is. 0, or a failure as
+ * lyr/fs.h writes one; Windows answers Unsupported until its poller (S11). Each of these is the
+ * poller's own thread's, as its waits are. */
+#define LYR_POLL_READ 1
+#define LYR_POLL_WRITE 2
+int64_t lyr_poller_arm(LyrPoller *poller, int64_t fd, int64_t interest, int64_t token);
+
+/* The descriptor out of the poller, before it is closed: what is armed on it is given as ready —
+ * its waiters run again and find it closed. */
+void lyr_poller_forget(LyrPoller *poller, int64_t fd);
+
+/* The tokens of the readinesses seen since the last call, at most `n`, into `into`, the oldest
+ * first: how many. */
+int64_t lyr_poller_take(LyrPoller *poller, int64_t *into, int64_t n);
+
 #endif

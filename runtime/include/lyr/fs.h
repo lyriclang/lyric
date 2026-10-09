@@ -27,6 +27,12 @@
 #define LYR_IO_NOT_DIRECTORY 5
 #define LYR_IO_INVALID_INPUT 6
 #define LYR_IO_INVALID_DATA 7
+/* The network's (M8b S10b); 13, BrokenPipe, is lyr/console.h's. */
+#define LYR_IO_TIMED_OUT 9
+#define LYR_IO_CONNECTION_REFUSED 10
+#define LYR_IO_CONNECTION_RESET 11
+#define LYR_IO_ADDR_IN_USE 12
+#define LYR_IO_UNSUPPORTED 15
 
 /* `path` (UTF-8, NUL-terminated; Windows takes it as UTF-16) opened as `how` says: the handle. */
 int64_t lyr_fs_open(const LyrStr *path, int64_t how);

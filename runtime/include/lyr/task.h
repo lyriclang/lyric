@@ -58,6 +58,14 @@ void lyr_thread_start(void (*code)(void *env, LyrErr **error), void *env);
 int64_t lyr_task_poller(void);
 void lyr_task_wake(int64_t poller);
 
+/* A descriptor's readiness on the calling thread's poller (lyr/poll.h; M8b S10b): armed with a
+ * waiter's token, forgotten before its close, and the tokens fired since the last take — at most
+ * the slice's length, into it: how many. */
+int64_t lyr_task_arm(int64_t fd, int64_t interest, int64_t token);
+void lyr_task_forget(int64_t fd);
+int64_t lyr_task_take(int64_t *into, int64_t n);
+#define LYR_TASK_TAKE(slice) lyr_task_take((slice).ptr, (slice).len)
+
 /* A thread that spins on a lock lets another run: the lock's holder, perhaps. */
 void lyr_task_spin(void);
 

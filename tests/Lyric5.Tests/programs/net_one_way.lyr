@@ -1,0 +1,55 @@
+// One way's readiness while the other way's wait stays armed (13 M8b P2, S10b): the client's writer
+// waits — the server reads nothing yet — while its reader waits for one byte. The byte comes and
+// ends the reader's wait alone, and the reader waits no more. When the server drains the stream,
+// the writer's wait must still be armed: epoll's one-shot disarmed the whole descriptor, and the
+// poller arms the other way again. Expected stdout: "1 byte read, then 33554432 written".
+import std.io { println };
+import std.net { IpAddr, SocketAddr, TcpListener, TcpStream };
+import std.task { TimedOut, sleep, spawn, withTimeout };
+import std.time { Duration };
+
+fn main(): void throws Error {
+    let listener = try TcpListener.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 });
+    let at = try listener.localAddr();
+    let server = spawn(() => {
+        var conn = try listener.accept();
+        // the client's writer fills the buffers meanwhile, and waits
+        try sleep(Duration.ofMillis(200));
+        try conn.writeString("x");
+        // the client's reader has its byte by then, and is done
+        try sleep(Duration.ofMillis(200));
+        let buf: uint8[] = [0u8] * 65536;
+        loop {
+            if (try conn.read(buf[..]) == 0) {
+                break;
+            }
+        }
+        try conn.close();
+    });
+    var client = try TcpStream.connect(at);
+    let size = 33554432;
+    let writer = spawn(() => {
+        let chunk: uint8[] = [0u8] * 1048576;
+        var sent = 0;
+        while (sent < size) {
+            try client.writeAll(chunk[..]);
+            sent += chunk.length();
+        }
+        try client.shutdown(.Write);
+        return sent;
+    });
+    let reader = spawn(() => {
+        let one: uint8[] = [0u8] * 1;
+        return try client.read(one[..]);
+    });
+    let got = try reader.await();
+    try {
+        let sent = withTimeout(Duration.ofMillis(10000), () => try writer.await());
+        println(f"{got} byte read, then {sent} written");
+    } catch (_: TimedOut) {
+        println("the writer was never woken");
+    }
+    try server.await();
+    try client.close();
+    try listener.close();
+}
