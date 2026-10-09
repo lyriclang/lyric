@@ -1,0 +1,34 @@
+// A thread that is never idle still sees a socket's readiness (13 M8b S10b): a task yields over and
+// over while another waits to read; the scheduler asks the poller every 61 turns where sockets
+// wait, so the read ends long before the busy task gives up. Expected stdout: "read while busy".
+import std.io { println };
+import std.net { IpAddr, SocketAddr, TcpListener, TcpStream };
+import std.task { spawn, yieldNow };
+
+fn main(): void throws Error {
+    let listener = try TcpListener.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 });
+    var client = try TcpStream.connect(try listener.localAddr());
+    var conn = try listener.accept();
+    var done = false;
+    let reader = spawn(() => {
+        let buf: uint8[] = [0u8] * 4;
+        let _ = try conn.read(buf[..]);
+        done = true;
+    });
+    let busy = spawn(() => {
+        var turns = 0;
+        while (!done && turns < 1000000) {
+            try yieldNow();
+            turns += 1;
+        }
+        return turns;
+    });
+    try yieldNow();
+    try client.writeString("x");
+    let turns = try busy.await();
+    try reader.await();
+    println(if (done && turns < 1000000) "read while busy" else f"never read ({turns} turns)");
+    try client.close();
+    try conn.close();
+    try listener.close();
+}

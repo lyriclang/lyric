@@ -1,0 +1,62 @@
+// Both ways of one socket at once (13 M8b P2, S10b): the client writes 4 MiB in one task while
+// another reads the echo back from the same stream — more than the system's buffers hold, so both
+// tasks wait on the one descriptor, a read and a write armed together, each readiness disarming its
+// own way only. Expected stdout: "4194304 back, all of them right".
+import std.io { println };
+import std.net { IpAddr, SocketAddr, TcpListener, TcpStream };
+import std.task { spawn };
+
+fn main(): void throws Error {
+    let listener = try TcpListener.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 });
+    let at = try listener.localAddr();
+    let server = spawn(() => {
+        var conn = try listener.accept();
+        let buf: uint8[] = [0u8] * 65536;
+        loop {
+            let n = try conn.read(buf[..]);
+            if (n == 0) {
+                break;
+            }
+            try conn.writeAll(buf[..n]);
+        }
+        try conn.close();
+    });
+    var client = try TcpStream.connect(at);
+    let total = 4194304;
+    let writer = spawn(() => {
+        let chunk: uint8[] = [0u8] * 65536;
+        var sent = 0;
+        while (sent < total) {
+            var k = 0;
+            while (k < chunk.length()) {
+                chunk[k] = ((sent + k) % 251) as uint8;
+                k += 1;
+            }
+            try client.writeAll(chunk[..]);
+            sent += chunk.length();
+        }
+        try client.shutdown(.Write);
+    });
+    let buf: uint8[] = [0u8] * 65536;
+    var got = 0;
+    var right = true;
+    loop {
+        let n = try client.read(buf[..]);
+        if (n == 0) {
+            break;
+        }
+        var k = 0;
+        while (k < n) {
+            if (buf[k] != ((got + k) % 251) as uint8) {
+                right = false;
+            }
+            k += 1;
+        }
+        got += n;
+    }
+    try writer.await();
+    try server.await();
+    try client.close();
+    try listener.close();
+    println(f"{got} back, {if (right) "all of them right" else "some wrong"}");
+}

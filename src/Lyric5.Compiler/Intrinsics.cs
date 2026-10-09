@@ -76,6 +76,24 @@ public static class Intrinsics
         ["std.fs.fsAbsolute"] = "LYR_FS_ABSOLUTE",
         ["std.task.currentPoller"] = "lyr_task_poller",
         ["std.task.wakePoller"] = "lyr_task_wake",
+        // A descriptor's readiness on the thread's poller (M8b S10b, lyr/task.h): std.net's waits.
+        ["std.task.armOnPoller"] = "lyr_task_arm",
+        ["std.task.forgetOnPoller"] = "lyr_task_forget",
+        ["std.task.takeFromPoller"] = "LYR_TASK_TAKE",
+        // The network (M8b S10b, lyr/net.h): std.net's sockets, non-blocking, waited for on the
+        // poller.
+        ["std.net.netSocket"] = "lyr_net_socket",
+        ["std.net.netBind"] = "LYR_NET_BIND",
+        ["std.net.netListen"] = "lyr_net_listen",
+        ["std.net.netAccept"] = "lyr_net_accept",
+        ["std.net.netConnect"] = "LYR_NET_CONNECT",
+        ["std.net.netConnected"] = "lyr_net_connected",
+        ["std.net.netRecv"] = "LYR_NET_RECV",
+        ["std.net.netSend"] = "LYR_NET_SEND",
+        ["std.net.netShutdown"] = "lyr_net_shutdown",
+        ["std.net.netSetNoDelay"] = "lyr_net_set_nodelay",
+        ["std.net.netName"] = "LYR_NET_NAME",
+        ["std.net.netClose"] = "lyr_net_close",
         ["std.task.spin"] = "lyr_task_spin",
         // Signals as a channel (10 Q9, 06 K5): the abstract names and the system's numbers, the
         // handler on or off, the watcher's poller, the caught ones.

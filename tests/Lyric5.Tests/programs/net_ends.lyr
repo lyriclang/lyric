@@ -1,0 +1,56 @@
+// How a socket's wait ends besides its readiness (10 O7, Review 2026-10-08; 13 M8b S10b): a cancel
+// — withTimeout around an accept and around a read —, a close of the listener while a task waits in
+// its accept, and a connection to a port nobody listens on. Expected stdout:
+//   accept: timed out
+//   read: timed out
+//   closed while accepting: closed (accepted)
+//   refused: connection refused
+import std.io { IoError, IoErrorKind, println };
+import std.net { IpAddr, SocketAddr, TcpListener, TcpStream };
+import std.task { Cancelled, TimedOut, sleep, spawn, withTimeout };
+import std.time { Duration };
+
+fn main(): void throws Error {
+    let local = IpAddr.V4(127, 0, 0, 1);
+    let listener = try TcpListener.bind(SocketAddr { ip = local, port = 0 });
+    let at = try listener.localAddr();
+    try {
+        let _ = withTimeout(Duration.ofMillis(50), () => try listener.accept());
+        println("accept: came");
+    } catch (_: TimedOut) {
+        println("accept: timed out");
+    }
+
+    let server = spawn(() => try listener.accept());
+    var client = try TcpStream.connect(at);
+    var conn = try server.await();
+    try {
+        let buf: uint8[] = [0u8] * 8;
+        let _ = withTimeout(Duration.ofMillis(50), () => try client.read(buf[..]));
+        println("read: came");
+    } catch (_: TimedOut) {
+        println("read: timed out");
+    }
+    try client.close();
+    try conn.close();
+
+    let waiting = spawn(() => try listener.accept());
+    try sleep(Duration.ofMillis(20));
+    try listener.close();
+    try {
+        let _ = try waiting.await();
+        println("closed while accepting: came");
+    } catch (e: IoError) {
+        println(f"closed while accepting: {e.message()}");
+    }
+
+    let gone = try TcpListener.bind(SocketAddr { ip = local, port = 0 });
+    let nobody = try gone.localAddr();
+    try gone.close();
+    try {
+        let _ = try TcpStream.connect(nobody);
+        println("refused: connected");
+    } catch (e: IoError) {
+        println(f"refused: {if (e.kind == .ConnectionRefused) "connection refused" else e.message()}");
+    }
+}

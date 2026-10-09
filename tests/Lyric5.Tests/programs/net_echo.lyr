@@ -1,0 +1,37 @@
+// TCP within one program (design/v5/spec/10 O7; 13 M8b S10b): a listener on 127.0.0.1 with a port
+// the system chose, a server task that echoes until the client shuts its writing, the client
+// reading it all back — every wait a socket's, on the thread's poller. Expected stdout:
+//   hello over tcp
+//   127.0.0.1 true
+import std.io { println };
+import std.net { IpAddr, SocketAddr, TcpListener, TcpStream };
+import std.task { spawn };
+
+fn main(): void throws Error {
+    let listener = try TcpListener.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 });
+    let at = try listener.localAddr();
+    let server = spawn(() => {
+        var conn = try listener.accept();
+        let buf: uint8[] = [0u8] * 64;
+        loop {
+            let n = try conn.read(buf[..]);
+            if (n == 0) {
+                break;
+            }
+            try conn.writeAll(buf[..n]);
+        }
+        try conn.close();
+    });
+    var client = try TcpStream.connect(at);
+    // asked while connected: once both ends have closed, the system knows no peer (ENOTCONN)
+    let peer = try client.peerAddr();
+    try client.setNoDelay(true);
+    try client.writeString("hello over tcp");
+    try client.shutdown(.Write);
+    let back = try client.readToString();
+    println(back);
+    println(f"{peer.ip} {peer.port == at.port}");
+    try client.close();
+    try server.await();
+    try listener.close();
+}

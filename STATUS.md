@@ -645,6 +645,15 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   never waits without bound declares `IoError` alone (memory, `File`, the console); `std.fs` and
   `stdin()` keep `IoError` (`uncancelled`, a `StdinLinesIter`). Spec 12 rules 2–8 of "Input and
   output", "Files" 5, "The console" 4; four cases.
+- **S10b** TCP over the poller (10 O7; P2): the poller arms a descriptor one-shot, each way apart
+  (epoll's table re-arms the other way; kqueue's filters are apart anyway), its fired tokens taken
+  after each wait; a task parks in `awaitReady` — a cancel ends it —, a token is a slot and a count,
+  so a late readiness wakes nobody; a thread with sockets waiting asks the poller every 61 turns,
+  and a socket's wait is no deadlock. `runtime/src/net.c` (POSIX; Windows Unsupported until S11):
+  one call each, non-blocking. `std.net`: `IpAddr` (RFC 4291 read, RFC 5952 written), `SocketAddr`,
+  `TcpListener`, `TcpStream`, `Shutdown`; a close wakes the waiters of its thread with `Closed`.
+  100 connections on one thread. Spec 12 "The network", five cases. S10c: UDP, `resolve`, the echo
+  server.
 - **S13** the build script (11 W3 BS1–BS6): a package's `build.lyr` built as a program of its
   own (`build`, `build/`, its `[build-dependencies]` as a graph of its own in the same lock) and
   run before the compile; `std.build` (`target`, `profile`, `outDir`, `genDir`, `rerunIfChanged`,

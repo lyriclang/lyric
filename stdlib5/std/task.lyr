@@ -8,6 +8,7 @@
 /// state, the scheduler, `launchOn`, the registry of the living schedulers and the natives.
 
 
+import std.core { filled };
 import std.time { Duration };
 
 /// What a suspended `yield` throws when `close()` unwinds its coroutine (06 A5), and what a wait
@@ -1336,6 +1337,19 @@ class Scheduler {
     /// The thread's random generator's state (10 Q2), `std.random`'s to lay out and to fill: made
     /// at its first use on the thread, as an array, so this module names no type of that one.
     var randomState: ?uint32[] = null,
+    /// The tasks that wait on the poller for a descriptor (13 M8b P2, S10b), each in a slot: the
+    /// token it armed with is its slot's number with a count above it, so a readiness that comes
+    /// after its wait ended finds another token there and wakes nobody. The free slots are a
+    /// stack; the turns count to the poll a busy thread makes now and then (`step`).
+    var ioWaiting: (?Context)[] = [],
+    var ioTokens: int[] = [],
+    var ioFree: int[] = [],
+    var ioFreeTop: int = 0,
+    var ioMade: int = 0,
+    var ioCount: int = 0,
+    var ioNext: int = 0,
+    var turns: int = 0,
+    ioFired: int[] = [0] * 64,
 
     /// The thread begins to run this scheduler: from here a waker on another thread wakes it.
     mut fn started(): void {
@@ -1409,6 +1423,88 @@ class Scheduler {
         c.endWait();
         this.unsleep(c);
         if (atomicLoad(&c.cancelled)) { throw Cancelled { }; }
+    }
+
+    /// The running task waits until `fd` is ready as `interest` says — 1 to read, 2 to write
+    /// (lyr/poll.h; M8b S10b): a socket's call that would block. A cancel ends the wait with
+    /// `Cancelled` (06 N9; 10 Review 2026-10-08). 0, or the poller's failure as lyr/fs.h writes
+    /// one. The descriptor is armed before the wait begins: its readiness is seen only after the
+    /// task has parked, by this thread's next turn, and a failed arm leaves no wait behind.
+    mut fn awaitReady(fd: int, interest: int): int throws Cancelled {
+        let c = this.running ?? panic("a wait where no task runs");
+        if (atomicLoad(&c.cancelled)) { throw Cancelled { }; }
+        let token = this.ioEnter(c);
+        let armed = armOnPoller(fd, interest, token);
+        if (armed < 0) {
+            this.ioLeave(token);
+            return armed;
+        }
+        c.beginWait();
+        this.wakeIfCancelled(c);
+        park();
+        c.endWait();
+        this.ioLeave(token);
+        if (atomicLoad(&c.cancelled)) { throw Cancelled { }; }
+        return 0;
+    }
+
+    /// `c` takes a slot among the descriptors' waiters: its token.
+    mut fn ioEnter(c: Context): int {
+        var slot = this.ioMade;
+        if (this.ioFreeTop > 0) {
+            this.ioFreeTop -= 1;
+            slot = this.ioFree[this.ioFreeTop];
+        } else {
+            if (slot == this.ioTokens.length()) {
+                let room = if (slot == 0) 16 else slot * 2;
+                let none: ?Context = null;
+                let waiting = filled(room, none);
+                let tokens: int[] = [0] * room;
+                let free: int[] = [0] * room;
+                this.ioWaiting[..].copyInto(waiting[..]);
+                this.ioTokens[..].copyInto(tokens[..]);
+                this.ioWaiting = waiting;
+                this.ioTokens = tokens;
+                this.ioFree = free;
+            }
+            this.ioMade += 1;
+        }
+        // a count above the slot's 24 bits, from 1: no token is 0, and none outlives its wait
+        this.ioNext = this.ioNext % 549755813887 + 1;
+        let token = (this.ioNext << 24) | slot;
+        this.ioWaiting[slot] = c;
+        this.ioTokens[slot] = token;
+        this.ioCount += 1;
+        return token;
+    }
+
+    /// The slot of `token` is free again.
+    mut fn ioLeave(token: int): void {
+        let slot = token & 16777215;
+        this.ioWaiting[slot] = null;
+        this.ioTokens[slot] = 0;
+        this.ioFree[this.ioFreeTop] = slot;
+        this.ioFreeTop += 1;
+        this.ioCount -= 1;
+    }
+
+    /// The readinesses the poller saw: their waiters run again, where they still wait.
+    mut fn takeFired(): void {
+        loop {
+            let n = takeFromPoller(this.ioFired[..]);
+            var i = 0;
+            while (i < n) {
+                let token = this.ioFired[i];
+                let slot = token & 16777215;
+                if (slot < this.ioTokens.length() && this.ioTokens[slot] == token) {
+                    if (let c = this.ioWaiting[slot]) {
+                        this.wakeUp(c);
+                    }
+                }
+                i += 1;
+            }
+            if (n < this.ioFired.length()) { return; }
+        }
     }
 
     /// `c` goes into the sleepers' heap, to wake once `nanos` have passed.
@@ -1566,6 +1662,15 @@ class Scheduler {
     mut fn step(): void {
         this.takeInbox();
         if (this.sleepers != null) { this.wakeSleepers(monotonicNanos()); }
+        if (this.ioCount > 0) {
+            // a thread that is never idle asks the poller now and then (Go's 61), so a socket's
+            // readiness does not wait for the busy tasks to end
+            this.turns += 1;
+            if (this.turns % 61 == 0) {
+                if (waitOnPoller(0)) { this.pollerWoke(); }
+                this.takeFired();
+            }
+        }
         if (let c = this.takeReady()) {
             if (!c.live) { this.admit(c); }
             this.running = c;
@@ -1582,11 +1687,13 @@ class Scheduler {
             if (this.deadlock()) { return; }
             waitOnPoller(-1);
             this.pollerWoke();
+            this.takeFired();
             return;
         }
         let left = top.deadline - monotonicNanos();
         waitOnPoller(if (left > 0) left else 0);
         this.pollerWoke();
+        this.takeFired();
     }
 
     /// `c` has its first turn: from here it lives on this thread. On a thread in its last turns
@@ -1637,10 +1744,11 @@ class Scheduler {
     /// the oldest.
     ///
     /// The count is read BEFORE the inbox: a thread that ends hands its last wake-ups over before
-    /// it leaves the count, so with the count at one they are all there to be seen. (A wait on the
-    /// system — a file, a socket — has to count here once there is one: M8b.)
+    /// it leaves the count, so with the count at one they are all there to be seen. A task that
+    /// waits on a descriptor waits on the system, which may end it (M6-12's "I/O-Interesse",
+    /// M8b S10b): no deadlock while one does. A file's call waits on the pool, a thread that lives.
     mut fn deadlock(): bool {
-        if (this.liveFirst == null || living.others(this) || this.pending()) { return false; }
+        if (this.liveFirst == null || this.ioCount > 0 || living.others(this) || this.pending()) { return false; }
         var at = this.liveFirst;
         while (let c = at) {
             if (!c.awaits && this.wakeStuck(c)) { return true; }
@@ -1747,6 +1855,18 @@ var channelIds: int = 0;
 /// The running thread's scheduler: there is one wherever a task runs.
 fn here(): Scheduler {
     return currentScheduler() ?? panic("a wait where no task runs");
+}
+
+/// The running task waits until `fd` is ready to read (1) or to write (2) — std.net's sockets
+/// (M8b S10b): 0, or the poller's failure as lyr/fs.h writes one; a cancel throws `Cancelled`.
+fn awaitDescriptor(fd: int, interest: int): int throws Cancelled {
+    return try here().awaitReady(fd, interest);
+}
+
+/// `fd` out of the running thread's poller, before it is closed: a task of the thread that waits
+/// on it runs again, and finds it closed.
+fn forgetDescriptor(fd: int): void {
+    forgetOnPoller(fd);
 }
 
 /// The running thread's random generator's state, if it has one yet (std.random's free forms).
@@ -1881,6 +2001,12 @@ fn startThread(body: fn() -> void): void;
 /// from any thread, while its thread runs.
 fn currentPoller(): int;
 fn wakePoller(poller: int): void;
+
+/// A descriptor's readiness on the running thread's poller (lyr/task.h; M8b S10b): armed with a
+/// waiter's token, out of the poller before its close, and the tokens fired since the last take.
+fn armOnPoller(fd: int, interest: int, token: int): int;
+fn forgetOnPoller(fd: int): void;
+fn takeFromPoller(into: Slice<int>): int;
 
 /// A thread that spins on a lock lets another run.
 fn spin(): void;

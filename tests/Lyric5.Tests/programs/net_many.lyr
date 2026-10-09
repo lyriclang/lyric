@@ -1,0 +1,45 @@
+// Many connections on one thread (13 M8b S10's check): 100 clients at once against one server, a
+// task per connection on each side, each line sent and echoed — all of it waits on one poller.
+// Expected stdout: "100 echoed, 4950 summed".
+import std.io { TextReader, println };
+import std.net { IpAddr, SocketAddr, TcpListener, TcpStream };
+import std.task { TaskScope, spawn };
+
+fn main(): void throws Error {
+    let listener = try TcpListener.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 });
+    let at = try listener.localAddr();
+    let count = 100;
+    let server = spawn(() => {
+        using let scope = TaskScope.new();
+        var accepted = 0;
+        while (accepted < count) {
+            var conn = try listener.accept();
+            accepted += 1;
+            let _ = scope.spawn(() => {
+                let line = try TextReader.new(conn).readLine();
+                try conn.writeString(f"{line ?? "-"}\n");
+                try conn.close();
+            });
+        }
+    });
+    var sum = 0;
+    var echoed = 0;
+    {
+        using let clients = TaskScope.new();
+        for (i in 0..count) {
+            let _ = clients.spawn(() => {
+                var conn = try TcpStream.connect(at);
+                try conn.writeString(f"{i}\n");
+                let back = try TextReader.new(conn).readLine();
+                if (back == f"{i}") {
+                    sum += i;
+                    echoed += 1;
+                }
+                try conn.close();
+            });
+        }
+    }
+    try server.await();
+    try listener.close();
+    println(f"{echoed} echoed, {sum} summed");
+}

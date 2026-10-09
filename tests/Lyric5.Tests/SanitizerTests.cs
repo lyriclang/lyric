@@ -133,6 +133,12 @@ public class SanitizerTests
     [InlineData("locks", 0)]
     [InlineData("pool", 0)]
     [InlineData("files", 0)]
+    // the poller's descriptors (M8b S10b): its table, its fired tokens, a close that fires them
+    [InlineData("net_echo", 0)]
+    [InlineData("net_many", 0)]
+    [InlineData("net_duplex", 0)]
+    [InlineData("net_ends", 0)]
+    [InlineData("net_one_way", 0)]
     [InlineData("thread_end", 0)]
     [InlineData("deadlock", 101)]
     [InlineData("poison", 101)]

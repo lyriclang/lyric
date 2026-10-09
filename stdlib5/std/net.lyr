@@ -1,0 +1,637 @@
+/// The network (design/v5/spec/10 O7; 13 M8b P1, P2, S10b): IP addresses and socket addresses,
+/// and TCP — a listener that accepts, a stream that is a `Reader` and a `Writer`. A call that would
+/// block parks the task until the thread's poller says the socket is ready (06 S2), then asks
+/// again; a cancel ends that wait with `Cancelled` (10 Review 2026-10-08). There are no socket
+/// timeouts: `withTimeout` is the one way (O7). POSIX; on Windows every call throws `Unsupported`
+/// until its poller and Winsock (S11). S10c: UDP and the resolver.
+import std.core { Parse, ParseError, StringBuilder, viewBytes };
+import std.io { IoError, Reader, Writer, failure };
+import std.task { Cancelled, awaitDescriptor, forgetDescriptor };
+
+fn netSocket(family: int, kind: int): int;
+fn netBind(fd: int, family: int, address: Slice<uint8>, port: int, reuse: int): int;
+fn netListen(fd: int, backlog: int): int;
+fn netAccept(fd: int): int;
+fn netConnect(fd: int, family: int, address: Slice<uint8>, port: int): int;
+fn netConnected(fd: int): int;
+fn netRecv(fd: int, into: Slice<uint8>): int;
+fn netSend(fd: int, from: Slice<uint8>): int;
+fn netShutdown(fd: int, how: int): int;
+fn netSetNoDelay(fd: int, on: int): int;
+fn netName(fd: int, peer: int, into: Slice<uint8>): int;
+fn netClose(fd: int): int;
+
+/// What a call that would block answers (lyr/net.h).
+let wouldBlock = -(64 << 32);
+
+/// How many connections a listener keeps waiting for `accept` (Rust's and Go's 128).
+let backlog = 128;
+
+// ---------------------------------------------------------------------------------------------
+// The addresses (10 O7).
+// ---------------------------------------------------------------------------------------------
+
+/// An IP address (10 O7): version 4's four bytes, or version 6's eight groups of 16 bits.
+pub enum IpAddr :: [Equatable, Debug] {
+    V4(uint8, uint8, uint8, uint8),
+    V6(uint16, uint16, uint16, uint16, uint16, uint16, uint16, uint16),
+}
+
+extend IpAddr :: [Display] {
+    /// Version 4 dotted, `192.0.2.1`; version 6 as RFC 5952 writes it — lower case, no leading
+    /// zero in a group, the longest run of two or more zero groups (the first of equals) as `::`,
+    /// and an IPv4-mapped address with its dotted tail, `::ffff:192.0.2.1`.
+    fn show(): string {
+        return match (this) {
+            .V4(a, b, c, d) => f"{a}.{b}.{c}.{d}",
+            .V6(g0, g1, g2, g3, g4, g5, g6, g7) => v6Text([g0, g1, g2, g3, g4, g5, g6, g7]),
+        };
+    }
+}
+
+extend IpAddr :: [Parse] {
+    /// Version 4 dotted — four decimal bytes, none with a leading zero (RFC 6943 §3.1.1: no octal
+    /// reading) —, or version 6 in the forms of RFC 4291 §2.2: groups of one to four hex digits,
+    /// `::` once for one or more zero groups, an IPv4 tail in the last 32 bits. No zone (`%eth0`).
+    static fn parse(s: StringView): IpAddr throws ParseError {
+        let text = viewBytes(s);
+        if (text.isEmpty()) {
+            throw ParseError { kind = .Empty };
+        }
+        if (let v4 = v4Of(text)) {
+            return IpAddr.V4(v4[0], v4[1], v4[2], v4[3]);
+        }
+        if (let g = v6Of(text)) {
+            return IpAddr.V6(g[0], g[1], g[2], g[3], g[4], g[5], g[6], g[7]);
+        }
+        throw ParseError { kind = .Invalid };
+    }
+}
+
+/// An IP address and a port (10 O7).
+pub struct SocketAddr :: [Equatable, Debug] {
+    pub ip: IpAddr,
+    pub port: uint16,
+}
+
+extend SocketAddr :: [Display] {
+    /// `192.0.2.1:8080`; a version 6 address in brackets, `[::1]:8080` (RFC 3986).
+    fn show(): string {
+        return match (this.ip) {
+            .V4(_, _, _, _) => f"{this.ip}:{this.port}",
+            .V6(_, _, _, _, _, _, _, _) => f"[{this.ip}]:{this.port}",
+        };
+    }
+}
+
+extend SocketAddr :: [Parse] {
+    /// `192.0.2.1:8080` or `[2001:db8::1]:8080`: the address as `IpAddr.parse` takes it, then a
+    /// decimal port up to 65535.
+    static fn parse(s: StringView): SocketAddr throws ParseError {
+        let text = viewBytes(s);
+        if (text.isEmpty()) {
+            throw ParseError { kind = .Empty };
+        }
+        var colon = text.length() - 1;
+        while (colon >= 0 && text[colon] != 58u8) {
+            colon -= 1;
+        }
+        if (colon <= 0) {
+            throw ParseError { kind = .Invalid };
+        }
+        let port = portOf(text[colon + 1..]);
+        if (port == null) {
+            throw ParseError { kind = .Invalid };
+        }
+        var host = text[..colon];
+        let bracketed = host[0] == 91u8;
+        if (bracketed) {
+            if (host.length() < 2 || host[host.length() - 1] != 93u8) {
+                throw ParseError { kind = .Invalid };
+            }
+            host = host[1..host.length() - 1];
+        }
+        if (let v4 = v4Of(host)) {
+            if (bracketed) {
+                throw ParseError { kind = .Invalid };
+            }
+            return SocketAddr { ip = IpAddr.V4(v4[0], v4[1], v4[2], v4[3]), port = port };
+        }
+        if (bracketed) {
+            if (let g = v6Of(host)) {
+                return SocketAddr { ip = IpAddr.V6(g[0], g[1], g[2], g[3], g[4], g[5], g[6], g[7]), port = port };
+            }
+        }
+        throw ParseError { kind = .Invalid };
+    }
+}
+
+/// The four bytes of a dotted version 4 address, or null where `text` is none.
+fn v4Of(text: Slice<uint8>): ?uint8[] {
+    let bytes: uint8[] = [0u8] * 4;
+    var part = 0;
+    var value = 0;
+    var digits = 0;
+    var leadingZero = false;
+    for (b in text) {
+        if (b == 46u8) {
+            if (digits == 0 || part == 3) {
+                return null;
+            }
+            bytes[part] = value as uint8;
+            part += 1;
+            value = 0;
+            digits = 0;
+            leadingZero = false;
+        } else if (b >= 48u8 && b <= 57u8) {
+            if (leadingZero || digits == 3) {
+                return null;
+            }
+            if (digits == 0 && b == 48u8) {
+                leadingZero = true;
+            }
+            value = value * 10 + (b as int - 48);
+            digits += 1;
+            if (value > 255) {
+                return null;
+            }
+        } else {
+            return null;
+        }
+    }
+    if (part != 3 || digits == 0) {
+        return null;
+    }
+    bytes[3] = value as uint8;
+    return bytes;
+}
+
+/// The eight groups of a version 6 address, or null where `text` is none.
+fn v6Of(text: Slice<uint8>): ?uint16[] {
+    let groups: uint16[] = [0u16] * 8;
+    let n = text.length();
+    var count = 0;
+    var gap = -1;
+    var i = 0;
+    if (n >= 2 && text[0] == 58u8 && text[1] == 58u8) {
+        gap = 0;
+        i = 2;
+    } else if (n >= 1 && text[0] == 58u8) {
+        return null;
+    }
+    while (i < n) {
+        if (count == 8) {
+            return null;
+        }
+        var end = i;
+        var dotted = false;
+        while (end < n && text[end] != 58u8) {
+            if (text[end] == 46u8) {
+                dotted = true;
+            }
+            end += 1;
+        }
+        if (dotted) {
+            // an IPv4 tail: the last 32 bits, nothing after it
+            if (end != n || count > 6) {
+                return null;
+            }
+            let tail = v4Of(text[i..end]);
+            if (tail == null) {
+                return null;
+            }
+            let v4 = tail;
+            groups[count] = ((v4[0] as int) * 256 + (v4[1] as int)) as uint16;
+            groups[count + 1] = ((v4[2] as int) * 256 + (v4[3] as int)) as uint16;
+            count += 2;
+            i = n;
+        } else {
+            let g = hexGroup(text[i..end]);
+            if (g == null) {
+                return null;
+            }
+            groups[count] = g;
+            count += 1;
+            i = end;
+            if (i < n) {
+                i += 1;
+                if (i == n) {
+                    return null;
+                }
+                if (text[i] == 58u8) {
+                    if (gap >= 0) {
+                        return null;
+                    }
+                    gap = count;
+                    i += 1;
+                }
+            }
+        }
+    }
+    if (gap < 0) {
+        return if (count == 8) groups else null;
+    }
+    // `::` stands for one zero group at least: the groups after it move to the end
+    if (count == 8) {
+        return null;
+    }
+    let after = count - gap;
+    var k = 0;
+    while (k < after) {
+        groups[7 - k] = groups[count - 1 - k];
+        k += 1;
+    }
+    var z = gap;
+    while (z < 8 - after) {
+        groups[z] = 0u16;
+        z += 1;
+    }
+    return groups;
+}
+
+/// One to four hex digits as a group, or null.
+fn hexGroup(text: Slice<uint8>): ?uint16 {
+    if (text.isEmpty() || text.length() > 4) {
+        return null;
+    }
+    var value = 0;
+    for (b in text) {
+        let digit = if (b >= 48u8 && b <= 57u8) b as int - 48
+            else if (b >= 97u8 && b <= 102u8) b as int - 87
+            else if (b >= 65u8 && b <= 70u8) b as int - 55
+            else -1;
+        if (digit < 0) {
+            return null;
+        }
+        value = value * 16 + digit;
+    }
+    return value as uint16;
+}
+
+/// A decimal port, 0 to 65535, no sign and no leading zero; or null.
+fn portOf(text: Slice<uint8>): ?uint16 {
+    if (text.isEmpty() || text.length() > 5 || (text.length() > 1 && text[0] == 48u8)) {
+        return null;
+    }
+    var value = 0;
+    for (b in text) {
+        if (b < 48u8 || b > 57u8) {
+            return null;
+        }
+        value = value * 10 + (b as int - 48);
+    }
+    return if (value > 65535) null else value as uint16;
+}
+
+/// Version 6's text (RFC 5952).
+fn v6Text(g: uint16[]): string {
+    if (g[0] == 0u16 && g[1] == 0u16 && g[2] == 0u16 && g[3] == 0u16 && g[4] == 0u16 && g[5] == 65535u16) {
+        let high = g[6] as int;
+        let low = g[7] as int;
+        let tail = IpAddr.V4((high / 256) as uint8, (high % 256) as uint8, (low / 256) as uint8, (low % 256) as uint8);
+        return f"::ffff:{tail}";
+    }
+    // the longest run of zero groups, two at least, the first of equals
+    var best = -1;
+    var bestLength = 1;
+    var at = 0;
+    while (at < 8) {
+        if (g[at] == 0u16) {
+            var end = at;
+            while (end < 8 && g[end] == 0u16) {
+                end += 1;
+            }
+            if (end - at > bestLength) {
+                best = at;
+                bestLength = end - at;
+            }
+            at = end;
+        } else {
+            at += 1;
+        }
+    }
+    let out = StringBuilder.new();
+    var i = 0;
+    while (i < 8) {
+        if (i == best) {
+            out.appendStr("::");
+            i += bestLength;
+        } else {
+            if (i > 0 && i != best + bestLength) {
+                out.appendStr(":");
+            }
+            out.appendStr(hexText(g[i]));
+            i += 1;
+        }
+    }
+    return out.toString();
+}
+
+/// A group in lower-case hex, no leading zero.
+fn hexText(v: uint16): string {
+    let digits = "0123456789abcdef";
+    let bytes = viewBytes(digits);
+    let out = StringBuilder.new();
+    var started = false;
+    var shift = 12;
+    while (shift >= 0) {
+        let d = ((v as int) >> shift) & 15;
+        if (d != 0 || started || shift == 0) {
+            out.appendChar(char.fromUint32(bytes[d] as uint32)!);
+            started = true;
+        }
+        shift -= 4;
+    }
+    return out.toString();
+}
+
+/// An address as it crosses to the runtime (lyr/net.h): its family, its 16 bytes, its port.
+fn familyOf(ip: IpAddr): int {
+    return match (ip) {
+        .V4(_, _, _, _) => 4,
+        .V6(_, _, _, _, _, _, _, _) => 6,
+    };
+}
+
+fn bytesOf(ip: IpAddr): uint8[] {
+    let bytes: uint8[] = [0u8] * 16;
+    match (ip) {
+        .V4(a, b, c, d) => {
+            bytes[0] = a;
+            bytes[1] = b;
+            bytes[2] = c;
+            bytes[3] = d;
+        }
+        .V6(g0, g1, g2, g3, g4, g5, g6, g7) => {
+            let groups = [g0, g1, g2, g3, g4, g5, g6, g7];
+            var k = 0;
+            while (k < 8) {
+                let group = groups[k] as int;
+                bytes[2 * k] = (group / 256) as uint8;
+                bytes[2 * k + 1] = (group % 256) as uint8;
+                k += 1;
+            }
+        }
+    }
+    return bytes;
+}
+
+/// The address the runtime wrote (lyr/net.h: family, port high and low, 16 bytes).
+fn addressFrom(b: Slice<uint8>): SocketAddr {
+    let port = ((b[1] as int) * 256 + (b[2] as int)) as uint16;
+    if (b[0] == 4u8) {
+        return SocketAddr { ip = IpAddr.V4(b[3], b[4], b[5], b[6]), port = port };
+    }
+    let groups: uint16[] = [0u16] * 8;
+    var k = 0;
+    while (k < 8) {
+        groups[k] = ((b[3 + 2 * k] as int) * 256 + (b[4 + 2 * k] as int)) as uint16;
+        k += 1;
+    }
+    return SocketAddr {
+        ip = IpAddr.V6(groups[0], groups[1], groups[2], groups[3], groups[4], groups[5], groups[6], groups[7]),
+        port = port,
+    };
+}
+
+// ---------------------------------------------------------------------------------------------
+// TCP (10 O4, O7): handles are classes with a closed state (P4); every call after `close()`
+// throws `Closed`, and a second `close()` does nothing.
+// ---------------------------------------------------------------------------------------------
+
+/// What a failed call of the runtime says, about `addr` where there is one: an `IoError` whose
+/// path is the address's text.
+fn netFailure(answer: int, addr: ?SocketAddr, doing: string): IoError {
+    var path: ?string = null;
+    if (let a = addr) {
+        path = a.show();
+    }
+    return failure(answer, path, doing);
+}
+
+/// The running task waits until `fd` is ready as `interest` says (1 to read, 2 to write).
+fn waitFor(fd: int, interest: int, doing: string): void throws [IoError, Cancelled] {
+    let armed = try awaitDescriptor(fd, interest);
+    if (armed < 0) {
+        throw failure(armed, null, doing);
+    }
+}
+
+/// A new socket for `addr`'s family.
+fn socketFor(addr: SocketAddr, kind: int, doing: string): int throws IoError {
+    let fd = netSocket(familyOf(addr.ip), kind);
+    if (fd < 0) {
+        throw netFailure(fd, addr, doing);
+    }
+    return fd;
+}
+
+/// A TCP socket that listens (10 O7): `bind` makes it, `accept` gives each connection that comes
+/// as a `TcpStream`.
+pub class TcpListener :: [Closeable] {
+    fd: int,
+    var closed: bool = false,
+
+    /// A listener on `addr`; port 0 asks the system for a free one, which `localAddr` says. A port
+    /// that a closed listener's connections still hold (TIME_WAIT) is taken all the same.
+    pub static fn bind(addr: SocketAddr): TcpListener throws IoError {
+        let fd = try socketFor(addr, 1, "bound");
+        let bytes = bytesOf(addr.ip);
+        var answer = netBind(fd, familyOf(addr.ip), bytes[..], addr.port as int, 1);
+        if (answer == 0) {
+            answer = netListen(fd, backlog);
+        }
+        if (answer < 0) {
+            let _ = netClose(fd);
+            throw netFailure(answer, addr, "bound");
+        }
+        return TcpListener { fd = fd };
+    }
+
+    /// The next connection: waits until one comes.
+    pub mut fn accept(): TcpStream throws [IoError, Cancelled] {
+        loop {
+            try this.stillOpen("accepted");
+            let fd = netAccept(this.fd);
+            if (fd >= 0) {
+                return TcpStream { fd = fd };
+            }
+            if (fd != wouldBlock) {
+                throw failure(fd, null, "accepted");
+            }
+            try waitFor(this.fd, 1, "accepted");
+        }
+    }
+
+    /// The address it listens on — with the port the system chose, where `bind` asked for 0.
+    pub fn localAddr(): SocketAddr throws IoError {
+        try this.stillOpen("asked its address");
+        return try nameOf(this.fd, 0);
+    }
+
+    /// Lets the socket go; a task that waits in `accept` throws `Closed`. A second close does
+    /// nothing.
+    pub fn close(): void throws IoError {
+        let me = this;
+        if (me.closed) {
+            return;
+        }
+        me.closed = true;
+        try closeSocket(me.fd);
+    }
+
+    fn stillOpen(doing: string): void throws IoError {
+        if (this.closed) {
+            throw IoError { kind = .Closed, detail = doing };
+        }
+    }
+}
+
+/// How much of a stream `shutdown` ends (10 O7): its reading, its writing, or both.
+pub enum Shutdown :: [Equatable, Debug] {
+    Read,
+    Write,
+    Both,
+}
+
+/// A TCP connection (10 O4, O7): a `Reader` and a `Writer` whose calls wait for the socket — a
+/// read until bytes come, a write until the system takes some.
+pub class TcpStream :: [Reader, Writer, Closeable] {
+    fd: int,
+    var closed: bool = false,
+
+    /// A connection to `addr`: waits until it is made, or refused.
+    pub static fn connect(addr: SocketAddr): TcpStream throws [IoError, Cancelled] {
+        let fd = try socketFor(addr, 1, "connected");
+        let bytes = bytesOf(addr.ip);
+        let started = netConnect(fd, familyOf(addr.ip), bytes[..], addr.port as int);
+        var answer = started;
+        if (started == wouldBlock) {
+            try {
+                waitFor(fd, 2, "connected");
+            } catch (e: IoError) {
+                let _ = netClose(fd);
+                throw e;
+            } catch (e: Cancelled) {
+                forgetDescriptor(fd);
+                let _ = netClose(fd);
+                throw e;
+            }
+            answer = netConnected(fd);
+        }
+        if (answer < 0) {
+            forgetDescriptor(fd);
+            let _ = netClose(fd);
+            throw netFailure(answer, addr, "connected");
+        }
+        return TcpStream { fd = fd };
+    }
+
+    /// Bytes from the connection: waits until some come; 0 once the peer has ended its writing.
+    pub mut fn read(into: Slice<uint8>): int throws [IoError, Cancelled] {
+        loop {
+            try this.stillOpen("read");
+            if (into.isEmpty()) {
+                return 0;
+            }
+            let n = netRecv(this.fd, into);
+            if (n >= 0) {
+                return n;
+            }
+            if (n != wouldBlock) {
+                throw failure(n, null, "read");
+            }
+            try waitFor(this.fd, 1, "read");
+        }
+    }
+
+    /// Bytes into the connection: waits until the system takes some, and answers how many — maybe
+    /// fewer than `from` holds (`writeAll` takes the rest). A peer that is gone is `BrokenPipe`.
+    pub mut fn write(from: Slice<uint8>): int throws [IoError, Cancelled] {
+        loop {
+            try this.stillOpen("written");
+            if (from.isEmpty()) {
+                return 0;
+            }
+            let n = netSend(this.fd, from);
+            if (n >= 0) {
+                return n;
+            }
+            if (n != wouldBlock) {
+                throw failure(n, null, "written");
+            }
+            try waitFor(this.fd, 2, "written");
+        }
+    }
+
+    /// Ends the reading, the writing or both: a peer reading sees the end once the writing is shut.
+    pub fn shutdown(how: Shutdown): void throws IoError {
+        try this.stillOpen("shut down");
+        let which = match (how) {
+            .Read => 0,
+            .Write => 1,
+            .Both => 2,
+        };
+        let answer = netShutdown(this.fd, which);
+        if (answer < 0) {
+            throw failure(answer, null, "shut down");
+        }
+    }
+
+    /// Nagle's waiting off — each small write goes out at once — or on again.
+    pub fn setNoDelay(on: bool): void throws IoError {
+        try this.stillOpen("set");
+        let answer = netSetNoDelay(this.fd, if (on) 1 else 0);
+        if (answer < 0) {
+            throw failure(answer, null, "set");
+        }
+    }
+
+    /// The address of the connection's other end.
+    pub fn peerAddr(): SocketAddr throws IoError {
+        try this.stillOpen("asked its address");
+        return try nameOf(this.fd, 1);
+    }
+
+    /// The address of this end.
+    pub fn localAddr(): SocketAddr throws IoError {
+        try this.stillOpen("asked its address");
+        return try nameOf(this.fd, 0);
+    }
+
+    /// Lets the connection go; a task that waits in a read or a write throws `Closed`. A second
+    /// close does nothing.
+    pub fn close(): void throws IoError {
+        let me = this;
+        if (me.closed) {
+            return;
+        }
+        me.closed = true;
+        try closeSocket(me.fd);
+    }
+
+    fn stillOpen(doing: string): void throws IoError {
+        if (this.closed) {
+            throw IoError { kind = .Closed, detail = doing };
+        }
+    }
+}
+
+/// The socket's own address, or its peer's.
+fn nameOf(fd: int, peer: int): SocketAddr throws IoError {
+    let into: uint8[] = [0u8] * 19;
+    let n = netName(fd, peer, into[..]);
+    if (n < 0) {
+        throw failure(n, null, "asked its address");
+    }
+    return addressFrom(into[..]);
+}
+
+/// The socket out of the poller — its waiters run again and find it closed — and closed.
+fn closeSocket(fd: int): void throws IoError {
+    forgetDescriptor(fd);
+    let answer = netClose(fd);
+    if (answer < 0) {
+        throw failure(answer, null, "closed");
+    }
+}

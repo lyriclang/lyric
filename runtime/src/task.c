@@ -137,6 +137,14 @@ int64_t lyr_task_poller(void) { return (int64_t)(intptr_t)lyr_poller_current(); 
 
 void lyr_task_wake(int64_t poller) { lyr_poller_wake((LyrPoller *)(intptr_t)poller); }
 
+int64_t lyr_task_arm(int64_t fd, int64_t interest, int64_t token) {
+    return lyr_poller_arm(lyr_poller_current(), fd, interest, token);
+}
+
+void lyr_task_forget(int64_t fd) { lyr_poller_forget(lyr_poller_current(), fd); }
+
+int64_t lyr_task_take(int64_t *into, int64_t n) { return lyr_poller_take(lyr_poller_current(), into, n); }
+
 void lyr_task_spin(void) {
 #ifdef _WIN32
     SwitchToThread();
