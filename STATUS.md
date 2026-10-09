@@ -668,6 +668,14 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   both ways), cancelled and asked again on its completion when more ways come; ntdll's calls looked
   up at run time. `net.c` is POSIX's and Winsock's in one file. Every network test runs on Windows
   now, the echo server's Interrupt aside (a POSIX `kill`).
+- **S12a** processes on POSIX (10 O8, Q9): `std.process` — `Command` (an options struct), `Stdio`,
+  `Child` (`stdin: ?PipeWriter`, `stdout`/`stderr: ?PipeReader`, `wait`, `kill`, `signal`),
+  `ExitStatus`, `Output`; `runtime/src/process.c` forks and execs (PATH looked up by the parent, the
+  child doing only what is safe after a fork, SIGPIPE back at its default); a child's end comes as
+  SIGCHLD, whose pipe a reaper thread watches, asking each child it waits for — never
+  `waitpid(-1)` —, and closing a channel every waiter receives. The pipes wait on the poller. **The
+  pipeline example** (S12's artifact): `printf | sort | uniq`, joined by tasks. Spec 12 "Processes",
+  six cases. S12b: Windows.
 - **S13** the build script (11 W3 BS1–BS6): a package's `build.lyr` built as a program of its
   own (`build`, `build/`, its `[build-dependencies]` as a graph of its own in the same lock) and
   run before the compile; `std.build` (`target`, `profile`, `outDir`, `genDir`, `rerunIfChanged`,

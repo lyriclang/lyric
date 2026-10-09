@@ -1,0 +1,94 @@
+// Processes (design/v5/spec/10 O8, Q9; 13 M8b S12a): a child's output read through its pipe; a
+// child's output and errors at once, and its code; its input piped and closed; a variable set over
+// the environment and a working directory; a program that is not there; a kill; a cancelled wait;
+// SIGPIPE back at its default in the child although the parent ignores it; twenty children at once;
+// a wait on another thread. POSIX (sh, cat, echo, pwd, sleep). Expected stdout:
+//   hello world | exit code 0
+//   out | err | 3
+//   cat: piped data
+//   env: set | cwd: /
+//   not found: no-such-program-for-lyric (started)
+//   killed: signal 9
+//   wait: timed out
+//   sigpipe: signal 13
+//   20 children, codes summed 190
+//   waited on another thread: exit code 7
+import std.io { IoError, IoErrorKind, println };
+import std.process { Command, Stdio };
+import std.task { TaskScope, TimedOut, withTimeout };
+import std.thread { Thread };
+import std.time { Duration };
+
+fn text(bytes: uint8[]): string {
+    return string.fromUtf8Lossy(bytes[..]).trimEnd().toString();
+}
+
+fn main(): void throws Error {
+    var echo = try Command { program = "echo", args = ["hello", "world"], stdout = Stdio.Piped }.spawn();
+    var out = echo.stdout!;
+    let said = try out.readToEnd();
+    try out.close();
+    println(f"{text(said)} | {try echo.wait()}");
+
+    let both = try Command { program = "sh", args = ["-c", "echo out; echo err >&2; exit 3"] }.output();
+    println(f"{text(both.stdout)} | {text(both.stderr)} | {both.status.code() ?? -1}");
+
+    var cat = try Command { program = "cat", stdin = Stdio.Piped, stdout = Stdio.Piped }.spawn();
+    var into = cat.stdin!;
+    try into.writeString("piped data");
+    try into.close();
+    var back = cat.stdout!;
+    let catted = try back.readToEnd();
+    try back.close();
+    let _ = try cat.wait();
+    println(f"cat: {text(catted)}");
+
+    let env = try Command { program = "sh", args = ["-c", "echo $LYRIC_PROCESS_TEST"], env = [("LYRIC_PROCESS_TEST", "set")] }.output();
+    let cwd = try Command { program = "pwd", cwd = "/" }.output();
+    println(f"env: {text(env.stdout)} | cwd: {text(cwd.stdout)}");
+
+    try {
+        let _ = Command { program = "no-such-program-for-lyric" }.spawn();
+        println("not found: started");
+    } catch (e: IoError) {
+        println(if (e.kind == IoErrorKind.NotFound) f"not found: {e.path ?? "-"} ({e.detail})" else e.message());
+    }
+
+    var sleeper = try Command { program = "sleep", args = ["10"] }.spawn();
+    try sleeper.kill();
+    println(f"killed: {try sleeper.wait()}");
+
+    var slow = try Command { program = "sleep", args = ["10"] }.spawn();
+    try {
+        let _ = withTimeout(Duration.ofMillis(50), () => try slow.wait());
+        println("wait: ended");
+    } catch (_: TimedOut) {
+        println("wait: timed out");
+    }
+    try slow.kill();
+    {
+        let _ = try slow.wait();
+    }
+
+    // the test host ignores SIGPIPE, and so do we (10 Q9): the child must not inherit it
+    let piped = try Command { program = "sh", args = ["-c", "kill -PIPE $$; echo survived"] }.output();
+    println(f"sigpipe: {piped.status}");
+
+    var sum = 0;
+    var count = 0;
+    {
+        using let scope = TaskScope.new();
+        for (i in 0..20) {
+            let _ = scope.spawn(() => {
+                let s = try Command { program = "sh", args = ["-c", f"exit {i}"] }.status();
+                sum += s.code() ?? 1000;
+                count += 1;
+            });
+        }
+    }
+    println(f"{count} children, codes summed {sum}");
+
+    var seven = try Command { program = "sh", args = ["-c", "sleep 0.1; exit 7"] }.spawn();
+    let other = Thread.spawn(() => try seven.wait());
+    println(f"waited on another thread: {try other.await()}");
+}

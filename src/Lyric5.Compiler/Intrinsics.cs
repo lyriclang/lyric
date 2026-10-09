@@ -97,6 +97,15 @@ public static class Intrinsics
         ["std.net.netSendTo"] = "LYR_NET_SENDTO",
         ["std.net.netRecvFrom"] = "LYR_NET_RECVFROM",
         ["std.net.netResolve"] = "LYR_NET_RESOLVE",
+        // Processes (M8b S12, lyr/process.h): a child started, reaped, signalled; its pipes.
+        ["std.process.processSpawn"] = "LYR_PROCESS_SPAWN",
+        ["std.process.processAttach"] = "lyr_process_attach",
+        ["std.process.processNudge"] = "lyr_process_nudge",
+        ["std.process.processReap"] = "lyr_process_reap",
+        ["std.process.processSignal"] = "lyr_process_signal",
+        ["std.process.processRead"] = "LYR_PROCESS_READ",
+        ["std.process.processWrite"] = "LYR_PROCESS_WRITE",
+        ["std.process.processClose"] = "lyr_process_close",
         ["std.task.spin"] = "lyr_task_spin",
         // Signals as a channel (10 Q9, 06 K5): the abstract names and the system's numbers, the
         // handler on or off, the watcher's poller, the caught ones.
