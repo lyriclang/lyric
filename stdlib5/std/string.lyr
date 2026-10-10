@@ -16,3 +16,8 @@ pub fn fromFloat32(value: float32): string;
 /// The character as a one-character string.
 pub fn fromChar(value: char): string;
 pub fn fromBool(value: bool): string;
+
+/// The version of the Unicode Character Database behind `char`'s answers — its category, its
+/// simple case mappings, `isWhitespace` (10 B9 S4, C2). Written by `tooling/unicode/gen.py` from
+/// the files it reads.
+pub let unicodeVersion: string = "18.0.0";

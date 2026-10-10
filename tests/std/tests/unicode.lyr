@@ -1,0 +1,100 @@
+// char over the Unicode Character Database (10 B9 S4, S5; M8c S1): the category, the predicates,
+// the simple case mappings, the digits. Every code point against the database is Lyric5.Tests'
+// UnicodeTests; here what a reader of the decisions would ask.
+import std.core { UnicodeCategory };
+import std.string { unicodeVersion };
+import std.test { assertEq, assertFalse, assertNull, assertTrue };
+
+@Test
+fn theVersionIsTheDatabasesFiles(): void {
+    assertEq(unicodeVersion, "18.0.0");
+}
+
+@Test
+fn everyCategoryHasACharacter(): void {
+    assertEq('A'.category(), UnicodeCategory.UppercaseLetter);
+    assertEq('a'.category(), UnicodeCategory.LowercaseLetter);
+    assertEq('\u{01C5}'.category(), UnicodeCategory.TitlecaseLetter);
+    assertEq('\u{02B0}'.category(), UnicodeCategory.ModifierLetter);
+    assertEq('中'.category(), UnicodeCategory.OtherLetter);
+    assertEq('\u{0301}'.category(), UnicodeCategory.NonspacingMark);
+    assertEq('\u{0903}'.category(), UnicodeCategory.SpacingMark);
+    assertEq('\u{20DD}'.category(), UnicodeCategory.EnclosingMark);
+    assertEq('٣'.category(), UnicodeCategory.DecimalNumber);
+    assertEq('Ⅻ'.category(), UnicodeCategory.LetterNumber);
+    assertEq('½'.category(), UnicodeCategory.OtherNumber);
+    assertEq('_'.category(), UnicodeCategory.ConnectorPunctuation);
+    assertEq('-'.category(), UnicodeCategory.DashPunctuation);
+    assertEq('('.category(), UnicodeCategory.OpenPunctuation);
+    assertEq(')'.category(), UnicodeCategory.ClosePunctuation);
+    assertEq('«'.category(), UnicodeCategory.InitialPunctuation);
+    assertEq('»'.category(), UnicodeCategory.FinalPunctuation);
+    assertEq('!'.category(), UnicodeCategory.OtherPunctuation);
+    assertEq('+'.category(), UnicodeCategory.MathSymbol);
+    assertEq('€'.category(), UnicodeCategory.CurrencySymbol);
+    assertEq('^'.category(), UnicodeCategory.ModifierSymbol);
+    assertEq('©'.category(), UnicodeCategory.OtherSymbol);
+    assertEq(' '.category(), UnicodeCategory.SpaceSeparator);
+    assertEq('\u{2028}'.category(), UnicodeCategory.LineSeparator);
+    assertEq('\u{2029}'.category(), UnicodeCategory.ParagraphSeparator);
+    assertEq('\u{0007}'.category(), UnicodeCategory.Control);
+    assertEq('\u{200B}'.category(), UnicodeCategory.Format);
+    assertEq('\u{E000}'.category(), UnicodeCategory.PrivateUse);
+    assertEq('\u{0378}'.category(), UnicodeCategory.Unassigned);
+    assertEq('\u{10FFFF}'.category(), UnicodeCategory.Unassigned);
+}
+
+@Test
+fn thePredicatesAskUnicodeAndTheAsciiOnesAscii(): void {
+    assertTrue('ß'.isAlpha());
+    assertTrue('中'.isAlpha());
+    assertFalse('٣'.isAlpha());
+    assertTrue('٣'.isDigit());
+    assertFalse('٣'.isAsciiDigit());
+    assertFalse('Ⅻ'.isDigit());
+    assertTrue('7'.isAsciiDigit());
+    assertTrue('é'.isAlphanumeric());
+    assertTrue('٣'.isAlphanumeric());
+    assertFalse('_'.isAlphanumeric());
+    assertTrue('\u{3000}'.isWhitespace());
+    assertTrue('\u{00A0}'.isWhitespace());
+    assertTrue('\u{000B}'.isWhitespace());
+    assertFalse('\u{000B}'.isAsciiWhitespace());
+    assertFalse('\u{200B}'.isWhitespace());
+    assertTrue('\t'.isAsciiWhitespace());
+    assertTrue('Ä'.isUpper());
+    assertFalse('\u{01C5}'.isUpper());
+    assertTrue('ä'.isLower());
+    assertTrue('\u{0085}'.isControl());
+    assertTrue('é'.isAlpha());
+    assertFalse('é'.isAsciiAlpha());
+    assertTrue('F'.isAsciiHexDigit());
+    assertFalse('g'.isAsciiHexDigit());
+}
+
+@Test
+fn caseMapsOneCharacterToOne(): void {
+    assertEq('a'.toUpper(), 'A');
+    assertEq('Ä'.toLower(), 'ä');
+    assertEq('ß'.toUpper(), 'ß');
+    assertEq('Σ'.toLower(), 'σ');
+    assertEq('ς'.toUpper(), 'Σ');
+    assertEq('\u{01C5}'.toUpper(), '\u{01C4}');
+    assertEq('\u{01C5}'.toLower(), '\u{01C6}');
+    assertEq('İ'.toLower(), 'i');
+    assertEq('1'.toUpper(), '1');
+    assertEq('中'.toLower(), '中');
+}
+
+@Test
+fn digitsInABase(): void {
+    assertEq('7'.toDigit(10)!, 7);
+    assertNull('7'.toDigit(7));
+    assertEq('f'.toDigit(16)!, 15);
+    assertEq('Z'.toDigit(36)!, 35);
+    assertNull('٣'.toDigit(10));
+    assertEq(char.fromDigit(11, 16)!, 'b');
+    assertEq(char.fromDigit(9, 10)!, '9');
+    assertNull(char.fromDigit(10, 10));
+    assertNull(char.fromDigit(-1, 10));
+}

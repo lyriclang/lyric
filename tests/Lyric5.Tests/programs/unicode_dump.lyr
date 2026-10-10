@@ -1,0 +1,31 @@
+// Every scalar value as char reports it (M8c S1; UnicodeTests reads the database itself and expects
+// the same lines): `c` where the category changes, `u` and `l` where a case mapping moves the
+// character, `w` for White_Space — in the order of the values, the surrogates left out.
+import std.core { UnicodeCategory };
+import std.io { println };
+
+fn main(): void {
+    var last: ?UnicodeCategory = null;
+    var n: uint32 = 0;
+    while (n <= 0x10FFFF) {
+        if (let c = char.fromUint32(n)) {
+            let k = c.category();
+            if (last != k) {
+                println(f"c {n:x} {k:?}");
+                last = k;
+            }
+            let up = c.toUpper();
+            if (up != c) {
+                println(f"u {n:x} {up as uint32:x}");
+            }
+            let low = c.toLower();
+            if (low != c) {
+                println(f"l {n:x} {low as uint32:x}");
+            }
+            if (c.isWhitespace()) {
+                println(f"w {n:x}");
+            }
+        }
+        n += 1;
+    }
+}
