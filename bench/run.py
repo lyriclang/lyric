@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Measurement points 2 and 3 (design/v5/spec/13, "Messpunkte"): loops, arith and struct arrays
-(after M3); a Map, a sort and string work (after M8a) — Lyric against C, Go and C# on the same
-machine. Builds every twin, checks that all print the same checksum, times each as the minimum of
+(after M3); a Map, a sort and string work (after M8a); M8b's I/O, a file copied and a TCP echo,
+reported under no bound — Lyric against C, Go and C# on the same machine. Builds every twin, checks that all print the same checksum, times each as the minimum of
 several runs, prints a table, and with --ratchet fails when Lyric is slower than 3x C or 1.5x Go
 (the plan's bounds; point 3 has no C twin). --bound X is the wide fence for a shared CI runner,
 whose timings are too noisy for the ratchet: it fails when Lyric is slower than X times Go.
@@ -15,7 +15,9 @@ import argparse, glob, os, pathlib, shutil, subprocess, sys, time
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
-BENCHES = ['loops', 'arith', 'structs', 'maps', 'sorting', 'strings']
+BENCHES = ['loops', 'arith', 'structs', 'maps', 'sorting', 'strings', 'io_copy', 'echo']
+# M8b's I/O measurement (13, S14): reported, under no bound — the ratchet and --bound pass them by
+UNBOUND = {'io_copy', 'echo'}
 OUT = HERE / 'out'
 
 def run(cmd, cwd=None, env=None):
@@ -45,7 +47,7 @@ def build_go(name):
 
 def build_cs(name):
     dotnet = shutil.which('dotnet') or (str(pathlib.Path.home() / '.dotnet' / 'dotnet') if (pathlib.Path.home() / '.dotnet' / 'dotnet').exists() else None)
-    if not dotnet: return None
+    if not dotnet or not (HERE / name / 'cs').exists(): return None
     out = OUT / 'cs' / name
     must(run([dotnet, 'build', '-c', 'Release', '-o', str(out), '--nologo', '-v', 'q'], cwd=HERE / name / 'cs'), f'C# {name}')
     return [dotnet, str(out / f'{name}.dll')]
@@ -91,6 +93,7 @@ def main():
         if len(set(outputs.values())) != 1:
             print(f'{name}: the twins disagree: {outputs}', file=sys.stderr); sys.exit(2)
         rows.append((name, outputs['Lyric'], times))
+        if name in UNBOUND: continue
         if 'C' in times and times['Lyric'] > 3.0 * times['C']: bad.append(f'{name}: Lyric {times["Lyric"]:.3f} s > 3x C {times["C"]:.3f} s')
         if 'Go' in times and times['Lyric'] > 1.5 * times['Go']: bad.append(f'{name}: Lyric {times["Lyric"]:.3f} s > 1.5x Go {times["Go"]:.3f} s')
         if args.bound is not None and times['Lyric'] > args.bound * times['Go']:

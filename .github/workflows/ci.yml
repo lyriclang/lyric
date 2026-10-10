@@ -208,7 +208,8 @@ jobs:
     # 3x Go — a regression nobody would call noise. 'strings' had a fence of its own, 5x, until
     # f-strings wrote into one builder (M8a S13; it stood at 1.80x on this runner after). The job
     # runs on main and by hand, not on a pull request (the head of the file). Go is the runner's
-    # own; nothing is downloaded for it (see the head of this file).
+    # own; nothing is downloaded for it (see the head of this file). M8b's I/O — a file copied, a
+    # TCP echo — is reported beside them under no bound (13, S14; run.py passes them by).
     name: Benchmarks
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -229,7 +230,7 @@ jobs:
         run: |
           set -o pipefail
           go version
-          python3 bench/run.py --runs 5 --bound 3.0 loops arith structs maps sorting strings | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 bench/run.py --runs 5 --bound 3.0 loops arith structs maps sorting strings io_copy echo | tee -a "$GITHUB_STEP_SUMMARY"
 
   conformance:
     # The specification's suite (lyriclang/lyric-spec) against the WORKING TREE, in both profiles:

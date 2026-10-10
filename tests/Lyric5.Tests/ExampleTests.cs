@@ -9,6 +9,7 @@ namespace Lyric5.Tests;
 /// Lyric 5, each built as a package and run. And M7's artifacts: the multi-package example — <c>programs/three_packages</c>, a
 /// path dependency and one from git — builds offline once the cache holds it, and builds for the
 /// other operating system; a dependency's globals are ready before the importer's (07 G2).
+/// And M8b's: the file tool, <c>programs/filetool.lyr</c>, over a tree the test makes.
 /// Through <c>Main</c>, so in the console collection.
 /// </summary>
 [Collection("console")]
@@ -90,5 +91,56 @@ public class ExampleTests
             ("deps/geo/lyric.toml", "[package]\nname = \"geo\"\nversion = \"0.1.0\"\n"),
             ("deps/geo/src/base.lyr", "fn seven(): int {\n    return 7;\n}\n\npub let unit: int = seven();\n"));
         Assert.Equal("21\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    private const string TreeStats = "5 files, 3 directories, 2325 bytes\n  1000 sub/c.txt\n  1000 sub/e.bin\n  300 b.log\n";
+
+    /// <summary>M8b's artifact (13, S14): the file tool built as a package — its three commands over
+    /// a tree with an empty directory and two files of one size (the walk's order between them
+    /// kept), the copy byte for byte the original, a missing directory and an unknown command.</summary>
+    [Fact]
+    public void The_file_tool_reports_copies_and_finds()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", ProgramText("filetool")));
+        var (built, _, why) = Run("build", "-C", dir);
+        Assert.True(built == 0, why);
+        var host = Target.Host;
+        var exe = Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix);
+
+        var tree = Path.Combine(dir, "tree");
+        void Put(string rel, int size) =>
+            File.WriteAllBytes(Path.Combine(tree, rel), [.. Enumerable.Range(0, size).Select(i => (byte)(i * 7 + rel.Length))]);
+        Directory.CreateDirectory(Path.Combine(tree, "empty"));
+        Directory.CreateDirectory(Path.Combine(tree, "sub", "deeper"));
+        Put("a.txt", 5);
+        Put("b.log", 300);
+        Put(Path.Combine("sub", "c.txt"), 1000);
+        Put(Path.Combine("sub", "deeper", "d.txt"), 20);
+        Put(Path.Combine("sub", "e.bin"), 1000);
+
+        (int Exit, string Out, string Err) Tool(params string[] args)
+        {
+            var ran = ProcessRunner.Run(exe, args, TimeSpan.FromMinutes(1));
+            return (ran.ExitCode, ran.Stdout.Replace("\r\n", "\n"), ran.Stderr.Replace("\r\n", "\n"));
+        }
+
+        Assert.Equal((0, TreeStats, ""), Tool("stats", tree));
+        Assert.Equal((0, "a.txt\nsub/c.txt\nsub/deeper/d.txt\n", ""), Tool("find", tree, ".txt"));
+
+        var copy = Path.Combine(dir, "copy");
+        Assert.Equal((0, "copied 5 files, 2325 bytes\n", ""), Tool("copy", tree, copy));
+        Assert.True(Directory.Exists(Path.Combine(copy, "empty")));
+        foreach (var file in Directory.EnumerateFiles(tree, "*", SearchOption.AllDirectories))
+            Assert.Equal(File.ReadAllBytes(file), File.ReadAllBytes(Path.Combine(copy, Path.GetRelativePath(tree, file))));
+        Assert.Equal((0, TreeStats, ""), Tool("stats", copy));
+
+        var missing = Path.Combine(dir, "missing");
+        var (failed, nothing, said) = Tool("stats", missing);
+        Assert.Equal((1, ""), (failed, nothing));
+        Assert.StartsWith($"filetool: not found: {missing}", said);
+
+        var (unknown, _, usage) = Tool();
+        Assert.Equal(2, unknown);
+        Assert.StartsWith("usage: filetool", usage);
     }
 }

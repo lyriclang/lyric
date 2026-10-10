@@ -76,7 +76,7 @@ fn aSetHoldsEachValueOnce(): void {
     assertTrue(s.remove("x"));
     assertFalse(s.remove("x"));
     var n = 0;
-    for (v in s) {
+    for (_ in s) {
         n = n + 1;
     }
     assertEq(n, 1);
