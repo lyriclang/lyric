@@ -805,6 +805,14 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   `isLower`, `isControl`, the four `isAscii*`, `toUpper`/`toLower`, `toDigit(radix)` and
   `char.fromDigit`. Every scalar value checked against a reading of the files apart from the
   generator. Spec 12 "Characters", five cases.
+- **S2** text over Unicode (10 S1, S3, S4, S12c, S12d, S14): `trim` and its two ends take
+  White_Space, `trimMatches` and its ends any pattern, again and again; `isBlank`; `toUpper`/
+  `toLower` on text by the simple mappings; `toBytes()` a copy; `string.fromChars`; `chars()` is
+  `DoubleEnded`, `charIndices()` gives the byte each character begins at; `parse<T>()` takes `T`
+  from where the result goes. `Debug` of a text or a `char` writes it as it would be written —
+  the quote, the backslash and the controls escaped, a character that does not print as `\u{…}`.
+  `Contains<char>` on text went to S9: the generic `contains<P>` is no witness for it yet. Spec 12
+  "Strings", seven cases.
 
 ## Design decisions
 

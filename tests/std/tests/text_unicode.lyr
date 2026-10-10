@@ -1,0 +1,95 @@
+// Text over Unicode (10 S1, S3, S4, S12c, S12d, S14; M8c S2): trimming by White_Space and by a
+// pattern, blankness, case, bytes, characters from both ends and with their indices, `parse`
+// by the expected type, `Debug` as the text would be written.
+import std.test { assertEq, assertFalse, assertNull, assertTrue };
+
+@Test
+fn trimTakesUnicodesWhiteSpace(): void {
+    assertEq("  \u{3000}a b\u{00A0}\n".trim(), "a b");
+    assertEq("\t x".trimStart(), "x");
+    assertEq("x \u{2029}".trimEnd(), "x");
+    assertEq("\u{200B}a".trim(), "\u{200B}a");
+    assertEq("".trim(), "");
+}
+
+@Test
+fn trimMatchesTakesAPatternAgainAndAgain(): void {
+    assertEq("xxaxx".trimMatches('x'), "a");
+    assertEq("abab-ab".trimStartMatches("ab"), "-ab");
+    assertEq("ab-abab".trimEndMatches("ab"), "ab-");
+    assertEq("123abc456".trimMatches((c: char) => c.isAsciiDigit()), "abc");
+    assertEq("aaa".trimMatches('a'), "");
+    assertEq("abc".trimMatches(""), "abc");
+}
+
+@Test
+fn blankIsNothingButWhiteSpace(): void {
+    assertTrue("".isBlank());
+    assertTrue(" \t\u{3000}\n".isBlank());
+    assertFalse(" a ".isBlank());
+}
+
+@Test
+fn caseMapsEachCharacterAlone(): void {
+    assertEq("straße".toUpper(), "STRAßE");
+    assertEq("Ǆemal".toLower(), "ǆemal");
+    assertEq("ΣΑΣ".toLower(), "σασ");
+    assertEq("Hello, Wörld!"[7..].toUpper(), "WÖRLD!");
+}
+
+@Test
+fn toBytesIsACopy(): void {
+    let s = "aé";
+    let bytes = s.toBytes();
+    assertEq(bytes, [97u8, 195u8, 169u8]);
+    bytes[0] = 98u8;
+    assertEq(s, "aé");
+}
+
+@Test
+fn charactersComeFromBothEnds(): void {
+    var it = "abc".chars();
+    assertEq(it.nextBack()!, 'c');
+    assertEq(it.next()!, 'a');
+    assertEq(it.nextBack()!, 'b');
+    assertNull(it.next());
+    assertNull(it.nextBack());
+    var wide = "é€".chars();
+    assertEq(wide.nextBack()!, '€');
+    assertEq(wide.nextBack()!, 'é');
+    assertNull(wide.next());
+}
+
+@Test
+fn charIndicesGiveTheByteEachBeginsAt(): void {
+    let pairs = "aé€".charIndices().toArray();
+    let expected: (int, char)[] = [(0, 'a'), (1, 'é'), (3, '€')];
+    assertEq(pairs, expected);
+}
+
+@Test
+fn fromCharsJoinsCharacters(): void {
+    assertEq(string.fromChars("héllo".chars()), "héllo");
+    assertEq(string.fromChars("".chars()), "");
+}
+
+@Test
+fn parseTakesItsTypeFromWhereItGoes(): void {
+    let n: int = try! "42".parse();
+    assertEq(n, 42);
+    let x: float = try! " 2.5".trim().parse();
+    assertEq(x, 2.5);
+}
+
+@Test
+fn debugWritesTextAsItWouldBeWritten(): void {
+    assertEq("a\"b\\c\nd\u{200B}".debug(), "\"a\\\"b\\\\c\\nd\\u{200b}\"");
+    assertEq("it's".debug(), "\"it's\"");
+    assertEq('\''.debug(), "'\\''");
+    assertEq('"'.debug(), "'\"'");
+    assertEq('\0'.debug(), "'\\0'");
+    assertEq('\u{3000}'.debug(), "'\\u{3000}'");
+    assertEq(' '.debug(), "' '");
+    let xs = ["a\"b", "c"];
+    assertEq(f"{xs}", "[\"a\\\"b\", \"c\"]");
+}

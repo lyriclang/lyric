@@ -753,7 +753,14 @@ extend bool :: [Debug, Clone, Default] {
 }
 
 extend char :: [Debug, Clone] {
-    fn debug(): string { return f"'{this}'"; }
+    /// Between `'`, escaped as a text's characters are (10 S14) — `'\''`, `'\n'`, `'\u{200b}'`.
+    fn debug(): string {
+        let out = StringBuilder.new();
+        out.appendChar('\'');
+        escapeTo(out, this, '\'');
+        out.appendChar('\'');
+        return out.toString();
+    }
     fn clone(): char { return this; }
 }
 
@@ -980,9 +987,87 @@ extend string :: [Hashable] {
 }
 
 extend string :: [Debug, Clone, Default] {
-    fn debug(): string { return "\"" + this + "\""; }
+    /// Between `"`, as it would be written (10 S14, Rust's `escape_debug`): `["a\"b", "c"]` prints
+    /// as it is written, and the quotes keep the boundaries C9 draws with them.
+    fn debug(): string {
+        let out = StringBuilder.new();
+        debugText(out, this);
+        return out.toString();
+    }
+    fn debugTo(&out: StringBuilder): void { debugText(out, this); }
     fn clone(): string { return this; }
     static fn default(): string { return ""; }
+}
+
+fn debugText(out: StringBuilder, s: StringView): void {
+    out.appendChar('"');
+    for (c in s.chars()) {
+        escapeTo(out, c, '"');
+    }
+    out.appendChar('"');
+}
+
+/// One character as `Debug` writes it between `quote`s (10 S14): `\\`, the quote, `\n`, `\r`,
+/// `\t` and `\0` escaped; a character that does not print as itself as `\u{…}`, its scalar value
+/// in hex.
+fn escapeTo(out: StringBuilder, c: char, quote: char): void {
+    let n = c as uint32;
+    if (c == quote || c == '\\') {
+        out.appendChar('\\');
+        out.appendChar(c);
+    } else if (c == '\n') {
+        out.appendStr("\\n");
+    } else if (c == '\r') {
+        out.appendStr("\\r");
+    } else if (c == '\t') {
+        out.appendStr("\\t");
+    } else if (n == 0) {
+        out.appendStr("\\0");
+    } else if (printsAsItself(c)) {
+        out.appendChar(c);
+    } else {
+        // The hex digits by hand: a format spec here would pull the whole format language into
+        // every program that shows a text.
+        let digits = "0123456789abcdef";
+        out.appendStr("\\u{");
+        var k = 5;
+        var started = false;
+        while (k >= 0) {
+            let d = ((n >> ((k * 4) as uint32)) & 15) as int;
+            if (d != 0 || started || k == 0) {
+                out.appendChar(digits[d]);
+                started = true;
+            }
+            k -= 1;
+        }
+        out.appendChar('}');
+    }
+}
+
+/// Whether a character prints as itself in a `Debug` text: every category but Cc, Cf, Cs, Co,
+/// Cn, Zl and Zp, and of the space separators the space alone.
+fn printsAsItself(c: char): bool {
+    let n = c as uint32;
+    if (n < 128) {
+        return n >= 32 && n != 127;
+    }
+    return unicodeCategory(c) < 22;
+}
+
+extend string {
+    /// The text of the characters in order (10 S3).
+    pub static fn fromChars<I :: [Iterator<Item = char>]>(chars: I): string throws I.Error {
+        var walk = chars;
+        let out = StringBuilder.new();
+        loop {
+            if (let c = try walk.next()) {
+                out.appendChar(c);
+            } else {
+                break;
+            }
+        }
+        return out.toString();
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2079,9 +2164,14 @@ fn matchesNothing<P :: [Pattern]>(p: P): bool {
 }
 
 extend StringView {
-    /// The characters, decoded from the bytes.
+    /// The characters, decoded from the bytes — from either end.
     pub fn chars(): CharsIter {
-        return CharsIter { s = this, at = 0 };
+        return CharsIter { s = this, at = 0, end = byteCount(this) };
+    }
+
+    /// The characters, each with the byte index it begins at.
+    pub fn charIndices(): CharIndicesIter {
+        return CharIndicesIter { s = this, at = 0 };
     }
 
     /// How many characters it holds, `O(n)`.
@@ -2188,8 +2278,9 @@ extend StringView {
         return LinesIter { s = this, at = 0 };
     }
 
-    /// Without the white space at both ends (ASCII's for now: space, tab, the line breaks, vertical
-    /// tab and form feed).
+    /// Without the white space at both ends — the characters with the property White_Space (10
+    /// S4): the ideographic space and the no-break space as well as the tab. A pattern of one's own
+    /// is `trimMatches` (S12c).
     pub fn trim(): StringView {
         return this.trimStart().trimEnd();
     }
@@ -2198,8 +2289,8 @@ extend StringView {
     pub fn trimStart(): StringView {
         let n = byteCount(this);
         var i = 0;
-        while (i < n && isAsciiSpace(byteAt(this, i))) {
-            i = i + 1;
+        while (i < n && charAtByte(this, i).isWhitespace()) {
+            i = nextChar(this, i);
         }
         return this[i..];
     }
@@ -2207,10 +2298,84 @@ extend StringView {
     /// Without the white space at the end.
     pub fn trimEnd(): StringView {
         var n = byteCount(this);
-        while (n > 0 && isAsciiSpace(byteAt(this, n - 1))) {
-            n = n - 1;
+        while (n > 0) {
+            let before = previousChar(this, n);
+            if (!charAtByte(this, before).isWhitespace()) {
+                break;
+            }
+            n = before;
         }
         return this[..n];
+    }
+
+    /// Without the matches of `p` at both ends, again and again: `"xxaxx".trimMatches('x')` is `a`
+    /// (10 S12c, Rust's `trim_matches`). A match of the empty text takes nothing.
+    pub fn trimMatches<P :: [Pattern]>(p: P): StringView {
+        return this.trimStartMatches(p).trimEndMatches(p);
+    }
+
+    /// Without the matches of `p` at the start, again and again.
+    pub fn trimStartMatches<P :: [Pattern]>(p: P): StringView {
+        let n = byteCount(this);
+        var i = 0;
+        while (i < n) {
+            let end = p.matchAt(this, i) ?? i;
+            if (end == i) {
+                break;
+            }
+            i = end;
+        }
+        return this[i..];
+    }
+
+    /// Without the matches of `p` at the end, again and again.
+    pub fn trimEndMatches<P :: [Pattern]>(p: P): StringView {
+        var n = byteCount(this);
+        while (n > 0) {
+            let start = p.matchBefore(this, n) ?? n;
+            if (start == n) {
+                break;
+            }
+            n = start;
+        }
+        return this[..n];
+    }
+
+    /// Whether it holds nothing but white space — the empty text too.
+    pub fn isBlank(): bool {
+        return this.trimStart().isEmpty();
+    }
+
+    /// Every character by its simple uppercase mapping (10 S4): one character for one and no
+    /// locale, so `"straße".toUpper()` is `STRAßE`.
+    pub fn toUpper(): string {
+        let out = StringBuilder.new();
+        for (c in this.chars()) {
+            out.appendChar(c.toUpper());
+        }
+        return out.toString();
+    }
+
+    /// Every character by its simple lowercase mapping: one character for one, no locale.
+    pub fn toLower(): string {
+        let out = StringBuilder.new();
+        for (c in this.chars()) {
+            out.appendChar(c.toLower());
+        }
+        return out.toString();
+    }
+
+    /// Its bytes, a copy (10 S12d): a `Slice<uint8>` of a string would write into a text that may
+    /// not change.
+    pub fn toBytes(): uint8[] {
+        let bytes: uint8[] = [0u8] * byteCount(this);
+        viewBytes(this).copyInto(bytes[..]);
+        return bytes;
+    }
+
+    /// `T.parse(this)`, the type from where it goes (10 S3): `let n: int = try s.parse();`.
+    pub fn parse<T :: [Parse]>(): T throws ParseError {
+        return try T.parse(this);
     }
 
     /// The rest after `p` where it begins with `p`, or `null` (10 S2: absence is information).
@@ -2849,14 +3014,16 @@ extend bool :: [Format] {
 }
 
 
-/// A string's characters, decoded from its UTF-8 bytes.
-pub struct CharsIter :: [Iterator] {
+/// A string's characters, decoded from its UTF-8 bytes — from the front by `next`, from the back
+/// by `nextBack` (10 S1: `chars()` is `DoubleEnded`), the two meeting in the middle.
+pub struct CharsIter :: [Iterator, DoubleEnded] {
     type Item = char;
     s: StringView,
     var at: int,
+    var end: int,
 
     pub mut fn next(): ?char {
-        if (this.at >= byteCount(this.s)) {
+        if (this.at >= this.end) {
             return null;
         }
         let first = byteAt(this.s, this.at);
@@ -2879,6 +3046,31 @@ pub struct CharsIter :: [Iterator] {
         }
         this.at = this.at + size;
         return (code as uint32) as char;
+    }
+
+    pub mut fn nextBack(): ?char {
+        if (this.end <= this.at) {
+            return null;
+        }
+        this.end = previousChar(this.s, this.end);
+        return charAtByte(this.s, this.end);
+    }
+}
+
+/// A text's characters with the byte index each begins at (10 S1): the indices `s[i]` and
+/// `s[a..b]` take.
+pub struct CharIndicesIter :: [Iterator] {
+    type Item = (int, char);
+    s: StringView,
+    var at: int,
+
+    pub mut fn next(): ?(int, char) {
+        if (this.at >= byteCount(this.s)) {
+            return null;
+        }
+        let item: (int, char) = (this.at, charAtByte(this.s, this.at));
+        this.at = nextChar(this.s, this.at);
+        return item;
     }
 }
 
