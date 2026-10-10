@@ -1,0 +1,90 @@
+// Processes on Windows (design/v5/spec/10 O8; 13 M8b S12b): what processes.lyr checks on POSIX,
+// with what every Windows has — cmd, sort (it reads its input), ping (it waits). A child's
+// arguments go through CreateProcessW's one command line, quoted as the C runtime reads it back.
+// Expected stdout (CRLF read as LF):
+//   hello world | exit code 0
+//   out | err | 3
+//   sorted: a
+//   b
+//   c
+//   env: set | cwd: C:\
+//   not found: no-such-program-for-lyric (started)
+//   killed: exit code 1
+//   wait: timed out
+//   20 children, codes summed 190
+//   waited on another thread: exit code 7
+import std.io { IoError, IoErrorKind, println };
+import std.process { Command, Stdio };
+import std.task { TaskScope, TimedOut, withTimeout };
+import std.thread { Thread };
+import std.time { Duration };
+
+fn text(bytes: uint8[]): string {
+    return string.fromUtf8Lossy(bytes[..]).trimEnd().toString();
+}
+
+fn main(): void throws Error {
+    var echo = try Command { program = "cmd", args = ["/c", "echo hello world"], stdout = Stdio.Piped }.spawn();
+    var out = echo.stdout!;
+    let said = try out.readToEnd();
+    try out.close();
+    println(f"{text(said)} | {try echo.wait()}");
+
+    let both = try Command { program = "cmd", args = ["/c", "echo out& echo err 1>&2& exit 3"] }.output();
+    println(f"{text(both.stdout)} | {text(both.stderr)} | {both.status.code() ?? -1}");
+
+    var sort = try Command { program = "sort", stdin = Stdio.Piped, stdout = Stdio.Piped }.spawn();
+    var into = sort.stdin!;
+    try into.writeString("c\r\nb\r\na\r\n");
+    try into.close();
+    var back = sort.stdout!;
+    let sorted = try back.readToEnd();
+    try back.close();
+    let _ = try sort.wait();
+    println(f"sorted: {text(sorted)}");
+
+    let env = try Command { program = "cmd", args = ["/c", "echo %LYRIC_PROCESS_TEST%"], env = [("LYRIC_PROCESS_TEST", "set")] }.output();
+    let cwd = try Command { program = "cmd", args = ["/c", "cd"], cwd = "C:\\" }.output();
+    println(f"env: {text(env.stdout)} | cwd: {text(cwd.stdout)}");
+
+    try {
+        let _ = Command { program = "no-such-program-for-lyric" }.spawn();
+        println("not found: started");
+    } catch (e: IoError) {
+        println(if (e.kind == IoErrorKind.NotFound) f"not found: {e.path ?? "-"} ({e.detail})" else e.message());
+    }
+
+    var long = try Command { program = "ping", args = ["-n", "20", "127.0.0.1"], stdout = Stdio.Null }.spawn();
+    try long.kill();
+    println(f"killed: {try long.wait()}");
+
+    var slow = try Command { program = "ping", args = ["-n", "20", "127.0.0.1"], stdout = Stdio.Null }.spawn();
+    try {
+        let _ = withTimeout(Duration.ofMillis(50), () => try slow.wait());
+        println("wait: ended");
+    } catch (_: TimedOut) {
+        println("wait: timed out");
+    }
+    try slow.kill();
+    {
+        let _ = try slow.wait();
+    }
+
+    var sum = 0;
+    var count = 0;
+    {
+        using let scope = TaskScope.new();
+        for (i in 0..20) {
+            let _ = scope.spawn(() => {
+                let s = try Command { program = "cmd", args = ["/c", f"exit {i}"] }.status();
+                sum += s.code() ?? 1000;
+                count += 1;
+            });
+        }
+    }
+    println(f"{count} children, codes summed {sum}");
+
+    var seven = try Command { program = "cmd", args = ["/c", "ping -n 2 127.0.0.1 >NUL& exit 7"] }.spawn();
+    let other = Thread.spawn(() => try seven.wait());
+    println(f"waited on another thread: {try other.await()}");
+}

@@ -1,5 +1,5 @@
-/* Processes (lyr/process.h): fork and exec on POSIX, the reaper's SIGCHLD pipe, a pipe's ends.
- * Windows answers Unsupported until S12b. */
+/* Processes (lyr/process.h): fork and exec on POSIX, the reaper's SIGCHLD pipe, a pipe's ends;
+ * CreateProcessW on Windows, a registered wait for a child's end (S12b). */
 #if defined(__linux__)
 #  define _GNU_SOURCE  /* pipe2 */
 #elif defined(__APPLE__)
@@ -23,38 +23,361 @@ static int64_t failure(int64_t kind, int64_t raw) {
 }
 
 #ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#  include <stdatomic.h>
+
+/* What GetLastError says, as a failure: the kinds a start or a pipe can give by their names. */
+static int64_t failed_with(DWORD e) {
+    switch (e) {
+    case ERROR_FILE_NOT_FOUND:
+    case ERROR_PATH_NOT_FOUND:
+    case ERROR_DIRECTORY:
+    case ERROR_INVALID_NAME:
+        return failure(LYR_IO_NOT_FOUND, (int64_t)e);
+    case ERROR_ACCESS_DENIED: return failure(LYR_IO_PERMISSION_DENIED, (int64_t)e);
+    case ERROR_BROKEN_PIPE:
+    case ERROR_NO_DATA: return failure(LYR_IO_BROKEN_PIPE, (int64_t)e);
+    case ERROR_INVALID_PARAMETER: return failure(LYR_IO_INVALID_INPUT, (int64_t)e);
+    default: return failure(0, (int64_t)e);
+    }
+}
+
+/* `n` bytes of UTF-8 as a NUL-ended UTF-16 string, allocated; NULL where they are no UTF-8. */
+static wchar_t *wide_of(const char *bytes, int64_t n) {
+    int units = n == 0 ? 0 : MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, bytes, (int)n, NULL, 0);
+    if (n > 0 && units <= 0) return NULL;
+    wchar_t *wide = calloc((size_t)units + 1, sizeof *wide);
+    if (wide == NULL) return NULL;
+    if (units > 0) MultiByteToWideChar(CP_UTF8, 0, bytes, (int)n, wide, units);
+    return wide;
+}
+
+/* A growing buffer of UTF-8: the command line, before it becomes UTF-16. */
+typedef struct {
+    char *bytes;
+    size_t used, room;
+} Text;
+
+static int put(Text *t, const char *bytes, size_t n) {
+    if (t->used + n + 1 > t->room) {
+        size_t room = t->room == 0 ? 256 : t->room;
+        while (room < t->used + n + 1) room *= 2;
+        char *grown = realloc(t->bytes, room);
+        if (grown == NULL) return 0;
+        t->bytes = grown;
+        t->room = room;
+    }
+    memcpy(t->bytes + t->used, bytes, n);
+    t->used += n;
+    t->bytes[t->used] = '\0';
+    return 1;
+}
+
+static int put_char(Text *t, char c, size_t times) {
+    for (size_t i = 0; i < times; i++) {
+        if (!put(t, &c, 1)) return 0;
+    }
+    return 1;
+}
+
+/* One argument as the C runtime's command-line parser reads it back (CommandLineToArgvW's rules):
+ * plain where it holds nothing to quote; else in quotes, a run of backslashes doubled before a
+ * quote and before the closing one, a quote after a backslash. */
+static int quoted(Text *t, const char *arg) {
+    if (*arg != '\0' && strpbrk(arg, " \t\n\v\"") == NULL) return put(t, arg, strlen(arg));
+    if (!put_char(t, '"', 1)) return 0;
+    size_t slashes = 0;
+    for (const char *at = arg;; at++) {
+        if (*at == '\\') {
+            slashes++;
+        } else if (*at == '"') {
+            if (!put_char(t, '\\', 2 * slashes + 1) || !put_char(t, '"', 1)) return 0;
+            slashes = 0;
+        } else if (*at == '\0') {
+            if (!put_char(t, '\\', 2 * slashes)) return 0;
+            break;
+        } else {
+            if (!put_char(t, '\\', slashes) || !put_char(t, *at, 1)) return 0;
+            slashes = 0;
+        }
+    }
+    return put_char(t, '"', 1);
+}
+
+/* Whether the environment entry `entry` (NAME=value, UTF-16) is one `set` sets — its name the same
+ * but for case, as Windows' names are. A name may begin with '=' (the drives' directories). */
+static int overridden(const wchar_t *entry, wchar_t **set, int64_t count) {
+    const wchar_t *equals = wcschr(entry + 1, L'=');
+    size_t name = equals != NULL ? (size_t)(equals - entry) : wcslen(entry);
+    for (int64_t j = 0; j < count; j++) {
+        const wchar_t *other = wcschr(set[j] + 1, L'=');
+        size_t length = other != NULL ? (size_t)(other - set[j]) : wcslen(set[j]);
+        if (length == name && CompareStringOrdinal(entry, (int)name, set[j], (int)name, TRUE) == CSTR_EQUAL) return 1;
+    }
+    return 0;
+}
+
+/* The parent's environment with `set` over it, as CreateProcessW's UTF-16 block: each entry ended
+ * by a NUL, the block by another. */
+static wchar_t *environment_of(wchar_t **set, int64_t count) {
+    wchar_t *current = GetEnvironmentStringsW();
+    if (current == NULL) return NULL;
+    size_t units = 1;
+    for (const wchar_t *at = current; *at; at += wcslen(at) + 1) {
+        if (!overridden(at, set, count)) units += wcslen(at) + 1;
+    }
+    for (int64_t j = 0; j < count; j++) units += wcslen(set[j]) + 1;
+    wchar_t *block = calloc(units, sizeof *block);
+    if (block != NULL) {
+        wchar_t *into = block;
+        for (const wchar_t *at = current; *at; at += wcslen(at) + 1) {
+            if (overridden(at, set, count)) continue;
+            size_t n = wcslen(at) + 1;
+            memcpy(into, at, n * sizeof *into);
+            into += n;
+        }
+        for (int64_t j = 0; j < count; j++) {
+            size_t n = wcslen(set[j]) + 1;
+            memcpy(into, set[j], n * sizeof *into);
+            into += n;
+        }
+        *into = L'\0';
+    }
+    FreeEnvironmentStringsW(current);
+    return block;
+}
+
+/* The reaper's poller, which a child's end wakes (lyr_process_attach), and the children's waits:
+ * each registered wait with its process, unregistered when the child is reaped. */
+static _Atomic(LyrPoller *) reaper;
+
+typedef struct Registered {
+    HANDLE process, wait;
+    struct Registered *next;
+} Registered;
+
+static Registered *registered;
+static SRWLOCK registered_lock = SRWLOCK_INIT;
+
+static VOID CALLBACK on_end(PVOID context, BOOLEAN timed_out) {
+    (void)context; (void)timed_out;
+    LyrPoller *poller = atomic_load(&reaper);
+    if (poller != NULL) lyr_poller_wake(poller);
+}
+
+void lyr_process_attach(void) {
+    atomic_store(&reaper, lyr_poller_current());
+}
+
+/* Before the reaper attaches there is nothing to wake: its first look comes after. */
+void lyr_process_nudge(void) {
+    LyrPoller *poller = atomic_load(&reaper);
+    if (poller != NULL) lyr_poller_wake(poller);
+}
+
+/* A handle the child inherits for one of its streams — the parent's own stream for Inherit, a
+ * pipe's end for Piped (the parent's end into `parent`), NUL for Null. NULL, with the error set,
+ * where the system refuses one. */
+static HANDLE stream_for(int index, int mode, HANDLE *parent) {
+    SECURITY_ATTRIBUTES inherit = { sizeof inherit, NULL, TRUE };
+    if (mode == LYR_PROCESS_PIPED) {
+        HANDLE read, write;
+        if (!CreatePipe(&read, &write, NULL, 0)) return NULL;
+        HANDLE child = index == 0 ? read : write;
+        *parent = index == 0 ? write : read;
+        if (!SetHandleInformation(child, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT)) {
+            DWORD e = GetLastError();
+            CloseHandle(read);
+            CloseHandle(write);
+            *parent = NULL;
+            SetLastError(e);
+            return NULL;
+        }
+        return child;
+    }
+    if (mode == LYR_PROCESS_NULL) {
+        HANDLE nul = CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &inherit, OPEN_EXISTING, 0, NULL);
+        return nul == INVALID_HANDLE_VALUE ? NULL : nul;
+    }
+    /* the parent's own, a copy the child may inherit; where there is none, NUL */
+    HANDLE own = GetStdHandle(index == 0 ? STD_INPUT_HANDLE : index == 1 ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE);
+    if (own == NULL || own == INVALID_HANDLE_VALUE) return stream_for(index, LYR_PROCESS_NULL, parent);
+    HANDLE copy;
+    if (!DuplicateHandle(GetCurrentProcess(), own, GetCurrentProcess(), &copy, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
+        return stream_for(index, LYR_PROCESS_NULL, parent);
+    }
+    return copy;
+}
 
 int64_t lyr_process_spawn(const LyrStr *program, const uint8_t *args, int64_t argc, const uint8_t *env, int64_t envc,
                           const LyrStr *cwd, int64_t modes, int64_t *ends, int64_t n) {
-    (void)program; (void)args; (void)argc; (void)env; (void)envc; (void)cwd; (void)modes; (void)ends; (void)n;
-    return failure(LYR_IO_UNSUPPORTED, 0);
+    (void)program;  /* the first argument is the program's name, and CreateProcessW looks it up */
+    if (n < 3 || argc < 1) return failure(LYR_IO_INVALID_INPUT, 0);
+    for (int i = 0; i < 3; i++) ends[i] = -1;
+    int64_t answer = 0;
+    Text line = { NULL, 0, 0 };
+    wchar_t *command = NULL, *directory = NULL, *block = NULL;
+    wchar_t **set = NULL;
+    HANDLE streams[3] = { NULL, NULL, NULL }, parents[3] = { NULL, NULL, NULL };
+    LPPROC_THREAD_ATTRIBUTE_LIST attributes = NULL;
+    const char *at = (const char *)args;
+    for (int64_t i = 0; i < argc; i++) {
+        if ((i > 0 && !put_char(&line, ' ', 1)) || !quoted(&line, at)) {
+            answer = failure(0, ERROR_NOT_ENOUGH_MEMORY);
+            goto done;
+        }
+        at += strlen(at) + 1;
+    }
+    command = wide_of(line.bytes, (int64_t)line.used);
+    if (command == NULL) {
+        answer = failure(LYR_IO_INVALID_INPUT, 0);
+        goto done;
+    }
+    if (cwd->len > 0 && (directory = wide_of(cwd->bytes, cwd->len)) == NULL) {
+        answer = failure(LYR_IO_INVALID_INPUT, 0);
+        goto done;
+    }
+    if (envc > 0) {
+        set = calloc((size_t)envc, sizeof *set);
+        if (set == NULL) {
+            answer = failure(0, ERROR_NOT_ENOUGH_MEMORY);
+            goto done;
+        }
+        const char *entry = (const char *)env;
+        for (int64_t j = 0; j < envc; j++) {
+            if ((set[j] = wide_of(entry, (int64_t)strlen(entry))) == NULL) {
+                answer = failure(LYR_IO_INVALID_INPUT, 0);
+                goto done;
+            }
+            entry += strlen(entry) + 1;
+        }
+        if ((block = environment_of(set, envc)) == NULL) {
+            answer = failure(0, ERROR_NOT_ENOUGH_MEMORY);
+            goto done;
+        }
+    }
+    for (int i = 0; i < 3; i++) {
+        streams[i] = stream_for(i, (int)((modes >> (2 * i)) & 3), &parents[i]);
+        if (streams[i] == NULL) {
+            answer = failed_with(GetLastError());
+            goto done;
+        }
+    }
+    /* the child inherits its three handles and nothing else the parent let be inherited */
+    SIZE_T size = 0;
+    InitializeProcThreadAttributeList(NULL, 1, 0, &size);
+    attributes = malloc(size);
+    if (attributes == NULL || !InitializeProcThreadAttributeList(attributes, 1, 0, &size)
+        || !UpdateProcThreadAttribute(attributes, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, streams, sizeof streams, NULL, NULL)) {
+        answer = failed_with(GetLastError());
+        goto done;
+    }
+    STARTUPINFOEXW start;
+    memset(&start, 0, sizeof start);
+    start.StartupInfo.cb = sizeof start;
+    start.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    start.StartupInfo.hStdInput = streams[0];
+    start.StartupInfo.hStdOutput = streams[1];
+    start.StartupInfo.hStdError = streams[2];
+    start.lpAttributeList = attributes;
+    PROCESS_INFORMATION started;
+    if (!CreateProcessW(NULL, command, NULL, NULL, TRUE, EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
+                        block, directory, &start.StartupInfo, &started)) {
+        answer = failed_with(GetLastError());
+        goto done;
+    }
+    CloseHandle(started.hThread);
+    Registered *entry = malloc(sizeof *entry);
+    if (entry == NULL || !RegisterWaitForSingleObject(&entry->wait, started.hProcess, on_end, NULL, INFINITE, WT_EXECUTEONLYONCE)) {
+        /* no wait: the child runs, but its end would wake nobody — it is ended, and the start fails */
+        DWORD e = entry == NULL ? ERROR_NOT_ENOUGH_MEMORY : GetLastError();
+        free(entry);
+        TerminateProcess(started.hProcess, 1);
+        CloseHandle(started.hProcess);
+        answer = failed_with(e);
+        goto done;
+    }
+    entry->process = started.hProcess;
+    AcquireSRWLockExclusive(&registered_lock);
+    entry->next = registered;
+    registered = entry;
+    ReleaseSRWLockExclusive(&registered_lock);
+    for (int i = 0; i < 3; i++) {
+        ends[i] = parents[i] != NULL ? (int64_t)(intptr_t)parents[i] : -1;
+        parents[i] = NULL;
+    }
+    answer = (int64_t)(intptr_t)started.hProcess;
+done:
+    for (int i = 0; i < 3; i++) {
+        if (streams[i] != NULL) CloseHandle(streams[i]);
+        if (parents[i] != NULL) CloseHandle(parents[i]);
+    }
+    if (attributes != NULL) {
+        DeleteProcThreadAttributeList(attributes);
+        free(attributes);
+    }
+    if (set != NULL) {
+        for (int64_t j = 0; j < envc; j++) free(set[j]);
+        free(set);
+    }
+    free(line.bytes);
+    free(command);
+    free(directory);
+    free(block);
+    return answer;
 }
 
-void lyr_process_attach(void) {}
-void lyr_process_nudge(void) {}
-
 int64_t lyr_process_reap(int64_t pid) {
-    (void)pid;
-    return failure(LYR_IO_UNSUPPORTED, 0);
+    HANDLE process = (HANDLE)(intptr_t)pid;
+    DWORD state = WaitForSingleObject(process, 0);
+    if (state == WAIT_TIMEOUT) return -1;
+    if (state != WAIT_OBJECT_0) return failed_with(GetLastError());
+    DWORD code = 0;
+    if (!GetExitCodeProcess(process, &code)) return failed_with(GetLastError());
+    /* its wait out, the handle closed: the child is reaped */
+    AcquireSRWLockExclusive(&registered_lock);
+    for (Registered **at = &registered; *at != NULL; at = &(*at)->next) {
+        if ((*at)->process == process) {
+            Registered *gone = *at;
+            *at = gone->next;
+            UnregisterWaitEx(gone->wait, NULL);
+            free(gone);
+            break;
+        }
+    }
+    ReleaseSRWLockExclusive(&registered_lock);
+    CloseHandle(process);
+    return (int64_t)code;
 }
 
 int64_t lyr_process_signal(int64_t pid, int64_t number) {
-    (void)pid; (void)number;
-    return failure(LYR_IO_UNSUPPORTED, 0);
+    /* no signals on Windows: a kill — SIGKILL's number — ends the child, anything else is refused */
+    if (number != 9) return failure(LYR_IO_UNSUPPORTED, 0);
+    if (!TerminateProcess((HANDLE)(intptr_t)pid, 1)) return failed_with(GetLastError());
+    return 0;
 }
 
+uint8_t lyr_process_pipes_block(void) { return 1; }
+
 int64_t lyr_process_read(int64_t fd, uint8_t *into, int64_t n) {
-    (void)fd; (void)into; (void)n;
-    return failure(LYR_IO_UNSUPPORTED, 0);
+    DWORD want = n > 0x40000000 ? 0x40000000 : (DWORD)n, got = 0;
+    if (!ReadFile((HANDLE)(intptr_t)fd, into, want, &got, NULL)) {
+        DWORD e = GetLastError();
+        if (e == ERROR_BROKEN_PIPE) return 0;  /* the child closed its end: the pipe's end */
+        return failed_with(e);
+    }
+    return (int64_t)got;
 }
 
 int64_t lyr_process_write(int64_t fd, const uint8_t *from, int64_t n) {
-    (void)fd; (void)from; (void)n;
-    return failure(LYR_IO_UNSUPPORTED, 0);
+    DWORD want = n > 0x40000000 ? 0x40000000 : (DWORD)n, sent = 0;
+    if (!WriteFile((HANDLE)(intptr_t)fd, from, want, &sent, NULL)) return failed_with(GetLastError());
+    return (int64_t)sent;
 }
 
 int64_t lyr_process_close(int64_t fd) {
-    (void)fd;
+    if (!CloseHandle((HANDLE)(intptr_t)fd)) return failed_with(GetLastError());
     return 0;
 }
 
@@ -328,9 +651,11 @@ int64_t lyr_process_reap(int64_t pid) {
     if (done < 0) return failed_with(errno);
     if (done == 0) return -1;
     if (WIFEXITED(status)) return WEXITSTATUS(status);
-    if (WIFSIGNALED(status)) return 256 + WTERMSIG(status);
+    if (WIFSIGNALED(status)) return LYR_PROCESS_SIGNALLED + WTERMSIG(status);
     return -1;
 }
+
+uint8_t lyr_process_pipes_block(void) { return 0; }
 
 int64_t lyr_process_signal(int64_t pid, int64_t number) {
     if (kill((pid_t)pid, (int)number) != 0) return failed_with(errno);

@@ -8,7 +8,14 @@
  * reports a failed exec through a pipe that exec closes. A child's end comes as SIGCHLD, which the
  * runtime keeps for itself (Q9): its handler writes to a pipe std.process's reaper watches, which
  * asks each child it waits for (waitpid, WNOHANG) — never waitpid(-1), which would take a host's
- * children too. Windows comes with S12b. */
+ * children too.
+ *
+ * Windows (S12b): CreateProcessW — the arguments quoted as the C runtime reads them back, the
+ * environment a UTF-16 block, only the child's three handles inherited (a handle list). A child is
+ * its process handle, in the int64_t a pid takes on POSIX; its end wakes the reaper's poller from a
+ * registered wait, as a console signal wakes the signals' watcher. Its pipes block: std.process
+ * calls them on the I/O pool, as a file's calls (13 M8b P2). There are no signals; a kill is
+ * TerminateProcess. */
 #ifndef LYR_PROCESS_H
 #define LYR_PROCESS_H
 
@@ -38,15 +45,22 @@ void lyr_process_attach(void);
  * its fork may have ended before, and its end's wake been taken by a look at a list without it. */
 void lyr_process_nudge(void);
 
-/* The child's end, where it has ended: its exit code (0 to 255), or 256 plus the number of the
- * signal that ended it; -1 while it runs. The child is reaped then — asked once more it is gone. */
+/* The child's end, where it has ended: its exit code — 0 to 255 on POSIX, any 32 bits on Windows —,
+ * or LYR_PROCESS_SIGNALLED plus the number of the signal that ended it; -1 while it runs. The child
+ * is reaped then — asked once more it is gone. */
+#define LYR_PROCESS_SIGNALLED (INT64_C(1) << 40)
 int64_t lyr_process_reap(int64_t pid);
 
-/* The signal numbered `number` to the child (SIGKILL for a kill). 0. */
+/* The signal numbered `number` to the child (SIGKILL for a kill; on Windows a kill alone,
+ * TerminateProcess). 0. */
 int64_t lyr_process_signal(int64_t pid, int64_t number);
 
+/* Whether a pipe's calls block (Windows): then std.process makes them on the I/O pool. */
+uint8_t lyr_process_pipes_block(void);
+
 /* A pipe's end: at most `n` bytes read into `into` — how many, 0 at its end —; at most `n` of
- * `from` written — how many; LYR_NET_WOULD_BLOCK (lyr/net.h) where the call would block; closed. */
+ * `from` written — how many; on POSIX LYR_NET_WOULD_BLOCK (lyr/net.h) where the call would block;
+ * closed. */
 int64_t lyr_process_read(int64_t fd, uint8_t *into, int64_t n);
 int64_t lyr_process_write(int64_t fd, const uint8_t *from, int64_t n);
 int64_t lyr_process_close(int64_t fd);

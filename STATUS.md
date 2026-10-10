@@ -676,6 +676,13 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   `waitpid(-1)` —, and closing a channel every waiter receives. The pipes wait on the poller. **The
   pipeline example** (S12's artifact): `printf | sort | uniq`, joined by tasks. Spec 12 "Processes",
   six cases. S12b: Windows.
+- **S12b** processes on Windows: `CreateProcessW` — the arguments on one command line quoted as
+  the C runtime reads them back (a Lyric child checks it: spaces, quotes, backslashes before a quote
+  and at the end, an empty one), the environment a UTF-16 block, only the child's three handles
+  inherited (a handle list); a child's end wakes the reaper's poller from a registered wait; the
+  pipes block and run on the I/O pool; a kill is TerminateProcess (code 1), and there are no other
+  signals. An end's encoding marks a signal by bit 40, since a Windows exit code is any 32 bits.
+  **S12 is done.**
 - **S13** the build script (11 W3 BS1–BS6): a package's `build.lyr` built as a program of its
   own (`build`, `build/`, its `[build-dependencies]` as a graph of its own in the same lock) and
   run before the compile; `std.build` (`target`, `profile`, `outDir`, `genDir`, `rerunIfChanged`,
