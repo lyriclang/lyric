@@ -3125,7 +3125,7 @@ extend<I :: [Iterator]> I :: [Iterable<Iter = I>] {
 
 // A range is an iterator of its own values, from both ends (I10): the value changes as it is
 // walked — a 'let' range is walked through a copy, as `for` takes one.
-extend<T :: [Integer]> Range<T> :: [Iterator, DoubleEnded] {
+extend<T :: [Step]> Range<T> :: [Iterator, DoubleEnded] {
     type Item = T;
 
     mut fn next(): ?T {
@@ -3133,7 +3133,7 @@ extend<T :: [Integer]> Range<T> :: [Iterator, DoubleEnded] {
             return null;
         }
         let value = this.start;
-        this.start = this.start + T.one;
+        this.start = value.after();
         return value;
     }
 
@@ -3141,9 +3141,84 @@ extend<T :: [Integer]> Range<T> :: [Iterator, DoubleEnded] {
         if (this.start >= this.end) {
             return null;
         }
-        this.end = this.end - T.one;
+        this.end = this.end.before();
         return this.end;
     }
+}
+
+/// What a range walks by (03 S15b; M8c S3 — Rust's `Step`): the value after and the value before,
+/// and the type's first and last — an integer's `± 1`, `min` and `max`; a character's scalar values
+/// past the surrogates. Within std.core. One block per type: a blanket over `Integer` beside
+/// `char`'s would conform some type twice, and there is no specialization (04).
+interface Step :: [TotalOrder] {
+    static fn first(): Self;
+    static fn last(): Self;
+
+    fn after(): Self;
+    fn before(): Self;
+}
+
+extend int :: [Step] {
+    static fn first(): int { return int.min; }
+    static fn last(): int { return int.max; }
+    fn after(): int { return this + 1; }
+    fn before(): int { return this - 1; }
+}
+
+extend int8 :: [Step] {
+    static fn first(): int8 { return int8.min; }
+    static fn last(): int8 { return int8.max; }
+    fn after(): int8 { return this + 1; }
+    fn before(): int8 { return this - 1; }
+}
+
+extend int16 :: [Step] {
+    static fn first(): int16 { return int16.min; }
+    static fn last(): int16 { return int16.max; }
+    fn after(): int16 { return this + 1; }
+    fn before(): int16 { return this - 1; }
+}
+
+extend int32 :: [Step] {
+    static fn first(): int32 { return int32.min; }
+    static fn last(): int32 { return int32.max; }
+    fn after(): int32 { return this + 1; }
+    fn before(): int32 { return this - 1; }
+}
+
+extend uint :: [Step] {
+    static fn first(): uint { return uint.min; }
+    static fn last(): uint { return uint.max; }
+    fn after(): uint { return this + 1; }
+    fn before(): uint { return this - 1; }
+}
+
+extend uint8 :: [Step] {
+    static fn first(): uint8 { return uint8.min; }
+    static fn last(): uint8 { return uint8.max; }
+    fn after(): uint8 { return this + 1; }
+    fn before(): uint8 { return this - 1; }
+}
+
+extend uint16 :: [Step] {
+    static fn first(): uint16 { return uint16.min; }
+    static fn last(): uint16 { return uint16.max; }
+    fn after(): uint16 { return this + 1; }
+    fn before(): uint16 { return this - 1; }
+}
+
+extend uint32 :: [Step] {
+    static fn first(): uint32 { return uint32.min; }
+    static fn last(): uint32 { return uint32.max; }
+    fn after(): uint32 { return this + 1; }
+    fn before(): uint32 { return this - 1; }
+}
+
+extend char :: [Step] {
+    static fn first(): char { return '\0'; }
+    static fn last(): char { return '\u{10FFFF}'; }
+    fn after(): char { return charAfter(this); }
+    fn before(): char { return charBefore(this); }
 }
 
 /// The iterator of an array or a view (10 B6 I10): its elements from the front and from the
@@ -4208,9 +4283,10 @@ extend<I :: [Iterator<Item = T>], T :: [Display]> I {
 }
 
 // An inclusive range ends without a flag: its last value leaves `start` past `end` — or `end`
-// before `start` where that value is the type's `max` (`min` from the back), so neither bound
-// leaves the type.
-extend<T :: [Integer]> RangeInclusive<T> :: [Iterator, DoubleEnded] {
+// before `start` where that value is the type's last (its first from the back), so neither bound
+// leaves the type. A range of characters walks the scalar values, the surrogates passed over
+// (03 S15b; `Step` above).
+extend<T :: [Step]> RangeInclusive<T> :: [Iterator, DoubleEnded] {
     type Item = T;
 
     mut fn next(): ?T {
@@ -4218,10 +4294,10 @@ extend<T :: [Integer]> RangeInclusive<T> :: [Iterator, DoubleEnded] {
             return null;
         }
         let value = this.start;
-        if (value == this.end && value == T.max) {
-            this.end = value - T.one;
+        if (value == this.end && value == T.last()) {
+            this.end = value.before();
         } else {
-            this.start = value + T.one;
+            this.start = value.after();
         }
         return value;
     }
@@ -4231,13 +4307,31 @@ extend<T :: [Integer]> RangeInclusive<T> :: [Iterator, DoubleEnded] {
             return null;
         }
         let value = this.end;
-        if (value == this.start && value == T.min) {
-            this.start = value + T.one;
+        if (value == this.start && value == T.first()) {
+            this.start = value.after();
         } else {
-            this.end = value - T.one;
+            this.end = value.before();
         }
         return value;
     }
+}
+
+/// The scalar value after `c`, past the surrogates; `c` is below U+10FFFF.
+fn charAfter(c: char): char {
+    var n = (c as uint32) + 1;
+    if (n == 0xD800) {
+        n = 0xE000;
+    }
+    return n as char;
+}
+
+/// The scalar value before `c`, past the surrogates; `c` is above U+0000.
+fn charBefore(c: char): char {
+    var n = (c as uint32) - 1;
+    if (n == 0xDFFF) {
+        n = 0xD7FF;
+    }
+    return n as char;
 }
 
 /// The debug rendering of an array — what a synthesized `debug()` reaches for, the array's own

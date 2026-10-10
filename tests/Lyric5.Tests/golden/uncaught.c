@@ -808,22 +808,22 @@ _Static_assert(sizeof(lyr_slice_u8) == 16, "layout of lyr_slice_u8");
 /* prototypes */
 uint8_t lyr_std_core__extend__Slice_uint8__isEmpty_6b51423e(lyr_slice_u8 l0_this);
 
-#line 3205 "stdlib5/std/core.lyr"
+#line 3280 "stdlib5/std/core.lyr"
 uint8_t lyr_std_core__extend__Slice_uint8__isEmpty_6b51423e(lyr_slice_u8 l0_this) {
     lyr_slice_u8 t0 = {0};
     int64_t t1 = 0;
     int64_t t2 = 0;
     uint8_t t3 = 0;
 bb0:;
-#line 3205
+#line 3280
     t0 = l0_this;
-#line 3205
+#line 3280
     t1 = t0.len;
-#line 3205
+#line 3280
     t2 = (int64_t)INT64_C(0);
-#line 3205
+#line 3280
     t3 = (uint8_t)(t1 == t2);
-#line 3205
+#line 3280
     return t3;
 }
 
