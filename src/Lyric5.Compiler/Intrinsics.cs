@@ -106,6 +106,7 @@ public static class Intrinsics
         ["std.process.processRead"] = "LYR_PROCESS_READ",
         ["std.process.processWrite"] = "LYR_PROCESS_WRITE",
         ["std.process.processClose"] = "lyr_process_close",
+        ["std.process.processPipesBlock"] = "lyr_process_pipes_block",
         ["std.task.spin"] = "lyr_task_spin",
         // Signals as a channel (10 Q9, 06 K5): the abstract names and the system's numbers, the
         // handler on or off, the watcher's poller, the caught ones.

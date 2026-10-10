@@ -1,0 +1,15 @@
+// A child's arguments arrive as they were given (10 O8; 13 M8b S12b): spaces, quotes, backslashes
+// before a quote and at the end, an empty one — on Windows through CreateProcessW's one command
+// line, quoted as the C runtime reads it back (the child, args_echo, is a Lyric program: its
+// os.args() reads that line with CommandLineToArgvW). The child's path is the first argument.
+// Expected stdout: [plain][with space][with "quote"][trailing\][back\\slash][slash\"quote][][tab	in]
+import std.io { println };
+import std.os;
+import std.process { Command, Stdio };
+
+fn main(): void throws Error {
+    let child = os.args()[1];
+    let given = ["plain", "with space", "with \"quote\"", "trailing\\", "back\\\\slash", "slash\\\"quote", "", "tab\tin"];
+    let done = try Command { program = child, args = given, stdout = Stdio.Piped }.output();
+    println(string.fromUtf8Lossy(done.stdout[..]).trimEnd());
+}

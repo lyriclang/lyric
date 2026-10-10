@@ -1,0 +1,14 @@
+// The arguments a program was started with, after its own name, each in brackets (M8b S12b): what
+// a child sees of what its parent gave it.
+import std.io { print, println };
+import std.os;
+
+fn main(): void {
+    let args = os.args();
+    var i = 1;
+    while (i < args.length()) {
+        print(f"[{args[i]}]");
+        i += 1;
+    }
+    println("");
+}

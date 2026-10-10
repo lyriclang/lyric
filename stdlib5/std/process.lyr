@@ -3,10 +3,12 @@
 /// for its end; `output` and `status` do it all at once. A child's end comes as SIGCHLD, which the
 /// runtime keeps for itself (Q9): a reaper on a thread of its own asks each child that has not been
 /// seen to end (lyr/process.h), and an end wakes every task that waits for it, on any thread. A
-/// wait is a wait (10 §1 rule 7): a cancel ends it. POSIX; Windows comes with S12b.
+/// wait is a wait (10 §1 rule 7): a cancel ends it. On Windows (S12b) a child is its process handle,
+/// its end wakes the reaper from a registered wait, its pipes block and run on the I/O pool — no
+/// point of cancellation there, as a file's call —, and a kill is all the signals there are.
 import std.collections { List };
 import std.core { StringBuilder, viewBytes };
-import std.io { IoError, Reader, Writer, failure };
+import std.io { IoError, Reader, Writer, failure, onPool };
 import std.os { Signal, numberOf, signalOf };
 import std.task;
 import std.task { Cancelled, Channel, SpinLock, Waits, awaitDescriptor, forgetDescriptor, here };
@@ -20,9 +22,16 @@ fn processSignal(pid: int, number: int): int;
 fn processRead(fd: int, into: Slice<uint8>): int;
 fn processWrite(fd: int, from: Slice<uint8>): int;
 fn processClose(fd: int): int;
+fn processPipesBlock(): bool;
 
 /// What a call that would block answers (lyr/net.h).
 let wouldBlock = -(64 << 32);
+
+/// Whether a pipe's calls block (Windows): then they run on the I/O pool (13 M8b P2).
+let pipesBlock = processPipesBlock();
+
+/// lyr/process.h's mark of an end by a signal: bit 40, above any exit code.
+let signalled = 1 << 40;
 
 /// What a child's standard stream is (10 O8): the parent's, a pipe to the parent, or nothing.
 pub enum Stdio :: [Equatable, Debug] {
@@ -158,13 +167,13 @@ pub class Child {
         return ExitStatus { raw = end };
     }
 
-    /// Ends the child now — SIGKILL on POSIX. A child that has ended already is not touched: its
-    /// number may be another process's by then.
+    /// Ends the child now — SIGKILL on POSIX, TerminateProcess on Windows (code 1). A child that has
+    /// ended already is not touched: its number may be another process's by then.
     pub fn kill(): void throws IoError {
         try this.signal(Signal.Other(9));
     }
 
-    /// `s` to the child (Q9), where it has not ended.
+    /// `s` to the child (Q9), where it has not ended. Windows has no signals: `Unsupported` there.
     pub fn signal(s: Signal): void throws IoError {
         let number = numberOf(s);
         if (number < 0) {
@@ -177,9 +186,10 @@ pub class Child {
     }
 }
 
-/// How a child ended (10 O8): with an exit code, or — POSIX — by a signal.
+/// How a child ended (10 O8): with an exit code — 0 to 255 on POSIX, any 32 bits on Windows —, or,
+/// on POSIX, by a signal.
 pub struct ExitStatus :: [Equatable, Debug] {
-    /// The runtime's answer (lyr/process.h): the code, or 256 plus the signal's number.
+    /// The runtime's answer (lyr/process.h): the code, or bit 40 and the signal's number.
     raw: int,
 
     /// Whether it ended with code 0.
@@ -189,19 +199,19 @@ pub struct ExitStatus :: [Equatable, Debug] {
 
     /// Its exit code, where it ended with one.
     pub fn code(): ?int {
-        return if (this.raw < 256) this.raw else null;
+        return if (this.raw < signalled) this.raw else null;
     }
 
     /// The signal that ended it, where one did.
     pub fn signal(): ?Signal {
-        return if (this.raw >= 256) signalOf(this.raw - 256) else null;
+        return if (this.raw >= signalled) signalOf(this.raw - signalled) else null;
     }
 }
 
 extend ExitStatus :: [Display] {
     /// `exit code 3`, or `signal 9`.
     fn show(): string {
-        return if (this.raw < 256) f"exit code {this.raw}" else f"signal {this.raw - 256}";
+        return if (this.raw < signalled) f"exit code {this.raw}" else f"signal {this.raw - signalled}";
     }
 }
 
@@ -213,7 +223,8 @@ pub struct Output {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The pipes (13 M8b P2): non-blocking, waited for on the thread's poller as a socket is.
+// The pipes (13 M8b P2): on POSIX non-blocking, waited for on the thread's poller as a socket is;
+// on Windows blocking, each call on the I/O pool.
 // ---------------------------------------------------------------------------------------------
 
 /// The running task waits until `fd` is ready as `interest` says, in `waits`.
@@ -248,7 +259,8 @@ pub class PipeReader :: [Reader, Closeable] {
             if (into.isEmpty()) {
                 return 0;
             }
-            let n = processRead(this.fd, into);
+            let fd = this.fd;
+            let n = if (pipesBlock) onPool(() => processRead(fd, into)) else processRead(fd, into);
             if (n >= 0) {
                 return n;
             }
@@ -289,7 +301,8 @@ pub class PipeWriter :: [Writer, Closeable] {
             if (from.isEmpty()) {
                 return 0;
             }
-            let n = processWrite(this.fd, from);
+            let fd = this.fd;
+            let n = if (pipesBlock) onPool(() => processWrite(fd, from)) else processWrite(fd, from);
             if (n >= 0) {
                 return n;
             }
