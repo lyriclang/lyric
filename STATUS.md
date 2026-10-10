@@ -813,6 +813,13 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   the quote, the backslash and the controls escaped, a character that does not print as `\u{…}`.
   `Contains<char>` on text went to S9: the generic `contains<P>` is no witness for it yet. Spec 12
   "Strings", seven cases.
+- **S3a** two pieces of the language (03 S3, S15b): an array literal where a view is expected
+  checks its elements against the view's element type, `take([1, 2])` for `Slice<uint8>`; two
+  characters bound a range — `c in 'a'..='z'`, and walked, in a `for` head too, it gives the
+  scalar values in between, the surrogates passed over. The walk of every range goes through an
+  internal `Step` of std.core (Rust's), one block per integer type and `char`: a block of its own
+  for `Range<char>` beside the one for `Integer` would conform it twice (no specialization, 04).
+  Spec 03 §5.2 rule 4, §7, 12 §Iteration; four cases.
 
 ## Design decisions
 

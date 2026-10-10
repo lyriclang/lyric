@@ -5772,14 +5772,18 @@ public sealed class TypeChecker
     {
         var lo = CheckExpr(r.Low, scope);
         var hi = CheckExpr(r.High, scope);
-        var elem = UnifyNumeric(r.Low, lo, r.High, hi);
+        // Two characters bound a range of characters (03 S15b, M8c S3): 'c in 'a'..='z'', and
+        // walked it gives the scalar values between, the surrogates passed over (std.core).
+        var chars = TypeFacts.IsChar(lo) && TypeFacts.IsChar(hi);
+        var elem = chars ? lo : UnifyNumeric(r.Low, lo, r.High, hi);
         if (elem is null && !lo.IsError && !hi.IsError)
-            _de.Report("LYR-SEM0003", Severity.Error, r.Span, $"range bounds must be matching numerics, got '{TypeFacts.Display(lo)}' and '{TypeFacts.Display(hi)}'");
+            _de.Report("LYR-SEM0003", Severity.Error, r.Span, $"range bounds must be matching numerics or two characters, got '{TypeFacts.Display(lo)}' and '{TypeFacts.Display(hi)}'");
 
         // In a 'for' head the range is the counted loop and no value (03 T13 A3); everywhere
         // else 'a..b' is a 'Range<T>' and 'a..=b' a 'RangeInclusive<T>' of std.core, holding its
-        // bounds. Lyric 4 refused the value.
-        if (ReferenceEquals(r, _rangeInPosition)) return new RangeOf(elem ?? LyrType.Error);
+        // bounds. Lyric 4 refused the value. A range of characters is the value in a head too: its
+        // walk passes over the surrogates, which a counted loop would count.
+        if (ReferenceEquals(r, _rangeInPosition) && !chars) return new RangeOf(elem ?? LyrType.Error);
         if (elem is null || elem.IsError) return LyrType.Error;
         var symbol = r.IsInclusive ? _rangeInclusive : _range;
         if (symbol is null)
@@ -6360,7 +6364,10 @@ public sealed class TypeChecker
             return inline;
         }
 
-        var elemExpected = expected is ArrayOf ea ? ea.Element : null;
+        // A view's element type too (03 S3, M8c S3): 'take([1, 2])' with 'take(s: Slice<uint8>)'
+        // checks the elements against 'uint8' as 'let a: uint8[] = [1, 2]' does; the array the
+        // literal builds then stands for the view at the site (§5.2 rule 4).
+        var elemExpected = expected switch { ArrayOf ea => ea.Element, SliceOf sv => sv.Element, _ => null };
         if (arr.Elements.Length == 0)
         {
             // Empty: the element type comes from the context alone. Without one it is open — a
