@@ -194,31 +194,45 @@ public class GitDependencyTests
         File.WriteAllText(Path.Combine(dir, "lyric.toml"), Manifest("app", $"[dependencies]\ngeo = {{ git = \"{repo.Url}\", tag = \"v1.1.0\" }}\n"));
         Assert.Equal("13\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
+
+    /// <summary>The test repositories' git leaves nothing running behind a command
+    /// (<see cref="TestRepo"/>): it reads <c>maintenance.auto</c> as false.</summary>
+    [Fact]
+    public void A_test_repository_runs_no_maintenance()
+    {
+        using var repo = new TestRepo();
+        Assert.Equal("false", repo.Git("config", "--get", "maintenance.auto"));
+    }
 }
 
-/// <summary>A git repository in a temporary directory, made with the git command line under a
-/// configuration of its own — the developer's does not reach it —, and removed with what the
-/// user's cache holds of it.</summary>
+/// <summary>A git repository in one of the run's directories, made with the git command line
+/// under a configuration of its own — the developer's does not reach it —, and removed with what
+/// the user's cache holds of it.</summary>
 internal sealed class TestRepo : IDisposable
 {
     private static readonly Dictionary<string, string> Isolated = new(StringComparer.Ordinal)
     {
         ["GIT_CONFIG_NOSYSTEM"] = "1",
         ["GIT_CONFIG_GLOBAL"] = OperatingSystem.IsWindows() ? "NUL" : "/dev/null",
+        // No maintenance: a commit starts `git maintenance run --auto --detach`, which on POSIX
+        // goes on in .git after the commit has returned — while the test is removing the
+        // repository (CI, ubuntu: "Directory not empty", in the tests that end fastest).
+        ["GIT_CONFIG_COUNT"] = "1",
+        ["GIT_CONFIG_KEY_0"] = "maintenance.auto",
+        ["GIT_CONFIG_VALUE_0"] = "false",
         ["GIT_AUTHOR_NAME"] = "test",
         ["GIT_AUTHOR_EMAIL"] = "test@lyric.invalid",
         ["GIT_COMMITTER_NAME"] = "test",
         ["GIT_COMMITTER_EMAIL"] = "test@lyric.invalid",
     };
 
-    public string Dir { get; } = Path.Combine(Path.GetTempPath(), "lyric5-repo-" + Guid.NewGuid().ToString("N"));
+    public string Dir { get; } = TestDirectories.Fresh("lyric5-repo-");
 
     /// <summary>As a manifest names it: a <c>file://</c> URL.</summary>
     public string Url => new Uri(Dir).AbsoluteUri;
 
     public TestRepo()
     {
-        Directory.CreateDirectory(Dir);
         Git("init", "-q", "-b", "main");
     }
 
@@ -251,12 +265,18 @@ internal sealed class TestRepo : IDisposable
         return result.Stdout.Trim();
     }
 
+    /// <summary>As the run's directories are removed: as far as it goes. What cannot be removed
+    /// yet stays — the repository goes with the run's root when the process ends —, and a test
+    /// whose checks passed does not fail over its cleanup.</summary>
     public void Dispose()
     {
         var id = GitCache.Id(Url);
-        DeleteTree(Dir);
-        DeleteTree(Path.Combine(UserCache.Root, "git", "db", id));
-        DeleteTree(Path.Combine(UserCache.Root, "git", "checkouts", id));
+        foreach (var directory in new[] { Dir, Path.Combine(UserCache.Root, "git", "db", id), Path.Combine(UserCache.Root, "git", "checkouts", id) })
+        {
+            try { DeleteTree(directory); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
     }
 
     /// <summary>git keeps its objects read-only, which a recursive delete on Windows refuses.</summary>
