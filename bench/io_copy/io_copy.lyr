@@ -1,0 +1,43 @@
+// M8b's I/O measurement (design/v5/spec/13, S14 — reported, no bound): a file of 128 MiB written
+// a MiB at a time, copied by fs.copy, the copy read back a MiB at a time and summed; both removed.
+// Prints the bytes copied and the sum of the copy's bytes.
+import std.fs;
+import std.io { println };
+import std.fs { File };
+import std.path;
+
+fn main(): void throws Error {
+    let dir = try fs.tempDir();
+    let original = path.join(dir, "original.bin");
+    let copy = path.join(dir, "copy.bin");
+    let chunk: uint8[] = [0u8] * 1048576;
+    var i = 0;
+    while (i < chunk.length()) {
+        chunk[i] = ((i * 31) % 251) as uint8;
+        i += 1;
+    }
+    {
+        using let f = try File.create(original);
+        for (_ in 0..128) {
+            try f.writeAll(chunk[..]);
+        }
+    }
+    let copied = try fs.copy(original, copy);
+    var sum = 0;
+    {
+        using let f = try File.open(copy);
+        loop {
+            let n = try f.read(chunk[..]);
+            if (n == 0) {
+                break;
+            }
+            var k = 0;
+            while (k < n) {
+                sum += chunk[k] as int;
+                k += 1;
+            }
+        }
+    }
+    try fs.removeAll(dir);
+    println(f"{copied} {sum}");
+}

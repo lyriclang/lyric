@@ -124,3 +124,28 @@ in `strings` is not measured apart here; the hasher's share of `maps` is as abov
 The CI runner, same commit: maps 0.99×, sorting 1.09×, strings 1.80× Go. Since the review of
 2026-10-07 the job runs on `main` and by hand, not on every pull request, and `strings` stands
 under the common fence of 3× Go.
+
+## M8b's I/O (reported, no bound)
+
+| Program | What it measures |
+|---|---|
+| `io_copy` | a file of 128 MiB written a MiB at a time, copied by `fs.copy`, the copy read back a MiB at a time and its bytes summed — `std.fs` (10 O5), its calls parking the task on the I/O pool (O10) |
+| `echo` | 256 MiB through a TCP echo on 127.0.0.1 within one program: a task writes them 64 KiB at a time, a server task echoes, the main task reads them back and sums them — `std.net` (10 O7), its sockets parking the task on the poller (O10) |
+
+The plan asks for these as a report, not a ratchet (13, S14): `run.py --ratchet` and `--bound`
+pass them by. The twin is Go — `io.Copy`, which hands a file-to-file copy to `copy_file_range`,
+and its netpoller; C# has none here. CI's job *Benchmarks* reports them beside the others.
+
+Measured 2026-10-08 (WSL2 x86-64, the release profile through `zig cc 0.16`, Go 1.27; minimum
+of 3 runs; the files on WSL's `/tmp`, a tmpfs):
+
+| bench | Lyric | Go | Lyric / Go |
+|---|---|---|---|
+| io_copy | 0.155 s | 0.143 s | 1.08 |
+| echo | 0.138 s | 0.137 s | 1.01 |
+
+Both at Go's level, against the guess written before the run: 1.5–3× for the copy, which goes
+through two pool calls per MiB where Go hands the whole file to `copy_file_range`. Not profiled;
+on a tmpfs the copy is a copy in memory either way, and what both twins do besides — write the
+file, read the copy back, sum it — is in both numbers. A disk would measure the system more than
+the language.

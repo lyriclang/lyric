@@ -455,6 +455,21 @@ Dokuments dem widerspricht, gilt die Zeile hier.
 | S4b | **Ein nacktes `T[N]` ist `Equatable` und `Hashable`**, wie C8 es sagt: der Compiler erzeugt `equals` und `hash` je Instanztyp in der Senkung, denn `extend` auf `T[N]` ist verboten (03 M4-2). Ein Struct mit einem `T[N]`-Feld vergleicht schon elementweise; heute fehlt `d == digest()` für `uint8[4]` (`LYR-SEM0059`), nichts in M8b hängt daran (`constantTimeEq`, `toArray()`). Uhr: M8c | C8 |
 | S4a | **Base64 ohne Padding** (JOSE, RFC 7515) kommt, wo es gebraucht wird — als eigene Funktionen oder als Options-Struct (N12), entschieden dort. Bis dahin sind beide Alphabete gepaddet und streng dekodiert (RFC 4648 §3.2). Uhr: M10, mit `http` und `uri` | Q5 |
 
+## Review 2026-10-08 (2) — die offenen Punkte aus M8b S10–S12
+
+Entscheidungen des Maintainers („alle Empfehlungen“) zu den offenen Punkten, die M8b S10–S12
+nach der ersten Durchsicht gesammelt hat. Kennung, „Betrifft“ und Uhr wie im Abschnitt davor; wo
+eine ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| S10b | **`IpAddr` trägt Bytes und Gruppen als Felder** (bestätigt): `V4(uint8, uint8, uint8, uint8)`, `V6(` acht `uint16)` — `IpAddr.V4(127, 0, 0, 1)`; die acht Felder sind die Gruppen, die RFC 5952 schreibt. Rust kapselt eigene Typen (`IpAddr::V4(Ipv4Addr)`), Go nimmt ein Byte-Slice. Verworfen: `V4(uint8[4])`/`V6(uint8[16])`, sobald ein nacktes `T[N]` gleich und hashbar ist (die S4b-Zeile oben) | O7 |
+| S10c | **`resolve` ist kein Abbruchpunkt** (bestätigt): er läuft auf dem I/O-Pool wie ein Datei-Aufruf (die S6b-Zeile oben), endet in begrenzter Zeit — beim Resolver Sekunden, nicht Millisekunden —, und ein Abbruch zeigt sich beim nächsten echten Warten. Go bricht `LookupHost` über einen Context ab, Rust gar nicht. Eigene Fristen, wenn `http` sie braucht. Uhr: M10 | O7, O10 |
+| S12a | **Prozesse über `fork` und `exec`**, nicht `posix_spawn` (bestätigt; 13 S12): ein Arbeitsverzeichnis bräuchte dort `posix_spawn_file_actions_addchdir_np` (glibc 2.29), und zig baut ohne Versionsangabe gegen eine ältere glibc. Ein Weg für alles, wie Rusts Rückfallweg; den PATH sucht der Elternprozess, das Kind tut nur, was nach einem `fork` sicher ist. Verworfen: die glibc-Version im Ziel auf 2.29 festlegen — die Programme liefen auf älteren Systemen nicht mehr | O8 |
+| S12a | **`env` legt die Paare über die geerbte Umgebung** (bestätigt), wie Rusts `Command`. Eine leere Umgebung (Rusts `env_clear`) ist eine Tür | O8 |
+| S12a | **`Child.stdin: ?PipeWriter`, `stdout`/`stderr: ?PipeReader`** statt `?Writer`/`?Reader` (bestätigt): die konkreten Klassen sind `Writer` bzw. `Reader` und `Closeable` — ein Feld vom Interface-Typ hätte kein `close()`, und `wait()` schließt stdin | O8 |
+| S12b | **Die Pipes eines Kindes parken unter Windows wie Sockets**: überlappte Named Pipes über den Completion-Port des Pollers (seit M8b S11), wie Go und Rusts `read2`. Bis dahin blockieren sie auf dem I/O-Pool (13 P2): ein Kind, das nie schreibt, hält einen Pool-Thread, und ein Abbruch wirkt erst, wenn es schreibt oder endet. Uhr: M10 | O8, O10 |
+
 ---
 
 **Bereich 10 ist damit vollständig entschieden** (B1–B13, 2026-09-29). Nachträge in anderen

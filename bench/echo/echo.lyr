@@ -1,0 +1,59 @@
+// M8b's I/O measurement (design/v5/spec/13, S14 — reported, no bound): 256 MiB through a TCP echo
+// on 127.0.0.1 within one program — a task writes them 64 KiB at a time, the server echoes, the
+// client's main task reads them back and sums them. Prints the bytes back and their sum.
+import std.io { println };
+import std.net { IpAddr, SocketAddr, TcpListener, TcpStream };
+import std.task { spawn };
+
+fn main(): void throws Error {
+    let listener = try TcpListener.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 });
+    let at = try listener.localAddr();
+    let server = spawn(() => {
+        var conn = try listener.accept();
+        let buf: uint8[] = [0u8] * 65536;
+        loop {
+            let n = try conn.read(buf[..]);
+            if (n == 0) {
+                break;
+            }
+            try conn.writeAll(buf[..n]);
+        }
+        try conn.close();
+    });
+    var client = try TcpStream.connect(at);
+    let total = 268435456;
+    let writer = spawn(() => {
+        let chunk: uint8[] = [0u8] * 65536;
+        var i = 0;
+        while (i < chunk.length()) {
+            chunk[i] = ((i * 31) % 251) as uint8;
+            i += 1;
+        }
+        var sent = 0;
+        while (sent < total) {
+            try client.writeAll(chunk[..]);
+            sent += chunk.length();
+        }
+        try client.shutdown(.Write);
+    });
+    let buf: uint8[] = [0u8] * 65536;
+    var got = 0;
+    var sum = 0;
+    loop {
+        let n = try client.read(buf[..]);
+        if (n == 0) {
+            break;
+        }
+        var k = 0;
+        while (k < n) {
+            sum += buf[k] as int;
+            k += 1;
+        }
+        got += n;
+    }
+    try writer.await();
+    try server.await();
+    try client.close();
+    try listener.close();
+    println(f"{got} {sum}");
+}

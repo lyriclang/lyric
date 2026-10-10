@@ -38,8 +38,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M6 | Coroutines, scheduler, threads | XL | **done** 2026-10-02 |
 | M7 | Modules and packages | L | **done** 2026-10-02 |
 | M8a | std core | XL | **done** 2026-10-07 |
-| M8b | std I/O and system | L | **in progress**: planned 2026-10-07 (S1–S14) |
-| M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | — |
+| M8b | std I/O and system | L | **done** 2026-10-08 |
+| M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | approved 2026-10-08, after M8b |
 | M9a | `comptime` (the IR interpreter) | L | — |
 | M9b | Macros | L | — |
 | M10 | std after rule D | XL | — |
@@ -510,14 +510,93 @@ raising no version and no `--locked`; `extern "C"`'s stage-1 types; the `lyric5`
 the 4.x catalogue; reproducibility checked on one machine at a time (zig's own libunwind keeps
 the directory zig built it in; gcc maps the working directory, into its cache keys).
 
-### M8b — in progress
+### M8a — done (2026-10-07)
+
+Merged as #261–#307 (S1–S11a) and, after the review of 2026-10-05, #308–#373 (the blocks R0–R9,
+then S12–S16); the spec side is lyric-spec#122 onward. Slice by slice (each PR says what it did
+and how it was checked):
+
+- **Tests:** `lyric test`, `@Test`, `std.test` with `@callerExpr`, subtests, the watchdog (S1).
+- **Language the library needs:** `&x: T` (S2a), `static let` in interfaces and blocks (S2b),
+  blanket and form blocks with their conformances (S2c), defaults per conformer (S2d), the
+  variadic parameter `nums: int...` (S9b).
+- **Numbers (B5):** the tower `Num`/`Signed`/`Integer`/`Float`, checked/saturating/wrapping,
+  `parse`, float methods, the shortest float text, `std.math` (S3).
+- **Iteration (B6):** `Iterator`/`Iterable` with `type Item` and `type Error`, `for` over every
+  iterable, closing, `for (x in try it)`, the adapters as blanket extends, the join of two
+  thrown types, the terminators (S4).
+- **Arrays and views (C2, C10):** their members, `arrayOf` in linear time, the sorts (S5).
+- **Hashing (K2, C4, C5):** `Hasher` with SipHash-1-3 and FNV, `Hashable` streaming into a
+  hasher, `Map` as a Swiss table (S6).
+- **Collections:** `Index`/`IndexSet` (B4), `List` (C3), a map's walks, `Set`, `toList` (S7);
+  `Deque` (C6) and `Heap` (C1) (S11a; the least first since the review's A1).
+- **Strings, first and second part (B9 S1–S3):** search, split, trim, replace, pad,
+  `StringBuilder`; a `char` literal beyond the basic plane (S8).
+- **The prelude naming the collections (B2)** (S9a); **the format language (08 Y7, 10 S7)**,
+  checked where a spec is written (S9c).
+- **The artifact:** `lyric test` runs the std tests (147); the examples inventory, stats and
+  stack build and run as packages (S10a); measurement point 3 is measured (S10b, S10c) and
+  **not met**: maps 1.90×, sorting 1.53×, strings 2.53× Go, ahead of C# in all three. What
+  bounds it — no inlining across translation units, the map's three arrays, f-string
+  allocation — is in `bench/README.md`.
+
+**The review of 2026-10-05.** After S11a the maintainer went through the open points of M4 to
+M8a and decided them: 110 decisions, written into the area documents, each in a section "Review
+2026-10-05". They re-cut the milestone (13, the addendum there):
+
+- **M8a closes with** the review's decisions — blocks R0 (the spec pin, these texts, test
+  hygiene), R1 (the compiler's footing: a depth limit, the emitter's tests as packages, names
+  instead of numbers in the C, lowering only what is reached), R2 syntax, R3 names and modules,
+  R4 types and inference, R5 errors and generators, R6 concurrency, R7 std corrections, R8
+  packages and the command line, R9 performance — and then with what M8b needs of the library:
+  `StringView`, `Pattern`, `fromUtf8` (S12); `showTo`/`debugTo` and f-strings writing into one
+  builder (S13); containers' `Debug`, `Display` and `Equatable` (S14); `collect`/`FromIterator`
+  and `x in xs` (S15); the close with measurement point 3 measured again (S16).
+- **Built from the list the review left M8a** — all of it: the members of `T[N]` (R4e),
+  `copyInto` (R7c); text as a view, `StringView` and its members, `Pattern` (`char`, `string`, a
+  view, `fn(char) -> bool`) for search, split and replace, `string.fromUtf8`, `Utf8Error`,
+  `fromUtf8Lossy`, function types as extend targets (S12); `Display.showTo` and `Debug.debugTo`,
+  f-strings writing into one builder, `[x] * n` by doubling (S13); `==`, `Debug` and `Display` for
+  arrays, views and every container — a set and a map equal in any order —, a shape conforming
+  through its block comparing and rendering (S14a); `withCapacity` on every container, `Heap.of`
+  (N3's name for the review's `Heap.from`, S14b); `FromIterator`, `collect()`, `toSet()`, a fixed
+  associated type read inside every type (S15a); `x in xs` and `x !in xs` through `Contains<T>`,
+  a call's receiver evaluated before its arguments (S15b).
+- **Measurement point 3 again (S16):** maps 1.36×, sorting 1.21×, strings 1.70× Go
+  (S10c: 1.90, 1.53, 2.53), ahead of C# in all three; maps and sorting within the bound, strings
+  over it — on the CI runner 0.99×, 1.09× and 1.80×. The numbers and what moved them are in
+  `bench/README.md`.
+- **The open points, decided (2026-10-07):** what the run R0–S16 collected, gone through with the
+  maintainer — in the design documents 01, 03, 04, 10 and 11, each in a section "Review
+  2026-10-07", with their clocks (M8c, M12, M10/M11). Built at once: release traces stated as best
+  effort (spec 13 §1.4), CI's platform jobs and benchmarks on `main` only, `strings` under the
+  common fence; `arrayOf` filling in one allocation, the `spawn` test waiting instead of sleeping.
+- **Found at the close (S16):** no map over objects compiled since R9d — its table filled by
+  `[empty] * n`, which a generic body passed and every instance over an object refused as a
+  compiler bug (`LYR-CG0001`); no test held one. Now a generic `[x] * n` asks for `Clone` (03 §5.1),
+  and the containers fill through std's own `filled`, shared, one allocation.
+- **Not built, and M8c's** (after M8b): the Unicode tables, `char`'s predicates, `toUpper` and
+  `toLower`; `mapNotNull`, `flatMap`, `flatten`, `chunks`, `windows`, `dedup`, `scan`,
+  `peekable`, `rev`, `cycle`, and lambdas that throw inside adapters; `toMap`/`sorted` and the
+  other collecting terminators beyond `collect` and `toSet`; the set operations, `map[k]`,
+  `list[a..b]`, `+` and `*` on collections; `Result`, `From`/`Into`; `std.fmt.format` at run time; an interface with a
+  fixed associated type as a value; `suppressed()` and `backtrace()` at a `catch` binding;
+  `@Bench` and `lyric bench`.
+- **Clocks the review set:** measurement point 3 (at the close of M8a: maps and sorting within it,
+  strings at 1.70×) holds its bound of 1.5× Go and is to be met
+  after M11, or decided again; the prologue's stack check and `Atomic` over a class come with
+  M11; the notes on hidden candidates and the lint for foreign conformances with M12.
+
+### M8b — done (2026-10-08)
 
 The plan is design 13's addendum of 2026-10-07: the boundary to C (P1), waiting through the
 poller and an I/O pool (P2), the console (P3), handles (P4), the platforms (P5), the spec's
 chapter 12 (P6), and the slices S1–S14 with their artefacts. Approved like M8a: no halt until the
-close, each slice merged on green CI, the open points collected for the report at the close.
+close, each slice merged on green CI — a slice of platform code on a dispatched run on every
+platform as well —, the open points collected for the report at the close.
 
-Merged, slice by slice (each PR says what it did and how it was checked):
+Merged as #374 onward, the spec side lyric-spec#221 onward; slice by slice (each PR says what it
+did and how it was checked):
 
 - **S1, the module cut** (10 Q9, Q10): the locks in `std.sync`, with `Semaphore` (06 K4, the one
   waker of 5.0); `Thread` and `Pool` in `std.thread`, with `parallelMap` (06 P5) on the program's
@@ -689,83 +768,23 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   `linkLib`, `cFlags`, `compileC`, `warn`), the directives through a file; `gen/` the module
   space `app.gen.*`; a cache over the script, its dependencies, its inputs and `gen/`; a
   dependency's script only with the root's `[trust] build-scripts`. Spec 15 §8, five cases.
+- **S14** the close: **the file tool** (`tests/Lyric5.Tests/programs/filetool.lyr`, M8b's
+  artifact) — `stats`, `copy` and `find` over a tree through `fs.walk`, `fs.copy`, `std.path` and
+  `os.args()`, a failure on the standard error with its path and code 1 —, built as a package and
+  run by `ExampleTests`, and as a real Windows process. The dogfood: the std tests (293) and the
+  examples at M8b's state, the tests' own three warnings gone. **M8b's I/O measured** (reported,
+  no bound): a file of 128 MiB copied and read back 1.08×, a TCP echo of 256 MiB 1.01× Go — the
+  numbers and the guess they beat in `bench/README.md`.
 
-### M8a — done (2026-10-07)
-
-Merged as #261–#307 (S1–S11a) and, after the review of 2026-10-05, #308–#373 (the blocks R0–R9,
-then S12–S16); the spec side is lyric-spec#122 onward. Slice by slice (each PR says what it did
-and how it was checked):
-
-- **Tests:** `lyric test`, `@Test`, `std.test` with `@callerExpr`, subtests, the watchdog (S1).
-- **Language the library needs:** `&x: T` (S2a), `static let` in interfaces and blocks (S2b),
-  blanket and form blocks with their conformances (S2c), defaults per conformer (S2d), the
-  variadic parameter `nums: int...` (S9b).
-- **Numbers (B5):** the tower `Num`/`Signed`/`Integer`/`Float`, checked/saturating/wrapping,
-  `parse`, float methods, the shortest float text, `std.math` (S3).
-- **Iteration (B6):** `Iterator`/`Iterable` with `type Item` and `type Error`, `for` over every
-  iterable, closing, `for (x in try it)`, the adapters as blanket extends, the join of two
-  thrown types, the terminators (S4).
-- **Arrays and views (C2, C10):** their members, `arrayOf` in linear time, the sorts (S5).
-- **Hashing (K2, C4, C5):** `Hasher` with SipHash-1-3 and FNV, `Hashable` streaming into a
-  hasher, `Map` as a Swiss table (S6).
-- **Collections:** `Index`/`IndexSet` (B4), `List` (C3), a map's walks, `Set`, `toList` (S7);
-  `Deque` (C6) and `Heap` (C1) (S11a; the least first since the review's A1).
-- **Strings, first and second part (B9 S1–S3):** search, split, trim, replace, pad,
-  `StringBuilder`; a `char` literal beyond the basic plane (S8).
-- **The prelude naming the collections (B2)** (S9a); **the format language (08 Y7, 10 S7)**,
-  checked where a spec is written (S9c).
-- **The artifact:** `lyric test` runs the std tests (147); the examples inventory, stats and
-  stack build and run as packages (S10a); measurement point 3 is measured (S10b, S10c) and
-  **not met**: maps 1.90×, sorting 1.53×, strings 2.53× Go, ahead of C# in all three. What
-  bounds it — no inlining across translation units, the map's three arrays, f-string
-  allocation — is in `bench/README.md`.
-
-**The review of 2026-10-05.** After S11a the maintainer went through the open points of M4 to
-M8a and decided them: 110 decisions, written into the area documents, each in a section "Review
-2026-10-05". They re-cut the milestone (13, the addendum there):
-
-- **M8a closes with** the review's decisions — blocks R0 (the spec pin, these texts, test
-  hygiene), R1 (the compiler's footing: a depth limit, the emitter's tests as packages, names
-  instead of numbers in the C, lowering only what is reached), R2 syntax, R3 names and modules,
-  R4 types and inference, R5 errors and generators, R6 concurrency, R7 std corrections, R8
-  packages and the command line, R9 performance — and then with what M8b needs of the library:
-  `StringView`, `Pattern`, `fromUtf8` (S12); `showTo`/`debugTo` and f-strings writing into one
-  builder (S13); containers' `Debug`, `Display` and `Equatable` (S14); `collect`/`FromIterator`
-  and `x in xs` (S15); the close with measurement point 3 measured again (S16).
-- **Built from the list the review left M8a** — all of it: the members of `T[N]` (R4e),
-  `copyInto` (R7c); text as a view, `StringView` and its members, `Pattern` (`char`, `string`, a
-  view, `fn(char) -> bool`) for search, split and replace, `string.fromUtf8`, `Utf8Error`,
-  `fromUtf8Lossy`, function types as extend targets (S12); `Display.showTo` and `Debug.debugTo`,
-  f-strings writing into one builder, `[x] * n` by doubling (S13); `==`, `Debug` and `Display` for
-  arrays, views and every container — a set and a map equal in any order —, a shape conforming
-  through its block comparing and rendering (S14a); `withCapacity` on every container, `Heap.of`
-  (N3's name for the review's `Heap.from`, S14b); `FromIterator`, `collect()`, `toSet()`, a fixed
-  associated type read inside every type (S15a); `x in xs` and `x !in xs` through `Contains<T>`,
-  a call's receiver evaluated before its arguments (S15b).
-- **Measurement point 3 again (S16):** maps 1.36×, sorting 1.21×, strings 1.70× Go
-  (S10c: 1.90, 1.53, 2.53), ahead of C# in all three; maps and sorting within the bound, strings
-  over it — on the CI runner 0.99×, 1.09× and 1.80×. The numbers and what moved them are in
-  `bench/README.md`.
-- **The open points, decided (2026-10-07):** what the run R0–S16 collected, gone through with the
-  maintainer — in the design documents 01, 03, 04, 10 and 11, each in a section "Review
-  2026-10-07", with their clocks (M8c, M12, M10/M11). Built at once: release traces stated as best
-  effort (spec 13 §1.4), CI's platform jobs and benchmarks on `main` only, `strings` under the
-  common fence; `arrayOf` filling in one allocation, the `spawn` test waiting instead of sleeping.
-- **Found at the close (S16):** no map over objects compiled since R9d — its table filled by
-  `[empty] * n`, which a generic body passed and every instance over an object refused as a
-  compiler bug (`LYR-CG0001`); no test held one. Now a generic `[x] * n` asks for `Clone` (03 §5.1),
-  and the containers fill through std's own `filled`, shared, one allocation.
-- **Not built, and M8c's** (after M8b): the Unicode tables, `char`'s predicates, `toUpper` and
-  `toLower`; `mapNotNull`, `flatMap`, `flatten`, `chunks`, `windows`, `dedup`, `scan`,
-  `peekable`, `rev`, `cycle`, and lambdas that throw inside adapters; `toMap`/`sorted` and the
-  other collecting terminators beyond `collect` and `toSet`; the set operations, `map[k]`,
-  `list[a..b]`, `+` and `*` on collections; `Result`, `From`/`Into`; `std.fmt.format` at run time; an interface with a
-  fixed associated type as a value; `suppressed()` and `backtrace()` at a `catch` binding;
-  `@Bench` and `lyric bench`.
-- **Clocks the review set:** measurement point 3 (at the close of M8a: maps and sorting within it,
-  strings at 1.70×) holds its bound of 1.5× Go and is to be met
-  after M11, or decided again; the prologue's stack check and `Atomic` over a class come with
-  M11; the notes on hidden candidates and the lint for foreign conformances with M12.
+**M8b is done.** Every slice of the plan is built; what it moved on the way stands in its row —
+`Zone.load`, `Zone.local` and the time's format patterns to M10; O2's buffers classes, not
+structs over inline bytes (03 §5.3). The open points the run collected: those up to S8b decided
+with the maintainer on 2026-10-08 (10 and 03 "Review 2026-10-08", 13 "Durchsicht 2026-10-08",
+built in S8c and S10a); those after — the form of `IpAddr`, `resolve` no point of cancellation,
+`fork`/`exec` for `posix_spawn`, a command's `env` over the parent's, the pipes' concrete types, the
+reaper a thread, Windows' pipes blocking on the I/O pool — decided with the maintainer the same
+day (10 "Review 2026-10-08 (2)"): confirmed as built, with two clocks for M10 — deadlines for
+`resolve`, a Windows child's pipes through the completion port. M8c follows.
 
 ## Design decisions
 
@@ -780,7 +799,7 @@ Claude plans **and** implements; the maintainer reviews (in force since the scop
 merged once its CI is green; the milestones follow each other without a pause until 5.0 stands,
 and the last push toward 5.0 waits for the maintainer's review of the points collected on the
 way (those of M4 to M8a were reviewed on 2026-10-05, those of the run that closed M8a on
-2026-10-07). Claude also merges, tags and releases. Anything that acts outside the repository — creating
+2026-10-07, M8b's on 2026-10-08). Claude also merges, tags and releases. Anything that acts outside the repository — creating
 repositories, publishing releases, deleting published things — is laid out first and done on the
 maintainer's word.
 

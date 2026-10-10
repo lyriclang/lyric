@@ -59,8 +59,8 @@ fn aDequeIndexOutsideItsValuesPanics(): void {
     let d = Deque<int>.new();
     d.pushBack(1);
     d.pushFront(0);
-    assertPanics(() => { let v = d[2]; });
-    assertPanics(() => { let v = d[-1]; });
+    assertPanics(() => { let _ = d[2]; });
+    assertPanics(() => { let _ = d[-1]; });
 }
 
 @Test

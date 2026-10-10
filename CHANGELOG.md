@@ -97,6 +97,26 @@ promise. This entry fills with the milestones.
   Of the review of 2026-10-05 besides: the depth limit, `lyric.lock` with `--locked`,
   `lyric update` raising a tag's line, the IR optimizer in the release profile, `lto` on every
   target.
+- **Input, output and the system (M8b** — `design/v5/spec/10`, `11` W3, spec chapters 12 and
+  15 §8**):** `std.io` — `Reader`, `Writer` and `Seek` in Go's form, a read or a write that may
+  wait throwing `[IoError, Cancelled]`; `BufReader`, `BufWriter`, `TextReader` (lines and chars,
+  UTF-8 checked) and `TextWriter`; `IoError` with its kind and path. The console: `print`,
+  `println`, `eprint`, `eprintln`, buffered and flushed at every end, the standard error a line at
+  a time, a standard output nobody reads ending the program as SIGPIPE would; `stdin()` with
+  `readLine()` and `lines()`, `stdout()` and `stderr()` as writers. `std.fs` — `File`, the
+  conveniences (`readText`, `writeText`, `lines`, …), directories, `walk`, `copy`, `removeAll`,
+  temporary directories and files — and `std.path`, lexically, Windows' volumes included.
+  `std.net` — TCP, UDP, `IpAddr`, `SocketAddr`, `resolve` —, a socket's wait parking the task on
+  the poller (epoll, kqueue, a completion port on Windows). `std.process` — `Command`, `Child`
+  with its pipes, `wait`, `kill` — on POSIX and Windows. `std.os` — the arguments, the
+  environment, the working directory, `exit`, the platform, the signals. `std.time` (`Duration`,
+  `Instant`, `Monotonic`, a calendar, RFC 3339), `std.encoding` (Base64, hex, UTF-16),
+  `std.crypto` (SHA-2, SHA-1, MD5, HMAC, the system's randomness), `std.random` (ChaCha8, a
+  seeded stream fixed for 5.x). A package's `build.lyr`, with `std.build`. The locks in
+  `std.sync`, `Thread` and `Pool` in `std.thread`. Of the catch-up block besides: tuples compare,
+  hash and print, optionals are `Equatable` and `Hashable`, aliases take type parameters,
+  `Identity`, `Point { x, y }`, a type set in a pattern, raw, multi-line and byte strings; a
+  comparison does not chain.
 
 ---
 
