@@ -149,6 +149,11 @@ public static class Intrinsics
         ["std.core.countTrailingZeros"] = "LYR_CTZ",
         ["std.core.countOnes"] = "LYR_POPCOUNT",
         ["std.core.rotateBitsLeft"] = "LYR_ROTL",
+        // The Unicode Character Database's answers for a char (10 B9 S4, C2; M8c S1, lyr/unicode.h).
+        ["std.core.unicodeCategory"] = "lyr_unicode_category",
+        ["std.core.unicodeUpper"] = "lyr_unicode_upper",
+        ["std.core.unicodeLower"] = "lyr_unicode_lower",
+        ["std.core.unicodeWhiteSpace"] = "lyr_unicode_white_space",
         // A view's length and bytes (10 S1; M8a S12) — a string's through the view it gives —,
         // the conversion of `as` toward a type parameter, a float's text read by C.
         ["std.core.byteCount"] = "LYR_VIEW_LEN",

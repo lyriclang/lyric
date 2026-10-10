@@ -226,6 +226,69 @@ Entschieden: ein **Nachholblock vor M8b S2**, alle übrigen Punkte bekommen eine
 | die 4.x-`stdlib/`, Version 4.6.0 | M17 (das Frontend ist bis dahin geteilt) |
 | die Intrinsics-Tabelle → `extern "C"` | M14 (M8b P1) |
 
+## Nachtrag 2026-10-08 — der Plan für M8c
+
+M8c nach seiner Zeile oben, dazu jede Uhr, die auf M8c steht: 01 S13; 03 M4-1, S15b, S3; 05 M5-3;
+10 C1, C2, S4b, S12c, S12d, S13, S14, Q3; in diesem Dokument die Zeile „kleine std-APIs“ und die
+Durchsichten vom 2026-10-07 und 2026-10-08. Freigegeben am 2026-10-08 („Darf M8c nach dem Merge
+von S14 starten?“ — ja): wie M8b ohne Halt bis zum Abschluss, Merge bei grüner CI, offene Punkte
+gesammelt, Bericht am Ende; vor M9a wird neu gefragt. Grundlage ist eine Prüfung jedes Punkts gegen
+den Code (gebaut, halb, fehlt), damit keine Entscheidung ohne Zeile bleibt (Lehre des Nachtrags
+davor). Die Slices heißen **M8c S1–S14**; jeder ist ein PR, sein Regel-PR in der Spec geht voran.
+
+### Architektur
+
+| # | Entscheidung | Warum — und warum nicht die Alternativen |
+|---|---|---|
+| P1 | **Unicode-Tabellen in C, erzeugt** (10 C2): die UCD-Dateien `UnicodeData.txt` und `PropList.txt` mit ihrer Lizenz liegen unter `runtime/third_party/ucd/` (Version 18.0.0); `tooling/unicode/gen.py` (Python, nur die Standardbibliothek) schreibt `runtime/src/unicode_tables.h` und die Zeile `std.string.unicodeVersion`, beides eingecheckt. Die Kategorie als zweistufige Tabelle (Blöcke à 2^k Codepunkte, gleiche Blöcke einmal, `k` das kleinste Ganze), die einfachen Groß-/Kleinabbildungen als sortierte Paare, `White_Space` als Bereiche. CI prüft, dass der Generator dieselben Dateien schreibt | S4 sagt C-Schicht. Rust erzeugt seine Tabellen mit Python (`unicode.py`), Go mit Go (`maketables`). Ein Generator in C# bände die Tabellen an den Compilerbau; Tabellen als Lyric-Literale kosteten jedes Programm, das `char` benutzt, die Übersetzung von 70 000 Einträgen. Im Archiv der Laufzeit zieht nur ein Programm die Tabellen, das sie fragt |
+| P2 | **Werfende Lambdas über 05 K4**: jeder Adapter und Terminator mit einem Funktionsparameter bekommt ein `E :: [Error]` — `map<U, E>(f: fn(Item) -> U throws E)` gibt einen Iterator mit `type Error = Join<I.Error, E>`, ein Terminator wirft `Join<I.Error, E>`. Mit `E = never` bleibt alles, wie es ist, ohne `try`. Ebenso `sortBy`, `sortByKey`, `arrayOf`, `Map.update`/`getOrInsert`/`retain`, `List.removeWhere` | 13 „mit werfenden Lambdas“, „höhere std-Funktionen mit Fehlermenge“. Swifts `rethrows` ist dieselbe Absicht als Schlüsselwort; K4 hat sie als Typparameter. Verworfen: zwei Fassungen je Funktion |
+| P3 | **Der Builder ohne `&`** (10 S13) in std und Senkung zuerst, dann `std.fmt.format` zur Laufzeit über die Grammatik der f-Strings (S7) | ein Pfad für die Formatierung; `format` liest die Vorlage zur Laufzeit, ein f-String zur Übersetzungszeit |
+| P4 | **Was die Sprache betrifft, steht als Regel in der Spec**, bevor der Code kommt: `T[N]` gleich und hashbar, ein Literal an einer View-Stelle, `char`-Bereiche, die Wertform `Iterator<Item = T>`, die Auskunft an der `catch`-Bindung | Spec-Pin |
+| P5 | **Spec**: Kapitel 12 bekommt „Characters“ (S1), seine Abschnitte zu Text, Iteration und Sammlungen wachsen, dazu „Results and conversion“, „Formatting“, „Benchmarks“; die Sprachstücke in 03, 05, 06 | wie M8b P6 |
+| P6 | **Plattform**: ein Dispatch-Lauf auf allen Plattformen nur, wo Laufzeit-Code plattformabhängig ist (M8b P5) — die Tabellen sind es nicht | Messpunkt 1 bleibt: hello zieht nichts davon |
+
+### Slices
+
+| Slice | Inhalt | Artefakt, Prüfung |
+|---|---|---|
+| **S1** Unicode | P1; `char`: `category(): UnicodeCategory`, `isAlpha`, `isDigit` (Nd), `isAlphanumeric`, `isWhitespace` (`White_Space`), `isUpper`, `isLower`, `isControl`, `isAscii*`, `toUpper`/`toLower` (einfach), `toDigit(radix)`, `char.fromDigit`; `std.string.unicodeVersion` | jeder Skalarwert gegen eine eigene Lesung der Dateien im Test |
+| **S2** Text über Unicode | `toUpper`/`toLower` auf Text; `trim*` über `White_Space`, `trimMatches*` (S12c); `isBlank`, `toBytes` (S12d), `string.fromChars`, `charIndices`, `chars()` als `DoubleEnded`, `parse<T>()`, `string`/`StringView :: [Contains<char>]`; `Debug` eines Textes maskiert (S14) | `ß` bleibt `ß`; `Debug` druckt, wie geschrieben |
+| **S3** Sprache klein | ein Literal an einer View-Stelle (03 S3); `char`-Bereiche, iterierbar (03 S15b); ein nacktes `T[N]` `Equatable` und `Hashable` (10 S4b) | `Map<uint8[16], V>` |
+| **S4** werfende Lambdas | P2 über die vorhandenen Adapter, Terminatoren und höheren Funktionen | `try xs.map((s) => try int.parse(s)).toList()` |
+| **S5** Adapter und Terminatoren | `mapNotNull`, `flatMap`, `flatten`, `chunks`, `windows`, `dedup`/`dedupBy`, `scan`, `peekable`, `rev`, `cycle`; `average`, `minBy`, `maxBy`, `toMap`, `sorted`, `sortedBy`, `partition`, `groupBy`; `collect` liest `sizeHint` (I4) | I4 vollständig |
+| **S6** Sammlungen | `Set`-Operationen (C5); `map[k]`, `map[k] = v`, `Map.from`, `entries` (C4); `list[a..b]`, `List.from`, `shrinkToFit` (C3); `+` auf `T[]` und `Slice<T>`, soweit C7 es noch nicht hat; `FromArrayLiteral` (K4) | `let s: Set<int> = [1, 2]` |
+| **S7** Ergebnis und Konversion | `Result<T, E>` mit `Result.of { … }` und `try r.get()` (05 E1); `From<T>`/`Into<T>` mit dem Blanket (04) | beide Brücken |
+| **S8** Formatierung | P3: `&` aus `showTo`, `debugTo`, `format`; `std.fmt.format(template, args...)`; der Wachstumspfad des Builders aus der Reihe (01 S13) | Messpunkt 3 `strings` nicht schlechter |
+| **S9** `Iterator<Item = T>` als Wert | 03 M4-1: ein Interface-Wert mit fixiertem assoziiertem Typ | eine Funktion, die einen solchen Iterator nimmt und gibt |
+| **S10** Fehler an der Bindung | 05 M5-3: `e.suppressed()`, `e.backtrace()`, der Typ `Backtrace` | ein unterdrückter Fehler aus `using`, gesehen im `catch` |
+| **S11** Prüfsummen, Bytes | Q3: `crc32`, `crc32c`, `adler32`; `toBytesLE`/`toBytesBE` | Testvektoren der Normen |
+| **S12** Test und Bench | X1, X3: `assertContains`, `assertEmpty`, der String-Diff, `@Test { parallel = true }`; X4: `@Bench`, `Bench`, `blackBox`, `lyric5 bench` (`--save`, `--compare`) | **`lyric5 bench` läuft die std-Benchmarks** |
+| **S13** Melde-Qualität | der Sammelslice der Durchsicht vom 2026-10-08: `1.` und `.5`, ein Name außerhalb von ASCII, nach `LYR-SEM0126`, `lyric5 test --target` | je Meldung ein Fall |
+| **S14** Abschluss | **Wortzähler über Unicode-Text** als Beispiel; Dogfood; STATUS, CHANGELOG | die Zeile oben erfüllt |
+
+**Nicht in M8c**: `std.regex` (10 S8) — M10, der die Tabellen braucht; Normalisierung, Grapheme
+und Breite gehören dem Ring `unicode`, nicht `std` (S4).
+
+### Tests
+
+Je Slice die Regel-Fälle der Spec, rot gegen den Compiler davor; die std-Tests unter `tests/std`;
+eine Mutationskontrolle je Regel, die rot werden muss. Unicode zusätzlich: jeder Skalarwert gegen
+eine Lesung der UCD-Dateien im C#-Test, die nicht der Generator ist.
+
+### Umfang
+
+Laufzeit in C wenig (die Tabellen erzeugt, die Nachschläge etwa 50 Zeilen, `crc32c`), std in Lyric
+etwa 3000 Zeilen, der Compiler mittel (S3, S9, S10, S13; die Senkung der Builder in S8). Groß: S4,
+S5, S9, S12; mittel: S1, S2, S3, S6, S7, S8, S10; klein: S11, S13, S14.
+
+### Reflexion
+
+- **Rust**: `core::unicode` aus Python-erzeugten Tabellen; ein Iterator-Adapter als Typ je Adapter
+  (P2 bleibt dabei); `escape_debug` (S2).
+- **Go**: das Paket `unicode` mit Bereichstabellen aus `maketables`; `isUpper` als Kategorie Lu.
+- **Swift**: `rethrows` — dieselbe Absicht wie P2, als Schlüsselwort statt Typparameter.
+- **Kotlin**: `CharRange` (S3), Mengenoperationen als Methoden (S6).
+
 ---
 
 **Damit ist die Runde vollständig** (Bereiche 0–12 entschieden, 2026-09-28/29). Die Dokumente

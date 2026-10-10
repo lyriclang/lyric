@@ -106,6 +106,12 @@ jobs:
       - name: Set up zig
         uses: ./.github/actions/setup-zig
 
+      - name: The Unicode tables are the generator's
+        # tooling/unicode/gen.py writes runtime/src/unicode_tables.h and std.string's unicodeVersion
+        # from runtime/third_party/ucd (M8c S1): a hand edit, or a new UCD without a run, fails here.
+        if: runner.os == 'Linux'
+        run: python3 tooling/unicode/gen.py --check
+
       - name: Build, cross-build and sanitize
         shell: bash
         run: bash tooling/c-smoke/run.sh

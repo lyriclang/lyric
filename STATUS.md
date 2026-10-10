@@ -39,7 +39,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M7 | Modules and packages | L | **done** 2026-10-02 |
 | M8a | std core | XL | **done** 2026-10-07 |
 | M8b | std I/O and system | L | **done** 2026-10-08 |
-| M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | approved 2026-10-08, after M8b |
+| M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | **in progress**: planned 2026-10-08 (S1–S14) |
 | M9a | `comptime` (the IR interpreter) | L | — |
 | M9b | Macros | L | — |
 | M10 | std after rule D | XL | — |
@@ -785,6 +785,26 @@ built in S8c and S10a); those after — the form of `IpAddr`, `resolve` no point
 reaper a thread, Windows' pipes blocking on the I/O pool — decided with the maintainer the same
 day (10 "Review 2026-10-08 (2)"): confirmed as built, with two clocks for M10 — deadlines for
 `resolve`, a Windows child's pipes through the completion port. M8c follows.
+
+### M8c — in progress
+
+The plan is design 13's addendum of 2026-10-08: the Unicode tables generated into C (P1), lambdas
+that throw through 05 K4 (P2), the builder without `&` and `std.fmt.format` (P3), the language's
+pieces as spec rules first (P4), the spec (P5), the platforms (P6), and the slices S1–S14 with
+their artefacts — every clock that stood on M8c, each point checked against the code first.
+Approved like M8b: no halt until the close, each slice merged on green CI, the open points
+collected for the report at the close; before M9a the maintainer is asked again.
+
+Merged, slice by slice (each PR says what it did and how it was checked):
+
+- **S1** Unicode (10 B9 S4, S5, C2): the Unicode Character Database 18.0.0 checked in under
+  `runtime/third_party/ucd/` (two files and the license); `tooling/unicode/gen.py` writes the
+  runtime's tables — the general category in two stages, the simple case mappings, White_Space —
+  and `std.string.unicodeVersion`, and CI checks that it would write the same. `char` has
+  `category(): UnicodeCategory`, `isAlpha`, `isDigit`, `isAlphanumeric`, `isWhitespace`, `isUpper`,
+  `isLower`, `isControl`, the four `isAscii*`, `toUpper`/`toLower`, `toDigit(radix)` and
+  `char.fromDigit`. Every scalar value checked against a reading of the files apart from the
+  generator. Spec 12 "Characters", five cases.
 
 ## Design decisions
 

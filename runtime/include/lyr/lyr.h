@@ -22,5 +22,6 @@
 #include "lyr/console.h"
 #include "lyr/net.h"
 #include "lyr/process.h"
+#include "lyr/unicode.h"
 
 #endif

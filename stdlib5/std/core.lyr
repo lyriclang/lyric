@@ -771,6 +771,200 @@ extend char {
     }
 }
 
+/// A character's general category (UAX #44), in the standard's order (10 B9 S5). No `char` is a
+/// `Surrogate` — the halves of a UTF-16 pair are no scalar values —; the variant is there because
+/// the standard lists it.
+pub enum UnicodeCategory :: [Equatable, Hashable, Debug] {
+    UppercaseLetter,
+    LowercaseLetter,
+    TitlecaseLetter,
+    ModifierLetter,
+    OtherLetter,
+    NonspacingMark,
+    SpacingMark,
+    EnclosingMark,
+    DecimalNumber,
+    LetterNumber,
+    OtherNumber,
+    ConnectorPunctuation,
+    DashPunctuation,
+    OpenPunctuation,
+    ClosePunctuation,
+    InitialPunctuation,
+    FinalPunctuation,
+    OtherPunctuation,
+    MathSymbol,
+    CurrencySymbol,
+    ModifierSymbol,
+    OtherSymbol,
+    SpaceSeparator,
+    LineSeparator,
+    ParagraphSeparator,
+    Control,
+    Format,
+    Surrogate,
+    PrivateUse,
+    Unassigned,
+}
+
+// The Unicode Character Database's answers (lyr/unicode.h): the category as its index in
+// UnicodeCategory's order, the simple case mappings, White_Space.
+fn unicodeCategory(c: char): int;
+fn unicodeUpper(c: char): char;
+fn unicodeLower(c: char): char;
+fn unicodeWhiteSpace(c: char): bool;
+
+fn categoryOf(k: int): UnicodeCategory {
+    return match (k) {
+        0 => .UppercaseLetter,
+        1 => .LowercaseLetter,
+        2 => .TitlecaseLetter,
+        3 => .ModifierLetter,
+        4 => .OtherLetter,
+        5 => .NonspacingMark,
+        6 => .SpacingMark,
+        7 => .EnclosingMark,
+        8 => .DecimalNumber,
+        9 => .LetterNumber,
+        10 => .OtherNumber,
+        11 => .ConnectorPunctuation,
+        12 => .DashPunctuation,
+        13 => .OpenPunctuation,
+        14 => .ClosePunctuation,
+        15 => .InitialPunctuation,
+        16 => .FinalPunctuation,
+        17 => .OtherPunctuation,
+        18 => .MathSymbol,
+        19 => .CurrencySymbol,
+        20 => .ModifierSymbol,
+        21 => .OtherSymbol,
+        22 => .SpaceSeparator,
+        23 => .LineSeparator,
+        24 => .ParagraphSeparator,
+        25 => .Control,
+        26 => .Format,
+        27 => .Surrogate,
+        28 => .PrivateUse,
+        _ => .Unassigned,
+    };
+}
+
+// What a character is (10 B9 S5): `isX` asks Unicode — the general category, or for whitespace the
+// property White_Space, from the Unicode Character Database std.string's `unicodeVersion` names —,
+// `isAsciiX` asks ASCII alone. Case maps one character to one (the simple case mapping) and knows
+// no locale: `ß` stays `ß` (S4).
+extend char {
+    /// The general category.
+    pub fn category(): UnicodeCategory {
+        return categoryOf(unicodeCategory(this));
+    }
+
+    /// A letter of any script: the categories Lu, Ll, Lt, Lm and Lo.
+    pub fn isAlpha(): bool {
+        return unicodeCategory(this) <= 4;
+    }
+
+    /// A decimal digit of any script: the category Nd — `'٣'` is one. `isAsciiDigit` asks for
+    /// `0`–`9` alone, and `parse` reads those alone (Z6).
+    pub fn isDigit(): bool {
+        return unicodeCategory(this) == 8;
+    }
+
+    /// A letter or a decimal digit: `isAlpha` or `isDigit`.
+    pub fn isAlphanumeric(): bool {
+        let k = unicodeCategory(this);
+        return k <= 4 || k == 8;
+    }
+
+    /// The property White_Space: the space, the tab, the line ends, the no-break spaces, the
+    /// ideographic space and their kin.
+    pub fn isWhitespace(): bool {
+        return unicodeWhiteSpace(this);
+    }
+
+    /// An uppercase letter: the category Lu.
+    pub fn isUpper(): bool {
+        return unicodeCategory(this) == 0;
+    }
+
+    /// A lowercase letter: the category Ll.
+    pub fn isLower(): bool {
+        return unicodeCategory(this) == 1;
+    }
+
+    /// A control character: the category Cc.
+    pub fn isControl(): bool {
+        return unicodeCategory(this) == 25;
+    }
+
+    /// The uppercase character, by the simple mapping; the character itself where it has none.
+    pub fn toUpper(): char {
+        return unicodeUpper(this);
+    }
+
+    /// The lowercase character, by the simple mapping; the character itself where it has none.
+    pub fn toLower(): char {
+        return unicodeLower(this);
+    }
+
+    /// `0`–`9`.
+    pub fn isAsciiDigit(): bool {
+        return this >= '0' && this <= '9';
+    }
+
+    /// `a`–`z` and `A`–`Z`.
+    pub fn isAsciiAlpha(): bool {
+        return (this >= 'a' && this <= 'z') || (this >= 'A' && this <= 'Z');
+    }
+
+    /// `0`–`9`, `a`–`f` and `A`–`F`.
+    pub fn isAsciiHexDigit(): bool {
+        return this.isAsciiDigit() || (this >= 'a' && this <= 'f') || (this >= 'A' && this <= 'F');
+    }
+
+    /// ASCII's whitespace as WHATWG counts it, Rust too: the space, tab, line feed, form feed and
+    /// carriage return — not the vertical tab.
+    pub fn isAsciiWhitespace(): bool {
+        let n = this as uint32;
+        return n == 32 || n == 9 || n == 10 || n == 12 || n == 13;
+    }
+
+    /// The character's value as a digit in base `radix`, 2–36: `0`–`9`, then `a`–`z` or `A`–`Z` for
+    /// 10–35 — ASCII alone, as `parse` reads. `null` where it is no digit of the base; a radix
+    /// outside 2–36 is a programmer's error and panics.
+    pub fn toDigit(radix: int): ?int {
+        if (radix < 2 || radix > 36) {
+            panic(f"radix {radix} is outside 2…36");
+        }
+        let n = this as uint32;
+        var d = 36;
+        if (n >= 48 && n <= 57) {
+            d = (n - 48) as int;
+        } else if (n >= 97 && n <= 122) {
+            d = (n - 87) as int;
+        } else if (n >= 65 && n <= 90) {
+            d = (n - 55) as int;
+        }
+        if (d < radix) {
+            return d;
+        }
+        return null;
+    }
+
+    /// The character of the digit `n` in base `radix`, 2–36, its letters lowercase: `fromDigit(11,
+    /// 16)` is `b`. `null` where `n` is no digit of the base; a radix outside 2–36 panics.
+    pub static fn fromDigit(n: int, radix: int): ?char {
+        if (radix < 2 || radix > 36) {
+            panic(f"radix {radix} is outside 2…36");
+        }
+        if (n < 0 || n >= radix) {
+            return null;
+        }
+        let code = if (n < 10) 48 + n else 87 + n;
+        return (code as uint32) as char;
+    }
+}
+
 /// A string writes its bytes and then 255, which no UTF-8 text holds: ("ab", "c") and ("a", "bc")
 /// write differently (10 C8).
 extend string :: [Hashable] {
