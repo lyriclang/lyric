@@ -117,6 +117,8 @@ public sealed class TypeChecker
     private readonly bool _repeatAsksTypeParameters;
     // 'Contains<T>' (04 D6): what 'x in xs' asks of the right operand's type.
     private readonly TypeSymbol? _coreContains;
+    // 'FromArrayLiteral<T>' (10 K4; M8c S6b): what an array literal becomes where a type is expected.
+    private readonly TypeSymbol? _fromArrayLiteral;
 
     private LyrType _currentReturn = LyrType.Void;
     private LyrType? _currentYield; // the yield type when the current function is a coroutine
@@ -197,6 +199,8 @@ public sealed class TypeChecker
         _repeatAsksTypeParameters = comp.FindModule(["std", "core"])?.Members.LookupLocal("filled") is FunctionSymbol;
         _coreContains = comp.FindModule(["std", "core"])?.Members.LookupLocal("Contains")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreContains ? coreContains : null;
+        _fromArrayLiteral = comp.FindModule(["std", "core"])?.Members.LookupLocal("FromArrayLiteral")
+            is TypeSymbol { Kind: TypeSymbolKind.Interface } fromLiteral ? fromLiteral : null;
 
         // 'Equatable<T>' is what '==' desugars through on a user type, 'Ordered<T>' what the four
         // comparisons desugar through — the same pattern as 'Iterator' for 'for-in': the compiler
@@ -4986,6 +4990,19 @@ public sealed class TypeChecker
         return null;
     }
 
+    /// <summary>The element an array literal takes where <paramref name="target"/> is expected: the
+    /// <c>T</c> of the <c>FromArrayLiteral&lt;T&gt;</c> it conforms to (10 K4), or <c>null</c> where it
+    /// conforms to none — a named type, its instance; an array, a view and an inline array take
+    /// their literals themselves.</summary>
+    private LyrType? LiteralElement(LyrType target, TypeSymbol fromLiteral)
+    {
+        if (target is not (NamedRef or GenericInstance) || TypeSymbolOf(target) is not { } ts) return null;
+        var ofInstance = target is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+        foreach (var (instance, _) in ConformancesTo(ts, fromLiteral, ofInstance))
+            if (instance is GenericInstance { Arguments: [var x] }) return x;
+        return null;
+    }
+
     /// <summary>
     /// What <c>==</c> and <c>!=</c> may compare: scalars, <c>null</c>, and every type that conforms
     /// to <c>Equatable</c>.
@@ -6381,6 +6398,20 @@ public sealed class TypeChecker
 
     private LyrType CheckArrayLit(ArrayLitExpr arr, SymbolTable scope, LyrType? expected)
     {
+        // A literal where a 'FromArrayLiteral<T>' is expected (10 K4; M8c S6b): the elements check
+        // against T, and the literal is that type's 'fromLiteral' of them — 'let s: Set<int> = [1, 2]',
+        // 'let m: Map<string, int> = [("a", 1)]'. The empty one too: the type gives its element.
+        // Through '?' as every coercion (03 T3): with '?Set<int>' expected the literal is the set,
+        // and the place wraps it.
+        var literalTarget = expected is Optional { Inner: var inner } ? inner : expected;
+        if (literalTarget is not null && _fromArrayLiteral is { } fromLiteral && LiteralElement(literalTarget, fromLiteral) is { } into)
+        {
+            foreach (var element in arr.Elements)
+                CheckAssignable(element, CheckExpr(element, scope, into), into, element.Span);
+            _result.RecordLiteralInto(arr, into);
+            return literalTarget;
+        }
+
         // '[a, b, c]' where a 'T[3]' is expected builds the inline array (03 T13 A4; 10 C7): the
         // literal has exactly the length the type says, or it is refused.
         if (expected is InlineArrayOf inline)

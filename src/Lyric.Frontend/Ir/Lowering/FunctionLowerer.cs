@@ -4817,6 +4817,40 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    /// <summary>A literal into a <c>FromArrayLiteral&lt;T&gt;</c> (10 K4): the elements as <c>T</c> into
+    /// a fresh array, and the expected type's static <c>fromLiteral</c> called with it — the type's
+    /// own or its block's, found as <see cref="LowerStaticConstraintCall"/> finds a static the
+    /// constraint promised.</summary>
+    private TempId LowerLiteralInto(ArrayLitExpr expr, LyrType into)
+    {
+        var concrete = SubstituteType(_types.TypeOf(expr));
+        var element = LowerType(into, expr.Span);
+        var elements = new TempId[expr.Elements.Length];
+        for (var i = 0; i < expr.Elements.Length; i++)
+            elements[i] = LowerExprAs(expr.Elements[i], element);
+        var array = _slots.NewTemp(new IrArrayType(element));
+        _b.Emit(new NewArray(array, element, elements, expr.Span));
+
+        // The collections' blocks are generic ('extend<T> List<T>'), so only the match finds them;
+        // a type of the program's own declares the static in its body or in a plain block on it.
+        var owner = TypeFacts.SymbolOf(concrete);
+        var function = owner?.Members.LookupLocal("fromLiteral") as FunctionSymbol
+                       ?? (owner is null ? null : _typeTable.ExtensionMethod(owner, "fromLiteral"));
+        FunctionId target;
+        if ((function is null || _typeTable.BlockOf(function) is { } block && (block.Generics.Length > 0 || block.IsConstructorTarget))
+            && BlockStatic(concrete, "fromLiteral") is { Method.Declaration: FunctionDecl blockDecl } found)
+            target = _instances.RequestExtension(found.Method, blockDecl, found.Block, found.Map, concrete, expr.Span, []);
+        else if (function is not { IsStatic: true, Declaration: FunctionDecl decl })
+            throw Bug($"no 'fromLiteral' on '{TypeFacts.Display(concrete)}' at {expr.Span}");
+        else if (concrete is GenericInstance instance && _typeTable.BlockOf(function) is null)
+            target = _instances.RequestMethod(function, decl, instance, expr.Span);
+        else if (!TryResolveFunction(function, out target))
+            throw Bug($"'{TypeFacts.Display(concrete)}.fromLiteral' was not lowered at {expr.Span}");
+        var result = _slots.NewTemp(TypeOfExpr(expr));
+        _b.Emit(new Call(result, target, [array], expr.Span));
+        return result;
+    }
+
     private TempId LowerArrayLiteral(ArrayLitExpr expr)
     {
         // '[a, b, c]' as a 'T[3]' (03 T13 A4): the inline array, a fresh value.
@@ -4830,6 +4864,12 @@ internal sealed class FunctionLowerer
             _fresh.Add(built);
             return built;
         }
+
+        // A literal that stands for a 'FromArrayLiteral<T>' (10 K4; M8c S6b): the array of its
+        // elements, then the expected type's 'fromLiteral' of it — the block's static, as a written
+        // 'Set<int>.fromLiteral([…])' calls it.
+        if (_types.LiteralElementOf(expr) is { } into)
+            return LowerLiteralInto(expr, into);
 
         if (TypeOfExpr(expr) is not IrArrayType type)
             throw NotSupported("array literal of a non-array type", expr.Span);
