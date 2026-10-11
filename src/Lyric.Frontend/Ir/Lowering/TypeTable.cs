@@ -741,6 +741,56 @@ internal sealed class TypeTable
     /// </summary>
     private TypeId InternInterface(TypeSymbol symbol) => InternInterface(symbol, symbol.Name);
 
+    private readonly Dictionary<string, TypeId> _fixedInterfaceIds = new(StringComparer.Ordinal);
+    private readonly List<(GenericInstance Type, TypeId Id)> _fixedInterfaces = new();
+
+    /// <summary>The entries of interface values with their associated types fixed, for their table
+    /// rows: a type gets one where it answers as the value is written.</summary>
+    public IReadOnlyList<(GenericInstance Type, TypeId Id)> FixedInterfaces => _fixedInterfaces;
+
+    /// <summary>The interface a fixed instance names, where its entry is one: <c>Iterator</c> for
+    /// <c>Iterator&lt;Item = int&gt;</c>.</summary>
+    public GenericInstance? FixedInterfaceOf(TypeId id) =>
+        _fixedInterfaces.FirstOrDefault(f => f.Id == id) is { Type: { } type } ? type : null;
+
+    /// <summary>
+    /// The entry of an interface value whose associated types are fixed (03 M4-1, T6): one per
+    /// interface instance and fixations, as a generic interface has one per instance. Its slots are
+    /// the members typed by an associated type too — <c>next(): ?int</c> has one signature for every
+    /// value of <c>Iterator&lt;Item = int&gt;</c> —, and a slot throws only where what it throws is
+    /// more than <c>never</c> at this instance: the value's <c>Error</c> is <c>never</c>.
+    /// </summary>
+    private TypeId InternFixedInterface(GenericInstance fixedType, Core.Span span)
+    {
+        var key = InstanceNames.Of(fixedType, Compilation);
+        if (_fixedInterfaceIds.TryGetValue(key, out var known)) return known;
+        var symbol = fixedType.Definition;
+        if (symbol.Declaration is not InterfaceDecl decl)
+            throw new UnsupportedConstructException($"interface '{symbol.Name}' has no declaration to read its methods from", span);
+        var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+        for (var i = 0; i < symbol.Generics.Length && i < fixedType.Arguments.Length; i++)
+            mapping[symbol.Generics[i].Name] = fixedType.Arguments[i];
+        _substitutions.Push(mapping);
+        try
+        {
+            var slots = SlotNames(symbol, decl, fixedType);
+            var id = new TypeId(_defs.Count);
+            _defs.Add(new IrTypeDef(TypeFacts.Display(fixedType), [], [])
+            {
+                MethodSlots = slots, IsInterface = true,
+                SlotThrows = slots.Select(slot => SlotThrows(symbol, decl, slot, fixedType)).ToArray(),
+                Module = ModuleNameOf(symbol),
+            });
+            _fixedInterfaceIds[key] = id;
+            _fixedInterfaces.Add((fixedType, id));
+            return id;
+        }
+        finally
+        {
+            _substitutions.Pop();
+        }
+    }
+
     /// <param name="name">For an instance the full name (<c>Iterator&lt;int&gt;</c>): it appears in
     /// disassembly and diagnostics, and two instances of the same interface should be distinguishable
     /// there.</param>
@@ -775,15 +825,26 @@ internal sealed class TypeTable
 
     /// <summary>Whether the member behind a slot declares <c>throws</c> (design/v5/spec/05 E2): its
     /// own or a parent's, the one declaration a name has (<c>LYR-SEM0079</c>).</summary>
-    private bool SlotThrows(TypeSymbol symbol, InterfaceDecl decl, string slot)
+    private bool SlotThrows(TypeSymbol symbol, InterfaceDecl decl, string slot, GenericInstance? fixedType = null)
     {
         if (decl.Members.FirstOrDefault(m => m.Name == slot && !m.IsStatic && m.Generics.Length == 0) is { } own)
-            return own.Throws is not null;
+            return own.Throws is { } thrown
+                   && (fixedType is null || thrown.Types.Any(node => !AnswersNever(symbol, node, fixedType)));
         foreach (var parent in Conformance.ParentsOf(symbol, _binding))
-            if (parent.Declaration is InterfaceDecl parentDecl && SlotNames(parent, parentDecl).Contains(slot))
-                return SlotThrows(parent, parentDecl, slot);
+            if (parent.Declaration is InterfaceDecl parentDecl && SlotNames(parent, parentDecl, fixedType).Contains(slot))
+                return SlotThrows(parent, parentDecl, slot, fixedType);
         return false;
     }
+
+    /// <summary>Whether a thrown type is an associated type the fixed instance answers with
+    /// <c>never</c>: <c>throws Self.Error</c> of <c>Iterator&lt;Item = int&gt;</c>.</summary>
+    private bool AnswersNever(TypeSymbol symbol, TypeNode node, GenericInstance fixedType) =>
+        node is NamedType { Path: [_, var name] } named
+        && _binding.Resolve(named) is GenericParamSymbol { SelfOf: not null }
+        && Conformance.WithParents(symbol, _binding)
+            .SelectMany(part => part.Members.Symbols.OfType<AssociatedTypeSymbol>())
+            .FirstOrDefault(member => member.Name == name) is { } assoc
+        && Sema.TypeChecker.ResolveAssociated(fixedType, assoc) is NeverType;
 
     /// <summary>
     /// The slot list: every parent's slots in the order the parent list writes them, own members
@@ -800,13 +861,13 @@ internal sealed class TypeTable
     /// CHILD addresses. Which is why several parents cost no thunks — the reason the list held
     /// one entry until 2.16.</para>
     /// </summary>
-    private string[] SlotNames(TypeSymbol symbol, InterfaceDecl decl)
+    private string[] SlotNames(TypeSymbol symbol, InterfaceDecl decl, GenericInstance? fixedType = null)
     {
         var slots = new List<string>();
 
         foreach (var parent in Conformance.ParentsOf(symbol, _binding))
             if (parent.Declaration is InterfaceDecl parentDecl)
-                foreach (var name in SlotNames(parent, parentDecl))
+                foreach (var name in SlotNames(parent, parentDecl, fixedType))
                     if (!slots.Contains(name))
                         slots.Add(name);
 
@@ -825,9 +886,11 @@ internal sealed class TypeTable
             if (member.IsPrivateHelper) continue;
             // A member typed by an ASSOCIATED type (03 T6), 'fn first(): Self.Item', has one C
             // signature per conformer: no slot can hold it. It is reached through a constraint
-            // only (04 D9); the value form comes with M8c (03 M4-1).
-            if (member.Parameters.Any(p => MentionsAssociated(p.Type))
-                || (member.ReturnType is { } returns && MentionsAssociated(returns))) continue;
+            // only (04 D9) — but on a value whose type fixes the associated types (03 M4-1), where
+            // it has one signature, and the checker refused a value that leaves one open.
+            if (fixedType is null
+                && (member.Parameters.Any(p => MentionsAssociated(p.Type))
+                    || (member.ReturnType is { } returns && MentionsAssociated(returns)))) continue;
             if (!slots.Contains(member.Name))
                 slots.Add(member.Name);
         }
@@ -1124,6 +1187,13 @@ internal sealed class TypeTable
                 using (PushSubstitution(AliasArguments(aliasSymbol, named, span)))
                     return Lower(generalized.Aliased, span);
 
+            // 'Iterator<Item = int>' (03 M4-1, T6): an argument that names an associated type fixes
+            // it, and a value of the interface so written has an entry of its own.
+            if (named.ArgumentNames is { } argumentNames && argumentNames.Any(n => n is not null)
+                && bound is TypeSymbol { Kind: TypeSymbolKind.Interface }
+                && Resolve(named, span) is GenericInstance fixedValue)
+                return InstanceType(fixedValue, span);
+
             // Written type arguments ('Box<int>' as a field or parameter type) are lowered BEFORE the
             // instance is interned: an argument may itself be a type parameter of the surrounding
             // instance ('Box<T>' in 'Pair<T>').
@@ -1192,6 +1262,9 @@ internal sealed class TypeTable
     /// what the definition is.</summary>
     public IrType InstanceType(GenericInstance instance, Core.Span span)
     {
+        // A value of an interface with its associated types fixed (03 M4-1): an entry of its own.
+        if (instance.Definition.Kind == TypeSymbolKind.Interface && instance.Fixations is { Length: > 0 })
+            return new IrInterfaceType(InternFixedInterface(instance, span));
         var id = Intern(instance.Definition, instance.Arguments);
         return instance.Definition.Kind switch
         {
@@ -1379,6 +1452,26 @@ internal sealed class TypeTable
             if (definition is TypeSymbol { Kind: TypeSymbolKind.Builtin, Name: "Slice" }
                 && generic.TypeArguments.Length == 1)
                 return new SliceOf(Resolve(generic.TypeArguments[0], span));
+
+            // 'Iterator<Item = int>' (03 M4-1): a named argument of an interface fixes its
+            // associated type, as the sema resolves it.
+            if (definition is TypeSymbol { Kind: TypeSymbolKind.Interface } fixedInterface
+                && generic.ArgumentNames is { } argumentNames && argumentNames.Any(n => n is not null))
+            {
+                var positional = new List<LyrType>();
+                var fixations = new List<(AssociatedTypeSymbol Member, LyrType Type)>();
+                for (var i = 0; i < generic.TypeArguments.Length; i++)
+                {
+                    var resolved = Resolve(generic.TypeArguments[i], span);
+                    if (i < argumentNames.Length && argumentNames[i] is { } fixedName
+                        && Conformance.WithParents(fixedInterface, _binding)
+                            .SelectMany(part => part.Members.Symbols.OfType<AssociatedTypeSymbol>())
+                            .FirstOrDefault(member => member.Name == fixedName) is { } fixedMember)
+                        fixations.Add((fixedMember, resolved));
+                    else positional.Add(resolved);
+                }
+                return new GenericInstance(fixedInterface, positional.ToArray()) { Fixations = fixations.ToArray() };
+            }
 
             if (definition is TypeSymbol generictype)
                 return new GenericInstance(generictype,
