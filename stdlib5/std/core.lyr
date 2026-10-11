@@ -2805,6 +2805,28 @@ fn decimalOf(c: char): int {
     return ((c as uint32) as int) - 48;
 }
 
+/// A part of a spec the value's type does not take (12 §2 rule 2) panics when it is read: an
+/// f-string's was refused where it was written (LYR-SEM0164), a template's — `fmt.format`, read
+/// at run time — panics as a broken one does (10 B3; M8c S8c).
+fn refuseSpec(spec: StringView, what: string): never {
+    panic(f"'{spec}' does not apply to {what}");
+}
+
+/// The spec of a value that takes fill, alignment and width alone — a `char`, a `bool`, another
+/// `Display` type's text —, the rest refused.
+fn paddingOnly(spec: StringView, what: string): FormatSpec {
+    let s = readSpec(spec);
+    if (!padsOnly(s, '\0')) {
+        refuseSpec(spec, what);
+    }
+    return s;
+}
+
+/// Whether the spec says no more than fill, alignment and width, besides the type `kind`.
+fn padsOnly(s: FormatSpec, kind: char): bool {
+    return !s.plus && !s.alternate && s.align != '=' && s.grouping == '\0' && s.precision < 0 && s.kind == kind;
+}
+
 /// `text` in the spec's width, counted in characters: the fill before it, after it, or around it
 /// (the odd one after), as the spec aligns it or else as `natural` does.
 fn pad(text: string, s: FormatSpec, natural: char, out: StringBuilder): void {
@@ -2846,6 +2868,9 @@ fn finishNumber(sign: string, prefix: string, digits: string, s: FormatSpec, out
 /// prefix under `#`, the digits grouped by three (decimal) or four (another radix).
 fn formatInteger(negative: bool, magnitude: uint, spec: StringView, out: StringBuilder): void {
     let s = readSpec(spec);
+    if (s.precision >= 0 || !(s.kind == '\0' || s.kind == 'b' || s.kind == 'o' || s.kind == 'x' || s.kind == 'X')) {
+        refuseSpec(spec, "an integer");
+    }
     let radix = if (s.kind == 'b') 2 else if (s.kind == 'o') 8 else if (s.kind == 'x' || s.kind == 'X') 16 else 10;
     var prefix = "";
     if (s.alternate) {
@@ -2920,6 +2945,9 @@ fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int
 /// none. Its sign, the integer part grouped (the zeros of `0` with it), padded.
 fn formatFloat(v: float, narrow: bool, spec: StringView, out: StringBuilder): void {
     let s = readSpec(spec);
+    if (s.alternate || !(s.kind == '\0' || s.kind == 'e' || s.kind == 'E' || s.kind == 'f' || s.kind == '%')) {
+        refuseSpec(spec, "a float");
+    }
     let digits = if (s.precision < 0) 6 else s.precision;
     var text = "";
     if (s.kind == 'e') {
@@ -3054,16 +3082,19 @@ extend float32 :: [Format] {
 extend string :: [Format] {
     fn format(spec: StringView, out: StringBuilder): void {
         let s = readSpec(spec);
+        if (s.plus || s.alternate || s.align == '=' || s.grouping != '\0' || s.kind != '\0') {
+            refuseSpec(spec, "a string");
+        }
         pad(if (s.precision >= 0) firstChars(this, s.precision) else this, s, '<', out);
     }
 }
 
 extend char :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { pad(f"{this}", readSpec(spec), '<', out); }
+    fn format(spec: StringView, out: StringBuilder): void { pad(f"{this}", paddingOnly(spec, "a char"), '<', out); }
 }
 
 extend bool :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { pad(f"{this}", readSpec(spec), '<', out); }
+    fn format(spec: StringView, out: StringBuilder): void { pad(f"{this}", paddingOnly(spec, "a bool"), '<', out); }
 }
 
 
@@ -5052,7 +5083,7 @@ pub fn fstringFormatted<T :: [Format]>(out: StringBuilder, value: T, spec: Strin
 /// Another `Display` type's hole with a spec: what `showTo` writes, in its width, alignment and
 /// fill — without a width straight into `out`.
 pub fn fstringPadded<T :: [Display]>(out: StringBuilder, value: T, spec: StringView): void {
-    let s = readSpec(spec);
+    let s = paddingOnly(spec, "a Display type's text");
     if (s.width == 0) {
         value.showTo(out);
         return;
@@ -5065,6 +5096,9 @@ pub fn fstringPadded<T :: [Display]>(out: StringBuilder, value: T, spec: StringV
 /// A hole under `?`: what `debugTo` writes, in the width, alignment and fill before it.
 pub fn fstringDebugged<T :: [Debug]>(out: StringBuilder, value: T, spec: StringView): void {
     let s = readSpec(spec);
+    if (!padsOnly(s, '?')) {
+        refuseSpec(spec, "a Debug text");
+    }
     if (s.width == 0) {
         value.debugTo(out);
         return;

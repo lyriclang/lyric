@@ -1,0 +1,45 @@
+// std.fmt.format (08 Y7, 10 S7; M8c S8c): a template read at run time in the f-strings' format
+// language — the next value and the i-th, a spec on either, Debug under '?', braces doubled.
+import std.fmt { format };
+import std.test { assertEq };
+
+struct Point :: [Display, Debug] {
+    x: int,
+    y: int,
+
+    fn show(): string {
+        return f"({this.x}, {this.y})";
+    }
+}
+
+@Test
+fn holesTakeTheNextValueOrTheNamedOne(): void {
+    assertEq(format("{} and {}", 1, "two"), "1 and two");
+    assertEq(format("{1} {0} {1}", "a", "b"), "b a b");
+    assertEq(format("{} {0:>4}", 7), "7    7");
+    assertEq(format("no holes"), "no holes");
+}
+
+@Test
+fn aSpecFormatsAsInAnFString(): void {
+    let n = 255;
+    let pi = 3.14159;
+    let ab = "ab";
+    let big = 1234567;
+    assertEq(format("{:#x} {:08.3f} {:>5} {:,}", n, pi, ab, big), f"{n:#x} {pi:08.3f} {ab:>5} {big:,}");
+    assertEq(format("[{:^7}]", 'c'), "[   c   ]");
+    assertEq(format("[{:*<6}]", true), "[true**]");
+}
+
+@Test
+fn aTypeOfItsOwnShowsAndPadsAndDebugs(): void {
+    let p = Point { x = 1, y = 2 };
+    assertEq(format("{} [{:>8}] {:?}", p, p, p), "(1, 2) [  (1, 2)] Point { x = 1, y = 2 }");
+    assertEq(format("{:?}", "q"), "\"q\"");
+}
+
+@Test
+fn bracesAreDoubled(): void {
+    assertEq(format("{{{}}}", 5), "{5}");
+    assertEq(format("}}{{"), "}{");
+}

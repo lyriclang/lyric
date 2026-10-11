@@ -1,0 +1,88 @@
+/// Text from a template read at run time (design/v5/spec/08 Y7, 10 S7): the f-strings' format
+/// language with the values given apart from it — `fmt.format("{} has {1:>4}", name, n)`. What
+/// the compiler checks in an f-string is checked here when it runs, and what is wrong panics (10
+/// B3): a template that leaves a brace open or closes one it did not open, a value it names that
+/// is not given, a spec that is no format or does not apply to its value.
+import std.core { Format, fstringDebugged, fstringFormatted, fstringPadded, StringBuilder };
+
+/// The template's text with each hole replaced by its value: `{}` takes the next value, `{i}` the
+/// i-th from 0 — the two mix, `{}` counting only itself, as in Rust —, either with `:spec` after
+/// it (12 §2): what applies to the value's type, or `?` for its `Debug` text. `{{` and `}}` write
+/// a brace. A value no hole names is left out.
+pub fn format(template: string, args: Display...): string {
+    let out = StringBuilder.new();
+    let cs = template.chars().toArray();
+    let n = cs.length();
+    var next = 0;
+    var i = 0;
+    while (i < n) {
+        let c = cs[i];
+        if (c == '}') {
+            if (i + 1 < n && cs[i + 1] == '}') {
+                out.appendChar('}');
+                i += 2;
+                continue;
+            }
+            panic(f"'{template}' closes a brace it did not open, at character {i}");
+        }
+        if (c != '{') {
+            out.appendChar(c);
+            i += 1;
+            continue;
+        }
+        if (i + 1 < n && cs[i + 1] == '{') {
+            out.appendChar('{');
+            i += 2;
+            continue;
+        }
+        var j = i + 1;
+        var index = -1;
+        while (j < n && cs[j].isAsciiDigit()) {
+            index = (if (index < 0) 0 else index) * 10 + cs[j].toDigit(10)!;
+            j += 1;
+        }
+        let spec = StringBuilder.new();
+        if (j < n && cs[j] == ':') {
+            j += 1;
+            while (j < n && cs[j] != '}') {
+                spec.appendChar(cs[j]);
+                j += 1;
+            }
+        }
+        if (j >= n || cs[j] != '}') {
+            panic(f"'{template}' leaves the hole at character {i} open");
+        }
+        var at = index;
+        if (at < 0) {
+            at = next;
+            next += 1;
+        }
+        if (at >= args.length()) {
+            panic(f"'{template}' names value {at}, and {args.length()} are given");
+        }
+        write(args[at], spec.toString(), out);
+        i = j + 1;
+    }
+    return out.toString();
+}
+
+/// One value into `out` as its hole's spec says: without one its text; under `?` its `Debug` text;
+/// a `Format` type reads the spec itself — the scalars do —; another `Display` type is padded.
+fn write(value: Display, spec: string, out: StringBuilder): void {
+    if (spec.isEmpty()) {
+        value.showTo(out);
+        return;
+    }
+    if (spec.endsWith('?')) {
+        if (value is Debug) {
+            fstringDebugged(out, value, spec);
+            return;
+        }
+        panic(f"'{spec}' asks for a Debug text, and the value has none");
+    }
+    if (value is Format) {
+        fstringFormatted(out, value, spec);
+        return;
+    }
+    fstringPadded(out, value, spec);
+}
