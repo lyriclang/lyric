@@ -6209,7 +6209,8 @@ public sealed class TypeChecker
         var builder = new LocalSymbol("$fstring", builderType, true, fs);
         var inner = new SymbolTable(scope);
         inner.TryDeclare(builder);
-        Expr Output() => new UnaryExpr(UnaryOp.Place, new IdentifierExpr("$fstring", span), span);
+        // The builder by its reference (10 S13): a class, written through it; no '&'.
+        Expr Output() => new IdentifierExpr("$fstring", span);
 
         var pieces = new List<CallExpr>();
         var failed = new List<CallExpr>();
