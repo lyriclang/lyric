@@ -1001,7 +1001,10 @@ public sealed class CEmitter
     private void DefineBox(int type)
     {
         var def = _module.Types[type];
-        var inner = def.IsEnum ? (IrType)new IrEnumType(new TypeId(type)) : new IrStructType(new TypeId(type));
+        // A built-in's box holds the value itself (M8c S8b): its one field's type, an 'int64_t' or a
+        // string's reference, which the thunks read as the receiver.
+        var inner = def.IsBuiltinBox ? def.FieldTypes[0]
+            : def.IsEnum ? (IrType)new IrEnumType(new TypeId(type)) : new IrStructType(new TypeId(type));
         var (size, align) = LayoutOf(inner);
         if (align > 8) throw new InvalidOperationException($"a box of {Display(inner)} would need {align}-byte alignment");
         var total = 8 + (size + 7) / 8 * 8;
@@ -1014,7 +1017,7 @@ public sealed class CEmitter
         var words = new List<int>();
         var ambiguous = false;
         ReferenceWords(inner, 8, words, ref ambiguous);
-        var text = $"box<{Qualified(def)}>".Replace("\\", "\\\\").Replace("\"", "\\\"");
+        var text = (def.IsBuiltinBox ? def.Name : $"box<{Qualified(def)}>").Replace("\\", "\\\\").Replace("\"", "\\\"");
         var flags = ambiguous ? "LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE" : "LYR_DESC_HAS_REFS";
         var itables = ItablesOf(type);
         if (itables != "NULL") _out.AppendLine($"extern const LyrItable {itables}[];");

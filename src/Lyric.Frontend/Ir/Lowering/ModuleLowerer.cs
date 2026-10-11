@@ -1182,6 +1182,39 @@ public static class ModuleLowerer
             }
         }
 
+        // A built-in's box (01 V7; M8c S8b): a row for each interface a block on the built-in
+        // names, or reaches as a parent — 'extend int :: [Display]' —, the slot's method from any
+        // block on it, else the interface's default: 'showTo' left to 'Display'.
+        foreach (var (builtin, _, boxId) in typeTable.BuiltinBoxes)
+        {
+            var onBuiltin = compilation.Extensions.Blocks.Where(b => ReferenceEquals(b.Target, builtin)).ToList();
+            foreach (var (iface, ifaceId) in interfaces.OrderBy(t => t.Id.Value))
+            {
+                var reaches = onBuiltin.Any(b => b.Decl.Interfaces.Any(node =>
+                    Conformance.InterfaceOf(node, binding) is { } named
+                    && Conformance.WithParents(named, binding).Any(p => ReferenceEquals(p, iface))));
+                if (!reaches) continue;
+                var slots = typeTable.MethodSlotsOf(ifaceId);
+                var methods = new FunctionId[slots.Length];
+                var complete = true;
+                for (var i = 0; i < slots.Length; i++)
+                {
+                    var target = ResolveInExtensions(onBuiltin, slots[i], extensions, typeTable, boxId, instances)
+                                 ?? Conformance.WithParents(iface, binding)
+                                     .Select(p => Resolve(p, slots[i], ids))
+                                     .FirstOrDefault(f => f is not null)
+                                 ?? ResolveInInstance(typeTable, ifaceId, slots[i], instances);
+                    if (target is { } id) { methods[i] = id; continue; }
+                    LoweringDiagnostics.ReportUnsupported(de, default,
+                        $"'{builtin.Name}' implements '{iface.Name}', but its '{slots[i]}' is not lowerable");
+                    complete = false;
+                    break;
+                }
+                if (complete) impls.Add(new IrImpl(boxId, ifaceId, methods));
+                else failed = true;
+            }
+        }
+
         return impls;
     }
 

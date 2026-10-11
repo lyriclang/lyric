@@ -1121,13 +1121,17 @@ public static class IrVerifier
             IrRefType r => (TypeId?)r.Type,
             IrStructType v => v.Type,
             IrEnumType e => e.Type,
+            // A built-in's value into its box (M8c S8b): the box's one field is the value's type.
+            var value when m.Concrete.Value >= 0 && m.Concrete.Value < _module.Types.Count
+                           && _module.Types[m.Concrete.Value] is { IsBuiltinBox: true, FieldTypes: [var payload] }
+                           && IrType.Equal(payload, value) => m.Concrete,
             _ => null,
         };
 
         if (concrete is null)
         {
             Report(block, index,
-                $"mkiface expects a class, struct or enum value, found {Show(TypeOf(m.Value))}");
+                $"mkiface expects a class, struct or enum value, or a built-in's for its box, found {Show(TypeOf(m.Value))}");
             return;
         }
 

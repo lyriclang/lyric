@@ -1,0 +1,66 @@
+// A built-in's value as an interface value (01 V7, 05 §2; M8c S8b): a number, a bool, a char, a
+// string and a view go into the interface they conform to through std.core's blocks, in a box of
+// their own — from a binding, an argument, a variadic tail, a list, a generic body.
+import std.collections { List };
+import std.test { assertEq, assertTrue };
+
+fn shown(xs: Display...): string {
+    var text = "";
+    for (x in xs) {
+        text = f"{text}{x}|";
+    }
+    return text;
+}
+
+fn lifted<T :: [Display]>(t: T): Display {
+    return t;
+}
+
+@Test
+fn aScalarIsAnInterfaceValue(): void {
+    let d: Display = 5;
+    assertEq(f"{d}", "5");
+    let small: int8 = -3;
+    let byte: uint8 = 200;
+    let narrow: float32 = 1.5;
+    assertEq(shown(small, byte, narrow, 2.25, 'z', false), "-3|200|1.5|2.25|z|false|");
+}
+
+@Test
+fn aStringAndAViewAreInterfaceValues(): void {
+    let s: Display = "text";
+    let v: Display = "abcd"[1..3];
+    let q: Debug = "x";
+    assertEq(f"{s} {v} {q:?}", "text bc \"x\"");
+}
+
+@Test
+fn aListHoldsBuiltinsBesideEachOther(): void {
+    let xs: List<Display> = [1, "two", 3.5];
+    var text = "";
+    for (x in xs) {
+        text = f"{text}[{x}]";
+    }
+    assertEq(text, "[1][two][3.5]");
+}
+
+@Test
+fn aGenericBodyLiftsItsArgument(): void {
+    assertEq(f"{lifted(7)} {lifted("seven")}", "7 seven");
+    let maybe: ?Display = 9;
+    assertTrue(maybe != null);
+    assertEq(f"{maybe!}", "9");
+}
+
+@Test
+fn manyStringsBehindInterfaceValuesSurviveTheCollector(): void {
+    let kept = List<Display>.new();
+    for (i in 0..200000) {
+        kept.push(f"s{i}");
+    }
+    var total = 0;
+    for (k in kept) {
+        total += f"{k}".length();
+    }
+    assertEq(total, 1288890);
+}
