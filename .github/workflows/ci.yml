@@ -64,6 +64,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # the whole history: a pull request's tests are chosen by its diff against main
+          fetch-depth: 0
 
       - name: Set up zig (the Lyric 5 runtime tests build C)
         uses: ./.github/actions/setup-zig
@@ -74,8 +77,25 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
+      # WHICH TESTS (tooling/affected.toml; the maintainer's decision of 2026-10-11): a pull
+      # request runs the tests its diff reaches and a fixed regression group — the goldens, the
+      # native runs, the examples —; main after a merge, and a dispatched run, run everything.
+      # A break the selection misses shows on main, not here; main's run is read after every merge.
+      - name: The tests the change reaches
+        id: affected
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          git fetch --quiet origin main
+          python3 tooling/affected.py --base origin/main --out affected
+          echo "filter=$(cat affected/tests.filter)" >> "$GITHUB_OUTPUT"
+
       - name: Test
-        run: dotnet test --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+        shell: bash
+        run: |
+          filter='${{ steps.affected.outputs.filter }}'
+          if [ -n "$filter" ]; then set -- --filter "$filter"; else set --; fi
+          dotnet test --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx" "$@"
 
       - name: Upload test results
         if: always()
@@ -271,6 +291,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # the whole history: a pull request's cases are chosen by its diff against main
+          fetch-depth: 0
 
       - name: Read the specification's pin
         id: pin
@@ -309,10 +332,22 @@ jobs:
       # takes them one after the other, about a second each, and three of the runner's four
       # processors sat idle for twenty minutes. The judgement of every case stays the pinned
       # runner's; the wrapper only hands them out.
+      # WHICH CASES (tooling/affected.toml, as in build-and-test): on a pull request the cases the
+      # diff reaches — the chapters of the touched area, the cases naming a touched std module —,
+      # the regression list (tooling/conformance/regression.txt), and always the cases the pin
+      # moved over. main and a dispatched run take the whole suite.
+      - name: The cases the change reaches
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          git fetch --quiet origin main
+          python3 tooling/affected.py --base origin/main --out affected --spec spec-repo --old-pin "$(git show origin/main:spec.pin | tr -d '[:space:]')"
+
       - name: Run the suite against the working tree, ${{ matrix.profile }}
         run: |
           lyric5="$PWD/src/Lyric5/bin/Release/net10.0/lyric5"
           version=$("$lyric5" --version | head -1 | awk '{print $2}' | cut -d+ -f1)
           echo "working tree claims $version"
           nproc
-          python3 tooling/conformance/run_parallel.py --runner spec-repo/tools/run_conformance.py --lyric5 "$lyric5" --profile "${{ matrix.profile }}" --toolchain-version "$version"
+          if [ -f affected/cases.txt ]; then set -- --only affected/cases.txt; else set --; fi
+          python3 tooling/conformance/run_parallel.py --runner spec-repo/tools/run_conformance.py --lyric5 "$lyric5" --profile "${{ matrix.profile }}" --toolchain-version "$version" "$@"
