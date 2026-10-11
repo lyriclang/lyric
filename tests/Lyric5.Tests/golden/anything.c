@@ -16,6 +16,7 @@ typedef struct lyr_ty_std_task_LockState lyr_ty_std_task_LockState;
 typedef struct lyr_ty_std_task_SpinLock lyr_ty_std_task_SpinLock;
 typedef struct lyr_ty_std_time_Zone lyr_ty_std_time_Zone;
 typedef struct lyr_ty_std_task_Living lyr_ty_std_task_Living;
+typedef struct lyr_ty_std_hash_CrcTables lyr_ty_std_hash_CrcTables;
 typedef struct lyr_ty_std_thread_Pool lyr_ty_std_thread_Pool;
 typedef struct lyr_ty_std_thread_Worker lyr_ty_std_thread_Worker;
 typedef struct lyr_ty_std_task_Channel_void__be27c1cc lyr_ty_std_task_Channel_void__be27c1cc;
@@ -373,6 +374,17 @@ _Static_assert(offsetof(lyr_ty_std_task_Living, f_count) == 24, "layout of lyr_t
 extern const LyrItable lyr_itab_ty_std_task_Living[];
 static const uint64_t lyr_refmap_ty_std_task_Living[] = { UINT64_C(0x6) };
 const LyrDesc lyr_desc_ty_std_task_Living = { sizeof(lyr_ty_std_task_Living), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_task_Living, "std.task.Living", lyr_itab_ty_std_task_Living };
+struct lyr_ty_std_hash_CrcTables {
+    LyrObj header;
+    LyrArr *f_ieee;
+    LyrArr *f_castagnoli;
+};
+_Static_assert(sizeof(lyr_ty_std_hash_CrcTables) == 24, "layout of lyr_ty_std_hash_CrcTables");
+_Static_assert(offsetof(lyr_ty_std_hash_CrcTables, f_ieee) == 8, "layout of lyr_ty_std_hash_CrcTables");
+_Static_assert(offsetof(lyr_ty_std_hash_CrcTables, f_castagnoli) == 16, "layout of lyr_ty_std_hash_CrcTables");
+extern const LyrItable lyr_itab_ty_std_hash_CrcTables[];
+static const uint64_t lyr_refmap_ty_std_hash_CrcTables[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_ty_std_hash_CrcTables = { sizeof(lyr_ty_std_hash_CrcTables), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_hash_CrcTables, "std.hash.CrcTables", lyr_itab_ty_std_hash_CrcTables };
 struct lyr_ty_std_thread_Pool {
     LyrObj header;
     lyr_ty_std_thread_Worker *f_workers;
@@ -1041,8 +1053,8 @@ typedef struct { LyrObj header; lyr_ty_std_core_Backtrace value; } lyr_box_ty_st
 _Static_assert(sizeof(lyr_box_ty_std_core_Backtrace) == 16, "layout of lyr_box_ty_std_core_Backtrace");
 _Static_assert(offsetof(lyr_box_ty_std_core_Backtrace, value) == 8, "layout of lyr_box_ty_std_core_Backtrace");
 extern const LyrItable lyr_itab_ty_std_core_Backtrace[];
-static const uint64_t lyr_refmap_box28[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_box_ty_std_core_Backtrace = { sizeof(lyr_box_ty_std_core_Backtrace), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box28, "box<std.core.Backtrace>", lyr_itab_ty_std_core_Backtrace };
+static const uint64_t lyr_refmap_box29[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_box_ty_std_core_Backtrace = { sizeof(lyr_box_ty_std_core_Backtrace), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box29, "box<std.core.Backtrace>", lyr_itab_ty_std_core_Backtrace };
 typedef struct { LyrObj header; lyr_ty_std_core_UnicodeCategory value; } lyr_box_ty_std_core_UnicodeCategory;
 _Static_assert(sizeof(lyr_box_ty_std_core_UnicodeCategory) == 16, "layout of lyr_box_ty_std_core_UnicodeCategory");
 _Static_assert(offsetof(lyr_box_ty_std_core_UnicodeCategory, value) == 8, "layout of lyr_box_ty_std_core_UnicodeCategory");
@@ -1052,8 +1064,8 @@ typedef struct { LyrObj header; lyr_ty_std_core_CharsIter value; } lyr_box_ty_st
 _Static_assert(sizeof(lyr_box_ty_std_core_CharsIter) == 40, "layout of lyr_box_ty_std_core_CharsIter");
 _Static_assert(offsetof(lyr_box_ty_std_core_CharsIter, value) == 8, "layout of lyr_box_ty_std_core_CharsIter");
 extern const LyrItable lyr_itab_ty_std_core_CharsIter[];
-static const uint64_t lyr_refmap_box60[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_box_ty_std_core_CharsIter = { sizeof(lyr_box_ty_std_core_CharsIter), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box60, "box<std.core.CharsIter>", lyr_itab_ty_std_core_CharsIter };
+static const uint64_t lyr_refmap_box61[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_box_ty_std_core_CharsIter = { sizeof(lyr_box_ty_std_core_CharsIter), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box61, "box<std.core.CharsIter>", lyr_itab_ty_std_core_CharsIter };
 typedef struct { LyrObj header; lyr_ty_std_core_ParseError value; } lyr_box_ty_std_core_ParseError;
 _Static_assert(sizeof(lyr_box_ty_std_core_ParseError) == 16, "layout of lyr_box_ty_std_core_ParseError");
 _Static_assert(offsetof(lyr_box_ty_std_core_ParseError, value) == 8, "layout of lyr_box_ty_std_core_ParseError");
@@ -1078,14 +1090,14 @@ typedef struct { LyrObj header; lyr_ty_std_core_LinesIter value; } lyr_box_ty_st
 _Static_assert(sizeof(lyr_box_ty_std_core_LinesIter) == 32, "layout of lyr_box_ty_std_core_LinesIter");
 _Static_assert(offsetof(lyr_box_ty_std_core_LinesIter, value) == 8, "layout of lyr_box_ty_std_core_LinesIter");
 extern const LyrItable lyr_itab_ty_std_core_LinesIter[];
-static const uint64_t lyr_refmap_box76[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_box_ty_std_core_LinesIter = { sizeof(lyr_box_ty_std_core_LinesIter), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box76, "box<std.core.LinesIter>", lyr_itab_ty_std_core_LinesIter };
+static const uint64_t lyr_refmap_box77[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_box_ty_std_core_LinesIter = { sizeof(lyr_box_ty_std_core_LinesIter), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box77, "box<std.core.LinesIter>", lyr_itab_ty_std_core_LinesIter };
 typedef struct { LyrObj header; lyr_ty_std_core_CharIndicesIter value; } lyr_box_ty_std_core_CharIndicesIter;
 _Static_assert(sizeof(lyr_box_ty_std_core_CharIndicesIter) == 32, "layout of lyr_box_ty_std_core_CharIndicesIter");
 _Static_assert(offsetof(lyr_box_ty_std_core_CharIndicesIter, value) == 8, "layout of lyr_box_ty_std_core_CharIndicesIter");
 extern const LyrItable lyr_itab_ty_std_core_CharIndicesIter[];
-static const uint64_t lyr_refmap_box78[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_box_ty_std_core_CharIndicesIter = { sizeof(lyr_box_ty_std_core_CharIndicesIter), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box78, "box<std.core.CharIndicesIter>", lyr_itab_ty_std_core_CharIndicesIter };
+static const uint64_t lyr_refmap_box79[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_box_ty_std_core_CharIndicesIter = { sizeof(lyr_box_ty_std_core_CharIndicesIter), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box79, "box<std.core.CharIndicesIter>", lyr_itab_ty_std_core_CharIndicesIter };
 typedef struct { LyrObj header; lyr_ty_std_core_Utf8Error value; } lyr_box_ty_std_core_Utf8Error;
 _Static_assert(sizeof(lyr_box_ty_std_core_Utf8Error) == 16, "layout of lyr_box_ty_std_core_Utf8Error");
 _Static_assert(offsetof(lyr_box_ty_std_core_Utf8Error, value) == 8, "layout of lyr_box_ty_std_core_Utf8Error");
@@ -1095,8 +1107,8 @@ typedef struct { LyrObj header; lyr_ty_std_io_IoError value; } lyr_box_ty_std_io
 _Static_assert(sizeof(lyr_box_ty_std_io_IoError) == 64, "layout of lyr_box_ty_std_io_IoError");
 _Static_assert(offsetof(lyr_box_ty_std_io_IoError, value) == 8, "layout of lyr_box_ty_std_io_IoError");
 extern const LyrItable lyr_itab_ty_std_io_IoError[];
-static const uint64_t lyr_refmap_box83[] = { UINT64_C(0x38) };
-const LyrDesc lyr_desc_box_ty_std_io_IoError = { sizeof(lyr_box_ty_std_io_IoError), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box83, "box<std.io.IoError>", lyr_itab_ty_std_io_IoError };
+static const uint64_t lyr_refmap_box84[] = { UINT64_C(0x38) };
+const LyrDesc lyr_desc_box_ty_std_io_IoError = { sizeof(lyr_box_ty_std_io_IoError), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box84, "box<std.io.IoError>", lyr_itab_ty_std_io_IoError };
 typedef struct { LyrObj header; lyr_ty_std_io_IoErrorKind value; } lyr_box_ty_std_io_IoErrorKind;
 _Static_assert(sizeof(lyr_box_ty_std_io_IoErrorKind) == 24, "layout of lyr_box_ty_std_io_IoErrorKind");
 _Static_assert(offsetof(lyr_box_ty_std_io_IoErrorKind, value) == 8, "layout of lyr_box_ty_std_io_IoErrorKind");
@@ -1106,8 +1118,8 @@ typedef struct { LyrObj header; lyr_ty_std_io_StdinLinesIter value; } lyr_box_ty
 _Static_assert(sizeof(lyr_box_ty_std_io_StdinLinesIter) == 16, "layout of lyr_box_ty_std_io_StdinLinesIter");
 _Static_assert(offsetof(lyr_box_ty_std_io_StdinLinesIter, value) == 8, "layout of lyr_box_ty_std_io_StdinLinesIter");
 extern const LyrItable lyr_itab_ty_std_io_StdinLinesIter[];
-static const uint64_t lyr_refmap_box103[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_box_ty_std_io_StdinLinesIter = { sizeof(lyr_box_ty_std_io_StdinLinesIter), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box103, "box<std.io.StdinLinesIter>", lyr_itab_ty_std_io_StdinLinesIter };
+static const uint64_t lyr_refmap_box104[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_box_ty_std_io_StdinLinesIter = { sizeof(lyr_box_ty_std_io_StdinLinesIter), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box104, "box<std.io.StdinLinesIter>", lyr_itab_ty_std_io_StdinLinesIter };
 typedef struct { LyrObj header; lyr_ty_std_io_SeekFrom value; } lyr_box_ty_std_io_SeekFrom;
 _Static_assert(sizeof(lyr_box_ty_std_io_SeekFrom) == 24, "layout of lyr_box_ty_std_io_SeekFrom");
 _Static_assert(offsetof(lyr_box_ty_std_io_SeekFrom, value) == 8, "layout of lyr_box_ty_std_io_SeekFrom");
@@ -1152,8 +1164,8 @@ typedef struct { LyrObj header; lyr_ty_std_time_TimeError value; } lyr_box_ty_st
 _Static_assert(sizeof(lyr_box_ty_std_time_TimeError) == 16, "layout of lyr_box_ty_std_time_TimeError");
 _Static_assert(offsetof(lyr_box_ty_std_time_TimeError, value) == 8, "layout of lyr_box_ty_std_time_TimeError");
 extern const LyrItable lyr_itab_ty_std_time_TimeError[];
-static const uint64_t lyr_refmap_box132[] = { UINT64_C(0x2) };
-const LyrDesc lyr_desc_box_ty_std_time_TimeError = { sizeof(lyr_box_ty_std_time_TimeError), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box132, "box<std.time.TimeError>", lyr_itab_ty_std_time_TimeError };
+static const uint64_t lyr_refmap_box134[] = { UINT64_C(0x2) };
+const LyrDesc lyr_desc_box_ty_std_time_TimeError = { sizeof(lyr_box_ty_std_time_TimeError), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box134, "box<std.time.TimeError>", lyr_itab_ty_std_time_TimeError };
 typedef struct { LyrObj header; lyr_ty_std_time_DateTime value; } lyr_box_ty_std_time_DateTime;
 _Static_assert(sizeof(lyr_box_ty_std_time_DateTime) == 72, "layout of lyr_box_ty_std_time_DateTime");
 _Static_assert(offsetof(lyr_box_ty_std_time_DateTime, value) == 8, "layout of lyr_box_ty_std_time_DateTime");
@@ -1243,6 +1255,7 @@ const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_18_std_task_LockState = { &l
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_17_std_task_SpinLock = { &lyr_desc_ty_std_task_SpinLock,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_13_std_time_Zone = { &lyr_desc_box_ty_std_time_Zone,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_15_std_task_Living = { &lyr_desc_ty_std_task_Living,  };
+const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_18_std_hash_CrcTables = { &lyr_desc_ty_std_hash_CrcTables,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_15_std_thread_Pool = { &lyr_desc_ty_std_thread_Pool,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_17_std_thread_Worker = { &lyr_desc_ty_std_thread_Worker,  };
 const lyr_vt_ty_std_core_Any lyr_vt_12_std_core_Any_31_std_task_Channel_void__be27c1cc = { &lyr_desc_ty_std_task_Channel_void__be27c1cc,  };
@@ -1319,6 +1332,7 @@ const LyrItable lyr_itab_ty_std_task_LockState[] = { { lyr_ifid_ty_std_core_Any,
 const LyrItable lyr_itab_ty_std_task_SpinLock[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_17_std_task_SpinLock } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_time_Zone[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_13_std_time_Zone } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_task_Living[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_15_std_task_Living } , { NULL, NULL } };
+const LyrItable lyr_itab_ty_std_hash_CrcTables[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_18_std_hash_CrcTables } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_thread_Pool[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_15_std_thread_Pool } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_thread_Worker[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_17_std_thread_Worker } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_task_Channel_void__be27c1cc[] = { { lyr_ifid_ty_std_core_Any, &lyr_vt_12_std_core_Any_31_std_task_Channel_void__be27c1cc } , { NULL, NULL } };

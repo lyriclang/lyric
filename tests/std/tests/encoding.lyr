@@ -1,6 +1,6 @@
 // std.encoding (design/v5/spec/10 Q5; M8b S4a): RFC 4648's test vectors for Base64 and Base16,
 // the URL-safe alphabet, the strict decoders' offsets, UTF-16 with a surrogate pair, the integers
-// of a byte slice.
+// of a byte slice and the bytes of an integer (M8c S11).
 import std.encoding { Base64, Base64Url, EncodingError, Hex, Utf16 };
 import std.io { ByteBuffer };
 import std.test { assertEq, assertPanics, assertTrue, fail };
@@ -132,4 +132,46 @@ fn aNumberTakesExactlyItsWidth(): void {
     assertPanics(() => { int.fromBytesLE(four[..]); });
     assertPanics(() => { four[..].getUint32LE(1); });
     assertTrue(uint32.fromBytesBE(four[..]) == 0u32);
+}
+
+@Test
+fn anIntegerGivesItsBytesInEitherOrder(): void {
+    // an inline array is Equatable, not Debug (10 S4b): an assertion compares it as an array
+    let n: uint16 = 0x0102;
+    let be: uint8[2] = [1u8, 2u8];
+    assertTrue(n.toBytesBE() == be);
+    assertEq(n.toBytesBE().toArray(), [1u8, 2u8]);
+    assertEq(n.toBytesLE().toArray(), [2u8, 1u8]);
+    let m: int32 = -2;
+    assertEq(m.toBytesBE().toArray(), [0xFFu8, 0xFFu8, 0xFFu8, 0xFEu8]);
+    assertEq(m.toBytesLE().toArray(), [0xFEu8, 0xFFu8, 0xFFu8, 0xFFu8]);
+    let wide: uint = 0x0102030405060708;
+    let low = wide.toBytesLE();
+    assertEq(low[0], 8u8);
+    assertEq(low[7], 1u8);
+}
+
+@Test
+fn anIntegersBytesReadBackAsIt(): void {
+    let ints: int[] = [int.min, -1, 0, 1, 0x0102030405060708, int.max];
+    for (v in ints) {
+        let le = v.toBytesLE();
+        let be = v.toBytesBE();
+        assertEq(int.fromBytesLE(le.toArray()), v);
+        assertEq(int.fromBytesBE(be.toArray()), v);
+    }
+    let u: uint32 = 0xDEADBEEF;
+    let ule = u.toBytesLE();
+    let ube = u.toBytesBE();
+    assertEq(uint32.fromBytesLE(ule.toArray()), u);
+    assertEq(uint32.fromBytesBE(ube.toArray()), u);
+    let s: int16 = -12345;
+    let sle = s.toBytesLE();
+    assertEq(int16.fromBytesLE(sle.toArray()), s);
+    let t: int8 = -100;
+    let tbe = t.toBytesBE();
+    assertEq(int8.fromBytesBE(tbe.toArray()), t);
+    let top: uint = 0xFFFFFFFFFFFFFFFF;
+    let topBe = top.toBytesBE();
+    assertEq(uint.fromBytesBE(topBe.toArray()), top);
 }
