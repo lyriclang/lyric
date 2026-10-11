@@ -100,7 +100,7 @@ class Badge :: [Display] {
 struct Celsius :: [Format] {
     degrees: float,
 
-    fn format(spec: StringView, &out: StringBuilder): void {
+    fn format(spec: StringView, out: StringBuilder): void {
         if (spec == "F") {
             out.appendStr(f"{this.degrees * 1.8 + 32.0}°F");
         } else {
@@ -121,8 +121,8 @@ fn debugDisplayAndOwnFormats(): void {
 
 @Test
 fn theHelpersAreStdCores(): void {
-    var out = fstringStart(4);
-    fstringFormatted(&out, 255, "#x");
+    let out = fstringStart(4);
+    fstringFormatted(out, 255, "#x");
     assertEq(fstringEnd(out), "0xff");
 }
 
@@ -137,26 +137,26 @@ fn showToWritesEachScalarsText(): void {
     let half = -2.5;
     let o = 'ö';
     let no = false;
-    var b = StringBuilder.new();
-    least.showTo(&b);
+    let b = StringBuilder.new();
+    least.showTo(b);
     b.appendChar(' ');
-    most.showTo(&b);
+    most.showTo(b);
     b.appendChar(' ');
-    small.showTo(&b);
+    small.showTo(b);
     b.appendChar(' ');
-    zero.showTo(&b);
+    zero.showTo(b);
     b.appendChar(' ');
-    tenth.showTo(&b);
+    tenth.showTo(b);
     b.appendChar(' ');
-    half.showTo(&b);
+    half.showTo(b);
     b.appendChar(' ');
-    o.showTo(&b);
+    o.showTo(b);
     b.appendChar(' ');
-    no.showTo(&b);
+    no.showTo(b);
     b.appendChar(' ');
-    "text".showTo(&b);
+    "text".showTo(b);
     b.appendChar(' ');
-    "a view"[2..].showTo(&b);
+    "a view"[2..].showTo(b);
     assertEq(b.toString(), "-9223372036854775808 18446744073709551615 -128 0 0.1 -2.5 ö false text view");
 }
 

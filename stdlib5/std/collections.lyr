@@ -1301,16 +1301,16 @@ extend<T :: [Debug]> List<T> :: [Debug, Display] {
         return this.asSlice().debug();
     }
 
-    fn debugTo(&out: StringBuilder): void {
-        this.asSlice().debugTo(&out);
+    fn debugTo(out: StringBuilder): void {
+        this.asSlice().debugTo(out);
     }
 
     fn show(): string {
         return this.asSlice().debug();
     }
 
-    fn showTo(&out: StringBuilder): void {
-        this.asSlice().debugTo(&out);
+    fn showTo(out: StringBuilder): void {
+        this.asSlice().debugTo(out);
     }
 }
 
@@ -1330,18 +1330,18 @@ extend<T :: [Equatable]> Deque<T> :: [Equatable] {
 
 extend<T :: [Debug]> Deque<T> :: [Debug, Display] {
     fn debug(): string {
-        var out = StringBuilder.new();
-        this.debugTo(&out);
+        let out = StringBuilder.new();
+        this.debugTo(out);
         return out.toString();
     }
 
-    fn debugTo(&out: StringBuilder): void {
+    fn debugTo(out: StringBuilder): void {
         out.appendChar('[');
         for (i in 0..this.count) {
             if (i > 0) {
                 out.appendStr(", ");
             }
-            this[i].debugTo(&out);
+            this[i].debugTo(out);
         }
         out.appendChar(']');
     }
@@ -1350,8 +1350,8 @@ extend<T :: [Debug]> Deque<T> :: [Debug, Display] {
         return this.debug();
     }
 
-    fn showTo(&out: StringBuilder): void {
-        this.debugTo(&out);
+    fn showTo(out: StringBuilder): void {
+        this.debugTo(out);
     }
 }
 
@@ -1371,12 +1371,12 @@ extend<T :: [Hashable], H :: [Hasher]> Set<T, H> :: [Equatable] {
 
 extend<T :: [Hashable, Debug], H :: [Hasher]> Set<T, H> :: [Debug, Display] {
     fn debug(): string {
-        var out = StringBuilder.new();
-        this.debugTo(&out);
+        let out = StringBuilder.new();
+        this.debugTo(out);
         return out.toString();
     }
 
-    fn debugTo(&out: StringBuilder): void {
+    fn debugTo(out: StringBuilder): void {
         out.appendChar('{');
         var first = true;
         for (v in this) {
@@ -1384,7 +1384,7 @@ extend<T :: [Hashable, Debug], H :: [Hasher]> Set<T, H> :: [Debug, Display] {
                 out.appendStr(", ");
             }
             first = false;
-            v.debugTo(&out);
+            v.debugTo(out);
         }
         out.appendChar('}');
     }
@@ -1393,8 +1393,8 @@ extend<T :: [Hashable, Debug], H :: [Hasher]> Set<T, H> :: [Debug, Display] {
         return this.debug();
     }
 
-    fn showTo(&out: StringBuilder): void {
-        this.debugTo(&out);
+    fn showTo(out: StringBuilder): void {
+        this.debugTo(out);
     }
 }
 
@@ -1419,12 +1419,12 @@ extend<K :: [Hashable], V :: [Equatable], H :: [Hasher]> Map<K, V, H> :: [Equata
 
 extend<K :: [Hashable, Debug], V :: [Debug], H :: [Hasher]> Map<K, V, H> :: [Debug, Display] {
     fn debug(): string {
-        var out = StringBuilder.new();
-        this.debugTo(&out);
+        let out = StringBuilder.new();
+        this.debugTo(out);
         return out.toString();
     }
 
-    fn debugTo(&out: StringBuilder): void {
+    fn debugTo(out: StringBuilder): void {
         out.appendChar('{');
         var first = true;
         for (entry in this) {
@@ -1433,9 +1433,9 @@ extend<K :: [Hashable, Debug], V :: [Debug], H :: [Hasher]> Map<K, V, H> :: [Deb
                 out.appendStr(", ");
             }
             first = false;
-            k.debugTo(&out);
+            k.debugTo(out);
             out.appendStr(": ");
-            v.debugTo(&out);
+            v.debugTo(out);
         }
         out.appendChar('}');
     }
@@ -1444,8 +1444,8 @@ extend<K :: [Hashable, Debug], V :: [Debug], H :: [Hasher]> Map<K, V, H> :: [Deb
         return this.debug();
     }
 
-    fn showTo(&out: StringBuilder): void {
-        this.debugTo(&out);
+    fn showTo(out: StringBuilder): void {
+        this.debugTo(out);
     }
 }
 
@@ -1454,8 +1454,8 @@ extend<T :: [TotalOrder, Debug]> Heap<T> :: [Debug] {
         return this.items.debug();
     }
 
-    fn debugTo(&out: StringBuilder): void {
-        this.items.debugTo(&out);
+    fn debugTo(out: StringBuilder): void {
+        this.items.debugTo(out);
     }
 }
 

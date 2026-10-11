@@ -386,7 +386,7 @@ pub interface Display {
 
     /// The text written into `out` (10 S6): what f-strings and the containers call, so a text is
     /// built in one buffer. The default appends `show()`; a type that can write itself does.
-    fn showTo(&out: StringBuilder): void {
+    fn showTo(out: StringBuilder): void {
         out.appendStr(this.show());
     }
 }
@@ -406,7 +406,7 @@ extend int :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul,
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
     fn show(): string { return f"{this}"; }
-    fn showTo(&out: StringBuilder): void { out.putInt(this); }
+    fn showTo(out: StringBuilder): void { out.putInt(this); }
     fn add(rhs: int): int { return this + rhs; }
     fn sub(rhs: int): int { return this - rhs; }
     fn mul(rhs: int): int { return this * rhs; }
@@ -435,7 +435,7 @@ extend int8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
     fn show(): string { return f"{this}"; }
-    fn showTo(&out: StringBuilder): void { out.putInt(this); }
+    fn showTo(out: StringBuilder): void { out.putInt(this); }
     fn add(rhs: int8): int8 { return this + rhs; }
     fn sub(rhs: int8): int8 { return this - rhs; }
     fn mul(rhs: int8): int8 { return this * rhs; }
@@ -464,7 +464,7 @@ extend int16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mu
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
     fn show(): string { return f"{this}"; }
-    fn showTo(&out: StringBuilder): void { out.putInt(this); }
+    fn showTo(out: StringBuilder): void { out.putInt(this); }
     fn add(rhs: int16): int16 { return this + rhs; }
     fn sub(rhs: int16): int16 { return this - rhs; }
     fn mul(rhs: int16): int16 { return this * rhs; }
@@ -493,7 +493,7 @@ extend int32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mu
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
     fn show(): string { return f"{this}"; }
-    fn showTo(&out: StringBuilder): void { out.putInt(this); }
+    fn showTo(out: StringBuilder): void { out.putInt(this); }
     fn add(rhs: int32): int32 { return this + rhs; }
     fn sub(rhs: int32): int32 { return this - rhs; }
     fn mul(rhs: int32): int32 { return this * rhs; }
@@ -522,7 +522,7 @@ extend uint :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
     fn show(): string { return f"{this}"; }
-    fn showTo(&out: StringBuilder): void { out.putUint(this); }
+    fn showTo(out: StringBuilder): void { out.putUint(this); }
     fn add(rhs: uint): uint { return this + rhs; }
     fn sub(rhs: uint): uint { return this - rhs; }
     fn mul(rhs: uint): uint { return this * rhs; }
@@ -550,7 +550,7 @@ extend uint8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mu
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
     fn show(): string { return f"{this}"; }
-    fn showTo(&out: StringBuilder): void { out.putUint(this); }
+    fn showTo(out: StringBuilder): void { out.putUint(this); }
     fn add(rhs: uint8): uint8 { return this + rhs; }
     fn sub(rhs: uint8): uint8 { return this - rhs; }
     fn mul(rhs: uint8): uint8 { return this * rhs; }
@@ -578,7 +578,7 @@ extend uint16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, M
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
     fn show(): string { return f"{this}"; }
-    fn showTo(&out: StringBuilder): void { out.putUint(this); }
+    fn showTo(out: StringBuilder): void { out.putUint(this); }
     fn add(rhs: uint16): uint16 { return this + rhs; }
     fn sub(rhs: uint16): uint16 { return this - rhs; }
     fn mul(rhs: uint16): uint16 { return this * rhs; }
@@ -606,7 +606,7 @@ extend uint32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, M
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
     fn show(): string { return f"{this}"; }
-    fn showTo(&out: StringBuilder): void { out.putUint(this); }
+    fn showTo(out: StringBuilder): void { out.putUint(this); }
     fn add(rhs: uint32): uint32 { return this + rhs; }
     fn sub(rhs: uint32): uint32 { return this - rhs; }
     fn mul(rhs: uint32): uint32 { return this * rhs; }
@@ -629,7 +629,7 @@ extend float :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
         return null;
     }
     fn show(): string { return f"{this}"; }
-    fn showTo(&out: StringBuilder): void { out.appendStr(textOfFloat(this)); }
+    fn showTo(out: StringBuilder): void { out.appendStr(textOfFloat(this)); }
     fn add(rhs: float): float { return this + rhs; }
     fn sub(rhs: float): float { return this - rhs; }
     fn mul(rhs: float): float { return this * rhs; }
@@ -647,7 +647,7 @@ extend float32 :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
         return null;
     }
     fn show(): string { return f"{this}"; }
-    fn showTo(&out: StringBuilder): void { out.appendStr(textOfFloat32(this)); }
+    fn showTo(out: StringBuilder): void { out.appendStr(textOfFloat32(this)); }
     fn add(rhs: float32): float32 { return this + rhs; }
     fn sub(rhs: float32): float32 { return this - rhs; }
     fn mul(rhs: float32): float32 { return this * rhs; }
@@ -660,7 +660,7 @@ extend bool :: [Equatable, Hashable, Display] {
     fn equals(o: bool): bool { return this == o; }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeByte(if (this) 1 else 0); }
     fn show(): string { return f"{this}"; }
-    fn showTo(&out: StringBuilder): void { out.appendStr(if (this) "true" else "false"); }
+    fn showTo(out: StringBuilder): void { out.appendStr(if (this) "true" else "false"); }
 }
 
 extend char :: [Equatable, Ordered, TotalOrder, Hashable, Display] {
@@ -677,13 +677,13 @@ extend char :: [Equatable, Ordered, TotalOrder, Hashable, Display] {
     }
     fn hash<H :: [Hasher]>(&h: H): void { h.writeUint((this as uint32) as uint64); }
     fn show(): string { return f"{this}"; }
-    fn showTo(&out: StringBuilder): void { out.appendChar(this); }
+    fn showTo(out: StringBuilder): void { out.appendChar(this); }
 }
 
 extend string :: [Equatable, Display, Add] {
     fn equals(o: string): bool { return this == o; }
     fn show(): string { return this; }
-    fn showTo(&out: StringBuilder): void { out.appendStr(this); }
+    fn showTo(out: StringBuilder): void { out.appendStr(this); }
     fn add(rhs: string): string { return this + rhs; }
 }
 
@@ -699,7 +699,7 @@ pub interface Debug {
     fn debug(): string;
 
     /// The debug text written into `out` (10 S6), as `showTo` is `show()`'s.
-    fn debugTo(&out: StringBuilder): void {
+    fn debugTo(out: StringBuilder): void {
         out.appendStr(this.debug());
     }
 }
@@ -1043,7 +1043,7 @@ extend string :: [Debug, Clone, Default] {
         debugText(out, this);
         return out.toString();
     }
-    fn debugTo(&out: StringBuilder): void { debugText(out, this); }
+    fn debugTo(out: StringBuilder): void { debugText(out, this); }
     fn clone(): string { return this; }
     static fn default(): string { return ""; }
 }
@@ -2650,9 +2650,7 @@ pub class StringBuilder {
 
     /// `v`'s text at the end.
     pub mut fn append<T :: [Display]>(v: T): void {
-        // A class's 'this' is no place to hand on (LYR-SEM0156); the reference is, the same builder.
-        var me = this;
-        v.showTo(&me);
+        v.showTo(this);
     }
 
     /// Every byte taken out; the room stays.
@@ -2670,12 +2668,18 @@ pub class StringBuilder {
         this.count = this.count + 1;
     }
 
-    /// Room for `n` bytes more.
+    /// Room for `n` bytes more. Only the check: small enough for the IR inliner to put into every
+    /// append, so a builder with room calls nothing; the growth is `grow`'s, out of line (01 S13,
+    /// Rust's `reserve` beside its cold `do_reserve_and_handle`).
     mut fn reserve(n: int): void {
-        let need = this.count + n;
-        if (need <= this.bytes.length()) {
-            return;
+        if (this.count + n > this.bytes.length()) {
+            this.grow(this.count + n);
         }
+    }
+
+    /// The buffer doubled until `need` bytes fit, the bytes so far copied over. Above the inliner's
+    /// budget by its loop and copy, so it stays one function every growth calls.
+    mut fn grow(need: int): void {
         var room = if (this.bytes.length() == 0) 16 else this.bytes.length() * 2;
         while (room < need) {
             room = room * 2;
@@ -2705,7 +2709,7 @@ fn panicRange(low: int, high: int, length: int): never;
 /// conform with the format language, which the compiler checks where a spec is written; the spec
 /// is a view (10 A3), and a string stands for one.
 pub interface Format {
-    fn format(spec: StringView, &out: StringBuilder): void;
+    fn format(spec: StringView, out: StringBuilder): void;
 }
 
 /// A spec read (12 §2 rule 1): `[[fill]align][sign][#][0][width][grouping][.precision][type]`.
@@ -2803,7 +2807,7 @@ fn decimalOf(c: char): int {
 
 /// `text` in the spec's width, counted in characters: the fill before it, after it, or around it
 /// (the odd one after), as the spec aligns it or else as `natural` does.
-fn pad(text: string, s: FormatSpec, natural: char, &out: StringBuilder): void {
+fn pad(text: string, s: FormatSpec, natural: char, out: StringBuilder): void {
     let room = s.width - text.charCount();
     if (room <= 0) {
         out.appendStr(text);
@@ -2811,13 +2815,13 @@ fn pad(text: string, s: FormatSpec, natural: char, &out: StringBuilder): void {
     }
     let align = if (s.align == '\0') natural else s.align;
     let before = if (align == '>') room else if (align == '^') room / 2 else 0;
-    fillOut(s.fill, before, &out);
+    fillOut(s.fill, before, out);
     out.appendStr(text);
-    fillOut(s.fill, room - before, &out);
+    fillOut(s.fill, room - before, out);
 }
 
 /// `count` times `c`.
-fn fillOut(c: char, count: int, &out: StringBuilder): void {
+fn fillOut(c: char, count: int, out: StringBuilder): void {
     var i = 0;
     while (i < count) {
         out.appendChar(c);
@@ -2827,20 +2831,20 @@ fn fillOut(c: char, count: int, &out: StringBuilder): void {
 
 /// A number's parts in the spec's width: under `0` the zeros between the sign and the prefix and
 /// the digits; otherwise the whole padded, right-aligned unless the spec aligns it.
-fn finishNumber(sign: string, prefix: string, digits: string, s: FormatSpec, &out: StringBuilder): void {
+fn finishNumber(sign: string, prefix: string, digits: string, s: FormatSpec, out: StringBuilder): void {
     if (s.align == '=') {
         out.appendStr(sign);
         out.appendStr(prefix);
-        fillOut(s.fill, s.width - byteCount(sign) - byteCount(prefix) - digits.charCount(), &out);
+        fillOut(s.fill, s.width - byteCount(sign) - byteCount(prefix) - digits.charCount(), out);
         out.appendStr(digits);
         return;
     }
-    pad(sign + prefix + digits, s, '>', &out);
+    pad(sign + prefix + digits, s, '>', out);
 }
 
 /// An integer by its sign and magnitude (12 §2 rule 3): the radix `b`, `o`, `x` or `X` names, the
 /// prefix under `#`, the digits grouped by three (decimal) or four (another radix).
-fn formatInteger(negative: bool, magnitude: uint, spec: StringView, &out: StringBuilder): void {
+fn formatInteger(negative: bool, magnitude: uint, spec: StringView, out: StringBuilder): void {
     let s = readSpec(spec);
     let radix = if (s.kind == 'b') 2 else if (s.kind == 'o') 8 else if (s.kind == 'x' || s.kind == 'X') 16 else 10;
     var prefix = "";
@@ -2853,7 +2857,7 @@ fn formatInteger(negative: bool, magnitude: uint, spec: StringView, &out: String
     // separators (12 §2 rule 1; the review's A4): as many digits as fill the width, at least
     let least = if (zeroGrouped(s)) digitsFor(s.width - byteCount(sign) - byteCount(prefix), size) else 0;
     let digits = digitsOf(magnitude, radix as uint, s.kind == 'X', s.grouping, size, least);
-    finishNumber(sign, prefix, digits, s, &out);
+    finishNumber(sign, prefix, digits, s, out);
 }
 
 /// Whether the spec fills with zeros after the sign and groups: the zeros then count as digits.
@@ -2872,9 +2876,9 @@ fn digitsFor(width: int, size: int): int {
 }
 
 /// A signed integer: its magnitude in `uint`, where `int`'s least value has one.
-fn formatSigned(v: int, spec: StringView, &out: StringBuilder): void {
+fn formatSigned(v: int, spec: StringView, out: StringBuilder): void {
     let magnitude = if (v < 0) (-(v + 1)) as uint + 1 else v as uint;
-    formatInteger(v < 0, magnitude, spec, &out);
+    formatInteger(v < 0, magnitude, spec, out);
 }
 
 /// The digits of `magnitude` in `radix`, most significant first, `grouping` between each `size`
@@ -2914,7 +2918,7 @@ fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int
 /// `float32`'s own where `narrow` says so; fixed with a precision; `e`/`E` with an exponent; `%` a
 /// hundredfold and fixed, the point moved on the exact digits — six digits where those three name
 /// none. Its sign, the integer part grouped (the zeros of `0` with it), padded.
-fn formatFloat(v: float, narrow: bool, spec: StringView, &out: StringBuilder): void {
+fn formatFloat(v: float, narrow: bool, spec: StringView, out: StringBuilder): void {
     let s = readSpec(spec);
     let digits = if (s.precision < 0) 6 else s.precision;
     var text = "";
@@ -2940,7 +2944,7 @@ fn formatFloat(v: float, narrow: bool, spec: StringView, &out: StringBuilder): v
         // digits and separators, at least (nothing for `nan` and `inf`, which have no digits)
         least = digitsFor(s.width - byteCount(sign) - (byteCount(body) - integerDigits(body)), 3);
     }
-    finishNumber(sign, "", grouped(body, s.grouping, least), s, &out);
+    finishNumber(sign, "", grouped(body, s.grouping, least), s, out);
 }
 
 /// How many digits lead `body`: a float's integer part.
@@ -3005,61 +3009,61 @@ fn floatText(value: float, precision: int, form: int): string;
 fn shortestFloat32(value: float32): string;
 
 extend int :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void { formatSigned(this, spec, &out); }
+    fn format(spec: StringView, out: StringBuilder): void { formatSigned(this, spec, out); }
 }
 
 extend int8 :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void { formatSigned(this as int, spec, &out); }
+    fn format(spec: StringView, out: StringBuilder): void { formatSigned(this as int, spec, out); }
 }
 
 extend int16 :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void { formatSigned(this as int, spec, &out); }
+    fn format(spec: StringView, out: StringBuilder): void { formatSigned(this as int, spec, out); }
 }
 
 extend int32 :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void { formatSigned(this as int, spec, &out); }
+    fn format(spec: StringView, out: StringBuilder): void { formatSigned(this as int, spec, out); }
 }
 
 extend uint :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void { formatInteger(false, this, spec, &out); }
+    fn format(spec: StringView, out: StringBuilder): void { formatInteger(false, this, spec, out); }
 }
 
 extend uint8 :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void { formatInteger(false, this as uint, spec, &out); }
+    fn format(spec: StringView, out: StringBuilder): void { formatInteger(false, this as uint, spec, out); }
 }
 
 extend uint16 :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void { formatInteger(false, this as uint, spec, &out); }
+    fn format(spec: StringView, out: StringBuilder): void { formatInteger(false, this as uint, spec, out); }
 }
 
 extend uint32 :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void { formatInteger(false, this as uint, spec, &out); }
+    fn format(spec: StringView, out: StringBuilder): void { formatInteger(false, this as uint, spec, out); }
 }
 
 extend float :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void { formatFloat(this, false, spec, &out); }
+    fn format(spec: StringView, out: StringBuilder): void { formatFloat(this, false, spec, out); }
 }
 
 /// A `float32` is formatted as the `float` it widens to — the same value exactly —, its shortest
 /// text its own (03 §1.7; the review's M8a-9).
 extend float32 :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void { formatFloat(this as float, true, spec, &out); }
+    fn format(spec: StringView, out: StringBuilder): void { formatFloat(this as float, true, spec, out); }
 }
 
 /// A string: fill, alignment, width, and the precision as the most characters it keeps.
 extend string :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void {
+    fn format(spec: StringView, out: StringBuilder): void {
         let s = readSpec(spec);
-        pad(if (s.precision >= 0) firstChars(this, s.precision) else this, s, '<', &out);
+        pad(if (s.precision >= 0) firstChars(this, s.precision) else this, s, '<', out);
     }
 }
 
 extend char :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void { pad(f"{this}", readSpec(spec), '<', &out); }
+    fn format(spec: StringView, out: StringBuilder): void { pad(f"{this}", readSpec(spec), '<', out); }
 }
 
 extend bool :: [Format] {
-    fn format(spec: StringView, &out: StringBuilder): void { pad(f"{this}", readSpec(spec), '<', &out); }
+    fn format(spec: StringView, out: StringBuilder): void { pad(f"{this}", readSpec(spec), '<', out); }
 }
 
 
@@ -4936,7 +4940,7 @@ extend StringView :: [Equatable, Hashable, Ordered, TotalOrder, Display, Debug, 
         return viewToString(this);
     }
 
-    fn showTo(&out: StringBuilder): void {
+    fn showTo(out: StringBuilder): void {
         out.appendStr(this);
     }
 
@@ -5007,67 +5011,67 @@ pub fn fstringEnd(out: StringBuilder): string {
     return out.toString();
 }
 
-pub fn fstringText(&out: StringBuilder, text: StringView): void {
+pub fn fstringText(out: StringBuilder, text: StringView): void {
     out.appendStr(text);
 }
 
-pub fn fstringInt(&out: StringBuilder, value: int): void {
+pub fn fstringInt(out: StringBuilder, value: int): void {
     out.putInt(value);
 }
 
-pub fn fstringUint(&out: StringBuilder, value: uint): void {
+pub fn fstringUint(out: StringBuilder, value: uint): void {
     out.putUint(value);
 }
 
-pub fn fstringFloat(&out: StringBuilder, value: float): void {
+pub fn fstringFloat(out: StringBuilder, value: float): void {
     out.appendStr(textOfFloat(value));
 }
 
-pub fn fstringFloat32(&out: StringBuilder, value: float32): void {
+pub fn fstringFloat32(out: StringBuilder, value: float32): void {
     out.appendStr(textOfFloat32(value));
 }
 
-pub fn fstringBool(&out: StringBuilder, value: bool): void {
+pub fn fstringBool(out: StringBuilder, value: bool): void {
     out.appendStr(if (value) "true" else "false");
 }
 
-pub fn fstringChar(&out: StringBuilder, value: char): void {
+pub fn fstringChar(out: StringBuilder, value: char): void {
     out.appendChar(value);
 }
 
 /// A `Display` type's hole: through `showTo`.
-pub fn fstringShown<T :: [Display]>(&out: StringBuilder, value: T): void {
-    value.showTo(&out);
+pub fn fstringShown<T :: [Display]>(out: StringBuilder, value: T): void {
+    value.showTo(out);
 }
 
 /// A `Format` type's hole with a spec: the type reads the spec (10 S7).
-pub fn fstringFormatted<T :: [Format]>(&out: StringBuilder, value: T, spec: StringView): void {
-    value.format(spec, &out);
+pub fn fstringFormatted<T :: [Format]>(out: StringBuilder, value: T, spec: StringView): void {
+    value.format(spec, out);
 }
 
 /// Another `Display` type's hole with a spec: what `showTo` writes, in its width, alignment and
 /// fill — without a width straight into `out`.
-pub fn fstringPadded<T :: [Display]>(&out: StringBuilder, value: T, spec: StringView): void {
+pub fn fstringPadded<T :: [Display]>(out: StringBuilder, value: T, spec: StringView): void {
     let s = readSpec(spec);
     if (s.width == 0) {
-        value.showTo(&out);
+        value.showTo(out);
         return;
     }
-    var text = StringBuilder.sized(s.width);
-    value.showTo(&text);
-    pad(text.toString(), s, '<', &out);
+    let text = StringBuilder.sized(s.width);
+    value.showTo(text);
+    pad(text.toString(), s, '<', out);
 }
 
 /// A hole under `?`: what `debugTo` writes, in the width, alignment and fill before it.
-pub fn fstringDebugged<T :: [Debug]>(&out: StringBuilder, value: T, spec: StringView): void {
+pub fn fstringDebugged<T :: [Debug]>(out: StringBuilder, value: T, spec: StringView): void {
     let s = readSpec(spec);
     if (s.width == 0) {
-        value.debugTo(&out);
+        value.debugTo(out);
         return;
     }
-    var text = StringBuilder.sized(s.width);
-    value.debugTo(&text);
-    pad(text.toString(), s, '<', &out);
+    let text = StringBuilder.sized(s.width);
+    value.debugTo(text);
+    pad(text.toString(), s, '<', out);
 }
 
 /// A float's shortest text (12 §1), as `std.string.fromFloat` gives it.
@@ -5099,16 +5103,16 @@ extend<T :: [Debug]> T[] :: [Debug, Display] {
         return debugText(this);
     }
 
-    fn debugTo(&out: StringBuilder): void {
-        debugElements(this, &out);
+    fn debugTo(out: StringBuilder): void {
+        debugElements(this, out);
     }
 
     fn show(): string {
         return debugText(this);
     }
 
-    fn showTo(&out: StringBuilder): void {
-        debugElements(this, &out);
+    fn showTo(out: StringBuilder): void {
+        debugElements(this, out);
     }
 }
 
@@ -5117,16 +5121,16 @@ extend<T :: [Debug]> Slice<T> :: [Debug, Display] {
         return debugText(this);
     }
 
-    fn debugTo(&out: StringBuilder): void {
-        debugElements(this, &out);
+    fn debugTo(out: StringBuilder): void {
+        debugElements(this, out);
     }
 
     fn show(): string {
         return debugText(this);
     }
 
-    fn showTo(&out: StringBuilder): void {
-        debugElements(this, &out);
+    fn showTo(out: StringBuilder): void {
+        debugElements(this, out);
     }
 }
 
@@ -5144,21 +5148,21 @@ fn sameElements<T :: [Equatable]>(a: Slice<T>, b: Slice<T>): bool {
 }
 
 /// The elements' debug texts in brackets, `, ` between each two, into `out`.
-fn debugElements<T :: [Debug]>(xs: Slice<T>, &out: StringBuilder): void {
+fn debugElements<T :: [Debug]>(xs: Slice<T>, out: StringBuilder): void {
     out.appendChar('[');
     for (i in 0..xs.length()) {
         if (i > 0) {
             out.appendStr(", ");
         }
-        xs[i].debugTo(&out);
+        xs[i].debugTo(out);
     }
     out.appendChar(']');
 }
 
 /// The same as a string of its own.
 fn debugText<T :: [Debug]>(xs: Slice<T>): string {
-    var out = StringBuilder.new();
-    debugElements(xs, &out);
+    let out = StringBuilder.new();
+    debugElements(xs, out);
     return out.toString();
 }
 
@@ -5245,7 +5249,7 @@ pub fn repeatText(s: string, n: int): string {
     if (n < 0) {
         let _ = [s] * n;
     }
-    var out = StringBuilder.new();
+    let out = StringBuilder.new();
     for (_ in 0..n) {
         out.appendStr(s);
     }
@@ -5298,32 +5302,32 @@ extend<T0 :: [Hashable], T1 :: [Hashable]> (T0, T1) :: [Hashable] {
 
 extend<T0 :: [Debug], T1 :: [Debug]> (T0, T1) :: [Debug] {
     fn debug(): string {
-        var out = StringBuilder.new();
-        this.debugTo(&out);
+        let out = StringBuilder.new();
+        this.debugTo(out);
         return out.toString();
     }
 
-    fn debugTo(&out: StringBuilder): void {
+    fn debugTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.debugTo(&out);
+        this.0.debugTo(out);
         out.appendStr(", ");
-        this.1.debugTo(&out);
+        this.1.debugTo(out);
         out.appendChar(')');
     }
 }
 
 extend<T0 :: [Display], T1 :: [Display]> (T0, T1) :: [Display] {
     fn show(): string {
-        var out = StringBuilder.new();
-        this.showTo(&out);
+        let out = StringBuilder.new();
+        this.showTo(out);
         return out.toString();
     }
 
-    fn showTo(&out: StringBuilder): void {
+    fn showTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.showTo(&out);
+        this.0.showTo(out);
         out.appendStr(", ");
-        this.1.showTo(&out);
+        this.1.showTo(out);
         out.appendChar(')');
     }
 }
@@ -5344,36 +5348,36 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable]> (T0, T1, T2) :: [Ha
 
 extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug]> (T0, T1, T2) :: [Debug] {
     fn debug(): string {
-        var out = StringBuilder.new();
-        this.debugTo(&out);
+        let out = StringBuilder.new();
+        this.debugTo(out);
         return out.toString();
     }
 
-    fn debugTo(&out: StringBuilder): void {
+    fn debugTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.debugTo(&out);
+        this.0.debugTo(out);
         out.appendStr(", ");
-        this.1.debugTo(&out);
+        this.1.debugTo(out);
         out.appendStr(", ");
-        this.2.debugTo(&out);
+        this.2.debugTo(out);
         out.appendChar(')');
     }
 }
 
 extend<T0 :: [Display], T1 :: [Display], T2 :: [Display]> (T0, T1, T2) :: [Display] {
     fn show(): string {
-        var out = StringBuilder.new();
-        this.showTo(&out);
+        let out = StringBuilder.new();
+        this.showTo(out);
         return out.toString();
     }
 
-    fn showTo(&out: StringBuilder): void {
+    fn showTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.showTo(&out);
+        this.0.showTo(out);
         out.appendStr(", ");
-        this.1.showTo(&out);
+        this.1.showTo(out);
         out.appendStr(", ");
-        this.2.showTo(&out);
+        this.2.showTo(out);
         out.appendChar(')');
     }
 }
@@ -5395,40 +5399,40 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable]> (
 
 extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug]> (T0, T1, T2, T3) :: [Debug] {
     fn debug(): string {
-        var out = StringBuilder.new();
-        this.debugTo(&out);
+        let out = StringBuilder.new();
+        this.debugTo(out);
         return out.toString();
     }
 
-    fn debugTo(&out: StringBuilder): void {
+    fn debugTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.debugTo(&out);
+        this.0.debugTo(out);
         out.appendStr(", ");
-        this.1.debugTo(&out);
+        this.1.debugTo(out);
         out.appendStr(", ");
-        this.2.debugTo(&out);
+        this.2.debugTo(out);
         out.appendStr(", ");
-        this.3.debugTo(&out);
+        this.3.debugTo(out);
         out.appendChar(')');
     }
 }
 
 extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display]> (T0, T1, T2, T3) :: [Display] {
     fn show(): string {
-        var out = StringBuilder.new();
-        this.showTo(&out);
+        let out = StringBuilder.new();
+        this.showTo(out);
         return out.toString();
     }
 
-    fn showTo(&out: StringBuilder): void {
+    fn showTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.showTo(&out);
+        this.0.showTo(out);
         out.appendStr(", ");
-        this.1.showTo(&out);
+        this.1.showTo(out);
         out.appendStr(", ");
-        this.2.showTo(&out);
+        this.2.showTo(out);
         out.appendStr(", ");
-        this.3.showTo(&out);
+        this.3.showTo(out);
         out.appendChar(')');
     }
 }
@@ -5451,44 +5455,44 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T
 
 extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]> (T0, T1, T2, T3, T4) :: [Debug] {
     fn debug(): string {
-        var out = StringBuilder.new();
-        this.debugTo(&out);
+        let out = StringBuilder.new();
+        this.debugTo(out);
         return out.toString();
     }
 
-    fn debugTo(&out: StringBuilder): void {
+    fn debugTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.debugTo(&out);
+        this.0.debugTo(out);
         out.appendStr(", ");
-        this.1.debugTo(&out);
+        this.1.debugTo(out);
         out.appendStr(", ");
-        this.2.debugTo(&out);
+        this.2.debugTo(out);
         out.appendStr(", ");
-        this.3.debugTo(&out);
+        this.3.debugTo(out);
         out.appendStr(", ");
-        this.4.debugTo(&out);
+        this.4.debugTo(out);
         out.appendChar(')');
     }
 }
 
 extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display]> (T0, T1, T2, T3, T4) :: [Display] {
     fn show(): string {
-        var out = StringBuilder.new();
-        this.showTo(&out);
+        let out = StringBuilder.new();
+        this.showTo(out);
         return out.toString();
     }
 
-    fn showTo(&out: StringBuilder): void {
+    fn showTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.showTo(&out);
+        this.0.showTo(out);
         out.appendStr(", ");
-        this.1.showTo(&out);
+        this.1.showTo(out);
         out.appendStr(", ");
-        this.2.showTo(&out);
+        this.2.showTo(out);
         out.appendStr(", ");
-        this.3.showTo(&out);
+        this.3.showTo(out);
         out.appendStr(", ");
-        this.4.showTo(&out);
+        this.4.showTo(out);
         out.appendChar(')');
     }
 }
@@ -5512,48 +5516,48 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T
 
 extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug]> (T0, T1, T2, T3, T4, T5) :: [Debug] {
     fn debug(): string {
-        var out = StringBuilder.new();
-        this.debugTo(&out);
+        let out = StringBuilder.new();
+        this.debugTo(out);
         return out.toString();
     }
 
-    fn debugTo(&out: StringBuilder): void {
+    fn debugTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.debugTo(&out);
+        this.0.debugTo(out);
         out.appendStr(", ");
-        this.1.debugTo(&out);
+        this.1.debugTo(out);
         out.appendStr(", ");
-        this.2.debugTo(&out);
+        this.2.debugTo(out);
         out.appendStr(", ");
-        this.3.debugTo(&out);
+        this.3.debugTo(out);
         out.appendStr(", ");
-        this.4.debugTo(&out);
+        this.4.debugTo(out);
         out.appendStr(", ");
-        this.5.debugTo(&out);
+        this.5.debugTo(out);
         out.appendChar(')');
     }
 }
 
 extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display]> (T0, T1, T2, T3, T4, T5) :: [Display] {
     fn show(): string {
-        var out = StringBuilder.new();
-        this.showTo(&out);
+        let out = StringBuilder.new();
+        this.showTo(out);
         return out.toString();
     }
 
-    fn showTo(&out: StringBuilder): void {
+    fn showTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.showTo(&out);
+        this.0.showTo(out);
         out.appendStr(", ");
-        this.1.showTo(&out);
+        this.1.showTo(out);
         out.appendStr(", ");
-        this.2.showTo(&out);
+        this.2.showTo(out);
         out.appendStr(", ");
-        this.3.showTo(&out);
+        this.3.showTo(out);
         out.appendStr(", ");
-        this.4.showTo(&out);
+        this.4.showTo(out);
         out.appendStr(", ");
-        this.5.showTo(&out);
+        this.5.showTo(out);
         out.appendChar(')');
     }
 }
@@ -5578,52 +5582,52 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T
 
 extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug], T6 :: [Debug]> (T0, T1, T2, T3, T4, T5, T6) :: [Debug] {
     fn debug(): string {
-        var out = StringBuilder.new();
-        this.debugTo(&out);
+        let out = StringBuilder.new();
+        this.debugTo(out);
         return out.toString();
     }
 
-    fn debugTo(&out: StringBuilder): void {
+    fn debugTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.debugTo(&out);
+        this.0.debugTo(out);
         out.appendStr(", ");
-        this.1.debugTo(&out);
+        this.1.debugTo(out);
         out.appendStr(", ");
-        this.2.debugTo(&out);
+        this.2.debugTo(out);
         out.appendStr(", ");
-        this.3.debugTo(&out);
+        this.3.debugTo(out);
         out.appendStr(", ");
-        this.4.debugTo(&out);
+        this.4.debugTo(out);
         out.appendStr(", ");
-        this.5.debugTo(&out);
+        this.5.debugTo(out);
         out.appendStr(", ");
-        this.6.debugTo(&out);
+        this.6.debugTo(out);
         out.appendChar(')');
     }
 }
 
 extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display], T6 :: [Display]> (T0, T1, T2, T3, T4, T5, T6) :: [Display] {
     fn show(): string {
-        var out = StringBuilder.new();
-        this.showTo(&out);
+        let out = StringBuilder.new();
+        this.showTo(out);
         return out.toString();
     }
 
-    fn showTo(&out: StringBuilder): void {
+    fn showTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.showTo(&out);
+        this.0.showTo(out);
         out.appendStr(", ");
-        this.1.showTo(&out);
+        this.1.showTo(out);
         out.appendStr(", ");
-        this.2.showTo(&out);
+        this.2.showTo(out);
         out.appendStr(", ");
-        this.3.showTo(&out);
+        this.3.showTo(out);
         out.appendStr(", ");
-        this.4.showTo(&out);
+        this.4.showTo(out);
         out.appendStr(", ");
-        this.5.showTo(&out);
+        this.5.showTo(out);
         out.appendStr(", ");
-        this.6.showTo(&out);
+        this.6.showTo(out);
         out.appendChar(')');
     }
 }
@@ -5649,56 +5653,56 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T
 
 extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug], T6 :: [Debug], T7 :: [Debug]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Debug] {
     fn debug(): string {
-        var out = StringBuilder.new();
-        this.debugTo(&out);
+        let out = StringBuilder.new();
+        this.debugTo(out);
         return out.toString();
     }
 
-    fn debugTo(&out: StringBuilder): void {
+    fn debugTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.debugTo(&out);
+        this.0.debugTo(out);
         out.appendStr(", ");
-        this.1.debugTo(&out);
+        this.1.debugTo(out);
         out.appendStr(", ");
-        this.2.debugTo(&out);
+        this.2.debugTo(out);
         out.appendStr(", ");
-        this.3.debugTo(&out);
+        this.3.debugTo(out);
         out.appendStr(", ");
-        this.4.debugTo(&out);
+        this.4.debugTo(out);
         out.appendStr(", ");
-        this.5.debugTo(&out);
+        this.5.debugTo(out);
         out.appendStr(", ");
-        this.6.debugTo(&out);
+        this.6.debugTo(out);
         out.appendStr(", ");
-        this.7.debugTo(&out);
+        this.7.debugTo(out);
         out.appendChar(')');
     }
 }
 
 extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display], T6 :: [Display], T7 :: [Display]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Display] {
     fn show(): string {
-        var out = StringBuilder.new();
-        this.showTo(&out);
+        let out = StringBuilder.new();
+        this.showTo(out);
         return out.toString();
     }
 
-    fn showTo(&out: StringBuilder): void {
+    fn showTo(out: StringBuilder): void {
         out.appendChar('(');
-        this.0.showTo(&out);
+        this.0.showTo(out);
         out.appendStr(", ");
-        this.1.showTo(&out);
+        this.1.showTo(out);
         out.appendStr(", ");
-        this.2.showTo(&out);
+        this.2.showTo(out);
         out.appendStr(", ");
-        this.3.showTo(&out);
+        this.3.showTo(out);
         out.appendStr(", ");
-        this.4.showTo(&out);
+        this.4.showTo(out);
         out.appendStr(", ");
-        this.5.showTo(&out);
+        this.5.showTo(out);
         out.appendStr(", ");
-        this.6.showTo(&out);
+        this.6.showTo(out);
         out.appendStr(", ");
-        this.7.showTo(&out);
+        this.7.showTo(out);
         out.appendChar(')');
     }
 }
