@@ -826,6 +826,15 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   the conformances of 04 D7 are; the only blocks on an inline array, a written one is still
   refused. A block over a generic length cannot be written, one over a written length can.
   **S3 is done.** Spec 03 §5.3 rule 7; three cases.
+- **S4** lambdas that throw (P2, 05 K4): every adapter, terminator and higher function of std
+  that takes a function takes one that may throw — `E :: [Error]` bound at the call, an
+  adapter's `Error` the join with its source's, a terminator throwing the join; `never` where
+  the function throws nothing, and then nothing changes. `map`, `filter`, `takeWhile`,
+  `skipWhile`, `inspect`; `fold`, `reduce`, `any`, `all`, `none`, `find`, `position`,
+  `forEach`; `arrayOf`, `partitionPoint`, `sortBy`, `sortByKey`; `List.removeWhere`,
+  `Map.getOrInsert`, `update`, `retain`. What a throw leaves: a sort every element (its runs
+  sorted by swaps, its buffer put back by a `defer`), `removeWhere` what it decided and the rest,
+  a map a map. Spec 12 §Iteration, §Arrays and views, §Collections; four cases.
 
 ## Design decisions
 

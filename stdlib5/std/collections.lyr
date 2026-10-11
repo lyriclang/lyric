@@ -130,13 +130,30 @@ pub class List<T> :: [IndexSet<int>, Iterable] {
         return taken;
     }
 
-    /// The elements for which `p` holds taken out, the others kept in order; how many went.
-    pub mut fn removeWhere(p: fn(T) -> bool): int {
+    /// The elements for which `p` holds taken out, the others kept in order; how many went. A `p`
+    /// that throws ends it there: what it decided is done, the rest is kept as it was (Rust's
+    /// `retain` where its predicate panics).
+    pub mut fn removeWhere<E :: [Error]>(p: fn(T) -> bool throws E): int throws E {
         var kept = 0;
         var i = 0;
+        defer {
+            if (i < this.count) {
+                // the way out a throw takes: the undecided rest moves down behind the kept
+                let rest = this.count - i;
+                var k = 0;
+                while (k < rest) {
+                    this.buffer[kept + k] = this.buffer[i + k];
+                    k = k + 1;
+                }
+                if (i > kept) {
+                    this.changes = this.changes + 1;
+                }
+                this.count = kept + rest;
+            }
+        }
         while (i < this.count) {
             let x = this.buffer[i];
-            if (!p(x)) {
+            if (!(try p(x))) {
                 this.buffer[kept] = x;
                 kept = kept + 1;
             }
@@ -356,13 +373,13 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
     }
 
     /// The value under `k`; where there is none, `make()`'s, inserted first.
-    pub mut fn getOrInsert(k: K, make: fn() -> V): V {
+    pub mut fn getOrInsert<E :: [Error]>(k: K, make: fn() -> V throws E): V throws E {
         let hash = this.hashOf(k);
         let at = this.find(k, hash);
         if (at >= 0) {
             return this.slots[at]!.value;
         }
-        let made = make();
+        let made = try make();
         if (this.free == 0) {
             this.rebuild();
         }
@@ -373,23 +390,23 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
     }
 
     /// The value under `k` replaced by `f` of it; whether there was one.
-    pub mut fn update(k: K, f: fn(V) -> V): bool {
+    pub mut fn update<E :: [Error]>(k: K, f: fn(V) -> V throws E): bool throws E {
         let at = this.find(k, this.hashOf(k));
         if (at < 0) {
             return false;
         }
         let slot = this.slots[at]!;
-        this.slots[at] = MapSlot<K, V> { key = slot.key, value = f(slot.value) };
+        this.slots[at] = MapSlot<K, V> { key = slot.key, value = try f(slot.value) };
         return true;
     }
 
     /// The entries for which `p` fails taken out; how many went.
-    pub mut fn retain(p: fn(K, V) -> bool): int {
+    pub mut fn retain<E :: [Error]>(p: fn(K, V) -> bool throws E): int throws E {
         var gone = 0;
         var at = 0;
         while (at < this.slots.length()) {
             if (let slot = this.slots[at]) {
-                if (!p(slot.key, slot.value)) {
+                if (!(try p(slot.key, slot.value))) {
                     this.remove(slot.key);
                     gone = gone + 1;
                 }
