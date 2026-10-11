@@ -835,6 +835,16 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   `Map.getOrInsert`, `update`, `retain`. What a throw leaves: a sort every element (its runs
   sorted by swaps, its buffer put back by a `defer`), `removeWhere` what it decided and the rest,
   a map a map. Spec 12 §Iteration, §Arrays and views, §Collections; four cases.
+- **S5** the rest of I4: the adapters `mapNotNull`, `flatMap` and `flatten` (over any
+  `Iterable`), `dedup`/`dedupBy`, `scan` (the start first, as Kotlin's), `peekable()` (a
+  `PeekableIter`, the names ending in `Iter`), `rev()` (no `DoubleEnded` itself: its source's
+  back throws nothing, its front may), `cycle()` (of a `Clone` iterator — an array's walk, a
+  range, a string's characters); the terminators `minBy`/`maxBy`, `average()` of `int` or
+  `float`, and in std.collections `chunks`, `windows`, `sorted`, `sortedBy`, `partition`,
+  `groupBy`, `toMap`. `collect` into an array or a list starts with the room `sizeHint` gives,
+  and an exact one makes no copy. `toMap` needed the language to bind a block's parameters through
+  a fixation inside a type, `Iterator<Item = (K, V)>` (05 §13 rule 2) — the checker and the
+  lowering bind alike now. Spec 12 §Iteration, 05 §13; four cases.
 
 ## Design decisions
 

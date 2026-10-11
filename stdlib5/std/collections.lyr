@@ -1,6 +1,6 @@
 /// The containers (design/v5/spec/10 B7). Not safe across threads (C11): a `Mutex` holds one
 /// that is shared.
-import std.core { arrayOf, Contains, filled, FromIterator, Hasher, StringBuilder };
+import std.core { arrayOf, Contains, filled, FromIterator, Hasher, Join, StringBuilder };
 import std.hash { DefaultHasher };
 
 // --- List (10 C3) --------------------------------------------------------------------------------
@@ -680,10 +680,11 @@ extend<T :: [Hashable]> Set<T, DefaultHasher> {
 // --- from iterators (10 I4) ----------------------------------------------------------------------
 
 extend<I :: [Iterator]> I {
-    /// The values, in a list of their own.
+    /// The values, in a list of their own — its room the iterator's guess of its length
+    /// (`sizeHint`, 10 I4).
     pub fn toList(): List<I.Item> throws I.Error {
         var it = this;
-        let out = List<I.Item>.new();
+        let out = List<I.Item>.withCapacity(it.sizeHint().0);
         var x = try it.next();
         while (x != null) {
             out.push(x);
@@ -693,6 +694,145 @@ extend<I :: [Iterator]> I {
     }
 }
 
+
+/// `it.chunks(n)`: the values of `it` in lists of `n`, the last one shorter where they do not divide.
+pub struct ChunksIter<I :: [Iterator]> :: [Iterator] {
+    type Item = List<I.Item>;
+    type Error = I.Error;
+    var inner: I,
+    n: int,
+
+    pub mut fn next(): ?List<I.Item> throws I.Error {
+        let chunk = List<I.Item>.withCapacity(this.n);
+        while (chunk.length() < this.n) {
+            let x = try this.inner.next();
+            if (x == null) {
+                break;
+            }
+            chunk.push(x);
+        }
+        if (chunk.isEmpty()) {
+            return null;
+        }
+        return chunk;
+    }
+}
+
+/// `it.windows(n)`: every run of `n` values of `it` in turn, each a list of its own — none where
+/// there are fewer.
+pub struct WindowsIter<I :: [Iterator]> :: [Iterator] {
+    type Item = List<I.Item>;
+    type Error = I.Error;
+    var inner: I,
+    n: int,
+    window: List<I.Item>,
+
+    pub mut fn next(): ?List<I.Item> throws I.Error {
+        if (this.window.isEmpty()) {
+            while (this.window.length() < this.n) {
+                let x = try this.inner.next();
+                if (x == null) {
+                    return null;
+                }
+                this.window.push(x);
+            }
+        } else {
+            let x = try this.inner.next();
+            if (x == null) {
+                return null;
+            }
+            let _ = this.window.removeAt(0);
+            this.window.push(x);
+        }
+        return List.of(this.window.toArray());
+    }
+}
+
+extend<I :: [Iterator, Closeable]> ChunksIter<I> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable]> WindowsIter<I> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator]> I {
+    /// The values in lists of `n`; `n` below 1 panics.
+    pub fn chunks(n: int): ChunksIter<I> {
+        if (n < 1) {
+            panic(f"chunks: {n} values a chunk");
+        }
+        return ChunksIter<I> { inner = this, n = n };
+    }
+
+    /// Every run of `n` values; `n` below 1 panics.
+    pub fn windows(n: int): WindowsIter<I> {
+        if (n < 1) {
+            panic(f"windows: {n} values a window");
+        }
+        return WindowsIter<I> { inner = this, n = n, window = List<I.Item>.withCapacity(n) };
+    }
+
+    /// The values in a list, in the order `cmp` gives — stable; a `cmp` that throws, as `sortBy`.
+    pub fn sortedBy<E :: [Error]>(cmp: fn(I.Item, I.Item) -> Ordering throws E): List<I.Item> throws Join<I.Error, E> {
+        let out = try this.toList();
+        try out.asSlice().sortBy(cmp);
+        return out;
+    }
+
+    /// The values `p` holds for and the others, each in a list, in order.
+    pub fn partition<E :: [Error]>(p: fn(I.Item) -> bool throws E): (List<I.Item>, List<I.Item>) throws Join<I.Error, E> {
+        var it = this;
+        let yes = List<I.Item>.new();
+        let no = List<I.Item>.new();
+        var x = try it.next();
+        while (x != null) {
+            if (try p(x)) {
+                yes.push(x);
+            } else {
+                no.push(x);
+            }
+            x = try it.next();
+        }
+        let both: (List<I.Item>, List<I.Item>) = (yes, no);
+        return both;
+    }
+
+    /// The values in lists under their `key`, each list in order — eagerly, a map.
+    pub fn groupBy<K :: [Hashable], E :: [Error]>(key: fn(I.Item) -> K throws E): Map<K, List<I.Item>, DefaultHasher> throws Join<I.Error, E> {
+        var it = this;
+        let out = Map<K, List<I.Item>, DefaultHasher>.new();
+        var x = try it.next();
+        while (x != null) {
+            let k = try key(x);
+            let group = out.getOrInsert(k, () => List<I.Item>.new());
+            group.push(x);
+            x = try it.next();
+        }
+        return out;
+    }
+}
+
+extend<I :: [Iterator<Item = T>], T :: [TotalOrder]> I {
+    /// The values in a list, in ascending order — stable.
+    pub fn sorted(): List<T> throws I.Error {
+        let out: List<T> = try this.toList();
+        out.asSlice().sort();
+        return out;
+    }
+}
+
+extend<I :: [Iterator<Item = (K, V)>], K :: [Hashable], V> I {
+    /// The pairs in a map — a later value of a key replacing the earlier one, as `collect()`.
+    pub fn toMap(): Map<K, V, DefaultHasher> throws I.Error {
+        let out: Map<K, V, DefaultHasher> = try this.collect();
+        return out;
+    }
+}
 extend<K :: [Hashable], V> Map<K, V, DefaultHasher> {
     /// An empty map hashing with the process's key (10 K2): its order differs from run to run.
     pub static fn new(): Map<K, V, DefaultHasher> {
