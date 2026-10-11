@@ -1,0 +1,92 @@
+# Which tests a change reaches (tooling/affected.py; the maintainer's decision of 2026-10-11): a
+# pull request runs the tests of what its diff touched and a fixed regression group, the whole
+# suite runs on main after the merge and in a dispatched run. A break the selection misses shows
+# on main, not on the pull request — so main's run is read after every merge.
+#
+# A path is a prefix of a repository path (forward slashes). Every rule whose prefix matches
+# adds its tests and its cases; a path no rule names selects EVERYTHING (the table is extended,
+# not guessed around). `tests` are Lyric5.Tests class names, or "4x" (the Lyric.Tests.* projects
+# of the 4.x front end), or "all5" (every Lyric5.Tests class). `cases` are prefixes of the
+# conformance labels ("12-"), or "all", or "imports": the cases that name the touched std module
+# (`std.string`); a module the prelude imports reaches every case.
+
+# The harness itself: everything runs.
+full = [".github/", "tooling/", "global.json", "Directory.Build.props", "Directory.Build.targets", "Lyric.slnx",
+        "tests/Lyric5.Tests/Lyric5.Tests.csproj", "tests/Directory.Build.props"]
+
+# Text no test reads. spec.pin is read apart: the cases the pin moved over always run.
+ignore = ["docs/", "design/", "bench/", "STATUS.md", "CHANGELOG.md", "README.md", "CONTRIBUTING.md", "LICENSE",
+          "spec.pin", ".gitignore", ".gitattributes"]
+
+[regression]
+# Always: the goldens and the native runs of every program, the examples, and the cases that
+# once went red after a merge, with one run case per chapter (tooling/conformance/regression.txt).
+tests = ["CEmitterTests", "ExampleTests", "RuntimeProgramTests", "ProgramTests"]
+cases = "tooling/conformance/regression.txt"
+
+[[rule]]
+paths = ["runtime/"]
+tests = ["RuntimeBuildTests", "RuntimeProgramTests", "SanitizerTests", "PanicTextTests", "SignalTests", "ProcessTests",
+         "NetTests", "ConsoleTests", "DeadlockTests", "LockTests", "PoolAndSignalTests", "SchedulerAtomicsTests",
+         "CoroutineCloseTests", "TraceFrameTests", "PoisonTests", "SystemTests", "OutTests", "StdTests", "NativeTests",
+         "UnicodeTests", "LtoTests", "DynamicYieldTests", "GeneratorLambdaTests"]
+cases = ["06-", "10-", "12-", "13-"]
+
+[[rule]]
+# The text of the language: lexing, parsing, the tree, the formatter.
+paths = ["src/Lyric.Frontend/Lexing/", "src/Lyric.Frontend/Parsing/", "src/Lyric.Frontend/AST/", "src/Lyric.Frontend/Formatting/"]
+tests = ["4x", "InterpolationTests", "UnicodeTests", "TrailingBlockCallTests", "ShiftCountTests", "ManifestTests"]
+cases = ["01-", "07-", "08-", "09-"]
+
+[[rule]]
+# The meaning: resolver, checker, lowering. Shared with 4.x (memory: the front end still serves 4.x).
+paths = ["src/Lyric.Frontend/"]
+tests = ["4x", "all5"]
+cases = ["03-", "04-", "05-", "06-", "07-", "08-", "09-", "11-"]
+
+[[rule]]
+# The C back end and the toolchain under every program.
+paths = ["src/Lyric5.Compiler/", "src/Lyric5.Toolchain/"]
+tests = ["all5"]
+cases = ["all"]
+
+[[rule]]
+# The driver, packages, builds, measurement.
+paths = ["src/Lyric5.Build/", "src/Lyric5/"]
+tests = ["BuildTests", "BuildScriptTests", "PackageTests", "PackageRuleTests", "PackageContentTests", "GitDependencyTests",
+         "LockedTests", "DriverTests", "TestCommandTests", "MeasurementTests", "ManifestTests", "ManifestEditTests",
+         "DependencyTests", "ProfileTests", "ReproducibilityTests", "UpdateRaiseTests", "ToolchainTests", "TestHygieneTests",
+         "LtoTests", "SubsetGateTests", "OutTests", "ExampleTests", "StdTests"]
+cases = ["13-", "15-"]
+
+[[rule]]
+paths = ["src/Lyric.Core/", "src/Lyric.Lsp/", "stdlib/", "tests/Lyric.Tests."]
+tests = ["4x"]
+cases = []
+
+[[rule]]
+# The standard library of Lyric 5: its own tests, the examples, the goldens (they carry std's
+# text), what reads names across modules; the cases that import the touched module.
+paths = ["stdlib5/"]
+tests = ["StdTests", "ExampleTests", "CEmitterTests", "VisibilityTests", "PreludeTests", "PreludeNameTests", "ImportTests",
+         "ImportedFunctionValueTests", "RootModuleTests", "WitnessWordTests", "NativeTests", "UnicodeTests"]
+cases = ["imports"]
+
+[[rule]]
+paths = ["tests/std/"]
+tests = ["StdTests"]
+cases = []
+
+[[rule]]
+paths = ["examples/"]
+tests = ["ExampleTests"]
+cases = []
+
+[[rule]]
+# The goldens and the programs under them.
+paths = ["tests/Lyric5.Tests/golden/", "tests/Lyric5.Tests/programs/"]
+tests = ["CEmitterTests", "RuntimeProgramTests", "ProgramTests"]
+cases = []
+
+# tests/Lyric5.Tests/<Name>.cs selects the class <Name> (affected.py); a file there that is no
+# test class — a fixture, a helper — selects every Lyric5 class.

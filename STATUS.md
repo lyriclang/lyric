@@ -25,6 +25,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
   profiles; the cases side by side since 2026-10-11, `tooling/conformance/run_parallel.py` over the pinned runner),
   at the commit [`spec.pin`](spec.pin) names: a compiler change and its rule are two
   pull requests checked together, the specification merges first, and main is green in between.
+  **A pull request runs what its diff reaches** (`tooling/affected.toml`, 2026-10-11) and a fixed regression group;
+  main after a merge, and a dispatched run, run everything — a break the selection misses shows on main.
 
 ## Milestones
 

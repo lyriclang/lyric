@@ -1,0 +1,20 @@
+# Conformance cases that always run on a pull request (tooling/affected.toml [regression]):
+# the cases that once went red after a merge, then one run case of every chapter. A label as
+# the suite prints it; a line with # is a comment. The whole suite runs on main.
+# #402 (M8b S10a, 2026-10-09): a std signature broke these two, in another chapter than the change.
+12-stdlib/a-buf-writer-holds-back-until-its-close.lyr
+12-stdlib/a-last-line-needs-no-end.lyr
+# S16 (2026-10-07): no map over objects compiled since R9d, and no test had one.
+05-interfaces/an-identity-class-compares-and-hashes-by-the-object.lyr
+# one run case per chapter
+01-lexical/a-byte-string-is-bytes.lyr
+03-types/a-blocks-static-is-called-through-the-bare-name.lyr
+04-modules/a-call-passes-a-field-that-is-no-function.lyr
+05-interfaces/a-blanket-block-adds-to-every-conformer.lyr
+06-errors/a-binding-thrown-from-a-lambda-is-an-error-of-its-own.lyr
+07-statements/a-block-further-in-binds-a-name-again.lyr
+08-expressions/a-branch-that-leaves-gives-no-value.lyr
+09-patterns/a-type-set-binding-carries-its-set.lyr
+10-concurrency/a-body-may-catch-cancelled-and-return.lyr
+11-metaprogramming/caller-expr-gives-the-argument-s-text.lyr
+12-stdlib/a-base64-decoder-is-strict.lyr
