@@ -243,8 +243,8 @@ pub struct Utf16 {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The integers of bytes (10 Q5; the counterpart of Z1's toBytesLE, which comes with M8c). Each
-// takes exactly its width in bytes, else it panics, as an index out of range does.
+// The integers of bytes and their bytes (10 Q5, Z1; M8c S11). `fromBytes*` takes exactly its width
+// in bytes, else it panics, as an index out of range does; `toBytes*` gives it, an inline array.
 // ---------------------------------------------------------------------------------------------
 
 /// The `width` bytes of `s`, the first the lowest.
@@ -271,6 +271,11 @@ fn bigEnd(s: Slice<uint8>, width: int): uint {
     return v;
 }
 
+/// Byte `i` of `v`, the lowest `0`.
+fn byteOf(v: uint, i: int): uint8 {
+    return ((v >> ((8 * i) as uint)) & 0xFF) as uint8;
+}
+
 fn holdsWidth(s: Slice<uint8>, width: int): void {
     if (s.length() != width) {
         panic(f"a number of {width} bytes from a slice of {s.length()}");
@@ -280,41 +285,109 @@ fn holdsWidth(s: Slice<uint8>, width: int): void {
 extend int8 {
     pub static fn fromBytesLE(s: Slice<uint8>): int8 { return littleEnd(s, 1) as int8; }
     pub static fn fromBytesBE(s: Slice<uint8>): int8 { return bigEnd(s, 1) as int8; }
+    pub fn toBytesLE(): uint8[1] {
+        let v = this as uint;
+        return [byteOf(v, 0)];
+    }
+    pub fn toBytesBE(): uint8[1] {
+        let v = this as uint;
+        return [byteOf(v, 0)];
+    }
 }
 
 extend int16 {
     pub static fn fromBytesLE(s: Slice<uint8>): int16 { return littleEnd(s, 2) as int16; }
     pub static fn fromBytesBE(s: Slice<uint8>): int16 { return bigEnd(s, 2) as int16; }
+    pub fn toBytesLE(): uint8[2] {
+        let v = this as uint;
+        return [byteOf(v, 0), byteOf(v, 1)];
+    }
+    pub fn toBytesBE(): uint8[2] {
+        let v = this as uint;
+        return [byteOf(v, 1), byteOf(v, 0)];
+    }
 }
 
 extend int32 {
     pub static fn fromBytesLE(s: Slice<uint8>): int32 { return littleEnd(s, 4) as int32; }
     pub static fn fromBytesBE(s: Slice<uint8>): int32 { return bigEnd(s, 4) as int32; }
+    pub fn toBytesLE(): uint8[4] {
+        let v = this as uint;
+        return [byteOf(v, 0), byteOf(v, 1), byteOf(v, 2), byteOf(v, 3)];
+    }
+    pub fn toBytesBE(): uint8[4] {
+        let v = this as uint;
+        return [byteOf(v, 3), byteOf(v, 2), byteOf(v, 1), byteOf(v, 0)];
+    }
 }
 
 extend int {
     pub static fn fromBytesLE(s: Slice<uint8>): int { return littleEnd(s, 8) as int; }
     pub static fn fromBytesBE(s: Slice<uint8>): int { return bigEnd(s, 8) as int; }
+    pub fn toBytesLE(): uint8[8] {
+        let v = this as uint;
+        return [byteOf(v, 0), byteOf(v, 1), byteOf(v, 2), byteOf(v, 3),
+            byteOf(v, 4), byteOf(v, 5), byteOf(v, 6), byteOf(v, 7)];
+    }
+    pub fn toBytesBE(): uint8[8] {
+        let v = this as uint;
+        return [byteOf(v, 7), byteOf(v, 6), byteOf(v, 5), byteOf(v, 4),
+            byteOf(v, 3), byteOf(v, 2), byteOf(v, 1), byteOf(v, 0)];
+    }
 }
 
 extend uint8 {
     pub static fn fromBytesLE(s: Slice<uint8>): uint8 { return littleEnd(s, 1) as uint8; }
     pub static fn fromBytesBE(s: Slice<uint8>): uint8 { return bigEnd(s, 1) as uint8; }
+    pub fn toBytesLE(): uint8[1] {
+        let v = this as uint;
+        return [byteOf(v, 0)];
+    }
+    pub fn toBytesBE(): uint8[1] {
+        let v = this as uint;
+        return [byteOf(v, 0)];
+    }
 }
 
 extend uint16 {
     pub static fn fromBytesLE(s: Slice<uint8>): uint16 { return littleEnd(s, 2) as uint16; }
     pub static fn fromBytesBE(s: Slice<uint8>): uint16 { return bigEnd(s, 2) as uint16; }
+    pub fn toBytesLE(): uint8[2] {
+        let v = this as uint;
+        return [byteOf(v, 0), byteOf(v, 1)];
+    }
+    pub fn toBytesBE(): uint8[2] {
+        let v = this as uint;
+        return [byteOf(v, 1), byteOf(v, 0)];
+    }
 }
 
 extend uint32 {
     pub static fn fromBytesLE(s: Slice<uint8>): uint32 { return littleEnd(s, 4) as uint32; }
     pub static fn fromBytesBE(s: Slice<uint8>): uint32 { return bigEnd(s, 4) as uint32; }
+    pub fn toBytesLE(): uint8[4] {
+        let v = this as uint;
+        return [byteOf(v, 0), byteOf(v, 1), byteOf(v, 2), byteOf(v, 3)];
+    }
+    pub fn toBytesBE(): uint8[4] {
+        let v = this as uint;
+        return [byteOf(v, 3), byteOf(v, 2), byteOf(v, 1), byteOf(v, 0)];
+    }
 }
 
 extend uint {
     pub static fn fromBytesLE(s: Slice<uint8>): uint { return littleEnd(s, 8); }
     pub static fn fromBytesBE(s: Slice<uint8>): uint { return bigEnd(s, 8); }
+    pub fn toBytesLE(): uint8[8] {
+        let v = this;
+        return [byteOf(v, 0), byteOf(v, 1), byteOf(v, 2), byteOf(v, 3),
+            byteOf(v, 4), byteOf(v, 5), byteOf(v, 6), byteOf(v, 7)];
+    }
+    pub fn toBytesBE(): uint8[8] {
+        let v = this;
+        return [byteOf(v, 7), byteOf(v, 6), byteOf(v, 5), byteOf(v, 4),
+            byteOf(v, 3), byteOf(v, 2), byteOf(v, 1), byteOf(v, 0)];
+    }
 }
 
 /// The integers in a byte slice, at a byte offset (10 Q5): the slice must hold the width there,

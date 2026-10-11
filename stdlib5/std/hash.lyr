@@ -1,8 +1,11 @@
 /// The hashers (design/v5/spec/10 Q3, K2). `DefaultHasher` is SipHash-1-3 under a key the system
 /// draws once per process: a `Map` hashes with it, its order differs from run to run, and no input
 /// from outside can aim collisions at it. `FixedHasher` is the same under a zero key, for what must
-/// hash alike in every run; `Fnv1a64` is fast and keyless, for trusted input.
+/// hash alike in every run; `Fnv1a64` is fast and keyless, for trusted input. Below them the
+/// checksums of formats and protocols: `crc32`, `crc32c`, `adler32`.
 pub import std.core { Hasher };
+import std.core { arrayOf };
+import std.task { SpinLock };
 
 extern "C" fn lyr_hash_key(which: int): uint64;
 
@@ -144,4 +147,85 @@ pub struct Fnv1a64 :: [Hasher] {
     pub fn finish(): uint64 {
         return this.state;
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Checksums (10 Q3): CRC-32 of ISO-HDLC — zip, gzip, PNG —, CRC-32C of Castagnoli — iSCSI
+// (RFC 3720), ext4 —, and Adler-32 of zlib (RFC 1950). Each continues from a running value, as
+// zlib's own do: the checksum of the whole is that of its pieces, one after the other.
+// ---------------------------------------------------------------------------------------------
+
+/// CRC-32 of `bytes`, continued from `running` — the checksum of what came before, `0` at the
+/// start: `crc32("123456789".toBytes())` is `0xCBF43926`.
+pub fn crc32(bytes: Slice<uint8>, running: uint32 = 0): uint32 {
+    return crcOver(crcTables().ieee, bytes, running);
+}
+
+/// CRC-32C, the Castagnoli polynomial, of `bytes`, continued from `running`:
+/// `crc32c("123456789".toBytes())` is `0xE3069283`.
+pub fn crc32c(bytes: Slice<uint8>, running: uint32 = 0): uint32 {
+    return crcOver(crcTables().castagnoli, bytes, running);
+}
+
+/// Adler-32 of `bytes`, continued from `running` — `1` at the start: `adler32("Wikipedia".toBytes())`
+/// is `0x11E60398`.
+pub fn adler32(bytes: Slice<uint8>, running: uint32 = 1): uint32 {
+    var a = running & 0xFFFF;
+    var b = running >> 16;
+    var at = 0;
+    let n = bytes.length();
+    while (at < n) {
+        // 5552 bytes are the most whose sums stay below 2^32 before they are reduced (zlib's NMAX)
+        let end = if (n - at > 5552) at + 5552 else n;
+        while (at < end) {
+            a = a + (bytes[at] as uint32);
+            b = b + a;
+            at = at + 1;
+        }
+        a = a % 65521;
+        b = b % 65521;
+    }
+    return (b << 16) | a;
+}
+
+/// The table of a reflected CRC of `polynomial`: the remainder of each byte, eight shifts each.
+fn crcTable(polynomial: uint32): uint32[] {
+    return arrayOf(256, (n: int) => {
+        var c = n as uint32;
+        var k = 0;
+        while (k < 8) {
+            c = if ((c & 1) != 0) polynomial ^ (c >> 1) else c >> 1;
+            k = k + 1;
+        }
+        c
+    });
+}
+
+/// The two tables, made at the first CRC asked for. Not module bindings of their own: those are
+/// filled before the entry (04 §1), and the prelude's collections load this module — every
+/// program would build them.
+class CrcTables {
+    ieee: uint32[],
+    castagnoli: uint32[],
+}
+
+var theCrcTables: ?CrcTables = null;
+let crcTablesGuard = SpinLock { };
+
+fn crcTables(): CrcTables {
+    crcTablesGuard.acquire();
+    if (theCrcTables == null) {
+        theCrcTables = CrcTables { ieee = crcTable(0xEDB88320), castagnoli = crcTable(0x82F63B78) };
+    }
+    let t = theCrcTables!;
+    crcTablesGuard.release();
+    return t;
+}
+
+fn crcOver(table: uint32[], bytes: Slice<uint8>, running: uint32): uint32 {
+    var c = running ^ 0xFFFFFFFF;
+    for (b in bytes) {
+        c = table[((c ^ (b as uint32)) & 0xFF) as int] ^ (c >> 8);
+    }
+    return c ^ 0xFFFFFFFF;
 }

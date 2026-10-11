@@ -1,0 +1,66 @@
+// The checksums of std.hash (10 Q3; M8c S11) against their norms: CRC-32's and CRC-32C's check
+// value over "123456789" (the CRC catalogue's), RFC 3720 B.4's four vectors for CRC-32C, Adler-32
+// of "Wikipedia", and larger inputs against zlib and a bitwise CRC-32C from the definition
+// (r/c11/vectors.py) — past Adler-32's 5552 bytes between reductions. Each continues from a
+// running value: the checksum of the whole is that of its pieces in order.
+import std.core { arrayOf };
+import std.hash { adler32, crc32, crc32c };
+import std.test { assertEq };
+
+fn ascending(n: int): uint8[] {
+    return arrayOf(n, (i: int) => i as uint8);
+}
+
+fn pattern(n: int): uint8[] {
+    return arrayOf(n, (i: int) => ((i * 7 + 3) % 256) as uint8);
+}
+
+fn repeated(n: int, b: uint8): uint8[] {
+    return [b] * n;
+}
+
+@Test
+fn theCheckValues(): void {
+    let check = "123456789".toBytes();
+    assertEq(crc32(check), 0xCBF43926);
+    assertEq(crc32c(check), 0xE3069283);
+    assertEq(adler32("Wikipedia".toBytes()), 0x11E60398);
+}
+
+@Test
+fn nothingChecksAsTheStart(): void {
+    let none: uint8[] = [];
+    assertEq(crc32(none), 0);
+    assertEq(crc32c(none), 0);
+    assertEq(adler32(none), 1);
+}
+
+@Test
+fn theVectorsOfRfc3720(): void {
+    assertEq(crc32c(repeated(32, 0)), 0x8A9136AA);
+    assertEq(crc32c(repeated(32, 0xFF)), 0x62A8AB43);
+    assertEq(crc32c(ascending(32)), 0x46DD794E);
+    let down = arrayOf(32, (i: int) => (31 - i) as uint8);
+    assertEq(crc32c(down), 0x113FDB5C);
+}
+
+@Test
+fn largeInputsAgreeWithZlib(): void {
+    let ones = repeated(100000, 0xFF);
+    assertEq(adler32(ones), 0x149A302C);
+    assertEq(crc32(ones), 0x68C6CEC4);
+    assertEq(crc32c(ones), 0x2F0B8293);
+    let mixed = pattern(70000);
+    assertEq(adler32(mixed), 0x8E7B36C1);
+    assertEq(crc32(mixed), 0xE0290E8E);
+    assertEq(crc32c(mixed), 0x368E7C81);
+}
+
+@Test
+fn aChecksumContinuesFromItsRunningValue(): void {
+    assertEq(crc32("456789".toBytes(), crc32("123".toBytes())), 0xCBF43926);
+    assertEq(crc32c("456789".toBytes(), crc32c("123".toBytes())), 0xE3069283);
+    assertEq(adler32("pedia".toBytes(), adler32("Wiki".toBytes())), 0x11E60398);
+    let mixed = pattern(70000);
+    assertEq(adler32(mixed[30000..], adler32(mixed[..30000])), 0x8E7B36C1);
+}
