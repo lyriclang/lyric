@@ -387,8 +387,23 @@ static size_t note_repeats(char *out, size_t capacity, size_t used, int repeats)
 
 static size_t emit(char *out, size_t capacity, uintptr_t fault_pc);
 
+/* The one trace - and DbgHelp, on Windows - serves one thread at a time. A panic lets one report
+ * through, but a program's Backtrace is named on any thread at any time (05 E6 O3), and so is
+ * main's report: a spin lock, since naming is rare. The panic path waits for it a bounded while
+ * only - it may run in a signal handler on the very thread that holds it, and a garbled trace
+ * beats a hang. */
+static atomic_flag naming = ATOMIC_FLAG_INIT;
+enum { PANIC_PATIENCE = 1 << 24 };
+
+static int take_naming(long patience) {
+    for (long tries = 0; atomic_flag_test_and_set_explicit(&naming, memory_order_acquire); tries++)
+        if (patience > 0 && tries >= patience) return 0;
+    return 1;
+}
+
 size_t lyr_trace_format(char *out, size_t capacity, const LyrFault *fault) {
     if (capacity == 0) return 0;
+    int taken = take_naming(PANIC_PATIENCE);
     out[0] = '\0';
     trace.count = 0;
     trace.truncated = 0;
@@ -398,16 +413,21 @@ size_t lyr_trace_format(char *out, size_t capacity, const LyrFault *fault) {
 #else
     capture_at(fault_pc);
 #endif
-    return emit(out, capacity, fault_pc);
+    size_t used = emit(out, capacity, fault_pc);
+    if (taken) atomic_flag_clear_explicit(&naming, memory_order_release);
+    return used;
 }
 
 size_t lyr_trace_format_pcs(char *out, size_t capacity, const uintptr_t *pcs, int count) {
     if (capacity == 0) return 0;
+    take_naming(0);
     out[0] = '\0';
     trace.count = 0;
     trace.truncated = count >= MAX_PCS;  /* the capture filled its buffer */
     name_captured(pcs, count);
-    return emit(out, capacity, 0);
+    size_t used = emit(out, capacity, 0);
+    atomic_flag_clear_explicit(&naming, memory_order_release);
+    return used;
 }
 
 /* The named trace as lines: from the faulting frame, or below the runtime's own frames; up to

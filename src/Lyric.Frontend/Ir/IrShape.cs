@@ -85,7 +85,8 @@ public static class IrShape
         CoroutineClose c => new[] { c.Coroutine },
         YieldSuspend y => y.Value is { } v ? new[] { v } : Array.Empty<TempId>(),
 
-        CurrentError or ClearError or StashError or RestoreError or SuppressError => Array.Empty<TempId>(),
+        CurrentError or ClearError or StashError or RestoreError or SuppressError
+            or SuppressedErrors or ErrorTrace => Array.Empty<TempId>(),
 
         _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
     };
@@ -163,6 +164,8 @@ public static class IrShape
         YieldSuspend => null,
 
         CurrentError e => e.Dest,
+        SuppressedErrors s => s.Dest,
+        ErrorTrace t => t.Dest,
         ClearError or StashError or RestoreError or SuppressError => null,
 
         _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
@@ -263,6 +266,8 @@ public static class IrShape
             YieldSuspend y => y with { Value = Opt(y.Value) },
 
             CurrentError e => e with { Dest = temp(e.Dest) },
+            SuppressedErrors s => s with { Dest = temp(s.Dest) },
+            ErrorTrace t => t with { Dest = temp(t.Dest) },
             ClearError or StashError or RestoreError or SuppressError => op,
 
             _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")

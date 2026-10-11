@@ -88,8 +88,9 @@ public class SanitizerTests
 
     /// <summary>
     /// The throw paths under ASan and UBSan (13, M5): the emitter's C for every program that throws,
-    /// catches, runs a defer or a close on the error path, suppresses, rethrows, or lets an error
-    /// leave main — and the floor under the blocks the lowering sealed as unreachable (01 M5-4)
+    /// catches, runs a defer or a close on the error path, suppresses, asks a clause's binding of
+    /// its record, rethrows, or lets an error leave main — and the floor under the blocks the
+    /// lowering sealed as unreachable (01 M5-4)
     /// holds them to never being reached: one reached would panic. An error escaping main exits 1, a 'try!' on
     /// an error 101. Each under a name of its own, so the plain run of the same program in
     /// <see cref="CEmitterTests"/> never shares its sources.
@@ -103,6 +104,7 @@ public class SanitizerTests
     [InlineData("resources", 0)]
     [InlineData("fn_throws", 0)]
     [InlineData("bank", 0)]
+    [InlineData("caught_record", 0)]
     [InlineData("uncaught", 1)]
     [InlineData("uncaught_suppressed", 1)]
     [InlineData("rethrow", 1)]

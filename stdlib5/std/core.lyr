@@ -133,6 +133,30 @@ pub class Exception :: [Error] {
     }
 }
 
+/// Where an error was thrown (design/v5/spec/05 E6 O3, the review's M5-3): what a clause's
+/// `e.backtrace()` answers in the debug profile, which keeps the frames of every throw; the
+/// release profile keeps none. Shown, it is a panic's trace — `    at <function> (<file>:<line>)`,
+/// a line a frame, innermost first —, named only when it is shown.
+pub struct Backtrace :: [Display] {
+    pcs: int[],
+
+    pub fn show(): string {
+        return traceText(this.pcs);
+    }
+}
+
+/// The frames at `pcs` in a panic's trace form.
+fn traceText(pcs: int[]): string;
+
+/// `e.backtrace()` at a clause's binding (06 §4): the lowering reads the program counters the
+/// record kept, none where it kept none, and asks here.
+fn backtraceOf(pcs: int[]): ?Backtrace {
+    if (pcs.length() == 0) {
+        return null;
+    }
+    return Backtrace { pcs = pcs };
+}
+
 /// A failure as a value (05 E1; 10 B3): `Ok` with the value or `Err` with the error, to keep,
 /// collect or decide on later. `throws` stays the mechanism, and the two bridges lead to it and
 /// back — `Result.of { try f() }` catches into one, `try r.get()` throws out of one —, with no

@@ -1719,6 +1719,11 @@ public sealed class CEmitter
         StashError s => $"lyr_s{s.Stash} = lyr_e; lyr_e = NULL;",
         RestoreError r => $"lyr_e = lyr_s{r.Stash};",
         SuppressError s => $"lyr_err_suppress(lyr_s{s.Stash}, lyr_e); lyr_e = lyr_s{s.Stash};",
+        // What a clause asks of the error it kept (05 E6 O3), into arrays of the program's own.
+        SuppressedErrors s when s.Type is IrArrayType errors =>
+            $"{Temp(s.Dest)} = lyr_err_suppressed(lyr_s{s.Stash}, &{ArrayDescriptor(errors.Element)});",
+        ErrorTrace t when t.Type is IrArrayType pcs =>
+            $"{Temp(t.Dest)} = lyr_err_trace(lyr_s{t.Stash}, &{ArrayDescriptor(pcs.Element)});",
         // 'x is T' (03 T11): the descriptor the value's table begins with, or the conformance
         // list behind that descriptor for an interface.
         TypeTest t when _module.Types[t.Target.Value].IsInterface =>
