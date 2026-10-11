@@ -845,6 +845,13 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   and an exact one makes no copy. `toMap` needed the language to bind a block's parameters through
   a fixation inside a type, `Iterator<Item = (K, V)>` (05 §13 rule 2) — the checker and the
   lowering bind alike now. Spec 12 §Iteration, 05 §13; four cases.
+- **S6a** collections (10 C3, C4, C5, C7, N3): a set's `union`, `intersect`, `difference`,
+  `symmetricDifference`, `isSubset`, `isSuperset`, `isDisjoint` (methods, no operators) and
+  `Set.of`; a map's `m[k]` (`?V`) and `m[k] = v` through `IndexSet<K>` — `m[k] = null` takes `k`
+  out, as Swift's —, `Map.from(pairs)` and `entries()`; `List.from(it)` and `shrinkToFit()`; a
+  view plus a view, a new array. `list[a..b]` is not built: 03 N2's `Index<Range…>` would be a
+  second conformance of `Index` beside `Index<int>`, which D4 refuses — a decision for the
+  maintainer; until then `list.asSlice()[a..b]`. Spec 12 §Collections, 03 §5.1; four cases.
 
 ## Design decisions
 

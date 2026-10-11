@@ -3351,6 +3351,21 @@ extend<T> Slice<T> {
     }
 }
 
+/// `a + b` of two views (10 C7): a new array of the elements of both, as `xs + ys` of two arrays.
+extend<T> Slice<T> :: [Add<Out = T[]>] {
+    fn add(rhs: Slice<T>): T[] {
+        let n = this.length();
+        let m = rhs.length();
+        if (n + m == 0) {
+            return [];
+        }
+        let out = filled(n + m, if (n > 0) this[0] else rhs[0]);
+        this.copyInto(out[..n]);
+        rhs.copyInto(out[n..]);
+        return out;
+    }
+}
+
 /// `x in xs` (10 C12): an element equal to `x`.
 extend<T :: [Equatable]> Slice<T> :: [Contains<T>] {
     fn contains(x: T): bool {
