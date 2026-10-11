@@ -65,8 +65,29 @@ public sealed class TypeResult
 
     /// <summary>The block a call through a constraint reaches on a concrete type where no symbol
     /// of the type holds the conformance (05 §13 rules 6, 8), with the block's method of the
-    /// member's name — the sema's answer at the instance the lowering reached.</summary>
-    public Func<LyrType, FunctionSymbol, (ExtensionBlock Block, FunctionSymbol? Method)?>? ConformanceBlock { get; internal set; }
+    /// member's name — the sema's answer at the instance the lowering reached. Given the instance
+    /// the constraint asks for (<c>Into&lt;Centimeters&gt;</c>), it binds the parameters only the
+    /// block's conformance names (rule 9): <c>Open</c>, empty where there are none.</summary>
+    public Func<LyrType, FunctionSymbol, LyrType?, (ExtensionBlock Block, FunctionSymbol? Method, IReadOnlyDictionary<GenericParamSymbol, LyrType> Open)?>? ConformanceBlock { get; internal set; }
+
+    /// <summary>The parameters of a block only its conformance names (05 §13 rule 9), as a call of
+    /// its member bound them — <c>U</c> of <c>m.into()</c> by the type the position expects. The
+    /// lowering adds them to what the receiver binds.</summary>
+    private readonly Dictionary<Node, IReadOnlyDictionary<GenericParamSymbol, LyrType>> _openBlockArguments = new(ReferenceEqualityComparer.Instance);
+
+    public void SetOpenBlockArguments(Node call, IReadOnlyDictionary<GenericParamSymbol, LyrType> bound) => _openBlockArguments[call] = bound;
+
+    public IReadOnlyDictionary<GenericParamSymbol, LyrType>? OpenBlockArgumentsOf(Node call) => _openBlockArguments.GetValueOrDefault(call);
+
+    /// <summary>The instance of a generic interface a member reached through a type parameter's
+    /// constraint belongs to — <c>Into&lt;Centimeters&gt;</c> of <c>t.into()</c> under
+    /// <c>T :: [Into&lt;Centimeters&gt;]</c> —, in the generic body's terms: the lowering asks the
+    /// block that gives it at the instance for exactly that one (05 §13 rule 9).</summary>
+    private readonly Dictionary<MemberExpr, LyrType> _constraintInstances = new(ReferenceEqualityComparer.Instance);
+
+    public void RecordConstraintInstance(MemberExpr member, LyrType instance) => _constraintInstances[member] = instance;
+
+    public LyrType? ConstraintInstanceOf(MemberExpr member) => _constraintInstances.GetValueOrDefault(member);
 
     /// <summary>Whether a type conforms to an interface — the sema's answer at an instance the
     /// lowering reached, for a question the checked code could not settle: is the concrete

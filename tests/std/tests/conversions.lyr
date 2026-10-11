@@ -1,0 +1,79 @@
+// From and Into (10 B4; M8c S7): a type writes From, and Into follows through std.core's blanket —
+// the expected type chooses the target, a constraint on Into reaches the blanket, a generic type
+// is From its element.
+import std.test { assertEq };
+
+struct Meters {
+    n: int,
+}
+
+struct Centimeters :: [From<Meters>] {
+    n: int,
+
+    static fn from(m: Meters): Centimeters {
+        return Centimeters { n = m.n * 100 };
+    }
+}
+
+struct Millimeters :: [From<Meters>] {
+    n: int,
+
+    static fn from(m: Meters): Millimeters {
+        return Millimeters { n = m.n * 1000 };
+    }
+}
+
+struct Boxed<T> {
+    value: T,
+}
+
+extend<T> Boxed<T> :: [From<T>] {
+    static fn from(v: T): Boxed<T> {
+        return Boxed<T> { value = v };
+    }
+}
+
+fn inCentimeters<T :: [Into<Centimeters>]>(t: T): int {
+    let c: Centimeters = t.into();
+    return c.n;
+}
+
+fn convert<T, U :: [From<T>]>(t: T): U {
+    return t.into();
+}
+
+fn width(c: Centimeters): int {
+    return c.n;
+}
+
+@Test
+fn fromConvertsAndIntoFollows(): void {
+    let m = Meters { n = 3 };
+    assertEq(Centimeters.from(m).n, 300);
+    let c: Centimeters = m.into();
+    assertEq(c.n, 300);
+}
+
+@Test
+fn theExpectedTypeChoosesTheTarget(): void {
+    let m = Meters { n = 2 };
+    let c: Centimeters = m.into();
+    let mm: Millimeters = m.into();
+    assertEq(c.n + mm.n, 2200);
+    assertEq(width(m.into()), 200);
+}
+
+@Test
+fn aConstraintOnIntoReachesTheBlanket(): void {
+    assertEq(inCentimeters(Meters { n = 4 }), 400);
+    let mm: Millimeters = convert(Meters { n = 1 });
+    assertEq(mm.n, 1000);
+}
+
+@Test
+fn aGenericTypeIsFromItsElement(): void {
+    let b: Boxed<int> = 5.into();
+    assertEq(b.value, 5);
+    let s: Boxed<string> = Boxed.from("x");
+    assertEq(s.value, "x");
+}

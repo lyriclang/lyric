@@ -133,6 +133,34 @@ pub class Exception :: [Error] {
     }
 }
 
+/// A failure as a value (05 E1; 10 B3): `Ok` with the value or `Err` with the error, to keep,
+/// collect or decide on later. `throws` stays the mechanism, and the two bridges lead to it and
+/// back — `Result.of { try f() }` catches into one, `try r.get()` throws out of one —, with no
+/// operator of its own. `E` is an `Error`, as Swift's `Result` has it: `get()` throws it.
+pub enum Result<T, E :: [Error]> {
+    Ok(T),
+    Err(E),
+}
+
+extend<T, E :: [Error]> Result<T, E> {
+    /// What `f` returns, as `Ok`; what it throws, as `Err`.
+    pub static fn of(f: fn() -> T throws E): Result<T, E> {
+        try {
+            return .Ok(f());
+        } catch (e) {
+            return .Err(e);
+        }
+    }
+
+    /// An `Ok`'s value; an `Err`'s error, thrown.
+    pub fn get(): T throws E {
+        return match (this) {
+            .Ok(v) => v,
+            .Err(e) => throw e,
+        };
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Attributes (design/v5/spec/09 A1–A3, A11). An attribute is a struct that says where it may sit —
 // one of the markers below —, and a use writes its fields: `@Test { skip = "needs a network" }`.
@@ -685,6 +713,26 @@ pub interface Clone {
 /// The value a type starts from: `0`, `""`, `[]`, `null`, a field default. Synthesized field-wise.
 pub interface Default {
     static fn default(): Self;
+}
+
+/// A conversion into the type (10 B4; 04 D6: `as` converts numbers only): `Centimeters.from(m)`.
+/// A type writes `From`; `Into` follows from it.
+pub interface From<T> {
+    static fn from(v: T): Self;
+}
+
+/// A conversion out of the type (10 B4): `let cm: Centimeters = m.into();`, the expected type
+/// choosing which. The blanket below gives it wherever a `From` is; a type's own `Into<X>` stands
+/// only where no `X :: [From<…>]` of the type gives the same (04 D15: the blanket excludes it where
+/// it reaches).
+pub interface Into<T> {
+    fn into(): T;
+}
+
+extend<T, U :: [From<T>]> T :: [Into<U>] {
+    fn into(): U {
+        return U.from(this);
+    }
 }
 
 extend int :: [Debug, Clone, Default] {

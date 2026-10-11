@@ -84,6 +84,12 @@ public sealed class ExtensionBlock
     /// (LYR-SEM0170), so the block reaches no type. Set by the checker; <c>null</c> until asked.</summary>
     public GenericParamSymbol[]? UnboundParameters { get; set; }
 
+    /// <summary>The block's parameters only its conformance names (05 §13 rule 9): <c>U</c> in
+    /// <c>extend&lt;T, U :: [From&lt;T&gt;]&gt; T :: [Into&lt;U&gt;]</c> — bound by the instance a
+    /// constraint asks for, or at a call of a member by the call. Set by the checker; <c>null</c>
+    /// until asked.</summary>
+    public GenericParamSymbol[]? OpenParameters { get; set; }
+
     /// <summary>The target is the block's own parameter, <c>extend&lt;T :: [I]&gt; T</c> (04 D15): a
     /// blanket block, matched by its constraints alone.</summary>
     public bool IsBlanketTarget { get; set; }
