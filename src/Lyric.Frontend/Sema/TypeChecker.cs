@@ -1149,8 +1149,9 @@ public sealed class TypeChecker
                 // An inline array is no target (03 T13 A4; the review's M4-2). Its members are
                 // the three it has built in and, where it lies in the heap, a view's — so a
                 // block on 'Slice<T>' is the block that reaches it. One on 'T[4]' was taken and
-                // added nothing: its member was "no member" at every call.
-                if (block.Decl.Target is ArrayType { Length: not null })
+                // added nothing: its member was "no member" at every call. The one exception is
+                // the compiler's own: 'Equatable' and 'Hashable' per written length (M8c S3b).
+                if (block.Decl.Target is ArrayType { Length: not null } && !_comp.InlineArrayBlocks.Contains(block.Decl))
                 {
                     _de.Report("LYR-SEM0047", Severity.Error, block.Decl.Target.Span,
                         $"an extend block does not target an inline array, '{TypeFacts.Display(BlockTargetType(block))}' — it has "
@@ -7178,6 +7179,9 @@ public sealed class TypeChecker
                     return Report(mem.MemberSpan, "LYR-SEM0012", $"'{mem.Member}' is called: write '{mem.Member}()'");
                 return mem.Member == "isEmpty" ? new FnType([], LyrType.Bool) : new FnType([], new ArrayOf(inline.Element));
             }
+            // Its own blocks before a view's: 'equals' and 'hash' of the length (M8c S3b) are the
+            // array's wherever it lies, and a view's 'equals' would ask for a view it may not have.
+            if (ShapeBlockMember(receiver, mem, span, ref shapeOnly) is { } own) return own;
             if (ShapeBlockMember(new SliceOf(inline.Element), mem, span, ref shapeOnly) is { } ofView)
             {
                 if (IsHeapResident(mem.Target)) return ofView;
@@ -8503,6 +8507,8 @@ public sealed class TypeChecker
                     return Walk(x.Element, y.Element);
                 case (SliceOf x, SliceOf y):
                     return Walk(x.Element, y.Element);
+                case (InlineArrayOf x, InlineArrayOf y):
+                    return x.Length == y.Length && Walk(x.Element, y.Element);
                 default:
                     return LyrType.Equal(a, b);
             }

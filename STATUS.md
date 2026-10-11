@@ -820,6 +820,12 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   internal `Step` of std.core (Rust's), one block per integer type and `char`: a block of its own
   for `Range<char>` beside the one for `Integer` would conform it twice (no specialization, 04).
   Spec 03 §5.2 rule 4, §7, 12 §Iteration; four cases.
+- **S3b** a bare `T[N]` compares and hashes where `T` does (10 C8, S4b): `d == sha256(x)`, and a
+  `uint8[16]` is a key. The resolver writes, for every length the program writes anywhere, a
+  block of `Equatable` and one of `Hashable` on `T[N]` into std.core — synthesized as source, as
+  the conformances of 04 D7 are; the only blocks on an inline array, a written one is still
+  refused. A block over a generic length cannot be written, one over a written length can.
+  **S3 is done.** Spec 03 §5.3 rule 7; three cases.
 
 ## Design decisions
 

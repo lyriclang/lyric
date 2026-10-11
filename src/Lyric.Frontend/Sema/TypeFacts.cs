@@ -166,6 +166,9 @@ public static class TypeFacts
                 return true;
             case ArrayOf pa when actual is ArrayOf aa: return Match(pa.Element, aa.Element, map);
             case SliceOf ps when actual is SliceOf sa: return Match(ps.Element, sa.Element, map);
+            // An inline array of the same length (the blocks synthesized per length, M8c S3b).
+            case InlineArrayOf pi when actual is InlineArrayOf ai && pi.Length == ai.Length:
+                return Match(pi.Element, ai.Element, map);
             case Optional po when actual is Optional ao: return Match(po.Inner, ao.Inner, map);
             case TupleOf pt when actual is TupleOf at && pt.Elements.Length == at.Elements.Length:
                 for (var i = 0; i < pt.Elements.Length; i++)

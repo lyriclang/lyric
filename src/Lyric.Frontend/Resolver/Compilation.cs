@@ -43,6 +43,11 @@ public sealed class Compilation
     public string TextOf(Span span) => _sm.Slice(span).ToString();
     public ExtensionRegistry Extensions { get; } = new();
 
+    /// <summary>The blocks the resolver synthesized for inline arrays, <c>T[N] :: [Equatable]</c> and
+    /// <c>[Hashable]</c> per length (10 C8, S4b; M8c S3b): the only blocks on an inline array, which
+    /// one written is refused (<c>LYR-SEM0047</c>, 03 M4-2).</summary>
+    public HashSet<ExtendDecl> InlineArrayBlocks { get; } = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>
     /// Loads a module that is not yet in the compilation. Returns <c>null</c> when the path does
     /// not exist.
