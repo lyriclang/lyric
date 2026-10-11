@@ -5298,6 +5298,11 @@ public sealed class TypeChecker
         if (TypeFacts.IsString(l) && TypeFacts.IsString(r)) return LyrType.String;      // "a" + "b"
         if (l is ArrayOf la && r is ArrayOf ra && LyrType.Equal(la.Element, ra.Element)) // [..] + [..]
             return new ArrayOf(la.Element);
+        // A view and a view (10 C7; M8c S6): a new array, through the block std.core gives
+        // 'Slice<T>' — a shape's operator, as its '==' is (05 §13 rule 6).
+        if (l is SliceOf ls && r is SliceOf rs && LyrType.Equal(ls.Element, rs.Element)
+            && _add is { } add && Satisfies(l, add, new GenericInstance(add, [l])))
+            return DesugarToMethodCall(b, "add", scope);
         return DesugarArithmetic(b, l, r, scope, _add, "add", "+") ?? BadBinary(b, l, r);
     }
 

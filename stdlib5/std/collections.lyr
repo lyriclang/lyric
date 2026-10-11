@@ -208,6 +208,28 @@ pub class List<T> :: [IndexSet<int>, Iterable] {
     }
 }
 
+extend<T> List<T> {
+    /// The values of an iterator, in a list (10 C3, N3): `List.from(words.iter())`.
+    pub static fn from<I :: [Iterator<Item = T>]>(items: I): List<T> throws I.Error {
+        return try items.toList();
+    }
+
+    /// The room cut down to the elements (10 C3): a buffer of `length()` slots. A view taken before
+    /// keeps the buffer it was taken of.
+    pub mut fn shrinkToFit(): void {
+        if (this.buffer.length() == this.count) {
+            return;
+        }
+        if (this.count == 0) {
+            this.buffer = [];
+            return;
+        }
+        let fitted = filled(this.count, this.buffer[0]);
+        this.buffer[..this.count].copyInto(fitted[..]);
+        this.buffer = fitted;
+    }
+}
+
 extend<T :: [Equatable]> List<T> {
     /// The first element equal to `x` taken out; whether there was one.
     pub mut fn remove(x: T): bool {
@@ -671,9 +693,119 @@ extend<T :: [Hashable]> Set<T, DefaultHasher> {
         return Set<T, DefaultHasher>.withHasher(DefaultHasher.new());
     }
 
+    /// A set of the array's elements, each once (10 N3, as `List.of`).
+    pub static fn of(xs: T[]): Set<T, DefaultHasher> {
+        let out = Set<T, DefaultHasher>.new();
+        for (x in xs) {
+            let _ = out.insert(x);
+        }
+        return out;
+    }
+
     /// An empty set with room for `n` values before it grows (10 N3); a negative `n` panics.
     pub static fn withCapacity(n: int): Set<T, DefaultHasher> {
         return Set<T, DefaultHasher> { table = Map<T, bool, DefaultHasher>.withCapacity(n) };
+    }
+}
+
+// --- the map's index, the entries, a set's operations (10 C4, C5) --------------------------------
+
+// `map[k]` is the value under `k` or `null`; `map[k] = v` puts `v` there, and `map[k] = null` takes `k`
+// out, as Swift's dictionary does — the index gives an optional, so the place takes one.
+extend<K :: [Hashable], V, H :: [Hasher]> Map<K, V, H> :: [IndexSet<K>] {
+    type Output = ?V;
+
+    fn index(k: K): ?V {
+        return this.get(k);
+    }
+
+    mut fn setIndex(k: K, v: ?V): void {
+        if (let value = v) {
+            let _ = this.insert(k, value);
+        } else {
+            let _ = this.remove(k);
+        }
+    }
+}
+
+extend<K :: [Hashable], V, H :: [Hasher]> Map<K, V, H> {
+    /// The entries, `(K, V)`, in no order of the map's own — `iter()` by its name in C4.
+    pub fn entries(): MapEntriesIter<K, V, H> {
+        return this.iter();
+    }
+}
+
+// A set's operations are methods (10 C5): each makes a new set hashing as this one does, or answers
+// a question; no operators.
+extend<T :: [Hashable], H :: [Hasher]> Set<T, H> {
+    /// The elements of either.
+    pub fn union(other: Set<T, H>): Set<T, H> {
+        let out = Set<T, H>.withHasher(this.table.seed);
+        for (x in this) {
+            let _ = out.insert(x);
+        }
+        for (x in other) {
+            let _ = out.insert(x);
+        }
+        return out;
+    }
+
+    /// The elements of both.
+    pub fn intersect(other: Set<T, H>): Set<T, H> {
+        let out = Set<T, H>.withHasher(this.table.seed);
+        for (x in this) {
+            if (other.contains(x)) {
+                let _ = out.insert(x);
+            }
+        }
+        return out;
+    }
+
+    /// The elements of this one the other lacks.
+    pub fn difference(other: Set<T, H>): Set<T, H> {
+        let out = Set<T, H>.withHasher(this.table.seed);
+        for (x in this) {
+            if (!other.contains(x)) {
+                let _ = out.insert(x);
+            }
+        }
+        return out;
+    }
+
+    /// The elements of exactly one of the two.
+    pub fn symmetricDifference(other: Set<T, H>): Set<T, H> {
+        let out = this.difference(other);
+        for (x in other) {
+            if (!this.contains(x)) {
+                let _ = out.insert(x);
+            }
+        }
+        return out;
+    }
+
+    /// Whether every element is the other's too — the empty set is a subset of every set.
+    pub fn isSubset(other: Set<T, H>): bool {
+        for (x in this) {
+            if (!other.contains(x)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Whether every element of the other is this one's too.
+    pub fn isSuperset(other: Set<T, H>): bool {
+        return other.isSubset(this);
+    }
+
+    /// Whether no element is the other's too.
+    pub fn isDisjoint(other: Set<T, H>): bool {
+        for (x in this) {
+            if (other.contains(x)) {
+                return false;
+            }
+        }
+        return true;
     }
 }
 
@@ -837,6 +969,16 @@ extend<K :: [Hashable], V> Map<K, V, DefaultHasher> {
     /// An empty map hashing with the process's key (10 K2): its order differs from run to run.
     pub static fn new(): Map<K, V, DefaultHasher> {
         return Map<K, V, DefaultHasher>.withHasher(DefaultHasher.new());
+    }
+
+    /// The pairs in a map (10 C4, N3), a later value of a key replacing the earlier one:
+    /// `Map.from([("a", 1), ("b", 2)])`.
+    pub static fn from(pairs: Slice<(K, V)>): Map<K, V, DefaultHasher> {
+        let out = Map<K, V, DefaultHasher>.withCapacity(pairs.length());
+        for (p in pairs) {
+            let _ = out.insert(p.0, p.1);
+        }
+        return out;
     }
 
     /// An empty map with room for `n` keys before it grows (10 N3); a negative `n` panics.

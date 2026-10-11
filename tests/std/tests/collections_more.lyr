@@ -1,0 +1,86 @@
+// The collections after M8c S6a (10 C3, C4, C5, C7, N3): a set's operations, a map's index — a
+// null takes the key out —, Map.from and entries, Set.of, List.from and shrinkToFit, a view plus a view.
+import std.collections { List, Map, Set };
+import std.test { assertEq, assertFalse, assertNull, assertTrue };
+
+fn sortedOf(s: Set<int>): int[] {
+    return s.iter().sorted().toArray();
+}
+
+@Test
+fn aSetsOperationsMakeNewSets(): void {
+    let a = Set.of([1, 2, 3]);
+    let b = Set.of([2, 3, 4]);
+    assertEq(sortedOf(a.union(b)), [1, 2, 3, 4]);
+    assertEq(sortedOf(a.intersect(b)), [2, 3]);
+    assertEq(sortedOf(a.difference(b)), [1]);
+    assertEq(sortedOf(a.symmetricDifference(b)), [1, 4]);
+    assertEq(sortedOf(a), [1, 2, 3]);
+    let empty: Set<int> = Set.new();
+    assertEq(sortedOf(a.union(empty)), [1, 2, 3]);
+    assertEq(a.intersect(empty).length(), 0);
+}
+
+@Test
+fn aSetsQuestions(): void {
+    let a = Set.of([1, 2, 3]);
+    let small = Set.of([2, 3]);
+    let empty: Set<int> = Set.new();
+    assertTrue(small.isSubset(a));
+    assertFalse(a.isSubset(small));
+    assertTrue(a.isSuperset(small));
+    assertTrue(empty.isSubset(a));
+    assertTrue(a.isSubset(a));
+    assertFalse(a.isDisjoint(small));
+    assertTrue(a.isDisjoint(Set.of([7, 8])));
+    assertEq(Set.of([1, 1, 2]).length(), 2);
+}
+
+@Test
+fn aMapsIndexReadsWritesAndTakesOut(): void {
+    let m = Map.from([("a", 1), ("b", 2), ("a", 3)]);
+    assertEq(m.length(), 2);
+    let a = "a";
+    let b = "b";
+    let c = "c";
+    assertEq(m[a]!, 3);
+    assertNull(m[c]);
+    m[c] = 30;
+    assertEq(m[c]!, 30);
+    m[b] = null;
+    assertNull(m[b]);
+    assertFalse(m.containsKey(b));
+    assertEq(m.length(), 2);
+    var total = 0;
+    for (e in m.entries()) {
+        total += e.1;
+    }
+    assertEq(total, 33);
+}
+
+@Test
+fn aListFromAnIteratorShrinks(): void {
+    let list: List<int> = List.from([3, 1, 2].iter().filter((x: int) => x > 1));
+    assertEq(list.toArray(), [3, 2]);
+    let grown: List<int> = List.withCapacity(100);
+    grown.push(1);
+    grown.shrinkToFit();
+    assertEq(grown.toArray(), [1]);
+    grown.push(2);
+    assertEq(grown.toArray(), [1, 2]);
+    let empty: List<int> = List.new();
+    empty.shrinkToFit();
+    assertEq(empty.length(), 0);
+}
+
+@Test
+fn aViewPlusAViewIsANewArray(): void {
+    let xs = [1, 2, 3];
+    let ys = [4];
+    let both = xs[1..] + ys[..];
+    assertEq(both, [2, 3, 4]);
+    both[0] = 9;
+    assertEq(xs, [1, 2, 3]);
+    let none: int[] = [];
+    assertEq((none[..] + none[..]).length(), 0);
+}
