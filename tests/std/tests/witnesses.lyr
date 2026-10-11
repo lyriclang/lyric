@@ -1,0 +1,48 @@
+// A generic member as the witness of a plain interface member (13 S9; M8c S9b): a string and a view
+// are Contains<char> through the view's contains<P :: [Pattern]>, a type of the program's own
+// through its generic member, reached from a constraint and by 'in'.
+import std.core { Contains };
+import std.test { assertFalse, assertTrue };
+
+interface Holds<T> {
+    fn holds(x: T): bool;
+}
+
+struct Digits :: [Holds<int>] {
+    text: string,
+
+    fn holds<N :: [Display]>(x: N): bool {
+        return this.text.contains(f"{x}");
+    }
+}
+
+fn has<C :: [Contains<char>]>(c: C, x: char): bool {
+    return c.contains(x);
+}
+
+fn holding<H :: [Holds<int>]>(h: H, n: int): bool {
+    return h.holds(n);
+}
+
+@Test
+fn aTextHoldsItsCharacters(): void {
+    let b = 'b';
+    assertTrue(b in "abc");
+    assertTrue(has("abc", 'c'));
+    assertFalse(has("abc", 'z'));
+    assertTrue(has("abc"[1..], 'b'));
+    assertFalse(has("abc"[1..], 'a'));
+}
+
+@Test
+fn aTextStillFindsAText(): void {
+    assertTrue("abc".contains("bc"));
+    assertTrue("abc"[..].contains("ab"));
+}
+
+@Test
+fn aGenericMemberOfItsOwnAnswers(): void {
+    let d = Digits { text = "123" };
+    assertTrue(holding(d, 2));
+    assertFalse(holding(d, 9));
+}
