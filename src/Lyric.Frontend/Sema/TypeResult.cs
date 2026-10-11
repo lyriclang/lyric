@@ -375,6 +375,15 @@ public sealed class TypeResult
 
     public CallExpr? OperatorCallOf(Node op) => _operatorCalls.GetValueOrDefault(op);
 
+    /// <summary>An array literal that stands for a <c>FromArrayLiteral&lt;T&gt;</c> (10 K4; M8c S6b),
+    /// with the element type its elements were checked against: the lowering builds the array of
+    /// them and calls the expected type's <c>fromLiteral</c>.</summary>
+    private readonly Dictionary<ArrayLitExpr, LyrType> _literalsInto = new(ReferenceEqualityComparer.Instance);
+
+    public void RecordLiteralInto(ArrayLitExpr literal, LyrType element) => _literalsInto[literal] = element;
+
+    public LyrType? LiteralElementOf(ArrayLitExpr literal) => _literalsInto.GetValueOrDefault(literal);
+
     /// <summary>
     /// The type arguments of a call site, inferred or written.
     ///

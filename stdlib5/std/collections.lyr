@@ -1,6 +1,6 @@
 /// The containers (design/v5/spec/10 B7). Not safe across threads (C11): a `Mutex` holds one
 /// that is shared.
-import std.core { arrayOf, Contains, filled, FromIterator, Hasher, Join, StringBuilder };
+import std.core { arrayOf, Contains, filled, FromArrayLiteral, FromIterator, Hasher, Join, StringBuilder };
 import std.hash { DefaultHasher };
 
 // --- List (10 C3) --------------------------------------------------------------------------------
@@ -806,6 +806,42 @@ extend<T :: [Hashable], H :: [Hasher]> Set<T, H> {
             }
         }
         return true;
+    }
+}
+
+// --- from array literals (10 K4) ----------------------------------------------------------------
+
+extend<T> List<T> :: [FromArrayLiteral<T>] {
+    static fn fromLiteral(items: T[]): List<T> {
+        return List<T>.of(items);
+    }
+}
+
+extend<T :: [Hashable]> Set<T, DefaultHasher> :: [FromArrayLiteral<T>] {
+    static fn fromLiteral(items: T[]): Set<T, DefaultHasher> {
+        return Set<T, DefaultHasher>.of(items);
+    }
+}
+
+extend<K :: [Hashable], V> Map<K, V, DefaultHasher> :: [FromArrayLiteral<(K, V)>] {
+    static fn fromLiteral(items: (K, V)[]): Map<K, V, DefaultHasher> {
+        return Map<K, V, DefaultHasher>.from(items[..]);
+    }
+}
+
+extend<T> Deque<T> :: [FromArrayLiteral<T>] {
+    static fn fromLiteral(items: T[]): Deque<T> {
+        let out = Deque<T>.new();
+        for (x in items) {
+            out.pushBack(x);
+        }
+        return out;
+    }
+}
+
+extend<T :: [TotalOrder]> Heap<T> :: [FromArrayLiteral<T>] {
+    static fn fromLiteral(items: T[]): Heap<T> {
+        return Heap<T>.of(items);
     }
 }
 

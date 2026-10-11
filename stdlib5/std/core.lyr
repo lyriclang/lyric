@@ -5118,6 +5118,14 @@ fn debugText<T :: [Debug]>(xs: Slice<T>): string {
 // `collect()` builds what the expected type is, through its `FromIterator`: `let xs: List<int> =
 // it.collect();`. An array is one; the containers of std.collections are the others.
 
+/// What an array literal becomes where a value of the type is expected (10 K4): the elements check
+/// against `T`, and the literal is `Self.fromLiteral([…])` — `let s: Set<int> = [1, 2, 3];`,
+/// `let m: Map<string, int> = [("a", 1)];` (a map is no literal of its own). A copy, as `of` would
+/// make one.
+pub interface FromArrayLiteral<T> {
+    static fn fromLiteral(items: T[]): Self;
+}
+
 /// A type built from an iterator's values (10 B6): `collect()` calls `fromIter`, the type's own.
 pub interface FromIterator<T> {
     static fn fromIter<I :: [Iterator<Item = T>]>(it: I): Self throws I.Error;
