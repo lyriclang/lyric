@@ -57,13 +57,57 @@ internal sealed class TypeTable
     public ExtensionTable? Extensions { get; set; }
 
     /// <summary>The symbol behind a primitive type (<c>int</c>, <c>string</c>, …), the anchor an
-    /// <c>extend int { … }</c> hangs on. Primitives have no symbol in <see cref="TypeFacts.SymbolOf"/>,
-    /// and that is deliberate: on it hangs the boundary that a scalar does NOT fit into an interface
-    /// slot, which would need boxing.</summary>
+    /// <c>extend int { … }</c> hangs on. Primitives have no symbol in <see cref="TypeFacts.SymbolOf"/>:
+    /// a built-in's value reaches an interface slot through a box of its own
+    /// (<see cref="BoxOfBuiltin"/>), not as a type the table interns.</summary>
     public TypeSymbol? BuiltinSymbolOf(LyrType type) =>
         type is PrimitiveType or StringViewType && Compilation is { } comp
             ? comp.Builtins.LookupLocal(TypeFacts.Display(type)) as TypeSymbol
             : null;
+
+    /// <summary>The built-in an IR value type stands for, where a box of it can be made: a scalar,
+    /// and the view a string gives (<c>Slice&lt;u8&gt;</c> — no other view becomes an interface
+    /// value, 05 §13 rule 6).</summary>
+    public TypeSymbol? BuiltinOfIr(IrType type)
+    {
+        var name = type switch
+        {
+            IrScalarType { Kind: var kind } => kind switch
+            {
+                IrScalar.I8 => "int8", IrScalar.I16 => "int16", IrScalar.I32 => "int32", IrScalar.I64 => "int",
+                IrScalar.U8 => "uint8", IrScalar.U16 => "uint16", IrScalar.U32 => "uint32", IrScalar.U64 => "uint",
+                IrScalar.F32 => "float32", IrScalar.F64 => "float",
+                IrScalar.Bool => "bool", IrScalar.Char => "char", IrScalar.String => "string",
+                _ => null,
+            },
+            IrSliceType { Element: IrScalarType { Kind: IrScalar.U8 } } => "StringView",
+            _ => null,
+        };
+        return name is not null ? Compilation?.Builtins.LookupLocal(name) as TypeSymbol : null;
+    }
+
+    private readonly List<(TypeSymbol Builtin, IrType Payload, TypeId Id)> _builtinBoxes = new();
+
+    /// <summary>The boxes a built-in's value went into an interface value through, with the
+    /// built-in's symbol: their table rows are built from its blocks.</summary>
+    public IReadOnlyList<(TypeSymbol Builtin, IrType Payload, TypeId Id)> BuiltinBoxes => _builtinBoxes;
+
+    /// <summary>
+    /// The box of a built-in's value (01 V7 "ein Struct wird beim Übergang geboxt — immer", 03 T3
+    /// Typ → Interface; M8c S8b): an entry whose one field is the value itself. Interned by the
+    /// value's type, as a cell is: two boxes of an <c>int</c> are one type. A string is boxed too
+    /// — the data word of an interface value is always a reference to a box or an object, and a
+    /// string's own header describes no table.
+    /// </summary>
+    public TypeId BoxOfBuiltin(IrType payload, TypeSymbol builtin)
+    {
+        foreach (var (_, existing, id) in _builtinBoxes)
+            if (IrType.Equal(existing, payload)) return id;
+        var fresh = new TypeId(_defs.Count);
+        _defs.Add(new IrTypeDef($"<box:{builtin.Name}>", [payload], ["value"]) { IsStruct = true, IsBuiltinBox = true });
+        _builtinBoxes.Add((builtin, payload, fresh));
+        return fresh;
+    }
 
     /// <summary>The <c>extend</c> block this method symbol belongs to, with the target name and the
     /// declaring module, the two facts the mangling needs. <c>null</c> when the symbol is not an

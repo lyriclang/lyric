@@ -5982,6 +5982,13 @@ public sealed class TypeChecker
             case NamedRef { Symbol.Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }
                 or GenericInstance { Definition.Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }:
                 return true;
+            // A built-in's value does lie behind an interface since M8c S8b, in a box of its own;
+            // a test for it is no form of the language (05 §9 rule 3).
+            case PrimitiveType or StringViewType when _comp.Lyric5Modules:
+                _de.Report("LYR-SEM0131", Severity.Error, span,
+                    $"'{TypeFacts.Display(target)}' is a built-in type, and a test for one is no form of the language — "
+                    + "test for a struct, a class, an enum or an interface");
+                return false;
             default:
                 _de.Report("LYR-SEM0131", Severity.Error, span,
                     $"'{TypeFacts.Display(target)}' is never behind an interface value — only a struct, a class, an enum or an interface is");
@@ -12072,6 +12079,12 @@ public sealed class TypeChecker
         if (TypeFacts.SymbolOf(from) is { } source)
             return ImplementsWithExtensions(source, target, to,
                 from is GenericInstance instance ? SubstMap(instance) : EmptySubst);
+
+        // A built-in's value conforms through std.core's blocks on it, and goes into its interface
+        // in a box (01 V7, 03 T3; M8c S8b): 'let d: Display = 5;', 'f(1, "two")' for 'f(xs: Display...)'.
+        // Lyric 5's: the 4.x lowering has no box for it.
+        if (_comp.Lyric5Modules && (from is PrimitiveType { Kind: not PrimitiveKind.Void } || from is StringViewType))
+            return Satisfies(from, target, to);
 
         // A type parameter satisfies what its constraints demand. It has no symbol of its own, so it
         // stands here beside rather than inside SymbolOf.

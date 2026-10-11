@@ -4530,9 +4530,11 @@ internal sealed class FunctionLowerer
             IrRefType r => r.Type,
             IrStructType v => v.Type,
             IrEnumType e => e.Type,
+            // A built-in's value in a box of its own (01 V7; M8c S8b): 'let d: Display = 5;'.
+            _ when _typeTable.BuiltinOfIr(concrete) is { } builtin => _typeTable.BoxOfBuiltin(concrete, builtin),
             _ => throw NotSupported(
                 "a value of this type cannot be used through an interface "
-                + "(only classes, structs and enums)",
+                + "(only classes, structs, enums and the built-in types)",
                 span),
         };
 

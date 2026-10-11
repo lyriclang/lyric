@@ -135,6 +135,12 @@ public record struct IrTypeDef(string Name, IrType[] FieldTypes, string[] FieldN
     /// the layout itself changes.</summary>
     public bool IsStruct { get; init; }
 
+    /// <summary>The box a built-in type's value lives in behind an interface value (01 V7, 03 T3;
+    /// M8c S8b): a struct entry whose one field, <c>value</c>, IS the boxed value — an <c>int</c>, a
+    /// <c>string</c>, a view —, not a struct of it. Its table rows come from the built-in's blocks,
+    /// <c>extend int :: [Display]</c>.</summary>
+    public bool IsBuiltinBox { get; init; }
+
     /// <summary>Declared with <c>class</c>: a heap object with a header, reached by reference.
     /// A positive flag, because the entries that are neither a struct, an enum nor an interface
     /// are not all classes — a variant, a tuple, a closure cell and an environment are entries
