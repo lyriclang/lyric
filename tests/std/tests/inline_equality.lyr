@@ -1,0 +1,65 @@
+// A bare T[N] compares and hashes where T does (10 C8, "Review 2026-10-08" S4b; M8c S3b): element
+// by element, the elements written into the hasher in order — a digest compares with `==`, and an
+// inline array is a key of a Map or a Set.
+import std.collections { Map, Set };
+import std.crypto { sha256 };
+import std.hash { FixedHasher };
+import std.test { assertEq, assertFalse, assertTrue };
+
+fn hashOf(x: uint8[4]): uint64 {
+    var h = FixedHasher.new();
+    x.hash(&h);
+    return h.finish();
+}
+
+@Test
+fn anInlineArrayComparesElementByElement(): void {
+    let a: uint8[4] = [1, 2, 3, 4];
+    let b: uint8[4] = [1, 2, 3, 4];
+    let c: uint8[4] = [1, 2, 3, 5];
+    assertTrue(a == b);
+    assertFalse(a == c);
+    assertTrue(a != c);
+    let grid: int[2][3] = [[1, 2], [3, 4], [5, 6]];
+    let same: int[2][3] = [[1, 2], [3, 4], [5, 6]];
+    let other: int[2][3] = [[1, 2], [3, 4], [6, 5]];
+    assertTrue(grid == same);
+    assertFalse(grid == other);
+}
+
+@Test
+fn aDigestComparesWithEquals(): void {
+    let x = "lyric".toBytes();
+    let y = "Lyric".toBytes();
+    assertTrue(sha256(x[..]) == sha256(x[..]));
+    assertFalse(sha256(x[..]) == sha256(y[..]));
+}
+
+@Test
+fn equalArraysHashAlike(): void {
+    let a: uint8[4] = [9, 8, 7, 6];
+    let b: uint8[4] = [9, 8, 7, 6];
+    let c: uint8[4] = [6, 7, 8, 9];
+    assertEq(hashOf(a), hashOf(b));
+    assertTrue(hashOf(a) != hashOf(c));
+}
+
+@Test
+fn anInlineArrayIsAKey(): void {
+    let names: Map<uint8[4], string> = Map.new();
+    let home: uint8[4] = [127, 0, 0, 1];
+    let again: uint8[4] = [127, 0, 0, 1];
+    let away: uint8[4] = [10, 0, 0, 1];
+    {
+        let _ = names.insert(home, "localhost");
+    }
+    assertEq(names.get(again) ?? "", "localhost");
+    assertEq(names.get(away) ?? "", "");
+    let pairs: Set<char[2]> = Set.new();
+    let ab: char[2] = ['a', 'b'];
+    let ba: char[2] = ['b', 'a'];
+    for (p in [ab, ba, ab]) {
+        let _ = pairs.insert(p);
+    }
+    assertEq(pairs.length(), 2);
+}

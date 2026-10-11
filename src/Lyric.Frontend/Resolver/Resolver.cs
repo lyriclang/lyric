@@ -41,6 +41,7 @@ public sealed class Resolver
     public BindingResult Run()
     {
         foreach (var module in _comp.Modules) DeclareModule(module);
+        SynthesizeInlineArrays();
         foreach (var module in _comp.Modules) ResolveImports(module);
         if (_comp.Lyric5Modules) CheckOneNamespace();
         DetectImportCycles();
@@ -48,6 +49,73 @@ public sealed class Resolver
         ResolveExtensionTargets();
         _comp.Extensions.BuildIndex();
         return _binding;
+    }
+
+    /// <summary>
+    /// An inline array is <c>Equatable</c> and <c>Hashable</c> where its element is (design/v5/spec/10
+    /// C8, "Review 2026-10-08" S4b; M8c S3b): for every length the program writes — in any module,
+    /// std's among them — a block of each, synthesized as source into std.core as the conformances
+    /// of 04 D7 are. A block over a generic length cannot be written (no generic constant, 03 T13);
+    /// one over a written length can, and no other block targets an inline array (03 M4-2). A
+    /// length nobody compares or hashes costs nothing: the lowering takes what is reached. A fault
+    /// in a block is pointed at the first place the length was written.
+    /// </summary>
+    private void SynthesizeInlineArrays()
+    {
+        if (!_comp.Lyric5Modules) return;
+        var core = _comp.Modules.FirstOrDefault(m => m.FullName == "std.core");
+        if (core is null) return;
+        var declared = _comp.AstOf(core).Declarations.OfType<InterfaceDecl>().Select(i => i.Name).ToHashSet(StringComparer.Ordinal);
+        if (!declared.Contains("Equatable") || !declared.Contains("Hashable") || !declared.Contains("Hasher")) return;
+
+        var lengths = new SortedDictionary<int, Span>();
+        foreach (var module in _comp.Modules)
+        {
+            var pending = new Stack<Node>();
+            pending.Push(_comp.AstOf(module));
+            while (pending.Count > 0)
+            {
+                var node = pending.Pop();
+                if (node is ArrayType { Length: { } n } && !lengths.ContainsKey(n)) lengths[n] = node.Span;
+                foreach (var child in AstChildren.Of(node)) pending.Push(child);
+            }
+        }
+        foreach (var (n, at) in lengths)
+        {
+            var text = $$"""
+                extend<T :: [Equatable]> T[{{n}}] :: [Equatable] {
+                    fn equals(o: T[{{n}}]): bool {
+                        var i = 0;
+                        while (i < {{n}}) {
+                            if (this[i] != o[i]) {
+                                return false;
+                            }
+                            i += 1;
+                        }
+                        return true;
+                    }
+                }
+
+                extend<T :: [Hashable]> T[{{n}}] :: [Hashable] {
+                    fn hash<H :: [Hasher]>(&h: H): void {
+                        var i = 0;
+                        while (i < {{n}}) {
+                            this[i].hash(&h);
+                            i += 1;
+                        }
+                    }
+                }
+
+                """;
+            var id = _sm.AddSynthesized($"<synthesized Equatable and Hashable for T[{n}]>", text, at,
+                $"in the 'Equatable' and 'Hashable' synthesized for 'T[{n}]'");
+            foreach (var synthesized in new Parser(_sm, id, _de).ParseModule().Declarations)
+                if (synthesized is ExtendDecl block)
+                {
+                    _comp.InlineArrayBlocks.Add(block);
+                    DeclareExtend(core, block, implicitly: true);
+                }
+        }
     }
 
     // --- pass 1: declaring ---
