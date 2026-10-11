@@ -6007,7 +6007,7 @@ internal sealed class FunctionLowerer
     /// requested for the receiver, a plain block's lowered as every extension is; the call is
     /// direct either way.</summary>
     private TempId? LowerBlockMethodCall(MemberExpr member, FunctionSymbol symbol, ExtensionBlock block,
-        LyrType receiver, CallExpr expr, bool viewed = false)
+        LyrType receiver, CallExpr expr, bool viewed = false, IReadOnlyDictionary<GenericParamSymbol, LyrType>? open = null)
     {
         if (symbol.Declaration is not FunctionDecl decl || decl.Body is null)
             throw NotSupported($"'{member.Member}' of the block on '{TypeFacts.Display(receiver)}' has no body", expr.Span);
@@ -6030,7 +6030,14 @@ internal sealed class FunctionLowerer
             // bound by the receiver: 'mapped<U>' in 'extend<I :: [Iterator]> I'.
             var own = symbol.Generics.Length > 0 ? SubstitutedTypeArguments(expr) : [];
             for (var i = 0; i < symbol.Generics.Length && i < own.Length; i++) map[symbol.Generics[i]] = own[i];
-            target = _instances.RequestExtension(symbol, decl, block, map, receiver, expr.Span, own);
+            // What only the block's conformance names (05 §13 rule 9): the constraint's instance
+            // bound it, or the call did — 'U' of 'm.into()'. It names the instance as the method's
+            // own arguments do: 'into' to centimeters and to inches are two functions.
+            var opened = new List<LyrType>();
+            foreach (var p in block.Generics)
+                if (!map.ContainsKey(p) && (open?.GetValueOrDefault(p) ?? _types.OpenBlockArgumentsOf(expr)?.GetValueOrDefault(p)) is { } answer)
+                    opened.Add(map[p] = SubstituteType(answer));
+            target = _instances.RequestExtension(symbol, decl, block, map, receiver, expr.Span, [.. own, .. opened]);
             byName = map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal);
         }
         // The receiver before the arguments: left to right everywhere (04 D6), as a type's own
@@ -6267,11 +6274,14 @@ internal sealed class FunctionLowerer
         // The implementation stands in a shape's block or a blanket block (05 §13 rules 6, 8),
         // where no symbol of the type holds the conformance: the sema says which block gives it at
         // this instance, and the call is the block method's instance for the type.
+        // The constraint's instance, 'Into<Centimeters>', binds what only the block's conformance
+        // names (05 §13 rule 9).
         if (_types.RefOf(member) is FunctionSymbol promised
-            && _types.ConformanceBlock?.Invoke(concrete, promised) is { } through)
+            && _types.ConformanceBlock?.Invoke(concrete, promised,
+                _types.ConstraintInstanceOf(member) is { } asked ? SubstituteType(asked) : null) is { } through)
         {
             if (through.Method is { } implementation)
-                return LowerBlockMethodCall(member, implementation, through.Block, concrete, expr);
+                return LowerBlockMethodCall(member, implementation, through.Block, concrete, expr, open: through.Open);
             // The block leaves the member to the interface's default: its instance for the type.
             return DirectDefault(member) is { } viaBlock
                 ? LowerDefaultCall(member, viaBlock, concrete, expr)

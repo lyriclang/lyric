@@ -1264,13 +1264,13 @@ public sealed class TypeChecker
         // written out beside its child is one conformance (§1.3), and what a chain reaches is
         // not written twice by being reached twice. Across sites the same direct interface on
         // overlapping instances is the duplicate.
-        var seen = new List<(int Site, TypeSymbol Target, LyrType Instance, LyrType Iface)>();
+        var seen = new List<(int Site, TypeSymbol Target, LyrType Instance, LyrType Iface, Span At)>();
         var site = 0;
         void Note(TypeSymbol target, LyrType instance, TypeNode node, LyrType self, SymbolTable scope)
         {
             if (Conformance.InterfaceOf(node, _binding) is not { } iface) return;
             var ifaceInstance = Substitute(ResolveType(node, scope), SelfMap(iface, self));
-            foreach (var (priorSite, priorTarget, priorInstance, priorIface) in seen)
+            foreach (var (priorSite, priorTarget, priorInstance, priorIface, _) in seen)
                 if (priorSite != site && ReferenceEquals(priorTarget, target) && TypeFacts.Overlaps(priorInstance, instance)
                     && TypeFacts.Overlaps(priorIface, ifaceInstance))
                 {
@@ -1278,7 +1278,7 @@ public sealed class TypeChecker
                         $"'{TypeFacts.Display(instance)}' conforms to '{TypeFacts.Display(ifaceInstance)}' twice — one conformance per type and interface, whole-program; no specialization");
                     break;
                 }
-            seen.Add((site, target, instance, ifaceInstance));
+            seen.Add((site, target, instance, ifaceInstance, NodeSpan(node)));
         }
         foreach (var module in _comp.Modules)
         {
@@ -1324,13 +1324,23 @@ public sealed class TypeChecker
                 TypeSymbol? SharedWith(IEnumerable<TypeSymbol> other) =>
                     other.FirstOrDefault(p => reached.Any(r => ReferenceEquals(r, p)));
                 string? clash = null;
+                // Said at the type's own conformance, the one the blanket excludes (rule 8): a
+                // blanket of the library cannot be changed where it stands, the program's can.
+                var excluded = false;
                 if (block.IsBlanketTarget)
-                    foreach (var (_, _, instance, priorIface) in seen)
+                    foreach (var (_, _, instance, priorIface, priorAt) in seen)
                         if (TypeFacts.SymbolOf(priorIface) is { } written
                             && SharedWith(Conformance.WithParents(written, _binding)) is { } shared
-                            && BlockSubstitution(block, instance) is not null)
-                        { clash = $"'{TypeFacts.Display(instance)}' conforms to '{shared.Name}' on its own, and this block gives it to every type its constraints admit"; break; }
-                if (clash is null)
+                            && ReachesInTheProgram(block, instance, priorIface))
+                        {
+                            _de.Report("LYR-SEM0133", Severity.Error, priorAt,
+                                $"'{TypeFacts.Display(instance)}' conforms to '{TypeFacts.Display(priorIface)}' on its own, and a blanket block "
+                                + $"gives '{shared.Name}' to every type its constraints admit, this one included — one conformance per type "
+                                + "and interface, whole-program; no specialization",
+                                new DiagnosticNote(NodeSpan(node), "the blanket block's conformance"));
+                            excluded = true;
+                        }
+                if (clash is null && !excluded)
                     foreach (var (prior, priorTarget, priorChain) in blockSites)
                         if (Meets(block, target, prior, priorTarget) && SharedWith(priorChain) is { } shared)
                         { clash = $"another block gives '{shared.Name}' to '{TypeFacts.Display(priorTarget)}'"; break; }
@@ -1342,6 +1352,18 @@ public sealed class TypeChecker
             blockSites.Add((block, target, chain));
         }
         _currentModule = null;
+    }
+
+    /// <summary>Whether a blanket block reaches a type at the instance its own conformance names
+    /// (05 §13 rules 8, 9): asked of the whole program, as coherence is (rule 4) — the block that
+    /// makes <c>int</c> a <c>From&lt;Meters&gt;</c> stands where the type does, not where the blanket
+    /// does, and from std.core it was not seen.</summary>
+    private bool ReachesInTheProgram(ExtensionBlock block, LyrType instance, LyrType wanted)
+    {
+        var saved = _currentModule;
+        _currentModule = null;
+        try { return BlockSubstitution(block, instance, wanted) is not null; }
+        finally { _currentModule = saved; }
     }
 
     /// <summary>
@@ -1432,20 +1454,34 @@ public sealed class TypeChecker
     /// the block's constraints holding for what the match bound — <c>extend&lt;T :: [Display]&gt;
     /// List&lt;T&gt;</c> applies to <c>List&lt;int&gt;</c> and not to <c>List&lt;Foo&gt;</c>.
     /// <c>null</c> where it does not apply.
+    /// <para>A parameter only the conformance names (05 §13 rule 9) takes its answer from
+    /// <paramref name="wanted"/>, the instance a constraint asks for. Where none is asked — a
+    /// member looked up on a receiver, which the call then binds — <paramref name="open"/> leaves
+    /// it unbound, and the constraints that still name it unchecked.</para>
     /// </summary>
-    private Dictionary<GenericParamSymbol, LyrType>? BlockSubstitution(ExtensionBlock block, LyrType receiver)
+    private Dictionary<GenericParamSymbol, LyrType>? BlockSubstitution(ExtensionBlock block, LyrType receiver,
+        LyrType? wanted = null, bool open = false)
     {
         var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
         if (!TypeFacts.Match(BlockTargetType(block), receiver, map)) return null;
         FixationBindingsOf(block);
         if (!ApplyFixations(block, map)) return null;
+        var openParameters = OpenParametersOf(block);
+        if (wanted is GenericInstance asked && openParameters.Length > 0) BindOpenParameters(block, receiver, asked, map);
         foreach (var g in block.Generics)
         {
-            if (!map.TryGetValue(g, out var bound)) return null;
+            if (!map.TryGetValue(g, out var bound))
+            {
+                if (open && openParameters.Contains(g)) continue;
+                return null;
+            }
             foreach (var c in g.Constraints)
-                if (ConstraintInterface(c) is { } ci
-                    && !Satisfies(bound, ci, Substitute(ResolveType(c, block.MethodScope), map)))
-                    return null;
+            {
+                if (ConstraintInterface(c) is not { } ci) continue;
+                var required = Substitute(ResolveType(c, block.MethodScope), map);
+                if (open && openParameters.Any(p => !map.ContainsKey(p) && MentionsParam(required, p))) continue;
+                if (!Satisfies(bound, ci, required)) return null;
+            }
         }
         return map;
     }
@@ -1500,6 +1536,15 @@ public sealed class TypeChecker
         if (block.UnboundParameters is { } known) return known;
         if (block.Generics.Length == 0 || BlockTargetType(block) is not { IsError: false } target)
             return block.UnboundParameters = [];
+        var bound = BoundByTheReceiver(block, target);
+        var open = OpenParametersOf(block);
+        return block.UnboundParameters = block.Generics.Where(g => !bound.Contains(g) && !open.Contains(g)).ToArray();
+    }
+
+    /// <summary>The block's parameters a receiver binds: those the target names, and those a
+    /// fixation of a bound parameter's constraint names (05 §13 rule 2).</summary>
+    private HashSet<GenericParamSymbol> BoundByTheReceiver(ExtensionBlock block, LyrType target)
+    {
         var bound = new HashSet<GenericParamSymbol>(ReferenceEqualityComparer.Instance);
         foreach (var g in block.Generics)
             if (MentionsParam(target, g)) bound.Add(g);
@@ -1512,7 +1557,47 @@ public sealed class TypeChecker
                     foreach (var n in named)
                         if (bound.Add(n)) grew = true;
         }
-        return block.UnboundParameters = block.Generics.Where(g => !bound.Contains(g)).ToArray();
+        return bound;
+    }
+
+    /// <summary>
+    /// The block's parameters only its conformance names (05 §13 rule 9): <c>U</c> in
+    /// <c>extend&lt;T, U :: [From&lt;T&gt;]&gt; T :: [Into&lt;U&gt;]</c> (10 B4). No receiver binds them;
+    /// the instance a constraint asks for does — <c>Into&lt;Centimeters&gt;</c> binds <c>U</c> —,
+    /// and at a call of the block's member the call does, as it binds the member's own parameters
+    /// (03 T8: the arguments, then the type the position expects). Once per block.
+    /// </summary>
+    private GenericParamSymbol[] OpenParametersOf(ExtensionBlock block)
+    {
+        if (block.OpenParameters is { } known) return known;
+        block.OpenParameters = []; // a conformance naming the block again finds none yet
+        if (block.Generics.Length == 0 || block.Decl.Interfaces.Length == 0
+            || BlockTargetType(block) is not { IsError: false } target)
+            return block.OpenParameters;
+        var bound = BoundByTheReceiver(block, target);
+        var named = block.Decl.Interfaces.Select(node => ResolveType(node, block.MethodScope)).ToArray();
+        return block.OpenParameters = block.Generics
+            .Where(g => !bound.Contains(g) && named.Any(conformance => MentionsParam(conformance, g))).ToArray();
+    }
+
+    /// <summary>The block's open parameters (<see cref="OpenParametersOf"/>) bound by the instance
+    /// asked for: each conformance of the block, its chain included, matched against
+    /// <paramref name="wanted"/> where it is of the same interface — the first that matches.</summary>
+    private void BindOpenParameters(ExtensionBlock block, LyrType receiver, GenericInstance wanted,
+        Dictionary<GenericParamSymbol, LyrType> map)
+    {
+        foreach (var node in block.Decl.Interfaces)
+        {
+            if (Conformance.InterfaceOf(node, _binding) is not { } direct) continue;
+            foreach (var (iface, instance) in InterfaceClosure(direct, ResolveType(node, block.MethodScope)))
+            {
+                if (!ReferenceEquals(iface, wanted.Definition)) continue;
+                var trial = new Dictionary<GenericParamSymbol, LyrType>(map, ReferenceEqualityComparer.Instance);
+                if (!TypeFacts.Match(Substitute(Substitute(instance, SelfMap(iface, receiver)), map), wanted, trial)) continue;
+                foreach (var (p, t) in trial) map.TryAdd(p, t);
+                return;
+            }
+        }
     }
 
     /// <summary>
@@ -5959,6 +6044,14 @@ public sealed class TypeChecker
             return target;
         }
 
+        // 'as' through 'Into' is 4.x's. Lyric 5's 'as' converts numbers only (04 D6, 03 §1.4); its
+        // std.core has an 'Into' too since M8c S7, and the desugar found it.
+        if (_coreFormat is not null)
+            return Report(c.Span, "LYR-SEM0006",
+                $"cannot cast '{TypeFacts.Display(op)}' to '{TypeFacts.Display(target)}' — 'as' converts numbers only; "
+                + $"a conversion is a method: '{TypeFacts.Display(target)}.from(v)' or 'v.into()', through a "
+                + $"'From<{TypeFacts.Display(op)}>' of '{TypeFacts.Display(target)}'");
+
         if (_into is { } into && (CanConform(op) || op is PrimitiveType)
             && Satisfies(op, into, new GenericInstance(into, [target])))
         {
@@ -6635,7 +6728,15 @@ public sealed class TypeChecker
             }
             if (map.Count > 0) expecting = (FnType)Substitute(fn, map);
         }
-        GenericParamSymbol[] inferable = [.. openReceiver?.Params ?? [], .. fsym?.Generics ?? []];
+        // A member of a block whose parameter only the conformance names (05 §13 rule 9): the
+        // receiver left it open, and the call binds it as it binds the member's own — 'm.into()'
+        // takes its 'U' from the type the position expects.
+        var owningBlock = fsym is not null && call.Callee is MemberExpr && _comp.Extensions.BlockOf(fsym) is { Generics.Length: > 0 } ownedBy
+            ? ownedBy : null;
+        var openInBlock = owningBlock is not null
+            ? OpenParametersOf(owningBlock).Where(p => MentionsParam(fn, p)).ToArray()
+            : [];
+        GenericParamSymbol[] inferable = [.. openReceiver?.Params ?? [], .. openInBlock, .. fsym?.Generics ?? []];
 
         for (var i = 0; i < args.Length; i++)
             if (args[i] is { } given && given is not LambdaExpr)
@@ -6713,11 +6814,10 @@ public sealed class TypeChecker
                 UnifyInfer(fn.Return, expected, map, call.Span);
 
             // A block's member (05 §13 rules 2, 7): its own constraints may name the block's
-            // parameters, 'chain<B :: [Iterator<Item = I.Item>]>', which the receiver binds.
-            if (fsym is not null && call.Callee is MemberExpr { Target: var receiverExpr }
-                && _comp.Extensions.Blocks.FirstOrDefault(b => b.Generics.Length > 0
-                    && ReferenceEquals(b.MethodScope.LookupLocal(fsym!.Name), fsym)) is { } owningBlock
-                && BlockSubstitution(owningBlock, _result.TypeOf(receiverExpr)) is { } blockMap)
+            // parameters, 'chain<B :: [Iterator<Item = I.Item>]>', which the receiver binds —
+            // and the receiver alone, the open ones (rule 9) bound above, their constraints below.
+            if (owningBlock is not null && call.Callee is MemberExpr { Target: var receiverExpr }
+                && BlockSubstitution(owningBlock, _result.TypeOf(receiverExpr), open: true) is { } blockMap)
                 foreach (var (param, bound) in blockMap) map.TryAdd(param, bound);
 
             CheckInferredConstraints(inferable, map, call.Span);
@@ -6736,6 +6836,16 @@ public sealed class TypeChecker
                         _de.Report("LYR-SEM0060", Severity.Error, call.Span,
                             $"cannot infer type argument '{generic.Name}' for '{fsym.Name}' — " +
                             "no argument determines it; write it explicitly");
+            if (openInBlock.Length > 0)
+            {
+                if (openInBlock.All(map.ContainsKey))
+                    _result.SetOpenBlockArguments(call, openInBlock.ToDictionary<GenericParamSymbol, GenericParamSymbol, LyrType>(p => p, p => map[p], ReferenceEqualityComparer.Instance));
+                else if (!faulty)
+                    foreach (var open in openInBlock.Where(p => !map.ContainsKey(p)))
+                        _de.Report("LYR-SEM0060", Severity.Error, call.Span,
+                            $"cannot infer '{open.Name}' for '{fsym!.Name}' — the block's conformance names it and nothing here "
+                            + $"determines it; give the call a type to answer: 'let x: … = ….{fsym.Name}(…)'");
+            }
 
             // For monomorphization: which instance is meant is settled here and nowhere else. In
             // declaration order, because that is the identity of the instance.
@@ -7198,7 +7308,7 @@ public sealed class TypeChecker
                 if (s is not null) _result.BindRef(mem, s);
                 return Substitute(t, SubstMap(gi));
             case TypeParamType tp:
-                return BindMember(mem, MemberOfTypeParam(tp.Param, mem.Member, span));
+                return BindMember(mem, MemberOfTypeParam(tp.Param, mem.Member, span, mem));
             case AssocOf assoc:
                 return BindMember(mem, MemberOfAssoc(assoc, mem.Member, span));
             // A string reaches the members written once on its view (10 S1): where its own
@@ -7321,7 +7431,8 @@ public sealed class TypeChecker
             if (!block.IsBlanketTarget) continue;
             if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
             if (block.MethodScope.LookupLocal(member) is not FunctionSymbol found || !MayName(found)) continue;
-            if (BlockSubstitution(block, receiver) is not { } map) continue;
+            // A parameter only the conformance names stays open; the call binds it (05 §13 rule 9).
+            if (BlockSubstitution(block, receiver, open: true) is not { } map) continue;
             if (found.IsStatic)
                 return (Report(span, "LYR-SEM0074", $"'{member}' is a static extension and belongs to the type — the instance form is an error"), found);
             return (Substitute(FnTypeOf(found), map), found);
@@ -7343,13 +7454,18 @@ public sealed class TypeChecker
 
     // Members on a type parameter T: what its constraint interfaces provide — the closure, since
     // a constraint on the child interface implies the parents' members too.
-    private (LyrType, Symbol?) MemberOfTypeParam(GenericParamSymbol gp, string member, Span span)
+    private (LyrType, Symbol?) MemberOfTypeParam(GenericParamSymbol gp, string member, Span span, MemberExpr? at = null)
     {
         foreach (var c in gp.Constraints)
         {
             if (c is not NamedType nt) continue;
             foreach (var (it, subst) in ClosureOfNode(nt))
             {
+                // The interface instance the member belongs to, for a block that gives it at the
+                // instance with a parameter only its conformance names (05 §13 rule 9).
+                if (at is not null && it.Generics.Length > 0 && it.Members.LookupLocal(member) is FunctionSymbol)
+                    _result.RecordConstraintInstance(at, new GenericInstance(it,
+                        it.Generics.Select(g => subst.TryGetValue(g, out var a) ? a : new TypeParamType(g)).ToArray()));
                 if (it.Members.LookupLocal(member) is GlobalSymbol)
                     return (Report(span, "LYR-SEM0055",
                         $"'{member}' is a static member of '{it.Name}' — read it on the type parameter: '{gp.Name}.{member}'"), null);
@@ -8438,7 +8554,7 @@ public sealed class TypeChecker
             // parameters — reaches where its target matches the instance and its constraints hold
             // for what the match bound; the lowering builds a row for exactly the instances
             // proved here.
-            if (BlockSubstitution(block, self) is not { } blockMap) continue;
+            if (BlockSubstitution(block, self, wanted) is not { } blockMap) continue;
             foreach (var node in block.Decl.Interfaces)
                 if (NodeReaches(node, block.MethodScope, iface, wanted, blockMap, self))
                 {
@@ -8492,7 +8608,7 @@ public sealed class TypeChecker
             if (!_blockProbes.Add(probe)) continue;
             try
             {
-                if (BlockSubstitution(block, type) is not { } map) continue;
+                if (BlockSubstitution(block, type, wanted) is not { } map) continue;
                 foreach (var node in block.Decl.Interfaces)
                     if (NodeReaches(node, block.MethodScope, iface, wanted, map, type))
                     {
@@ -8613,7 +8729,8 @@ public sealed class TypeChecker
         finally { _currentModule = saved; }
     }
 
-    private (ExtensionBlock Block, FunctionSymbol? Method)? ConformanceBlockFor(LyrType concrete, FunctionSymbol promised)
+    private (ExtensionBlock Block, FunctionSymbol? Method, IReadOnlyDictionary<GenericParamSymbol, LyrType> Open)? ConformanceBlockFor(
+        LyrType concrete, FunctionSymbol promised, LyrType? wanted)
     {
         var saved = _currentModule;
         _currentModule = null;
@@ -8624,7 +8741,10 @@ public sealed class TypeChecker
                 if (block.Decl.Interfaces.Length == 0
                     || !(block.IsBlanketTarget || ((IsShape(concrete) || concrete is CoroutineOf) && IsShapeBlock(block))))
                     continue;
-                if (BlockSubstitution(block, concrete) is not { } map) continue;
+                // The instance the constraint asks for binds what only the conformance names (05 §13
+                // rule 9); without one such a block reaches the type for no instance in particular.
+                if (BlockSubstitution(block, concrete, wanted) is not { } map) continue;
+                var open = OpenParametersOf(block).Where(map.ContainsKey).ToDictionary<GenericParamSymbol, GenericParamSymbol, LyrType>(p => p, p => map[p], ReferenceEqualityComparer.Instance);
                 foreach (var node in block.Decl.Interfaces)
                 {
                     if (Conformance.InterfaceOf(node, _binding) is not { } direct) continue;
@@ -8637,7 +8757,7 @@ public sealed class TypeChecker
                         _withoutBlocks = true;
                         try { own = Satisfies(concrete, iface, given); }
                         finally { _withoutBlocks = false; }
-                        return own ? null : (block, block.MethodScope.LookupLocal(promised.Name) as FunctionSymbol);
+                        return own ? null : (block, block.MethodScope.LookupLocal(promised.Name) as FunctionSymbol, open);
                     }
                 }
             }
@@ -8821,7 +8941,7 @@ public sealed class TypeChecker
         receiver ??= _memberReceiver; // a static member names its receiver: 'Box<int>.default()'
         if (_comp.Extensions.BlockOf(ext) is not { Decl.Target: NamedType { TypeArguments.Length: > 0 } } block
             || receiver is null) return signature;
-        if (BlockSubstitution(block, receiver) is { } map) return Substitute(signature, map);
+        if (BlockSubstitution(block, receiver, open: true) is { } map) return Substitute(signature, map);
         // A block on one instance adds to that instance alone: elsewhere the member is simply
         // not there. A generic block's constraints failing is worth the sentence.
         if (block.Generics.Length == 0)
