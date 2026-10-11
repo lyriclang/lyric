@@ -5972,7 +5972,7 @@ public sealed class TypeChecker
                     $"no type test on the type parameter '{tp.Param.Name}' (03 T11): a value of 'Any' is what a dynamic test takes");
                 return false;
             case NamedRef { Symbol.Kind: TypeSymbolKind.Interface } or GenericInstance { Definition.Kind: TypeSymbolKind.Interface }:
-                if (!ValueUsable(TypeFacts.SymbolOf(target)!, out var reason))
+                if (!ValueUsable(TypeFacts.SymbolOf(target)!, out var reason, target))
                 {
                     _de.Report("LYR-SEM0126", Severity.Error, span,
                         $"'{TypeFacts.Display(target)}' is a constraint, not a type for a value: {reason}");
@@ -7314,6 +7314,15 @@ public sealed class TypeChecker
             case GenericInstance gi:
                 var (t, s) = InstanceMember(gi.Definition, mem.Member, span);
                 if (s is not null) _result.BindRef(mem, s);
+                // A value of an interface with its associated types fixed (03 M4-1): 'Self' is the
+                // value — its own interface's and a parent's — so 'Self.Item' reads the fixation.
+                if (gi.Definition.Kind == TypeSymbolKind.Interface && gi.Fixations is { Length: > 0 })
+                {
+                    var asValue = SubstMap(gi);
+                    foreach (var part in Conformance.WithParents(gi.Definition, _binding))
+                        if (part.SelfParam is { } selfOfPart) asValue[selfOfPart] = gi;
+                    return Substitute(t, asValue);
+                }
                 return Substitute(t, SubstMap(gi));
             case TypeParamType tp:
                 return BindMember(mem, MemberOfTypeParam(tp.Param, mem.Member, span, mem));
@@ -7671,6 +7680,12 @@ public sealed class TypeChecker
         switch (@base)
         {
             case TypeParamType or AssocOf: return new AssocOf(@base, member);
+            // A value of an interface (03 M4-1): what its type fixes, 'Iterator<Item = int>', else the
+            // interface's default — its 'Error' is 'never'.
+            case GenericInstance { Definition.Kind: TypeSymbolKind.Interface } face
+                when (face.Fixations?.FirstOrDefault(f => ReferenceEquals(f.Member, member)) is { Member: not null } written
+                         ? written.Type : member.Default) is { } given:
+                return given;
             case NamedRef nr when member.Answer(nr.Symbol, instance) is { } bound: return bound;
             case GenericInstance gi when member.Answer(gi.Definition, instance) is { } bound:
                 return Substitute(bound, SubstMap(gi));
@@ -7886,6 +7901,12 @@ public sealed class TypeChecker
                 if (symbol is not TypeSymbol { Kind: TypeSymbolKind.Interface } iface || !DeclaredInModule(iface, module)) continue;
                 foreach (var member in iface.Members.Symbols.OfType<AssociatedTypeSymbol>())
                 {
+                    // The default a value of the interface answers with (03 M4-1), where it is one
+                    // type for every value — no 'Self' in it.
+                    if (member.Declaration is AssociatedTypeDecl { Type: { } byDefault }
+                        && ResolveType(byDefault, DeclarationScope(iface)) is var defaultAnswer
+                        && (iface.SelfParam is not { } selfParam || !MentionsParam(defaultAnswer, selfParam)))
+                        member.Default = defaultAnswer;
                     if (member.Declaration is not AssociatedTypeDecl { Bounds.Length: > 0 } decl)
                     {
                         if (member.Declaration is AssociatedTypeDecl { Type: NamedType { Path: ["never"], TypeArguments.Length: 0 } unbounded })
@@ -8535,7 +8556,14 @@ public sealed class TypeChecker
     /// <c>Src&lt;string&gt;</c> — so the same <c>Matches</c> decides it as everywhere else.</para>
     /// </summary>
     private static bool IsTheConstraint(LyrType arg, TypeSymbol ts, TypeSymbol iface, LyrType wanted) =>
-        ReferenceEquals(ts, iface) && Matches(arg, EmptySubst, wanted);
+        ReferenceEquals(ts, iface) && (Matches(arg, EmptySubst, wanted)
+            // A value with its associated types fixed is a value of its interface (03 M4-1): what a
+            // constraint fixes as well, it answers alike — 'Iterator<Item = int>' is an 'Iterator',
+            // and an 'Iterator<Item = int>', and no 'Iterator<Item = string>'.
+            || arg is GenericInstance { Fixations.Length: > 0 } fixedArg
+               && Matches(WithoutFixations(fixedArg), EmptySubst, WithoutFixations(wanted))
+               && (wanted is not GenericInstance { Fixations: { } asked }
+                   || asked.All(w => LyrType.Equal(ResolveAssociated(fixedArg, w.Member), w.Type))));
 
     // Conformance through the declared interfaces OR a visible `extend T :: [I]` block — each
     // reaching through its parents: declaring the child implies the whole chain.
@@ -11763,7 +11791,7 @@ public sealed class TypeChecker
         // member naming 'Self' beyond the receiver, a static, a generic one — is a constraint
         // and no type for a value; said where the value would come to be.
         if (TypeFacts.KindOf(liftedTo) == TypeSymbolKind.Interface && !LyrType.Equal(from, liftedTo) && !from.IsError
-            && TypeFacts.SymbolOf(liftedTo) is { } boxedInto && !ValueUsable(boxedInto, out var why))
+            && TypeFacts.SymbolOf(liftedTo) is { } boxedInto && !ValueUsable(boxedInto, out var why, liftedTo))
         {
             _de.Report("LYR-SEM0126", Severity.Error, span,
                 $"'{boxedInto.Name}' is usable as a constraint only, not as the type of a value — {why}; "
@@ -11802,6 +11830,7 @@ public sealed class TypeChecker
                 ? " — two different types share this name (declared in different scopes, or a "
                   + "generic call instantiating itself at a larger type, which cannot be "
                   + "monomorphized)"
+                : FixationMismatch(from, to) is { } differs ? $" — {differs}"
                 : "";
             _de.Report("LYR-SEM0001", Severity.Error, span,
                 $"cannot assign '{fromText}' to '{toText}'{hint}");
@@ -12006,17 +12035,27 @@ public sealed class TypeChecker
     /// names <c>Self</c> outside the receiver, is static, or is generic — a table slot holds one
     /// function for every conformer, and such a member has no one function. Such an interface is
     /// a constraint, and the diagnostic says so where a value of it would arise.
+    /// <para>An interface with associated types is a value's type where <paramref name="instance"/>
+    /// answers every one of them — fixed, <c>Iterator&lt;Item = int&gt;</c>, or by the interface's
+    /// default, its <c>Error</c> (03 M4-1, T6) —; a member typed by <c>Self.Item</c> then has one
+    /// signature for every value.</para>
     /// </summary>
-    private bool ValueUsable(TypeSymbol iface, out string reason)
+    private bool ValueUsable(TypeSymbol iface, out string reason, LyrType? instance = null)
     {
         foreach (var part in Conformance.WithParents(iface, _binding))
             foreach (var symbol in part.Members.Symbols)
             {
-                // A value of it would need the associated type fixed, 'Iterator<Item = int>' (03
-                // T6, 04 D9); such values come with M8c (03 M4-1). Asked before 'Self',
-                // which 'Self.Item' mentions as well.
-                if (symbol is AssociatedTypeSymbol assoc)
-                { reason = $"it declares the associated type '{assoc.Name}', and a value of it would fix that type — not yet"; return false; }
+                // A value fixes its associated types, 'Iterator<Item = int>' (03 M4-1, T6, 04 D9),
+                // or leaves one to the interface's default. Asked before 'Self', which 'Self.Item'
+                // mentions as well.
+                if (symbol is AssociatedTypeSymbol assoc
+                    && (instance is null || ResolveAssociated(instance, assoc) is AssocOf))
+                {
+                    reason = instance is null
+                        ? $"it declares the associated type '{assoc.Name}', and a value of it fixes that type — '{iface.Name}<{assoc.Name} = …>'"
+                        : $"its associated type '{assoc.Name}' is not fixed — '{iface.Name}<{assoc.Name} = …>'";
+                    return false;
+                }
                 if (symbol is GlobalSymbol constant)
                 { reason = $"it declares the static member '{constant.Name}'"; return false; }
                 if (symbol is not FunctionSymbol fn) continue;
@@ -12037,13 +12076,33 @@ public sealed class TypeChecker
                 // (D9's generic members are the first loop's. The 4.x library reaches
                 // 'Iterator<T>' values with a generic 'map' — 05 §5.2a of the 4.x text,
                 // monomorphized and not overridable — and keeps them in its own path.)
+                // 'Self.Item' is an answer the value's type fixes; 'Self' itself — 'equals(o: Self)' —
+                // is the one type no table has a function for.
                 if (part.SelfParam is { } self && FnTypeOf(fn) is { } signature
-                    && signature.Parameters.Append(signature.Return).Any(t => MentionsParam(t, self)))
+                    && signature.Parameters.Append(signature.Return)
+                        .Any(t => instance is null ? MentionsParam(t, self) : NamesSelfItself(t, self)))
                 { reason = $"its member '{fn.Name}' names 'Self'"; return false; }
             }
         reason = "";
         return true;
     }
+
+    /// <summary>Whether a type names <paramref name="self"/> other than as the base of an associated
+    /// type, <c>Self.Item</c>: what a fixed value of the interface does not answer.</summary>
+    private static bool NamesSelfItself(LyrType type, GenericParamSymbol self) => type switch
+    {
+        TypeParamType tp => ReferenceEquals(tp.Param, self),
+        AssocOf { Base: TypeParamType } => false,
+        AssocOf a => NamesSelfItself(a.Base, self),
+        Optional o => NamesSelfItself(o.Inner, self),
+        ArrayOf a => NamesSelfItself(a.Element, self),
+        SliceOf s => NamesSelfItself(s.Element, self),
+        InlineArrayOf ia => NamesSelfItself(ia.Element, self),
+        TupleOf tu => tu.Elements.Any(e => NamesSelfItself(e, self)),
+        FnType f => f.Parameters.Any(p => NamesSelfItself(p, self)) || NamesSelfItself(f.Return, self),
+        GenericInstance g => g.Arguments.Any(a => NamesSelfItself(a, self)),
+        _ => false,
+    };
 
     private static bool MentionsParam(LyrType type, GenericParamSymbol param) => type switch
     {
@@ -12062,6 +12121,24 @@ public sealed class TypeChecker
         _ => false,
     };
 
+    /// <summary>Why a type that conforms is no value of a fixed interface (03 M4-1): the first
+    /// associated type it answers otherwise than the value — <c>'Countdown' answers 'Error' with
+    /// 'Oops', the value with 'never'</c>. <c>null</c> where that is not the reason.</summary>
+    private string? FixationMismatch(LyrType from, LyrType to)
+    {
+        if (to is not GenericInstance { Definition.Kind: TypeSymbolKind.Interface, Fixations.Length: > 0 } face) return null;
+        if (!Satisfies(from, face.Definition, new NamedRef(face.Definition))) return null;
+        foreach (var member in Conformance.WithParents(face.Definition, _binding).SelectMany(part => part.Members.Symbols.OfType<AssociatedTypeSymbol>()))
+        {
+            var answered = ReduceFixed(ResolveAssociated(from, member));
+            var asked = ResolveAssociated(face, member);
+            if (!LyrType.Equal(answered, asked))
+                return $"'{TypeFacts.Display(from)}' answers '{member.Name}' with '{TypeFacts.Display(answered)}', "
+                       + $"the value with '{TypeFacts.Display(asked)}'";
+        }
+        return null;
+    }
+
     private bool ImplementsInterface(LyrType from, LyrType to)
     {
         // The target may be a generic interface ('Src<int>'), in which case it is a GenericInstance
@@ -12069,6 +12146,19 @@ public sealed class TypeChecker
         // error and 'Iterator<T>' is unusable.
         if (TypeFacts.KindOf(to) != TypeSymbolKind.Interface) return false;
         var target = TypeFacts.SymbolOf(to)!;
+
+        // A value of an interface with its associated types fixed (03 M4-1) holds a type that
+        // answers EVERY one of them as the value does — the fixed ones as written, the others as
+        // the interface's default: a throwing iterator is no 'Iterator<Item = int>', whose 'Error'
+        // is 'never', or a call through the value would throw what its type says it cannot. The
+        // table rows are built by the same rule.
+        // A type parameter answers through its constraints' fixations, and one they leave open is
+        // no answer: its instance may throw.
+        if (to is GenericInstance { Fixations.Length: > 0 } face && !LyrType.Equal(from, to)
+            && !Conformance.WithParents(target, _binding)
+                .SelectMany(part => part.Members.Symbols.OfType<AssociatedTypeSymbol>())
+                .All(member => LyrType.Equal(ReduceFixed(ResolveAssociated(from, member)), ResolveAssociated(face, member))))
+            return false;
 
         // Conformance may be DECLARED ('class P :: [I]') or come from a visible 'extend P :: [I]'.
         // Both are the same question, so one function answers it.

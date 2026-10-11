@@ -1065,7 +1065,7 @@ public static class ModuleLowerer
         var impls = new List<IrImpl>();
         var interned = typeTable.Interned.ToList();
         var interfaces = interned.Where(t => t.Symbol.Kind == TypeSymbolKind.Interface).ToList();
-        if (interfaces.Count == 0) return impls;
+        if (interfaces.Count == 0 && typeTable.FixedInterfaces.Count == 0) return impls;
 
         foreach (var (type, typeId) in interned
                      .Where(t => t.Symbol.Kind is TypeSymbolKind.Class or TypeSymbolKind.Struct
@@ -1215,7 +1215,67 @@ public static class ModuleLowerer
             }
         }
 
+        // A value of an interface with its associated types fixed (03 M4-1): a row for each type
+        // that conforms and answers as the value is written — 'SliceIter<int>' for 'Iterator<Item =
+        // int>', no 'SliceIter<string>' —, a slot from the type's members, else the interface's
+        // default for the type, whose 'this' is the type's value (04 D9).
+        foreach (var (fixedType, fixedId) in typeTable.FixedInterfaces)
+        {
+            var iface = fixedType.Definition;
+            foreach (var (type, typeId) in interned
+                         .Where(t => t.Symbol.Kind is TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum)
+                         .OrderBy(t => t.Id.Value))
+            {
+                var ofInstance = typeTable.InstanceOf(typeId);
+                LyrType concrete = ofInstance is not null ? ofInstance : new NamedRef(type);
+                var viaExtension = ExtendBlocksFor(compilation, type, iface, binding)
+                    .Where(b => b.Decl.Target is not NamedType { TypeArguments.Length: > 0 }
+                                || (ofInstance is not null && types.BlockConformanceRecorded(ofInstance, iface, b)))
+                    .ToList();
+                if (!Conformance.Implements(type, iface, binding) && viaExtension.Count == 0) continue;
+                if (!AnswersAsTheValue(concrete, fixedType, binding)) continue;
+                var slots = typeTable.MethodSlotsOf(fixedId);
+                var methods = new FunctionId[slots.Length];
+                var complete = true;
+                for (var i = 0; i < slots.Length; i++)
+                {
+                    var target = ResolveInInstance(typeTable, typeId, slots[i], instances)
+                                 ?? Resolve(type, slots[i], ids)
+                                 ?? ResolveInExtensions(viaExtension, slots[i], extensions, typeTable, typeId, instances)
+                                 ?? DefaultFor(iface, slots[i], concrete, instances, binding);
+                    if (target is { } id) { methods[i] = id; continue; }
+                    LoweringDiagnostics.ReportUnsupported(de, type.Declaration?.Span ?? default,
+                        $"'{type.Name}' is an '{TypeFacts.Display(fixedType)}', but its '{slots[i]}' is not lowerable");
+                    complete = false;
+                    break;
+                }
+                if (complete) impls.Add(new IrImpl(typeId, fixedId, methods));
+                else failed = true;
+            }
+        }
+
         return impls;
+    }
+
+    /// <summary>Whether a type answers every associated type of a fixed interface value as the
+    /// value does (03 M4-1): the fixed ones as written, the others as the interface's default —
+    /// a throwing iterator is no value of an <c>Iterator&lt;Item = string&gt;</c>, whose
+    /// <c>Error</c> is <c>never</c>.</summary>
+    private static bool AnswersAsTheValue(LyrType concrete, GenericInstance fixedType, BindingResult binding) =>
+        Conformance.WithParents(fixedType.Definition, binding)
+            .SelectMany(part => part.Members.Symbols.OfType<AssociatedTypeSymbol>())
+            .All(member => LyrType.Equal(TypeChecker.ResolveAssociated(concrete, member),
+                                         TypeChecker.ResolveAssociated(fixedType, member)));
+
+    /// <summary>The interface's default of a slot for one conformer (04 D9): an instance whose
+    /// 'Self' is the conformer — what a fixed value's row holds where the type leaves it.</summary>
+    private static FunctionId? DefaultFor(TypeSymbol iface, string slot, LyrType conformer,
+        InstanceTable instances, BindingResult binding)
+    {
+        foreach (var part in Conformance.WithParents(iface, binding))
+            if (part.Members.LookupLocal(slot) is FunctionSymbol { Declaration: FunctionDecl { Body: not null } decl } method)
+                return instances.RequestDefault(method, decl, part, conformer, decl.Span);
+        return null;
     }
 
     /// <summary>

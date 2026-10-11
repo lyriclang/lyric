@@ -1,0 +1,81 @@
+// An interface value with its associated types fixed (03 M4-1, T6; M8c S9a): 'Iterator<Item = int>'
+// taken and given, walked by 'for' and by 'next()', two iterators behind one type, a throwing one
+// with its Error fixed, a generic body lifting what its constraint fixes.
+import std.test { assertEq, assertTrue };
+
+class Oops :: [Error] {
+    fn message(): string {
+        return "oops";
+    }
+}
+
+struct Countdown :: [Iterator] {
+    type Item = int;
+    type Error = Oops;
+    var n: int,
+
+    mut fn next(): ?int throws Oops {
+        if (this.n == 0) {
+            throw Oops { };
+        }
+        this.n -= 1;
+        return this.n;
+    }
+}
+
+fn evens(xs: int[]): Iterator<Item = int> {
+    return xs.iter().filter((x: int) => x % 2 == 0);
+}
+
+fn sum(it: Iterator<Item = int>): int {
+    var total = 0;
+    for (x in it) {
+        total += x;
+    }
+    return total;
+}
+
+fn lift<T :: [Iterator<Item = int, Error = never>]>(t: T): Iterator<Item = int> {
+    return t;
+}
+
+@Test
+fn aValueIsTakenAndGiven(): void {
+    let xs = [1, 2, 3, 4, 5, 6];
+    assertEq(sum(evens(xs)), 12);
+    var source: Iterator<Item = int> = xs.iter();
+    var seen = 0;
+    var next = source.next();
+    while (next != null) {
+        seen += 1;
+        next = source.next();
+    }
+    assertEq(seen, 6);
+}
+
+@Test
+fn twoIteratorsStandBehindOneType(): void {
+    let xs = [1, 2, 3, 4];
+    let both: Iterator<Item = int>[] = [xs.iter(), xs.iter().map((x: int) => x * 10)];
+    let (low, high) = both[0].sizeHint();
+    assertEq(low, 4);
+    assertTrue(high! == 4);
+    assertEq(sum(both[0]) + sum(both[1]), 110);
+    // the value is its box: what the walk took, a copy of the value does not have again
+    let (after, _) = both[0].sizeHint();
+    assertEq(after, 0);
+}
+
+@Test
+fn aThrowingIteratorFixesItsError(): void {
+    var it: Iterator<Item = int, Error = Oops> = Countdown { n = 2 };
+    assertEq((try? it.next())!!, 1);
+    assertEq((try? it.next())!!, 0);
+    assertTrue((try? it.next()) == null);
+}
+
+@Test
+fn aGenericBodyLiftsWhatItsConstraintFixes(): void {
+    let xs = [5, 6];
+    assertEq(sum(lift(xs.iter())), 11);
+}

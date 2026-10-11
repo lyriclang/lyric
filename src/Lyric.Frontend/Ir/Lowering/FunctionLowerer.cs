@@ -7158,7 +7158,9 @@ internal sealed class FunctionLowerer
     /// </summary>
     private TempId? LowerVirtualCall(MemberExpr member, GenericInstance instance, CallExpr expr) =>
         LowerVirtualCall(member, instance.Definition, expr,
-            _typeTable.Intern(instance.Definition, instance.Arguments));
+            // through the instance's type: a value with its associated types fixed has an entry of
+            // its own (03 M4-1)
+            ((IrInterfaceType)_typeTable.InstanceType(instance, member.Span)).Type);
 
     private TempId? LowerVirtualCall(MemberExpr member, TypeSymbol iface, CallExpr expr,
         TypeId? instanceType = null, TempId? receiver = null)
@@ -7209,10 +7211,16 @@ internal sealed class FunctionLowerer
         // 'Iterator<int>' is 'fn(int) -> bool'. Without it the lowering meets a bare T, which is
         // no type at all — the wall every default of a generic interface ran into.
         var owning = _typeTable.InstanceOf(interfaceId);
+        // A value with its associated types fixed (03 M4-1): the declaration writes 'Self.Item',
+        // which the checker read at the value's fixations — its signature is the one to lower.
+        var asFixed = _typeTable.FixedInterfaceOf(interfaceId) is not null && _types.TypeOf(member) is FnType read
+            ? read : null;
 
         for (var i = 0; i < expr.Arguments.Length; i++)
             args[i + 1] = declaration is not null && i < declaration.Parameters.Length
-                ? LowerExprAs(expr.Arguments[i], owning is { } instance
+                ? LowerExprAs(expr.Arguments[i], asFixed is { } fixedSignature && i < fixedSignature.Parameters.Length
+                    ? LowerType(fixedSignature.Parameters[i], expr.Span)
+                    : owning is { } instance
                     ? LowerWithOwner(declaration.Parameters[i].Type, instance, expr.Span)
                     : _typeTable.Lower(declaration.Parameters[i].Type))
                 : LowerExpr(expr.Arguments[i]);
