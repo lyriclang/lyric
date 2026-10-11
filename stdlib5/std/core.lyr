@@ -60,8 +60,9 @@ pub struct RangeFull { }
 
 /// `arrayOf(n, f)` (design/v5/spec/10 C7): an array of `n` elements, the element at `i` the value
 /// of `f(i)` — fresh elements each, where `[x] * n` copies one value into every slot; `f` is
-/// called in order, once per index. A negative `n` panics.
-pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[] {
+/// called in order, once per index. A negative `n` panics; what `f` throws, the call throws, the
+/// array dropped.
+pub fn arrayOf<T, E :: [Error]>(n: int, f: fn(int) -> T throws E): T[] throws E {
     if (n < 0) {
         panic("arrayOf: a negative length");
     }
@@ -71,11 +72,11 @@ pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[] {
     // One allocation, every slot the first value until its own is written. (Joined from the
     // blocks of the length's binary digits, as before, it allocated once per digit and copied
     // every element several times — the most of maps' cache misses, R9c.)
-    let first = f(0);
+    let first = try f(0);
     let whole = filled(n, first);
     var i = 1;
     while (i < n) {
-        whole[i] = f(i);
+        whole[i] = try f(i);
         i = i + 1;
     }
     return whole;
@@ -3335,12 +3336,12 @@ extend<T> Slice<T> {
 
     /// The first index whose element fails `p`, for elements that `p` partitions — every one it
     /// holds for before every one it does not: a binary search.
-    pub fn partitionPoint(p: fn(T) -> bool): int {
+    pub fn partitionPoint<E :: [Error]>(p: fn(T) -> bool throws E): int throws E {
         var lo = 0;
         var hi = this.length();
         while (lo < hi) {
             let mid = lo + (hi - lo) / 2;
-            if (p(this[mid])) {
+            if (try p(this[mid])) {
                 lo = mid + 1;
             } else {
                 hi = mid;
@@ -3421,12 +3422,14 @@ extend<T :: [Display]> Slice<T> {
 extend<T> Slice<T> {
     /// The elements in the order `cmp` gives, equal ones keeping theirs: a merge sort — runs of
     /// 16 sorted by insertion, then merged pairwise through a buffer of the length.
-    pub fn sortBy(cmp: fn(T, T) -> Ordering): void {
+    /// A comparison that throws ends the sort, and the call throws it: the elements are then in
+    /// some order, every one still there — Rust's guarantee where its comparison panics.
+    pub fn sortBy<E :: [Error]>(cmp: fn(T, T) -> Ordering throws E): void throws E {
         let n = this.length();
         var start = 0;
         while (start < n) {
             let end = if (start + 16 < n) start + 16 else n;
-            sortRunBy(this[start..end], cmp);
+            try sortRunBy(this[start..end], cmp);
             start = end;
         }
         if (n <= 16) {
@@ -3435,23 +3438,28 @@ extend<T> Slice<T> {
         let buffer = sortBuffer(this);
         var width = 16;
         var inBuffer = false;
+        // Where the buffer holds the elements — at the end, or when a comparison throws while a
+        // pass writes them back — they go back whole.
+        defer {
+            if (inBuffer) {
+                buffer[..].copyInto(this);
+            }
+        }
         while (width < n) {
             if (inBuffer) {
-                mergeRunsBy(buffer[..], this, width, cmp);
+                try mergeRunsBy(buffer[..], this, width, cmp);
             } else {
-                mergeRunsBy(this, buffer[..], width, cmp);
+                try mergeRunsBy(this, buffer[..], width, cmp);
             }
             inBuffer = !inBuffer;
             width = width * 2;
         }
-        if (inBuffer) {
-            buffer[..].copyInto(this);
-        }
     }
 
-    /// The elements in the order of their keys, equal keys keeping theirs.
-    pub fn sortByKey<K :: [TotalOrder]>(key: fn(T) -> K): void {
-        this.sortBy((a: T, b: T) => key(a).totalCompare(key(b)));
+    /// The elements in the order of their keys, equal keys keeping theirs; a key that throws, as
+    /// `sortBy`'s comparison.
+    pub fn sortByKey<K :: [TotalOrder], E :: [Error]>(key: fn(T) -> K throws E): void throws E {
+        try this.sortBy((a: T, b: T) => (try key(a)).totalCompare(try key(b)));
     }
 }
 
@@ -3562,23 +3570,22 @@ fn mergeRuns<T :: [TotalOrder]>(src: Slice<T>, dst: Slice<T>, width: int): void 
 
 /// A run sorted by insertion: each element moved before the ones it is less than, so equal ones
 /// keep their order.
-fn sortRunBy<T>(xs: Slice<T>, cmp: fn(T, T) -> Ordering): void {
+fn sortRunBy<T, E :: [Error]>(xs: Slice<T>, cmp: fn(T, T) -> Ordering throws E): void throws E {
+    // By swaps, not by a hole: a comparison that throws finds every element in a slot.
     var i = 1;
     while (i < xs.length()) {
-        let x = xs[i];
         var j = i;
-        while (j > 0 && isLess(cmp(x, xs[j - 1]))) {
-            xs[j] = xs[j - 1];
+        while (j > 0 && isLess(try cmp(xs[j], xs[j - 1]))) {
+            xs.swap(j, j - 1);
             j = j - 1;
         }
-        xs[j] = x;
         i = i + 1;
     }
 }
 
 /// One pass of the merge sort: the runs of `width` in `src` merged pairwise into `dst`, the left
 /// one's element first where two are equal.
-fn mergeRunsBy<T>(src: Slice<T>, dst: Slice<T>, width: int, cmp: fn(T, T) -> Ordering): void {
+fn mergeRunsBy<T, E :: [Error]>(src: Slice<T>, dst: Slice<T>, width: int, cmp: fn(T, T) -> Ordering throws E): void throws E {
     let n = src.length();
     var lo = 0;
     while (lo < n) {
@@ -3588,7 +3595,7 @@ fn mergeRunsBy<T>(src: Slice<T>, dst: Slice<T>, width: int, cmp: fn(T, T) -> Ord
         var j = mid;
         var k = lo;
         while (i < mid && j < hi) {
-            if (isLess(cmp(src[j], src[i]))) {
+            if (isLess(try cmp(src[j], src[i]))) {
                 dst[k] = src[j];
                 j = j + 1;
             } else {
@@ -3710,32 +3717,33 @@ fn siftDown<T :: [TotalOrder]>(xs: Slice<T>, root: int, end: int): void {
 }
 
 /// `it.map(f)` (10 B6 I3, I4): the values of `it`, each through `f` — lazily, a pull at a time.
-/// Named for what it gives: `Map` is the collection's (C4).
-pub struct MapIter<I :: [Iterator], U> :: [Iterator] {
+/// Named for what it gives: `Map` is the collection's (C4). What `f` throws, a pull throws beside
+/// what `it` does (05 K4; 13 M8c P2).
+pub struct MapIter<I :: [Iterator], U, E :: [Error]> :: [Iterator] {
     type Item = U;
-    type Error = I.Error;
+    type Error = Join<I.Error, E>;
     var inner: I,
-    f: fn(I.Item) -> U,
+    f: fn(I.Item) -> U throws E,
 
-    pub mut fn next(): ?U throws I.Error {
+    pub mut fn next(): ?U throws Join<I.Error, E> {
         let x = try this.inner.next();
         if (x == null) {
             return null;
         }
-        return this.f(x);
+        return try this.f(x);
     }
 }
 
 /// `it.filter(p)`: the values of `it` that `p` holds for.
-pub struct FilterIter<I :: [Iterator]> :: [Iterator] {
+pub struct FilterIter<I :: [Iterator], E :: [Error]> :: [Iterator] {
     type Item = I.Item;
-    type Error = I.Error;
+    type Error = Join<I.Error, E>;
     var inner: I,
-    p: fn(I.Item) -> bool,
+    p: fn(I.Item) -> bool throws E,
 
-    pub mut fn next(): ?I.Item throws I.Error {
+    pub mut fn next(): ?I.Item throws Join<I.Error, E> {
         var x = try this.inner.next();
-        while (x != null && !this.p(x)) {
+        while (x != null && !(try this.p(x))) {
             x = try this.inner.next();
         }
         return x;
@@ -3777,14 +3785,14 @@ pub struct SkipIter<I :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.takeWhile(p)`: the values of `it` up to the first `p` does not hold for.
-pub struct TakeWhileIter<I :: [Iterator]> :: [Iterator] {
+pub struct TakeWhileIter<I :: [Iterator], E :: [Error]> :: [Iterator] {
     type Item = I.Item;
-    type Error = I.Error;
+    type Error = Join<I.Error, E>;
     var inner: I,
-    p: fn(I.Item) -> bool,
+    p: fn(I.Item) -> bool throws E,
     var done: bool,
 
-    pub mut fn next(): ?I.Item throws I.Error {
+    pub mut fn next(): ?I.Item throws Join<I.Error, E> {
         if (this.done) {
             return null;
         }
@@ -3793,7 +3801,7 @@ pub struct TakeWhileIter<I :: [Iterator]> :: [Iterator] {
             this.done = true;
             return null;
         }
-        if (!this.p(x)) {
+        if (!(try this.p(x))) {
             this.done = true;
             return null;
         }
@@ -3802,20 +3810,20 @@ pub struct TakeWhileIter<I :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.skipWhile(p)`: the values of `it` from the first `p` does not hold for.
-pub struct SkipWhileIter<I :: [Iterator]> :: [Iterator] {
+pub struct SkipWhileIter<I :: [Iterator], E :: [Error]> :: [Iterator] {
     type Item = I.Item;
-    type Error = I.Error;
+    type Error = Join<I.Error, E>;
     var inner: I,
-    p: fn(I.Item) -> bool,
+    p: fn(I.Item) -> bool throws E,
     var started: bool,
 
-    pub mut fn next(): ?I.Item throws I.Error {
+    pub mut fn next(): ?I.Item throws Join<I.Error, E> {
         if (this.started) {
             return try this.inner.next();
         }
         this.started = true;
         var x = try this.inner.next();
-        while (x != null && this.p(x)) {
+        while (x != null && (try this.p(x))) {
             x = try this.inner.next();
         }
         return x;
@@ -3864,16 +3872,16 @@ pub struct EnumerateIter<I :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.inspect(f)`: the values of `it`, each shown to `f` on its way through.
-pub struct InspectIter<I :: [Iterator]> :: [Iterator] {
+pub struct InspectIter<I :: [Iterator], E :: [Error]> :: [Iterator] {
     type Item = I.Item;
-    type Error = I.Error;
+    type Error = Join<I.Error, E>;
     var inner: I,
-    f: fn(I.Item) -> void,
+    f: fn(I.Item) -> void throws E,
 
-    pub mut fn next(): ?I.Item throws I.Error {
+    pub mut fn next(): ?I.Item throws Join<I.Error, E> {
         let x = try this.inner.next();
         if (x != null) {
-            this.f(x);
+            try this.f(x);
         }
         return x;
     }
@@ -3936,13 +3944,13 @@ pub struct ChainIter<A :: [Iterator], B :: [Iterator<Item = A.Item>]> :: [Iterat
 // (LYR-SEM0174). The two over two iterators close both; where both throw, the first error wins
 // and the second is suppressed into it (05 E7).
 
-extend<I :: [Iterator, Closeable], U> MapIter<I, U> :: [Closeable] {
+extend<I :: [Iterator, Closeable], U, E :: [Error]> MapIter<I, U, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> FilterIter<I> :: [Closeable] {
+extend<I :: [Iterator, Closeable], E :: [Error]> FilterIter<I, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
@@ -3960,13 +3968,13 @@ extend<I :: [Iterator, Closeable]> SkipIter<I> :: [Closeable] {
     }
 }
 
-extend<I :: [Iterator, Closeable]> TakeWhileIter<I> :: [Closeable] {
+extend<I :: [Iterator, Closeable], E :: [Error]> TakeWhileIter<I, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> SkipWhileIter<I> :: [Closeable] {
+extend<I :: [Iterator, Closeable], E :: [Error]> SkipWhileIter<I, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
@@ -3984,7 +3992,7 @@ extend<I :: [Iterator, Closeable]> EnumerateIter<I> :: [Closeable] {
     }
 }
 
-extend<I :: [Iterator, Closeable]> InspectIter<I> :: [Closeable] {
+extend<I :: [Iterator, Closeable], E :: [Error]> InspectIter<I, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
@@ -4008,13 +4016,13 @@ extend<A :: [Iterator, Closeable], B :: [Iterator<Item = A.Item>, Closeable]> Ch
 // allocation, no interface value.
 extend<I :: [Iterator]> I {
     /// The values, each through `f`.
-    pub fn map<U>(f: fn(I.Item) -> U): MapIter<I, U> {
-        return MapIter<I, U> { inner = this, f = f };
+    pub fn map<U, E :: [Error]>(f: fn(I.Item) -> U throws E): MapIter<I, U, E> {
+        return MapIter<I, U, E> { inner = this, f = f };
     }
 
     /// The values `p` holds for.
-    pub fn filter(p: fn(I.Item) -> bool): FilterIter<I> {
-        return FilterIter<I> { inner = this, p = p };
+    pub fn filter<E :: [Error]>(p: fn(I.Item) -> bool throws E): FilterIter<I, E> {
+        return FilterIter<I, E> { inner = this, p = p };
     }
 
     /// The first `n` values, or all where there are fewer.
@@ -4028,13 +4036,13 @@ extend<I :: [Iterator]> I {
     }
 
     /// The values up to the first `p` does not hold for.
-    pub fn takeWhile(p: fn(I.Item) -> bool): TakeWhileIter<I> {
-        return TakeWhileIter<I> { inner = this, p = p, done = false };
+    pub fn takeWhile<E :: [Error]>(p: fn(I.Item) -> bool throws E): TakeWhileIter<I, E> {
+        return TakeWhileIter<I, E> { inner = this, p = p, done = false };
     }
 
     /// The values from the first `p` does not hold for.
-    pub fn skipWhile(p: fn(I.Item) -> bool): SkipWhileIter<I> {
-        return SkipWhileIter<I> { inner = this, p = p, started = false };
+    pub fn skipWhile<E :: [Error]>(p: fn(I.Item) -> bool throws E): SkipWhileIter<I, E> {
+        return SkipWhileIter<I, E> { inner = this, p = p, started = false };
     }
 
     /// The first value, then every `n`th; `n` below 1 panics.
@@ -4051,8 +4059,8 @@ extend<I :: [Iterator]> I {
     }
 
     /// The values, each shown to `f` on its way through.
-    pub fn inspect(f: fn(I.Item) -> void): InspectIter<I> {
-        return InspectIter<I> { inner = this, f = f };
+    pub fn inspect<E :: [Error]>(f: fn(I.Item) -> void throws E): InspectIter<I, E> {
+        return InspectIter<I, E> { inner = this, f = f };
     }
 
     /// Each value beside the other's at its position, as long as both have one.
@@ -4076,19 +4084,19 @@ extend<I :: [Iterator]> I {
     }
 
     /// `f` over the values from `init`, the last result the answer.
-    pub fn fold<A>(init: A, f: fn(A, I.Item) -> A): A throws I.Error {
+    pub fn fold<A, E :: [Error]>(init: A, f: fn(A, I.Item) -> A throws E): A throws Join<I.Error, E> {
         var it = this;
         var acc = init;
         var x = try it.next();
         while (x != null) {
-            acc = f(acc, x);
+            acc = try f(acc, x);
             x = try it.next();
         }
         return acc;
     }
 
     /// `f` over the values from the first; `null` where there is none.
-    pub fn reduce(f: fn(I.Item, I.Item) -> I.Item): ?I.Item throws I.Error {
+    pub fn reduce<E :: [Error]>(f: fn(I.Item, I.Item) -> I.Item throws E): ?I.Item throws Join<I.Error, E> {
         var it = this;
         let first = try it.next();
         if (first == null) {
@@ -4097,7 +4105,7 @@ extend<I :: [Iterator]> I {
         var acc = first;
         var x = try it.next();
         while (x != null) {
-            acc = f(acc, x);
+            acc = try f(acc, x);
             x = try it.next();
         }
         return acc;
@@ -4141,37 +4149,37 @@ extend<I :: [Iterator]> I {
     }
 
     /// Whether `p` holds for some value; stops at the first.
-    pub fn any(p: fn(I.Item) -> bool): bool throws I.Error {
+    pub fn any<E :: [Error]>(p: fn(I.Item) -> bool throws E): bool throws Join<I.Error, E> {
         return try this.find(p) != null;
     }
 
     /// Whether `p` holds for every value; stops at the first it does not — `true` for none.
-    pub fn all(p: fn(I.Item) -> bool): bool throws I.Error {
-        return try this.find((v) => !p(v)) == null;
+    pub fn all<E :: [Error]>(p: fn(I.Item) -> bool throws E): bool throws Join<I.Error, E> {
+        return try this.find((v) => !(try p(v))) == null;
     }
 
     /// Whether `p` holds for no value.
-    pub fn none(p: fn(I.Item) -> bool): bool throws I.Error {
+    pub fn none<E :: [Error]>(p: fn(I.Item) -> bool throws E): bool throws Join<I.Error, E> {
         return try this.find(p) == null;
     }
 
     /// The first value `p` holds for, or `null`.
-    pub fn find(p: fn(I.Item) -> bool): ?I.Item throws I.Error {
+    pub fn find<E :: [Error]>(p: fn(I.Item) -> bool throws E): ?I.Item throws Join<I.Error, E> {
         var it = this;
         var x = try it.next();
-        while (x != null && !p(x)) {
+        while (x != null && !(try p(x))) {
             x = try it.next();
         }
         return x;
     }
 
     /// The position of the first value `p` holds for, from 0, or `null`.
-    pub fn position(p: fn(I.Item) -> bool): ?int throws I.Error {
+    pub fn position<E :: [Error]>(p: fn(I.Item) -> bool throws E): ?int throws Join<I.Error, E> {
         var it = this;
         var i = 0;
         var x = try it.next();
         while (x != null) {
-            if (p(x)) {
+            if (try p(x)) {
                 return i;
             }
             i = i + 1;
@@ -4181,11 +4189,11 @@ extend<I :: [Iterator]> I {
     }
 
     /// `f` for every value, in order.
-    pub fn forEach(f: fn(I.Item) -> void): void throws I.Error {
+    pub fn forEach<E :: [Error]>(f: fn(I.Item) -> void throws E): void throws Join<I.Error, E> {
         var it = this;
         var x = try it.next();
         while (x != null) {
-            f(x);
+            try f(x);
             x = try it.next();
         }
     }
