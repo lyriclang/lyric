@@ -175,7 +175,8 @@ public static class SubsetGate
                     break;
                 case MakeInterface or CallVirt or TypeTest or Downcast:
                     break;
-                case CurrentError or ClearError or StashError or RestoreError or SuppressError:
+                case CurrentError or ClearError or StashError or RestoreError or SuppressError
+                    or SuppressedErrors or ErrorTrace:
                     break;
                 case LoadGlobal or StoreGlobal:
                     break;

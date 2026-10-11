@@ -1,0 +1,30 @@
+// What a clause's binding tells of the error it took (design/v5/spec/05 E6 O3, 06 §4): the errors
+// a close suppressed into it, and where it was thrown — kept in the debug profile only.
+import std.io { println };
+
+class Res :: [Closeable] {
+    name: string,
+    fn close(): void throws Error { throw Exception(f"close {this.name}"); }
+}
+class Boom :: [Error] { fn message(): string { return "boom"; } }
+
+fn explode(): void throws Boom { throw Boom { }; }
+
+fn main(): void {
+    try {
+        using let a = Res { name = "a" };
+        using let b = Res { name = "b" };
+        explode();
+    } catch (e) {
+        println(f"caught {e.message()}");
+        for (s in e.suppressed()) {
+            println(f"suppressed {s.message()}");
+        }
+        let where = e.backtrace();
+        if (where != null) {
+            println(where.show());
+        } else {
+            println("no trace");
+        }
+    }
+}

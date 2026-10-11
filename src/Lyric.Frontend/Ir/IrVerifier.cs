@@ -797,6 +797,18 @@ public static class IrVerifier
                 case RestoreError:
                 case SuppressError:
                     break;
+                // What a clause asks of the error it kept (05 E6 O3): an array of interface values,
+                // and one of 'int'.
+                case SuppressedErrors s:
+                    if (s.Type is not IrArrayType { Element: IrInterfaceType })
+                        Report(block, index, $"suppressed {s.Dest} is {Show(s.Type)}; the suppressed errors are interface values");
+                    RequireDestType(s.Dest, s.Type, "suppressed", block, index);
+                    break;
+                case ErrorTrace t:
+                    if (!IrType.Equal(t.Type, new IrArrayType(new IrScalarType(IrScalar.I64))))
+                        Report(block, index, $"errtrace {t.Dest} is {Show(t.Type)}; the program counters are an int[]");
+                    RequireDestType(t.Dest, t.Type, "errtrace", block, index);
+                    break;
                 default:
                     throw new InternalCompilationException(
                         $"ir-verifier: unhandled op {op.GetType().Name}");

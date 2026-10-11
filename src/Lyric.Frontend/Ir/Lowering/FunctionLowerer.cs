@@ -1352,10 +1352,11 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>A clause takes the error off the slot: the record dropped — or, where the body throws
-    /// the binding again, kept aside for that throw (05 E6 O3), which is one store more.</summary>
+    /// the binding again or asks it of its record, kept aside for the clause (05 E6 O3), which is
+    /// one store more.</summary>
     private void Take(CatchClause clause, LocalSymbol? symbol)
     {
-        if (symbol is not null && ThrowsAgain(clause.Body, symbol))
+        if (symbol is not null && (ThrowsAgain(clause.Body, symbol) || AsksTheRecord(clause.Body, symbol)))
         {
             var stash = _stashes++;
             _kept[symbol] = stash;
@@ -1373,6 +1374,40 @@ internal sealed class FunctionLowerer
         ThrowExpr { Value: IdentifierExpr id } when ReferenceEquals(_types.RefOf(id), binding) => true,
         _ => AstChildren.Of(node).Any(child => ThrowsAgain(child, binding)),
     };
+
+    /// <summary>Does this code ask the binding of its record — <c>e.suppressed()</c>,
+    /// <c>e.backtrace()</c>? The sema marked each such member, and none in a lambda.</summary>
+    private bool AsksTheRecord(Node node, LocalSymbol binding) =>
+        node is MemberExpr member && ReferenceEquals(_types.RecordQueryOf(member), binding)
+        || AstChildren.Of(node).Any(child => AsksTheRecord(child, binding));
+
+    /// <summary>
+    /// What a clause's binding tells of the record its clause kept (06 §4, 05 E6 O3):
+    /// <c>e.suppressed()</c> the errors suppressed into it, a new <c>Error[]</c>; <c>e.backtrace()</c>
+    /// its program counters, which std.core's <c>backtraceOf</c> makes a <c>?Backtrace</c> of —
+    /// null where there are none, as in the release profile.
+    /// </summary>
+    private TempId LowerRecordQuery(MemberExpr member, LocalSymbol binding, CallExpr call)
+    {
+        if (!_kept.TryGetValue(binding, out var stash))
+            throw Bug($"'{member.Member}()' at {call.Span} asks a record its clause did not keep");
+        var type = TypeOfExpr(call);
+        if (member.Member == "suppressed")
+        {
+            var errors = _slots.NewTemp(type);
+            _b.Emit(new SuppressedErrors(errors, type, stash, call.Span));
+            return errors;
+        }
+        var counters = new IrArrayType(new IrScalarType(IrScalar.I64));
+        var pcs = _slots.NewTemp(counters);
+        _b.Emit(new ErrorTrace(pcs, counters, stash, call.Span));
+        if (_typeTable.Compilation?.FindModule(["std", "core"])?.Members.LookupLocal("backtraceOf") is not FunctionSymbol made
+            || !TryResolveFunction(made, out var target))
+            throw Bug($"std.core's 'backtraceOf' was not lowered, for {call.Span}");
+        var trace = _slots.NewTemp(type);
+        _b.Emit(new Call(trace, target, [pcs], call.Span));
+        return trace;
+    }
 
     /// <summary>A caught type as a type test's target, and as the binding's IR type.</summary>
     private (TypeId Target, IrType Type) TestTarget(LyrType caught, Span span)
@@ -6598,6 +6633,10 @@ internal sealed class FunctionLowerer
             LowerCoroutineClose(closed, expr, expr.Span);
             return null;
         }
+        // 'e.suppressed()', 'e.backtrace()' on a clause's binding (06 §4): from the record the
+        // clause kept.
+        if (expr.Callee is MemberExpr told && _types.RecordQueryOf(told) is { } caught)
+            return LowerRecordQuery(told, caught, expr);
 
         // The receiver is parameter 0. For `p.get()` the 'p' therefore becomes the first argument; for
         // `P.new(…)` there is none and the call is an ordinary one. Both forms then run through the same

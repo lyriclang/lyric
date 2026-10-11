@@ -646,6 +646,29 @@ public class CEmitterTests
             Assert.Equal(2, lines.Length);
     }
 
+    /// <summary>What a clause's binding tells of the error it took (design/v5/spec/05 E6 O3, 06 §4;
+    /// M8c S10): the errors two closes suppressed into it, the last-bound closed first, and where it
+    /// was thrown — in the debug profile a panic's trace form, 'explode' at its throw and 'main' at
+    /// its call; the release profile keeps none, so the binding has no backtrace.</summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_clause_binding_tells_what_was_suppressed_and_where_it_was_thrown(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC("caught_record"), "caught_record", profile);
+        Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        var lines = result.Stdout.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(["caught boom", "suppressed close b", "suppressed close a"], lines.Take(3));
+        if (profile == Profile.Release)
+        {
+            Assert.Equal(["no trace"], lines.Skip(3));
+            return;
+        }
+        Assert.Matches(@"^    at lyr_app_main_explode \(.*programs[\\/]caught_record\.lyr:11\)$", lines[3]);
+        Assert.Matches(@"^    at lyr_app_main_main \(.*programs[\\/]caught_record\.lyr:17\)$", lines[4]);
+        Assert.Equal(5, lines.Length);
+    }
+
     /// <summary>An error thrown deep in a recursion (design/v5/spec/01 E8): the debug trace shows the
     /// recursion's frame once with a count, as a panic's does, and says the stack went deeper than
     /// it kept — the capture keeps as many frames as a panic's trace.</summary>

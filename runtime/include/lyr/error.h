@@ -53,6 +53,17 @@ typedef const struct LyrStr *(*LyrErrMessage)(LyrIface error);
 typedef int (*LyrErrCause)(LyrIface error, LyrIface *next);
 int lyr_err_report(const LyrErr *err, LyrErrMessage message, LyrErrCause cause);
 
+/* What a clause asks of the error it took (05 E6 O3, the review's M5-3), from the record it kept:
+ * the errors suppressed into it, in the order they were, as a new array of `desc` - the emitted
+ * descriptor of `Error[]` - and empty where there are none; where it was thrown, the program
+ * counters the debug profile kept, as a new array of `desc` (the emitted `int[]`), empty where
+ * none were kept. New arrays: what the program does with them leaves the record as it was. */
+struct LyrArr *lyr_err_suppressed(const LyrErr *err, const LyrDesc *desc);
+struct LyrArr *lyr_err_trace(const LyrErr *err, const LyrDesc *desc);
+
+/* std.core's Backtrace shown: the frames at `pcs` (from lyr_err_trace) in a panic's trace form. */
+struct LyrStr *lyr_trace_text(const struct LyrArr *pcs);
+
 /* `try!` on an error (05 E4, E8): a panic, code RT0010, with the error's message - or without one
  * where the program has no member to ask. */
 LYR_NORETURN void lyr_panic_error(const LyrErr *err, LyrErrMessage message);

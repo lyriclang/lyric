@@ -1,10 +1,13 @@
-/* The error record and main's report (design/v5/spec/05 E6 O3/O4, 01 L5 E1-E2). */
+/* The error record, what a clause asks of it, and main's report (design/v5/spec/05 E6 O3/O4, 01 L5
+ * E1-E2). */
 #include "lyr/error.h"
 #include "lyr/console.h"
 #include "lyr/gc.h"
 #include "lyr/init.h"
 #include "lyr/panic.h"
+#include "lyr/string.h"
 #include "internal.h"
+#include <stdlib.h>
 #include <string.h>
 
 /* Word 1 is the value's object, word 3 the suppressed array and word 4 the trace; word 2 is the
@@ -60,6 +63,36 @@ LyrErr *lyr_err_unsuppress(const LyrErr *dropped) {
     }
     err->trace = dropped->trace;
     return err;
+}
+
+LyrArr *lyr_err_suppressed(const LyrErr *err, const LyrDesc *desc) {
+    int64_t count = err->suppressed != NULL ? err->suppressed->len : 0;
+    LyrArr *copy = lyr_alloc_array(desc, count);
+    if (count > 0) memcpy(copy->data, err->suppressed->data, (size_t)count * sizeof(LyrIface));
+    return copy;
+}
+
+/* The trace keeps addresses; the program reads `int`s. */
+LyrArr *lyr_err_trace(const LyrErr *err, const LyrDesc *desc) {
+    int64_t count = err->trace != NULL ? err->trace->len : 0;
+    LyrArr *pcs = lyr_alloc_array(desc, count);
+    for (int64_t i = 0; i < count; i++)
+        LYR_ARR_DATA(pcs, int64_t)[i] = (int64_t)LYR_ARR_DATA(err->trace, uintptr_t)[i];
+    return pcs;
+}
+
+LyrStr *lyr_trace_text(const LyrArr *pcs) {
+    uintptr_t at[LYR_TRACE_PCS];
+    int count = pcs->len < LYR_TRACE_PCS ? (int)pcs->len : LYR_TRACE_PCS;
+    for (int i = 0; i < count; i++) at[i] = (uintptr_t)LYR_ARR_DATA(pcs, int64_t)[i];
+    /* main's report's room, off the stack: a task's is small */
+    enum { ROOM = 16 * 1024 };
+    char *text = malloc(ROOM);
+    if (text == NULL) return lyr_str_from_bytes("", 0);
+    size_t n = lyr_trace_format_pcs(text, ROOM, at, count);
+    LyrStr *shown = lyr_str_from_bytes(text, (int64_t)n);
+    free(text);
+    return shown;
 }
 
 static void write_line(const char *prefix, const LyrStr *text) {

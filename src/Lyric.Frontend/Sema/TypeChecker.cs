@@ -70,6 +70,16 @@ public sealed class TypeChecker
     /// asked — a missing root must not cascade into every throw.</summary>
     private readonly TypeSymbol? _error;
 
+    /// <summary>What a clause's <c>e.backtrace()</c> answers: <c>std.core</c>'s <c>Backtrace</c>
+    /// (design/v5/spec/05 E6 O3, the review's M5-3). Null without it — then a binding answers
+    /// nothing of its record.</summary>
+    private readonly TypeSymbol? _backtrace;
+
+    /// <summary>The clause bindings that tell of their record here (06 §4, M5-3): those of the
+    /// clauses being checked, in the function being checked — a lambda's body starts without
+    /// them, since what it captures is a value.</summary>
+    private HashSet<LocalSymbol> _askable = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>What a <c>using let</c> binding closes: <c>std.core</c>'s <c>Closeable</c>
     /// (design/v5/spec/05 E7 R1, 10 K1). Null without a standard library.</summary>
     private readonly TypeSymbol? _closeable;
@@ -146,6 +156,7 @@ public sealed class TypeChecker
         _result.ValueInterface = iface => ValueUsable(iface, out _);
         _result.Lyric5Modules = comp.Lyric5Modules;
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
+        _backtrace = comp.FindModule(["std", "core"])?.Members.LookupLocal("Backtrace") as TypeSymbol is { Kind: TypeSymbolKind.Struct } backtrace ? backtrace : null;
         _closeable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") as TypeSymbol is { Kind: TypeSymbolKind.Interface } closeable ? closeable : null;
         _identity = comp.FindModule(["std", "core"])?.Members.LookupLocal("Identity") as TypeSymbol is { Kind: TypeSymbolKind.Interface } identity ? identity : null;
         _cancelled = comp.FindModule(["std", "task"])?.Members.LookupLocal("Cancelled") as TypeSymbol is { Kind: TypeSymbolKind.Class } cancelled ? cancelled : null;
@@ -3414,7 +3425,11 @@ public sealed class TypeChecker
             }
             var catchScope = BindCatch(clauses[i], scope);
             CheckAgainstAbove(clauses[i], above);
+            // Its binding tells of the record while its own body runs (06 §4, M5-3).
+            var binding = clauses[i].BindingName is not null ? _result.RefOf(clauses[i]) as LocalSymbol : null;
+            if (binding is not null) _askable.Add(binding);
             body(clauses[i], catchScope);
+            if (binding is not null) _askable.Remove(binding);
         }
     }
 
@@ -7336,6 +7351,15 @@ public sealed class TypeChecker
             return new FnType([], LyrType.Void);
         }
 
+        // What a clause's binding tells of its record (06 §4, 05 E6 O3; the review's M5-3), where
+        // its type has no member of the name — asked muted first: built in, as a coroutine's
+        // 'next()' is.
+        if (mem.Member is "suppressed" or "backtrace" && AskedBinding(mem) is { } held)
+        {
+            bool own;
+            using (_de.Mute()) own = InstanceMemberOf(baseType, mem, mem.Span) is { IsError: false };
+            if (!own) return RecordQuery(mem, held);
+        }
         if (InstanceMemberOf(baseType, mem, mem.Span) is { } mt)
             return mem.IsOptional ? Optionalized(mt) : mt;
         // A coroutine's members beside its built-in ones come from the blanket blocks its
@@ -7345,6 +7369,36 @@ public sealed class TypeChecker
         if (targetType.IsError) return LyrType.Error;
         return Report(mem.Span, "LYR-SEM0012", $"'{TypeFacts.Display(targetType)}' has no member '{mem.Member}'");
     }
+
+    /// <summary>The clause binding this member is asked of, in its clause and not in a lambda there
+    /// (06 §4, M5-3) — null for any other receiver, and without std.core's two types.</summary>
+    private LocalSymbol? AskedBinding(MemberExpr mem) =>
+        mem.Target is IdentifierExpr && _result.RefOf(mem.Target) is LocalSymbol held && _askable.Contains(held)
+        && _error is not null && _backtrace is not null
+            ? held
+            : null;
+
+    /// <summary>
+    /// <c>e.suppressed()</c> and <c>e.backtrace()</c> on a clause's binding (06 §4, M5-3): the record
+    /// lives as long as the clause, so the binding itself answers, and a value stored elsewhere
+    /// does not. <c>Error[]</c>, in the order the errors were suppressed; <c>?Backtrace</c>, null
+    /// where the profile kept no trace.
+    /// </summary>
+    private LyrType RecordQuery(MemberExpr mem, LocalSymbol held)
+    {
+        if (!_calleePosition.Contains(mem))
+            return Report(mem.MemberSpan, "LYR-SEM0012", $"'{mem.Member}' is called: write '{mem.Member}()'");
+        _result.MarkRecordQuery(mem, held);
+        return new FnType([], mem.Member == "suppressed" ? new ArrayOf(new NamedRef(_error!)) : new Optional(new NamedRef(_backtrace!)));
+    }
+
+    /// <summary>The sentence a refusal of <c>suppressed</c> or <c>backtrace</c> on an error adds: the
+    /// two are the binding's, not the value's (M5-3).</summary>
+    private string RecordNote(string member, TypeSymbol ts) =>
+        member is "suppressed" or "backtrace" && _backtrace is not null && IsThrowable(new NamedRef(ts))
+            ? " — what was suppressed into an error and where it was thrown are told by a clause's binding, "
+              + "in the clause itself, not by an error stored, passed or captured"
+            : "";
 
     /// <summary>
     /// <c>T</c> becomes <c>?T</c>, while <c>?T</c> stays <c>?T</c>.
@@ -9006,7 +9060,7 @@ public sealed class TypeChecker
         // A blanket block's member (04 D15), asked last: the receiver binds its parameter.
         var receiver = _memberReceiver is GenericInstance own && ReferenceEquals(own.Definition, ts) ? own : SelfType(ts);
         if (BlanketMember(receiver, member, span) is { } blanket) return blanket;
-        return (Report(span, "LYR-SEM0012", $"'{ts.Name}' has no member '{member}'",
+        return (Report(span, "LYR-SEM0012", $"'{ts.Name}' has no member '{member}'" + RecordNote(member, ts),
             NameSuggestion.Note(member, MemberFacts
                 .OfInstance(_comp, _binding, ts, _currentModule)
                 .Select(candidate => candidate.Symbol.Name))), null);
@@ -11453,6 +11507,8 @@ public sealed class TypeChecker
         var savedInference = _returnInference;
         var savedLoops = _loops;
         _loops = new(); // its loops are its own (08 Y11 F5)
+        var savedAskable = _askable;
+        _askable = new(ReferenceEqualityComparer.Instance); // a clause's binding is a captured value here (06 §4)
         _currentYield = null; // a lambda is no coroutine: a yield inside it is the DYNAMIC kind
                               // (§10a) even when the lambda stands inside a coroutine body —
                               // which chain it meets is decided by who calls it, at runtime
@@ -11521,6 +11577,7 @@ public sealed class TypeChecker
             _currentYield = savedYield;
             _returnInference = savedInference;
             _loops = savedLoops;
+            _askable = savedAskable;
             RecordCaptures(lam);
             _result.MarkGeneratorLambda(lam);
             return new FnType(pTypes, made) { Places = places.Contains(true) ? places : [] };
@@ -11601,6 +11658,7 @@ public sealed class TypeChecker
         _currentYield = savedYield;
         _returnInference = savedInference;
         _loops = savedLoops;
+        _askable = savedAskable;
 
         RecordCaptures(lam);
         return new FnType(pTypes, ret) { Throws = thrown ?? EscapingOf(lam.Body), Places = places.Contains(true) ? places : [] };

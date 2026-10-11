@@ -229,6 +229,15 @@ public sealed class TypeResult
     public LyrType? ThrownByPull(Node pull) =>
         _throwingPulls.TryGetValue(pull, out var t) ? t : null;
 
+    /// <summary>The members a clause's binding answers of its record, <c>e.suppressed()</c> and
+    /// <c>e.backtrace()</c> (06 §4, 05 E6 O3): the member, and the binding whose record the
+    /// lowering keeps for the clause and reads.</summary>
+    private readonly Dictionary<MemberExpr, LocalSymbol> _recordQueries = new(ReferenceEqualityComparer.Instance);
+
+    public void MarkRecordQuery(MemberExpr member, LocalSymbol binding) => _recordQueries[member] = binding;
+
+    public LocalSymbol? RecordQueryOf(MemberExpr member) => _recordQueries.GetValueOrDefault(member);
+
     // --- errors (design/v5/spec/05 E2) ---------------------------------------------------------
 
     private readonly Dictionary<Node, LyrType[]> _declaredThrows = new(ReferenceEqualityComparer.Instance);

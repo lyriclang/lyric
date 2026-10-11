@@ -24,6 +24,8 @@ public static class Intrinsics
         ["std.core.shortestFloat32"] = "lyr_str_from_float32",
         ["std.string.fromChar"] = "lyr_str_from_char",
         ["std.core.panic"] = "lyr_panic_message",
+        // Where an error was thrown, shown (05 E6 O3): a Backtrace's frames named.
+        ["std.core.traceText"] = "lyr_trace_text",
         // The catalogue (05 E8): 'assert' a check at the call, so its trace starts in the program;
         // the two that never return are panics of their own codes.
         ["std.core.assert"] = "LYR_ASSERT",

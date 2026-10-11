@@ -215,6 +215,8 @@ public static class IrPrinter
         StashError s => $"stash s{s.Stash}",
         RestoreError r => $"restore s{r.Stash}",
         SuppressError s => $"suppress s{s.Stash}",
+        SuppressedErrors s => $"{s.Dest}: {TypeStr(s.Type)} = suppressed s{s.Stash}",
+        ErrorTrace t => $"{t.Dest}: {TypeStr(t.Type)} = errtrace s{t.Stash}",
         _ => throw new InternalCompilationException($"ir-printer: unhandled op {op.GetType().Name}")
     };
 

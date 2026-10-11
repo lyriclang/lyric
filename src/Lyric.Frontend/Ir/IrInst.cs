@@ -294,3 +294,11 @@ public sealed record RestoreError(int Stash, Span Span) : IrOp(Span);
 /// <summary>The body failed: its error is appended to the stashed one's suppressed errors — the
 /// first wins — and the stashed one is in flight again.</summary>
 public sealed record SuppressError(int Stash, Span Span) : IrOp(Span);
+
+/// <summary><c>e.suppressed()</c> in a clause (05 E6 O3, the review's M5-3): the errors suppressed
+/// into the error the clause kept in stash <paramref name="Stash"/>, a new <c>Error[]</c>.</summary>
+public sealed record SuppressedErrors(TempId Dest, IrType Type, int Stash, Span Span) : IrOp(Span);
+
+/// <summary><c>e.backtrace()</c> in a clause: the program counters kept where that error was
+/// thrown, a new <c>int[]</c> — empty where none were kept, as in the release profile.</summary>
+public sealed record ErrorTrace(TempId Dest, IrType Type, int Stash, Span Span) : IrOp(Span);
