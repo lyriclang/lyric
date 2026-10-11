@@ -22,7 +22,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
   milestone; branch `script` holds the 4.x text, which checks `lyric-script`, not this tree: the
   milestones move the language away from it, so the 4.x conformance gate ended with M2 S0.
   The Lyric 5 suite runs against this tree in CI since M3 S9 (*Conformance gate*, one job per profile since M8c S19, both
-  profiles), at the commit [`spec.pin`](spec.pin) names: a compiler change and its rule are two
+  profiles; the cases side by side since 2026-10-11, `tooling/conformance/run_parallel.py` over the pinned runner),
+  at the commit [`spec.pin`](spec.pin) names: a compiler change and its rule are two
   pull requests checked together, the specification merges first, and main is green in between.
 
 ## Milestones
