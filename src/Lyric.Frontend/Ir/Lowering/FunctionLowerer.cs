@@ -6265,6 +6265,38 @@ internal sealed class FunctionLowerer
         return result;
     }
 
+    /// <summary>The witness's instance for the concrete type, called on the receiver (M8c S9b): a
+    /// block's member on a built-in has no holder, the block's target in its name; a string's call
+    /// of its view's member passes the view (10 S1).</summary>
+    private TempId? LowerWitnessCall(MemberExpr member, FunctionSymbol witness, FunctionDecl decl,
+        LyrType[] arguments, LyrType concrete, CallExpr expr)
+    {
+        var onView = concrete is PrimitiveType { Kind: PrimitiveKind.String }
+                     && _typeTable.BlockOf(witness) is { Target: { Kind: TypeSymbolKind.Builtin, Name: "StringView" } };
+        var owner = TypeFacts.SymbolOf(concrete);
+        var target = _instances.Request(witness, decl, StaticBaseName(witness, witness.Name), owner,
+            arguments, _typeTable, expr.Span,
+            receiverType: owner is null ? (onView ? LyrType.StringView : concrete) : null);
+        var self = onView
+            ? LowerExprAs(member.Target, _typeTable.Lower(LyrType.StringView, member.Span))
+            : LowerExpr(member.Target);
+        var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span,
+            NamedSubstitutionFor(witness, arguments));
+        var all = new TempId[passed.Length + 1];
+        all[0] = self;
+        passed.CopyTo(all, 1);
+        var resultType = TypeOfExpr(expr);
+        if (IsVoid(resultType))
+        {
+            _b.Emit(new Call(null, target, all, expr.Span));
+            return null;
+        }
+        var result = _slots.NewTemp(resultType);
+        _b.Emit(new Call(result, target, all, expr.Span));
+        _fresh.Add(result);
+        return result;
+    }
+
     private TempId? LowerConstraintCall(MemberExpr member, LyrType concrete, CallExpr expr)
     {
         // An interface's private helper (07 V2 S4) is never overridden: a conformer's method of its
@@ -6299,6 +6331,14 @@ internal sealed class FunctionLowerer
             && (promisedDecl.Body is null || Replaceable(promisedGeneric))
             && GenericImplementationOf(concrete, member) is { Declaration: FunctionDecl genericDecl } genericImplementation)
             return LowerGenericImplementationCall(member, genericImplementation, genericDecl, concrete, expr);
+
+        // A generic member as the witness of a plain one (13 S9; M8c S9b): its instance at the
+        // binding the conformance made — 'contains<char>' for 'Contains<char>' —, a string's call
+        // on its view's.
+        if (_types.RefOf(member) is FunctionSymbol { Generics.Length: 0 } plainPromised
+            && GenericImplementationOf(concrete, member) is { Generics.Length: > 0, Declaration: FunctionDecl witnessDecl } witness
+            && _types.WitnessArgumentsOf(witness, _types.ConstraintInstanceOf(member) is { } askedFor ? SubstituteType(askedFor) : null) is { } witnessArguments)
+            return LowerWitnessCall(member, witness, witnessDecl, witnessArguments, concrete, expr);
 
         // A BUILTIN as the substituted type: 'render(42)' with 'extend int :: [Display]'. Primitives have
         // no symbol in SymbolOf, and that stays so, because on it hangs the boundary that a scalar does

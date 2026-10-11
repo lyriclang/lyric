@@ -1951,6 +1951,12 @@ public sealed class TypeChecker
         RequireSealedInModule(interfaces, module, name);
         interfaces = RequireIdentityOfAnObject(implementer, interfaces, name);
         var candidates = CandidateMethods(implementer, module);
+        // A string reaches the members written once on its view (10 S1) — at a call, and as the
+        // witness of a conformance alike (M8c S9b): 'extend string :: [Contains<char>] { }' is
+        // answered by the view's 'contains', a name the string's own blocks leave free.
+        if (implementer is { Kind: TypeSymbolKind.Builtin, Name: "string" } && _stringView is { } ofText)
+            foreach (var (viewName, viewMembers) in CandidateMethods(ofText, module))
+                candidates.TryAdd(viewName, viewMembers);
 
         // Of several candidates of one name, those written where THIS conformance is declared
         // come first (04 D3): two blocks of one type may each give a 'greet', one for 'Greeter'
@@ -2200,6 +2206,12 @@ public sealed class TypeChecker
                         // to repeat.
                         _result.RecordConformanceImpl(implementer, iface, im.Name,
                             InstanceOfConformance(iface, subst), satisfying);
+                        // A generic member as the witness (M8c S9b): the instance the lowering
+                        // calls, its own parameters as the conformance bound them.
+                        if (satisfying.Generics.Length > 0 && im.Generics.Length == 0
+                            && WitnessArguments(want, satisfying, WitnessSignature(satisfying, at)) is { } witness)
+                            _result.RecordWitnessArguments(satisfying, InstanceOfConformance(iface, subst),
+                                satisfying.Generics.Select(g => witness[g]).ToArray());
                         CheckWitnessWord(satisfying, implementer, iface, name, NodeSpan(node));
                         CheckCloseWithinError(at, iface, im, satisfying, name, NodeSpan(node));
                         continue;
@@ -2474,19 +2486,61 @@ public sealed class TypeChecker
         iface.Members.LookupLocal(name) as FunctionSymbol;
 
     // Signature comparison, invariant: arity, parameter types, return type, mut, and throws ⊆.
+    /// <summary>The binding of a generic member's own parameters that makes it the plain interface
+    /// member <paramref name="want"/> (13 S9): its parameters and return unified with the
+    /// member's, every own parameter bound, every constraint holding for what it bound. <c>null</c>
+    /// where none does.</summary>
+    private Dictionary<GenericParamSymbol, LyrType>? WitnessArguments(FnType want, FunctionSymbol impl, FnType have)
+    {
+        if (want.Parameters.Length != have.Parameters.Length) return null;
+        var found = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        using (_de.Mute())
+        {
+            for (var i = 0; i < want.Parameters.Length; i++) UnifyInfer(have.Parameters[i], want.Parameters[i], found, default);
+            UnifyInfer(have.Return, want.Return, found, default);
+        }
+        var binding = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        foreach (var g in impl.Generics)
+        {
+            if (!found.TryGetValue(g, out var bound)) return null;
+            binding[g] = bound;
+        }
+        foreach (var g in impl.Generics)
+            foreach (var c in g.Constraints)
+                if (ConstraintInterface(c) is { } ci
+                    && !Satisfies(binding[g], ci, Substitute(ResolveType(c, _currentModule?.Members ?? _comp.Builtins), binding)))
+                    return null;
+        return binding;
+    }
+
+    /// <summary>A candidate's signature at the site's target: from a GENERIC block it speaks in that
+    /// block's own parameters, which the target binds (03 T7 X1).</summary>
+    private FnType WitnessSignature(FunctionSymbol impl, LyrType? at) =>
+        at is not null && _comp.Extensions.BlockOf(impl) is { Generics.Length: > 0 } block
+        && BlockSubstitution(block, at) is { } map
+            ? (FnType)Substitute(FnTypeOf(impl), map)
+            : FnTypeOf(impl);
+
     private string? SignatureMismatch(FnType want, FunctionDecl ifaceMethod, FunctionSymbol impl, LyrType? at = null)
     {
         var decl = (FunctionDecl)impl.Declaration!;
-        var have = FnTypeOf(impl);
         // A candidate from a GENERIC block speaks in that block's own parameters: 'Pair<T>' of
         // 'extend<T :: [Equatable]> Pair<T>' is not the 'Pair<T>' of the site checking an
         // implied parent from another block. Read at this site's target, where the block's
         // parameters bind to ours (03 T7 X1).
-        if (at is not null && _comp.Extensions.BlockOf(impl) is { Generics.Length: > 0 } block
-            && BlockSubstitution(block, at) is { } map)
-            have = (FnType)Substitute(have, map);
+        var have = WitnessSignature(impl, at);
         if (ifaceMethod.IsStatic != decl.IsStatic)
             return ifaceMethod.IsStatic ? "expected a static member" : "expected an instance member, found a static one";
+        // A GENERIC member answers a plain one where its parameters bind to the member's (13 S9;
+        // M8c S9b): 'contains<P :: [Pattern]>(p: P)' is 'Contains<char>.contains(x: char)' at
+        // 'P = char', 'char' being a Pattern — read at that binding, and compared as written.
+        if (impl.Generics.Length > 0 && ifaceMethod.Generics.Length == 0)
+        {
+            if (WitnessArguments(want, impl, have) is not { } binding)
+                return $"its type parameters {string.Join(", ", impl.Generics.Select(g => $"'{g.Name}'"))} do not bind "
+                       + $"to '{TypeFacts.Display(want)}' under their constraints";
+            have = (FnType)Substitute(have, binding);
+        }
         if (want.Parameters.Length != have.Parameters.Length)
             return $"expected {want.Parameters.Length} parameter(s), found {have.Parameters.Length}";
         for (var i = 0; i < want.Parameters.Length; i++)

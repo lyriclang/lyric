@@ -130,6 +130,27 @@ public sealed class TypeResult
     public bool BlockConformanceRecorded(LyrType instance, TypeSymbol iface, ExtensionBlock block) =>
         _blockConformances.Any(e => ReferenceEquals(e.Block, block) && ReferenceEquals(e.Iface, iface) && LyrType.Equal(e.Instance, instance));
 
+    /// <summary>A generic member as the witness of a plain interface member (13 S9; M8c S9b): its
+    /// own type arguments as the conformance to that interface instance bound them —
+    /// <c>contains&lt;P&gt;</c> for <c>Contains&lt;char&gt;</c> is <c>contains&lt;char&gt;</c>.</summary>
+    private readonly List<(FunctionSymbol Witness, LyrType Instance, LyrType[] Arguments)> _witnessArguments = new();
+
+    public void RecordWitnessArguments(FunctionSymbol witness, LyrType instance, LyrType[] arguments)
+    {
+        if (!_witnessArguments.Any(w => ReferenceEquals(w.Witness, witness) && LyrType.Equal(w.Instance, instance)))
+            _witnessArguments.Add((witness, instance, arguments));
+    }
+
+    /// <summary>The witness's type arguments for the interface instance; for the interface alone,
+    /// where one conformance names it, that one's.</summary>
+    public LyrType[]? WitnessArgumentsOf(FunctionSymbol witness, LyrType? instance)
+    {
+        foreach (var w in _witnessArguments)
+            if (ReferenceEquals(w.Witness, witness) && (instance is null || LyrType.Equal(w.Instance, instance)))
+                return w.Arguments;
+        return null;
+    }
+
     public void RecordConformanceImpl(TypeSymbol implementer, TypeSymbol iface, string member,
         LyrType instance, FunctionSymbol impl)
     {

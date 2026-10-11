@@ -3462,6 +3462,14 @@ extend<T :: [Equatable]> T[] :: [Contains<T>] {
     }
 }
 
+/// `c in text` (10 C12; M8c S9b): a character of the text. The view's `contains<P :: [Pattern]>`
+/// is the witness at `P = char` (13 S9), so the conformance writes nothing.
+extend StringView :: [Contains<char>] { }
+
+/// A string's: its view's, as a call on a string reaches the members written once on its view (10
+/// S1) — a member of its own would hide the view's 'contains' of a text.
+extend string :: [Contains<char>] { }
+
 extend<T :: [Equatable]> Slice<T> {
     /// The index of the first element equal to `x`, or `null`.
     pub fn indexOf(x: T): ?int {
