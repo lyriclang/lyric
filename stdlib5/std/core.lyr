@@ -3937,6 +3937,189 @@ pub struct ChainIter<A :: [Iterator], B :: [Iterator<Item = A.Item>]> :: [Iterat
     }
 }
 
+/// `it.mapNotNull(f)`: the values of `it` through `f`, the `null`s left out.
+pub struct MapNotNullIter<I :: [Iterator], U, E :: [Error]> :: [Iterator] {
+    type Item = U;
+    type Error = Join<I.Error, E>;
+    var inner: I,
+    f: fn(I.Item) -> ?U throws E,
+
+    pub mut fn next(): ?U throws Join<I.Error, E> {
+        loop {
+            let x = try this.inner.next();
+            if (x == null) {
+                return null;
+            }
+            let y = try this.f(x);
+            if (y != null) {
+                return y;
+            }
+        }
+    }
+}
+
+/// `it.flatMap(f)`: the values of what `f` gives for each value of `it`, one after the other — `f`
+/// gives an `Iterable`, an array or a list as well as an iterator.
+pub struct FlatMapIter<I :: [Iterator], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error]> :: [Iterator] {
+    type Item = J.Item;
+    type Error = Join<Join<I.Error, E>, J.Error>;
+    var inner: I,
+    f: fn(I.Item) -> B throws E,
+    var current: ?J,
+
+    pub mut fn next(): ?J.Item throws Join<Join<I.Error, E>, J.Error> {
+        loop {
+            if (this.current != null) {
+                var part = this.current!;
+                let x = try part.next();
+                this.current = part;
+                if (x != null) {
+                    return x;
+                }
+                this.current = null;
+            }
+            let outer = try this.inner.next();
+            if (outer == null) {
+                return null;
+            }
+            this.current = (try this.f(outer)).iter();
+        }
+    }
+}
+
+/// `it.flatten()`: the values of the iterables `it` gives, one after the other.
+pub struct FlattenIter<I :: [Iterator<Item = B>], B :: [Iterable<Iter = J>], J :: [Iterator]> :: [Iterator] {
+    type Item = J.Item;
+    type Error = Join<I.Error, J.Error>;
+    var inner: I,
+    var current: ?J,
+
+    pub mut fn next(): ?J.Item throws Join<I.Error, J.Error> {
+        loop {
+            if (this.current != null) {
+                var part = this.current!;
+                let x = try part.next();
+                this.current = part;
+                if (x != null) {
+                    return x;
+                }
+                this.current = null;
+            }
+            let outer = try this.inner.next();
+            if (outer == null) {
+                return null;
+            }
+            this.current = outer.iter();
+        }
+    }
+}
+
+/// `it.dedupBy(same)`, `it.dedup()`: the values of `it`, a run of ones `same` holds for given once.
+pub struct DedupIter<I :: [Iterator], E :: [Error]> :: [Iterator] {
+    type Item = I.Item;
+    type Error = Join<I.Error, E>;
+    var inner: I,
+    same: fn(I.Item, I.Item) -> bool throws E,
+    var last: ?I.Item,
+
+    pub mut fn next(): ?I.Item throws Join<I.Error, E> {
+        loop {
+            let x = try this.inner.next();
+            if (x == null) {
+                return null;
+            }
+            if (let previous = this.last) {
+                if (try this.same(previous, x)) {
+                    continue;
+                }
+            }
+            this.last = x;
+            return x;
+        }
+    }
+}
+
+/// `it.scan(init, f)`: `init`, then each value `f` makes of the one before and a value of `it` —
+/// the running values of `fold` (Kotlin's `scan`).
+pub struct ScanIter<I :: [Iterator], A, E :: [Error]> :: [Iterator] {
+    type Item = A;
+    type Error = Join<I.Error, E>;
+    var inner: I,
+    f: fn(A, I.Item) -> A throws E,
+    var acc: A,
+    var started: bool,
+
+    pub mut fn next(): ?A throws Join<I.Error, E> {
+        if (!this.started) {
+            this.started = true;
+            return this.acc;
+        }
+        let x = try this.inner.next();
+        if (x == null) {
+            return null;
+        }
+        this.acc = try this.f(this.acc, x);
+        return this.acc;
+    }
+}
+
+/// `it.peekable()`: the values of `it`, and `peek()`, the next one without taking it.
+pub struct PeekableIter<I :: [Iterator]> :: [Iterator] {
+    type Item = I.Item;
+    type Error = I.Error;
+    var inner: I,
+    var peeked: ?I.Item,
+    var hasPeeked: bool,
+
+    /// The value `next()` gives next, or `null` at the end — pulled from the inner iterator once.
+    pub mut fn peek(): ?I.Item throws I.Error {
+        if (!this.hasPeeked) {
+            this.peeked = try this.inner.next();
+            this.hasPeeked = true;
+        }
+        return this.peeked;
+    }
+
+    pub mut fn next(): ?I.Item throws I.Error {
+        if (this.hasPeeked) {
+            this.hasPeeked = false;
+            return this.peeked;
+        }
+        return try this.inner.next();
+    }
+}
+
+/// `it.rev()`: the values of a `DoubleEnded` iterator from its back. A pull from the back throws
+/// nothing (`DoubleEnded`), so neither does this walk; it is no `DoubleEnded` itself, as a pull
+/// from its back would be the inner one's front, which may throw.
+pub struct RevIter<I :: [DoubleEnded]> :: [Iterator] {
+    type Item = I.Item;
+    type Error = never;
+    var inner: I,
+
+    pub mut fn next(): ?I.Item {
+        return this.inner.nextBack();
+    }
+}
+
+/// `it.cycle()`: the values of `it` over and over, from a clone of it each time — none where it has
+/// none.
+pub struct CycleIter<I :: [Iterator, Clone]> :: [Iterator] {
+    type Item = I.Item;
+    type Error = I.Error;
+    origin: I,
+    var current: I,
+
+    pub mut fn next(): ?I.Item throws I.Error {
+        let x = try this.current.next();
+        if (x != null) {
+            return x;
+        }
+        this.current = this.origin.clone();
+        return try this.current.next();
+    }
+}
+
 // Closing through an adapter (I6; the review's M8a-4): an adapter over a Closeable iterator is
 // Closeable itself and passes `close()` on, so a loop that leaves early closes the generator
 // behind `gen().map(f)`. Its `close()` throws what the inner one's may — the inner's Error, which
@@ -3993,6 +4176,43 @@ extend<I :: [Iterator, Closeable]> EnumerateIter<I> :: [Closeable] {
 }
 
 extend<I :: [Iterator, Closeable], E :: [Error]> InspectIter<I, E> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable], U, E :: [Error]> MapNotNullIter<I, U, E> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable], E :: [Error]> DedupIter<I, E> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable], A, E :: [Error]> ScanIter<I, A, E> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator, Closeable]> PeekableIter<I> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+// The outer iterator closed; a part `f` or the source gave is the walk's own, closed by none.
+extend<I :: [Iterator, Closeable], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error]> FlatMapIter<I, B, J, E> :: [Closeable] {
+    fn close(): void throws I.Error {
+        try this.inner.close();
+    }
+}
+
+extend<I :: [Iterator<Item = B>, Closeable], B :: [Iterable<Iter = J>], J :: [Iterator]> FlattenIter<I, B, J> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
@@ -4071,6 +4291,31 @@ extend<I :: [Iterator]> I {
     /// The values, then the other's — an iterator of the same items.
     pub fn chain<B :: [Iterator<Item = I.Item>]>(other: B): ChainIter<I, B> {
         return ChainIter<I, B> { a = this, b = other, second = false };
+    }
+
+    /// The values through `f`, the `null`s left out.
+    pub fn mapNotNull<U, E :: [Error]>(f: fn(I.Item) -> ?U throws E): MapNotNullIter<I, U, E> {
+        return MapNotNullIter<I, U, E> { inner = this, f = f };
+    }
+
+    /// The values of what `f` gives for each value, one after the other.
+    pub fn flatMap<B :: [Iterable], E :: [Error]>(f: fn(I.Item) -> B throws E): FlatMapIter<I, B, B.Iter, E> {
+        return FlatMapIter<I, B, B.Iter, E> { inner = this, f = f, current = null };
+    }
+
+    /// A run of values `same` holds for, given once.
+    pub fn dedupBy<E :: [Error]>(same: fn(I.Item, I.Item) -> bool throws E): DedupIter<I, E> {
+        return DedupIter<I, E> { inner = this, same = same, last = null };
+    }
+
+    /// `init`, then the running values `f` makes.
+    pub fn scan<A, E :: [Error]>(init: A, f: fn(A, I.Item) -> A throws E): ScanIter<I, A, E> {
+        return ScanIter<I, A, E> { inner = this, f = f, acc = init, started = false };
+    }
+
+    /// The values, with `peek()` to look at the next one.
+    pub fn peekable(): PeekableIter<I> {
+        return PeekableIter<I> { inner = this, peeked = null, hasPeeked = false };
     }
 
     /// How many values there are, walking them all.
@@ -4188,6 +4433,48 @@ extend<I :: [Iterator]> I {
         return null;
     }
 
+
+    /// The value whose `key` is least, or `null`; the first of equal ones.
+    pub fn minBy<K :: [TotalOrder], E :: [Error]>(key: fn(I.Item) -> K throws E): ?I.Item throws Join<I.Error, E> {
+        var it = this;
+        let first = try it.next();
+        if (first == null) {
+            return null;
+        }
+        var best = first;
+        var bestKey = try key(first);
+        var x = try it.next();
+        while (x != null) {
+            let k = try key(x);
+            if (k < bestKey) {
+                best = x;
+                bestKey = k;
+            }
+            x = try it.next();
+        }
+        return best;
+    }
+
+    /// The value whose `key` is greatest, or `null`; the first of equal ones.
+    pub fn maxBy<K :: [TotalOrder], E :: [Error]>(key: fn(I.Item) -> K throws E): ?I.Item throws Join<I.Error, E> {
+        var it = this;
+        let first = try it.next();
+        if (first == null) {
+            return null;
+        }
+        var best = first;
+        var bestKey = try key(first);
+        var x = try it.next();
+        while (x != null) {
+            let k = try key(x);
+            if (k > bestKey) {
+                best = x;
+                bestKey = k;
+            }
+            x = try it.next();
+        }
+        return best;
+    }
     /// `f` for every value, in order.
     pub fn forEach<E :: [Error]>(f: fn(I.Item) -> void throws E): void throws Join<I.Error, E> {
         var it = this;
@@ -4207,6 +4494,102 @@ extend<I :: [Iterator]> I {
 
 // The terminators of an element kind (10 B6 I4): blocks whose `T` the iterator's `Item` binds
 // (05 §13 rule 2), reaching the iterators of numbers, of ordered values, of shown ones.
+// The terminators and adapters of a kind of iterator (10 B6 I4): a flat walk over iterables, runs
+// of equal values, the walk from the back, the walk over and over, the mean.
+
+extend<I :: [Iterator<Item = B>], B :: [Iterable]> I {
+    /// The values of the iterables, one after the other.
+    pub fn flatten(): FlattenIter<I, B, B.Iter> {
+        return FlattenIter<I, B, B.Iter> { inner = this, current = null };
+    }
+}
+
+extend<I :: [Iterator<Item = T>], T :: [Equatable]> I {
+    /// A run of equal values, given once.
+    pub fn dedup(): DedupIter<I, I.Error> {
+        // the comparison throws nothing; I.Error for its set, which the join takes as the source's
+        return DedupIter<I, I.Error> { inner = this, same = (a: T, b: T) => a == b, last = null };
+    }
+}
+
+extend<I :: [DoubleEnded]> I {
+    /// The values from the back.
+    pub fn rev(): RevIter<I> {
+        return RevIter<I> { inner = this };
+    }
+}
+
+extend<I :: [Iterator, Clone]> I {
+    /// The values over and over: an iterator a clone of which starts anew.
+    pub fn cycle(): CycleIter<I> {
+        return CycleIter<I> { origin = this.clone(), current = this };
+    }
+}
+
+extend<I :: [Iterator<Item = int>]> I {
+    /// The mean of the values, or `null` where there is none — summed as `float`, which no
+    /// `int` sum overflows.
+    pub fn average(): ?float throws I.Error {
+        var it = this;
+        var total = 0.0;
+        var n = 0;
+        var x = try it.next();
+        while (x != null) {
+            total = total + (x as float);
+            n = n + 1;
+            x = try it.next();
+        }
+        if (n == 0) {
+            return null;
+        }
+        return total / (n as float);
+    }
+}
+
+extend<I :: [Iterator<Item = float>]> I {
+    /// The mean of the values, or `null` where there is none.
+    pub fn average(): ?float throws I.Error {
+        var it = this;
+        var total = 0.0;
+        var n = 0;
+        var x = try it.next();
+        while (x != null) {
+            total = total + x;
+            n = n + 1;
+            x = try it.next();
+        }
+        if (n == 0) {
+            return null;
+        }
+        return total / (n as float);
+    }
+}
+
+// A value iterator is a clone of itself: a copy walks on its own (cycle).
+extend<T> SliceIter<T> :: [Clone] {
+    fn clone(): SliceIter<T> {
+        return this;
+    }
+}
+
+extend<T :: [Step]> Range<T> :: [Clone] {
+    fn clone(): Range<T> {
+        return this;
+    }
+}
+
+extend<T :: [Step]> RangeInclusive<T> :: [Clone] {
+    fn clone(): RangeInclusive<T> {
+        return this;
+    }
+}
+
+extend CharsIter :: [Clone] {
+    fn clone(): CharsIter {
+        return this;
+    }
+}
+
 extend<I :: [Iterator<Item = T>], T :: [Num]> I {
     /// The sum of the values; zero where there is none.
     pub fn sum(): T throws I.Error {
@@ -4727,19 +5110,22 @@ pub interface FromIterator<T> {
 
 extend<T> T[] :: [FromIterator<T>] {
     /// The values in an array, in order: a buffer that doubles, its first value for the slots
-    /// not yet written, then one copy of the length — one pass.
+    /// not yet written, then one copy of the length — one pass. The buffer starts at the
+    /// iterator's own guess of its length (`sizeHint`, 10 I4), and where that was exact — an
+    /// array's walk, a view's — the buffer is the array, with no copy at the end.
     static fn fromIter<I :: [Iterator<Item = T>]>(it: I): T[] throws I.Error {
         var walk = it;
+        let least = walk.sizeHint().0;
         let first = try walk.next();
         if (first == null) {
             return [];
         }
-        var buffer = arrayOf(8, (i: int) => first);
+        var buffer = filled(if (least > 8) least else 8, first);
         var count = 1;
         var x = try walk.next();
         while (x != null) {
             if (count == buffer.length()) {
-                let grown = arrayOf(count * 2, (i: int) => first);
+                let grown = filled(count * 2, first);
                 buffer[..count].copyInto(grown[..]);
                 buffer = grown;
             }
@@ -4747,7 +5133,10 @@ extend<T> T[] :: [FromIterator<T>] {
             count = count + 1;
             x = try walk.next();
         }
-        let out = arrayOf(count, (i: int) => first);
+        if (count == buffer.length()) {
+            return buffer;
+        }
+        let out = filled(count, first);
         buffer[..count].copyInto(out[..]);
         return out;
     }

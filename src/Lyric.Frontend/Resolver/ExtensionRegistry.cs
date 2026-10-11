@@ -1,4 +1,5 @@
 using Lyric.AST;
+using Lyric.Sema;
 
 namespace Lyric.Resolver;
 
@@ -73,10 +74,11 @@ public sealed class ExtensionBlock
     /// no symbol of its own, matched by shape.</summary>
     public bool IsConstructorTarget { get; set; }
 
-    /// <summary>The block's parameters a fixation of another's constraint names (05 §13 rule 2):
-    /// <c>T</c> in <c>extend&lt;I :: [Iterator&lt;Item = T&gt;], T :: [Num]&gt; I</c>, the receiver's
-    /// answer for <c>Item</c> once <c>I</c> is bound. Set by the checker.</summary>
-    public (GenericParamSymbol Bound, GenericParamSymbol From, AssociatedTypeSymbol Member)[]? FixationBindings { get; set; }
+    /// <summary>The fixations of another parameter's constraint that name the block's parameters (05
+    /// §13 rule 2): <c>T</c> in <c>extend&lt;I :: [Iterator&lt;Item = T&gt;], T :: [Num]&gt; I</c>, the
+    /// receiver's answer for <c>Item</c> once <c>I</c> is bound; <c>K</c> and <c>V</c> in
+    /// <c>Item = (K, V)</c>, the answer matched against the pattern. Set by the checker.</summary>
+    public (LyrType Pattern, GenericParamSymbol From, AssociatedTypeSymbol Member, GenericParamSymbol[] Named)[]? FixationBindings { get; set; }
 
     /// <summary>The block's parameters neither its target nor a fixation names: bound by nothing
     /// (LYR-SEM0170), so the block reaches no type. Set by the checker; <c>null</c> until asked.</summary>

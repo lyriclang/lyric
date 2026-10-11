@@ -1433,10 +1433,8 @@ public sealed class TypeChecker
     {
         var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
         if (!TypeFacts.Match(BlockTargetType(block), receiver, map)) return null;
-        // A parameter only a fixation names is the receiver's answer (05 §13 rule 2).
-        foreach (var (bound, from, member) in FixationBindingsOf(block))
-            if (!map.ContainsKey(bound) && map.TryGetValue(from, out var source))
-                map[bound] = ResolveAssociated(source, member);
+        FixationBindingsOf(block);
+        if (!ApplyFixations(block, map)) return null;
         foreach (var g in block.Generics)
         {
             if (!map.TryGetValue(g, out var bound)) return null;
@@ -1448,20 +1446,43 @@ public sealed class TypeChecker
         return map;
     }
 
-    /// <summary>The block's parameters named by a fixation of another's constraint, once per
-    /// block: <c>T</c> from <c>I :: [Iterator&lt;Item = T&gt;]</c> (05 §13 rule 2).</summary>
-    private (GenericParamSymbol, GenericParamSymbol, AssociatedTypeSymbol)[] FixationBindingsOf(ExtensionBlock block)
+    /// <summary>The fixations of the block's constraints that name its parameters, once per block:
+    /// <c>T</c> from <c>I :: [Iterator&lt;Item = T&gt;]</c> (05 §13 rule 2), and <c>K</c>, <c>V</c>
+    /// from <c>I :: [Iterator&lt;Item = (K, V)&gt;]</c> — the fixed type a pattern the receiver's
+    /// answer is matched against (M8c S5, the pairs <c>toMap</c> takes).</summary>
+    private (LyrType, GenericParamSymbol, AssociatedTypeSymbol, GenericParamSymbol[])[] FixationBindingsOf(ExtensionBlock block)
     {
         if (block.FixationBindings is { } known) return known;
-        var found = new List<(GenericParamSymbol, GenericParamSymbol, AssociatedTypeSymbol)>();
+        var found = new List<(LyrType, GenericParamSymbol, AssociatedTypeSymbol, GenericParamSymbol[])>();
         block.FixationBindings = []; // a constraint naming the block again finds nothing yet
         foreach (var from in block.Generics)
             foreach (var c in from.Constraints)
                 if (ResolveType(c, block.MethodScope) is GenericInstance { Fixations: { } fixations })
                     foreach (var (member, fixedTo) in fixations)
-                        if (fixedTo is TypeParamType { Param: var p } && block.Generics.Contains(p) && !ReferenceEquals(p, from))
-                            found.Add((p, from, member));
+                    {
+                        var named = block.Generics.Where(p => !ReferenceEquals(p, from) && MentionsParam(fixedTo, p)).ToArray();
+                        if (named.Length > 0) found.Add((fixedTo, from, member, named));
+                    }
         return block.FixationBindings = found.ToArray();
+    }
+
+    /// <summary>A block's fixations applied to a map its target began (05 §13 rule 2): a parameter
+    /// only a fixation names takes the receiver's answer — the answer matched against the fixed type
+    /// where that is a structure, <c>(K, V)</c> of <c>Iterator&lt;Item = (K, V)&gt;</c>. False where
+    /// the answer does not fit the structure. The checker and the lowering bind alike.</summary>
+    internal static bool ApplyFixations(ExtensionBlock block, Dictionary<GenericParamSymbol, LyrType> map)
+    {
+        foreach (var (pattern, from, member, named) in block.FixationBindings ?? [])
+        {
+            if (!map.TryGetValue(from, out var source)) continue;
+            if (pattern is TypeParamType { Param: var p })
+            {
+                if (!map.ContainsKey(p)) map[p] = ResolveAssociated(source, member);
+            }
+            else if (named.Any(n => !map.ContainsKey(n)) && !TypeFacts.Match(pattern, ResolveAssociated(source, member), map))
+                return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -1482,8 +1503,10 @@ public sealed class TypeChecker
         for (var grew = true; grew;)
         {
             grew = false;
-            foreach (var (named, from, _) in fixations)
-                if (bound.Contains(from) && bound.Add(named)) grew = true;
+            foreach (var (_, from, _, named) in fixations)
+                if (bound.Contains(from))
+                    foreach (var n in named)
+                        if (bound.Add(n)) grew = true;
         }
         return block.UnboundParameters = block.Generics.Where(g => !bound.Contains(g)).ToArray();
     }

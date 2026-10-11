@@ -1,0 +1,134 @@
+// The adapters and terminators of I4 that M8a left (M8c S5): mapNotNull, flatMap, flatten, dedup,
+// dedupBy, scan, peekable, rev, cycle; average, minBy, maxBy, chunks, windows, sorted, sortedBy,
+// partition, groupBy, toMap — and collect reading the iterator's guess of its length.
+import std.collections { List };
+import std.core { ParseError, arrayOf };
+import std.test { assertEq, assertNull, assertPanics, assertThrows, assertTrue };
+
+/// The number a text names, `null` for an empty one.
+fn numberOf(s: string): ?int throws ParseError {
+    if (s.isEmpty()) {
+        return null;
+    }
+    return try int.parse(s);
+}
+
+@Test
+fn mapNotNullLeavesTheNullsOut(): void {
+    let words = ["a1", "b", "c1"];
+    assertEq(words.iter().mapNotNull((s: string) => s.find('1')).toArray(), [1, 1]);
+    let none: string[] = [];
+    assertEq(none.iter().mapNotNull((s: string) => s.find('1')).toArray().length(), 0);
+    assertEq(try! ["1", "", "3"].iter().mapNotNull(numberOf).toArray(), [1, 3]);
+    let e = assertThrows(() => {
+        try ["1", "x"].iter().mapNotNull(numberOf).toArray();
+    });
+    assertTrue(e.message().contains("x"));
+}
+
+@Test
+fn flatMapAndFlattenWalkWhatTheyGive(): void {
+    assertEq([1, 2].iter().flatMap((x: int) => [x, -x]).toArray(), [1, -1, 2, -2]);
+    assertEq([1, 2].iter().flatMap((x: int) => List.of([x])).toArray(), [1, 2]);
+    let nested: int[][] = [[], [1], [], [2, 3], []];
+    assertEq(nested.iter().flatten().toArray(), [1, 2, 3]);
+    let empty: int[][] = [];
+    assertEq(empty.iter().flatten().toArray().length(), 0);
+}
+
+@Test
+fn dedupGivesARunOnce(): void {
+    assertEq([1, 1, 2, 1, 1].iter().dedup().toArray(), [1, 2, 1]);
+    let words = ["a", "A", "b", "B", "a"];
+    assertEq(words.iter().dedupBy((x: string, y: string) => x.toLower() == y.toLower()).toArray(), ["a", "b", "a"]);
+}
+
+@Test
+fn scanGivesTheStartAndEveryRunningValue(): void {
+    assertEq([1, 2, 3].iter().scan(10, (a: int, x: int) => a + x).toArray(), [10, 11, 13, 16]);
+    let none: int[] = [];
+    assertEq(none.iter().scan(7, (a: int, x: int) => a + x).toArray(), [7]);
+}
+
+@Test
+fn peekLooksWithoutTaking(): void {
+    var it = [5].iter().peekable();
+    assertEq(it.peek()!, 5);
+    assertEq(it.peek()!, 5);
+    assertEq(it.next()!, 5);
+    assertNull(it.peek());
+    assertNull(it.next());
+}
+
+@Test
+fn revAndCycle(): void {
+    assertEq([1, 2, 3].iter().rev().toArray(), [3, 2, 1]);
+    assertEq("abc".chars().rev().toArray(), ['c', 'b', 'a']);
+    assertEq((1..4).rev().toArray(), [3, 2, 1]);
+    assertEq([1, 2].iter().cycle().take(5).toArray(), [1, 2, 1, 2, 1]);
+    let none: int[] = [];
+    assertEq(none.iter().cycle().take(3).toArray().length(), 0);
+    assertEq(('a'..='b').cycle().take(3).toArray(), ['a', 'b', 'a']);
+}
+
+@Test
+fn averageMinByMaxBy(): void {
+    assertEq([1, 2, 3, 4].iter().average()!, 2.5);
+    let none: int[] = [];
+    assertNull(none.iter().average());
+    let big = [int.max, int.max];
+    assertTrue(big.iter().average()! > 9.0e18);
+    let words = ["bb", "a", "cc", "d"];
+    assertEq(words.iter().maxBy((s: string) => s.length())!, "bb");
+    assertEq(words.iter().minBy((s: string) => s.length())!, "a");
+    assertNull(none.iter().minBy((x: int) => x));
+}
+
+@Test
+fn chunksAndWindows(): void {
+    let chunks = [1, 2, 3, 4, 5].iter().chunks(2).toArray();
+    assertEq(chunks.length(), 3);
+    assertEq(chunks[2].toArray(), [5]);
+    let windows = [1, 2, 3].iter().windows(2).map((w: List<int>) => w.toArray()).toArray();
+    assertEq(windows, [[1, 2], [2, 3]]);
+    assertEq([1].iter().windows(2).toArray().length(), 0);
+    assertPanics(() => { let _ = [1].iter().chunks(0); });
+    assertPanics(() => { let _ = [1].iter().windows(0); });
+}
+
+@Test
+fn sortedSortedByPartitionGroupBy(): void {
+    assertEq([3, 1, 2].iter().sorted().toArray(), [1, 2, 3]);
+    let pairs = [(2, "x"), (1, "y"), (2, "z"), (1, "w")];
+    let byFirst = pairs.iter().sortedBy((a: (int, string), b: (int, string)) => a.0.totalCompare(b.0)).toArray();
+    assertEq(byFirst, [(1, "y"), (1, "w"), (2, "x"), (2, "z")]);
+    let (small, large) = [1, 5, 2, 6].iter().partition((x: int) => x < 4);
+    assertEq(small.toArray(), [1, 2]);
+    assertEq(large.toArray(), [5, 6]);
+    let groups = ["ab", "c", "de", "f"].iter().groupBy((s: string) => s.length());
+    assertEq(groups.get(2)!.toArray(), ["ab", "de"]);
+    assertEq(groups.get(1)!.toArray(), ["c", "f"]);
+    let e = assertThrows(() => {
+        try ["1", "x"].iter().groupBy((s: string) => try int.parse(s));
+    });
+    assertTrue(e.message().contains("x"));
+}
+
+@Test
+fn toMapTakesTheLaterValue(): void {
+    let m = [("a", 1), ("b", 2), ("a", 3)].iter().toMap();
+    assertEq(m.length(), 2);
+    assertEq(m.get("a")!, 3);
+}
+
+@Test
+fn collectKeepsEveryLengthAroundTheBuffer(): void {
+    for (n in [0, 1, 7, 8, 9, 16, 100]) {
+        let xs = arrayOf(n, (i: int) => i * 3);
+        let back = xs.iter().toArray();
+        assertEq(back, xs);
+        let walked = xs.iter().filter((x: int) => x % 2 == 0).toArray();
+        assertEq(walked.length(), (n + 1) / 2);
+        assertEq(xs.iter().toList().length(), n);
+    }
+}
