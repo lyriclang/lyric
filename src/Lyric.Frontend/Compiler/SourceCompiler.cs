@@ -127,6 +127,10 @@ public static class SourceCompiler
         // it, and the real lowering writes each site's value as a constant. Lyric 5's: the 4.x
         // tools lower a site as its inner expression, as they did since their VM went (01 L7).
         ComptimeTable? comptime = null;
+        // 'embed' (09 Q4) reads relative to the module that calls, within its package's directory:
+        // the one a package's source root lies in
+        var embed = new EmbedReader(sources.GetPath,
+            options.PackageRoots?.Values.Select(root => Path.GetDirectoryName(Path.GetFullPath(root))!).ToList() ?? []);
         if (compilation.Lyric5Modules && types.ComptimeSites.Count > 0)
         {
             report?.BeginPhase(Phase.Lower);
@@ -135,7 +139,7 @@ public static class SourceCompiler
             report?.EndPhase();
             if (hoisted is null || diagnostics.HasErrors)
                 return new CompileResult(sources, diagnostics, null, model);
-            var values = ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks);
+            var values = ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks, embed);
             if (values is null)
                 return new CompileResult(sources, diagnostics, null, model);
             comptime = new ComptimeTable { Values = values };
@@ -163,7 +167,7 @@ public static class SourceCompiler
             report?.ReportPhase(Phase.Verify,
                 timings.Runs > 1 ? $"{FunctionCount(ir)}, {timings.Runs} runs" : FunctionCount(ir),
                 timings.Verification);
-        return new CompileResult(sources, diagnostics, ir, model);
+        return new CompileResult(sources, diagnostics, ir, model) { Embedded = embed.Read };
     }
 
     /// <summary>
@@ -601,6 +605,10 @@ public sealed record CompileResult(
 {
     /// <summary>No error was reported. Warnings do not count.</summary>
     public bool Ok => !Diagnostics.HasErrors;
+
+    /// <summary>The files <c>embed</c> read while the program compiled (design/v5/spec/09 Q4),
+    /// absolute: inputs of the build beside its sources.</summary>
+    public IReadOnlyList<string> Embedded { get; init; } = [];
 
     /// <summary>Renders every diagnostic exactly once and reports whether the run was clean.
     /// </summary>

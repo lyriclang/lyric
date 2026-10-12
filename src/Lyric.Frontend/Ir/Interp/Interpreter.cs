@@ -26,10 +26,11 @@ public sealed class Interpreter
     private readonly Dictionary<(int Type, int Interface), IrImpl> _impls = new();
     private readonly Natives _natives;
 
-    /// <param name="budget">The steps all runs of this interpreter may take together.</param>
+    /// <param name="budget">The steps a run may take; <see cref="Refill"/> gives each run its own.</param>
     /// <param name="overflowChecks">The profile's setting (07 P3): a checked operation panics
     /// where the binary would, and wraps where it would.</param>
-    public Interpreter(IrModule module, long budget, bool overflowChecks)
+    /// <param name="embed">What <c>embed</c> reads files through (09 Q4); without one it reads none.</param>
+    public Interpreter(IrModule module, long budget, bool overflowChecks, EmbedReader? embed = null)
     {
         _module = module;
         _budgetLimit = budget;
@@ -37,7 +38,7 @@ public sealed class Interpreter
         _overflowChecks = overflowChecks;
         _globals = module.Globals.Select(g => Zero(g.Type)).ToArray();
         foreach (var impl in module.Impls) _impls[(impl.Type.Value, impl.Interface.Value)] = impl;
-        _natives = new Natives(this);
+        _natives = new Natives(this) { Embed = embed };
     }
 
     public IrModule Module => _module;
@@ -267,7 +268,7 @@ public sealed class Interpreter
                 var import = _module.Imports[c.Target.Value];
                 var args = c.Args.Select(T).ToArray();
                 var types = c.Args.Select(TypeOf).ToArray();
-                var result = _natives.Call(import, args, types);
+                var result = _natives.Call(import, args, types, c.Span);
                 if (c.Dest is { } d) Set(d, result);
                 return null;
             }

@@ -628,6 +628,21 @@ public static class ModuleLowerer
         // cover up — a malformed body nobody calls — the first verification has already seen.
         Reachability.Prune(result);
 
+        // 'embed' reads its file while the program compiles (09 Q4): what a 'comptime' site
+        // reaches may call it, what the program runs never does. Asked of the pruned module — a
+        // function only a site called was lowered all the same, and is gone now.
+        if (comptime is not { Hoist: true } && entry is not null
+            && result.Imports.FindIndex(import => import.Name == "std.core.embed") is var embed and >= 0)
+        {
+            var calls = result.Functions.SelectMany(f => f.Blocks).SelectMany(b => b.Insts)
+                .OfType<CallImport>().Where(call => call.Target.Value == embed).ToList();
+            foreach (var call in calls)
+                de.Report("LYR-CT0004", Severity.Error, call.Span,
+                    "'embed' reads its file while the program compiles, and this call would run in the program — "
+                    + "let a 'comptime' site make it: 'comptime embed(\"…\")'");
+            if (calls.Count > 0) return null;
+        }
+
         // The evaluation module requires what its retained imports require — nothing more. The
         // whole-program bits would refuse a pure site in a program that also touches the disk.
         if (comptime is { Hoist: true })

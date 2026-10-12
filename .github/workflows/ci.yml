@@ -127,7 +127,8 @@ jobs:
         uses: ./.github/actions/setup-zig
 
       - name: The Unicode tables are the generator's
-        # tooling/unicode/gen.py writes runtime/src/unicode_tables.h and std.string's unicodeVersion
+        # tooling/unicode/gen.py writes runtime/src/unicode_tables.h, the interpreter's C# twin
+        # (src/Lyric.Frontend/Ir/Interp/UnicodeTables.cs, M9a S4) and std.string's unicodeVersion
         # from runtime/third_party/ucd (M8c S1): a hand edit, or a new UCD without a run, fails here.
         if: runner.os == 'Linux'
         run: python3 tooling/unicode/gen.py --check

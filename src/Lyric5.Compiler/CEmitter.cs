@@ -1923,13 +1923,27 @@ public sealed class CEmitter
         var name = $"lyr_data{_data++}";
         var count = array.Elements.Length;
         // C has no array of no elements: the data of an empty one is one element nothing reads
-        var items = count == 0 ? "0" : string.Join(", ", array.Elements.Select(e => Constant(e, element)));
+        var items = count == 0 ? "0" : string.Join(", ", array.Elements.Select(e => Datum(e, element)));
         _constants.AppendLine($"static {CType(element)} const {name}[{Math.Max(count, 1)}] = {{ {items} }};");
         var bytes = $"{count} * sizeof {name}[0]";
         return c.Type is IrArrayType
             ? $"{Temp(c.Dest)} = lyr_alloc_array(&{ArrayDescriptor(element)}, {count}); __builtin_memcpy({Elements(c.Dest, element)}, {name}, {bytes});"
             : $"__builtin_memcpy({Storage(c.Dest)}.v, {name}, {bytes}); {Temp(c.Dest)} = &{Storage(c.Dest)};";
     }
+
+    /// <summary>An element of static data: an integer as its plain decimal, at its width's sign —
+    /// the initializer converts it, and a table of bytes (an <c>embed</c>) costs a few characters
+    /// an element rather than a cast and a macro —; anything else as its constant.</summary>
+    private string Datum(IrConstValue value, IrType element) => (value, element) switch
+    {
+        (IntConst i, IrScalarType { Kind: IrScalar.I8 }) => unchecked((sbyte)i.Value).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        (IntConst i, IrScalarType { Kind: IrScalar.I16 }) => unchecked((short)i.Value).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        (IntConst i, IrScalarType { Kind: IrScalar.I32 }) => unchecked((int)i.Value).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        (IntConst i, IrScalarType { Kind: IrScalar.I64 }) => unchecked((long)i.Value) == long.MinValue
+            ? "INT64_MIN" : unchecked((long)i.Value).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        (IntConst i, _) => i.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) + "u",
+        _ => Constant(value, element),
+    };
 
     /// <summary>
     /// A string literal as a static object the runtime reads without a copy (V9): one per distinct

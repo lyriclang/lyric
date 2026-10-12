@@ -967,6 +967,11 @@ M9b the maintainer is asked again.
   `else if`s choosing the same way — every branch checked, the chosen one lowered; `comptime for`
   over an array a site computes, its body unrolled per element. `comptime`, `inline`, `quote` and
   `macro` are words in Lyric 5. Spec 11 §2 rules 6–8, 01 §3; six cases, two older ones renamed.
+- **S4** determinism and `embed` (P2's rest, Q4): the Unicode tables a third time, as C# for the
+  interpreter — `gen.py --check` holds all three —, so compile time answers Unicode as the program
+  does; `std.core.embed(path)`, a file of the package as `uint8[]`, called by what a site reaches
+  (a call the program would make, a file outside the package or none: `LYR-CT0004`), the build
+  depending on what it read. Spec 11 §2 rule 9; three cases.
 
 ## Design decisions
 

@@ -20,6 +20,13 @@ pub fn unreachable(message: string = ""): never;
 /// "not implemented" and `message` behind it where one is given.
 pub fn todo(message: string = ""): never;
 
+/// The bytes of a file of the package, read while the program compiles (design/v5/spec/09 Q4):
+/// `path` relative to the module that calls, within the package's directory — the one thing code
+/// run at compile time reads from outside the program, and a build reads it again when it
+/// changes. A `comptime` site, or what one calls, makes the call: `comptime embed("table.bin")`;
+/// the program itself never does (`LYR-CT0004`).
+pub fn embed(path: string): uint8[];
+
 /// The empty interface (design/v5/spec/03 T10): every struct, class and enum value is an `Any`
 /// at the transition, and `is` or a type pattern takes it out again (T11). `Any[]` is the
 /// heterogeneous array. Nothing converts here unasked — the target has to say `Any`.
