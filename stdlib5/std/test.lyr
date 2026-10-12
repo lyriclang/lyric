@@ -3,54 +3,65 @@
 /// throwing if it likes — in a module of the package or under its `tests/` (07 V4). An assertion
 /// that does not hold panics with what it got against what was expected, each as `Debug` writes
 /// it, and names the expression it got it from (X1): `xs.length() = 2, expected 3`. The actual
-/// value comes first (N13).
+/// value comes first (N13). Two values too long to compare by eye get their first difference
+/// named below: a text's first line that differs, else the first character.
 
+import std.core { Contains, StringBuilder, filled };
 import std.io { flush, println };
+import std.os { cpuCount };
 import std.task { spawn, sleep, PanicInfo, TaskStatus, Cancelled, monotonicNanos };
-import std.thread { Thread };
+import std.thread { Pool, Thread };
 import std.sync { Atomic };
 import std.time { Duration };
 
 /// One test as `lyric test` hands it to `run`: its name — the module's path and the function's —,
-/// its body, why it is skipped, if it is, and how many seconds it may take
-/// (`@Test { skip = "…", timeout = 10 }`).
+/// its body, why it is skipped, if it is, how many seconds it may take, and whether it runs beside
+/// the others that say so (`@Test { skip = "…", timeout = 10, parallel = true }`).
 pub struct TestCase {
     pub name: string,
     pub body: fn() -> void throws Error,
     pub skip: string = "",
     pub timeout: int = 60,
+    pub parallel: bool = false,
 }
 
 /// Ends the process at once — no handler runs, and nothing flushes what the console holds: the
 /// watchdog flushes first (M8b S8a). Its way out of a test that does not stop.
 extern "C" fn _exit(status: int32): void;
 
-/// The running test, for the watchdog on a thread of its own (X3): which, and until when it may
-/// run — 0 while none does.
+/// The running test, for the watchdog on a thread of its own (X3): which — `together` while the
+/// parallel ones run —, until when it may run — 0 while none does —, and how many seconds that is.
 class Watch {
     current: Atomic<int> = Atomic<int>.new(-1),
     deadline: Atomic<int> = Atomic<int>.new(0),
+    seconds: Atomic<int> = Atomic<int>.new(0),
 }
 
+/// What `Watch.current` holds while the parallel tests run.
+let together = -2;
+
 /// What the running test's subtests left (X2): the name they are reported under, and how many
-/// failed.
+/// failed; `apart` is 1 while the parallel tests run, which have none.
 class Subtests {
     var parent: string = "",
     var failed: int = 0,
+    apart: Atomic<int> = Atomic<int>.new(0),
 }
 
 let watch = Watch { };
 let subtests = Subtests { };
 
 /// Runs the tests one after another, each in a task of its own (X3): a panic or an error that
-/// leaves a test fails it, and the run goes on. A line for each test once it has ended — what it
-/// printed comes before —, then the count. A test that outlives its time ends the run, as a
-/// failure. The answer is the program's exit: 0 when no test failed, 1 when one did (11 C5).
+/// leaves a test fails it, and the run goes on. Those marked `parallel` run after the others, at
+/// once. A line for each test once it has ended — what it printed comes before —, then the count.
+/// A test that outlives its time ends the run, as a failure. The answer is the program's exit: 0
+/// when no test failed, 1 when one did (11 C5).
 pub fn run(cases: TestCase[]): int {
     let _ = Thread.spawn(() => try guard(cases));
     var passed = 0;
     var failed = 0;
     var skipped = 0;
+    let apart = List<int>.new();
     for (i in 0..cases.length()) {
         let c = cases[i];
         if (c.skip != "") {
@@ -58,10 +69,15 @@ pub fn run(cases: TestCase[]): int {
             skipped += 1;
             continue;
         }
+        if (c.parallel) {
+            apart.push(i);
+            continue;
+        }
         subtests.parent = c.name;
         subtests.failed = 0;
         watch.current.store(i);
-        watch.deadline.store(if (c.timeout > 0) monotonicNanos() + c.timeout * 1000000000 else 0);
+        watch.seconds.store(c.timeout);
+        watch.deadline.store(deadlineAfter(c.timeout));
         let held = outcome(c.name, c.body);
         watch.deadline.store(0);
         if (held && subtests.failed == 0) {
@@ -76,10 +92,63 @@ pub fn run(cases: TestCase[]): int {
             failed += 1;
         }
     }
+    if (!apart.isEmpty()) {
+        let wrong = runApart(cases, apart);
+        passed += apart.length() - wrong;
+        failed += wrong;
+    }
     let count = passed + failed + skipped;
     let noun = if (count == 1) "test" else "tests";
     println(f"\n{count} {noun}: {passed} passed, {failed} failed, {skipped} skipped");
     return if (failed > 0) 1 else 0;
+}
+
+/// The tests marked `parallel` (X3), after the others: each a task on a pool of a thread for each
+/// processor, all at once; their lines in their order, each once it has ended. One deadline for
+/// them all — the longest of their timeouts, from their start; none where one of them has none.
+/// The number that failed.
+fn runApart(cases: TestCase[], chosen: List<int>): int {
+    var longest = 0;
+    var unbounded = false;
+    for (i in chosen) {
+        let t = cases[i].timeout;
+        if (t <= 0) {
+            unbounded = true;
+        }
+        if (t > longest) {
+            longest = t;
+        }
+    }
+    subtests.apart.store(1);
+    watch.current.store(together);
+    watch.seconds.store(longest);
+    watch.deadline.store(if (unbounded) 0 else deadlineAfter(longest));
+    let pool = Pool.new(cpuCount());
+    let head = pool.spawn(cases[chosen[0]].body);
+    let tasks = filled(chosen.length(), head);
+    for (k in 1..chosen.length()) {
+        tasks[k] = pool.spawn(cases[chosen[k]].body);
+    }
+    var failed = 0;
+    for (k in 0..chosen.length()) {
+        let name = cases[chosen[k]].name;
+        var task = tasks[k];
+        task.join();
+        if (reported(name, task.status())) {
+            println(f"ok    {name}");
+        } else {
+            failed += 1;
+        }
+    }
+    watch.deadline.store(0);
+    subtests.apart.store(0);
+    try? pool.close();
+    return failed;
+}
+
+/// When a test given `seconds` from now has outlived them; 0 for none.
+fn deadlineAfter(seconds: int): int {
+    return if (seconds > 0) monotonicNanos() + seconds * 1000000000 else 0;
 }
 
 /// Runs `body` in a task of its own; where it does not hold, writes `FAIL` with the panic or the
@@ -87,18 +156,24 @@ pub fn run(cases: TestCase[]): int {
 fn outcome(name: string, body: fn() -> void throws Error): bool {
     var task = spawn(body);
     task.join();
+    return reported(name, task.status());
+}
+
+/// How a test's task ended: `FAIL` with the panic or the error below it where it did not hold —
+/// a message's further lines under its first. Whether it held.
+fn reported(name: string, status: TaskStatus<void>): bool {
     var held = false;
-    match (task.status()) {
+    match (status) {
         TaskStatus.Done(_) => {
             held = true;
         }
         TaskStatus.Failed(e) => {
             println(f"FAIL  {name}");
-            println(f"      error: {e.message()}");
+            println(f"      error: {indented(e.message())}");
         }
         TaskStatus.Panicked(p) => {
             println(f"FAIL  {name}");
-            println(f"      panic [{p.code}]: {p.message}");
+            println(f"      panic [{p.code}]: {indented(p.message)}");
             if (p.trace != "") { println(p.trace); }
         }
         TaskStatus.Cancelled => {
@@ -110,6 +185,11 @@ fn outcome(name: string, body: fn() -> void throws Error): bool {
     return held;
 }
 
+/// A message's lines after its first, under it.
+fn indented(message: string): string {
+    return message.replace("\n", "\n      ");
+}
+
 /// The watchdog (X3): on a thread of its own, it looks every tenth of a second whether the running
 /// test has outlived its time. One that has ends the run — it cannot be stopped from outside: a
 /// task gives way only where it waits.
@@ -118,9 +198,10 @@ fn guard(cases: TestCase[]): void throws Cancelled {
         try sleep(Duration.ofMillis(100));
         let deadline = watch.deadline.load();
         if (deadline > 0 && monotonicNanos() > deadline) {
-            let c = cases[watch.current.load()];
-            println(f"FAIL  {c.name}");
-            println(f"      timed out after {c.timeout} s — the run ends here");
+            let at = watch.current.load();
+            let name = if (at >= 0) cases[at].name else "the parallel tests";
+            println(f"FAIL  {name}");
+            println(f"      timed out after {watch.seconds.load()} s — the run ends here");
             flush();
             _exit(1);
         }
@@ -129,8 +210,12 @@ fn guard(cases: TestCase[]): void throws Cancelled {
 
 /// A part of the running test, reported under its own name — `parent/name` — and run in a task of
 /// its own, so the test goes on after one fails (X2): a table-driven test, a row each. A failed
-/// one fails the test.
+/// one fails the test. A parallel test has none: it runs beside others, and a subtest is reported
+/// under the test that runs.
 pub fn subtest(name: string, body: fn() -> void throws Error): void {
+    if (subtests.apart.load() == 1) {
+        fail("a subtest is reported under its test, and a parallel test runs beside others: it has no subtests");
+    }
     let full = subtests.parent + "/" + name;
     if (outcome(full, body)) {
         println(f"ok    {full}");
@@ -163,11 +248,14 @@ pub fn assertPanics(f: fn() -> void throws Error, message: string = ""): PanicIn
 }
 
 /// Fails the test unless `actual` equals `expected`: `xs.length() = 2, expected 3` — the
-/// expression the call wrote for `actual`, where it is not the value itself —, then `message`.
+/// expression the call wrote for `actual`, where it is not the value itself —, then `message`,
+/// then, for values too long to compare by eye, their first difference.
 pub fn assertEq<T :: [Equatable, Debug]>(actual: T, expected: T, message: string = "",
     @callerExpr(actual) written: string = ""): void {
     if (!(actual == expected)) {
-        fail(because(got(written, actual.debug()) + ", expected " + expected.debug(), message));
+        let shown = actual.debug();
+        let wanted = expected.debug();
+        fail(because(got(written, shown) + ", expected " + wanted, message) + difference(shown, wanted));
     }
 }
 
@@ -233,6 +321,25 @@ pub fn assertGreater<T :: [Ordered, Debug]>(actual: T, bound: T, message: string
     }
 }
 
+/// Fails the test unless `container` holds `x` — what `x in container` asks (`Contains`):
+/// `assertContains("abc", 'b')`, `assertContains(xs, 3)`.
+pub fn assertContains<T :: [Debug], C :: [Contains<T>, Debug]>(container: C, x: T, message: string = "",
+    @callerExpr(container) written: string = ""): void {
+    if (!container.contains(x)) {
+        fail(because(got(written, container.debug()) + ", expected to contain " + x.debug(), message));
+    }
+}
+
+/// Fails the test unless `c` holds nothing: its iterator gives no value — a list, a map, a set, an
+/// array, a slice. It throws what that iterator throws: nothing, for those.
+pub fn assertEmpty<C :: [Iterable, Debug]>(c: C, message: string = "",
+    @callerExpr(c) written: string = ""): void throws C.Iter.Error {
+    var walk = c.iter();
+    if (try walk.next() != null) {
+        fail(because(got(written, c.debug()) + ", expected nothing", message));
+    }
+}
+
 /// Fails the test outright, with `message` — for a branch a test must not reach.
 pub fn fail(message: string): never {
     panic(message);
@@ -247,4 +354,100 @@ fn got(written: string, value: string): string {
 /// What an assertion found, and the test's own words after it where it gave some.
 fn because(found: string, message: string): string {
     return if (message == "") found else found + ": " + message;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The first difference (X1): over what `Debug` shows of the two values (D7), since a value is
+// compared as it is shown — a text's lines are its own, between the quotes, a break written `\n`.
+// ---------------------------------------------------------------------------------------------
+
+/// Where `actual` and `expected` — two values as `Debug` shows them — differ, for a failure's
+/// message: for texts that break lines, the first line that differs, both as `Debug` shows them;
+/// else, where the two are longer than 40 characters together, the first character that differs,
+/// the two around it and a mark under it. Nothing for short ones, which the message shows whole.
+fn difference(actual: string, expected: string): string {
+    let a = linesOfText(actual);
+    let e = linesOfText(expected);
+    if (a.length() > 1 || e.length() > 1) {
+        var i = 0;
+        while (i < a.length() && i < e.length() && a[i] == e[i]) {
+            i += 1;
+        }
+        return f"\nline {i + 1}: {lineOf(a, i)}, expected {lineOf(e, i)}";
+    }
+    let ac = actual.chars().toArray();
+    let ec = expected.chars().toArray();
+    if (ac.length() + ec.length() <= 40) {
+        return "";
+    }
+    var at = 0;
+    while (at < ac.length() && at < ec.length() && ac[at] == ec[at]) {
+        at += 1;
+    }
+    let from = if (at > 20) at - 20 else 0;
+    let out = StringBuilder.new();
+    out.appendStr(f"\nfirst difference at character {at + 1}:\n  ");
+    windowTo(out, ac, from);
+    out.appendStr("\n  ");
+    windowTo(out, ec, from);
+    out.appendStr("\n  ");
+    // the ellipsis before a cut window takes a column of its own
+    var pad = at - from + (if (from > 0) 1 else 0);
+    while (pad > 0) {
+        out.appendChar(' ');
+        pad -= 1;
+    }
+    out.appendChar('^');
+    return out.toString();
+}
+
+/// Up to 40 characters of `cs` from `from` on, an ellipsis where they are cut.
+fn windowTo(out: StringBuilder, cs: char[], from: int): void {
+    if (from > 0) {
+        out.appendChar('…');
+    }
+    let to = if (cs.length() - from > 40) from + 40 else cs.length();
+    for (i in from..to) {
+        out.appendChar(cs[i]);
+    }
+    if (to < cs.length()) {
+        out.appendChar('…');
+    }
+}
+
+/// Line `i` of `lines`, in quotes, or `no line` past their end.
+fn lineOf(lines: List<string>, i: int): string {
+    return if (i < lines.length()) "\"" + lines[i] + "\"" else "no line";
+}
+
+/// The lines of a text as `Debug` shows it — between quotes, a break written `\n` —, each as shown;
+/// anything else is one line, the whole.
+fn linesOfText(shown: string): List<string> {
+    let lines = List<string>.new();
+    let cs = shown.chars().toArray();
+    let n = cs.length();
+    if (n < 2 || cs[0] != '"' || cs[n - 1] != '"') {
+        lines.push(shown);
+        return lines;
+    }
+    var line = StringBuilder.new();
+    var i = 1;
+    while (i < n - 1) {
+        let c = cs[i];
+        if (c == '\\' && i + 2 < n) {
+            if (cs[i + 1] == 'n') {
+                lines.push(line.toString());
+                line = StringBuilder.new();
+            } else {
+                line.appendChar(c);
+                line.appendChar(cs[i + 1]);
+            }
+            i += 2;
+        } else {
+            line.appendChar(c);
+            i += 1;
+        }
+    }
+    lines.push(line.toString());
+    return lines;
 }

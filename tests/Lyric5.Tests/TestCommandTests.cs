@@ -172,6 +172,56 @@ public class TestCommandTests
         Assert.EndsWith("FAIL  app.tests.slow.spins\n      timed out after 1 s — the run ends here\n", output);
     }
 
+    /// <summary>Two tests that wait for each other (X3): one after the other, the first would wait
+    /// until its time ran out; marked <c>parallel</c>, they run at once, after the others, and their
+    /// lines come in their order.</summary>
+    private const string MeetingTests =
+        "import std.sync { Atomic };\nimport std.task { sleep };\nimport std.time { Duration };\n\n"
+        + "let a = Atomic<int>.new(0);\nlet b = Atomic<int>.new(0);\n\n"
+        + "@Test { parallel = true, timeout = 5 }\nfn first(): void throws Error {\n    a.store(1);\n"
+        + "    while (b.load() == 0) {\n        try sleep(Duration.ofMillis(5));\n    }\n}\n\n"
+        + "@Test { parallel = true, timeout = 5 }\nfn second(): void throws Error {\n    b.store(1);\n"
+        + "    while (a.load() == 0) {\n        try sleep(Duration.ofMillis(5));\n    }\n}\n\n"
+        + "@Test\nfn alone(): void {\n}\n";
+
+    [Fact]
+    public void Parallel_tests_run_at_once_after_the_others()
+    {
+        var dir = App(("tests/meeting.lyr", MeetingTests));
+        var (exit, output, error) = Run("test", "-C", dir, "-f", "meeting");
+        Assert.True(exit == 0, output + error);
+        Assert.Equal("ok    app.tests.meeting.alone\nok    app.tests.meeting.first\nok    app.tests.meeting.second\n\n"
+                     + "3 tests: 3 passed, 0 failed, 0 skipped\n", output);
+    }
+
+    [Fact]
+    public void A_parallel_test_has_no_subtests()
+    {
+        var dir = App(("tests/rows.lyr",
+            "import std.test { assertEq, subtest };\n\n@Test { parallel = true }\nfn table(): void {\n"
+            + "    subtest(\"row\") {\n        assertEq(1, 1);\n    }\n}\n"));
+        var (exit, output, error) = Run("test", "-C", dir, "-f", "rows");
+        Assert.True(exit == 1, output + error);
+        Assert.StartsWith("FAIL  app.tests.rows.table\n      panic [LYR-RT0008]: a subtest is reported under its test, "
+                          + "and a parallel test runs beside others: it has no subtests\n", output);
+    }
+
+    /// <summary>A failed assertion's further lines — the first difference of two long texts (X1) —
+    /// come under its first.</summary>
+    [Fact]
+    public void A_long_difference_is_pointed_at_under_the_failure()
+    {
+        var dir = App(("tests/long.lyr",
+            "import std.test { assertEq };\n\n@Test\nfn words(): void {\n"
+            + "    let said = \"the quick brown fox jumps over the lazy dog\";\n"
+            + "    assertEq(said, \"the quick brown fox jumps over the lazy cat\");\n}\n"));
+        var (exit, output, error) = Run("test", "-C", dir, "-f", "long");
+        Assert.True(exit == 1, output + error);
+        Assert.Contains("FAIL  app.tests.long.words\n      panic [LYR-RT0008]: said = \"the quick brown fox jumps over the lazy dog\", "
+                        + "expected \"the quick brown fox jumps over the lazy cat\"\n      first difference at character 42:\n"
+                        + "        …jumps over the lazy dog\"\n        …jumps over the lazy cat\"\n                             ^\n", output);
+    }
+
     [Fact]
     public void A_file_is_no_package_to_test()
     {
