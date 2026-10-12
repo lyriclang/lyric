@@ -913,6 +913,11 @@ After the review:
   `Any` takes their values (`let a: Any = 5`, design 03 T10 as written). The test compares the
   descriptor of the built-in's box (S8b). Spec 05 §9 rules 1–3, 09 §2 rule 12; five cases, the
   pin `any-takes-no-scalar` retired with its rule.
+- **S16** a debug text for an optional — `null` or the value's own, through the helper a
+  synthesized `debug()` used already; no `Display` — and `Debug` and `Display` for `T[N]` as for
+  `T[]` (`[1, 2, 3]`), synthesized per written length beside S3b's `Equatable` and `Hashable`, so
+  `assertEq('7'.toDigit(10), 7)` and `{x.toBytesLE()}` compile. Spec 03 §3.4 rule 1, §5.3 rule 8;
+  three cases.
 
 ## Design decisions
 
