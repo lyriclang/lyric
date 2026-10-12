@@ -5423,6 +5423,16 @@ extend<T :: [Hashable]> ?T :: [Hashable] {
     }
 }
 
+/// An optional is Debug where its value's type is (10, "Review 2026-10-09" S1; M8c S16): `null`,
+/// or the value's own debug text — no wrapper, as an optional has none (Kotlin's form, not Rust's
+/// `Some(7)`) —, so `assertEq('7'.toDigit(10), 7)` names both sides. The text a synthesized
+/// `debug()` gives an optional field already.
+extend<T :: [Debug]> ?T :: [Debug] {
+    fn debug(): string {
+        return debugOptional(this);
+    }
+}
+
 /// An array is Clone where its element is (10 K5): a new array of the elements' clones.
 extend<T :: [Clone]> T[] :: [Clone] {
     fn clone(): T[] {

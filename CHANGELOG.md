@@ -132,7 +132,8 @@ promise. This entry fills with the milestones.
   `.5`, a name beyond ASCII, a constraint written for a value — each said once —, and
   `lyric5 test --target`. Of the review of 2026-10-09: `is`, type patterns and type sets on the
   built-in types, exact (`d is int`, `n: int =>`), and `Any` taking their values
-  (`let a: Any = 5`).
+  (`let a: Any = 5`); a debug text for an optional (`null` or the value), and `Debug` and
+  `Display` for an inline array as for an array.
 
 ---
 

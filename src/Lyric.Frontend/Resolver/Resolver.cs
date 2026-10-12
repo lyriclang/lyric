@@ -53,7 +53,8 @@ public sealed class Resolver
 
     /// <summary>
     /// An inline array is <c>Equatable</c> and <c>Hashable</c> where its element is (design/v5/spec/10
-    /// C8, "Review 2026-10-08" S4b; M8c S3b): for every length the program writes — in any module,
+    /// C8, "Review 2026-10-08" S4b; M8c S3b), and <c>Debug</c> and <c>Display</c> as an array is
+    /// ("Review 2026-10-09" S11; M8c S16): for every length the program writes — in any module,
     /// std's among them — a block of each, synthesized as source into std.core as the conformances
     /// of 04 D7 are. A block over a generic length cannot be written (no generic constant, 03 T13);
     /// one over a written length can, and no other block targets an inline array (03 M4-2). A
@@ -67,6 +68,7 @@ public sealed class Resolver
         if (core is null) return;
         var declared = _comp.AstOf(core).Declarations.OfType<InterfaceDecl>().Select(i => i.Name).ToHashSet(StringComparer.Ordinal);
         if (!declared.Contains("Equatable") || !declared.Contains("Hashable") || !declared.Contains("Hasher")) return;
+        var shows = declared.Contains("Debug") && declared.Contains("Display");
 
         var lengths = new SortedDictionary<int, Span>();
         foreach (var module in _comp.Modules)
@@ -107,8 +109,50 @@ public sealed class Resolver
                 }
 
                 """;
-            var id = _sm.AddSynthesized($"<synthesized Equatable and Hashable for T[{n}]>", text, at,
-                $"in the 'Equatable' and 'Hashable' synthesized for 'T[{n}]'");
+            Declare(_sm.AddSynthesized($"<synthesized Equatable and Hashable for T[{n}]>", text, at,
+                $"in the 'Equatable' and 'Hashable' synthesized for 'T[{n}]'"));
+            if (!shows) continue;
+
+            // Debug and Display as an array's (10, "Review 2026-10-09" S11; M8c S16): `[1, 2]`,
+            // each element in its debug text, the display text the same. A source of its own, so
+            // the first one's name — in the #line of a lowered 'equals' — stays as it was.
+            var shown = $$"""
+                extend<T :: [Debug]> T[{{n}}] :: [Debug, Display] {
+                    fn debug(): string {
+                        let out = StringBuilder.new();
+                        this.debugTo(out);
+                        return out.toString();
+                    }
+
+                    fn debugTo(out: StringBuilder): void {
+                        out.appendChar('[');
+                        var i = 0;
+                        while (i < {{n}}) {
+                            if (i > 0) {
+                                out.appendStr(", ");
+                            }
+                            this[i].debugTo(out);
+                            i += 1;
+                        }
+                        out.appendChar(']');
+                    }
+
+                    fn show(): string {
+                        return this.debug();
+                    }
+
+                    fn showTo(out: StringBuilder): void {
+                        this.debugTo(out);
+                    }
+                }
+
+                """;
+            Declare(_sm.AddSynthesized($"<synthesized Debug and Display for T[{n}]>", shown, at,
+                $"in the 'Debug' and 'Display' synthesized for 'T[{n}]'"));
+        }
+
+        void Declare(FileId id)
+        {
             foreach (var synthesized in new Parser(_sm, id, _de).ParseModule().Declarations)
                 if (synthesized is ExtendDecl block)
                 {
