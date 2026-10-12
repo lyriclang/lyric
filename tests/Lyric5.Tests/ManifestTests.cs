@@ -74,6 +74,15 @@ public class ManifestTests
         Assert.Equal("1.2.3-beta.1", m.Version);
         Assert.Equal("5", m.Edition);
         Assert.Equal(Path.Combine(m.Root, "src"), m.SourceRoot);
+        Assert.Null(m.ComptimeBudget);
+    }
+
+    /// <summary>The steps one <c>comptime</c> site may take (design/v5/spec/09 Q5).</summary>
+    [Fact]
+    public void A_manifest_sets_the_budget_of_a_comptime_site()
+    {
+        var m = Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\ncomptimeBudget = 2_000_000_000\n"));
+        Assert.Equal(2_000_000_000L, m.ComptimeBudget);
     }
 
     [Theory]
@@ -91,6 +100,9 @@ public class ManifestTests
     [InlineData("name = \"app\"\nversion = \"0.1.0\"\ntoolchain = \"~5.1\"", "LYR-PKG0002", "is no toolchain requirement")]
     [InlineData("name = \"app\"\nversion = \"0.1.0\"\ninclude = \"src\"", "LYR-PKG0002", "'include' is an array of patterns")]
     [InlineData("name = \"app\"\nversion = \"0.1.0\"\nexclude = [\"../notes\"]", "LYR-PKG0002", "'../notes' is no pattern of the package's files")]
+    [InlineData("name = \"app\"\nversion = \"0.1.0\"\ncomptimeBudget = 0", "LYR-PKG0002",
+        "'comptimeBudget' is the positive number of steps one 'comptime' site may take, not the number 0")]
+    [InlineData("name = \"app\"\nversion = \"0.1.0\"\ncomptimeBudget = \"1e6\"", "LYR-PKG0002", "site may take, not \"1e6\"")]
     public void A_package_table_is_checked(string body, string code, string why)
     {
         var e = Assert.Throws<ManifestException>(() => Manifest.Read(Write("[package]\n" + body + "\n")));

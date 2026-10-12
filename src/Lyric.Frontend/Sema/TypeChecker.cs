@@ -11532,7 +11532,9 @@ public sealed class TypeChecker
         }
         Walk(ct.Inner);
 
-        if (pure) _result.ComptimeSites.Add(ct);
+        // once: a hole of an f-string is checked twice — a site listed twice ran twice and
+        // reported its error twice (M9a S1)
+        if (pure && !_result.ComptimeSites.Contains(ct)) _result.ComptimeSites.Add(ct);
         return type;
     }
 

@@ -16,7 +16,7 @@ namespace Lyric5.Tests;
 public class CEmitterTests
 {
     private static readonly string Root = RuntimeLayout.FindRoot(AppContext.BaseDirectory);
-    private static readonly string Programs = Path.Combine(Root, "tests", "Lyric5.Tests", "programs");
+    internal static readonly string Programs = Path.Combine(Root, "tests", "Lyric5.Tests", "programs");
     private static readonly string Golden = Path.Combine(Root, "tests", "Lyric5.Tests", "golden");
 
     internal static IReadOnlyList<CEmitter.Unit> EmitC(string name)

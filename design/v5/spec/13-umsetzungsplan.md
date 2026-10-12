@@ -303,6 +303,98 @@ S5, S9, S12; mittel: S1, S2, S3, S6, S7, S8, S10; klein: S11, S13, S14.
 - **Swift**: `rethrows` — dieselbe Absicht wie P2, als Schlüsselwort statt Typparameter.
 - **Kotlin**: `CharRange` (S3), Mengenoperationen als Methoden (S6).
 
+## Nachtrag 2026-10-09 — der Plan für M9a
+
+M9a nach seiner Zeile oben, dazu jede Uhr, die auf M9a steht:
+
+- in diesem Dokument die M4-Synthese nach `std.core` (M4-Zeile), `inline fn` und lokale `fn`, `@Shared`;
+- 04 S3b (`T[N]` als Ganzes);
+- 08 Y1 (`comptime`, `quote` reserviert);
+- STATUS (`assert` baut seine Meldung bis `inline` eifrig);
+- `std.io` (`IoErrorKind` wird `@NonExhaustive`);
+- Spec 01 (`inline`, `macro`, `quote`), 11 und 12 (`@NonExhaustive` an den I/O-Arten).
+
+Freigegeben am 2026-10-09 („wie M8c“): ohne Halt bis zum Abschluss, Merge bei grüner CI, offene Punkte gesammelt, Bericht am Ende. Vor M9b wird neu gefragt.
+
+Grundlage ist eine Prüfung jedes Punkts gegen den Code (2026-10-09). Von M9a steht fast nichts:
+
+- `comptime e` wird geprüft und nie ausgewertet: `SourceCompiler` reicht keinen Auswerter durch, die Stelle wird als Laufzeitausdruck gesenkt.
+- Die Attribute laufen auf dem 4.x-Zeilenmodell.
+- Die Synthese ist das M4-Provisorium im Resolver (Quelltext, Interfaces am bloßen Namen).
+- Es gibt keinen Interpreter, kein `std.meta`, kein `embed`, kein `@When`, kein `inline fn`; von Art 2 nur `@Test`, `@Bench`, `@callerExpr`.
+
+Die Slices heißen **M9a S1–S12**; jeder ist ein PR, sein Regel-PR in der Spec geht voran. Größe: **XL** statt L (die Zeile schätzte, bevor die Prüfung zeigte, wie wenig steht).
+
+### Architektur
+
+| # | Entscheidung | Warum — und warum nicht die Alternativen |
+|---|---|---|
+| P1 | **Der Interpreter ist C#, im Frontend (`Ir/Interp/`), über der typisierten IR** (L7, die Tür hier gebaut). Mit **expliziten Rahmen** (kein Rekursionsstapel in C#), sodass auch ein Generator zur Compile-Zeit läuft. Werte: Skalare roh, Strings als Bytes, Structs/Enums/Tupel als Feldfolgen, Objekte und Arrays auf dem Heap des .NET-GC. Fehlerslot und Panik wie zur Laufzeit; ein **Budget zählt IR-Instruktionen** (Q5). | Die IR ist selbstbeschreibend gebaut (M2), damit genau das geht. **Verworfen:** das Programm mit dem C-Backend bauen und laufen lassen — ein C-Compiler-Lauf je Auswertung, das Ergebnis hinge an der Plattform (Q7), und ein Cross-Build bräuchte den Zielrechner. **Verworfen:** die 4.x-VM, die mit M2 S0 ging. |
+| P2 | **Die reinen Eingebauten als C#-Gegenstück, bitgleich.** Das gilt für die rund 150 Intrinsics: Zahl ↔ Text, die kürzeste Gleitkommaform, Strings, Unicode — der UCD-Generator schreibt die Tabellen zusätzlich als C#, die CI prüft beide. Die **unreinen** (Konsole, Dateien, Netz, Zeit, Zufall, Threads, Tasks, Prozesse, Signale) sind an der Stelle ein Fehler mit der Aufrufkette (Q3). Der **SipHash-Schlüssel ist zur Compile-Zeit fest** (Q7: eine `Map` läuft jedes Mal gleich). | Ein Aufruf aus `comptime` landet über std in denselben Intrinsics wie zur Laufzeit. **Verworfen:** die C-Laufzeit per P/Invoke — nicht für jedes Host-Ziel gebaut, und ein Fehler darin wäre ein Absturz des Compilers. |
+| P3 | **Ergebnisse jeder Werttyp** (Q1): neue IR-Konstanten für Arrays, Structs, Enums, Tupel, Optionals, `Box<T>`, als statische Daten im C. Ein Array ist schreibbar: jede Auswertung des Ausdrucks baut eins aus den Daten neu, wie ein Literal. Ein Wert ist eine Kopie. Klassen, Closures und Koroutinen sind kein Ergebnis (`LYR-CT…`). | Zigs Regel; die Tabelle (CRC, Unicode-Teilmengen) ist der Fall, der zählt. **Verworfen:** Arrays nur lesend (`const`) — ein `let t = comptime table()` darf geschrieben werden wie jedes Array. |
+| P4 | **Die Formen** (Q2): `comptime { … }`, `comptime if` — beide Zweige geprüft, einer gesenkt —, `comptime for (x in w)` über einen `comptime`-Wert, entfaltet. Schlüsselwörter **`comptime`, `inline`, `quote`, `macro` reserviert** (08 Y1, Spec 01). `quote` und `macro` bekommen ihre Form erst mit M9b; der Parametername `quote` in `std.core` weicht. | Die Liste der Wörter steht seit Bereich 8; ein Wort, das erst in M9b reserviert würde, bräche Programme dazwischen. |
+| P5 | **Typinformation als Entfaltung** (A7): `fields(T)`, `variants(E)`, `members(T)`, `conformances(T)`, `typeName<T>()`, `isStruct/isClass/isEnum` geben `comptime`-Werte (`FieldInfo` mit Name, Typ, Sichtbarkeit, Attributen, Index). Ein `comptime for` über sie und `this.[f]` werden **je Instanz entfaltet und geprüft**: eine Stufe zwischen Checker und Senkung, die den Rumpf je Konformer mit den Infos als Konstanten prüft. R7: ein fremdes Paket sieht nur `pub`. | Der Rumpf eines generischen Defaults wird heute einmal geprüft. `this.[f]` hat aber je Feld einen anderen Typ, also muss die Prüfung je Entfaltung laufen (Zigs `inline for`, Nims `fieldPairs`). **Verworfen:** `this.[f]` zur Laufzeit — das wäre Reflexion, die R6 verbietet. **Verworfen:** Makros dafür — die Trennregel in A1 gibt Rumpfcode über Typinfo `comptime`. |
+| P6 | **Synthese nach A5:** `Equatable`, `Hashable`, `Ordered`, `Clone`, `Default` als `comptime`-Defaults in `std.core`, geschrieben über P5; das Provisorium fällt für sie. **Lesart:** `TotalOrder` geht mit `Ordered` (dieselbe Familie; A5 nennt fünf). `Debug` und `Identity` bleiben im Compiler (A5), `Display` auf Anfrage mit `Debug`. Die Blöcke je Länge für `T[N]` (S3b, S16) bleiben — es gibt keine generische Konstante (T13). | Spec 05 §14 ist die Messlatte, ihre Fälle bleiben grün. Regel 1 („die Liste ist fest“) fällt: jedes Interface kann synthetisieren. |
+| P7 | **Attribute:** die Art je Attribut festgehalten (T1); die Marker aus F1 vollständig, mit Hierarchie; Attribute an allen Deklarationen (T7). Werte sind `comptime`-Ausdrücke (F4), mit **einem Weg** für Checker, Runner und Warnungen. Der latente Fehler: `@Test { timeout = LIMIT }` lief mit 60, weil der Runner nur Literale liest. **Positionsform** (Lesart): ein Attribut mit genau einem Feld ohne Default nimmt `@X(v)`, statt `WithArg<T>` aus 4.x. Das 4.x-Zeilenmodell (Prüfungen, Texte über das Format) gilt nur noch im 4.x-Pfad. In Lyric 5 ist eine attributierte Funktion keine Wurzel (01 B13), außer `@Test`/`@Bench` unter ihrem Befehl. | A1–A3 sind entschieden; gebaut war 4.x. |
+| P8 | **Art 2 vollständig** (A11): `@Deprecated { message, until, replacement }` — `until` gegen die 5er-Version —, `@AlwaysInline`/`@NoInline`/`@Cold` als C-Attribute, `@MustUse` an Funktionen und Typen (die Sperre `SEM0067` gegen generische Ziele fällt für Art 2), `@NonExhaustive` (an `IoErrorKind`), `@callerLine`/`@callerFile`, `@When`, `@Allow(code)` mit `[lints] allow` im Manifest, `@Shared`. **Nicht hier:** `@Export` und `@Layout` gehören M14 (Spec 13, die ABI); die M9a-Zeile oben nannte `@Layout` doppelt. | Ein Name, eine Art; jede Anweisung bekommt ihren Vertrag in Spec 11 und einen roten und einen grünen Fall (11 G10). |
+| P9 | **Ziel und Profil im Frontend** (A6): `target.os`, `target.arch`, `target.pointerWidth`, `profile.debug` sind `comptime`-Konstanten aus dem Bau, beim Cross-Build die des Ziels. `@When(cond)` an Deklarationen und am Modulkopf; der inaktive Zweig wird geprüft, soweit das Ziel es erlaubt. Features (07 P9) bleiben Tür. | B1–B4. |
+| P10 | **`inline fn`** (Y11 F6): in der IR eingesetzt, ihre Lambda-Argumente an Ort und Stelle, mit nicht-lokalem `return`. **Lokale `fn`** (F8/F9) mit Captures und Rekursion, ohne Defaults und `...`. `assert` wird `inline`: seine Meldung entsteht erst im Fehlerfall. | Kotlins `inline`; die Uhr aus M3. |
+| P11 | **Kosten:** ausgewertet wird nur, wo `comptime` steht; ein Programm ohne Stelle senkt einmal wie bisher. Mit Stellen senkt eine Hebe-Senkung nur, was die Stellen erreichen, ohne Optimierer, und die Ausgabe-Senkung schreibt die Werte ein. Messpunkt 1 (hello warm ≤ 50 ms) gilt weiter; gemessen wird er in S12, wenn std selbst `comptime` nutzt. *Korrigiert mit S1: hier stand „einmal gesenkt und für die Ausgabe wiederverwendet“.* | Einmal zu senken hieße, den Optimierer erst nach der Auswertung laufen zu lassen und die Stellen in der fertigen IR zu ersetzen. Das wäre eine Umstellung der Senkung, die keine Messung verlangt: die Hebe-Senkung kostet nur, was die Stellen erreichen. |
+| P12 | **Spec:** Kapitel 11 wächst um `comptime`, Attribute, `std.meta`, `@When` und `embed`; 05 §14 neu nach A5; 01 die Wörter; 16 die Codes `LYR-CT…`. | wie M8c P4/P5 |
+| P13 | **`lyric check` wertet aus** (Q8): heute gibt es keinen `check`-Befehl (M12). Jeder Bau, der senkt, wertet aus, und der Satz in `ComptimeTable` („kein Auswerten im Check“) fällt. Der Editor (Q8 „strenger“) gehört M13b. | |
+
+### Slices
+
+| Slice | Inhalt | Artefakt, Prüfung |
+|---|---|---|
+| **S1** Der Interpreter | P1, P2 für Skalare und Strings: Kontrollfluss, Aufrufe, Structs, Enums, Tupel, Optionals, Arrays, Objekte, Fehler; eine Panik ist ein Übersetzungsfehler mit innerem Backtrace (Q6); Budget mit Manifest-Feld (Q5); unreine Eingebaute als Fehler mit Kette; `comptime e` wird ausgewertet | `comptime fib(30)` ist eine Konstante, `fib` fehlt im Binary; eine C#-Testreihe des Interpreters über IR-Stücke |
+| **S2** Ergebnisse | P3 | `let t = comptime crcTable(0xEDB88320u32)`, ein `uint32[]` in den Daten |
+| **S3** Formen und Wörter | P4 | Block, `comptime if` mit Fehler im inaktiven Zweig, `comptime for` über ein Array |
+| **S4** Determinismus und `embed` | P2-Rest: Unicode als C#-Tabellen, SipHash fest; `embed("pfad")` (Q4), Bauabhängigkeit im Cache | eine Datei als `uint8[]`, ihr Wechsel baut neu |
+| **S5** Attribute | P7 | `@Test { timeout = LIMIT }` läuft mit `LIMIT`; ein Attribut an jeder Deklarationsart; die Marker |
+| **S6** Art 2 | P8 | je Attribut ein roter und ein grüner Fall |
+| **S7** Ziel und Profil | P9 mit `@When` | ein Modul je Plattform über `@When` am Kopf; ein Cross-Build wählt das Ziel |
+| **S8** `inline fn`, lokale `fn` | P10; `@Shared` beim `Clone` | `forEach { if (…) return }` verlässt die Funktion |
+| **S9** `std.meta` | P5 mit R7 | `comptime for (f in fields(Self))` mit `this.[f]` in einer eigenen Synthese (`ToJson`-artig) |
+| **S10** Synthese nach A5 | P6 | Spec 05 §14 grün, das Provisorium für die fünf gelöscht |
+| **S11** Enum-Reflexion | R5: `E.variants()`, `E.fromName(s): ?E`, `e.name()` über ein `std.core`-Interface, das ein Enum auf Anfrage konformiert. Der Name des Interfaces ist eine Lesart | `match`-freie Namenstabelle eines Enums |
+| **S12** Abschluss | `examples/constants.lyr` für Lyric 5; das `comptime`-Tabellen-Beispiel: `std.hash`s CRC-Tabellen über `comptime` statt SpinLock (M8c S11); Dogfood; Messpunkt 1; STATUS, CHANGELOG | die Zeile oben erfüllt |
+
+**Nicht in M9a:**
+
+- Makros, `std.syntax`, `quote`-Form, `lyric expand` — M9b;
+- `@Export`, `@Layout` — M14;
+- die Lint-Namen und `lyric check` — M12;
+- der Editor — M13b;
+- Doc-Tests — M13a;
+- Features — Tür.
+
+### Tests
+
+- Je Slice die Regel-Fälle der Spec, rot gegen den Compiler davor, dazu **die ganze Suite** vor dem Ausliefern (Lehre aus #402).
+- Der Interpreter bekommt eine C#-Testreihe über IR-Stücke, je Konstrukt und je Eingebautem, mit dem Wert gegen den des C-Laufs desselben Programms: bitgleich, sonst rot.
+- Eine Mutationskontrolle je Regel. Die 4.x-Attributtests (Sema 73, Parsing 17) bleiben grün; ihr Pfad wird abgegrenzt, nicht gelöscht.
+
+### Umfang
+
+| | Umfang |
+|---|---|
+| Interpreter (C#) | etwa 3000 Zeilen |
+| Entfaltung | etwa 1500 |
+| Attribute | etwa 1500 |
+| `std.meta` und die Synthese in Lyric | etwa 800 |
+| Spec | etwa 600 Zeilen |
+
+Nach Aufwand: groß S1, S5, S9, S10; mittel S2, S3, S6, S8; klein S4, S7, S11, S12.
+
+### Reflexion
+
+- **Zig**: `comptime` im Compiler interpretiert, `@typeInfo` und `inline for` (P5), `@embedFile` (S4), Determinismus über Plattformen (P2).
+- **Rust**: `const`-Auswertung über einen Interpreter der mittleren Repräsentation (Miri), mit dem Rahmenstapel bei einer Panik (Q6); `derive` neben dem Trait, das A5 nicht übernimmt.
+- **Nim**: `static:`/`when` und `fieldPairs` — die Entfaltung je Instanz.
+- **Kotlin**: `inline` mit nicht-lokalem `return` (P10).
+- **Swift**: `CaseIterable` (S11).
+
 ---
 
 **Damit ist die Runde vollständig** (Bereiche 0–12 entschieden, 2026-09-28/29). Die Dokumente
