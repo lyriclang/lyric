@@ -567,7 +567,7 @@ public sealed class TypeResult
     private readonly Dictionary<ForInStmt, MetaRound[]> _metaRounds = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<FieldByInfoExpr, MemberExpr> _fieldMembers = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<LocalSymbol, MetaField> _knownFields = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<(FunctionDecl Default, TypeSymbol Conformer), FunctionDecl> _expansions = new();
+    private readonly Dictionary<(FunctionDecl Default, TypeSymbol Conformer), (FunctionDecl Expansion, LyrType Self)> _expansions = new();
 
     /// <summary>The module a question to <c>std.meta</c> is asked from: whose fields it may see.</summary>
     public ModuleSymbol? MetaFromOf(CallExpr call) => _metaFrom.GetValueOrDefault(call);
@@ -593,9 +593,63 @@ public sealed class TypeResult
     /// <summary>A default whose body walks the fields of <c>Self</c>, set in place for one
     /// conformer (09 A5): parsed again, checked with <c>Self</c> that conformer.</summary>
     public FunctionDecl? ExpansionOf(FunctionDecl @default, TypeSymbol conformer) =>
-        _expansions.GetValueOrDefault((@default, conformer));
-    internal void SetExpansion(FunctionDecl @default, TypeSymbol conformer, FunctionDecl expansion) =>
-        _expansions[(@default, conformer)] = expansion;
+        _expansions.TryGetValue((@default, conformer), out var found) ? found.Expansion : null;
+    /// <summary>The <c>Self</c> an expansion was checked with: a generic conformer's instance over
+    /// its conformance block's parameters, which the lowering binds to the instance's arguments.</summary>
+    public LyrType? ExpansionSelfOf(FunctionDecl @default, TypeSymbol conformer) =>
+        _expansions.TryGetValue((@default, conformer), out var found) ? found.Self : null;
+    internal void SetExpansion(FunctionDecl @default, TypeSymbol conformer, FunctionDecl expansion, LyrType self) =>
+        _expansions[(@default, conformer)] = (expansion, self);
+
+    // ------------------------------------------------------------------ M9a S10: variants and initializers over infos
+    private readonly Dictionary<LocalSymbol, MetaVariant> _knownVariants = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<LocalSymbol, MetaVariant> _knownPayloads = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<TypeTestExpr, MetaVariant> _variantTests = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<PayloadByInfoExpr, (MetaVariant Variant, MetaField Field)> _payloadAccesses = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<Expr, Expr> _rewrites = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<VariantInitExpr, (EnumVariantSymbol Variant, LyrType Enum, Expr?[] Values)> _variantInits = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The variant a round's variable holds the info of (a loop over <c>variants</c>).</summary>
+    public MetaVariant? KnownVariantOf(LocalSymbol variable) => _knownVariants.GetValueOrDefault(variable);
+    internal void SetKnownVariant(LocalSymbol variable, MetaVariant variant) => _knownVariants[variable] = variant;
+
+    /// <summary>The variant whose payload a round's variable walks (a loop over <c>v.payload</c>);
+    /// the field itself is <see cref="KnownFieldOf"/>.</summary>
+    public MetaVariant? KnownPayloadOf(LocalSymbol variable) => _knownPayloads.GetValueOrDefault(variable);
+    internal void SetKnownPayload(LocalSymbol variable, MetaVariant variant) => _knownPayloads[variable] = variant;
+
+    /// <summary><c>e is v</c> in a round: the variant tested, by its position.</summary>
+    public MetaVariant? VariantTestOf(TypeTestExpr test) => _variantTests.GetValueOrDefault(test);
+    internal void SetVariantTest(TypeTestExpr test, MetaVariant variant) => _variantTests[test] = variant;
+
+    /// <summary><c>e.[v, p]</c> in a round: the variant and its payload field.</summary>
+    public (MetaVariant Variant, MetaField Field)? PayloadAccessOf(PayloadByInfoExpr access) =>
+        _payloadAccesses.TryGetValue(access, out var found) ? found : null;
+    internal void SetPayloadAccess(PayloadByInfoExpr access, (MetaVariant Variant, MetaField Field) found) => _payloadAccesses[access] = found;
+
+    private readonly Dictionary<IfStmt, bool> _decidedIfs = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<Node, FunctionDecl> _reparsedOwners = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The function a round's loop was parsed again from: its 'mut' is the round's.</summary>
+    public FunctionDecl? ReparsedOwnerOf(Node root) => _reparsedOwners.GetValueOrDefault(root);
+    internal void SetReparsedOwner(Node root, FunctionDecl? owner) { if (owner is not null) _reparsedOwners[root] = owner; }
+
+    /// <summary>A <c>comptime if</c> statement whose condition a round decided (M9a S10): the
+    /// branch the checker checked, the one the lowering takes.</summary>
+    public bool? DecidedIf(IfStmt stmt) => _decidedIfs.TryGetValue(stmt, out var chosen) ? chosen : null;
+    internal void SetDecidedIf(IfStmt stmt, bool chosen) => _decidedIfs[stmt] = chosen;
+
+    /// <summary>What the lowering takes for an expression instead of itself: the chosen arm of a
+    /// <c>comptime if</c> a round decided, an initializer over infos as the named one it stands
+    /// for, <c>E.[v](…)</c> as the call of the variant.</summary>
+    public Expr? RewriteOf(Expr expr) => _rewrites.GetValueOrDefault(expr);
+    internal void SetRewrite(Expr from, Expr to) => _rewrites[from] = to;
+
+    /// <summary><c>E.[v] { … }</c>: the variant, the enum, and the payload's values in the
+    /// payload's order.</summary>
+    public (EnumVariantSymbol Variant, LyrType Enum, Expr?[] Values)? VariantInitOf(VariantInitExpr init) =>
+        _variantInits.TryGetValue(init, out var found) ? found : null;
+    internal void SetVariantInit(VariantInitExpr init, (EnumVariantSymbol Variant, LyrType Enum, Expr?[] Values) found) => _variantInits[init] = found;
 
     /// <summary>What was parsed again — a round's body, a default set in place —: nodes of their
     /// own over text the walkers read once, at the declaration. What they say of it, the written

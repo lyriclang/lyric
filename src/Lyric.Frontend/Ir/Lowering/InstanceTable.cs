@@ -411,6 +411,12 @@ internal sealed class InstanceTable
                 if (conformer is GenericInstance instance)
                     for (var i = 0; i < instance.Definition.Generics.Length && i < instance.Arguments.Length; i++)
                         bound[instance.Definition.Generics[i]] = instance.Arguments[i];
+                // The family's block is 'extend<T :: [I]> P<T>' (05 §14 rule 4; M9a S10): the expansion
+                // was checked over the BLOCK's parameters, which the instance's arguments bind too.
+                if (conformer is GenericInstance bound2 && types.ExpansionSelfOf(p.Decl, holder) is GenericInstance { Arguments: var over })
+                    for (var i = 0; i < over.Length && i < bound2.Arguments.Length; i++)
+                        if (over[i] is TypeParamType { Param: var blockParam } && !bound.ContainsKey(blockParam))
+                            bound[blockParam] = bound2.Arguments[i];
                 p = p with { Decl = expansion, Substitution = bound };
             }
             // A generic coroutine is two functions per instance, as a written one is (06 N2): the

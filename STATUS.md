@@ -996,6 +996,46 @@ M9b the maintainer is asked again.
   active use is `LYR-CT0006`, one in the branch a `comptime if` does not take is none. `lyric
   test` leaves such tests out. `std.path` asks the target, not the runtime. Spec 11 §3, §1
   rules 4 and 7, 04 §2 rule 2, 01 rule 4, 12; eight cases.
+- **S8** `inline fn`, local `fn` and `@Shared` (P10): `inline fn` sets its body in place at every
+  call, and the lambda literals at its function parameters with it — Kotlin's semantics: the
+  arguments once, a lambda literal alone set in place, its `return` leaving the function that
+  wrote it through the body's defers, its `break` and `continue` reaching that function's loops;
+  `forEach` is inline, with no closure and no indirect call. A local `fn` is a named closure that
+  calls itself, a value of its type. What cannot be inline is refused (`LYR-SEM0184`: an
+  interface's member, a function without a body, a `mut fn`, a place parameter, a body that
+  yields). A `@Shared` field is copied by `clone()`, not cloned. Spec 08 F6/F8, 05 §14; thirteen
+  cases.
+- **S9** `std.meta` (P5, with R7): `fields`, `variants`, `members`, `conformances`,
+  `hasConformance`, `typeName`, `isStruct`/`isClass`/`isEnum`/`isInterface`, `attribute`,
+  `typeAttribute` — questions without a body, answered by the lowering as constants of the type
+  at the instance. `comptime for` over a known type's fields has a round per field, `f` that
+  field's info and `e.[f]` the field, of its own type (the enclosing function is parsed again
+  per round); a default that walks `Self`'s fields is set in place for each conformer and
+  checked as the conformer's — a `ToJson` written once. A question sees what the asking module
+  may name (R7). Found on the way: `comptime` sites were compared as AST records, by value.
+  Spec 11 §4 rules 1–6; ten cases.
+- **S12a** std computes while compiling (S12's first part): `std.hash`'s CRC tables are
+  `comptime` module bindings — data in the program, copied once before its entry where a CRC is
+  asked for, nothing where it is not; M8c S11's `SpinLock` class is gone. std's sites take the
+  toolchain's budget, a program's `comptimeBudget` is its own code's. `programs/constants.lyr`
+  for Lyric 5. Open: every build evaluates std's sites, read or not (D8, clocked at S12).
+- **S10** the synthesis after A5 (P6; the review of 2026-10-12, D2–D5): `Equatable`,
+  `Hashable`, `Ordered`, `TotalOrder` and `Clone` are std.core's defaults, written once over
+  `fields<Self>()` and `variants<Self>()` and set in place for each conformer; on the Lyric 5
+  path `Synthesis` emits the head alone (`extend<T :: [I]> P<T> :: [I] { }`, rule 4 = D3).
+  `Default`, `Display`, `Debug` and `Identity` stay the compiler's (a static interface member
+  declares only). The forms the family needed (D4, D5): `comptime for (v in variants<E>())`
+  with `e is v`, `E.[v]`, `E.[v](…)`, `E.[v] { … }`, `comptime for (p in v.payload)` and
+  `e.[v, p]` (a panic on another variant); an initializer over infos,
+  `T { comptime for (f in fields<T>()) [f] = e }`; `comptime if (c) a else b` as a value; and a
+  `comptime if` a round decides checks the chosen branch alone. The family asks with the
+  conformer's module (D2): private fields compare, hash and clone; what is wrong in one of its
+  defaults is said at the conformer's entry, the field's round and the default's line as notes
+  (05 §14 rule 6); a shape without a form is `LYR-SEM0135`. std.meta's questions and structs
+  live in std.core now (core imports nothing), re-exported by std.meta. `T[N]` clones element
+  by element (a block per written length, as it compares); a round's info takes no slot — a
+  read of `v.index` is the number, and a default that decides with the info alone leaves none
+  in the C. Spec 05 §14 rules 1 and 6, 08 §2 rule 6, 11 §4 rules 7–10; fourteen cases.
 
 ## Design decisions
 

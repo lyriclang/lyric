@@ -109,6 +109,24 @@ public sealed class Resolver
                 }
 
                 """;
+            // Clone element by element (M9a S10): std.core's Clone default clones each field with
+            // 'clone()', where the provisional synthesis unrolled an inline array itself. After the
+            // two above, so their lines stay as they were.
+            if (declared.Contains("Clone"))
+                text += $$"""
+                    extend<T :: [Clone]> T[{{n}}] :: [Clone] {
+                        fn clone(): T[{{n}}] {
+                            var out = this;
+                            var i = 0;
+                            while (i < {{n}}) {
+                                out[i] = this[i].clone();
+                                i += 1;
+                            }
+                            return out;
+                        }
+                    }
+
+                    """;
             Declare(_sm.AddSynthesized($"<synthesized Equatable and Hashable for T[{n}]>", text, at,
                 $"in the 'Equatable' and 'Hashable' synthesized for 'T[{n}]'"));
             if (!shows) continue;

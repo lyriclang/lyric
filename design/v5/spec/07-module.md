@@ -202,6 +202,12 @@ Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert 
 | M7-10 | **Git-URLs werden normalisiert**: `.git` und ein Schrägstrich am Ende fallen weg, Schema und Hostname werden klein. Verglichen, gecacht und ins Lock geschrieben wird diese Form. `https` und `ssh` für dasselbe Repository bleiben zwei Quellen | V7 P2 |
 | M7-12 | Paketnamen folgen `^[a-z][a-z0-9_]*$`. `pub import` re-exportiert nur `pub`. MVS zählt die Anforderungen jeder gelesenen Version (kein Pruning). `include` und `exclude` zusammen ergeben „include ohne exclude“, die Muster sind an der Paketwurzel verankert. Ein Tag, dessen Version nicht die des Manifests ist, wird verweigert | V1 M3, V3 I4, V7 P4, 11 P8 |
 
+## Review 2026-10-12 — die offenen Punkte aus M9a
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| D6 | **Der pfadlose Kopf `module;` ist der Ort der Modul-Attribute** (bestätigt, M9a S7): M2 strich den Kopf mit Pfad, 09 B3/T7 wollen `@When` am Modulkopf; `@When(cond) module;` steht vor der ersten Deklaration und nennt keinen Namen, `module a.b;` bleibt `RES0008`. Spec 04 §2 Regel 2 und 01 Regel 4 | M2; 09 A6 |
+
 ---
 
 **Bereich 7 ist damit vollständig entschieden** (V1–V10, 2026-09-29).

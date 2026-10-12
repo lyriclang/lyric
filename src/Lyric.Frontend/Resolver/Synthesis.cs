@@ -95,6 +95,12 @@ internal static class Synthesis
             : identity
                 ? $"extend<{string.Join(", ", generics.Select(g => g.Name))}> {typeText} :: [{iface}] {{\n"
                 : $"extend<{string.Join(", ", generics.Select(g => $"{g.Name} :: [{BoundOf(iface)}]"))}> {typeText} :: [{iface}] {{\n";
+        // Lyric 5 (09 A5; M9a S10): the family's members are std.core's defaults over Self's fields
+        // and variants, set in place per conformer — the block carries the conformance and its
+        // condition (05 §14 rule 4), nothing else. 'Default' stays written here: a static member of
+        // an interface declares only (SEM0127), so no default can build 'Self' for it.
+        if (streamsHash && !request.ByIdentity && iface is "Equatable" or "Hashable" or "Ordered" or "TotalOrder" or "Clone")
+            return head + "}\n";
         if (iface == "Identity")
         {
             if (!isClass) refusal = IdentityOfAValue(name);

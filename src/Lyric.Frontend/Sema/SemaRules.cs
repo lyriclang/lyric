@@ -47,6 +47,17 @@ public sealed class SemaRules
                 CheckDecl(decl);
                 CheckNeverPositions(decl, null);
             }
+        // The bodies parsed again — a round per field, a default per conformer (M9a S9, S10):
+        // 'e.[f]' is a member there, and a write through it answers to the field's word and the
+        // function's 'mut' as any member write does.
+        foreach (var root in _types.ReparsedRoots)
+        {
+            if (root is FunctionDecl expansion) { RunBody(expansion); continue; }
+            var saved = _thisMut;
+            _thisMut = _types.ReparsedOwnerOf(root)?.IsMut ?? _thisMut;
+            if (root is Stmt statement) WalkStmt(statement); else WalkInside(root);
+            _thisMut = saved;
+        }
         CheckMain();
         if (_comp.Lyric5Modules) CheckSurfaces();
     }

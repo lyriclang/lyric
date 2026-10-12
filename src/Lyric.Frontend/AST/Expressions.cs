@@ -150,6 +150,28 @@ public sealed record IndexExpr(Expr Target, Expr Index, Span Span) : Expr(Span);
 /// <c>comptime for</c> over <c>std.meta.fields</c> names — set in place once per field, so each
 /// round has the field's own type (M9a S9).</summary>
 public sealed record FieldByInfoExpr(Expr Target, Expr Info, Span Span) : Expr(Span);
+
+/// <summary><c>e.[v, p]</c> (09 A7 R2; M9a S10): the payload field <c>p</c> of the variant
+/// <c>v</c> of the enum value <c>e</c> — <c>v</c> the variable of a <c>comptime for</c> over
+/// <c>std.meta.variants</c>, <c>p</c> one over <c>v.payload</c>. A panic where <c>e</c> holds
+/// another variant.</summary>
+public sealed record PayloadByInfoExpr(Expr Target, Expr Variant, Expr Field, Span Span) : Expr(Span);
+
+/// <summary><c>comptime if (c) a else b</c> in expression position (09 Q2; M9a S10): the arm the
+/// condition chooses while compiling; in a round that decides the condition, the chosen arm alone
+/// is checked.</summary>
+public sealed record ComptimeIfExpr(Expr Condition, Expr Then, Expr Else, Span Span) : Expr(Span);
+
+/// <summary><c>E.[v] { [p] = …, comptime for (p in v.payload) [p] = … }</c> (M9a S10): a variant
+/// built by its info, its struct payload set field by field.</summary>
+public sealed record VariantInitExpr(Expr Target, Expr Variant, StructInitField[] Fields, StructInitRound[] Rounds, Span Span) : Expr(Span);
+
+/// <summary><c>comptime for (f in fields&lt;T&gt;()) [f] = e</c> inside an initializer (M9a S10): one
+/// field per round, <c>e</c> checked with <c>f</c> that field's info.</summary>
+public sealed record StructInitRound(string Variable, Expr Iterable, StructInitField Item, Span Span) : Node(Span)
+{
+    public required Span VariableSpan { get; init; }
+}
 /// <remarks>IsOptional means '?.' rather than '.'.</remarks>
 public sealed record MemberExpr(Expr Target, string Member, bool IsOptional, Span Span) : Expr(Span)
 {
@@ -265,6 +287,10 @@ public sealed record StructInitExpr(string[] Path, TypeNode[] TypeArguments, Str
     /// <summary>The span of the LAST path segment — the name the initializer's symbol answers for.
     /// The segments before it qualify; only this one is the type's own name.</summary>
     public required Span NameSpan { get; init; }
+
+    /// <summary><c>comptime for (f in fields&lt;T&gt;()) [f] = e</c> items (M9a S10) beside the named
+    /// fields; none in the common case.</summary>
+    public StructInitRound[] Rounds { get; init; } = [];
 }
 
 // --- a type path in value position: 'Pair<int>.of(3)' ---
@@ -297,6 +323,10 @@ public sealed record StructInitField(string Name, Expr Value, Span Span) : Node(
     /// <summary><c>S { v }</c> (02 I3): the name alone, <c>v = v</c> — <see cref="Value"/> is the
     /// read of the name, at the name's own span. The formatter writes it back alone.</summary>
     public bool IsShorthand { get; init; }
+
+    /// <summary><c>[f] = e</c> (M9a S10): the field that the info <c>f</c> names — a round's
+    /// variable — rather than a written name; <see cref="Name"/> is empty then.</summary>
+    public Expr? Info { get; init; }
 }
 
 // --- recovery ---

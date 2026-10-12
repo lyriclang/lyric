@@ -374,6 +374,22 @@ public sealed partial class Parser
             var value = ParsePrefix();
             return new ThrowExpr(value, Span.Union(kw.Span, Whole(value)));
         }
+        // 'comptime if (c) a else b' in expression position (09 Q2; M9a S10): the arms are
+        // expressions, the condition a site; in a round that decides it, the chosen arm alone is
+        // checked — a '@Shared' field's clone is the field itself, and the other arm names a
+        // 'clone' the field's type need not have.
+        if (_buffer.Check(TokenKind.Comptime) && _buffer.Peek(1).TokenKind == TokenKind.If)
+        {
+            var kw = _buffer.Advance();
+            _buffer.Advance(); // if
+            _buffer.Expect(TokenKind.LParen, "LYR-PAR0003", "expected '(' after 'comptime if'");
+            var condition = ParseExpr(0);
+            _buffer.Expect(TokenKind.RParen, "LYR-PAR0003", "expected ')' after the condition");
+            var then = ParseSubExpr();
+            _buffer.Expect(TokenKind.Else, "LYR-PAR0061", "a 'comptime if' in expression position chooses between two: expected 'else'");
+            var other = ParseSubExpr();
+            return new ComptimeIfExpr(new ComptimeExpr(condition, condition.Span), then, other, Span.Union(kw.Span, Whole(other)));
+        }
         // 'comptime e' and 'comptime { … }' (design/v5/spec/09 Q2): a word in Lyric 5, whose
         // block is a value block — its last expression the value.
         if (_buffer.Check(TokenKind.Comptime))
@@ -461,11 +477,26 @@ public sealed partial class Parser
             {
                 case TokenKind.Dot when _sm.Lyric5 && _buffer.Peek(1).TokenKind == TokenKind.LBracket:
                 {
-                    // 'e.[f]' (09 A7 R2): the field a 'comptime for' over 'std.meta.fields' names
+                    // 'e.[f]' (09 A7 R2): the field a 'comptime for' over 'std.meta.fields' names;
+                    // 'e.[v, p]' (M9a S10) the payload field 'p' of the variant 'v'; 'E.[v]' the
+                    // variant 'v' of the enum 'E', and 'E.[v] { … }' one built field by field
                     _buffer.Advance();
                     _buffer.Advance();
                     var info = ParseExpr(0);
+                    if (_buffer.Match(TokenKind.Comma))
+                    {
+                        var field = ParseExpr(0);
+                        var closePayload = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0003", "expected ']' after the payload field's info");
+                        operand = new PayloadByInfoExpr(operand, info, field, Span.Union(Whole(operand), closePayload.Span));
+                        break;
+                    }
                     var close = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0003", "expected ']' after the field's info");
+                    if (_buffer.Check(TokenKind.LBrace) && InfoInitializerAhead(0))
+                    {
+                        var (fields, rounds, end) = ParseInitItems();
+                        operand = new VariantInitExpr(operand, info, fields, rounds, Span.Union(Whole(operand), end));
+                        break;
+                    }
                     operand = new FieldByInfoExpr(operand, info, Span.Union(Whole(operand), close.Span));
                     break;
                 }
@@ -954,7 +985,7 @@ public sealed partial class Parser
         // The body decides the rest. After type arguments one name alone is the shorthand too,
         // 'Box<int> { v }': nothing with arguments takes a trailing block.
         return _buffer.Peek(i).TokenKind == TokenKind.LBrace
-            && (InitializerBodyAhead(i) || withArguments && _buffer.Peek(i + 1).TokenKind == TokenKind.Identifier
+            && (InitializerBodyAhead(i) || _sm.Lyric5 && InfoInitializerAhead(i) || withArguments && _buffer.Peek(i + 1).TokenKind == TokenKind.Identifier
                 && _buffer.Peek(i + 2).TokenKind == TokenKind.RBrace);
     }
 
@@ -1117,10 +1148,46 @@ public sealed partial class Parser
     /// <summary>The <c>{ field = value, … }</c> of an initializer, after its name.</summary>
     private Expr ParseStructInitFields(List<string> path, TypeNode[] typeArgs, Span start, Span nameSpan, bool implicitMember)
     {
+        var (fields, rounds, end) = ParseInitItems();
+        return new StructInitExpr(path.ToArray(), typeArgs, fields, Span.Union(start, end))
+            { NameSpan = nameSpan, IsImplicit = implicitMember, Rounds = rounds };
+    }
+
+    /// <summary>The body of an initializer, from its '{' to its '}': named fields, and in Lyric 5
+    /// the items over infos (M9a S10) — '[f] = e' the field the round's variable names, and
+    /// 'comptime for (f in fields&lt;T&gt;()) [f] = e' one such item per round.</summary>
+    private (StructInitField[] Fields, StructInitRound[] Rounds, Span End) ParseInitItems()
+    {
         _buffer.Advance(); // '{', guaranteed by the caller's lookahead
         var fields = new List<StructInitField>();
+        var rounds = new List<StructInitRound>();
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
+            if (_sm.Lyric5 && _buffer.Check(TokenKind.LBracket))
+            {
+                fields.Add(ParseInfoItem());
+                if (!_buffer.Match(TokenKind.Comma)) break;
+                continue;
+            }
+            if (_sm.Lyric5 && _buffer.Check(TokenKind.Comptime) && _buffer.Peek(1).TokenKind == TokenKind.For)
+            {
+                var kw = _buffer.Advance();
+                _buffer.Advance(); // for
+                _buffer.Expect(TokenKind.LParen, "LYR-PAR0003", "expected '(' after 'comptime for'");
+                var variable = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0003", "expected the round's variable");
+                _buffer.Expect(TokenKind.In, "LYR-PAR0003", "expected 'in'");
+                var iterable = ParseExpr(0);
+                _buffer.Expect(TokenKind.RParen, "LYR-PAR0003", "expected ')' after what the rounds walk");
+                if (!_buffer.Check(TokenKind.LBracket))
+                    _de.Report("LYR-PAR0062", Severity.Error, _buffer.Current.Span,
+                        "a 'comptime for' in an initializer sets one field per round: '[f] = e' follows it");
+                var item = _buffer.Check(TokenKind.LBracket) ? ParseInfoItem()
+                    : new StructInitField("", ParseSubExpr(), _buffer.Current.Span) { NameSpan = _buffer.Current.Span };
+                rounds.Add(new StructInitRound(_sm.Slice(variable.Span).ToString(), new ComptimeExpr(iterable, iterable.Span), item,
+                    Span.Union(kw.Span, item.Span)) { VariableSpan = variable.Span });
+                if (!_buffer.Match(TokenKind.Comma)) break;
+                continue;
+            }
             var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
                 $"expected field name, got {_buffer.Current.TokenKind}");
             var fieldName = _sm.Slice(nameTok.Span).ToString();
@@ -1139,9 +1206,28 @@ public sealed partial class Parser
             if (!_buffer.Match(TokenKind.Comma)) break;
         }
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close struct initializer");
-        return new StructInitExpr(path.ToArray(), typeArgs, fields.ToArray(),
-            Span.Union(start, close.Span)) { NameSpan = nameSpan, IsImplicit = implicitMember };
+        return (fields.ToArray(), rounds.ToArray(), close.Span);
     }
+
+    /// <summary>'[f] = e': the field the info names, and its value.</summary>
+    private StructInitField ParseInfoItem()
+    {
+        var open = _buffer.Advance(); // '['
+        var info = ParseExpr(0);
+        _buffer.Expect(TokenKind.RBracket, "LYR-PAR0003", "expected ']' after the field's info");
+        _buffer.Expect(TokenKind.Equal, "LYR-PAR0037", "expected '=' after '[f]' in the initializer");
+        var value = ParseSubExpr();
+        return new StructInitField("", value, Span.Union(open.Span, Whole(value))) { NameSpan = Span.Union(open.Span, Whole(info)), Info = info };
+    }
+
+    /// <summary>Is the '{' at <paramref name="open"/> an initializer over infos: '{ [', '{ comptime
+    /// for', or '{ }'? A block after 'if (e.[v])' begins with a statement, which none of these is —
+    /// a 'comptime for' statement there is the one collision, and parentheses around the condition
+    /// settle it.</summary>
+    private bool InfoInitializerAhead(int open) =>
+        _buffer.Peek(open).TokenKind == TokenKind.LBrace
+        && (_buffer.Peek(open + 1).TokenKind is TokenKind.LBracket or TokenKind.RBrace
+            || _buffer.Peek(open + 1).TokenKind == TokenKind.Comptime && _buffer.Peek(open + 2).TokenKind == TokenKind.For);
 
     // ---------------------------------------------------------------------
     // f-strings. The lexer already yields the sub-tokens; this only assembles them:

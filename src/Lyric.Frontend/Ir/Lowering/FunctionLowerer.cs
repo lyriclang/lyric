@@ -1807,6 +1807,9 @@ internal sealed class FunctionLowerer
         // chose and nothing of the other; in the hoisting pass, the 'if' it is
         if (stmt.Comptime && stmt.Condition is ComptimeExpr site && ComptimeValue(site) is BoolConst chosen)
             return chosen.Value ? LowerScope(stmt.Then) : stmt.Else is not { } other || LowerStmt(other);
+        // decided by the round while checking (M9a S10): the branch the checker checked, alone
+        if (stmt.Comptime && _types.DecidedIf(stmt) is bool decided)
+            return decided ? LowerScope(stmt.Then) : stmt.Else is not { } rest || LowerStmt(rest);
 
         if (stmt.Condition is LetCondExpr letCond) return LowerIfLet(stmt, letCond);
 
@@ -1868,13 +1871,12 @@ internal sealed class FunctionLowerer
         if (_types.RefOf(stmt) is not LocalSymbol loopVar)
             throw Bug($"loop variable '{stmt.Variable}' was not bound by the type checker");
 
-        // a loop over a known type's fields (M9a S9): a body per round, its variable that field's info
+        // a loop over a known type's fields (M9a S9): a body per round, its variable that field's info.
+        // The info takes no slot (M9a S10): a read of the variable materializes the constant where it
+        // stands (LowerIdentifier; a lambda reads it there too), so a round that decides with it alone — the family's
+        // defaults, 'attribute<Shared>(f)' — leaves no FieldInfo in the function.
         if (stmt.Comptime && _types.MetaRoundsOf(stmt) is { } metaRounds)
-            return LowerRounds(stmt, [.. metaRounds.Select(r => (r.Body, (Action?)(() =>
-            {
-                var type = LowerType(r.Variable.Type, stmt.Span);
-                _b.Emit(new StoreLocal(_slots.DeclareFor(r.Variable, type), EmitComptimeValue(FieldInfoConst(r.Field), type, stmt.Span), stmt.Span));
-            })))]);
+            return LowerRounds(stmt, [.. metaRounds.Select(r => (r.Body, (Action?)null))]);
         if (stmt.Comptime && stmt.Iterable is ComptimeExpr walked && ComptimeValue(walked) is ArrayConst elements)
             return LowerUnrolled(stmt, elements, loopVar);
 
@@ -2626,7 +2628,9 @@ internal sealed class FunctionLowerer
     /// an 'if' or a 'match' whose every branch is one — and for one that gives no value and has
     /// sealed its block. Otherwise a temp.</summary>
     private TempId? LowerExprOrVoid(Expr expr) =>
-        _chainReceivers.TryGetValue(expr, out var alreadyUnwrapped) ? alreadyUnwrapped : expr switch
+        _chainReceivers.TryGetValue(expr, out var alreadyUnwrapped) ? alreadyUnwrapped
+        : _types.RewriteOf(expr) is { } rewritten ? LowerExprOrVoid(rewritten) // what the checker set in its place (M9a S10)
+        : expr switch
     {
         IntLiteralExpr e => LowerIntLiteral(e),
         FloatLiteralExpr e => LowerFloatLiteral(e),
@@ -2657,6 +2661,9 @@ internal sealed class FunctionLowerer
         MatchExpr e => LowerMatchExpr(e),
         MemberExpr e => LowerFieldRead(e),
         FieldByInfoExpr e => LowerExprOrVoid(MemberOfInfo(e)),
+        PayloadByInfoExpr e => LowerPayloadByInfo(e),
+        ComptimeIfExpr e => LowerComptimeIfExpr(e),
+        VariantInitExpr e => LowerVariantInitByInfo(e),
         IndexExpr e => LowerIndexRead(e),
         ArrayLitExpr e => LowerArrayLiteral(e),
         StructInitExpr e => LowerObjectInit(e),
@@ -2704,6 +2711,8 @@ internal sealed class FunctionLowerer
         // out of the function: its field's info, a constant.
         if (symbol is LocalSymbol round && _types.KnownFieldOf(round) is { } known && !_slots.TryLookup(round, out _))
             return EmitComptimeValue(FieldInfoConst(known), LowerType(round.Type, expr.Span), expr.Span);
+        if (symbol is LocalSymbol variantRound && _types.KnownVariantOf(variantRound) is { } knownVariant && !_slots.TryLookup(variantRound, out _))
+            return EmitComptimeValue(VariantInfoConst(knownVariant), LowerType(variantRound.Type, expr.Span), expr.Span);
 
         // A parameter of the CALLEE, named in a default that is being lowered at this call site
         // (04 D5 F2): the argument materialized for it.
@@ -2828,6 +2837,15 @@ internal sealed class FunctionLowerer
     private TempId LowerTypeTest(TypeTestExpr test)
     {
         var value = LowerExpr(test.Operand);
+        // 'e is v' (M9a S10): the tag against the variant's
+        if (_types.VariantTestOf(test) is { } variant)
+        {
+            var enumType = RequireEnum(test.Operand);
+            var expected = EmitConst(new IntConst((ulong)_typeTable.TagOf(enumType.Type, variant.Name, test.Span)), new IrScalarType(IrScalar.I64), test.Span);
+            var same = _slots.NewTemp(BoolType);
+            _b.Emit(new BinOp(same, IrBinKind.Eq, BoolType, TagOf(value, test.Span), expected, test.Span));
+            return same;
+        }
         if (TypeOfExpr(test.Operand) is not IrInterfaceType)
             throw NotSupported("'is' on a value that is no interface value", test.Span);
         var target = _typeTable.Lower(test.Type);
@@ -5629,8 +5647,42 @@ internal sealed class FunctionLowerer
         return new IrFunction(name, signature.Return, locals.Count, locals, temps, blocks) { Entry = new BlockId(0), Throws = throws };
     }
 
+    /// <summary>The members of std.core's infos, in the order their constants are built here
+    /// (<see cref="FieldInfoConst"/>, <see cref="VariantInfoConst"/>, <see cref="TypeConst"/>).</summary>
+    private static readonly Dictionary<string, string[]> InfoMembers = new(StringComparer.Ordinal)
+    {
+        ["FieldInfo"] = ["name", "type", "index", "visibility", "isVar"],
+        ["VariantInfo"] = ["name", "index", "payload"],
+        ["Type"] = ["name"],
+    };
+
+    /// <summary>A round's info, or a member of it, as the constant it is (M9a S10): <c>v</c>,
+    /// <c>v.index</c>, <c>f.type.name</c> — so that <c>h.writeInt(v.index)</c> writes a number and
+    /// builds no <c>VariantInfo</c> with its payload array at every call. <c>null</c> for anything
+    /// else.</summary>
+    private IrConstValue? RoundInfoConst(Expr e)
+    {
+        switch (e)
+        {
+            case IdentifierExpr id when _types.RefOf(id) is LocalSymbol round && !_slots.TryLookup(round, out _):
+                if (_types.KnownFieldOf(round) is { } known) return FieldInfoConst(known);
+                if (_types.KnownVariantOf(round) is { } variant) return VariantInfoConst(variant);
+                return null;
+            case MemberExpr m when RoundInfoConst(m.Target) is StructConst s
+                && SubstituteType(_types.TypeOf(m.Target)) is NamedRef { Symbol: { } info } && info.Home?.FullName == "std.core"
+                && InfoMembers.TryGetValue(info.Name, out var members)
+                && Array.IndexOf(members, m.Member) is var i && i >= 0 && i < s.Fields.Length:
+                return s.Fields[i];
+            default:
+                return null;
+        }
+    }
+
     private TempId LowerFieldRead(MemberExpr expr)
     {
+        // a member of a round's info (M9a S10): the constant's field, folded
+        if (RoundInfoConst(expr) is { } folded) return EmitComptimeValue(folded, TypeOfExpr(expr), expr.Span);
+
         // 'T.zero' (05 §7 rule 2): the interface's constant through a constraint. Under this
         // instance's substitution T is a type, and the read is that type's own constant.
         if (_types.RefOf(expr) is GlobalSymbol
@@ -6742,13 +6794,68 @@ internal sealed class FunctionLowerer
     // ------------------------------------------------------------------ std.meta (09 A7; M9a S9)
 
     /// <summary><c>e.[f]</c>, in its round, is the member access the checker made of it.</summary>
+    /// <summary><c>e.[v, p]</c> (M9a S10): the tag tested against the variant's — a panic where it
+    /// is another —, the value narrowed, the payload field read by its place in the layout.</summary>
+    private TempId LowerPayloadByInfo(PayloadByInfoExpr access)
+    {
+        var (variant, field) = _types.PayloadAccessOf(access) ?? throw Bug($"'e.[v, p]' at {access.Span} reached the lowering outside a round");
+        var value = LowerExpr(access.Target);
+        var enumType = RequireEnum(access.Target);
+        var variantType = _typeTable.VariantOf(enumType.Type, variant.Name, access.Span);
+        var expected = EmitConst(new IntConst((ulong)_typeTable.TagOf(enumType.Type, variant.Name, access.Span)), new IrScalarType(IrScalar.I64), access.Span);
+        var matches = _slots.NewTemp(BoolType);
+        _b.Emit(new BinOp(matches, IrBinKind.Eq, BoolType, TagOf(value, access.Span), expected, access.Span));
+        var matched = _b.NewBlock();
+        var other = _b.NewBlock();
+        _b.Seal(new CondBranch(matches, matched, other, access.Span));
+        _b.SwitchTo(other);
+        CallHelper("std.core.panic", access.Span,
+            EmitConst(new StringConst($"'e.[v, p]': the value is not the variant '{variant.Name}'"), new IrScalarType(IrScalar.String), access.Span));
+        _b.Seal(new Unreachable(access.Span));
+        _b.SwitchTo(matched);
+        var narrowed = _slots.NewTemp(new IrRefType(variantType));
+        _b.Emit(new EnumAs(narrowed, value, variantType, access.Span));
+        var layout = _typeTable.Defs[variantType.Value];
+        var index = Array.IndexOf(layout.FieldNames, field.Name);
+        if (index < 0) index = field.Index + 1; // the tag first, the payload in its order
+        var dest = _slots.NewTemp(layout.FieldTypes[index]);
+        _b.Emit(new LoadField(dest, narrowed, variantType, new FieldId(index), layout.FieldTypes[index], access.Span));
+        return dest;
+    }
+
+    /// <summary><c>comptime if (c) a else b</c> as a value whose condition no round decided: the
+    /// evaluator's answer chooses the arm here.</summary>
+    private TempId? LowerComptimeIfExpr(ComptimeIfExpr cif)
+    {
+        if (cif.Condition is ComptimeExpr site && ComptimeValue(site) is BoolConst chosen)
+            return LowerExprOrVoid(chosen.Value ? cif.Then : cif.Else);
+        throw Bug($"a 'comptime if' at {cif.Span} whose condition the evaluator did not decide");
+    }
+
+    /// <summary><c>E.[v] { … }</c> (M9a S10): the variant built from the values the checker
+    /// settled, in the payload's order.</summary>
+    private TempId LowerVariantInitByInfo(VariantInitExpr init)
+    {
+        var (variant, _, values) = _types.VariantInitOf(init) ?? throw Bug($"'E.[v] {{ … }}' at {init.Span} reached the lowering unchecked");
+        var enumType = RequireEnum(_types.TypeOf(init), init.Span);
+        var variantType = _typeTable.VariantOf(enumType.Type, variant.Name, init.Span);
+        var layout = _typeTable.Defs[variantType.Value];
+        var fields = new TempId[layout.FieldNames.Length - 1];
+        for (var i = 1; i < layout.FieldNames.Length; i++)
+            fields[i - 1] = LowerExprAs(values[i - 1] ?? throw Bug($"the initializer at {init.Span} omits a payload field"), layout.FieldTypes[i]);
+        var dest = _slots.NewTemp(enumType);
+        _b.Emit(new NewVariant(dest, variantType, enumType.Type, fields, init.Span));
+        return dest;
+    }
+
     private MemberExpr MemberOfInfo(FieldByInfoExpr access) =>
         _types.FieldMemberOf(access) ?? throw Bug($"'e.[f]' at {access.Span} reached the lowering outside a round");
 
     /// <summary>The question to std.meta a call asks — a function of its without a body — or none.</summary>
     private FunctionSymbol? MetaQueryOf(CallExpr call) =>
         (_types.RefOf(call.Callee) is ImportBindingSymbol { Target: var target } ? target : _types.RefOf(call.Callee))
-            is FunctionSymbol { Declaration: FunctionDecl { Body: null } } query && query.Home is { FullName: "std.meta" }
+            is FunctionSymbol { Declaration: FunctionDecl { Body: null }, Name: "fields" or "members" or "attribute" or "typeAttribute" or "variants" or "conformances" or "hasConformance" or "typeName" or "isStruct" or "isClass" or "isEnum" or "isInterface" } query
+        && query.Home is { FullName: "std.meta" or "std.core" }
             ? query
             : null;
 
@@ -6765,8 +6872,7 @@ internal sealed class FunctionLowerer
         return query.Name switch
         {
             "fields" => new ArrayConst([.. (_types.MetaFields?.Invoke(about, _types.MetaFromOf(call)) ?? []).Select(FieldInfoConst)]),
-            "variants" => new ArrayConst([.. (_types.MetaVariants?.Invoke(about) ?? []).Select(v => (IrConstValue)new StructConst(
-                [new StringConst(v.Name), new IntConst((ulong)v.Index), new ArrayConst([.. v.Payload.Select(FieldInfoConst)])]))]),
+            "variants" => new ArrayConst([.. (_types.MetaVariants?.Invoke(about) ?? []).Select(VariantInfoConst)]),
             "conformances" => new ArrayConst([.. (_types.MetaConformances?.Invoke(about) ?? []).Select(i => TypeConst(TypeFacts.Display(new NamedRef(i))))]),
             "hasConformance" => new BoolConst(asked.Length > 1 && TypeFacts.SymbolOf(asked[1]) is { Kind: TypeSymbolKind.Interface } iface
                                               && _types.Satisfies?.Invoke(about, iface) == true),
@@ -6791,6 +6897,10 @@ internal sealed class FunctionLowerer
         VisibilityConst(field.Visibility),
         new BoolConst(field.IsVar),
     ]);
+
+    /// <summary>std.meta's <c>VariantInfo</c> — name, index, payload — of a variant.</summary>
+    private static IrConstValue VariantInfoConst(TypeResult.MetaVariant variant) => new StructConst(
+        [new StringConst(variant.Name), new IntConst((ulong)variant.Index), new ArrayConst([.. variant.Payload.Select(FieldInfoConst)])]);
 
     /// <summary>std.meta's <c>Visibility</c>: <c>Pub</c>, <c>Internal</c>, <c>Private</c>.</summary>
     private static IrConstValue VisibilityConst(Visibility visibility) =>
