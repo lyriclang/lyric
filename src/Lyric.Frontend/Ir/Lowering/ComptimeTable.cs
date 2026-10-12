@@ -30,6 +30,9 @@ public sealed class ComptimeTable
 
     public IReadOnlyDictionary<int, IrConstValue>? Values { get; init; }
 
+    /// <summary>What the build leaves out (09 B2): the real lowering builds none of it.</summary>
+    public Inactivity? Inactive { get; init; }
+
     /// <summary>A runner's boxed value as the constant the site's type expects. The runner
     /// answers by tag; the site's sema type says which literal to write.</summary>
     public static IrConstValue Constant(object value, LyrType type) => type switch

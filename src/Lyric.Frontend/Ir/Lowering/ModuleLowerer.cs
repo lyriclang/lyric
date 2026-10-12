@@ -134,11 +134,14 @@ public static class ModuleLowerer
 
         // Pass 1: the function table. The order is module order then declaration order and therefore
         // deterministic; FunctionIds land as indices in the bytecode.
+        // what the build leaves out (09 B2) gets no id, no body and no slot
+        bool Built(Decl decl) => comptime?.Inactive is not { } inactive || !inactive.IsInactive(decl);
+
         foreach (var module in compilation.Modules)
         {
             foreach (var decl in compilation.AstOf(module).Declarations)
             {
-                if (decl is not FunctionDecl function) continue;
+                if (decl is not FunctionDecl function || !Built(function)) continue;
 
                 // A GENERIC native is a template rather than a row: one import per type argument
                 // tuple a call site asks for, built there and interned by name AND signature —
@@ -240,7 +243,7 @@ public static class ModuleLowerer
             // Methods are ordinary functions with the receiver as parameter 0, the same convention as
             // CIL. The difference between an instance and a static method is therefore the parameter list
             // alone, and the vtable only has to decide WHICH function is called, not what it looks like.
-            foreach (var decl in compilation.AstOf(module).Declarations)
+            foreach (var decl in compilation.AstOf(module).Declarations.Where(Built))
             {
                 // Classes and enums both carry methods; for the lowering they are the same case, with the
                 // receiver as parameter 0, only the member list sits elsewhere in the AST.
@@ -313,7 +316,7 @@ public static class ModuleLowerer
         // down in the source. The same two-phase shape as for the FunctionIds.
         try
         {
-            globals.Collect(compilation, types, typeTable);
+            globals.Collect(compilation, types, typeTable, Built);
         }
         catch (UnsupportedConstructException ex)
         {

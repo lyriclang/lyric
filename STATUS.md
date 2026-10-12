@@ -987,6 +987,15 @@ M9b the maintainer is asked again.
   `SEM0067` falls for them. Found on the way: a call through an interface dropped its defaults,
   names and variadic rest; the verifier now counts a `callvirt`'s arguments. Spec 11 §1 rules 2,
   7–13, 09 §3 rule 5, 10 §2 rule 8, 12, 15 §1 rule 4; twenty-three cases.
+- **S7** target, profile and `@When` (P9): `target` (`os`, `arch`, `pointerWidth`) and `profile` (`debug`),
+  constants of the build in std.core and the prelude — a cross-build's target, which `--emit` now
+  honours too —; a program that reads neither carries neither (a `comptime` initializer is
+  prunable; hello's C byte for byte). `@When(cond)` on top-level declarations and on the header
+  `module;`, which names nothing (a reading: 07 M2 left no place for a module's attributes):
+  the `@When` sites first, then the rest but what they leave out, checked and not built; an
+  active use is `LYR-CT0006`, one in the branch a `comptime if` does not take is none. `lyric
+  test` leaves such tests out. `std.path` asks the target, not the runtime. Spec 11 §3, §1
+  rules 4 and 7, 04 §2 rule 2, 01 rule 4, 12; eight cases.
 
 ## Design decisions
 

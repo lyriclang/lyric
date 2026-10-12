@@ -139,6 +139,8 @@ public static class TestRun
             foreach (var fn in model.Compilation.AstOf(module).Declarations.OfType<FunctionDecl>())
             {
                 if (fn.Attributes.FirstOrDefault(a => ReferenceEquals(model.Types.RefOf(a), mark)) is not { } marked) continue;
+                // one '@When' leaves out is no test of this target (09 B2)
+                if (result.Inactive?.IsInactive(fn) == true) continue;
                 var fields = new Dictionary<string, IrConstValue>(StringComparer.Ordinal);
                 if (model.Types.AttributeValueOf(marked) is { } site
                     && result.ComptimeValues?.GetValueOrDefault(model.Types.ComptimeSites.IndexOf(site)) is StructConst value)

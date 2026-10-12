@@ -21,16 +21,22 @@ public static class ComptimeEvaluator
     private const int ShownFrames = 12;
 
     /// <param name="embed">What <c>embed</c> reads through (09 Q4), which notes each file read.</param>
+    /// <param name="build">What the build is for and as (09 B4): <c>target</c>'s and <c>profile</c>'s
+    /// answers; the host's without.</param>
+    /// <param name="include">Which sites to evaluate, by index; all without. A site left out has no
+    /// value — one in what the build leaves out (09 B2).</param>
     /// <returns>Each site's constant, or <c>null</c> where a site was reported.</returns>
     public static IReadOnlyDictionary<int, IrConstValue>? Evaluate(IrModule hoisted, TypeResult types,
-        DiagnosticEngine diagnostics, long budget, bool overflowChecks, EmbedReader? embed = null)
+        DiagnosticEngine diagnostics, long budget, bool overflowChecks, EmbedReader? embed = null, BuildFacts? build = null,
+        Func<int, bool>? include = null)
     {
-        var interpreter = new Interpreter(hoisted, budget, overflowChecks, embed);
+        var interpreter = new Interpreter(hoisted, budget, overflowChecks, embed, build);
         var sites = types.ComptimeSites;
         var values = new Dictionary<int, IrConstValue>();
         var failed = false;
         for (var i = 0; i < sites.Count; i++)
         {
+            if (include is not null && !include(i)) continue;
             var name = ComptimeTable.FunctionName(i);
             var index = hoisted.Functions.FindIndex(f => f.Name.EndsWith(name, StringComparison.Ordinal));
             if (index < 0) throw new InternalCompilationException($"comptime: site {i} was not hoisted");

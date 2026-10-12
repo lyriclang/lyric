@@ -254,18 +254,19 @@ public static class Program
 
         if (library is not null) return Pipeline.CheckLibrary(library, Console.Error, profile);
 
-        if (values.TryGetValue("--emit", out var emit))
-        {
-            if (emit is not ("ir" or "c")) return Unknown($"unknown emission '{emit}': ir, c");
-            if (run) return Unknown("'--emit' prints instead of building; use 'build'");
-            return Pipeline.Emit(programs[0], emit, Console.Out, Console.Error, profile);
-        }
-
         Target target;
         try { target = values.TryGetValue("--target", out var triple) ? Target.Parse(triple) : Target.Host; }
         catch (ArgumentException)
         {
             return Unknown($"unknown target '{values["--target"]}': {string.Join(", ", Target.Tier1.Select(t => t.Triple))}");
+        }
+
+        // the emission is the target's too: 'comptime if (target.os == …)' chose for it (09 A6)
+        if (values.TryGetValue("--emit", out var emit))
+        {
+            if (emit is not ("ir" or "c")) return Unknown($"unknown emission '{emit}': ir, c");
+            if (run) return Unknown("'--emit' prints instead of building; use 'build'");
+            return Pipeline.Emit(programs[0], emit, Console.Out, Console.Error, profile, target);
         }
 
         if (CompilerFor(profile) is not { } compiler) return 2;

@@ -42,6 +42,10 @@ public sealed class Natives(Interpreter interpreter)
     /// <summary>What <c>embed</c> reads through (09 Q4); <c>null</c>, it reads nothing.</summary>
     public EmbedReader? Embed { get; init; }
 
+    /// <summary>What the build is for and as (09 B4), which <c>std.core</c>'s <c>target</c> and
+    /// <c>profile</c> read.</summary>
+    public BuildFacts Facts { get; init; } = BuildFacts.Host;
+
     /// <summary>Where the native at hand is called: <c>embed</c>'s path is the calling module's.</summary>
     private Core.Span _at;
 
@@ -286,6 +290,12 @@ public sealed class Natives(Interpreter interpreter)
             var bytes = (Embed ?? throw ComptimeFailure.Embed("'embed' reads no file in this compilation")).Bytes(_at, S(a[0]).ToString());
             return Value.Of(new ArrayObj([.. bytes.Select(b => Value.Uint(b))]));
         },
+
+        // --- the build's target and profile (09 A6 B4): compile time's alone, nothing at run time asks
+        ["std.core.buildOs"] = (_, _, _) => Value.Int(Facts.Os),
+        ["std.core.buildArch"] = (_, _, _) => Value.Int(Facts.Arch),
+        ["std.core.buildPointerWidth"] = (_, _, _) => Value.Int(Facts.PointerWidth),
+        ["std.core.buildDebug"] = (_, _, _) => Value.Bool(Facts.Debug),
 
         // --- the Unicode Character Database (unicode.c)
         ["std.core.unicodeCategory"] = (a, _, _) => Value.Int(UnicodeCategory((uint)a[0].Bits)),

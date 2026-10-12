@@ -9,9 +9,8 @@
 /// these functions build, they build with `\`. Elsewhere `/` separates and names compare exactly.
 import std.core { arrayOf, viewBytes };
 
-extern "C" fn lyr_os_platform(): int;
-
-let onWindows = lyr_os_platform() == 3;
+// the target's, a constant (09 B4): what a cross-build for Windows writes is Windows' path
+let onWindows = comptime target.os == .Windows;
 
 /// The separator the system writes: `\` on Windows, `/` elsewhere.
 pub let separator: string = if (onWindows) "\\" else "/";

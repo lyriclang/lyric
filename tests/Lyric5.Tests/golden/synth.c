@@ -264,8 +264,8 @@ typedef struct { LyrObj header; lyr_ty_app_main_Outer value; } lyr_box_ty_app_ma
 _Static_assert(sizeof(lyr_box_ty_app_main_Outer) == 40, "layout of lyr_box_ty_app_main_Outer");
 _Static_assert(offsetof(lyr_box_ty_app_main_Outer, value) == 8, "layout of lyr_box_ty_app_main_Outer");
 extern const LyrItable lyr_itab_ty_app_main_Outer[];
-static const uint64_t lyr_refmap_box40[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_box_ty_app_main_Outer = { sizeof(lyr_box_ty_app_main_Outer), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box40, "box<app.main.Outer>", lyr_itab_ty_app_main_Outer };
+static const uint64_t lyr_refmap_box51[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_box_ty_app_main_Outer = { sizeof(lyr_box_ty_app_main_Outer), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box51, "box<app.main.Outer>", lyr_itab_ty_app_main_Outer };
 typedef struct { LyrObj header; lyr_ty_app_main_Inner value; } lyr_box_ty_app_main_Inner;
 _Static_assert(sizeof(lyr_box_ty_app_main_Inner) == 16, "layout of lyr_box_ty_app_main_Inner");
 _Static_assert(offsetof(lyr_box_ty_app_main_Inner, value) == 8, "layout of lyr_box_ty_app_main_Inner");
@@ -275,8 +275,8 @@ typedef struct { LyrObj header; lyr_ty_app_main_D value; } lyr_box_ty_app_main_D
 _Static_assert(sizeof(lyr_box_ty_app_main_D) == 24, "layout of lyr_box_ty_app_main_D");
 _Static_assert(offsetof(lyr_box_ty_app_main_D, value) == 8, "layout of lyr_box_ty_app_main_D");
 extern const LyrItable lyr_itab_ty_app_main_D[];
-static const uint64_t lyr_refmap_box45[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_box_ty_app_main_D = { sizeof(lyr_box_ty_app_main_D), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box45, "box<app.main.D>", lyr_itab_ty_app_main_D };
+static const uint64_t lyr_refmap_box56[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_box_ty_app_main_D = { sizeof(lyr_box_ty_app_main_D), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box56, "box<app.main.D>", lyr_itab_ty_app_main_D };
 typedef struct { LyrObj header; lyr_ty_app_main_Mat value; } lyr_box_ty_app_main_Mat;
 _Static_assert(sizeof(lyr_box_ty_app_main_Mat) == 40, "layout of lyr_box_ty_app_main_Mat");
 _Static_assert(offsetof(lyr_box_ty_app_main_Mat, value) == 8, "layout of lyr_box_ty_app_main_Mat");

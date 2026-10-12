@@ -13066,10 +13066,11 @@ public sealed class TypeChecker
             : scope.Lookup(id.Name) ?? ImplicitMember(id, id.Name);
 
     /// <summary>A name not in scope (design/v5/spec/07 V3 I8): the prelude's in a program's own
-    /// code, std.core's in what the compiler wrote — and for the 4.x tools, as before.</summary>
+    /// code — a type, a function, a binding (<c>target</c>, <c>profile</c>: 09 B4) —, std.core's in
+    /// what the compiler wrote — and for the 4.x tools, as before.</summary>
     private Symbol? ImplicitMember(Node at, string name) =>
         _comp.Lyric5Modules && !WrittenByCompiler(at)
-            ? _comp.PreludeMember(name) is (TypeSymbol or FunctionSymbol) and var passed ? passed : null
+            ? _comp.PreludeMember(name) is (TypeSymbol or FunctionSymbol or GlobalSymbol) and var passed ? passed : null
             : CoreMember(name);
 
     private IReadOnlyList<FunctionSymbol> ImplicitOverloads(Node at, string name) =>
@@ -13153,7 +13154,7 @@ public sealed class TypeChecker
     /// <summary>The compiler instructions of <c>std.core</c> beside <c>@Test</c>, <c>@Bench</c> and
     /// <c>@callerExpr</c> (09 A11, the closed list of T2): what changes what the compiler does.</summary>
     private static readonly string[] CompilerInstructions =
-        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow"];
+        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "When"];
 
     /// <summary>Whether this is one of <see cref="CompilerInstructions"/>, by identity (09 T6).</summary>
     private bool IsCompilerInstruction(TypeSymbol ts) =>
