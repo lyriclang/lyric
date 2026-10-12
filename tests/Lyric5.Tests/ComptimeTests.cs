@@ -36,7 +36,7 @@ public class ComptimeTests
     {
         var result = RuntimeBuildTests.RunEmitted(CEmitterTests.EmitC("comptime_same"), "comptime_same", profile);
         Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstdout:\n{result.Stdout}\nstderr:\n{result.Stderr}");
-        Assert.Equal("13 cases, 0 differ\n", result.Stdout.Replace("\r\n", "\n"));
+        Assert.Equal("14 cases, 0 differ\n", result.Stdout.Replace("\r\n", "\n"));
     }
 
     /// <summary>The comparison above holds vacuously where a site is not computed at all — lowered
@@ -55,7 +55,7 @@ public class ComptimeTests
         var called = main.Blocks.SelectMany(b => b.Insts).OfType<Call>()
             .Select(c => ir.Functions[c.Target.Value].Name)
             .ToList();
-        foreach (var name in new[] { "tower", "checked", "bits", "divisions", "floats", "formats", "parsing", "strings", "structures", "debugs", "record" })
+        foreach (var name in new[] { "tower", "checked", "bits", "divisions", "floats", "formats", "parsing", "strings", "structures", "debugs", "record", "unicode" })
             Assert.Single(called, $"app.main.{name}");
     }
 
@@ -136,15 +136,14 @@ public class ComptimeTests
     }
 
     /// <summary>What compile time cannot answer the same on every platform yet is refused, not
-    /// guessed (09 Q7): a function each C library rounds its own way, a Unicode answer beyond
-    /// ASCII. The exactly rounded functions and ASCII's answers are computed.</summary>
+    /// guessed (09 Q7): a function each C library rounds its own way. The exactly rounded ones are
+    /// computed, and Unicode is answered from the runtime's own tables (S4).</summary>
     [Theory]
     [InlineData("1.0.exp()", "'exp' rounds as each C library does")]
     [InlineData("2.0.pow(0.5)", "'pow' rounds as each C library does")]
-    [InlineData("'É'.isUpper()", "'std.core.unicodeCategory' asks the Unicode tables beyond ASCII")]
     public void What_compile_time_cannot_answer_alike_is_refused(string site, string message)
     {
-        var errors = Errors(Head + $"fn main(): void {{\n    println(f\"{{comptime 2.0.sqrt()}} {{comptime 'E'.isUpper()}} {{comptime {site}}}\");\n}}\n");
+        var errors = Errors(Head + $"fn main(): void {{\n    println(f\"{{comptime 2.0.sqrt()}} {{comptime 'É'.isUpper()}} {{comptime {site}}}\");\n}}\n");
         var error = Assert.Single(errors, l => l.Contains("error["));
         Assert.Contains("error[LYR-CT0005]: " + message, error);
     }
@@ -176,7 +175,7 @@ public class ComptimeTests
         Assert.True(lowered.Ok);
         Assert.DoesNotContain(lowered.Ir!.Functions, f => f.Name == "app.main.crcTable");
         var c = Lyric5.Compiler.CEmitter.Join(CEmitterTests.EmitC("comptime_values"));
-        Assert.Matches(@"static uint32_t const lyr_data\d+\[256\] = \{ \(uint32_t\)UINT64_C\(0\), \(uint32_t\)UINT64_C\(1996959894\),", c);
+        Assert.Matches(@"static uint32_t const lyr_data\d+\[256\] = \{ 0u, 1996959894u, ", c);
         Assert.Contains("__builtin_memcpy(", c);
     }
 
@@ -245,5 +244,41 @@ public class ComptimeTests
         Assert.Single(errors, l => l.Contains($"error[{code}]"));
         Assert.Single(errors, l => l.Contains("error["));
         Assert.Contains(why, string.Join("\n", errors));
+    }
+
+    private const string Embedding = "import std.io { println };\nimport std.core { embed };\n\n"
+        + "fn table(): uint8[] {\n    return embed(\"../data/table.bin\");\n}\n\n"
+        + "fn main(): void {\n    let bytes = comptime table();\n    let text = comptime embed(\"../data/hello.txt\");\n"
+        + "    println(f\"{bytes.length()} {bytes[0]} {bytes[bytes.length() - 1]} {text.length()}\");\n}\n";
+
+    /// <summary><c>embed</c> (09 Q4; 13 M9a S4, its artifact): a file of the package, relative to
+    /// the module that calls, a <c>uint8[]</c> in the binary — through a function a site calls
+    /// too; and the build depends on it: changed, it is read again.</summary>
+    [Fact]
+    public void Embed_reads_a_file_of_the_package_and_a_change_builds_anew()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", Embedding),
+            ("data/table.bin", "ABC"), ("data/hello.txt", "hello\n"));
+        Assert.Equal("3 65 67 6\n", BuildAndRun(dir, "app", "build", "-C", dir));
+
+        File.WriteAllText(Path.Combine(dir, "data", "table.bin"), "XYZW");
+        Assert.Equal("4 88 87 6\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    /// <summary>What <c>embed</c> refuses (<c>LYR-CT0004</c>): a call the program would make at
+    /// run time; a file outside the package's directory; a file that is not there.</summary>
+    [Theory]
+    [InlineData("    let b = embed(\"../data/table.bin\");\n    println(f\"{b.length()}\");\n", "this call would run in the program")]
+    [InlineData("    let b = comptime embed(\"../../outside.bin\");\n    println(f\"{b.length()}\");\n", "lies outside it")]
+    [InlineData("    let b = comptime embed(\"../data/none.bin\");\n    println(f\"{b.length()}\");\n", "found no file '../data/none.bin'")]
+    public void Embed_refuses_a_run_time_call_a_file_outside_and_none(string body, string why)
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("data/table.bin", "ABC"),
+            ("src/main.lyr", "import std.io { println };\nimport std.core { embed };\n\nfn main(): void {\n" + body + "}\n"));
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.True(exit == 1, error);
+        var lines = error.Split('\n');
+        Assert.Contains("error[LYR-CT0004]", Assert.Single(lines, l => l.Contains("error[")));
+        Assert.Contains(why, error);
     }
 }

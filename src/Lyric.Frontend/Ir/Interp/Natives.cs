@@ -27,14 +27,6 @@ public sealed class Natives(Interpreter interpreter)
         "std.task.armOnPoller", "std.task.forgetOnPoller", "std.task.takeFromPoller",
     };
 
-    /// <summary>The Unicode Character Database's answers, which the interpreter gets with its own
-    /// tables (13 M9a S4) — until then answered for ASCII alone and refused beyond, rather than
-    /// answered from .NET's, which are of another Unicode version.</summary>
-    private static readonly HashSet<string> Unicode = new(StringComparer.Ordinal)
-    {
-        "std.core.unicodeCategory", "std.core.unicodeUpper", "std.core.unicodeLower", "std.core.unicodeWhiteSpace",
-    };
-
     /// <summary>The C library's functions that each libm rounds its own way: no answer at compile
     /// time is the same on every platform (Q7) until one implementation serves the compiler and
     /// the runtime alike (13 M9a S4).</summary>
@@ -47,13 +39,17 @@ public sealed class Natives(Interpreter interpreter)
     private readonly ConditionalWeakTable<object, StrongBox<long>> _identities = new();
     private long _nextIdentity = 1;
 
-    public Value Call(IrImport import, Value[] args, IrType[] types)
+    /// <summary>What <c>embed</c> reads through (09 Q4); <c>null</c>, it reads nothing.</summary>
+    public EmbedReader? Embed { get; init; }
+
+    /// <summary>Where the native at hand is called: <c>embed</c>'s path is the calling module's.</summary>
+    private Core.Span _at;
+
+    public Value Call(IrImport import, Value[] args, IrType[] types, Core.Span at)
     {
+        _at = at;
         var name = import.Name;
         if (Table.TryGetValue(name, out var native)) return native(args, types, import.ReturnType);
-        if (Unicode.Contains(name))
-            return Ascii(name, (uint)args[0].Bits)
-                ?? throw ComptimeFailure.NotYet($"'{Short(name)}' asks the Unicode tables beyond ASCII, which compile time reads from a later slice of M9a");
         if (RoundedByEachLibm.Contains(name))
             throw ComptimeFailure.NotYet($"'{Short(name)}' rounds as each C library does, and compile time has no answer the same on every platform yet");
         if (WorldNatives.Contains(name) || WorldModules.Any(m => name.StartsWith(m, StringComparison.Ordinal)) || name.StartsWith("C:", StringComparison.Ordinal))
@@ -61,36 +57,40 @@ public sealed class Natives(Interpreter interpreter)
         throw ComptimeFailure.NotYet($"'{Short(name)}' does not run at compile time yet");
     }
 
-    /// <summary>The Unicode tables' answer for an ASCII character, which every Unicode version
-    /// gives alike — the runtime takes the same short cut for the case mappings (unicode.c);
-    /// <c>null</c> beyond ASCII.</summary>
-    private static Value? Ascii(string name, uint code)
+    // --- the Unicode Character Database (unicode.c over unicode_tables.h): the same lookups over
+    // the same tables, which tooling/unicode/gen.py writes for both — not .NET's, which are of
+    // another Unicode version.
+
+    private static long UnicodeCategory(uint c)
     {
-        if (code >= 0x80) return null;
-        var c = (char)code;
-        return name switch
+        if (c >= 0x110000) return 29; // Cn: no character has a scalar value beyond 0x10FFFF
+        var block = UnicodeTables.CategoryIndex[(int)(c >> UnicodeTables.CategoryShift)];
+        return UnicodeTables.CategoryBlocks[(block << UnicodeTables.CategoryShift) | (int)(c & ((1u << UnicodeTables.CategoryShift) - 1))];
+    }
+
+    /// <summary>The mapping of <paramref name="c"/> in a table of pairs sorted by the character
+    /// mapped, or <paramref name="c"/> itself.</summary>
+    private static uint Mapped(ReadOnlySpan<uint> pairs, uint c)
+    {
+        int lo = 0, hi = pairs.Length / 2;
+        while (lo < hi)
         {
-            "std.core.unicodeWhiteSpace" => Value.Bool(c is >= '\t' and <= '\r' or ' '),
-            "std.core.unicodeUpper" => Value.Uint(c is >= 'a' and <= 'z' ? code - 32 : code),
-            "std.core.unicodeLower" => Value.Uint(c is >= 'A' and <= 'Z' ? code + 32 : code),
-            // the index in UnicodeCategory's order (std.core)
-            _ => Value.Int(c switch
-            {
-                < ' ' or '\x7F' => 25,                              // Cc
-                ' ' => 22,                                          // Zs
-                >= '0' and <= '9' => 8,                             // Nd
-                >= 'A' and <= 'Z' => 0,                             // Lu
-                >= 'a' and <= 'z' => 1,                             // Ll
-                '$' => 19,                                          // Sc
-                '(' or '[' or '{' => 13,                            // Ps
-                ')' or ']' or '}' => 14,                            // Pe
-                '+' or '<' or '=' or '>' or '|' or '~' => 18,       // Sm
-                '-' => 12,                                          // Pd
-                '^' or '`' => 20,                                   // Sk
-                '_' => 11,                                          // Pc
-                _ => 17,                                            // Po: ! " # % & ' * , . / : ; ? @ \
-            }),
-        };
+            var mid = lo + (hi - lo) / 2;
+            if (pairs[2 * mid] < c) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo < pairs.Length / 2 && pairs[2 * lo] == c ? pairs[2 * lo + 1] : c;
+    }
+
+    private static bool UnicodeWhiteSpace(uint c)
+    {
+        var ranges = UnicodeTables.WhiteSpace;
+        for (var i = 0; i < ranges.Length; i += 2)
+        {
+            if (c < ranges[i]) return false;
+            if (c <= ranges[i + 1]) return true;
+        }
+        return false;
     }
 
     private static string Short(string name) => name.StartsWith("C:", StringComparison.Ordinal) ? name[2..] : name;
@@ -279,6 +279,19 @@ public sealed class Natives(Interpreter interpreter)
         // An object's address at run time; at compile time a number per object, in the order asked —
         // the same each run (Q7), which an address is not.
         ["std.core.identityOf"] = (a, _, _) => Value.Int(_identities.GetValue(a[0].Ref!, _ => new StrongBox<long>(_nextIdentity++)).Value!),
+
+        // --- a file of the package, the one thing compile time reads (09 Q4)
+        ["std.core.embed"] = (a, _, _) =>
+        {
+            var bytes = (Embed ?? throw ComptimeFailure.Embed("'embed' reads no file in this compilation")).Bytes(_at, S(a[0]).ToString());
+            return Value.Of(new ArrayObj([.. bytes.Select(b => Value.Uint(b))]));
+        },
+
+        // --- the Unicode Character Database (unicode.c)
+        ["std.core.unicodeCategory"] = (a, _, _) => Value.Int(UnicodeCategory((uint)a[0].Bits)),
+        ["std.core.unicodeUpper"] = (a, _, _) => Value.Uint(Mapped(UnicodeTables.Upper, (uint)a[0].Bits)),
+        ["std.core.unicodeLower"] = (a, _, _) => Value.Uint(Mapped(UnicodeTables.Lower, (uint)a[0].Bits)),
+        ["std.core.unicodeWhiteSpace"] = (a, _, _) => Value.Bool(UnicodeWhiteSpace((uint)a[0].Bits)),
 
         // --- the C library's exactly rounded functions (math.h, which std declares 'extern "C"'):
         // IEEE 754 fixes each result to the bit, on every platform.

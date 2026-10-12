@@ -108,19 +108,28 @@ public static class Pipeline
         var key = Key(SourcesKey(project), request.ToolchainVersion, CEmitter.Version, CompilerIdentity,
             request.Profile.OverflowChecks ? "checked" : "wrapping");
         var manifest = Path.Combine(project.CacheDir, $"{project.BinaryName}-{key}.units");
+        // What 'embed' read (design/v5/spec/09 Q4) is an input the key cannot name before the front
+        // end runs: the list beside the units says which, and a file that changed sends the
+        // program through the front end again — into a unit named by what it read.
+        var embeds = manifest + ".embeds";
+        if (File.Exists(manifest) && !EmbedsHold(embeds)) File.Delete(manifest);
         if (!File.Exists(manifest))
         {
             var result = Compile(project, error, request.Profile);
             if (result is null) return (1, null);
+            var read = result.Embedded.Select(file => $"{FileKey(file)} {file}").ToList();
+            var unitKey = read.Count == 0 ? key : Key(key, string.Join("\n", read));
             var paths = new List<string>();
             foreach (var unit in CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot, request.Profile.OverflowChecks))
             {
                 var path = unit.Instance is null
-                    ? Path.Combine(project.CacheDir, $"{project.BinaryName}-{key}.c")
+                    ? Path.Combine(project.CacheDir, $"{project.BinaryName}-{unitKey}.c")
                     : Path.Combine(project.CacheDir, "units", $"inst-{Key(Placeless(project, unit.Text))}.c");
                 WriteOnce(path, unit.Text);
                 paths.Add(path);
             }
+            if (read.Count > 0) File.WriteAllLines(embeds, read);
+            else File.Delete(embeds);
             WriteOnce(manifest, string.Join("\n", paths) + "\n");
         }
         var sources = File.ReadAllLines(manifest).Where(line => line.Length > 0).ToList();
@@ -316,6 +325,24 @@ public static class Pipeline
         File.WriteAllText(partial, text);
         try { File.Move(partial, path, overwrite: false); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException && File.Exists(path)) { File.Delete(partial); }
+    }
+
+    /// <summary>A file's content as a key: what an embedded file was when the program read it.</summary>
+    private static string FileKey(string file) => System.Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file)));
+
+    /// <summary>Whether every file the cached program embedded is still what it read — none
+    /// embedded holds trivially.</summary>
+    private static bool EmbedsHold(string embeds)
+    {
+        if (!File.Exists(embeds)) return true;
+        foreach (var line in File.ReadAllLines(embeds))
+        {
+            var at = line.IndexOf(' ');
+            if (at < 0) return false;
+            var file = line[(at + 1)..];
+            if (!File.Exists(file) || FileKey(file) != line[..at]) return false;
+        }
+        return true;
     }
 
     /// <summary>A binary newer than every content-keyed input it was linked from is that link.</summary>

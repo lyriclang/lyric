@@ -20,11 +20,12 @@ public static class ComptimeEvaluator
     /// <summary>The frames of the inner backtrace a diagnostic shows, innermost first.</summary>
     private const int ShownFrames = 12;
 
+    /// <param name="embed">What <c>embed</c> reads through (09 Q4), which notes each file read.</param>
     /// <returns>Each site's constant, or <c>null</c> where a site was reported.</returns>
     public static IReadOnlyDictionary<int, IrConstValue>? Evaluate(IrModule hoisted, TypeResult types,
-        DiagnosticEngine diagnostics, long budget, bool overflowChecks)
+        DiagnosticEngine diagnostics, long budget, bool overflowChecks, EmbedReader? embed = null)
     {
-        var interpreter = new Interpreter(hoisted, budget, overflowChecks);
+        var interpreter = new Interpreter(hoisted, budget, overflowChecks, embed);
         var sites = types.ComptimeSites;
         var values = new Dictionary<int, IrConstValue>();
         var failed = false;
