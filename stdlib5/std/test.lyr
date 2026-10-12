@@ -4,9 +4,11 @@
 /// that does not hold panics with what it got against what was expected, each as `Debug` writes
 /// it, and names the expression it got it from (X1): `xs.length() = 2, expected 3`. The actual
 /// value comes first (N13). Two values too long to compare by eye get their first difference
-/// named below: a text's first line that differs, else the first character.
+/// named below: a text's first line that differs, else the first character. The runner of
+/// `lyric bench` is here too (X4).
 
 import std.core { Contains, StringBuilder, filled };
+import std.fs { readText, writeText };
 import std.io { flush, println };
 import std.os { cpuCount };
 import std.task { spawn, sleep, PanicInfo, TaskStatus, Cancelled, monotonicNanos };
@@ -450,4 +452,69 @@ fn linesOfText(shown: string): List<string> {
     }
     lines.push(line.toString());
     return lines;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Benchmarks (X4): what `lyric bench` hands a package's `@Bench` functions to.
+// ---------------------------------------------------------------------------------------------
+
+/// One benchmark as `lyric bench` hands it to `runBenches`: its name — the module's path and the
+/// function's — and its body, handed a bench to measure through.
+pub struct BenchCase {
+    pub name: string,
+    pub body: fn(&Bench) -> void,
+}
+
+/// Runs the benchmarks one after another on this thread (X4), each with a bench of its own, and
+/// writes a line for each: the nanoseconds a run, its allocations and their bytes, the megabytes a
+/// second where the bench said how many bytes a run handles, and the runs measured. Where `compare`
+/// names a file a run saved before, a line also says how the time a run changed against it; where
+/// `save` names one, this run writes it — a line a benchmark: its name, then the nanoseconds, the
+/// allocations and the bytes a run, apart by tabs. The answer is the program's exit: 0, or 1 where
+/// such a file could not be read or written.
+pub fn runBenches(cases: BenchCase[], save: string = "", compare: string = ""): int {
+    let before = Map<string, float>.new();
+    if (compare != "") {
+        let text = try readText(compare) catch (e) {
+            println(f"error: {e.message()}");
+            return 1;
+        };
+        for (line in text.lines()) {
+            let parts = line.split('\t').toArray();
+            if (parts.length() >= 2) {
+                before[parts[0].toString()] = try float.parse(parts[1]) catch (_) 0.0;
+            }
+        }
+    }
+    let saved = StringBuilder.new();
+    for (c in cases) {
+        var b = Bench { };
+        let body = c.body;
+        body(&b);
+        let ns = b.nanosPerRun();
+        let allocations = if (b.runs > 0) b.allocations / b.runs else 0;
+        let bytes = if (b.runs > 0) b.allocatedBytes / b.runs else 0;
+        let out = StringBuilder.new();
+        out.appendStr(f"bench {c.name}: {ns:.1f} ns/op, {allocations} allocs/op, {bytes} B/op");
+        if (b.bytesPerRun > 0 && ns > 0.0) {
+            out.appendStr(f", {(b.bytesPerRun as float) * 1000.0 / ns:.1f} MB/s");
+        }
+        out.appendStr(f" ({b.runs} runs)");
+        if (let was = before.get(c.name)) {
+            if (was > 0.0) {
+                out.appendStr(f", was {was:.1f} ns/op: {(ns - was) * 100.0 / was:+.1f}%");
+            }
+        }
+        println(out.toString());
+        saved.appendStr(f"{c.name}\t{ns:.3f}\t{allocations}\t{bytes}\n");
+    }
+    if (save != "") {
+        try {
+            writeText(save, saved.toString());
+        } catch (e) {
+            println(f"error: {e.message()}");
+            return 1;
+        }
+    }
+    return 0;
 }

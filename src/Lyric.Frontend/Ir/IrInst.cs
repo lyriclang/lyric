@@ -302,3 +302,8 @@ public sealed record SuppressedErrors(TempId Dest, IrType Type, int Stash, Span 
 /// <summary><c>e.backtrace()</c> in a clause: the program counters kept where that error was
 /// thrown, a new <c>int[]</c> — empty where none were kept, as in the release profile.</summary>
 public sealed record ErrorTrace(TempId Dest, IrType Type, int Stash, Span Span) : IrOp(Span);
+
+/// <summary>std.core's <c>blackBox(x)</c> (10 X4): <paramref name="Value"/> into
+/// <paramref name="Dest"/> through a point the C compiler cannot see through — what computed the
+/// value is not dropped, and the value that comes out is not known in advance.</summary>
+public sealed record BlackBox(TempId Dest, TempId Value, IrType Type, Span Span) : IrOp(Span);

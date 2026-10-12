@@ -809,6 +809,11 @@ public static class IrVerifier
                         Report(block, index, $"errtrace {t.Dest} is {Show(t.Type)}; the program counters are an int[]");
                     RequireDestType(t.Dest, t.Type, "errtrace", block, index);
                     break;
+                case BlackBox b:
+                    if (!IrType.Equal(TypeOf(b.Value), b.Type))
+                        Report(block, index, $"blackbox {b.Value} is {Show(TypeOf(b.Value))}, annotated {Show(b.Type)}");
+                    RequireDestType(b.Dest, b.Type, "blackbox", block, index);
+                    break;
                 default:
                     throw new InternalCompilationException(
                         $"ir-verifier: unhandled op {op.GetType().Name}");

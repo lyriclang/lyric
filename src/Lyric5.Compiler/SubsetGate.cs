@@ -178,6 +178,8 @@ public static class SubsetGate
                 case CurrentError or ClearError or StashError or RestoreError or SuppressError
                     or SuppressedErrors or ErrorTrace:
                     break;
+                case BlackBox:
+                    break;
                 case LoadGlobal or StoreGlobal:
                     break;
                 // Places (03 T12): a place parameter's.

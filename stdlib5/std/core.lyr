@@ -216,6 +216,86 @@ pub struct Test :: [OnFunction] {
     pub parallel: bool = false,
 }
 
+/// A benchmark (10 B12 X4): `lyric bench` runs every function marked so — `fn name(&b: Bench)`,
+/// not private —, one after another. The bench it is handed is its measure: `b.iter { … }` runs the
+/// block until its time a run is known, `b.bytes(n)` says how many bytes a run handles; what it
+/// measured is the bench's after the call.
+pub struct Bench :: [OnFunction] {
+    /// The runs of the round reported, the nanoseconds they took, and the allocations they made
+    /// on this thread and their bytes.
+    pub var runs: int = 0,
+    pub var nanos: int = 0,
+    pub var allocations: int = 0,
+    pub var allocatedBytes: int = 0,
+    /// The bytes a run handles, as `bytes(n)` said; 0 where it said nothing.
+    pub var bytesPerRun: int = 0,
+
+    /// Runs `body` until its time a run is known (X4): once to warm up, then rounds of ever more
+    /// runs until one takes a tenth of a second, then five rounds of that many — the bench reports
+    /// the round of the median time. The loop's call of `body` is in the time; `blackBox` keeps a
+    /// result the compiler would otherwise drop.
+    pub mut fn iter(body: fn() -> void): void {
+        body();
+        var n = 1;
+        var took = timedRound(body, n).0;
+        while (took < 100000000) {
+            // as many runs as a tenth of a second at this pace, a fifth more, at most a hundred times more
+            let pace = if (took > 0) ((n as float) * 120000000.0 / (took as float)) as int else n * 100;
+            n = if (pace > n * 100) n * 100 else if (pace <= n) n + 1 else pace;
+            took = timedRound(body, n).0;
+        }
+        let rounds = arrayOf(5, (_: int) => timedRound(body, n));
+        let times = arrayOf(5, (i: int) => rounds[i].0);
+        times.sort();
+        for (r in rounds) {
+            if (r.0 == times[2]) {
+                this.runs = n;
+                this.nanos = r.0;
+                this.allocations = r.1;
+                this.allocatedBytes = r.2;
+                return;
+            }
+        }
+    }
+
+    /// A run handles `n` bytes: the report gives the bytes a second.
+    pub mut fn bytes(n: int): void {
+        this.bytesPerRun = n;
+    }
+
+    /// The nanoseconds a run took, in the round reported.
+    pub fn nanosPerRun(): float {
+        return if (this.runs > 0) (this.nanos as float) / (this.runs as float) else 0.0;
+    }
+}
+
+/// `n` runs of `body`: the nanoseconds they took, the allocations they made on this thread, and
+/// their bytes.
+fn timedRound(body: fn() -> void, n: int): (int, int, int) {
+    let allocations = threadAllocations();
+    let bytes = threadAllocatedBytes();
+    let start = benchClock();
+    for (_ in 0..n) {
+        body();
+    }
+    let took = benchClock() - start;
+    return (took, threadAllocations() - allocations, threadAllocatedBytes() - bytes);
+}
+
+/// The monotonic clock, in nanoseconds (lyr/time.h).
+fn benchClock(): int;
+
+/// The allocations this thread has made since it started, and their bytes (lyr/gc.h).
+fn threadAllocations(): int;
+fn threadAllocatedBytes(): int;
+
+/// `x`, handed back through a point the compiler cannot see through (10 X4): what computed it is
+/// not dropped as unused, and the value that comes out is not known in advance — for a benchmark's
+/// body, whose result nothing reads. It costs a store.
+pub fn blackBox<T>(x: T): T {
+    return x;
+}
+
 /// `@callerExpr(p)` on a `string` parameter with a default (09 A11): where a call leaves the
 /// parameter out, it gets the text the call wrote for `p` — `assertEq(xs.length(), 3)` hands
 /// `std.test` the words `xs.length()`. Named like the compiler instruction it is, not like a type.

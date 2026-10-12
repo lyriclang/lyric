@@ -25,6 +25,7 @@ public static class Program
                 "build" => Build(args[1..], run: false),
                 "run" => Build(args[1..], run: true),
                 "test" => Test(args[1..]),
+                "bench" => Bench(args[1..]),
                 "update" => Update(args[1..]),
                 "clean" => Clean(args[1..]),
                 "metadata" => Metadata(args[1..]),
@@ -71,6 +72,9 @@ public static class Program
         output.WriteLine("  remove <name>                  take the dependency out of lyric.toml (-C <dir>, --offline)");
         output.WriteLine("  test [options] [-f <text>]     build the package's tests and run them, each in a task of");
         output.WriteLine("                                 its own — those whose name holds <text>, with -f");
+        output.WriteLine("  bench [options] [-f <text>] [--save <file>] [--compare <file>]");
+        output.WriteLine("                                 build the package's benchmarks in the release profile and");
+        output.WriteLine("                                 run them; --save writes the times, --compare reads them back");
         output.WriteLine("  clean [-C <dir>]               remove the package's out/");
         output.WriteLine("  metadata [options]             the package as JSON: its graph, programs, profiles, targets");
         output.WriteLine("                                 (options: -C <dir>, --offline, --json)");
@@ -340,7 +344,32 @@ public static class Program
     /// this machine and run, one after another, each in a task of its own; the program's exit is
     /// the command's (C5): 0 when every test held, 1 when one failed or the program was refused.
     /// </summary>
-    private static int Test(string[] args)
+    private static int Test(string[] args) =>
+        Package(args, "test", "tests", TestValueOptions, null, (project, profile, compiler, values) =>
+            TestRun.Run(project, profile, compiler, DisplayVersion(), values.GetValueOrDefault("-f"), Console.Out, Console.Error));
+
+    private static readonly string[] BenchValueOptions = [.. TestValueOptions, "--save", "--compare"];
+
+    /// <summary>
+    /// <c>lyric bench</c> (design/v5/spec/10 B12 X4, 11 C2): the package's benchmarks — every
+    /// function it marks <c>@Bench</c>, under <c>src/</c> and under <c>tests/</c> — built into one
+    /// program for this machine, in the release profile unless <c>--profile</c> names another, and
+    /// run one after another. <c>--save</c> names a file the run writes its times to,
+    /// <c>--compare</c> one it reads to say how they changed. The program's exit is the command's.
+    /// </summary>
+    private static int Bench(string[] args) =>
+        Package(args, "bench", "benchmarks", BenchValueOptions, "release", (project, profile, compiler, values) =>
+            BenchRun.Run(project, profile, compiler, DisplayVersion(), values.GetValueOrDefault("-f"),
+                values.TryGetValue("--save", out var save) ? Path.GetFullPath(save) : "",
+                values.TryGetValue("--compare", out var compare) ? Path.GetFullPath(compare) : "",
+                Console.Out, Console.Error));
+
+    /// <summary>A verb over the package of the nearest <c>lyric.toml</c> — <c>test</c>, <c>bench</c>:
+    /// its options read, the package and its graph loaded, the profile chosen — <paramref name="profileDefault"/>
+    /// where the command line names none, else as <c>build</c> chooses —, and the compiler found;
+    /// then <paramref name="run"/>.</summary>
+    private static int Package(string[] args, string verb, string what, string[] valueOptions, string? profileDefault,
+        Func<Project, BuildProfile, CCompiler, Dictionary<string, string>, int> run)
     {
         var values = new Dictionary<string, string>();
         var flags = new HashSet<string>(StringComparer.Ordinal);
@@ -352,9 +381,9 @@ public static class Program
                 flags.Add(arg);
                 continue;
             }
-            var option = TestValueOptions.FirstOrDefault(o => arg == o || arg.StartsWith(o + "=", StringComparison.Ordinal));
+            var option = valueOptions.FirstOrDefault(o => arg == o || arg.StartsWith(o + "=", StringComparison.Ordinal));
             if (option is null)
-                return Unknown(arg.StartsWith('-') ? $"unknown option '{arg}' for 'test'" : $"'test' runs a package's tests and takes no file, got '{arg}'");
+                return Unknown(arg.StartsWith('-') ? $"unknown option '{arg}' for '{verb}'" : $"'{verb}' runs a package's {what} and takes no file, got '{arg}'");
             string? value = arg == option ? (i + 1 < args.Length ? args[++i] : null) : arg[(option.Length + 1)..];
             if (value is null) return Unknown($"'{option}' needs a value");
             values[option == "--filter" ? "-f" : option] = value;
@@ -372,7 +401,7 @@ public static class Program
             if (Project.TestsOf(baseDirectory, flags.Contains("--offline"), flags.Contains("--locked")) is not { } found)
             {
                 Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
-                Console.Error.WriteLine("  = help: lyric5 test runs a package's tests");
+                Console.Error.WriteLine($"  = help: lyric5 {verb} runs a package's {what}");
                 return 2;
             }
             project = found;
@@ -384,9 +413,10 @@ public static class Program
             return refused.Exit;
         }
 
+        if (profileDefault is not null) values.TryAdd("--profile", profileDefault);
         if (ProfileOf(values, flags, project.Manifest) is not { } profile) return 2;
         if (CompilerFor(profile) is not { } compiler) return 2;
-        return TestRun.Run(project, profile, compiler, DisplayVersion(), values.GetValueOrDefault("-f"), Console.Out, Console.Error);
+        return run(project, profile, compiler, values);
     }
 
     // --- update --------------------------------------------------------------------------------

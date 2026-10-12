@@ -56,7 +56,23 @@ public static class TestRun
     /// each module's in the order they are written —, after one compilation of every module under
     /// <c>src/</c> and <c>tests/</c>. <c>null</c> after reporting a program the compiler refuses.
     /// </summary>
-    public static IReadOnlyList<TestCase>? Discover(Project project, TextWriter error)
+    public static IReadOnlyList<TestCase>? Discover(Project project, TextWriter error) =>
+        Marked(project, "Test", error)?.Select(m =>
+        {
+            var skip = m.Attribute.Fields.FirstOrDefault(f => f.Name == "skip")?.Value is StringLiteralExpr { Value: var why } ? why : "";
+            var timeout = m.Attribute.Fields.FirstOrDefault(f => f.Name == "timeout")?.Value is IntLiteralExpr { Value: var seconds } ? (long)seconds : 60;
+            var parallel = m.Attribute.Fields.FirstOrDefault(f => f.Name == "parallel")?.Value is BoolLiteralExpr { Value: true };
+            return new TestCase(m.Module, m.Function.Name, m.Function.Throws is not null, skip, timeout, parallel);
+        }).ToList();
+
+    /// <summary>
+    /// The package's functions marked with std.core's <paramref name="attribute"/> — <c>Test</c>,
+    /// <c>Bench</c> — module by module in the order of their paths, each module's in the order they
+    /// are written, with the module's path and the mark. One compilation of every module under
+    /// <c>src/</c> and <c>tests/</c>; <c>null</c> after reporting a program the compiler refuses.
+    /// </summary>
+    internal static IReadOnlyList<(string Module, FunctionDecl Function, AttributeNode Attribute)>? Marked(
+        Project project, string attribute, TextWriter error)
     {
         var manifest = project.Manifest!;
         var testRoot = project.TestRoot!;
@@ -92,19 +108,16 @@ public static class TestRun
             return null;
         }
 
-        var test = model.Compilation.FindModule(["std", "core"])?.Members.LookupLocal("Test");
-        var found = new List<TestCase>();
+        var mark = model.Compilation.FindModule(["std", "core"])?.Members.LookupLocal(attribute);
+        var found = new List<(string, FunctionDecl, AttributeNode)>();
         foreach (var module in model.Compilation.Modules
                      .Where(m => m.Path.Length > 1 && m.Path[0] == manifest.Name)
                      .OrderBy(m => string.Join('.', m.Path), StringComparer.Ordinal))
         {
             foreach (var fn in model.Compilation.AstOf(module).Declarations.OfType<FunctionDecl>())
             {
-                if (fn.Attributes.FirstOrDefault(a => ReferenceEquals(model.Types.RefOf(a), test)) is not { } marked) continue;
-                var skip = marked.Fields.FirstOrDefault(f => f.Name == "skip")?.Value is StringLiteralExpr { Value: var why } ? why : "";
-                var timeout = marked.Fields.FirstOrDefault(f => f.Name == "timeout")?.Value is IntLiteralExpr { Value: var seconds } ? (long)seconds : 60;
-                var parallel = marked.Fields.FirstOrDefault(f => f.Name == "parallel")?.Value is BoolLiteralExpr { Value: true };
-                found.Add(new TestCase(string.Join('.', module.Path), fn.Name, fn.Throws is not null, skip, timeout, parallel));
+                if (fn.Attributes.FirstOrDefault(a => ReferenceEquals(model.Types.RefOf(a), mark)) is not { } marked) continue;
+                found.Add((string.Join('.', module.Path), fn, marked));
             }
         }
         return found;
@@ -145,7 +158,7 @@ public static class TestRun
     }
 
     /// <summary>A Lyric string literal holding <paramref name="text"/>.</summary>
-    private static string Quote(string text) =>
+    internal static string Quote(string text) =>
         "\"" + text.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t") + "\"";
 
     private static IEnumerable<string> Files(string root) =>

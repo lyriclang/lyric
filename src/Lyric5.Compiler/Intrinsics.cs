@@ -24,6 +24,10 @@ public static class Intrinsics
         ["std.core.shortestFloat32"] = "lyr_str_from_float32",
         ["std.string.fromChar"] = "lyr_str_from_char",
         ["std.core.panic"] = "lyr_panic_message",
+        // A benchmark's measure (10 X4): the clock, this thread's allocations and their bytes.
+        ["std.core.benchClock"] = "lyr_clock_monotonic_ns",
+        ["std.core.threadAllocations"] = "lyr_gc_thread_allocations",
+        ["std.core.threadAllocatedBytes"] = "lyr_gc_thread_allocated_bytes",
         // Where an error was thrown, shown (05 E6 O3): a Backtrace's frames named.
         ["std.core.traceText"] = "lyr_trace_text",
         // The catalogue (05 E8): 'assert' a check at the call, so its trace starts in the program;

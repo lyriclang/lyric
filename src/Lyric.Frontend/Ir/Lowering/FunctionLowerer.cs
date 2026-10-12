@@ -4926,9 +4926,12 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>Is this std.core's <c>filled</c>, the standard library's own fill?</summary>
-    private bool IsCoreFilled(FunctionSymbol symbol) =>
-        _typeTable.Compilation?.FindModule(["std", "core"])?.Members.LookupLocal("filled") is FunctionSymbol filled
-        && ReferenceEquals(symbol, filled);
+    private bool IsCoreFilled(FunctionSymbol symbol) => IsCoreNamed(symbol, "filled");
+
+    /// <summary>Is this std.core's function of that name?</summary>
+    private bool IsCoreNamed(FunctionSymbol symbol, string name) =>
+        _typeTable.Compilation?.FindModule(["std", "core"])?.Members.LookupLocal(name) is FunctionSymbol found
+        && ReferenceEquals(symbol, found);
 
     /// <summary>
     /// <c>filled(n, x)</c>: <c>n</c> slots of the one value <c>x</c>, in one allocation — the
@@ -6946,6 +6949,16 @@ internal sealed class FunctionLowerer
 
         // std.core's 'filled(n, x)' (M8a S16): the repetition's instruction, sharing.
         if (IsCoreFilled(symbol)) return LowerFilled(expr);
+        // std.core's 'blackBox(x)' (10 X4): the value through an instruction the C compiler cannot
+        // see through.
+        if (IsCoreNamed(symbol, "blackBox") && expr.Arguments.Length == 1)
+        {
+            var type = TypeOfExpr(expr);
+            var value = LowerExprAs(expr.Arguments[0], type);
+            var held = _slots.NewTemp(type);
+            _b.Emit(new BlackBox(held, value, type, expr.Span));
+            return held;
+        }
 
         // Natively backed, by the stdlib or the host: its own instruction type and its own index space.
         //
