@@ -39,13 +39,16 @@ public class BenchCommandTests
         Assert.Matches(@"^bench app\.tests\.speed\.adds: \d+\.\d ns/op, 0 allocs/op, 0 B/op \(\d+ runs\)$", lines[0]);
         Assert.Matches(@"^bench app\.tests\.speed\.reads: \d+\.\d ns/op, 0 allocs/op, 0 B/op, \d+\.\d MB/s \(\d+ runs\)$", lines[1]);
         Assert.Matches(@"^bench app\.tests\.speed\.makes: \d+\.\d ns/op, [1-9]\d* allocs/op, [1-9]\d* B/op \(\d+ runs\)$", lines[2]);
-        // a round measured is one that took a tenth of a second at least: its runs times its time
-        // a run (12 §Benchmarks), less what a line rounds away
+        // The runs were sized until one round took a tenth of a second (12 §Benchmarks); the round
+        // reported is the median of five more at that many runs, and may be shorter — the sizing
+        // round slowed by a hiccup, the five after it not (a Windows runner reported 94.9 ms, under
+        // a floor of 95). What holds: its runs times its time a run is at least half of the tenth,
+        // unless the machine doubled its pace between the rounds.
         foreach (var line in lines)
         {
             var measured = System.Text.RegularExpressions.Regex.Match(line, @": (\d+\.\d) ns/op.*\((\d+) runs\)");
             Assert.True(double.Parse(measured.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture)
-                        * long.Parse(measured.Groups[2].Value) >= 0.95e8, line);
+                        * long.Parse(measured.Groups[2].Value) >= 0.5e8, line);
         }
     }
 
