@@ -1,0 +1,21 @@
+// A bench measures its block (design/v5/spec/10 X4): runs, time, the bytes it said, the allocations
+// of this thread; blackBox hands a value back through a point the C compiler cannot see through.
+import std.core { blackBox };
+import std.io { println };
+
+fn main(): void {
+    var b = Bench { };
+    b.bytes(64);
+    b.iter {
+        let _ = blackBox(1 + 2);
+    }
+    println(f"{b.runs > 0} {b.nanos > 0} {b.allocations} {b.bytesPerRun}");
+    var c = Bench { };
+    c.iter {
+        let xs = List<int>.new();
+        xs.push(1);
+        let _ = blackBox(xs.length());
+    }
+    println(f"{c.allocations >= c.runs} {c.allocatedBytes > 0}");
+    println(f"{blackBox(41) + 1}");
+}

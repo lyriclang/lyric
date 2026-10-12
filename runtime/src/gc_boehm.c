@@ -102,7 +102,14 @@ void lyr_gc_init(void) {
     initialized = 1;
 }
 
+/* What this thread has allocated (10 X4: a benchmark's allocations a run) — the collector's own
+ * total is the process's, every thread's at once. Two adds an allocation, no atomics. */
+static _Thread_local uint64_t thread_allocations;
+static _Thread_local uint64_t thread_allocated_bytes;
+
 static void *allocate(size_t bytes, int has_refs, int zero) {
+    thread_allocations++;
+    thread_allocated_bytes += bytes;
     if (LYR_UNLIKELY(atomic_load_explicit(&callbacks_pending, memory_order_relaxed))) run_callbacks();
     TSAN_PUBLISH();
     void *memory = has_refs ? GC_MALLOC(bytes) : GC_MALLOC_ATOMIC(bytes);
@@ -434,6 +441,14 @@ size_t lyr_gc_heap_size(void) {
 
 size_t lyr_gc_collections(void) {
     return (size_t)GC_get_gc_no();
+}
+
+int64_t lyr_gc_thread_allocations(void) {
+    return (int64_t)thread_allocations;
+}
+
+int64_t lyr_gc_thread_allocated_bytes(void) {
+    return (int64_t)thread_allocated_bytes;
 }
 
 void lyr_gc_set_heap_limit(size_t bytes) {

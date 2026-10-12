@@ -40,6 +40,7 @@ pub import std.core {
     Index,
     IndexSet,
     Test,
+    Bench,
     callerExpr,
     sequence
 };

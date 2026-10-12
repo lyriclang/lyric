@@ -80,4 +80,9 @@ size_t lyr_gc_heap_size(void);
 /* Number of collections since start. */
 size_t lyr_gc_collections(void);
 
+/* The allocations the calling thread has made since it started, and their bytes (10 X4: what a
+ * benchmark's run allocates). */
+int64_t lyr_gc_thread_allocations(void);
+int64_t lyr_gc_thread_allocated_bytes(void);
+
 #endif

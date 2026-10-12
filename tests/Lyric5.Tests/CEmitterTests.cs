@@ -669,6 +669,22 @@ public class CEmitterTests
         Assert.Equal(5, lines.Length);
     }
 
+    /// <summary>A bench measures its block (design/v5/spec/10 X4; M8c S12b), in both profiles: its
+    /// runs and time, the bytes it said, what a round allocated on this thread. std.core's
+    /// <c>blackBox</c> reaches the C as a store whose address an empty asm takes, with a memory
+    /// clobber — a value the C compiler can neither drop nor know.</summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_bench_measures_its_block_and_blackBox_is_opaque_to_the_C_compiler(Profile profile)
+    {
+        var units = EmitC("bench_measure");
+        Assert.Contains("__asm__ volatile(\"\" : : \"r\"(&", CEmitter.Join(units));
+        var result = RuntimeBuildTests.RunEmitted(units, "bench_measure", profile);
+        Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.Equal("true true 0 64\ntrue true\n42\n", result.Stdout.Replace("\r\n", "\n"));
+    }
+
     /// <summary>An error thrown deep in a recursion (design/v5/spec/01 E8): the debug trace shows the
     /// recursion's frame once with a count, as a panic's does, and says the stack went deeper than
     /// it kept — the capture keeps as many frames as a panic's trace.</summary>

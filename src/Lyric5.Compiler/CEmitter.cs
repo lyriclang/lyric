@@ -1724,6 +1724,11 @@ public sealed class CEmitter
             $"{Temp(s.Dest)} = lyr_err_suppressed(lyr_s{s.Stash}, &{ArrayDescriptor(errors.Element)});",
         ErrorTrace t when t.Type is IrArrayType pcs =>
             $"{Temp(t.Dest)} = lyr_err_trace(lyr_s{t.Stash}, &{ArrayDescriptor(pcs.Element)});",
+        // std.core's blackBox (10 X4): the value stored, and its address handed to an empty asm that
+        // may read and write any memory — Google Benchmark's DoNotOptimize. An aggregate's temp
+        // points at its storage: the value is stored there, and that is held.
+        BlackBox b => Assign(b.Dest, Value(b.Value))
+            + $" __asm__ volatile(\"\" : : \"r\"(&{(IsAggregate(TypeOf(b.Dest)) ? Storage(b.Dest) : Temp(b.Dest))}) : \"memory\");",
         // 'x is T' (03 T11): the descriptor the value's table begins with, or the conformance
         // list behind that descriptor for an interface.
         TypeTest t when _module.Types[t.Target.Value].IsInterface =>
