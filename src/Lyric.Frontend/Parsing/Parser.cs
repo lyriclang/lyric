@@ -631,6 +631,21 @@ public sealed partial class Parser
             case TokenKind.Null:
                 _buffer.Advance();
                 return new NullLiteralExpr(cur.Span);
+            // '.5' where an operand begins: a float literal with nothing before its point (spec 01
+            // §4.2 rule 1). Said once, and read as the float it means; after an operand '.5' is the
+            // element of a tuple, which is no primary.
+            case TokenKind.Dot when _buffer.Peek(1).TokenKind is TokenKind.IntLiteral or TokenKind.FloatLiteral
+                                    && _buffer.Peek(1).Span.Start == cur.Span.End:
+            {
+                _buffer.Advance();
+                var digits = _buffer.Advance();
+                var span = Span.Union(cur.Span, digits.Span);
+                var written = "0." + _sm.Slice(digits.Span).ToString();
+                _de.Report("LYR-LEX0016", Severity.Error, span,
+                    $"a float literal has digits on both sides of its '.': write '{written}'");
+                var (value, suffix) = LiteralDecoder.DecodeFloat(written, span, _de);
+                return new FloatLiteralExpr(value, suffix, span);
+            }
             // '.Red', '.Num(3)', '.Rect { w = 1 }': a member of the type the position expects
             // (08 Y9). The call and the initializer take the same shapes as after a name.
             case TokenKind.Dot when _buffer.Peek(1).TokenKind == TokenKind.Identifier:

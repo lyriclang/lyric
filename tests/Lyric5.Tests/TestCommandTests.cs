@@ -1,3 +1,4 @@
+using Lyric5.Toolchain;
 using static Lyric5.Tests.PackageFixture;
 
 namespace Lyric5.Tests;
@@ -228,5 +229,18 @@ public class TestCommandTests
         var (exit, _, error) = Run("test", "main.lyr");
         Assert.Equal(2, exit);
         Assert.Contains("'test' runs a package's tests and takes no file", error);
+    }
+
+    /// <summary><c>--target</c> as <c>build</c> and <c>run</c> take it (14 §1.1; the review of
+    /// 2026-10-08): the tests are built for another machine and named, not run there — exit 2.</summary>
+    [Fact]
+    public void A_cross_target_builds_the_tests_and_runs_none()
+    {
+        var dir = App();
+        var other = Target.Tier1.First(t => !t.IsHost && t.Os == TargetOs.Linux);
+        var (exit, output, error) = Run("test", "-C", dir, "--target", other.Triple);
+        Assert.True(exit == 2, output + error);
+        Assert.Contains($"'{other.Triple}' is not this machine; the binary is at", error);
+        Assert.Equal("", output);
     }
 }

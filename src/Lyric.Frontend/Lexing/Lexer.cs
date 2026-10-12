@@ -1,4 +1,5 @@
-﻿using Lyric.Core;
+﻿using System.Globalization;
+using Lyric.Core;
 
 namespace Lyric.Lexing;
 
@@ -68,6 +69,13 @@ public sealed class Lexer
     private static bool IsWhitespace(char c) => (c == ' ' || c == '\t' || c == '\r' || c == '\n');
     private static bool IsIdentifierStart(char c) => c is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or '_';
     private static bool IsIdentifierCont(char c) => IsIdentifierStart(c) || c is >= '0' and <= '9';
+
+    /// <summary>A letter, a digit or a mark beyond ASCII — or half of a pair of UTF-16 units: what a
+    /// name written in another script holds. No name holds it (spec 01 §3 rule 1); the word is read
+    /// as one name all the same, so its uses follow without an error each.</summary>
+    private static bool IsNameBeyondAscii(char c) =>
+        c > 0x7F && (char.IsLetterOrDigit(c) || char.IsSurrogate(c)
+                     || CharUnicodeInfo.GetUnicodeCategory(c) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark);
 
     private static bool IsHexDigit(char c) =>
         (c is >= '0' and <= '9') || (c is >= 'a' and <= 'f') || (c is >= 'A' and <= 'F');
@@ -257,7 +265,7 @@ public sealed class Lexer
             return ScanAtIdentifier(_pos);
         }
 
-        if (IsIdentifierStart(Current))
+        if (IsIdentifierStart(Current) || IsNameBeyondAscii(Current))
         {
             return ScanIdentifier(_pos);
         }
@@ -363,12 +371,31 @@ public sealed class Lexer
 
     private Token ScanIdentifier(int identifierStart)
     {
-        while (IsIdentifierCont(Current))
+        var beyond = new List<string>();
+        while (IsIdentifierCont(Current) || IsNameBeyondAscii(Current))
         {
+            if (IsNameBeyondAscii(Current))
+            {
+                // a pair of UTF-16 units is one character
+                var width = char.IsHighSurrogate(Current) && char.IsLowSurrogate(PeekAt(1)) ? 2 : 1;
+                var character = _source.Substring(_pos, width);
+                if (!beyond.Contains(character)) beyond.Add(character);
+                _pos += width;
+                continue;
+            }
             _pos++;
         }
 
         var lexme = _source.Substring(identifierStart, _pos - identifierStart);
+        // A name written beyond ASCII (spec 01 §3 rule 1): refused once, naming what it holds, and
+        // read as the name it is.
+        if (beyond.Count > 0)
+        {
+            _diagnostics.Report(new Diagnostic("LYR-LEX0001", Severity.Error, new Span(_file, identifierStart, _pos),
+                $"a name is written in ASCII — letters, digits and '_': '{lexme}' holds "
+                + string.Join(", ", beyond.Select(c => $"'{c}'"))));
+            return new Token(TokenKind.Identifier, new Span(_file, identifierStart, _pos));
+        }
         // Lyric 5 drops 'module' and 'params' as words (08 Y1): names, which the parser still reads
         // at the two places the words stood, to say what replaced them.
         if (Keywords.TryGetValue(lexme, out var kind) && !(_sources.Lyric5 && kind is TokenKind.Module or TokenKind.Params))
@@ -477,6 +504,17 @@ public sealed class Lexer
         {
             _pos++; //Consume '.'
             while (IsDecDigit(Current) || Current == '_') _pos++;
+            isFloat = true;
+        }
+        // '1.' — a '.' that no digit follows, nor a member's name ('3.show()'), nor a second '.'
+        // ('1..5'): a float literal with nothing after its point (spec 01 §4.2 rule 1). Said once,
+        // and read as the float it means, so nothing follows from it.
+        else if (Current == '.' && PeekAt(1) != '.' && !IsIdentifierStart(PeekAt(1)) && !IsNameBeyondAscii(PeekAt(1)))
+        {
+            _pos++; //Consume '.'
+            var written = _source.Substring(numberStart, _pos - numberStart);
+            _diagnostics.Report(new Diagnostic("LYR-LEX0016", Severity.Error, new Span(_file, numberStart, _pos),
+                $"a float literal has digits on both sides of its '.': write '{written}0'"));
             isFloat = true;
         }
 

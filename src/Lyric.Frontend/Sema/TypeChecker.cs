@@ -2624,7 +2624,7 @@ public sealed class TypeChecker
             foreach (var g in fsym.Generics) scope.TryDeclare(g);
         foreach (var p in fn.Parameters)
         {
-            var pt = ResolveType(p.Type, scope);
+            var pt = ValueTypeAt(ResolveType(p.Type, scope), p.Type.Span);
             var ps = new ParameterSymbol(p.Name, pt, p) { IsPlace = p.IsPlace };
             if (!scope.TryDeclare(ps))
                 ReportDuplicateParameter(p.Name, p.Span,
@@ -2649,7 +2649,7 @@ public sealed class TypeChecker
                         + "before the receiver; it may read the parameters before it");
             }
         }
-        _currentReturn = fn.ReturnType is not null ? ResolveType(fn.ReturnType, scope) : LyrType.Void;
+        _currentReturn = fn.ReturnType is not null ? ValueTypeAt(ResolveType(fn.ReturnType, scope), fn.ReturnType.Span) : LyrType.Void;
         // Coroutine — 'Coroutine<…>' and a yield of its own (08 D11): the body never produces the
         // coroutine value, which the runtime builds at the call. Its 'return' gives the coroutine's
         // result (06 A1), so coverage asks for one where the result is not void; the yield context
@@ -2857,7 +2857,7 @@ public sealed class TypeChecker
 
     private void CheckBinding(BindingStmt bnd, SymbolTable scope)
     {
-        var declared = bnd.Type is not null ? ResolveType(bnd.Type, scope) : null;
+        var declared = bnd.Type is not null ? ValueTypeAt(ResolveType(bnd.Type, scope), bnd.Type.Span) : null;
         var quiet = _de.ErrorCount;
         var initT = bnd.Initializer is not null ? CheckExpr(bnd.Initializer, scope, declared) : null;
         quiet = _de.ErrorCount - quiet;
@@ -4389,10 +4389,11 @@ public sealed class TypeChecker
     private FnType FnTypeOf(FunctionSymbol f)
     {
         var fn = (FunctionDecl)f.Declaration!;
-        var ps = fn.Parameters.Select(p => ResolveType(p.Type, _comp.Builtins)).ToArray();
+        // a constraint only goes on as the error type, said where the declaration is checked
+        var ps = fn.Parameters.Select(p => ValueTypeAt(ResolveType(p.Type, _comp.Builtins), null)).ToArray();
         // 'never' is a return type like any other (05 E12): 'panic', 'unreachable' and 'todo' say it
         // in their declarations, and so may any function.
-        var ret = fn.ReturnType is not null ? ResolveType(fn.ReturnType, _comp.Builtins) : LyrType.Void;
+        var ret = fn.ReturnType is not null ? ValueTypeAt(ResolveType(fn.ReturnType, _comp.Builtins), null) : LyrType.Void;
         return new FnType(ps, CoroutineThrowsOf(fn, ret, _comp.Builtins)) { Throws = DeclaredThrowsOf(fn), Places = PlacesOf(fn) };
     }
 
@@ -12152,6 +12153,39 @@ public sealed class TypeChecker
     /// default, its <c>Error</c> (03 M4-1, T6) —; a member typed by <c>Self.Item</c> then has one
     /// signature for every value.</para>
     /// </summary>
+    /// <summary>
+    /// A type written for a value — a binding's, a parameter's, a return — that is an interface no
+    /// value of arises, or an optional of one (05 §7 rule 3, 04 D9): said once where it is written
+    /// (<c>LYR-SEM0126</c>), and the error type from there on, so its uses and its calls say nothing
+    /// more (the review of 2026-10-08; M8c S13). Silent where <paramref name="at"/> is null — a
+    /// signature read again. Lyric 5's: the 4.x line keeps saying it at the transition alone.
+    /// </summary>
+    private LyrType ValueTypeAt(LyrType type, Span? at)
+    {
+        if (!_comp.Lyric5Modules || type.IsError) return type;
+        var inner = type;
+        while (inner is Optional { Inner: var wrapped }) inner = wrapped;
+        if (TypeFacts.KindOf(inner) != TypeSymbolKind.Interface || TypeFacts.SymbolOf(inner) is not { } iface)
+            return type;
+        // ValueUsable reads the interface's members' signatures, which come here again: an
+        // interface being asked about counts as usable inside its own question
+        if (!_askedForValue.Add(iface)) return type;
+        string reason;
+        try
+        {
+            if (ValueUsable(iface, out reason, inner)) return type;
+        }
+        finally { _askedForValue.Remove(iface); }
+        if (at is { } span)
+            _de.Report("LYR-SEM0126", Severity.Error, span,
+                $"'{TypeFacts.Display(inner)}' is usable as a constraint only, not as the type of a value — {reason}; "
+                + $"write 'fn f<T :: [{iface.Name}]>(…)'");
+        return LyrType.Error;
+    }
+
+    /// <summary>The interfaces <see cref="ValueTypeAt"/> is asking about.</summary>
+    private readonly HashSet<TypeSymbol> _askedForValue = new(ReferenceEqualityComparer.Instance);
+
     private bool ValueUsable(TypeSymbol iface, out string reason, LyrType? instance = null)
     {
         foreach (var part in Conformance.WithParents(iface, _binding))

@@ -24,7 +24,7 @@ public static class BenchRun
     /// <paramref name="save"/> and <paramref name="compare"/> are the files the program writes and
     /// reads, full paths or empty. The answer is the program's exit: 0, or 1 where a file could not
     /// be read or written; a refused program is 1 as well, a build that could not run 2.</summary>
-    public static int Run(Project project, BuildProfile profile, CCompiler compiler, string version, string? filter,
+    public static int Run(Project project, BuildProfile profile, Target target, CCompiler compiler, string version, string? filter,
         string save, string compare, TextWriter output, TextWriter error)
     {
         // the scripts first, so that a benchmark may import what they generate (11 W3 BS4, BS6)
@@ -40,9 +40,7 @@ public static class BenchRun
             return 0;
         }
         var program = project with { EntryText = Driver(chosen, save, compare) };
-        var (exit, built) = Pipeline.Build(new BuildRequest(program, profile, Target.Host, compiler, version), error);
-        if (exit != 0 || built is null) return exit;
-        return ProcessRunner.Stream(built, [], output, error);
+        return TestRun.BuildAndRun(program, profile, target, compiler, version, output, error);
     }
 
     /// <summary>The program: each benchmark imported under a name of its own and called from a
