@@ -28,6 +28,12 @@ public sealed record BindingStmt(bool IsMutable, string Name, TypeNode? Type, Ex
     /// <c>defer try f.close();</c> the binding owes its scope, written by the parser at the
     /// keyword — one LIFO list with the scope's other defers. <c>null</c> for a plain binding.</summary>
     public DeferStmt? Cleanup { get; init; }
+
+    /// <summary>A local <c>fn</c> (design/v5/spec/08 F8, F9), which the parser writes as this
+    /// binding: its type the function's, its initializer a lambda of the parameters and the body.
+    /// The name is bound before the lambda is checked — the body calls itself — and a closure that
+    /// captures it holds a cell, filled once the closure stands.</summary>
+    public bool LocalFunction { get; init; }
 }
 
 /// <summary>

@@ -111,6 +111,9 @@ internal sealed class FlowAnalyzer
             case Block b:
                 return AnalyzeStatements(b.Statements, assigned);
             case BindingStmt bd:
+                // a local 'fn' (08 F8) is assigned within its own lambda: the body runs once called,
+                // and the binding holds the closure by then
+                if (bd.LocalFunction && _types.RefOf(bd) is { } own) assigned.Add(own);
                 if (bd.Initializer is not null)
                 {
                     AnalyzeExpr(bd.Initializer, assigned);

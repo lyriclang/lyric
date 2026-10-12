@@ -1315,6 +1315,10 @@ internal sealed class TypeTable
         return mapping;
     }
 
+    /// <summary>The substitution written types are lowered under now: the top of the stack, or
+    /// none.</summary>
+    public IReadOnlyDictionary<string, LyrType>? CurrentSubstitution => _substitutions.Count > 0 ? _substitutions.Peek() : null;
+
     public IDisposable PushSubstitution(IReadOnlyDictionary<string, LyrType> mapping)
     {
         _substitutions.Push(mapping);

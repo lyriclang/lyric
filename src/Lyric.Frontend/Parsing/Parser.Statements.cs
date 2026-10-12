@@ -35,6 +35,8 @@ public sealed partial class Parser
         TokenKind.Identifier when IsLoopAhead(0) => LoopStatement(ParseLoop(null, default)),
         TokenKind.LBrace => ParseBlock(),
         TokenKind.Let or TokenKind.Var => ParseBinding(),
+        // a local 'fn' (08 F8): Lyric 5's; the 4.x grammar has none
+        TokenKind.Fn when _sm.Lyric5 && _buffer.Peek(1).TokenKind == TokenKind.Identifier => ParseLocalFunction(),
         // 'comptime if' and 'comptime for' (design/v5/spec/09 Q2); 'comptime e;' is an
         // expression statement, as any other expression.
         TokenKind.Comptime when _buffer.Peek(1).TokenKind is TokenKind.If or TokenKind.For => ParseComptimeStatement(),
@@ -97,6 +99,39 @@ public sealed partial class Parser
             }
         }
         finally { _loopLabels.RemoveAt(_loopLabels.Count - 1); }
+    }
+
+    /// <summary>
+    /// A local <c>fn</c> (design/v5/spec/08 F8, F9): a named closure — captures as a lambda's, a
+    /// call of itself in its body. Written as the binding it is (<see cref="BindingStmt.LocalFunction"/>):
+    /// the function's type, a lambda of its parameters and body. No type parameters — a closure is
+    /// one function —, no default and no variadic parameter (F9); a body of its own, out of reach of
+    /// the loops around it.
+    /// </summary>
+    private Stmt ParseLocalFunction()
+    {
+        var start = _buffer.Current.Span;
+        var fn = OutsideLoops(() => ParseFunctionDecl(VisibilityWord.None, start));
+        // refused whole: its type parameters would name nothing in the binding it becomes
+        if (fn.Generics.Length > 0)
+        {
+            _de.Report("LYR-PAR0060", Severity.Error, fn.NameSpan,
+                $"a local function takes no type parameters — '{fn.Name}' is one closure, not one per type (08 F9)");
+            return new Block([], fn.Span);
+        }
+        foreach (var p in fn.Parameters)
+            if (p.Default is not null || p.IsParams)
+                _de.Report("LYR-PAR0060", Severity.Error, p.Span,
+                    $"a local function's parameter has no default and is no variadic one: '{p.Name}' (08 F9)");
+        if (fn.Body is null)
+            _de.Report("LYR-PAR0060", Severity.Error, fn.Span, $"a local function has a body: '{fn.Name}'");
+        var body = fn.Body ?? new Block([], fn.Span);
+        var returns = fn.ReturnType ?? new NamedType(["void"], [], fn.NameSpan) { NameSpan = fn.NameSpan };
+        var type = new FunctionType([.. fn.Parameters.Select(p => p.Type)], returns, fn.Span) { Throws = fn.Throws };
+        var lambda = new LambdaExpr([.. fn.Parameters.Select(p => new LambdaParam(p.Name, p.Type, p.Span) { NameSpan = p.NameSpan })],
+            // from the name on: the parameters lie within the lambda, the binding (from 'fn') does not
+            fn.ReturnType, body, Span.Union(fn.NameSpan, body.Span));
+        return new BindingStmt(false, fn.Name, type, lambda, fn.Span) { NameSpan = fn.NameSpan, LocalFunction = true };
     }
 
     /// <summary>The labels of the loops around what is being parsed, innermost last: a name after

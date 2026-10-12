@@ -524,6 +524,14 @@ public sealed class TypeResult
     /// EVERY access site, outside the closure too, because both sides have to see the same
     /// cell.</summary>
     public bool IsBoxed(Symbol symbol) => _boxed.Contains(symbol);
+
+    /// <summary>The lambda literals an <c>inline fn</c>'s call sets in place (design/v5/spec/08 F6):
+    /// no closure, their <c>return</c> the enclosing function's, their loops its loops.</summary>
+    private readonly HashSet<LambdaExpr> _inlineLambdas = new(ReferenceEqualityComparer.Instance);
+
+    public void MarkInlineLambda(LambdaExpr lambda) => _inlineLambdas.Add(lambda);
+
+    public bool IsInlineLambda(LambdaExpr lambda) => _inlineLambdas.Contains(lambda);
 }
 
 /// <summary>What of a call's place a parameter takes where the call leaves it out (09 A11).</summary>

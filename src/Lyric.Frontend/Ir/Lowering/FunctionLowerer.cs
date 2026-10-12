@@ -490,6 +490,9 @@ internal sealed class FunctionLowerer
 
     private TempId LowerLambda(LambdaExpr lambda)
     {
+        // a lambda an inline call sets in place (08 F6) is no closure: its 'return' is not its own
+        if (_types.IsInlineLambda(lambda))
+            throw NotSupported("a lambda an inline function sets in place, on a call path that does not set it in place", lambda.Span);
         if (LowerType(_types.TypeOf(lambda), lambda.Span) is not IrFunctionType signature)
             throw Bug("lambda has no function type");
 
@@ -511,8 +514,8 @@ internal sealed class FunctionLowerer
 
         if (capturesThis)
         {
-            var slot = _thisSlot ?? throw Bug("lambda captures 'this' outside a method");
-            var thisType = _thisType ?? throw Bug("captured 'this' has no type");
+            var slot = ThisSlot ?? throw Bug("lambda captures 'this' outside a method");
+            var thisType = ThisType ?? throw Bug("captured 'this' has no type");
             var value = _slots.NewTemp(thisType);
             _b.Emit(new LoadLocal(value, slot, thisType, lambda.Span));
 
@@ -582,7 +585,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>The receiver type an inner lambda inherits when it captures <c>this</c>.</summary>
-    private TypeSymbol? ReceiverForLambda() => _receiver;
+    private TypeSymbol? ReceiverForLambda() => _inlineThis is { } inlined ? inlined.Receiver : _receiver;
 
     // ------------------------------------------------------------------ cells
 
@@ -691,7 +694,7 @@ internal sealed class FunctionLowerer
                 return Address(type, dest => new AddrLocal(dest, slot, type, span));
             }
             // 'normalize(&this)' in a 'mut fn' (03 T12): the receiver's place, which is the caller's.
-            case ThisExpr when _thisSlot is { } self && _thisType is { } selfType:
+            case ThisExpr when ThisSlot is { } self && ThisType is { } selfType:
                 return Address(selfType, dest => new AddrLocal(dest, self, selfType, span));
             case ThisExpr:
                 throw NotSupported("'&this' inside a lambda", span);
@@ -1730,6 +1733,8 @@ internal sealed class FunctionLowerer
 
     private bool LowerReturn(ReturnStmt stmt)
     {
+        // in the body of an inline function (08 F6), or a lambda its call wrote: the expansion's
+        if (_inline is { } frame) return LowerInlineReturn(stmt, frame);
         // A bare 'return;' in a coroutine body is the ordinary void return below (§10): the
         // body is a void function since format 4.0, and the chain's end is the frame ending —
         // the interpreter marks exhaustion when this frame pops through the resume boundary.
@@ -3214,7 +3219,7 @@ internal sealed class FunctionLowerer
     {
         // 'this = value' in a 'mut fn' of a struct replaces the caller's value as a whole
         // (02 M4): 'this' is the caller's place (M5), and the store reaches it.
-        if (expr.Target is ThisExpr && expr.Operator is null && _thisSlot is { } self && _thisType is { } selfType)
+        if (expr.Target is ThisExpr && expr.Operator is null && ThisSlot is { } self && ThisType is { } selfType)
         {
             var replacement = LowerExprAs(expr.Value, selfType);
             _b.Emit(new StoreLocal(self, replacement, expr.Span));
@@ -3552,7 +3557,7 @@ internal sealed class FunctionLowerer
         // Inside a lambda 'this' is a captured value (02 M8 C2): read from the environment, at
         // the field behind the named captures. A class's 'this' is the shared reference, a
         // struct's the copy taken when the closure was made.
-        if (_thisSlot is null && _capturedThisField is { } field && _envSlot is { } envSlot && _envType is { } envType
+        if (ThisSlot is null && _capturedThisField is { } field && _envSlot is { } envSlot && _envType is { } envType
             && _thisType is { } captured)
         {
             var env = _slots.NewTemp(new IrRefType(envType));
@@ -3562,7 +3567,7 @@ internal sealed class FunctionLowerer
             return self;
         }
 
-        if (_thisSlot is not { } slot || _thisType is not { } type)
+        if (ThisSlot is not { } slot || ThisType is not { } type)
             throw Bug($"'this' reached lowering outside an instance method at {expr.Span}");
 
         var dest = _slots.NewTemp(type);
@@ -5888,6 +5893,18 @@ internal sealed class FunctionLowerer
         var methodArguments = method.Generics.Length > 0
             ? SubstitutedTypeArguments(expr) : [];
 
+        // an inline method (08 F6): set in place, the type's parameters bound by the instance
+        if (declaration is { IsInline: true, Body: not null })
+        {
+            var symbols = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+            for (var i = 0; i < Math.Min(owner.Definition.Generics.Length, owner.Arguments.Length); i++)
+                symbols[owner.Definition.Generics[i]] = owner.Arguments[i];
+            for (var i = 0; i < Math.Min(method.Generics.Length, methodArguments.Length); i++)
+                symbols[method.Generics[i]] = methodArguments[i];
+            return LowerInline(expr, declaration, method.IsStatic ? null : LowerExpr(member.Target), owner.Definition,
+                symbols, InstanceSubstitution(owner, method, methodArguments));
+        }
+
         var target = method.Generics.Length > 0
             ? _instances.Request(method, declaration, $"{owner.Definition.Name}.{method.Name}",
                 method.IsStatic ? null : owner.Definition, methodArguments, _typeTable,
@@ -5953,6 +5970,10 @@ internal sealed class FunctionLowerer
             var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
             if (block.TargetType is not { } pattern || !TypeFacts.Match(pattern, owner, map))
                 throw NotSupported($"'{TypeFacts.Display(owner)}' does not match the block's target", expr.Span);
+            // an inline static of the block (08 F6): set in place under the instance's binding
+            if (declaration is { IsInline: true, Body: not null })
+                return LowerInline(expr, declaration, null, null, map,
+                    map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal));
             var blockTarget = _instances.RequestExtension(method, declaration, block, map, owner, expr.Span);
             var byName = map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal);
             var blockArgs = MaterializeArguments(declaration, ArgumentsOf(expr), member.Member, expr.Span, byName);
@@ -5972,6 +5993,18 @@ internal sealed class FunctionLowerer
         // receiver, which is the only difference -- the request says so by passing none.
         var methodArguments = method.Generics.Length > 0
             ? SubstitutedTypeArguments(expr) : [];
+
+        // an inline method (08 F6): set in place, the type's parameters bound by the instance
+        if (declaration is { IsInline: true, Body: not null })
+        {
+            var symbols = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+            for (var i = 0; i < Math.Min(owner.Definition.Generics.Length, owner.Arguments.Length); i++)
+                symbols[owner.Definition.Generics[i]] = owner.Arguments[i];
+            for (var i = 0; i < Math.Min(method.Generics.Length, methodArguments.Length); i++)
+                symbols[method.Generics[i]] = methodArguments[i];
+            return LowerInline(expr, declaration, method.IsStatic ? null : LowerExpr(member.Target), owner.Definition,
+                symbols, InstanceSubstitution(owner, method, methodArguments));
+        }
 
         var target = method.Generics.Length > 0
             ? _instances.Request(method, declaration, $"{owner.Definition.Name}.{method.Name}",
@@ -6184,11 +6217,12 @@ internal sealed class FunctionLowerer
     {
         if (symbol.Declaration is not FunctionDecl decl || decl.Body is null)
             throw NotSupported($"'{member.Member}' of the block on '{TypeFacts.Display(receiver)}' has no body", expr.Span);
-        FunctionId target;
+        FunctionId target = default;
         Dictionary<string, LyrType>? byName = null;
+        Dictionary<GenericParamSymbol, LyrType>? blockMap = null;
         if (block.Generics.Length == 0 && !block.IsConstructorTarget && receiver is GenericInstance)
         {
-            if (!TryResolveFunction(symbol, out target))
+            if (!decl.IsInline && !TryResolveFunction(symbol, out target))
                 throw NotSupported($"'{member.Member}' of the block on '{TypeFacts.Display(receiver)}' was not lowered", expr.Span);
         }
         else
@@ -6210,7 +6244,8 @@ internal sealed class FunctionLowerer
             foreach (var p in block.Generics)
                 if (!map.ContainsKey(p) && (open?.GetValueOrDefault(p) ?? _types.OpenBlockArgumentsOf(expr)?.GetValueOrDefault(p)) is { } answer)
                     opened.Add(map[p] = SubstituteType(answer));
-            target = _instances.RequestExtension(symbol, decl, block, map, receiver, expr.Span, [.. own, .. opened]);
+            if (!decl.IsInline) target = _instances.RequestExtension(symbol, decl, block, map, receiver, expr.Span, [.. own, .. opened]);
+            blockMap = map;
             byName = map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal);
         }
         // The receiver before the arguments: left to right everywhere (04 D6), as a type's own
@@ -6223,6 +6258,9 @@ internal sealed class FunctionLowerer
                 var other => throw Bug($"a view of all of a '{other}' at {member.Span}"),
             }, member.Span)
             : LowerExpr(member.Target);
+        // an inline method of the block (08 F6): set in place, its parameters bound by the receiver
+        if (decl.IsInline)
+            return LowerInline(expr, decl, self, null, blockMap ?? new Dictionary<GenericParamSymbol, LyrType>(), byName);
         var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span, byName);
         var all = new TempId[passed.Length + 1];
         all[0] = self;
@@ -6670,6 +6708,238 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    // ------------------------------------------------------------------ inline functions (08 F6)
+
+    /// <summary>The expansion of an inline function whose code is being lowered — <c>null</c> for
+    /// the function's own code. A <c>return</c> there goes to the expansion's exit.</summary>
+    private InlineFrame? _inline;
+
+    /// <summary>The receiver of the inline method being expanded: its slot, type and type — the
+    /// <c>this</c> of its body, and of the lambdas that body makes.</summary>
+    private (LocalId Slot, IrType Type, TypeSymbol? Receiver)? _inlineThis;
+
+    private LocalId? ThisSlot => _inlineThis is { } inlined ? inlined.Slot : _thisSlot;
+    private IrType? ThisType => _inlineThis is { } inlined ? inlined.Type : _thisType;
+
+    /// <summary>One expansion: where its value goes, where it ends, the scopes it began over, and
+    /// the lambda literals its call sets in place, by the parameter that holds each.</summary>
+    private sealed class InlineFrame(IrType resultType, LocalId? result, int deferDepth)
+    {
+        public IrType ResultType { get; } = resultType;
+        public LocalId? Result { get; } = result;
+        public int DeferDepth { get; } = deferDepth;
+        public BlockId? Exit { get; private set; }
+        public Dictionary<Symbol, InlineLambda> Lambdas { get; } = new(ReferenceEqualityComparer.Instance);
+        public BlockId ExitBlock(BlockBuilder blocks) => Exit ??= blocks.NewBlock();
+    }
+
+    /// <summary>The context code was written in: its expansion (none for the function's own), its
+    /// receiver, the loops around it, its substitutions. A lambda an inline call sets in place is
+    /// lowered in it — its <c>return</c>, <c>break</c> and <c>continue</c> are that code's.</summary>
+    private sealed record InlineContext(InlineFrame? Frame, (LocalId Slot, IrType Type, TypeSymbol? Receiver)? This,
+        int Loops, IReadOnlyDictionary<GenericParamSymbol, LyrType> Substitution, IReadOnlyDictionary<string, LyrType>? Named);
+
+    private sealed record InlineLambda(LambdaExpr Lambda, InlineContext Context);
+
+    private InlineContext CurrentInlineContext() =>
+        new(_inline, _inlineThis, _loops.Count, _substitution, _typeTable.CurrentSubstitution);
+
+    private static readonly IReadOnlyDictionary<string, LyrType> NoNames = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// A call of an inline function (design/v5/spec/08 F6; 13 M9a P10): its body set in place. The
+    /// arguments are evaluated first, left to right, each once — but a lambda literal at a function
+    /// parameter, which is set in place where the body calls it, in the context it was written in.
+    /// The body's parameters get slots of their own and its receiver one, under the call's type
+    /// arguments; its <c>return</c> stores the value and leaves for the expansion's exit. The call
+    /// has no error edge of its own: the body's throwing sites have theirs, into this function's
+    /// error path.
+    /// </summary>
+    private TempId? LowerInline(CallExpr expr, FunctionDecl decl, TempId? receiver, TypeSymbol? receiverOwner,
+        IReadOnlyDictionary<GenericParamSymbol, LyrType> symbols, IReadOnlyDictionary<string, LyrType>? named)
+    {
+        var resultType = TypeOfExpr(expr);
+        var provided = ArgumentsOf(expr);
+        var parameters = decl.Parameters;
+        var context = CurrentInlineContext();
+        var values = new TempId?[parameters.Length];
+        var lambdas = new Dictionary<Symbol, InlineLambda>(ReferenceEqualityComparer.Instance);
+        for (var i = 0; i < parameters.Length; i++)
+        {
+            var parameter = parameters[i];
+            if (_types.RefOf(parameter) is not ParameterSymbol bound)
+                throw Bug($"parameter '{parameter.Name}' of the inline '{decl.Name}' was not bound by the type checker");
+            var given = i < provided.Length ? provided[i] : null;
+            if (given is LambdaExpr literal && _types.IsInlineLambda(literal))
+            {
+                lambdas[bound] = new InlineLambda(literal, context);
+                continue;
+            }
+            // passed on from the inline function this call stands in (F6): the same lambda
+            if (given is IdentifierExpr forwarded && _types.RefOf(forwarded) is ParameterSymbol held
+                && _inline?.Lambdas.TryGetValue(held, out var passed) == true)
+            {
+                lambdas[bound] = passed;
+                continue;
+            }
+            if (parameter.IsParams)
+            {
+                values[i] = CollectVariadic(parameter, provided, i, expr.Span, named);
+                break;
+            }
+            values[i] = given is not null
+                ? LowerArgument(given, parameter, named)
+                : OmittedArgument(parameters, i, provided, [.. values.Take(i).Select(v => v ?? default)], expr.Span, named)
+                  ?? throw Bug($"call to the inline '{decl.Name}' at {expr.Span} leaves out '{parameter.Name}', which has no default");
+        }
+
+        var frame = new InlineFrame(resultType, IsVoid(resultType) ? null : _slots.DeclareSynthetic("inline", resultType), _defers.Count);
+        foreach (var (held, lambda) in lambdas) frame.Lambdas[held] = lambda;
+        var saved = (_inline, _inlineThis, _substitution);
+        var edged = new HashSet<CallExpr>(_errorEdged, ReferenceEqualityComparer.Instance);
+        var bindings = _slots.Bindings();
+        // a function's body has no value position of its own: the caller's is not the body's
+        var savedSink = _tailSink;
+        _tailSink = null;
+        using (_typeTable.PushSubstitution(named ?? context.Named ?? NoNames))
+        {
+            var own = new Dictionary<GenericParamSymbol, LyrType>(_substitution, ReferenceEqualityComparer.Instance);
+            foreach (var (parameter, argument) in symbols) own[parameter] = argument;
+            _substitution = own;
+            try
+            {
+                if (receiver is { } self)
+                {
+                    var selfType = _slots.TypeOfTemp(self);
+                    var selfSlot = _slots.DeclareSynthetic("inlinethis", selfType);
+                    _b.Emit(new StoreLocal(selfSlot, self, expr.Span));
+                    _inlineThis = (selfSlot, selfType, receiverOwner);
+                }
+                for (var i = 0; i < parameters.Length; i++)
+                {
+                    if (values[i] is not { } value || _types.RefOf(parameters[i]) is not ParameterSymbol bound) continue;
+                    var slot = _slots.DeclareFor(bound, LowerValueType(bound.Type, parameters[i].Span));
+                    _b.Emit(new StoreLocal(slot, value, parameters[i].Span));
+                }
+                _inline = frame;
+                // falling off the end is a void function's return
+                if (LowerScope(decl.Body!)) _b.Seal(new Branch(frame.ExitBlock(_b), decl.Body!.Span));
+            }
+            finally
+            {
+                (_inline, _inlineThis, _substitution) = saved;
+                _errorEdged.Clear();
+                _errorEdged.UnionWith(edged);
+                _slots.Rebind(bindings);
+                _tailSink = savedSink;
+            }
+        }
+        _errorEdged.Add(expr); // no call stands here to edge
+        if (frame.Exit is not { } exit) throw new Diverged();
+        _b.SwitchTo(exit);
+        if (frame.Result is not { } result) return null;
+        var dest = _slots.NewTemp(resultType);
+        _b.Emit(new LoadLocal(dest, result, resultType, expr.Span));
+        return dest;
+    }
+
+    /// <summary>
+    /// The call of a function parameter an inline call set a lambda literal at (08 F6): the
+    /// lambda's body, in place. Its arguments are evaluated here, in the body's context; the body
+    /// is lowered in the context the lambda was written in — its <c>return</c> that code's, the loops
+    /// around it its loops, the inline body's loops out of reach. A block body gives its value as
+    /// its last expression.
+    /// </summary>
+    private TempId? LowerInlineLambda(CallExpr expr, InlineLambda set)
+    {
+        var lambda = set.Lambda;
+        var resultType = TypeOfExpr(expr);
+        var arguments = new TempId[expr.Arguments.Length];
+        var signature = LowerType(_types.TypeOf(expr.Callee), expr.Callee.Span) as IrFunctionType
+            ?? throw Bug("a lambda set in place without a function type");
+        for (var i = 0; i < arguments.Length; i++)
+            arguments[i] = i < signature.Parameters.Length
+                ? LowerExprAs(expr.Arguments[i], signature.Parameters[i])
+                : LowerExpr(expr.Arguments[i]);
+
+        var result = IsVoid(resultType) ? null : (LocalId?)_slots.DeclareSynthetic("lambda", resultType);
+        var saved = (_inline, _inlineThis, _substitution);
+        var edged = new HashSet<CallExpr>(_errorEdged, ReferenceEqualityComparer.Instance);
+        var hidden = new List<LoopScope>();
+        while (_loops.Count > set.Context.Loops) hidden.Add(_loops.Pop());
+        var comesOut = true;
+        using (_typeTable.PushSubstitution(set.Context.Named ?? NoNames))
+        {
+            (_inline, _inlineThis, _substitution) = (set.Context.Frame, set.Context.This, set.Context.Substitution);
+            try
+            {
+                var parameters = lambda.Parameters;
+                for (var i = 0; i < parameters.Length && i < arguments.Length; i++)
+                {
+                    if (_types.RefOf(parameters[i]) is not ParameterSymbol bound) continue;
+                    var slot = _slots.DeclareFor(bound, signature.Parameters[i]);
+                    _b.Emit(new StoreLocal(slot, arguments[i], parameters[i].Span));
+                    if (parameters[i].Pattern is { } pattern)
+                    {
+                        var value = _slots.NewTemp(signature.Parameters[i]);
+                        _b.Emit(new LoadLocal(value, slot, signature.Parameters[i], parameters[i].Span));
+                        LowerPattern(pattern, value, signature.Parameters[i],
+                            () => throw Bug("an irrefutable parameter pattern asked for a failure path"), assumeMatch: true);
+                    }
+                }
+                switch (lambda.Body)
+                {
+                    case Block block:
+                    {
+                        var savedTail = _tailSink;
+                        _tailSink = new TailSink(result, result is null ? null : resultType, AsReturn: false);
+                        try { comesOut = LowerScope(block); }
+                        finally { _tailSink = savedTail; }
+                        break;
+                    }
+                    case Expr body when Diverges(body):
+                        LowerDiverging(body);
+                        comesOut = false;
+                        break;
+                    case Expr body when result is { } slot:
+                        comesOut = ComesOut(() => _b.Emit(new StoreLocal(slot, LowerExprAs(body, resultType), body.Span)));
+                        break;
+                    case Expr body:
+                        comesOut = ComesOut(() => LowerExprOrVoid(body));
+                        break;
+                }
+            }
+            finally
+            {
+                (_inline, _inlineThis, _substitution) = saved;
+                for (var i = hidden.Count - 1; i >= 0; i--) _loops.Push(hidden[i]);
+                _errorEdged.Clear();
+                _errorEdged.UnionWith(edged);
+            }
+        }
+        _errorEdged.Add(expr); // its throwing sites have their edges; no call stands here
+        if (!comesOut || _b.IsSealed) throw new Diverged();
+        if (result is not { } held) return null;
+        var dest = _slots.NewTemp(resultType);
+        _b.Emit(new LoadLocal(dest, held, resultType, expr.Span));
+        return dest;
+    }
+
+    /// <summary>A <c>return</c> in an expansion's code (08 F6): the value into its slot, the scopes
+    /// it leaves closed, and on to its exit.</summary>
+    private bool LowerInlineReturn(ReturnStmt stmt, InlineFrame frame)
+    {
+        if (stmt.Value is { } diverging && Diverges(diverging)) { LowerDiverging(diverging); return false; }
+        if (stmt.Value is { } value)
+        {
+            if (frame.Result is { } slot) _b.Emit(new StoreLocal(slot, LowerExprAs(value, frame.ResultType), stmt.Span));
+            else LowerExprOrVoid(value);
+            if (_b.IsSealed) return false;
+        }
+        if (EmitLeavingDefers(_defers.Count - frame.DeferDepth)) _b.Seal(new Branch(frame.ExitBlock(_b), stmt.Span));
+        return false;
+    }
+
     private TempId? LowerIndirectCall(CallExpr expr)
     {
         if (LowerType(_types.TypeOf(expr.Callee), expr.Callee.Span) is not IrFunctionType signature)
@@ -6801,6 +7071,11 @@ internal sealed class FunctionLowerer
         // module's binding, and 'handler(4)' calls the function it holds.
         var called = _types.RefOf(expr.Callee);
         while (called is ImportBindingSymbol calledThrough) called = calledThrough.Target;
+        // a function parameter of an inline function (08 F6) whose argument is a lambda literal:
+        // its body, set in place
+        if (called is ParameterSymbol inlineParameter && _inline is { } frame
+            && frame.Lambdas.TryGetValue(inlineParameter, out var setInPlace))
+            return LowerInlineLambda(expr, setInPlace);
         if (_types.TypeOf(expr.Callee) is FnType
             && called is null or LocalSymbol or ParameterSymbol or FieldSymbol or GlobalSymbol)
             return LowerIndirectCall(expr);
@@ -7079,6 +7354,17 @@ internal sealed class FunctionLowerer
 
         if (bound is not FunctionSymbol symbol)
             throw NotSupported($"call to '{calleeName}' (not a function or method)", expr.Span);
+
+        // an inline function (08 F6): its body set in place, under the call's type arguments
+        if (symbol.Declaration is FunctionDecl { IsInline: true, Body: not null } inlined)
+        {
+            var symbols = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+            var typeArguments = _types.TypeArgumentsOf(expr);
+            for (var i = 0; i < symbol.Generics.Length && i < typeArguments.Length; i++)
+                symbols[symbol.Generics[i]] = SubstituteType(typeArguments[i]);
+            return LowerInline(expr, inlined, receiver, receiverOwner, symbols,
+                symbol.Generics.Length > 0 ? NamedSubstitutionFor(symbol, _types.TypeArgumentsOf(expr)) : null);
+        }
 
         // std.core's 'filled(n, x)' (M8a S16): the repetition's instruction, sharing.
         if (IsCoreFilled(symbol)) return LowerFilled(expr);
