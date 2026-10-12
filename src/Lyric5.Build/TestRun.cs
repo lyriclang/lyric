@@ -1,6 +1,7 @@
 using System.Text;
 using Lyric.AST;
 using Lyric.Compiler;
+using Lyric.Ir;
 using Lyric5.Toolchain;
 
 namespace Lyric5.Build;
@@ -72,19 +73,21 @@ public static class TestRun
     public static IReadOnlyList<TestCase>? Discover(Project project, TextWriter error) =>
         Marked(project, "Test", error)?.Select(m =>
         {
-            var skip = m.Attribute.Fields.FirstOrDefault(f => f.Name == "skip")?.Value is StringLiteralExpr { Value: var why } ? why : "";
-            var timeout = m.Attribute.Fields.FirstOrDefault(f => f.Name == "timeout")?.Value is IntLiteralExpr { Value: var seconds } ? (long)seconds : 60;
-            var parallel = m.Attribute.Fields.FirstOrDefault(f => f.Name == "parallel")?.Value is BoolLiteralExpr { Value: true };
+            // the attribute's value, evaluated while the package compiled (09 F4): written or defaulted
+            var skip = m.Fields.GetValueOrDefault("skip") is StringConst { Value: var why } ? why : "";
+            var timeout = m.Fields.GetValueOrDefault("timeout") is IntConst { Value: var seconds } ? (long)seconds : 60;
+            var parallel = m.Fields.GetValueOrDefault("parallel") is BoolConst { Value: true };
             return new TestCase(m.Module, m.Function.Name, m.Function.Throws is not null, skip, timeout, parallel);
         }).ToList();
 
     /// <summary>
     /// The package's functions marked with std.core's <paramref name="attribute"/> — <c>Test</c>,
     /// <c>Bench</c> — module by module in the order of their paths, each module's in the order they
-    /// are written, with the module's path and the mark. One compilation of every module under
-    /// <c>src/</c> and <c>tests/</c>; <c>null</c> after reporting a program the compiler refuses.
+    /// are written, with the module's path, the mark and the mark's fields by name as the compilation
+    /// evaluated them (09 F4). One compilation of every module under <c>src/</c> and <c>tests/</c>;
+    /// <c>null</c> after reporting a program the compiler refuses.
     /// </summary>
-    internal static IReadOnlyList<(string Module, FunctionDecl Function, AttributeNode Attribute)>? Marked(
+    internal static IReadOnlyList<(string Module, FunctionDecl Function, AttributeNode Attribute, IReadOnlyDictionary<string, IrConstValue> Fields)>? Marked(
         Project project, string attribute, TextWriter error)
     {
         var manifest = project.Manifest!;
@@ -122,7 +125,10 @@ public static class TestRun
         }
 
         var mark = model.Compilation.FindModule(["std", "core"])?.Members.LookupLocal(attribute);
-        var found = new List<(string, FunctionDecl, AttributeNode)>();
+        var found = new List<(string, FunctionDecl, AttributeNode, IReadOnlyDictionary<string, IrConstValue>)>();
+        // the struct's fields in their order, which is the order of the value's (its layout)
+        var fieldNames = ((mark as Lyric.Resolver.TypeSymbol)?.Declaration as StructDecl)?.Members.OfType<FieldDecl>()
+            .Select(f => f.Name).ToArray() ?? [];
         foreach (var module in model.Compilation.Modules
                      .Where(m => m.Path.Length > 1 && m.Path[0] == manifest.Name)
                      .OrderBy(m => string.Join('.', m.Path), StringComparer.Ordinal))
@@ -130,7 +136,11 @@ public static class TestRun
             foreach (var fn in model.Compilation.AstOf(module).Declarations.OfType<FunctionDecl>())
             {
                 if (fn.Attributes.FirstOrDefault(a => ReferenceEquals(model.Types.RefOf(a), mark)) is not { } marked) continue;
-                found.Add((string.Join('.', module.Path), fn, marked));
+                var fields = new Dictionary<string, IrConstValue>(StringComparer.Ordinal);
+                if (model.Types.AttributeValueOf(marked) is { } site
+                    && result.ComptimeValues?.GetValueOrDefault(model.Types.ComptimeSites.IndexOf(site)) is StructConst value)
+                    for (var i = 0; i < Math.Min(fieldNames.Length, value.Fields.Length); i++) fields[fieldNames[i]] = value.Fields[i];
+                found.Add((string.Join('.', module.Path), fn, marked, fields));
             }
         }
         return found;

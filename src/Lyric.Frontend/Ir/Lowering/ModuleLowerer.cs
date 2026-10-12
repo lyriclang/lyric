@@ -411,6 +411,16 @@ public static class ModuleLowerer
                 globalInit = nextId.Next();
                 downstreamSeed.Add((globalInit.Value,
                     GlobalInitializer.Build(globals, types, ids, imports, typeTable, lambdas, instances)));
+                // The hoisting pass gives each global an initializer of its own as well, which the
+                // interpreter runs at the global's first access (13 M9a S5); roots, so the pruning
+                // keeps them.
+                if (comptime is { Hoist: true })
+                    foreach (var (_, each) in GlobalInitializer.BuildEach(globals, types, ids, imports, typeTable, lambdas, instances))
+                    {
+                        var id = nextId.Next();
+                        downstreamSeed.Add((id, each));
+                        exportRoots.Add(id);
+                    }
             }
             catch (UnsupportedConstructException ex)
             {
@@ -556,8 +566,11 @@ public static class ModuleLowerer
         // Attribute rows AFTER the function lowering and BEFORE the module is assembled: function
         // ids are final here, and the rows may still intern types — an attribute struct nobody
         // constructs, or an attributed type nobody uses, enters the table exactly because the row
-        // references it.
-        var attributes = CollectAttributes(compilation, types, ids, typeTable);
+        // references it. Lyric 5 writes none (09 F4; 13 M9a P7): an attribute is a value the
+        // build evaluates and its readers take from there, and an attributed function is no root
+        // (01 B13) — a test is reached from the program 'lyric test' writes, a benchmark from
+        // 'lyric bench''s.
+        var attributes = compilation.Lyric5Modules ? [] : CollectAttributes(compilation, types, ids, typeTable);
 
         var result = new IrModule(functions)
         {

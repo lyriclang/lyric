@@ -225,6 +225,7 @@ public sealed class TypeChecker
         _range = core?.LookupLocal("Range") as TypeSymbol;
         _rangeInclusive = core?.LookupLocal("RangeInclusive") as TypeSymbol;
         _box = core?.LookupLocal("Box") as TypeSymbol;
+        _coreMembers = core;
         _ordered = core?.LookupLocal("Ordered") as TypeSymbol;
         _add = core?.LookupLocal("Add") as TypeSymbol;
         _sub = core?.LookupLocal("Sub") as TypeSymbol;
@@ -289,6 +290,9 @@ public sealed class TypeChecker
     /// <summary>std.core's <c>Box</c> (02 M13): the one class whose value a <c>comptime</c> site
     /// may leave behind — its value is fixed, so a fresh box is as good as the evaluated one.</summary>
     private readonly TypeSymbol? _box;
+
+    /// <summary>std.core's members: the attribute markers by name (09 F1).</summary>
+    private readonly SymbolTable? _coreMembers;
 
     /// <summary>What <c>[x] * n</c> asks of an element that is or holds an object (03 §5.1,
     /// 10 C7), under the same rules.</summary>
@@ -373,7 +377,7 @@ public sealed class TypeChecker
         {
             _currentModule = module;
             var ast = _comp.AstOf(module);
-            CheckAttributes(ast.Attributes, AttributeTarget.Module, targetIsGeneric: false,
+            CheckAttributes(ast.Attributes, AttributeSite.Module, targetIsGeneric: false,
                 module.Members, "the module header");
             CheckOverloadSets(module.Members, $"module '{module.FullName}'", inInterface: false);
             foreach (var decl in ast.Declarations)
@@ -560,14 +564,14 @@ public sealed class TypeChecker
         switch (decl)
         {
             case FunctionDecl fn:
-                var fnAttributes = CheckAttributes(fn.Attributes, AttributeTarget.Function, fn.Generics.Length > 0,
+                var fnAttributes = CheckAttributes(fn.Attributes, AttributeSite.Function, fn.Generics.Length > 0,
                     module.Members, "a function");
                 if (fnAttributes.Exists(IsCanonicalTest)) CheckTest(fn, module);
                 RequireBody(fn, module);
                 CheckFunction(fn, module.Members, thisType: null);
                 break;
             case StructDecl s:
-                CheckAttributes(s.Attributes, AttributeTarget.Type, s.Generics.Length > 0,
+                CheckAttributes(s.Attributes, AttributeSite.Type, s.Generics.Length > 0,
                     module.Members, "a struct");
                 CheckValueTypeIsFinite(s, s.Name, "struct", module);
                 if (module.Members.LookupLocal(s.Name) is TypeSymbol sType)
@@ -576,7 +580,7 @@ public sealed class TypeChecker
                 CheckTypeConformance(s.Name, s.Interfaces, module, s.Delegates);
                 break;
             case ClassDecl c:
-                CheckAttributes(c.Attributes, AttributeTarget.Type, c.Generics.Length > 0,
+                CheckAttributes(c.Attributes, AttributeSite.Type, c.Generics.Length > 0,
                     module.Members, "a class");
                 if (module.Members.LookupLocal(c.Name) is TypeSymbol cType)
                     CheckOverloadSets(cType.Members, $"'{c.Name}'", inInterface: false);
@@ -584,8 +588,11 @@ public sealed class TypeChecker
                 CheckTypeConformance(c.Name, c.Interfaces, module, c.Delegates);
                 break;
             case EnumDecl e:
-                CheckAttributes(e.Attributes, AttributeTarget.Type, e.Generics.Length > 0,
+                CheckAttributes(e.Attributes, AttributeSite.Type, e.Generics.Length > 0,
                     module.Members, "an enum");
+                foreach (var variant in e.Variants)
+                    CheckAttributes(variant.Attributes, AttributeSite.Variant, e.Generics.Length > 0,
+                        module.Members, "a variant");
                 CheckValueTypeIsFinite(e, e.Name, "enum", module);
                 if (module.Members.LookupLocal(e.Name) is TypeSymbol eType)
                     CheckOverloadSets(eType.Members, $"'{e.Name}'", inInterface: false);
@@ -593,6 +600,11 @@ public sealed class TypeChecker
                 CheckTypeConformance(e.Name, e.Interfaces, module);
                 break;
             case InterfaceDecl i:
+                CheckAttributes(i.Attributes, AttributeSite.Interface, i.Generics.Length > 0,
+                    module.Members, "an interface");
+                foreach (var type in i.Types)
+                    CheckAttributes(type.Attributes, AttributeSite.AssociatedType, i.Generics.Length > 0,
+                        module.Members, "an associated type");
                 CheckInterfaceParents(i, module);
                 RequireSealedInModule(i.Interfaces, module, i.Name);
                 // An interface's members are public always (design/v5/spec/04 D14): a conformance
@@ -619,6 +631,19 @@ public sealed class TypeChecker
                 CheckMethods(i.Name, i.Members, module);
                 break;
             // ExtendDecl goes to CheckExtensionBlocks after all types; GlobalBindingDecl to ComputeGlobals.
+            // Their attributes, and an alias's, are checked here (Lyric 5, 09 T7).
+            case ExtendDecl x:
+                CheckAttributes(x.Attributes, AttributeSite.Extend, x.Generics.Length > 0,
+                    module.Members, "an extend block");
+                break;
+            case GlobalBindingDecl g:
+                CheckAttributes(g.Attributes, AttributeSite.Binding, targetIsGeneric: false,
+                    module.Members, "a module-level binding");
+                break;
+            case TypeAliasDecl alias:
+                CheckAttributes(alias.Attributes, AttributeSite.Alias, alias.Generics.Length > 0,
+                    module.Members, "a type alias");
+                break;
         }
     }
 
@@ -784,7 +809,12 @@ public sealed class TypeChecker
                 FieldDecl mfd => mfd.Attributes,
                 _ => [],
             };
-            CheckAttributes(memberAttributes, AttributeTarget.Member,
+            CheckAttributes(memberAttributes, m switch
+                {
+                    FunctionDecl => AttributeSite.Method,
+                    StaticBindingDecl => AttributeSite.StaticLet,
+                    _ => AttributeSite.Field,
+                },
                 targetIsGeneric: ts.Generics.Length > 0, ts.Members, "a member");
 
             // Typed and checked with the module's bindings (ComputeGlobals).
@@ -1085,13 +1115,13 @@ public sealed class TypeChecker
         var thisType = SelfType(ts);
         foreach (var fn in e.Methods)
         {
-            CheckAttributes(fn.Attributes, AttributeTarget.Member,
+            CheckAttributes(fn.Attributes, AttributeSite.Method,
                 targetIsGeneric: ts.Generics.Length > 0, ts.Members, "a member");
             CheckFunction(fn, ts.Members, thisType);
         }
         // Typed and checked with the module's bindings, as a struct's are; their attributes here.
         foreach (var sb in e.Statics)
-            CheckAttributes(sb.Attributes, AttributeTarget.Member,
+            CheckAttributes(sb.Attributes, AttributeSite.StaticLet,
                 targetIsGeneric: ts.Generics.Length > 0, ts.Members, "a member");
     }
 
@@ -1161,7 +1191,7 @@ public sealed class TypeChecker
                 : new NamedRef(block.Target);
         foreach (var fn in block.Decl.Methods)
         {
-            CheckAttributes(fn.Attributes, AttributeTarget.Member,
+            CheckAttributes(fn.Attributes, AttributeSite.Method,
                 targetIsGeneric: false, block.MethodScope, "a member");
             CheckFunction(fn, block.MethodScope, thisType);
         }
@@ -1198,7 +1228,7 @@ public sealed class TypeChecker
                 CheckBlockConformance(block);
                 foreach (var fn in block.Decl.Methods)
                 {
-                    CheckAttributes(fn.Attributes, AttributeTarget.Member, targetIsGeneric: false, block.MethodScope, "a member");
+                    CheckAttributes(fn.Attributes, AttributeSite.Method, targetIsGeneric: false, block.MethodScope, "a member");
                     CheckFunction(fn, block.MethodScope, BlockTargetType(block));
                 }
                 continue;
@@ -1211,7 +1241,7 @@ public sealed class TypeChecker
                 CheckBlockConformance(block);
                 foreach (var fn in block.Decl.Methods)
                 {
-                    CheckAttributes(fn.Attributes, AttributeTarget.Member, targetIsGeneric: false, block.MethodScope, "a member");
+                    CheckAttributes(fn.Attributes, AttributeSite.Method, targetIsGeneric: false, block.MethodScope, "a member");
                     CheckFunction(fn, block.MethodScope, BlockTargetType(block));
                 }
                 continue;
@@ -9522,6 +9552,38 @@ public sealed class TypeChecker
 
     private enum AttributeTarget { Module, Type, Function, Member }
 
+    /// <summary>Where an attribute stands in Lyric 5 (design/v5/spec/09 T7): on every declaration.</summary>
+    private enum AttributeSite { Module, Function, Method, Field, StaticLet, Variant, Parameter, Type, Interface, Alias, Extend, Binding, AssociatedType }
+
+    /// <summary>The markers that admit an attribute at a site (09 F1): its own kind first, then
+    /// the wider sets that hold it — the first is what a refusal names. The markers inherit
+    /// nothing; this table is the hierarchy.</summary>
+    private static string[] Admitting(AttributeSite site) => site switch
+    {
+        AttributeSite.Module => ["OnModule", "OnAny"],
+        AttributeSite.Function => ["OnFunction", "OnCallable", "OnTopLevel", "OnDecl", "OnAny"],
+        AttributeSite.Method => ["OnMethod", "OnCallable", "OnMember", "OnDecl", "OnAny"],
+        AttributeSite.Field => ["OnField", "OnMember", "OnDecl", "OnAny"],
+        AttributeSite.StaticLet => ["OnMember", "OnDecl", "OnAny"],
+        AttributeSite.Variant => ["OnVariant", "OnMember", "OnDecl", "OnAny"],
+        AttributeSite.Parameter => ["OnParameter", "OnDecl", "OnAny"],
+        AttributeSite.Type => ["OnType", "OnTypeLike", "OnTopLevel", "OnDecl", "OnAny"],
+        AttributeSite.Interface => ["OnInterface", "OnTypeLike", "OnTopLevel", "OnDecl", "OnAny"],
+        AttributeSite.Alias => ["OnAlias", "OnTypeLike", "OnTopLevel", "OnDecl", "OnAny"],
+        AttributeSite.Extend => ["OnExtend", "OnTopLevel", "OnAny"],
+        AttributeSite.Binding => ["OnTopLevel", "OnDecl", "OnAny"],
+        _ => ["OnMember", "OnDecl", "OnAny"], // an associated type
+    };
+
+    /// <summary>The 4.x target a site was: the module, a type, a function, a member.</summary>
+    private static AttributeTarget TargetOf(AttributeSite site) => site switch
+    {
+        AttributeSite.Module => AttributeTarget.Module,
+        AttributeSite.Type or AttributeSite.Interface or AttributeSite.Alias => AttributeTarget.Type,
+        AttributeSite.Function => AttributeTarget.Function,
+        _ => AttributeTarget.Member,
+    };
+
     private static string MarkerName(AttributeTarget target) => target switch
     {
         AttributeTarget.Module => "OnModule",
@@ -9541,7 +9603,7 @@ public sealed class TypeChecker
     /// </summary>
     /// <returns>The attributes' types, each once: what a declaration's own rules ask after
     /// (<see cref="CheckTest"/>).</returns>
-    private List<TypeSymbol> CheckAttributes(AttributeNode[] attributes, AttributeTarget target,
+    private List<TypeSymbol> CheckAttributes(AttributeNode[] attributes, AttributeSite site,
         bool targetIsGeneric, SymbolTable scope, string targetDescription)
     {
         // Duplicates by resolved symbol, not by written path: two spellings of one type are still
@@ -9549,7 +9611,9 @@ public sealed class TypeChecker
         var seen = new List<TypeSymbol>();
         foreach (var attribute in attributes)
         {
-            var ts = CheckAttribute(attribute, target, targetIsGeneric, scope, targetDescription);
+            var ts = _comp.Lyric5Modules
+                ? CheckAttribute5(attribute, site, targetIsGeneric, scope, targetDescription)
+                : CheckAttribute(attribute, TargetOf(site), targetIsGeneric, scope, targetDescription);
             if (ts is null) continue;
             if (seen.Contains(ts))
                 _de.Report("LYR-SEM0068", Severity.Error, attribute.PathSpan,
@@ -9712,6 +9776,83 @@ public sealed class TypeChecker
                     : $"'@{ts.Name}' leaves '{field.Name}' to a default that is not a value at "
                       + "compile time — a literal, or a 'let' whose initializer is one");
         }
+        return ts;
+    }
+
+    /// <summary>
+    /// A Lyric 5 attribute (design/v5/spec/09 A1–A3, F1, F4; 13 M9a P7): a struct that declares a
+    /// marker admitting the site (<see cref="Admitting"/>), whose value is the struct it writes —
+    /// made a <c>comptime</c> site and checked as its initializer is: field names, types,
+    /// defaults. One value, which the build evaluates and the runner and the warnings read. The
+    /// parenthesized form fills the one field without a default.
+    /// </summary>
+    private TypeSymbol? CheckAttribute5(AttributeNode attribute, AttributeSite site, bool targetIsGeneric,
+        SymbolTable scope, string targetDescription)
+    {
+        // the 4.x call sites call every member "a member"; Lyric 5 names the kind
+        targetDescription = site switch
+        {
+            AttributeSite.Method => "a method",
+            AttributeSite.Field => "a field",
+            AttributeSite.StaticLet => "a 'static let'",
+            _ => targetDescription,
+        };
+        var (sym, _) = ResolveInitPath(attribute.Path, scope, attribute.PathSpan);
+        var written = string.Join('.', attribute.Path);
+        var admitting = Admitting(site);
+        if (sym is null)
+        {
+            Report(attribute.PathSpan, "LYR-SEM0011", $"unknown type '{written}'",
+                attribute.Path is [var single] ? NameSuggestion.Note(single, NamesIn(scope, typesOnly: true)) : null);
+            foreach (var f in attribute.Fields) CheckExpr(f.Value, scope);
+            return null;
+        }
+        if (sym is not TypeSymbol { Kind: TypeSymbolKind.Struct } ts)
+        {
+            _de.Report("LYR-SEM0065", Severity.Error, attribute.PathSpan,
+                $"'@{written}' is not an attribute — an attribute is a struct declaring a marker, here '{admitting[0]}'");
+            foreach (var f in attribute.Fields) CheckExpr(f.Value, scope);
+            return null;
+        }
+        _result.BindRef(attribute, ts);
+        if (ts.Generics.Length > 0)
+        {
+            _de.Report("LYR-SEM0065", Severity.Error, attribute.PathSpan,
+                $"a generic type cannot be an attribute — '@{ts.Name}' would leave its type arguments to no one");
+            return ts;
+        }
+        if (!admitting.Any(name => _coreMembers?.LookupLocal(name) is TypeSymbol marker
+                                   && Satisfies(new NamedRef(ts), marker, new NamedRef(marker))))
+        {
+            _de.Report("LYR-SEM0065", Severity.Error, attribute.PathSpan,
+                $"'@{ts.Name}' cannot sit on {targetDescription} — declare '{ts.Name}' with ':: [{admitting[0]}]', "
+                + $"or a marker whose set holds it ({string.Join(", ", admitting.Skip(1))}), to allow it here");
+            return ts;
+        }
+        if (targetIsGeneric)
+            _de.Report("LYR-SEM0067", Severity.Error, attribute.PathSpan,
+                "an attribute cannot sit on a generic declaration — one value would stand for every instance");
+
+        var fields = attribute.Fields.ToList();
+        if (attribute.Positional is { } positional)
+        {
+            var open = ((ts.Declaration as StructDecl)?.Members.OfType<FieldDecl>() ?? []).Where(f => f.Default is null).ToList();
+            if (open.Count != 1 || fields.Count > 0)
+            {
+                _de.Report("LYR-SEM0094", Severity.Error, attribute.Span,
+                    $"'@{ts.Name}' does not take a parenthesized value — the form fills the one field without a default, "
+                    + (open.Count == 1 ? "and the fields are written by name here as well" : $"and '{ts.Name}' has {open.Count}"));
+                CheckExpr(positional, scope);
+                return ts;
+            }
+            fields.Add(new StructInitField(open[0].Name, positional, positional.Span) { NameSpan = positional.Span });
+        }
+        // The value (09 F4): the struct the attribute writes, computed while the program compiles.
+        var value = new ComptimeExpr(
+            new StructInitExpr(attribute.Path, [], [.. fields], attribute.Span) { NameSpan = attribute.NameSpan },
+            attribute.Span);
+        CheckExpr(value, scope);
+        _result.SetAttributeValue(attribute, value);
         return ts;
     }
 
@@ -12934,6 +13075,12 @@ public sealed class TypeChecker
             var written = string.Join('.', attribute.Path);
             if (sym is not TypeSymbol ts || !ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("callerExpr")))
             {
+                // Lyric 5: a parameter carries what declares a marker for it (09 T7)
+                if (_comp.Lyric5Modules && sym is TypeSymbol)
+                {
+                    CheckAttribute5(attribute, AttributeSite.Parameter, fn.Generics.Length > 0, scope, "a parameter");
+                    continue;
+                }
                 _de.Report(sym is null ? "LYR-SEM0011" : "LYR-SEM0065", Severity.Error, attribute.PathSpan,
                     sym is null
                         ? $"unknown type '{written}'"

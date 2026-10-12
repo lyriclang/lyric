@@ -97,9 +97,9 @@ public static class ComptimeEvaluator
             "LYR-CT0001" => $"the evaluation panicked: {failure.Message} ({failure.RuntimeCode} at run time)",
             _ => failure.Message,
         };
-        // the globals are filled at the first access to one: then the stack holds their filling
-        if (failure.Trace.Any(t => t.Function.EndsWith("<globals>", StringComparison.Ordinal)))
-            message += " — while filling the globals the evaluation reads";
+        // a global is filled at its first access: then the stack holds its filling
+        if (failure.Trace.Any(t => t.Function.Contains("<global", StringComparison.Ordinal)))
+            message += " — while filling a global the evaluation reads";
         // The site's own function stands at the bottom and is the site: the frames above it are
         // where the evaluation went.
         var frames = failure.Trace.Where(t => !t.Function.Contains("<comptime:", StringComparison.Ordinal)).ToList();

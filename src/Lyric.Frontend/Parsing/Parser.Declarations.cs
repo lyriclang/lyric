@@ -247,37 +247,27 @@ public sealed partial class Parser
             case TokenKind.Enum:
                 return WithAttributes(ParseEnum(isPublic, start), attributes);
             case TokenKind.Interface:
-                RejectAttributes(attributes, "an interface");
-                return ParseInterface(isPublic, start, isSealed);
+                return Attach(ParseInterface(isPublic, start, isSealed), attributes, "an interface");
             case TokenKind.Extend:
-                RejectAttributes(attributes, "an extend block");
-                return ParseExtend(isPublic, start);
+                return Attach(ParseExtend(isPublic, start), attributes, "an extend block");
             case TokenKind.Let:
             case TokenKind.Var:
-                RejectAttributes(attributes, "a global binding");
-                return ParseGlobalBinding(isPublic, start);
+                return Attach(ParseGlobalBinding(isPublic, start), attributes, "a global binding");
 
             default:
                 if (AtContextual("type"))
-                {
-                    RejectAttributes(attributes, "a type alias");
-                    return ParseTypeAlias(isPublic, isOpaque: false, start);
-                }
+                    return Attach(ParseTypeAlias(isPublic, isOpaque: false, start), attributes, "a type alias");
                 // 'extern "dotnet" fn f(x: int): int = "System.Math::Abs";' — contextual like
                 // 'type': the word stays an identifier everywhere else, so no program that names
                 // something 'extern' loses that name.
                 if (AtContextual("extern") && _buffer.Peek(1).TokenKind == TokenKind.StringLiteral)
-                {
-                    RejectAttributes(attributes, "an extern declaration");
-                    return ParseExternDecl(isPublic, start);
-                }
+                    return Attach(ParseExternDecl(isPublic, start), attributes, "an extern declaration");
                 // 'opaque type X = int;' — contextual like 'type' itself: neither word is a
                 // keyword, so neither is taken from anyone's identifiers.
                 if (AtContextual("opaque") && PeekContextual(1, "type"))
                 {
-                    RejectAttributes(attributes, "a type alias");
                     _buffer.Advance(); // 'opaque'
-                    return ParseTypeAlias(isPublic, isOpaque: true, start);
+                    return Attach(ParseTypeAlias(isPublic, isOpaque: true, start), attributes, "a type alias");
                 }
                 if (attributes.Length > 0)
                 {
@@ -328,6 +318,27 @@ public sealed partial class Parser
         _de.Report("LYR-PAR0042", Severity.Error, attributes[0].Span,
             $"an attribute cannot sit on {what} — a function, a struct, a class, an enum, "
             + "a member of one, or the module header carries one");
+    }
+
+    /// <summary>In Lyric 5 every declaration carries attributes (design/v5/spec/09 T7); the 4.x
+    /// parser refuses them where its module format had no row for them.</summary>
+    private Decl Attach(Decl decl, AttributeNode[] attributes, string what)
+    {
+        if (attributes.Length == 0) return decl;
+        if (!_sm.Lyric5)
+        {
+            RejectAttributes(attributes, what);
+            return decl;
+        }
+        return decl switch
+        {
+            InterfaceDecl i => i with { Attributes = attributes },
+            ExtendDecl x => x with { Attributes = attributes },
+            GlobalBindingDecl g => g with { Attributes = attributes },
+            TypeAliasDecl t => t with { Attributes = attributes },
+            FunctionDecl f => f with { Attributes = attributes },
+            _ => decl, // recovery produced an ErrorDecl; the list is lost with the declaration
+        };
     }
 
     private static Decl WithAttributes(Decl decl, AttributeNode[] attributes) => decl switch
@@ -689,6 +700,8 @@ public sealed partial class Parser
         var membersBegin = false;
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.Check(TokenKind.Semicolon) && !_buffer.AtEnd)
         {
+            // attributes before a variant's name (Lyric 5, 09 T7); before a member they are the member's
+            var variantAttributes = AtAttributedVariant() ? ParseAttributeList() : [];
             // A member where a variant's name is expected: the ';' that ends the variants is
             // missing. Said once, and the members are read as what they are — 'static' and 'let'
             // were taken for two variants, and what was synthesized from those names failed to
@@ -711,7 +724,7 @@ public sealed partial class Parser
                 continue;
             }
             var before = _buffer.Position;
-            variants.Add(ParseEnumVariant());
+            variants.Add(ParseEnumVariant() with { Attributes = variantAttributes });
             if (_buffer.Position == before) { _buffer.Advance(); continue; }
             if (!_buffer.Match(TokenKind.Comma)) break;
         }
@@ -740,6 +753,50 @@ public sealed partial class Parser
             || (at == 0 && AtContextual("type") && _buffer.Peek(1).TokenKind == TokenKind.Identifier
                 && _buffer.Peek(2).TokenKind == TokenKind.Equal);
     }
+
+    /// <summary>Do attributes stand here before a variant's name — not before a member's start
+    /// (Lyric 5, 09 T7)? Read ahead over the list: each <c>@Name</c> with its dotted path and its
+    /// braces or parentheses, each <c>@[…]</c> group, balanced.</summary>
+    private bool AtAttributedVariant()
+    {
+        if (!_sm.Lyric5 || !AtAttributeStart) return false;
+        var at = 0;
+        while (true)
+        {
+            var kind = _buffer.Peek(at).TokenKind;
+            if (kind == TokenKind.AtLBracket)
+                at = PastBalanced(at);
+            else if (kind == TokenKind.AtIdentifier)
+            {
+                at++;
+                while (_buffer.Peek(at).TokenKind == TokenKind.Dot && _buffer.Peek(at + 1).TokenKind == TokenKind.Identifier)
+                    at += 2;
+                if (_buffer.Peek(at).TokenKind is TokenKind.LBrace or TokenKind.LParen) at = PastBalanced(at);
+            }
+            else
+                return kind == TokenKind.Identifier && !(AtContextualAt(at, "type") && _buffer.Peek(at + 1).TokenKind == TokenKind.Identifier);
+        }
+    }
+
+    /// <summary>The offset past the bracket that opens at <paramref name="at"/> and its match.</summary>
+    private int PastBalanced(int at)
+    {
+        var depth = 0;
+        do
+        {
+            switch (_buffer.Peek(at).TokenKind)
+            {
+                case TokenKind.LBrace or TokenKind.LParen or TokenKind.LBracket or TokenKind.AtLBracket: depth++; break;
+                case TokenKind.RBrace or TokenKind.RParen or TokenKind.RBracket: depth--; break;
+                case TokenKind.Eof: return at;
+            }
+            at++;
+        } while (depth > 0);
+        return at;
+    }
+
+    private bool AtContextualAt(int at, string word) =>
+        _buffer.Peek(at).TokenKind == TokenKind.Identifier && _sm.Slice(_buffer.Peek(at).Span).ToString() == word;
 
     private EnumVariant ParseEnumVariant()
     {
@@ -851,16 +908,18 @@ public sealed partial class Parser
     {
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
-            if (types is not null && AtContextual("type") && _buffer.Peek(1).TokenKind == TokenKind.Identifier)
-            {
-                types.Add(ParseAssociatedType());
-                continue;
-            }
             var attributes = AtAttributeStart ? ParseAttributeList() : [];
             if (attributes.Length > 0 && !allowAttributes)
             {
                 RejectAttributes(attributes, "an interface member");
                 attributes = [];
+            }
+            if (types is not null && AtContextual("type") && _buffer.Peek(1).TokenKind == TokenKind.Identifier)
+            {
+                // an associated type carries attributes in Lyric 5 (09 T7)
+                if (attributes.Length > 0 && !_sm.Lyric5) RejectAttributes(attributes, "an associated type");
+                types.Add(ParseAssociatedType() with { Attributes = _sm.Lyric5 ? attributes : [] });
+                continue;
             }
 
             var before = _buffer.Position;

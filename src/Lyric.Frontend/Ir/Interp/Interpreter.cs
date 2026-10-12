@@ -37,7 +37,14 @@ public sealed class Interpreter
         _budget = budget;
         _overflowChecks = overflowChecks;
         _globals = module.Globals.Select(g => Zero(g.Type)).ToArray();
+        _globalState = new byte[_globals.Length];
+        _globalFailed = new ComptimeFailure?[_globals.Length];
         foreach (var impl in module.Impls) _impls[(impl.Type.Value, impl.Interface.Value)] = impl;
+        // each global's own initializer, which the hoisting lowering names by its slot
+        for (var i = 0; i < module.Functions.Count; i++)
+            if (module.Functions[i].Name.StartsWith("<global:", StringComparison.Ordinal)
+                && int.TryParse(module.Functions[i].Name.AsSpan(8, module.Functions[i].Name.Length - 9), out var slot))
+                _globalInits[slot] = new FunctionId(i);
         _natives = new Natives(this) { Embed = embed };
     }
 
@@ -49,26 +56,37 @@ public sealed class Interpreter
     /// <summary>The budget whole again: each evaluation has its own (09 Q5 "je Auswertung").</summary>
     public void Refill() => _budget = _budgetLimit;
 
-    private bool _globalsFilled;
-    private ComptimeFailure? _globalsFailed;
+    /// <summary>Per global: 0 not filled yet, 1 being filled, 2 filled.</summary>
+    private readonly byte[] _globalState;
+    private readonly ComptimeFailure?[] _globalFailed;
+    private readonly Dictionary<int, FunctionId> _globalInits = new();
 
-    /// <summary>The module's globals filled, as a program's are before its entry (07 G2) — at the
-    /// first access to one, so a site that reads no global does not stop on one that cannot be
-    /// filled at compile time (<c>std.path</c> asks the system whether it runs on Windows). One
-    /// that could not be filled stops every access after it, rather than reading a zero.</summary>
-    private void FillGlobals()
+    /// <summary>
+    /// A global filled at its first access (13 M9a S5), by the initializer the hoisting lowering
+    /// gave it alone — so code run at compile time runs no initializer it does not read, and a
+    /// module's that cannot run there (<c>std.path</c> asks the system whether it runs on Windows)
+    /// stops only what reads it. One that could not be filled stops every access to it, rather
+    /// than reading a zero. A global read while it is being filled reads its zero, as a program
+    /// reads a later one before its turn (07 G2).
+    /// </summary>
+    private void FillGlobal(int global)
     {
-        if (_globalsFailed is { } failed) throw failed.Copy();
-        if (_globalsFilled) return;
-        _globalsFilled = true;
-        if (_module.GlobalInit is not { } init) return;
+        if (_globalFailed[global] is { } failed) throw failed.Copy();
+        if (_globalState[global] != 0) return;
+        _globalState[global] = 1;
+        if (!_globalInits.TryGetValue(global, out var init))
+        {
+            _globalState[global] = 2;
+            return;
+        }
         try
         {
             Run(init);
+            _globalState[global] = 2;
         }
         catch (ComptimeFailure failure)
         {
-            _globalsFailed = failure.Copy();
+            _globalFailed[global] = failure.Copy();
             throw;
         }
     }
@@ -247,11 +265,11 @@ public sealed class Interpreter
                 f.Locals[s.Local.Value] = Heap.Store(f.Locals[s.Local.Value], T(s.Value));
                 return null;
             case LoadGlobal l:
-                FillGlobals();
+                FillGlobal(l.Global.Value);
                 Set(l.Dest, _globals[l.Global.Value]);
                 return null;
             case StoreGlobal s:
-                FillGlobals();
+                FillGlobal(s.Global.Value);
                 _globals[s.Global.Value] = Heap.Store(_globals[s.Global.Value], T(s.Value));
                 return null;
 
@@ -440,7 +458,7 @@ public sealed class Interpreter
                 return null;
             }
             case AddrGlobal a:
-                FillGlobals();
+                FillGlobal(a.Global.Value);
             {
                 var index = a.Global.Value;
                 Set(a.Dest, Value.Of(new PlaceObj(() => _globals[index], v => _globals[index] = Heap.Store(_globals[index], v))));
