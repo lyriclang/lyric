@@ -130,7 +130,9 @@ promise. This entry fills with the milestones.
   `assertContains`, `assertEmpty`, the first difference of two long values, parallel tests;
   `@Bench`, `blackBox` and `lyric5 bench` with `--save` and `--compare`. Diagnostics: `1.` and
   `.5`, a name beyond ASCII, a constraint written for a value — each said once —, and
-  `lyric5 test --target`.
+  `lyric5 test --target`. Of the review of 2026-10-09: `is`, type patterns and type sets on the
+  built-in types, exact (`d is int`, `n: int =>`), and `Any` taking their values
+  (`let a: Any = 5`).
 
 ---
 

@@ -370,6 +370,21 @@ gesammelt hat; Kennung, „Betrifft“ und Uhr wie im Abschnitt davor.
 | N2b | **Geschriebene Typen prüfen ihre Schranken** (Spec 03 §9.1 Regel 3: „written or inferred alike“): ein Durchgang über Signaturen, Felder und Annotationen prüft jede geschriebene Instanz gegen die Schranken ihrer Deklaration, wie Rusts WF-Prüfung. Heute kompiliert `fn f(s: Set<NoHash>)`, und erst ein Aufruf, der eine Instanz baut (`Set.new()`), meldet `LYR-SEM0028`; generische Aliase prüfen ihre Argumente schon am Gebrauch. Uhr: M12, mit den Diagnosen | T8 |
 | S3 | **Ein Literal an einer View-Stelle bekommt den Elementtyp des Views**: `take([1, 2])` mit `take(s: Slice<uint8>)` prüft die Elemente gegen `uint8` wie `let a: uint8[] = [1, 2]` (Spec 03 §5.2 Regel 4, §5.1 Regel 2). Heute `LYR-SEM0001 cannot assign 'int[]' to 'Slice<uint8>'`; das leere `take([])` geht seit dem Fix nach S3. Uhr: M8c | T13 |
 
+## Review 2026-10-09 — die offenen Punkte aus M8c
+
+Entscheidungen des Maintainers („alle Empfehlungen“, `v` nach eigener Rückfrage) zu den offenen
+Punkten, die M8c S1–S13 gesammelt hat. Die Kennung ist der M8c-Slice, der den Punkt fand;
+„Betrifft“ und Uhr wie im Abschnitt davor; wo eine ältere Zeile dieses Dokuments dem
+widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| S8b | **`is` und Typ-Pattern auf eingebauten Typen; `Any` nimmt sie** (T10 wörtlich: `let a: Any = 5`): `bool`, `char`, die zehn Zahltypen, `string` und `StringView` liegen hinter einem Interface-Wert in einer eigenen Box (S8b), deren Deskriptor den Typ nennt. `d is int`, `n: int => …` und `x in [int8, int16]` testen ihn **exakt** — ein `int8` ist kein `int`, nichts wird erweitert; ein Alias ist der Typ, den er nennt; ein `string` ist kein `StringView`. Die Ablehnung (`LYR-SEM0131`) war ein Rest aus M4, in S8b nur neu begründet. C#, Kotlin und Swift testen auf eingebaute Typen wie auf eigene. Verworfen: so lassen, bis ein Fall danach fragt — dynamische Werte (eine Konfiguration, ein `Any[]` aus einem Parser) fragen genau danach. Gebaut in M8c S15 | T10, T11 |
+| S6 | **Ein Bereichsindex auf einem Typ, der einen View von sich gibt, ist der Bereich des Views** (Option a): `list[a..b]` ist `list.asSlice()[a..b]`, wie der Auto-View eines Strings; eine kleine Schnittstelle in `std.core` sagt, wer einen View gibt. Zwei Konformanzen von `Index` an einem Typ (T14 für `T[]`/`Slice<T>`) wären zwei `index` gleicher Arität, die D4 verbietet. Verworfen: auf eine Lösung für mehrere Konformanzen einer generischen Schnittstelle warten (04, Zeile M8c S7). Uhr: M8c S18 | T14 |
+| S5 | **Ein Lambda, das `T` liefert, bindet kein `?U`** (`mapNotNull((s) => try int.parse(s))` → `LYR-SEM0060`): die Inferenz soll die Erweiterung `T` → `?T` als Bindung von `U` nehmen, wie Kotlin. Uhr: M12, mit den übrigen Inferenz-Punkten | T8 |
+| S7 | **Ein offener Blanket schließt eine eigene Konformanz nur an seinen Instanzen aus** (bestätigt): `struct Meters :: [Into<int>]` steht, bis ein Modul `extend int :: [From<Meters>]` schreibt — dann `LYR-SEM0133` an der Konformanz des Typs, wie Rust; die Kohärenz fragt das ganze Programm | T7 |
+| S3 | **`char`-Bereiche über ein internes `Step`** (bestätigt): `interface Step :: [TotalOrder]` in `std.core`, nicht `pub`, je ein Block für die acht Ganzzahltypen und `char`, wie Rusts `Step` — ein eigener Block für `Range<char>` neben dem für `Integer` wäre dieselbe Konformanz zweimal | T13 |
+
 ---
 
 **Bereich 3 ist damit vollständig entschieden** (T1–T19, 2026-09-28).

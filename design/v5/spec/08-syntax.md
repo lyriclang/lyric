@@ -352,6 +352,15 @@ Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert 
 | M8a-8 | **Rundung unter einer Präzision: eine exakte Hälfte geht von null weg**, wie `round()` (`{0.125:.2f}` ist `0.13`, `{2.5:.0f}` ist `3`). Der Text entsteht aus der exakten Dezimalentwicklung, gleich auf jeder Plattform | Y7 |
 | M6-30 | Ein Aufruf `name(…)` in einer Methode meint ein Feld nur, wenn es aufrufbar ist (07 V6) | Y4 |
 
+## Review 2026-10-09 — die offenen Punkte aus M8c
+
+Entscheidung des Maintainers („alle Empfehlungen“) zu einem offenen Punkt aus M8c; die Kennung ist
+der M8c-Slice, der ihn fand.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| S12a | **Eine leere nachgestellte Lambda wird untersucht**: `subtest("row") { }` ist `LYR-PAR0002` „expected an expression, got RBrace“, mit einer Anweisung im Rumpf geht es. Y11 sagt nicht ausdrücklich, ob `run { }` steht; vermutlich liest der Parser den Block als Wertblock. Ist es ein Parser-Fehler, wird er behoben; zeigt sich eine Frage der Grammatik, kommt sie als Entscheidung zurück. Uhr: M8c S18 | Y11 |
+
 ---
 
 **Bereich 8 ist damit vollständig entschieden** (Y1–Y12, 2026-09-29) — und mit ihm die Sprache.

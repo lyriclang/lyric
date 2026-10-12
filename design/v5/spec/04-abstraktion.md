@@ -263,6 +263,18 @@ widerspricht, gilt die Zeile hier.
 | R4a3 | **Arität über Rumpf und Blöcke, wie die Spec sagt** (08 §1.2 Regel 1: die Member eines Typs sind ein Scope samt seinen Blöcken): zwei Funktionen eines Namens mit verschiedener Anzahl dürfen im Rumpf, in einem inhärenten Block eines deklarierten Typs, über Rumpf und Block und über zwei Blöcke stehen. Heute nimmt der Compiler nur Rumpf, Konformanzblock und den Block auf einem Builtin und lehnt die übrigen ab (`LYR-SEM0121`, dazu zwei Folgefehler an den Aufrufen). Spec 05 §3 Regel 1 heißt dann „eine Funktion je Name und Anzahl“. Uhr: M12 | D2, D4 |
 | R4b | **Delegation gilt auch für generische Member**: ein an ein Feld delegiertes abstraktes generisches Member (`Outer :: [Tagger by inner]`, `fn tag<U>(u: U)`) bekommt einen synthetisierten generischen Weiterleiter, eine Funktion je Instanz. Heute `LYR-SEM0020` mit dem Rat, das Member am Typ zu schreiben (Prüfung 2026-10-07). Verworfen: generische Member von der Delegation ausnehmen — eine Ausnahme in Spec 05 §5 für eine Lücke der Senkung. Uhr: M12 | D1 |
 
+## Review 2026-10-09 — die offenen Punkte aus M8c
+
+Entscheidungen des Maintainers („alle Empfehlungen“) zu den offenen Punkten aus M8c S1–S13;
+Kennung (der M8c-Slice), „Betrifft“ und Uhr wie im Abschnitt davor.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| S3b | **Die Synthese vergleicht und hasht ein `T[N]`-Feld als Ganzes**: seit S3b ist `T[N]` selbst `Equatable` und `Hashable`, also schreibt die Synthese `a.f == b.f` und `this.f.hash(h)` wie für jedes Feld. Heute rollt sie das Feld aus — ein Struct mit `uint8[4096]` bekommt einen Ausdruck mit 4096 `&&`. Die Synthese wird in M9a eine `comptime`-Definition (A5); die Regel gilt dort weiter. Uhr: M8c S17 | D7 |
+| S7 | **Ein Typ ist `From` einer Quelle — vertagt**: `struct Label :: [From<int>, From<string>]` hat zwei `static fn from` gleicher Arität (`LYR-SEM0085`/`SEM0086`, D4). Ob Member einer Konformanz an der Instanz unterschieden werden (Rusts mehrere `From` für einen Fehlertyp), entscheidet M12 zusammen mit den übrigen Fragen mehrerer Konformanzen einer generischen Schnittstelle; bis dahin bleibt D4, und ein Fehlertyp mit mehreren Quellen nimmt ein Enum als Ziel. Uhr: M12 | D4 |
+| S9b | **Ein `string` nimmt den Zeugen seiner Konformanz vom View** (bestätigt): `extend string :: [Contains<char>] { }` wird vom `contains<P>` des `StringView` beantwortet, wo `string`s eigene Blöcke den Namen frei lassen — dieselbe Reichweite, die ein Aufruf hat. Ein eigenes `contains(x: char)` hätte das `contains` jedes Textes verdeckt | D15 |
+| S13 | **`LYR-SEM0126` am geschriebenen Typ** (bestätigt; nachziehen): ein für einen Wert geschriebener reiner Constraint-Typ meldet sich dort einmal — Bindung, Parameter, Rückgabe, auch als Optional — und läuft als Fehlertyp weiter; Aufrufe und Gebräuche schweigen. Felder, Elemente von Arrays und Tupeln und Typargumente (`List<Equatable>`) melden es noch am Übergang. Uhr: M8c S18 | D9 |
+
 ---
 
 **Bereich 4 ist damit vollständig entschieden** (D1–D15, 2026-09-28).

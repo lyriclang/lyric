@@ -1184,13 +1184,15 @@ public static class ModuleLowerer
 
         // A built-in's box (01 V7; M8c S8b): a row for each interface a block on the built-in
         // names, or reaches as a parent — 'extend int :: [Display]' —, the slot's method from any
-        // block on it, else the interface's default: 'showTo' left to 'Display'.
+        // block on it, else the interface's default: 'showTo' left to 'Display'. And 'Any', which
+        // every built-in is undeclared (05 §9 rule 1): its row is the descriptor alone.
+        var any = compilation.FindModule(["std", "core"])?.Members.LookupLocal("Any");
         foreach (var (builtin, _, boxId) in typeTable.BuiltinBoxes)
         {
             var onBuiltin = compilation.Extensions.Blocks.Where(b => ReferenceEquals(b.Target, builtin)).ToList();
             foreach (var (iface, ifaceId) in interfaces.OrderBy(t => t.Id.Value))
             {
-                var reaches = onBuiltin.Any(b => b.Decl.Interfaces.Any(node =>
+                var reaches = ReferenceEquals(iface, any) || onBuiltin.Any(b => b.Decl.Interfaces.Any(node =>
                     Conformance.InterfaceOf(node, binding) is { } named
                     && Conformance.WithParents(named, binding).Any(p => ReferenceEquals(p, iface))));
                 if (!reaches) continue;

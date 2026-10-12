@@ -470,6 +470,25 @@ eine ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
 | S12a | **`Child.stdin: ?PipeWriter`, `stdout`/`stderr: ?PipeReader`** statt `?Writer`/`?Reader` (bestätigt): die konkreten Klassen sind `Writer` bzw. `Reader` und `Closeable` — ein Feld vom Interface-Typ hätte kein `close()`, und `wait()` schließt stdin | O8 |
 | S12b | **Die Pipes eines Kindes parken unter Windows wie Sockets**: überlappte Named Pipes über den Completion-Port des Pollers (seit M8b S11), wie Go und Rusts `read2`. Bis dahin blockieren sie auf dem I/O-Pool (13 P2): ein Kind, das nie schreibt, hält einen Pool-Thread, und ein Abbruch wirkt erst, wenn es schreibt oder endet. Uhr: M10 | O8, O10 |
 
+## Review 2026-10-09 — die offenen Punkte aus M8c
+
+Entscheidungen des Maintainers („alle Empfehlungen“) zu den offenen Punkten aus M8c S1–S13. Die
+Kennung ist der M8c-Slice, der den Punkt fand; „Betrifft“ und Uhr wie im Abschnitt davor; wo eine
+ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| S1 | **`?T` ist `Debug`, wo `T` es ist**: `extend<T :: [Debug]> ?T :: [Debug]` zeigt `null` oder den Wert — `assertEq('7'.toDigit(10), 7)` kompiliert dann. N2a gab `?T` schon `Equatable` und `Hashable`. Uhr: M8c S16 | B4 |
+| S11 | **`T[N]` ist `Display` und `Debug` wie `T[]`** (Option b): `assertEq` auf `toBytesLE()` und ein f-String zeigen es. S4b gab `T[N]` `Equatable` und `Hashable`. Verworfen: so lassen — ein Inline-Array hat im Frame keinen View (03 §5.3), der Umweg über `toArray()` ist an jeder Stelle zu schreiben. Uhr: M8c S16 | B4, S4b |
+| S12a | **Ein paralleler Test hat keine Subtests** (Option a): `subtest(name) { … }` hat kein Test-Objekt, sein Bericht hängt am laufenden Test — laufen mehrere zugleich, ist der nicht eindeutig; `subtest` lässt einen parallelen Test mit einer Meldung scheitern. Verworfen: ein Test-Objekt als Parameter paralleler Tests (Go's `t.Run`; die Form der Tests änderte sich) und Task-lokaler Zustand in `std.task` (neu) | B12 X2, X3 |
+| S1 | **`isUpper`/`isLower` über die Kategorie** (bestätigt): `Lu`/`Ll` wie Go, passend zu `isAlpha` = L\* und `isDigit` = Nd; nur `isWhitespace` ist eine Eigenschaft. **`isAlphanumeric` ist L\* oder Nd** (bestätigt), nicht Rusts Alphabetic oder Numeric — `'½'` ist es nicht | B9 C1 |
+| S5 | **Die Adapter** (bestätigt): `scan` gibt den Startwert zuerst; `peekable()` gibt `PeekableIter`; `average()` ist `?float`; `minBy`/`maxBy` über einen Schlüssel, je das erste von gleichen; `rev()` ist kein `DoubleEnded` und wirft nichts; `cycle()` nur über `Clone`-Iteratoren; `chunks` und `windows` geben `List`s, `windows` je eine Kopie | B6 I4 |
+| S6 | **`map[k] = null` entfernt den Schlüssel** (bestätigt), wie Swifts Dictionary: `[k]` gibt `?V`, also nimmt das Setzen ein `?V` | B7 C4 |
+| S8c | **Ein unpassender Spec panikt zur Laufzeit** (bestätigt): `fmt.format` liest die Vorlage erst dann, und `{x:.2f}` für ein `int` ist dort eine Panik; im f-String lehnt der Compiler denselben Fall ab (`LYR-SEM0164`) | B3, S7 |
+| S11 | **Die Prüfsummen nehmen einen laufenden Wert** (bestätigt): `crc32(bytes, running = 0)`, `crc32c(…, running = 0)`, `adler32(…, running = 1)`, wie zlib, Python und Go — kein Hasher-Typ | B11 Q3 |
+| S12a | **`assertEmpty` über `Iterable`** (bestätigt): leer ist, was sein Iterator nicht liefert; es wirft, was der Iterator wirft. **Der erste Unterschied über `Debug`** (bestätigt): ein Text in Anführungszeichen mit `\n` gibt seine erste abweichende Zeile, sonst ab 40 Zeichen das erste abweichende Zeichen mit Fenster und Marke | B12 X1 |
+| S12b | **Benchmarks** (bestätigt): `Bench` ist Attribut und Maß zugleich und steht im Prelude, `blackBox` nicht; Aufwärmen, Runden wachsen bis 0,1 s, dann der Median aus fünf; Allokationen aus zwei thread-lokalen Zählern; `lyric bench` baut im Release-Profil; `--save`/`--compare` schreiben Tab-getrennte Zeilen | B12 X4 |
+
 ---
 
 **Bereich 10 ist damit vollständig entschieden** (B1–B13, 2026-09-29). Nachträge in anderen

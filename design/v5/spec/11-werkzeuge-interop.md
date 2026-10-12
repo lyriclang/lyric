@@ -293,6 +293,14 @@ widerspricht, gilt die Zeile hier.
 | CI | **Die Plattform-Jobs laufen auf `main` und in einem von Hand gestarteten Lauf**, nicht je PR: die C-Toolchain samt Laufzeittests und die NativeAOT-Binaries auf ARM-Linux, Windows und macOS. Ein PR prüft auf Linux x86-64 — C-Toolchain mit Sanitizern, ein AOT-Binary, das Gate —, Build und Tests auch unter Windows. Vor einem Tag läuft der volle Satz ohnehin auf `main`. Grund: rund fünf Runner zugleich, 13 Jobs je Lauf, Abbruch nach 15 Minuten ohne Runner — etwa ein PR pro Stunde und rote `main`-Läufe ohne roten Test. Ein Plattformfehler fällt so erst nach dem Merge auf. Verworfen: auf `main` nur Gate und Build — der Merge-Commit ist ein neuer Stand, und `main` ist die Stelle der Plattform-Jobs | — |
 | CI | **Die Benchmarks laufen auf `main` und von Hand**, nicht je PR; 1,5× Go bleibt die Handmessung je Meilenstein. `strings` hat seit M8a S13 (f-Strings in einen Builder) keinen eigenen Zaun mehr: 3× Go für alle (auf dem Runner 1,80×) | D4 |
 
+## Review 2026-10-09 — die offenen Punkte aus M8c
+
+Entscheidung des Maintainers („alle Empfehlungen“) zu einem offenen Punkt, den M8b S14 fand.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| CI | **Das Konformanz-Gate läuft je Profil als eigener Job** (`debug`, `release` als Matrix): 1166 Fälle in beiden Profilen brauchten im PR-Lauf 27 Minuten, im Dispatch-Lauf über 40 (die Grenze wurde in M8b S14 auf 60 angehoben); geteilt halbiert sich die Wandzeit. Die Checks heißen dann je Profil, und welche ein Merge abwartet, ist eine Einstellung des Repos — sie wird mit demselben PR nachgezogen. Verworfen: ein Job mit höherer Grenze — die Wandzeit bleibt, und jeder neue Fall verlängert sie. Uhr: M8c S19 | M5-8 |
+
 ---
 
 **Bereich 11 ist damit vollständig entschieden** (W1–W9, 2026-09-29). Es bleibt 12 (Migration).

@@ -6011,9 +6011,9 @@ public sealed class TypeChecker
 
     /// <summary>
     /// <c>x is T</c> (03 T11): the operand is an interface value — on anything else the static
-    /// type answers already (<c>LYR-SEM0131</c>) — and <c>T</c> a struct, class, enum or an
-    /// interface a value can have. A type parameter is no test (O2): dynamic typing takes
-    /// <c>Any</c>.
+    /// type answers already (<c>LYR-SEM0131</c>) — and <c>T</c> a struct, class, enum, built-in
+    /// type (Lyric 5) or an interface a value can have. A type parameter is no test (O2): dynamic
+    /// typing takes <c>Any</c>.
     /// </summary>
     private LyrType CheckTypeTest(TypeTestExpr t, SymbolTable scope)
     {
@@ -6031,8 +6031,8 @@ public sealed class TypeChecker
         return LyrType.Bool;
     }
 
-    /// <summary>What a value behind an interface can be: a struct, a class, an enum, or an
-    /// interface that is a value type itself (04 D9).</summary>
+    /// <summary>What a value behind an interface can be: a struct, a class, an enum, a built-in
+    /// type in Lyric 5, or an interface that is a value type itself (04 D9).</summary>
     private bool CheckTestTarget(LyrType target, Span span)
     {
         switch (target)
@@ -6052,16 +6052,15 @@ public sealed class TypeChecker
             case NamedRef { Symbol.Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }
                 or GenericInstance { Definition.Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }:
                 return true;
-            // A built-in's value does lie behind an interface since M8c S8b, in a box of its own;
-            // a test for it is no form of the language (05 §9 rule 3).
-            case PrimitiveType or StringViewType when _comp.Lyric5Modules:
-                _de.Report("LYR-SEM0131", Severity.Error, span,
-                    $"'{TypeFacts.Display(target)}' is a built-in type, and a test for one is no form of the language — "
-                    + "test for a struct, a class, an enum or an interface");
-                return false;
+            // A built-in's value lies behind an interface in a box of its own (M8c S8b), whose
+            // descriptor names the type: the test is exact — an 'int8' is no 'int', nothing widens
+            // (05 §9 rule 3), and an alias is the type it names.
+            case var builtin when _comp.Lyric5Modules && BoxesAsBuiltin(builtin):
+                return true;
             default:
                 _de.Report("LYR-SEM0131", Severity.Error, span,
-                    $"'{TypeFacts.Display(target)}' is never behind an interface value — only a struct, a class, an enum or an interface is");
+                    $"'{TypeFacts.Display(target)}' is never behind an interface value — only a struct, a class, an enum"
+                    + (_comp.Lyric5Modules ? ", a built-in type" : "") + " or an interface is");
                 return false;
         }
     }
@@ -12111,8 +12110,10 @@ public sealed class TypeChecker
         if (coercionSite && TypeFacts.Widens(from, to)) return true;                           // int8 to int, T1c
         if (ImplementsInterface(from, to)) return true;   // T to I when T :: [I]
         // Every struct, class and enum value is an 'Any' at the transition (03 T10): the empty
-        // interface asks nothing, so nothing has to be declared.
-        if (IsAny(to) && TypeFacts.SymbolOf(from) is { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum })
+        // interface asks nothing, so nothing has to be declared. In Lyric 5 a built-in's value
+        // too, in its box ('let a: Any = 5', 05 §9 rule 1); the 4.x lowering has none.
+        if (IsAny(to) && (TypeFacts.SymbolOf(from) is { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }
+                          || _comp.Lyric5Modules && BoxesAsBuiltin(from)))
             return true;
         // A child interface value where a parent is expected (04 D10): a coercion, the parent's
         // table found at the transition through the concrete type's conformance list.
@@ -12319,7 +12320,7 @@ public sealed class TypeChecker
         // A built-in's value conforms through std.core's blocks on it, and goes into its interface
         // in a box (01 V7, 03 T3; M8c S8b): 'let d: Display = 5;', 'f(1, "two")' for 'f(xs: Display...)'.
         // Lyric 5's: the 4.x lowering has no box for it.
-        if (_comp.Lyric5Modules && (from is PrimitiveType { Kind: not PrimitiveKind.Void } || from is StringViewType))
+        if (_comp.Lyric5Modules && BoxesAsBuiltin(from))
             return Satisfies(from, target, to);
 
         // A type parameter satisfies what its constraints demand. It has no symbol of its own, so it
@@ -12735,6 +12736,12 @@ public sealed class TypeChecker
     /// <summary>THE <c>Any</c> of <c>std.core</c> (03 T10), by identity.</summary>
     private bool IsAny(LyrType type) =>
         TypeFacts.SymbolOf(type) is { } ts && ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("Any"));
+
+    /// <summary>A built-in whose value goes into an interface value in a box of its own (01 V7;
+    /// M8c S8b): <c>bool</c>, <c>char</c>, the ten number types, <c>string</c> and the view a
+    /// string gives — the ones the lowering boxes (<c>TypeTable.BuiltinOfIr</c>).</summary>
+    private static bool BoxesAsBuiltin(LyrType type) =>
+        type is PrimitiveType { Kind: not PrimitiveKind.Void } or StringViewType;
 
     /// <summary>
     /// What sits on a parameter (design/v5/spec/09 A11): <c>@callerExpr(p)</c> alone, by its
