@@ -426,6 +426,15 @@ public sealed class TypeResult
 
     public CallExpr? OperatorCallOf(Node op) => _operatorCalls.GetValueOrDefault(op);
 
+    /// <summary>A range on a type that gives a view of itself (std.core's <c>AsSlice&lt;T&gt;</c>;
+    /// M8c S18): <c>list[a..b]</c> checked as <c>list.asSlice()[a..b]</c>, the index the lowering
+    /// takes in its place.</summary>
+    private readonly Dictionary<IndexExpr, IndexExpr> _rangesThroughViews = new(ReferenceEqualityComparer.Instance);
+
+    public void DesugarRangeThroughView(IndexExpr range, IndexExpr throughView) => _rangesThroughViews[range] = throughView;
+
+    public IndexExpr? RangeThroughViewOf(IndexExpr range) => _rangesThroughViews.GetValueOrDefault(range);
+
     /// <summary>An array literal that stands for a <c>FromArrayLiteral&lt;T&gt;</c> (10 K4; M8c S6b),
     /// with the element type its elements were checked against: the lowering builds the array of
     /// them and calls the expected type's <c>fromLiteral</c>.</summary>

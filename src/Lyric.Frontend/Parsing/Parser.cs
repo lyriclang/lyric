@@ -1391,9 +1391,12 @@ public sealed partial class Parser
     }
 
     // Does the block at the cursor contain a ';' at its own level, or begin with a statement
-    // keyword? Then it is a statement block rather than a single expression.
+    // keyword? Then it is a statement block rather than a single expression. An empty one is
+    // a block of no statements — 'subtest("row") { }' a lambda that does nothing, as '() => { }'
+    // is (08 Y11; M8c S18) — not an expression missing.
     private bool HoldsStatements()
     {
+        if (_buffer.Peek(1).TokenKind == TokenKind.RBrace) return true;
         // An 'if' that is a statement — no final 'else', a binding condition, more behind it —
         // makes the braces a block; one that is an expression is the ONE expression they hold.
         if (_buffer.Peek(1).TokenKind == TokenKind.If && !IfIsExpression(1)) return true;

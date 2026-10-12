@@ -482,6 +482,14 @@ pub interface IndexSet<K> :: [Index<K>] {
     mut fn setIndex(k: K, v: Self.Output): void;
 }
 
+/// `x[a..b]` on a type that gives a view of its elements is the range of the view —
+/// `list[a..b]` is `list.asSlice()[a..b]`, a `Slice<T>` over them, no copy (03 §5.2, design 03
+/// "Review 2026-10-09" S6; M8c S18). A second `Index` for ranges beside `Index<int>` would be two
+/// `index` of one arity (04 D4); an array's, a view's and a string's range are built in.
+pub interface AsSlice<T> {
+    fn asSlice(): Slice<T>;
+}
+
 /// `x in xs` is `xs.contains(x)` (04 D6; the operator comes with the collections).
 pub interface Contains<T> {
     fn contains(x: T): bool;

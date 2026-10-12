@@ -135,7 +135,8 @@ promise. This entry fills with the milestones.
   (`let a: Any = 5`); a debug text for an optional (`null` or the value), and `Debug` and
   `Display` for an inline array as for an array; a large inline array field in a struct with a
   synthesized `Equatable` compiles, compared and hashed whole; `never` as a type argument for
-  a parameter bounded by `Error`.
+  a parameter bounded by `Error`; `list[a..b]` through `AsSlice<T>`; a constraint inside a
+  written type said once; an empty trailing block.
 
 ---
 

@@ -4960,6 +4960,9 @@ internal sealed class FunctionLowerer
         // A type's own index (04 D6): the call the sema desugared, 'x.index(k)'.
         if (_types.OperatorCallOf(expr) is { } indexCall)
             return LowerCall(indexCall) ?? throw Bug("'index' returned no value");
+        // A range on a type that gives a view (M8c S18): the range of 'x.asSlice()', as checked.
+        if (_types.RangeThroughViewOf(expr) is { Index: SliceRangeExpr viewRange } throughView)
+            return LowerSlice(throughView, viewRange);
         // A container from std.collections goes through 'Indexable<T>.get(i)' — the same division of
         // labour as for 'for-in': the compiler knows ONE built-in form, the array, and everything else
         // runs through the interface.

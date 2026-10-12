@@ -1,6 +1,6 @@
 /// The containers (design/v5/spec/10 B7). Not safe across threads (C11): a `Mutex` holds one
 /// that is shared.
-import std.core { arrayOf, Contains, filled, FromArrayLiteral, FromIterator, Hasher, Join, StringBuilder };
+import std.core { arrayOf, AsSlice, Contains, filled, FromArrayLiteral, FromIterator, Hasher, Join, StringBuilder };
 import std.hash { DefaultHasher };
 
 // --- List (10 C3) --------------------------------------------------------------------------------
@@ -9,8 +9,9 @@ import std.hash { DefaultHasher };
 // `T[]` and `asSlice()` a view of it (C3: growth leaves an older view on the older buffer).
 
 /// A growing array (10 C3): its elements in order; `[i]` and `[i] = v` as an array's, panicking
-/// outside `0 ≤ i < length()`. Not safe across threads (C11).
-pub class List<T> :: [IndexSet<int>, Iterable] {
+/// outside `0 ≤ i < length()`; `[a..b]` a view of the elements, as `asSlice()[a..b]`. Not safe
+/// across threads (C11).
+pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
     type Output = T;
     type Iter = ListIter<T>;
     var buffer: T[],
