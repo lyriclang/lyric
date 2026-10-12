@@ -42,7 +42,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M7 | Modules and packages | L | **done** 2026-10-02 |
 | M8a | std core | XL | **done** 2026-10-07 |
 | M8b | std I/O and system | L | **done** 2026-10-08 |
-| M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | **in progress**: planned 2026-10-08 (S1–S14) |
+| M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | **done** 2026-10-09 |
 | M9a | `comptime` (the IR interpreter) | L | — |
 | M9b | Macros | L | — |
 | M10 | std after rule D | XL | — |
@@ -789,7 +789,7 @@ reaper a thread, Windows' pipes blocking on the I/O pool — decided with the ma
 day (10 "Review 2026-10-08 (2)"): confirmed as built, with two clocks for M10 — deadlines for
 `resolve`, a Windows child's pipes through the completion port. M8c follows.
 
-### M8c — in progress
+### M8c — done (2026-10-09)
 
 The plan is design 13's addendum of 2026-10-08: the Unicode tables generated into C (P1), lambdas
 that throw through 05 K4 (P2), the builder without `&` and `std.fmt.format` (P3), the language's
@@ -855,6 +855,54 @@ Merged, slice by slice (each PR says what it did and how it was checked):
   view plus a view, a new array. `list[a..b]` is not built: 03 N2's `Index<Range…>` would be a
   second conformance of `Index` beside `Index<int>`, which D4 refuses — a decision for the
   maintainer; until then `list.asSlice()[a..b]`. Spec 12 §Collections, 03 §5.1; four cases.
+- **S6b** array literals into collections (10 K4): `FromArrayLiteral<T>` in std.core, with blocks
+  for `List`, `Deque`, `Heap`, `Set` and `Map` — `let s: Set<int> = [1, 2]`, through one `?` too.
+  **S6 is done.** Spec 12 §Collections; three cases.
+- **S7** results and conversions (05 E1, 04): `Result<T, E :: [Error]>` — `Ok`, `Err`,
+  `Result.of { … }`, `try r.get()` —, and `From<T>`/`Into<T>` with the blanket
+  `extend<T, U :: [From<T>]> T :: [Into<U>]`, its coherence asked over the whole program; `as`
+  converts numbers only. Spec 12 "Results and conversions", 05 §13 rule 9; eight cases.
+- **S8a** the builder without `&` (10 S13, 01 S13): `showTo`, `debugTo` and `format` take the
+  `StringBuilder` by its reference; `reserve` is a check, its growth out of line. Spec 12; four cases.
+- **S8b** a built-in's value as an interface value (01 V7): a box per built-in type,
+  `let d: Display = 5`. Spec 05; three cases.
+- **S8c** `std.fmt.format(template, args...)`, the f-strings' format language read at run time; a
+  spec that fits no type panics. **S8 is done.** Spec 12 "Formatting"; four cases.
+- **S9a** `Iterator<Item = T>` as a value (03 M4-1): an interface value with its associated types
+  fixed, taken and returned and walked by `for`. Spec 05; six cases.
+- **S9b** a generic member as a witness (05 §1 rule 2): `contains<P :: [Pattern]>` answers
+  `Contains<char>` at `P = char`, so `'b' in "abc"`; a string takes its witness from its view.
+  **S9 is done.** Spec 05, 12; three cases.
+- **S10** what a clause's binding tells of its error (05 E6 O3, the review's M5-3):
+  `e.suppressed()` and `e.backtrace(): ?Backtrace`, in the clause itself and not in a lambda
+  there; the record kept for the clause; the runtime's trace naming locked, since a `Backtrace` is
+  shown on any thread. Spec 06 §4; five cases.
+- **S11** checksums and bytes (10 Q3, Z1): `crc32`, `crc32c` and `adler32` with a running value,
+  their tables made at the first call — a module binding of `std.hash` would have built them in
+  every program —; `toBytesLE`/`toBytesBE` on every integer type. Spec 12; three cases.
+- **S12a** the tests (10 X1, X3): `assertContains`, `assertEmpty`, the first difference of two
+  long values named under the failure, `@Test { parallel = true }` — after the others, at once,
+  without subtests. Spec 14 §3.
+- **S12b** the benchmarks (10 X4): `@Bench fn name(&b: Bench)`, `b.iter { … }`, `b.bytes(n)`,
+  `blackBox`; the runtime counts each thread's allocations; `lyric5 bench` in the release
+  profile, with `--save` and `--compare`, and the std's eight benchmarks under `tests/std`.
+  **S12 is done.** Spec 12 "Benchmarks", 14 §4; one case.
+- **S13** four diagnostics, once each: `1.` and `.5` (`LYR-LEX0016`), a name beyond ASCII, a
+  constraint only written for a value (`LYR-SEM0126` there, then no type), `lyric5 test --target`.
+  Spec 01, 05, 14; four cases.
+- **S14** the close: **the word counter** (`tests/Lyric5.Tests/programs/wordcount.lyr`, M8c's
+  artifact) — the lines, words, characters and bytes of a file, its most frequent words split at
+  White_Space and lowercased by the simple mapping, a CRC-32 —, built as a package and run by
+  `ExampleTests` over a text in four scripts, checked against Python's reading of it. The dogfood:
+  the std tests (394), the examples, `lyric5 bench` over the std's benchmarks. The rows S6b–S13
+  above were written here, at the close.
+
+On the way, outside the plan: a child that ended before the reaper knew of it was never reaped,
+its `wait` hanging (M8b S12's; the processes test's two timeouts) — fixed in a PR of its own.
+
+**M8c is done.** Every slice of the plan is built; what it moved stands in its row — `list[a..b]`
+for a decision, `Contains<char>` on text from S2 to S9, S8 and S12 split. The open points the run
+collected go to the maintainer with the report. M9a follows, once the maintainer is asked.
 
 ## Design decisions
 
