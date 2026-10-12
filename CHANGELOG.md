@@ -117,6 +117,20 @@ promise. This entry fills with the milestones.
   hash and print, optionals are `Equatable` and `Hashable`, aliases take type parameters,
   `Identity`, `Point { x, y }`, a type set in a pattern, raw, multi-line and byte strings; a
   comparison does not chain.
+- **The rest of the standard library (M8c** — `design/v5/spec/10`, `13` M8c, spec chapters 01,
+  03, 05, 06, 12 and 14**):** Unicode 18.0 from the UCD's files — `char`'s category and
+  predicates, the simple case mappings, `trim` over White_Space, `toUpper`/`toLower` on text,
+  `chars()` from both ends, `charIndices()`; lambdas that throw through every adapter,
+  terminator and higher function, and the rest of the adapters (`flatMap`, `flatten`, `chunks`,
+  `windows`, `scan`, `peekable`, `rev`, `cycle`, `groupBy`, `toMap`, …); set operations,
+  `map[k]`, `Map.from`, array literals into collections; `Result` with `Result.of` and
+  `try r.get()`, `From`/`Into`; `std.fmt.format`, a built-in's value as an interface value;
+  `Iterator<Item = T>` as a value, a generic member as a witness (`'b' in "abc"`); a catch
+  binding's `suppressed()` and `backtrace()`; `crc32`, `crc32c`, `adler32`, an integer's bytes;
+  `assertContains`, `assertEmpty`, the first difference of two long values, parallel tests;
+  `@Bench`, `blackBox` and `lyric5 bench` with `--save` and `--compare`. Diagnostics: `1.` and
+  `.5`, a name beyond ASCII, a constraint written for a value — each said once —, and
+  `lyric5 test --target`.
 
 ---
 

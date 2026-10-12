@@ -9,7 +9,8 @@ namespace Lyric5.Tests;
 /// Lyric 5, each built as a package and run. And M7's artifacts: the multi-package example — <c>programs/three_packages</c>, a
 /// path dependency and one from git — builds offline once the cache holds it, and builds for the
 /// other operating system; a dependency's globals are ready before the importer's (07 G2).
-/// And M8b's: the file tool, <c>programs/filetool.lyr</c>, over a tree the test makes.
+/// And M8b's: the file tool, <c>programs/filetool.lyr</c>, over a tree the test makes. And M8c's:
+/// the word counter, <c>programs/wordcount.lyr</c>, over a text in four scripts.
 /// Through <c>Main</c>, so in the console collection.
 /// </summary>
 [Collection("console")]
@@ -142,5 +143,35 @@ public class ExampleTests
         var (unknown, _, usage) = Tool();
         Assert.Equal(2, unknown);
         Assert.StartsWith("usage: filetool", usage);
+    }
+
+    /// <summary>Three lines in German, Greek, Japanese and Portuguese — letters beyond ASCII, an
+    /// upper-case word, a dash between words, punctuation at both ends.</summary>
+    private const string UnicodeText =
+        "Grüße aus Zürich! Zürich ist groß, ZÜRICH ist schön.\nΕλλάδα, ελλάδα — Ωραία μέρα.\n"
+        + "東京 und São Paulo: São Paulo ist groß.\n";
+
+    /// <summary>M8c's artifact (13, S14): the word counter built as a package, over a text in four
+    /// scripts — the counts and the ranking checked against Python's reading of the same text
+    /// (<c>str.split</c>, <c>isalnum</c>, <c>lower</c>), the CRC-32 against zlib's.</summary>
+    [Fact]
+    public void The_word_counter_counts_a_text_in_four_scripts()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", ProgramText("wordcount")));
+        var (built, _, why) = Run("build", "-C", dir);
+        Assert.True(built == 0, why);
+        var host = Target.Host;
+        var exe = Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix);
+        var text = Path.Combine(dir, "text.txt");
+        File.WriteAllBytes(text, System.Text.Encoding.UTF8.GetBytes(UnicodeText));
+
+        var ran = ProcessRunner.Run(exe, [text], TimeSpan.FromMinutes(1));
+        Assert.True(ran.ExitCode == 0, ran.Stderr);
+        Assert.Equal("3 lines, 21 words, 120 characters, 157 bytes\n  3  ist\n  3  zürich\n  2  groß\n  2  paulo\n"
+                     + "  2  são\ncrc32 cd8316ea\n", ran.Stdout.Replace("\r\n", "\n"));
+
+        var usage = ProcessRunner.Run(exe, [], TimeSpan.FromMinutes(1));
+        Assert.Equal(2, usage.ExitCode);
+        Assert.StartsWith("usage: wordcount", usage.Stderr);
     }
 }

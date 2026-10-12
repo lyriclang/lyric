@@ -1,0 +1,49 @@
+// A word counter over Unicode text (M8c's artifact, design/v5/spec/13): the lines, words,
+// characters and bytes of a file, its five most frequent words, and a CRC-32 of it.
+//
+//     lyric5 run -- text.txt
+//
+// A word is what stands between Unicode's White_Space, its punctuation trimmed — whatever is no
+// letter or digit at either end —, and lowercased by Unicode's simple mapping, so "Zürich" and
+// "ZÜRICH" are one word and "groß" stays "groß". The most frequent first, a tie in the order of
+// the words' code points. A character is a Unicode scalar value, not a byte.
+import std.fs { readText };
+import std.hash { crc32 };
+import std.io { eprintln, println };
+import std.math { min };
+import std.os { args };
+
+fn main(): int throws Error {
+    let given = args();
+    if (given.length() != 2) {
+        eprintln("usage: wordcount <file>");
+        return 2;
+    }
+    let text = try readText(given[1]);
+
+    var lines = 0;
+    for (_ in text.lines()) {
+        lines += 1;
+    }
+
+    let counts = Map<string, int>.new();
+    var words = 0;
+    for (piece in text.split((c: char) => c.isWhitespace())) {
+        let word = piece.trimMatches((c: char) => !c.isAlphanumeric()).toLower();
+        if (word.isEmpty()) {
+            continue;
+        }
+        words += 1;
+        counts[word] = (counts[word] ?? 0) + 1;
+    }
+
+    let bytes = text.toBytes();
+    println(f"{lines} lines, {words} words, {text.charCount()} characters, {bytes.length()} bytes");
+    let ranked = counts.entries().sortedBy((a, b) => if (a.1 != b.1) b.1.totalCompare(a.1) else a.0.totalCompare(b.0));
+    for (i in 0..min(5, ranked.length())) {
+        let (word, n) = ranked[i];
+        println(f"{n:>3}  {word}");
+    }
+    println(f"crc32 {crc32(bytes):08x}");
+    return 0;
+}
