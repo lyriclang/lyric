@@ -3941,7 +3941,7 @@ fn siftDown<T :: [TotalOrder]>(xs: Slice<T>, root: int, end: int): void {
 /// `it.map(f)` (10 B6 I3, I4): the values of `it`, each through `f` — lazily, a pull at a time.
 /// Named for what it gives: `Map` is the collection's (C4). What `f` throws, a pull throws beside
 /// what `it` does (05 K4; 13 M8c P2).
-pub struct MapIter<I :: [Iterator], U, E :: [Error]> :: [Iterator] {
+pub struct MapIter<I :: [Iterator], U, E :: [Error] = never> :: [Iterator] {
     type Item = U;
     type Error = Join<I.Error, E>;
     var inner: I,
@@ -3957,7 +3957,7 @@ pub struct MapIter<I :: [Iterator], U, E :: [Error]> :: [Iterator] {
 }
 
 /// `it.filter(p)`: the values of `it` that `p` holds for.
-pub struct FilterIter<I :: [Iterator], E :: [Error]> :: [Iterator] {
+pub struct FilterIter<I :: [Iterator], E :: [Error] = never> :: [Iterator] {
     type Item = I.Item;
     type Error = Join<I.Error, E>;
     var inner: I,
@@ -4007,7 +4007,7 @@ pub struct SkipIter<I :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.takeWhile(p)`: the values of `it` up to the first `p` does not hold for.
-pub struct TakeWhileIter<I :: [Iterator], E :: [Error]> :: [Iterator] {
+pub struct TakeWhileIter<I :: [Iterator], E :: [Error] = never> :: [Iterator] {
     type Item = I.Item;
     type Error = Join<I.Error, E>;
     var inner: I,
@@ -4032,7 +4032,7 @@ pub struct TakeWhileIter<I :: [Iterator], E :: [Error]> :: [Iterator] {
 }
 
 /// `it.skipWhile(p)`: the values of `it` from the first `p` does not hold for.
-pub struct SkipWhileIter<I :: [Iterator], E :: [Error]> :: [Iterator] {
+pub struct SkipWhileIter<I :: [Iterator], E :: [Error] = never> :: [Iterator] {
     type Item = I.Item;
     type Error = Join<I.Error, E>;
     var inner: I,
@@ -4094,7 +4094,7 @@ pub struct EnumerateIter<I :: [Iterator]> :: [Iterator] {
 }
 
 /// `it.inspect(f)`: the values of `it`, each shown to `f` on its way through.
-pub struct InspectIter<I :: [Iterator], E :: [Error]> :: [Iterator] {
+pub struct InspectIter<I :: [Iterator], E :: [Error] = never> :: [Iterator] {
     type Item = I.Item;
     type Error = Join<I.Error, E>;
     var inner: I,
@@ -4160,7 +4160,7 @@ pub struct ChainIter<A :: [Iterator], B :: [Iterator<Item = A.Item>]> :: [Iterat
 }
 
 /// `it.mapNotNull(f)`: the values of `it` through `f`, the `null`s left out.
-pub struct MapNotNullIter<I :: [Iterator], U, E :: [Error]> :: [Iterator] {
+pub struct MapNotNullIter<I :: [Iterator], U, E :: [Error] = never> :: [Iterator] {
     type Item = U;
     type Error = Join<I.Error, E>;
     var inner: I,
@@ -4182,7 +4182,7 @@ pub struct MapNotNullIter<I :: [Iterator], U, E :: [Error]> :: [Iterator] {
 
 /// `it.flatMap(f)`: the values of what `f` gives for each value of `it`, one after the other — `f`
 /// gives an `Iterable`, an array or a list as well as an iterator.
-pub struct FlatMapIter<I :: [Iterator], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error]> :: [Iterator] {
+pub struct FlatMapIter<I :: [Iterator], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error] = never> :: [Iterator] {
     type Item = J.Item;
     type Error = Join<Join<I.Error, E>, J.Error>;
     var inner: I,
@@ -4237,7 +4237,7 @@ pub struct FlattenIter<I :: [Iterator<Item = B>], B :: [Iterable<Iter = J>], J :
 }
 
 /// `it.dedupBy(same)`, `it.dedup()`: the values of `it`, a run of ones `same` holds for given once.
-pub struct DedupIter<I :: [Iterator], E :: [Error]> :: [Iterator] {
+pub struct DedupIter<I :: [Iterator], E :: [Error] = never> :: [Iterator] {
     type Item = I.Item;
     type Error = Join<I.Error, E>;
     var inner: I,
@@ -4263,7 +4263,7 @@ pub struct DedupIter<I :: [Iterator], E :: [Error]> :: [Iterator] {
 
 /// `it.scan(init, f)`: `init`, then each value `f` makes of the one before and a value of `it` —
 /// the running values of `fold` (Kotlin's `scan`).
-pub struct ScanIter<I :: [Iterator], A, E :: [Error]> :: [Iterator] {
+pub struct ScanIter<I :: [Iterator], A, E :: [Error] = never> :: [Iterator] {
     type Item = A;
     type Error = Join<I.Error, E>;
     var inner: I,

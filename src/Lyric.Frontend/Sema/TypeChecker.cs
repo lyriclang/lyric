@@ -761,6 +761,12 @@ public sealed class TypeChecker
         // it and monomorphized per conformer (04 D9) — through a value of the interface, the
         // interface is the conformer.
         var thisType = isInterface && ts.SelfParam is { } selfParam ? new TypeParamType(selfParam) : SelfType(ts);
+        // 'never' as a parameter's default (05 A7, "Review 2026-10-09" S5; M8c S20) stands where
+        // the bound is 'Error': 'MapIter<I, U>' is 'MapIter<I, U, never>'.
+        foreach (var generic in ts.Generics)
+            if (generic.Declaration is GenericParam { Default: { } fallback }
+                && ResolveType(fallback, DeclarationScope(ts)) is NeverType)
+                CheckNeverArgument(generic, fallback.Span);
         foreach (var m in members)
         {
             // Member attributes (2.1): the list parses on struct/class members; only the
