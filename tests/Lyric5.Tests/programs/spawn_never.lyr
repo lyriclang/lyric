@@ -14,7 +14,9 @@ fn main(): void throws Error {
             turns += 1;
         }
     });
-    try sleep(Duration.ofMillis(50));
+    // 200 ms for three turns of 5: Windows' timer ticks about every 16 ms, and 50 ms held three
+    // ticks at best - a loaded runner gave two (2026-10-12).
+    try sleep(Duration.ofMillis(200));
     forever.cancel();
     try {
         forever.await();
