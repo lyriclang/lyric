@@ -386,6 +386,12 @@ widerspricht, gilt die Zeile hier.
 | S3 | **`char`-Bereiche über ein internes `Step`** (bestätigt): `interface Step :: [TotalOrder]` in `std.core`, nicht `pub`, je ein Block für die acht Ganzzahltypen und `char`, wie Rusts `Step` — ein eigener Block für `Range<char>` neben dem für `Integer` wäre dieselbe Konformanz zweimal | T13 |
 | S16 | **Ein Literal an einem generischen Parameter, den ein früheres Argument auf `T[N]` bindet, nimmt `T[N]` als Ziel** (Rückfrage nach S15–S19): `assertEq(x.toBytesBE(), [2u8, 1u8])` ist heute `LYR-SEM0001` „cannot assign 'uint8[]' to 'uint8[2]'“ — die Inferenz bindet `T` aus dem ersten Argument und prüft das Literal nicht gegen `T` als Ziel; `let want: uint8[2] = …` geht. Uhr: M12, mit den übrigen Inferenz-Punkten | T8 |
 
+## Review 2026-10-12 — Nachtrag beim Bauen (M9a S11)
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| S11 | **Ein statisches Interface-Member mit Rumpf ist ein Default.** T5 ließ Statics nur deklarieren (`LYR-SEM0127`): ein Rumpf „liefe für keinen Typ“. Seit M9a S9 wird ein Default je Konformer an Ort und Stelle gesetzt — ein statischer genauso, `Self` der Konformer, `E.m(…)` und `T.m(…)` seine Instanz, ein eigenes Static des Konformers ersetzt ihn. Damit schreibt `std.core` R5s Enum-Reflexion (`Variants.all()`, `fromName`) als Default statt im Compiler, und ein Nutzer-Interface bekommt Fabriken mit Rumpf (`static fn two(): Self[] { … }`). `static let` deklariert weiter nur. Verworfen: die Statics als Quelltext synthetisieren (der zweite Mechanismus, den S10 gerade gelöscht hat) | T5; Spec 05 §2 Regel 2, 11 §4 Regel 5 |
+
 ---
 
 **Bereich 3 ist damit vollständig entschieden** (T1–T19, 2026-09-28).

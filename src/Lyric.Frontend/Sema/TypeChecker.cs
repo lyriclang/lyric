@@ -862,9 +862,12 @@ public sealed class TypeChecker
 
             if (m is not FunctionDecl fn) continue;
             if (!isInterface) RequireBody(fn, module);
-            // A static interface member declares and does not define (03 T5): a body would run
-            // for no type — 'T.parse(s)' is the conformer's static, direct under monomorphization.
-            if (isInterface && fn.IsStatic && fn.Body is not null)
+            // A static interface member with a body is a default in Lyric 5 (03 T5, "Review
+            // 2026-10-12"; M9a S11): set in place per conformer as an instance default is, 'E.m(…)'
+            // and 'T.m(…)' the conformer's instance of it. (Until S11 it declared only: a body
+            // "would run for no type" — S9's expansion gave it one per conformer.) The 4.x
+            // frontend keeps the rule: nothing sets a default in place there.
+            if (isInterface && fn.IsStatic && fn.Body is not null && !_comp.Lyric5Modules)
                 _de.Report("LYR-SEM0127", Severity.Error, fn.NameSpan,
                     $"'{fn.Name}' is a static member of an interface and declares only — it is implemented by every conforming type and reached as 'T.{fn.Name}(…)'; drop the body");
 
@@ -9524,6 +9527,9 @@ public sealed class TypeChecker
                     $"'{ext.Name}' is an instance method and needs a receiver — " +
                     $"call it on a value, or declare it 'static fn {member}(…)'"), ext),
 
+                // A static default of an interface the type conforms to (03 T5, M9a S11): the
+                // conformer's instance of it, 'Self' the conformer.
+                null when StaticDefaultOf(ts, member, instance ?? SelfType(ts)) is var (defaultType, defaultFn) => (defaultType, defaultFn),
                 null => (Report(span, "LYR-SEM0012",
                     $"'{ts.Name}' has no static member '{member}'",
                     NameSuggestion.Note(member, ts.Members.Symbols.Select(s => s.Name))), null),
@@ -12237,6 +12243,13 @@ public sealed class TypeChecker
             // a round per variant (M9a S10): 'v' that variant's info, 'e is v' and 'e.[v, p]' its forms
             foreach (var variant in MetaVariantsOf(about))
             {
+                // 'Variants' (09 A7 R5; M9a S11) is for an enum whose variants all are units: a
+                // variant with a payload has no value without it, said as such at the entry
+                if (_familyExpanding == "Variants" && variant.Payload.Length > 0)
+                {
+                    _de.Report("LYR-SEM0135", Severity.Error, fo.Span, $"the variant '{variant.Name}' has a payload, and no value without it");
+                    continue;
+                }
                 if (ReparsedLoop(fo) is not { } fresh) return;
                 var roundScope = new SymbolTable(scope);
                 var variable = new LocalSymbol(fo.Variable, element, false, fresh);
@@ -12416,7 +12429,17 @@ public sealed class TypeChecker
 
     private static bool IsFamily(TypeSymbol iface) =>
         iface.Home is { FullName: "std.core" }
-        && iface.Name is "Equatable" or "Hashable" or "Ordered" or "TotalOrder" or "Clone";
+        && iface.Name is "Equatable" or "Hashable" or "Ordered" or "TotalOrder" or "Clone" or "VariantName" or "Variants";
+
+    /// <summary>A static default of an interface <paramref name="ts"/> conforms to (03 T5; M9a
+    /// S11), reached as <c>E.m(…)</c>: its type with <c>Self</c> the conformer, or nothing.</summary>
+    private (LyrType, FunctionSymbol)? StaticDefaultOf(TypeSymbol ts, string member, LyrType self)
+    {
+        foreach (var (iface, subst) in InterfacesOf(ts))
+            if (iface.Members.LookupLocal(member) is FunctionSymbol { IsStatic: true, Declaration: FunctionDecl { Body: not null } } fn)
+                return (Substitute(FnTypeOf(fn), WithSelf(subst, iface, self)), fn);
+        return null;
+    }
 
     private const string RoundsMessage =
         "in a round of its own — here there is none: the type is known only per instance, or this is no such loop's variable";
