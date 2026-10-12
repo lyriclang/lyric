@@ -40,6 +40,14 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
             if (diagnostic.Severity == Severity.Error && _probe is { } probe && _muted == probe.Level) probe.Errors++;
             return;
         }
+        if (_within.Count > 0)
+        {
+            if (diagnostic.Severity is not Severity.Error) return;
+            var rounds = new List<DiagnosticNote>();
+            if (diagnostic.Notes is { } own) rounds.AddRange(own);
+            for (var i = _within.Count - 1; i >= 0; i--) rounds.Add(_within[i]);
+            diagnostic = diagnostic with { Notes = rounds };
+        }
         if (_sourceManager.OriginOf(diagnostic.Span.File) is { } origin)
         {
             // Nobody wrote a synthesized file, so a hint or warning about its style is nobody's
@@ -61,6 +69,31 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
             };
         }
         _diagnostics.Add(diagnostic);
+    }
+
+    private readonly List<DiagnosticNote> _within = [];
+
+    /// <summary>
+    /// While the scope lasts, an error is said with where it was set in place: a body checked
+    /// once per round or per conformer (M9a S9) reports at the line written once, and the note
+    /// names the round. A warning or a hint the written body has had already is not said again.
+    /// </summary>
+    public IDisposable Within(DiagnosticNote where)
+    {
+        _within.Add(where);
+        return new WithinScope(this);
+    }
+
+    private sealed class WithinScope(DiagnosticEngine owner) : IDisposable
+    {
+        private bool _done;
+
+        public void Dispose()
+        {
+            if (_done) return;
+            _done = true;
+            owner._within.RemoveAt(owner._within.Count - 1);
+        }
     }
 
     /// <summary>Takes back the warnings, notes and hints <paramref name="allowed"/> says yes to

@@ -146,6 +146,10 @@ public sealed record CallExpr(Expr Callee, Expr[] Arguments, Span Span,
     public (Expr Argument, Span Dots)[]? Spreads { get; init; }
 }
 public sealed record IndexExpr(Expr Target, Expr Index, Span Span) : Expr(Span);
+/// <summary><c>e.[f]</c> (design/v5/spec/09 A7 R2): the field of <c>e</c> that the variable of a
+/// <c>comptime for</c> over <c>std.meta.fields</c> names — set in place once per field, so each
+/// round has the field's own type (M9a S9).</summary>
+public sealed record FieldByInfoExpr(Expr Target, Expr Info, Span Span) : Expr(Span);
 /// <remarks>IsOptional means '?.' rather than '.'.</remarks>
 public sealed record MemberExpr(Expr Target, string Member, bool IsOptional, Span Span) : Expr(Span)
 {

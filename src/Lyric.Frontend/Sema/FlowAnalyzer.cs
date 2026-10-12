@@ -308,6 +308,7 @@ internal sealed class FlowAnalyzer
                 return;
             case MemberExpr m: AnalyzeExpr(m.Target, assigned); return;
             case IndexExpr ix: AnalyzeExpr(ix.Target, assigned); AnalyzeExpr(ix.Index, assigned); return;
+            case FieldByInfoExpr byInfo: AnalyzeExpr(byInfo.Target, assigned); AnalyzeExpr(byInfo.Info, assigned); return;
             case CastExpr cs: AnalyzeExpr(cs.Operand, assigned); return;
             case TypeTestExpr tt: AnalyzeExpr(tt.Operand, assigned); return;
             case RangeExpr r: AnalyzeExpr(r.Low, assigned); AnalyzeExpr(r.High, assigned); return;

@@ -739,6 +739,13 @@ public sealed class SemaRules
     /// </summary>
     private string? WhyNotWritable(Expr expr)
     {
+        // 'e.[f]' (M9a S9) is the member it stands for in its round; in the body checked once,
+        // where the field is no one's yet, nothing can be said
+        if (expr is FieldByInfoExpr byInfo)
+        {
+            if (_types.FieldMemberOf(byInfo) is not { } member) return null;
+            expr = member;
+        }
         switch (expr)
         {
             case IdentifierExpr id:
@@ -843,6 +850,11 @@ public sealed class SemaRules
     /// </summary>
     private string? WhyNotAPlace(Expr expr)
     {
+        if (expr is FieldByInfoExpr byInfo)
+        {
+            if (_types.FieldMemberOf(byInfo) is not { } member) return null;
+            expr = member;
+        }
         var type = _types.TypeOf(expr);
         if (type.IsError) return null;
 

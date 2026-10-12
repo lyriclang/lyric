@@ -42,6 +42,32 @@ public sealed partial class Parser
         _buffer = new TokenBuffer(sm, id, de);
     }
 
+    private Parser(SourceManager sm, DiagnosticEngine de, TokenBuffer buffer)
+    {
+        _sm = sm;
+        _de = de;
+        _buffer = buffer;
+    }
+
+    /// <summary>
+    /// The function declared at <paramref name="span"/>, parsed again into nodes of its own — the
+    /// same text, the same spans, nothing shared with the first parse (M9a S9: a body set in place
+    /// once per field, or per conformer, is checked once per round). Its attributes are the first
+    /// parse's and are skipped; what the parse reports, the first one did.
+    /// </summary>
+    public static FunctionDecl? FunctionAt(SourceManager sm, List<Token> tokens, Span span)
+    {
+        var de = new DiagnosticEngine(sm);
+        var parser = new Parser(sm, de, TokenBuffer.Range(span.File, de, tokens, span));
+        var start = parser._buffer.Current.Span;
+        if (parser.AtAttributeStart) parser.ParseAttributeList();
+        var visibility = parser.ParseVisibility();
+        var isStatic = parser._buffer.Match(TokenKind.Static);
+        return parser._buffer.Check(TokenKind.Fn) || parser._buffer.Check(TokenKind.Mut) || parser._buffer.Check(TokenKind.Inline)
+            ? parser.ParseFunctionDecl(visibility, start, isStatic)
+            : null;
+    }
+
     /// <summary>
     /// The '///' blocks of this file, keyed by the source offset of what follows them. A side table
     /// rather than a field on <see cref="Decl"/>: the AST records stay untouched, and so does every
@@ -433,6 +459,16 @@ public sealed partial class Parser
         {
             switch (_buffer.Current.TokenKind)
             {
+                case TokenKind.Dot when _sm.Lyric5 && _buffer.Peek(1).TokenKind == TokenKind.LBracket:
+                {
+                    // 'e.[f]' (09 A7 R2): the field a 'comptime for' over 'std.meta.fields' names
+                    _buffer.Advance();
+                    _buffer.Advance();
+                    var info = ParseExpr(0);
+                    var close = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0003", "expected ']' after the field's info");
+                    operand = new FieldByInfoExpr(operand, info, Span.Union(Whole(operand), close.Span));
+                    break;
+                }
                 case TokenKind.Dot:
                 {
                     _buffer.Advance();

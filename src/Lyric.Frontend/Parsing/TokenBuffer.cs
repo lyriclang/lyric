@@ -20,6 +20,27 @@ namespace Lyric.Parsing
         private readonly Dictionary<int, string> _docs = [];
         private int _pos = 0;
 
+        /// <summary>The tokens of a file, lexed again, for a part of it to be parsed again (M9a
+        /// S9). The file was lexed once already and what was wrong in it reported: what the lexer
+        /// says goes to <paramref name="de"/>, which the caller throws away.</summary>
+        public static List<Token> Lex(SourceManager sm, FileId id, DiagnosticEngine de) => new TokenBuffer(sm, id, de)._buffer;
+
+        /// <summary>The tokens within <paramref name="span"/>, an end behind them: a part of a file
+        /// to parse again into nodes of its own.</summary>
+        public static TokenBuffer Range(FileId id, DiagnosticEngine de, List<Token> tokens, Span span)
+        {
+            var part = tokens.Where(t => t.TokenKind != TokenKind.Eof && t.Span.Start >= span.Start && t.Span.End <= span.End).ToList();
+            part.Add(new Token(TokenKind.Eof, new Span(id, span.End, span.End)));
+            return new TokenBuffer(id, de, part);
+        }
+
+        private TokenBuffer(FileId id, DiagnosticEngine de, List<Token> tokens)
+        {
+            _id = id;
+            _de = de;
+            _buffer.AddRange(tokens);
+        }
+
         public TokenBuffer(SourceManager sm, FileId id, DiagnosticEngine de)
         {
             _id = id;

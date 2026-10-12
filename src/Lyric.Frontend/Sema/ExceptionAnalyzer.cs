@@ -387,6 +387,7 @@ internal sealed class ExceptionAnalyzer
             case CastExpr c: AnalyzeExpr(c.Operand); break;
             case TypeTestExpr tt: AnalyzeExpr(tt.Operand); break;
             case IndexExpr ix: AnalyzeExpr(ix.Target); AnalyzeExpr(ix.Index); Operator(ix); break;
+            case FieldByInfoExpr byInfo: AnalyzeExpr(byInfo.Target); AnalyzeExpr(byInfo.Info); break;
             case ArrayLitExpr arr: foreach (var e in arr.Elements) AnalyzeExpr(e); break;
             case TupleLitExpr tu: foreach (var e in tu.Elements) AnalyzeExpr(e); break;
             case StructInitExpr si: foreach (var f in si.Fields) AnalyzeExpr(f.Value); break;

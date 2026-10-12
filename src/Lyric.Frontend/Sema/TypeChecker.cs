@@ -1,5 +1,7 @@
 using Lyric.AST;
 using Lyric.Core;
+using Lyric.Lexing;
+using Lyric.Parsing;
 using Lyric.Resolver;
 
 namespace Lyric.Sema;
@@ -155,6 +157,10 @@ public sealed class TypeChecker
         _result.ConformanceBlock = ConformanceBlockFor;
         _result.Satisfies = SatisfiesAt;
         _result.ValueInterface = iface => ValueUsable(iface, out _);
+        _result.MetaFields = MetaFieldsOf;
+        _result.MetaVariants = MetaVariantsOf;
+        _result.MetaConformances = MetaConformancesOf;
+        _result.MetaMembers = MetaMembersOf;
         _result.Lyric5Modules = comp.Lyric5Modules;
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
         _backtrace = comp.FindModule(["std", "core"])?.Members.LookupLocal("Backtrace") as TypeSymbol is { Kind: TypeSymbolKind.Struct } backtrace ? backtrace : null;
@@ -386,6 +392,8 @@ public sealed class TypeChecker
         CheckExtensionBlocks(); // extend bodies, conformance
         CheckMethodSets();      // one name, one function per type (04 D2, D3)
         CheckStaticSets();      // one constant of a name per type (05 §6)
+        if (_comp.Lyric5Modules) ExpandMetaDefaults(); // 09 A5, A7
+        foreach (var asked in _metaAttributeCalls) CheckFieldAttributeQuery(asked); // R4
         if (_comp.Lyric5Modules) CheckInlineFunctions(); // 08 F6
         JudgeContextless(errorsAtStart); // the '[]' outside every function body
         _currentModule = null;
@@ -869,7 +877,10 @@ public sealed class TypeChecker
 
             // A static member has no receiver, so 'this' is not bound there; CheckExpr reports it as
             // LYR-SEM0008.
+            var savedIface = _metaIface;
+            _metaIface = isInterface ? ts : null;
             CheckFunction(fn, ts.Members, fn.IsStatic ? null : thisType);
+            _metaIface = savedIface;
         }
     }
 
@@ -1485,6 +1496,8 @@ public sealed class TypeChecker
                             _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
                                 $"the block on '{name}' does not implement abstract method '{im.Name}' of interface '{iface.Name}'{implied}",
                                 new DiagnosticNote(im.Span, $"'{im.Name}' is declared here"));
+                        else if (self is { } shapeType && TypeFacts.SymbolOf(shapeType) is { } shape)
+                            _inheritedDefaults.Add((iface, im, shape, shapeType));
                         continue;
                     }
                     var want = (FnType)ApplyAnswers(Substitute(FnTypeOf(FnSym(iface, im.Name)!), WithSelf(subst, iface, self)),
@@ -2227,6 +2240,7 @@ public sealed class TypeChecker
                             _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
                                 $"'{name}' does not implement abstract method '{im.Name}' of interface '{iface.Name}'{implied}",
                                 new DiagnosticNote(im.Span, $"'{im.Name}' is declared here"));
+                        else _inheritedDefaults.Add((iface, im, implementer, self ?? SelfType(implementer)));
                         continue; // a default method is inherited
                     }
                     var at = self ?? SelfType(implementer);
@@ -2661,6 +2675,8 @@ public sealed class TypeChecker
         var savedThis = _currentThis;
         var savedNarrowed = _narrowed;
         var savedContextless = _contextless;
+        var savedOuter = _outerFunction;
+        _outerFunction ??= fn;
         var errorsBefore = _de.ErrorCount;
         _currentThis = thisType;
         _narrowed = new(ReferenceEqualityComparer.Instance);
@@ -2735,6 +2751,7 @@ public sealed class TypeChecker
         _currentYield = savedYield;
         _currentThis = savedThis;
         _narrowed = savedNarrowed;
+        _outerFunction = savedOuter;
     }
 
     /// <summary>The empty array literals of the unit being checked — a function, or the rest of the
@@ -3037,6 +3054,13 @@ public sealed class TypeChecker
             else if (iterType is not (ArrayOf or InlineArrayOf))
                 _de.Report("LYR-SEM0100", Severity.Error, fo.Iterable.Span,
                     $"a 'comptime for' walks an array its site computes — this one is '{TypeFacts.Display(iterType)}'");
+        }
+        // 'comptime for (f in fields<T>())' (09 A7; M9a S9): the body once per field
+        if (fo.Comptime && fo.Pattern is null && fo.Iterable is ComptimeExpr walkedMeta && _result.IsMetaSite(walkedMeta)
+            && walkedMeta.Inner is CallExpr metaCall && iterType is ArrayOf metaArray)
+        {
+            CheckMetaLoop(fo, metaCall, metaArray.Element, scope);
+            return;
         }
         // Lyric 5 (10 B6 I2): anything but a range literal — the counted loop — and the shapes the
         // compiler walks itself goes through the protocol.
@@ -4156,6 +4180,7 @@ public sealed class TypeChecker
             case CastExpr c: return CheckCast(c, scope);
             case TypeTestExpr tt: return CheckTypeTest(tt, scope);
             case IndexExpr ix: return CheckIndex(ix, scope);
+            case FieldByInfoExpr byInfo: return CheckFieldByInfo(byInfo, scope, expected);
             case ArrayLitExpr arr: return CheckArrayLit(arr, scope, expected);
             case WithExpr w: return CheckWith(w, scope);
             case TupleLitExpr tu: return CheckTupleLiteral(tu, scope, expected);
@@ -6866,6 +6891,8 @@ public sealed class TypeChecker
         // the call leaves to its default.
         var args = ArrangeArguments(call, decl);
         _callees.Add(call.Callee);
+        if (_currentModule is { } asker && IsMetaQuery(fsym)) _result.SetMetaFrom(call, asker);
+        if (IsMetaQuery(fsym) && fsym!.Name == "attribute") _metaAttributeCalls.Add(call);
         // An 'inline fn' (08 F6) sets the lambda literals at its function parameters in place:
         // marked before phase C checks them, so their 'return' is the enclosing function's
         if (decl is { IsInline: true })
@@ -11724,6 +11751,15 @@ public sealed class TypeChecker
         var type = CheckExpr(ct.Inner, scope, expected);
         if (type.IsError) return type;
 
+        // A question to std.meta (09 A7; M9a S9) is a constant of the type it asks about, which in
+        // a generic body is known per instance: the lowering answers it there. No site — a site is
+        // evaluated once.
+        if (ct.Inner is CallExpr asked && IsMetaQuery(TargetSymbol(asked.Callee)))
+        {
+            _result.MarkMetaSite(ct);
+            return type;
+        }
+
         if (NoConstant(type, new HashSet<string>(StringComparer.Ordinal)) is { } why)
             return Report(ct.Span, "LYR-SEM0100",
                 "a 'comptime' expression has to produce a value the compiled module can hold as a literal — "
@@ -11745,6 +11781,19 @@ public sealed class TypeChecker
                     pure = false;
                     Report(t.Span, "LYR-SEM0100", "'this' cannot be used in a 'comptime' expression — "
                         + "it is evaluated before any receiver exists");
+                    return;
+                // A round's variable (M9a S9) is its field's info, a constant. One whose rounds come
+                // later stands in a body checked once and never built — its site is the rounds'.
+                case IdentifierExpr known when _result.RefOf(known) is LocalSymbol round
+                                              && (_result.KnownFieldOf(round) is not null || _metaPending.Contains(round)):
+                    if (_metaPending.Contains(round)) pure = false;
+                    return;
+                // a question to std.meta about a type known per instance, inside a larger site
+                case CallExpr metaCall when IsMetaQuery(TargetSymbol(metaCall.Callee))
+                                            && _result.TypeArgumentsOf(metaCall).Any(MentionsTypeParam):
+                    pure = false;
+                    Report(metaCall.Span, "LYR-SEM0100", "a 'comptime' expression is evaluated once, and this asks "
+                        + "'std.meta' about a type known only per instance — ask it alone, 'comptime …', or outside it");
                     return;
                 case IdentifierExpr id when _result.RefOf(id) is (LocalSymbol or ParameterSymbol) and var local && !Own(local):
                     pure = false;
@@ -12046,6 +12095,258 @@ public sealed class TypeChecker
         return new FnType(pTypes, ret) { Throws = thrown ?? EscapingOf(lam.Body), Places = places.Contains(true) ? places : [] };
     }
 
+    // ------------------------------------------------------------------ std.meta (09 A7; M9a S9)
+
+    /// <summary>'Self' read as a conformer while a default is set in place for it.</summary>
+    private (GenericParamSymbol Param, LyrType Type)? _selfAs;
+
+    /// <summary>The interface whose member is being checked: its defaults walk 'Self's fields.</summary>
+    private TypeSymbol? _metaIface;
+
+    /// <summary>The outermost function being checked — what a round parses again.</summary>
+    private FunctionDecl? _outerFunction;
+
+    /// <summary>The variables of loops over fields whose rounds come later: in the body checked
+    /// once, what 'e.[f]' reads is no one's yet.</summary>
+    private readonly HashSet<LocalSymbol> _metaPending = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The calls of <c>std.meta.attribute</c>, held to a round's variable once their
+    /// arguments are bound.</summary>
+    private readonly List<CallExpr> _metaAttributeCalls = [];
+
+    /// <summary>Every variable whose rounds came after its body was checked once.</summary>
+    private readonly HashSet<LocalSymbol> _metaPendingEver = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The type a round's variable holds a field of.</summary>
+    private readonly Dictionary<LocalSymbol, LyrType> _roundOwner = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The defaults set in place per conformer: their bodies walk 'Self's fields.</summary>
+    private readonly HashSet<FunctionDecl> _metaDefaults = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>Every default a conformer takes from an interface, with the conformer as 'Self'.</summary>
+    private readonly List<(TypeSymbol Iface, FunctionDecl Member, TypeSymbol Conformer, LyrType Self)> _inheritedDefaults = [];
+
+    /// <summary>A file's tokens, lexed once for every part of it parsed again.</summary>
+    private readonly Dictionary<FileId, List<Token>> _tokens = new();
+
+    /// <summary>A question of std.meta (09 A7): a function of its without a body, which the
+    /// compiler answers.</summary>
+    private static bool IsMetaQuery(Symbol? symbol) =>
+        symbol is FunctionSymbol { Declaration: FunctionDecl { Body: null } } && symbol.Home is { FullName: "std.meta" };
+
+    /// <summary>
+    /// <c>comptime for (f in fields&lt;T&gt;())</c> (design/v5/spec/09 A7 R1, R2; 13 M9a P5, S9).
+    /// The body is checked once, <c>f</c> a <c>FieldInfo</c>: what it names is bound, and what is
+    /// wrong in it is said once. Where <c>T</c> is a type whose fields the checker reads here and
+    /// the body reads a field through <c>e.[f]</c> or asks a <c>comptime</c> site about <c>f</c>,
+    /// the body is then parsed again once per field and checked with <c>f</c> that field's info
+    /// and <c>e.[f]</c> that field, of its own type — the rounds the lowering builds. A default's
+    /// <c>Self</c> is known per conformer: the default is set in place for each
+    /// (<see cref="ExpandMetaDefaults"/>). A type known only per instance elsewhere has its
+    /// rounds built by the lowering, one body for all, and nothing for <c>e.[f]</c> to read
+    /// (<c>LYR-SEM0185</c>).
+    /// </summary>
+    private void CheckMetaLoop(ForInStmt fo, CallExpr asked, LyrType element, SymbolTable scope)
+    {
+        var question = TargetSymbol(asked.Callee) as FunctionSymbol;
+        var about = _result.TypeArgumentsOf(asked) is [var only, ..] ? only : LyrType.Error;
+        var reads = Descendants(fo.Body).Any(n => n is FieldByInfoExpr or ComptimeExpr or IfStmt { Comptime: true } or ForInStmt { Comptime: true }
+            || n is CallExpr { Callee: IdentifierExpr { Name: "attribute" } or MemberExpr { Member: "attribute" } });
+        var overFields = question?.Name == "fields";
+        var known = overFields && about is not (TypeParamType or AssocOf or ErrorType);
+        var perConformer = overFields && about is TypeParamType { Param: var param }
+                           && _metaIface?.SelfParam is { } self && ReferenceEquals(param, self);
+        var rounds = reads && known && _outerFunction is not null;
+
+        var loopScope = new SymbolTable(scope);
+        var loopVar = new LocalSymbol(fo.Variable, element, false, fo);
+        loopScope.TryDeclare(loopVar);
+        _result.BindRef(fo, loopVar);
+        if (rounds || perConformer && reads)
+        {
+            _metaPending.Add(loopVar);
+            _metaPendingEver.Add(loopVar);
+        }
+        var errorsBefore = _de.ErrorCount;
+        CheckBlock(fo.Body, loopScope);
+        _metaPending.Remove(loopVar);
+        if (perConformer && reads && _outerFunction is { } @default && _de.ErrorCount == errorsBefore)
+            _metaDefaults.Add(@default);
+        if (!rounds || _de.ErrorCount != errorsBefore) return;
+
+        var built = new List<TypeResult.MetaRound>();
+        foreach (var field in MetaFieldsOf(about, _currentModule))
+        {
+            if (ReparsedLoop(fo) is not { } fresh) return;
+            var roundScope = new SymbolTable(scope);
+            var variable = new LocalSymbol(fo.Variable, element, false, fresh);
+            roundScope.TryDeclare(variable);
+            _result.BindRef(fresh, variable);
+            _result.SetKnownField(variable, field);
+            _roundOwner[variable] = about;
+            using (_de.Within(new DiagnosticNote(field.Symbol?.Declaration?.Span ?? fo.Span,
+                       $"in the round for the field '{field.Name}' of '{TypeFacts.Display(about)}'")))
+                CheckBlock(fresh.Body, roundScope);
+            built.Add(new TypeResult.MetaRound(fresh.Body, variable, field));
+            _result.ReparsedRoots.Add(fresh);
+        }
+        _result.SetMetaRounds(fo, [.. built]);
+    }
+
+    /// <summary><c>std.meta.attribute&lt;A&gt;(f)</c> (R4): <c>f</c> the variable of a loop over
+    /// fields, whose round knows the field — or whose rounds come later.</summary>
+    private void CheckFieldAttributeQuery(CallExpr call)
+    {
+        if (call.Arguments is [IdentifierExpr named] && _result.RefOf(named) is LocalSymbol round
+            && (_result.KnownFieldOf(round) is not null || _metaPendingEver.Contains(round)))
+            return;
+        _de.Report("LYR-SEM0185", Severity.Error, call.Span,
+            "'attribute' reads the field that the variable of a 'comptime for' over 'std.meta.fields' names, in a round of its own — "
+            + "here there is none: the type's fields are known only per instance, or this is no such loop's variable");
+    }
+
+    /// <summary><c>e.[f]</c> (09 A7 R2; M9a S9): in a round, the field whose info <c>f</c> holds —
+    /// the member access it is, checked as one; in a body checked once whose rounds come later,
+    /// no one's yet.</summary>
+    private LyrType CheckFieldByInfo(FieldByInfoExpr access, SymbolTable scope, LyrType? expected)
+    {
+        CheckExpr(access.Info, scope);
+        var round = access.Info is IdentifierExpr ? _result.RefOf(access.Info) as LocalSymbol : null;
+        var target = CheckExpr(access.Target, scope);
+        if (round is not null && _result.KnownFieldOf(round) is { } field)
+        {
+            var owner = _roundOwner[round];
+            if (!target.IsError && !LyrType.Equal(target, owner))
+                return Report(access.Target.Span, "LYR-SEM0185",
+                    $"'{_comp.TextOf(access.Info.Span)}' holds a field of '{TypeFacts.Display(owner)}', and this is '{TypeFacts.Display(target)}'");
+            var member = new MemberExpr(access.Target, field.Name, false, access.Span) { MemberSpan = access.Info.Span };
+            var savedTarget = _typedTarget;
+            _typedTarget = access.Target;
+            var type = CheckExpr(member, scope, expected);
+            _typedTarget = savedTarget;
+            _result.SetFieldMember(access, member);
+            return type;
+        }
+        if (round is not null && _metaPending.Contains(round)) return LyrType.Error;
+        return Report(access.Span, "LYR-SEM0185",
+            "'e.[f]' reads the field that the variable of a 'comptime for' over 'std.meta.fields' names, in a round of its own — "
+            + "here there is none: the type's fields are known only per instance, or this is no such loop's variable");
+    }
+
+    /// <summary>
+    /// The defaults that walk <c>Self</c>'s fields (09 A5, A7; M9a S9), set in place for each
+    /// conformer that takes them: the default parsed again and checked as the conformer's —
+    /// <c>Self</c> and <c>this</c> the conformer, the scope the interface's, so it names what the
+    /// interface's module names. Its rounds come with the check; the lowering builds the
+    /// conformer's instance of the default from it. An error there names the conformer.
+    /// </summary>
+    private void ExpandMetaDefaults()
+    {
+        foreach (var (iface, member, conformer, self) in _inheritedDefaults)
+        {
+            if (!_metaDefaults.Contains(member) || _result.ExpansionOf(member, conformer) is not null) continue;
+            if (iface.SelfParam is not { } selfParam || Reparsed(member) is not { } fresh) continue;
+            var saved = (_currentModule, _selfAs, _metaIface);
+            (_currentModule, _selfAs, _metaIface) = (iface.Home, (selfParam, self), null);
+            var at = conformer.Declaration is INamedDecl named ? named.NameSpan : conformer.Declaration?.Span ?? member.Span;
+            using (_de.Within(new DiagnosticNote(at, $"'{member.Name}' of '{iface.Name}' set in place for '{conformer.Name}', which takes it")))
+                CheckFunction(fresh, iface.Members, self);
+            (_currentModule, _selfAs, _metaIface) = saved;
+            _result.SetExpansion(member, conformer, fresh);
+            _result.ReparsedRoots.Add(fresh);
+        }
+    }
+
+    /// <summary>The comptime loop at <paramref name="loop"/>'s place in its function parsed again.</summary>
+    private ForInStmt? ReparsedLoop(ForInStmt loop) =>
+        _outerFunction is { } outer && Reparsed(outer) is { } fresh
+            ? Descendants(fresh).OfType<ForInStmt>().FirstOrDefault(f => f.Comptime && f.Span == loop.Span)
+            : null;
+
+    /// <summary>A function parsed again from its text: nodes of its own, the same spans.</summary>
+    private FunctionDecl? Reparsed(FunctionDecl original)
+    {
+        var file = original.Span.File;
+        if (!_tokens.TryGetValue(file, out var tokens))
+            _tokens[file] = tokens = TokenBuffer.Lex(_comp.Sources, file, new DiagnosticEngine(_comp.Sources));
+        return Parser.FunctionAt(_comp.Sources, tokens, original.Span);
+    }
+
+    /// <summary>The fields of a struct or a class that <paramref name="from"/> may name (09 A7
+    /// R1, R7), in declaration order, of the instance's types; none of any other type.</summary>
+    private TypeResult.MetaField[] MetaFieldsOf(LyrType type, ModuleSymbol? from)
+    {
+        if (TypeFacts.SymbolOf(type) is not { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class } ts) return [];
+        var declared = ts.Declaration switch
+        {
+            StructDecl s => s.Members.OfType<FieldDecl>(),
+            ClassDecl c => c.Members.OfType<FieldDecl>(),
+            _ => [],
+        };
+        var subst = type is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+        var fields = new List<TypeResult.MetaField>();
+        foreach (var written in declared)
+        {
+            if (ts.Members.LookupLocal(written.Name) is not FieldSymbol symbol) continue;
+            if (from is not null && !_comp.Visible(symbol, from)) continue;
+            var fieldType = FieldType(symbol);
+            fields.Add(new(written.Name, type is GenericInstance ? Substitute(fieldType, subst) : fieldType,
+                fields.Count, symbol.Visibility, written.IsVar, symbol));
+        }
+        return [.. fields];
+    }
+
+    /// <summary>The functions of a type's own body that <paramref name="from"/> may name, in
+    /// declaration order.</summary>
+    private TypeResult.MetaMember[] MetaMembersOf(LyrType type, ModuleSymbol? from)
+    {
+        if (TypeFacts.SymbolOf(type) is not { } ts) return [];
+        IEnumerable<FunctionDecl> own = ts.Declaration switch
+        {
+            StructDecl s => s.Members.OfType<FunctionDecl>(),
+            ClassDecl c => c.Members.OfType<FunctionDecl>(),
+            EnumDecl e => e.Methods,
+            InterfaceDecl i => i.Members,
+            _ => [],
+        };
+        var members = new List<TypeResult.MetaMember>();
+        foreach (var fn in own)
+        {
+            if (ts.Members.FunctionFor(fn.Name, fn) is not { } symbol) continue;
+            if (from is not null && !_comp.Visible(symbol, from)) continue;
+            members.Add(new(fn.Name, symbol.Visibility, fn.IsStatic, fn.IsMut));
+        }
+        return [.. members];
+    }
+
+    /// <summary>The variants of an enum, in declaration order, their payloads' fields — a
+    /// positional one named by its position.</summary>
+    private TypeResult.MetaVariant[] MetaVariantsOf(LyrType type)
+    {
+        if (TypeFacts.SymbolOf(type) is not { Kind: TypeSymbolKind.Enum, Declaration: EnumDecl e } ts) return [];
+        var subst = type is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+        LyrType Of(TypeNode written) =>
+            type is GenericInstance ? Substitute(ResolveType(written, ts.Members), subst) : ResolveType(written, ts.Members);
+        return [.. e.Variants.Select((v, i) => new TypeResult.MetaVariant(v.Name, i, v.StructFields is { } named
+            ? [.. named.Select((f, j) => new TypeResult.MetaField(f.Name, Of(f.Type), j, Visibility.Public, false, null))]
+            : [.. (v.TupleFields ?? []).Select((t, j) => new TypeResult.MetaField(
+                j.ToString(System.Globalization.CultureInfo.InvariantCulture), Of(t), j, Visibility.Public, false, null))]))];
+    }
+
+    /// <summary>The interfaces a type conforms to — its list's, its blocks', their parents —, in
+    /// the order the modules declare them.</summary>
+    private TypeSymbol[] MetaConformancesOf(LyrType type)
+    {
+        var found = new List<TypeSymbol>();
+        foreach (var module in _comp.Modules)
+            foreach (var decl in _comp.AstOf(module).Declarations)
+                if (decl is InterfaceDecl { Generics.Length: 0 } written
+                    && module.Members.LookupLocal(written.Name) is TypeSymbol { Kind: TypeSymbolKind.Interface } iface
+                    && SatisfiesAt(type, iface))
+                    found.Add(iface);
+        return [.. found];
+    }
+
     /// <summary>Every callee a call names: an 'inline fn' (08 F6) is called, never a value.</summary>
     private readonly HashSet<Expr> _callees = new(ReferenceEqualityComparer.Instance);
 
@@ -12295,6 +12596,7 @@ public sealed class TypeChecker
                 case TypeTestExpr tt2: WalkNode(tt2.Operand); return;
                 case CallExpr call: WalkNode(call.Callee); foreach (var a in call.Arguments) WalkNode(a); return;
                 case IndexExpr ix: WalkNode(ix.Target); WalkNode(ix.Index); return;
+                case FieldByInfoExpr byInfo: WalkNode(byInfo.Target); WalkNode(byInfo.Info); return;
                 case MemberExpr mem: WalkNode(mem.Target); return;
                 case ComptimeExpr ct: WalkNode(ct.Inner); return;
                 case ThrowExpr te: WalkNode(te.Value); return;
@@ -12927,7 +13229,9 @@ public sealed class TypeChecker
                 // 'Self' in the body of a generic type is the type at its own parameters (03 T5).
                 if (n.Path is ["Self"] && n.TypeArguments.Length == 0 && sym is TypeSymbol { Generics.Length: > 0 } selfType)
                     return new GenericInstance(selfType, selfType.Generics.Select(g => (LyrType)new TypeParamType(g)).ToArray());
-                if (sym is GenericParamSymbol gp) return new TypeParamType(gp);
+                // 'Self' of a default set in place for a conformer (M9a S9) is the conformer
+                if (sym is GenericParamSymbol gp)
+                    return _selfAs is { } selfAs && ReferenceEquals(selfAs.Param, gp) ? selfAs.Type : new TypeParamType(gp);
                 if (ReferenceEquals(sym, _slice)) // Slice<T> becomes the internal SliceOf
                 {
                     if (n.TypeArguments.Length != 1)

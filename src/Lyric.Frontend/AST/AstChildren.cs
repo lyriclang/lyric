@@ -321,6 +321,11 @@ public static class AstChildren
                 yield return i.Index;
                 break;
 
+            case FieldByInfoExpr byInfo:
+                yield return byInfo.Target;
+                yield return byInfo.Info;
+                break;
+
             case MemberExpr m:
                 // The member NAME is not a node of its own. Whoever wants it has to read it off this
                 // node, which is why the search hands out the whole path rather than one node.
