@@ -162,6 +162,13 @@ public enum TokenKind
     // This
     This,
 
+    // The compile-time words (design/v5/spec/08 Y1; 13 M9a P4): Lyric 5's, names in 4.x. Only
+    // 'comptime' has a form yet; 'inline', 'quote' and 'macro' are reserved for theirs.
+    Comptime,
+    Inline,
+    Quote,
+    Macro,
+
     // Doc comments
     DocComment
 }

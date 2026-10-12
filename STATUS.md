@@ -962,6 +962,11 @@ M9b the maintainer is asked again.
   structs, enums, `Box`. A class's object, a view, a function value, a coroutine and an interface
   value are refused with the reason (`LYR-SEM0100`). `_` binds nothing, found by the probes. Spec
   11 §2 rule 1, 07 §4 rule 2; four cases.
+- **S3** the forms and the words (P4): `comptime { … }`, a block whose last expression is the
+  value, with locals, loops and lambdas of its own; `comptime if`, its condition a site and its
+  `else if`s choosing the same way — every branch checked, the chosen one lowered; `comptime for`
+  over an array a site computes, its body unrolled per element. `comptime`, `inline`, `quote` and
+  `macro` are words in Lyric 5. Spec 11 §2 rules 6–8, 01 §3; six cases, two older ones renamed.
 
 ## Design decisions
 

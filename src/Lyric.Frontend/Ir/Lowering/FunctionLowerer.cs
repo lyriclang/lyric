@@ -1775,6 +1775,11 @@ internal sealed class FunctionLowerer
     /// </summary>
     private bool LowerIf(IfStmt stmt)
     {
+        // 'comptime if' (09 Q2): with the evaluator's values in hand, the branch its condition
+        // chose and nothing of the other; in the hoisting pass, the 'if' it is
+        if (stmt.Comptime && stmt.Condition is ComptimeExpr site && ComptimeValue(site) is BoolConst chosen)
+            return chosen.Value ? LowerScope(stmt.Then) : stmt.Else is not { } other || LowerStmt(other);
+
         if (stmt.Condition is LetCondExpr letCond) return LowerIfLet(stmt, letCond);
 
         var condition = LowerExpr(stmt.Condition);
@@ -1834,6 +1839,9 @@ internal sealed class FunctionLowerer
     {
         if (_types.RefOf(stmt) is not LocalSymbol loopVar)
             throw Bug($"loop variable '{stmt.Variable}' was not bound by the type checker");
+
+        if (stmt.Comptime && stmt.Iterable is ComptimeExpr walked && ComptimeValue(walked) is ArrayConst elements)
+            return LowerUnrolled(stmt, elements, loopVar);
 
         if (stmt.Pattern is null && stmt.Iterable is RangeExpr literal
             && SubstituteType(_types.TypeOf(stmt.Iterable)) is RangeOf)
@@ -1908,6 +1916,44 @@ internal sealed class FunctionLowerer
         _loops.Pop();
 
         _b.SwitchTo(exitBlock);
+        return true;
+    }
+
+    /// <summary>
+    /// <c>comptime for (x in w)</c> (design/v5/spec/09 Q2): the body once per element of the
+    /// array its site computed, <c>x</c> that element's value, built where the round begins. A
+    /// round's <c>continue</c> goes on with the next round, a <c>break</c> past the last; each
+    /// round has a loop scope of its own whose targets arise only where a jump asks for them, and
+    /// a round nobody reaches is not lowered.
+    /// </summary>
+    private bool LowerUnrolled(ForInStmt stmt, ArrayConst elements, LocalSymbol loopVar)
+    {
+        var span = stmt.Span;
+        var element = LowerType(loopVar.Type, span);
+        var variable = _slots.DeclareFor(loopVar, element);
+        var breaks = new List<BlockId>();
+        var reached = true;
+        foreach (var value in elements.Elements)
+        {
+            _b.Emit(new StoreLocal(variable, EmitComptimeValue(value, element, span), span));
+            var round = new LoopScope(_b) { DeferDepth = _defers.Count, Label = stmt.Label };
+            _loops.Push(round);
+            var fallsThrough = LowerScope(stmt.Body);
+            _loops.Pop();
+            if (round.BreakRequested) breaks.Add(round.BreakTarget);
+            reached = fallsThrough || round.ContinueRequested;
+            if (!reached) break;
+            var next = _b.NewBlock();
+            if (fallsThrough) _b.Seal(new Branch(next, stmt.Body.Span));
+            if (round.ContinueRequested) _b.SealBlock(round.ContinueTarget, new Branch(next, span));
+            _b.SwitchTo(next);
+        }
+        if (breaks.Count == 0) return reached;
+
+        var exit = _b.NewBlock();
+        if (reached) _b.Seal(new Branch(exit, span));
+        foreach (var broken in breaks) _b.SealBlock(broken, new Branch(exit, span));
+        _b.SwitchTo(exit);
         return true;
     }
 
@@ -3214,17 +3260,18 @@ internal sealed class FunctionLowerer
     /// hoisting pass and in a check it is the inner expression, computed where it stands — the
     /// same value, so the two lowerings agree by construction. See <see cref="ComptimeTable"/>.
     /// </summary>
-    private TempId? LowerComptime(ComptimeExpr expr)
-    {
-        if (_typeTable.Comptime is { Values: { } values })
-        {
-            var index = _types.ComptimeSites.IndexOf(expr);
-            if (index < 0 || !values.TryGetValue(index, out var constant))
-                throw Bug($"comptime site at {expr.Span} has no evaluated value");
-            return EmitComptimeValue(constant, TypeOfExpr(expr), expr.Span);
-        }
+    private TempId? LowerComptime(ComptimeExpr expr) =>
+        ComptimeValue(expr) is { } constant ? EmitComptimeValue(constant, TypeOfExpr(expr), expr.Span) : LowerExpr(expr.Inner);
 
-        return LowerExpr(expr.Inner);
+    /// <summary>A site's value from the evaluator; <c>null</c> in the hoisting pass and in a check,
+    /// where the site is the expression it holds.</summary>
+    private IrConstValue? ComptimeValue(ComptimeExpr site)
+    {
+        if (_typeTable.Comptime is not { Values: { } values }) return null;
+        var index = _types.ComptimeSites.IndexOf(site);
+        return index >= 0 && values.TryGetValue(index, out var value)
+            ? value
+            : throw Bug($"comptime site at {site.Span} has no evaluated value");
     }
 
     /// <summary>

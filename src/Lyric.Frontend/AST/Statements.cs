@@ -52,7 +52,12 @@ public sealed record LetPatternStmt(bool IsMutable, Pattern Pattern, TypeNode? T
     Expr Initializer, Block? Else, Span Span) : Stmt(Span);
 
 // Else is a block, an IfStmt (else-if) or null.
-public sealed record IfStmt(Expr Condition, Block Then, Stmt? Else, Span Span) : Stmt(Span);
+public sealed record IfStmt(Expr Condition, Block Then, Stmt? Else, Span Span) : Stmt(Span)
+{
+    /// <summary><c>comptime if</c> (design/v5/spec/09 Q2): <see cref="Condition"/> is a
+    /// <c>comptime</c> site; both branches are checked, the one it chooses is lowered.</summary>
+    public bool Comptime { get; init; }
+}
 
 // A loop may carry a label ('outer: while (…) { … }'), the target of 'break outer' and
 // 'continue outer'. Labels are no symbols: they live beside the value namespace, scoped to the
@@ -79,6 +84,11 @@ public sealed record ForInStmt(string Variable, Expr Iterable, Block Body, Span 
     /// name. <see cref="Variable"/> is then <c>_</c> — the element still gets a slot, and the
     /// pattern takes it apart at the top of every iteration.</summary>
     public Pattern? Pattern { get; init; }
+
+    /// <summary><c>comptime for</c> (design/v5/spec/09 Q2): <see cref="Iterable"/> is a
+    /// <c>comptime</c> site holding an array; the body is checked once and lowered once for each
+    /// element, the variable that element's value.</summary>
+    public bool Comptime { get; init; }
 
     string INamedDecl.Name => Variable;
 }

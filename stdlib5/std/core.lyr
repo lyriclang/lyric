@@ -1172,12 +1172,12 @@ fn debugText(out: StringBuilder, s: StringView): void {
     out.appendChar('"');
 }
 
-/// One character as `Debug` writes it between `quote`s (10 S14): `\\`, the quote, `\n`, `\r`,
+/// One character as `Debug` writes it between `mark`s (10 S14): `\\`, the mark, `\n`, `\r`,
 /// `\t` and `\0` escaped; a character that does not print as itself as `\u{…}`, its scalar value
 /// in hex.
-fn escapeTo(out: StringBuilder, c: char, quote: char): void {
+fn escapeTo(out: StringBuilder, c: char, mark: char): void {
     let n = c as uint32;
-    if (c == quote || c == '\\') {
+    if (c == mark || c == '\\') {
         out.appendChar('\\');
         out.appendChar(c);
     } else if (c == '\n') {

@@ -131,8 +131,17 @@ public sealed class Lexer
         { "false", TokenKind.False },
         { "null", TokenKind.Null },
 
-        { "this", TokenKind.This }
+        { "this", TokenKind.This },
+
+        { "comptime", TokenKind.Comptime },
+        { "inline", TokenKind.Inline },
+        { "quote", TokenKind.Quote },
+        { "macro", TokenKind.Macro },
     };
+
+    /// <summary>The words Lyric 5 reserves for its compile-time forms (08 Y1): names in 4.x.</summary>
+    private static bool IsCompileTimeWord(TokenKind kind) =>
+        kind is TokenKind.Comptime or TokenKind.Inline or TokenKind.Quote or TokenKind.Macro;
 
     /// <summary>The reverse of <see cref="Keywords"/>: how a keyword kind was written, or null for
     /// every other kind. Built from the same table, because a second list of the words would be a
@@ -397,8 +406,11 @@ public sealed class Lexer
             return new Token(TokenKind.Identifier, new Span(_file, identifierStart, _pos));
         }
         // Lyric 5 drops 'module' and 'params' as words (08 Y1): names, which the parser still reads
-        // at the two places the words stood, to say what replaced them.
-        if (Keywords.TryGetValue(lexme, out var kind) && !(_sources.Lyric5 && kind is TokenKind.Module or TokenKind.Params))
+        // at the two places the words stood, to say what replaced them. It takes the compile-time
+        // words, which stay names in 4.x.
+        if (Keywords.TryGetValue(lexme, out var kind)
+            && !(_sources.Lyric5 && kind is TokenKind.Module or TokenKind.Params)
+            && !(!_sources.Lyric5 && IsCompileTimeWord(kind)))
             return new Token(kind, new Span(_file, identifierStart, _pos));
 
         return new Token(TokenKind.Identifier, new Span(_file, identifierStart, _pos));

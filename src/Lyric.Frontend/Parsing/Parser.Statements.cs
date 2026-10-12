@@ -35,6 +35,9 @@ public sealed partial class Parser
         TokenKind.Identifier when IsLoopAhead(0) => LoopStatement(ParseLoop(null, default)),
         TokenKind.LBrace => ParseBlock(),
         TokenKind.Let or TokenKind.Var => ParseBinding(),
+        // 'comptime if' and 'comptime for' (design/v5/spec/09 Q2); 'comptime e;' is an
+        // expression statement, as any other expression.
+        TokenKind.Comptime when _buffer.Peek(1).TokenKind is TokenKind.If or TokenKind.For => ParseComptimeStatement(),
         // In a value block an 'if' may be an expression (08 Y4, the tail rule): the form without
         // braces, and the block form with its 'else' standing last — the block's value.
         TokenKind.If when _allowTail && IfIsExpression(0) => ParseExprStmt(),
@@ -365,6 +368,33 @@ public sealed partial class Parser
         }
         return new IfStmt(cond, then, elseBranch, Span.Union(kw.Span, end));
     }
+
+    /// <summary>
+    /// <c>comptime if (c) { … } else { … }</c> and <c>comptime for (x in w) { … }</c> (design/v5/
+    /// spec/09 Q2): the condition, or the value walked, becomes a <c>comptime</c> site; the rest
+    /// is the <c>if</c> or the <c>for</c> it was — checked whole, then its branch chosen or its
+    /// rounds unrolled where it is lowered. An <c>else if</c> after it chooses at compile time
+    /// too: one chain, one kind of choice.
+    /// </summary>
+    private Stmt ParseComptimeStatement()
+    {
+        var kw = _buffer.Advance(); // comptime
+        return _buffer.Check(TokenKind.If)
+            ? ComptimeIf((IfStmt)ParseIf(), kw.Span)
+            : ParseForIn() is ForInStmt f
+                ? f with { Iterable = new ComptimeExpr(f.Iterable, f.Iterable.Span), Comptime = true, Span = Span.Union(kw.Span, f.Span) }
+                : throw new InvalidOperationException("a 'for' parsed as no for statement");
+    }
+
+    /// <summary>A chain of <c>if</c>s as one compile-time choice. A <c>let</c> condition binds a
+    /// value of the run and stays as written, for the checker to refuse.</summary>
+    private static IfStmt ComptimeIf(IfStmt s, Span? keyword) => s with
+    {
+        Condition = s.Condition is LetCondExpr ? s.Condition : new ComptimeExpr(s.Condition, s.Condition.Span),
+        Else = s.Else is IfStmt next ? ComptimeIf(next, null) : s.Else,
+        Comptime = true,
+        Span = keyword is { } at ? Span.Union(at, s.Span) : s.Span,
+    };
 
     /// <summary>
     /// Is the 'if' <paramref name="at"/> tokens ahead — the start of a statement in a value block
