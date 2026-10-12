@@ -1,0 +1,42 @@
+// Constants (13 M9a S12): a module 'let' is filled once before 'main', in declaration order. A
+// 'comptime' one is computed while compiling and stands in the program as data — what computes it
+// is not built, and nothing of it is carried where nothing reads it.
+import std.io { println };
+import std.core { arrayOf };
+
+let VERSION = "1.0";
+let BANNER = "lyric " + VERSION;
+
+fn fib(n: int): int {
+    return if (n < 2) n else fib(n - 1) + fib(n - 2);
+}
+
+// fib(30) is 1.6 million calls while compiling, none at run time
+let FIB30: int = comptime fib(30);
+
+let SQUARES: int[] = comptime arrayOf(8, (i: int) => i * i);
+
+struct Vector2 {
+    var x: int,
+    var y: int,
+
+    static let ORIGIN: Vector2 = Vector2 { x = 0, y = 0 };
+
+    fn sum(): int {
+        return this.x + this.y;
+    }
+}
+
+let UNIT: Vector2 = comptime Vector2 { x = 1, y = 1 };
+
+fn main(): void {
+    println(BANNER);
+    println(f"{FIB30}");
+    println(f"{SQUARES[7]} {SQUARES.length()}");
+    println(f"{Vector2.ORIGIN.sum()} {UNIT.sum()}");
+    comptime if (target.pointerWidth == 64) {
+        println("64 bits");
+    } else {
+        println(f"{target.pointerWidth} bits");
+    }
+}

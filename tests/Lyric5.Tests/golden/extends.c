@@ -77,8 +77,8 @@ typedef struct { LyrObj header; lyr_ty_app_main_Pair_string__string__246b3e39 va
 _Static_assert(sizeof(lyr_box_ty_app_main_Pair_string__string__246b3e39) == 24, "layout of lyr_box_ty_app_main_Pair_string__string__246b3e39");
 _Static_assert(offsetof(lyr_box_ty_app_main_Pair_string__string__246b3e39, value) == 8, "layout of lyr_box_ty_app_main_Pair_string__string__246b3e39");
 extern const LyrItable lyr_itab_ty_app_main_Pair_string__string__246b3e39[];
-static const uint64_t lyr_refmap_box37[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_box_ty_app_main_Pair_string__string__246b3e39 = { sizeof(lyr_box_ty_app_main_Pair_string__string__246b3e39), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box37, "box<app.main.Pair<string, string>>", lyr_itab_ty_app_main_Pair_string__string__246b3e39 };
+static const uint64_t lyr_refmap_box36[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_box_ty_app_main_Pair_string__string__246b3e39 = { sizeof(lyr_box_ty_app_main_Pair_string__string__246b3e39), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box36, "box<app.main.Pair<string, string>>", lyr_itab_ty_app_main_Pair_string__string__246b3e39 };
 
 /* string literals */
 static const LyrStaticStr(2) lyr_lit0 = LYR_STR_INIT("a");
