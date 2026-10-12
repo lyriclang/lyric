@@ -1,0 +1,16 @@
+// A struct with a large inline array field: its synthesized equality, hash and debug text take
+// the field whole (M8c S17; design 04 "Review 2026-10-09" S3b) — one call each through the
+// length's blocks, not a branch per element. Exits 0 when the comparisons and the set agree.
+struct Page :: [Equatable, Hashable] { id: int, bytes: uint8[4096] }
+
+fn main(): int {
+    var a: uint8[4096] = [0u8] * 4096;
+    let p = Page { id = 1, bytes = a };
+    a[4095] = 9u8;
+    let q = Page { id = 1, bytes = a };
+    let s: Set<Page> = [p, q, p];
+    if (p == q || !(p == p) || s.length() != 2 || !s.contains(q)) {
+        return 1;
+    }
+    return 0;
+}

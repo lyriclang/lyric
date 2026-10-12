@@ -360,6 +360,22 @@ public class CEmitterTests
         Assert.Contains("lyr_task_set_scheduler", tasks);
     }
 
+    /// <summary>
+    /// A struct's synthesized conformances take an inline array field whole (M8c S17; design 04
+    /// "Review 2026-10-09" S3b): a <c>uint8[4096]</c> field is one comparison and one hash call
+    /// through its length's blocks. Unrolled, as before, the C held a branch per element — some
+    /// 200 000 lines for this program; whole it is about 5 000.
+    /// </summary>
+    [Fact]
+    public void A_large_inline_array_field_is_compared_and_hashed_whole()
+    {
+        var units = EmitC("inline_fields");
+        var lines = CEmitter.Join(units).Count(c => c == '\n');
+        Assert.True(lines < 20_000, $"{lines} lines of C");
+        var result = RuntimeBuildTests.RunEmitted(units, "inline_fields", Profile.Debug);
+        Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+    }
+
     [Theory]
     [MemberData(nameof(Programs_))]
     public void A_program_runs_natively(string name, Profile profile, int exit, string stdout)

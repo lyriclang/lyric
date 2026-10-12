@@ -4720,9 +4720,9 @@ extend<I :: [Iterator<Item = B>], B :: [Iterable]> I {
 
 extend<I :: [Iterator<Item = T>], T :: [Equatable]> I {
     /// A run of equal values, given once.
-    pub fn dedup(): DedupIter<I, I.Error> {
-        // the comparison throws nothing; I.Error for its set, which the join takes as the source's
-        return DedupIter<I, I.Error> { inner = this, same = (a: T, b: T) => a == b, last = null };
+    pub fn dedup(): DedupIter<I, never> {
+        // the comparison throws nothing: its set is empty (M8c S17 — before it, I.Error stood here)
+        return DedupIter<I, never> { inner = this, same = (a: T, b: T) => a == b, last = null };
     }
 }
 
