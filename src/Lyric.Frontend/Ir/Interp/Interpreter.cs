@@ -53,8 +53,9 @@ public sealed class Interpreter
     /// <summary>Steps taken since the last <see cref="Refill"/>.</summary>
     public long Spent => _budgetLimit - _budget;
 
-    /// <summary>The budget whole again: each evaluation has its own (09 Q5 "je Auswertung").</summary>
-    public void Refill() => _budget = _budgetLimit;
+    /// <summary>The budget whole again: each evaluation has its own (09 Q5 "je Auswertung") — the
+    /// one given, for a site the manifest's budget does not hold (std's, M9a S12).</summary>
+    public void Refill(long? budget = null) => _budget = budget ?? _budgetLimit;
 
     /// <summary>Per global: 0 not filled yet, 1 being filled, 2 filled.</summary>
     private readonly byte[] _globalState;

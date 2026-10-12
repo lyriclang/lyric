@@ -252,16 +252,20 @@ public static class SourceCompiler
         // '@When' first (09 B2, B3): what it leaves out is checked, but its sites are not evaluated
         // — a site of another target's code may read what this one does not have
         var when = WhenSites(compilation, types);
+        // the standard library's sites run under the default budget, not the program's (M9a S12)
+        var stdFiles = compilation.Modules.Where(compilation.IsNative).Select(m => compilation.AstOf(m).Span.File).ToHashSet();
+        bool Standard(int site) => stdFiles.Contains(types.ComptimeSites[site].Span.File);
         var chosen = when.Count == 0 ? new Dictionary<int, IrConstValue>()
             : ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks,
-                embed, options.Build, include: when.ContainsKey);
+                embed, options.Build, include: when.ContainsKey, standard: Standard);
         if (chosen is null) return false;
         var inactive = new Inactivity();
         foreach (var (site, (decl, file)) in when)
             if (chosen[site] is StructConst { Fields: [BoolConst { Value: false }, ..] })
                 if (decl is null) inactive.Module(file); else inactive.Declaration(decl);
         var rest = ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks,
-            embed, options.Build, include: i => !when.ContainsKey(i) && !inactive.Covers(types.ComptimeSites[i].Span));
+            embed, options.Build, include: i => !when.ContainsKey(i) && !inactive.Covers(types.ComptimeSites[i].Span),
+            standard: Standard);
         if (rest is null) return false;
         var values = new Dictionary<int, IrConstValue>(rest);
         foreach (var (site, value) in chosen) values[site] = value;

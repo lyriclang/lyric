@@ -25,10 +25,13 @@ public static class ComptimeEvaluator
     /// answers; the host's without.</param>
     /// <param name="include">Which sites to evaluate, by index; all without. A site left out has no
     /// value — one in what the build leaves out (09 B2).</param>
+    /// <param name="standard">Which sites are the standard library's (M9a S12): they run under
+    /// <see cref="DefaultBudget"/>, the program's manifest's budget being the program's — a tight one
+    /// stopped std.hash's tables in every program that set it.</param>
     /// <returns>Each site's constant, or <c>null</c> where a site was reported.</returns>
     public static IReadOnlyDictionary<int, IrConstValue>? Evaluate(IrModule hoisted, TypeResult types,
         DiagnosticEngine diagnostics, long budget, bool overflowChecks, EmbedReader? embed = null, BuildFacts? build = null,
-        Func<int, bool>? include = null)
+        Func<int, bool>? include = null, Func<int, bool>? standard = null)
     {
         var interpreter = new Interpreter(hoisted, budget, overflowChecks, embed, build);
         var sites = types.ComptimeSites;
@@ -42,7 +45,7 @@ public static class ComptimeEvaluator
             if (index < 0) throw new InternalCompilationException($"comptime: site {i} was not hoisted");
             try
             {
-                interpreter.Refill();
+                interpreter.Refill(standard?.Invoke(i) == true ? DefaultBudget : null);
                 values[i] = Constant(interpreter.Run(new FunctionId(index)), hoisted.Functions[index].ReturnType, hoisted);
             }
             catch (ComptimeFailure failure)

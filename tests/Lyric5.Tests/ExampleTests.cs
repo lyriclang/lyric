@@ -151,6 +151,18 @@ public class ExampleTests
         "Grüße aus Zürich! Zürich ist groß, ZÜRICH ist schön.\nΕλλάδα, ελλάδα — Ωραία μέρα.\n"
         + "東京 und São Paulo: São Paulo ist groß.\n";
 
+    /// <summary>M9a's example (13, S12): constants a module computes before its entry, and ones
+    /// computed while compiling — <c>fib(30)</c> is data in the program, and <c>fib</c> is not built.</summary>
+    [Fact]
+    public void Constants_are_filled_before_the_entry_or_computed_while_compiling()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", ProgramText("constants")));
+        Assert.Equal("lyric 1.0\n832040\n49 8\n0 2\n64 bits\n", BuildAndRun(dir, "app", "build", "-C", dir));
+        var (exit, ir, error) = Run("build", "-C", dir, "--emit", "ir");
+        Assert.True(exit == 0, error);
+        Assert.DoesNotContain("fn app.main.fib ", ir);
+    }
+
     /// <summary>M8c's artifact (13, S14): the word counter built as a package, over a text in four
     /// scripts — the counts and the ranking checked against Python's reading of the same text
     /// (<c>str.split</c>, <c>isalnum</c>, <c>lower</c>), the CRC-32 against zlib's.</summary>
