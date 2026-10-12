@@ -41,6 +41,9 @@ public sealed class Compilation
 
     /// <summary>The source text a span covers: what <c>@callerExpr</c> hands a call's callee.</summary>
     public string TextOf(Span span) => _sm.Slice(span).ToString();
+
+    /// <summary>The sources, for a part of a file parsed again (M9a S9).</summary>
+    public SourceManager Sources => _sm;
     public ExtensionRegistry Extensions { get; } = new();
 
     /// <summary>The blocks the resolver synthesized for inline arrays, <c>T[N] :: [Equatable]</c> and

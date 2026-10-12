@@ -1088,6 +1088,18 @@ public static class ModuleLowerer
     /// <para>Sorted deterministically: the rows land as a section in the bytecode, and the same input
     /// has to give byte-identical output. The enumeration order of a dictionary does not do that.</para>
     /// </summary>
+    /// <summary>The instance of a default set in place for <paramref name="type"/> (09 A5, A7; M9a
+    /// S9) that fills its row, or none.</summary>
+    private static FunctionId? ExpandedDefault(TypeSymbol type, LyrType conformer, TypeSymbol iface, string slot,
+        TypeResult types, BindingResult binding, InstanceTable instances)
+    {
+        foreach (var parent in Conformance.WithParents(iface, binding))
+            if (parent.Members.LookupLocal(slot) is FunctionSymbol { Declaration: FunctionDecl { Body: not null } decl } method
+                && types.ExpansionOf(decl, type) is not null)
+                return instances.RequestDefault(method, decl, parent, conformer, decl.Span);
+        return null;
+    }
+
     private static List<IrImpl> BuildImpls(TypeTable typeTable, BindingResult binding,
         Compilation compilation, Dictionary<FunctionSymbol, FunctionId> ids,
         ExtensionTable extensions, InstanceTable instances, TypeResult types,
@@ -1179,6 +1191,10 @@ public static class ModuleLowerer
                                  ?? ResolveInInstance(typeTable, typeId, slots[i], instances)
                                  ?? (ownDeclares ? Resolve(type, slots[i], ids) : null)
                                  ?? ResolveInExtensions(viaExtension, slots[i], extensions, typeTable, typeId, instances)
+                                 // a default set in place for this type (M9a S9): its own instance —
+                                 // the interface's one walks no one's fields
+                                 ?? ExpandedDefault(type, typeTable.InstanceOf(typeId) ?? (LyrType)new NamedRef(type), iface,
+                                     slots[i], types, binding, instances)
                                  ?? Conformance.WithParents(iface, binding)
                                      .Select(p => Resolve(p, slots[i], ids))
                                      .FirstOrDefault(f => f is not null)

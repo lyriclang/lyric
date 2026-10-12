@@ -698,6 +698,8 @@ internal sealed class FunctionLowerer
                 return Address(selfType, dest => new AddrLocal(dest, self, selfType, span));
             case ThisExpr:
                 throw NotSupported("'&this' inside a lambda", span);
+            case FieldByInfoExpr byInfo:
+                return LowerPlace(MemberOfInfo(byInfo));
             case MemberExpr member:
             {
                 var (obj, type, field, fieldType) = ResolveFieldAccess(member);
@@ -723,6 +725,8 @@ internal sealed class FunctionLowerer
     {
         switch (target)
         {
+            case FieldByInfoExpr byInfo:
+                return AccessOf(MemberOfInfo(byInfo), span, write);
             case MemberExpr member:
             {
                 var (obj, type, field, fieldType) = ResolveFieldAccess(member);
@@ -1864,6 +1868,13 @@ internal sealed class FunctionLowerer
         if (_types.RefOf(stmt) is not LocalSymbol loopVar)
             throw Bug($"loop variable '{stmt.Variable}' was not bound by the type checker");
 
+        // a loop over a known type's fields (M9a S9): a body per round, its variable that field's info
+        if (stmt.Comptime && _types.MetaRoundsOf(stmt) is { } metaRounds)
+            return LowerRounds(stmt, [.. metaRounds.Select(r => (r.Body, (Action?)(() =>
+            {
+                var type = LowerType(r.Variable.Type, stmt.Span);
+                _b.Emit(new StoreLocal(_slots.DeclareFor(r.Variable, type), EmitComptimeValue(FieldInfoConst(r.Field), type, stmt.Span), stmt.Span));
+            })))]);
         if (stmt.Comptime && stmt.Iterable is ComptimeExpr walked && ComptimeValue(walked) is ArrayConst elements)
             return LowerUnrolled(stmt, elements, loopVar);
 
@@ -1955,20 +1966,30 @@ internal sealed class FunctionLowerer
         var span = stmt.Span;
         var element = LowerType(loopVar.Type, span);
         var variable = _slots.DeclareFor(loopVar, element);
+        return LowerRounds(stmt, [.. elements.Elements.Select(value => (stmt.Body, (Action?)(() =>
+            _b.Emit(new StoreLocal(variable, EmitComptimeValue(value, element, span), span)))))]);
+    }
+
+    /// <summary>The rounds of a <c>comptime for</c>, each its body after what enters it: the
+    /// element stored, one body for all — or, over a known type's fields (M9a S9), a body of its
+    /// own per field, checked with that field.</summary>
+    private bool LowerRounds(ForInStmt stmt, IReadOnlyList<(Block Body, Action? Enter)> rounds)
+    {
+        var span = stmt.Span;
         var breaks = new List<BlockId>();
         var reached = true;
-        foreach (var value in elements.Elements)
+        foreach (var (body, enter) in rounds)
         {
-            _b.Emit(new StoreLocal(variable, EmitComptimeValue(value, element, span), span));
+            enter?.Invoke();
             var round = new LoopScope(_b) { DeferDepth = _defers.Count, Label = stmt.Label };
             _loops.Push(round);
-            var fallsThrough = LowerScope(stmt.Body);
+            var fallsThrough = LowerScope(body);
             _loops.Pop();
             if (round.BreakRequested) breaks.Add(round.BreakTarget);
             reached = fallsThrough || round.ContinueRequested;
             if (!reached) break;
             var next = _b.NewBlock();
-            if (fallsThrough) _b.Seal(new Branch(next, stmt.Body.Span));
+            if (fallsThrough) _b.Seal(new Branch(next, body.Span));
             if (round.ContinueRequested) _b.SealBlock(round.ContinueTarget, new Branch(next, span));
             _b.SwitchTo(next);
         }
@@ -2635,6 +2656,7 @@ internal sealed class FunctionLowerer
         WithExpr e => LowerWith(e),
         MatchExpr e => LowerMatchExpr(e),
         MemberExpr e => LowerFieldRead(e),
+        FieldByInfoExpr e => LowerExprOrVoid(MemberOfInfo(e)),
         IndexExpr e => LowerIndexRead(e),
         ArrayLitExpr e => LowerArrayLiteral(e),
         StructInitExpr e => LowerObjectInit(e),
@@ -2677,6 +2699,11 @@ internal sealed class FunctionLowerer
     private TempId LowerIdentifier(IdentifierExpr expr)
     {
         var symbol = _types.RefOf(expr) ?? throw Bug($"identifier '{expr.Name}' is unbound");
+
+        // A round's variable (M9a S9) where no round stored it — in a 'comptime' site, lifted
+        // out of the function: its field's info, a constant.
+        if (symbol is LocalSymbol round && _types.KnownFieldOf(round) is { } known && !_slots.TryLookup(round, out _))
+            return EmitComptimeValue(FieldInfoConst(known), LowerType(round.Type, expr.Span), expr.Span);
 
         // A parameter of the CALLEE, named in a default that is being lowered at this call site
         // (04 D5 F2): the argument materialized for it.
@@ -3226,6 +3253,7 @@ internal sealed class FunctionLowerer
             return replacement;
         }
 
+        if (expr.Target is FieldByInfoExpr byInfo) return LowerFieldAssign(MemberOfInfo(byInfo), expr);
         if (expr.Target is MemberExpr member) return LowerFieldAssign(member, expr);
         // 'x[k] = v' and 'x[k] op= v' through IndexSet (04 D6; 02 M8a-1): the write the sema
         // stored, 'x.setIndex(k, …)'.
@@ -3291,6 +3319,9 @@ internal sealed class FunctionLowerer
     /// where the site is the expression it holds.</summary>
     private IrConstValue? ComptimeValue(ComptimeExpr site)
     {
+        // a question to std.meta (M9a S9): answered at this instance — it is no site
+        if (_types.IsMetaSite(site) && site.Inner is CallExpr asked && MetaQueryOf(asked) is { } query)
+            return MetaAnswer(asked, query);
         if (_typeTable.Comptime is not { Values: { } values }) return null;
         var index = _types.ComptimeSites.IndexOf(site);
         return index >= 0 && values.TryGetValue(index, out var value)
@@ -6708,6 +6739,101 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    // ------------------------------------------------------------------ std.meta (09 A7; M9a S9)
+
+    /// <summary><c>e.[f]</c>, in its round, is the member access the checker made of it.</summary>
+    private MemberExpr MemberOfInfo(FieldByInfoExpr access) =>
+        _types.FieldMemberOf(access) ?? throw Bug($"'e.[f]' at {access.Span} reached the lowering outside a round");
+
+    /// <summary>The question to std.meta a call asks — a function of its without a body — or none.</summary>
+    private FunctionSymbol? MetaQueryOf(CallExpr call) =>
+        (_types.RefOf(call.Callee) is ImportBindingSymbol { Target: var target } ? target : _types.RefOf(call.Callee))
+            is FunctionSymbol { Declaration: FunctionDecl { Body: null } } query && query.Home is { FullName: "std.meta" }
+            ? query
+            : null;
+
+    /// <summary>
+    /// What std.meta answers (09 A7 R1, R6; 10 B13 M1), of the type the call asks about at this
+    /// instance: the fields the asking module may name (R7), an enum's variants, the interfaces it
+    /// conforms to, its name, its kind. The checker reads the fields and the conformances; the
+    /// constants are std.meta's structs, in their layout order.
+    /// </summary>
+    private IrConstValue MetaAnswer(CallExpr call, FunctionSymbol query)
+    {
+        var asked = SubstitutedTypeArguments(call);
+        var about = asked.Length > 0 ? asked[0] : LyrType.Error;
+        return query.Name switch
+        {
+            "fields" => new ArrayConst([.. (_types.MetaFields?.Invoke(about, _types.MetaFromOf(call)) ?? []).Select(FieldInfoConst)]),
+            "variants" => new ArrayConst([.. (_types.MetaVariants?.Invoke(about) ?? []).Select(v => (IrConstValue)new StructConst(
+                [new StringConst(v.Name), new IntConst((ulong)v.Index), new ArrayConst([.. v.Payload.Select(FieldInfoConst)])]))]),
+            "conformances" => new ArrayConst([.. (_types.MetaConformances?.Invoke(about) ?? []).Select(i => TypeConst(TypeFacts.Display(new NamedRef(i))))]),
+            "hasConformance" => new BoolConst(asked.Length > 1 && TypeFacts.SymbolOf(asked[1]) is { Kind: TypeSymbolKind.Interface } iface
+                                              && _types.Satisfies?.Invoke(about, iface) == true),
+            "members" => new ArrayConst([.. (_types.MetaMembers?.Invoke(about, _types.MetaFromOf(call)) ?? []).Select(m => (IrConstValue)new StructConst(
+                [new StringConst(m.Name), VisibilityConst(m.Visibility), new BoolConst(m.IsStatic), new BoolConst(m.IsMut)]))]),
+            "typeName" => new StringConst(TypeFacts.Display(about)),
+            "isStruct" => new BoolConst(TypeFacts.KindOf(about) == TypeSymbolKind.Struct),
+            "isClass" => new BoolConst(TypeFacts.KindOf(about) == TypeSymbolKind.Class),
+            "isEnum" => new BoolConst(TypeFacts.KindOf(about) == TypeSymbolKind.Enum),
+            "isInterface" => new BoolConst(TypeFacts.KindOf(about) == TypeSymbolKind.Interface),
+            _ => throw NotSupported($"'std.meta.{query.Name}'", call.Span),
+        };
+    }
+
+    /// <summary>std.meta's <c>Type</c>: its name.</summary>
+    private static IrConstValue TypeConst(string name) => new StructConst([new StringConst(name)]);
+
+    /// <summary>std.meta's <c>FieldInfo</c> — name, type, index, visibility, isVar — of a field.</summary>
+    private static IrConstValue FieldInfoConst(TypeResult.MetaField field) => new StructConst(
+    [
+        new StringConst(field.Name), TypeConst(TypeFacts.Display(field.Type)), new IntConst((ulong)field.Index),
+        VisibilityConst(field.Visibility),
+        new BoolConst(field.IsVar),
+    ]);
+
+    /// <summary>std.meta's <c>Visibility</c>: <c>Pub</c>, <c>Internal</c>, <c>Private</c>.</summary>
+    private static IrConstValue VisibilityConst(Visibility visibility) =>
+        new VariantConst(visibility switch { Visibility.Public => 0, Visibility.Internal => 1, _ => 2 }, []);
+
+    /// <summary>
+    /// <c>attribute&lt;A&gt;(f)</c> and <c>typeAttribute&lt;T, A&gt;()</c> (09 A7 R4): the attribute of
+    /// type <c>A</c> the field — the one a round's variable holds — or the type's declaration
+    /// carries, its value as its site computed it; none where it carries none. Where the value is
+    /// not computed yet — in a site lifted out to be evaluated — its initializer, lowered here.
+    /// </summary>
+    private TempId LowerAttributeQuery(CallExpr call, FunctionSymbol query)
+    {
+        var resultType = TypeOfExpr(call);
+        var wanted = SubstitutedTypeArguments(call) is { Length: > 0 } asked ? asked[^1] : LyrType.Error;
+        AttributeNode[] carried = query.Name == "attribute"
+            ? call.Arguments is [IdentifierExpr named] && _types.RefOf(named) is LocalSymbol round
+              && _types.KnownFieldOf(round) is { Symbol.Declaration: FieldDecl field } ? field.Attributes : []
+            : SubstitutedTypeArguments(call) is [var holder, ..] && TypeFacts.SymbolOf(holder)?.Declaration is { } declared
+                ? AttributesOf(declared)
+                : [];
+        var dest = _slots.NewTemp(resultType);
+        var inner = resultType is IrOptionalType optional ? optional.Inner : throw Bug("an attribute query answers no optional");
+        foreach (var attribute in carried)
+        {
+            if (_types.AttributeValueOf(attribute) is not { } site || !LyrType.Equal(_types.TypeOf(site), wanted)) continue;
+            var value = ComptimeValue(site) is { } computed ? EmitComptimeValue(computed, inner, call.Span) : LowerExprAs(site.Inner, inner);
+            _b.Emit(new OptSome(dest, value, inner, call.Span));
+            return dest;
+        }
+        _b.Emit(new OptNone(dest, inner, call.Span));
+        return dest;
+    }
+
+    private static AttributeNode[] AttributesOf(Node declaration) => declaration switch
+    {
+        StructDecl s => s.Attributes,
+        ClassDecl c => c.Attributes,
+        EnumDecl e => e.Attributes,
+        InterfaceDecl i => i.Attributes,
+        _ => [],
+    };
+
     // ------------------------------------------------------------------ inline functions (08 F6)
 
     /// <summary>The expansion of an inline function whose code is being lowered — <c>null</c> for
@@ -7354,6 +7480,12 @@ internal sealed class FunctionLowerer
 
         if (bound is not FunctionSymbol symbol)
             throw NotSupported($"call to '{calleeName}' (not a function or method)", expr.Span);
+
+        // a question to std.meta (09 A7; M9a S9): a constant of the type asked about, here
+        if (MetaQueryOf(expr) is { } metaQuery)
+            return metaQuery.Name is "attribute" or "typeAttribute"
+                ? LowerAttributeQuery(expr, metaQuery)
+                : EmitComptimeValue(MetaAnswer(expr, metaQuery), TypeOfExpr(expr), expr.Span);
 
         // an inline function (08 F6): its body set in place, under the call's type arguments
         if (symbol.Declaration is FunctionDecl { IsInline: true, Body: not null } inlined)

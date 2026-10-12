@@ -401,6 +401,18 @@ internal sealed class InstanceTable
         for (; _lowered < _pending.Count; _lowered++)
         {
             var p = _pending[_lowered];
+            // A default set in place for its conformer (09 A5, A7; M9a S9): that body, checked as
+            // the conformer's — a generic conformer's parameters bound by the instance.
+            if (p.ReceiverType is { } conformer && TypeFacts.SymbolOf(conformer) is { } holder
+                && types.ExpansionOf(p.Decl, holder) is { } expansion)
+            {
+                var bound = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+                foreach (var (parameter, argument) in p.Substitution) bound[parameter] = argument;
+                if (conformer is GenericInstance instance)
+                    for (var i = 0; i < instance.Definition.Generics.Length && i < instance.Arguments.Length; i++)
+                        bound[instance.Definition.Generics[i]] = instance.Arguments[i];
+                p = p with { Decl = expansion, Substitution = bound };
+            }
             // A generic coroutine is two functions per instance, as a written one is (06 N2): the
             // factory under the instance's name, the body behind it in the instance's terms.
             if (ModuleLowerer.CoroutineReturn(p.Decl) is not null)

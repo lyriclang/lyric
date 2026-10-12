@@ -40,7 +40,7 @@ public sealed class TypeResult
     /// <c>&lt;comptime:i&gt;</c> in the first lowering and reads value <c>i</c> in the second,
     /// and both runs check the same sources in the same order.
     /// </summary>
-    public List<ComptimeExpr> ComptimeSites { get; } = new();
+    public SiteList ComptimeSites { get; } = new();
 
     private readonly Dictionary<AttributeNode, ComptimeExpr> _attributeValues = new(ReferenceEqualityComparer.Instance);
 
@@ -532,6 +532,104 @@ public sealed class TypeResult
     public void MarkInlineLambda(LambdaExpr lambda) => _inlineLambdas.Add(lambda);
 
     public bool IsInlineLambda(LambdaExpr lambda) => _inlineLambdas.Contains(lambda);
+
+    // ------------------------------------------------------------------ std.meta (09 A7; M9a S9)
+
+    /// <summary>A field as <c>std.meta.fields</c> answers it: name, type, position in the
+    /// declaration, word, whether it is a <c>var</c>.</summary>
+    public sealed record MetaField(string Name, LyrType Type, int Index, Visibility Visibility, bool IsVar, FieldSymbol? Symbol);
+
+    /// <summary>A variant as <c>std.meta.variants</c> answers it, its payload's fields.</summary>
+    public sealed record MetaVariant(string Name, int Index, MetaField[] Payload);
+
+    /// <summary>One round of a <c>comptime for</c> over the fields of a known type: its own body,
+    /// parsed again, its variable — whose value is the field's info —, the field.</summary>
+    public sealed record MetaRound(Block Body, LocalSymbol Variable, MetaField Field);
+
+    /// <summary>The fields of a type that a module may name (R7), as the checker reads them;
+    /// asked by the lowering, too, for an instance it settles.</summary>
+    public Func<LyrType, ModuleSymbol?, MetaField[]>? MetaFields { get; internal set; }
+
+    /// <summary>A function of a type's own body as <c>std.meta.members</c> answers it.</summary>
+    public sealed record MetaMember(string Name, Visibility Visibility, bool IsStatic, bool IsMut);
+
+    /// <summary>The functions of a type's own body that a module may name (R7).</summary>
+    public Func<LyrType, ModuleSymbol?, MetaMember[]>? MetaMembers { get; internal set; }
+
+    /// <summary>The variants of an enum (its instance's payload types).</summary>
+    public Func<LyrType, MetaVariant[]>? MetaVariants { get; internal set; }
+
+    /// <summary>The interfaces a type conforms to, its parents' with them.</summary>
+    public Func<LyrType, TypeSymbol[]>? MetaConformances { get; internal set; }
+
+    private readonly Dictionary<CallExpr, ModuleSymbol> _metaFrom = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<ComptimeExpr> _metaSites = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<ForInStmt, MetaRound[]> _metaRounds = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<FieldByInfoExpr, MemberExpr> _fieldMembers = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<LocalSymbol, MetaField> _knownFields = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<(FunctionDecl Default, TypeSymbol Conformer), FunctionDecl> _expansions = new();
+
+    /// <summary>The module a question to <c>std.meta</c> is asked from: whose fields it may see.</summary>
+    public ModuleSymbol? MetaFromOf(CallExpr call) => _metaFrom.GetValueOrDefault(call);
+    internal void SetMetaFrom(CallExpr call, ModuleSymbol module) => _metaFrom[call] = module;
+
+    /// <summary>A <c>comptime</c> expression that is a question to <c>std.meta</c>: answered per
+    /// instance by the lowering, never a site of its own.</summary>
+    public bool IsMetaSite(ComptimeExpr site) => _metaSites.Contains(site);
+    internal void MarkMetaSite(ComptimeExpr site) => _metaSites.Add(site);
+
+    /// <summary>A <c>comptime for</c> over the fields of a known type, one body per field.</summary>
+    public MetaRound[]? MetaRoundsOf(ForInStmt loop) => _metaRounds.GetValueOrDefault(loop);
+    internal void SetMetaRounds(ForInStmt loop, MetaRound[] rounds) => _metaRounds[loop] = rounds;
+
+    /// <summary><c>e.[f]</c> as the member access it is in its round.</summary>
+    public MemberExpr? FieldMemberOf(FieldByInfoExpr access) => _fieldMembers.GetValueOrDefault(access);
+    internal void SetFieldMember(FieldByInfoExpr access, MemberExpr member) => _fieldMembers[access] = member;
+
+    /// <summary>The field a round's variable holds the info of: a constant where it is read.</summary>
+    public MetaField? KnownFieldOf(LocalSymbol variable) => _knownFields.GetValueOrDefault(variable);
+    internal void SetKnownField(LocalSymbol variable, MetaField field) => _knownFields[variable] = field;
+
+    /// <summary>A default whose body walks the fields of <c>Self</c>, set in place for one
+    /// conformer (09 A5): parsed again, checked with <c>Self</c> that conformer.</summary>
+    public FunctionDecl? ExpansionOf(FunctionDecl @default, TypeSymbol conformer) =>
+        _expansions.GetValueOrDefault((@default, conformer));
+    internal void SetExpansion(FunctionDecl @default, TypeSymbol conformer, FunctionDecl expansion) =>
+        _expansions[(@default, conformer)] = expansion;
+
+    /// <summary>What was parsed again — a round's body, a default set in place —: nodes of their
+    /// own over text the walkers read once, at the declaration. What they say of it, the written
+    /// nodes said.</summary>
+    public List<Node> ReparsedRoots { get; } = [];
+}
+
+/// <summary>
+/// The <c>comptime</c> sites in the order the checker met them, each known BY ITS NODE (M9a S9).
+/// An AST node is a record, equal to any node of the same text at the same place — and a body
+/// parsed again for a round or a conformer is exactly that: its sites are sites of their own, with
+/// values of their own. A list's <c>IndexOf</c> found the first of them for every one.
+/// </summary>
+public sealed class SiteList : IReadOnlyList<ComptimeExpr>
+{
+    private readonly List<ComptimeExpr> _sites = [];
+    private readonly Dictionary<ComptimeExpr, int> _index = new(ReferenceEqualityComparer.Instance);
+
+    public int Count => _sites.Count;
+
+    public ComptimeExpr this[int index] => _sites[index];
+
+    public void Add(ComptimeExpr site)
+    {
+        if (_index.TryAdd(site, _sites.Count)) _sites.Add(site);
+    }
+
+    public bool Contains(ComptimeExpr site) => _index.ContainsKey(site);
+
+    public int IndexOf(ComptimeExpr site) => _index.TryGetValue(site, out var index) ? index : -1;
+
+    public IEnumerator<ComptimeExpr> GetEnumerator() => _sites.GetEnumerator();
+
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 /// <summary>What of a call's place a parameter takes where the call leaves it out (09 A11).</summary>

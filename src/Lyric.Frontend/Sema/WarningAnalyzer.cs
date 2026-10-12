@@ -613,8 +613,18 @@ internal sealed class WarningAnalyzer
     /// </summary>
     private void HintNeverReassigned()
     {
+        // what was parsed again (M9a S9) is read at the declaration it repeats
+        var reparsed = new HashSet<Node>(ReferenceEqualityComparer.Instance);
+        void Collect(Node node)
+        {
+            if (!reparsed.Add(node)) return;
+            foreach (var child in AstChildren.Of(node)) Collect(child);
+        }
+        foreach (var root in _types.ReparsedRoots) Collect(root);
+
         foreach (var (node, symbol) in _types.AllReferences)
         {
+            if (reparsed.Contains(node)) continue;
             if (symbol is not LocalSymbol { IsMutable: true } local) continue;
             if (!ReferenceEquals(symbol.Declaration, node)) continue;
             if (node is not BindingStmt { Initializer: not null } binding) continue;
@@ -848,6 +858,7 @@ internal sealed class WarningAnalyzer
             {
                 case MemberExpr m: root = m.Target; continue;
                 case IndexExpr ix: root = ix.Target; continue;
+                case FieldByInfoExpr byInfo: root = byInfo.Target; continue;
                 case PostfixExpr { Operator: PostfixOp.ForceUnwrap } fu: root = fu.Operand; continue;
                 case CastExpr cs: root = cs.Operand; continue;
                 case TypeTestExpr tt: root = tt.Operand; continue;
@@ -934,6 +945,7 @@ internal sealed class WarningAnalyzer
                 break;
             case MemberExpr m: WalkExpr(m.Target); break;
             case IndexExpr ix: WalkExpr(ix.Target); WalkExpr(ix.Index); break;
+            case FieldByInfoExpr byInfo: WalkExpr(byInfo.Target); WalkExpr(byInfo.Info); break;
             case CastExpr cs: WalkExpr(cs.Operand); break;
             case TypeTestExpr tt: WalkExpr(tt.Operand); break;
             case RangeExpr r: WalkExpr(r.Low); WalkExpr(r.High); break;

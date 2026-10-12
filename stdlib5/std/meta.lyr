@@ -1,0 +1,74 @@
+/// What a type is, while compiling (design/v5/spec/09 A7; 10 B13 M1): its name, its kind, its
+/// fields, an enum's variants, the interfaces it conforms to. Each answer is a constant of the type
+/// it is asked of — in a generic function or a default, of each instance — and there is no
+/// reflection at run time (R6): what a program reads of a type it reads as such a constant.
+///
+/// A `comptime for (f in fields<T>())` sets its body in place once per field, where `e.[f]` is the
+/// field `f` names, of the field's own type (R2). A field is listed where the code that asks may
+/// name it (R7): an interface of another package sees the `pub` fields alone.
+
+/// Who may name a declaration (07 V2).
+pub enum Visibility :: [Equatable, Debug] { Pub, Internal, Private }
+
+/// A type as a value while compiling: its name, as `typeName` gives it. What else a type is — set
+/// into a `quote` — comes with the macros (13 M9b).
+pub struct Type :: [Equatable, Debug] {
+    pub name: string,
+}
+
+/// A field of a struct or a class, in declaration order.
+pub struct FieldInfo :: [Equatable, Debug] {
+    pub name: string,
+    pub type: Type,
+    pub index: int,
+    pub visibility: Visibility,
+    pub isVar: bool,
+}
+
+/// A variant of an enum, in declaration order, and the fields of its payload — a positional one
+/// named by its position, `0`, `1`, ….
+pub struct VariantInfo :: [Equatable, Debug] {
+    pub name: string,
+    pub index: int,
+    pub payload: FieldInfo[],
+}
+
+/// A function of a type's own body: its name, its word, whether it is static, whether it is `mut`.
+pub struct MemberInfo :: [Equatable, Debug] {
+    pub name: string,
+    pub visibility: Visibility,
+    pub isStatic: bool,
+    pub isMut: bool,
+}
+
+/// The fields of a struct or a class that the asking code may name, in declaration order; none
+/// for any other type.
+pub fn fields<T>(): FieldInfo[];
+
+/// The functions of a type's own body that the asking code may name, in declaration order — a
+/// block's members are the block's.
+pub fn members<T>(): MemberInfo[];
+
+/// The attribute `A` the field `f` carries, its value — none where it carries none (R4). `f` is
+/// the variable of a `comptime for` over `fields`, read in its round.
+pub fn attribute<A>(f: FieldInfo): ?A;
+
+/// The attribute `A` the declaration of `T` carries, its value; none where it carries none.
+pub fn typeAttribute<T, A>(): ?A;
+
+/// The variants of an enum, in declaration order; none for any other type.
+pub fn variants<E>(): VariantInfo[];
+
+/// The interfaces `T` conforms to, by its list, its blocks and the parents they bring.
+pub fn conformances<T>(): Type[];
+
+/// Does `T` conform to `I`?
+pub fn hasConformance<T, I>(): bool;
+
+/// `T`'s name, its arguments with it: `Pair<int, string>`.
+pub fn typeName<T>(): string;
+
+pub fn isStruct<T>(): bool;
+pub fn isClass<T>(): bool;
+pub fn isEnum<T>(): bool;
+pub fn isInterface<T>(): bool;
