@@ -336,7 +336,7 @@ public static class Program
 
     // --- test ----------------------------------------------------------------------------------
 
-    private static readonly string[] TestValueOptions = ["--profile", "-C", "--opt", "-f", "--filter"];
+    private static readonly string[] TestValueOptions = ["--profile", "-C", "--opt", "-f", "--filter", "--target"];
 
     /// <summary>
     /// <c>lyric test</c> (design/v5/spec/10 B12, 11 C2): the package's tests — every function it
@@ -345,8 +345,8 @@ public static class Program
     /// the command's (C5): 0 when every test held, 1 when one failed or the program was refused.
     /// </summary>
     private static int Test(string[] args) =>
-        Package(args, "test", "tests", TestValueOptions, null, (project, profile, compiler, values) =>
-            TestRun.Run(project, profile, compiler, DisplayVersion(), values.GetValueOrDefault("-f"), Console.Out, Console.Error));
+        Package(args, "test", "tests", TestValueOptions, null, (project, profile, target, compiler, values) =>
+            TestRun.Run(project, profile, target, compiler, DisplayVersion(), values.GetValueOrDefault("-f"), Console.Out, Console.Error));
 
     private static readonly string[] BenchValueOptions = [.. TestValueOptions, "--save", "--compare"];
 
@@ -358,18 +358,19 @@ public static class Program
     /// <c>--compare</c> one it reads to say how they changed. The program's exit is the command's.
     /// </summary>
     private static int Bench(string[] args) =>
-        Package(args, "bench", "benchmarks", BenchValueOptions, "release", (project, profile, compiler, values) =>
-            BenchRun.Run(project, profile, compiler, DisplayVersion(), values.GetValueOrDefault("-f"),
+        Package(args, "bench", "benchmarks", BenchValueOptions, "release", (project, profile, target, compiler, values) =>
+            BenchRun.Run(project, profile, target, compiler, DisplayVersion(), values.GetValueOrDefault("-f"),
                 values.TryGetValue("--save", out var save) ? Path.GetFullPath(save) : "",
                 values.TryGetValue("--compare", out var compare) ? Path.GetFullPath(compare) : "",
                 Console.Out, Console.Error));
 
     /// <summary>A verb over the package of the nearest <c>lyric.toml</c> — <c>test</c>, <c>bench</c>:
     /// its options read, the package and its graph loaded, the profile chosen — <paramref name="profileDefault"/>
-    /// where the command line names none, else as <c>build</c> chooses —, and the compiler found;
-    /// then <paramref name="run"/>.</summary>
+    /// where the command line names none, else as <c>build</c> chooses —, the target — this machine
+    /// unless <c>--target</c> names another, as <c>build</c> and <c>run</c> take it —, and the
+    /// compiler found; then <paramref name="run"/>.</summary>
     private static int Package(string[] args, string verb, string what, string[] valueOptions, string? profileDefault,
-        Func<Project, BuildProfile, CCompiler, Dictionary<string, string>, int> run)
+        Func<Project, BuildProfile, Target, CCompiler, Dictionary<string, string>, int> run)
     {
         var values = new Dictionary<string, string>();
         var flags = new HashSet<string>(StringComparer.Ordinal);
@@ -415,8 +416,14 @@ public static class Program
 
         if (profileDefault is not null) values.TryAdd("--profile", profileDefault);
         if (ProfileOf(values, flags, project.Manifest) is not { } profile) return 2;
+        Target target;
+        try { target = values.TryGetValue("--target", out var triple) ? Target.Parse(triple) : Target.Host; }
+        catch (ArgumentException)
+        {
+            return Unknown($"unknown target '{values["--target"]}': {string.Join(", ", Target.Tier1.Select(t => t.Triple))}");
+        }
         if (CompilerFor(profile) is not { } compiler) return 2;
-        return run(project, profile, compiler, values);
+        return run(project, profile, target, compiler, values);
     }
 
     // --- update --------------------------------------------------------------------------------

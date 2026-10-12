@@ -31,7 +31,7 @@ public static class TestRun
     /// one is given — and runs them, what they print passed on as it comes. The answer is the
     /// program's exit: 0 when every test held, 1 when one failed (11 C5); a refused program is 1
     /// as well, a build that could not run 2.</summary>
-    public static int Run(Project project, BuildProfile profile, CCompiler compiler, string version, string? filter,
+    public static int Run(Project project, BuildProfile profile, Target target, CCompiler compiler, string version, string? filter,
         TextWriter output, TextWriter error)
     {
         // the scripts first, so that a test may import what they generate (11 W3 BS4, BS6)
@@ -46,8 +46,21 @@ public static class TestRun
             return 0;
         }
         var program = project with { EntryText = Driver(chosen) };
-        var (exit, built) = Pipeline.Build(new BuildRequest(program, profile, Target.Host, compiler, version), error);
+        return BuildAndRun(program, profile, target, compiler, version, output, error);
+    }
+
+    /// <summary>The program built for <paramref name="target"/> and run — on this machine only; for
+    /// another, the binary is built and named, as <c>run</c> does (14 §1.1), exit 2.</summary>
+    internal static int BuildAndRun(Project program, BuildProfile profile, Target target, CCompiler compiler, string version,
+        TextWriter output, TextWriter error)
+    {
+        var (exit, built) = Pipeline.Build(new BuildRequest(program, profile, target, compiler, version), error);
         if (exit != 0 || built is null) return exit;
+        if (!target.IsHost)
+        {
+            error.WriteLine($"error[LYR-CLI0003]: '{target.Triple}' is not this machine; the binary is at {built}");
+            return 2;
+        }
         return ProcessRunner.Stream(built, [], output, error);
     }
 
