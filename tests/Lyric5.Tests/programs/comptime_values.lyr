@@ -1,0 +1,89 @@
+// A 'comptime' site's value of every value type (design/v5/spec/09 Q1; 13 M9a P3), each written
+// into the binary as a literal of it: an array of scalars as static data, filled afresh at every
+// evaluation (so a write to one is no write to the next), the rest built where the site stands.
+// Expected stdout: see ComptimeTests.A_site_leaves_a_value_of_any_value_type.
+import std.io { println };
+
+struct Point {
+    x: int,
+    y: float,
+}
+
+enum Shape {
+    Dot,
+    Circle(Point, float),
+    Named { name: string, at: Point },
+}
+
+enum Tree {
+    Leaf(int),
+    Node(Box<Tree>, Box<Tree>),
+}
+
+fn crcTable(poly: uint32): uint32[] {
+    let t = [0u32] * 256;
+    var i = 0;
+    while (i < 256) {
+        var c = i as uint32;
+        var k = 0;
+        while (k < 8) {
+            c = if ((c & 1u32) != 0u32) poly ^ (c >> 1) else c >> 1;
+            k += 1;
+        }
+        t[i] = c;
+        i += 1;
+    }
+    return t;
+}
+
+fn table(): uint32[] {
+    return comptime crcTable(0xEDB88320u32);
+}
+
+fn build(n: int): Tree {
+    return if (n == 0) Tree.Leaf(1) else Tree.Node(Box { value = build(n - 1) }, Box { value = build(n - 1) });
+}
+
+fn sum(t: Tree): int {
+    return match (t) {
+        .Leaf(v) => v,
+        .Node(a, b) => sum(a.value) + sum(b.value),
+    };
+}
+
+fn maybe(yes: bool): ?Point {
+    return if (yes) Point { x = 7, y = -1.5 } else null;
+}
+
+fn fixed4(): int[4] {
+    var a: int[4] = [1, 2, 3, 4];
+    a[3] = 40;
+    return a;
+}
+
+fn main(): void {
+    let t = table();
+    println(f"{t.length()} {t[1]} {t[255]}");
+    t[0] = 5u32;
+    let u = table();
+    println(f"{t[0]} {u[0]}");
+    let p = comptime Point { x = 3, y = 0.5 };
+    println(f"{p:?}");
+    let shapes = comptime [Shape.Dot, Shape.Circle(Point { x = 1, y = 2.0 }, 3.0), Shape.Named { name = "n", at = Point { x = 0, y = 0.0 } }];
+    println(f"{shapes:?}");
+    let tree = comptime build(3);
+    println(f"{sum(tree)}");
+    let o = comptime maybe(true);
+    let n = comptime maybe(false);
+    println(f"{o:?} {n:?}");
+    let tuple = comptime (1, "two", 3.0);
+    println(f"{tuple:?}");
+    let fixed = comptime fixed4();
+    println(f"{fixed:?}");
+    let words = comptime ["a", "bc", "déf"];
+    println(f"{words:?}");
+    let nested = comptime [[1, 2], [3]];
+    println(f"{nested:?}");
+    let r = comptime 0..5;
+    println(f"{r.start} {r.end}");
+}

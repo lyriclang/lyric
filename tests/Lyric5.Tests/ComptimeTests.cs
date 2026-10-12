@@ -36,7 +36,7 @@ public class ComptimeTests
     {
         var result = RuntimeBuildTests.RunEmitted(CEmitterTests.EmitC("comptime_same"), "comptime_same", profile);
         Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstdout:\n{result.Stdout}\nstderr:\n{result.Stderr}");
-        Assert.Equal("12 cases, 0 differ\n", result.Stdout.Replace("\r\n", "\n"));
+        Assert.Equal("13 cases, 0 differ\n", result.Stdout.Replace("\r\n", "\n"));
     }
 
     /// <summary>The comparison above holds vacuously where a site is not computed at all — lowered
@@ -55,7 +55,7 @@ public class ComptimeTests
         var called = main.Blocks.SelectMany(b => b.Insts).OfType<Call>()
             .Select(c => ir.Functions[c.Target.Value].Name)
             .ToList();
-        foreach (var name in new[] { "tower", "checked", "bits", "divisions", "floats", "formats", "parsing", "strings", "structures", "debugs" })
+        foreach (var name in new[] { "tower", "checked", "bits", "divisions", "floats", "formats", "parsing", "strings", "structures", "debugs", "record" })
             Assert.Single(called, $"app.main.{name}");
     }
 
@@ -147,5 +147,53 @@ public class ComptimeTests
         var errors = Errors(Head + $"fn main(): void {{\n    println(f\"{{comptime 2.0.sqrt()}} {{comptime 'E'.isUpper()}} {{comptime {site}}}\");\n}}\n");
         var error = Assert.Single(errors, l => l.Contains("error["));
         Assert.Contains("error[LYR-CT0005]: " + message, error);
+    }
+
+    /// <summary>A site leaves a value of any value type (09 Q1; 13 M9a P3, S2): the CRC table as
+    /// a <c>uint32[]</c>, a fresh array at every evaluation, which a write to the first does not
+    /// reach; a struct, enums with payloads, a recursive enum through <c>Box</c>, optionals, a
+    /// tuple, an inline array, arrays of strings and of arrays, a range.</summary>
+    [Theory]
+    [InlineData(Profile.Debug)]
+    [InlineData(Profile.Release)]
+    public void A_site_leaves_a_value_of_any_value_type(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunEmitted(CEmitterTests.EmitC("comptime_values"), "comptime_values", profile);
+        Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.Equal("256 1996959894 755167117\n5 0\nPoint { x = 3, y = 0.5 }\n"
+                     + "[Shape.Dot, Shape.Circle(Point { x = 1, y = 2.0 }, 3.0), Shape.Named { name = \"n\", at = Point { x = 0, y = 0.0 } }]\n"
+                     + "8\nPoint { x = 7, y = -1.5 } null\n(1, \"two\", 3.0)\n[1, 2, 3, 40]\n[\"a\", \"bc\", \"déf\"]\n[[1, 2], [3]]\n0 5\n",
+            result.Stdout.Replace("\r\n", "\n"));
+    }
+
+    /// <summary>An array of scalars is the C's static data, copied into each fresh array; the
+    /// function that computed it is no part of the binary.</summary>
+    [Fact]
+    public void An_array_of_scalars_is_static_data()
+    {
+        var text = File.ReadAllText(Path.Combine(CEmitterTests.Programs, "comptime_values.lyr"));
+        var lowered = TestCompiler.Lower("programs/comptime_values.lyr", text);
+        Assert.True(lowered.Ok);
+        Assert.DoesNotContain(lowered.Ir!.Functions, f => f.Name == "app.main.crcTable");
+        var c = Lyric5.Compiler.CEmitter.Join(CEmitterTests.EmitC("comptime_values"));
+        Assert.Matches(@"static uint32_t const lyr_data\d+\[256\] = \{ \(uint32_t\)UINT64_C\(0\), \(uint32_t\)UINT64_C\(1996959894\),", c);
+        Assert.Contains("__builtin_memcpy(", c);
+    }
+
+    /// <summary>What no literal makes is refused where the site stands (09 Q1), with the reason:
+    /// a class's object, a view, a function value, an interface value — also inside an array.
+    /// A <c>Box</c> is the one class a site leaves.</summary>
+    [Theory]
+    [InlineData("class C {\n    var n: int = 0,\n}\n\nfn make(): C {\n    return C { };\n}\n", "make()", "'C' is a class, an object with an identity")]
+    [InlineData("class C {\n    var n: int = 0,\n}\n\nfn make(): C[] {\n    return [C { }];\n}\n", "make()", "and this one is 'C[]': 'C' is a class")]
+    [InlineData("fn view(): Slice<int> {\n    return [1, 2, 3][0..2];\n}\n", "view()", "a view shows an array or a string it does not own")]
+    [InlineData("fn add(): fn(int) -> int {\n    return (x: int) => x + 1;\n}\n", "add()", "a function value holds what it captures")]
+    [InlineData("fn shown(): Display {\n    return 5;\n}\n", "shown()", "an interface value holds an object of any type")]
+    public void A_site_leaves_no_object_view_or_function(string declarations, string site, string why)
+    {
+        var errors = Errors(declarations + $"\nfn main(): void {{\n    let _ = comptime {site};\n}}\n");
+        var error = Assert.Single(errors, l => l.Contains("error["));
+        Assert.Contains("error[LYR-SEM0100]: a 'comptime' expression has to produce a value the compiled module can hold as a literal", error);
+        Assert.Contains(why, error);
     }
 }

@@ -1,7 +1,7 @@
 // Each case twice: at compile time, through the IR interpreter ('comptime'), and in the binary.
 // The two texts must be the same to the byte (design/v5/spec/09 Q7; 13 M9a P2) — every value a
 // case computes goes into its text, a float by its bits as well. Expected stdout:
-//   12 cases, 0 differ
+//   13 cases, 0 differ
 import std.io { println };
 import std.core { ParseError };
 
@@ -208,6 +208,31 @@ fn debugs(): string {
     return f"{p:?} {Shade.Plain:?} {Shade.Mixed(7, "x"):?} {o:?} {q:?} {l:?} {[1.5, -0.0]:?} {'\t':?} {(1, "two"):?}";
 }
 
+struct Record {
+    name: string,
+    values: float[],
+    small: int8[3],
+    shade: ?Shade,
+    pairs: (int, string)[],
+}
+
+// a value of many types (13 M9a P3): floats in static data — -0.0, an infinity, a third —, an
+// inline array, an enum behind an optional, an array of tuples
+fn record(): Record {
+    var values: float[] = [];
+    var x = 1.0;
+    for (i in 0..5) {
+        values = values + [x / 3.0];
+        x = x * -10.0;
+    }
+    values = values + [-0.0, 1e308 * 10.0];
+    var pairs: (int, string)[] = [];
+    for (i in 0..3) {
+        pairs = pairs + [(i * i, f"#{i}")];
+    }
+    return Record { name = "rec", values = values, small = [-128, 0, 127], shade = Shade.Mixed(-1, "m"), pairs = pairs };
+}
+
 fn least32(): int32 {
     let x: int32 = -2147483647;
     return x - 1;
@@ -243,6 +268,7 @@ fn main(): int {
             + f"{comptime (4294967295 as uint32)} {comptime 18446744073709551615u64} {comptime (-9223372036854775807 - 1)} {comptime 'é'} {comptime (1 < 2)}",
         f"{-5 as int8} {-300 as int16} {least32()} {255 as uint8} {65535 as uint16} "
             + f"{4294967295 as uint32} {18446744073709551615u64} {-9223372036854775807 - 1} {'é'} {1 < 2}");
-    println(f"12 cases, {differ} differ");
+    differ += alike("values", f"{comptime record():?}", f"{record():?}");
+    println(f"13 cases, {differ} differ");
     return differ;
 }

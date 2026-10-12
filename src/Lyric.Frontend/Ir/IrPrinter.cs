@@ -295,6 +295,12 @@ public static class IrPrinter
         BoolConst b => b.Value ? "true" : "false",
         CharConst c => c.CodePoint.ToString(CultureInfo.InvariantCulture),
         StringConst s => Quote(s.Value),
+        ArrayConst a => $"[{string.Join(", ", a.Elements.Select(ConstStr))}]",
+        // never in a const the lowering made; a verifier finding names them all the same
+        StructConst s => $"{{{string.Join(", ", s.Fields.Select(ConstStr))}}}",
+        VariantConst variant => $"#{variant.Variant}({string.Join(", ", variant.Fields.Select(ConstStr))})",
+        OptionalConst { Value: { } inner } => $"some {ConstStr(inner)}",
+        OptionalConst => "none",
         _ => throw new InternalCompilationException($"ir-printer: unhandled const {v.GetType().Name}")
     };
 

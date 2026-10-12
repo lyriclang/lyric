@@ -10,6 +10,19 @@ public sealed record BoolConst(bool Value) : IrConstValue;
 public sealed record CharConst(int CodePoint) : IrConstValue;
 public sealed record StringConst(string Value) : IrConstValue;
 
+/// <summary>An array a <c>comptime</c> site computed (design/v5/spec/09 Q1; 13 M9a P3). In a
+/// <see cref="Const"/> only where its elements are scalars or strings: static data in the C,
+/// from which each evaluation fills a fresh array — or the inline array's storage —, as a
+/// literal is filled. Of other elements, the lowering builds it element by element.</summary>
+public sealed record ArrayConst(IrConstValue[] Elements) : IrConstValue;
+
+// The rest of a 'comptime' value (P3), which the lowering builds as it builds a literal and which
+// never stands in a Const: a struct, a tuple or a Box's object by its fields in layout order, an
+// enum by its variant's index and payload, an optional present or not.
+public sealed record StructConst(IrConstValue[] Fields) : IrConstValue;
+public sealed record VariantConst(int Variant, IrConstValue[] Fields) : IrConstValue;
+public sealed record OptionalConst(IrConstValue? Value) : IrConstValue;
+
 public abstract record IrInst(Span Span);
 public abstract record IrOp(Span Span) : IrInst(Span);
 public abstract record IrTerminator(Span Span) : IrInst(Span);

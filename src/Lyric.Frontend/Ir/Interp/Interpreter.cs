@@ -491,7 +491,9 @@ public sealed class Interpreter
         }
     }
 
-    private Value Constant(Const c) => (c.Value, c.Type) switch
+    private Value Constant(Const c) => Constant(c.Value, c.Type);
+
+    private Value Constant(IrConstValue value, IrType type) => (value, type) switch
     {
         (IntConst i, IrScalarType s) => Value.Uint(Arith.Norm(i.Value, s.Kind)),
         (IntConst i, _) => Value.Uint(i.Value),
@@ -500,7 +502,10 @@ public sealed class Interpreter
         (BoolConst b, _) => Value.Bool(b.Value),
         (CharConst ch, _) => Value.Uint((ulong)ch.CodePoint),
         (StringConst s, _) => Value.Of(StrObj.Of(s.Value)),
-        _ => throw new InternalCompilationException($"comptime: no constant {c.Value}"),
+        // a comptime array's static data: a fresh array, or the inline array's storage, each time
+        (ArrayConst a, IrArrayType t) => Value.Of(new ArrayObj([.. a.Elements.Select(e => Constant(e, t.Element))])),
+        (ArrayConst a, IrInlineArrayType t) => Value.Of(new AggObj(AggKind.Inline, default, [.. a.Elements.Select(e => Constant(e, t.Element))])),
+        _ => throw new InternalCompilationException($"comptime: no constant {value}"),
     };
 
     private IrImpl Impl(TypeId concrete, TypeId iface) =>

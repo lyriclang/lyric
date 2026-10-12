@@ -41,13 +41,15 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "r1e";
+    public const string Version = "r1f";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
     private readonly StringBuilder _out = new();
     private readonly StringBuilder _constants = new();
     private readonly Dictionary<string, string> _literals = new(StringComparer.Ordinal);
+    /// <summary>The number of the next static data of a <c>comptime</c> array (<see cref="StaticArray"/>).</summary>
+    private int _data;
     private StringBuilder _fn = null!;
     private IrFunction _function = null!;
     private FileId? _file;
@@ -753,7 +755,7 @@ public sealed class CEmitter
         foreach (var function in Scope()) body.Append(Function(function));
         if (_main && _module.EntryFunction is { } entry) body.Append(Entry(_module.Functions[entry.Value]));
 
-        if (_constants.Length > 0) _out.AppendLine("/* string literals */").Append(_constants).AppendLine();
+        if (_constants.Length > 0) _out.AppendLine(_data > 0 ? "/* string literals, comptime data */" : "/* string literals */").Append(_constants).AppendLine();
         _out.Append(prototypes).AppendLine();
         if (tables.Length > 0) _out.Append(tables).AppendLine();
         if (adapters.Length > 0) _out.Append(adapters).AppendLine();
@@ -1664,7 +1666,8 @@ public sealed class CEmitter
 
     private string Instruction(IrOp op) => op switch
     {
-        Const c => $"{Temp(c.Dest)} = {Constant(c)};",
+        Const { Value: ArrayConst array } c => StaticArray(c, array),
+        Const c => $"{Temp(c.Dest)} = {Constant(c.Value, c.Type)};",
         BinOp b => $"{Temp(b.Dest)} = {Binary(b)};",
         UnOp u => $"{Temp(u.Dest)} = {Unary(u)};",
         Lyric.Ir.Convert v => $"{Temp(v.Dest)} = {Conversion(v)};",
@@ -1899,15 +1902,34 @@ public sealed class CEmitter
         return $"{check}{slot} = {Value(s.Value)};";
     }
 
-    private string Constant(Const c) => c.Value switch
+    private string Constant(IrConstValue value, IrType type) => value switch
     {
         BoolConst b => b.Value ? "1" : "0",
-        IntConst i => Integer(i.Value, c.Type),
-        FloatConst f => Float(f.Value, c.Type),
+        IntConst i => Integer(i.Value, type),
+        FloatConst f => Float(f.Value, type),
         CharConst ch => $"(uint32_t){ch.CodePoint}",
         StringConst t => $"(LyrStr *)&{Literal(t.Value)}",
-        _ => throw new InvalidOperationException($"the C emitter has no constant for {c.Value.GetType().Name}; the gate let it through"),
+        _ => throw new InvalidOperationException($"the C emitter has no constant for {value.GetType().Name}; the gate let it through"),
     };
+
+    /// <summary>
+    /// An array a <c>comptime</c> site computed (design/v5/spec/09 Q1, 13 M9a P3): its elements
+    /// as static data, never written, from which each evaluation fills a fresh array — or the
+    /// inline array's storage —, as a literal is filled. A string element is its static object.
+    /// </summary>
+    private string StaticArray(Const c, ArrayConst array)
+    {
+        var element = c.Type is IrArrayType a ? a.Element : ((IrInlineArrayType)c.Type).Element;
+        var name = $"lyr_data{_data++}";
+        var count = array.Elements.Length;
+        // C has no array of no elements: the data of an empty one is one element nothing reads
+        var items = count == 0 ? "0" : string.Join(", ", array.Elements.Select(e => Constant(e, element)));
+        _constants.AppendLine($"static {CType(element)} const {name}[{Math.Max(count, 1)}] = {{ {items} }};");
+        var bytes = $"{count} * sizeof {name}[0]";
+        return c.Type is IrArrayType
+            ? $"{Temp(c.Dest)} = lyr_alloc_array(&{ArrayDescriptor(element)}, {count}); __builtin_memcpy({Elements(c.Dest, element)}, {name}, {bytes});"
+            : $"__builtin_memcpy({Storage(c.Dest)}.v, {name}, {bytes}); {Temp(c.Dest)} = &{Storage(c.Dest)};";
+    }
 
     /// <summary>
     /// A string literal as a static object the runtime reads without a copy (V9): one per distinct
