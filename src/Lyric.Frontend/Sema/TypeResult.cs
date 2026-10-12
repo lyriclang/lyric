@@ -42,6 +42,15 @@ public sealed class TypeResult
     /// </summary>
     public List<ComptimeExpr> ComptimeSites { get; } = new();
 
+    private readonly Dictionary<AttributeNode, ComptimeExpr> _attributeValues = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>A Lyric 5 attribute's value (design/v5/spec/09 F4): the struct it writes, as the
+    /// <c>comptime</c> site the checker made of it — one of <see cref="ComptimeSites"/>, whose
+    /// evaluated constant holds every field, written or defaulted.</summary>
+    public ComptimeExpr? AttributeValueOf(AttributeNode attribute) => _attributeValues.GetValueOrDefault(attribute);
+
+    internal void SetAttributeValue(AttributeNode attribute, ComptimeExpr value) => _attributeValues[attribute] = value;
+
     /// <summary>Every typed expression with its type. The consumer is the test that checks the
     /// <see cref="ErrorType"/> invariant; without an enumeration it could only be checked where
     /// someone already looks.</summary>

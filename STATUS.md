@@ -972,6 +972,12 @@ M9b the maintainer is asked again.
   does; `std.core.embed(path)`, a file of the package as `uint8[]`, called by what a site reaches
   (a call the program would make, a file outside the package or none: `LYR-CT0004`), the build
   depending on what it read. Spec 11 §2 rule 9; three cases.
+- **S5** the attributes (P7): on every declaration, where one of the sixteen markers of
+  std.core admits them; each a value computed while the program compiles — the struct it writes,
+  a `comptime` site —, which `lyric test` reads: `@Test { timeout = LIMIT }` runs with `LIMIT`. The
+  parenthesized form fills the one field without a default; Lyric 5 writes no attribute rows, and
+  an attributed function is no root. Found on the way: the interpreter filled every global at the
+  first read of one; each now fills alone. Spec 11 §1 rules 1, 4–6; four cases.
 
 ## Design decisions
 

@@ -74,6 +74,19 @@ public class ComptimeTests
         Assert.Equal("832040\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
+    /// <summary>A site fills the module bindings it reads and no other (13 M9a S5): std.path's,
+    /// which asks the platform, stays unfilled. Filled with all the others at the first read, as
+    /// S1 did, it stopped every site that read a binding in a program that loads std.path
+    /// (<c>LYR-CT0003</c>) — S5 found it through <c>@Test { timeout = LIMIT }</c>.</summary>
+    [Fact]
+    public void A_site_fills_only_the_globals_it_reads()
+    {
+        const string main = Head + "import std.path { join };\n\nlet base = 40;\n\n"
+                            + "fn main(): void {\n    println(f\"{comptime base + 2} {join(\"a\", \"b\")}\");\n}\n";
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", main));
+        Assert.Equal($"42 a{Path.DirectorySeparatorChar}b\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
     private const string Spin = Head + "fn spin(n: int): int {\n    var s = 0;\n    var i = 0;\n    while (i < n) {\n"
                                 + "        s += i;\n        i += 1;\n    }\n    return s;\n}\n\n";
 

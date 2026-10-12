@@ -173,6 +173,23 @@ public class TestCommandTests
         Assert.EndsWith("FAIL  app.tests.slow.spins\n      timed out after 1 s — the run ends here\n", output);
     }
 
+    /// <summary>A test's attribute holds values computed while the package compiles (design/v5/
+    /// spec/09 F4; 13 M9a S5): <c>timeout = LIMIT</c> is <c>LIMIT</c>'s value and <c>skip</c> a
+    /// string built from a constant — the runner read only literals, and ran such a test with 60
+    /// seconds and no reason.</summary>
+    [Fact]
+    public void A_tests_attribute_holds_values_computed_while_compiling()
+    {
+        var dir = App(("tests/computed.lyr",
+            "let LIMIT = 1;\nlet WHY = \"needs\";\n\n"
+            + "@Test { skip = WHY + \" a network\" }\nfn fetches(): void {\n    panic(\"ran\");\n}\n\n"
+            + "@Test { timeout = LIMIT }\nfn spins(): void {\n    var n = 0;\n    while (true) {\n        n = n +% 1;\n    }\n}\n"));
+        var (exit, output, error) = Run("test", "-C", dir, "-f", "computed");
+        Assert.True(exit == 1, output + error);
+        Assert.Contains("skip  app.tests.computed.fetches: needs a network\n", output);
+        Assert.EndsWith("FAIL  app.tests.computed.spins\n      timed out after 1 s — the run ends here\n", output);
+    }
+
     /// <summary>Two tests that wait for each other (X3): one after the other, the first would wait
     /// until its time ran out; marked <c>parallel</c>, they run at once, after the others, and their
     /// lines come in their order.</summary>

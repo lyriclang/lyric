@@ -47,6 +47,33 @@ internal static class GlobalInitializer
         return new FunctionLowerer(decl, Name, types, functions, imports, typeTable,
             ModuleLowerer.NoSubstitution, globals, lambdas, instances).Run();
     }
+
+    /// <summary>The name of a global's own initializer: <c>&lt;global:i&gt;</c>, by its slot.</summary>
+    public static string EachName(int global) => $"<global:{global}>";
+
+    /// <summary>
+    /// The hoisting pass's initializers (13 M9a S5): one function per global, which the interpreter
+    /// runs at the global's first access — so code run at compile time runs no initializer it does
+    /// not read, a module's that reaches the world among them (std.path's asks the platform).
+    /// </summary>
+    public static List<(GlobalId Global, IrFunction Function)> BuildEach(GlobalTable globals, TypeResult types,
+        IReadOnlyDictionary<FunctionSymbol, FunctionId> functions, ImportTable imports,
+        TypeTable typeTable, LambdaTable lambdas, InstanceTable instances)
+    {
+        var built = new List<(GlobalId, IrFunction)>();
+        foreach (var entry in globals.Pending.ToList())
+        {
+            var global = globals.IdOf(entry.Symbol);
+            var name = EachName(global.Value);
+            var decl = new FunctionDecl(
+                Visibility: VisibilityWord.None, IsMut: false, IsStatic: false, Name: name, Generics: [],
+                Parameters: [], ReturnType: null, Throws: null,
+                Body: new Block([new GlobalInitStmt(entry.Symbol, entry.Binding)], default), Span: default) { NameSpan = default };
+            built.Add((global, new FunctionLowerer(decl, name, types, functions, imports, typeTable,
+                ModuleLowerer.NoSubstitution, globals, lambdas, instances).Run()));
+        }
+        return built;
+    }
 }
 
 /// <summary>

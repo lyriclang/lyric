@@ -126,24 +126,9 @@ public static class SourceCompiler
         // — the module's only roots, so it holds what the sites reach —, the IR interpreter over
         // it, and the real lowering writes each site's value as a constant. Lyric 5's: the 4.x
         // tools lower a site as its inner expression, as they did since their VM went (01 L7).
-        ComptimeTable? comptime = null;
-        // 'embed' (09 Q4) reads relative to the module that calls, within its package's directory:
-        // the one a package's source root lies in
-        var embed = new EmbedReader(sources.GetPath,
-            options.PackageRoots?.Values.Select(root => Path.GetDirectoryName(Path.GetFullPath(root))!).ToList() ?? []);
-        if (compilation.Lyric5Modules && types.ComptimeSites.Count > 0)
-        {
-            report?.BeginPhase(Phase.Lower);
-            var hoisted = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
-                optimize: false, libraryRoots: false, passes: options.Passes, comptime: new ComptimeTable { Hoist = true });
-            report?.EndPhase();
-            if (hoisted is null || diagnostics.HasErrors)
-                return new CompileResult(sources, diagnostics, null, model);
-            var values = ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks, embed);
-            if (values is null)
-                return new CompileResult(sources, diagnostics, null, model);
-            comptime = new ComptimeTable { Values = values };
-        }
+        var embed = EmbedReaderFor(sources, options);
+        if (!EvaluateSites(compilation, binding, types, diagnostics, options, embed, report, out var comptime))
+            return new CompileResult(sources, diagnostics, null, model);
 
         // Lowering limits arrive as LYR-IR0001 in the same engine and are rendered with file, line and
         // column like any other error.
@@ -167,7 +152,37 @@ public static class SourceCompiler
             report?.ReportPhase(Phase.Verify,
                 timings.Runs > 1 ? $"{FunctionCount(ir)}, {timings.Runs} runs" : FunctionCount(ir),
                 timings.Verification);
-        return new CompileResult(sources, diagnostics, ir, model) { Embedded = embed.Read };
+        return new CompileResult(sources, diagnostics, ir, model) { Embedded = embed.Read, ComptimeValues = comptime?.Values };
+    }
+
+    /// <summary>'embed' (09 Q4) reads relative to the module that calls, within its package's
+    /// directory: the one a package's source root lies in.</summary>
+    private static EmbedReader EmbedReaderFor(SourceManager sources, CompilerOptions options) =>
+        new(sources.GetPath,
+            options.PackageRoots?.Values.Select(root => Path.GetDirectoryName(Path.GetFullPath(root))!).ToList() ?? []);
+
+    /// <summary>
+    /// The 'comptime' sites of a Lyric 5 compilation evaluated (09 A4; 13 M9a P1, P11, P13): a
+    /// lowering that hoists each into a function of its own — the module's only roots, so it holds
+    /// what the sites reach —, the IR interpreter over it. <paramref name="comptime"/> holds the
+    /// values the real lowering writes as constants; <c>null</c> where there is no site, or for
+    /// the 4.x tools, which lower a site as its inner expression (01 L7). False after reporting.
+    /// </summary>
+    private static bool EvaluateSites(Compilation compilation, BindingResult binding, TypeResult types,
+        DiagnosticEngine diagnostics, CompilerOptions options, EmbedReader embed, TerminalOutput? report,
+        out ComptimeTable? comptime)
+    {
+        comptime = null;
+        if (!compilation.Lyric5Modules || types.ComptimeSites.Count == 0) return true;
+        report?.BeginPhase(Phase.Lower);
+        var hoisted = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
+            optimize: false, libraryRoots: false, passes: options.Passes, comptime: new ComptimeTable { Hoist = true });
+        report?.EndPhase();
+        if (hoisted is null || diagnostics.HasErrors) return false;
+        var values = ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks, embed);
+        if (values is null) return false;
+        comptime = new ComptimeTable { Values = values };
+        return true;
     }
 
     /// <summary>
@@ -346,11 +361,17 @@ public static class SourceCompiler
         if (diagnostics.HasErrors)
             return new CompileResult(sources, diagnostics, null, model);
 
+        // Every build that lowers evaluates (13 M9a P13) — a library by itself too; an
+        // attribute's value is read from here (09 F4: 'lyric test' its '@Test').
+        var embed = EmbedReaderFor(sources, options);
+        if (!EvaluateSites(compilation, binding, types, diagnostics, options, embed, report: null, out var comptime))
+            return new CompileResult(sources, diagnostics, null, model);
+
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
-            optimize: options.Optimize, libraryRoots: true, passes: options.Passes);
+            optimize: options.Optimize, libraryRoots: true, passes: options.Passes, comptime: comptime);
         if (ir is null) return new CompileResult(sources, diagnostics, null, model);
 
-        return new CompileResult(sources, diagnostics, ir, model);
+        return new CompileResult(sources, diagnostics, ir, model) { Embedded = embed.Read, ComptimeValues = comptime?.Values };
     }
 
     /// <summary>
@@ -609,6 +630,10 @@ public sealed record CompileResult(
     /// <summary>The files <c>embed</c> read while the program compiled (design/v5/spec/09 Q4),
     /// absolute: inputs of the build beside its sources.</summary>
     public IReadOnlyList<string> Embedded { get; init; } = [];
+
+    /// <summary>Each 'comptime' site's value by its index in the model's sites (09 A4), where the
+    /// compilation evaluated any — an attribute's among them (09 F4).</summary>
+    public IReadOnlyDictionary<int, IrConstValue>? ComptimeValues { get; init; }
 
     /// <summary>Renders every diagnostic exactly once and reports whether the run was clean.
     /// </summary>

@@ -239,6 +239,10 @@ public sealed record EnumDecl(VisibilityWord Visibility, string Name, GenericPar
 public sealed record EnumVariant(string Name, TypeNode[]? TupleFields, FieldDecl[]? StructFields, Span Span) : Node(Span), INamedDecl // both null means a unit variant
 {
     public required Span NameSpan { get; init; }
+
+    /// <summary>Its attributes (design/v5/spec/09 T7: every declaration carries them in Lyric 5;
+    /// the 4.x parser refuses them here).</summary>
+    public AttributeNode[] Attributes { get; init; } = [];
 }
 
 public sealed record InterfaceDecl(VisibilityWord Visibility, string Name, GenericParam[] Generics, TypeNode[] Interfaces, FunctionDecl[] Members, Span Span) : Decl(Span), INamedDecl
@@ -257,6 +261,10 @@ public sealed record InterfaceDecl(VisibilityWord Visibility, string Name, Gener
     /// <summary>The constants it declares, <c>static let zero: Self;</c> (design/v5/spec/03 T5):
     /// every conformer answers them with a <c>static let</c> of its own.</summary>
     public StaticBindingDecl[] Statics { get; init; } = [];
+
+    /// <summary>Its attributes (design/v5/spec/09 T7: every declaration carries them in Lyric 5;
+    /// the 4.x parser refuses them here).</summary>
+    public AttributeNode[] Attributes { get; init; } = [];
 }
 
 public sealed record ExtendDecl(VisibilityWord Visibility, TypeNode Target, TypeNode[] Interfaces, FunctionDecl[] Methods, Span Span) : Decl(Span)
@@ -273,6 +281,10 @@ public sealed record ExtendDecl(VisibilityWord Visibility, TypeNode Target, Type
     /// <summary>The constants the block adds to its type, <c>static let answer: int = 42;</c> — or
     /// answers for its interfaces (05 §6, §7).</summary>
     public StaticBindingDecl[] Statics { get; init; } = [];
+
+    /// <summary>Its attributes (design/v5/spec/09 T7: every declaration carries them in Lyric 5;
+    /// the 4.x parser refuses them here).</summary>
+    public AttributeNode[] Attributes { get; init; } = [];
 }
 
 /// <summary>
@@ -288,6 +300,10 @@ public sealed record AssociatedTypeDecl(string Name, TypeNode? Type, Span Span) 
     /// <summary>What every answer conforms to, in an interface's declaration —
     /// <c>type Iter :: [Iterator];</c> (10 B6) —, as a type parameter's constraints are written.</summary>
     public TypeNode[] Bounds { get; init; } = [];
+
+    /// <summary>Its attributes (design/v5/spec/09 T7: every declaration carries them in Lyric 5;
+    /// the 4.x parser refuses them here).</summary>
+    public AttributeNode[] Attributes { get; init; } = [];
 }
 
 // --- global bindings and type aliases ---
@@ -299,6 +315,10 @@ public sealed record GlobalBindingDecl(VisibilityWord Visibility, BindingStmt Bi
     public string Name => Binding.Name;
 
     public Span NameSpan => Binding.NameSpan;
+
+    /// <summary>Its attributes (design/v5/spec/09 T7: every declaration carries them in Lyric 5;
+    /// the 4.x parser refuses them here).</summary>
+    public AttributeNode[] Attributes { get; init; } = [];
 }
 
 public sealed record TypeAliasDecl(VisibilityWord Visibility, bool IsOpaque, string Name, TypeNode Aliased, Span Span) : Decl(Span), INamedDecl
@@ -309,6 +329,10 @@ public sealed record TypeAliasDecl(VisibilityWord Visibility, bool IsOpaque, str
 
     /// <summary>The parameters of a generic alias, <c>type Pair&lt;T&gt; = (T, T)</c> (03 T15).</summary>
     public GenericParam[] Generics { get; init; } = [];
+
+    /// <summary>Its attributes (design/v5/spec/09 T7: every declaration carries them in Lyric 5;
+    /// the 4.x parser refuses them here).</summary>
+    public AttributeNode[] Attributes { get; init; } = [];
 }
 
 public sealed record ErrorDecl(Span Span) : Decl(Span); // recovery placeholder
