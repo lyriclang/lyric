@@ -11,7 +11,10 @@
 //   pulled to the end true       its pull says so,
 //   generator task cancelled     and the task's next wait throws
 //   woke 20 40 1 41 ... 19 59    sixty sleepers, every third cancelled from wherever it is in the
-//                                heap: the others wake by deadline, ties in the order they slept
+//                                heap: the others wake by deadline, ties in the order they slept.
+//                                The deadlines lie 50 ms apart: the sixty spawns take time, and a
+//                                loaded runner took more than the 10 ms they once lay apart (two red
+//                                runs on 2026-10-12, a later sleeper woken before an earlier one).
 import std.core { arrayOf };
 import std.io { println };
 import std.task { spawn, sleep, yieldNow, Cancelled };
@@ -97,13 +100,13 @@ fn main(): void {
     }
 
     let hs = arrayOf(60, (i) => spawn(() => {
-        try sleep(Duration.ofMillis((i % 20) * 10));
+        try sleep(Duration.ofMillis((i % 20) * 50));
         woke = woke + f" {i}";
     }));
     try yieldNow();
     for (i in 0..60) {
         if (i % 3 == 0) { hs[i].cancel(); }
     }
-    try sleep(Duration.ofMillis(300));
+    try sleep(Duration.ofMillis(1200));
     println("woke" + woke);
 }
