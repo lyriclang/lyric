@@ -6,8 +6,8 @@ import std.math;
 fn theWorldsConstants(): void {
     assertEq(math.pi, 3.141592653589793);
     assertEq(math.tau, 2.0 * math.pi);
-    assertClose(math.e.ln(), 1.0, 1e-15);
-    assertClose((math.pi / 4.0).tan(), 1.0, 1e-15);
+    assertClose(math.ln(math.e), 1.0, 1e-15);
+    assertClose(math.tan(math.pi / 4.0), 1.0, 1e-15);
     let narrow: float32 = 3.1415927;
     assertEq(math.pi as float32, narrow);
 }

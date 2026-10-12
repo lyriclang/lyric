@@ -4,6 +4,7 @@
 //   14 cases, 0 differ
 import std.io { println };
 import std.core { ParseError };
+import std.math { abs, ceil, floor, round, sqrt, trunc };
 
 fn tower(): string {
     let w1 = 128 as int8;
@@ -37,7 +38,7 @@ fn bits(): string {
     let z: uint64 = 0x8000_0000_0000_0001u64;
     let counts = f"{x.leadingZeros()} {x.trailingZeros()} {x.popCount()} {y.popCount()} {z.leadingZeros()} {(0 as uint16).leadingZeros()}";
     let rotations = f"{x.rotateLeft(3)} {x.rotateRight(3)} {z.rotateLeft(1)} {y.rotateLeft(7)} {x.rotateLeft(-1)}";
-    let others = f"{(-17).abs()} {(3).pow(13)} {(2 as uint64).pow(63)} {0xF0 & 0x3C} {0xF0 | 0x0F} {0xF0 ^ 0xFF}";
+    let others = f"{abs(-17)} {(3).pow(13)} {(2 as uint64).pow(63)} {0xF0 & 0x3C} {0xF0 | 0x0F} {0xF0 ^ 0xFF}";
     return f"{counts} | {rotations} | {others}";
 }
 
@@ -60,8 +61,8 @@ fn floats(): string {
     let third = 1.0 / 3.0;
     let texts = bitsOf([0.1 + 0.2, 1e21, 1e-7, 123456789012345680000.0, 5e-324, 1.7976931348623157e308,
         -0.0, 2.5e-8, 100.0, third, 0.3 - 0.2, 3.0 % 2.5, -7.5 % 2.0, 1.0 / 0.0, -1.0 / 0.0]);
-    let rounding = bitsOf([2.5.floor(), (-2.5).floor(), 2.5.ceil(), (-2.5).ceil(), 2.5.round(), (-2.5).round(),
-        0.49999999999999994.round(), (-0.3).round(), 4503599627370497.0.round(), (-2.7).trunc(), 2.0.sqrt(), 1e-300.sqrt()]);
+    let rounding = bitsOf([floor(2.5), floor(-2.5), ceil(2.5), ceil(-2.5), round(2.5), round(-2.5),
+        round(0.49999999999999994), round(-0.3), round(4503599627370497.0), trunc(-2.7), sqrt(2.0), sqrt(1e-300)]);
     let f32: float32 = 0.1;
     let g32: float32 = 16777217.0;
     let narrow = f"{f32} {f32 + 0.2} {g32} {f32.toBits()} {(1.0 as float32) / 3.0} {3.4028235e38f32}";

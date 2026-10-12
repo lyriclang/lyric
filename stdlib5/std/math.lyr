@@ -1,6 +1,8 @@
-/// What describes the world rather than a type (design/v5/spec/10 B5 Z2) — `math.pi`, typed
-/// `float`; `math.pi as float32` for the narrow width — and the functions of two numbers. What
-/// describes a type is that type's static member: `float.epsilon`, `int.max`.
+/// What a number is stands at its type — `float.epsilon`, `int.max`, `x.isNan()` —; what one
+/// computes with numbers stands here (design/v5/spec/10 B5 Z2, "Review 2026-10-12"): the
+/// elementary functions, free and generic over the tower, and the constants that describe the
+/// world — `math.pi`, typed `float`; `math.pi as float32` for the narrow width.
+import std.core { Signed, asTypeOf };
 
 /// π, a half turn in radians.
 pub let pi: float = 3.141592653589793;
@@ -52,3 +54,161 @@ pub fn lerp<T :: [Float]>(a: T, b: T, t: T): T {
     }
     return b - (b - a) * (T.one - t);
 }
+
+// The elementary functions (Z2): computed in `float` by C's libm, a `float32` rounded once, at
+// the end. (The transcendental ones have no answer at compile time yet: 09 D7.)
+/// The greatest integral value not above `x`.
+pub fn floor<T :: [Float]>(x: T): T {
+    return asTypeOf(libmFloor(asTypeOf(x, 0.0)), x);
+}
+
+/// The least integral value not below `x`.
+pub fn ceil<T :: [Float]>(x: T): T {
+    return asTypeOf(libmCeil(asTypeOf(x, 0.0)), x);
+}
+
+/// The nearest integral value, a half away from zero.
+pub fn round<T :: [Float]>(x: T): T {
+    return asTypeOf(libmRound(asTypeOf(x, 0.0)), x);
+}
+
+/// The integral part of `x`, toward zero.
+pub fn trunc<T :: [Float]>(x: T): T {
+    return asTypeOf(libmTrunc(asTypeOf(x, 0.0)), x);
+}
+
+/// The square root; NaN below zero.
+pub fn sqrt<T :: [Float]>(x: T): T {
+    return asTypeOf(libmSqrt(asTypeOf(x, 0.0)), x);
+}
+
+/// The cube root.
+pub fn cbrt<T :: [Float]>(x: T): T {
+    return asTypeOf(libmCbrt(asTypeOf(x, 0.0)), x);
+}
+
+/// *e* to the power `x`.
+pub fn exp<T :: [Float]>(x: T): T {
+    return asTypeOf(libmExp(asTypeOf(x, 0.0)), x);
+}
+
+/// The natural logarithm; NaN below zero, `-infinity` at zero.
+pub fn ln<T :: [Float]>(x: T): T {
+    return asTypeOf(libmLn(asTypeOf(x, 0.0)), x);
+}
+
+/// The logarithm to base 2.
+pub fn log2<T :: [Float]>(x: T): T {
+    return asTypeOf(libmLog2(asTypeOf(x, 0.0)), x);
+}
+
+/// The logarithm to base 10.
+pub fn log10<T :: [Float]>(x: T): T {
+    return asTypeOf(libmLog10(asTypeOf(x, 0.0)), x);
+}
+
+/// The sine, `x` in radians.
+pub fn sin<T :: [Float]>(x: T): T {
+    return asTypeOf(libmSin(asTypeOf(x, 0.0)), x);
+}
+
+/// The cosine.
+pub fn cos<T :: [Float]>(x: T): T {
+    return asTypeOf(libmCos(asTypeOf(x, 0.0)), x);
+}
+
+/// The tangent.
+pub fn tan<T :: [Float]>(x: T): T {
+    return asTypeOf(libmTan(asTypeOf(x, 0.0)), x);
+}
+
+/// The arcsine, in radians.
+pub fn asin<T :: [Float]>(x: T): T {
+    return asTypeOf(libmAsin(asTypeOf(x, 0.0)), x);
+}
+
+/// The arccosine.
+pub fn acos<T :: [Float]>(x: T): T {
+    return asTypeOf(libmAcos(asTypeOf(x, 0.0)), x);
+}
+
+/// The arctangent.
+pub fn atan<T :: [Float]>(x: T): T {
+    return asTypeOf(libmAtan(asTypeOf(x, 0.0)), x);
+}
+
+/// The hyperbolic sine.
+pub fn sinh<T :: [Float]>(x: T): T {
+    return asTypeOf(libmSinh(asTypeOf(x, 0.0)), x);
+}
+
+/// The hyperbolic cosine.
+pub fn cosh<T :: [Float]>(x: T): T {
+    return asTypeOf(libmCosh(asTypeOf(x, 0.0)), x);
+}
+
+/// The hyperbolic tangent.
+pub fn tanh<T :: [Float]>(x: T): T {
+    return asTypeOf(libmTanh(asTypeOf(x, 0.0)), x);
+}
+
+/// The angle of the point (x, y) from the positive x axis, in radians, -π to π.
+pub fn atan2<T :: [Float]>(y: T, x: T): T {
+    return asTypeOf(libmAtan2(asTypeOf(y, 0.0), asTypeOf(x, 0.0)), x);
+}
+
+/// The length of the hypotenuse, without the overflow of `sqrt(x * x + y * y)`.
+pub fn hypot<T :: [Float]>(x: T, y: T): T {
+    return asTypeOf(libmHypot(asTypeOf(x, 0.0), asTypeOf(y, 0.0)), x);
+}
+
+/// `x` to the power `e`. (An integer's power by squaring is its own `x.pow(n)`.)
+pub fn pow<T :: [Float]>(x: T, e: T): T {
+    return asTypeOf(libmPow(asTypeOf(x, 0.0), asTypeOf(e, 0.0)), x);
+}
+
+/// The value without its sign: `0.0` for `-0.0`, which `<` does not tell from `0.0`.
+pub fn abs<T :: [Signed]>(x: T): T {
+    if (x < T.zero) {
+        return -x;
+    }
+    return if (x == T.zero) T.zero else x;
+}
+
+/// `-1`, `0` or `1` as a value of the type; a float's NaN stays NaN.
+pub fn signum<T :: [Signed]>(x: T): T {
+    if (!(x == x)) {
+        return x;
+    }
+    if (x < T.zero) {
+        return -T.one;
+    }
+    if (x > T.zero) {
+        return T.one;
+    }
+    return T.zero;
+}
+
+// libm's functions, in double (11 W4).
+extern "C" fn libmFloor(x: float): float = "floor";
+extern "C" fn libmCeil(x: float): float = "ceil";
+extern "C" fn libmRound(x: float): float = "round";
+extern "C" fn libmTrunc(x: float): float = "trunc";
+extern "C" fn libmSqrt(x: float): float = "sqrt";
+extern "C" fn libmCbrt(x: float): float = "cbrt";
+extern "C" fn libmExp(x: float): float = "exp";
+extern "C" fn libmLn(x: float): float = "log";
+extern "C" fn libmLog2(x: float): float = "log2";
+extern "C" fn libmLog10(x: float): float = "log10";
+extern "C" fn libmSin(x: float): float = "sin";
+extern "C" fn libmCos(x: float): float = "cos";
+extern "C" fn libmTan(x: float): float = "tan";
+extern "C" fn libmAsin(x: float): float = "asin";
+extern "C" fn libmAcos(x: float): float = "acos";
+extern "C" fn libmAtan(x: float): float = "atan";
+extern "C" fn libmSinh(x: float): float = "sinh";
+extern "C" fn libmCosh(x: float): float = "cosh";
+extern "C" fn libmTanh(x: float): float = "tanh";
+extern "C" fn libmAtan2(y: float, x: float): float = "atan2";
+extern "C" fn libmHypot(x: float, y: float): float = "hypot";
+extern "C" fn libmPow(x: float, e: float): float = "pow";

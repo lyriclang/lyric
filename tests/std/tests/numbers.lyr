@@ -1,4 +1,5 @@
 // std.core's numbers (design/v5/spec/10 B5): the tower, its static members, the defaults on it.
+import std.math { abs, signum };
 import std.test { assertEq, assertTrue, assertFalse, assertNull, assertNotNull };
 import std.core { Signed };
 
@@ -11,7 +12,7 @@ fn total<T :: [Num]>(xs: T[]): T {
 }
 
 fn magnitude<T :: [Signed]>(x: T): T {
-    return x.abs();
+    return abs(x);
 }
 
 fn span<T :: [Integer]>(sample: T): string {
@@ -38,15 +39,15 @@ fn theIntegersKnowTheirRange(): void {
 }
 
 @Test
-fn absAndSignumAreDefaults(): void {
-    assertEq((-5).abs(), 5);
+fn absAndSignumAreMathsOverSigned(): void {
+    assertEq(abs(-5), 5);
     assertEq(magnitude(-7), 7);
     assertEq(magnitude(-2.5), 2.5);
-    assertEq((-3).signum(), -1);
-    assertEq(0.signum(), 0);
-    assertEq(4.signum(), 1);
+    assertEq(signum(-3), -1);
+    assertEq(signum(0), 0);
+    assertEq(signum(4), 1);
     let x: int8 = -9;
-    assertEq(x.abs(), 9);
+    assertEq(abs(x), 9);
 }
 
 @Test
