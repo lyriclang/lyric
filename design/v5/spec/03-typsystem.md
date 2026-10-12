@@ -384,6 +384,7 @@ widerspricht, gilt die Zeile hier.
 | S5 | **Ein Lambda, das `T` liefert, bindet kein `?U`** (`mapNotNull((s) => try int.parse(s))` → `LYR-SEM0060`): die Inferenz soll die Erweiterung `T` → `?T` als Bindung von `U` nehmen, wie Kotlin. Uhr: M12, mit den übrigen Inferenz-Punkten | T8 |
 | S7 | **Ein offener Blanket schließt eine eigene Konformanz nur an seinen Instanzen aus** (bestätigt): `struct Meters :: [Into<int>]` steht, bis ein Modul `extend int :: [From<Meters>]` schreibt — dann `LYR-SEM0133` an der Konformanz des Typs, wie Rust; die Kohärenz fragt das ganze Programm | T7 |
 | S3 | **`char`-Bereiche über ein internes `Step`** (bestätigt): `interface Step :: [TotalOrder]` in `std.core`, nicht `pub`, je ein Block für die acht Ganzzahltypen und `char`, wie Rusts `Step` — ein eigener Block für `Range<char>` neben dem für `Integer` wäre dieselbe Konformanz zweimal | T13 |
+| S16 | **Ein Literal an einem generischen Parameter, den ein früheres Argument auf `T[N]` bindet, nimmt `T[N]` als Ziel** (Rückfrage nach S15–S19): `assertEq(x.toBytesBE(), [2u8, 1u8])` ist heute `LYR-SEM0001` „cannot assign 'uint8[]' to 'uint8[2]'“ — die Inferenz bindet `T` aus dem ersten Argument und prüft das Literal nicht gegen `T` als Ziel; `let want: uint8[2] = …` geht. Uhr: M12, mit den übrigen Inferenz-Punkten | T8 |
 
 ---
 

@@ -932,6 +932,10 @@ After the review:
 - **S19** the conformance gate in one job per profile, a matrix — shipped from `main` as a PR of
   its own before S15–S18, so every later gate ran split. `main` requires no check by name: no
   setting followed, the merge scripts match the prefix.
+- **S20** `never` as a type parameter's default under `Error` — the maintainer's answer to the
+  question after S15–S19: the nine adapters write `E :: [Error] = never`, so `MapIter<I, U>` is
+  again the one whose function throws nothing, as before S4. Spec 06 §9.3 rule 3, 12 §Iteration;
+  two cases.
 
 ## Design decisions
 

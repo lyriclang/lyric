@@ -245,9 +245,10 @@ public sealed class SemaRules
         foreach (var child in AstChildren.Of(node)) CheckNeverPositions(child, node);
     }
 
-    /// <summary>A written type argument — of a type, a call, a struct literal, a type path: the
-    /// empty set where the parameter's bound is <c>Error</c> (design/v5/spec/05 "Review 2026-10-09"
-    /// S5; M8c S17, <c>DedupIter&lt;I, never&gt;</c>), which the checker asks, knowing the parameter.</summary>
+    /// <summary>A written type argument — of a type, a call, a struct literal, a type path — or a
+    /// type parameter's default (<c>E :: [Error] = never</c>, M8c S20): the empty set where the
+    /// parameter's bound is <c>Error</c> (design/v5/spec/05 "Review 2026-10-09" S5; M8c S17,
+    /// <c>DedupIter&lt;I, never&gt;</c>), which the checker asks, knowing the parameter.</summary>
     private static bool IsTypeArgument(TypeNode type, Node? parent) => parent switch
     {
         NamedType n => Enumerable.Range(0, n.TypeArguments.Length).Any(i => ReferenceEquals(n.TypeArguments[i], type)
@@ -255,6 +256,7 @@ public sealed class SemaRules
         CallExpr c => c.TypeArguments?.Any(a => ReferenceEquals(a, type)) == true,
         StructInitExpr s => s.TypeArguments.Any(a => ReferenceEquals(a, type)),
         TypePathExpr t => t.TypeArguments.Any(a => ReferenceEquals(a, type)),
+        GenericParam g => ReferenceEquals(g.Default, type),
         _ => false,
     };
 
