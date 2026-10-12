@@ -128,6 +128,7 @@ Nach M8a S11a hat der Maintainer die offenen Punkte aus M4 bis M8a durchgesehen 
 | **Durchsicht 2026-10-07** | Die offenen Punkte des Laufs R0–S16, mit dem Maintainer entschieden: in 01, 03, 04, 10, 11 je im Abschnitt „Review 2026-10-07“. Uhren: M8c — `Debug` eines Textes maskiert, `&` aus den Builder-Signaturen, `trimMatches`, `toBytes`, `char`-Bereiche, das Builder-Wachstum aus der Reihe · M12 — Typargumente am Methodenaufruf, Fixierung in Funktionen, Arität über Blöcke, der generische Weiterleiter · M10/M11 — der Vorgabe-Hasher. Die Plattform-Jobs und die Benchmarks der CI laufen auf `main` |
 | **Durchsicht 2026-10-08** | Die offenen Punkte aus M8b S2–S9, mit dem Maintainer entschieden („alle Empfehlungen“): in 03 und 10 je im Abschnitt „Review 2026-10-08“. In M8b: S8c (stderr zeilengepuffert; `print` in eine Pipe, die niemand liest, beendet das Programm), S10 (`Reader`/`Writer` werfen `[IoError, Cancelled]`). Uhren: M8c — `T[N]` gleich und hashbar, der Elementtyp eines Literals an einer View-Stelle, **ein Sammelslice Melde-Qualität**: `1.` und `.5` sagen, dass ein Gleitkommaliteral Ziffern auf beiden Seiten des `.` hat; ein Name mit Zeichen außerhalb von ASCII gibt eine Meldung statt einer je Zeichen und Folgefehlern; nach `LYR-SEM0126` läuft der abgelehnte Typ als Fehlertyp weiter, ohne `SEM0138`/`SEM0003`/`SEM0006` am Gebrauch; `lyric5 test --target` wie `build` und `run` · M10 — Base64Url ohne Padding · M12 — geschriebene Typen gegen ihre Schranken, die R3-Warnung für eine Hülle um einen Handle ohne Namen |
 | **Durchsicht 2026-10-08 (2)** | Die offenen Punkte aus M8b S10–S12, mit dem Maintainer entschieden („alle Empfehlungen“): in 10 im Abschnitt „Review 2026-10-08 (2)“. Bestätigt: `IpAddr` mit Feldern, `fork`/`exec`, `env` über der geerbten Umgebung, die konkreten Pipe-Typen. Uhren: M10 — Fristen für `resolve`, die Pipes eines Kindes unter Windows über den Completion-Port. M8c nach M8b freigegeben |
+| **Durchsicht 2026-10-09** | Die offenen Punkte aus M8c S1–S13, mit dem Maintainer entschieden („alle Empfehlungen“; `v` nach Rückfrage „voll, wie T10“): in 03, 04, 05, 08, 10, 11 je im Abschnitt „Review 2026-10-09“. Uhren: M8c S15–S19 (Nachtrag zum M8c-Plan unten) — `is` auf eingebauten Typen und `Any` für sie; `Debug` für `?T`, `Display`/`Debug` für `T[N]`; die Synthese über `T[N]`-Feldern als Ganzes, `never` als Typargument unter `Error`; der Bereichsindex über den View, `LYR-SEM0126` an Feldern, Elementen und Typargumenten, die leere nachgestellte Lambda; das Gate je Profil · M12 — `?U` aus einem Lambda, das `T` liefert; mehrere `From` eines Typs (vertagt). Bestätigt: die Lesarten zu Unicode, Adaptern, `map[k] = null`, Blankets, Zeugen über den View, `Backtrace`, Prüfsummen, Assertions und Benchmarks |
 
 ## Nachtrag 2026-10-07 — der Plan für M8b
 
@@ -265,6 +266,18 @@ davor). Die Slices heißen **M8c S1–S14**; jeder ist ein PR, sein Regel-PR in 
 | **S12** Test und Bench | X1, X3: `assertContains`, `assertEmpty`, der String-Diff, `@Test { parallel = true }`; X4: `@Bench`, `Bench`, `blackBox`, `lyric5 bench` (`--save`, `--compare`). Geteilt: **S12a** die Tests — die drei Stücke von X1 und der Opt-in von X3; **S12b** die Benchmarks — X4 | **`lyric5 bench` läuft die std-Benchmarks** |
 | **S13** Melde-Qualität | der Sammelslice der Durchsicht vom 2026-10-08: `1.` und `.5`, ein Name außerhalb von ASCII, nach `LYR-SEM0126`, `lyric5 test --target` | je Meldung ein Fall |
 | **S14** Abschluss | **Wortzähler über Unicode-Text** als Beispiel; Dogfood; STATUS, CHANGELOG | die Zeile oben erfüllt |
+
+**Nachtrag 2026-10-09 — nach der Durchsicht.** Die Durchsicht der offenen Punkte von M8c (oben,
+„Durchsicht 2026-10-09“) gab neun Punkten die Uhr M8c; sie folgen S14 in fünf Slices, vor M9a
+(vor dem wird weiter gefragt):
+
+| Slice | Inhalt | Artefakt, Prüfung |
+|---|---|---|
+| **S15** `is` auf eingebauten Typen | 03 T10/T11, Zeile M8c S8b der Durchsicht: `is`, Typ-Pattern und Typmengen auf `bool`, `char`, den zehn Zahltypen, `string`, `StringView`, exakt; `Any` nimmt ihre Werte | `let a: Any = 5; a is int` |
+| **S16** `Debug` und `Display` | 10, Zeilen S1 und S11: `?T :: [Debug]`; `T[N] :: [Display, Debug]` wie `T[]` | `assertEq('7'.toDigit(10), 7)`, `assertEq(x.toBytesLE(), …)` |
+| **S17** Synthese und `never` | 04, Zeile S3b: ein `T[N]`-Feld als Ganzes; 05, Zeile S5: `never` als Typargument unter `Error` | die Goldens ohne 4096 `&&`; `DedupIter<I, never>` |
+| **S18** Index über den View, Meldungen | 03, Zeile S6: `list[a..b]`; 04, Zeile S13: `LYR-SEM0126` an Feldern, Elementen und Typargumenten; 08, Zeile S12a: die leere nachgestellte Lambda | je Regel ein Fall |
+| **S19** Gate je Profil | 11, Zeile CI: die Matrix `debug`/`release`, die Einstellung der geforderten Checks; STATUS, CHANGELOG | die Wandzeit des Gates halbiert |
 
 **Nicht in M8c**: `std.regex` (10 S8) — M10, der die Tabellen braucht; Normalisierung, Grapheme
 und Breite gehören dem Ring `unicode`, nicht `std` (S4).

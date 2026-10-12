@@ -42,7 +42,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M7 | Modules and packages | L | **done** 2026-10-02 |
 | M8a | std core | XL | **done** 2026-10-07 |
 | M8b | std I/O and system | L | **done** 2026-10-08 |
-| M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | **done** 2026-10-09 |
+| M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | S1–S14 **done** 2026-10-09; S15–S19 after the review |
 | M9a | `comptime` (the IR interpreter) | L | — |
 | M9b | Macros | L | — |
 | M10 | std after rule D | XL | — |
@@ -789,7 +789,7 @@ reaper a thread, Windows' pipes blocking on the I/O pool — decided with the ma
 day (10 "Review 2026-10-08 (2)"): confirmed as built, with two clocks for M10 — deadlines for
 `resolve`, a Windows child's pipes through the completion port. M8c follows.
 
-### M8c — done (2026-10-09)
+### M8c — the plan done (2026-10-09), S15–S19 after the review
 
 The plan is design 13's addendum of 2026-10-08: the Unicode tables generated into C (P1), lambdas
 that throw through 05 K4 (P2), the builder without `&` and `std.fmt.format` (P3), the language's
@@ -900,9 +900,19 @@ Merged, slice by slice (each PR says what it did and how it was checked):
 On the way, outside the plan: a child that ended before the reaper knew of it was never reaped,
 its `wait` hanging (M8b S12's; the processes test's two timeouts) — fixed in a PR of its own.
 
-**M8c is done.** Every slice of the plan is built; what it moved stands in its row — `list[a..b]`
+**M8c's plan is built.** Every slice of it stands; what it moved stands in its row — `list[a..b]`
 for a decision, `Contains<char>` on text from S2 to S9, S8 and S12 split. The open points the run
-collected go to the maintainer with the report. M9a follows, once the maintainer is asked.
+collected went to the maintainer with the report and were decided on 2026-10-09 (design, each area's
+"Review 2026-10-09"); nine of them carry the clock M8c and follow in five slices (design 13, the
+addendum after M8c's S14 row). M9a follows those, once the maintainer is asked.
+
+After the review:
+
+- **S15** `is`, type patterns and type sets on the built-in types — `bool`, `char`, the ten
+  number types, `string`, `StringView` —, exact (an `int8` is no `int`, an alias is its type), and
+  `Any` takes their values (`let a: Any = 5`, design 03 T10 as written). The test compares the
+  descriptor of the built-in's box (S8b). Spec 05 §9 rules 1–3, 09 §2 rule 12; five cases, the
+  pin `any-takes-no-scalar` retired with its rule.
 
 ## Design decisions
 
@@ -917,7 +927,7 @@ Claude plans **and** implements; the maintainer reviews (in force since the scop
 merged once its CI is green; the milestones follow each other without a pause until 5.0 stands,
 and the last push toward 5.0 waits for the maintainer's review of the points collected on the
 way (those of M4 to M8a were reviewed on 2026-10-05, those of the run that closed M8a on
-2026-10-07, M8b's on 2026-10-08). Claude also merges, tags and releases. Anything that acts outside the repository — creating
+2026-10-07, M8b's on 2026-10-08, M8c's on 2026-10-09). Claude also merges, tags and releases. Anything that acts outside the repository — creating
 repositories, publishing releases, deleting published things — is laid out first and done on the
 maintainer's word.
 

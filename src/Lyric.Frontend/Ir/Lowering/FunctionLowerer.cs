@@ -2715,13 +2715,15 @@ internal sealed class FunctionLowerer
         return value;
     }
 
-    /// <summary>The type a test names, as the entry a descriptor identifies.</summary>
+    /// <summary>The type a test names, as the entry a descriptor identifies — for a built-in, its
+    /// box (05 §9 rule 3): the descriptor a value of it carries behind an interface.</summary>
     private TypeId TargetIdOf(IrType type, Span span) => type switch
     {
         IrRefType r => r.Type,
         IrStructType s => s.Type,
         IrEnumType e => e.Type,
         IrInterfaceType i => i.Type,
+        _ when _typeTable.BuiltinOfIr(type) is { } builtin => _typeTable.BoxOfBuiltin(type, builtin),
         _ => throw NotSupported($"a type test against '{type}'", span),
     };
 

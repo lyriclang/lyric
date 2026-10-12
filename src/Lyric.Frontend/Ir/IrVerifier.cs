@@ -1124,6 +1124,10 @@ public static class IrVerifier
             IrStructType s => s.Type,
             IrEnumType e => e.Type,
             IrInterfaceType i => i.Type,
+            // A built-in's value out of its box (05 §9 rule 3): the box's one field is the result.
+            var value when d.Target.Value >= 0 && d.Target.Value < _module.Types.Count
+                           && _module.Types[d.Target.Value] is { IsBuiltinBox: true, FieldTypes: [var payload] }
+                           && IrType.Equal(payload, value) => d.Target,
             _ => null,
         };
         if (named is null || named.Value != d.Target)

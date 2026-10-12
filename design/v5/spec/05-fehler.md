@@ -211,6 +211,19 @@ Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert 
 | M6-25 | Abweichung von E8 mit Uhr: der Stacküberlauf beendet bis M11 den Prozess (01 S3) | E8 |
 | M6-21 | Eine Panik im Rumpf eines Schlosses gibt es frei und vergiftet es (06) | E8 |
 
+## Review 2026-10-09 — die offenen Punkte aus M8c
+
+Entscheidungen des Maintainers („alle Empfehlungen“) zu den offenen Punkten aus M8c S1–S13. Die
+Kennung ist der M8c-Slice, der den Punkt fand; „Betrifft“ wie oben, die Uhr steht in der Zeile; wo
+eine ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| S5 | **`never` als Typargument, unter der Schranke `Error`** (A7 erweitert): `DedupIter<I, never>` und `f<never>(…)` für ein `E :: [Error]` — E2 sagt `E = never` ist „keine Klausel“, geschrieben ist es dasselbe. Heute `LYR-SEM0145 'never' stands only as a return type`; `dedup()` umgeht es mit `E = I.Error`. Ein Typparameter ohne die Schranke (`List<never>`) bleibt ein Fehler. Uhr: M8c S17 | E12, A7 |
+| S10 | **`Backtrace` hat nur `Display`** (bestätigt): sein Text ist die Form eines Panik-Traces, eine Zeile `    at <Funktion> (<Datei>:<Zeile>)` je Rahmen, mit den C-Namen wie dort. Rahmen als Werte und Lyric-Namen im Trace sind eine eigene Frage, für Paniken genauso — wenn ein Werkzeug danach fragt | M5-3 |
+| S10 | **Ein eigenes Member geht vor** (bestätigt): hat der Typ der Bindung selbst ein `backtrace` oder `suppressed`, ist der Name dieses Member; die Auskunft gilt, wo der Typ den Namen frei lässt | M5-3 |
+| S10 | **Im Lambda keine Auskunft** (bestätigt): ein Lambda in der Klausel fängt den Wert ein, nicht den Datensatz — `() => e.backtrace()` ist `LYR-SEM0012`, dieselbe Grenze wie für das erneute Werfen (M5-11) | M5-3, M5-11 |
+
 ---
 
 **Bereich 5 ist damit vollständig entschieden** (E1–E12, 2026-09-28).
