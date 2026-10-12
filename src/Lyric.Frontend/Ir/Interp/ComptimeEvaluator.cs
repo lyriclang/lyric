@@ -36,7 +36,7 @@ public static class ComptimeEvaluator
             try
             {
                 interpreter.Refill();
-                values[i] = Constant(interpreter.Run(new FunctionId(index)), types.TypeOf(sites[i]), hoisted.Functions[index].ReturnType);
+                values[i] = Constant(interpreter.Run(new FunctionId(index)), hoisted.Functions[index].ReturnType, hoisted);
             }
             catch (ComptimeFailure failure)
             {
@@ -47,18 +47,47 @@ public static class ComptimeEvaluator
         return failed ? null : values;
     }
 
-    /// <summary>A site's value as the literal its type writes (09 Q1; scalars and strings in M9a
-    /// S1); an integer in the IR's encoding of its width (<paramref name="lowered"/>).</summary>
-    public static IrConstValue Constant(Value value, LyrType type, IrType lowered) => type switch
+    /// <summary>A site's value as the constant the real lowering writes (09 Q1; 13 M9a P3).
+    /// <paramref name="type"/> is its type in <paramref name="module"/>, the hoisted one, whose
+    /// layouts the value's slots follow: an integer in the IR's encoding of its width, an
+    /// aggregate as the tree the lowering builds it from — fields in layout order, a variant by
+    /// its index, which both lowerings give alike.</summary>
+    public static IrConstValue Constant(Value value, IrType type, IrModule module) => type switch
     {
-        PrimitiveType { Kind: PrimitiveKind.Bool } => new BoolConst(value.AsBool),
-        PrimitiveType { Kind: PrimitiveKind.Char } => new CharConst((int)value.Bits),
-        PrimitiveType { Kind: PrimitiveKind.String } => new StringConst(((StrObj)value.Ref!).ToString()),
-        PrimitiveType { Kind: PrimitiveKind.Float } => new FloatConst(value.AsDouble),
-        PrimitiveType { Kind: PrimitiveKind.Float32 } => new FloatConst(value.AsSingle),
-        PrimitiveType when lowered is IrScalarType scalar => new IntConst(Arith.Pattern(value.Bits, scalar.Kind)),
-        _ => throw new InternalCompilationException($"comptime: a site of type '{TypeFacts.Display(type)}' survived the sema"),
+        IrScalarType { Kind: IrScalar.Bool } => new BoolConst(value.AsBool),
+        IrScalarType { Kind: IrScalar.Char } => new CharConst((int)value.Bits),
+        IrScalarType { Kind: IrScalar.String } => new StringConst(((StrObj)value.Ref!).ToString()),
+        IrScalarType { Kind: IrScalar.F64 } => new FloatConst(value.AsDouble),
+        IrScalarType { Kind: IrScalar.F32 } => new FloatConst(value.AsSingle),
+        IrScalarType scalar => new IntConst(Arith.Pattern(value.Bits, scalar.Kind)),
+        IrStructType s => new StructConst(Fields(((AggObj)value.Ref!).Slots, module.Types[s.Type.Value].FieldTypes, 0, module)),
+        // a Box's object (02 M13), the one class whose value is a constant: its value is fixed
+        IrRefType r => new StructConst(Fields(((ClassObj)value.Ref!).Fields, module.Types[r.Type.Value].FieldTypes, 0, module)),
+        IrEnumType e => Variant((AggObj)value.Ref!, module.Types[e.Type.Value], module),
+        IrOptionalType o => (OptObj)value.Ref! is { Has: true } some
+            ? new OptionalConst(Constant(some.Inner, o.Inner, module))
+            : new OptionalConst(null),
+        IrArrayType a => new ArrayConst([.. ((ArrayObj)value.Ref!).Items.Select(x => Constant(x, a.Element, module))]),
+        IrInlineArrayType i => new ArrayConst([.. ((AggObj)value.Ref!).Slots.Select(x => Constant(x, i.Element, module))]),
+        _ => throw new InternalCompilationException($"comptime: a site of the IR type {type} survived the sema"),
     };
+
+    /// <summary>The slots from <paramref name="from"/> on, each by its field's type.</summary>
+    private static IrConstValue[] Fields(Value[] slots, IrType[] types, int from, IrModule module)
+    {
+        var fields = new IrConstValue[types.Length - from];
+        for (var i = from; i < types.Length; i++) fields[i - from] = Constant(slots[i], types[i], module);
+        return fields;
+    }
+
+    /// <summary>An enum's value: slot 0 the tag, the index of its variant, whose layout holds the
+    /// tag at 0 and the payload after it.</summary>
+    private static VariantConst Variant(AggObj value, IrTypeDef enumDef, IrModule module)
+    {
+        var tag = (int)value.Slots[0].Bits;
+        var layout = module.Types[enumDef.Variants[tag].Value];
+        return new VariantConst(tag, Fields(value.Slots, layout.FieldTypes, 1, module));
+    }
 
     private static void Report(DiagnosticEngine diagnostics, ComptimeFailure failure, Span site)
     {

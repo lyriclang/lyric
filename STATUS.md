@@ -957,6 +957,11 @@ M9b the maintainer is asked again.
   the profile says. `programs/comptime_same.lyr` computes twelve cases at compile time and at run
   time, the same to the byte in both profiles. P11 corrected: two lowerings where there are sites,
   not one reused. Spec 11 §2 rules 1–5, 15 §1 rule 7; seven cases.
+- **S2** a site leaves a value of any value type (P3): arrays — of scalars or strings as the C's
+  static data, copied into a fresh array at every evaluation —, inline arrays, tuples, optionals,
+  structs, enums, `Box`. A class's object, a view, a function value, a coroutine and an interface
+  value are refused with the reason (`LYR-SEM0100`). `_` binds nothing, found by the probes. Spec
+  11 §2 rule 1, 07 §4 rule 2; four cases.
 
 ## Design decisions
 

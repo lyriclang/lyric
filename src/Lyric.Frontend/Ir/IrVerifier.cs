@@ -824,26 +824,53 @@ public static class IrVerifier
         {
             RequireDestType(c.Dest, c.Type, "const", block, index);
 
+            // A comptime array of scalars or strings (13 M9a P3): static data, each element a
+            // scalar const of the element type. The rest of a comptime value is built by the
+            // lowering and never stands in a const.
+            if (c.Value is ArrayConst array)
+            {
+                var (element, length) = c.Type switch
+                {
+                    IrArrayType a => (a.Element, (int?)null),
+                    IrInlineArrayType i => (i.Element, i.Length),
+                    _ => (null, null),
+                };
+                if (element is not IrScalarType elementScalar)
+                {
+                    Report(block, index, $"array const of type {Show(c.Type)}, which is no array of scalars");
+                    return;
+                }
+                if (length is { } n && n != array.Elements.Length)
+                    Report(block, index, $"array const of {array.Elements.Length} element(s) for {Show(c.Type)}");
+                for (var i = 0; i < array.Elements.Length; i++)
+                    CheckScalarConst(array.Elements[i], elementScalar, $"element {i}: ", block, index);
+                return;
+            }
+
             if (c.Type is not IrScalarType scalar)
             {
                 Report(block, index, $"const type {Show(c.Type)} is not a scalar");
                 return;
             }
+            CheckScalarConst(c.Value, scalar, "", block, index);
+        }
 
-            if (!ConstKindMatches(c.Value, scalar.Kind))
+        private void CheckScalarConst(IrConstValue value, IrScalarType scalar, string what, BlockId block, int index)
+        {
+            if (!ConstKindMatches(value, scalar.Kind))
             {
-                Report(block, index, $"{ConstKindName(c.Value)} const does not match type {Show(c.Type)}");
+                Report(block, index, $"{what}{ConstKindName(value)} const does not match type {Show(scalar)}");
                 return;
             }
 
-            switch (c.Value)
+            switch (value)
             {
                 // The encoding of IntConst: two's complement, zero-extended to 64 bits. The value has to
                 // fit into the declared width as a bit pattern, which catches a lowering that failed to
                 // truncate or sign-extend a literal.
                 case IntConst ic when !FitsWidth(ic.Value, scalar.Kind):
                     Report(block, index,
-                        $"integer const {N(ic.Value)} does not fit the bit pattern of {Show(c.Type)}");
+                        $"{what}integer const {N(ic.Value)} does not fit the bit pattern of {Show(scalar)}");
                     break;
 
                 // An f32 const whose value is no f32 value means the lowering did not narrow.
@@ -852,13 +879,13 @@ public static class IrVerifier
                                         && double.IsFinite(fc.Value)
                                         && (float)fc.Value != fc.Value:
                     Report(block, index,
-                        $"float const {Floats.Render(fc.Value)} " +
+                        $"{what}float const {Floats.Render(fc.Value)} " +
                         "is not exactly representable as f32");
                     break;
 
                 case CharConst ch when !IsUnicodeScalarValue(ch.CodePoint):
                     Report(block, index,
-                        $"char const {N(ch.CodePoint)} is not a Unicode scalar value");
+                        $"{what}char const {N(ch.CodePoint)} is not a Unicode scalar value");
                     break;
             }
         }
@@ -1974,6 +2001,8 @@ public static class IrVerifier
             BoolConst => kind == IrScalar.Bool,
             CharConst => kind == IrScalar.Char,
             StringConst => kind == IrScalar.String,
+            // a comptime value's tree is built by the lowering, never a scalar's const (13 M9a P3)
+            ArrayConst or StructConst or VariantConst or OptionalConst => false,
             _ => throw new InternalCompilationException(
                 $"ir-verifier: unhandled const {value.GetType().Name}")
         };

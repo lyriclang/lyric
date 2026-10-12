@@ -3210,13 +3210,6 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// <c>resume co</c> — continue the coroutine and fetch the next value.
-    ///
-    /// <para>An ordinary <c>callind</c>: the coroutine value IS a function value over the state object.
-    /// The jump table in the body makes the call continue where the last <c>yield</c> stopped; from here
-    /// it looks like any other call, and that is the whole point of the transformation.</para>
-    /// </summary>
-    /// <summary>
     /// A <c>comptime</c> site. With the evaluator's values in hand it is a constant; in the
     /// hoisting pass and in a check it is the inner expression, computed where it stands — the
     /// same value, so the two lowerings agree by construction. See <see cref="ComptimeTable"/>.
@@ -3228,11 +3221,76 @@ internal sealed class FunctionLowerer
             var index = _types.ComptimeSites.IndexOf(expr);
             if (index < 0 || !values.TryGetValue(index, out var constant))
                 throw Bug($"comptime site at {expr.Span} has no evaluated value");
-            return EmitConst(constant, TypeOfExpr(expr), expr.Span);
+            return EmitComptimeValue(constant, TypeOfExpr(expr), expr.Span);
         }
 
         return LowerExpr(expr.Inner);
     }
+
+    /// <summary>
+    /// A site's value (13 M9a P3), built where the site stands as a literal of it is built —
+    /// each evaluation a fresh value, an array one to write. An array of scalars or strings is
+    /// one constant, the C's static data; everything else the instructions of its literal.
+    /// </summary>
+    private TempId EmitComptimeValue(IrConstValue value, IrType type, Span span)
+    {
+        switch (value, type)
+        {
+            case (ArrayConst array, IrArrayType or IrInlineArrayType) when IsStaticData(type):
+                return EmitConst(array, type, span);
+            case (ArrayConst array, IrArrayType a):
+            {
+                var dest = _slots.NewTemp(type);
+                _b.Emit(new NewArray(dest, a.Element, [.. array.Elements.Select(e => EmitComptimeValue(e, a.Element, span))], span));
+                return dest;
+            }
+            case (ArrayConst array, IrInlineArrayType i):
+            {
+                var dest = _slots.NewTemp(type);
+                _b.Emit(new NewInline(dest, i.Element, i.Length, [.. array.Elements.Select(e => EmitComptimeValue(e, i.Element, span))],
+                    Repeat: false, span));
+                _fresh.Add(dest);
+                return dest;
+            }
+            case (StructConst s, IrStructType or IrRefType):
+            {
+                var id = type is IrStructType st ? st.Type : ((IrRefType)type).Type;
+                var layout = _typeTable.Defs[id.Value];
+                var dest = _slots.NewTemp(type);
+                _b.Emit(new NewObject(dest, id, type, span));
+                for (var i = 0; i < s.Fields.Length; i++)
+                    _b.Emit(new StoreField(dest, id, new FieldId(i), EmitComptimeValue(s.Fields[i], layout.FieldTypes[i], span), span));
+                if (type is IrStructType) _fresh.Add(dest);
+                return dest;
+            }
+            case (VariantConst v, IrEnumType e):
+            {
+                var variant = _typeTable.Defs[e.Type.Value].Variants[v.Variant];
+                var layout = _typeTable.Defs[variant.Value];
+                var fields = new TempId[v.Fields.Length];
+                for (var i = 0; i < fields.Length; i++) fields[i] = EmitComptimeValue(v.Fields[i], layout.FieldTypes[i + 1], span);
+                var dest = _slots.NewTemp(type);
+                _b.Emit(new NewVariant(dest, variant, e.Type, fields, span));
+                return dest;
+            }
+            case (OptionalConst o, IrOptionalType opt):
+            {
+                var dest = _slots.NewTemp(type);
+                if (o.Value is { } inner) _b.Emit(new OptSome(dest, EmitComptimeValue(inner, opt.Inner, span), opt.Inner, span));
+                else _b.Emit(new OptNone(dest, opt.Inner, span));
+                return dest;
+            }
+            case (IntConst or FloatConst or BoolConst or CharConst or StringConst, IrScalarType):
+                return EmitConst(value, type, span);
+            default:
+                throw Bug($"a comptime value {value.GetType().Name} for the type {type}");
+        }
+    }
+
+    /// <summary>Whether an array's elements are C's static data: scalars and strings, which a
+    /// literal in the data names (a string by its static object).</summary>
+    private static bool IsStaticData(IrType array) =>
+        (array is IrArrayType a ? a.Element : ((IrInlineArrayType)array).Element) is IrScalarType;
 
     /// <summary>
     /// <c>co.next()</c> (06 N2 A2): one instruction — <c>?Y</c>, or for a coroutine that yields

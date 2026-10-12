@@ -224,6 +224,7 @@ public sealed class TypeChecker
         _clone = core?.LookupLocal("Clone") as TypeSymbol;
         _range = core?.LookupLocal("Range") as TypeSymbol;
         _rangeInclusive = core?.LookupLocal("RangeInclusive") as TypeSymbol;
+        _box = core?.LookupLocal("Box") as TypeSymbol;
         _ordered = core?.LookupLocal("Ordered") as TypeSymbol;
         _add = core?.LookupLocal("Add") as TypeSymbol;
         _sub = core?.LookupLocal("Sub") as TypeSymbol;
@@ -284,6 +285,10 @@ public sealed class TypeChecker
 
     /// <summary>What <c>&lt;</c> and its three siblings resolve through, under the same rules.</summary>
     private readonly TypeSymbol? _ordered;
+
+    /// <summary>std.core's <c>Box</c> (02 M13): the one class whose value a <c>comptime</c> site
+    /// may leave behind — its value is fixed, so a fresh box is as good as the evaluated one.</summary>
+    private readonly TypeSymbol? _box;
 
     /// <summary>What <c>[x] * n</c> asks of an element that is or holds an object (03 §5.1,
     /// 10 C7), under the same rules.</summary>
@@ -2897,7 +2902,9 @@ public sealed class TypeChecker
         // bound in the body's own block, whose table is the parameters' child (decided the same day,
         // as C#, Java and Go have it): a 'let' of its name there hid it in silence.
         var fresh = scope.TryDeclare(local);
-        if (_comp.Lyric5Modules)
+        // '_' binds nothing (09 §1 rule 1): 'let _ = f();' twice in a block keeps two values
+        // nobody reads, and is no name bound twice (M9a S2, found by its probes)
+        if (_comp.Lyric5Modules && bnd.Name != "_")
         {
             if (!fresh)
                 _de.Report("LYR-SEM0176", Severity.Error, bnd.Span,
@@ -11481,25 +11488,24 @@ public sealed class TypeChecker
         }
     }
 
-    // resume co: yields the value of the next yield.
     /// <summary>
-    /// <c>comptime e</c>: <c>e</c> is checked exactly as it would be without the prefix — the
-    /// value is the same — and then held to what the evaluator can honour. It runs the
-    /// expression in a VM with no capability and no frame of the enclosing function, so a
-    /// local, a parameter or <c>this</c> has nothing to stand on there; a lambda inside would be
-    /// a value the module cannot hold; and the result has to be a literal the lowering can
-    /// write back, which is a scalar, a <c>bool</c>, a <c>char</c> or a <c>string</c>. A nested
-    /// <c>comptime</c> is simply evaluated as part of the outer one.
+    /// <c>comptime e</c> (design/v5/spec/09 A4, Q1): <c>e</c> is checked exactly as it would be
+    /// without the prefix — the value is the same — and then held to what the evaluation can
+    /// honour. The IR interpreter runs it as a function of its own, without the enclosing
+    /// function's frame, so a local, a parameter or <c>this</c> has nothing to stand on there;
+    /// and the value has to be one the lowering can write as a literal (<see cref="NoConstant"/>).
+    /// A nested <c>comptime</c> is evaluated as part of the outer one.
     /// </summary>
     private LyrType CheckComptime(ComptimeExpr ct, SymbolTable scope, LyrType? expected)
     {
         var type = CheckExpr(ct.Inner, scope, expected);
         if (type.IsError) return type;
 
-        if (type is not PrimitiveType { Kind: not PrimitiveKind.Void })
+        if (NoConstant(type, new HashSet<string>(StringComparer.Ordinal)) is { } why)
             return Report(ct.Span, "LYR-SEM0100",
-                $"a 'comptime' expression has to produce a scalar, a bool, a char or a string — this one "
-                + $"is '{TypeFacts.Display(type)}', which the compiled module has no way to hold as a literal");
+                "a 'comptime' expression has to produce a value the compiled module can hold as a literal — "
+                + "a scalar, a string, or an array, a struct, an enum, a tuple, an optional or a 'Box' of such — "
+                + $"and this one is '{TypeFacts.Display(type)}': {why}");
 
         var pure = true;
         void Walk(Node? node)
@@ -11536,6 +11542,57 @@ public sealed class TypeChecker
         // reported its error twice (M9a S1)
         if (pure && !_result.ComptimeSites.Contains(ct)) _result.ComptimeSites.Add(ct);
         return type;
+    }
+
+    /// <summary>
+    /// Why a value of <paramref name="type"/> is no literal a <c>comptime</c> site can leave
+    /// behind (09 Q1; 13 M9a P3) — <c>null</c> where it is one: a scalar, a string, and an array,
+    /// an inline array, a tuple, an optional, a struct, an enum or a <c>Box</c> of such. A class
+    /// is an object with an identity; a view shows an array it does not own; a function value
+    /// holds its captures, a coroutine its stack, an interface value an object of any type.
+    /// </summary>
+    private string? NoConstant(LyrType type, HashSet<string> seen)
+    {
+        // a recursive enum, through its Box: once is enough — by the type's text with its
+        // modules, since a substituted instance is a new record every time
+        if (!seen.Add(TypeFacts.Display(type, s => s.Home is { } home ? $"{home.FullName}.{s.Name}" : s.Name))) return null;
+        switch (type)
+        {
+            case PrimitiveType { Kind: PrimitiveKind.Void }:
+                return "'void' is no value";
+            case PrimitiveType:
+                return null;
+            case Optional o:
+                return NoConstant(o.Inner, seen);
+            case ArrayOf a:
+                return NoConstant(a.Element, seen);
+            case InlineArrayOf ia:
+                return NoConstant(ia.Element, seen);
+            case RangeOf r:
+                return NoConstant(r.Element, seen);
+            case TupleOf t:
+                return t.Elements.Select(e => NoConstant(e, seen)).FirstOrDefault(why => why is not null);
+            case SliceOf or StringViewType:
+                return "a view shows an array or a string it does not own";
+            case FnType:
+                return "a function value holds what it captures";
+            case CoroutineOf:
+                return "a coroutine holds its stack";
+        }
+        switch (TypeFacts.SymbolOf(type))
+        {
+            case { } box when ReferenceEquals(box, _box):
+                return NoConstant(PayloadTypes(box, type).Single(), seen);
+            case { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Enum } ts:
+                return PayloadTypes(ts, type).Select(p => NoConstant(p, seen)).FirstOrDefault(why => why is not null);
+            case { Kind: TypeSymbolKind.Class } c:
+                return $"'{c.Name}' is a class, an object with an identity, which no literal makes";
+            case { Kind: TypeSymbolKind.Interface }:
+                return "an interface value holds an object of any type";
+        }
+        return type is TypeParamType or AssocOf
+            ? "its type is known only per instance, and a site is evaluated once"
+            : "the compiled module has no literal for it";
     }
 
     // A lambda with bidirectional inference: unannotated parameters take the context FnType, and the
