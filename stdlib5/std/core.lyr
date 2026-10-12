@@ -1,6 +1,15 @@
 /// What the language itself binds without an import (std.core, design/v5/spec/10 U-series; spec
 /// chapter 12): the core interfaces, the number tower, the iterator protocol and the members of the
 /// built-in types.
+//
+// In this order (M9a S11c): 0 the preamble - panic, assert, Error, Result, Box, the ranges, arrayOf;
+// 1 the attributes and the compiler's instructions; 2 the operator interfaces and the language's
+// own - Equatable, Ordered, Hashable, Identity, Variants, Index, Display; 3 the scalars' conformances;
+// 4 Debug, Clone, Default, From/Into, char and Unicode; 5 the numbers; 6 parsing; 7 strings, views,
+// bytes to text, f-strings; 8 the format language; 9 iteration - the protocol, the ranges,
+// collecting, membership (the adapters are std.iter's); 10 arrays, views and slices - their members,
+// sorting, equality and display; 11 optionals and tuples; 12 the build's target and profile;
+// 13 type information while compiling.
 
 
 /// Ends the process with a message and a backtrace, exit 101 (05 E8): `LYR-RT0008`. Its type is
@@ -2934,6 +2943,226 @@ fn moveElements<T>(into: Slice<T>, from: Slice<T>, count: int): void;
 /// The panic of a range `low..high` outside `length` (LYR-RT0003), as `xs[a..b]` raises it.
 fn panicRange(low: int, high: int, length: int): never;
 
+// --- StringView (10 S1, 03 A2; M8a S12): the view of a string's bytes --------------------------
+// A pointer into a string's bytes and a length, read and never written. `s[a..b]` takes one on
+// character boundaries, a string stands where one is expected, and `s[i]` is the character that
+// begins at a byte. The string's search and split members stand on it (the strings, above).
+
+/// `a == b` between a string and a view, or two views: the same bytes. The checker's for the
+/// operator; a program writes `==`.
+pub fn equalViews(a: StringView, b: StringView): bool {
+    return viewsHoldTheSameBytes(a, b);
+}
+
+/// `<`, `<=`, `>`, `>=` between a string and a view, or two views: byte by byte, which is the
+/// order of the code points. The checker's for the operators.
+pub fn compareViews(a: StringView, b: StringView): ?Ordering {
+    return a.totalCompare(b);
+}
+
+/// `s[i]`: the character that begins at byte `i`; outside the bytes, or at a byte that continues
+/// a character, a panic (LYR-RT0003). The checker's for the index.
+pub fn charAtByte(v: StringView, i: int): char {
+    return charOfView(v, i);
+}
+
+fn viewsHoldTheSameBytes(a: StringView, b: StringView): bool;
+/// Byte by byte, as `memcmp` and then the length: -1, 0 or 1.
+fn compareViewBytes(a: StringView, b: StringView): int;
+fn viewToString(v: StringView): string;
+fn charOfView(v: StringView, i: int): char;
+/// The view's bytes as the `Slice<uint8>` it is below the checker — read here, never written.
+fn viewBytes(v: StringView): Slice<uint8>;
+
+extend StringView {
+    /// Whether it holds no byte.
+    pub fn isEmpty(): bool {
+        return this.length() == 0;
+    }
+
+    /// Its bytes in a string of their own.
+    pub fn toString(): string {
+        return viewToString(this);
+    }
+}
+
+/// A view compares, hashes and orders by its bytes, as a string does: equal to the string it
+/// shows, hashing as it does (10 C8); it shows its text and debugs quoted.
+extend StringView :: [Equatable, Hashable, Ordered, TotalOrder, Display, Debug, Index<int>] {
+    type Output = char;
+
+    fn equals(o: StringView): bool {
+        return viewsHoldTheSameBytes(this, o);
+    }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        h.write(viewBytes(this));
+        h.writeByte(255);
+    }
+
+    fn compare(o: StringView): ?Ordering {
+        return this.totalCompare(o);
+    }
+
+    fn totalCompare(o: StringView): Ordering {
+        let c = compareViewBytes(this, o);
+        if (c < 0) {
+            return Ordering.Less;
+        }
+        if (c > 0) {
+            return Ordering.Greater;
+        }
+        return Ordering.Equal;
+    }
+
+    fn show(): string {
+        return viewToString(this);
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.appendStr(this);
+    }
+
+    fn debug(): string {
+        return viewToString(this).debug();
+    }
+
+    fn index(k: int): char {
+        return charOfView(this, k);
+    }
+}
+
+/// `s[i]` through `Index<int>` where a type parameter asks for it (04 D6): the character that
+/// begins at byte `i`.
+extend string :: [Index<int>] {
+    type Output = char;
+
+    fn index(k: int): char {
+        return charOfView(this, k);
+    }
+}
+
+// --- bytes to text (10 S3; M8a S12) -----------------------------------------------------------
+
+/// What `string.fromUtf8` throws (10 S3, B3: the bytes are the data's, so it throws): they are no
+/// well-formed UTF-8 from `offset` on — an overlong form, a surrogate, beyond U+10FFFF, a byte
+/// that begins nothing, a sequence cut short.
+pub struct Utf8Error :: [Error] {
+    /// The first byte that is no well-formed UTF-8.
+    pub offset: int,
+
+    pub fn message(): string {
+        return f"the bytes are no UTF-8 from byte {this.offset} on";
+    }
+}
+
+extend string {
+    /// The text the bytes are, copied; `Utf8Error` where they are no well-formed UTF-8.
+    pub static fn fromUtf8(bytes: Slice<uint8>): string throws Utf8Error {
+        let bad = utf8Invalid(bytes);
+        if (bad >= 0) {
+            throw Utf8Error { offset = bad };
+        }
+        return stringOfSlice(bytes);
+    }
+
+    /// The text the bytes are, each maximal part of a sequence that is not well-formed replaced by
+    /// U+FFFD — the Unicode Standard's recommended practice (3.9), WHATWG's decoding.
+    pub static fn fromUtf8Lossy(bytes: Slice<uint8>): string {
+        return stringOfUtf8Lossy(bytes);
+    }
+}
+
+/// -1 where the bytes are well-formed UTF-8, else the offset of the first that is not.
+fn utf8Invalid(bytes: Slice<uint8>): int;
+fn stringOfSlice(bytes: Slice<uint8>): string;
+fn stringOfUtf8Lossy(bytes: Slice<uint8>): string;
+
+// --- f-strings into one builder (10 S6; M8a S13) -----------------------------------------------
+// What an f-string compiles to (12 §2 rule 4): a builder sized for its text, each piece appended in
+// order, the text taken — one buffer, no string per piece. The checker writes these calls.
+
+pub fn fstringStart(room: int): StringBuilder {
+    return StringBuilder.sized(room);
+}
+
+pub fn fstringEnd(out: StringBuilder): string {
+    return out.toString();
+}
+
+pub fn fstringText(out: StringBuilder, text: StringView): void {
+    out.appendStr(text);
+}
+
+pub fn fstringInt(out: StringBuilder, value: int): void {
+    out.putInt(value);
+}
+
+pub fn fstringUint(out: StringBuilder, value: uint): void {
+    out.putUint(value);
+}
+
+pub fn fstringFloat(out: StringBuilder, value: float): void {
+    out.appendStr(textOfFloat(value));
+}
+
+pub fn fstringFloat32(out: StringBuilder, value: float32): void {
+    out.appendStr(textOfFloat32(value));
+}
+
+pub fn fstringBool(out: StringBuilder, value: bool): void {
+    out.appendStr(if (value) "true" else "false");
+}
+
+pub fn fstringChar(out: StringBuilder, value: char): void {
+    out.appendChar(value);
+}
+
+/// A `Display` type's hole: through `showTo`.
+pub fn fstringShown<T :: [Display]>(out: StringBuilder, value: T): void {
+    value.showTo(out);
+}
+
+/// A `Format` type's hole with a spec: the type reads the spec (10 S7).
+pub fn fstringFormatted<T :: [Format]>(out: StringBuilder, value: T, spec: StringView): void {
+    value.format(spec, out);
+}
+
+/// Another `Display` type's hole with a spec: what `showTo` writes, in its width, alignment and
+/// fill — without a width straight into `out`.
+pub fn fstringPadded<T :: [Display]>(out: StringBuilder, value: T, spec: StringView): void {
+    let s = paddingOnly(spec, "a Display type's text");
+    if (s.width == 0) {
+        value.showTo(out);
+        return;
+    }
+    let text = StringBuilder.sized(s.width);
+    value.showTo(text);
+    pad(text.toString(), s, '<', out);
+}
+
+/// A hole under `?`: what `debugTo` writes, in the width, alignment and fill before it.
+pub fn fstringDebugged<T :: [Debug]>(out: StringBuilder, value: T, spec: StringView): void {
+    let s = readSpec(spec);
+    if (!padsOnly(s, '?')) {
+        refuseSpec(spec, "a Debug text");
+    }
+    if (s.width == 0) {
+        value.debugTo(out);
+        return;
+    }
+    let text = StringBuilder.sized(s.width);
+    value.debugTo(text);
+    pad(text.toString(), s, '<', out);
+}
+
+/// A float's shortest text (12 §1), as `std.string.fromFloat` gives it.
+fn textOfFloat(value: float): string;
+fn textOfFloat32(value: float32): string;
+/// An integer's decimal digits into `bytes` from `at` on: how many; the room is the caller's.
+fn putIntDigits(bytes: uint8[], at: int, value: int): int;
+fn putUintDigits(bytes: uint8[], at: int, value: uint): int;
+
 // --- the format language (08 Y7, 10 S7; spec 12 §2) ---------------------------------------------
 
 /// A type with formats of its own (10 S7): `{x:spec}` hands it the spec as written. The scalars
@@ -3587,6 +3816,85 @@ extend<T> Slice<T> :: [Iterable] {
     }
 }
 
+// --- collecting (10 B6, I4; M8a S15) -------------------------------------------------------------
+// `collect()` builds what the expected type is, through its `FromIterator`: `let xs: List<int> =
+// it.collect();`. An array is one; the containers of std.collections are the others.
+
+/// What an array literal becomes where a value of the type is expected (10 K4): the elements check
+/// against `T`, and the literal is `Self.fromLiteral([…])` — `let s: Set<int> = [1, 2, 3];`,
+/// `let m: Map<string, int> = [("a", 1)];` (a map is no literal of its own). A copy, as `of` would
+/// make one.
+pub interface FromArrayLiteral<T> {
+    static fn fromLiteral(items: T[]): Self;
+}
+
+/// A type built from an iterator's values (10 B6): `collect()` calls `fromIter`, the type's own.
+pub interface FromIterator<T> {
+    static fn fromIter<I :: [Iterator<Item = T>]>(it: I): Self throws I.Error;
+}
+
+extend<T> T[] :: [FromIterator<T>] {
+    /// The values in an array, in order: a buffer that doubles, its first value for the slots
+    /// not yet written, then one copy of the length — one pass. The buffer starts at the
+    /// iterator's own guess of its length (`sizeHint`, 10 I4), and where that was exact — an
+    /// array's walk, a view's — the buffer is the array, with no copy at the end.
+    static fn fromIter<I :: [Iterator<Item = T>]>(it: I): T[] throws I.Error {
+        var walk = it;
+        let least = walk.sizeHint().0;
+        let first = try walk.next();
+        if (first == null) {
+            return [];
+        }
+        var buffer = filled(if (least > 8) least else 8, first);
+        var count = 1;
+        var x = try walk.next();
+        while (x != null) {
+            if (count == buffer.length()) {
+                let grown = filled(count * 2, first);
+                buffer[..count].copyInto(grown[..]);
+                buffer = grown;
+            }
+            buffer[count] = x;
+            count = count + 1;
+            x = try walk.next();
+        }
+        if (count == buffer.length()) {
+            return buffer;
+        }
+        let out = filled(count, first);
+        buffer[..count].copyInto(out[..]);
+        return out;
+    }
+}
+
+extend<T :: [Ordered]> Range<T> :: [Contains<T>] {
+    /// Whether `x` lies from `start` up to, not including, `end`.
+    fn contains(x: T): bool {
+        return this.start <= x && x < this.end;
+    }
+}
+
+extend<T :: [Ordered]> RangeInclusive<T> :: [Contains<T>] {
+    /// Whether `x` lies from `start` to `end`, both included.
+    fn contains(x: T): bool {
+        return this.start <= x && x <= this.end;
+    }
+}
+
+/// `s * n` (10 C7): the text `s`, `n` times over — `""` for none. `n * s` is refused, the one order
+/// of `[x] * n`, and a negative `n` panics as an array's repetition does (`LYR-RT0007`): the count
+/// goes through it. The compiler desugars the operator to this call (N1a).
+pub fn repeatText(s: string, n: int): string {
+    if (n < 0) {
+        let _ = [s] * n;
+    }
+    let out = StringBuilder.new();
+    for (_ in 0..n) {
+        out.appendStr(s);
+    }
+    return out.toString();
+}
+
 // --- the members of arrays and views (10 C2): written once on `Slice<T>`, and reached on an
 // array - and a `T[N]` in the heap (03 §5.3 rule 6) - through a view of all of it. A write goes there.
 extend<T> Slice<T> {
@@ -4053,177 +4361,6 @@ fn siftDown<T :: [TotalOrder]>(xs: Slice<T>, root: int, end: int): void {
     }
 }
 
-/// `it.map(f)` (10 B6 I3, I4): the values of `it`, each through `f` — lazily, a pull at a time.
-/// Named for what it gives: `Map` is the collection's (C4). What `f` throws, a pull throws beside
-/// what `it` does (05 K4; 13 M8c P2).
-pub struct MapIter<I :: [Iterator], U, E :: [Error] = never> :: [Iterator] {
-    type Item = U;
-    type Error = Join<I.Error, E>;
-    var inner: I,
-    f: fn(I.Item) -> U throws E,
-
-    pub mut fn next(): ?U throws Join<I.Error, E> {
-        let x = try this.inner.next();
-        if (x == null) {
-            return null;
-        }
-        return try this.f(x);
-    }
-}
-
-/// `it.filter(p)`: the values of `it` that `p` holds for.
-pub struct FilterIter<I :: [Iterator], E :: [Error] = never> :: [Iterator] {
-    type Item = I.Item;
-    type Error = Join<I.Error, E>;
-    var inner: I,
-    p: fn(I.Item) -> bool throws E,
-
-    pub mut fn next(): ?I.Item throws Join<I.Error, E> {
-        var x = try this.inner.next();
-        while (x != null && !(try this.p(x))) {
-            x = try this.inner.next();
-        }
-        return x;
-    }
-}
-
-/// `it.take(n)`: the first `n` values of `it`, or all where it has fewer.
-pub struct TakeIter<I :: [Iterator]> :: [Iterator] {
-    type Item = I.Item;
-    type Error = I.Error;
-    var inner: I,
-    var left: int,
-
-    pub mut fn next(): ?I.Item throws I.Error {
-        if (this.left <= 0) {
-            return null;
-        }
-        this.left = this.left - 1;
-        return try this.inner.next();
-    }
-}
-
-/// `it.skip(n)`: the values of `it` after its first `n`.
-pub struct SkipIter<I :: [Iterator]> :: [Iterator] {
-    type Item = I.Item;
-    type Error = I.Error;
-    var inner: I,
-    var n: int,
-
-    pub mut fn next(): ?I.Item throws I.Error {
-        while (this.n > 0) {
-            this.n = this.n - 1;
-            if (try this.inner.next() == null) {
-                return null;
-            }
-        }
-        return try this.inner.next();
-    }
-}
-
-/// `it.takeWhile(p)`: the values of `it` up to the first `p` does not hold for.
-pub struct TakeWhileIter<I :: [Iterator], E :: [Error] = never> :: [Iterator] {
-    type Item = I.Item;
-    type Error = Join<I.Error, E>;
-    var inner: I,
-    p: fn(I.Item) -> bool throws E,
-    var done: bool,
-
-    pub mut fn next(): ?I.Item throws Join<I.Error, E> {
-        if (this.done) {
-            return null;
-        }
-        let x = try this.inner.next();
-        if (x == null) {
-            this.done = true;
-            return null;
-        }
-        if (!(try this.p(x))) {
-            this.done = true;
-            return null;
-        }
-        return x;
-    }
-}
-
-/// `it.skipWhile(p)`: the values of `it` from the first `p` does not hold for.
-pub struct SkipWhileIter<I :: [Iterator], E :: [Error] = never> :: [Iterator] {
-    type Item = I.Item;
-    type Error = Join<I.Error, E>;
-    var inner: I,
-    p: fn(I.Item) -> bool throws E,
-    var started: bool,
-
-    pub mut fn next(): ?I.Item throws Join<I.Error, E> {
-        if (this.started) {
-            return try this.inner.next();
-        }
-        this.started = true;
-        var x = try this.inner.next();
-        while (x != null && (try this.p(x))) {
-            x = try this.inner.next();
-        }
-        return x;
-    }
-}
-
-/// `it.stepBy(n)`: the first value of `it`, then every `n`th.
-pub struct StepByIter<I :: [Iterator]> :: [Iterator] {
-    type Item = I.Item;
-    type Error = I.Error;
-    var inner: I,
-    step: int,
-    var first: bool,
-
-    pub mut fn next(): ?I.Item throws I.Error {
-        if (this.first) {
-            this.first = false;
-            return try this.inner.next();
-        }
-        var gap = this.step - 1;
-        while (gap > 0) {
-            gap = gap - 1;
-            if (try this.inner.next() == null) {
-                return null;
-            }
-        }
-        return try this.inner.next();
-    }
-}
-
-/// `it.enumerate()`: each value of `it` with its position, from 0.
-pub struct EnumerateIter<I :: [Iterator]> :: [Iterator] {
-    type Item = (int, I.Item);
-    type Error = I.Error;
-    var inner: I,
-    var i: int,
-
-    pub mut fn next(): ?(int, I.Item) throws I.Error {
-        let x = try this.inner.next();
-        if (x == null) {
-            return null;
-        }
-        this.i = this.i + 1;
-        return (this.i - 1, x);
-    }
-}
-
-/// `it.inspect(f)`: the values of `it`, each shown to `f` on its way through.
-pub struct InspectIter<I :: [Iterator], E :: [Error] = never> :: [Iterator] {
-    type Item = I.Item;
-    type Error = Join<I.Error, E>;
-    var inner: I,
-    f: fn(I.Item) -> void throws E,
-
-    pub mut fn next(): ?I.Item throws Join<I.Error, E> {
-        let x = try this.inner.next();
-        if (x != null) {
-            try this.f(x);
-        }
-        return x;
-    }
-}
-
 /// The join of two thrown types (design/v5/spec/05 E2 K7): what a walk over two sources throws.
 /// The compiler reduces it once both are known — one type where they are one, the other where
 /// one is `never`, the root `Error` where they differ; open, it covers each of its parts. No value
@@ -4235,675 +4372,6 @@ pub struct Join<A :: [Error], B :: [Error]> :: [Error] {
 }
 
 /// `it.zip(other)`: each value beside the other's at its position, as long as both have one.
-pub struct ZipIter<A :: [Iterator], B :: [Iterator]> :: [Iterator] {
-    type Item = (A.Item, B.Item);
-    type Error = Join<A.Error, B.Error>;
-    var a: A,
-    var b: B,
-
-    pub mut fn next(): ?(A.Item, B.Item) throws Join<A.Error, B.Error> {
-        let x = try this.a.next();
-        if (x == null) {
-            return null;
-        }
-        let y = try this.b.next();
-        if (y == null) {
-            return null;
-        }
-        return (x, y);
-    }
-}
-
-/// `it.chain(other)`: the values of `it`, then the other's.
-pub struct ChainIter<A :: [Iterator], B :: [Iterator<Item = A.Item>]> :: [Iterator] {
-    type Item = A.Item;
-    type Error = Join<A.Error, B.Error>;
-    var a: A,
-    var b: B,
-    var second: bool,
-
-    pub mut fn next(): ?A.Item throws Join<A.Error, B.Error> {
-        if (!this.second) {
-            let x = try this.a.next();
-            if (x != null) {
-                return x;
-            }
-            this.second = true;
-        }
-        return try this.b.next();
-    }
-}
-
-/// `it.mapNotNull(f)`: the values of `it` through `f`, the `null`s left out.
-pub struct MapNotNullIter<I :: [Iterator], U, E :: [Error] = never> :: [Iterator] {
-    type Item = U;
-    type Error = Join<I.Error, E>;
-    var inner: I,
-    f: fn(I.Item) -> ?U throws E,
-
-    pub mut fn next(): ?U throws Join<I.Error, E> {
-        loop {
-            let x = try this.inner.next();
-            if (x == null) {
-                return null;
-            }
-            let y = try this.f(x);
-            if (y != null) {
-                return y;
-            }
-        }
-    }
-}
-
-/// `it.flatMap(f)`: the values of what `f` gives for each value of `it`, one after the other — `f`
-/// gives an `Iterable`, an array or a list as well as an iterator.
-pub struct FlatMapIter<I :: [Iterator], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error] = never> :: [Iterator] {
-    type Item = J.Item;
-    type Error = Join<Join<I.Error, E>, J.Error>;
-    var inner: I,
-    f: fn(I.Item) -> B throws E,
-    var current: ?J,
-
-    pub mut fn next(): ?J.Item throws Join<Join<I.Error, E>, J.Error> {
-        loop {
-            if (this.current != null) {
-                var part = this.current!;
-                let x = try part.next();
-                this.current = part;
-                if (x != null) {
-                    return x;
-                }
-                this.current = null;
-            }
-            let outer = try this.inner.next();
-            if (outer == null) {
-                return null;
-            }
-            this.current = (try this.f(outer)).iter();
-        }
-    }
-}
-
-/// `it.flatten()`: the values of the iterables `it` gives, one after the other.
-pub struct FlattenIter<I :: [Iterator<Item = B>], B :: [Iterable<Iter = J>], J :: [Iterator]> :: [Iterator] {
-    type Item = J.Item;
-    type Error = Join<I.Error, J.Error>;
-    var inner: I,
-    var current: ?J,
-
-    pub mut fn next(): ?J.Item throws Join<I.Error, J.Error> {
-        loop {
-            if (this.current != null) {
-                var part = this.current!;
-                let x = try part.next();
-                this.current = part;
-                if (x != null) {
-                    return x;
-                }
-                this.current = null;
-            }
-            let outer = try this.inner.next();
-            if (outer == null) {
-                return null;
-            }
-            this.current = outer.iter();
-        }
-    }
-}
-
-/// `it.dedupBy(same)`, `it.dedup()`: the values of `it`, a run of ones `same` holds for given once.
-pub struct DedupIter<I :: [Iterator], E :: [Error] = never> :: [Iterator] {
-    type Item = I.Item;
-    type Error = Join<I.Error, E>;
-    var inner: I,
-    same: fn(I.Item, I.Item) -> bool throws E,
-    var last: ?I.Item,
-
-    pub mut fn next(): ?I.Item throws Join<I.Error, E> {
-        loop {
-            let x = try this.inner.next();
-            if (x == null) {
-                return null;
-            }
-            if (let previous = this.last) {
-                if (try this.same(previous, x)) {
-                    continue;
-                }
-            }
-            this.last = x;
-            return x;
-        }
-    }
-}
-
-/// `it.scan(init, f)`: `init`, then each value `f` makes of the one before and a value of `it` —
-/// the running values of `fold` (Kotlin's `scan`).
-pub struct ScanIter<I :: [Iterator], A, E :: [Error] = never> :: [Iterator] {
-    type Item = A;
-    type Error = Join<I.Error, E>;
-    var inner: I,
-    f: fn(A, I.Item) -> A throws E,
-    var acc: A,
-    var started: bool,
-
-    pub mut fn next(): ?A throws Join<I.Error, E> {
-        if (!this.started) {
-            this.started = true;
-            return this.acc;
-        }
-        let x = try this.inner.next();
-        if (x == null) {
-            return null;
-        }
-        this.acc = try this.f(this.acc, x);
-        return this.acc;
-    }
-}
-
-/// `it.peekable()`: the values of `it`, and `peek()`, the next one without taking it.
-pub struct PeekableIter<I :: [Iterator]> :: [Iterator] {
-    type Item = I.Item;
-    type Error = I.Error;
-    var inner: I,
-    var peeked: ?I.Item,
-    var hasPeeked: bool,
-
-    /// The value `next()` gives next, or `null` at the end — pulled from the inner iterator once.
-    pub mut fn peek(): ?I.Item throws I.Error {
-        if (!this.hasPeeked) {
-            this.peeked = try this.inner.next();
-            this.hasPeeked = true;
-        }
-        return this.peeked;
-    }
-
-    pub mut fn next(): ?I.Item throws I.Error {
-        if (this.hasPeeked) {
-            this.hasPeeked = false;
-            return this.peeked;
-        }
-        return try this.inner.next();
-    }
-}
-
-/// `it.rev()`: the values of a `DoubleEnded` iterator from its back. A pull from the back throws
-/// nothing (`DoubleEnded`), so neither does this walk; it is no `DoubleEnded` itself, as a pull
-/// from its back would be the inner one's front, which may throw.
-pub struct RevIter<I :: [DoubleEnded]> :: [Iterator] {
-    type Item = I.Item;
-    type Error = never;
-    var inner: I,
-
-    pub mut fn next(): ?I.Item {
-        return this.inner.nextBack();
-    }
-}
-
-/// `it.cycle()`: the values of `it` over and over, from a clone of it each time — none where it has
-/// none.
-pub struct CycleIter<I :: [Iterator, Clone]> :: [Iterator] {
-    type Item = I.Item;
-    type Error = I.Error;
-    origin: I,
-    var current: I,
-
-    pub mut fn next(): ?I.Item throws I.Error {
-        let x = try this.current.next();
-        if (x != null) {
-            return x;
-        }
-        this.current = this.origin.clone();
-        return try this.current.next();
-    }
-}
-
-// Closing through an adapter (I6; the review's M8a-4): an adapter over a Closeable iterator is
-// Closeable itself and passes `close()` on, so a loop that leaves early closes the generator
-// behind `gen().map(f)`. Its `close()` throws what the inner one's may — the inner's Error, which
-// is the adapter's own —, as the rule at the declaration asks of every Closeable iterator
-// (LYR-SEM0174). The two over two iterators close both; where both throw, the first error wins
-// and the second is suppressed into it (05 E7).
-
-extend<I :: [Iterator, Closeable], U, E :: [Error]> MapIter<I, U, E> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator, Closeable], E :: [Error]> FilterIter<I, E> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator, Closeable]> TakeIter<I> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator, Closeable]> SkipIter<I> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator, Closeable], E :: [Error]> TakeWhileIter<I, E> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator, Closeable], E :: [Error]> SkipWhileIter<I, E> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator, Closeable]> StepByIter<I> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator, Closeable]> EnumerateIter<I> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator, Closeable], E :: [Error]> InspectIter<I, E> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator, Closeable], U, E :: [Error]> MapNotNullIter<I, U, E> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator, Closeable], E :: [Error]> DedupIter<I, E> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator, Closeable], A, E :: [Error]> ScanIter<I, A, E> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator, Closeable]> PeekableIter<I> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-// The outer iterator closed; a part `f` or the source gave is the walk's own, closed by none.
-extend<I :: [Iterator, Closeable], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error]> FlatMapIter<I, B, J, E> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<I :: [Iterator<Item = B>, Closeable], B :: [Iterable<Iter = J>], J :: [Iterator]> FlattenIter<I, B, J> :: [Closeable] {
-    fn close(): void throws I.Error {
-        try this.inner.close();
-    }
-}
-
-extend<A :: [Iterator, Closeable], B :: [Iterator, Closeable]> ZipIter<A, B> :: [Closeable] {
-    fn close(): void throws Join<A.Error, B.Error> {
-        defer try this.b.close();
-        try this.a.close();
-    }
-}
-
-extend<A :: [Iterator, Closeable], B :: [Iterator<Item = A.Item>, Closeable]> ChainIter<A, B> :: [Closeable] {
-    fn close(): void throws Join<A.Error, B.Error> {
-        defer try this.b.close();
-        try this.a.close();
-    }
-}
-
-// The adapters (I3): members of every iterator, each a struct of its own — monomorphized, no
-// allocation, no interface value.
-extend<I :: [Iterator]> I {
-    /// The values, each through `f`.
-    pub fn map<U, E :: [Error]>(f: fn(I.Item) -> U throws E): MapIter<I, U, E> {
-        return MapIter<I, U, E> { inner = this, f = f };
-    }
-
-    /// The values `p` holds for.
-    pub fn filter<E :: [Error]>(p: fn(I.Item) -> bool throws E): FilterIter<I, E> {
-        return FilterIter<I, E> { inner = this, p = p };
-    }
-
-    /// The first `n` values, or all where there are fewer.
-    pub fn take(n: int): TakeIter<I> {
-        return TakeIter<I> { inner = this, left = n };
-    }
-
-    /// The values after the first `n`.
-    pub fn skip(n: int): SkipIter<I> {
-        return SkipIter<I> { inner = this, n = n };
-    }
-
-    /// The values up to the first `p` does not hold for.
-    pub fn takeWhile<E :: [Error]>(p: fn(I.Item) -> bool throws E): TakeWhileIter<I, E> {
-        return TakeWhileIter<I, E> { inner = this, p = p, done = false };
-    }
-
-    /// The values from the first `p` does not hold for.
-    pub fn skipWhile<E :: [Error]>(p: fn(I.Item) -> bool throws E): SkipWhileIter<I, E> {
-        return SkipWhileIter<I, E> { inner = this, p = p, started = false };
-    }
-
-    /// The first value, then every `n`th; `n` below 1 panics.
-    pub fn stepBy(n: int): StepByIter<I> {
-        if (n < 1) {
-            panic("stepBy needs a step of at least 1");
-        }
-        return StepByIter<I> { inner = this, step = n, first = true };
-    }
-
-    /// Each value with its position, from 0.
-    pub fn enumerate(): EnumerateIter<I> {
-        return EnumerateIter<I> { inner = this, i = 0 };
-    }
-
-    /// The values, each shown to `f` on its way through.
-    pub fn inspect<E :: [Error]>(f: fn(I.Item) -> void throws E): InspectIter<I, E> {
-        return InspectIter<I, E> { inner = this, f = f };
-    }
-
-    /// Each value beside the other's at its position, as long as both have one.
-    pub fn zip<B :: [Iterable]>(other: B): ZipIter<I, B.Iter> {
-        return ZipIter<I, B.Iter> { a = this, b = other.iter() };
-    }
-
-    /// The values, then the other's — an iterator of the same items.
-    pub fn chain<B :: [Iterator<Item = I.Item>]>(other: B): ChainIter<I, B> {
-        return ChainIter<I, B> { a = this, b = other, second = false };
-    }
-
-    /// The values through `f`, the `null`s left out.
-    pub fn mapNotNull<U, E :: [Error]>(f: fn(I.Item) -> ?U throws E): MapNotNullIter<I, U, E> {
-        return MapNotNullIter<I, U, E> { inner = this, f = f };
-    }
-
-    /// The values of what `f` gives for each value, one after the other.
-    pub fn flatMap<B :: [Iterable], E :: [Error]>(f: fn(I.Item) -> B throws E): FlatMapIter<I, B, B.Iter, E> {
-        return FlatMapIter<I, B, B.Iter, E> { inner = this, f = f, current = null };
-    }
-
-    /// A run of values `same` holds for, given once.
-    pub fn dedupBy<E :: [Error]>(same: fn(I.Item, I.Item) -> bool throws E): DedupIter<I, E> {
-        return DedupIter<I, E> { inner = this, same = same, last = null };
-    }
-
-    /// `init`, then the running values `f` makes.
-    pub fn scan<A, E :: [Error]>(init: A, f: fn(A, I.Item) -> A throws E): ScanIter<I, A, E> {
-        return ScanIter<I, A, E> { inner = this, f = f, acc = init, started = false };
-    }
-
-    /// The values, with `peek()` to look at the next one.
-    pub fn peekable(): PeekableIter<I> {
-        return PeekableIter<I> { inner = this, peeked = null, hasPeeked = false };
-    }
-
-    /// How many values there are, walking them all.
-    pub fn count(): int throws I.Error {
-        var it = this;
-        var n = 0;
-        while (try it.next() != null) {
-            n = n + 1;
-        }
-        return n;
-    }
-
-    /// `f` over the values from `init`, the last result the answer.
-    pub fn fold<A, E :: [Error]>(init: A, f: fn(A, I.Item) -> A throws E): A throws Join<I.Error, E> {
-        var it = this;
-        var acc = init;
-        var x = try it.next();
-        while (x != null) {
-            acc = try f(acc, x);
-            x = try it.next();
-        }
-        return acc;
-    }
-
-    /// `f` over the values from the first; `null` where there is none.
-    pub fn reduce<E :: [Error]>(f: fn(I.Item, I.Item) -> I.Item throws E): ?I.Item throws Join<I.Error, E> {
-        var it = this;
-        let first = try it.next();
-        if (first == null) {
-            return null;
-        }
-        var acc = first;
-        var x = try it.next();
-        while (x != null) {
-            acc = try f(acc, x);
-            x = try it.next();
-        }
-        return acc;
-    }
-
-    /// The first value, or `null`.
-    pub fn first(): ?I.Item throws I.Error {
-        var it = this;
-        return try it.next();
-    }
-
-    /// The last value, or `null` — walking them all.
-    pub fn last(): ?I.Item throws I.Error {
-        var it = this;
-        var last = try it.next();
-        if (last == null) {
-            return null;
-        }
-        var x = try it.next();
-        while (x != null) {
-            last = x;
-            x = try it.next();
-        }
-        return last;
-    }
-
-    /// The value at position `n` from 0, or `null` — a negative `n` included.
-    pub fn nth(n: int): ?I.Item throws I.Error {
-        if (n < 0) {
-            return null;
-        }
-        var it = this;
-        var left = n;
-        while (left > 0) {
-            if (try it.next() == null) {
-                return null;
-            }
-            left = left - 1;
-        }
-        return try it.next();
-    }
-
-    /// Whether `p` holds for some value; stops at the first.
-    pub fn any<E :: [Error]>(p: fn(I.Item) -> bool throws E): bool throws Join<I.Error, E> {
-        return try this.find(p) != null;
-    }
-
-    /// Whether `p` holds for every value; stops at the first it does not — `true` for none.
-    pub fn all<E :: [Error]>(p: fn(I.Item) -> bool throws E): bool throws Join<I.Error, E> {
-        return try this.find((v) => !(try p(v))) == null;
-    }
-
-    /// Whether `p` holds for no value.
-    pub fn none<E :: [Error]>(p: fn(I.Item) -> bool throws E): bool throws Join<I.Error, E> {
-        return try this.find(p) == null;
-    }
-
-    /// The first value `p` holds for, or `null`.
-    pub fn find<E :: [Error]>(p: fn(I.Item) -> bool throws E): ?I.Item throws Join<I.Error, E> {
-        var it = this;
-        var x = try it.next();
-        while (x != null && !(try p(x))) {
-            x = try it.next();
-        }
-        return x;
-    }
-
-    /// The position of the first value `p` holds for, from 0, or `null`.
-    pub fn position<E :: [Error]>(p: fn(I.Item) -> bool throws E): ?int throws Join<I.Error, E> {
-        var it = this;
-        var i = 0;
-        var x = try it.next();
-        while (x != null) {
-            if (try p(x)) {
-                return i;
-            }
-            i = i + 1;
-            x = try it.next();
-        }
-        return null;
-    }
-
-
-    /// The value whose `key` is least, or `null`; the first of equal ones.
-    pub fn minBy<K :: [TotalOrder], E :: [Error]>(key: fn(I.Item) -> K throws E): ?I.Item throws Join<I.Error, E> {
-        var it = this;
-        let first = try it.next();
-        if (first == null) {
-            return null;
-        }
-        var best = first;
-        var bestKey = try key(first);
-        var x = try it.next();
-        while (x != null) {
-            let k = try key(x);
-            if (k < bestKey) {
-                best = x;
-                bestKey = k;
-            }
-            x = try it.next();
-        }
-        return best;
-    }
-
-    /// The value whose `key` is greatest, or `null`; the first of equal ones.
-    pub fn maxBy<K :: [TotalOrder], E :: [Error]>(key: fn(I.Item) -> K throws E): ?I.Item throws Join<I.Error, E> {
-        var it = this;
-        let first = try it.next();
-        if (first == null) {
-            return null;
-        }
-        var best = first;
-        var bestKey = try key(first);
-        var x = try it.next();
-        while (x != null) {
-            let k = try key(x);
-            if (k > bestKey) {
-                best = x;
-                bestKey = k;
-            }
-            x = try it.next();
-        }
-        return best;
-    }
-    /// `f` for every value, in order. Inline (08 F6): a lambda written at the call is set in place —
-    /// a `return` in it leaves the function that wrote it, `break` and `continue` reach its loops.
-    pub inline fn forEach<E :: [Error]>(f: fn(I.Item) -> void throws E): void throws Join<I.Error, E> {
-        var it = this;
-        var x = try it.next();
-        while (x != null) {
-            try f(x);
-            x = try it.next();
-        }
-    }
-
-    /// The values in an array, in order — the array's own `fromIter`, in one pass.
-    pub fn toArray(): I.Item[] throws I.Error {
-        let out: I.Item[] = try this.collect();
-        return out;
-    }
-}
-
-// The terminators of an element kind (10 B6 I4): blocks whose `T` the iterator's `Item` binds
-// (05 §13 rule 2), reaching the iterators of numbers, of ordered values, of shown ones.
-// The terminators and adapters of a kind of iterator (10 B6 I4): a flat walk over iterables, runs
-// of equal values, the walk from the back, the walk over and over, the mean.
-
-extend<I :: [Iterator<Item = B>], B :: [Iterable]> I {
-    /// The values of the iterables, one after the other.
-    pub fn flatten(): FlattenIter<I, B, B.Iter> {
-        return FlattenIter<I, B, B.Iter> { inner = this, current = null };
-    }
-}
-
-extend<I :: [Iterator<Item = T>], T :: [Equatable]> I {
-    /// A run of equal values, given once.
-    pub fn dedup(): DedupIter<I, never> {
-        // the comparison throws nothing: its set is empty (M8c S17 — before it, I.Error stood here)
-        return DedupIter<I, never> { inner = this, same = (a: T, b: T) => a == b, last = null };
-    }
-}
-
-extend<I :: [DoubleEnded]> I {
-    /// The values from the back.
-    pub fn rev(): RevIter<I> {
-        return RevIter<I> { inner = this };
-    }
-}
-
-extend<I :: [Iterator, Clone]> I {
-    /// The values over and over: an iterator a clone of which starts anew.
-    pub fn cycle(): CycleIter<I> {
-        return CycleIter<I> { origin = this.clone(), current = this };
-    }
-}
-
-extend<I :: [Iterator<Item = int>]> I {
-    /// The mean of the values, or `null` where there is none — summed as `float`, which no
-    /// `int` sum overflows.
-    pub fn average(): ?float throws I.Error {
-        var it = this;
-        var total = 0.0;
-        var n = 0;
-        var x = try it.next();
-        while (x != null) {
-            total = total + (x as float);
-            n = n + 1;
-            x = try it.next();
-        }
-        if (n == 0) {
-            return null;
-        }
-        return total / (n as float);
-    }
-}
-
-extend<I :: [Iterator<Item = float>]> I {
-    /// The mean of the values, or `null` where there is none.
-    pub fn average(): ?float throws I.Error {
-        var it = this;
-        var total = 0.0;
-        var n = 0;
-        var x = try it.next();
-        while (x != null) {
-            total = total + x;
-            n = n + 1;
-            x = try it.next();
-        }
-        if (n == 0) {
-            return null;
-        }
-        return total / (n as float);
-    }
-}
-
-// A value iterator is a clone of itself: a copy walks on its own (cycle).
 extend<T> SliceIter<T> :: [Clone] {
     fn clone(): SliceIter<T> {
         return this;
@@ -4925,89 +4393,6 @@ extend<T :: [Step]> RangeInclusive<T> :: [Clone] {
 extend CharsIter :: [Clone] {
     fn clone(): CharsIter {
         return this;
-    }
-}
-
-extend<I :: [Iterator<Item = T>], T :: [Num]> I {
-    /// The sum of the values; zero where there is none.
-    pub fn sum(): T throws I.Error {
-        var it = this;
-        var s = T.zero;
-        var x = try it.next();
-        while (x != null) {
-            s = s + x;
-            x = try it.next();
-        }
-        return s;
-    }
-
-    /// The product of the values; one where there is none.
-    pub fn product(): T throws I.Error {
-        var it = this;
-        var p = T.one;
-        var x = try it.next();
-        while (x != null) {
-            p = p * x;
-            x = try it.next();
-        }
-        return p;
-    }
-}
-
-extend<I :: [Iterator<Item = T>], T :: [Ordered]> I {
-    /// The least value, or `null`; the first of equal ones.
-    pub fn min(): ?T throws I.Error {
-        var it = this;
-        let first = try it.next();
-        if (first == null) {
-            return null;
-        }
-        var least = first;
-        var x = try it.next();
-        while (x != null) {
-            if (x < least) {
-                least = x;
-            }
-            x = try it.next();
-        }
-        return least;
-    }
-
-    /// The greatest value, or `null`; the first of equal ones.
-    pub fn max(): ?T throws I.Error {
-        var it = this;
-        let first = try it.next();
-        if (first == null) {
-            return null;
-        }
-        var most = first;
-        var x = try it.next();
-        while (x != null) {
-            if (x > most) {
-                most = x;
-            }
-            x = try it.next();
-        }
-        return most;
-    }
-}
-
-extend<I :: [Iterator<Item = T>], T :: [Display]> I {
-    /// The values' texts, `sep` between each two.
-    pub fn join(sep: string): string throws I.Error {
-        var it = this;
-        var out = "";
-        var x = try it.next();
-        var first = true;
-        while (x != null) {
-            if (!first) {
-                out = out + sep;
-            }
-            first = false;
-            out = out + f"{x}";
-            x = try it.next();
-        }
-        return out;
     }
 }
 
@@ -5135,226 +4520,6 @@ pub fn sequence<T>(body: fn() -> Coroutine<T>): Coroutine<T> {
     return body();
 }
 
-// --- StringView (10 S1, 03 A2; M8a S12): the view of a string's bytes --------------------------
-// A pointer into a string's bytes and a length, read and never written. `s[a..b]` takes one on
-// character boundaries, a string stands where one is expected, and `s[i]` is the character that
-// begins at a byte. The string's search and split members stand on it (the strings, above).
-
-/// `a == b` between a string and a view, or two views: the same bytes. The checker's for the
-/// operator; a program writes `==`.
-pub fn equalViews(a: StringView, b: StringView): bool {
-    return viewsHoldTheSameBytes(a, b);
-}
-
-/// `<`, `<=`, `>`, `>=` between a string and a view, or two views: byte by byte, which is the
-/// order of the code points. The checker's for the operators.
-pub fn compareViews(a: StringView, b: StringView): ?Ordering {
-    return a.totalCompare(b);
-}
-
-/// `s[i]`: the character that begins at byte `i`; outside the bytes, or at a byte that continues
-/// a character, a panic (LYR-RT0003). The checker's for the index.
-pub fn charAtByte(v: StringView, i: int): char {
-    return charOfView(v, i);
-}
-
-fn viewsHoldTheSameBytes(a: StringView, b: StringView): bool;
-/// Byte by byte, as `memcmp` and then the length: -1, 0 or 1.
-fn compareViewBytes(a: StringView, b: StringView): int;
-fn viewToString(v: StringView): string;
-fn charOfView(v: StringView, i: int): char;
-/// The view's bytes as the `Slice<uint8>` it is below the checker — read here, never written.
-fn viewBytes(v: StringView): Slice<uint8>;
-
-extend StringView {
-    /// Whether it holds no byte.
-    pub fn isEmpty(): bool {
-        return this.length() == 0;
-    }
-
-    /// Its bytes in a string of their own.
-    pub fn toString(): string {
-        return viewToString(this);
-    }
-}
-
-/// A view compares, hashes and orders by its bytes, as a string does: equal to the string it
-/// shows, hashing as it does (10 C8); it shows its text and debugs quoted.
-extend StringView :: [Equatable, Hashable, Ordered, TotalOrder, Display, Debug, Index<int>] {
-    type Output = char;
-
-    fn equals(o: StringView): bool {
-        return viewsHoldTheSameBytes(this, o);
-    }
-
-    fn hash<H :: [Hasher]>(&h: H): void {
-        h.write(viewBytes(this));
-        h.writeByte(255);
-    }
-
-    fn compare(o: StringView): ?Ordering {
-        return this.totalCompare(o);
-    }
-
-    fn totalCompare(o: StringView): Ordering {
-        let c = compareViewBytes(this, o);
-        if (c < 0) {
-            return Ordering.Less;
-        }
-        if (c > 0) {
-            return Ordering.Greater;
-        }
-        return Ordering.Equal;
-    }
-
-    fn show(): string {
-        return viewToString(this);
-    }
-
-    fn showTo(out: StringBuilder): void {
-        out.appendStr(this);
-    }
-
-    fn debug(): string {
-        return viewToString(this).debug();
-    }
-
-    fn index(k: int): char {
-        return charOfView(this, k);
-    }
-}
-
-/// `s[i]` through `Index<int>` where a type parameter asks for it (04 D6): the character that
-/// begins at byte `i`.
-extend string :: [Index<int>] {
-    type Output = char;
-
-    fn index(k: int): char {
-        return charOfView(this, k);
-    }
-}
-
-// --- bytes to text (10 S3; M8a S12) -----------------------------------------------------------
-
-/// What `string.fromUtf8` throws (10 S3, B3: the bytes are the data's, so it throws): they are no
-/// well-formed UTF-8 from `offset` on — an overlong form, a surrogate, beyond U+10FFFF, a byte
-/// that begins nothing, a sequence cut short.
-pub struct Utf8Error :: [Error] {
-    /// The first byte that is no well-formed UTF-8.
-    pub offset: int,
-
-    pub fn message(): string {
-        return f"the bytes are no UTF-8 from byte {this.offset} on";
-    }
-}
-
-extend string {
-    /// The text the bytes are, copied; `Utf8Error` where they are no well-formed UTF-8.
-    pub static fn fromUtf8(bytes: Slice<uint8>): string throws Utf8Error {
-        let bad = utf8Invalid(bytes);
-        if (bad >= 0) {
-            throw Utf8Error { offset = bad };
-        }
-        return stringOfSlice(bytes);
-    }
-
-    /// The text the bytes are, each maximal part of a sequence that is not well-formed replaced by
-    /// U+FFFD — the Unicode Standard's recommended practice (3.9), WHATWG's decoding.
-    pub static fn fromUtf8Lossy(bytes: Slice<uint8>): string {
-        return stringOfUtf8Lossy(bytes);
-    }
-}
-
-/// -1 where the bytes are well-formed UTF-8, else the offset of the first that is not.
-fn utf8Invalid(bytes: Slice<uint8>): int;
-fn stringOfSlice(bytes: Slice<uint8>): string;
-fn stringOfUtf8Lossy(bytes: Slice<uint8>): string;
-
-// --- f-strings into one builder (10 S6; M8a S13) -----------------------------------------------
-// What an f-string compiles to (12 §2 rule 4): a builder sized for its text, each piece appended in
-// order, the text taken — one buffer, no string per piece. The checker writes these calls.
-
-pub fn fstringStart(room: int): StringBuilder {
-    return StringBuilder.sized(room);
-}
-
-pub fn fstringEnd(out: StringBuilder): string {
-    return out.toString();
-}
-
-pub fn fstringText(out: StringBuilder, text: StringView): void {
-    out.appendStr(text);
-}
-
-pub fn fstringInt(out: StringBuilder, value: int): void {
-    out.putInt(value);
-}
-
-pub fn fstringUint(out: StringBuilder, value: uint): void {
-    out.putUint(value);
-}
-
-pub fn fstringFloat(out: StringBuilder, value: float): void {
-    out.appendStr(textOfFloat(value));
-}
-
-pub fn fstringFloat32(out: StringBuilder, value: float32): void {
-    out.appendStr(textOfFloat32(value));
-}
-
-pub fn fstringBool(out: StringBuilder, value: bool): void {
-    out.appendStr(if (value) "true" else "false");
-}
-
-pub fn fstringChar(out: StringBuilder, value: char): void {
-    out.appendChar(value);
-}
-
-/// A `Display` type's hole: through `showTo`.
-pub fn fstringShown<T :: [Display]>(out: StringBuilder, value: T): void {
-    value.showTo(out);
-}
-
-/// A `Format` type's hole with a spec: the type reads the spec (10 S7).
-pub fn fstringFormatted<T :: [Format]>(out: StringBuilder, value: T, spec: StringView): void {
-    value.format(spec, out);
-}
-
-/// Another `Display` type's hole with a spec: what `showTo` writes, in its width, alignment and
-/// fill — without a width straight into `out`.
-pub fn fstringPadded<T :: [Display]>(out: StringBuilder, value: T, spec: StringView): void {
-    let s = paddingOnly(spec, "a Display type's text");
-    if (s.width == 0) {
-        value.showTo(out);
-        return;
-    }
-    let text = StringBuilder.sized(s.width);
-    value.showTo(text);
-    pad(text.toString(), s, '<', out);
-}
-
-/// A hole under `?`: what `debugTo` writes, in the width, alignment and fill before it.
-pub fn fstringDebugged<T :: [Debug]>(out: StringBuilder, value: T, spec: StringView): void {
-    let s = readSpec(spec);
-    if (!padsOnly(s, '?')) {
-        refuseSpec(spec, "a Debug text");
-    }
-    if (s.width == 0) {
-        value.debugTo(out);
-        return;
-    }
-    let text = StringBuilder.sized(s.width);
-    value.debugTo(text);
-    pad(text.toString(), s, '<', out);
-}
-
-/// A float's shortest text (12 §1), as `std.string.fromFloat` gives it.
-fn textOfFloat(value: float): string;
-fn textOfFloat32(value: float32): string;
-/// An integer's decimal digits into `bytes` from `at` on: how many; the room is the caller's.
-fn putIntDigits(bytes: uint8[], at: int, value: int): int;
-fn putUintDigits(bytes: uint8[], at: int, value: uint): int;
-
 // --- equality and display of arrays and views (10 C9; M8a S14) ----------------------------------
 // Element by element. The debug text is `[1, 2, 3]`, each element in its own debug text — a string
 // quoted, `["a", "b"]`, where its bounds would be lost unquoted —, and the display text is the
@@ -5437,96 +4602,6 @@ fn debugElements<T :: [Debug]>(xs: Slice<T>, out: StringBuilder): void {
 fn debugText<T :: [Debug]>(xs: Slice<T>): string {
     let out = StringBuilder.new();
     debugElements(xs, out);
-    return out.toString();
-}
-
-// --- collecting (10 B6, I4; M8a S15) -------------------------------------------------------------
-// `collect()` builds what the expected type is, through its `FromIterator`: `let xs: List<int> =
-// it.collect();`. An array is one; the containers of std.collections are the others.
-
-/// What an array literal becomes where a value of the type is expected (10 K4): the elements check
-/// against `T`, and the literal is `Self.fromLiteral([…])` — `let s: Set<int> = [1, 2, 3];`,
-/// `let m: Map<string, int> = [("a", 1)];` (a map is no literal of its own). A copy, as `of` would
-/// make one.
-pub interface FromArrayLiteral<T> {
-    static fn fromLiteral(items: T[]): Self;
-}
-
-/// A type built from an iterator's values (10 B6): `collect()` calls `fromIter`, the type's own.
-pub interface FromIterator<T> {
-    static fn fromIter<I :: [Iterator<Item = T>]>(it: I): Self throws I.Error;
-}
-
-extend<T> T[] :: [FromIterator<T>] {
-    /// The values in an array, in order: a buffer that doubles, its first value for the slots
-    /// not yet written, then one copy of the length — one pass. The buffer starts at the
-    /// iterator's own guess of its length (`sizeHint`, 10 I4), and where that was exact — an
-    /// array's walk, a view's — the buffer is the array, with no copy at the end.
-    static fn fromIter<I :: [Iterator<Item = T>]>(it: I): T[] throws I.Error {
-        var walk = it;
-        let least = walk.sizeHint().0;
-        let first = try walk.next();
-        if (first == null) {
-            return [];
-        }
-        var buffer = filled(if (least > 8) least else 8, first);
-        var count = 1;
-        var x = try walk.next();
-        while (x != null) {
-            if (count == buffer.length()) {
-                let grown = filled(count * 2, first);
-                buffer[..count].copyInto(grown[..]);
-                buffer = grown;
-            }
-            buffer[count] = x;
-            count = count + 1;
-            x = try walk.next();
-        }
-        if (count == buffer.length()) {
-            return buffer;
-        }
-        let out = filled(count, first);
-        buffer[..count].copyInto(out[..]);
-        return out;
-    }
-}
-
-extend<I :: [Iterator]> I {
-    /// The values in a value of the expected type, built through its `FromIterator` (10 I4):
-    /// `let names: Set<string> = words.iter().collect();`.
-    pub fn collect<C :: [FromIterator<I.Item>]>(): C throws I.Error {
-        return try C.fromIter(this);
-    }
-}
-
-// --- membership (05 §12 rule 10; 10 C12; M8a S15) -----------------------------------------------
-// `x in xs` is `xs.contains(x)`: a range holds what lies between its bounds.
-
-extend<T :: [Ordered]> Range<T> :: [Contains<T>] {
-    /// Whether `x` lies from `start` up to, not including, `end`.
-    fn contains(x: T): bool {
-        return this.start <= x && x < this.end;
-    }
-}
-
-extend<T :: [Ordered]> RangeInclusive<T> :: [Contains<T>] {
-    /// Whether `x` lies from `start` to `end`, both included.
-    fn contains(x: T): bool {
-        return this.start <= x && x <= this.end;
-    }
-}
-
-/// `s * n` (10 C7): the text `s`, `n` times over — `""` for none. `n * s` is refused, the one order
-/// of `[x] * n`, and a negative `n` panics as an array's repetition does (`LYR-RT0007`): the count
-/// goes through it. The compiler desugars the operator to this call (N1a).
-pub fn repeatText(s: string, n: int): string {
-    if (n < 0) {
-        let _ = [s] * n;
-    }
-    let out = StringBuilder.new();
-    for (_ in 0..n) {
-        out.appendStr(s);
-    }
     return out.toString();
 }
 

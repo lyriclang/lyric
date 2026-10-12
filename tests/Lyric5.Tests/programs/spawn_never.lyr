@@ -14,13 +14,14 @@ fn main(): void throws Error {
             turns += 1;
         }
     });
-    // 200 ms for three turns of 5: Windows' timer ticks about every 16 ms, and 50 ms held three
-    // ticks at best - a loaded runner gave two (2026-10-12).
+    // 200 ms for turns of 5 ms: what the test shows is that the body ran and was cancelled, so one
+    // turn is enough - Windows' timer ticks about every 16 ms, a loaded runner gave two turns
+    // (2026-10-12), macOS under the sanitizers two as well (2026-10-13).
     try sleep(Duration.ofMillis(200));
     forever.cancel();
     try {
         forever.await();
     } catch (_: Cancelled) {
-        println(if (turns >= 3) "cancelled after 3 turns or more" else f"cancelled after {turns}");
+        println(if (turns >= 1) "cancelled after a turn or more" else "cancelled before a turn");
     }
 }

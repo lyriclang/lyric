@@ -60,3 +60,6 @@ pub import std.core {
     profile
 };
 pub import std.collections { List, Map, Set };
+// The adapters' home (10 B6 I3; M9a S11c): named here, so its blocks reach every iterator in every
+// module; the structs are imported where a type is written, `import std.iter { MapIter }`.
+import std.iter;

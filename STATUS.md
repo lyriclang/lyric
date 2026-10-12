@@ -1051,6 +1051,13 @@ M9b the maintainer is asked again.
   what describes it or its value. libm's externs moved with them; std.core is 163 lines
   shorter. `x.sqrt()` is no member any more (`LYR-SEM0012`). Spec 12 "Numbers" and "std.math";
   four cases, the first that compute a root or an angle at all.
+- **S11c** the `std.core` audit (design 10 "Review 2026-10-13"): the adapters are `std.iter`'s,
+  a module the prelude names, so its blocks reach every iterator everywhere and a struct is
+  imported where its type is written; `std.core` is ordered by subject with a table of contents
+  — 5275 lines from 6363, `std.iter` 942. What stays, stays for a reason (the format
+  language's conformances, the tuples' written-out blocks, the scalars' natives). A build of
+  hello: 1554 → 1555 ms; its C unchanged. Spec 12 "Iteration", 04 rule 5; three
+  cases import from `std.iter`.
 
 ## Design decisions
 
