@@ -255,6 +255,16 @@ internal sealed class FlowAnalyzer
     }
 
     // Checks reads, where unassigned is an error, and handles assignments.
+    /// <summary>A 'comptime for' item of an initializer (M9a S10): its variable is the round's,
+    /// assigned as a loop's is; the value is read once, as the body of a loop is.</summary>
+    private void AnalyzeInitRound(StructInitRound round, HashSet<Symbol> assigned)
+    {
+        AnalyzeExpr(round.Iterable, assigned);
+        var roundSet = Clone(assigned);
+        if (_types.RefOf(round) is { } variable) roundSet.Add(variable);
+        AnalyzeExpr(round.Item.Value, roundSet);
+    }
+
     private void AnalyzeExpr(Expr expr, HashSet<Symbol> assigned)
     {
         switch (expr)
@@ -309,6 +319,13 @@ internal sealed class FlowAnalyzer
             case MemberExpr m: AnalyzeExpr(m.Target, assigned); return;
             case IndexExpr ix: AnalyzeExpr(ix.Target, assigned); AnalyzeExpr(ix.Index, assigned); return;
             case FieldByInfoExpr byInfo: AnalyzeExpr(byInfo.Target, assigned); AnalyzeExpr(byInfo.Info, assigned); return;
+            case PayloadByInfoExpr pb: AnalyzeExpr(pb.Target, assigned); AnalyzeExpr(pb.Variant, assigned); AnalyzeExpr(pb.Field, assigned); return;
+            case ComptimeIfExpr cif: AnalyzeExpr(cif.Condition, assigned); AnalyzeExpr(cif.Then, assigned); AnalyzeExpr(cif.Else, assigned); return;
+            case VariantInitExpr vi:
+                AnalyzeExpr(vi.Target, assigned); AnalyzeExpr(vi.Variant, assigned);
+                foreach (var fld in vi.Fields) AnalyzeExpr(fld.Value, assigned);
+                foreach (var r in vi.Rounds) AnalyzeInitRound(r, assigned);
+                return;
             case CastExpr cs: AnalyzeExpr(cs.Operand, assigned); return;
             case TypeTestExpr tt: AnalyzeExpr(tt.Operand, assigned); return;
             case RangeExpr r: AnalyzeExpr(r.Low, assigned); AnalyzeExpr(r.High, assigned); return;
@@ -318,7 +335,10 @@ internal sealed class FlowAnalyzer
                 return;
             case ArrayLitExpr arr: foreach (var e in arr.Elements) AnalyzeExpr(e, assigned); return;
             case TupleLitExpr tu: foreach (var e in tu.Elements) AnalyzeExpr(e, assigned); return;
-            case StructInitExpr si: foreach (var fld in si.Fields) AnalyzeExpr(fld.Value, assigned); return;
+            case StructInitExpr si:
+                foreach (var fld in si.Fields) AnalyzeExpr(fld.Value, assigned);
+                foreach (var r in si.Rounds) AnalyzeInitRound(r, assigned);
+                return;
             case WithExpr w: AnalyzeExpr(w.Target, assigned); foreach (var fld in w.Fields) AnalyzeExpr(fld.Value, assigned); return;
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments) if (seg is InterpHole h) AnalyzeExpr(h.Expr, assigned);

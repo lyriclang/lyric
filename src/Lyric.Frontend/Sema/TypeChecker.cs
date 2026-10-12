@@ -1497,7 +1497,7 @@ public sealed class TypeChecker
                                 $"the block on '{name}' does not implement abstract method '{im.Name}' of interface '{iface.Name}'{implied}",
                                 new DiagnosticNote(im.Span, $"'{im.Name}' is declared here"));
                         else if (self is { } shapeType && TypeFacts.SymbolOf(shapeType) is { } shape)
-                            _inheritedDefaults.Add((iface, im, shape, shapeType));
+                            _inheritedDefaults.Add((iface, im, shape, shapeType, NodeSpan(node)));
                         continue;
                     }
                     var want = (FnType)ApplyAnswers(Substitute(FnTypeOf(FnSym(iface, im.Name)!), WithSelf(subst, iface, self)),
@@ -2240,7 +2240,7 @@ public sealed class TypeChecker
                             _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
                                 $"'{name}' does not implement abstract method '{im.Name}' of interface '{iface.Name}'{implied}",
                                 new DiagnosticNote(im.Span, $"'{im.Name}' is declared here"));
-                        else _inheritedDefaults.Add((iface, im, implementer, self ?? SelfType(implementer)));
+                        else _inheritedDefaults.Add((iface, im, implementer, self ?? SelfType(implementer), NodeSpan(node)));
                         continue; // a default method is inherited
                     }
                     var at = self ?? SelfType(implementer);
@@ -3055,6 +3055,13 @@ public sealed class TypeChecker
                 _de.Report("LYR-SEM0100", Severity.Error, fo.Iterable.Span,
                     $"a 'comptime for' walks an array its site computes — this one is '{TypeFacts.Display(iterType)}'");
         }
+        // 'comptime for (p in v.payload)' (M9a S10): the body once per field of the variant's payload
+        if (fo.Comptime && fo.Pattern is null && fo.Iterable is ComptimeExpr { Inner: MemberExpr { Member: "payload", Target: IdentifierExpr over } }
+            && RoundVariable(over, scope) is { } overVariant && iterType is ArrayOf payloadArray)
+        {
+            CheckPayloadLoop(fo, overVariant, payloadArray.Element, scope);
+            return;
+        }
         // 'comptime for (f in fields<T>())' (09 A7; M9a S9): the body once per field
         if (fo.Comptime && fo.Pattern is null && fo.Iterable is ComptimeExpr walkedMeta && _result.IsMetaSite(walkedMeta)
             && walkedMeta.Inner is CallExpr metaCall && iterType is ArrayOf metaArray)
@@ -3737,6 +3744,15 @@ public sealed class TypeChecker
         if (f.Condition is LetCondExpr letCond) { CheckIfLet(f, letCond, scope); return; }
 
         CheckCondition(f.Condition, scope);
+        // a 'comptime if' the round decides (M9a S10): the chosen branch alone — the other may name
+        // what this field's type has not ('clone' of a '@Shared' field)
+        if (f.Comptime && f.Condition is ComptimeExpr decidedSite && RoundConstant(decidedSite.Inner, scope) is bool chosenBranch)
+        {
+            _result.SetDecidedIf(f, chosenBranch);
+            if (chosenBranch) CheckBlock(f.Then, scope);
+            else if (f.Else is not null) CheckStmt(f.Else, scope);
+            return;
+        }
         var (thenFacts, elseFacts) = NarrowingFacts(f.Condition);
 
         var before = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
@@ -4181,6 +4197,9 @@ public sealed class TypeChecker
             case TypeTestExpr tt: return CheckTypeTest(tt, scope);
             case IndexExpr ix: return CheckIndex(ix, scope);
             case FieldByInfoExpr byInfo: return CheckFieldByInfo(byInfo, scope, expected);
+            case PayloadByInfoExpr payload: return CheckPayloadByInfo(payload, scope, expected);
+            case ComptimeIfExpr cif: return CheckComptimeIfExpr(cif, scope, expected);
+            case VariantInitExpr vi: return CheckVariantInitByInfo(vi, scope, expected);
             case ArrayLitExpr arr: return CheckArrayLit(arr, scope, expected);
             case WithExpr w: return CheckWith(w, scope);
             case TupleLitExpr tu: return CheckTupleLiteral(tu, scope, expected);
@@ -4188,9 +4207,11 @@ public sealed class TypeChecker
                 return CheckInterpolation(fs, scope);
             case ErrorExpr: return LyrType.Error;
 
+            case CallExpr { Callee: FieldByInfoExpr byInfoCallee } call when _comp.Lyric5Modules: return CheckVariantCallByInfo(call, byInfoCallee, scope, expected);
             case CallExpr call: return CheckCall(call, scope, expected);
             case MemberExpr mem: return CheckMember(mem, scope, expected);
-            case StructInitExpr si: return CheckStructInit(si, scope, expected);
+            case StructInitExpr si: return si.Rounds.Length > 0 || si.Fields.Any(f => f.Info is not null)
+                ? CheckInitWithRounds(si, scope, expected) : CheckStructInit(si, scope, expected);
             case TypePathExpr tp: return CheckTypePath(tp, scope, expected);
             case IfExpr iff: return CheckIfExpr(iff, scope, expected);
             case BlockExpr block: return CheckBlockExpr(block, scope, expected);
@@ -4493,6 +4514,18 @@ public sealed class TypeChecker
         type is FnType or Optional { Inner: FnType } || type.IsError;
 
     private FnType FnTypeOf(FunctionSymbol f)
+    {
+        // In a default set in place for a conformer (M9a S9, S10) 'Self' is the conformer — in the
+        // default's body. A member's signature resolved here names ITS interface's Self, which the
+        // caller substitutes with the receiver: an 'equals(o: Self)' asked of a field's type 'T'
+        // takes a 'T', not the conformer.
+        var savedSelf = _selfAs;
+        _selfAs = null;
+        try { return FnTypeOfInner(f); }
+        finally { _selfAs = savedSelf; }
+    }
+
+    private FnType FnTypeOfInner(FunctionSymbol f)
     {
         var fn = (FunctionDecl)f.Declaration!;
         // a constraint only goes on as the error type, said where the declaration is checked
@@ -4994,6 +5027,7 @@ public sealed class TypeChecker
                 return Report(u.Span, "LYR-SEM0114",
                     "'^n' counts from the end inside '[…]' only — as the index, or as a bound of its range");
             case UnaryOp.Place: // at a place parameter it never reaches here: CheckPlaceArgument takes it
+                if (_metaPending.Count > 0) return t; // a body checked once (M9a S9), its call's receiver no one's yet: the rounds say it
                 return Report(u.Span, "LYR-SEM0157",
                     "'&' hands a place to a place parameter, and this argument's parameter takes a value");
             default: // PreInc and PreDec
@@ -6123,6 +6157,17 @@ public sealed class TypeChecker
     /// </summary>
     private LyrType CheckTypeTest(TypeTestExpr t, SymbolTable scope)
     {
+        // 'e is v' (M9a S10): is 'e' the variant the round names? In the body checked once, nothing yet.
+        if (t.Type is NamedType { Path: [var variantName], TypeArguments.Length: 0 } && scope.Lookup(variantName) is LocalSymbol roundVariable
+            && (_result.KnownVariantOf(roundVariable) is not null || _metaPendingEver.Contains(roundVariable)))
+        {
+            var tested = CheckExpr(t.Operand, scope);
+            if (_result.KnownVariantOf(roundVariable) is not { } variant) return LyrType.Bool;
+            if (!tested.IsError && !LyrType.Equal(tested, _roundOwner[roundVariable]))
+                return Report(t.Operand.Span, "LYR-SEM0185", $"'{variantName}' holds a variant of '{TypeFacts.Display(_roundOwner[roundVariable])}', and this is '{TypeFacts.Display(tested)}'");
+            _result.SetVariantTest(t, variant);
+            return LyrType.Bool;
+        }
         var op = CheckExpr(t.Operand, scope);
         var target = ResolveType(t.Type, scope);
         if (op.IsError || target.IsError) return LyrType.Bool;
@@ -6767,7 +6812,7 @@ public sealed class TypeChecker
             calleeScope = past.Outward;
             if (NameOf(bare, calleeScope) is null)
             {
-                foreach (var leftover in call.Arguments) CheckExpr(leftover, scope);
+                foreach (var leftover in call.Arguments) CheckOrphanArgument(leftover, scope);
                 _result.BindRef(bare, past.Passed);
                 return Report(bare.Span, "LYR-SEM0013",
                     $"'{bare.Name}' is a field of {TypeBodyOf(past.Body) ?? "this type"} and a "
@@ -6880,7 +6925,7 @@ public sealed class TypeChecker
 
         if (calleeType is not FnType fn)
         {
-            foreach (var a in call.Arguments) CheckExpr(a, scope); // type them anyway, to avoid follow-up errors
+            foreach (var a in call.Arguments) CheckOrphanArgument(a, scope); // type them anyway, to avoid follow-up errors
             if (calleeType.IsError) return LyrType.Error;
             return Report(call.Span, "LYR-SEM0013", $"'{TypeFacts.Display(calleeType)}' is not callable");
         }
@@ -7385,6 +7430,15 @@ public sealed class TypeChecker
         //
         // An unresolvable import gives an error type and falls through: InstanceMemberOf has no case
         // for it and the IsError check below returns without a second diagnostic.
+        // 'Self.A' in a default set in place for a conformer (M9a S10): the conformer's static,
+        // not the type parameter's constraint
+        if (targetType is NonValueType { Symbol: GenericParamSymbol selfParam } && _selfAs is { } boundSelf && ReferenceEquals(boundSelf.Param, selfParam))
+            targetType = boundSelf.Type switch
+            {
+                NamedRef nr => new NonValueType(nr.Symbol, "type"),
+                GenericInstance gi => new NonValueType(gi.Definition, "type", gi),
+                _ => targetType,
+            };
         switch (targetType)
         {
             case NonValueType { Symbol: TypeSymbol ts } named:
@@ -11785,7 +11839,7 @@ public sealed class TypeChecker
                 // A round's variable (M9a S9) is its field's info, a constant. One whose rounds come
                 // later stands in a body checked once and never built — its site is the rounds'.
                 case IdentifierExpr known when _result.RefOf(known) is LocalSymbol round
-                                              && (_result.KnownFieldOf(round) is not null || _metaPending.Contains(round)):
+                                              && (_result.KnownFieldOf(round) is not null || _result.KnownVariantOf(round) is not null || _metaPending.Contains(round)):
                     if (_metaPending.Contains(round)) pure = false;
                     return;
                 // a question to std.meta about a type known per instance, inside a larger site
@@ -12124,7 +12178,7 @@ public sealed class TypeChecker
     private readonly HashSet<FunctionDecl> _metaDefaults = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>Every default a conformer takes from an interface, with the conformer as 'Self'.</summary>
-    private readonly List<(TypeSymbol Iface, FunctionDecl Member, TypeSymbol Conformer, LyrType Self)> _inheritedDefaults = [];
+    private readonly List<(TypeSymbol Iface, FunctionDecl Member, TypeSymbol Conformer, LyrType Self, Span At)> _inheritedDefaults = [];
 
     /// <summary>A file's tokens, lexed once for every part of it parsed again.</summary>
     private readonly Dictionary<FileId, List<Token>> _tokens = new();
@@ -12132,7 +12186,8 @@ public sealed class TypeChecker
     /// <summary>A question of std.meta (09 A7): a function of its without a body, which the
     /// compiler answers.</summary>
     private static bool IsMetaQuery(Symbol? symbol) =>
-        symbol is FunctionSymbol { Declaration: FunctionDecl { Body: null } } && symbol.Home is { FullName: "std.meta" };
+        symbol is FunctionSymbol { Declaration: FunctionDecl { Body: null }, Name: "fields" or "members" or "attribute" or "typeAttribute" or "variants" or "conformances" or "hasConformance" or "typeName" or "isStruct" or "isClass" or "isEnum" or "isInterface" }
+        && symbol.Home is { FullName: "std.meta" or "std.core" };
 
     /// <summary>
     /// <c>comptime for (f in fields&lt;T&gt;())</c> (design/v5/spec/09 A7 R1, R2; 13 M9a P5, S9).
@@ -12150,11 +12205,13 @@ public sealed class TypeChecker
     {
         var question = TargetSymbol(asked.Callee) as FunctionSymbol;
         var about = _result.TypeArgumentsOf(asked) is [var only, ..] ? only : LyrType.Error;
-        var reads = Descendants(fo.Body).Any(n => n is FieldByInfoExpr or ComptimeExpr or IfStmt { Comptime: true } or ForInStmt { Comptime: true }
+        var reads = Descendants(fo.Body).Any(n => n is FieldByInfoExpr or PayloadByInfoExpr or TypeTestExpr or VariantInitExpr or ComptimeIfExpr
+            or StructInitRound or ComptimeExpr or IfStmt { Comptime: true } or ForInStmt { Comptime: true }
             || n is CallExpr { Callee: IdentifierExpr { Name: "attribute" } or MemberExpr { Member: "attribute" } });
         var overFields = question?.Name == "fields";
-        var known = overFields && about is not (TypeParamType or AssocOf or ErrorType);
-        var perConformer = overFields && about is TypeParamType { Param: var param }
+        var overVariants = question?.Name == "variants";
+        var known = (overFields || overVariants) && about is not (TypeParamType or AssocOf or ErrorType);
+        var perConformer = (overFields || overVariants) && about is TypeParamType { Param: var param }
                            && _metaIface?.SelfParam is { } self && ReferenceEquals(param, self);
         var rounds = reads && known && _outerFunction is not null;
 
@@ -12175,8 +12232,35 @@ public sealed class TypeChecker
         if (!rounds || _de.ErrorCount != errorsBefore) return;
 
         var built = new List<TypeResult.MetaRound>();
+        if (overVariants)
+        {
+            // a round per variant (M9a S10): 'v' that variant's info, 'e is v' and 'e.[v, p]' its forms
+            foreach (var variant in MetaVariantsOf(about))
+            {
+                if (ReparsedLoop(fo) is not { } fresh) return;
+                var roundScope = new SymbolTable(scope);
+                var variable = new LocalSymbol(fo.Variable, element, false, fresh);
+                roundScope.TryDeclare(variable);
+                _result.BindRef(fresh, variable);
+                _result.SetKnownVariant(variable, variant);
+                _roundOwner[variable] = about;
+                _result.SetReparsedOwner(fresh, _outerFunction);
+                using (_de.Within(new DiagnosticNote(fo.Span, $"in the round for the variant '{variant.Name}' of '{TypeFacts.Display(about)}'")))
+                    CheckBlock(fresh.Body, roundScope);
+                built.Add(new TypeResult.MetaRound(fresh.Body, variable, new TypeResult.MetaField(variant.Name, LyrType.Error, variant.Index, Visibility.Public, false, null)));
+                _result.ReparsedRoots.Add(fresh);
+            }
+            _result.SetMetaRounds(fo, [.. built]);
+            return;
+        }
         foreach (var field in MetaFieldsOf(about, _currentModule))
         {
+            // a shape the family's synthesis has no form for (05 §14 rule 6): said as such, not as a missing member
+            if (_familyExpanding is { } family && FamilyShapeRefusal(family, field) is { } why)
+            {
+                _de.Report("LYR-SEM0135", Severity.Error, fo.Span, why);
+                continue;
+            }
             if (ReparsedLoop(fo) is not { } fresh) return;
             var roundScope = new SymbolTable(scope);
             var variable = new LocalSymbol(fo.Variable, element, false, fresh);
@@ -12184,6 +12268,7 @@ public sealed class TypeChecker
             _result.BindRef(fresh, variable);
             _result.SetKnownField(variable, field);
             _roundOwner[variable] = about;
+            _result.SetReparsedOwner(fresh, _outerFunction);
             using (_de.Within(new DiagnosticNote(field.Symbol?.Declaration?.Span ?? fo.Span,
                        $"in the round for the field '{field.Name}' of '{TypeFacts.Display(about)}'")))
                 CheckBlock(fresh.Body, roundScope);
@@ -12212,6 +12297,28 @@ public sealed class TypeChecker
     {
         CheckExpr(access.Info, scope);
         var round = access.Info is IdentifierExpr ? _result.RefOf(access.Info) as LocalSymbol : null;
+        // 'E.[v]' (M9a S10): the value of the unit variant the round names; in the body checked once,
+        // 'Self' is no value yet and the rounds come later
+        if (round is not null && _metaPending.Contains(round) && access.Target is IdentifierExpr { Name: "Self" }) return LyrType.Error;
+        if (round is not null && _result.KnownVariantOf(round) is { } variant)
+        {
+            if (variant.Payload.Length > 0)
+                return Report(access.Span, "LYR-SEM0185", $"'E.[v]' is the value of a unit variant, and '{variant.Name}' has a payload — build it with 'E.[v](…)' or 'E.[v] {{ … }}'");
+            var value = new MemberExpr(access.Target, variant.Name, false, access.Span) { MemberSpan = access.Info.Span };
+            var valueType = CheckExpr(value, scope, expected);
+            if (!valueType.IsError && !LyrType.Equal(valueType, _roundOwner[round]))
+                return Report(access.Target.Span, "LYR-SEM0185", $"'{_comp.TextOf(access.Info.Span)}' holds a variant of '{TypeFacts.Display(_roundOwner[round])}', and this is '{TypeFacts.Display(valueType)}'");
+            _result.SetFieldMember(access, value);
+            return valueType;
+        }
+        // a type's name as the target outside a round over variants: 'E.[v]' with no round, one refusal (not
+        // 'E is a type, not a value' as well)
+        if (TypeOfTypeExpr(access.Target, scope) is not null)
+        {
+            if (round is not null && _metaPending.Contains(round)) return LyrType.Error;
+            return Report(access.Span, "LYR-SEM0185",
+                "'E.[v]' is the value of the unit variant that the variable of a 'comptime for' over 'std.meta.variants' names, in a round of its own — here there is none");
+        }
         var target = CheckExpr(access.Target, scope);
         if (round is not null && _result.KnownFieldOf(round) is { } field)
         {
@@ -12242,17 +12349,27 @@ public sealed class TypeChecker
     /// </summary>
     private void ExpandMetaDefaults()
     {
-        foreach (var (iface, member, conformer, self) in _inheritedDefaults)
+        foreach (var (iface, member, conformer, self, entry) in _inheritedDefaults)
         {
             if (!_metaDefaults.Contains(member) || _result.ExpansionOf(member, conformer) is not null) continue;
             if (iface.SelfParam is not { } selfParam || Reparsed(member) is not { } fresh) continue;
             var saved = (_currentModule, _selfAs, _metaIface);
-            (_currentModule, _selfAs, _metaIface) = (iface.Home, (selfParam, self), null);
+            // The family's defaults (D2; M9a S10) ask with the conformer's module: a conformer's
+            // internal and private fields compare, hash and clone as its pub ones do. What is
+            // wrong in them is said at the conformer's entry (05 §14 rule 6).
+            var family = IsFamily(iface);
+            _familyExpanding = family ? iface.Name : null;
+            (_currentModule, _selfAs, _metaIface) = (family ? conformer.Home : iface.Home, (selfParam, self), null);
             var at = conformer.Declaration is INamedDecl named ? named.NameSpan : conformer.Declaration?.Span ?? member.Span;
-            using (_de.Within(new DiagnosticNote(at, $"'{member.Name}' of '{iface.Name}' set in place for '{conformer.Name}', which takes it")))
+            var ifaceName = iface.Name;
+            var conformerName = conformer.Name;
+            var written = _comp.Sources.OriginOf(entry.File) is { } origin ? origin.At : entry;
+            using (_de.Within(new DiagnosticNote(at, $"'{member.Name}' of '{iface.Name}' set in place for '{conformer.Name}', which takes it"), family ? written : null,
+                       family ? d => d with { Message = $"'{ifaceName}' is not synthesized for '{conformerName}': {d.Message} — write the member" } : null))
                 CheckFunction(fresh, iface.Members, self);
             (_currentModule, _selfAs, _metaIface) = saved;
-            _result.SetExpansion(member, conformer, fresh);
+            _familyExpanding = null;
+            _result.SetExpansion(member, conformer, fresh, self);
             _result.ReparsedRoots.Add(fresh);
         }
     }
@@ -12270,6 +12387,475 @@ public sealed class TypeChecker
         if (!_tokens.TryGetValue(file, out var tokens))
             _tokens[file] = tokens = TokenBuffer.Lex(_comp.Sources, file, new DiagnosticEngine(_comp.Sources));
         return Parser.FunctionAt(_comp.Sources, tokens, original.Span);
+    }
+
+    // ------------------------------------------------------------------ M9a S10: variants, payloads, initializers over infos
+
+    /// <summary>The variable of a round — of a loop over <c>fields</c>, <c>variants</c> or a
+    /// variant's <c>payload</c> —, named alone: known in its round, pending in the body checked
+    /// once, or nothing.</summary>
+    private LocalSymbol? RoundVariable(Expr e, SymbolTable scope) =>
+        e is IdentifierExpr id && scope.Lookup(id.Name) is LocalSymbol local
+        && (_result.KnownFieldOf(local) is not null || _result.KnownVariantOf(local) is not null || _metaPendingEver.Contains(local))
+            ? local : null;
+
+    /// <summary>The five of 05 §14 and <c>TotalOrder</c> (09 A5; M9a S10): their defaults in
+    /// std.core ask with the conformer's module (D2), and what is wrong in them is said at the
+    /// conformer's entry (05 §14 rule 6).</summary>
+    /// <summary>The family's member being set in place, while it is (05 §14 rule 6): a shape its
+    /// synthesis has no form for is refused as such.</summary>
+    private string? _familyExpanding;
+
+    private static string? FamilyShapeRefusal(string family, TypeResult.MetaField field) => family switch
+    {
+        "Hashable" when field.Type is ArrayOf or SliceOf or InlineArrayOf { Element: ArrayOf or SliceOf } =>
+            $"the field '{field.Name}' is an array or a view, which is no Hashable (10 C8)",
+        "Clone" when field.Type is SliceOf or FnType => $"a field of type '{TypeFacts.Display(field.Type)}' has no synthesized clone",
+        _ => null,
+    };
+
+    private static bool IsFamily(TypeSymbol iface) =>
+        iface.Home is { FullName: "std.core" }
+        && iface.Name is "Equatable" or "Hashable" or "Ordered" or "TotalOrder" or "Clone";
+
+    private const string RoundsMessage =
+        "in a round of its own — here there is none: the type is known only per instance, or this is no such loop's variable";
+
+    /// <summary><c>comptime for (p in v.payload)</c> (M9a S10): the body once per field of the
+    /// variant's payload, <c>p</c> that field's info — <c>e.[v, p]</c> the field, <c>[p] = …</c>
+    /// its initializer. Where <c>v</c> is pending, the body is checked once and the rounds come
+    /// with <c>v</c>'s.</summary>
+    private void CheckPayloadLoop(ForInStmt fo, LocalSymbol over, LyrType element, SymbolTable scope)
+    {
+        var known = _result.KnownVariantOf(over);
+        var loopScope = new SymbolTable(scope);
+        var loopVar = new LocalSymbol(fo.Variable, element, false, fo);
+        loopScope.TryDeclare(loopVar);
+        _result.BindRef(fo, loopVar);
+        _metaPending.Add(loopVar);
+        _metaPendingEver.Add(loopVar);
+        var errorsBefore = _de.ErrorCount;
+        CheckBlock(fo.Body, loopScope);
+        _metaPending.Remove(loopVar);
+        if (known is null || _de.ErrorCount != errorsBefore || _outerFunction is null) return;
+        var owner = _roundOwner[over];
+        var built = new List<TypeResult.MetaRound>();
+        foreach (var field in known.Payload)
+        {
+            if (ReparsedLoop(fo) is not { } fresh) return;
+            var roundScope = new SymbolTable(scope);
+            var variable = new LocalSymbol(fo.Variable, element, false, fresh);
+            roundScope.TryDeclare(variable);
+            _result.BindRef(fresh, variable);
+            _result.SetKnownField(variable, field);
+            _result.SetKnownPayload(variable, known);
+            _roundOwner[variable] = owner;
+            _result.SetReparsedOwner(fresh, _outerFunction);
+            using (_de.Within(new DiagnosticNote(fo.Span, $"in the round for the payload field '{field.Name}' of '{known.Name}'")))
+                CheckBlock(fresh.Body, roundScope);
+            built.Add(new TypeResult.MetaRound(fresh.Body, variable, field));
+            _result.ReparsedRoots.Add(fresh);
+        }
+        _result.SetMetaRounds(fo, [.. built]);
+    }
+
+    /// <summary><c>e.[v, p]</c>: the payload field <c>p</c> of the variant <c>v</c> of <c>e</c>,
+    /// of the field's own type; a panic at run time where <c>e</c> holds another variant.</summary>
+    private LyrType CheckPayloadByInfo(PayloadByInfoExpr access, SymbolTable scope, LyrType? expected)
+    {
+        CheckExpr(access.Variant, scope);
+        CheckExpr(access.Field, scope);
+        var rv = RoundVariable(access.Variant, scope);
+        var rp = RoundVariable(access.Field, scope);
+        var target = CheckExpr(access.Target, scope);
+        if (rv is not null && rp is not null && _result.KnownVariantOf(rv) is { } variant
+            && _result.KnownPayloadOf(rp) is { } of && _result.KnownFieldOf(rp) is { } field)
+        {
+            if (of.Index != variant.Index || of.Name != variant.Name)
+                return Report(access.Field.Span, "LYR-SEM0185",
+                    $"'{_comp.TextOf(access.Field.Span)}' walks the payload of '{of.Name}', and '{_comp.TextOf(access.Variant.Span)}' is '{variant.Name}'");
+            var owner = _roundOwner[rv];
+            if (!target.IsError && !LyrType.Equal(target, owner))
+                return Report(access.Target.Span, "LYR-SEM0185",
+                    $"'{_comp.TextOf(access.Variant.Span)}' holds a variant of '{TypeFacts.Display(owner)}', and this is '{TypeFacts.Display(target)}'");
+            _result.SetPayloadAccess(access, (variant, field));
+            return field.Type;
+        }
+        if (rv is not null && rp is not null && (_metaPending.Contains(rv) || _metaPending.Contains(rp))) return LyrType.Error;
+        return Report(access.Span, "LYR-SEM0185",
+            "'e.[v, p]' reads the payload field 'p' of the variant 'v' — 'v' the variable of a 'comptime for' over 'std.meta.variants', "
+            + "'p' one over 'v.payload' — " + RoundsMessage);
+    }
+
+    /// <summary><c>comptime if (c) a else b</c> as a value: where the round decides <c>c</c>, the
+    /// chosen arm alone is checked and stands for the whole; otherwise both arms, of one type, and
+    /// the evaluator chooses while lowering.</summary>
+    private LyrType CheckComptimeIfExpr(ComptimeIfExpr cif, SymbolTable scope, LyrType? expected)
+    {
+        var decided = RoundConstant(cif.Condition is ComptimeExpr site ? site.Inner : cif.Condition, scope);
+        CheckCondition(cif.Condition, scope);
+        if (decided is bool chosen)
+        {
+            var arm = chosen ? cif.Then : cif.Else;
+            var type = CheckExpr(arm, scope, expected);
+            _result.SetRewrite(cif, arm);
+            return type;
+        }
+        var thenType = CheckExpr(cif.Then, scope, expected);
+        var elseType = CheckExpr(cif.Else, scope, expected ?? thenType);
+        if (!thenType.IsError && !elseType.IsError && !LyrType.Equal(thenType, elseType))
+            return Report(cif.Span, "LYR-SEM0100",
+                $"the two arms of a 'comptime if' are one value: '{TypeFacts.Display(thenType)}' and '{TypeFacts.Display(elseType)}' differ");
+        return thenType;
+    }
+
+    private static readonly object NullMark = new();
+    private static readonly object Present = new();
+
+    /// <summary>What a round decides of an expression (M9a S10): a field's <c>isVar</c>, <c>index</c>,
+    /// <c>name</c>, a variant's <c>index</c> and <c>name</c>, whether <c>attribute&lt;A&gt;(f)</c> is
+    /// there, literals, and <c>==</c>, <c>!=</c>, the orderings, <c>!</c>, <c>&amp;&amp;</c>, <c>||</c> over
+    /// them — or <c>null</c> where it is no such thing, and the site decides while lowering.</summary>
+    private object? RoundConstant(Expr e, SymbolTable scope)
+    {
+        var touched = false;
+        var value = RoundConstant(e, scope, ref touched);
+        return touched ? value : null;
+    }
+
+    private object? RoundConstant(Expr e, SymbolTable scope, ref bool touched)
+    {
+        switch (e)
+        {
+            case BoolLiteralExpr b: return b.Value;
+            case IntLiteralExpr i: return (long)i.Value;
+            case StringLiteralExpr s: return s.Value;
+            case NullLiteralExpr: return NullMark;
+            case MemberExpr { Target: IdentifierExpr id, IsOptional: false } m when RoundVariable(id, scope) is { } rv:
+                touched = true;
+                if (_result.KnownFieldOf(rv) is { } f)
+                    return m.Member switch { "isVar" => f.IsVar, "index" => (long)f.Index, "name" => f.Name, _ => null };
+                if (_result.KnownVariantOf(rv) is { } v)
+                    return m.Member switch { "index" => (long)v.Index, "name" => v.Name, _ => null };
+                return null;
+            case CallExpr { Arguments: [IdentifierExpr arg], TypeArguments: [NamedType attribute] } call
+                when call.Callee is IdentifierExpr { Name: "attribute" } or MemberExpr { Member: "attribute" }
+                     && RoundVariable(arg, scope) is { } rv && _result.KnownFieldOf(rv) is { } field:
+                touched = true;
+                return field.Symbol?.Declaration is FieldDecl fd && fd.Attributes.Any(a => a.Path[^1] == attribute.Path[^1])
+                    ? Present : NullMark;
+            // the kind of Self in a default set in place: decided, as the round's variables are
+            case CallExpr { Arguments.Length: 0, TypeArguments: [NamedType { Path: ["Self"] } asked] } kind
+                when _selfAs is not null && kind.Callee is IdentifierExpr { Name: "isEnum" or "isStruct" or "isClass" or "isInterface" } or MemberExpr { Member: "isEnum" or "isStruct" or "isClass" or "isInterface" }
+                     && ResolveType(asked, scope) is var about && about is not (TypeParamType or ErrorType):
+            {
+                touched = true;
+                var name = kind.Callee is IdentifierExpr idn ? idn.Name : ((MemberExpr)kind.Callee).Member;
+                var kindOf = TypeFacts.KindOf(about);
+                return name switch
+                {
+                    "isEnum" => kindOf == TypeSymbolKind.Enum,
+                    "isStruct" => kindOf == TypeSymbolKind.Struct,
+                    "isClass" => kindOf == TypeSymbolKind.Class,
+                    _ => kindOf == TypeSymbolKind.Interface,
+                };
+            }
+            case UnaryExpr { Operator: UnaryOp.Not } not:
+                return RoundConstant(not.Operand, scope, ref touched) is bool inner ? !inner : null;
+            case BinaryExpr bin:
+            {
+                var l = RoundConstant(bin.Left, scope, ref touched);
+                if (l is null) return null;
+                if (bin.Operator == BinaryOp.LogicalAnd && l is bool la) return la ? RoundConstant(bin.Right, scope, ref touched) as bool? : false;
+                if (bin.Operator == BinaryOp.LogicalOr && l is bool lo) return lo ? true : RoundConstant(bin.Right, scope, ref touched) as bool?;
+                var r = RoundConstant(bin.Right, scope, ref touched);
+                if (r is null) return null;
+                return bin.Operator switch
+                {
+                    BinaryOp.Eq => ConstantEqual(l, r),
+                    BinaryOp.Ne => !ConstantEqual(l, r),
+                    BinaryOp.Lt when l is long a && r is long b => a < b,
+                    BinaryOp.Le when l is long a && r is long b => a <= b,
+                    BinaryOp.Gt when l is long a && r is long b => a > b,
+                    BinaryOp.Ge when l is long a && r is long b => a >= b,
+                    _ => null,
+                };
+            }
+            default: return null;
+        }
+    }
+
+    private static bool ConstantEqual(object l, object r) =>
+        (l, r) switch
+        {
+            (long a, long b) => a == b,
+            (string a, string b) => a == b,
+            (bool a, bool b) => a == b,
+            _ => ReferenceEquals(l, r),
+        };
+
+    /// <summary>An initializer with items over infos (M9a S10): <c>[f] = e</c> and
+    /// <c>comptime for (f in fields&lt;T&gt;()) [f] = e</c> — one named field per round, <c>e</c>
+    /// checked with <c>f</c> that field's info, of that field's type. The type is the written one,
+    /// or <c>Self</c> in a default: the conformer's at the expansion.</summary>
+    private LyrType CheckInitWithRounds(StructInitExpr si, SymbolTable scope, LyrType? expected)
+    {
+        LyrType? type = null;
+        if (si.Path is ["Self"] && _selfAs is { } selfAs) type = selfAs.Type;
+        else if (si.Path is not ["Self"] && ResolveInitPath(si.Path, scope, si.Span) is (TypeSymbol { Generics.Length: 0 } ts, _)) type = new NamedRef(ts);
+        if (type is null)
+        {
+            if (si.Path is ["Self"]) return CheckInitRoundsPending(si, scope); // the interface's own body: the rounds come per conformer
+            foreach (var r in si.Rounds) CheckPendingInitRound(r, scope);
+            foreach (var f in si.Fields) CheckExpr(f.Value, scope);
+            return Report(si.Span, "LYR-SEM0185", "an initializer over infos names a type the place knows — a written type without "
+                + "type arguments, or 'Self' in a default; '" + string.Join('.', si.Path) + "' is none");
+        }
+        var symbol = TypeFacts.SymbolOf(type);
+        if (symbol is not { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class })
+        {
+            foreach (var r in si.Rounds) CheckPendingInitRound(r, scope);
+            foreach (var f in si.Fields) CheckExpr(f.Value, scope);
+            return Report(si.Span, "LYR-SEM0185", $"an initializer over infos builds a struct or a class; '{TypeFacts.Display(type)}' is neither");
+        }
+        var subst = type is GenericInstance gi ? SubstMap(gi) : EmptySubst;
+        var items = new List<(string Name, Expr Value, Span Span, LyrType Given)>();
+        foreach (var item in si.Fields)
+        {
+            if (item.Info is null)
+            {
+                items.Add((item.Name, item.Value, item.Span, CheckExpr(item.Value, scope, FieldTypeNamed(symbol, item.Name, subst))));
+                continue;
+            }
+            var rv = RoundVariable(item.Info, scope);
+            if (rv is not null && _result.KnownFieldOf(rv) is { } known)
+            {
+                CheckExpr(item.Info, scope);
+                items.Add((known.Name, item.Value, item.Span, CheckExpr(item.Value, scope, known.Type)));
+            }
+            else if (rv is not null && _metaPending.Contains(rv)) CheckExpr(item.Value, scope);
+            else
+            {
+                CheckExpr(item.Value, scope);
+                Report(item.NameSpan, "LYR-SEM0185", "'[f] = …' sets the field that the variable of a 'comptime for' over 'std.meta.fields' names " + RoundsMessage);
+            }
+        }
+        var pending = false;
+        foreach (var round in si.Rounds)
+        {
+            var iterType = CheckExpr(round.Iterable, scope);
+            var asked = round.Iterable is ComptimeExpr { Inner: CallExpr call } && TargetSymbol(call.Callee) is FunctionSymbol { Name: "fields" } q && IsMetaQuery(q) ? call : null;
+            var about = asked is not null && _result.TypeArgumentsOf(asked) is [var only, ..] ? only : LyrType.Error;
+            var element = iterType is ArrayOf arr ? arr.Element : LyrType.Error;
+            if (asked is null || about is TypeParamType or ErrorType)
+            {
+                CheckPendingInitRound(round, scope, element);
+                if (asked is null)
+                    Report(round.Iterable.Span, "LYR-SEM0185", "a 'comptime for' in an initializer walks 'fields<T>()' of the type built");
+                else pending = true;
+                continue;
+            }
+            if (!LyrType.Equal(about, type))
+                Report(round.Iterable.Span, "LYR-SEM0185", $"the rounds walk the fields of '{TypeFacts.Display(about)}', and this builds a '{TypeFacts.Display(type)}'");
+            foreach (var field in MetaFieldsOf(about, _currentModule))
+            {
+                if (_outerFunction is null || Reparsed(_outerFunction) is not { } outer) break;
+                if (Descendants(outer).OfType<StructInitRound>().FirstOrDefault(r => r.Span == round.Span) is not { } fresh) break;
+                var roundScope = new SymbolTable(scope);
+                var variable = new LocalSymbol(fresh.Variable, element, false, fresh);
+                roundScope.TryDeclare(variable);
+                _result.BindRef(fresh, variable);
+                _result.SetKnownField(variable, field);
+                _roundOwner[variable] = about;
+                if (fresh.Item.Info is not IdentifierExpr { Name: var named } || named != fresh.Variable)
+                {
+                    Report(fresh.Item.NameSpan, "LYR-SEM0185", $"the item of this 'comptime for' sets '[{fresh.Variable}]', the round's own field");
+                    break;
+                }
+                CheckExpr(fresh.Item.Info, roundScope);
+                using (_de.Within(new DiagnosticNote(field.Symbol?.Declaration?.Span ?? round.Span, $"in the round for the field '{field.Name}' of '{TypeFacts.Display(about)}'")))
+                    items.Add((field.Name, fresh.Item.Value, fresh.Item.Span, CheckExpr(fresh.Item.Value, roundScope, field.Type)));
+            }
+        }
+        if (pending) return type;
+        // one value per field, every field of the type set
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var fields = new List<StructInitField>();
+        foreach (var (name, value, span, given) in items)
+        {
+            if (!seen.Add(name)) _de.Report("LYR-SEM0070", Severity.Error, span, $"duplicate field '{name}' in initializer for '{symbol.Name}'");
+            if (symbol.Members.LookupLocal(name) is FieldSymbol fs) CheckAssignable(value, given, Substitute(FieldType(fs), subst), span);
+            else _de.Report("LYR-SEM0015", Severity.Error, span, $"'{symbol.Name}' has no field '{name}'");
+            fields.Add(new StructInitField(name, value, span) { NameSpan = span });
+        }
+        ReportOmittedFields(si.Span, symbol.Name, DeclaredFields(symbol.Declaration), seen);
+        var expanded = si with { Fields = [.. fields], Rounds = [] };
+        _result.SetType(expanded, type);
+        _result.SetRewrite(si, expanded);
+        return type;
+    }
+
+    /// <summary>An argument of a call whose callee is no one's: typed for its own faults, where
+    /// '&x' is no fault — whether the parameter takes a place is the callee's to say.</summary>
+    private void CheckOrphanArgument(Expr a, SymbolTable scope)
+    {
+        if (a is UnaryExpr { Operator: UnaryOp.Place } place) CheckExpr(place.Operand, scope);
+        else CheckExpr(a, scope);
+    }
+
+    private LyrType? FieldTypeNamed(TypeSymbol ts, string name, Dictionary<GenericParamSymbol, LyrType> subst) =>
+        ts.Members.LookupLocal(name) is FieldSymbol fs ? Substitute(FieldType(fs), subst) : null;
+
+    /// <summary>The interface's own body of a default that builds <c>Self</c>: its rounds come per
+    /// conformer; here the values are checked once with pending variables, and the default is
+    /// marked for expansion.</summary>
+    private LyrType CheckInitRoundsPending(StructInitExpr si, SymbolTable scope)
+    {
+        foreach (var item in si.Fields) CheckExpr(item.Value, scope);
+        foreach (var round in si.Rounds) CheckPendingInitRound(round, scope);
+        if (_outerFunction is { } @default && _metaIface is not null) _metaDefaults.Add(@default);
+        return _metaIface?.SelfParam is { } self ? new TypeParamType(self) : LyrType.Error;
+    }
+
+    /// <summary>The value of a 'comptime for' item checked once, its variable pending.</summary>
+    private void CheckPendingInitRound(StructInitRound round, SymbolTable scope, LyrType? element = null)
+    {
+        if (element is null)
+        {
+            var iterType = CheckExpr(round.Iterable, scope);
+            element = iterType is ArrayOf arr ? arr.Element : LyrType.Error;
+        }
+        var loopScope = new SymbolTable(scope);
+        var loopVar = new LocalSymbol(round.Variable, element, false, round);
+        loopScope.TryDeclare(loopVar);
+        _result.BindRef(round, loopVar);
+        _metaPending.Add(loopVar);
+        _metaPendingEver.Add(loopVar);
+        if (round.Item.Info is not null) CheckExpr(round.Item.Info, loopScope);
+        CheckExpr(round.Item.Value, loopScope);
+        _metaPending.Remove(loopVar);
+    }
+
+    /// <summary><c>E.[v] { … }</c> (M9a S10): the variant <c>v</c> of <c>E</c> built from its
+    /// payload's infos — <c>[p] = e</c> per field, or <c>comptime for (p in v.payload) [p] = e</c>.
+    /// A unit variant takes no items and is its value.</summary>
+    private LyrType CheckVariantInitByInfo(VariantInitExpr vi, SymbolTable scope, LyrType? expected)
+    {
+        CheckExpr(vi.Variant, scope);
+        var rv = RoundVariable(vi.Variant, scope);
+        if (rv is not null && _metaPending.Contains(rv))
+        {
+            foreach (var item in vi.Fields) CheckExpr(item.Value, scope);
+            foreach (var round in vi.Rounds) CheckPendingInitRound(round, scope);
+            return LyrType.Error;
+        }
+        if (rv is null || _result.KnownVariantOf(rv) is not { } variant)
+        {
+            foreach (var item in vi.Fields) CheckExpr(item.Value, scope);
+            foreach (var round in vi.Rounds) CheckPendingInitRound(round, scope);
+            return Report(vi.Variant.Span, "LYR-SEM0185", "'E.[v] { … }' builds the variant that the variable of a 'comptime for' over 'std.meta.variants' names " + RoundsMessage);
+        }
+        var owner = _roundOwner[rv];
+        var targetType = TypeOfTypeExpr(vi.Target, scope);
+        if (targetType is not null && !LyrType.Equal(targetType, owner))
+            return Report(vi.Target.Span, "LYR-SEM0185", $"'{_comp.TextOf(vi.Variant.Span)}' holds a variant of '{TypeFacts.Display(owner)}', and this is '{TypeFacts.Display(targetType)}'");
+        if (TypeFacts.SymbolOf(owner)?.Members.LookupLocal(variant.Name) is not EnumVariantSymbol ev)
+            return Report(vi.Span, "LYR-SEM0185", $"'{TypeFacts.Display(owner)}' has no variant '{variant.Name}'");
+        _result.BindRef(vi, ev);
+        var values = new Expr?[variant.Payload.Length];
+        void Set(TypeResult.MetaField field, Expr value, Span span, LyrType given)
+        {
+            if (values[field.Index] is not null) _de.Report("LYR-SEM0070", Severity.Error, span, $"duplicate field '{field.Name}' in initializer for variant '{variant.Name}'");
+            CheckAssignable(value, given, field.Type, span);
+            values[field.Index] = value;
+        }
+        foreach (var item in vi.Fields)
+        {
+            var rp = item.Info is not null ? RoundVariable(item.Info, scope) : null;
+            if (rp is not null && _result.KnownPayloadOf(rp) is { } of && _result.KnownFieldOf(rp) is { } field && of.Index == variant.Index)
+            {
+                CheckExpr(item.Info!, scope);
+                Set(field, item.Value, item.Span, CheckExpr(item.Value, scope, field.Type));
+            }
+            else if (item.Info is null && variant.Payload.FirstOrDefault(p => p.Name == item.Name) is { } named)
+                Set(named, item.Value, item.Span, CheckExpr(item.Value, scope, named.Type));
+            else
+            {
+                CheckExpr(item.Value, scope);
+                Report(item.NameSpan, "LYR-SEM0185", $"an item of 'E.[v] {{ … }}' sets a payload field of '{variant.Name}' — by its name, or '[p] = …' with 'p' a round over 'v.payload'");
+            }
+        }
+        foreach (var round in vi.Rounds)
+        {
+            var iterType = CheckExpr(round.Iterable, scope);
+            var element = iterType is ArrayOf arr ? arr.Element : LyrType.Error;
+            if (round.Iterable is not ComptimeExpr { Inner: MemberExpr { Member: "payload", Target: IdentifierExpr over } } || RoundVariable(over, scope) != rv)
+            {
+                CheckPendingInitRound(round, scope, element);
+                Report(round.Iterable.Span, "LYR-SEM0185", $"a 'comptime for' in 'E.[v] {{ … }}' walks 'v.payload' — the payload of '{variant.Name}'");
+                continue;
+            }
+            foreach (var field in variant.Payload)
+            {
+                if (_outerFunction is null || Reparsed(_outerFunction) is not { } outer) break;
+                if (Descendants(outer).OfType<StructInitRound>().FirstOrDefault(r => r.Span == round.Span) is not { } fresh) break;
+                var roundScope = new SymbolTable(scope);
+                var variable = new LocalSymbol(fresh.Variable, element, false, fresh);
+                roundScope.TryDeclare(variable);
+                _result.BindRef(fresh, variable);
+                _result.SetKnownField(variable, field);
+                _result.SetKnownPayload(variable, variant);
+                _roundOwner[variable] = owner;
+                if (fresh.Item.Info is not IdentifierExpr { Name: var named } || named != fresh.Variable)
+                {
+                    Report(fresh.Item.NameSpan, "LYR-SEM0185", $"the item of this 'comptime for' sets '[{fresh.Variable}]', the round's own field");
+                    break;
+                }
+                CheckExpr(fresh.Item.Info, roundScope);
+                using (_de.Within(new DiagnosticNote(round.Span, $"in the round for the payload field '{field.Name}' of '{variant.Name}'")))
+                    Set(field, fresh.Item.Value, fresh.Item.Span, CheckExpr(fresh.Item.Value, roundScope, field.Type));
+            }
+        }
+        for (var i = 0; i < values.Length; i++)
+            if (values[i] is null)
+                _de.Report("LYR-SEM0031", Severity.Error, vi.Span, $"the initializer for variant '{variant.Name}' omits the payload field '{variant.Payload[i].Name}'");
+        _result.SetVariantInit(vi, (ev, owner, values));
+        return owner;
+    }
+
+    /// <summary>The type a value-position expression names — <c>Self</c> in a default, a type's
+    /// name —, or <c>null</c> where it names no type.</summary>
+    private LyrType? TypeOfTypeExpr(Expr e, SymbolTable scope)
+    {
+        if (e is IdentifierExpr { Name: "Self" } && _selfAs is { } selfAs) return selfAs.Type;
+        if (e is IdentifierExpr id && scope.Lookup(id.Name) is TypeSymbol { Generics.Length: 0 } ts) return new NamedRef(ts);
+        return null;
+    }
+
+    /// <summary><c>E.[v](…)</c>: the variant's constructor, called — checked as the call it stands
+    /// for, <c>E.Name(…)</c>, which the lowering takes.</summary>
+    private LyrType CheckVariantCallByInfo(CallExpr call, FieldByInfoExpr callee, SymbolTable scope, LyrType? expected)
+    {
+        CheckExpr(callee.Info, scope);
+        var rv = RoundVariable(callee.Info, scope);
+        if (rv is not null && _metaPending.Contains(rv))
+        {
+            foreach (var a in call.Arguments) CheckExpr(a, scope);
+            return LyrType.Error;
+        }
+        if (rv is null || _result.KnownVariantOf(rv) is not { } variant)
+        {
+            foreach (var a in call.Arguments) CheckExpr(a, scope);
+            return Report(callee.Span, "LYR-SEM0185", "'E.[v](…)' builds the variant that the variable of a 'comptime for' over 'std.meta.variants' names " + RoundsMessage);
+        }
+        var member = new MemberExpr(callee.Target, variant.Name, false, callee.Span) { MemberSpan = callee.Info.Span };
+        var rewritten = new CallExpr(member, call.Arguments, call.Span, call.TypeArguments) { ArgumentNames = call.ArgumentNames };
+        var type = CheckExpr(rewritten, scope, expected);
+        if (!type.IsError && !LyrType.Equal(type, _roundOwner[rv]))
+            return Report(callee.Target.Span, "LYR-SEM0185", $"'{_comp.TextOf(callee.Info.Span)}' holds a variant of '{TypeFacts.Display(_roundOwner[rv])}', and this is '{TypeFacts.Display(type)}'");
+        _result.SetFieldMember(callee, member);
+        _result.SetRewrite(call, rewritten);
+        return type;
     }
 
     /// <summary>The fields of a struct or a class that <paramref name="from"/> may name (09 A7
@@ -12597,6 +13183,13 @@ public sealed class TypeChecker
                 case CallExpr call: WalkNode(call.Callee); foreach (var a in call.Arguments) WalkNode(a); return;
                 case IndexExpr ix: WalkNode(ix.Target); WalkNode(ix.Index); return;
                 case FieldByInfoExpr byInfo: WalkNode(byInfo.Target); WalkNode(byInfo.Info); return;
+                case PayloadByInfoExpr pb: WalkNode(pb.Target); WalkNode(pb.Variant); WalkNode(pb.Field); return;
+                case ComptimeIfExpr cif: WalkNode(cif.Condition); WalkNode(cif.Then); WalkNode(cif.Else); return;
+                case VariantInitExpr vi:
+                    WalkNode(vi.Target); WalkNode(vi.Variant);
+                    foreach (var f in vi.Fields) WalkNode(f.Value);
+                    foreach (var r in vi.Rounds) WalkNode(r.Item.Value);
+                    return;
                 case MemberExpr mem: WalkNode(mem.Target); return;
                 case ComptimeExpr ct: WalkNode(ct.Inner); return;
                 case ThrowExpr te: WalkNode(te.Value); return;
@@ -12604,7 +13197,10 @@ public sealed class TypeChecker
                 case TailExprStmt tail: WalkNode(tail.Expr); return;
                 case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkNode(e); return;
                 case TupleLitExpr tu: foreach (var e in tu.Elements) WalkNode(e); return;
-                case StructInitExpr si: foreach (var f in si.Fields) WalkNode(f.Value); return;
+                case StructInitExpr si:
+                    foreach (var f in si.Fields) WalkNode(f.Value);
+                    foreach (var r in si.Rounds) WalkNode(r.Item.Value);
+                    return;
                 case WithExpr w: WalkNode(w.Target); foreach (var f in w.Fields) WalkNode(f.Value); return;
                 case InterpolatedStringExpr fs:
                     foreach (var seg in fs.Segments) if (seg is InterpHole h) WalkNode(h.Expr);

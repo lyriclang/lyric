@@ -489,6 +489,16 @@ Kennung ist der M8c-Slice, der den Punkt fand; „Betrifft“ und Uhr wie im Abs
 | S12a | **`assertEmpty` über `Iterable`** (bestätigt): leer ist, was sein Iterator nicht liefert; es wirft, was der Iterator wirft. **Der erste Unterschied über `Debug`** (bestätigt): ein Text in Anführungszeichen mit `\n` gibt seine erste abweichende Zeile, sonst ab 40 Zeichen das erste abweichende Zeichen mit Fenster und Marke | B12 X1 |
 | S12b | **Benchmarks** (bestätigt): `Bench` ist Attribut und Maß zugleich und steht im Prelude, `blackBox` nicht; Aufwärmen, Runden wachsen bis 0,1 s, dann der Median aus fünf; Allokationen aus zwei thread-lokalen Zählern; `lyric bench` baut im Release-Profil; `--save`/`--compare` schreiben Tab-getrennte Zeilen | B12 X4 |
 
+## Review 2026-10-12 — die offenen Punkte aus M9a
+
+Entscheidungen des Maintainers („alle Empfehlungen“) zu den offenen Punkten aus M9a S1–S9 und
+S12a, soweit sie diesen Bereich betreffen (D2–D5, D7, D8 in 09, D6 in 07). Wo eine ältere Zeile
+dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| D1 | **`assert`s Meldung ist eine Lambda** (Kotlins Form): `assert(c) { f"x = {x}" }` — `inline` allein macht nichts faul (08 F6: ein `string`-Argument wird vorher ausgewertet), und ein by-name-Parameter wäre ein zweiter Mechanismus. `assert(c, "…")` ist damit abgelehnt (zwei `assert` gleicher Stelligkeit verbietet 08 §1.2); die zwei Spec-Fälle, die es schreiben, werden umgeschrieben. **Uhr: M9a S12** | X1, 09 A8 Sprosse 3; 08 F6 |
+
 ---
 
 **Bereich 10 ist damit vollständig entschieden** (B1–B13, 2026-09-29). Nachträge in anderen

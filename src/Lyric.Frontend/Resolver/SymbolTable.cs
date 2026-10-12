@@ -87,6 +87,11 @@ public sealed class SymbolTable
         foreach (var candidate in OverloadsLocal(name))
             if (ReferenceEquals(candidate.Declaration, declaration))
                 return candidate;
+        // A declaration parsed again (M9a S9, S10) is a fresh node over the same text: the one
+        // whose span it has.
+        foreach (var candidate in OverloadsLocal(name))
+            if (candidate.Declaration is { } own && own.Span == declaration.Span)
+                return candidate;
         return null;
     }
 

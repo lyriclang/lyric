@@ -193,6 +193,23 @@ Quellgeneratoren (`lyrbind`, Schema→`.lyr`) bleiben **Werkzeuge im Bau**, schr
 `gen/` — sichtbar, versionierbar, debuggbar; `build.lyr` (Bereich 11) ruft sie. Makros (A8) für
 das, was *im* Programm entsteht; Generatoren für das, was aus *fremden* Beschreibungen kommt.
 
+## Review 2026-10-12 — die offenen Punkte aus M9a S1–S9 und S12a
+
+Entscheidungen des Maintainers („alle Empfehlungen“) zu den offenen Punkten, die M9a S1–S9 und
+S12a gesammelt haben (D1–D8 des Berichts; D1 steht in 10, D6 in 07). „Betrifft“ und Uhr wie in
+den anderen Bereichen; wo eine ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| D2 | **Die Familie fragt mit dem Modul des Konformers.** Die Defaults von `Equatable`, `Hashable`, `Ordered`, `TotalOrder` und `Clone` in `std.core` sehen jedes Feld des Konformers, auch interne und private — so, wie das Provisorium es tat. R7 gilt für jedes andere Interface, auch eines in `std`: ein fremdes `ToJson` sieht `pub`. Verworfen: R7 auch für die Familie (ein privates Feld bliebe beim Vergleich still unberücksichtigt — ein falsches `==` ohne Meldung); eine Sichtbarkeits-Erklärung am Typ (`@Visible(...)`, ein zweiter Mechanismus) | A5, A7 R7; Spec 11 §4 Regel 10 |
+| D3 | **Der generische Konformer** (bestätigt): `struct Pair<T> :: [Equatable]` ist `extend<T :: [Equatable]> Pair<T> :: [Equatable]` (05 §14 Regel 4); `Synthesis` schreibt auf dem Lyric-5-Pfad nur noch diesen Kopf, der leere Block nimmt das Default. Für jedes andere Interface gelten die Constraints, die `T` geschrieben hat | A5; 05 §14 Regel 4 |
+| D4 | **Ein Initialisierer über Infos** — eine Form, Bereich 8: `T { comptime for (f in fields<T>()) [f] = e }` und `[f] = e` setzen das Feld, das die Runde nennt, `e` gegen den Feldtyp geprüft; die gesetzten Felder sind die geschriebenen (die Fehler des geschriebenen Initialisierers). Dazu **`comptime if (c) a else b` als Wert**, und **ein `comptime if`, das eine Runde entscheidet, prüft nur den gewählten Zweig** (gegen A4/S3: der andere nennt, was dieser Feldtyp nicht hat — `clone()` eines `@Shared`-Feldes). Verworfen: Felder ohne `var` über Infos schreibbar machen (ein Loch im Wertmodell); `comptime for` als Ausdruck (keine Anwendung) | A5, A7 R2; Spec 11 §4 Regeln 8–9, 08 §2 Regel 6 |
+| D5 | **Variante und Nutzlast per Info** — Formen, Bereich 8: `comptime for (v in variants<E>())` mit `e is v` (ein `bool` des Laufs), `E.[v]` (Einheitsvariante), `E.[v](…)`/`E.[v] { … }` (Nutzlast, über `comptime for (p in v.payload)` auch per Info), `e.[v, p]` (das Nutzlastfeld; eine andere Variante ist eine Panik). Die Enum-Synthese der Familie und S11s Reflexion (R5) schreiben sich damit in `std.core`. Verworfen: `e.[v, p]` nur syntaktisch unter `if (e is v)` erlauben (ein `match`-Arm-Narrowing für Infos — Rust/Swift haben es nur für Muster; die Panik ist die Regel, die `?T`s `!` auch hat) | A5, A7 R5; Spec 11 §4 Regel 7 |
+| D7 | **Transzendente libm-Funktionen zur Compile-Zeit**: eine Implementierung (ein musl- oder CORE-MATH-Port) in Laufzeit und C#, bitgleich — dann ist auch die Laufzeit plattformgleich (Q7). Bis dahin bleiben `exp`, `log`, die Trigonometrie und `pow` `LYR-CT0005`. **Uhr: M10** (mit `std.math`s freien Funktionen, 13 Durchsicht 2026-10-12) | Q7, Q3; 10 Z2 |
+| D8 | **Eine Modulbindung wird nur ausgewertet, wo ihr Global erreicht wird** (Streichen vor dem Auswerten); heute wertet jeder Bau jede Stelle in `std` aus (S1 Lesart 2, 30–50 ms je Bau für die zwei CRC-Tabellen, wachsend). **Uhr: M9a S12.** Verworfen: std's Werte zwischen Bauten cachen (ein zweiter Cache neben dem Objekt-Cache) | A4, Q5; Spec 11 §2 |
+| S10 | **`Default` bleibt beim Compiler** (Nachtrag beim Bauen): `default()` ist ein statisches Member, und ein statisches Interface-Member deklariert nur (03 T5, `LYR-SEM0127`) — ein Default dafür wäre ein zweiter Mechanismus für Statics. A5s Liste der fünf ist damit `Equatable`, `Hashable`, `Ordered`, `TotalOrder`, `Clone`; fest im Compiler: `Default`, `Display`, `Debug`, `Identity` | A5; Spec 05 §14 Regel 1 |
+| S10 | **`std.meta`s Fragen und Structs stehen in `std.core`** (Nachtrag beim Bauen): die Familie fragt `fields<Self>()`, und `std.core` importiert nichts (ein Zyklus ist `RES0005`); `std.meta` re-exportiert sie (`pub import std.core { … }`), die Schreibweise `import std.meta { fields }` bleibt | A7 R1; 10 B2 |
+
 ---
 
 **Bereich 9 ist damit vollständig entschieden** (A1–A12, 2026-09-29).

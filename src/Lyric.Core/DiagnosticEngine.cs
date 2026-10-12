@@ -45,8 +45,17 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
             if (diagnostic.Severity is not Severity.Error) return;
             var rounds = new List<DiagnosticNote>();
             if (diagnostic.Notes is { } own) rounds.AddRange(own);
-            for (var i = _within.Count - 1; i >= 0; i--) rounds.Add(_within[i]);
-            diagnostic = diagnostic with { Notes = rounds };
+            for (var i = _within.Count - 1; i >= 0; i--) rounds.Add(_within[i].Note);
+            // A scope with a place of its own (05 §14 rule 6; M9a S10): the error is said there —
+            // the conformer's entry — and where it arose becomes a note.
+            var primary = _within.LastOrDefault(w => w.Primary is not null).Primary;
+            if (primary is { } at && at.File != diagnostic.Span.File)
+            {
+                rounds.Insert(0, new DiagnosticNote(diagnostic.Span, "where the default says it"));
+                diagnostic = diagnostic with { Span = at, Notes = rounds };
+            }
+            else diagnostic = diagnostic with { Notes = rounds };
+            if (_within.LastOrDefault(w => w.Recode is not null).Recode is { } recode) diagnostic = recode(diagnostic);
         }
         if (_sourceManager.OriginOf(diagnostic.Span.File) is { } origin)
         {
@@ -71,16 +80,16 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
         _diagnostics.Add(diagnostic);
     }
 
-    private readonly List<DiagnosticNote> _within = [];
+    private readonly List<(DiagnosticNote Note, Span? Primary, Func<Diagnostic, Diagnostic>? Recode)> _within = [];
 
     /// <summary>
     /// While the scope lasts, an error is said with where it was set in place: a body checked
     /// once per round or per conformer (M9a S9) reports at the line written once, and the note
     /// names the round. A warning or a hint the written body has had already is not said again.
     /// </summary>
-    public IDisposable Within(DiagnosticNote where)
+    public IDisposable Within(DiagnosticNote where, Span? primary = null, Func<Diagnostic, Diagnostic>? recode = null)
     {
-        _within.Add(where);
+        _within.Add((where, primary, recode));
         return new WithinScope(this);
     }
 

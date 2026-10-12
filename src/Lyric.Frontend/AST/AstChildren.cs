@@ -326,6 +326,30 @@ public static class AstChildren
                 yield return byInfo.Info;
                 break;
 
+            case PayloadByInfoExpr payload:
+                yield return payload.Target;
+                yield return payload.Variant;
+                yield return payload.Field;
+                break;
+
+            case ComptimeIfExpr cif:
+                yield return cif.Condition;
+                yield return cif.Then;
+                yield return cif.Else;
+                break;
+
+            case VariantInitExpr vi:
+                yield return vi.Target;
+                yield return vi.Variant;
+                foreach (var f in vi.Fields) yield return f;
+                foreach (var r in vi.Rounds) yield return r;
+                break;
+
+            case StructInitRound round:
+                yield return round.Iterable;
+                yield return round.Item;
+                break;
+
             case MemberExpr m:
                 // The member NAME is not a node of its own. Whoever wants it has to read it off this
                 // node, which is why the search hands out the whole path rather than one node.
@@ -389,6 +413,7 @@ public static class AstChildren
             case StructInitExpr s:
                 foreach (var t in s.TypeArguments) yield return t;
                 foreach (var f in s.Fields) yield return f;
+                foreach (var r in s.Rounds) yield return r;
                 break;
 
             case WithExpr w:
@@ -401,6 +426,7 @@ public static class AstChildren
                 break;
 
             case StructInitField f:
+                if (f.Info is not null) yield return f.Info;
                 yield return f.Value;
                 break;
 

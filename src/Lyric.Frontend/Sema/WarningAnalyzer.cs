@@ -946,13 +946,23 @@ internal sealed class WarningAnalyzer
             case MemberExpr m: WalkExpr(m.Target); break;
             case IndexExpr ix: WalkExpr(ix.Target); WalkExpr(ix.Index); break;
             case FieldByInfoExpr byInfo: WalkExpr(byInfo.Target); WalkExpr(byInfo.Info); break;
+            case PayloadByInfoExpr pb: WalkExpr(pb.Target); WalkExpr(pb.Variant); WalkExpr(pb.Field); break;
+            case ComptimeIfExpr cif: WalkExpr(cif.Condition); WalkExpr(cif.Then); WalkExpr(cif.Else); break;
+            case VariantInitExpr vi:
+                WalkExpr(vi.Target); WalkExpr(vi.Variant);
+                foreach (var f in vi.Fields) WalkExpr(f.Value);
+                foreach (var r in vi.Rounds) WalkExpr(r.Item.Value);
+                break;
             case CastExpr cs: WalkExpr(cs.Operand); break;
             case TypeTestExpr tt: WalkExpr(tt.Operand); break;
             case RangeExpr r: WalkExpr(r.Low); WalkExpr(r.High); break;
             case SliceRangeExpr sr: WalkExpr(sr.Low); WalkExpr(sr.High); break;
             case ArrayLitExpr arr: foreach (var e in arr.Elements) WalkExpr(e); break;
             case TupleLitExpr tu: foreach (var e in tu.Elements) WalkExpr(e); break;
-            case StructInitExpr si: foreach (var f in si.Fields) WalkExpr(f.Value); break;
+            case StructInitExpr si:
+                foreach (var f in si.Fields) WalkExpr(f.Value);
+                foreach (var r in si.Rounds) WalkExpr(r.Item.Value);
+                break;
             case WithExpr w: WalkExpr(w.Target); foreach (var f in w.Fields) WalkExpr(f.Value); break;
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments) if (seg is InterpHole h) WalkExpr(h.Expr);

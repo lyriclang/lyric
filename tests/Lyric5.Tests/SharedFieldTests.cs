@@ -51,7 +51,7 @@ public class SharedFieldTests
             """);
         var (exit, _, error) = Run("build", "-C", dir);
         Assert.Equal(1, exit);
-        Assert.Contains("in the 'Clone' synthesized for 'Node'", error);
+        Assert.Contains("'Clone' is not synthesized for 'Node'", error); // at the entry (05 §14 rule 6)
         Assert.Contains("[LYR-SEM0012]", error);
     }
 }

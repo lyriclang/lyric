@@ -388,9 +388,19 @@ internal sealed class ExceptionAnalyzer
             case TypeTestExpr tt: AnalyzeExpr(tt.Operand); break;
             case IndexExpr ix: AnalyzeExpr(ix.Target); AnalyzeExpr(ix.Index); Operator(ix); break;
             case FieldByInfoExpr byInfo: AnalyzeExpr(byInfo.Target); AnalyzeExpr(byInfo.Info); break;
+            case PayloadByInfoExpr pb: AnalyzeExpr(pb.Target); AnalyzeExpr(pb.Variant); AnalyzeExpr(pb.Field); break;
+            case ComptimeIfExpr cif: AnalyzeExpr(cif.Condition); AnalyzeExpr(cif.Then); AnalyzeExpr(cif.Else); break;
+            case VariantInitExpr vi:
+                AnalyzeExpr(vi.Target); AnalyzeExpr(vi.Variant);
+                foreach (var f in vi.Fields) AnalyzeExpr(f.Value);
+                foreach (var r in vi.Rounds) AnalyzeExpr(r.Item.Value);
+                break;
             case ArrayLitExpr arr: foreach (var e in arr.Elements) AnalyzeExpr(e); break;
             case TupleLitExpr tu: foreach (var e in tu.Elements) AnalyzeExpr(e); break;
-            case StructInitExpr si: foreach (var f in si.Fields) AnalyzeExpr(f.Value); break;
+            case StructInitExpr si:
+                foreach (var f in si.Fields) AnalyzeExpr(f.Value);
+                foreach (var r in si.Rounds) AnalyzeExpr(r.Item.Value);
+                break;
             case WithExpr w: AnalyzeExpr(w.Target); foreach (var f in w.Fields) AnalyzeExpr(f.Value); break;
             case InterpolatedStringExpr fs:
                 foreach (var seg in fs.Segments) if (seg is InterpHole h) AnalyzeExpr(h.Expr);
