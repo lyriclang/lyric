@@ -1,0 +1,248 @@
+// Each case twice: at compile time, through the IR interpreter ('comptime'), and in the binary.
+// The two texts must be the same to the byte (design/v5/spec/09 Q7; 13 M9a P2) — every value a
+// case computes goes into its text, a float by its bits as well. Expected stdout:
+//   12 cases, 0 differ
+import std.io { println };
+import std.core { ParseError };
+
+fn tower(): string {
+    let w1 = 128 as int8;
+    let w2 = -1 as uint8;
+    let w3 = 256 as uint8;
+    let big = 1000.0;
+    let nan = 0.0 / 0.0;
+    let sat = f"{big as int8} {-big as int8} {nan as int} {300.0 as uint8} {1e30 as int} {-1e30 as uint}";
+    let trunc = f"{-3.9 as int} {3.9 as int} {9007199254740993 as float} {18446744073709551615u64 as float}";
+    let a: uint8 = 255;
+    let b: int8 = 127;
+    let c: int8 = -128;
+    let wraps = f"{a +% 1} {(0 as uint8) -% 1} {(129 as uint8) *% 129} {b +% 1} {c -% 1}";
+    let shifts = f"{1 << 3} {-8 >> 3} {a >> 0} {(1 as uint64) << 63} {-1 >> 63} {0x80u8 >> 7}";
+    let chars = f"{'A' as uint32} {66 as uint32 as char} {'é' as uint32} {'b' > 'a'}";
+    return f"{w1} {w2} {w3} | {sat} | {trunc} | {wraps} | {shifts} | {chars}";
+}
+
+fn checked(): string {
+    let m = 9223372036854775807;
+    let n: int8 = -128;
+    let adds = f"{m.checkedAdd(1) ?? -1} {m.checkedSub(1) ?? -1} {n.checkedMul(-1) ?? 1} {n.checkedDiv(-1) ?? 2}";
+    let sats = f"{m.saturatingAdd(5)} {n.saturatingSub(1)} {(200 as uint8).saturatingMul(2)} {m.wrappingAdd(1)}";
+    let exact = f"{int8.exact(300) ?? 0} {int8.exact(-100) ?? 0} {uint8.clamping(-5)} {uint8.clamping(999)}";
+    return f"{adds} | {sats} | {exact}";
+}
+
+fn bits(): string {
+    let x: uint8 = 0b0001_0110;
+    let y: int32 = -1;
+    let z: uint64 = 0x8000_0000_0000_0001u64;
+    let counts = f"{x.leadingZeros()} {x.trailingZeros()} {x.popCount()} {y.popCount()} {z.leadingZeros()} {(0 as uint16).leadingZeros()}";
+    let rotations = f"{x.rotateLeft(3)} {x.rotateRight(3)} {z.rotateLeft(1)} {y.rotateLeft(7)} {x.rotateLeft(-1)}";
+    let others = f"{(-17).abs()} {(3).pow(13)} {(2 as uint64).pow(63)} {0xF0 & 0x3C} {0xF0 | 0x0F} {0xF0 ^ 0xFF}";
+    return f"{counts} | {rotations} | {others}";
+}
+
+fn divisions(): string {
+    let ints = f"{-7 / 2} {-7 % 2} {7 / -2} {7 % -2} {-9223372036854775807 / 10}";
+    let small = f"{(-7 as int8) / 2} {(-7 as int8) % 2} {(250 as uint8) / 7} {(250 as uint8) % 7}";
+    let unsigned = f"{18446744073709551615u64 / 3u64} {18446744073709551615u64 % 1000u64}";
+    return f"{ints} | {small} | {unsigned}";
+}
+
+fn bitsOf(xs: float[]): string {
+    var out = "";
+    for (x in xs) {
+        out = out + f"{x}={x.toBits()} ";
+    }
+    return out;
+}
+
+fn floats(): string {
+    let third = 1.0 / 3.0;
+    let texts = bitsOf([0.1 + 0.2, 1e21, 1e-7, 123456789012345680000.0, 5e-324, 1.7976931348623157e308,
+        -0.0, 2.5e-8, 100.0, third, 0.3 - 0.2, 3.0 % 2.5, -7.5 % 2.0, 1.0 / 0.0, -1.0 / 0.0]);
+    let rounding = bitsOf([2.5.floor(), (-2.5).floor(), 2.5.ceil(), (-2.5).ceil(), 2.5.round(), (-2.5).round(),
+        0.49999999999999994.round(), (-0.3).round(), 4503599627370497.0.round(), (-2.7).trunc(), 2.0.sqrt(), 1e-300.sqrt()]);
+    let f32: float32 = 0.1;
+    let g32: float32 = 16777217.0;
+    let narrow = f"{f32} {f32 + 0.2} {g32} {f32.toBits()} {(1.0 as float32) / 3.0} {3.4028235e38f32}";
+    let nan = 0.0 / 0.0;
+    let order = f"{(-0.0).totalCompare(0.0):?} {nan.isNan()} {nan == nan} {-0.0 == 0.0} {(1.0 / 0.0).isInfinite()}";
+    return f"{texts}| {rounding}| {narrow} | {order}";
+}
+
+fn formats(): string {
+    let fixed = f"{2.0005:.3} {0.125:.2} {2.5:.0} {-2.5:.0} {1.0:.5} {123.456:.1} {0.0:.2} {-0.0:.1}";
+    let scientific = f"{1234567.891:e} {0.000123:.2e} {1e21:E} {0.256:%} {0.5:.0%}";
+    let ints = f"{255:x} {255:X} {255:b} {255:o} {-42:5} {42:<5}| {42:^7}| {7:03}";
+    return f"{fixed} | {scientific} | {ints}";
+}
+
+fn parsing(): string {
+    var out = "";
+    try {
+        out = out + f"{int.parse("-123")} {int.parse("7f", 16)} {uint8.parse("255")} {int8.parse("-128")} ";
+        let f = float.parse("3.14");
+        let g = float.parse("1e400");
+        let h = float.parse("-0");
+        let i = float.parse("2.2250738585072011e-308");
+        out = out + f"{f} {f.toBits()} {g} {h.toBits()} {i.toBits()} ";
+    } catch (_: ParseError) {
+        out = out + "unexpected ";
+    }
+    try {
+        out = out + f"{uint8.parse("256")}";
+    } catch (_: ParseError) {
+        out = out + "refused";
+    }
+    return out;
+}
+
+fn strings(): string {
+    let s = "  groß und klein  ";
+    let t = s.trim();
+    var joined = "";
+    for (p in t.split(" ")) {
+        joined = joined + p.toString() + "+";
+    }
+    let found = f"{t.find("und") ?? -1} {t.contains("klein")} {t.startsWith("gro")} {t.endsWith("x")}";
+    let counted = f"{"groß".length()} {"groß".charCount()} {"🎵".length()} {t.replace("und", "&")}";
+    var codes = "";
+    for (c in "aé🎵".chars()) {
+        codes = codes + f"{c as uint32},";
+    }
+    let compared = f"{"a" < "b"} {"ab" < "a"} {"é" > "z"} {"" == ""}";
+    return f"{t} | {joined} | {found} | {counted} | {codes} | {compared} | {'🎵'}";
+}
+
+interface Shape {
+    fn area(): int;
+}
+
+struct Rect :: [Shape] {
+    w: int,
+    h: int,
+    fn area(): int {
+        return this.w * this.h;
+    }
+}
+
+class Square :: [Shape] {
+    s: int,
+    fn area(): int {
+        return this.s * this.s;
+    }
+}
+
+enum Op {
+    Add(int, int),
+    Neg(int),
+    Zero,
+}
+
+struct Bad :: [Error] {
+    fn message(): string {
+        return "bad";
+    }
+}
+
+fn risky(n: int): int throws Bad {
+    if (n > 2) {
+        throw Bad { };
+    }
+    return n;
+}
+
+fn structures(): string {
+    let shapes: Shape[] = [Rect { w = 2, h = 3 }, Square { s = 4 }];
+    var area = 0;
+    for (x in shapes) {
+        area += x.area();
+    }
+    var ops = "";
+    for (o in [Op.Add(2, 3), Op.Neg(4), Op.Zero]) {
+        ops = ops + match (o) {
+            .Add(a, b) => f"{a + b}",
+            .Neg(x) => f"{-x}",
+            .Zero => "0",
+        };
+    }
+    var errors = "";
+    for (i in 0..5) {
+        try {
+            errors = errors + f"{risky(i)}";
+        } catch (e: Bad) {
+            errors = errors + e.message();
+        }
+    }
+    let k = 5;
+    let folded = [1, 2, 3].iter().map((x: int) => x + k).fold(0, (a: int, b: int) => a + b);
+    let m = Map<string, int>.new();
+    for (w in ["a", "b", "a", "c", "a"]) {
+        m[w] = (m[w] ?? 0) + 1;
+    }
+    let l: List<int> = [3, 1, 2];
+    l.push(0);
+    let sorted = l.toArray();
+    sorted.sort();
+    var fixed: int[3] = [1, 2, 3];
+    let copy = fixed;
+    fixed[0] = 100;
+    return f"{area} {ops} {errors} {folded} {m["a"] ?? 0}{m["z"] ?? 0} {sorted} {copy[0]} {fixed[0]}";
+}
+
+struct Point {
+    x: int,
+    y: float,
+}
+
+enum Shade {
+    Plain,
+    Mixed(int, string),
+}
+
+fn debugs(): string {
+    let p = Point { x = -3, y = 0.5 };
+    let o: ?int = null;
+    let q: ?Point = p;
+    let l: List<string> = ["a\"b", "c\n"];
+    return f"{p:?} {Shade.Plain:?} {Shade.Mixed(7, "x"):?} {o:?} {q:?} {l:?} {[1.5, -0.0]:?} {'\t':?} {(1, "two"):?}";
+}
+
+fn least32(): int32 {
+    let x: int32 = -2147483647;
+    return x - 1;
+}
+
+fn alike(name: string, atCompile: string, atRun: string): int {
+    if (atCompile == atRun) {
+        return 0;
+    }
+    println(f"{name} at compile time: {atCompile}");
+    println(f"{name} at run time:     {atRun}");
+    return 1;
+}
+
+fn main(): int {
+    var differ = 0;
+    differ += alike("tower", comptime tower(), tower());
+    differ += alike("checked", comptime checked(), checked());
+    differ += alike("bits", comptime bits(), bits());
+    differ += alike("divisions", comptime divisions(), divisions());
+    differ += alike("floats", comptime floats(), floats());
+    differ += alike("formats", comptime formats(), formats());
+    differ += alike("parsing", comptime parsing(), parsing());
+    differ += alike("strings", comptime strings(), strings());
+    differ += alike("structures", comptime structures(), structures());
+    differ += alike("debugs", comptime debugs(), debugs());
+    differ += alike("float bits", f"{(comptime 1.0 / 3.0).toBits()} {(comptime 0.1f32 * 3.0).toBits()} {(comptime -0.0).toBits()}",
+        f"{(1.0 / 3.0).toBits()} {(0.1f32 * 3.0).toBits()} {(-0.0).toBits()}");
+    // a site of each integer width, its sign bit set where it has one: the constant is the
+    // value's bit pattern at that width
+    differ += alike("scalar sites",
+        f"{comptime (-5 as int8)} {comptime (-300 as int16)} {comptime least32()} {comptime (255 as uint8)} {comptime (65535 as uint16)} "
+            + f"{comptime (4294967295 as uint32)} {comptime 18446744073709551615u64} {comptime (-9223372036854775807 - 1)} {comptime 'é'} {comptime (1 < 2)}",
+        f"{-5 as int8} {-300 as int16} {least32()} {255 as uint8} {65535 as uint16} "
+            + f"{4294967295 as uint32} {18446744073709551615u64} {-9223372036854775807 - 1} {'é'} {1 < 2}");
+    println(f"12 cases, {differ} differ");
+    return differ;
+}

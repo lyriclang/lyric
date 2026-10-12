@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Lyric.AST;
 using Lyric.Core;
 using Lyric.Ir;
+using Lyric.Ir.Interp;
 using Lyric.Ir.Lowering;
 using Lyric.Parsing;
 using Lyric.Resolver;
@@ -121,10 +122,24 @@ public static class SourceCompiler
         if (diagnostics.HasErrors)
             return new CompileResult(sources, diagnostics, null, model);
 
-        // 'comptime' sites lower as their inner expression: the 4.x evaluator was the VM over
-        // bytecode, both gone (01 L7); the IR interpreter that evaluates them comes with M9a.
-        // Until then a site is type-checked and lowered, and never evaluated.
+        // 'comptime' sites (09 A4; M9a S1): a lowering that hoists each into a function of its own
+        // — the module's only roots, so it holds what the sites reach —, the IR interpreter over
+        // it, and the real lowering writes each site's value as a constant. Lyric 5's: the 4.x
+        // tools lower a site as its inner expression, as they did since their VM went (01 L7).
         ComptimeTable? comptime = null;
+        if (compilation.Lyric5Modules && types.ComptimeSites.Count > 0)
+        {
+            report?.BeginPhase(Phase.Lower);
+            var hoisted = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
+                optimize: false, libraryRoots: false, passes: options.Passes, comptime: new ComptimeTable { Hoist = true });
+            report?.EndPhase();
+            if (hoisted is null || diagnostics.HasErrors)
+                return new CompileResult(sources, diagnostics, null, model);
+            var values = ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks);
+            if (values is null)
+                return new CompileResult(sources, diagnostics, null, model);
+            comptime = new ComptimeTable { Values = values };
+        }
 
         // Lowering limits arrive as LYR-IR0001 in the same engine and are rendered with file, line and
         // column like any other error.
@@ -555,6 +570,13 @@ public sealed record CompilerOptions
     /// unless a diagnostic switch (<c>--no-inline</c> and its siblings) takes one out to bisect a
     /// finding.</summary>
     public IrPasses Passes { get; init; } = IrPasses.All;
+
+    /// <summary>Whether integer overflow panics (03 T2), the profile's <c>overflowChecks</c>: at
+    /// compile time as in the binary, so <c>comptime f()</c> is <c>f()</c> (09 Q7).</summary>
+    public bool OverflowChecks { get; init; } = true;
+
+    /// <summary>The steps one <c>comptime</c> site may take (09 Q5).</summary>
+    public long ComptimeBudget { get; init; } = ComptimeEvaluator.DefaultBudget;
 }
 
 /// <summary>

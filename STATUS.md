@@ -43,7 +43,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M8a | std core | XL | **done** 2026-10-07 |
 | M8b | std I/O and system | L | **done** 2026-10-08 |
 | M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | **done** 2026-10-09 (S15–S19 after the review) |
-| M9a | `comptime` (the IR interpreter) | L | — |
+| M9a | `comptime` (the IR interpreter), attributes, `std.meta`, the synthesis | XL | **open** since 2026-10-09 (S1) |
 | M9b | Macros | L | — |
 | M10 | std after rule D | XL | — |
 | M11 | Own GC | XL | — |
@@ -936,6 +936,27 @@ After the review:
   question after S15–S19: the nine adapters write `E :: [Error] = never`, so `MapIter<I, U>` is
   again the one whose function throws nothing, as before S4. Spec 06 §9.3 rule 3, 12 §Iteration;
   two cases.
+
+### M9a — open (since 2026-10-09)
+
+`comptime` through an IR interpreter, the attributes, `std.meta`, the synthesis after A5: the plan
+is design 13's addendum "der Plan für M9a" (P1–P13, S1–S12), re-cut to XL after every point was
+checked against the code — of M9a almost nothing stood. Approved like M8c on 2026-10-09: no halt
+until it closes, merged on green CI, open points collected for the report at the close; before
+M9b the maintainer is asked again.
+
+- **S1** the interpreter (`src/Lyric.Frontend/Ir/Interp/`): the typed IR with explicit frames —
+  calls, structs, enums, tuples, optionals, arrays, objects, closures, interface values, errors
+  and `defer` —, the pure natives as C# twins of the runtime's (the number tower, the texts of
+  floats and their parse, strings and views, the C library's exactly rounded five, Unicode's
+  answers for ASCII), the world refused at the site (`LYR-CT0003`, with the chain of calls).
+  `comptime e` is evaluated: a lowering hoists each site into a function of its own, the
+  interpreter runs it, and the real lowering writes the value — `comptime fib(30)` is 832040 in
+  the binary and `fib` is gone. A panic is `LYR-CT0001` with the run-time code and the frames, a
+  site over its budget `LYR-CT0002` (`comptimeBudget` in `[package]`, each site's); overflow as
+  the profile says. `programs/comptime_same.lyr` computes twelve cases at compile time and at run
+  time, the same to the byte in both profiles. P11 corrected: two lowerings where there are sites,
+  not one reused. Spec 11 §2 rules 1–5, 15 §1 rule 7; seven cases.
 
 ## Design decisions
 

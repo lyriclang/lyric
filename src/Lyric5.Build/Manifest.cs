@@ -106,6 +106,10 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     /// <summary><c>toolchain</c> (P12): the least toolchain that builds the package; <c>null</c> for any.</summary>
     public ToolchainPin? Toolchain { get; init; }
 
+    /// <summary><c>comptimeBudget</c> (09 Q5; M9a S1): the steps one <c>comptime</c> site may take —
+    /// the root manifest's counts; <c>null</c> for the toolchain's default.</summary>
+    public long? ComptimeBudget { get; init; }
+
     /// <summary><c>[trust] build-scripts</c> (11 W3 BS5): the packages of the graph whose
     /// <c>build.lyr</c> may run — the root manifest's alone count; the root's own script always runs.</summary>
     public IReadOnlyList<string> TrustedScripts { get; init; } = [];
@@ -149,7 +153,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
 
     /// <summary>The keys of <c>[package]</c> the toolchain reads, and the ones that describe the
     /// package and change no build — for <c>lyric metadata</c> (P10).</summary>
-    private static readonly string[] PackageKeys = ["name", "version", "edition", "include", "exclude", "toolchain"];
+    private static readonly string[] PackageKeys = ["name", "version", "edition", "include", "exclude", "toolchain", "comptimeBudget"];
 
     private static readonly string[] DescriptiveStrings = ["description", "license", "repository"];
 
@@ -240,7 +244,19 @@ public sealed partial record Manifest(string File, string Name, string Version, 
             Binaries = ReadBinaries(document, file, name),
             Toolchain = ReadToolchain(package, file),
             TrustedScripts = ReadTrust(document, file),
+            ComptimeBudget = ReadComptimeBudget(package, file),
         };
+    }
+
+    /// <summary><c>comptimeBudget</c> (design/v5/spec/09 Q5): the steps one <c>comptime</c> site may
+    /// take, a positive number; the root manifest's holds for the whole build.</summary>
+    private static long? ReadComptimeBudget(TomlTable package, string file)
+    {
+        if (!package.TryGet("comptimeBudget", out var given)) return null;
+        if (given is not long steps || steps <= 0)
+            throw new ManifestException("LYR-PKG0002", file, package.Line, 1,
+                $"'comptimeBudget' is the positive number of steps one 'comptime' site may take, not {Describe(given)}");
+        return steps;
     }
 
     /// <summary><c>[build-dependencies]</c> (11 W3 BS3): read as <c>[dependencies]</c> is; the name

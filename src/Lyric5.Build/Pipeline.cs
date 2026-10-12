@@ -38,6 +38,10 @@ public static class Pipeline
             PackageTestRoots = project.TestRoot is { } tests ? new Dictionary<string, string> { [project.Name] = tests } : null,
             PackageGenRoots = GenRoots(project),
             Optimize = profile is { Opt: >= 2 },
+            // 'comptime' computes as the binary would (09 Q7), each site within the root
+            // manifest's budget (09 Q5)
+            OverflowChecks = profile?.OverflowChecks ?? true,
+            ComptimeBudget = project.Manifest?.ComptimeBudget ?? Lyric.Ir.Interp.ComptimeEvaluator.DefaultBudget,
         };
         var source = project.EntryText is { } text
             ? ScriptSource.FromText(project.Module, text)
