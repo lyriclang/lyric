@@ -1036,6 +1036,14 @@ M9b the maintainer is asked again.
   by element (a block per written length, as it compares); a round's info takes no slot — a
   read of `v.index` is the number, and a default that decides with the info alone leaves none
   in the C. Spec 05 §14 rules 1 and 6, 08 §2 rule 6, 11 §4 rules 7–10; fourteen cases.
+- **S11** enum reflection (R5; design 03 "Review 2026-10-12"): a static interface function
+  with a body is a default — set in place per conformer as an instance default is, `E.m(…)`
+  and `T.m(…)` its instance, the conformer's own static in its place; `LYR-SEM0127` stays for a
+  `static let` with a value. On it, std.core's `VariantName` (`name()`, any enum) and
+  `Variants :: [VariantName]` (`all()`, `fromName(s)`; unit enums, `LYR-SEM0135` at the entry
+  otherwise), both in the prelude — `all`, since `variants` inside the default is the question.
+  The artifact: a names table of an enum with no `match`. Spec 05 §2 rule 2, 11 §4 rules 5 and
+  11, 04's prelude; four cases.
 
 ## Design decisions
 

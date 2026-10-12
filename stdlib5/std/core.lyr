@@ -690,6 +690,49 @@ pub interface Hashable :: [Equatable] {
 pub interface Identity :: [Hashable] {
 }
 
+/// The name of the variant an enum value holds, as written (09 A7 R5; M9a S11):
+/// `Color.Red.name()` is `"Red"`. A default over the variants, for any enum.
+pub interface VariantName {
+    /// The variant's name.
+    fn name(): string {
+        comptime for (v in variants<Self>()) {
+            if (this is v) {
+                return v.name;
+            }
+        }
+        return unreachable("an enum value holds one of its variants");
+    }
+}
+
+/// An enum's variants as values (09 A7 R5; M9a S11; Swift's `CaseIterable`): all of them in
+/// declaration order, and one by its name. For an enum whose variants all are units — a variant
+/// with a payload has no value without it, and such an enum is refused at its entry.
+pub interface Variants :: [VariantName] {
+    /// Every variant, in declaration order. (Named `all`, not `variants`: inside the default the
+    /// latter is the question `variants<Self>()` itself.)
+    static fn all(): Self[] {
+        let all = variants<Self>();
+        var out: Self[] = [];
+        comptime for (v in variants<Self>()) {
+            comptime if (v.index == 0) {
+                out = [Self.[v]] * all.length();
+            }
+            out[v.index] = Self.[v];
+        }
+        return out;
+    }
+
+    /// The variant of that name, or `null`.
+    static fn fromName(s: string): ?Self {
+        comptime for (v in variants<Self>()) {
+            if (s == v.name) {
+                return Self.[v];
+            }
+        }
+        return null;
+    }
+}
+
 /// `x[k]` is `x.index(k)` (04 D6, 03 T14): the element a key or a position names, of the type the
 /// conformer answers. An array's and a view's index is built in.
 pub interface Index<K> {

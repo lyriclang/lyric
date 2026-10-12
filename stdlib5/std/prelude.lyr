@@ -28,6 +28,8 @@ pub import std.core {
     Debug,
     Default,
     Clone,
+    VariantName,
+    Variants,
     Closeable,
     Num,
     Integer,

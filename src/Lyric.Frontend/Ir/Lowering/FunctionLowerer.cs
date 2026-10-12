@@ -209,7 +209,9 @@ internal sealed class FunctionLowerer
         // The receiver is parameter 0 and is allocated BEFORE the declared parameters: the IR's parameter
         // convention is positional, and a later slot would be a wrong-slot read in the VM. CIL takes the
         // same route with 'this'.
-        if (receiver is not null || receiverType is not null)
+        // A static default set in place for a conformer (M9a S11) brings the conformer as its receiver
+        // type for 'Self', and has no 'this'.
+        if ((receiver is not null || receiverType is not null) && !decl.IsStatic)
         {
             // An enum receiver is the enum type rather than one of its variants; which one is present is
             // decided by the 'match' in the body.
@@ -6422,6 +6424,10 @@ internal sealed class FunctionLowerer
         if ((function is null || _typeTable.BlockOf(function) is { } found && (found.Generics.Length > 0 || found.IsConstructorTarget))
             && BlockStatic(concrete, member.Member) is { } fromBlock)
             return LowerBlockStaticCall(member, fromBlock.Method, fromBlock.Block, fromBlock.Map, concrete, expr);
+        // The interface's static default (03 T5, M9a S11), where the conformer wrote no static of
+        // the name: the conformer's instance of it.
+        if (function is null && StaticDefault(member) is { } staticDefault)
+            return LowerStaticDefaultCall(member, staticDefault, concrete, expr);
         if (function is not { IsStatic: true, Declaration: FunctionDecl declaration })
             throw NotSupported($"the static '{member.Member}' of '{TypeFacts.Display(concrete)}' through a constraint", expr.Span);
 
@@ -6469,6 +6475,38 @@ internal sealed class FunctionLowerer
     /// path, a generic default, which is lowered for the interface's value there
     /// (<see cref="LowerGenericInterfaceMethod"/>). In Lyric 5 a generic default is one instance
     /// per conformer and argument list (04 D9 whole): its interface has no value.</summary>
+    /// <summary>A static default of an interface the member is bound to (03 T5; M9a S11), or
+    /// nothing: the static twin of <see cref="DirectDefault"/>.</summary>
+    private (FunctionSymbol Default, FunctionDecl Decl, TypeSymbol Iface)? StaticDefault(MemberExpr member) =>
+        _types.RefOf(member) is FunctionSymbol { IsStatic: true } promised
+        && promised.Declaration is FunctionDecl { Body: not null } decl
+        && TypeTable.InterfaceOwning(promised) is { Generics.Length: 0 } iface
+            ? (promised, decl, iface)
+            : null;
+
+    /// <summary>A static default called through a conformer's name or a constraint (M9a S11):
+    /// its instance for the conformer, 'Self' that type, no receiver.</summary>
+    private TempId? LowerStaticDefaultCall(MemberExpr member, (FunctionSymbol Default, FunctionDecl Decl, TypeSymbol Iface) found,
+        LyrType conformer, CallExpr expr)
+    {
+        var own = found.Default.Generics.Length > 0 ? SubstitutedTypeArguments(expr) : [];
+        var target = _instances.RequestDefault(found.Default, found.Decl, found.Iface, conformer, expr.Span, own);
+        var under = new Dictionary<string, LyrType>(StringComparer.Ordinal) { ["Self"] = conformer };
+        for (var i = 0; i < Math.Min(found.Default.Generics.Length, own.Length); i++)
+            under[found.Default.Generics[i].Name] = own[i];
+        var passed = MaterializeArguments(found.Decl, ArgumentsOf(expr), member.Member, expr.Span, under);
+        var resultType = TypeOfExpr(expr);
+        if (IsVoid(resultType))
+        {
+            _b.Emit(new Call(null, target, passed, expr.Span));
+            return null;
+        }
+        var value = _slots.NewTemp(resultType);
+        _b.Emit(new Call(value, target, passed, expr.Span));
+        _fresh.Add(value);
+        return value;
+    }
+
     private (FunctionSymbol Default, FunctionDecl Decl, TypeSymbol Iface)? DirectDefault(MemberExpr member) =>
         _types.RefOf(member) is FunctionSymbol { IsStatic: false } promised
         && (promised.Generics.Length == 0 || _types.Lyric5Modules)
@@ -7568,6 +7606,14 @@ internal sealed class FunctionLowerer
                     && _typeTable.BlockOf(onView) is { Target: { Kind: TypeSymbolKind.Builtin, Name: "StringView" } })
                     receiver = ViewOf(receiver.Value, new IrScalarType(IrScalar.U8), member.Span);
                 break;
+
+            // A static default of an interface reached through the conformer's name, 'E.fromName(s)'
+            // (03 T5, M9a S11): the conformer's instance of the default, no receiver.
+            case MemberExpr member
+                when _types.TypeOf(member.Target) is Sema.NonValueType { Symbol: TypeSymbol concrete, Instance: null }
+                     && StaticDefault(member) is { } staticDefault
+                     && !ReferenceEquals(concrete.Members.LookupLocal(member.Member), staticDefault.Default):
+                return LowerStaticDefaultCall(member, staticDefault, new NamedRef(concrete), expr);
 
             case MemberExpr member: // a type or module target: P.new(…), console.println(…)
                 calleeName = member.Member;
