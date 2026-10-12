@@ -232,17 +232,31 @@ public sealed class SemaRules
     /// <summary>
     /// <c>never</c> stands only as a return type (design/v5/spec/05 E12): the whole return type of a
     /// function, a lambda or a function type. Anywhere else — a parameter, a binding, a field, an
-    /// element, an optional, a type argument, a thrown set, an alias — it would type a value that
-    /// cannot exist (<c>LYR-SEM0145</c>); three of those positions crashed the compiler before.
+    /// element, an optional, a thrown set, an alias — it would type a value that cannot exist
+    /// (<c>LYR-SEM0145</c>); three of those positions crashed the compiler before. A type argument
+    /// in Lyric 5 is the checker's to judge (<see cref="IsTypeArgument"/>).
     /// </summary>
     private void CheckNeverPositions(Node node, Node? parent)
     {
         if (node is NamedType { Path: ["never"], TypeArguments.Length: 0 } never && !IsReturnType(never, parent)
-            && !AnswersAnAssociatedType(never, parent))
+            && !AnswersAnAssociatedType(never, parent) && !(_comp.Lyric5Modules && IsTypeArgument(never, parent)))
             _de.Report("LYR-SEM0145", Severity.Error, never.Span,
                 "'never' stands only as a return type — no value of it can exist");
         foreach (var child in AstChildren.Of(node)) CheckNeverPositions(child, node);
     }
+
+    /// <summary>A written type argument — of a type, a call, a struct literal, a type path: the
+    /// empty set where the parameter's bound is <c>Error</c> (design/v5/spec/05 "Review 2026-10-09"
+    /// S5; M8c S17, <c>DedupIter&lt;I, never&gt;</c>), which the checker asks, knowing the parameter.</summary>
+    private static bool IsTypeArgument(TypeNode type, Node? parent) => parent switch
+    {
+        NamedType n => Enumerable.Range(0, n.TypeArguments.Length).Any(i => ReferenceEquals(n.TypeArguments[i], type)
+            && (n.ArgumentNames is not { } names || i >= names.Length || names[i] is null)),
+        CallExpr c => c.TypeArguments?.Any(a => ReferenceEquals(a, type)) == true,
+        StructInitExpr s => s.TypeArguments.Any(a => ReferenceEquals(a, type)),
+        TypePathExpr t => t.TypeArguments.Any(a => ReferenceEquals(a, type)),
+        _ => false,
+    };
 
     /// <summary>An associated type's answer, written or fixed — <c>type Error = never</c>,
     /// <c>Iterator&lt;Error = never&gt;</c>: an empty thrown set where the member's bound is

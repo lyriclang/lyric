@@ -125,7 +125,7 @@ internal static class Synthesis
         {
             case "Equatable":
                 sb.Append($"    fn equals(o: {typeText}): bool {{\n        return ");
-                sb.Append(fields.Length == 0 ? "true" : string.Join("\n            && ", fields.Select(f => EqOf($"this.{f.Name}", $"o.{f.Name}", f.Type, text))));
+                sb.Append(fields.Length == 0 ? "true" : string.Join("\n            && ", fields.Select(f => EqOf($"this.{f.Name}", $"o.{f.Name}", f.Type, text, streamsHash))));
                 sb.Append(";\n    }\n");
                 break;
             case "Hashable" when streamsHash:
@@ -197,7 +197,7 @@ internal static class Synthesis
                 {
                     sb.Append($"\"{name} {{ \"\n");
                     for (var i = 0; i < fields.Length; i++)
-                        sb.Append($"            + \"{(i > 0 ? ", " : "")}{fields[i].Name} = \" + {DebugOf($"this.{fields[i].Name}", fields[i].Type, text)}\n");
+                        sb.Append($"            + \"{(i > 0 ? ", " : "")}{fields[i].Name} = \" + {DebugOf($"this.{fields[i].Name}", fields[i].Type, text, streamsHash)}\n");
                     sb.Append("            + \" }\"");
                 }
                 sb.Append(";\n    }\n");
@@ -207,17 +207,21 @@ internal static class Synthesis
     }
 
     /// <summary><c>a == b</c> for a field of this type: the value's own equality, a helper for a
-    /// shape, element by element for a tuple.</summary>
-    private static string EqOf(string a, string b, TypeNode type, Func<TypeNode, string> text) => type switch
+    /// shape, element by element for a tuple. An inline array is whole where Lyric 5's std.core
+    /// gives each written length its blocks (<paramref name="whole"/>; M8c S3b, S16): its own
+    /// <c>==</c> walks it, so a <c>uint8[4096]</c> field is one comparison, not 4096 (04, "Review
+    /// 2026-10-09" S3b; M8c S17). The 4.x library has no such block: there it is unrolled.</summary>
+    private static string EqOf(string a, string b, TypeNode type, Func<TypeNode, string> text, bool whole) => type switch
     {
         ArrayType { Length: null } => $"equalArrays({a}, {b})",
-        // An inline array element by element, unrolled: a view of it is taken only on the heap
-        // (03 T13), and 'this' of a struct lies in a frame.
+        ArrayType { Length: not null } when whole => $"{a} == {b}",
+        // Element by element, unrolled: a view of it is taken only on the heap (03 T13), and
+        // 'this' of a struct lies in a frame.
         ArrayType { Length: { } n, Element: var e } => n == 0 ? "true"
-            : "(" + string.Join(" && ", Enumerable.Range(0, n).Select(i => EqOf($"{a}[{i}]", $"{b}[{i}]", e, text))) + ")",
+            : "(" + string.Join(" && ", Enumerable.Range(0, n).Select(i => EqOf($"{a}[{i}]", $"{b}[{i}]", e, text, whole))) + ")",
         NullableType => $"equalOptionals({a}, {b})",
         NamedType { Path: ["Slice"], TypeArguments.Length: 1 } => $"equalSlices({a}, {b})",
-        AST.TupleType t => "(" + string.Join(" && ", t.Elements.Select((e, i) => EqOf($"{a}.{i}", $"{b}.{i}", e, text))) + ")",
+        AST.TupleType t => "(" + string.Join(" && ", t.Elements.Select((e, i) => EqOf($"{a}.{i}", $"{b}.{i}", e, text, whole))) + ")",
         _ => $"{a} == {b}",
     };
 
@@ -232,13 +236,14 @@ internal static class Synthesis
     };
 
     /// <summary>A field written into the hasher <c>h</c> (10 K2): an optional through its mark, a tuple
-    /// and an inline array element by element; <c>null</c> for an array or a view, which is no
-    /// <c>Hashable</c> (C8).</summary>
+    /// element by element, an inline array through its own <c>hash</c> — the length's block writes its
+    /// elements in order (M8c S3b, S17), so the bytes are the ones the unrolled form wrote; <c>null</c>
+    /// for an array or a view, which is no <c>Hashable</c> (C8), and an inline array of them. Lyric 5's
+    /// alone: the 4.x library's <c>hash(): int</c> takes <see cref="HashOf"/>.</summary>
     private static string? HashInto(string expr, TypeNode type) => type switch
     {
         ArrayType { Length: null } => null,
-        ArrayType { Length: { } n, Element: var e } => Enumerable.Range(0, n).Select(i => HashInto($"{expr}[{i}]", e)).ToArray() is var parts && parts.All(p => p is not null)
-            ? string.Join(" ", parts) : null,
+        ArrayType { Length: not null, Element: var e } => HashInto($"{expr}[0]", e) is not null ? $"{expr}.hash(&h);" : null,
         NullableType => $"hashOptionalInto({expr}, &h);",
         NamedType { Path: ["Slice"], TypeArguments.Length: 1 } => null,
         AST.TupleType t => t.Elements.Select((e, i) => HashInto($"{expr}.{i}", e)).ToArray() is var items && items.All(p => p is not null)
@@ -278,15 +283,17 @@ internal static class Synthesis
     };
 
     /// <summary>The text rendering a value of this type in a synthesized <c>debug()</c>: the
-    /// value's own, or a helper of <c>std.core</c> for a shape that has none.</summary>
-    private static string DebugOf(string expr, TypeNode type, Func<TypeNode, string> text) => type switch
+    /// value's own, or a helper of <c>std.core</c> for a shape that has none. An inline array is
+    /// whole as in <see cref="EqOf"/>: its own text is the unrolled one, <c>[1, 2]</c> (M8c S16).</summary>
+    private static string DebugOf(string expr, TypeNode type, Func<TypeNode, string> text, bool whole) => type switch
     {
         ArrayType { Length: null } => $"debugArray({expr})",
+        ArrayType { Length: not null } when whole => $"{expr}.debug()",
         ArrayType { Length: { } n, Element: var e } => n == 0 ? "\"[]\""
-            : "\"[\" + " + string.Join(" + \", \" + ", Enumerable.Range(0, n).Select(i => DebugOf($"{expr}[{i}]", e, text))) + " + \"]\"",
+            : "\"[\" + " + string.Join(" + \", \" + ", Enumerable.Range(0, n).Select(i => DebugOf($"{expr}[{i}]", e, text, whole))) + " + \"]\"",
         NullableType => $"debugOptional({expr})",
         NamedType { Path: ["Slice"], TypeArguments.Length: 1 } => $"debugSlice({expr})",
-        AST.TupleType t => "\"(\" + " + string.Join(" + \", \" + ", t.Elements.Select((e, i) => DebugOf($"{expr}.{i}", e, text))) + " + \")\"",
+        AST.TupleType t => "\"(\" + " + string.Join(" + \", \" + ", t.Elements.Select((e, i) => DebugOf($"{expr}.{i}", e, text, whole))) + " + \")\"",
         _ => $"{expr}.debug()",
     };
 
@@ -325,7 +332,7 @@ internal static class Synthesis
                 {
                     var (pa, an, at) = Bind(v, "a_");
                     var (pb, bn, _) = Bind(v, "b_");
-                    var same = an.Length == 0 ? "true" : string.Join(" && ", an.Select((n, i) => EqOf(n, bn[i], at[i], text)));
+                    var same = an.Length == 0 ? "true" : string.Join(" && ", an.Select((n, i) => EqOf(n, bn[i], at[i], text, streamsHash)));
                     sb.Append($"            {pa} => match (o) {{ {pb} => {same}, _ => false }},\n");
                 }
                 sb.Append("        };\n    }\n");
@@ -418,9 +425,9 @@ internal static class Synthesis
                     var (p, names, types) = Bind(v, "a_");
                     string rendered;
                     if (v.TupleFields is { Length: > 0 })
-                        rendered = $"\"{name}.{v.Name}(\" + " + string.Join(" + \", \" + ", names.Select((n, i) => DebugOf(n, types[i], text))) + " + \")\"";
+                        rendered = $"\"{name}.{v.Name}(\" + " + string.Join(" + \", \" + ", names.Select((n, i) => DebugOf(n, types[i], text, streamsHash))) + " + \")\"";
                     else if (v.StructFields is { Length: > 0 } fs)
-                        rendered = $"\"{name}.{v.Name} {{ \" + " + string.Join(" + \", \" + ", fs.Select((f, i) => $"\"{f.Name} = \" + {DebugOf(names[i], types[i], text)}")) + " + \" }\"";
+                        rendered = $"\"{name}.{v.Name} {{ \" + " + string.Join(" + \", \" + ", fs.Select((f, i) => $"\"{f.Name} = \" + {DebugOf(names[i], types[i], text, streamsHash)}")) + " + \" }\"";
                     else rendered = $"\"{name}.{v.Name}\"";
                     sb.Append($"            {p} => {rendered},\n");
                 }

@@ -918,6 +918,11 @@ After the review:
   `T[]` (`[1, 2, 3]`), synthesized per written length beside S3b's `Equatable` and `Hashable`, so
   `assertEq('7'.toDigit(10), 7)` and `{x.toBytesLE()}` compile. Spec 03 §3.4 rule 1, §5.3 rule 8;
   three cases.
+- **S17** a synthesized `==`, `hash` and debug text take an inline array field whole, through
+  its length's blocks — unrolled, a `uint8[4096]` field did not compile (`LYR-SEM0105`, deeper
+  than the checker walks), and 64 bytes cost 3 400 lines of C —; `never` as a type argument where
+  the parameter's bound is `Error` (`MapIter<…, never>`, `f<never>()`), refused for any other
+  (`LYR-SEM0145`); `dedup()` names its empty set so. Spec 06 §9.3 rule 3; two cases.
 
 ## Design decisions
 

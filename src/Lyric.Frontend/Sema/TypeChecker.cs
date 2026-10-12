@@ -6853,6 +6853,7 @@ public sealed class TypeChecker
                     explicitArgs[i] = ResolveType(written[i], scope);
                     map[fsym.Generics[i]] = explicitArgs[i];
                 }
+                CheckNeverArguments(fsym.Generics, explicitArgs, written);
 
                 // Constraints apply to written arguments too, or the explicit form would be a way
                 // around them.
@@ -8153,6 +8154,30 @@ public sealed class TypeChecker
         _de.Report("LYR-SEM0145", Severity.Error, at,
             $"'never' answers '{member.Owner?.Name}.{member.Name}' only where its bound is 'Error' — an empty thrown set "
             + "(05 E2 K4); anywhere else it would type a value that cannot exist");
+
+    /// <summary>A written <c>never</c> as a type argument (05, "Review 2026-10-09" S5; M8c S17):
+    /// the empty thrown set where the parameter's bound is <c>Error</c> — <c>DedupIter&lt;I, never&gt;</c>,
+    /// <c>f&lt;never&gt;()</c> — as <c>E = never</c> is what a set of nothing binds (E2 K4); for any other
+    /// parameter it would type a value that cannot exist. The rule of an associated type's answer
+    /// (<see cref="NeverMayAnswer"/>), for a parameter.</summary>
+    private void CheckNeverArgument(GenericParamSymbol param, Span at)
+    {
+        // 4.x: SemaRules refused the position already.
+        if (!_comp.Lyric5Modules) return;
+        if (_error is { } root && param.Constraints.Any(c => ConstraintInterface(c) is { } bound
+                && Conformance.WithParents(bound, _binding).Any(p => ReferenceEquals(p, root))))
+            return;
+        _de.Report("LYR-SEM0145", Severity.Error, at,
+            $"'never' stands for '{param.Name}' only where its bound is 'Error' — an empty thrown set (05 E2 K4); "
+            + "anywhere else it would type a value that cannot exist");
+    }
+
+    /// <summary><see cref="CheckNeverArgument"/> over a written list, its arguments as resolved.</summary>
+    private void CheckNeverArguments(GenericParamSymbol[] generics, IReadOnlyList<LyrType?> args, IReadOnlyList<TypeNode> written)
+    {
+        for (var i = 0; i < generics.Length && i < args.Count && i < written.Count; i++)
+            if (args[i] is NeverType) CheckNeverArgument(generics[i], written[i].Span);
+    }
 
     /// <summary>A generic block's parameters read as its target's own (03 T7 X1): <c>extend&lt;U&gt;
     /// Box&lt;U&gt;</c> answers in its <c>U</c>, and the type's answer is asked in Box's own <c>T</c>.
@@ -9866,7 +9891,11 @@ public sealed class TypeChecker
             if (si.TypeArguments.Any(IsPlaceholder))
                 args = FillPlaceholders(si, ts, expected, scope, out prechecked);
             else if (si.TypeArguments.Length > 0)
-                args = FillDefaults(ts, si.TypeArguments.Select(a => ResolveType(a, scope)).ToArray());
+            {
+                var resolvedArgs = si.TypeArguments.Select(a => ResolveType(a, scope)).ToArray();
+                CheckNeverArguments(ts.Generics, resolvedArgs, si.TypeArguments);
+                args = FillDefaults(ts, resolvedArgs);
+            }
             else if (InstanceFromExpected(expected, ts) is { } fromContext)
                 args = fromContext.Arguments;
             else
@@ -10045,7 +10074,9 @@ public sealed class TypeChecker
 
         _result.BindRef(tp, ts);
 
-        var args = FillDefaults(ts, tp.TypeArguments.Select(a => ResolveType(a, scope)).ToArray());
+        var resolvedArgs = tp.TypeArguments.Select(a => ResolveType(a, scope)).ToArray();
+        CheckNeverArguments(ts.Generics, resolvedArgs, tp.TypeArguments);
+        var args = FillDefaults(ts, resolvedArgs);
         if (args.Length != ts.Generics.Length)
         {
             _de.Report("LYR-SEM0026", Severity.Error, tp.Span,
@@ -10094,7 +10125,10 @@ public sealed class TypeChecker
         var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
         for (var i = 0; i < fs.Generics.Length; i++)
             if (!IsPlaceholder(tp.TypeArguments[i]))
+            {
                 map[fs.Generics[i]] = ResolveType(tp.TypeArguments[i], scope);
+                if (map[fs.Generics[i]] is NeverType) CheckNeverArgument(fs.Generics[i], tp.TypeArguments[i].Span);
+            }
 
         // What is written binds first (the rule of the call); the expected function type fills
         // the rest, and only the rest, because UnifyInfer never overwrites.
@@ -12621,6 +12655,8 @@ public sealed class TypeChecker
                         $"'{ts.Name}' declares no associated type '{fixes}' to fix");
                 continue;
             }
+            if (resolved is NeverType && positional.Count < ts.Generics.Length)
+                CheckNeverArgument(ts.Generics[positional.Count], n.TypeArguments[i].Span);
             positional.Add(resolved);
         }
         var args = FillDefaults(ts, positional.ToArray());
