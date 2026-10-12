@@ -115,6 +115,9 @@ public static class TestRun
             PackageDependencies = project.DeclaredDependencies,
             PackageTestRoots = new Dictionary<string, string> { [manifest.Name] = testRoot },
             PackageGenRoots = Pipeline.GenRoots(project),
+            PlaceNames = Pipeline.Places(project),
+            ToolchainVersion = Pipeline.ClaimedVersion,
+            AllowedCodes = project.AllowedCodes,
         };
         var result = SourceCompiler.CheckProject(roots, options);
         // The warnings are the build's to report, which compiles the program again: once is enough.

@@ -42,6 +42,15 @@ pub import std.core {
     Test,
     Bench,
     callerExpr,
+    callerLine,
+    callerFile,
+    Deprecated,
+    AlwaysInline,
+    NoInline,
+    Cold,
+    MustUse,
+    NonExhaustive,
+    Allow,
     sequence
 };
 pub import std.collections { List, Map, Set };

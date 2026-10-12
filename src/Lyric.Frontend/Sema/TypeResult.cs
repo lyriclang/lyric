@@ -69,8 +69,23 @@ public sealed class TypeResult
     /// <c>null</c> where no <c>@callerExpr</c> sits on it.</summary>
     public string? CallerExprOf(Param parameter) => _callerExpr.GetValueOrDefault(parameter);
 
+    /// <summary>The parameters <c>@callerLine</c> or <c>@callerFile</c> sits on (09 A11), each with
+    /// what of the call's place it takes.</summary>
+    private readonly Dictionary<Param, CallerPlace> _callerPlace = new(ReferenceEqualityComparer.Instance);
+
+    public void BindCallerPlace(Param parameter, CallerPlace place) => _callerPlace[parameter] = place;
+
+    /// <summary>What of the call's place <paramref name="parameter"/> takes, or <c>null</c> where
+    /// neither <c>@callerLine</c> nor <c>@callerFile</c> sits on it.</summary>
+    public CallerPlace? CallerPlaceOf(Param parameter) =>
+        _callerPlace.TryGetValue(parameter, out var place) ? place : null;
+
     /// <summary>The source text of a span — what a call wrote —, for the lowering.</summary>
     public Func<Lyric.Core.Span, string>? SourceText { get; internal set; }
+
+    /// <summary>Where a span begins, as the binary names it (09 A11 against 11 W2 P6): the file
+    /// as a backtrace has it, and the line. The compiler sets it before it lowers.</summary>
+    public Func<Lyric.Core.Span, (string File, int Line)>? SourcePlace { get; internal set; }
 
     /// <summary>The block a call through a constraint reaches on a concrete type where no symbol
     /// of the type holds the conformance (05 §13 rules 6, 8), with the block's method of the
@@ -509,4 +524,14 @@ public sealed class TypeResult
     /// EVERY access site, outside the closure too, because both sides have to see the same
     /// cell.</summary>
     public bool IsBoxed(Symbol symbol) => _boxed.Contains(symbol);
+}
+
+/// <summary>What of a call's place a parameter takes where the call leaves it out (09 A11).</summary>
+public enum CallerPlace
+{
+    /// <summary><c>@callerLine</c>: the line the call begins on.</summary>
+    Line,
+
+    /// <summary><c>@callerFile</c>: the file the call stands in.</summary>
+    File,
 }

@@ -168,6 +168,7 @@ fn backtraceOf(pcs: int[]): ?Backtrace {
 /// collect or decide on later. `throws` stays the mechanism, and the two bridges lead to it and
 /// back — `Result.of { try f() }` catches into one, `try r.get()` throws out of one —, with no
 /// operator of its own. `E` is an `Error`, as Swift's `Result` has it: `get()` throws it.
+@MustUse
 pub enum Result<T, E :: [Error]> {
     Ok(T),
     Err(E),
@@ -349,6 +350,52 @@ pub fn blackBox<T>(x: T): T {
 /// parameter out, it gets the text the call wrote for `p` — `assertEq(xs.length(), 3)` hands
 /// `std.test` the words `xs.length()`. Named like the compiler instruction it is, not like a type.
 pub struct callerExpr :: [OnParameter] { }
+
+/// `@callerLine` on an `int` parameter with a default (09 A11): where a call leaves the parameter
+/// out, it gets the line the call begins on.
+pub struct callerLine :: [OnParameter] { }
+
+/// `@callerFile` on a `string` parameter with a default (09 A11): where a call leaves the
+/// parameter out, it gets the file the call stands in, as the binary's backtrace names it — the
+/// package's name, then the path within the package (`app/src/main.lyr`), with forward slashes.
+pub struct callerFile :: [OnParameter] { }
+
+/// A declaration on its way out (09 A11): every use outside a deprecated declaration warns
+/// (`LYR-SEM0076`) with `message`; `until` names the release that removes it — a build of that
+/// toolchain version or later fails at the attribute (`LYR-SEM0081`) —; `replacement` is what the
+/// use should become, for the tools. On whatever a use names: a module, what stands at its top
+/// level — an `extend` block for its members —, a member; not a parameter.
+pub struct Deprecated :: [OnModule, OnTopLevel, OnMember] {
+    pub message: string = "",
+    pub until: string = "",
+    pub replacement: string = "",
+}
+
+/// A hint to the C compiler (09 A11): inline the function wherever it is called. A hint, no
+/// promise — and not the word `inline`, whose function is spliced into its caller by the language.
+pub struct AlwaysInline :: [OnCallable] { }
+
+/// A hint to the C compiler (09 A11): keep the function a call; the compiler's own inliner keeps
+/// it one too.
+pub struct NoInline :: [OnCallable] { }
+
+/// A hint to the C compiler (09 A11): the function is rarely called — a path of errors, say.
+pub struct Cold :: [OnCallable] { }
+
+/// A value nobody should drop (09 A11): a call of a function marked so, or a call whose value is
+/// of a type marked so, warns where it stands as a statement and its value goes nowhere.
+pub struct MustUse :: [OnCallable, OnType] { }
+
+/// An enum or a `sealed` interface that may grow (09 A11): a `match` over it outside its package
+/// needs a `_` arm, so a new variant or conformer breaks nobody there.
+pub struct NonExhaustive :: [OnType, OnInterface] { }
+
+/// A warning not reported (09 A10): `@Allow("LYR-SEM0071")` on a declaration, or the module's
+/// head, silences that code inside it; an `@Allow` that silences nothing warns itself. The
+/// manifest's `[lints] allow` silences codes for the whole package.
+pub struct Allow :: [OnAny] {
+    pub code: string,
+}
 
 /// What a `using let` binding closes when its scope is left (design/v5/spec/05 E7 R1, 10 K1).
 /// `close()` may throw: on a normal exit the error leaves like any other, while one is in flight

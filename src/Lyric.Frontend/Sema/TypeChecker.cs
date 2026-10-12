@@ -9621,6 +9621,12 @@ public sealed class TypeChecker
             else
                 seen.Add(ts);
         }
+        // two hints that say opposite things (09 A11), which the C compiler would refuse
+        if (_comp.Lyric5Modules && _coreMembers is { } core
+            && seen.Any(t => ReferenceEquals(t, core.LookupLocal("AlwaysInline")))
+            && attributes.FirstOrDefault(a => ReferenceEquals(_result.RefOf(a), core.LookupLocal("NoInline"))) is { } noInline)
+            _de.Report("LYR-SEM0177", Severity.Error, noInline.PathSpan,
+                "'@NoInline' contradicts the '@AlwaysInline' beside it — a function takes one of the two hints");
         return seen;
     }
 
@@ -9829,7 +9835,9 @@ public sealed class TypeChecker
                 + $"or a marker whose set holds it ({string.Join(", ", admitting.Skip(1))}), to allow it here");
             return ts;
         }
-        if (targetIsGeneric)
+        // A compiler instruction says the same of every instance (13 M9a P8); data, and a test
+        // or benchmark — a root the runner cannot instantiate —, still may not
+        if (targetIsGeneric && !IsCompilerInstruction(ts))
             _de.Report("LYR-SEM0067", Severity.Error, attribute.PathSpan,
                 "an attribute cannot sit on a generic declaration — one value would stand for every instance");
 
@@ -10743,6 +10751,7 @@ public sealed class TypeChecker
         var pats = new List<Pattern>();
         foreach (var arm in arms)
             if (arm.Guard is null) Flatten(arm.Pattern, pats);
+        _nonExhaustive = null;
         var missing = set is not null ? MissingFromSet(set, pats, scrutinee) : MissingCases(scrutinee, pats);
         if (missing.Count == 0)
         {
@@ -10758,8 +10767,14 @@ public sealed class TypeChecker
             : missing is [var only]
                 ? $"no arm matches '{only}'"
                 : $"no arm matches {string.Join(", ", missing.Select(m => $"'{m}'"))}";
-        _de.Report("LYR-SEM0050", Severity.Error, match.Span,
-            $"match on '{TypeFacts.Display(scrutinee)}' is not exhaustive — {what}");
+        if (_nonExhaustive is { } open)
+            _de.Report("LYR-SEM0050", Severity.Error, match.Span,
+                $"match on '{TypeFacts.Display(scrutinee)}' is not exhaustive — {what}",
+                new DiagnosticNote($"'{open.Name}' is '@NonExhaustive': a later version of its package may add to it, "
+                                   + "so a match outside that package covers it with a '_' or binding arm"));
+        else
+            _de.Report("LYR-SEM0050", Severity.Error, match.Span,
+                $"match on '{TypeFacts.Display(scrutinee)}' is not exhaustive — {what}");
     }
 
     /// <summary>The set a catch binding carries (05 E2 K7), when the scrutinee is one: the binding
@@ -10834,12 +10849,15 @@ public sealed class TypeChecker
             case TupleOf tuple:
                 return MissingTupleCases(tuple, pats);
             default:
+                // '@NonExhaustive' (09 A11): outside the package that declares it, a later version
+                // may add one more — which only a default covers, as it covers an open type
                 if (EnumDefOf(type) is { Declaration: EnumDecl ed } enumTs)
-                    return MissingVariants(type, ed, enumTs, pats);
+                    return [.. MissingVariants(type, ed, enumTs, pats), .. ForeignNonExhaustive(enumTs, ed.Attributes)];
                 // A sealed interface's conformers are a closed set (04 D8): type patterns
                 // cover it; an open interface needs the default.
                 if (TypeFacts.SymbolOf(type) is { Kind: TypeSymbolKind.Interface } sealedIface && IsSealed(sealedIface))
-                    return MissingConformers(sealedIface, pats);
+                    return [.. MissingConformers(sealedIface, pats),
+                        .. ForeignNonExhaustive(sealedIface, ((InterfaceDecl)sealedIface.Declaration!).Attributes)];
                 return ["_"]; // an open type is coverable only by a default
         }
     }
@@ -10898,6 +10916,33 @@ public sealed class TypeChecker
         for (var i = 0; i < arity; i++) parts[i] = i == column ? missing : "_";
         return "(" + string.Join(", ", parts) + ")";
     }
+
+    /// <summary>
+    /// <c>["_"]</c> where <paramref name="ts"/> — an enum, a sealed interface — carries
+    /// <c>@NonExhaustive</c> of <c>std.core</c> (09 A11) and the match stands outside the package
+    /// that declares it; the type is named in <see cref="_nonExhaustive"/> for the diagnostic.
+    /// The attribute is read from the declaring module's scope: that module may be checked after
+    /// this match, and its attributes bound only then.
+    /// </summary>
+    private List<string> ForeignNonExhaustive(TypeSymbol ts, AttributeNode[] attributes)
+    {
+        if (!_comp.Lyric5Modules || attributes.Length == 0 || _currentModule is not { Path: [var here, ..] }
+            || _coreMembers?.LookupLocal("NonExhaustive") is not TypeSymbol marker
+            || _comp.Modules.FirstOrDefault(m => DeclaredInModule(ts, m)) is not { Path: [var package, ..] } declaring
+            || package == here)
+            return [];
+        Symbol? Named(AttributeNode a) => a.Path is [var name]
+            ? declaring.Members.Lookup(name)
+            : _comp.FindModule(a.Path[..^1])?.Members.LookupLocal(a.Path[^1]);
+        if (!attributes.Any(a => (_result.RefOf(a) ?? Named(a)) is var found
+                                 && ReferenceEquals(found is ImportBindingSymbol shell ? shell.Target : found, marker)))
+            return [];
+        _nonExhaustive = ts;
+        return ["_"];
+    }
+
+    /// <summary>The <c>@NonExhaustive</c> type the last coverage question left a default open for.</summary>
+    private TypeSymbol? _nonExhaustive;
 
     /// <summary>The variants no arm covers, each as a witness. A variant with one payload field
     /// is followed into that field, which is where a nested hole usually is.</summary>
@@ -13076,9 +13121,10 @@ public sealed class TypeChecker
             if (sym is not TypeSymbol ts || !ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("callerExpr")))
             {
                 // Lyric 5: a parameter carries what declares a marker for it (09 T7)
-                if (_comp.Lyric5Modules && sym is TypeSymbol)
+                if (_comp.Lyric5Modules && sym is TypeSymbol marked)
                 {
                     CheckAttribute5(attribute, AttributeSite.Parameter, fn.Generics.Length > 0, scope, "a parameter");
+                    if (CallerPlaceOf(marked) is { } place) CheckCallerPlace(attribute, p, type, place, written);
                     continue;
                 }
                 _de.Report(sym is null ? "LYR-SEM0011" : "LYR-SEM0065", Severity.Error, attribute.PathSpan,
@@ -13102,6 +13148,45 @@ public sealed class TypeChecker
             if (fault is not null)
                 _de.Report("LYR-SEM0155", Severity.Error, attribute.Span, $"'@callerExpr' {fault}");
         }
+    }
+
+    /// <summary>The compiler instructions of <c>std.core</c> beside <c>@Test</c>, <c>@Bench</c> and
+    /// <c>@callerExpr</c> (09 A11, the closed list of T2): what changes what the compiler does.</summary>
+    private static readonly string[] CompilerInstructions =
+        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow"];
+
+    /// <summary>Whether this is one of <see cref="CompilerInstructions"/>, by identity (09 T6).</summary>
+    private bool IsCompilerInstruction(TypeSymbol ts) =>
+        _coreMembers is { } core && CompilerInstructions.Any(name => ReferenceEquals(ts, core.LookupLocal(name)));
+
+    /// <summary><c>@callerLine</c> or <c>@callerFile</c> of <c>std.core</c>, by identity (09 A11).</summary>
+    private CallerPlace? CallerPlaceOf(TypeSymbol ts)
+    {
+        var core = _comp.FindModule(["std", "core"])?.Members;
+        if (ReferenceEquals(ts, core?.LookupLocal("callerLine"))) return CallerPlace.Line;
+        if (ReferenceEquals(ts, core?.LookupLocal("callerFile"))) return CallerPlace.File;
+        return null;
+    }
+
+    /// <summary>
+    /// <c>@callerLine</c> on an <c>int</c> parameter, <c>@callerFile</c> on a <c>string</c> one
+    /// (09 A11): where a call leaves the parameter out, it gets that of the call's place. Each with
+    /// a default, which a call that writes the argument keeps — the same rule as <c>@callerExpr</c>,
+    /// and the same code.
+    /// </summary>
+    private void CheckCallerPlace(AttributeNode attribute, Param p, LyrType type, CallerPlace place, string written)
+    {
+        var (wanted, what) = place == CallerPlace.Line ? (LyrType.Int, "an 'int' parameter: what it gives is a line number")
+            : (LyrType.String, "a 'string' parameter: what it gives is a path");
+        string? fault = null;
+        if (!LyrType.Equal(type, wanted))
+            fault = $"sits on {what}";
+        else if (p.Default is null)
+            fault = "sits on a parameter with a default, which a call that writes the argument keeps";
+        else
+            _result.BindCallerPlace(p, place);
+        if (fault is not null)
+            _de.Report("LYR-SEM0155", Severity.Error, attribute.Span, $"'@{written}' {fault}");
     }
 
     /// <summary>Whether this is THE <c>Test</c> attribute of <c>std.core</c> (09 A3): by identity —

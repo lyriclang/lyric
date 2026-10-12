@@ -74,8 +74,22 @@ public class IrFunction(string Name, IrType ReturnType, int ParamCount, List<IrL
     /// the debug profile reports when the coroutine is dropped without either (06 A5).</summary>
     public bool Cleanup { get; init; }
 
+    /// <summary>What the source asks of the C compiler for this function (design/v5/spec/09
+    /// A11): hints, no promises. <see cref="IrHints.NoInline"/> keeps the IR inliner away as well.</summary>
+    public IrHints Hints { get; init; }
+
     public List<IrBlock> Blocks { get; init; } = Blocks;
     public BlockId Entry { get; set; }
+}
+
+/// <summary><c>@AlwaysInline</c>, <c>@NoInline</c>, <c>@Cold</c> (09 A11) on a function.</summary>
+[Flags]
+public enum IrHints
+{
+    None = 0,
+    AlwaysInline = 1,
+    NoInline = 2,
+    Cold = 4,
 }
 
 /// <summary>A natively backed function: the signature is declared in Lyric, the implementation lives

@@ -110,6 +110,22 @@ public class ManifestTests
         Assert.Contains(why, e.Message);
     }
 
+    /// <summary><c>[lints] allow</c> (09 A10; M9a S6): warning codes, each once; a lint's name, and
+    /// the levels beside <c>allow</c>, come with M12.</summary>
+    [Fact]
+    public void A_manifest_allows_warnings_by_their_codes()
+    {
+        var m = Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[lints]\nallow = [\"LYR-SEM0071\", \"LYR-SEM0178\", \"LYR-SEM0071\"]\n"));
+        Assert.Equal(["LYR-SEM0071", "LYR-SEM0178"], m.LintAllow);
+        var named = Assert.Throws<ManifestException>(() =>
+            Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[lints]\nallow = [\"dead-code\"]\n")));
+        Assert.Equal("LYR-PKG0002", named.Code);
+        Assert.Contains("'dead-code' is no warning code", named.Message);
+        var single = Assert.Throws<ManifestException>(() =>
+            Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[lints]\nallow = \"LYR-SEM0071\"\n")));
+        Assert.Contains("allow is an array of warning codes", single.Message);
+    }
+
     [Theory]
     [InlineData("[lints]\ndeny = []", "comes with M12")]
     [InlineData("[workspace]\nmembers = []", "no part of a manifest")]

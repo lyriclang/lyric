@@ -978,6 +978,15 @@ M9b the maintainer is asked again.
   parenthesized form fills the one field without a default; Lyric 5 writes no attribute rows, and
   an attributed function is no root. Found on the way: the interpreter filled every global at the
   first read of one; each now fills alone. Spec 11 §1 rules 1, 4–6; four cases.
+- **S6** the compiler instructions (P8): `@callerLine` and `@callerFile` — the file as the binary's
+  backtrace names it, `app/src/main.lyr` —; `@Deprecated` read from its computed value after the
+  evaluation, its `replacement` a note, its `until` due against the claimed 5.0.0; `@AlwaysInline`,
+  `@NoInline` and `@Cold` as C attributes, `@NoInline` the IR inliner's too; `@MustUse` (on `Result`
+  and the free `spawn`); `@NonExhaustive` (on `IoErrorKind`), which a match outside the package
+  covers with `_`; `@Allow(code)` with `[lints] allow`, an `@Allow` that takes back nothing warning.
+  `SEM0067` falls for them. Found on the way: a call through an interface dropped its defaults,
+  names and variadic rest; the verifier now counts a `callvirt`'s arguments. Spec 11 §1 rules 2,
+  7–13, 09 §3 rule 5, 10 §2 rule 8, 12, 15 §1 rule 4; twenty-three cases.
 
 ## Design decisions
 

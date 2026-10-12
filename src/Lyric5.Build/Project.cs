@@ -69,6 +69,13 @@ public sealed record Project(string Source, string Name, string Module, string R
         : ModuleRoots is null ? Graph.SourceRoots
         : Graph.SourceRoots.Where(r => !ModuleRoots.ContainsKey(r.Key)).Concat(ModuleRoots).ToDictionary(r => r.Key, r => r.Value, StringComparer.Ordinal);
 
+    /// <summary>Each package's <c>[lints] allow</c> by name (09 A10): what its files do not report.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> AllowedCodes =>
+        Graph?.Packages.ToDictionary(p => p.Key, p => p.Value.LintAllow, StringComparer.Ordinal)
+        ?? (Manifest is { } own
+            ? new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal) { [Name] = own.LintAllow }
+            : new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal));
+
     /// <summary>What each package declares it imports from (07 P6) — a module space of a
     /// build script's own imports from none.</summary>
     public IReadOnlyDictionary<string, IReadOnlySet<string>> DeclaredDependencies =>

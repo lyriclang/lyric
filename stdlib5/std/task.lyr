@@ -214,7 +214,10 @@ pub class Task<T> {
 
 /// Starts `body` as a task of the running thread and gives its handle (06 T1): the task runs once
 /// the tasks ready before it had their turn, and `await()` on the handle gives its value or throws
-/// its error — `E`, what the body throws, the handle's type carries.
+/// its error — `E`, what the body throws, the handle's type carries. The handle is the only way to
+/// that error, so a call that drops it warns (09 A11); `spawnDetached` is the task nobody awaits,
+/// and a scope's `spawn` one its `close()` waits for.
+@MustUse
 pub fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
     return launch(body);
 }

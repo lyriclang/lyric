@@ -63,6 +63,11 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
         _diagnostics.Add(diagnostic);
     }
 
+    /// <summary>Takes back the warnings, notes and hints <paramref name="allowed"/> says yes to
+    /// (design/v5/spec/09 A10: <c>@Allow</c>, <c>[lints] allow</c>); an error stays.</summary>
+    public void Suppress(Func<Diagnostic, bool> allowed) =>
+        _diagnostics.RemoveAll(d => d.Severity != Severity.Error && allowed(d));
+
     private int _muted;
 
     /// <summary>

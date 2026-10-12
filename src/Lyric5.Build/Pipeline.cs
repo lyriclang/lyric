@@ -23,6 +23,12 @@ public static class Pipeline
     /// <summary>Where <c>lyric5</c> finds the seed of the Lyric 5 standard library: beside itself.</summary>
     public static string StdlibRoot => Path.Combine(AppContext.BaseDirectory, "stdlib5");
 
+    /// <summary>The version the toolchain claims — three numbers, no dev stamp —, which a
+    /// <c>@Deprecated</c>'s <c>until</c> comes due against (09 A11): it falls due on the branch
+    /// that raises the version, before the tag exists.</summary>
+    internal static string ClaimedVersion { get; } =
+        typeof(Pipeline).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "5.0.0";
+
     /// <summary>The front end and the gate on a project's source: the IR, or <c>null</c> after
     /// reporting. A profile that denies warnings (11 W2 P3) fails a compilation that warns. The IR
     /// optimizer — inlining, scalar replacement, devirtualization — runs where the profile
@@ -42,6 +48,10 @@ public static class Pipeline
             // manifest's budget (09 Q5)
             OverflowChecks = profile?.OverflowChecks ?? true,
             ComptimeBudget = project.Manifest?.ComptimeBudget ?? Lyric.Ir.Interp.ComptimeEvaluator.DefaultBudget,
+            // '@callerFile' names a source as the binary's backtrace does (09 A11, P6)
+            PlaceNames = Places(project),
+            ToolchainVersion = ClaimedVersion,
+            AllowedCodes = project.AllowedCodes,
         };
         var source = project.EntryText is { } text
             ? ScriptSource.FromText(project.Module, text)
@@ -190,7 +200,7 @@ public static class Pipeline
 
     /// <summary>Where the program's packages lie, and the name each is written as: the project's
     /// root first, then each package outside it.</summary>
-    private static List<(string From, string To)> Places(Project project)
+    internal static List<(string From, string To)> Places(Project project)
     {
         var places = new List<(string From, string To)> { (project.Root, project.Name) };
         if (project.Graph is { } graph)

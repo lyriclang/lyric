@@ -29,10 +29,14 @@ internal sealed class WarningAnalyzer
     private readonly Dictionary<FileId, HashSet<Symbol>> _usedByFile = [];
     private readonly HashSet<Symbol> _mutated = new(ReferenceEqualityComparer.Instance);
 
-    private readonly Dictionary<Node, (string Message, Span AttributeSpan)> _deprecatedDecls =
+    private readonly Dictionary<Node, Deprecation> _deprecatedDecls =
         new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<ModuleSymbol, (string Message, Span AttributeSpan)>
+    private readonly Dictionary<ModuleSymbol, Deprecation>
         _deprecatedModules = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>What a <c>@Deprecated</c> says: the message, what a use should become (09 A11),
+    /// and where it stands.</summary>
+    private readonly record struct Deprecation(string Message, string Replacement, Span AttributeSpan);
     private readonly List<(FileId File, Span Extent)> _deprecatedExtents = [];
 
     public WarningAnalyzer(Compilation comp, BindingResult binding, TypeResult types,
@@ -71,6 +75,7 @@ internal sealed class WarningAnalyzer
 
         WarnUnusedLocals();
         WarnNeverClosed();
+        if (_comp.Lyric5Modules) WarnMustUse();
         HintNeverReassigned();
         if (_comp.Lyric5Modules) WarnNamedVoid();
         WarnUnusedImports();
@@ -78,9 +83,32 @@ internal sealed class WarningAnalyzer
         if (_comp.Lyric5Modules) WarnMembersMoreVisibleThanTheirType();
         if (_comp.Lyric5Modules) WarnPreludeShadowing();
 
+        // Lyric 5 reads '@Deprecated' from its value, which the compiler computes after this
+        // (RunDeprecated); the 4.x tools from the literals the attribute writes
+        if (_comp.Lyric5Modules) return;
         CollectDeprecated();
         WarnDeprecatedUses();
     }
+
+    /// <summary>
+    /// <c>@Deprecated</c> in Lyric 5 (09 A11; 13 M9a P8): a pass of its own, after the compiler
+    /// has computed the attributes' values (11 §1 rule 5) — <paramref name="fieldsOf"/> gives the
+    /// string fields of one, by name. <c>until</c> is checked against
+    /// <paramref name="toolchain"/>, the version the toolchain claims.
+    /// </summary>
+    public void RunDeprecated(Func<AttributeNode, IReadOnlyDictionary<string, string>?> fieldsOf, string toolchain)
+    {
+        foreach (var module in _comp.Modules)
+            if (_comp.IsNative(module))
+                _nativeFiles.Add(_comp.AstOf(module).Span.File);
+        _fieldsOf = fieldsOf;
+        _toolchain = toolchain;
+        CollectDeprecated();
+        WarnDeprecatedUses();
+    }
+
+    private Func<AttributeNode, IReadOnlyDictionary<string, string>?>? _fieldsOf;
+    private string? _toolchain;
 
     /// <summary>
     /// A member whose word says more than its type's (design/v5/spec/07 V2 S3): <c>pub x</c> in an
@@ -281,11 +309,18 @@ internal sealed class WarningAnalyzer
                     StructDecl s => s.Attributes,
                     ClassDecl c => c.Attributes,
                     EnumDecl e => e.Attributes,
+                    // Lyric 5's (09 T7); the 4.x parser refuses attributes on these
+                    InterfaceDecl i => i.Attributes,
+                    TypeAliasDecl a => a.Attributes,
+                    GlobalBindingDecl g => g.Attributes,
+                    ExtendDecl x => x.Attributes,
                     _ => [],
                 };
-                if (FindDeprecated(attributes, canonical) is { } info)
+                var info = FindDeprecated(attributes, canonical);
+                if (info is { } found)
                 {
-                    _deprecatedDecls[decl] = info;
+                    // an 'extend' block is no name a use reaches: what it deprecates is its members
+                    if (decl is not ExtendDecl) _deprecatedDecls[decl] = found;
                     _deprecatedExtents.Add((decl.Span.File, decl.Span));
                 }
 
@@ -299,9 +334,12 @@ internal sealed class WarningAnalyzer
                         FunctionDecl mf => mf.Attributes,
                         StaticBindingDecl sb => sb.Attributes,
                         FieldDecl fd => fd.Attributes,
+                        EnumVariant v => v.Attributes,
+                        AssociatedTypeDecl t => t.Attributes,
                         _ => [],
                     };
-                    if (FindDeprecated(memberAttributes, canonical) is not { } memberInfo) continue;
+                    if ((FindDeprecated(memberAttributes, canonical) ?? (decl is ExtendDecl ? info : null))
+                        is not { } memberInfo) continue;
                     _deprecatedDecls[member] = memberInfo;
                     _deprecatedExtents.Add((member.Span.File, member.Span));
                 }
@@ -309,39 +347,38 @@ internal sealed class WarningAnalyzer
         }
     }
 
-    private static IEnumerable<Decl> MembersOf(Decl decl) => decl switch
+    private static IEnumerable<Node> MembersOf(Decl decl) => decl switch
     {
         StructDecl s => s.Members,
         ClassDecl c => c.Members,
-        EnumDecl e => e.Methods.Cast<Decl>().Concat(e.Statics),
-        ExtendDecl x => x.Methods,
+        EnumDecl e => e.Variants.Cast<Node>().Concat(e.Methods).Concat(e.Statics),
+        ExtendDecl x => x.Methods.Cast<Node>().Concat(x.Statics),
         // Since 2.15. A use that resolves to the interface's member warns; an IMPLEMENTATION
         // does not, because it is not a use and a conforming type has no choice about it.
-        InterfaceDecl i => i.Members,
+        InterfaceDecl i => i.Members.Cast<Node>().Concat(i.Statics).Concat(i.Types),
         _ => [],
     };
 
-    private (string Message, Span AttributeSpan)? FindDeprecated(
-        AttributeNode[] attributes, TypeSymbol canonical)
+    private Deprecation? FindDeprecated(AttributeNode[] attributes, TypeSymbol canonical)
     {
         foreach (var attribute in attributes)
         {
             if (!ReferenceEquals(_types.RefOf(attribute), canonical)) continue;
 
-            // Two string fields, both defaulting to "". Reading the defaults from the struct
-            // declaration would be the general form; two fields do not need it.
-            var written = attribute.Fields.FirstOrDefault(f => f.Name == "message");
-            var message = written?.Value is StringLiteralExpr s ? s.Value : "";
+            // Lyric 5: the value the compiler computed (11 §1 rule 5). The 4.x tools: the string
+            // literals written, each field defaulting to "" — reading the defaults from the struct
+            // declaration would be the general form; strings alone do not need it.
+            string Field(string name) => _fieldsOf is not null
+                ? _fieldsOf(attribute)?.GetValueOrDefault(name) ?? ""
+                : attribute.Fields.FirstOrDefault(f => f.Name == name)?.Value is StringLiteralExpr s ? s.Value : "";
 
             // The promise is checked HERE, at the declaration, and not where anything uses this:
             // a form kept past its date is wrong whether or not anyone still calls it, and the
             // build that has to fail is the one preparing the release that was supposed to
             // remove it.
-            var until = attribute.Fields.FirstOrDefault(f => f.Name == "until");
-            if (until?.Value is StringLiteralExpr promise)
-                DeprecationPromise.Check(promise.Value, attribute.Span, _de);
+            DeprecationPromise.Check(Field("until"), attribute.Span, _de, _toolchain);
 
-            return (message, attribute.Span);
+            return new Deprecation(Field("message"), Field("replacement"), attribute.Span);
         }
         return null;
     }
@@ -373,8 +410,7 @@ internal sealed class WarningAnalyzer
                     if (!reported.Add(node)) continue;
 
                     _de.Report("LYR-SEM0076", Severity.Warning, node.Span,
-                        DeprecationMessage($"'{target.Name}'", info.Message),
-                        new DiagnosticNote(info.AttributeSpan, "declared deprecated here"));
+                        DeprecationMessage($"'{target.Name}'", info.Message), Notes(info));
                 }
         }
 
@@ -390,11 +426,16 @@ internal sealed class WarningAnalyzer
                 if (InsideDeprecated(import.Span)) continue;
 
                 _de.Report("LYR-SEM0076", Severity.Warning, import.Span,
-                    DeprecationMessage($"module '{imported.FullName}'", info.Message),
-                    new DiagnosticNote(info.AttributeSpan, "declared deprecated here"));
+                    DeprecationMessage($"module '{imported.FullName}'", info.Message), Notes(info));
             }
         }
     }
+
+    /// <summary>Where the attribute stands, and what to write instead where it says (09 A11).</summary>
+    private static DiagnosticNote[] Notes(Deprecation info) => info.Replacement.Length == 0
+        ? [new DiagnosticNote(info.AttributeSpan, "declared deprecated here")]
+        : [new DiagnosticNote(info.AttributeSpan, "declared deprecated here"),
+           new DiagnosticNote($"write '{info.Replacement}' instead")];
 
     private static string DeprecationMessage(string what, string message) =>
         message.Length == 0 ? $"{what} is deprecated" : $"{what} is deprecated: {message}";
@@ -512,6 +553,50 @@ internal sealed class WarningAnalyzer
                 _de.Report("LYR-SEM0144", Severity.Warning, binding.NameSpan,
                     $"'{binding.Name}' is a '{TypeFacts.Display(((LocalSymbol)local).Type)}' that is never closed — "
                     + "'using let' closes it when the scope is left");
+    }
+
+    /// <summary>
+    /// A value <c>@MustUse</c> asks for, dropped (design/v5/spec/09 A11): an expression statement
+    /// whose call is of a function that carries it — <c>std.task.spawn</c>, whose handle is the
+    /// only way to the task's error — or gives a value of a type that does — <c>Result</c>. A
+    /// <c>void</c> call gives nothing to use; <c>let _ = …</c> drops a value on purpose.
+    /// </summary>
+    private void WarnMustUse()
+    {
+        if (_comp.FindModule(["std", "core"])?.Members.LookupLocal("MustUse") is not TypeSymbol mustUse) return;
+        bool Marked(Node? declaration) => (declaration switch
+        {
+            FunctionDecl f => f.Attributes,
+            StructDecl s => s.Attributes,
+            ClassDecl c => c.Attributes,
+            EnumDecl e => e.Attributes,
+            InterfaceDecl i => i.Attributes,
+            _ => [],
+        }).Any(a => ReferenceEquals(_types.RefOf(a), mustUse));
+
+        void Visit(Node node)
+        {
+            if (node is ExprStmt es && TypeChecker.Unmarked(es.Expr) is CallExpr call
+                && _types.TypeOf(call) is var type && !TypeFacts.IsVoid(type) && type is not ErrorType)
+            {
+                var callee = _types.RefOf(call.Callee) is ImportBindingSymbol shell ? shell.Target : _types.RefOf(call.Callee);
+                if (callee is FunctionSymbol { Declaration: var declared } function && Marked(declared))
+                    _de.Report("LYR-SEM0178", Severity.Warning, call.Span,
+                        $"the value of '{function.Name}' is dropped, and '{function.Name}' is '@MustUse' — "
+                        + "use it, or drop it on purpose with 'let _ = …'");
+                else if (TypeFacts.SymbolOf(type) is { Declaration: var typed } && Marked(typed))
+                    _de.Report("LYR-SEM0178", Severity.Warning, call.Span,
+                        $"a '{TypeFacts.Display(type)}' is dropped here, and its type is '@MustUse' — "
+                        + "use it, or drop it on purpose with 'let _ = …'");
+            }
+            foreach (var child in AstChildren.Of(node)) Visit(child);
+        }
+
+        foreach (var module in _comp.Modules)
+        {
+            if (_comp.IsNative(module)) continue;
+            foreach (var decl in _comp.AstOf(module).Declarations) Visit(decl);
+        }
     }
 
     /// <summary>

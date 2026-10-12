@@ -1375,6 +1375,17 @@ public static class IrVerifier
             return;
         }
 
+        // The slot's arity is its functions' — every row agrees, conformance saw to that, and the
+        // C table's type is read off the first. A call with fewer arguments is C's "too few
+        // arguments" in debug, where nothing inlines it into a direct call this verifier checks:
+        // an interface call once left a default out that way (M9a S6).
+        var row = _module.Impls.FindIndex(r => r.Interface == c.Interface);
+        if (row >= 0 && _module.Impls[row].Methods is { } methods && c.Slot < methods.Length
+            && methods[c.Slot].Value is var target and >= 0 && target < _module.Functions.Count
+            && _module.Functions[target].ParamCount is var taken && taken != c.Args.Length)
+            Report(block, index, $"callvirt to slot {N(c.Slot)} ({iface.MethodSlots[c.Slot]}) passes " +
+                                 $"{N(c.Args.Length)} arg(s) with the receiver, its functions take {N(taken)}");
+
         if (c.Dest is { } dest) RequireDestType(dest, c.ReturnType, "callvirt", block, index);
     }
 

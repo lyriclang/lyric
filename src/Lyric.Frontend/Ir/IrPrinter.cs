@@ -125,7 +125,7 @@ public static class IrPrinter
     // --- structure ---
     private static void WriteFunction(StringBuilder sb, IrFunction func, CallContext ctx)
     {
-        sb.Append($"fn {func.Name} -> {TypeStr(func.ReturnType)}{(func.Throws ? " throws" : "")} {{\n");
+        sb.Append($"fn {func.Name} -> {TypeStr(func.ReturnType)}{(func.Throws ? " throws" : "")}{Hints(func.Hints)} {{\n");
         sb.Append($"  params: {func.ParamCount.ToString(CultureInfo.InvariantCulture)}\n");
         sb.Append("  locals:\n");
         foreach (var loc in func.Locals)
@@ -268,6 +268,13 @@ public static class IrPrinter
     };
 
     // --- formatting helpers ---
+
+    /// <summary>The C compiler's hints (09 A11), as ' [alwaysinline noinline cold]'; nothing
+    /// without one.</summary>
+    private static string Hints(IrHints hints) => hints == IrHints.None ? "" :
+        " [" + string.Join(' ', new[] { (IrHints.AlwaysInline, "alwaysinline"), (IrHints.NoInline, "noinline"), (IrHints.Cold, "cold") }
+            .Where(h => hints.HasFlag(h.Item1)).Select(h => h.Item2)) + "]";
+
     // Internal: the ImportTable keys per-signature imports by this display, so the one type
     // spelling stays the one there is.
     internal static string TypeStr(IrType t) => t switch
