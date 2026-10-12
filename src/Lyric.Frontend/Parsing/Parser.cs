@@ -348,7 +348,15 @@ public sealed partial class Parser
             var value = ParsePrefix();
             return new ThrowExpr(value, Span.Union(kw.Span, Whole(value)));
         }
-        // 'comptime e': contextual, a prefix in shape. It opens the prefix only when what
+        // 'comptime e' and 'comptime { … }' (design/v5/spec/09 Q2): a word in Lyric 5, whose
+        // block is a value block — its last expression the value.
+        if (_buffer.Check(TokenKind.Comptime))
+        {
+            var kw = _buffer.Advance();
+            Expr inner = _buffer.Check(TokenKind.LBrace) ? ParseValueBlock() : ParsePrefix();
+            return new ComptimeExpr(inner, Span.Union(kw.Span, Whole(inner)));
+        }
+        // 4.x's 'comptime e': contextual, a prefix in shape. It opens the prefix only when what
         // follows can begin an expression, so an identifier 'comptime' before an operator, a
         // comma or a closing bracket is still the name.
         if (AtContextual("comptime") && BeginsExpression(_buffer.Peek(1).TokenKind))

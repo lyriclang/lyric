@@ -196,4 +196,54 @@ public class ComptimeTests
         Assert.Contains("error[LYR-SEM0100]: a 'comptime' expression has to produce a value the compiled module can hold as a literal", error);
         Assert.Contains(why, error);
     }
+
+    private const string Forms = Head + "let big = true;\n\nfn names(): string[] {\n    return [\"a\", \"b\", \"c\"];\n}\n\n"
+        + "fn onlyWhenSmall(): string {\n    return \"small\";\n}\n\n"
+        + "fn main(): void {\n"
+        + "    let x = comptime {\n        let a = 3;\n        a * 2\n    };\n    println(f\"{x}\");\n"
+        + "    comptime if (big) {\n        println(\"big\");\n    } else if (!big) {\n        println(\"huge\");\n    } else {\n        println(onlyWhenSmall());\n    }\n"
+        + "    comptime for (n in names()) {\n        if (n == \"b\") {\n            continue;\n        }\n        println(n);\n    }\n"
+        + "    var total = 0;\n"
+        + "    comptime for (k in [1, 2, 3, 4]) {\n        if (k == 3) {\n            break;\n        }\n        total += k;\n    }\n    println(f\"{total}\");\n"
+        + "    let s = comptime {\n        let xs = [1, 2, 3];\n        var t = 0;\n        for (v in xs) {\n            t += v;\n        }\n"
+        + "        xs.iter().map((v: int) => v * t).fold(0, (a: int, b: int) => a + b)\n    };\n    println(f\"{s}\");\n}\n";
+
+    /// <summary>The forms (09 Q2; 13 M9a S3): a block whose last expression is the value, with
+    /// locals, a loop and a lambda of its own; <c>comptime if</c> with its <c>else if</c> chain,
+    /// whose other branches are checked and not lowered — <c>onlyWhenSmall</c> is no part of the
+    /// module; <c>comptime for</c> unrolled over an array a site computed — <c>names</c> is gone
+    /// too —, a round's <c>continue</c> the next round, a <c>break</c> past the last.</summary>
+    [Fact]
+    public void The_forms_compute_choose_and_unroll()
+    {
+        var lowered = TestCompiler.Lower("main.lyr", Forms);
+        Assert.True(lowered.Ok);
+        Assert.DoesNotContain(lowered.Ir!.Functions, f => f.Name is "app.main.onlyWhenSmall" or "app.main.names");
+
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", Forms));
+        Assert.Equal("6\nbig\na\nc\n3\n36\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    /// <summary>What the forms refuse: a site uses no local of the enclosing function and assigns
+    /// no module's variable; a branch <c>comptime if</c> does not take is checked all the same;
+    /// <c>comptime for</c> walks an array and binds a name; <c>comptime if</c> takes no
+    /// <c>let</c>. The four words are Lyric 5's (08 Y1): no name.</summary>
+    [Theory]
+    [InlineData("let local = 3;\n    let _ = comptime {\n        local + 1\n    };", "LYR-SEM0100", "'local' is a local of the enclosing function")]
+    [InlineData("let _ = comptime {\n        counter = 5;\n        1\n    };", "LYR-SEM0100", "assigns only to what it binds itself")]
+    [InlineData("comptime if (false) {\n        let wrong: int = \"s\";\n    }", "LYR-SEM0001", "cannot assign 'string' to 'int'")]
+    [InlineData("comptime for (c in \"abc\") {\n    }", "LYR-SEM0100", "walks an array its site computes — this one is 'string'")]
+    [InlineData("comptime for ((a, b) in [(1, 2)]) {\n    }", "LYR-SEM0100", "binds the element to a name")]
+    [InlineData("comptime if (let x = maybe()) {\n    }", "LYR-SEM0100", "a 'let' condition binds a value of the run")]
+    [InlineData("let inline = 3;", "LYR-PAR0020", "'inline' is a keyword")]
+    [InlineData("let quote = 3;", "LYR-PAR0020", "'quote' is a keyword")]
+    [InlineData("let macro = 3;", "LYR-PAR0020", "'macro' is a keyword")]
+    [InlineData("let comptime = 3;", "LYR-PAR0020", "'comptime' is a keyword")]
+    public void The_forms_refuse(string statement, string code, string why)
+    {
+        var errors = Errors("var counter = 0;\n\nfn maybe(): ?int {\n    return null;\n}\n\nfn main(): void {\n    " + statement + "\n}\n");
+        Assert.Single(errors, l => l.Contains($"error[{code}]"));
+        Assert.Single(errors, l => l.Contains("error["));
+        Assert.Contains(why, string.Join("\n", errors));
+    }
 }

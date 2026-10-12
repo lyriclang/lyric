@@ -110,7 +110,7 @@ LYR_NOINLINE void lyr_app_main_main(void);
 LyrStr * lyr_app_main_ParseError_message(lyr_ty_app_main_ParseError *l0_this);
 LyrStr * lyr_app_main_Disk_message(lyr_ty_app_main_Disk *l0_this);
 LyrStr * lyr_app_main_Timeout_message(lyr_ty_app_main_Timeout *l0_this);
-void lyr_std_core_escapeTo(lyr_ty_std_core_StringBuilder *l0_out, uint32_t l1_c, uint32_t l2_quote);
+void lyr_std_core_escapeTo(lyr_ty_std_core_StringBuilder *l0_out, uint32_t l1_c, uint32_t l2_mark);
 uint8_t lyr_std_core_printsAsItself(uint32_t l0_c);
 uint32_t lyr_std_core_charAtByte(lyr_slice_u8 l0_v, int64_t l1_i);
 lyr_ty_std_core_StringBuilder * lyr_std_core_fstringStart(int64_t l0_room);
@@ -974,7 +974,7 @@ bb0:;
 }
 
 #line 1179 "stdlib5/std/core.lyr"
-void lyr_std_core_escapeTo(lyr_ty_std_core_StringBuilder *l0_out, uint32_t l1_c, uint32_t l2_quote) {
+void lyr_std_core_escapeTo(lyr_ty_std_core_StringBuilder *l0_out, uint32_t l1_c, uint32_t l2_mark) {
     uint32_t l3_n = 0;
     uint8_t l4__or0 = 0;
     LyrStr *l5_digits = NULL;
@@ -1084,7 +1084,7 @@ bb0:;
 #line 1180
     t2 = l1_c;
 #line 1180
-    t3 = l2_quote;
+    t3 = l2_mark;
 #line 1180
     t4 = (uint8_t)(t2 == t3);
 #line 1180

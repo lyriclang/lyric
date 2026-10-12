@@ -2981,6 +2981,17 @@ public sealed class TypeChecker
                 + "to catch what they throw, put the loop in a 'try { … }' block");
             iterType = LyrType.Error;
         }
+        // 'comptime for' (09 Q2): over an array a site computes, its body unrolled per element —
+        // a name for the element, which each round binds to a value of its own (M9a S3)
+        if (fo.Comptime && !iterType.IsError)
+        {
+            if (fo.Pattern is not null)
+                _de.Report("LYR-SEM0100", Severity.Error, fo.Iterable.Span,
+                    "a 'comptime for' binds the element to a name — take it apart in the body");
+            else if (iterType is not (ArrayOf or InlineArrayOf))
+                _de.Report("LYR-SEM0100", Severity.Error, fo.Iterable.Span,
+                    $"a 'comptime for' walks an array its site computes — this one is '{TypeFacts.Display(iterType)}'");
+        }
         // Lyric 5 (10 B6 I2): anything but a range literal — the counted loop — and the shapes the
         // compiler walks itself goes through the protocol.
         var protocol = _coreIterable is not null
@@ -3649,6 +3660,10 @@ public sealed class TypeChecker
     // 'if (x == null) { return; }' narrows x afterwards through the early exit.
     private void CheckIf(IfStmt f, SymbolTable scope)
     {
+        // 'comptime if' (09 Q2) chooses by a bool computed while compiling
+        if (f.Comptime && f.Condition is LetCondExpr refused)
+            _de.Report("LYR-SEM0100", Severity.Error, refused.Span,
+                "a 'comptime if' chooses by a bool computed while compiling — a 'let' condition binds a value of the run");
         if (f.Condition is LetCondExpr letCond) { CheckIfLet(f, letCond, scope); return; }
 
         CheckCondition(f.Condition, scope);
@@ -11507,6 +11522,11 @@ public sealed class TypeChecker
                 + "a scalar, a string, or an array, a struct, an enum, a tuple, an optional or a 'Box' of such — "
                 + $"and this one is '{TypeFacts.Display(type)}': {why}");
 
+        // What the site binds itself — the locals of its block, a lambda's parameters, a loop's
+        // variable — it may use and assign (09 Q2, M9a S3); what the enclosing function binds has
+        // no frame at compile time, and a module's 'var' is the run's, not the build's.
+        bool Own(Symbol symbol) =>
+            symbol.Declaration is { } d && d.Span.File == ct.Inner.Span.File && ct.Inner.Span.Contains(d.Span.Start);
         var pure = true;
         void Walk(Node? node)
         {
@@ -11518,18 +11538,15 @@ public sealed class TypeChecker
                     Report(t.Span, "LYR-SEM0100", "'this' cannot be used in a 'comptime' expression — "
                         + "it is evaluated before any receiver exists");
                     return;
-                case IdentifierExpr id when _result.RefOf(id) is LocalSymbol or ParameterSymbol:
+                case IdentifierExpr id when _result.RefOf(id) is (LocalSymbol or ParameterSymbol) and var local && !Own(local):
                     pure = false;
                     Report(id.Span, "LYR-SEM0100", $"'{id.Name}' is a local of the enclosing function and "
-                        + "cannot be used in a 'comptime' expression — only module-level names can");
+                        + "cannot be used in a 'comptime' expression — only module-level names and its own can");
                     return;
-                case LambdaExpr lam:
+                case AssignExpr a when !(RootOf(a.Target) is { } root && _result.RefOf(root) is LocalSymbol own && Own(own)):
                     pure = false;
-                    Report(lam.Span, "LYR-SEM0100", "a lambda cannot be used in a 'comptime' expression");
-                    return;
-                case AssignExpr a:
-                    pure = false;
-                    Report(a.Span, "LYR-SEM0100", "an assignment cannot be used in a 'comptime' expression");
+                    Report(a.Span, "LYR-SEM0100", "a 'comptime' expression assigns only to what it binds itself — "
+                        + "a module's variable belongs to the run, not to the build");
                     return;
                 default:
                     foreach (var child in AstChildren.Of(node)) Walk(child);
@@ -11543,6 +11560,15 @@ public sealed class TypeChecker
         if (pure && !_result.ComptimeSites.Contains(ct)) _result.ComptimeSites.Add(ct);
         return type;
     }
+
+    /// <summary>The name a place is reached through: <c>t</c> of <c>t[i].x</c>.</summary>
+    private static IdentifierExpr? RootOf(Expr place) => place switch
+    {
+        IdentifierExpr id => id,
+        IndexExpr i => RootOf(i.Target),
+        MemberExpr m => RootOf(m.Target),
+        _ => null,
+    };
 
     /// <summary>
     /// Why a value of <paramref name="type"/> is no literal a <c>comptime</c> site can leave
