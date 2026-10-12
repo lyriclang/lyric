@@ -51,6 +51,9 @@ pub import std.core {
     MustUse,
     NonExhaustive,
     Allow,
-    sequence
+    When,
+    sequence,
+    target,
+    profile
 };
 pub import std.collections { List, Map, Set };

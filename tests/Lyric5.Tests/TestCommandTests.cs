@@ -72,6 +72,21 @@ public class TestCommandTests
         Assert.EndsWith("4 tests: 3 passed, 0 failed, 1 skipped\n", output);
     }
 
+    /// <summary>A test a <c>@When</c> leaves out is no test of this build (design/v5/spec/09 B2): not
+    /// counted, not run — on the function, or on its module's header.</summary>
+    [Fact]
+    public void A_test_the_build_leaves_out_is_none()
+    {
+        var dir = App(("tests/narrow.lyr",
+                "@When(target.pointerWidth == 16)\n@Test\nfn narrowOnly(): void {\n    panic(\"ran\");\n}\n"),
+            ("tests/sixteen.lyr",
+                "@When(target.pointerWidth == 16)\nmodule;\n\n@Test\nfn sixteenOnly(): void {\n    panic(\"ran\");\n}\n"));
+        var (exit, output, error) = Run("test", "-C", dir);
+        Assert.True(exit == 0, output + error);
+        Assert.Equal("ok    app.math.twiceDoubles\nok    app.tests.arith.addsTwo\nok    app.tests.arith.holds\n\n"
+                     + "3 tests: 3 passed, 0 failed, 0 skipped\n", output);
+    }
+
     [Fact]
     public void The_filter_runs_the_tests_whose_name_holds_it()
     {

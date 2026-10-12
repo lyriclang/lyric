@@ -30,7 +30,7 @@ public sealed class Interpreter
     /// <param name="overflowChecks">The profile's setting (07 P3): a checked operation panics
     /// where the binary would, and wraps where it would.</param>
     /// <param name="embed">What <c>embed</c> reads files through (09 Q4); without one it reads none.</param>
-    public Interpreter(IrModule module, long budget, bool overflowChecks, EmbedReader? embed = null)
+    public Interpreter(IrModule module, long budget, bool overflowChecks, EmbedReader? embed = null, BuildFacts? build = null)
     {
         _module = module;
         _budgetLimit = budget;
@@ -45,7 +45,7 @@ public sealed class Interpreter
             if (module.Functions[i].Name.StartsWith("<global:", StringComparison.Ordinal)
                 && int.TryParse(module.Functions[i].Name.AsSpan(8, module.Functions[i].Name.Length - 9), out var slot))
                 _globalInits[slot] = new FunctionId(i);
-        _natives = new Natives(this) { Embed = embed };
+        _natives = new Natives(this) { Embed = embed, Facts = build ?? BuildFacts.Host };
     }
 
     public IrModule Module => _module;

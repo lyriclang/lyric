@@ -242,7 +242,8 @@ public sealed class Compilation
     public ModuleSymbol AddModule(Module ast, string? name = null, bool isNative = false,
         DocumentationTable? documentation = null)
     {
-        if (Lyric5Modules && ast.Header is { } header)
+        // a header that names nothing is Lyric 5's: where the module's attributes stand (09 T7)
+        if (Lyric5Modules && ast.Header is { Segments.Length: > 0 } header)
             _de.Report("LYR-RES0008", Severity.Error, header.Span,
                 "a module is named by its path: the 'module' header is gone (07 M2)");
 

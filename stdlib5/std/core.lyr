@@ -5983,3 +5983,102 @@ extend<Y, R> Coroutine<Y, R> :: [Identity] {
         hashIdentityInto(this, &h);
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// The build's target and profile (design/v5/spec/09 A6 B4, Q7; 11 W2 P11; 13 M9a P9): constants
+// the compiler writes — a cross-build's target, not the host's —, which `comptime if` and `@When`
+// choose by while compiling. `std.os` passes the two kinds on and answers them at run time (10 Q9).
+// ---------------------------------------------------------------------------------------------
+
+/// The system a program runs on (10 Q9), as the target triples name it: one of the Tier 1
+/// targets', `Other` for another POSIX system the runtime was built for.
+pub enum Platform :: [Equatable, Debug] {
+    Linux,
+    MacOS,
+    Windows,
+    Other,
+}
+
+extend Platform :: [Display] {
+    fn show(): string {
+        return match (this) {
+            .Linux => "linux",
+            .MacOS => "macos",
+            .Windows => "windows",
+            .Other => "other",
+        };
+    }
+}
+
+/// The machine a program runs on (10 Q9), as the target triples name it.
+pub enum Arch :: [Equatable, Debug] {
+    X86_64,
+    Aarch64,
+    Other,
+}
+
+extend Arch :: [Display] {
+    fn show(): string {
+        return match (this) {
+            .X86_64 => "x86_64",
+            .Aarch64 => "aarch64",
+            .Other => "other",
+        };
+    }
+}
+
+/// What a program is built for (09 B4): its system, its machine, the width of a pointer in bits.
+pub struct Target :: [Equatable, Debug] {
+    pub os: Platform,
+    pub arch: Arch,
+    pub pointerWidth: int,
+}
+
+/// What a program is built as (09 B4): `debug` where the profile is the built-in `debug` or one
+/// that inherits from it (11 W2 P3).
+pub struct Profile :: [Equatable, Debug] {
+    pub debug: bool,
+}
+
+/// The target of the build: `comptime if (target.os == .Windows)` chooses while compiling (09 B1).
+/// A constant; a program that does not read it carries nothing of it.
+pub let target: Target = comptime Target {
+    os = platformOf(buildOs()),
+    arch = archOf(buildArch()),
+    pointerWidth = buildPointerWidth(),
+};
+
+/// The profile of the build: `comptime if (profile.debug)`.
+pub let profile: Profile = comptime Profile { debug = buildDebug() };
+
+/// `@When(cond)` (09 A11 B2, B3): the declaration is built only where `cond` holds — a value
+/// computed while compiling, over `target` and `profile`. Where it does not, the declaration is
+/// checked as every other, and nothing of it is built; a use the program would run is refused
+/// (`LYR-CT0006`), one in the branch a `comptime if` does not take is none. On a module's header
+/// it holds for all the module declares: one module per system.
+pub struct When :: [OnTopLevel, OnModule] {
+    pub cond: bool,
+}
+
+fn platformOf(code: int): Platform {
+    return match (code) {
+        1 => .Linux,
+        2 => .MacOS,
+        3 => .Windows,
+        _ => .Other,
+    };
+}
+
+fn archOf(code: int): Arch {
+    return match (code) {
+        1 => .X86_64,
+        2 => .Aarch64,
+        _ => .Other,
+    };
+}
+
+// What the build is for and as: compile time answers them, nothing at run time asks.
+fn buildOs(): int;
+fn buildArch(): int;
+fn buildPointerWidth(): int;
+fn buildDebug(): bool;

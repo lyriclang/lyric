@@ -40,7 +40,9 @@ internal sealed class GlobalTable
     /// Collects all globals of a compilation. Runs BEFORE the function lowering: a function body may
     /// read a global that stands later in the source.
     /// </summary>
-    public void Collect(Compilation compilation, TypeResult types, TypeTable typeTable)
+    /// <param name="built">Whether the build makes a declaration (09 B2): a binding it leaves out has
+    /// no slot and no initializer.</param>
+    public void Collect(Compilation compilation, TypeResult types, TypeTable typeTable, Func<Decl, bool>? built = null)
     {
         foreach (var module in compilation.InitializationOrder())
         {
@@ -50,6 +52,7 @@ internal sealed class GlobalTable
 
             foreach (var decl in compilation.AstOf(module).Declarations)
             {
+                if (built is not null && !built(decl)) continue;
                 switch (decl)
                 {
                     case GlobalBindingDecl global
@@ -209,7 +212,7 @@ internal sealed class GlobalTable
 
     /// <summary>
     /// An initializer that only gives its value (01 B13): a literal, <c>null</c>, another global
-    /// read, or an array, a tuple, a struct or a class built of such — the type's field defaults
+    /// read, a <c>comptime</c> site, or an array, a tuple, a struct or a class built of such — the type's field defaults
     /// included. Nothing that calls or computes: an operator may panic, a call may do anything.
     /// </summary>
     private static bool EffectFree(Expr? e, TypeResult types, int depth)
@@ -221,6 +224,10 @@ internal sealed class GlobalTable
                 or NullLiteralExpr:
                 return true;
             case UnaryExpr { Operator: UnaryOp.Neg, Operand: IntLiteralExpr or FloatLiteralExpr }:
+                return true;
+            // a constant the compiler computed (09 A4): what runs is its construction — in Lyric 5;
+            // the 4.x tools lower a site as its inner expression, effects and all
+            case ComptimeExpr when types.Lyric5Modules:
                 return true;
             case IdentifierExpr id:
                 var bound = types.RefOf(id);

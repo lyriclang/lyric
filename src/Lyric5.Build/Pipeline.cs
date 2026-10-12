@@ -23,6 +23,17 @@ public static class Pipeline
     /// <summary>Where <c>lyric5</c> finds the seed of the Lyric 5 standard library: beside itself.</summary>
     public static string StdlibRoot => Path.Combine(AppContext.BaseDirectory, "stdlib5");
 
+    /// <summary>A target and a profile as the compile-time interpreter answers them (09 B4): a
+    /// profile is a debug one where it descends from the built-in <c>debug</c>, as the default does.</summary>
+    internal static Lyric.Ir.Interp.BuildFacts FactsOf(Target target, BuildProfile? profile) =>
+        Lyric.Ir.Interp.BuildFacts.Of(target.Os switch
+        {
+            TargetOs.Linux => "linux",
+            TargetOs.MacOs => "macos",
+            TargetOs.Windows => "windows",
+            _ => "other",
+        }, target.Arch, (profile?.Base ?? Lyric5.Toolchain.Profile.Debug) == Lyric5.Toolchain.Profile.Debug);
+
     /// <summary>The version the toolchain claims — three numbers, no dev stamp —, which a
     /// <c>@Deprecated</c>'s <c>until</c> comes due against (09 A11): it falls due on the branch
     /// that raises the version, before the tag exists.</summary>
@@ -34,7 +45,7 @@ public static class Pipeline
     /// optimizer — inlining, scalar replacement, devirtualization — runs where the profile
     /// optimizes C at <c>-O2</c> and above (design/v5/spec/01 B10): release, and a profile of the
     /// manifest's that asks as much; debug and the sanitizers' profiles see the code as written.</summary>
-    public static CompileResult? Compile(Project project, TextWriter error, BuildProfile? profile = null)
+    public static CompileResult? Compile(Project project, TextWriter error, BuildProfile? profile = null, Target? target = null)
     {
         // A package's modules by their paths, a single file with std alone (07 M1, 11 C8).
         var options = new CompilerOptions
@@ -52,6 +63,8 @@ public static class Pipeline
             PlaceNames = Places(project),
             ToolchainVersion = ClaimedVersion,
             AllowedCodes = project.AllowedCodes,
+            // what 'target' and 'profile' hold: the build's, a cross-build's target (09 B4)
+            Build = FactsOf(target ?? Target.Host, profile),
         };
         var source = project.EntryText is { } text
             ? ScriptSource.FromText(project.Module, text)
@@ -66,7 +79,8 @@ public static class Pipeline
 
     /// <summary><c>--emit ir</c> and <c>--emit c</c>: the text on <c>output</c>, the C as the
     /// profile has it emitted.</summary>
-    public static int Emit(Project project, string what, TextWriter output, TextWriter error, BuildProfile? profile = null)
+    public static int Emit(Project project, string what, TextWriter output, TextWriter error, BuildProfile? profile = null,
+        Target? target = null)
     {
         // the scripts first, for gen/ (11 W3 BS4); their C is the build's, not the emission's
         if (CCompiler.Locate() is { } compiler)
@@ -75,7 +89,7 @@ public static class Pipeline
                 ScriptVersion, error);
             if (ran != 0) return ran;
         }
-        var result = Compile(project, error, profile);
+        var result = Compile(project, error, profile, target);
         if (result is null) return 1;
         output.Write(what == "ir"
             ? IrPrinter.Dump(result.Ir!)
@@ -125,7 +139,7 @@ public static class Pipeline
         if (File.Exists(manifest) && !EmbedsHold(embeds)) File.Delete(manifest);
         if (!File.Exists(manifest))
         {
-            var result = Compile(project, error, request.Profile);
+            var result = Compile(project, error, request.Profile, request.Target);
             if (result is null) return (1, null);
             var read = result.Embedded.Select(file => $"{FileKey(file)} {file}").ToList();
             var unitKey = read.Count == 0 ? key : Key(key, string.Join("\n", read));

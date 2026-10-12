@@ -158,7 +158,8 @@ public static class SourceCompiler
         // '@Allow' and '[lints] allow' (09 A10), once every warning is in
         if (compilation.Lyric5Modules)
             AllowFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.AllowedCodes);
-        return new CompileResult(sources, diagnostics, ir, model) { Embedded = embed.Read, ComptimeValues = comptime?.Values };
+        return new CompileResult(sources, diagnostics, ir, model)
+            { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive };
     }
 
     /// <summary>
@@ -247,10 +248,60 @@ public static class SourceCompiler
             optimize: false, libraryRoots: false, passes: options.Passes, comptime: new ComptimeTable { Hoist = true });
         report?.EndPhase();
         if (hoisted is null || diagnostics.HasErrors) return false;
-        var values = ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks, embed);
-        if (values is null) return false;
-        comptime = new ComptimeTable { Values = values };
+
+        // '@When' first (09 B2, B3): what it leaves out is checked, but its sites are not evaluated
+        // — a site of another target's code may read what this one does not have
+        var when = WhenSites(compilation, types);
+        var chosen = when.Count == 0 ? new Dictionary<int, IrConstValue>()
+            : ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks,
+                embed, options.Build, include: when.ContainsKey);
+        if (chosen is null) return false;
+        var inactive = new Inactivity();
+        foreach (var (site, (decl, file)) in when)
+            if (chosen[site] is StructConst { Fields: [BoolConst { Value: false }, ..] })
+                if (decl is null) inactive.Module(file); else inactive.Declaration(decl);
+        var rest = ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks,
+            embed, options.Build, include: i => !when.ContainsKey(i) && !inactive.Covers(types.ComptimeSites[i].Span));
+        if (rest is null) return false;
+        var values = new Dictionary<int, IrConstValue>(rest);
+        foreach (var (site, value) in chosen) values[site] = value;
+        InactiveUses.Check(compilation, binding, types, diagnostics, inactive, values);
+        if (diagnostics.HasErrors) return false;
+        comptime = new ComptimeTable { Values = values, Inactive = inactive };
         return true;
+    }
+
+    /// <summary>The sites of the <c>@When</c>s of <c>std.core</c> (09 B2): each with the declaration
+    /// it sits on, or <c>null</c> and the module's file for one on the module header.</summary>
+    private static Dictionary<int, (Decl? Decl, FileId File)> WhenSites(Compilation compilation, TypeResult types)
+    {
+        var found = new Dictionary<int, (Decl?, FileId)>();
+        if (compilation.FindModule(["std", "core"])?.Members.LookupLocal("When") is not TypeSymbol when) return found;
+        void Note(AttributeNode[] attributes, Decl? decl, FileId file)
+        {
+            foreach (var attribute in attributes)
+                if (ReferenceEquals(types.RefOf(attribute), when) && types.AttributeValueOf(attribute) is { } site)
+                    found[types.ComptimeSites.IndexOf(site)] = (decl, file);
+        }
+        foreach (var module in compilation.Modules)
+        {
+            var ast = compilation.AstOf(module);
+            Note(ast.Attributes, null, ast.Span.File);
+            foreach (var decl in ast.Declarations)
+                Note(decl switch
+                {
+                    FunctionDecl f => f.Attributes,
+                    StructDecl s => s.Attributes,
+                    ClassDecl c => c.Attributes,
+                    EnumDecl e => e.Attributes,
+                    InterfaceDecl i => i.Attributes,
+                    TypeAliasDecl a => a.Attributes,
+                    GlobalBindingDecl g => g.Attributes,
+                    ExtendDecl x => x.Attributes,
+                    _ => [],
+                }, decl, ast.Span.File);
+        }
+        return found;
     }
 
     /// <summary>
@@ -410,7 +461,8 @@ public static class SourceCompiler
             // path registers under the name it claims; an import of the path-derived name then
             // reloads the file and reports the mismatch (LYR-RES0006), the same way it would were
             // the file not a root.
-            var name = parsed.Ast.Header is not null ? null : root.ModuleName;
+            // Lyric 5's names its module by the path alone (07 M2), a header or none
+            var name = parsed.Ast.Header is not null && !compilation.Lyric5Modules ? null : root.ModuleName;
 
             compilation.AddModule(parsed.Ast, name, documentation: parsed.Documentation);
             entry ??= parsed.Ast;
@@ -444,7 +496,8 @@ public static class SourceCompiler
         if (compilation.Lyric5Modules)
             AllowFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.AllowedCodes);
 
-        return new CompileResult(sources, diagnostics, ir, model) { Embedded = embed.Read, ComptimeValues = comptime?.Values };
+        return new CompileResult(sources, diagnostics, ir, model)
+            { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive };
     }
 
     /// <summary>
@@ -690,6 +743,11 @@ public sealed record CompilerOptions
 
     /// <summary>The steps one <c>comptime</c> site may take (09 Q5).</summary>
     public long ComptimeBudget { get; init; } = ComptimeEvaluator.DefaultBudget;
+
+    /// <summary>What the build is for and as (09 A6 B4): <c>std.core</c>'s <c>target</c> and
+    /// <c>profile</c> — a cross-build's target, not the host's. The host in the debug profile
+    /// without.</summary>
+    public BuildFacts Build { get; init; } = BuildFacts.Host;
 }
 
 /// <summary>
@@ -722,6 +780,9 @@ public sealed record CompileResult(
     /// <summary>Each 'comptime' site's value by its index in the model's sites (09 A4), where the
     /// compilation evaluated any — an attribute's among them (09 F4).</summary>
     public IReadOnlyDictionary<int, IrConstValue>? ComptimeValues { get; init; }
+
+    /// <summary>What the build leaves out (09 B2): a <c>@Test</c> there is no test of this target.</summary>
+    public Lyric.Ir.Lowering.Inactivity? Inactive { get; init; }
 
     /// <summary>Renders every diagnostic exactly once and reports whether the run was clean.
     /// </summary>

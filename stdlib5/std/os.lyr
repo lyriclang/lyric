@@ -7,48 +7,14 @@ import std.io { IoError, failure };
 import std.task { Channel, here, Scheduler, SpinLock };
 import std.thread { Thread, processorCount };
 
+/// The system and the machine (10 Q9) are std.core's, beside the build's `target` (09 B4).
+pub import std.core { Platform, Arch };
+
 // ---------------------------------------------------------------------------------------------
 // The program and its system (10 Q9; M8b S9). A text comes from the runtime through a buffer
 // (lyr/os.h); one that is no UTF-8 — a POSIX system's bytes may be anything — is taken with U+FFFD
 // for its bad bytes, as `string.fromUtf8Lossy` takes it: a program does not die of its environment.
 // ---------------------------------------------------------------------------------------------
-
-/// The system a program runs on (10 Q9), as the target triples name it: one of the Tier 1
-/// targets', `Other` for another POSIX system the runtime was built for.
-pub enum Platform :: [Equatable, Debug] {
-    Linux,
-    MacOS,
-    Windows,
-    Other,
-}
-
-extend Platform :: [Display] {
-    fn show(): string {
-        return match (this) {
-            .Linux => "linux",
-            .MacOS => "macos",
-            .Windows => "windows",
-            .Other => "other",
-        };
-    }
-}
-
-/// The machine a program runs on (10 Q9), as the target triples name it.
-pub enum Arch :: [Equatable, Debug] {
-    X86_64,
-    Aarch64,
-    Other,
-}
-
-extend Arch :: [Display] {
-    fn show(): string {
-        return match (this) {
-            .X86_64 => "x86_64",
-            .Aarch64 => "aarch64",
-            .Other => "other",
-        };
-    }
-}
 
 /// The program's arguments, its own name first, as C, Go and Rust give them; a new array each call.
 /// On Windows they are read from the command line as UTF-16, so a name that is not ASCII comes as

@@ -183,14 +183,18 @@ public sealed partial class Parser
     }
 
     /// <summary>A <c>module</c> header ahead: the word, or in Lyric 5 the name <c>module</c> before a
-    /// path (08 Y1) — read as the header still, for the resolver to refuse it (LYR-RES0008).</summary>
+    /// path (08 Y1) — read as the header still, for the resolver to refuse it (LYR-RES0008) — or
+    /// before <c>;</c> alone: Lyric 5's header, which names nothing and carries the module's
+    /// attributes (09 T7, B3: <c>@When(…) module;</c>).</summary>
     private bool AtModuleHeader => _buffer.Check(TokenKind.Module)
-        || AtContextual("module") && _buffer.Peek(1).TokenKind == TokenKind.Identifier;
+        || AtContextual("module") && _buffer.Peek(1).TokenKind == TokenKind.Identifier
+        || _sm.Lyric5 && AtContextual("module") && _buffer.Peek(1).TokenKind == TokenKind.Semicolon;
 
     private ModulePath ParseModuleHeader()
     {
         var kw = _buffer.Advance(); // 'module'
-        var segments = ParseDottedName();
+        // Lyric 5's header names nothing: the path does (07 M2)
+        var segments = _sm.Lyric5 && _buffer.Check(TokenKind.Semicolon) ? Array.Empty<string>() : ParseDottedName();
         var semi = ExpectSemicolon();
         return new ModulePath(segments, Span.Union(kw.Span, semi.Span));
     }
