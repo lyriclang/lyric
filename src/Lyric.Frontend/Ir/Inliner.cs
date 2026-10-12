@@ -115,6 +115,9 @@ internal static class Inliner
 
     private static bool Inlinable(IrFunction callee)
     {
+        // '@NoInline' (09 A11) is the C compiler's hint, and this inliner's
+        if (callee.Hints.HasFlag(IrHints.NoInline)) return false;
+
         // A callee with an error path keeps its own frame (05, 01 L5): its landings end in ITS
         // bottom — propagate into its caller's slot, or a dispatch — which spliced into another
         // function would mean that function's error, or nothing.

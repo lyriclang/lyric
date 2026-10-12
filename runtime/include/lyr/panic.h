@@ -30,11 +30,16 @@
 #if defined(__GNUC__) || defined(__clang__)
 #  define LYR_NORETURN __attribute__((noreturn, cold, noinline))
 #  define LYR_NOINLINE __attribute__((noinline))
+/* the hints '@AlwaysInline' and '@Cold' write on a function (09 A11), beside '@NoInline''s above */
+#  define LYR_ALWAYS_INLINE __attribute__((always_inline))
+#  define LYR_COLD __attribute__((cold))
 #  define LYR_PRINTF(f, a) __attribute__((format(printf, f, a)))
 #  define LYR_UNLIKELY(x) __builtin_expect(!!(x), 0)
 #else
 #  define LYR_NORETURN _Noreturn
 #  define LYR_NOINLINE
+#  define LYR_ALWAYS_INLINE
+#  define LYR_COLD
 #  define LYR_PRINTF(f, a)
 #  define LYR_UNLIKELY(x) (x)
 #endif

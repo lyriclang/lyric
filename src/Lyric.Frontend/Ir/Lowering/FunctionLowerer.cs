@@ -804,7 +804,26 @@ internal sealed class FunctionLowerer
             Entry = new BlockId(0), Throws = _irThrows,
             ReceiverByRef = _thisSlot is not null && _thisType is IrStructType or IrEnumType,
             Cleanup = _cleanup,
+            Hints = HintsOf(_decl),
         };
+    }
+
+    /// <summary>The C compiler's hints a function carries (09 A11): <c>@AlwaysInline</c>,
+    /// <c>@NoInline</c>, <c>@Cold</c> of <c>std.core</c>, by identity.</summary>
+    private IrHints HintsOf(FunctionDecl declaration)
+    {
+        if (declaration.Attributes.Length == 0
+            || _typeTable.Compilation?.FindModule(["std", "core"])?.Members is not { } core) return IrHints.None;
+        var hints = IrHints.None;
+        foreach (var attribute in declaration.Attributes)
+        {
+            var marked = _types.RefOf(attribute);
+            if (marked is null) continue;
+            if (ReferenceEquals(marked, core.LookupLocal("AlwaysInline"))) hints |= IrHints.AlwaysInline;
+            else if (ReferenceEquals(marked, core.LookupLocal("NoInline"))) hints |= IrHints.NoInline;
+            else if (ReferenceEquals(marked, core.LookupLocal("Cold"))) hints |= IrHints.Cold;
+        }
+        return hints;
     }
 
     /// <summary>
@@ -6005,16 +6024,20 @@ internal sealed class FunctionLowerer
     /// </remarks>
     private IrType LowerWithOwner(TypeNode node, GenericInstance owner, Core.Span span)
     {
+        using var scope = _typeTable.PushSubstitution(OwnerMapping(owner));
+        return _typeTable.Lower(node);
+    }
+
+    /// <summary>The owner's type parameters to its arguments, read through the own substitution:
+    /// an argument of the instance may itself be a type parameter of the calling function
+    /// (<c>Box&lt;T&gt;</c> in <c>wrap&lt;T&gt;</c>).</summary>
+    private Dictionary<string, LyrType> OwnerMapping(GenericInstance owner)
+    {
         var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
         var n = Math.Min(owner.Definition.Generics.Length, owner.Arguments.Length);
-
         for (var i = 0; i < n; i++)
-            // Through the OWN substitution: an argument of the instance may itself be a type parameter of
-            // the calling function ('Box<T>' in 'wrap<T>').
             mapping[owner.Definition.Generics[i].Name] = SubstituteType(owner.Arguments[i]);
-
-        using var scope = _typeTable.PushSubstitution(mapping);
-        return _typeTable.Lower(node);
+        return mapping;
     }
 
     /// <summary>
@@ -7245,33 +7268,10 @@ internal sealed class FunctionLowerer
                 continue;
             }
 
-            // '@callerExpr(p)' (09 A11): where the call leaves this parameter out, the text it
-            // wrote for 'p' — what an assertion names (10 X1).
-            if (_types.CallerExprOf(parameter) is { } target && _types.SourceText is { } text
-                && Array.FindIndex(parameters, q => q.Name == target) is var written and >= 0
-                && written < provided.Length && provided[written] is { } argument)
-            {
-                var quoted = _writtenWith.GetValueOrDefault(argument, argument.Span);
-                args[i] = EmitConst(new StringConst(text(quoted)), new IrScalarType(IrScalar.String), span);
-                continue;
-            }
-
-            if (parameter.Default is { } fallback)
-            {
-                // Per call, in the callee's scope: an earlier parameter the default names is the
-                // argument just materialized for it, for as long as this default is lowered.
-                var bound = new List<Symbol>();
-                for (var j = 0; j < i; j++)
-                    if (_types.RefOf(parameters[j]) is ParameterSymbol earlier && _argumentOverrides.TryAdd(earlier, args[j]))
-                        bound.Add(earlier);
-                try { args[i] = LowerArgument(fallback, parameter, calleeSubstitution); }
-                finally { foreach (var symbol in bound) _argumentOverrides.Remove(symbol); }
-                continue;
-            }
-
-            // The sema checked the arity; landing here would mean it slipped through.
-            throw Bug($"call to '{name}' at {span} passes {provided.Length} argument(s) but " +
-                      $"parameter '{parameter.Name}' has no default");
+            args[i] = OmittedArgument(parameters, i, provided, args, span, calleeSubstitution)
+                // The sema checked the arity; landing here would mean it slipped through.
+                ?? throw Bug($"call to '{name}' at {span} passes {provided.Length} argument(s) but " +
+                             $"parameter '{parameter.Name}' has no default");
         }
 
         if (provided.Length > parameters.Length)
@@ -7320,6 +7320,52 @@ internal sealed class FunctionLowerer
     /// callee gets a bare reference instead of a fat pointer. The verifier catches that, but as a type
     /// mismatch deep in the callee rather than as what it is: a missing coercion at the call site.</para>
     /// </summary>
+    /// <summary>
+    /// The argument for parameter <paramref name="i"/> where the call leaves it out (04 D5; 09 A11):
+    /// the text the call wrote for the parameter <c>@callerExpr</c> names, the call's place for
+    /// <c>@callerLine</c> and <c>@callerFile</c>, else the parameter's default — lowered per call,
+    /// in the callee's scope, as <paramref name="expected"/> where the call knows the type better
+    /// than the declaration does (a virtual call's). <paramref name="earlier"/> holds the arguments
+    /// before it, in parameter order. <c>null</c> where the parameter has none of these.
+    /// </summary>
+    private TempId? OmittedArgument(Param[] parameters, int i, Expr?[] provided, IReadOnlyList<TempId> earlier,
+        Span span, IReadOnlyDictionary<string, LyrType>? calleeSubstitution, IrType? expected = null)
+    {
+        var parameter = parameters[i];
+
+        // '@callerExpr(p)' (09 A11): the text the call wrote for 'p' — what an assertion names (10 X1)
+        if (_types.CallerExprOf(parameter) is { } target && _types.SourceText is { } text
+            && Array.FindIndex(parameters, q => q.Name == target) is var written and >= 0
+            && written < provided.Length && provided[written] is { } argument)
+        {
+            var quoted = _writtenWith.GetValueOrDefault(argument, argument.Span);
+            return EmitConst(new StringConst(text(quoted)), new IrScalarType(IrScalar.String), span);
+        }
+
+        // '@callerLine', '@callerFile' (09 A11): the call's place
+        if (_types.CallerPlaceOf(parameter) is { } place && _types.SourcePlace is { } where)
+        {
+            var (file, line) = where(span);
+            return place == CallerPlace.Line
+                ? EmitConst(new IntConst((ulong)line), new IrScalarType(IrScalar.I64), span)
+                : EmitConst(new StringConst(file), new IrScalarType(IrScalar.String), span);
+        }
+
+        if (parameter.Default is not { } fallback) return null;
+
+        // Per call, in the callee's scope: an earlier parameter the default names is the argument
+        // just materialized for it, for as long as this default is lowered.
+        var bound = new List<Symbol>();
+        for (var j = 0; j < i; j++)
+            if (_types.RefOf(parameters[j]) is ParameterSymbol before && _argumentOverrides.TryAdd(before, earlier[j]))
+                bound.Add(before);
+        try
+        {
+            return expected is null ? LowerArgument(fallback, parameter, calleeSubstitution) : LowerExprAs(fallback, expected);
+        }
+        finally { foreach (var symbol in bound) _argumentOverrides.Remove(symbol); }
+    }
+
     private TempId LowerArgument(Expr argument, Param parameter,
         IReadOnlyDictionary<string, LyrType>? calleeSubstitution = null)
     {
@@ -7397,16 +7443,21 @@ internal sealed class FunctionLowerer
             throw NotSupported($"interface '{iface.Name}' has no method '{member.Member}'",
                 member.Span);
 
-        var args = new TempId[expr.Arguments.Length + 1];
-
-        // The receiver may already be lifted, for instance for a constraint whose default method goes
-        // through the interface.
-        args[0] = receiver ?? LowerExpr(member.Target);
-
         // The signature stands on the interface rather than on an implementation: it is the contract.
         var declaration = iface.Members.LookupLocal(member.Member) is FunctionSymbol method
             ? method.Declaration as FunctionDecl
             : null;
+
+        // In parameter order, a parameter the call leaves out a null (04 D5): its default, or what
+        // '@callerExpr', '@callerLine' or '@callerFile' gives (09 A11), comes from the contract too.
+        var provided = ArgumentsOf(expr);
+        var parameters = declaration?.Parameters ?? [];
+        var variadic = parameters is [.., { IsParams: true }];
+        var args = new TempId[(variadic ? parameters.Length : Math.Max(provided.Length, parameters.Length)) + 1];
+
+        // The receiver may already be lifted, for instance for a constraint whose default method goes
+        // through the interface.
+        args[0] = receiver ?? LowerExpr(member.Target);
 
         // The parameter types are written against the interface's OWN type parameters, so for an
         // instance they have to be read under its substitution: 'fn(T) -> bool' on an
@@ -7418,14 +7469,28 @@ internal sealed class FunctionLowerer
         var asFixed = _typeTable.FixedInterfaceOf(interfaceId) is not null && _types.TypeOf(member) is FnType read
             ? read : null;
 
-        for (var i = 0; i < expr.Arguments.Length; i++)
-            args[i + 1] = declaration is not null && i < declaration.Parameters.Length
-                ? LowerExprAs(expr.Arguments[i], asFixed is { } fixedSignature && i < fixedSignature.Parameters.Length
+        for (var i = 0; i < args.Length - 1; i++)
+        {
+            // 'xs: T...' collects the rest (04 D5), as in a direct call
+            if (variadic && i == parameters.Length - 1)
+            {
+                args[i + 1] = CollectVariadic(parameters[i], provided, i, expr.Span, owning is { } of ? OwnerMapping(of) : null);
+                break;
+            }
+            IrType? expected = i < parameters.Length
+                ? asFixed is { } fixedSignature && i < fixedSignature.Parameters.Length
                     ? LowerType(fixedSignature.Parameters[i], expr.Span)
                     : owning is { } instance
-                    ? LowerWithOwner(declaration.Parameters[i].Type, instance, expr.Span)
-                    : _typeTable.Lower(declaration.Parameters[i].Type))
-                : LowerExpr(expr.Arguments[i]);
+                    ? LowerWithOwner(parameters[i].Type, instance, expr.Span)
+                    : _typeTable.Lower(parameters[i].Type)
+                : null;
+            if (i < provided.Length && provided[i] is { } given)
+                args[i + 1] = expected is null ? LowerExpr(given) : LowerExprAs(given, expected);
+            else
+                args[i + 1] = OmittedArgument(parameters, i, provided, new ArraySegment<TempId>(args, 1, i), expr.Span, null, expected)
+                    ?? throw Bug($"call to '{iface.Name}.{member.Member}' at {expr.Span} leaves out "
+                                 + $"'{parameters[i].Name}', which has no default");
+        }
 
         var returnType = TypeOfExpr(expr);
         if (IsVoid(returnType))
@@ -7553,7 +7618,8 @@ internal sealed class FunctionLowerer
     /// out (04 D5) — its own expressions, lowered at the call as every argument is: <c>assert(ok)</c>
     /// passes the default message. A parameter <c>@callerExpr</c> sits on (09 A11) gets the text
     /// the call wrote instead, as in a call of a Lyric function (<see cref="MaterializeArguments"/>):
-    /// <c>assert</c> names its condition. That text is a literal the sema never saw; its type
+    /// <c>assert</c> names its condition; one <c>@callerLine</c> or <c>@callerFile</c> sits on
+    /// gets the call's place. That text is a literal the sema never saw; its type
     /// stands in <c>_chainResults</c> for as long as the call is lowered, and
     /// <paramref name="quoted"/> says which entries to take out again.</summary>
     private Expr[] WithDefaults(FunctionSymbol native, CallExpr call, out List<Expr> quoted)
@@ -7576,6 +7642,17 @@ internal sealed class FunctionLowerer
                 var literal = new StringLiteralExpr(
                     source(_writtenWith.GetValueOrDefault(given[at], given[at].Span)), given[at].Span);
                 _chainResults[literal] = new IrScalarType(IrScalar.String);
+                quoted.Add(literal);
+                all.Add(literal);
+                continue;
+            }
+            if (_types.CallerPlaceOf(parameter) is { } place && _types.SourcePlace is { } where)
+            {
+                var (file, line) = where(call.Span);
+                Expr literal = place == CallerPlace.Line
+                    ? new IntLiteralExpr((ulong)line, null, call.Span)
+                    : new StringLiteralExpr(file, call.Span);
+                _chainResults[literal] = new IrScalarType(place == CallerPlace.Line ? IrScalar.I64 : IrScalar.String);
                 quoted.Add(literal);
                 all.Add(literal);
                 continue;

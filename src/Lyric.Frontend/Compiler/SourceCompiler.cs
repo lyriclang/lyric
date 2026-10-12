@@ -127,8 +127,11 @@ public static class SourceCompiler
         // it, and the real lowering writes each site's value as a constant. Lyric 5's: the 4.x
         // tools lower a site as its inner expression, as they did since their VM went (01 L7).
         var embed = EmbedReaderFor(sources, options);
+        types.SourcePlace = SourcePlaceFor(sources, options);
         if (!EvaluateSites(compilation, binding, types, diagnostics, options, embed, report, out var comptime))
             return new CompileResult(sources, diagnostics, null, model);
+        WarnDeprecated(compilation, binding, types, diagnostics, options, comptime);
+        if (diagnostics.HasErrors) return new CompileResult(sources, diagnostics, null, model); // an 'until' come due
 
         // Lowering limits arrive as LYR-IR0001 in the same engine and are rendered with file, line and
         // column like any other error.
@@ -152,14 +155,79 @@ public static class SourceCompiler
             report?.ReportPhase(Phase.Verify,
                 timings.Runs > 1 ? $"{FunctionCount(ir)}, {timings.Runs} runs" : FunctionCount(ir),
                 timings.Verification);
+        // '@Allow' and '[lints] allow' (09 A10), once every warning is in
+        if (compilation.Lyric5Modules)
+            AllowFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.AllowedCodes);
         return new CompileResult(sources, diagnostics, ir, model) { Embedded = embed.Read, ComptimeValues = comptime?.Values };
     }
+
+    /// <summary>
+    /// <c>@Deprecated</c> in Lyric 5 (09 A11; 13 M9a P8): its uses warn with what its value says —
+    /// computed now, so <c>message</c> may be any string a <c>comptime</c> site makes —, and its
+    /// <c>until</c> comes due against the version the toolchain claims. The 4.x tools read the
+    /// literals in the warning pass itself.
+    /// </summary>
+    private static void WarnDeprecated(Compilation compilation, BindingResult binding, TypeResult types,
+        DiagnosticEngine diagnostics, CompilerOptions options, ComptimeTable? comptime)
+    {
+        if (!compilation.Lyric5Modules) return;
+        new WarningAnalyzer(compilation, binding, types, diagnostics)
+            .RunDeprecated(StringFieldsOf(types, comptime), options.ToolchainVersion ?? ToolchainVersion.Value);
+    }
+
+    /// <summary>An attribute's string fields by name, as the compiler computed its value (09 F4).</summary>
+    private static Func<AttributeNode, IReadOnlyDictionary<string, string>?> StringFieldsOf(TypeResult types, ComptimeTable? comptime) =>
+        attribute =>
+        {
+            if (types.AttributeValueOf(attribute) is not { } site
+                || comptime?.Values?.GetValueOrDefault(types.ComptimeSites.IndexOf(site)) is not StructConst value
+                || (types.RefOf(attribute) as TypeSymbol)?.Declaration is not StructDecl declared)
+                return null;
+            // the struct's fields in their order, which is the order of the value's (its layout)
+            var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+            var names = declared.Members.OfType<FieldDecl>().Select(f => f.Name).ToArray();
+            for (var i = 0; i < Math.Min(names.Length, value.Fields.Length); i++)
+                if (value.Fields[i] is StringConst text) fields[names[i]] = text.Value;
+            return fields;
+        };
 
     /// <summary>'embed' (09 Q4) reads relative to the module that calls, within its package's
     /// directory: the one a package's source root lies in.</summary>
     private static EmbedReader EmbedReaderFor(SourceManager sources, CompilerOptions options) =>
         new(sources.GetPath,
             options.PackageRoots?.Values.Select(root => Path.GetDirectoryName(Path.GetFullPath(root))!).ToList() ?? []);
+
+    /// <summary>Where a span begins as the binary names it (09 A11): a standard-library source
+    /// relative to the library's parent directory, as its <c>#line</c> has it; a package's under
+    /// the name the build writes for the package's directory (<see cref="CompilerOptions.PlaceNames"/>);
+    /// anything else as the source manager has it. Forward slashes on every system, so a program
+    /// that prints its <c>@callerFile</c> prints the same on each.</summary>
+    private static Func<Span, (string File, int Line)> SourcePlaceFor(SourceManager sources, CompilerOptions options)
+    {
+        var stdlib = Path.GetFullPath(options.StdlibRoot ?? StdlibLoader.DefaultRoot());
+        var places = options.PlaceNames ?? [];
+        return span =>
+        {
+            var path = sources.GetPath(span.File);
+            return (PlaceName(path, stdlib, places).Replace('\\', '/'), sources.LocateStart(span).Line);
+        };
+    }
+
+    private static string PlaceName(string path, string stdlib, IReadOnlyList<(string From, string To)> places)
+    {
+        if (!Path.IsPathRooted(path)) return path;
+        var full = Path.GetFullPath(path);
+        if (Inside(full, stdlib)) return Path.GetRelativePath(Path.GetDirectoryName(stdlib) ?? "", full);
+        foreach (var (from, to) in places)
+            if (Inside(full, from)) return Path.Combine(to, Path.GetRelativePath(from, full));
+        return path;
+    }
+
+    private static bool Inside(string path, string directory)
+    {
+        var relative = Path.GetRelativePath(directory, path);
+        return relative != "." && !relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative);
+    }
 
     /// <summary>
     /// The 'comptime' sites of a Lyric 5 compilation evaluated (09 A4; 13 M9a P1, P11, P13): a
@@ -364,12 +432,17 @@ public static class SourceCompiler
         // Every build that lowers evaluates (13 M9a P13) — a library by itself too; an
         // attribute's value is read from here (09 F4: 'lyric test' its '@Test').
         var embed = EmbedReaderFor(sources, options);
+        types.SourcePlace = SourcePlaceFor(sources, options);
         if (!EvaluateSites(compilation, binding, types, diagnostics, options, embed, report: null, out var comptime))
             return new CompileResult(sources, diagnostics, null, model);
+        WarnDeprecated(compilation, binding, types, diagnostics, options, comptime);
+        if (diagnostics.HasErrors) return new CompileResult(sources, diagnostics, null, model); // an 'until' come due
 
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
             optimize: options.Optimize, libraryRoots: true, passes: options.Passes, comptime: comptime);
         if (ir is null) return new CompileResult(sources, diagnostics, null, model);
+        if (compilation.Lyric5Modules)
+            AllowFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.AllowedCodes);
 
         return new CompileResult(sources, diagnostics, ir, model) { Embedded = embed.Read, ComptimeValues = comptime?.Values };
     }
@@ -543,6 +616,21 @@ public sealed record CompilerOptions
     /// <summary>What each package declares it imports from (design/v5/spec/07 P6), by name;
     /// <c>null</c> where no package rules apply.</summary>
     public IReadOnlyDictionary<string, IReadOnlySet<string>>? PackageDependencies { get; init; }
+
+    /// <summary>The name the binary writes for each directory its sources lie in (11 W2 P6), as
+    /// the build hands the C compiler its <c>-ffile-prefix-map</c>: what <c>@callerFile</c> gives
+    /// (09 A11) is then what a backtrace shows, and no machine's path. Without, a source's path as
+    /// the source manager has it.</summary>
+    public IReadOnlyList<(string From, string To)>? PlaceNames { get; init; }
+
+    /// <summary>The version the toolchain claims, which a <c>@Deprecated</c>'s <c>until</c> comes
+    /// due against (09 A11): <c>lyric5</c>'s own. Without, the 4.x tree's
+    /// (<see cref="Lyric.Core.ToolchainVersion.Value"/>).</summary>
+    public string? ToolchainVersion { get; init; }
+
+    /// <summary>Each package's <c>[lints] allow</c> (09 A10), by name: the warning codes its files
+    /// do not report.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>>? AllowedCodes { get; init; }
 
     /// <summary>
     /// A package's <c>tests/</c> (design/v5/spec/07 V4), by the package's name: its files are

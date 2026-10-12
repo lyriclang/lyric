@@ -266,8 +266,9 @@ fn uncancelled<T>(call: fn() -> T throws [IoError, Cancelled]): T throws IoError
 // ---------------------------------------------------------------------------------------------
 
 /// What went wrong in an input or an output (10 O3) — a file's, a socket's, a process's, memory's
-/// alike. *(The decision marks it `@NonExhaustive`, which comes with the rest of the compiler's
-/// attributes, M9a: a `match` over it should write a `_`, as a later kind would need one.)*
+/// alike. `@NonExhaustive` (09 A11): a `match` over it outside `std` writes a `_`, which a
+/// later kind needs.
+@NonExhaustive
 pub enum IoErrorKind :: [Equatable] {
     NotFound,
     PermissionDenied,

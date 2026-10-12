@@ -110,6 +110,10 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     /// the root manifest's counts; <c>null</c> for the toolchain's default.</summary>
     public long? ComptimeBudget { get; init; }
 
+    /// <summary><c>[lints] allow</c> (09 A10; M9a S6): the warning codes the package's files do not
+    /// report — each package's own.</summary>
+    public IReadOnlyList<string> LintAllow { get; init; } = [];
+
     /// <summary><c>[trust] build-scripts</c> (11 W3 BS5): the packages of the graph whose
     /// <c>build.lyr</c> may run — the root manifest's alone count; the root's own script always runs.</summary>
     public IReadOnlyList<string> TrustedScripts { get; init; } = [];
@@ -157,12 +161,6 @@ public sealed partial record Manifest(string File, string Name, string Version, 
 
     private static readonly string[] DescriptiveStrings = ["description", "license", "repository"];
 
-    /// <summary>The sections the plan gives a meaning to later, with the slice they come with.</summary>
-    private static readonly Dictionary<string, string> LaterSections = new(StringComparer.Ordinal)
-    {
-        ["lints"] = "M12",
-    };
-
     /// <summary>Reads and checks <paramref name="file"/>.</summary>
     /// <exception cref="ManifestException">The manifest is not TOML, or not a manifest.</exception>
     public static Manifest Read(string file) => Parse(System.IO.File.ReadAllText(file), file);
@@ -184,7 +182,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
 
         foreach (var key in document.Keys)
         {
-            if (key is "package" or "dependencies" or "build-dependencies" or "override" or "profile" or "bin" or "native" or "trust") continue;
+            if (key is "package" or "dependencies" or "build-dependencies" or "override" or "profile" or "bin" or "native" or "trust" or "lints") continue;
             document.TryGet(key, out var section);
             var line = section switch
             {
@@ -192,9 +190,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
                 TomlArray { Count: > 0 } a when a[0] is TomlTable first => first.Line,
                 _ => 1,
             };
-            throw LaterSections.TryGetValue(key, out var when)
-                ? new ManifestException("LYR-PKG0003", file, line, 1, $"[{key}] comes with {when}: this toolchain does not read it yet")
-                : new ManifestException("LYR-PKG0003", file, line, 1, $"'{key}' is no part of a manifest");
+            throw new ManifestException("LYR-PKG0003", file, line, 1, $"'{key}' is no part of a manifest");
         }
 
         if (!document.TryGet("package", out var found) || found is not TomlTable package)
@@ -245,7 +241,34 @@ public sealed partial record Manifest(string File, string Name, string Version, 
             Toolchain = ReadToolchain(package, file),
             TrustedScripts = ReadTrust(document, file),
             ComptimeBudget = ReadComptimeBudget(package, file),
+            LintAllow = ReadLints(document, file),
         };
+    }
+
+    /// <summary><c>[lints] allow = ["LYR-SEM0071"]</c> (09 A10; 13 M9a P8): the warning codes the
+    /// package's files do not report — <c>@Allow</c> on the package. The levels beside it
+    /// (<c>warn</c>, <c>deny</c>) and the lint names come with M12 (11 L1, G2).</summary>
+    private static List<string> ReadLints(TomlTable document, string file)
+    {
+        var codes = new List<string>();
+        if (!document.TryGet("lints", out var found)) return codes;
+        if (found is not TomlTable lints)
+            throw new ManifestException("LYR-PKG0002", file, 1, 1, "[lints] is a table: [lints] allow = [\"LYR-SEM0071\"]");
+        foreach (var key in lints.Keys)
+            if (key != "allow")
+                throw new ManifestException("LYR-PKG0003", file, lints.Line, 1,
+                    $"[lints] {key} comes with M12: this toolchain reads 'allow' alone");
+        if (!lints.TryGet("allow", out var given)) return codes;
+        if (given is not TomlArray list || list.Any(c => c is not string))
+            throw new ManifestException("LYR-PKG0002", file, lints.Line, 1, "allow is an array of warning codes, as \"LYR-SEM0071\"");
+        foreach (string code in list)
+        {
+            if (!Lyric.Sema.AllowFilter.IsCode(code))
+                throw new ManifestException("LYR-PKG0002", file, lints.Line, 1,
+                    $"'{code}' is no warning code — a code is written as \"LYR-SEM0071\"; lint names come with M12");
+            if (!codes.Contains(code)) codes.Add(code);
+        }
+        return codes;
     }
 
     /// <summary><c>comptimeBudget</c> (design/v5/spec/09 Q5): the steps one <c>comptime</c> site may

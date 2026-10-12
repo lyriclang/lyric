@@ -1432,8 +1432,11 @@ public sealed class CEmitter
         // lyr_entry's frame — main folded into it took the program's frames with it (Windows,
         // whose symbolizer gives the physical frame before the inlined ones).
         var keep = _module.EntryFunction is { } entry && ReferenceEquals(_module.Functions[entry.Value], function)
-            ? "LYR_NOINLINE " : "";
-        return $"{keep}{CType(function.ReturnType)} {FunctionName(function.Name)}({(parameters.Count == 0 ? "void" : string.Join(", ", parameters))})";
+            || function.Hints.HasFlag(IrHints.NoInline) ? "LYR_NOINLINE " : "";
+        // what the source asks of the C compiler (09 A11): a hint, no promise
+        var hints = (function.Hints.HasFlag(IrHints.AlwaysInline) ? "LYR_ALWAYS_INLINE " : "")
+                    + (function.Hints.HasFlag(IrHints.Cold) ? "LYR_COLD " : "");
+        return $"{keep}{hints}{CType(function.ReturnType)} {FunctionName(function.Name)}({(parameters.Count == 0 ? "void" : string.Join(", ", parameters))})";
     }
 
     /// <summary>Whether a function handles errors at all: the in-flight error local exists only
