@@ -42,7 +42,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M7 | Modules and packages | L | **done** 2026-10-02 |
 | M8a | std core | XL | **done** 2026-10-07 |
 | M8b | std I/O and system | L | **done** 2026-10-08 |
-| M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | S1–S14 **done** 2026-10-09; S15–S19 after the review |
+| M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | **done** 2026-10-09 (S15–S19 after the review) |
 | M9a | `comptime` (the IR interpreter) | L | — |
 | M9b | Macros | L | — |
 | M10 | std after rule D | XL | — |
@@ -789,7 +789,7 @@ reaper a thread, Windows' pipes blocking on the I/O pool — decided with the ma
 day (10 "Review 2026-10-08 (2)"): confirmed as built, with two clocks for M10 — deadlines for
 `resolve`, a Windows child's pipes through the completion port. M8c follows.
 
-### M8c — the plan done (2026-10-09), S15–S19 after the review
+### M8c — done (2026-10-09)
 
 The plan is design 13's addendum of 2026-10-08: the Unicode tables generated into C (P1), lambdas
 that throw through 05 K4 (P2), the builder without `&` and `std.fmt.format` (P3), the language's
@@ -904,7 +904,7 @@ its `wait` hanging (M8b S12's; the processes test's two timeouts) — fixed in a
 for a decision, `Contains<char>` on text from S2 to S9, S8 and S12 split. The open points the run
 collected went to the maintainer with the report and were decided on 2026-10-09 (design, each area's
 "Review 2026-10-09"); nine of them carry the clock M8c and follow in five slices (design 13, the
-addendum after M8c's S14 row). M9a follows those, once the maintainer is asked.
+addendum after M8c's S14 row). With S19 they are built: **M8c is done.** M9a follows, once the maintainer is asked.
 
 After the review:
 
@@ -923,6 +923,15 @@ After the review:
   than the checker walks), and 64 bytes cost 3 400 lines of C —; `never` as a type argument where
   the parameter's bound is `Error` (`MapIter<…, never>`, `f<never>()`), refused for any other
   (`LYR-SEM0145`); `dedup()` names its empty set so. Spec 06 §9.3 rule 3; two cases.
+- **S18** `list[a..b]` is the range of the list's view — `AsSlice<T>` in `std.core`, `List`
+  conforms, the bounds and `^n` the view's —; `LYR-SEM0126` at a field's type and within a written
+  type (an element of an array, a view or a tuple, a type argument: `List<Equatable>`), said once,
+  the uses and initializers silent; an empty trailing block, `subtest("row") { }`, a lambda of no
+  statements (a parser case: `{ }` read as an expression). Spec 03 §5.2 rule 7, §8.2 rule 3, 05 §7
+  rule 3; five cases.
+- **S19** the conformance gate in one job per profile, a matrix — shipped from `main` as a PR of
+  its own before S15–S18, so every later gate ran split. `main` requires no check by name: no
+  setting followed, the merge scripts match the prefix.
 
 ## Design decisions
 

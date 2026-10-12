@@ -299,7 +299,7 @@ Entscheidung des Maintainers („alle Empfehlungen“) zu einem offenen Punkt, d
 
 | # | Entscheidung | Betrifft |
 |---|---|---|
-| CI | **Das Konformanz-Gate läuft je Profil als eigener Job** (`debug`, `release` als Matrix): 1166 Fälle in beiden Profilen brauchten im PR-Lauf 27 Minuten, im Dispatch-Lauf über 40 (die Grenze wurde in M8b S14 auf 60 angehoben); geteilt halbiert sich die Wandzeit. Die Checks heißen dann je Profil, und welche ein Merge abwartet, ist eine Einstellung des Repos — sie wird mit demselben PR nachgezogen. Verworfen: ein Job mit höherer Grenze — die Wandzeit bleibt, und jeder neue Fall verlängert sie. Uhr: M8c S19 | M5-8 |
+| CI | **Das Konformanz-Gate läuft je Profil als eigener Job** (`debug`, `release` als Matrix): 1166 Fälle in beiden Profilen brauchten im PR-Lauf 27 Minuten, im Dispatch-Lauf über 40 (die Grenze wurde in M8b S14 auf 60 angehoben); geteilt halbiert sich die Wandzeit. Die Checks heißen dann je Profil. Eine Einstellung, die einen Check beim Namen verlangt, gibt es nicht — `main` hat keine Branch-Regel (geprüft 2026-10-09); nachgezogen werden nur die eigenen Skripte, die das Ergebnis des Gates lesen (Präfix statt Namen). Verworfen: ein Job mit höherer Grenze — die Wandzeit bleibt, und jeder neue Fall verlängert sie. Gebaut in M8c S19, vor S15–S18 ausgeliefert | M5-8 |
 
 ---
 

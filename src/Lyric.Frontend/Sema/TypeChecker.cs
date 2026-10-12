@@ -111,6 +111,7 @@ public sealed class TypeChecker
     private readonly TypeSymbol? _indexable;
     private readonly TypeSymbol? _coreIndex;     // std.core's Index<K>: 'x[k]' (04 D6)
     private readonly TypeSymbol? _coreIndexSet;
+    private readonly TypeSymbol? _coreAsSlice;   // std.core's AsSlice<T>: 'x[a..b]' through the view (M8c S18)
     // 'Format' (10 S7): std.core declaring it is Lyric 5's format language — a spec checked here,
     // the hole a call of std.core's (12 §2); the 4.x tools keep their std.fmt converters.
     private readonly TypeSymbol? _coreFormat;
@@ -201,6 +202,8 @@ public sealed class TypeChecker
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIndex ? coreIndex : null;
         _coreIndexSet = comp.FindModule(["std", "core"])?.Members.LookupLocal("IndexSet")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIndexSet ? coreIndexSet : null;
+        _coreAsSlice = comp.FindModule(["std", "core"])?.Members.LookupLocal("AsSlice")
+            is TypeSymbol { Kind: TypeSymbolKind.Interface } coreAsSlice ? coreAsSlice : null;
         _coreFormat = comp.FindModule(["std", "core"])?.Members.LookupLocal("Format")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreFormat ? coreFormat : null;
         _debug = comp.FindModule(["std", "core"])?.Members.LookupLocal("Debug")
@@ -789,7 +792,7 @@ public sealed class TypeChecker
             // With the type's PARAMETERS in scope (03 T8; the review's R4a): 'items: List<T> =
             // List<T>.new()'. The parameters alone — the type's members are no part of a
             // default's scope: it has no 'this' (02 I2) and names a static through the type.
-            if (m is FieldDecl { Default: not null } field)
+            if (m is FieldDecl field && (field.Default is not null || _comp.Lyric5Modules))
             {
                 var defaults = module.Members;
                 if (ts.Generics.Length > 0)
@@ -798,8 +801,12 @@ public sealed class TypeChecker
                     foreach (var parameter in ts.Generics) defaults.TryDeclare(parameter);
                 }
                 var fieldType = ResolveType(field.Type, defaults);
-                CheckAssignable(field.Default, CheckExpr(field.Default, defaults, fieldType),
-                    fieldType, field.Default.Span);
+                // A constraint written for a field's value is said here, once (design 04 "Review
+                // 2026-10-09" S13; M8c S18); its reads take it as no type (FieldType).
+                if (ValueTypeAt(fieldType, field.Type.Span).IsError) fieldType = LyrType.Error;
+                if (field.Default is not null)
+                    CheckAssignable(field.Default, CheckExpr(field.Default, defaults, fieldType),
+                        fieldType, field.Default.Span);
                 continue;
             }
 
@@ -6402,6 +6409,19 @@ public sealed class TypeChecker
         // elements. The bounds are indices, '^n' among them, either left open.
         if (ix.Index is SliceRangeExpr range)
         {
+            // A type that gives a view of itself (std.core's AsSlice<T>; design 03 "Review
+            // 2026-10-09" S6, M8c S18): the range of its view — 'list[a..b]' is
+            // 'list.asSlice()[a..b]', its bounds checked against the view, which has the length.
+            if (_coreAsSlice is { } asSlice && IndexesThrough(target, asSlice))
+            {
+                var view = new CallExpr(new MemberExpr(ix.Target, "asSlice", IsOptional: false, ix.Target.Span) { MemberSpan = default },
+                    [], ix.Target.Span);
+                var through = ix with { Target = view };
+                var viewed = CheckExpr(through, scope);
+                if (viewed.IsError) return LyrType.Error;
+                _result.DesugarRangeThroughView(ix, through);
+                return viewed;
+            }
             if (range.Low is not null) CheckIndexValue(range.Low, target, scope);
             if (range.High is not null) CheckIndexValue(range.High, target, scope);
             return target switch
@@ -6414,7 +6434,7 @@ public sealed class TypeChecker
                 ErrorType => LyrType.Error,
                 _ => Report(ix.Span, "LYR-SEM0007",
                     $"'{TypeFacts.Display(target)}' has no view to take — a range indexes an array, a 'Slice<T>', "
-                    + "a string or a 'StringView'"),
+                    + "a string, a 'StringView' or a type that gives one ('AsSlice<T>' of std.core)"),
             };
         }
 
@@ -6906,8 +6926,10 @@ public sealed class TypeChecker
             // message at a place where the user merely omitted a type argument.
             //
             // Not reported when an argument was already faulty: the cause is reported then, and a
-            // second line about a type argument would be follow-up noise.
-            var faulty = argTypes.Any(t => t is not null && ContainsError(t));
+            // second line about a type argument would be follow-up noise. Nor where the type the
+            // position expects is the one already said ('let xs: List<Equatable> = List.new()',
+            // LYR-SEM0126 at the type; M8c S18): it would have determined the argument.
+            var faulty = argTypes.Any(t => t is not null && ContainsError(t)) || expected is { IsError: true };
             if (!faulty && fsym is not null)
                 foreach (var generic in fsym.Generics)
                     if (!map.ContainsKey(generic))
@@ -9466,7 +9488,7 @@ public sealed class TypeChecker
         return result; // a unit variant as a value
     }
 
-    private LyrType FieldType(FieldSymbol fs) => ResolveType(((FieldDecl)fs.Declaration!).Type, _comp.Builtins);
+    private LyrType FieldType(FieldSymbol fs) => ValueTypeAt(ResolveType(((FieldDecl)fs.Declaration!).Type, _comp.Builtins), null);
 
     // --- attributes ---
 
@@ -12193,29 +12215,57 @@ public sealed class TypeChecker
     /// value of arises, or an optional of one (05 §7 rule 3, 04 D9): said once where it is written
     /// (<c>LYR-SEM0126</c>), and the error type from there on, so its uses and its calls say nothing
     /// more (the review of 2026-10-08; M8c S13). Silent where <paramref name="at"/> is null — a
-    /// signature read again. Lyric 5's: the 4.x line keeps saying it at the transition alone.
+    /// signature read again. Within the type too, where a value of it holds values of another —
+    /// an element of an array, a view or a tuple, a type argument (<c>List&lt;Equatable&gt;</c>), and
+    /// a field's type (design 04 "Review 2026-10-09" S13; M8c S18). Lyric 5's: the 4.x line keeps
+    /// saying it at the transition alone.
     /// </summary>
     private LyrType ValueTypeAt(LyrType type, Span? at)
     {
         if (!_comp.Lyric5Modules || type.IsError) return type;
-        var inner = type;
-        while (inner is Optional { Inner: var wrapped }) inner = wrapped;
-        if (TypeFacts.KindOf(inner) != TypeSymbolKind.Interface || TypeFacts.SymbolOf(inner) is not { } iface)
-            return type;
-        // ValueUsable reads the interface's members' signatures, which come here again: an
-        // interface being asked about counts as usable inside its own question
-        if (!_askedForValue.Add(iface)) return type;
-        string reason;
-        try
-        {
-            if (ValueUsable(iface, out reason, inner)) return type;
-        }
-        finally { _askedForValue.Remove(iface); }
+        if (ConstraintWithin(type) is not var (inner, iface, reason)) return type;
+        var outer = type;
+        while (outer is Optional { Inner: var wrapped }) outer = wrapped;
         if (at is { } span)
             _de.Report("LYR-SEM0126", Severity.Error, span,
-                $"'{TypeFacts.Display(inner)}' is usable as a constraint only, not as the type of a value — {reason}; "
+                $"'{TypeFacts.Display(inner)}'"
+                + (LyrType.Equal(inner, outer) ? "" : $" (in '{TypeFacts.Display(type)}')")
+                + $" is usable as a constraint only, not as the type of a value — {reason}; "
                 + $"write 'fn f<T :: [{iface.Name}]>(…)'");
         return LyrType.Error;
+    }
+
+    /// <summary>The first interface no value of arises that a value of the type would hold: the
+    /// type itself through its optionals, an element of an array, a view or a tuple, a type
+    /// argument — with the reason <see cref="ValueUsable"/> gives.</summary>
+    private (LyrType Inner, TypeSymbol Iface, string Reason)? ConstraintWithin(LyrType type)
+    {
+        var inner = type;
+        while (inner is Optional { Inner: var wrapped }) inner = wrapped;
+        switch (inner)
+        {
+            case ArrayOf a: return ConstraintWithin(a.Element);
+            case SliceOf s: return ConstraintWithin(s.Element);
+            case InlineArrayOf ia: return ConstraintWithin(ia.Element);
+            case TupleOf t:
+                foreach (var element in t.Elements)
+                    if (ConstraintWithin(element) is { } inElement) return inElement;
+                return null;
+            case GenericInstance g:
+                foreach (var argument in g.Arguments)
+                    if (ConstraintWithin(argument) is { } inArgument) return inArgument;
+                break;
+        }
+        if (TypeFacts.KindOf(inner) != TypeSymbolKind.Interface || TypeFacts.SymbolOf(inner) is not { } iface)
+            return null;
+        // ValueUsable reads the interface's members' signatures, which come here again: an
+        // interface being asked about counts as usable inside its own question
+        if (!_askedForValue.Add(iface)) return null;
+        try
+        {
+            return ValueUsable(iface, out var reason, inner) ? null : (inner, iface, reason);
+        }
+        finally { _askedForValue.Remove(iface); }
     }
 
     /// <summary>The interfaces <see cref="ValueTypeAt"/> is asking about.</summary>

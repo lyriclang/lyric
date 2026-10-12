@@ -277,7 +277,7 @@ davor). Die Slices heißen **M8c S1–S14**; jeder ist ein PR, sein Regel-PR in 
 | **S16** `Debug` und `Display` | 10, Zeilen S1 und S11: `?T :: [Debug]`; `T[N] :: [Display, Debug]` wie `T[]` | `assertEq('7'.toDigit(10), 7)`, `assertEq(x.toBytesLE(), …)` |
 | **S17** Synthese und `never` | 04, Zeile S3b: ein `T[N]`-Feld als Ganzes; 05, Zeile S5: `never` als Typargument unter `Error` | die Goldens ohne 4096 `&&`; `DedupIter<I, never>` |
 | **S18** Index über den View, Meldungen | 03, Zeile S6: `list[a..b]`; 04, Zeile S13: `LYR-SEM0126` an Feldern, Elementen und Typargumenten; 08, Zeile S12a: die leere nachgestellte Lambda | je Regel ein Fall |
-| **S19** Gate je Profil | 11, Zeile CI: die Matrix `debug`/`release`, die Einstellung der geforderten Checks; STATUS, CHANGELOG | die Wandzeit des Gates halbiert |
+| **S19** Gate je Profil | 11, Zeile CI: die Matrix `debug`/`release` (keine Einstellung: `main` verlangt keinen Check beim Namen); als eigener PR von `main` aus vor S15–S18 geliefert | die Wandzeit des Gates halbiert |
 
 **Nicht in M8c**: `std.regex` (10 S8) — M10, der die Tabellen braucht; Normalisierung, Grapheme
 und Breite gehören dem Ring `unicode`, nicht `std` (S4).
