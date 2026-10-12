@@ -152,11 +152,11 @@ public class ComptimeTests
     /// guessed (09 Q7): a function each C library rounds its own way. The exactly rounded ones are
     /// computed, and Unicode is answered from the runtime's own tables (S4).</summary>
     [Theory]
-    [InlineData("1.0.exp()", "'exp' rounds as each C library does")]
-    [InlineData("2.0.pow(0.5)", "'pow' rounds as each C library does")]
+    [InlineData("exp(1.0)", "'exp' rounds as each C library does")]
+    [InlineData("pow(2.0, 0.5)", "'pow' rounds as each C library does")]
     public void What_compile_time_cannot_answer_alike_is_refused(string site, string message)
     {
-        var errors = Errors(Head + $"fn main(): void {{\n    println(f\"{{comptime 2.0.sqrt()}} {{comptime 'É'.isUpper()}} {{comptime {site}}}\");\n}}\n");
+        var errors = Errors(Head + "import std.math { exp, pow, sqrt };\n\n" + $"fn main(): void {{\n    println(f\"{{comptime sqrt(2.0)}} {{comptime 'É'.isUpper()}} {{comptime {site}}}\");\n}}\n");
         var error = Assert.Single(errors, l => l.Contains("error["));
         Assert.Contains("error[LYR-CT0005]: " + message, error);
     }

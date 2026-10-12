@@ -1044,6 +1044,13 @@ M9b the maintainer is asked again.
   otherwise), both in the prelude — `all`, since `variants` inside the default is the question.
   The artifact: a names table of an enum with no `match`. Spec 05 §2 rule 2, 11 §4 rules 5 and
   11, 04's prelude; four cases.
+- **S11b** `std.math`'s free functions (10 Z2 as the maintainer re-decided it on 2026-10-12): the
+  elementary functions — `sqrt`, `cbrt`, `exp`, `ln`, `log2`, `log10`, `pow(x, e)`, the
+  trigonometric and hyperbolic ones, `atan2(y, x)`, `hypot`, `floor`, `ceil`, `round`, `trunc`
+  — are free functions generic over `Float`, `abs` and `signum` over `Signed`; the type keeps
+  what describes it or its value. libm's externs moved with them; std.core is 163 lines
+  shorter. `x.sqrt()` is no member any more (`LYR-SEM0012`). Spec 12 "Numbers" and "std.math";
+  four cases, the first that compute a root or an angle at all.
 
 ## Design decisions
 
