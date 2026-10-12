@@ -1,6 +1,7 @@
 // std.test: the assertions hold where what they check does. What a failed one reports is
 // TestCommandTests' (tests/Lyric5.Tests), which runs lyric test over failing tests.
-import std.test { assertEq, assertNotEq, assertTrue, assertFalse, assertNull, assertNotNull, assertClose, assertLess, assertGreater, assertThrows, assertPanics, subtest };
+import std.collections { List };
+import std.test { assertEq, assertNotEq, assertTrue, assertFalse, assertNull, assertNotNull, assertClose, assertLess, assertGreater, assertThrows, assertPanics, subtest, assertContains, assertEmpty };
 
 @Test
 fn equalityAndItsNegation(): void {
@@ -66,4 +67,50 @@ fn subtestsRunEachInTurn(): void {
         }
     }
     assertEq(seen, 6);
+}
+
+@Test
+fn containment(): void {
+    assertContains("abc", 'b');
+    let xs = List<int>.new();
+    xs.push(4);
+    assertContains(xs, 4);
+    let p = assertPanics(() => { assertContains("abc", 'z'); });
+    assertEq(p.message, "got \"abc\", expected to contain 'z'");
+}
+
+@Test
+fn emptiness(): void {
+    let none: int[] = [];
+    assertEmpty(none);
+    assertEmpty(List<string>.new());
+    let p = assertPanics(() => {
+        let one: int[] = [1];
+        assertEmpty(one);
+    });
+    assertEq(p.message, "one = [1], expected nothing");
+}
+
+@Test
+fn aLongDifferenceIsPointedAt(): void {
+    let p = assertPanics(() => {
+        assertEq("the quick brown fox jumps over the lazy dog", "the quick brown fox jumps over the lazy cat");
+    });
+    assertEq(p.message, "got \"the quick brown fox jumps over the lazy dog\", expected \"the quick brown fox jumps over the lazy cat\""
+        + "\nfirst difference at character 42:\n  …jumps over the lazy dog\"\n  …jumps over the lazy cat\"\n"
+        + "                       ^");
+}
+
+@Test
+fn aTextsFirstDifferentLineIsNamed(): void {
+    let p = assertPanics(() => { assertEq("one\ntwo\nthree", "one\ntoo\nthree"); });
+    assertEq(p.message, "got \"one\\ntwo\\nthree\", expected \"one\\ntoo\\nthree\"\nline 2: \"two\", expected \"too\"");
+    let q = assertPanics(() => { assertEq("a\nb", "a\nb\nc"); });
+    assertEq(q.message, "got \"a\\nb\", expected \"a\\nb\\nc\"\nline 3: no line, expected \"c\"");
+}
+
+@Test
+fn aShortDifferenceNeedsNoPointer(): void {
+    let p = assertPanics(() => { assertEq(2 + 2, 5); });
+    assertEq(p.message, "2 + 2 = 4, expected 5");
 }

@@ -262,7 +262,7 @@ davor). Die Slices heißen **M8c S1–S14**; jeder ist ein PR, sein Regel-PR in 
 | **S9** `Iterator<Item = T>` als Wert, generische Zeugen | 03 M4-1: ein Interface-Wert mit fixiertem assoziiertem Typ; ein generisches Member erfüllt ein Interface-Member, wo seine Typparameter sich passend binden lassen — damit `string`/`StringView :: [Contains<char>]` (aus S2) | eine Funktion, die einen solchen Iterator nimmt und gibt; `assertContains("abc", 'b')` |
 | **S10** Fehler an der Bindung | 05 M5-3: `e.suppressed()`, `e.backtrace()`, der Typ `Backtrace` | ein unterdrückter Fehler aus `using`, gesehen im `catch` |
 | **S11** Prüfsummen, Bytes | Q3: `crc32`, `crc32c`, `adler32`; `toBytesLE`/`toBytesBE` | Testvektoren der Normen |
-| **S12** Test und Bench | X1, X3: `assertContains`, `assertEmpty`, der String-Diff, `@Test { parallel = true }`; X4: `@Bench`, `Bench`, `blackBox`, `lyric5 bench` (`--save`, `--compare`) | **`lyric5 bench` läuft die std-Benchmarks** |
+| **S12** Test und Bench | X1, X3: `assertContains`, `assertEmpty`, der String-Diff, `@Test { parallel = true }`; X4: `@Bench`, `Bench`, `blackBox`, `lyric5 bench` (`--save`, `--compare`). Geteilt: **S12a** die Tests — die drei Stücke von X1 und der Opt-in von X3; **S12b** die Benchmarks — X4 | **`lyric5 bench` läuft die std-Benchmarks** |
 | **S13** Melde-Qualität | der Sammelslice der Durchsicht vom 2026-10-08: `1.` und `.5`, ein Name außerhalb von ASCII, nach `LYR-SEM0126`, `lyric5 test --target` | je Meldung ein Fall |
 | **S14** Abschluss | **Wortzähler über Unicode-Text** als Beispiel; Dogfood; STATUS, CHANGELOG | die Zeile oben erfüllt |
 

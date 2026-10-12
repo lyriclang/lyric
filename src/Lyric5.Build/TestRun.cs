@@ -6,9 +6,10 @@ using Lyric5.Toolchain;
 namespace Lyric5.Build;
 
 /// <summary>One test <c>lyric test</c> runs: the function, by its module's path and its name,
-/// whether it says it throws, why it is skipped, if it is, and how many seconds it may take
-/// (<c>@Test { skip = "…", timeout = 10 }</c>; 60 unless it says).</summary>
-public sealed record TestCase(string Module, string Function, bool Throws, string Skip, long Timeout = 60)
+/// whether it says it throws, why it is skipped, if it is, how many seconds it may take, and
+/// whether it runs beside the others that say so (<c>@Test { skip = "…", timeout = 10, parallel =
+/// true }</c>; 60 unless it says, not parallel).</summary>
+public sealed record TestCase(string Module, string Function, bool Throws, string Skip, long Timeout = 60, bool Parallel = false)
 {
     /// <summary>How the run names it: <c>app.tests.math.adds</c>.</summary>
     public string Name => $"{Module}.{Function}";
@@ -102,7 +103,8 @@ public static class TestRun
                 if (fn.Attributes.FirstOrDefault(a => ReferenceEquals(model.Types.RefOf(a), test)) is not { } marked) continue;
                 var skip = marked.Fields.FirstOrDefault(f => f.Name == "skip")?.Value is StringLiteralExpr { Value: var why } ? why : "";
                 var timeout = marked.Fields.FirstOrDefault(f => f.Name == "timeout")?.Value is IntLiteralExpr { Value: var seconds } ? (long)seconds : 60;
-                found.Add(new TestCase(string.Join('.', module.Path), fn.Name, fn.Throws is not null, skip, timeout));
+                var parallel = marked.Fields.FirstOrDefault(f => f.Name == "parallel")?.Value is BoolLiteralExpr { Value: true };
+                found.Add(new TestCase(string.Join('.', module.Path), fn.Name, fn.Throws is not null, skip, timeout, parallel));
             }
         }
         return found;
@@ -134,6 +136,7 @@ public static class TestRun
         {
             var skip = test.Skip.Length > 0 ? $", skip = {Quote(test.Skip)}" : "";
             if (test.Timeout != 60) skip += $", timeout = {test.Timeout}";
+            if (test.Parallel) skip += ", parallel = true";
             var call = test.Throws ? $"try {alias}()" : $"{alias}()";
             text.Append($"        TestCase {{ name = {Quote(test.Name)}, body = () => {call}{skip} }},\n");
         }
