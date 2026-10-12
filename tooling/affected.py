@@ -37,7 +37,11 @@ def moved_cases(spec, old_pin):
         if not line.strip():
             continue
         rel = path.relative_to("conformance/cases")
-        # a package case: the directory under the chapter that holds (or held) the lyric.toml
+        # a file beside the chapters (the cases' README) is no case; a file below a chapter's
+        # directory, or one in the chapter that is no .lyr, belongs to a package case: the
+        # directory under the chapter that holds (or held) the lyric.toml
+        if len(rel.parts) < 2:
+            continue
         if len(rel.parts) > 2 or rel.suffix != ".lyr":
             labels.add(rel.parts[0] + "/" + rel.parts[1] + "/")
         else:
