@@ -386,6 +386,7 @@ public sealed class TypeChecker
         CheckExtensionBlocks(); // extend bodies, conformance
         CheckMethodSets();      // one name, one function per type (04 D2, D3)
         CheckStaticSets();      // one constant of a name per type (05 §6)
+        if (_comp.Lyric5Modules) CheckInlineFunctions(); // 08 F6
         JudgeContextless(errorsAtStart); // the '[]' outside every function body
         _currentModule = null;
         new FlowAnalyzer(_comp, _result, _de).Run(); // definite assignment
@@ -2905,6 +2906,15 @@ public sealed class TypeChecker
 
     private void CheckBinding(BindingStmt bnd, SymbolTable scope)
     {
+        // a local 'fn' (08 F8): bound before its lambda is checked, which calls it
+        if (bnd.LocalFunction && bnd.Type is not null && bnd.Initializer is not null)
+        {
+            var fnType = ValueTypeAt(ResolveType(bnd.Type, scope), bnd.Type.Span);
+            var self = new LocalSymbol(bnd.Name, fnType, false, bnd);
+            DeclareLocal(self, bnd, scope);
+            CheckAssignable(bnd.Initializer, CheckExpr(bnd.Initializer, scope, fnType), fnType, bnd.Span);
+            return;
+        }
         var declared = bnd.Type is not null ? ValueTypeAt(ResolveType(bnd.Type, scope), bnd.Type.Span) : null;
         var quiet = _de.ErrorCount;
         var initT = bnd.Initializer is not null ? CheckExpr(bnd.Initializer, scope, declared) : null;
@@ -2926,6 +2936,25 @@ public sealed class TypeChecker
         else { _de.Report("LYR-SEM0010", Severity.Error, bnd.Span, $"binding '{bnd.Name}' needs a type or an initializer"); type = LyrType.Error; }
 
         var local = new LocalSymbol(bnd.Name, type, bnd.IsMutable, bnd);
+        DeclareLocal(local, bnd, scope);
+
+        // 'using let' (05 E7 R1–R6): what it binds is Closeable (R6), and the close it owes its
+        // scope is checked as the defer it is — a site of this scope, the keyword its mark.
+        if (bnd.Cleanup is { } cleanup && !type.IsError)
+        {
+            // A coroutine is Closeable (10 I7) — by its built-in 'close()', not through a table.
+            if (type is CoroutineOf && _cancelled is not null
+                || _closeable is not null && ThrownCoveredBy(type, new NamedRef(_closeable), _currentModule))
+                CheckStmt(cleanup, scope);
+            else
+                _de.Report("LYR-SEM0143", Severity.Error, cleanup.Span,
+                    $"'using' closes what it binds — '{TypeFacts.Display(type)}' is no 'Closeable'");
+        }
+    }
+
+    /// <summary>A binding's name into its scope, once (N1a), and its symbol on its node.</summary>
+    private void DeclareLocal(LocalSymbol local, BindingStmt bnd, SymbolTable scope)
+    {
         // A name is bound once in a scope (Lyric 5; decided 2026-10-07, N1a). The table kept the first
         // binding and refused the second without a word, so the name went on meaning the first; a
         // block's own binding may still hide an outer one — another scope. A parameter counts as
@@ -2944,19 +2973,6 @@ public sealed class TypeChecker
                     $"'{bnd.Name}' is a parameter, bound in this block already — give the binding another name, or a block of its own");
         }
         _result.BindRef(bnd, local); // for definite-assignment analysis
-
-        // 'using let' (05 E7 R1–R6): what it binds is Closeable (R6), and the close it owes its
-        // scope is checked as the defer it is — a site of this scope, the keyword its mark.
-        if (bnd.Cleanup is { } cleanup && !type.IsError)
-        {
-            // A coroutine is Closeable (10 I7) — by its built-in 'close()', not through a table.
-            if (type is CoroutineOf && _cancelled is not null
-                || _closeable is not null && ThrownCoveredBy(type, new NamedRef(_closeable), _currentModule))
-                CheckStmt(cleanup, scope);
-            else
-                _de.Report("LYR-SEM0143", Severity.Error, cleanup.Span,
-                    $"'using' closes what it binds — '{TypeFacts.Display(type)}' is no 'Closeable'");
-        }
     }
 
     /// <summary>
@@ -6849,6 +6865,12 @@ public sealed class TypeChecker
         // In parameter order, a named argument where its name says (04 D5); a hole is a parameter
         // the call leaves to its default.
         var args = ArrangeArguments(call, decl);
+        _callees.Add(call.Callee);
+        // An 'inline fn' (08 F6) sets the lambda literals at its function parameters in place:
+        // marked before phase C checks them, so their 'return' is the enclosing function's
+        if (decl is { IsInline: true })
+            for (var i = 0; i < args.Length && i < fn.Parameters.Length; i++)
+                if (args[i] is LambdaExpr inlined && fn.Parameters[i] is FnType) _result.MarkInlineLambda(inlined);
         var argTypes = new LyrType?[args.Length];
 
         // Phase A: non-lambdas, eagerly — with the declared parameter type as the context, the same
@@ -11839,13 +11861,19 @@ public sealed class TypeChecker
         var savedReturn = _currentReturn;
         var savedInference = _returnInference;
         var savedLoops = _loops;
-        _loops = new(); // its loops are its own (08 Y11 F5)
         var savedAskable = _askable;
-        _askable = new(ReferenceEqualityComparer.Instance); // a clause's binding is a captured value here (06 §4)
-        _currentYield = null; // a lambda is no coroutine: a yield inside it is the DYNAMIC kind
-                              // (§10a) even when the lambda stands inside a coroutine body —
-                              // which chain it meets is decided by who calls it, at runtime
-        _returnInference = null; // this lambda's returns are its own, never the outer collection's
+        // A lambda an 'inline fn' sets in place (08 F6) is no function of its own: its 'return',
+        // 'break', 'continue' and 'yield' are the enclosing function's, and it captures nothing.
+        var inline = _result.IsInlineLambda(lam);
+        if (!inline)
+        {
+            _loops = new(); // its loops are its own (08 Y11 F5)
+            _askable = new(ReferenceEqualityComparer.Instance); // a clause's binding is a captured value here (06 §4)
+            _currentYield = null; // a lambda is no coroutine: a yield inside it is the DYNAMIC kind
+                                  // (§10a) even when the lambda stands inside a coroutine body —
+                                  // which chain it meets is decided by who calls it, at runtime
+            _returnInference = null; // this lambda's returns are its own, never the outer collection's
+        }
 
         var lambdaScope = new SymbolTable(scope);
         var pTypes = new LyrType[parameters.Length];
@@ -11897,7 +11925,7 @@ public sealed class TypeChecker
 
         // A yield of its own makes the lambda a GENERATOR (08 Y11 F5): 'fn(…) -> Coroutine<Y, R>'.
         // Calling it builds the coroutine and throws nothing; what the body throws is the pulls'.
-        if (lam.Body is Block generator && CoroutineShape.YieldsIn(generator))
+        if (!inline && lam.Body is Block generator && CoroutineShape.YieldsIn(generator))
         {
             // Its body runs after the call has returned, when the caller's place may be gone
             // (03 §2.3a) — as a coroutine function's.
@@ -11932,6 +11960,27 @@ public sealed class TypeChecker
                         CheckAssignable(e, bt, contextRet, e.Span);
                 }
                 break;
+            case Block b when inline:
+            {
+                // set in place (08 F6): a 'return' leaves the enclosing function, so the lambda's
+                // value is its tail — or nothing, for a void position
+                var savedTail = _tailExpected;
+                var wanted = openGeneric ? null : contextRet;
+                _tailExpected = wanted is null || TypeFacts.IsVoid(wanted) ? null : wanted;
+                CheckBlock(b, lambdaScope);
+                if (b.Tail is { } inlineTail)
+                {
+                    var tailType = _result.TypeOf(inlineTail.Expr);
+                    if (wanted is not null && !TypeFacts.IsVoid(wanted)) CheckAssignable(inlineTail.Expr, tailType, wanted, inlineTail.Span);
+                    ret = wanted ?? tailType;
+                }
+                else ret = wanted ?? LyrType.Void;
+                if (!TypeFacts.IsVoid(ret) && !ret.IsError && b.Tail is null && !Flow.AlwaysReturns(b, _result))
+                    _de.Report("LYR-SEM0046", Severity.Error, lam.Span,
+                        "a lambda an inline function sets in place gives its value as its last expression — its 'return' leaves the enclosing function");
+                _tailExpected = savedTail;
+                break;
+            }
             case Block b:
             {
                 // A tail is 'return tail;' at the block's end (§6.9, §7.3): it counts as a value
@@ -11993,8 +12042,99 @@ public sealed class TypeChecker
         _loops = savedLoops;
         _askable = savedAskable;
 
-        RecordCaptures(lam);
+        if (!inline) RecordCaptures(lam);
         return new FnType(pTypes, ret) { Throws = thrown ?? EscapingOf(lam.Body), Places = places.Contains(true) ? places : [] };
+    }
+
+    /// <summary>Every callee a call names: an 'inline fn' (08 F6) is called, never a value.</summary>
+    private readonly HashSet<Expr> _callees = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// What an <c>inline fn</c> (design/v5/spec/08 F6; 13 M9a P10) asks, once every body is checked:
+    /// <list type="bullet">
+    /// <item>its function parameters are called — or passed on to another <c>inline fn</c>'s —, never
+    /// kept, returned or captured: they are set in place (<c>LYR-SEM0181</c>);</item>
+    /// <item>it does not reach itself through calls of <c>inline fn</c>s: the setting in place would
+    /// not end (<c>LYR-SEM0182</c>);</item>
+    /// <item>it is no value: nothing is there to point at (<c>LYR-SEM0183</c>).</item>
+    /// </list>
+    /// </summary>
+    private void CheckInlineFunctions()
+    {
+        foreach (var (node, symbol) in _result.AllReferences)
+            if (symbol is FunctionSymbol { Declaration: FunctionDecl { IsInline: true } } called && node is Expr used
+                && !_callees.Contains(used))
+                _de.Report("LYR-SEM0183", Severity.Error, used.Span,
+                    $"'{called.Name}' is an inline function: it is called, and set in place there — it is no value");
+        var inlines = new List<FunctionDecl>();
+        foreach (var module in _comp.Modules)
+            foreach (var decl in _comp.AstOf(module).Declarations)
+            {
+                IEnumerable<FunctionDecl> fns = decl switch
+                {
+                    FunctionDecl f => new[] { f },
+                    StructDecl s => s.Members.OfType<FunctionDecl>(),
+                    ClassDecl c => c.Members.OfType<FunctionDecl>(),
+                    EnumDecl e => e.Methods,
+                    ExtendDecl x => x.Methods,
+                    InterfaceDecl i => i.Members,
+                    _ => [],
+                };
+                // what an expansion does not take (13 M9a S8): no body, a member called through a
+                // table, a receiver or parameter that is the caller's place, a body that yields
+                foreach (var fn in fns.Where(fn => fn.IsInline))
+                {
+                    string? why = decl is InterfaceDecl ? "an interface's member is called through its conformer's table"
+                        : fn.Body is null ? "it has no body to set in place"
+                        : fn.IsMut ? "its receiver would be the caller's place, which a body set in place does not hold"
+                        : fn.Parameters.FirstOrDefault(p => p.IsPlace) is { } place
+                            ? $"'{place.Name}' takes a place, which a body set in place does not hold"
+                        : CoroutineShape.YieldsIn(fn.Body) ? "its body yields: a coroutine's body runs where it is pulled, not where it is called"
+                        : null;
+                    if (why is null) inlines.Add(fn);
+                    else _de.Report("LYR-SEM0184", Severity.Error, fn.NameSpan, $"'{fn.Name}' cannot be inline — {why}");
+                }
+            }
+        if (inlines.Count == 0) return;
+
+        static FunctionDecl? InlineOf(Symbol? symbol) =>
+            symbol is FunctionSymbol { Declaration: FunctionDecl { IsInline: true } inline } ? inline : null;
+        var edges = new Dictionary<FunctionDecl, List<(FunctionDecl To, CallExpr At)>>(ReferenceEqualityComparer.Instance);
+        foreach (var fn in inlines)
+        {
+            var lambdas = new HashSet<Symbol>(ReferenceEqualityComparer.Instance);
+            foreach (var p in fn.Parameters)
+                if (_result.RefOf(p) is ParameterSymbol { Type: FnType } held) lambdas.Add(held);
+            var calls = edges[fn] = new();
+            void Walk(Node node, Node? parent)
+            {
+                if (node is CallExpr call && InlineOf(TargetSymbol(call.Callee)) is { } next) calls.Add((next, call));
+                if (node is IdentifierExpr id && _result.RefOf(id) is ParameterSymbol p && lambdas.Contains(p)
+                    && !(parent is CallExpr c && ReferenceEquals(c.Callee, id))
+                    && !(parent is CallExpr passed && InlineOf(TargetSymbol(passed.Callee)) is not null))
+                    _de.Report("LYR-SEM0181", Severity.Error, id.Span,
+                        $"'{id.Name}' is set in place at every call of '{fn.Name}' — it is called here, not kept, returned or captured");
+                foreach (var child in AstChildren.Of(node)) Walk(child, node);
+            }
+            Walk(fn.Body!, fn);
+        }
+
+        // a cycle through calls of inline functions, reported at the call that closes it
+        var state = new Dictionary<FunctionDecl, int>(ReferenceEqualityComparer.Instance);
+        void Visit(FunctionDecl from)
+        {
+            state[from] = 1;
+            foreach (var (to, at) in edges.GetValueOrDefault(from) ?? [])
+            {
+                if (state.GetValueOrDefault(to) == 1)
+                    _de.Report("LYR-SEM0182", Severity.Error, at.Span,
+                        $"'{to.Name}' is an inline function this call reaches again — it would be set in place without end");
+                else if (state.GetValueOrDefault(to) == 0) Visit(to);
+            }
+            state[from] = 2;
+        }
+        foreach (var fn in inlines)
+            if (state.GetValueOrDefault(fn) == 0) Visit(fn);
     }
 
     /// <summary>
@@ -12188,8 +12328,11 @@ public sealed class TypeChecker
 
         // Captured 'var' bindings are shared rather than copied, so they need a cell. Conservatively:
         // what counts is not WHETHER the closure writes, but that it could.
+        // A local 'fn' its own body captures (08 F8) too: the closure stands before the binding
+        // holds it, so the binding holds a cell the closure reads.
         foreach (var symbol in captured)
-            if (symbol is LocalSymbol { IsMutable: true }) _result.MarkBoxed(symbol);
+            if (symbol is LocalSymbol { IsMutable: true } or LocalSymbol { Declaration: BindingStmt { LocalFunction: true } })
+                _result.MarkBoxed(symbol);
     }
 
     // --- arithmetic, assignability, literal fit ---
@@ -13154,7 +13297,7 @@ public sealed class TypeChecker
     /// <summary>The compiler instructions of <c>std.core</c> beside <c>@Test</c>, <c>@Bench</c> and
     /// <c>@callerExpr</c> (09 A11, the closed list of T2): what changes what the compiler does.</summary>
     private static readonly string[] CompilerInstructions =
-        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "When"];
+        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "When", "Shared"];
 
     /// <summary>Whether this is one of <see cref="CompilerInstructions"/>, by identity (09 T6).</summary>
     private bool IsCompilerInstruction(TypeSymbol ts) =>

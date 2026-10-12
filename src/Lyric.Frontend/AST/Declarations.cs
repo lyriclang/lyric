@@ -123,6 +123,10 @@ public sealed record FunctionDecl(
     /// or overrides it.</summary>
     public bool IsPrivateHelper => Visibility == VisibilityWord.Private && Body is not null;
 
+    /// <summary><c>inline fn</c> (design/v5/spec/08 F6): set in place at every call, its lambda
+    /// arguments with it — no closure, a <c>return</c> in one leaves the function that wrote it.</summary>
+    public bool IsInline { get; init; }
+
     public required Span NameSpan { get; init; }
 
     /// <summary>Whether the return type is written in parentheses, <c>fn f(): (Task&lt;int&gt;) throws E</c>.

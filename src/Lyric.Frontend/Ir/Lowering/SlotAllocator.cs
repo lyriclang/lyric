@@ -60,6 +60,20 @@ internal sealed class SlotAllocator
 
     public IrType TypeOfLocal(LocalId id) => _locals[id.Value].Type;
 
+    public IrType TypeOfTemp(TempId id) => _temps[id.Value].Type;
+
+    /// <summary>Which slot each symbol names now. Kept around the expansion of an inline function
+    /// (08 F6): its symbols are the same at every expansion, and one set in place inside another of
+    /// the same function — <c>xs.forEach { ys.forEach { … } }</c> — would leave the outer's names on
+    /// the inner's slots.</summary>
+    public Dictionary<Symbol, LocalId> Bindings() => new(_bySymbol, ReferenceEqualityComparer.Instance);
+
+    public void Rebind(Dictionary<Symbol, LocalId> bindings)
+    {
+        _bySymbol.Clear();
+        foreach (var (symbol, id) in bindings) _bySymbol[symbol] = id;
+    }
+
     public TempId NewTemp(IrType type)
     {
         var id = new TempId(_temps.Count);

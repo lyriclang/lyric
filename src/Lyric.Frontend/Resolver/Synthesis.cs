@@ -167,7 +167,11 @@ internal static class Synthesis
                 var parts = new List<string>();
                 foreach (var f in fields)
                 {
-                    var cloned = CloneOf($"this.{f.Name}", f.Type, text);
+                    // '@Shared' (04 Clone; 13 M9a S8): the reference copied, not cloned — a parent,
+                    // a service, a cycle. Read by its name here; the checker holds it to std.core's.
+                    var cloned = f.Attributes.Any(a => a.Path is [.., "Shared"])
+                        ? $"this.{f.Name}"
+                        : CloneOf($"this.{f.Name}", f.Type, text);
                     if (cloned is null) { refusal = $"a field of type '{text(f.Type)}' has no synthesized clone"; return null; }
                     parts.Add($"            {f.Name} = {cloned}");
                 }

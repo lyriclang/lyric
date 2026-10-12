@@ -243,6 +243,7 @@ public sealed partial class Parser
         {
             case TokenKind.Mut:
             case TokenKind.Fn:
+            case TokenKind.Inline:
                 return ParseFunctionDecl(isPublic, start) with { Attributes = attributes };
             case TokenKind.Struct:
                 return WithAttributes(ParseStructOrClass(isPublic, start, isClass: false), attributes);
@@ -449,6 +450,16 @@ public sealed partial class Parser
     private FunctionDecl ParseFunctionDecl(VisibilityWord isPublic, Span start, bool isStatic = false,
         ExternSpec? spec = null)
     {
+        // 'inline fn' (08 F6): a word of Lyric 5's alone — the 4.x lexer reads 'inline' as a name
+        var isInline = _buffer.Match(TokenKind.Inline);
+        // the order is '[static] [inline] [mut] fn': 'inline static' is refused and read as what it
+        // says — the rest of the member parses as written, no cascade
+        if (isInline && !isStatic && _buffer.Check(TokenKind.Static))
+        {
+            _de.Report("LYR-PAR0032", Severity.Error, _buffer.Current.Span, "'static' comes before 'inline': write 'static inline fn'");
+            _buffer.Advance();
+            isStatic = true;
+        }
         var isMut = _buffer.Match(TokenKind.Mut);
         _buffer.Expect(TokenKind.Fn, "LYR-PAR0032", $"expected 'fn', got {_buffer.Current.TokenKind}");
         var name = ExpectNamed("LYR-PAR0026", "function name");
@@ -507,7 +518,7 @@ public sealed partial class Parser
         }
 
         return new FunctionDecl(isPublic, isMut, isStatic, name.Name, generics, parameters, returnType, throws, body,
-            Span.Union(start, end)) { NameSpan = name.Span, Extern = spec, ReturnGrouped = returnGrouped };
+            Span.Union(start, end)) { NameSpan = name.Span, Extern = spec, ReturnGrouped = returnGrouped, IsInline = isInline };
     }
 
     /// <summary>
@@ -665,7 +676,7 @@ public sealed partial class Parser
             return ParseFunctionDecl(isPublic, start, isStatic: true);
         }
 
-        if (_buffer.Check(TokenKind.Fn) || _buffer.Check(TokenKind.Mut))
+        if (_buffer.Check(TokenKind.Fn) || _buffer.Check(TokenKind.Mut) || _buffer.Check(TokenKind.Inline))
             return ParseFunctionDecl(isPublic, start);
 
         // 'var name: T' — the one word that makes a field writable (design/v5/spec/02 M2).
@@ -752,7 +763,7 @@ public sealed partial class Parser
     private bool AtEnumMember()
     {
         var at = WordOf(_buffer.Current.TokenKind) != VisibilityWord.None ? 1 : 0;
-        return _buffer.Peek(at).TokenKind is TokenKind.Fn or TokenKind.Mut or TokenKind.Static
+        return _buffer.Peek(at).TokenKind is TokenKind.Fn or TokenKind.Mut or TokenKind.Static or TokenKind.Inline
             || (at == 0 && AtAttributeStart)
             || (at == 0 && AtContextual("type") && _buffer.Peek(1).TokenKind == TokenKind.Identifier
                 && _buffer.Peek(2).TokenKind == TokenKind.Equal);

@@ -4793,8 +4793,9 @@ extend<I :: [Iterator]> I {
         }
         return best;
     }
-    /// `f` for every value, in order.
-    pub fn forEach<E :: [Error]>(f: fn(I.Item) -> void throws E): void throws Join<I.Error, E> {
+    /// `f` for every value, in order. Inline (08 F6): a lambda written at the call is set in place —
+    /// a `return` in it leaves the function that wrote it, `break` and `continue` reach its loops.
+    pub inline fn forEach<E :: [Error]>(f: fn(I.Item) -> void throws E): void throws Join<I.Error, E> {
         var it = this;
         var x = try it.next();
         while (x != null) {
@@ -6082,3 +6083,7 @@ fn buildOs(): int;
 fn buildArch(): int;
 fn buildPointerWidth(): int;
 fn buildDebug(): bool;
+
+/// `@Shared` on a field (04 Clone; 09 A11): a synthesized `clone()` copies the field as it stands
+/// instead of cloning it — a parent, a service, a cycle: what both copies share.
+pub struct Shared :: [OnField] { }
