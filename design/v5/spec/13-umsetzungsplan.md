@@ -131,6 +131,7 @@ Nach M8a S11a hat der Maintainer die offenen Punkte aus M4 bis M8a durchgesehen 
 | **Durchsicht 2026-10-09** | Die offenen Punkte aus M8c S1–S13, mit dem Maintainer entschieden („alle Empfehlungen“; `v` nach Rückfrage „voll, wie T10“): in 03, 04, 05, 08, 10, 11 je im Abschnitt „Review 2026-10-09“. Uhren: M8c S15–S19 (Nachtrag zum M8c-Plan unten) — `is` auf eingebauten Typen und `Any` für sie; `Debug` für `?T`, `Display`/`Debug` für `T[N]`; die Synthese über `T[N]`-Feldern als Ganzes, `never` als Typargument unter `Error`; der Bereichsindex über den View, `LYR-SEM0126` an Feldern, Elementen und Typargumenten, die leere nachgestellte Lambda; das Gate je Profil · M12 — `?U` aus einem Lambda, das `T` liefert; mehrere `From` eines Typs (vertagt). Bestätigt: die Lesarten zu Unicode, Adaptern, `map[k] = null`, Blankets, Zeugen über den View, `Backtrace`, Prüfsummen, Assertions und Benchmarks |
 | **Durchsicht 2026-10-12** | Die offenen Punkte aus M9a S1–S9 und S12a (D1–D8 des Berichts), mit dem Maintainer entschieden („alle Empfehlungen“): in 07, 09 und 10 je im Abschnitt „Review 2026-10-12“. In M9a: S10 (D2–D5: die Familie fragt mit dem Modul des Konformers, der generische Kopf bleibt, der Initialisierer über Infos, Variante und Nutzlast per Info), S11 (D5). Bestätigt: `module;` als Ort der Modul-Attribute (D6). Uhren: M9a S12 — `assert(c) { … }` (D1), eine Modulbindung nur auswerten, wo ihr Global erreicht wird (D8) · M10 — der libm-Port für Compile-Zeit und Laufzeit (D7). Dazu entschieden: **die Elementarfunktionen werden freie Funktionen in `std.math`** (`sqrt`, `cbrt`, `exp`, `ln`, `log2`, `log10`, `pow`, die Winkelfunktionen, `hypot`, `floor`, `ceil`, `round`, `trunc`, `abs`, `signum`); am Typ bleibt, was den Typ beschreibt (`epsilon`, `infinity`, `nan`, `min`/`max`/`leastPositive`/`bitWidth`, `isNan`/`isInfinite`/`isFinite`, `toBits`/`fromBits`, `totalCompare`, `parse`, `wrapping*`/`checked*`); `clamp` bleibt Methode — 10 Z2 wird mit dem Slice nach S11 geändert; und **`std.core` wird durchgesehen**: sortiert, verdichtet, ausgelagert, was nicht Kern ist (das größte Modul, das jedes Programm lädt) |
 | **Abgeschlossen** | 2026-10-13: M9a S1–S12 (#444–#457, dazu S11b, S11c, S12b), Suite 1391 in beiden Profilen, Spec-Pin lyric-spec#292. Messpunkt 1: hello 1 362 896 Bytes, 841 Zeilen C, Start 1,28 ms gegen 0,94 ms plain C. Lesarten, die der Maintainer sehen soll: statische Defaults (03 Review 2026-10-12), `Variants.all` statt `variants`, der Integer-`pow(n)` bleibt Methode, `std.iter` als Prelude-Modul, ein `inline`-Rumpf trägt die Aufrufzeile. Türen: `Default` nach `std.core` (braucht `f.type` in Typposition, M9b), `comptime for` über Tupelelemente, `std.unicode`, libm-Port (M10, D7) |
+| **Durchsicht 2026-10-13** | Der M9a-Abschlussbericht: die sieben Lesarten — statische Interface-Defaults (03 Review 2026-10-12), `Variants.all()`, der Integer-`pow(n)` als Methode, `std.iter` als Prelude-Modul ohne Namen, ein `inline`-Rumpf trägt die Aufrufzeile, `Default` bleibt beim Compiler, was in `std.core` bleibt (10 Review 2026-10-13 A3) — **alle bestätigt** („Alle sieben Lesarten bestätigt, M9b planen“). Die Punkte 81–84 (CI) und 85–104 (S10–S12b) bleiben gesammelt; 104 (die std-Selbsttests schreiben ins Arbeitsverzeichnis) bekommt die Uhr M9b S6 |
 
 ## Nachtrag 2026-10-07 — der Plan für M8b
 
@@ -399,6 +400,85 @@ Nach Aufwand: groß S1, S5, S9, S10; mittel S2, S3, S6, S8; klein S4, S7, S11, S
 - **Nim**: `static:`/`when` und `fieldPairs` — die Entfaltung je Instanz.
 - **Kotlin**: `inline` mit nicht-lokalem `return` (P10).
 - **Swift**: `CaseIterable` (S11).
+
+## Nachtrag 2026-10-13 — der Plan für M9b
+
+M9b nach seiner Zeile oben (09 A8 Sprosse 5, 08 Y12 Q1–Q7, 10 B13 M2–M3, 11 G12 und Q7), dazu jede Uhr, die auf M9b
+steht: `Default` nach `std.core` (braucht `f.type` in Typposition — 09 Review 2026-10-12, S10-Zeile), `comptime for`
+über Tupelelemente (10 Review 2026-10-13 A3), die std-Selbsttests ins Arbeitsverzeichnis (Punkt 104).
+
+Grundlage ist eine Prüfung jedes Punkts gegen den Code (2026-10-13). Von M9b steht:
+
+- die Wörter `macro` und `quote` sind reserviert (M9a S3), sonst nichts von ihnen: kein Parser, kein Knoten;
+- der Interpreter läuft über der typisierten IR mit expliziten Rahmen, Budget und Panik-Kette (S1), und die
+  Hebe-Senkung senkt, was Wurzeln erreichen (S1, S12b) — die Maschine, auf der ein Makro läuft;
+- `Box<T>`-, Struct-, Enum- und Array-Werte sind `comptime`-Ergebnisse (S2) — die Form, die ein Syntaxbaum als Wert
+  braucht (10 M2: Enums mit `Box`-Nutzlast);
+- `std.meta` gibt Typinformation als Konstanten je Instanz (S9), die Attribute der Arten 1 und 2 sind Werte des Baus
+  (S5, S6); Art 3 gibt es nicht;
+- die Diagnose-Engine kennt `Within` (Noten-Ketten, Hauptspan, Recode — S9, S10), die Grundlage für G12.
+
+Die Slices heißen **M9b S1–S6**; jeder ist ein PR, sein Regel-PR in der Spec geht voran. Größe: **L** wie die Zeile.
+
+### Architektur
+
+| # | Entscheidung | Warum — und warum nicht die Alternativen |
+|---|---|---|
+| P1 | **`std.syntax` ist eine Lyric-Bibliothek** (10 M2): der Syntaxbaum als Enums und Structs mit `Box`-Nutzlast — `Expr`, `Stmt`, `Block { stmts }`, `Decl` mit seinen Arten (`FnDecl`, `StructDecl`, `ClassDecl`, `EnumDecl`, `InterfaceDecl`, `ExtendDecl`, `LetDecl` …), `Type`, `Pattern`, `Ident { name, span }`, `Literal`, `Param`, `Attribute`, `Span { file, line, column }`; jeder Knoten mit `span`, `Debug` und `toSource()`; `children()`, `walk(f)`, `map(f)`; `Ident.fresh(hint)`; `parseExpr(s)`, `parseStmts(s)`, `parseDecls(s)` für DSL-Strings (Q5); `error(node, msg): never`, `warn`, `note`. **Gespiegelt wird, was ein Programm schreiben kann** — die Formen der Spec, nicht die inneren Knoten des Compilers (`FieldByInfoExpr`, `ErrorExpr` …); die Enums sind `@NonExhaustive` (M3), ein Makro-`match` braucht `_`. | Nim `macros`, Rust `syn` — ohne Token-Strom (A8 T1). Alternative, den C#-Baum direkt zu reichen: es gibt keine Fremdobjekte im Interpreter (Q1), und die Bibliothek ist die Spec der Formen. |
+| P2 | **Die Syntaxbrücke** (C#, `Sema/Syntax/`): der Compiler baut aus seinem Baum die `std.syntax`-Werte des Interpreters und liest Werte zu Knoten zurück — eine Tabelle je Knotenart in beide Richtungen, geprüft durch einen Rundlauf: Baum → Werte → Baum → Senkung, dasselbe C. Ein zurückgelesener Knoten ohne Span (aus `quote` gebaut) bekommt den Span der Aufrufstelle, die Herkunft (`quote`-Zeile) als Note (G12). | Die Brücke ist der große Posten; sie ist mechanisch und wird mit der Spiegelung in P1 in einem Slice gebaut, damit beide dieselbe Liste haben. |
+| P3 | **`macro` ist eine `comptime`-Funktion über `std.syntax`** (Q1): `macro retry(n: Expr, body: Block): Expr { … }` — geprüft wie eine Funktion, gesenkt wie eine `comptime`-Stelle, im Interpreter gelaufen unter dessen Regeln (09 Q9: rein, Budget, Panik = Fehler mit Kette). Rückgabe ein AST-Typ, `Stmt[]` oder `Decl[]`. Ein Makro ist eine Top-Level-Deklaration im Namensraum des Moduls (07 K3), `pub` und importierbar wie eine Funktion, nie ein Wert. | Nim `macro`; Swift `macro` mit externer Implementierung verworfen (zweiter Übersetzungsweg). |
+| P4 | **Die drei Aufrufformen** (Q4, Q5): `name!(args)`, `name!(args) { … }`, `name! { … }` — `!` unmittelbar nach dem Namen vor `(` oder `{` ist die Expansion (sonst das Unwrap-Postfix; der Parser sieht ein Token voraus); jedes Argument ist Lyric-Syntax und kommt dem Makro als Wert seines Parametertyps (`Expr`, `Block`, `Ident`, `Literal`, `Type`, `Stmt[]`), ein nachgestellter Block als `Block`. **Attribut-Makro** (Art 3, F2, T4): `@Builder struct P { … }`, `@Retry(3) fn f() { … }` — ein `macro`, dessen erster Parameter ein Deklarationstyp ist (der Typ ist der Zielmarker: `StructDecl` sitzt an Structs); die Deklaration geht als Wert hinein, das Ergebnis (`Decl` oder `Decl[]`) ersetzt sie: T5 — ein Attribut ändert nie Code, der es nicht trägt. Kein `!` am Attribut (T4). | Rust `#[attr]`/`name!`, Swift attached/freestanding. Verworfen: `name!` als Token-Strom (T1); DSLs über neue Grammatik (A8 Grenze). |
+| P5 | **`quote { … }` und `#{…}`** (Q2, Q3): `quote` ist ein Ausdruck vom AST-Typ seines Inhalts — ein Ausdruck gibt `Expr`, Anweisungen `Stmt[]` oder `Block`, Deklarationen `Decl` oder `Decl[]`; wo der Inhalt mehrdeutig ist, entscheidet der erwartete Typ. **Hygienisch**: ein Name, den das `quote` selbst bindet (`let`, Parameter, Schleifenvariable), wird je Expansion frisch (`Ident.fresh`), ein Name aus `#{…}` gehört dem Aufrufer, ein freier Name im `quote` wird im Modul des Makros aufgelöst (Julias `esc`-Grenze in der anderen Richtung: Einfügen ist die Ausnahme, nicht das Entkommen). `#{e}` setzt einen AST-Wert, ein `Ident` oder ein Literal ein; ein Array von Knoten wird gespleißt; in Bezeichnerposition (`fn #{name}()`) baut es Namen. Im Parser ist `#{` nur innerhalb von `quote` ein Token. | Elixir `quote`/`unquote`, Nim `quote do`/backticks, Julia-Hygiene. Verworfen: unhygienisch mit `gensym` von Hand (Lisp) — der Fehler, den jeder macht. |
+| P6 | **Die Expansion ist eine Phase je Modul, in Importreihenfolge**: ein Makro wird in den Modulen expandiert, die es importieren; das Modul, das es schreibt, prüft es zuerst (`LYR-SEM…`: ein Makro in seinem eigenen Modul aufzurufen ist abgelehnt — Rusts Regel, hier je Modul statt je Crate). Der Ablauf: Parsen aller Module; dann je Modul in Importreihenfolge — (1) seine Makrostellen (`!`-Aufrufe, Art-3-Attribute) finden, (2) die Makros der importierten Module samt dem, was sie erreichen, mit der Hebe-Senkung senken (einmal je Makro-Modul, gecacht), (3) jede Stelle im Interpreter expandieren, äußere vor inneren, mit Tiefenlimit aus dem Budget, (4) das Ergebnis durch die Brücke in den Baum des Moduls setzen, (5) das Modul prüfen wie geschrieben. Ohne Makrostelle kostet ein Bau nichts (P11 von M9a gilt weiter). | Nim verschränkt Sem und VM je Deklaration — mächtiger (Typen des Arguments), aber der Checker müsste unterbrechbar werden; Rust staged je Crate. Je Modul ist die kleinste Stufe, die der Modulgraph (07 K-Reihe, ohne Zyklen) schon hergibt. |
+| P7 | **Diagnosen** (G12, Q6): `error(node, msg)` aus dem Makro ist ein Fehler mit Hauptspan am Knoten (ein Argument der Aufrufstelle) und einer Note am `!`; ein Fehler im **expandierten** Code hat den Hauptspan an der Aufrufstelle und die Noten „in der Expansion von `retry!`“ und die `quote`-Zeile; eine Panik oder ein Budget im Makro wie bei `comptime` (`LYR-CT0001/2`, mit Kette). Die Spans der Argumente bleiben die geschriebenen (P2). | rustc: Makro-Backtrace als Noten. |
+| P8 | **`lyric expand <datei>`** (Q7, 11): schreibt das Modul mit expandierten Makros als Quelltext (`toSource`) auf stdout — `#line`-los, lesbar, derselbe Formatierer, der `toSource` schreibt. Der Editor (E2) kommt mit M13b. | `cargo expand`. |
+| P9 | **Typen auf Anfrage: nur, was das Makro selbst nennt.** `std.meta` läuft im Makro wie in jeder `comptime`-Funktion — `fields<app.P>()` über einen Typ, den der Makro-Rumpf schreibt. `typeOf(expr)` über ein **Argument** gibt es nicht: die Expansion läuft vor der Prüfung des Aufrufers (P6), ein Argument hat noch keinen Typ. A8 sagt „auf Anfrage Typen“; die Tür ist Nims Verschränkung — festgehalten als Tür, nicht gebaut. Was `@Builder` braucht, sind die geschriebenen Feldtypen der `StructDecl`: Syntax. | Rust-proc-macros haben es auch nicht; Nim hat es um den Preis des verschränkten Compilers. |
+| P10 | **Spec:** 11 §5 Makros (neu: Deklaration, Aufrufformen, `quote`/`#{}`, Hygiene, Staging je Modul, Diagnosen), 08 §1/§2 die Formen (`name!`, `quote`, `#{}`), 01 die Wörter (`macro`, `quote` erhalten ihre Form), 12 `std.syntax`, 14 `lyric expand`, 16 die neuen Codes. | wie M9a P12 |
+
+### Slices
+
+| Slice | Inhalt | Artefakt, Prüfung |
+|---|---|---|
+| **S1** `std.syntax` und die Brücke | P1, P2: die Bibliothek, die Brücke in beide Richtungen, `toSource` | ein Rundlauf über jedes Programm der `CEmitterTests`: Baum → Werte → Baum → dasselbe C; `toSource` eines Falls gleich dem Formatierer |
+| **S2** `macro` und `name!(…)` | P3, P4 (Ausdrucks- und Anweisungsform), P6, P7 ohne `quote`: der Rumpf baut Knoten über die Konstruktoren | `twice!(x)` als `Expr`-Rückgabe; ein Makro aus einem importierten Modul; der eigene Modulaufruf abgelehnt; ein `error(node, …)` mit beiden Spans |
+| **S3** `quote` und `#{}` | P5 mit Hygiene | **`retry!(3) { try fetch(url) }`** (die Zeile aus 08 Y12); ein `let` im `quote` kollidiert nicht mit dem des Aufrufers; `#{names}` gespleißt; `fn #{name}()` |
+| **S4** Attribut-Makros | P4 Art 3 an jeder Deklarationsart, die ein Marker-Typ nennt; `Decl[]` als Ersatz | **`@Builder struct P { … }`** erzeugt `PBuilder`; `@Retry(3) fn f()` umwickelt; T5 geprüft |
+| **S5** Diagnosen und `lyric expand` | P7 vollständig (Fehler im expandierten Code), P8 | `lyric expand` über `examples/macros`; ein Fehler in expandiertem Code zeigt Aufruf, Makro und `quote`-Zeile |
+| **S6** Abschluss | `examples/macros` für Lyric 5 (das 4.x-`comptime.lyr` wird S12as `constants.lyr`; dazu `retry!`, `@Builder`, ein DSL-Makro über `parseExpr`); Punkt 104 (die std-Selbsttests schreiben nach `tempDir()`); die Türen `Default` nach `std.core` und `comptime for` über Tupel geprüft: was `std.syntax`/`Type` in Typposition jetzt hergibt, wird gebaut, der Rest bleibt Tür; Dogfood; Messpunkt 1; STATUS, CHANGELOG | die Zeile oben erfüllt |
+
+**Nicht in M9b:**
+
+- `typeOf(expr)` über ein Makro-Argument (P9) — Tür;
+- die Expansion im Editor — M13b;
+- `@Export`, `@Layout` — M14;
+- Makros, die neue Grammatik definieren — nie (A8).
+
+### Tests
+
+- Je Slice die Regel-Fälle der Spec, rot gegen den Compiler davor, dazu die ganze Suite vor dem Ausliefern.
+- Die Brücke bekommt den Rundlauf (S1) als Dauertest in `Lyric5.Tests`: jede Knotenart, die ein Programm schreiben kann, geht hin und zurück.
+- Eine Mutationskontrolle je Regel: Hygiene aus (ein `let` des `quote` fängt den Aufrufer), Staging aus (der eigene Modulaufruf läuft), Span-Abbildung aus (der Fehler zeigt ins `quote`).
+
+### Umfang
+
+| | Umfang |
+|---|---|
+| `std.syntax` (Lyric) | etwa 700 Zeilen |
+| Brücke (C#) | etwa 1200 |
+| Parser: `macro`, `quote`, `#{}`, `name!` | etwa 400 |
+| Expansionsphase, Staging, Hygiene | etwa 1000 |
+| Diagnosen, `lyric expand` | etwa 350 |
+| Spec | etwa 400 Zeilen, ~25 Fälle |
+
+Nach Aufwand: groß S1, S3; mittel S2, S4; klein S5, S6. Etwa fünf Sessions.
+
+### Reflexion
+
+- **Nim**: Makros über dem typisierten AST in der Compiler-VM — das Modell (A8); Nims Verschränkung von Sem und VM gibt Argumenttypen, kostet den unterbrechbaren Checker — hier die Modul-Stufung (P6, P9).
+- **Rust**: proc-macros in eigenen Crates (Staging), `syn` statt Token-Strom für den, der Syntax will; die Backtrace-Noten (P7).
+- **Elixir/Julia**: `quote`/`unquote` und Hygiene als Standard, Entkommen als Ausnahme (P5).
+- **Swift**: attached und freestanding macros = Art 3 und die `!`-Formen; der externe Makro-Prozess verworfen (ein Interpreter steht schon).
+- **Racket**: die erweiterbare Grammatik, bewusst nicht (A8 Grenze).
 
 ---
 
