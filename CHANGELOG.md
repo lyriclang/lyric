@@ -138,6 +138,25 @@ promise. This entry fills with the milestones.
   a parameter bounded by `Error`, and as such a parameter's default — `MapIter<I, U>` is the
   adapter of a function that throws nothing; `list[a..b]` through `AsSlice<T>`; a constraint
   inside a written type said once; an empty trailing block.
+- **Compile time (M9a** — `design/v5/spec/09`, spec chapter 11**):** `comptime e` evaluates
+  through an IR interpreter — any value type as the result, `comptime { … }`, `comptime if`,
+  `comptime for`, a budget per site, a panic or a call into the world an error at the site —;
+  `embed(path)`; attributes on every declaration, each a value computed while compiling, and
+  the compiler's own (`@Deprecated`, `@MustUse`, `@NonExhaustive`, `@Allow`, `@AlwaysInline`,
+  `@NoInline`, `@Cold`, `@callerExpr`/`@callerLine`/`@callerFile`); `target` and `profile` as
+  constants of the build and `@When(cond)` on declarations and on `module;`; `inline fn`
+  and local `fn`, a lambda set in place returning from the function that wrote it, `forEach`
+  inline; `std.meta` — `fields`, `variants`, `members`, `conformances`, `attribute`, … — with
+  `comptime for` over a type's fields and variants, `e.[f]`, `e is v`, `E.[v]`, `e.[v, p]`,
+  initializers over infos, a `comptime if` a round decides; the synthesis of `Equatable`,
+  `Hashable`, `Ordered`, `TotalOrder` and `Clone` as std.core's defaults over them (`@Shared`
+  copies a field), and `VariantName`/`Variants` (`name()`, `all()`, `fromName(s)`); a static
+  interface function with a body is a default. Of the review of 2026-10-12: the elementary
+  functions are `std.math`'s free functions (`sqrt(x)`, `sin(x)`, `floor(x)`, `pow(x, e)`,
+  `abs(x)`, …; the methods are gone); the adapters are `std.iter`'s, reached everywhere; `std.core`
+  ordered by subject; `assert(c) { f"…" }` with a message built on failure alone (the string
+  form is refused); a module binding's `comptime` site is evaluated only where the program
+  reaches the binding. `std.hash`'s CRC tables are computed while compiling.
 
 ---
 

@@ -43,7 +43,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M8a | std core | XL | **done** 2026-10-07 |
 | M8b | std I/O and system | L | **done** 2026-10-08 |
 | M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | **done** 2026-10-09 (S15–S19 after the review) |
-| M9a | `comptime` (the IR interpreter), attributes, `std.meta`, the synthesis | XL | **open** since 2026-10-09 (S1) |
+| M9a | `comptime` (the IR interpreter), attributes, `std.meta`, the synthesis | XL | **done** 2026-10-13 |
 | M9b | Macros | L | — |
 | M10 | std after rule D | XL | — |
 | M11 | Own GC | XL | — |
@@ -937,7 +937,7 @@ After the review:
   again the one whose function throws nothing, as before S4. Spec 06 §9.3 rule 3, 12 §Iteration;
   two cases.
 
-### M9a — open (since 2026-10-09)
+### M9a — done (2026-10-13)
 
 `comptime` through an IR interpreter, the attributes, `std.meta`, the synthesis after A5: the plan
 is design 13's addendum "der Plan für M9a" (P1–P13, S1–S12), re-cut to XL after every point was
@@ -1065,6 +1065,20 @@ M9b the maintainer is asked again.
   walks from the program's roots and the sites outside bindings to the globals touched, their
   initializers in turn —; an unreached binding gets no initializer, and the pruning drops its
   slot. hello builds 1530 → 1443 ms. Spec 06 §9 rule 1, 11 §2 rule 10; four cases.
+- **S12** the close: `programs/constants.lyr` (S12a) and the `comptime` tables (S12a) stand;
+  the dogfood — the std tests (394), the programs `ExampleTests` and `CEmitterTests` run, the
+  std's eight benchmarks under `lyric5 bench` —; measurement point 1: hello 1 362 896 bytes,
+  841 lines of C, starts in 1.28 ms against plain C's 0.94. (The 4.x `examples/` stay 4.x's
+  until M17 brings the texts over.) The rows S8–S12b above were written at S10 and after.
+
+**M9a's plan is built.** Every slice of P1–P13 stands, three slices more than the plan had
+(S11b `std.math` free, S11c the `std.core` audit, S12b D1 and D8 — the maintainer's decisions
+of 2026-10-12), and `Default` stays the compiler's for a reason of its own (no form names a
+field's type). The readings built on the way, for the maintainer's veto: a static interface
+function with a body is a default (03 "Review 2026-10-12"); `Variants.all()`, not
+`variants()`; an integer's `pow(n)` stays a method; `std.iter` as a module the prelude imports
+without a name; an inline body carries the call's line. The open points of S10–S12b went into
+the report. **M9a is done.** M9b follows, once the maintainer is asked.
 
 ## Design decisions
 
