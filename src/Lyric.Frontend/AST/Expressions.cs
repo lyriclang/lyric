@@ -331,3 +331,16 @@ public sealed record StructInitField(string Name, Expr Value, Span Span) : Node(
 
 // --- recovery ---
 public sealed record ErrorExpr(Span Span) : Expr(Span);
+
+/// <summary><c>twice!(x)</c>, <c>retry!(3) { ... }</c>, <c>run! { ... }</c> (design/v5/spec/08 Y12 Q5;
+/// 13 M9b P4): a macro's expansion site. The arguments are syntax, not values, and are checked
+/// nowhere: the expander (M9b S2) replaces the node by what the macro gives back before the module
+/// is checked. A tree holds one only before its expansion; the checker types it as a hole, the
+/// lowering as a trap, and neither is reached in a program that compiles.</summary>
+public sealed record MacroCallExpr(string Name, Expr[] Arguments, Block? Trailing, Span Span) : Expr(Span)
+{
+    public required Span NameSpan { get; init; }
+
+    /// <summary>The <c>!</c>, where a diagnostic of the expansion points its note.</summary>
+    public required Span BangSpan { get; init; }
+}

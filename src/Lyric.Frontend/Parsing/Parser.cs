@@ -753,6 +753,13 @@ public sealed partial class Parser
                 // was a parse error everywhere but in a match arm, whose pattern is not parsed
                 // here, and in a guard, which the flag excludes.
                 if (!_inGuard && _buffer.Peek(1).TokenKind == TokenKind.FatArrow) return ParseBareLambda();
+                // 'twice!(x)', 'retry!(3) { ... }', 'run! { ... }' (08 Y12 Q5; 13 M9b P4): the '!'
+                // directly behind the name, before '(' or '{', is a macro's expansion site. With a
+                // space, or before anything else, it is the unwrap postfix as ever: 'x! in xs',
+                // 'x!.f()'. A call on an unwrapped value, 'x!(y)', was never written.
+                if (_buffer.Peek(1) is { TokenKind: TokenKind.Exclamation } bang && bang.Span.Start == cur.Span.End
+                    && _buffer.Peek(2).TokenKind is TokenKind.LParen or TokenKind.LBrace)
+                    return ParseMacroCall();
                 _buffer.Advance();
                 return new IdentifierExpr(_sm.Slice(cur.Span).ToString(), cur.Span);
             case TokenKind.This:
@@ -1424,6 +1431,34 @@ public sealed partial class Parser
     /// they hold statements, exactly as '=> { … }' does — a value block, whose tail is the
     /// lambda's result: <c>{ let d = it * 2; d + 1 }</c>.
     /// </summary>
+    /// <summary>A macro's expansion site (08 Y12 Q5): the name, its '!', then '(args)', a block, or
+    /// both. The arguments are expressions as written; the block is a value block, so its last
+    /// expression may stand without ';' ('retry!(3) { try fetch(url) }').</summary>
+    private MacroCallExpr ParseMacroCall()
+    {
+        var nameTok = _buffer.Advance();
+        var bang = _buffer.Advance();
+        var arguments = new List<Expr>();
+        var end = bang.Span;
+        if (_buffer.Match(TokenKind.LParen))
+        {
+            if (!_buffer.Check(TokenKind.RParen))
+            {
+                do arguments.Add(ParseSubExpr());
+                while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RParen));
+            }
+            end = _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after the macro's arguments").Span;
+        }
+        Block? trailing = null;
+        if (_buffer.Check(TokenKind.LBrace))
+        {
+            trailing = ParseBlock(valueBlock: true);
+            end = trailing.Span;
+        }
+        return new MacroCallExpr(_sm.Slice(nameTok.Span).ToString(), arguments.ToArray(), trailing, Span.Union(nameTok.Span, end))
+            { NameSpan = nameTok.Span, BangSpan = bang.Span };
+    }
+
     private LambdaExpr ParseTrailingLambda()
     {
         var open = _buffer.Current; // '{'

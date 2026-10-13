@@ -1217,6 +1217,16 @@ internal sealed class FunctionLowerer
         return null;
     }
 
+    /// <summary>An unexpanded site (13 M9b P6), met only in the hoisting pass of an expansion
+    /// round: a global's initializer of the calling module holds one, and that pass runs no
+    /// initializer. A trap, so the function stays well-formed; the expander replaces the site
+    /// before the module is lowered for real.</summary>
+    private TempId? LowerMacroSite(MacroCallExpr site)
+    {
+        _b.Seal(new Unreachable(site.Span));
+        return null;
+    }
+
     /// <summary>Does this expression have the type 'never' — a 'throw', a call to 'panic' or to a
     /// function declared 'never', an 'if' or 'match' whose every arm diverges? Such an expression
     /// seals the block when lowered, and the position holding it must not store or branch after it.
@@ -2675,6 +2685,7 @@ internal sealed class FunctionLowerer
         TryExpr e => LowerTryExpr(e),
         ThisExpr e => LowerThis(e),
         AtIdentifierExpr e => throw NotSupported($"attribute '{e.Name}'", e.Span),
+        MacroCallExpr e => LowerMacroSite(e),
         ErrorExpr e => throw Bug($"error expression reached lowering at {e.Span}"),
 
         _ => throw Bug($"unhandled expression {expr.GetType().Name}")

@@ -75,26 +75,42 @@ public static class SourceCompiler
 
         var stdlib = BuildModuleLoader(sources, diagnostics, options, source.BaseDirectory);
 
-        var compilation = new Compilation(sources, diagnostics)
+        // what the loader gave, by module name: a rebuild after a macro's expansion (13 M9b P6)
+        // serves it again, with the expanded tree where there is one, and parses nothing twice
+        var parsedModules = new Dictionary<string, LoadedModule>(StringComparer.Ordinal);
+        Compilation Build(IReadOnlyDictionary<string, Module>? trees)
         {
-            Lyric5Modules = options.PackageRoots is not null,
-            PackageDependencies = options.PackageDependencies,
-            ModuleOnDisk = ModuleProbe(options),
-            // The standard library is ordinary Lyric source and is loaded on demand.
-            ModuleLoader = modulePath =>
+            var built = new Compilation(sources, diagnostics)
             {
-                var name = string.Join('.', modulePath);
-                report?.UpdateDetail(name);
+                Lyric5Modules = options.PackageRoots is not null,
+                PackageDependencies = options.PackageDependencies,
+                ModuleOnDisk = ModuleProbe(options),
+                // The standard library is ordinary Lyric source and is loaded on demand.
+                ModuleLoader = modulePath =>
+                {
+                    var name = string.Join('.', modulePath);
+                    if (parsedModules.TryGetValue(name, out var again))
+                        return trees is not null && trees.TryGetValue(name, out var expanded) ? again with { Ast = expanded } : again;
+                    report?.UpdateDetail(name);
 
-                var started = Stopwatch.GetTimestamp();
-                var result = stdlib(modulePath);
-                loaderTime += Stopwatch.GetElapsedTime(started);
+                    var started = Stopwatch.GetTimestamp();
+                    var result = stdlib(modulePath);
+                    loaderTime += Stopwatch.GetElapsedTime(started);
 
-                if (result is not null) loaded.Add(name);
-                return result;
-            },
-        };
-        compilation.Entry = compilation.AddModule(entry, source.ModuleName, documentation: parsedEntry.Documentation);
+                    if (result is not null)
+                    {
+                        loaded.Add(name);
+                        parsedModules[name] = result;
+                    }
+                    return result;
+                },
+            };
+            var entryName = source.ModuleName ?? "main";
+            var entryTree = trees is not null && trees.TryGetValue(entryName, out var expandedEntry) ? expandedEntry : entry;
+            built.Entry = built.AddModule(entryTree, source.ModuleName, documentation: parsedEntry.Documentation);
+            return built;
+        }
+        var compilation = Build(null);
 
         // 'std' is the standard library's name (design/v5/spec/07 D1): a single file named std.lyr
         // would claim it — a package cannot, its manifest refuses the name.
@@ -109,6 +125,25 @@ public static class SourceCompiler
         var resolveTime = Stopwatch.GetElapsedTime(resolveStarted);
         report?.EndPhase(loaderTime);
         report?.ReportPhase(Phase.Resolve, ModuleCount(loaded), resolveTime - loaderTime);
+
+        var embed = EmbedReaderFor(sources, options);
+
+        // macros (13 M9b P6): every site is expanded before its module is checked; a program
+        // without a site pays nothing
+        if (compilation.Lyric5Modules && !diagnostics.HasErrors && MacroExpander.Sites(compilation).Count > 0)
+        {
+            report?.BeginPhase(Phase.Check, "macros");
+            var expanded = MacroExpander.Expand(compilation, binding, diagnostics, sources, options, embed, trees =>
+            {
+                var again = Build(trees);
+                CompilerPosition.Begin(sources);
+                return (again, again.Resolve());
+            });
+            report?.EndPhase();
+            if (expanded is null) return new CompileResult(sources, diagnostics, null);
+            (compilation, binding) = expanded.Value;
+            entry = compilation.AstOf(compilation.Entry!);
+        }
 
         report?.BeginPhase(Phase.Check, ModuleCount(loaded));
         var types = Semantics.Analyze(compilation, binding, diagnostics);
@@ -126,7 +161,6 @@ public static class SourceCompiler
         // — the module's only roots, so it holds what the sites reach —, the IR interpreter over
         // it, and the real lowering writes each site's value as a constant. Lyric 5's: the 4.x
         // tools lower a site as its inner expression, as they did since their VM went (01 L7).
-        var embed = EmbedReaderFor(sources, options);
         types.SourcePlace = SourcePlaceFor(sources, options);
         if (!EvaluateSites(compilation, binding, types, diagnostics, options, embed, report, out var comptime))
             return new CompileResult(sources, diagnostics, null, model);

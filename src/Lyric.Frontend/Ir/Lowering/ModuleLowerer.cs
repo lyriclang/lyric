@@ -124,6 +124,7 @@ public static class ModuleLowerer
         // Receiver == null means a free function or a 'static fn'. Otherwise the type whose instance is
         // passed as parameter 0.
         var pending = new List<(FunctionDecl Decl, string Name, TypeSymbol? Receiver, TypeNode? ExtendTarget)>();
+        var macroRoots = new List<FunctionId>(); // the macros of an expansion round (13 M9b P6)
         var ids = new Dictionary<FunctionSymbol, FunctionId>(ReferenceEqualityComparer.Instance);
         var imports = new ImportTable();
         var typeTable = new TypeTable(binding) { Compilation = compilation, Comptime = comptime };
@@ -206,10 +207,16 @@ public static class ModuleLowerer
                     continue;
                 }
 
+                // a macro (13 M9b P3, P6) is lowered for its expansion only: in the hoisting pass of
+                // a round, and only when the expander names it; the program never calls one, and
+                // its body reads syntax the gate refuses at run time
+                if (function.IsMacro && !(comptime is { Hoist: true, MacroRoots: { } wanted } && wanted.Contains(symbol))) continue;
+
                 var id = new FunctionId(pending.Count);
                 ids[symbol] = id;
                 pending.Add((function, NameMangling.ForFunction(module, function.Name)
                     + OverloadSuffixFor(module.Members, function), null, null));
+                if (function.IsMacro) macroRoots.Add(id);
 
                 // A library's surface: the pub functions of the COMPILED modules, never the standard
                 // library's — its pubs rooting would keep every program whole. Ids in 'pending' are
@@ -348,6 +355,7 @@ public static class ModuleLowerer
         {
             entry = null;
             exportRoots.Clear();
+            exportRoots.AddRange(macroRoots);
             for (var i = 0; i < types.ComptimeSites.Count; i++)
             {
                 var site = types.ComptimeSites[i];
@@ -377,8 +385,15 @@ public static class ModuleLowerer
         // missing constructs of their program in one run rather than one per call.
         var functions = new List<IrFunction>(pending.Count);
         var reported = new HashSet<(Span Span, string Message)>();
-        foreach (var (decl, name, receiver, extendTarget) in pending)
+        // the files of the modules an expansion round has not expanded yet (13 M9b P6): their
+        // bodies hold holes, nobody runs them this round, and each is lowered as a stub that
+        // keeps its id and its signature
+        var unexpandedFiles = comptime?.Unexpanded?.Select(m => compilation.AstOf(m).Span.File).ToHashSet();
+        foreach (var (written, name, receiver, extendTarget) in pending)
         {
+            var decl = written.Body is { } held && unexpandedFiles?.Contains(written.Span.File) == true
+                ? written with { Body = new Block([], held.Span) }
+                : written;
             try
             {
                 // A coroutine becomes TWO functions: the factory carries the written name and
@@ -396,7 +411,7 @@ public static class ModuleLowerer
                 functions.Add(new FunctionLowerer(decl, name, types, ids, imports, typeTable,
                     SelfSubstitution(receiver), globals, lambdas, instances, receiver,
                     receiverTypeNode: extendTarget,
-                    returnTypeOverride: comptimeReturns.GetValueOrDefault(decl)).Run());
+                    returnTypeOverride: comptimeReturns.GetValueOrDefault(written)).Run());
             }
             catch (UnsupportedConstructException ex)
             {
@@ -658,6 +673,7 @@ public static class ModuleLowerer
         if (comptime is { Hoist: true } && siteGlobal.Count > 0)
         {
             var roots = new List<FunctionId>(realRoots);
+            roots.AddRange(macroRoots);
             foreach (var (site, function) in siteFunction)
                 if (!siteGlobal.ContainsKey(site)) roots.Add(new FunctionId(function));
             var touched = new HashSet<int>();
@@ -677,7 +693,7 @@ public static class ModuleLowerer
             foreach (var (site, symbol) in siteGlobal)
                 if (!touched.Contains(globals.IdOf(symbol).Value)) skipped.Add(site);
             comptime.Skipped = skipped;
-            var kept = new List<FunctionId>();
+            var kept = new List<FunctionId>(macroRoots);
             foreach (var (site, function) in siteFunction)
                 if (!skipped.Contains(site)) kept.Add(new FunctionId(function));
             foreach (var (global, init) in initializerOf)

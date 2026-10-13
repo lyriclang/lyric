@@ -910,6 +910,11 @@ public sealed class AstFormatter
         LetCondExpr lc => Doc.Of(Doc.From("let "), PatternDoc(lc.Pattern), Doc.From(" = "),
             ExprDoc(lc.Initializer, Assign)),
         IdentifierExpr i => Doc.From(i.Name),
+        MacroCallExpr mc => Doc.Of(Doc.From(mc.Name + "!"),
+            mc.Arguments.Length > 0 || mc.Trailing is null
+                ? Doc.Of(Doc.From("("), Doc.Join(Doc.From(", "), mc.Arguments.Select(a => ExprDoc(a, Assign)).ToArray()), Doc.From(")"))
+                : Doc.Nil,
+            mc.Trailing is { } block ? Doc.Of(Doc.Space, BlockDoc(block)) : Doc.Nil),
         AtIdentifierExpr a => AtIdentifierDoc(a),
         TypePathExpr t => Doc.Of(Doc.From(string.Join(".", t.Path)), TypeArgsDoc(t.TypeArguments)),
 

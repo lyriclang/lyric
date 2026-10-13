@@ -99,7 +99,7 @@ public static class ComptimeEvaluator
         return new VariantConst(tag, Fields(value.Slots, layout.FieldTypes, 1, module));
     }
 
-    private static void Report(DiagnosticEngine diagnostics, ComptimeFailure failure, Span site)
+    internal static void Report(DiagnosticEngine diagnostics, ComptimeFailure failure, Span site)
     {
         var message = failure.Code switch
         {

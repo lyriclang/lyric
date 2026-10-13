@@ -16,9 +16,11 @@ namespace Lyric.Ir.Interp;
 /// and variants, the recovery nodes) is refused where it is read (<c>LYR-CT0005</c>). A node built
 /// from a value stands nowhere: its spans are empty, and the formatter writes it from its values.</para>
 /// </summary>
-public sealed class SyntaxBridge(IrModule module)
+public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
 {
-    private readonly SourceManager _sources = new() { Lyric5 = true };
+    /// <summary>Where the bridge parses into and locates in: the program's sources when it has
+    /// them (an expansion, M9b S2), its own for a bridge of its own.</summary>
+    private readonly SourceManager _sources = sources ?? new() { Lyric5 = true };
     private int _fresh;
     private int _parsed;
 
@@ -182,25 +184,51 @@ public sealed class SyntaxBridge(IrModule module)
         return Struct(t, ("file", S(file)), ("line", I(line)), ("column", I(column)));
     };
 
-    /// <summary>The program's sources, for the spans of a tree the program wrote (S2); the bridge
-    /// locates what it parsed itself in its own.</summary>
-    public SourceManager? Sources { get; init; }
-
     /// <summary>Where a span lies, as the diagnostics name it; nothing for a span of nothing, or
-    /// of a file the bridge does not hold (a tree parsed elsewhere: the ids of two managers
-    /// collide, which S2 settles by parsing into the program's).</summary>
+    /// of a file the bridge's sources do not hold.</summary>
     private (string File, int Line, int Column) Locate(Span span)
     {
-        if (span == default) return ("", 0, 0);
-        foreach (var sources in new[] { Sources, _sources })
-        {
-            if (sources is null || span.File.Value < 1 || span.File.Value > sources.FileCount) continue; // ids count from 1
-            if (span.End > sources.GetText(span.File).Length) continue;
-            var at = sources.Locate(span.File, span.Start);
-            return (sources.GetPath(span.File), at.Line, at.Column);
-        }
-        return ("", 0, 0);
+        if (span == default || span.File.Value < 1 || span.File.Value > _sources.FileCount) return ("", 0, 0); // ids count from 1
+        if (span.End > _sources.GetText(span.File).Length) return ("", 0, 0);
+        var at = _sources.Locate(span.File, span.Start);
+        return (_sources.GetPath(span.File), at.Line, at.Column);
     }
+
+    /// <summary>The span a <c>Span</c> value names, as a span of the program: its file by the
+    /// name the diagnostics use, the place by line and column; none where the program holds no
+    /// such file.</summary>
+    public Span SpanAt(string file, int line, int column)
+    {
+        for (var i = 1; i <= _sources.FileCount; i++)
+        {
+            var id = new FileId(i);
+            if (_sources.GetPath(id) != file) continue;
+            var text = _sources.GetText(id);
+            var offset = 0;
+            for (var l = 1; l < line && offset < text.Length; l++)
+            {
+                var next = text.IndexOf('\n', offset);
+                if (next < 0) return default;
+                offset = next + 1;
+            }
+            offset += Math.Max(column - 1, 0);
+            return offset <= text.Length ? new Span(id, offset, Math.Min(offset + 1, text.Length)) : default;
+        }
+        return default;
+    }
+
+    /// <summary>The failure <c>error(at, msg)</c> raises (13 M9b P7).</summary>
+    public ComptimeFailure MacroError(string file, int line, int column, string message) => ComptimeFailure.Macro(SpanAt(file, line, column), message);
+
+    /// <summary>The name <paramref name="name"/> as an <c>Ident</c> value, for a macro's parameter.</summary>
+    public Value IdentValue(string name, Span span, IrType t) => Ident(name, span, t);
+
+    /// <summary>A literal expression as a <c>Literal</c> value, for a macro's parameter.</summary>
+    public Value LiteralValue(Expr literal, IrType t) => Literal(literal, t);
+
+    public static bool IsLiteralExpr(Expr e) => IsLiteral(e);
+
+    public Stmt[] StmtsOf(Value v, IrType t) => Many(v, t, StmtOf);
 
     private Value Ident(string name, Span span, IrType t) => Struct(t, ("name", S(name)), ("span", Sp(span)));
     private Make Id(string name, Span span) => t => Ident(name, span, t);
@@ -311,6 +339,8 @@ public sealed class SyntaxBridge(IrModule module)
             case ThrowExpr th: return Variant(t, "Throw", Boxed(bt => Expr(th.Value, bt)), sp);
             case TryExpr tr:
                 return Variant(t, "Try", Boxed(bt => Expr(tr.Value, bt)), kt => Variant(kt, TryNames[(int)tr.Kind]), Catches(tr.Catches), sp);
+            case MacroCallExpr mc:
+                return Variant(t, "Macro", S(mc.Name), Exprs(mc.Arguments), OptBlock(mc.Trailing), sp);
             default:
                 throw NoForm(e);
         }
@@ -545,9 +575,11 @@ public sealed class SyntaxBridge(IrModule module)
     private TypeNode BoxedType(Value v, IrType t) { var (p, pt) = Unbox(v, t); return TypeOf(p, pt); }
     private Expr? MaybeBoxedExpr(Value v, IrType t) => OptionOf(v) is { } inner ? BoxedExpr(inner, Inner(t)) : null;
 
-    /// <summary>A node built from a value stands nowhere: the formatter writes it from its
-    /// values, and a diagnostic on it names the macro call that produced it (S5).</summary>
-    private static Span NoSpan => default;
+    /// <summary>The span a node built from values gets: the site it is built for (M9b S2), so a
+    /// diagnostic on expanded code points at the site; none for a bridge of its own.</summary>
+    public Span At { get; set; }
+
+    private Span NoSpan => At;
 
     private (string Name, Span Span) IdentOf(Value v, IrType t) => (StrOf(FieldOf(v, t, "name")), NoSpan);
     private (string? Name, Span Span) MaybeIdentOf(Value v, IrType t) => OptionOf(v) is { } inner ? IdentOf(inner, Inner(t)) : (null, NoSpan);
@@ -559,7 +591,7 @@ public sealed class SyntaxBridge(IrModule module)
         return i >= 0 ? i : throw ComptimeFailure.NotYet($"std.syntax: '{name}' has no form in the compiler yet");
     }
 
-    private static Expr LiteralOf(string name, Value[] f) => name switch
+    private Expr LiteralOf(string name, Value[] f) => name switch
     {
         "Int" => new IntLiteralExpr(f[0].Bits, MaybeStr(f[1]) is { } s ? Enum.Parse<IntSuffix>(s, ignoreCase: true) : null, NoSpan),
         "Float" => new FloatLiteralExpr(f[0].AsDouble, MaybeStr(f[1]) is { } s ? (s == "f32" ? FloatSuffix.F32 : FloatSuffix.F64) : null, NoSpan),
@@ -654,6 +686,8 @@ public sealed class SyntaxBridge(IrModule module)
                     Kind = (TryKind)IndexIn(TryNames, Case(f[1], ft[1]).Name),
                     Catches = CatchesOf(f[2], ft[2]),
                 };
+            case "Macro":
+                return new MacroCallExpr(StrOf(f[0]), Many(f[1], ft[1], ExprOf), Maybe(f[2], ft[2], BlockOf), NoSpan) { NameSpan = NoSpan, BangSpan = NoSpan };
             default: throw ComptimeFailure.NotYet($"std.syntax: the expression '{name}' has no form in the compiler yet");
         }
     }

@@ -35,4 +35,11 @@ public sealed class ComptimeFailure : Exception
     public static ComptimeFailure World(string what) => new("LYR-CT0003", null, what);
     public static ComptimeFailure Embed(string what) => new("LYR-CT0004", null, what);
     public static ComptimeFailure NotYet(string what) => new("LYR-CT0005", null, what);
+
+    /// <summary>A macro's own error (13 M9b P7): <c>error(at, msg)</c> from its body, the message
+    /// the macro's and the span the node's it names - <see cref="At"/>, or none where the
+    /// macro named a place the program does not hold.</summary>
+    public static ComptimeFailure Macro(Span at, string message) => new("LYR-MAC0001", null, message) { At = at };
+
+    public Span At { get; init; }
 }

@@ -256,6 +256,7 @@ public sealed class NameSpanTests
         nameof(StructInitField),  // a use: the field it assigns is declared on the type
         nameof(FieldPattern),     // its span is the name in the form that binds
         nameof(BindingPattern),   // its span is the name
+        nameof(MacroCallExpr),    // a use: the macro it expands is declared in another module (M9b S2)
     ];
 
     public static TheoryData<Type> NodeTypesWithAName()

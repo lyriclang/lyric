@@ -52,9 +52,10 @@ internal static class GlobalInitializer
 
         // A synthetic FunctionDecl: the FunctionLowerer works on a declaration, and building one here is
         // more honest than giving it a second entry point.
+        var unexpanded = typeTable.Comptime?.Unexpanded;
         var body = new Block(
             globals.Pending
-                .Where(entry => !Skipped(entry))
+                .Where(entry => !Skipped(entry) && unexpanded?.Contains(entry.Module) != true)
                 .Select(entry => (Stmt)new GlobalInitStmt(entry.Symbol, entry.Binding))
                 .ToArray(),
             default);
@@ -80,8 +81,12 @@ internal static class GlobalInitializer
         TypeTable typeTable, LambdaTable lambdas, InstanceTable instances)
     {
         var built = new List<(GlobalId, IrFunction)>();
+        var unexpanded = typeTable.Comptime?.Unexpanded;
         foreach (var entry in globals.Pending.ToList())
         {
+            // a module with sites still to expand (13 M9b P6): its initializers hold holes, and
+            // the round reads none of its globals
+            if (unexpanded?.Contains(entry.Module) == true) continue;
             var global = globals.IdOf(entry.Symbol);
             var name = EachName(global.Value);
             var decl = new FunctionDecl(

@@ -125,7 +125,11 @@ public sealed class Natives(Interpreter interpreter)
 
     /// <summary>The bridge to <c>std.syntax</c> (M9b S1), built on the first use: the program's
     /// tree as values, and values as a tree.</summary>
-    private SyntaxBridge Syntax => _syntax ??= new SyntaxBridge(interpreter.Module);
+    private SyntaxBridge Syntax => _syntax ??= new SyntaxBridge(interpreter.Module, Sources);
+
+    /// <summary>The program's sources (M9b S2): the bridge parses into them and locates in them,
+    /// so a span a macro reads is the program's and the file ids collide with nobody's.</summary>
+    public Core.SourceManager? Sources { get; init; }
 
     private static StrObj S(Value v) => (StrObj)v.Ref!;
     private static Value Str(string text) => Value.Of(StrObj.Of(text));
@@ -146,6 +150,8 @@ public sealed class Natives(Interpreter interpreter)
         ["std.syntax.sourceOfType"] = (a, t, _) => Str(Syntax.Source(Syntax.TypeOf(a[0], t[0]))),
         ["std.syntax.sourceOfPattern"] = (a, t, _) => Str(Syntax.Source(Syntax.PatternOf(a[0], t[0]))),
         ["std.syntax.freshName"] = (a, _, _) => Str(Syntax.FreshName(S(a[0]).ToString())),
+        // a struct parameter reaches a native flattened (ImportTable): the Span's file, line and column
+        ["std.syntax.error"] = (a, _, _) => throw Syntax.MacroError(S(a[0]).ToString(), (int)I(a[1]), (int)I(a[2]), S(a[3]).ToString()),
         // --- strings (string.c)
         ["std.string.concat"] = (a, _, _) => Str([.. S(a[0]).Bytes, .. S(a[1]).Bytes]),
         ["std.string.fromInt"] = (a, _, _) => Str(I(a[0]).ToString(System.Globalization.CultureInfo.InvariantCulture)),
