@@ -44,7 +44,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M8b | std I/O and system | L | **done** 2026-10-08 |
 | M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | **done** 2026-10-09 (S15–S19 after the review) |
 | M9a | `comptime` (the IR interpreter), attributes, `std.meta`, the synthesis | XL | **done** 2026-10-13 |
-| M9b | Macros | L | **open** since 2026-10-13 |
+| M9b | Macros | L | **done** 2026-10-13 |
 | M10 | std after rule D | XL | — |
 | M11 | Own GC | XL | — |
 | M12 | Diagnostics and lints | L | — |
@@ -1078,9 +1078,9 @@ field's type). The readings built on the way, for the maintainer's veto: a stati
 function with a body is a default (03 "Review 2026-10-12"); `Variants.all()`, not
 `variants()`; an integer's `pow(n)` stays a method; `std.iter` as a module the prelude imports
 without a name; an inline body carries the call's line. The open points of S10–S12b went into
-the report. **M9a is done.** M9b follows, once the maintainer is asked.
+the report. **M9a is done.**
 
-### M9b — open (2026-10-13)
+### M9b — done (2026-10-13)
 
 Macros over `std.syntax`: the plan is design 13's addendum "der Plan für M9b" (P1–P10, S1–S6),
 approved by the maintainer on 2026-10-13 after the seven readings of M9a's report were confirmed.
@@ -1163,6 +1163,21 @@ the report at the close.
   value block as an expression where an expansion writes one (`ParseExpressionOrBlock`). The
   artifacts: `bad!(1)` with the three places (`ExpansionDiagnosticTests`), `lyric expand` over a
   program with two sites (`ExpandCommandTests`). Spec 11 §5 rule 11, 14 §1.1 rule 6; three cases.
+- **S6** the close: `examples/macros` is a Lyric 5 package — `retry!` from a quote, `@Builder`
+  from the constructors, `formula!("2x^2 + 3x + 1", x)` as a language of its own read with
+  `parseExpr` —, built, run and expanded by `ExampleTests`; the 4.x `comptime.lyr` went (S12a's
+  `constants.lyr` is its heir), and a package under `examples/` is not the 4.x corpus. Point 104:
+  the std self-tests write under `fs.tempDir()` and remove it — a run from a foreign directory
+  leaves nothing there (400/400). The doors: `Default` stays with the compiler (10 Review
+  2026-10-13 A3, confirmed); `comptime for` over tuples stays a door — a macro could write the
+  tuple blocks per size, but std.core cannot carry a site of its own macro (P6), and a macro
+  module in std would cost every program a round. Measurement point 1: hello 791 936 bytes
+  (debug profile), 841 lines of C, start 1.48 ms against 1.03 ms plain C (minimum of 20); a
+  build with one site 2.2 s against 1.57 s without (point 117: a round is an analysis more).
+  CHANGELOG M9b; the report with the open points 105–146.
+
+M9b closed on 2026-10-13 with S6. The open points of S1–S6 (105–146) went into the report;
+the maintainer is asked before M10.
 
 ## Design decisions
 

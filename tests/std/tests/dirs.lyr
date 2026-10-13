@@ -1,8 +1,7 @@
 // std.fs's directories and what a path names (design/v5/spec/10 O5; M8b S7a): made, read and
 // removed; metadata; renamed over a file; exists, canonicalize, absolute; the entries' iterator
-// closed on every way out. Each test works in a directory of its own under the run's working
-// directory — which a run leaves to the next — and removes it at its end.
-import std.crypto { randomUint64 };
+// closed on every way out. Each test works in a directory of its own from fs.tempDir() and removes
+// it at its end: a run leaves nothing in its working directory (M9a's point 104).
 import std.fs;
 import std.io { IoError, IoErrorKind };
 import std.path;
@@ -25,11 +24,9 @@ fn kindOf(f: fn() -> void throws IoError): ?IoErrorKind {
     return null;
 }
 
-/// A directory of the test's own, new.
+/// A directory of the test's own, new, under the system's temporary place.
 fn root(): string throws IoError {
-    let dir = f"dirs-{randomUint64()}";
-    try fs.createDir(dir);
-    return dir;
+    return try fs.tempDir();
 }
 
 /// The entries of `dir` as `name:kind`, sorted.
@@ -161,8 +158,8 @@ fn aPathIsMadeAbsoluteAndCanonical(): void throws IoError {
     let t = try root();
     // written by hand: path.join would take the `..` out before the system sees it
     let s = path.separator;
-    let c = try fs.canonicalize(f"{t}{s}..{s}{t}");
-    assertEq(c, path.join(here, t));
+    let c = try fs.canonicalize(f"{t}{s}..{s}{path.fileName(t)}");
+    assertEq(c, try fs.canonicalize(t));
     assertTrue(kindOf(() => { let _ = try fs.canonicalize(path.join(t, "not-there")); }) == IoErrorKind.NotFound);
     // absolute asks nothing of the file system: a path that is not there is made absolute too,
     // by the working directory as the system names it (a short name on Windows stays short)

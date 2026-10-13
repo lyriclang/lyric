@@ -1,0 +1,42 @@
+// The three macros of this package at work: a statement macro with a trailing block, an attribute
+// macro that adds a declaration, an expression macro over a language of its own. `lyric expand`
+// prints this module with the three sites replaced.
+import std.io { println };
+import macros.tools { Builder, formula, retry };
+
+class Flaky :: [Error] {
+    n: int,
+
+    fn message(): string { return f"flaky {this.n}"; }
+}
+
+var calls = 0;
+
+/// Throws twice, then answers.
+fn fetch(): int throws Flaky {
+    calls += 1;
+    if (calls < 3) { throw Flaky { n = calls }; }
+    return calls * 10;
+}
+
+@Builder
+struct Point {
+    x: int,
+    y: int,
+}
+
+fn main(): void throws Flaky {
+    // the quote's own counter is not this one (hygiene)
+    let attempts = 7;
+    var result = 0;
+    retry!(3) {
+        result = try fetch();
+    }
+    println(f"fetched {result} after {calls} calls; attempts is still {attempts}");
+
+    let p = PointBuilder { }.set_x(3).set_y(4).build();
+    println(f"point {p.x} {p.y}");
+
+    let x = 5;
+    println(formula!("2x^2 + 3x + 1", x));
+}

@@ -311,7 +311,12 @@ public sealed class NameSpanTests
         foreach (var directory in new[] { "stdlib", "examples" })
             foreach (var file in Directory.EnumerateFiles(
                 Path.Combine(RepoRoot(), directory), "*.lyr", SearchOption.AllDirectories))
+            {
+                // a Lyric 5 package under examples/ is Lyric5.Tests' (M9b S6, examples/macros)
+                if (File.Exists(Path.Combine(Path.GetDirectoryName(file)!, "lyric.toml"))
+                    || File.Exists(Path.Combine(Path.GetDirectoryName(file)!, "..", "lyric.toml"))) continue;
                 data.Add(file);
+            }
         return data;
     }
 

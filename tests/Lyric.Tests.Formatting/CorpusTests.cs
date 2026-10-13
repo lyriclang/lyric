@@ -35,6 +35,10 @@ public class CorpusTests
             var segments = relative.Split(
                 Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             if (segments.Any(s => s is "bin" or "obj" or "out")) continue;
+            // A Lyric 5 package under examples/ (a lyric.toml beside, or above src/) is not the 4.x
+            // corpus: Lyric5.Tests builds and runs it (M9b S6, examples/macros).
+            if (File.Exists(Path.Combine(Path.GetDirectoryName(file)!, "lyric.toml"))
+                || File.Exists(Path.Combine(Path.GetDirectoryName(file)!, "..", "lyric.toml"))) continue;
 
             data.Add(relative);
         }

@@ -157,6 +157,21 @@ promise. This entry fills with the milestones.
   ordered by subject; `assert(c) { f"…" }` with a message built on failure alone (the string
   form is refused); a module binding's `comptime` site is evaluated only where the program
   reaches the binding. `std.hash`'s CRC tables are computed while compiling.
+- **Macros (M9b** — `design/v5/spec/09` A8, Q9; spec chapter 11 §5, 12 §Syntax, 14 §1.1**):**
+  `std.syntax` is the syntax tree as a Lyric library — `Expr`, `Stmt`, `Decl`, `Type`, `Pattern`
+  and the structs of the declarations, with `parseExpr`/`parseStmts`/`parseDecls`, `toSource()`,
+  `children()`/`walk(f)`, `Ident.fresh`. A `macro name(params): Ret { … }` is a function over
+  those trees that the compiler runs at a site — `name!(args)`, `name!(args) { … }`, `name! { … }`
+  — and whose result stands in the site's place before the module is checked, per module in
+  import order; a macro expands in the modules that import it, never in its own. `quote { … }`
+  builds a tree as a value, `#{e}` splices one in, hygienically: the names a quote binds are
+  fresh at every site, its free names are the macro module's. A macro whose first parameter is a
+  declaration sits on one as an attribute (`@Builder struct P { … }`, `@Retry(3) fn f() { … }`)
+  and gives the declaration or several back. An error in expanded code is said at the site, with
+  the line of the expansion and the quote it came from; what the caller wrote keeps its place;
+  `error(at, msg)` is the macro's own error. `lyric expand [<file>]` prints the entry module with
+  its macros expanded. `examples/macros` shows the three forms. Codes `LYR-SEM0186`–`0194`,
+  `LYR-CT0007`, `LYR-MAC0001`, `LYR-CG0002`, `LYR-PAR0063`.
 
 ---
 

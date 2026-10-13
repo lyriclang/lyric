@@ -1,0 +1,4 @@
+[package]
+name = "macros"
+version = "0.1.0"
+description = "Macros over std.syntax (design/v5/spec/11 §5; 13 M9b): retry!, @Builder, a formula DSL"
