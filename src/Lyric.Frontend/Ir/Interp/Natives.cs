@@ -121,6 +121,12 @@ public sealed class Natives(Interpreter interpreter)
     private Dictionary<string, Native>? _table;
     private Dictionary<string, Native> Table => _table ??= Build();
 
+    private SyntaxBridge? _syntax;
+
+    /// <summary>The bridge to <c>std.syntax</c> (M9b S1), built on the first use: the program's
+    /// tree as values, and values as a tree.</summary>
+    private SyntaxBridge Syntax => _syntax ??= new SyntaxBridge(interpreter.Module);
+
     private static StrObj S(Value v) => (StrObj)v.Ref!;
     private static Value Str(string text) => Value.Of(StrObj.Of(text));
     private static Value Str(byte[] bytes) => Value.Of(new StrObj(bytes));
@@ -129,6 +135,17 @@ public sealed class Natives(Interpreter interpreter)
 
     private Dictionary<string, Native> Build() => new(StringComparer.Ordinal)
     {
+        // --- std.syntax (10 B13 M2; M9b S1): the tree in both directions; type-directed, so the
+        // return type of the import and the types of the arguments say which nodes are meant
+        ["std.syntax.parseExpr"] = (a, _, r) => Syntax.Expr(Syntax.ParseExpr(S(a[0]).ToString()), r),
+        ["std.syntax.parseStmts"] = (a, _, r) => Syntax.Array(Syntax.ParseStmts(S(a[0]).ToString()), r, Syntax.Stmt),
+        ["std.syntax.parseDecls"] = (a, _, r) => Syntax.Array(Syntax.ParseDecls(S(a[0]).ToString()), r, Syntax.Decl),
+        ["std.syntax.sourceOfExpr"] = (a, t, _) => Str(Syntax.Source(Syntax.ExprOf(a[0], t[0]))),
+        ["std.syntax.sourceOfStmts"] = (a, t, _) => Str(Syntax.SourceOfStatements(a[0], t[0])),
+        ["std.syntax.sourceOfDecls"] = (a, t, _) => Str(Syntax.SourceOfDeclarations(a[0], t[0])),
+        ["std.syntax.sourceOfType"] = (a, t, _) => Str(Syntax.Source(Syntax.TypeOf(a[0], t[0]))),
+        ["std.syntax.sourceOfPattern"] = (a, t, _) => Str(Syntax.Source(Syntax.PatternOf(a[0], t[0]))),
+        ["std.syntax.freshName"] = (a, _, _) => Str(Syntax.FreshName(S(a[0]).ToString())),
         // --- strings (string.c)
         ["std.string.concat"] = (a, _, _) => Str([.. S(a[0]).Bytes, .. S(a[1]).Bytes]),
         ["std.string.fromInt"] = (a, _, _) => Str(I(a[0]).ToString(System.Globalization.CultureInfo.InvariantCulture)),

@@ -44,7 +44,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M8b | std I/O and system | L | **done** 2026-10-08 |
 | M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | **done** 2026-10-09 (S15–S19 after the review) |
 | M9a | `comptime` (the IR interpreter), attributes, `std.meta`, the synthesis | XL | **done** 2026-10-13 |
-| M9b | Macros | L | — |
+| M9b | Macros | L | **open** since 2026-10-13 |
 | M10 | std after rule D | XL | — |
 | M11 | Own GC | XL | — |
 | M12 | Diagnostics and lints | L | — |
@@ -1079,6 +1079,29 @@ function with a body is a default (03 "Review 2026-10-12"); `Variants.all()`, no
 `variants()`; an integer's `pow(n)` stays a method; `std.iter` as a module the prelude imports
 without a name; an inline body carries the call's line. The open points of S10–S12b went into
 the report. **M9a is done.** M9b follows, once the maintainer is asked.
+
+### M9b — open (2026-10-13)
+
+Macros over `std.syntax`: the plan is design 13's addendum "der Plan für M9b" (P1–P10, S1–S6),
+approved by the maintainer on 2026-10-13 after the seven readings of M9a's report were confirmed.
+The mode of M8c and M9a: no halt until it closes, merged on green CI, open points collected for
+the report at the close.
+
+- **S1** `std.syntax` and the bridge (P1, P2): the syntax tree as a Lyric library — `Expr`,
+  `Stmt`, `Decl`, `Type`, `Pattern` as `@NonExhaustive` enums with `Box` payloads, the structs of
+  the declarations, `Span { file, line, column }`, `Ident`, `Literal`, `Block` —;
+  `parseExpr`/`parseStmts`/`parseDecls` reading a text as the compiler does (the parser got an
+  entry for statements to the end of a text, the tail rule holding there); `toSource()` writing
+  a node as the formatter does, which learned to write a built tree from its values (no source
+  to copy a spelling from); `children()`/`walk(f)`; `Ident.fresh(hint)`. The bridge
+  (`Ir/Interp/SyntaxBridge.cs`) turns the compiler's tree into the interpreter's values and back,
+  type-directed by the module's own definitions — it knows names, not layouts. Two findings on
+  the way: a type position now looks past a value of the name in the scope chain
+  (`enum Expr { Literal(Literal, Span) }` named its own variant, `LYR-RES0002`), and the gate
+  walks a recursive enum once instead of forever. Run-time use of the module is `LYR-CG0002`;
+  `Box<T>` is `Debug` where `T` is. The artifact: every program of the emitter tests goes
+  tree → values → tree to the same text (`SyntaxTests`, 154 programs), and `toSource` of the
+  cases equals the formatter. Spec 12 §Syntax rules 1–6; three cases; a std self-test.
 
 ## Design decisions
 

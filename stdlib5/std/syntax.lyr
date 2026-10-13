@@ -1,0 +1,874 @@
+/// The syntax tree as values (design/v5/spec/10 B13 M2, 09 A8; M9b S1): what a program can write,
+/// as enums and structs a `comptime` function - a macro from S2 on - reads, builds and writes back.
+/// `parseExpr(s)`, `parseStmts(s)`, `parseDecls(s)` read source; `toSource()` writes a node as the
+/// formatter would; `children()` and `walk(f)` go over a tree; `Ident.fresh(hint)` names what a
+/// quote binds (S3). The enums are `@NonExhaustive` (M3): a `match` over them outside std writes a
+/// `_`, and a form the compiler has that this module has not - the rounds of a `comptime for`
+/// over fields and variants among them - is refused where it is read (`LYR-CT0005`).
+///
+/// A node built here, not read, has a `Span` of nothing: file `""`, line and column `0`.
+
+import std.collections { List };
+
+/// Where a node stands: a file as the diagnostics name it, a line and a column from 1; `""` and
+/// `0` where the node was built, not read.
+pub struct Span :: [Equatable, Debug] {
+    pub file: string,
+    pub line: int,
+    pub column: int,
+}
+
+extend Span {
+    /// The span of what was built, not read.
+    pub static fn none(): Span {
+        return Span { file = "", line = 0, column = 0 };
+    }
+}
+
+/// A name as written, with where it was written.
+pub struct Ident :: [Equatable, Debug] {
+    pub name: string,
+    pub span: Span,
+}
+
+extend Ident {
+    /// A name of its own for what a `quote` binds (S3): `hint` and a number no written name has.
+    pub static fn fresh(hint: string): Ident {
+        return Ident { name = freshName(hint), span = Span.none() };
+    }
+
+    /// The name alone, without a place.
+    pub static fn of(name: string): Ident {
+        return Ident { name = name, span = Span.none() };
+    }
+}
+
+/// The word in front of a declaration: none, `private`, `internal`, `pub`.
+pub enum Visibility :: [Equatable, Debug] { None, Private, Internal, Pub }
+
+/// A literal as written: an integer with its suffix (`u8`, `i32`, ... or none), a float with its,
+/// a string, a byte string, a character, a bool, `null`.
+@NonExhaustive
+pub enum Literal :: [Debug] {
+    Int(uint64, ?string),
+    Float(float, ?string),
+    Str(string),
+    Bytes(uint8[]),
+    Char(char),
+    Bool(bool),
+    Null,
+}
+
+@NonExhaustive
+pub enum UnaryOp :: [Equatable, Debug] { Not, Neg, BitNot, PreInc, PreDec, FromEnd, Place }
+
+@NonExhaustive
+pub enum PostfixOp :: [Equatable, Debug] { Inc, Dec, Unwrap }
+
+@NonExhaustive
+pub enum BinaryOp :: [Equatable, Debug] {
+    Add, Sub, Mul, Div, Rem, AddWrap, SubWrap, MulWrap,
+    Shl, Shr, BitAnd, BitXor, BitOr,
+    Lt, Le, Gt, Ge, Eq, Ne, In, NotIn,
+    And, Or, Coalesce,
+}
+
+/// How a lambda was written: `(x) => e`, `x => e`, or as a trailing block `f { ... }`.
+@NonExhaustive
+pub enum LambdaForm :: [Equatable, Debug] { Paren, Bare, Trailing }
+
+/// The mark on a `try`: `try e`, `try? e`, `try! e`.
+@NonExhaustive
+pub enum TryKind :: [Equatable, Debug] { Plain, Optional, Force }
+
+/// A piece of an f-string: text as written, or a hole with its expression and its format spec.
+@NonExhaustive
+pub enum Segment :: [Debug] {
+    Text(string),
+    Hole(Expr, ?string),
+}
+
+/// An argument of a call: its value, the name it was written with, if any, and whether it is
+/// spread (`xs...`).
+pub struct Arg :: [Debug] {
+    pub name: ?string,
+    pub value: Expr,
+    pub spread: bool,
+}
+
+/// A field of an initializer, `name = value`, or `name` alone (`isShorthand`, the value the read
+/// of the name); an attribute's one positional argument has the name `""`.
+pub struct FieldInit :: [Debug] {
+    pub name: Ident,
+    pub value: Expr,
+    pub isShorthand: bool,
+}
+
+/// A field of a `with`, `a.b.c = value`.
+pub struct WithField :: [Debug] {
+    pub path: string[],
+    pub value: Expr,
+}
+
+/// A parameter of a lambda: its name, its type if written, a pattern instead of a name
+/// (`((k, v)) => ...`), whether it is a place (`&n`), whether it is a trailing block's `it`.
+pub struct LambdaParam :: [Debug] {
+    pub name: Ident,
+    pub type: ?Type,
+    pub pattern: ?Pattern,
+    pub isPlace: bool,
+    pub isImplicit: bool,
+}
+
+/// A lambda's or an arm's body: an expression, or a block.
+@NonExhaustive
+pub enum Body :: [Debug] {
+    Expr(Box<Expr>),
+    Block(Block),
+}
+
+/// An arm of a `match`: its pattern, its guard, its body.
+pub struct Arm :: [Debug] {
+    pub pattern: Pattern,
+    pub guard: ?Expr,
+    pub body: Body,
+    pub span: Span,
+}
+
+/// A `catch` clause: the binding's name, its type (`catch (e: T)`) or its set (`catch (e in [A,
+/// B])`), the body - written bare after a `try` expression when `isExpr`.
+pub struct Catch :: [Debug] {
+    pub name: ?Ident,
+    pub type: ?Type,
+    pub types: Type[],
+    pub body: Block,
+    pub isExpr: bool,
+    pub span: Span,
+}
+
+/// An expression, each form a variant. The spans are of the whole expression.
+@NonExhaustive
+pub enum Expr :: [Debug] {
+    Literal(Literal, Span),
+    Name(Ident),
+    Implicit(Ident),
+    This(Span),
+    At(string, ?Expr[], Span),
+    Unary(UnaryOp, Box<Expr>, Span),
+    Postfix(Box<Expr>, PostfixOp, Span),
+    Binary(Box<Expr>, BinaryOp, Box<Expr>, Span),
+    Assign(Box<Expr>, ?BinaryOp, Box<Expr>, Span),
+    Range(Box<Expr>, Box<Expr>, bool, Span),
+    SliceRange(?Box<Expr>, ?Box<Expr>, bool, Span),
+    Cast(Box<Expr>, Type, Span),
+    Is(Box<Expr>, Type, Span),
+    Call(Box<Expr>, Arg[], Type[], Span),
+    Index(Box<Expr>, Box<Expr>, Span),
+    Member(Box<Expr>, Ident, bool, Span),
+    Array(Expr[], Span),
+    Tuple(Expr[], Span),
+    Interpolated(Segment[], Span),
+    Lambda(LambdaParam[], ?Type, ?Type[], Box<Body>, LambdaForm, Span),
+    LetCond(Pattern, Box<Expr>, Span),
+    If(Box<Expr>, Box<Expr>, Box<Expr>, Span),
+    Match(Box<Expr>, Arm[], Span),
+    Block(Block, Span),
+    Loop(Block, ?string, Span),
+    StructInit(string[], Type[], FieldInit[], bool, Span),
+    TypePath(string[], Type[], Span),
+    With(Box<Expr>, WithField[], Span),
+    Comptime(Box<Expr>, Span),
+    Throw(Box<Expr>, Span),
+    Try(Box<Expr>, TryKind, Catch[], Span),
+}
+
+/// A statement, each form a variant. A loop carries its label, if any; a `Let` is `var` by its
+/// first flag and `using let` by its last.
+@NonExhaustive
+pub enum Stmt :: [Debug] {
+    Expr(Expr, Span),
+    Tail(Expr, Span),
+    Let(bool, Ident, ?Type, ?Expr, bool, Span),
+    LetPattern(bool, Pattern, ?Type, Expr, ?Block, Span),
+    If(Expr, Block, ?Box<Stmt>, bool, Span),
+    While(Expr, Block, ?string, Span),
+    DoWhile(Block, Expr, ?string, Span),
+    For(Ident, ?Pattern, Expr, Block, bool, ?string, Span),
+    Break(?string, ?Expr, Span),
+    Continue(?string, Span),
+    Return(?Expr, Span),
+    Yield(?Expr, Span),
+    Defer(Box<Stmt>, Span),
+    Throw(Expr, Span),
+    Match(Expr, Arm[], Span),
+    Try(Block, Catch[], Span),
+    Block(Block, Span),
+}
+
+/// A block: its statements, in order.
+pub struct Block :: [Debug] {
+    pub stmts: Stmt[],
+    pub span: Span,
+}
+
+/// A field of a struct pattern, `name` or `name = pattern`.
+pub struct FieldPattern :: [Debug] {
+    pub name: Ident,
+    pub pattern: ?Pattern,
+}
+
+/// A pattern, each form a variant.
+@NonExhaustive
+pub enum Pattern :: [Debug] {
+    Wildcard(Span),
+    Literal(Box<Expr>, Span),
+    Binding(Ident),
+    TypePat(?Ident, Type, Span),
+    TypeSet(?Ident, Type[], Span),
+    Variant(string[], ?Pattern[], ?FieldPattern[], bool, Span),
+    Tuple(Pattern[], Span),
+    Range(Box<Expr>, Box<Expr>, bool, Span),
+    Or(Pattern[], Span),
+    Array(Pattern[], Span),
+    Rest(?Ident, Span),
+}
+
+/// A written type, each form a variant: a name with its arguments (and the names of the
+/// arguments that bind an associated type, `""` where positional, none when none is named),
+/// `?T`, `T[]` and `T[N]`, a tuple with its labels (`""` where none), a function type with its
+/// thrown set and which parameters take a place, a throwing type.
+@NonExhaustive
+pub enum Type :: [Debug] {
+    Named(string[], Type[], string[], Span),
+    Optional(Box<Type>, Span),
+    Array(Box<Type>, ?int, Span),
+    Tuple(Type[], string[], Span),
+    Fn(Type[], Box<Type>, ?Type[], bool[], Span),
+    Throwing(Box<Type>, ?Box<Type>, Span),
+}
+
+/// An attribute as written: its path and its fields.
+pub struct Attribute :: [Debug] {
+    pub path: string[],
+    pub fields: FieldInit[],
+    pub span: Span,
+}
+
+/// A type parameter, `T`, `T :: [I, J]`, `T = Self`.
+pub struct GenericParam :: [Debug] {
+    pub name: Ident,
+    pub constraints: Type[],
+    pub default: ?Type,
+}
+
+/// A parameter of a function: `name: T`, `&name: T`, `name: T = default`, `name: T...`.
+pub struct Param :: [Debug] {
+    pub name: Ident,
+    pub type: Type,
+    pub default: ?Expr,
+    pub isParams: bool,
+    pub isEllipsis: bool,
+    pub isPlace: bool,
+    pub attributes: Attribute[],
+    pub span: Span,
+}
+
+/// A function or a method, free or a member. `throws` is the thrown set, `null` where none is
+/// written; `retGrouped` says the return type stands in parentheses; `externAbi` and
+/// `externSymbol` are an `extern "abi" fn`'s.
+pub struct FnDecl :: [Debug] {
+    pub visibility: Visibility,
+    pub isStatic: bool,
+    pub isMut: bool,
+    pub isInline: bool,
+    pub name: Ident,
+    pub generics: GenericParam[],
+    pub params: Param[],
+    pub ret: ?Type,
+    pub retGrouped: bool,
+    pub throws: ?Type[],
+    pub body: ?Block,
+    pub externAbi: ?string,
+    pub externSymbol: ?string,
+    pub attributes: Attribute[],
+    pub span: Span,
+}
+
+/// A field of a struct or a class.
+pub struct FieldDecl :: [Debug] {
+    pub visibility: Visibility,
+    pub isVar: bool,
+    pub name: Ident,
+    pub type: Type,
+    pub default: ?Expr,
+    pub attributes: Attribute[],
+    pub span: Span,
+}
+
+/// A `let` or `var` at module level, or a `static let` in a type.
+pub struct LetDecl :: [Debug] {
+    pub visibility: Visibility,
+    pub isVar: bool,
+    pub isStatic: bool,
+    pub name: Ident,
+    pub type: ?Type,
+    pub init: ?Expr,
+    pub attributes: Attribute[],
+    pub span: Span,
+}
+
+/// An associated type: `type Item;`, `type Item :: [I];`, `type Item = int;`.
+pub struct AssocType :: [Debug] {
+    pub name: Ident,
+    pub type: ?Type,
+    pub bounds: Type[],
+    pub span: Span,
+}
+
+/// A struct or a class: the kind in the variant of `Decl` that holds it. `delegates` names, per
+/// interface, the field it is delegated to (`:: [Walker by legs]`), `""` where none; empty when
+/// none is.
+pub struct TypeDecl :: [Debug] {
+    pub visibility: Visibility,
+    pub name: Ident,
+    pub generics: GenericParam[],
+    pub interfaces: Type[],
+    pub delegates: string[],
+    pub members: Decl[],
+    pub attributes: Attribute[],
+    pub span: Span,
+}
+
+/// A variant of an enum: a unit, a tuple payload, or a struct payload.
+pub struct Variant :: [Debug] {
+    pub name: Ident,
+    pub tuple: ?Type[],
+    pub fields: ?FieldDecl[],
+    pub attributes: Attribute[],
+    pub span: Span,
+}
+
+pub struct EnumDecl :: [Debug] {
+    pub visibility: Visibility,
+    pub name: Ident,
+    pub generics: GenericParam[],
+    pub interfaces: Type[],
+    pub variants: Variant[],
+    pub types: AssocType[],
+    pub statics: LetDecl[],
+    pub methods: FnDecl[],
+    pub attributes: Attribute[],
+    pub span: Span,
+}
+
+pub struct InterfaceDecl :: [Debug] {
+    pub visibility: Visibility,
+    pub isSealed: bool,
+    pub name: Ident,
+    pub generics: GenericParam[],
+    pub interfaces: Type[],
+    pub types: AssocType[],
+    pub statics: LetDecl[],
+    pub members: FnDecl[],
+    pub attributes: Attribute[],
+    pub span: Span,
+}
+
+pub struct ExtendDecl :: [Debug] {
+    pub visibility: Visibility,
+    pub generics: GenericParam[],
+    pub target: Type,
+    pub interfaces: Type[],
+    pub types: AssocType[],
+    pub statics: LetDecl[],
+    pub methods: FnDecl[],
+    pub attributes: Attribute[],
+    pub span: Span,
+}
+
+pub struct AliasDecl :: [Debug] {
+    pub visibility: Visibility,
+    pub isOpaque: bool,
+    pub name: Ident,
+    pub aliased: Type,
+    pub span: Span,
+}
+
+/// An import: `import a.b;`, `import a.b { x, y as z }` (`names` with `renames` by index, `""`
+/// where a name keeps its own), `import a.b as c;`.
+pub struct ImportDecl :: [Debug] {
+    pub path: string[],
+    pub names: ?string[],
+    pub renames: string[],
+    pub alias: ?string,
+    pub isPub: bool,
+    pub span: Span,
+}
+
+/// A declaration, each kind a variant.
+@NonExhaustive
+pub enum Decl :: [Debug] {
+    Fn(FnDecl),
+    Struct(TypeDecl),
+    Class(TypeDecl),
+    Enum(EnumDecl),
+    Interface(InterfaceDecl),
+    Extend(ExtendDecl),
+    Let(LetDecl),
+    Field(FieldDecl),
+    AssocType(AssocType),
+    Alias(AliasDecl),
+    Import(ImportDecl),
+}
+
+/// Any node, for a walk over a tree: what `children()` gives and `walk(f)` visits.
+@NonExhaustive
+pub enum Node :: [Debug] {
+    Expr(Box<Expr>),
+    Stmt(Box<Stmt>),
+    Decl(Box<Decl>),
+    Type(Box<Type>),
+    Pattern(Box<Pattern>),
+}
+
+// --- reading and writing source ---------------------------------------------------------------
+
+/// The expression a text holds, parsed as the compiler parses it; a text that is no expression is
+/// an error at the call (`LYR-CT0001`, with the parser's message).
+pub fn parseExpr(s: string): Expr;
+
+/// The statements a text holds, as a block body would.
+pub fn parseStmts(s: string): Stmt[];
+
+/// The declarations a text holds, as a module would.
+pub fn parseDecls(s: string): Decl[];
+
+/// A node written back as the formatter writes it.
+fn sourceOfExpr(e: Expr): string;
+fn sourceOfStmts(s: Stmt[]): string;
+fn sourceOfDecls(d: Decl[]): string;
+fn sourceOfType(t: Type): string;
+fn sourceOfPattern(p: Pattern): string;
+
+/// A name no written identifier has: `hint` and a number of its own.
+fn freshName(hint: string): string;
+
+extend Expr {
+    /// This expression as source, as the formatter writes it.
+    pub fn toSource(): string {
+        return sourceOfExpr(this);
+    }
+}
+
+extend Block {
+    /// The statements as source, one under the other.
+    pub fn toSource(): string {
+        return sourceOfStmts(this.stmts);
+    }
+}
+
+extend Stmt {
+    pub fn toSource(): string {
+        return sourceOfStmts([this]);
+    }
+}
+
+extend Decl {
+    pub fn toSource(): string {
+        return sourceOfDecls([this]);
+    }
+}
+
+extend Type {
+    pub fn toSource(): string {
+        return sourceOfType(this);
+    }
+}
+
+extend Pattern {
+    pub fn toSource(): string {
+        return sourceOfPattern(this);
+    }
+}
+
+// --- walking --------------------------------------------------------------------------------------
+
+/// The children of a node, gathered in order.
+class Kids {
+    var out: List<Node>,
+}
+
+extend Kids {
+    static fn new(): Kids {
+        return Kids { out = List<Node>.new() };
+    }
+
+    fn expr(e: Expr): void {
+        this.out.push(Node.Expr(Box<Expr> { value = e }));
+    }
+
+    fn exprs(es: Expr[]): void {
+        for (e in es) {
+            this.expr(e);
+        }
+    }
+
+    fn optExpr(e: ?Expr): void {
+        if (let v = e) {
+            this.expr(v);
+        }
+    }
+
+    fn type(t: Type): void {
+        this.out.push(Node.Type(Box<Type> { value = t }));
+    }
+
+    fn types(ts: Type[]): void {
+        for (t in ts) {
+            this.type(t);
+        }
+    }
+
+    fn optType(t: ?Type): void {
+        if (let v = t) {
+            this.type(v);
+        }
+    }
+
+    fn stmt(s: Stmt): void {
+        this.out.push(Node.Stmt(Box<Stmt> { value = s }));
+    }
+
+    fn block(b: Block): void {
+        for (s in b.stmts) {
+            this.stmt(s);
+        }
+    }
+
+    fn optBlock(b: ?Block): void {
+        if (let v = b) {
+            this.block(v);
+        }
+    }
+
+    fn decl(d: Decl): void {
+        this.out.push(Node.Decl(Box<Decl> { value = d }));
+    }
+
+    fn pattern(p: Pattern): void {
+        this.out.push(Node.Pattern(Box<Pattern> { value = p }));
+    }
+
+    fn patterns(ps: Pattern[]): void {
+        for (p in ps) {
+            this.pattern(p);
+        }
+    }
+
+    fn body(b: Body): void {
+        match (b) {
+            .Expr(e) => { this.expr(e.value); },
+            .Block(bl) => { this.block(bl); },
+            _ => { },
+        }
+    }
+
+    fn arms(arms: Arm[]): void {
+        for (a in arms) {
+            this.pattern(a.pattern);
+            this.optExpr(a.guard);
+            this.body(a.body);
+        }
+    }
+
+    fn catches(cs: Catch[]): void {
+        for (c in cs) {
+            this.optType(c.type);
+            this.types(c.types);
+            this.block(c.body);
+        }
+    }
+
+    fn generics(gs: GenericParam[]): void {
+        for (g in gs) {
+            this.types(g.constraints);
+            this.optType(g.default);
+        }
+    }
+
+    fn fnDecl(f: FnDecl): void {
+        this.generics(f.generics);
+        for (p in f.params) {
+            this.type(p.type);
+            this.optExpr(p.default);
+        }
+        this.optType(f.ret);
+        if (let ts = f.throws) {
+            this.types(ts);
+        }
+        this.optBlock(f.body);
+    }
+
+    fn fns(fs: FnDecl[]): void {
+        for (f in fs) {
+            this.fnDecl(f);
+        }
+    }
+
+    fn assocTypes(ts: AssocType[]): void {
+        for (t in ts) {
+            this.types(t.bounds);
+            this.optType(t.type);
+        }
+    }
+
+    fn lets(ls: LetDecl[]): void {
+        for (l in ls) {
+            this.optType(l.type);
+            this.optExpr(l.init);
+        }
+    }
+
+    fn done(): Node[] {
+        return this.out.toArray();
+    }
+}
+
+extend Expr {
+    /// The nodes directly inside this one, in source order.
+    pub fn children(): Node[] {
+        let k = Kids.new();
+        match (this) {
+            .At(_, args, _) => { if (let xs = args) { k.exprs(xs); } },
+            .Unary(_, e, _) => { k.expr(e.value); },
+            .Postfix(e, _, _) => { k.expr(e.value); },
+            .Binary(l, _, r, _) => { k.expr(l.value); k.expr(r.value); },
+            .Assign(t, _, v, _) => { k.expr(t.value); k.expr(v.value); },
+            .Range(a, b, _, _) => { k.expr(a.value); k.expr(b.value); },
+            .SliceRange(a, b, _, _) => {
+                if (let x = a) { k.expr(x.value); }
+                if (let y = b) { k.expr(y.value); }
+            },
+            .Cast(e, t, _) => { k.expr(e.value); k.type(t); },
+            .Is(e, t, _) => { k.expr(e.value); k.type(t); },
+            .Call(c, args, targs, _) => {
+                k.expr(c.value);
+                for (a in args) {
+                    k.expr(a.value);
+                }
+                k.types(targs);
+            },
+            .Index(t, i, _) => { k.expr(t.value); k.expr(i.value); },
+            .Member(t, _, _, _) => { k.expr(t.value); },
+            .Array(es, _) => { k.exprs(es); },
+            .Tuple(es, _) => { k.exprs(es); },
+            .Interpolated(segs, _) => {
+                for (s in segs) {
+                    match (s) {
+                        .Hole(e, _) => { k.expr(e); },
+                        _ => { },
+                    }
+                }
+            },
+            .Lambda(ps, ret, throws, body, _, _) => {
+                for (p in ps) {
+                    k.optType(p.type);
+                    if (let pat = p.pattern) { k.pattern(pat); }
+                }
+                k.optType(ret);
+                if (let ts = throws) { k.types(ts); }
+                k.body(body.value);
+            },
+            .LetCond(p, e, _) => { k.pattern(p); k.expr(e.value); },
+            .If(c, t, e, _) => { k.expr(c.value); k.expr(t.value); k.expr(e.value); },
+            .Match(s, arms, _) => { k.expr(s.value); k.arms(arms); },
+            .Block(b, _) => { k.block(b); },
+            .Loop(b, _, _) => { k.block(b); },
+            .StructInit(_, targs, fields, _, _) => {
+                k.types(targs);
+                for (f in fields) {
+                    k.expr(f.value);
+                }
+            },
+            .TypePath(_, targs, _) => { k.types(targs); },
+            .With(t, fields, _) => {
+                k.expr(t.value);
+                for (f in fields) {
+                    k.expr(f.value);
+                }
+            },
+            .Comptime(e, _) => { k.expr(e.value); },
+            .Throw(e, _) => { k.expr(e.value); },
+            .Try(e, _, cs, _) => { k.expr(e.value); k.catches(cs); },
+            _ => { },
+        }
+        return k.done();
+    }
+}
+
+extend Stmt {
+    /// The nodes directly inside this one, in source order.
+    pub fn children(): Node[] {
+        let k = Kids.new();
+        match (this) {
+            .Expr(e, _) => { k.expr(e); },
+            .Tail(e, _) => { k.expr(e); },
+            .Let(_, _, t, e, _, _) => { k.optType(t); k.optExpr(e); },
+            .LetPattern(_, p, t, e, els, _) => { k.pattern(p); k.optType(t); k.expr(e); k.optBlock(els); },
+            .If(c, t, e, _, _) => {
+                k.expr(c);
+                k.block(t);
+                if (let s = e) { k.stmt(s.value); }
+            },
+            .While(c, b, _, _) => { k.expr(c); k.block(b); },
+            .DoWhile(b, c, _, _) => { k.block(b); k.expr(c); },
+            .For(_, p, it, b, _, _, _) => {
+                if (let pat = p) { k.pattern(pat); }
+                k.expr(it);
+                k.block(b);
+            },
+            .Break(_, v, _) => { k.optExpr(v); },
+            .Return(e, _) => { k.optExpr(e); },
+            .Yield(e, _) => { k.optExpr(e); },
+            .Defer(s, _) => { k.stmt(s.value); },
+            .Throw(e, _) => { k.expr(e); },
+            .Match(s, arms, _) => { k.expr(s); k.arms(arms); },
+            .Try(b, cs, _) => { k.block(b); k.catches(cs); },
+            .Block(b, _) => { k.block(b); },
+            _ => { },
+        }
+        return k.done();
+    }
+}
+
+extend Decl {
+    /// The nodes directly inside this one, in source order.
+    pub fn children(): Node[] {
+        let k = Kids.new();
+        match (this) {
+            .Fn(f) => { k.fnDecl(f); },
+            .Struct(t) => {
+                k.generics(t.generics);
+                k.types(t.interfaces);
+                for (m in t.members) {
+                    k.decl(m);
+                }
+            },
+            .Class(t) => {
+                k.generics(t.generics);
+                k.types(t.interfaces);
+                for (m in t.members) {
+                    k.decl(m);
+                }
+            },
+            .Enum(e) => {
+                k.generics(e.generics);
+                k.types(e.interfaces);
+                for (v in e.variants) {
+                    if (let ts = v.tuple) { k.types(ts); }
+                    if (let fs = v.fields) {
+                        for (f in fs) {
+                            k.decl(Decl.Field(f));
+                        }
+                    }
+                }
+                k.assocTypes(e.types);
+                k.lets(e.statics);
+                k.fns(e.methods);
+            },
+            .Interface(i) => {
+                k.generics(i.generics);
+                k.types(i.interfaces);
+                k.assocTypes(i.types);
+                k.lets(i.statics);
+                k.fns(i.members);
+            },
+            .Extend(x) => {
+                k.generics(x.generics);
+                k.type(x.target);
+                k.types(x.interfaces);
+                k.assocTypes(x.types);
+                k.lets(x.statics);
+                k.fns(x.methods);
+            },
+            .Let(l) => { k.optType(l.type); k.optExpr(l.init); },
+            .Field(f) => { k.type(f.type); k.optExpr(f.default); },
+            .AssocType(a) => { k.types(a.bounds); k.optType(a.type); },
+            .Alias(a) => { k.type(a.aliased); },
+            _ => { },
+        }
+        return k.done();
+    }
+}
+
+extend Type {
+    /// The nodes directly inside this one, in source order.
+    pub fn children(): Node[] {
+        let k = Kids.new();
+        match (this) {
+            .Named(_, args, _, _) => { k.types(args); },
+            .Optional(t, _) => { k.type(t.value); },
+            .Array(t, _, _) => { k.type(t.value); },
+            .Tuple(ts, _, _) => { k.types(ts); },
+            .Fn(ps, r, throws, _, _) => {
+                k.types(ps);
+                k.type(r.value);
+                if (let ts = throws) { k.types(ts); }
+            },
+            .Throwing(t, e, _) => {
+                k.type(t.value);
+                if (let x = e) { k.type(x.value); }
+            },
+            _ => { },
+        }
+        return k.done();
+    }
+}
+
+extend Pattern {
+    /// The nodes directly inside this one, in source order.
+    pub fn children(): Node[] {
+        let k = Kids.new();
+        match (this) {
+            .Literal(e, _) => { k.expr(e.value); },
+            .TypePat(_, t, _) => { k.type(t); },
+            .TypeSet(_, ts, _) => { k.types(ts); },
+            .Variant(_, elems, fields, _, _) => {
+                if (let ps = elems) { k.patterns(ps); }
+                if (let fs = fields) {
+                    for (f in fs) {
+                        if (let p = f.pattern) { k.pattern(p); }
+                    }
+                }
+            },
+            .Tuple(ps, _) => { k.patterns(ps); },
+            .Range(a, b, _, _) => { k.expr(a.value); k.expr(b.value); },
+            .Or(ps, _) => { k.patterns(ps); },
+            .Array(ps, _) => { k.patterns(ps); },
+            _ => { },
+        }
+        return k.done();
+    }
+}
+
+extend Node {
+    /// The nodes directly inside this one.
+    pub fn children(): Node[] {
+        return match (this) {
+            .Expr(e) => e.value.children(),
+            .Stmt(s) => s.value.children(),
+            .Decl(d) => d.value.children(),
+            .Type(t) => t.value.children(),
+            .Pattern(p) => p.value.children(),
+            _ => [],
+        };
+    }
+
+    /// `f` at this node and every node below it, parents before children, in source order.
+    pub fn walk(f: fn(Node) -> void): void {
+        f(this);
+        for (c in this.children()) {
+            c.walk(f);
+        }
+    }
+}

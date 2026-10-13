@@ -110,6 +110,16 @@ public sealed class SymbolTable
     public Symbol? LookupLocal(string name) =>
         _byName.TryGetValue(name, out var s) ? s : null;
 
+    /// <summary>This scope, then up the parent chain, for the first symbol of the name that
+    /// <paramref name="wanted"/> accepts: a type position looks past a value of the name.</summary>
+    public Symbol? Lookup(string name, Func<Symbol, bool> wanted)
+    {
+        for (var scope = this; scope is not null; scope = scope.Parent)
+            if (scope._byName.TryGetValue(name, out var s) && wanted(s))
+                return s;
+        return null;
+    }
+
     /// <summary>This scope, then up the parent chain.</summary>
     public Symbol? Lookup(string name)
     {

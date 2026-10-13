@@ -19,6 +19,9 @@ public static class SubsetGate
     /// <summary>The code of the one diagnostic: a construct the compiler does not translate yet.</summary>
     public const string NotYet = "LYR-CG0001";
 
+    /// <summary>A call that runs at compile time only, reached at run time (M9b S1).</summary>
+    public const string ComptimeOnly = "LYR-CG0002";
+
     /// <summary>
     /// The natively backed functions the emitter maps to the runtime: the 4.x front end lowers a
     /// bodyless function of the standard library to a <c>CallImport</c> by qualified name, and
@@ -37,6 +40,8 @@ public static class SubsetGate
     private sealed class Walk(IrModule module, DiagnosticEngine diagnostics)
     {
         public bool Refused { get; private set; }
+
+        private readonly HashSet<int> _walkedEnums = [];
 
         private void Refuse(Span span, string what, string milestone)
         {
@@ -94,6 +99,10 @@ public static class SubsetGate
                     Type(optional.Inner, span, where);
                     break;
                 case IrEnumType e:
+                    // once per enum: a recursive one ('enum Expr { Add(Box<Expr>, Box<Expr>) }',
+                    // or through an array and a second enum, as std.syntax's) is walked once, and
+                    // what it refuses was refused at that first visit
+                    if (!_walkedEnums.Add(e.Type.Value)) break;
                     foreach (var variant in module.Types[e.Type.Value].Variants)
                         foreach (var field in module.Types[variant.Value].FieldTypes.Skip(1))
                             Type(field, span, where);
@@ -139,13 +148,23 @@ public static class SubsetGate
                 case LoadLocal or StoreLocal or Call or StructCopy:
                     break;
                 case CallImport i:
-                    if (!Intrinsics.Contains(module.Imports[i.Target.Value].Name)
-                        && !Compiler.Intrinsics.IsForeign(module.Imports[i.Target.Value].Name))
+                {
+                    var name = module.Imports[i.Target.Value].Name;
+                    if (name.StartsWith("std.syntax.", StringComparison.Ordinal))
+                    {
+                        // the syntax tree is read, built and written at compile time (10 B13 M2, M9b S1):
+                        // the natives have no runtime call, and never will
+                        Refused = true;
+                        diagnostics.Report(ComptimeOnly, Severity.Error, op.Span,
+                            $"'{name["std.".Length..]}' runs at compile time only: a syntax tree is read, built and written inside 'comptime' (09 Q3)");
+                    }
+                    else if (!Intrinsics.Contains(name) && !Compiler.Intrinsics.IsForeign(name))
                         // M8a was named here, as if it would bring a program's own natives; nothing
                         // does — a program declares 'extern "C"' (N1b)
-                        Refuse(op.Span, $"the native function '{module.Imports[i.Target.Value].Name}'",
+                        Refuse(op.Span, $"the native function '{name}'",
                             "no milestone: a function without a body is the standard library's — a program reaches C through 'extern \"C\"'");
                     break;
+                }
                 case NewObject n:
                     Type(n.Result, op.Span, "the object");
                     break;
