@@ -825,7 +825,15 @@ public sealed class Resolver
         if (path.Length >= 2 && (head is GenericParamSymbol or TypeSymbol or ImportBindingSymbol { Target: TypeSymbol }))
             return head;
         if (head is null) return BuiltinType(path[0], file);
-        if (path.Length == 1) return IsTypeLike(head) ? head : BuiltinType(path[0], file);
+        if (path.Length == 1)
+        {
+            if (IsTypeLike(head)) return head;
+            // A value of the name in the way (a variant, a function, a global) is no type, and a
+            // type position looks past it as it looks past a module (BuiltinType): in
+            // 'enum Expr { Literal(Literal, Span) }' the payload names the TYPE Literal of the
+            // module, not the enum's own variant, which stands nearer (M9b S1, std.syntax).
+            return scope.Lookup(path[0], IsTypeLike) ?? BuiltinType(path[0], file);
+        }
 
         // Multi-segment paths navigate through imported modules only.
         for (var i = 1; i < path.Length; i++)

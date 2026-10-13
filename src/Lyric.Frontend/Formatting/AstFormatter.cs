@@ -44,19 +44,21 @@ public sealed class AstFormatter
     }
 
     private readonly string _source;
+    private readonly bool _synthesized; // the nodes were built, not read: no source to copy a spelling from
     private readonly IReadOnlyList<Trivia> _comments;
     private readonly int[] _lineStarts;
     private int _next;   // the comment cursor: everything before it is already printed
     private int _lastEnd = -1; // source end of the last element printed at line level
 
-    private AstFormatter(string source, IReadOnlyList<Trivia> comments)
+    private AstFormatter(string? source, IReadOnlyList<Trivia> comments)
     {
-        _source = source;
+        _source = source ?? "";
+        _synthesized = source is null;
         _comments = comments;
 
         var starts = new List<int> { 0 };
-        for (var i = 0; i < source.Length; i++)
-            if (source[i] == '\n')
+        for (var i = 0; i < _source.Length; i++)
+            if (_source[i] == '\n')
                 starts.Add(i + 1);
         _lineStarts = starts.ToArray();
     }
@@ -65,6 +67,87 @@ public sealed class AstFormatter
     /// plus the doc-comment tokens, merged by the caller.</param>
     public static Doc Build(Module module, string source, IReadOnlyList<Trivia> comments) =>
         new AstFormatter(source, comments).ModuleDoc(module);
+
+    /// <summary>A node that was built, not read, <c>std.syntax</c>'s (M9b S1): there is no source
+    /// to copy a spelling from, so a literal is written from its value, and there are no comments.
+    /// A <see cref="Block"/> is written with its braces.</summary>
+    public static string FormatNode(Node node) => DocRenderer.Render(new AstFormatter(null, []).NodeDoc(node));
+
+    /// <summary>Statements one under the other, as a block body holds them, without the braces.</summary>
+    public static string FormatStatements(IReadOnlyList<Stmt> statements)
+    {
+        var formatter = new AstFormatter(null, []);
+        return DocRenderer.Render(formatter.SequenceDoc(statements, formatter.StmtDoc, (_, _) => Air.User, 0));
+    }
+
+    /// <summary>Declarations as a module's, with the blank lines between them — without the
+    /// newline that ends a formatted file: a node's text ends with the node.</summary>
+    public static string FormatDeclarations(IReadOnlyList<Decl> declarations) =>
+        DocRenderer.Render(new AstFormatter(null, []).ModuleDoc(new Module(null, [.. declarations], default))).TrimEnd('\n');
+
+    private Doc NodeDoc(Node node) => node switch
+    {
+        Block b => BlockDoc(b),
+        Expr e => ExprDoc(e, Assign),
+        Stmt s => StmtDoc(s),
+        Decl d => DeclDoc(d),
+        TypeNode t => TypeDoc(t),
+        Pattern p => PatternDoc(p),
+        _ => throw new InternalCompilationException($"no document for a {node.GetType().Name}"),
+    };
+
+    // ------------------------------------------------------------------ literals from their values
+
+    /// <summary>The spelling of a literal whose node was built, not read: the value as the lexer
+    /// reads it back. A sign is a <see cref="UnaryExpr"/> around the literal.</summary>
+    private string LiteralText(Expr expr) => expr switch
+    {
+        IntLiteralExpr i => i.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                            + (i.Suffix is { } s ? s.ToString().ToLowerInvariant() : ""),
+        FloatLiteralExpr f => FloatLiteralText(f.Value) + (f.Suffix is { } s ? s.ToString().ToLowerInvariant() : ""),
+        StringLiteralExpr s => Quote(s.Value),
+        CharLiteralExpr c => "'" + EscapeChar(c.CodePoint, '\'') + "'",
+        ByteStringExpr b => "b\"" + string.Concat(b.Bytes.Select(x =>
+            x is >= 0x20 and < 0x7F && x != '"' && x != '\\' ? ((char)x).ToString() : $"\\x{x:x2}")) + "\"",
+        InterpolatedStringExpr s => "f\"" + string.Concat(s.Segments.Select(segment => segment switch
+        {
+            InterpText t => t.Text,
+            InterpHole h => "{" + DocRenderer.Render(ExprDoc(h.Expr, Assign), int.MaxValue / 2)
+                            + (h.FormatSpec is { } spec ? ":" + spec : "") + "}",
+            _ => "",
+        })) + "\"",
+        BoolLiteralExpr b => b.Value ? "true" : "false",
+        NullLiteralExpr => "null",
+        UnaryExpr { Operator: UnaryOp.Neg } u => "-" + LiteralText(u.Operand),
+        _ => throw new InternalCompilationException($"{expr.GetType().Name} is no literal"),
+    };
+
+    private static string FloatLiteralText(double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+            throw new InternalCompilationException("a float literal that is no number");
+        var text = Lyric.Ir.Interp.FloatText.Shortest(value);
+        return text.Contains('.') || text.Contains('e') || text.Contains('E') ? text : text + ".0";
+    }
+
+    private static string Quote(string s)
+    {
+        var sb = new System.Text.StringBuilder("\"");
+        foreach (var rune in s.EnumerateRunes()) sb.Append(EscapeChar(rune.Value, '"'));
+        return sb.Append('"').ToString();
+    }
+
+    private static string EscapeChar(int c, char quote) => c switch
+    {
+        '\\' => "\\\\",
+        '\n' => "\\n",
+        '\r' => "\\r",
+        '\t' => "\\t",
+        0 => "\\0",
+        _ when c == quote => "\\" + quote,
+        < 0x20 => $"\\u{{{c:x}}}",
+        _ => char.ConvertFromUtf32(c),
+    };
 
     // ------------------------------------------------------------------ lines and comments
 
@@ -321,7 +404,7 @@ public sealed class AstFormatter
         {
             Attributes(decl.Attributes),
             Pub(decl.Visibility),
-            decl.Extern is { } abi ? Doc.Of(Doc.From("extern "), Src(abi.AbiSpan), Doc.Space) : Doc.Nil,
+            decl.Extern is { } abi ? Doc.Of(Doc.From("extern "), _synthesized ? Doc.From(Quote(abi.Abi)) : Src(abi.AbiSpan), Doc.Space) : Doc.Nil,
             decl.IsStatic ? Doc.From("static ") : Doc.Nil,
             decl.IsMut ? Doc.From("mut ") : Doc.Nil,
             Doc.From($"fn {decl.Name}"),
@@ -332,8 +415,8 @@ public sealed class AstFormatter
         if (decl.ReturnType is { } ret) head.Add(Doc.Of(Doc.From(": "), ReturnDoc(ret, decl.Throws, decl.ReturnGrouped)));
         if (decl.Throws is { } throws) head.Add(ThrowsDoc(throws));
 
-        if (decl.Extern is { SymbolSpan: { } symbol })
-            head.Add(Doc.Of(Doc.From(" = "), Src(symbol)));
+        if (decl.Extern is { Symbol: { } symbolText } spec)
+            head.Add(Doc.Of(Doc.From(" = "), _synthesized || spec.SymbolSpan is null ? Doc.From(Quote(symbolText)) : Src(spec.SymbolSpan.Value)));
 
         head.Add(decl.Body is { } body ? Doc.Of(Doc.Space, BlockDoc(body)) : Doc.From(";"));
         return new Doc.Concat(head);
@@ -820,7 +903,7 @@ public sealed class AstFormatter
     {
         // Spelling lives in the source, not in the node.
         IntLiteralExpr or FloatLiteralExpr or StringLiteralExpr or CharLiteralExpr
-            or InterpolatedStringExpr or ByteStringExpr => Src(expr.Span),
+            or InterpolatedStringExpr or ByteStringExpr => _synthesized ? Doc.From(LiteralText(expr)) : Src(expr.Span),
         BoolLiteralExpr b => Doc.From(b.Value ? "true" : "false"),
         NullLiteralExpr => Doc.From("null"),
         ThisExpr => Doc.From("this"),
@@ -1156,7 +1239,7 @@ public sealed class AstFormatter
         BoolLiteralExpr b => Doc.From(b.Value ? "true" : "false"),
         NullLiteralExpr => Doc.From("null"),
         // A sign is a UnaryExpr around the literal; both spellings live in the span.
-        _ => Src(pattern.Literal.Span),
+        _ => _synthesized ? Doc.From(LiteralText(pattern.Literal)) : Src(pattern.Literal.Span),
     };
 
     private Doc VariantPatternDoc(VariantPattern pattern)

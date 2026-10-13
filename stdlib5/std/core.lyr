@@ -56,6 +56,13 @@ pub class Box<T> {
     pub value: T,
 }
 
+extend<T :: [Debug]> Box<T> :: [Debug] {
+    /// The value, as it shows itself: the box is an indirection and no part of what is said.
+    fn debug(): string {
+        return this.value.debug();
+    }
+}
+
 /// `a..b` (design/v5/spec/03 T13 A3): the values from `start` up to but not including `end`, a
 /// value holding its bounds. In a `for` head a range literal is the counted loop and no value.
 pub struct Range<T> {

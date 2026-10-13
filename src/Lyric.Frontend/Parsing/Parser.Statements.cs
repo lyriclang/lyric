@@ -13,6 +13,29 @@ namespace Lyric.Parsing;
 public sealed partial class Parser
 {
     /// <summary>Entry point for exactly ONE statement; a block covers sequences.</summary>
+    /// <summary>Every statement of the text, to its end, as a block body would hold them — what
+    /// <c>std.syntax</c>'s <c>parseStmts</c> reads (M9b S1). A last expression without its <c>;</c>
+    /// is the tail, as in a value block.</summary>
+    public Stmt[] ParseStatements()
+    {
+        var stmts = new List<Stmt>();
+        var savedTail = _allowTail;
+        var savedStructInit = _allowStructInit;
+        _allowTail = true;
+        _allowStructInit = true;
+        _tailAtEnd = true;
+        while (!_buffer.AtEnd)
+        {
+            var before = _buffer.Position;
+            stmts.Add(ParseStmt());
+            if (_buffer.Position == before && !_buffer.AtEnd) _buffer.Advance();
+        }
+        _allowTail = savedTail;
+        _allowStructInit = savedStructInit;
+        _tailAtEnd = false;
+        return stmts.ToArray();
+    }
+
     public Stmt ParseStatement()
     {
         var stmt = ParseStmt();
@@ -176,7 +199,11 @@ public sealed partial class Parser
     /// 'else', a 'match' and a 'loop' are worth what their expression forms are worth. In the
     /// middle of the block they are statements, and so is each of them in a statement block.
     /// </summary>
-    private bool AtTail() => _allowTail && _buffer.Check(TokenKind.RBrace);
+    private bool AtTail() => _allowTail && (_buffer.Check(TokenKind.RBrace) || (_tailAtEnd && _buffer.AtEnd));
+
+    /// <summary>Set by <see cref="ParseStatements"/>: the text ends where a value block would close, so
+    /// a last expression without its ';' is the tail there too.</summary>
+    private bool _tailAtEnd;
 
     private Stmt ParseMatchStmt()
     {
@@ -614,7 +641,7 @@ public sealed partial class Parser
         var value = ParseExpr(0);
         // 'throw e' as the tail of a value block: the arm's value is 'never' (§6.9), and the
         // block diverges — the same thing 'throw e;' says, in the position a tail stands in.
-        if (_allowTail && _buffer.Check(TokenKind.RBrace))
+        if (AtTail())
         {
             var span = Span.Union(kw.Span, Whole(value));
             return new TailExprStmt(new ThrowExpr(value, span), span);
@@ -726,7 +753,7 @@ public sealed partial class Parser
         // BEFORE the trailing-lambda rule below, because it is the narrower question: '_allowTail'
         // holds only inside a value block, and there the last expression IS the value — including
         // when it is written as a trailing lambda.
-        if (_allowTail && _buffer.Check(TokenKind.RBrace))
+        if (AtTail())
             return new TailExprStmt(expr, Whole(expr));
 
         // 'xs.forEach { println(it); }' — a statement that ends in a trailing lambda's '}'
