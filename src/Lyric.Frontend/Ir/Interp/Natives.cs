@@ -53,6 +53,9 @@ public sealed class Natives(Interpreter interpreter)
     {
         _at = at;
         var name = import.Name;
+        // a quote (13 M9b P5): the tree of the module's quote by the import's index, the splices' values set in
+        if (name.StartsWith("std.syntax.quote#", StringComparison.Ordinal))
+            return Syntax.Quote(interpreter.Module.Quotes[int.Parse(name["std.syntax.quote#".Length..])], args, types, import.ReturnType);
         if (Table.TryGetValue(name, out var native)) return native(args, types, import.ReturnType);
         if (RoundedByEachLibm.Contains(name))
             throw ComptimeFailure.NotYet($"'{Short(name)}' rounds as each C library does, and compile time has no answer the same on every platform yet");

@@ -50,6 +50,15 @@ internal sealed class TypeTable
     /// instances and extensions included — and a site may stand in any of them.</summary>
     public ComptimeTable? Comptime { get; init; }
 
+    /// <summary>The quotes the lowering met (13 M9b P5), numbered as their imports are.</summary>
+    public List<IrQuote> Quotes { get; } = [];
+
+    public int NoteQuote(Lyric.AST.QuoteExpr quote, string module)
+    {
+        Quotes.Add(new IrQuote(quote, module));
+        return Quotes.Count - 1;
+    }
+
     /// <summary>The worklist of used extension methods. It hangs here rather than being threaded through
     /// every lowerer: EVERY one has the TypeTable anyway, and the alternative would be an extra parameter
     /// on four tables (instances, lambdas, coroutines, extensions themselves) — four opportunities to

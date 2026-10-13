@@ -762,6 +762,10 @@ public sealed partial class Parser
                     return ParseMacroCall();
                 _buffer.Advance();
                 return new IdentifierExpr(_sm.Slice(cur.Span).ToString(), cur.Span);
+            case TokenKind.Quote when _sm.Lyric5:
+                return ParseQuote();
+            case TokenKind.Hash when _quoteDepth > 0 && _buffer.Peek(1).TokenKind == TokenKind.LBrace:
+                return ParseSplice();
             case TokenKind.This:
                 _buffer.Advance();
                 return new ThisExpr(cur.Span);
@@ -1457,6 +1461,78 @@ public sealed partial class Parser
         }
         return new MacroCallExpr(_sm.Slice(nameTok.Span).ToString(), arguments.ToArray(), trailing, Span.Union(nameTok.Span, end))
             { NameSpan = nameTok.Span, BangSpan = bang.Span };
+    }
+
+    private int _quoteDepth;
+    private List<Expr>? _splices;
+
+    /// <summary><c>quote { ... }</c> (08 Y12 Q2; M9b S3): declarations when the block opens with
+    /// one, statements otherwise - a value block, so a last expression without ';' is the tail,
+    /// and the quote an expression. Inside, '#{' is a splice.</summary>
+    private Expr ParseQuote()
+    {
+        var kw = _buffer.Advance(); // 'quote'
+        if (!_buffer.Check(TokenKind.LBrace))
+        {
+            _de.Report("LYR-PAR0063", Severity.Error, _buffer.Current.Span, "'quote' takes a block: 'quote { ... }'");
+            return new ErrorExpr(kw.Span);
+        }
+        var savedSplices = _splices;
+        _splices = [];
+        _quoteDepth++;
+        try
+        {
+            Node[] content;
+            Span end;
+            var declarations = AtQuotedDeclaration();
+            if (declarations)
+            {
+                _buffer.Advance(); // '{'
+                var decls = new List<Decl>();
+                while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
+                {
+                    var before = _buffer.Position;
+                    decls.Add(ParseTopLevelDecl([]));
+                    if (_buffer.Position == before && !_buffer.AtEnd) _buffer.Advance();
+                }
+                end = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close 'quote'").Span;
+                content = [.. decls];
+            }
+            else
+            {
+                var block = ParseBlock(valueBlock: true);
+                content = [.. block.Statements];
+                end = block.Span;
+            }
+            return new QuoteExpr(content, _splices.ToArray(), declarations, Span.Union(kw.Span, end));
+        }
+        finally
+        {
+            _quoteDepth--;
+            _splices = savedSplices;
+        }
+    }
+
+    private bool AtQuotedDeclaration()
+    {
+        var next = _buffer.Peek(1).TokenKind;
+        return next is TokenKind.Fn or TokenKind.Macro or TokenKind.Struct or TokenKind.Class or TokenKind.Enum
+            or TokenKind.Interface or TokenKind.Extend or TokenKind.Pub or TokenKind.Internal or TokenKind.Private
+            or TokenKind.Inline or TokenKind.AtIdentifier
+            || PeekContextual(1, "type") || PeekContextual(1, "extern");
+    }
+
+    /// <summary><c>#{e}</c> (08 Y12 Q3): the expression is the function's code, kept in the
+    /// quote's list; the content holds the splice by its index.</summary>
+    private SpliceExpr ParseSplice()
+    {
+        var hash = _buffer.Advance(); // '#'
+        _buffer.Advance(); // '{'
+        var inner = ParseSubExpr();
+        var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close the splice");
+        var index = _splices!.Count;
+        _splices.Add(inner);
+        return new SpliceExpr(index, inner, Span.Union(hash.Span, close.Span));
     }
 
     private LambdaExpr ParseTrailingLambda()

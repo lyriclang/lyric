@@ -1118,6 +1118,21 @@ the report at the close.
   at the `!`; a panic is `LYR-CT0001` at the site. The artifacts: `twice!(x)` as an `Expr` result,
   a macro from an imported module (and one whose module uses a macro itself), the own module's
   call refused, `error(node, …)` with both spans (`MacroTests`). Spec 11 §5 rules 1–5; five cases.
+- **S3** `quote { … }` and `#{…}` with hygiene (P5): a quote is a tree as a value of its content's
+  kind — `Expr` for a lone tail, `Stmt[]`/`Block` for statements, `Decl`/`Decl[]` for
+  declarations, the expected type deciding where the content allows two (`LYR-SEM0194` without
+  `std.syntax`); `#{e}` splices the value of the function's code by its position — an
+  expression, a statement of its own (arrays and a block's statements spliced in, a splice
+  statement ending at its `}`), a declaration's name (`fn #{name}()`, the content holding `#i`) —
+  checked against the position (`LYR-SEM0193`). The lowering numbers the quotes
+  (`IrModule.Quotes`) and calls a native of its own per quote, `std.syntax.quote#i`, with the
+  splices' values; the bridge builds the tree and, per evaluation, renames every name the content
+  binds (`Ident.fresh`) and marks every free name as the macro module's (`Ident.from`,
+  `Named`'s module), which the checker and the resolver answer in that module's scope. The
+  artifacts: `retry!(3) { … }` from a quote (`QuoteTests`), the caller's `attempts` untouched
+  beside the quote's, `#{stmts}` spliced, `fn #{name}()`, `helper()` of the macro's module
+  though the site never imports it. The formatter writes `quote`, `#{…}` and `macro`. Spec 11
+  §5 rules 6–8; three cases.
 
 ## Design decisions
 

@@ -2695,6 +2695,86 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0186", Severity.Error, fn.Generics[0].Span, $"a macro has no type parameters: '{fn.Name}' sees syntax, which carries no types (13 M9b P9)");
     }
 
+    /// <summary><c>quote { ... }</c> (08 Y12 Q2; 13 M9b P5): a value of std.syntax - an Expr for a
+    /// lone tail, Stmt[] or Block for statements, Decl or Decl[] for declarations, the expected type
+    /// deciding where the content allows two. The splices are checked as the function's code,
+    /// each against its position in the content: a name takes an Ident, a statement of its own
+    /// takes statements, a block or an expression, an expression takes an expression, a name, a
+    /// literal or a block.</summary>
+    private LyrType CheckQuote(QuoteExpr q, SymbolTable scope, LyrType? expected)
+    {
+        var syntax = _comp.FindModule(["std", "syntax"]);
+        if (syntax is null)
+            return Report(q.Span, "LYR-SEM0194", "'quote' builds a tree of std.syntax, which this program does not reach - 'import std.syntax;' first");
+        LyrType Of(string name) => syntax.Members.LookupLocal(name) is TypeSymbol t ? new NamedRef(t) : LyrType.Error;
+        string? KindOf(LyrType? t) => t switch
+        {
+            NamedRef { Symbol: var s } when ReferenceEquals(syntax.Members.LookupLocal(s.Name), s) => s.Name,
+            ArrayOf { Element: NamedRef { Symbol: var s } } when ReferenceEquals(syntax.Members.LookupLocal(s.Name), s) => s.Name + "[]",
+            _ => null,
+        };
+        var positions = SplicePositions(q);
+        for (var i = 0; i < q.Splices.Length; i++)
+        {
+            var type = CheckExpr(q.Splices[i], scope);
+            if (type.IsError) continue;
+            var kind = KindOf(type);
+            var position = positions.GetValueOrDefault(i, "expression");
+            var allowed = position switch
+            {
+                "name" => kind is "Ident",
+                "statement" => kind is "Stmt" or "Stmt[]" or "Block" or "Expr" or "Ident" or "Literal",
+                _ => kind is "Expr" or "Ident" or "Literal" or "Block",
+            };
+            if (!allowed)
+                _de.Report("LYR-SEM0193", Severity.Error, q.Splices[i].Span,
+                    $"a splice in {position} position takes " + position switch
+                    {
+                        "name" => "an Ident",
+                        "statement" => "statements, a block, an expression, a name or a literal",
+                        _ => "an expression, a name, a literal or a block",
+                    } + $" of std.syntax, not a '{TypeFacts.Display(type)}'");
+        }
+        _result.NoteQuote(q, _currentModule?.FullName ?? "");
+        if (q.Declarations)
+            return q.Content.Length == 1 && KindOf(expected) == "Decl" ? Of("Decl") : new ArrayOf(Of("Decl"));
+        var wanted = KindOf(expected);
+        if (q.Content is [TailExprStmt] && wanted is not ("Stmt[]" or "Block")) return Of("Expr");
+        if (wanted == "Block") return Of("Block");
+        return new ArrayOf(Of("Stmt"));
+    }
+
+    /// <summary>Where each splice of a quote stands: a name ("#i" as a declaration's name), a
+    /// statement of its own, or an expression.</summary>
+    private static Dictionary<int, string> SplicePositions(QuoteExpr q)
+    {
+        var positions = new Dictionary<int, string>();
+        void Walk(Node node)
+        {
+            switch (node)
+            {
+                case INamedDecl { Name: ['#', .. var digits] } when int.TryParse(digits, out var named):
+                    positions[named] = "name";
+                    break;
+                case ExprStmt { Expr: SpliceExpr s }:
+                    positions[s.Index] = "statement";
+                    break;
+                case TailExprStmt { Expr: SpliceExpr s }:
+                    positions[s.Index] = "statement";
+                    break;
+                case SpliceExpr s:
+                    positions.TryAdd(s.Index, "expression");
+                    return; // its inner is the function's code, not the content's
+            }
+            foreach (var child in AstChildren.Of(node)) Walk(child);
+        }
+        foreach (var n in q.Content) Walk(n);
+        return positions;
+    }
+
+    /// <summary>The scope of the module a quote wrote a name in (13 M9b P5), or <c>null</c>.</summary>
+    private SymbolTable? HomeScope(string module) => _comp.FindModule(module.Split('.'))?.Members;
+
     /// <summary>The macro a bare name means here, or <c>null</c>.</summary>
     private static FunctionSymbol? MacroNamed(string name, SymbolTable scope) => scope.Lookup(name) switch
     {
@@ -4274,6 +4354,8 @@ public sealed class TypeChecker
             // an unexpanded site (13 M9b P6): the expander replaces it before the module is
             // checked for real; this is the pre-expansion pass, whose findings are buffered
             case MacroCallExpr: return LyrType.Error;
+            case QuoteExpr q: return CheckQuote(q, scope, expected);
+            case SpliceExpr s: return Report(s.Span, "LYR-SEM0193", "a splice '#{...}' stands inside a 'quote' only");
             case ThrowExpr te:
             {
                 // The same rule as the statement (SEM0030); the difference is the type. 'never'
@@ -4350,6 +4432,8 @@ public sealed class TypeChecker
 
     private LyrType CheckIdentifier(IdentifierExpr id, SymbolTable scope, LyrType? expected = null)
     {
+        // a name a 'quote' wrote (13 M9b P5) is the macro's module's, not the site's
+        if (id.QuotedFrom is { } from && HomeScope(from) is { } home) scope = home;
         // A name that means SEVERAL functions, standing where a value is wanted rather than in
         // callee position. Nothing about the expression chooses, so the expected type has to: a
         // parameter of type 'fn(int) -> string' picks the overload with that shape, and without
@@ -6845,7 +6929,8 @@ public sealed class TypeChecker
         // A bare callee is looked up past a field that cannot be called (the review's M6-30):
         // 'label()' beside a field 'label: string' means the function outside. The arguments
         // stay in the call's own scope.
-        var calleeScope = scope;
+        // a callee a 'quote' wrote (13 M9b P5) is found in the macro's module; the arguments stay here
+        var calleeScope = call.Callee is IdentifierExpr { QuotedFrom: { } from } && HomeScope(from) is { } home ? home : scope;
         // a macro is never called as a function (13 M9b P3): its site is written with the '!'
         if (call.Callee is IdentifierExpr macroName && MacroNamed(macroName.Name, scope) is { } macro)
         {

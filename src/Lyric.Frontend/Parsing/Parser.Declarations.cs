@@ -1134,6 +1134,13 @@ public sealed partial class Parser
     /// </summary>
     private (string Name, Span Span) ExpectNamed(string code, string what)
     {
+        // 'fn #{name}()' inside a quote (08 Y12 Q3): the name is a splice, which the content
+        // holds as "#i" - the bridge sets the Ident's name in its place
+        if (_quoteDepth > 0 && _buffer.Check(TokenKind.Hash) && _buffer.Peek(1).TokenKind == TokenKind.LBrace)
+        {
+            var splice = ParseSplice();
+            return ("#" + splice.Index, splice.Span);
+        }
         var tok = _buffer.Expect(TokenKind.Identifier, code, $"expected {what}, got {_buffer.Current.TokenKind}");
         return (_sm.Slice(tok.Span).ToString(), tok.Span);
     }

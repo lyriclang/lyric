@@ -28,7 +28,12 @@ public sealed record BoolLiteralExpr(bool Value, Span Span) : Expr(Span);
 public sealed record NullLiteralExpr(Span Span) : Expr(Span);
 
 // --- names ---
-public sealed record IdentifierExpr(string Name, Span Span) : Expr(Span);
+public sealed record IdentifierExpr(string Name, Span Span) : Expr(Span)
+{
+    /// <summary>The module a <c>quote</c> wrote this name in (13 M9b P5): a free name of a quote
+    /// is the macro's module's, not the site's; <c>null</c> for every name a program writes.</summary>
+    public string? QuotedFrom { get; init; }
+}
 
 /// <summary><c>.Red</c>: a member of the type the position expects, the type unnamed
 /// (design/v5/spec/03 T9, 08 Y9). A unit variant as it stands; the callee of <c>.Num(3)</c>;
@@ -331,6 +336,17 @@ public sealed record StructInitField(string Name, Expr Value, Span Span) : Node(
 
 // --- recovery ---
 public sealed record ErrorExpr(Span Span) : Expr(Span);
+
+/// <summary><c>quote { ... }</c> (design/v5/spec/08 Y12 Q2; 13 M9b P5): a tree as a value of its
+/// content's kind - statements (a last expression without ';' the tail, which makes it an Expr),
+/// or declarations. The content is syntax, checked nowhere; the splices are the code of the
+/// surrounding function, evaluated at the quote in order. A name splice stands in the content as
+/// the name "#i" of its index.</summary>
+public sealed record QuoteExpr(Node[] Content, Expr[] Splices, bool Declarations, Span Span) : Expr(Span);
+
+/// <summary><c>#{e}</c> inside a quote (08 Y12 Q3): the value of <see cref="Inner"/> set into the
+/// tree at this place - an expression here, statements where it stands as one.</summary>
+public sealed record SpliceExpr(int Index, Expr Inner, Span Span) : Expr(Span);
 
 /// <summary><c>twice!(x)</c>, <c>retry!(3) { ... }</c>, <c>run! { ... }</c> (design/v5/spec/08 Y12 Q5;
 /// 13 M9b P4): a macro's expansion site. The arguments are syntax, not values, and are checked

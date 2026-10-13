@@ -230,8 +230,35 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
 
     public Stmt[] StmtsOf(Value v, IrType t) => Many(v, t, StmtOf);
 
-    private Value Ident(string name, Span span, IrType t) => Struct(t, ("name", S(name)), ("span", Sp(span)));
+    /// <summary>An <c>Ident</c>: the name, renamed where the quote being built binds it (hygiene,
+    /// 13 M9b P5), the splice's own where the content names it as "#i"; <paramref name="from"/>
+    /// the module a free name of a quote belongs to.</summary>
+    private Value Ident(string name, Span span, IrType t, string? from = null)
+    {
+        if (_splices is not null && name.Length > 1 && name[0] == '#' && int.TryParse(name.AsSpan(1), out var index))
+            return _splices[index]; // a name splice: the Ident the macro gave, as is
+        if (_renames is not null && _renames.TryGetValue(name, out var fresh))
+        {
+            name = fresh;
+            from = null;
+        }
+        return Struct(t, ("name", S(name)), ("span", Sp(span)), ("from", OptS(from)));
+    }
+
+    /// <summary>A binder's name: renamed inside a quote.</summary>
     private Make Id(string name, Span span) => t => Ident(name, span, t);
+
+    /// <summary>A reference: a free name inside a quote is the macro's module's.</summary>
+    private Make Ref(IdentifierExpr id) => t =>
+        _renames is not null && _renames.ContainsKey(id.Name) ? Ident(id.Name, id.Span, t) : Ident(id.Name, id.Span, t, id.QuotedFrom ?? _quoteModule);
+
+    /// <summary>A label (a member, a field, a declaration's name): never renamed, nobody's.</summary>
+    private Make Label(string name, Span span) => t =>
+        _splices is not null && name.Length > 1 && name[0] == '#' && int.TryParse(name.AsSpan(1), out var index)
+            ? _splices[index]
+            : Struct(t, ("name", S(name)), ("span", Sp(span)), ("from", OptS(null)));
+
+    private bool Renamed(string name) => _renames is not null && _renames.ContainsKey(name);
 
     private Value Visibility(VisibilityWord word, IrType t) => Variant(t, word switch
     {
@@ -284,7 +311,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         switch (e)
         {
             case var lit when IsLiteral(lit): return Variant(t, "Literal", lt => Literal(lit, lt), sp);
-            case IdentifierExpr id: return Variant(t, "Name", Id(id.Name, id.Span));
+            case IdentifierExpr id: return Variant(t, "Name", Ref(id));
             case ImplicitMemberExpr im: return Variant(t, "Implicit", Id(im.Name, im.Span));
             case ThisExpr: return Variant(t, "This", sp);
             case AtIdentifierExpr at: return Variant(t, "At", S(at.Name), OptOf(at.Arguments is not null, Exprs(at.Arguments ?? [])), sp);
@@ -308,7 +335,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
                     }),
                     Types(c.TypeArguments ?? []), sp);
             case IndexExpr ix: return Variant(t, "Index", Boxed(bt => Expr(ix.Target, bt)), Boxed(bt => Expr(ix.Index, bt)), sp);
-            case MemberExpr m: return Variant(t, "Member", Boxed(bt => Expr(m.Target, bt)), Id(m.Member, m.MemberSpan), B(m.IsOptional), sp);
+            case MemberExpr m: return Variant(t, "Member", Boxed(bt => Expr(m.Target, bt)), Label(m.Member, m.MemberSpan), B(m.IsOptional), sp);
             case ArrayLitExpr a: return Variant(t, "Array", Exprs(a.Elements), sp);
             case TupleLitExpr tu: return Variant(t, "Tuple", Exprs(tu.Elements), sp);
             case InterpolatedStringExpr s:
@@ -341,13 +368,16 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
                 return Variant(t, "Try", Boxed(bt => Expr(tr.Value, bt)), kt => Variant(kt, TryNames[(int)tr.Kind]), Catches(tr.Catches), sp);
             case MacroCallExpr mc:
                 return Variant(t, "Macro", S(mc.Name), Exprs(mc.Arguments), OptBlock(mc.Trailing), sp);
+            case SpliceExpr s when _splices is not null: return SpliceAsExpr(s, t);
             default:
                 throw NoForm(e);
         }
     }
 
     private Make FieldInits(StructInitField[] fields) =>
-        Arr(fields, (f, ft) => Struct(ft, ("name", Id(f.Name, f.NameSpan)), ("value", vt => Expr(f.Value, vt)), ("isShorthand", B(f.IsShorthand))));
+        Arr(fields, (f, ft) => Struct(ft, ("name", Label(f.Name, f.NameSpan)), ("value", vt => Expr(f.Value, vt)),
+            // 'S { v }' with 'v' renamed by the quote is 'S { v = v__1 }'
+            ("isShorthand", B(f.IsShorthand && !(f.Value is IdentifierExpr v && Renamed(v.Name))))));
 
     private Value Body(Node body, IrType t) => body switch
     {
@@ -363,7 +393,43 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         Struct(ct, ("name", OptIdent(c.BindingName, c.NameSpan)), ("type", OptType(c.BindingType)), ("types", Types(c.BindingTypes)),
             ("body", bt => BlockValue(c.Body, bt)), ("isExpr", B(c.ExpressionBody)), ("span", Sp(c.Span))));
 
-    public Value BlockValue(Block b, IrType t) => Struct(t, ("stmts", Arr(b.Statements, Stmt)), ("span", Sp(b.Span)));
+    public Value BlockValue(Block b, IrType t) => Struct(t, ("stmts", st => StatementsValue(b.Statements, st)), ("span", Sp(b.Span)));
+
+    /// <summary>The statements of a block as values. Inside a quote, a splice that stands as a
+    /// statement is set in by its kind: statements and a block's statements are spliced, a lone
+    /// statement stands, an expression, a name or a literal is the statement or the tail it is.</summary>
+    public Value StatementsValue(Stmt[] statements, IrType arrayType)
+    {
+        var element = Elem(arrayType);
+        var items = new List<Value>();
+        foreach (var statement in statements)
+        {
+            var splice = statement switch { ExprStmt { Expr: SpliceExpr s } => s, TailExprStmt { Expr: SpliceExpr s } => s, _ => null };
+            if (splice is null || _splices is null)
+            {
+                items.Add(Stmt(statement, element));
+                continue;
+            }
+            var value = _splices[splice.Index];
+            var type = _spliceTypes![splice.Index];
+            var tail = statement is TailExprStmt;
+            switch (KindName(type))
+            {
+                case "Stmt[]": items.AddRange(ArrOf(value).Select(v => tail ? v : Untailed(v, element))); break;
+                case "Block": items.AddRange(ArrOf(FieldOf(value, type, "stmts")).Select(v => tail ? v : Untailed(v, element))); break;
+                case "Stmt": items.Add(tail ? value : Untailed(value, element)); break;
+                default: items.Add(Variant(element, tail ? "Tail" : "Expr", et => SpliceAsExpr(splice, et), Sp(statement.Span))); break;
+            }
+        }
+        return Value.Of(new ArrayObj(items.ToArray()));
+    }
+
+    /// <summary>A tail spliced where no tail stands is the expression statement it is.</summary>
+    private Value Untailed(Value statement, IrType element)
+    {
+        var (name, f, _) = Case(statement, element);
+        return name == "Tail" ? Variant(element, "Expr", _ => f[0], _ => f[1]) : statement;
+    }
 
     public Value Stmt(Stmt s, IrType t)
     {
@@ -414,7 +480,10 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
                 return Variant(t, "Variant", Strings(v.Path),
                     OptOf(v.TupleElements is not null, Arr(v.TupleElements ?? [], Pattern)),
                     OptOf(v.StructFields is not null, Arr(v.StructFields ?? [], (f, ft) =>
-                        Struct(ft, ("name", Id(f.Name, f.Span)), ("pattern", OptPattern(f.Pattern))))),
+                        // 'Rect { w }' binds 'w', which a quote renames: the field stays, 'w = w__1' binds
+                        Struct(ft, ("name", Label(f.Name, f.Span)), ("pattern", f.Pattern is null && Renamed(f.Name)
+                            ? OptOf(true, pt => Variant(pt, "Binding", Id(f.Name, f.Span)))
+                            : OptPattern(f.Pattern))))),
                     B(v.IsImplicit), sp);
             case TuplePattern tu: return Variant(t, "Tuple", Arr(tu.Elements, Pattern), sp);
             case RangePattern r: return Variant(t, "Range", Boxed(et => Expr(r.Low, et)), Boxed(et => Expr(r.High, et)), B(r.IsInclusive), sp);
@@ -433,7 +502,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         {
             case NamedType nt:
                 return Variant(t, "Named", Strings(nt.Path), Types(nt.TypeArguments),
-                    Strings(nt.ArgumentNames is { } names ? names.Select(x => x ?? "") : []), sp);
+                    Strings(nt.ArgumentNames is { } names ? names.Select(x => x ?? "") : []), OptS(nt.QuotedFrom ?? _quoteModule), sp);
             case NullableType o: return Variant(t, "Optional", Boxed(bt => Type(o.Inner, bt)), sp);
             case ArrayType a: return Variant(t, "Array", Boxed(bt => Type(a.Element, bt)), OptOf(a.Length is not null, _ => Value.Int(a.Length!.Value)), sp);
             case TupleType tu: return Variant(t, "Tuple", Types(tu.Elements), Strings(tu.Labels is { } labels ? labels.Select(x => x ?? "") : []), sp);
@@ -451,23 +520,23 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
             ? [new StructInitField("", pos, pos.Span) { NameSpan = pos.Span }] : a.Fields)), ("span", Sp(a.Span)));
 
     private Value Generic(GenericParam g, IrType t) =>
-        Struct(t, ("name", Id(g.Name, g.NameSpan)), ("constraints", Types(g.Constraints)), ("default", OptType(g.Default)));
+        Struct(t, ("name", Label(g.Name, g.NameSpan)), ("constraints", Types(g.Constraints)), ("default", OptType(g.Default)));
 
     private Value Param(Param p, IrType t) => Struct(t, ("name", Id(p.Name, p.NameSpan)), ("type", tt => Type(p.Type, tt)), ("default", OptExpr(p.Default)),
         ("isParams", B(p.IsParams)), ("isEllipsis", B(p.IsEllipsis)), ("isPlace", B(p.IsPlace)), ("attributes", Attributes(p.Attributes)), ("span", Sp(p.Span)));
 
     private Value Fn(FunctionDecl f, IrType t) => Struct(t,
         ("visibility", vt => Visibility(f.Visibility, vt)), ("isStatic", B(f.IsStatic)), ("isMut", B(f.IsMut)), ("isInline", B(f.IsInline)),
-        ("name", Id(f.Name, f.NameSpan)), ("generics", Arr(f.Generics, Generic)), ("params", Arr(f.Parameters, Param)),
+        ("name", Label(f.Name, f.NameSpan)), ("generics", Arr(f.Generics, Generic)), ("params", Arr(f.Parameters, Param)),
         ("ret", OptType(f.ReturnType)), ("retGrouped", B(f.ReturnGrouped)), ("throws", OptTypes(f.Throws?.Types)),
         ("body", OptBlock(f.Body)), ("externAbi", OptS(f.Extern?.Abi)), ("externSymbol", OptS(f.Extern?.Symbol)),
         ("attributes", Attributes(f.Attributes)), ("span", Sp(f.Span)));
 
     private Value Field(FieldDecl f, IrType t) => Struct(t, ("visibility", vt => Visibility(f.Visibility, vt)), ("isVar", B(f.IsVar)),
-        ("name", Id(f.Name, f.NameSpan)), ("type", tt => Type(f.Type, tt)), ("default", OptExpr(f.Default)), ("attributes", Attributes(f.Attributes)), ("span", Sp(f.Span)));
+        ("name", Label(f.Name, f.NameSpan)), ("type", tt => Type(f.Type, tt)), ("default", OptExpr(f.Default)), ("attributes", Attributes(f.Attributes)), ("span", Sp(f.Span)));
 
     private Value Assoc(AssociatedTypeDecl a, IrType t) =>
-        Struct(t, ("name", Id(a.Name, a.NameSpan)), ("type", OptType(a.Type)), ("bounds", Types(a.Bounds)), ("span", Sp(a.Span)));
+        Struct(t, ("name", Label(a.Name, a.NameSpan)), ("type", OptType(a.Type)), ("bounds", Types(a.Bounds)), ("span", Sp(a.Span)));
 
     private Value Let(VisibilityWord visibility, bool isStatic, BindingStmt b, AttributeNode[] attributes, Span span, IrType t) => Struct(t,
         ("visibility", vt => Visibility(visibility, vt)), ("isVar", B(b.IsMutable)), ("isStatic", B(isStatic)), ("name", Id(b.Name, b.NameSpan)),
@@ -477,7 +546,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
 
     private Value TypeDecl(VisibilityWord visibility, string name, Span nameSpan, GenericParam[] generics, TypeNode[] interfaces, string?[]? delegates,
         Decl[] members, AttributeNode[] attributes, Span span, IrType t) => Struct(t,
-        ("visibility", vt => Visibility(visibility, vt)), ("name", Id(name, nameSpan)), ("generics", Arr(generics, Generic)),
+        ("visibility", vt => Visibility(visibility, vt)), ("name", Label(name, nameSpan)), ("generics", Arr(generics, Generic)),
         ("interfaces", Types(interfaces)), ("delegates", Strings(delegates is { } d ? d.Select(x => x ?? "") : [])),
         ("members", Arr(members, Decl)), ("attributes", Attributes(attributes)), ("span", Sp(span)));
 
@@ -491,9 +560,9 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
             case ClassDecl c:
                 return Variant(t, "Class", st => TypeDecl(c.Visibility, c.Name, c.NameSpan, c.Generics, c.Interfaces, c.Delegates, c.Members, c.Attributes, c.Span, st));
             case EnumDecl e:
-                return Variant(t, "Enum", et => Struct(et, ("visibility", vt => Visibility(e.Visibility, vt)), ("name", Id(e.Name, e.NameSpan)),
+                return Variant(t, "Enum", et => Struct(et, ("visibility", vt => Visibility(e.Visibility, vt)), ("name", Label(e.Name, e.NameSpan)),
                     ("generics", Arr(e.Generics, Generic)), ("interfaces", Types(e.Interfaces)),
-                    ("variants", Arr(e.Variants, (v, vt) => Struct(vt, ("name", Id(v.Name, v.NameSpan)),
+                    ("variants", Arr(e.Variants, (v, vt) => Struct(vt, ("name", Label(v.Name, v.NameSpan)),
                         ("tuple", OptTypes(v.TupleFields)),
                         ("fields", OptOf(v.StructFields is not null, Arr(v.StructFields ?? [], Field))),
                         ("attributes", Attributes(v.Attributes)), ("span", Sp(v.Span))))),
@@ -501,7 +570,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
                     ("attributes", Attributes(e.Attributes)), ("span", Sp(e.Span))));
             case InterfaceDecl i:
                 return Variant(t, "Interface", it => Struct(it, ("visibility", vt => Visibility(i.Visibility, vt)), ("isSealed", B(i.IsSealed)),
-                    ("name", Id(i.Name, i.NameSpan)), ("generics", Arr(i.Generics, Generic)), ("interfaces", Types(i.Interfaces)),
+                    ("name", Label(i.Name, i.NameSpan)), ("generics", Arr(i.Generics, Generic)), ("interfaces", Types(i.Interfaces)),
                     ("types", Arr(i.Types, Assoc)), ("statics", Arr(i.Statics, Static)), ("members", Arr(i.Members, Fn)),
                     ("attributes", Attributes(i.Attributes)), ("span", Sp(i.Span))));
             case ExtendDecl x:
@@ -516,7 +585,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
             case AssociatedTypeDecl a: return Variant(t, "AssocType", at => Assoc(a, at));
             case TypeAliasDecl a:
                 return Variant(t, "Alias", at => Struct(at, ("visibility", vt => Visibility(a.Visibility, vt)), ("isOpaque", B(a.IsOpaque)),
-                    ("name", Id(a.Name, a.NameSpan)), ("aliased", tt => Type(a.Aliased, tt)), ("span", Sp(a.Span))));
+                    ("name", Label(a.Name, a.NameSpan)), ("aliased", tt => Type(a.Aliased, tt)), ("span", Sp(a.Span))));
             case ImportDecl im:
             {
                 var selective = im.Clause as ImportSelective;
@@ -528,6 +597,101 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
             default:
                 throw NoForm(d);
         }
+    }
+
+    // ------------------------------------------------------------------ quotes (M9b S3)
+
+    private Value[]? _splices;
+    private IrType[]? _spliceTypes;
+    private string? _quoteModule;
+    private Dictionary<string, string>? _renames;
+
+    private string KindName(IrType t) => t switch
+    {
+        IrEnumType e => Def(e.Type).Name,
+        IrStructType s => Def(s.Type).Name,
+        IrArrayType { Element: IrEnumType e } => Def(e.Type).Name + "[]",
+        _ => "?",
+    };
+
+    /// <summary>The tree a quote builds (13 M9b P5): its content as values of the kind the type
+    /// says, the splices set in, every name the content binds renamed fresh (hygiene), every
+    /// free name marked as the quote's module's.</summary>
+    public Value Quote(IrQuote quote, Value[] splices, IrType[] spliceTypes, IrType resultType)
+    {
+        var saved = (_splices, _spliceTypes, _quoteModule, _renames);
+        _splices = splices;
+        _spliceTypes = spliceTypes;
+        _quoteModule = quote.Module.Length > 0 ? quote.Module : null;
+        _renames = Binders(quote.Node).ToDictionary(n => n, FreshName, StringComparer.Ordinal);
+        try
+        {
+            var content = quote.Node.Content;
+            switch (KindName(resultType))
+            {
+                case "Expr": return Expr(((TailExprStmt)content[0]).Expr, resultType);
+                // statements stand where no value is taken: a last expression without ';' is a statement
+                case "Block": return BlockValue(new Block(Statements(content), quote.Node.Span), resultType);
+                case "Stmt[]": return StatementsValue(Statements(content), resultType);
+                case "Decl": return Decl((Decl)content[0], resultType);
+                case "Decl[]": return Arr([.. content.Cast<Decl>()], Decl)(resultType);
+                default: throw new InternalCompilationException($"std.syntax: a quote of {resultType}");
+            }
+        }
+        finally
+        {
+            (_splices, _spliceTypes, _quoteModule, _renames) = saved;
+        }
+    }
+
+    private static Stmt[] Statements(Node[] content) =>
+        [.. content.Cast<Stmt>().Select((s, i) => i == content.Length - 1 && s is TailExprStmt tail ? new ExprStmt(tail.Expr, tail.Span) : s)];
+
+    /// <summary>A splice where an expression stands: an Expr as is, an Ident as a name, a Literal
+    /// as a literal, a Block as a block expression.</summary>
+    private Value SpliceAsExpr(SpliceExpr s, IrType exprType)
+    {
+        var value = _splices![s.Index];
+        var kind = KindName(_spliceTypes![s.Index]);
+        return kind switch
+        {
+            "Expr" => value,
+            "Ident" => Variant(exprType, "Name", _ => value),
+            "Literal" => Variant(exprType, "Literal", _ => value, Sp(s.Span)),
+            "Block" => Variant(exprType, "Block", _ => value, Sp(s.Span)),
+            _ => throw ComptimeFailure.NotYet($"std.syntax: a splice of '{kind}' where an expression stands"),
+        };
+    }
+
+    /// <summary>The names a quote's content binds: a let, a loop variable, a lambda's or a
+    /// function's parameter, a catch's binding, a pattern's names. Each is fresh per expansion.</summary>
+    private static List<string> Binders(QuoteExpr quote)
+    {
+        var names = new List<string>();
+        void Bind(string name)
+        {
+            if (name.Length > 0 && (char.IsLower(name[0]) || name[0] == '_') && !names.Contains(name)) names.Add(name);
+        }
+        void Walk(Node node)
+        {
+            switch (node)
+            {
+                case SpliceExpr: return; // its inner is the macro's code
+                case BindingStmt b: Bind(b.Name); break;
+                case ForInStmt f: Bind(f.Variable); break;
+                case LambdaParam { Implicit: false } p: Bind(p.Name); break;
+                case Param p: Bind(p.Name); break;
+                case CatchClause { BindingName: { } c }: Bind(c); break;
+                case BindingPattern bp: Bind(bp.Name); break;
+                case TypePattern { Name: { } tn }: Bind(tn); break;
+                case TypeSetPattern { Name: { } sn }: Bind(sn); break;
+                case RestPattern { Name: { } rn }: Bind(rn); break;
+                case FieldPattern { Pattern: null } fp: Bind(fp.Name); break;
+            }
+            foreach (var child in AstChildren.Of(node)) Walk(child);
+        }
+        foreach (var n in quote.Content) Walk(n);
+        return names;
     }
 
     // ------------------------------------------------------------------ a tree out of values
@@ -609,7 +773,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         switch (name)
         {
             case "Literal": { var (ln, lf, _) = Case(f[0], ft[0]); return LiteralOf(ln, lf); }
-            case "Name": { var (n, s) = IdentOf(f[0], ft[0]); return new IdentifierExpr(n, s); }
+            case "Name": { var (n, s) = IdentOf(f[0], ft[0]); return new IdentifierExpr(n, s) { QuotedFrom = MaybeStr(FieldOf(f[0], ft[0], "from")) }; }
             case "Implicit": { var (n, s) = IdentOf(f[0], ft[0]); return new ImplicitMemberExpr(n, s); }
             case "This": return new ThisExpr(NoSpan);
             case "At": return new AtIdentifierExpr(StrOf(f[0]), OptionOf(f[1]) is { } given ? Many(given, Inner(ft[1]), ExprOf) : null, NoSpan);
@@ -818,7 +982,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         var (name, f, ft) = Case(v, t);
         switch (name)
         {
-            case "Named": return new NamedType(StringsOf(f[0]), Many(f[1], ft[1], TypeOf), NoSpan) { NameSpan = NoSpan, ArgumentNames = NullableStrings(f[2]) };
+            case "Named": return new NamedType(StringsOf(f[0]), Many(f[1], ft[1], TypeOf), NoSpan) { NameSpan = NoSpan, ArgumentNames = NullableStrings(f[2]), QuotedFrom = MaybeStr(f[3]) };
             case "Optional": return new NullableType(BoxedType(f[0], ft[0]), NoSpan);
             case "Array": return new ArrayType(BoxedType(f[0], ft[0]), NoSpan) { Length = OptionOf(f[1]) is { } len ? (int)len.AsInt : null };
             case "Tuple": return new TupleType(Many(f[0], ft[0], TypeOf), NoSpan) { Labels = NullableStrings(f[1]) };

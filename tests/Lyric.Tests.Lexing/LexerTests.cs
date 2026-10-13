@@ -278,7 +278,7 @@ public class LexerTests
     [Fact]
     public void Bad_character_emits_token_and_diagnostic()
     {
-        var (tokens, diag) = Tokenize("#");
+        var (tokens, diag) = Tokenize("$");
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.BadChar, tokens[0].TokenKind);
         Assert.Equal(0, tokens[0].Span.Start);
@@ -291,7 +291,7 @@ public class LexerTests
     [Fact]
     public void Multiple_bad_characters_each_get_token_and_diagnostic()
     {
-        var (tokens, diag) = Tokenize("##");
+        var (tokens, diag) = Tokenize("$$");
         Assert.Equal(3, tokens.Count);
         Assert.Equal(TokenKind.BadChar, tokens[0].TokenKind);
         Assert.Equal(TokenKind.BadChar, tokens[1].TokenKind);
@@ -302,7 +302,7 @@ public class LexerTests
     [Fact]
     public void Bad_character_between_identifiers()
     {
-        var (tokens, diag) = Tokenize("foo#bar");
+        var (tokens, diag) = Tokenize("foo$bar");
         var kinds = tokens.Select(t => t.TokenKind).ToArray();
         Assert.Equal(
             new[] {
@@ -319,16 +319,16 @@ public class LexerTests
     public void Bad_character_message_quotes_the_character()
     {
         // Regression: apostrophes around the char, not only one.
-        var (_, diag) = Tokenize("#");
-        Assert.Contains("'#'", diag.Diagnostics[0].Message);
+        var (_, diag) = Tokenize("$");
+        Assert.Contains("'$'", diag.Diagnostics[0].Message);
     }
 
     [Fact]
     public void Bad_character_message_names_the_actual_bad_char()
     {
         // Regression: reading Current AFTER _pos++ reports the wrong character.
-        var (_, diag) = Tokenize("#x");
-        Assert.Contains("'#'", diag.Diagnostics[0].Message);
+        var (_, diag) = Tokenize("$x");
+        Assert.Contains("'$'", diag.Diagnostics[0].Message);
         Assert.DoesNotContain("'x'", diag.Diagnostics[0].Message);
     }
 
@@ -342,9 +342,9 @@ public class LexerTests
     [Fact]
     public void Bad_character_diagnostic_span_covers_only_that_char()
     {
-        var (_, diag) = Tokenize("foo#bar");
+        var (_, diag) = Tokenize("foo$bar");
         var d = diag.Diagnostics[0];
-        Assert.Equal(3, d.Span.Start);   // Position des '#'
+        Assert.Equal(3, d.Span.Start);   // Position des '$'
         Assert.Equal(4, d.Span.End);
     }
 

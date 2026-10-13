@@ -16,6 +16,10 @@ public sealed record NamedType(string[] Path, TypeNode[] TypeArguments, Span Spa
 {
     public required Span NameSpan { get; init; }
 
+    /// <summary>The module a <c>quote</c> wrote this type name in (13 M9b P5), as
+    /// <see cref="IdentifierExpr.QuotedFrom"/>.</summary>
+    public string? QuotedFrom { get; init; }
+
     /// <summary><c>Iterator&lt;Item = int&gt;</c> (design/v5/spec/03 T6): the associated type an
     /// argument fixes, by argument index, <c>null</c> where the argument is positional; <c>null</c>
     /// as a whole when none is named.</summary>
