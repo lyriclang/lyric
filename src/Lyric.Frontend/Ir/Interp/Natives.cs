@@ -224,10 +224,9 @@ public sealed class Natives(Interpreter interpreter)
 
         // --- panics (panic.c)
         ["std.core.panic"] = (a, _, _) => throw ComptimeFailure.Panic("LYR-RT0008", Clip(S(a[0]).ToString(), 1000)),
-        ["std.core.assert"] = (a, _, _) =>
+        ["std.core.assertFailed"] = (a, _, _) =>
         {
-            if (a[0].AsBool) return default;
-            var written = S(a[2]).ToString();
+            var written = S(a[0]).ToString();
             var message = S(a[1]).ToString();
             throw ComptimeFailure.Panic("LYR-RT0011",
                 "assertion failed" + (written.Length > 0 ? ": " + written : "") + (message.Length > 0 ? ": " + message : ""));

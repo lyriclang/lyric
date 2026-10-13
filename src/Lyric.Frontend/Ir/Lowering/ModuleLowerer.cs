@@ -338,6 +338,12 @@ public static class ModuleLowerer
         // exactly what the sites reach, and the capability bits are read off that — so a site
         // that needs no capability evaluates even in a program that, elsewhere, reads files.
         var comptimeReturns = new Dictionary<FunctionDecl, IrType>(ReferenceEqualityComparer.Instance);
+        // The hoisting pass keeps the program's own roots aside (09 D8; M9a S12b): a module
+        // binding's site is evaluated only where the program reaches the binding.
+        var realEntry = entry;
+        var realRoots = exportRoots.ToList();
+        var siteFunction = new Dictionary<int, int>();
+        var siteGlobal = new Dictionary<int, GlobalSymbol>();
         if (comptime is { Hoist: true })
         {
             entry = null;
@@ -346,6 +352,10 @@ public static class ModuleLowerer
             {
                 var site = types.ComptimeSites[i];
                 var name = ComptimeTable.FunctionName(i);
+                siteFunction[i] = pending.Count;
+                foreach (var (symbol, bindingStmt, _) in globals.Pending)
+                    if (bindingStmt.Span.File == site.Span.File && bindingStmt.Span.Start <= site.Span.Start && site.Span.End <= bindingStmt.Span.End)
+                        siteGlobal[i] = symbol;
                 var decl = new FunctionDecl(Visibility: VisibilityWord.Pub, IsMut: false, IsStatic: false, Name: name,
                     Generics: [], Parameters: [], ReturnType: null, Throws: null,
                     Body: new Block([new ReturnStmt(site.Inner, site.Span)], site.Span), Span: site.Span)
@@ -407,6 +417,7 @@ public static class ModuleLowerer
         // drain rounds — but it lands in the downstream batch and merges by id like the rest.
         FunctionId? globalInit = null;
         var downstreamSeed = new List<(FunctionId Id, IrFunction Function)>();
+        var initializerOf = new Dictionary<int, FunctionId>();
         if (!globals.IsEmpty)
         {
             try
@@ -418,11 +429,12 @@ public static class ModuleLowerer
                 // interpreter runs at the global's first access (13 M9a S5); roots, so the pruning
                 // keeps them.
                 if (comptime is { Hoist: true })
-                    foreach (var (_, each) in GlobalInitializer.BuildEach(globals, types, ids, imports, typeTable, lambdas, instances))
+                    foreach (var (global, each) in GlobalInitializer.BuildEach(globals, types, ids, imports, typeTable, lambdas, instances))
                     {
                         var id = nextId.Next();
                         downstreamSeed.Add((id, each));
                         exportRoots.Add(id);
+                        initializerOf[global.Value] = id;
                     }
             }
             catch (UnsupportedConstructException ex)
@@ -636,6 +648,42 @@ public static class ModuleLowerer
                 if (enabled.HasFlag(IrPasses.Inline)) Inliner.Run(result);
                 if (enabled.HasFlag(IrPasses.ScalarReplacement)) ScalarReplacement.Run(result);
             }
+        }
+
+        // A module binding's site is evaluated where the program reaches the binding (09 D8; M9a
+        // S12b): from the program's own roots and the sites outside bindings, the globals touched,
+        // each one's own initializer walked in turn - a table built of another. The sites of the
+        // rest are left out of the evaluation, their initializers out of the roots, and the real
+        // pass lowers them as the expressions they hold, which the pruning drops with the global.
+        if (comptime is { Hoist: true } && siteGlobal.Count > 0)
+        {
+            var roots = new List<FunctionId>(realRoots);
+            foreach (var (site, function) in siteFunction)
+                if (!siteGlobal.ContainsKey(site)) roots.Add(new FunctionId(function));
+            var touched = new HashSet<int>();
+            for (var grew = true; grew;)
+            {
+                grew = false;
+                var walk = new IrModule(result.Functions) { EntryFunction = realEntry, Imports = result.Imports, Types = result.Types, Globals = result.Globals, Impls = result.Impls, ExportRoots = roots };
+                foreach (var f in Reachability.Collect(walk))
+                    foreach (var block in result.Functions[f].Blocks)
+                        foreach (var op in block.Insts)
+                        {
+                            var global = op switch { LoadGlobal l => l.Global.Value, StoreGlobal s => s.Global.Value, AddrGlobal a => a.Global.Value, _ => -1 };
+                            if (global >= 0 && touched.Add(global) && initializerOf.TryGetValue(global, out var init)) { roots.Add(init); grew = true; }
+                        }
+            }
+            var skipped = new HashSet<int>();
+            foreach (var (site, symbol) in siteGlobal)
+                if (!touched.Contains(globals.IdOf(symbol).Value)) skipped.Add(site);
+            comptime.Skipped = skipped;
+            var kept = new List<FunctionId>();
+            foreach (var (site, function) in siteFunction)
+                if (!skipped.Contains(site)) kept.Add(new FunctionId(function));
+            foreach (var (global, init) in initializerOf)
+                if (touched.Contains(global)) kept.Add(init);
+            result.ExportRoots.Clear();
+            result.ExportRoots.AddRange(kept);
         }
 
         // The pruning still runs before the second verification, and this saving is the one that may

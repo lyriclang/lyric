@@ -47,11 +47,16 @@ internal sealed class BlockBuilder
 
     public void SwitchTo(BlockId id) => _current = _blocks[id.Value];
 
+    /// <summary>Where an instruction says it stands (M9a S12b): an inline expansion maps the
+    /// body's spans to the call's, so a panic in a body set in place names the call's line.</summary>
+    public Func<Span, Span>? MapSpan { get; set; }
+
     public void Emit(IrOp op)
     {
         if (IsSealed)
             throw new InternalCompilationException(
                 $"lowering: cannot emit into sealed block {_current.Id}");
+        if (MapSpan is { } map) op = op with { Span = map(op.Span) };
         _current.Insts.Add(op);
     }
 
@@ -67,6 +72,7 @@ internal sealed class BlockBuilder
         var block = _blocks[id.Value];
         if (block.Terminator is not null)
             throw new InternalCompilationException($"lowering: block {id} is already sealed");
+        if (MapSpan is { } map) terminator = terminator with { Span = map(terminator.Span) };
         block.Terminator = terminator;
     }
 

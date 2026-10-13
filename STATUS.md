@@ -1058,6 +1058,13 @@ M9b the maintainer is asked again.
   language's conformances, the tuples' written-out blocks, the scalars' natives). A build of
   hello: 1554 → 1555 ms; its C unchanged. Spec 12 "Iteration", 04 rule 5; three
   cases import from `std.iter`.
+- **S12b** D1 and D8 (the review of 2026-10-12): `assert(c) { f"…" }` — `assert` is an
+  `inline fn` of std.core whose message is a lambda built only on failure, the native
+  `assertFailed` its panic; the old string form is a type mismatch. A module binding's
+  `comptime` site is evaluated only where the program reaches the binding — the hoisting pass
+  walks from the program's roots and the sites outside bindings to the globals touched, their
+  initializers in turn —; an unreached binding gets no initializer, and the pruning drops its
+  slot. hello builds 1530 → 1443 ms. Spec 06 §9 rule 1, 11 §2 rule 10; four cases.
 
 ## Design decisions
 
