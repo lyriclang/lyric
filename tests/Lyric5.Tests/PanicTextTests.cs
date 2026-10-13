@@ -46,10 +46,10 @@ public class PanicTextTests
 
     [Theory]
     [InlineData("let n = 1;\n    assert(n > 2);", "panic [LYR-RT0011]: assertion failed: n > 2")]
-    [InlineData("let n = 1;\n    assert(n > 2, \"n is small\");", "panic [LYR-RT0011]: assertion failed: n > 2: n is small")]
-    [InlineData("let xs = [1, 2];\n    assert(xs.length() == 3 && xs[0] > 0, f\"got {xs.length()}\");", "panic [LYR-RT0011]: assertion failed: xs.length() == 3 && xs[0] > 0: got 2")]
+    [InlineData("let n = 1;\n    assert(n > 2) { \"n is small\" };", "panic [LYR-RT0011]: assertion failed: n > 2: n is small")]
+    [InlineData("let xs = [1, 2];\n    assert(xs.length() == 3 && xs[0] > 0) { f\"got {xs.length()}\" };", "panic [LYR-RT0011]: assertion failed: xs.length() == 3 && xs[0] > 0: got 2")]
     // what the call wrote, its own parentheses included (09 A11)
-    [InlineData("let n = 1;\n    assert((n > 2), \"m\");", "panic [LYR-RT0011]: assertion failed: (n > 2): m")]
+    [InlineData("let n = 1;\n    assert((n > 2)) { \"m\" };", "panic [LYR-RT0011]: assertion failed: (n > 2): m")]
     [InlineData("todo();", "panic [LYR-RT0013]: not implemented")]
     [InlineData("todo(\"the parser\");", "panic [LYR-RT0013]: not implemented: the parser")]
     [InlineData("unreachable();", "panic [LYR-RT0012]: unreachable")]
@@ -62,9 +62,10 @@ public class PanicTextTests
     /// <summary>An assertion that holds costs its check and says nothing; its message is built
     /// before the check, as every argument is.</summary>
     [Fact]
-    public void An_assertion_that_holds_says_nothing()
+    public void An_assertion_that_holds_builds_no_message()
     {
-        Assert.Equal("built\nheld\n", Output("""
+        // the message is a lambda, built only when the assertion fails (M9a S12b, D1)
+        Assert.Equal("held\n", Output("""
             fn text(): string {
                 println("built");
                 return "never shown";
@@ -72,7 +73,7 @@ public class PanicTextTests
 
             fn main(): void {
                 let n = 3;
-                assert(n > 2, text());
+                assert(n > 2) { text() };
                 println("held");
             }
             """));

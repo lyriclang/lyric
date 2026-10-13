@@ -28,6 +28,11 @@ public sealed class ComptimeTable
 
     public bool Hoist { get; init; }
 
+    /// <summary>The sites of module bindings no program reaches (09 D8; M9a S12b): the hoisting
+    /// pass fills it, the evaluator leaves them out, and the real pass lowers each as the
+    /// expression it holds - into an initializer the pruning drops with its global.</summary>
+    public HashSet<int>? Skipped { get; set; }
+
     public IReadOnlyDictionary<int, IrConstValue>? Values { get; init; }
 
     /// <summary>What the build leaves out (09 B2): the real lowering builds none of it.</summary>

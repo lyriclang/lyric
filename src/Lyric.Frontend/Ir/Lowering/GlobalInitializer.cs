@@ -32,10 +32,29 @@ internal static class GlobalInitializer
         IReadOnlyDictionary<FunctionSymbol, FunctionId> functions, ImportTable imports,
         TypeTable typeTable, LambdaTable lambdas, InstanceTable instances)
     {
+        // A binding whose site the program does not reach (09 D8; M9a S12b) gets no initializer: its
+        // site was not evaluated, and the slot - an empty range for the pruning, which drops it
+        // with the others nobody touches - stays what nobody reads.
+        bool Skipped((GlobalSymbol Symbol, BindingStmt Binding, ModuleSymbol Module) entry)
+        {
+            if (typeTable.Comptime?.Skipped is not { Count: > 0 } skipped) return false;
+            foreach (var site in skipped)
+            {
+                var span = types.ComptimeSites[site].Span;
+                if (span.File == entry.Binding.Span.File && entry.Binding.Span.Start <= span.Start && span.End <= entry.Binding.Span.End)
+                {
+                    globals.NoteInit(globals.IdOf(entry.Symbol), new BlockId(0), 0, 0);
+                    return true;
+                }
+            }
+            return false;
+        }
+
         // A synthetic FunctionDecl: the FunctionLowerer works on a declaration, and building one here is
         // more honest than giving it a second entry point.
         var body = new Block(
             globals.Pending
+                .Where(entry => !Skipped(entry))
                 .Select(entry => (Stmt)new GlobalInitStmt(entry.Symbol, entry.Binding))
                 .ToArray(),
             default);

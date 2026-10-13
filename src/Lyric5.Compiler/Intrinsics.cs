@@ -30,9 +30,9 @@ public static class Intrinsics
         ["std.core.threadAllocatedBytes"] = "lyr_gc_thread_allocated_bytes",
         // Where an error was thrown, shown (05 E6 O3): a Backtrace's frames named.
         ["std.core.traceText"] = "lyr_trace_text",
-        // The catalogue (05 E8): 'assert' a check at the call, so its trace starts in the program;
-        // the two that never return are panics of their own codes.
-        ["std.core.assert"] = "LYR_ASSERT",
+        // The catalogue (05 E8): 'assert' is Lyric, set in place at the call, so its trace starts
+        // in the program; its failure and the two that never return are panics of their own codes.
+        ["std.core.assertFailed"] = "lyr_panic_assert",
         ["std.core.unreachable"] = "lyr_panic_unreachable",
         ["std.core.todo"] = "lyr_panic_todo",
         // A collection changed while it was walked (10 I9): a panic of its own code.

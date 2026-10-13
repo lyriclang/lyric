@@ -3342,8 +3342,12 @@ internal sealed class FunctionLowerer
         // a question to std.meta (M9a S9): answered at this instance — it is no site
         if (_types.IsMetaSite(site) && site.Inner is CallExpr asked && MetaQueryOf(asked) is { } query)
             return MetaAnswer(asked, query);
-        if (_typeTable.Comptime is not { Values: { } values }) return null;
+        if (_typeTable.Comptime is not { Values: { } values } table) return null;
         var index = _types.ComptimeSites.IndexOf(site);
+        // a module binding's site the program does not reach (09 D8; M9a S12b) was not evaluated,
+        // and its binding gets no initializer (GlobalInitializer.Build): nothing lowers it
+        if (index >= 0 && table.Skipped is { } skipped && skipped.Contains(index))
+            throw Bug($"comptime site at {site.Span} was skipped as unreached, and is lowered");
         return index >= 0 && values.TryGetValue(index, out var value)
             ? value
             : throw Bug($"comptime site at {site.Span} has no evaluated value");
@@ -7015,6 +7019,22 @@ internal sealed class FunctionLowerer
 
     private sealed record InlineLambda(LambdaExpr Lambda, InlineContext Context);
 
+    /// <summary>The expansions open at this point, innermost last: each maps the spans of its
+    /// function's declaration to its call's (M9a S12b) — a panic in an `assert` set in place
+    /// names the call's line, as the native check did; a lambda set in place lies outside the
+    /// declaration and keeps its own. Nested, the inner call lies in the outer body and maps on.</summary>
+    private readonly List<(Span Body, Span Call)> _inlineSpans = [];
+
+    private Span MapInlineSpan(Span span)
+    {
+        for (var i = _inlineSpans.Count - 1; i >= 0; i--)
+        {
+            var (body, call) = _inlineSpans[i];
+            if (span.File == body.File && body.Start <= span.Start && span.End <= body.End) span = call;
+        }
+        return span;
+    }
+
     private InlineContext CurrentInlineContext() =>
         new(_inline, _inlineThis, _loops.Count, _substitution, _typeTable.CurrentSubstitution);
 
@@ -7096,11 +7116,15 @@ internal sealed class FunctionLowerer
                     _b.Emit(new StoreLocal(slot, value, parameters[i].Span));
                 }
                 _inline = frame;
+                _inlineSpans.Add((decl.Span, expr.Span));
+                _b.MapSpan = MapInlineSpan;
                 // falling off the end is a void function's return
                 if (LowerScope(decl.Body!)) _b.Seal(new Branch(frame.ExitBlock(_b), decl.Body!.Span));
             }
             finally
             {
+                _inlineSpans.RemoveAt(_inlineSpans.Count - 1);
+                if (_inlineSpans.Count == 0) _b.MapSpan = null;
                 (_inline, _inlineThis, _substitution) = saved;
                 _errorEdged.Clear();
                 _errorEdged.UnionWith(edged);

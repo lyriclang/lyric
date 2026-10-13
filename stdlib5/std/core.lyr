@@ -17,9 +17,17 @@
 pub fn panic(message: string): never;
 
 /// Ends the process unless `condition` holds (05 E8): `LYR-RT0011`, "assertion failed: " and
-/// the condition as it is written, then `message` where one is given. The check stands at the
-/// call; the message is built before it, as every argument is.
-pub fn assert(condition: bool, message: string = "", @callerExpr(condition) written: string = ""): void;
+/// the condition as it is written, then the message where one is given. The check stands at the
+/// call, set in place; the message is a lambda, `assert(n > 2) { f"n = {n}" }`, built only when
+/// the assertion fails (10 "Review 2026-10-12" D1; M9a S12b) - Kotlin's form.
+pub inline fn assert(condition: bool, message: fn() -> string = () => "", @callerExpr(condition) written: string = ""): void {
+    if (!condition) {
+        assertFailed(written, message());
+    }
+}
+
+/// The panic of a failed assertion (05 E8): `LYR-RT0011`, the word, the condition, the message.
+fn assertFailed(written: string, message: string): never;
 
 /// A branch the program never takes (05 E8, E12): taking it ends the process, `LYR-RT0012`,
 /// "unreachable" and `message` behind it where one is given.

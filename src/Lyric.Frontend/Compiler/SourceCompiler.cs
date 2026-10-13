@@ -244,8 +244,9 @@ public static class SourceCompiler
         comptime = null;
         if (!compilation.Lyric5Modules || types.ComptimeSites.Count == 0) return true;
         report?.BeginPhase(Phase.Lower);
+        var hoisting = new ComptimeTable { Hoist = true };
         var hoisted = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
-            optimize: false, libraryRoots: false, passes: options.Passes, comptime: new ComptimeTable { Hoist = true });
+            optimize: false, libraryRoots: false, passes: options.Passes, comptime: hoisting);
         report?.EndPhase();
         if (hoisted is null || diagnostics.HasErrors) return false;
 
@@ -264,14 +265,14 @@ public static class SourceCompiler
             if (chosen[site] is StructConst { Fields: [BoolConst { Value: false }, ..] })
                 if (decl is null) inactive.Module(file); else inactive.Declaration(decl);
         var rest = ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks,
-            embed, options.Build, include: i => !when.ContainsKey(i) && !inactive.Covers(types.ComptimeSites[i].Span),
+            embed, options.Build, include: i => !when.ContainsKey(i) && !inactive.Covers(types.ComptimeSites[i].Span) && !(hoisting.Skipped?.Contains(i) ?? false),
             standard: Standard);
         if (rest is null) return false;
         var values = new Dictionary<int, IrConstValue>(rest);
         foreach (var (site, value) in chosen) values[site] = value;
         InactiveUses.Check(compilation, binding, types, diagnostics, inactive, values);
         if (diagnostics.HasErrors) return false;
-        comptime = new ComptimeTable { Values = values, Inactive = inactive };
+        comptime = new ComptimeTable { Values = values, Inactive = inactive, Skipped = hoisting.Skipped };
         return true;
     }
 
