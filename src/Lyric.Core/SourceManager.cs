@@ -18,18 +18,30 @@ public sealed class SourceManager
     }
 
     /// <summary>Where a synthesized file comes from: the written node it stands for (a conformance
-    /// list entry, a declaration) and how to name it in a diagnostic (<c>"'Equatable' synthesized
-    /// for 'P'"</c>). Nobody wrote the file, so nothing in it can be pointed at.</summary>
-    public readonly record struct Synthesized(Span At, string Label);
+    /// list entry, a declaration, a macro's site) and how to name it in a diagnostic (<c>"'Equatable'
+    /// synthesized for 'P'"</c>), with notes every error in the file carries (the quote an expansion
+    /// came from, M9b S5). Nobody wrote the file, so nothing in it can be pointed at.</summary>
+    public readonly record struct Synthesized(Span At, string Label, IReadOnlyList<DiagnosticNote>? Notes = null);
 
-    /// <summary>A file the compiler wrote on the program's behalf (conformance synthesis, 04 D7).
-    /// It parses and checks like any other; its diagnostics are re-pointed at <paramref name="at"/>
-    /// by the <see cref="DiagnosticEngine"/>.</summary>
-    public FileId AddSynthesized(string displayName, string text, Span at, string label)
+    /// <summary>A file the compiler wrote on the program's behalf (conformance synthesis, 04 D7; a
+    /// macro's expansion, 13 M9b S5). It parses and checks like any other; its diagnostics are
+    /// re-pointed at <paramref name="at"/> by the <see cref="DiagnosticEngine"/>.</summary>
+    public FileId AddSynthesized(string displayName, string text, Span at, string label, IReadOnlyList<DiagnosticNote>? notes = null)
     {
         var id = AddVirtual(displayName, text);
-        _files[id.Value - 1] = _files[id.Value - 1] with { Origin = new Synthesized(at, label) };
+        _files[id.Value - 1] = _files[id.Value - 1] with { Origin = new Synthesized(at, label, notes) };
         return id;
+    }
+
+    /// <summary>The offset of a line and column (1-based, as the diagnostics count), or -1 for a
+    /// line the file does not have; a column past the line's end is clamped to the text.</summary>
+    public int OffsetAt(FileId id, int line, int column)
+    {
+        if (!id.IsValid || id.Value > _files.Count) return -1;
+        var entry = _files[id.Value - 1];
+        if (line < 1 || line > entry.LineStarts.Length) return -1;
+        var offset = entry.LineStarts[line - 1] + Math.Max(column - 1, 0);
+        return offset <= entry.Text.Length ? offset : -1;
     }
 
     /// <summary>The origin of a synthesized file; <c>null</c> for one that was written.</summary>

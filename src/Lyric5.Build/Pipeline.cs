@@ -47,8 +47,43 @@ public static class Pipeline
     /// manifest's that asks as much; debug and the sanitizers' profiles see the code as written.</summary>
     public static CompileResult? Compile(Project project, TextWriter error, BuildProfile? profile = null, Target? target = null)
     {
+        var result = SourceCompiler.Lower(SourceOf(project), OptionsFor(project, profile, target));
+        if (!result.Render(error) || result.Ir is null) return null;
+        if (Denied(result, profile, error)) return null;
+        if (SubsetGate.Check(result.Ir, result.Diagnostics)) return result;
+        result.Diagnostics.RenderText(error);
+        return null;
+    }
+
+    /// <summary><c>lyric expand</c> (13 M9b P8): the program's entry module after its macros'
+    /// expansion, as source on <paramref name="output"/> - the results in the sites' places, the
+    /// rest as written, in the formatter's form; a program without a site prints as it is. The
+    /// program is resolved and expanded, not checked: what the expansion needs is reported, the
+    /// rest is <c>build</c>'s.</summary>
+    public static int Expand(Project project, TextWriter output, TextWriter error, BuildProfile? profile = null, Target? target = null)
+    {
+        // the scripts first, for gen/ (11 W3 BS4), as an emission does
+        if (CCompiler.Locate() is { } compiler)
+        {
+            var (ran, _) = BuildScripts.Run(project, Target.Host, profile ?? BuildProfile.Of(Lyric5.Toolchain.Profile.Debug), compiler,
+                ScriptVersion, error);
+            if (ran != 0) return ran;
+        }
+        var result = SourceCompiler.Expand(SourceOf(project), OptionsFor(project, profile, target));
+        if (!result.Render(error) || result.Expanded is null) return 1;
+        output.WriteLine(Lyric.Formatting.AstFormatter.FormatDeclarations(result.Expanded.Declarations));
+        return 0;
+    }
+
+    private static ScriptSource SourceOf(Project project) =>
+        project.EntryText is { } text
+            ? ScriptSource.FromText(project.Module, text)
+            : ScriptSource.FromDisk(project.Source, project.Module);
+
+    private static CompilerOptions OptionsFor(Project project, BuildProfile? profile, Target? target)
+    {
         // A package's modules by their paths, a single file with std alone (07 M1, 11 C8).
-        var options = new CompilerOptions
+        return new CompilerOptions
         {
             StdlibRoot = StdlibRoot, PackageRoots = project.PackageRoots,
             PackageDependencies = project.DeclaredDependencies,
@@ -66,15 +101,6 @@ public static class Pipeline
             // what 'target' and 'profile' hold: the build's, a cross-build's target (09 B4)
             Build = FactsOf(target ?? Target.Host, profile),
         };
-        var source = project.EntryText is { } text
-            ? ScriptSource.FromText(project.Module, text)
-            : ScriptSource.FromDisk(project.Source, project.Module);
-        var result = SourceCompiler.Lower(source, options);
-        if (!result.Render(error) || result.Ir is null) return null;
-        if (Denied(result, profile, error)) return null;
-        if (SubsetGate.Check(result.Ir, result.Diagnostics)) return result;
-        result.Diagnostics.RenderText(error);
-        return null;
     }
 
     /// <summary><c>--emit ir</c> and <c>--emit c</c>: the text on <c>output</c>, the C as the

@@ -92,6 +92,19 @@ public sealed partial class Parser
         return expr;
     }
 
+    /// <summary>Exactly one expression, or a value block (08 Y4) where the text opens with
+    /// <c>{</c>: what a macro's expansion writes for an <c>Expr</c> that is a spliced block
+    /// (M9b S5), which no written expression starts with.</summary>
+    public Expr ParseExpressionOrBlock()
+    {
+        if (!_buffer.Check(TokenKind.LBrace)) return ParseExpression();
+        var block = ParseValueBlock();
+        if (!_buffer.AtEnd)
+            _de.Report("LYR-PAR0001", Severity.Error, _buffer.Current.Span,
+                $"unexpected token after expression: {_buffer.Current.TokenKind}");
+        return block;
+    }
+
     // ---------------------------------------------------------------------
     // The Pratt core: binary, assignment, range and cast operators.
     // ---------------------------------------------------------------------

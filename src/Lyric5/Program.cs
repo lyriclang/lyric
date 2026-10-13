@@ -9,7 +9,8 @@ namespace Lyric5;
 /// does not know (exit 2), reporting what the program did wrong with exit 1, passing a program's
 /// own exit through (C5). The verbs grow milestone by milestone; today: <c>build</c> (a binary,
 /// or <c>--emit ir|c</c>), <c>run</c>, <c>version</c>, <c>help</c> (M2), <c>update</c>,
-/// <c>clean</c>, <c>metadata</c>, <c>add</c>, <c>remove</c> (M7), <c>test</c> (M8a).
+/// <c>clean</c>, <c>metadata</c>, <c>add</c>, <c>remove</c> (M7), <c>test</c> (M8a),
+/// <c>expand</c> (M9b).
 /// </summary>
 public static class Program
 {
@@ -24,6 +25,7 @@ public static class Program
                 "--help" or "-h" or "help" => Usage(Console.Out, 0),
                 "build" => Build(args[1..], run: false),
                 "run" => Build(args[1..], run: true),
+                "expand" => Build(args[1..], run: false, expand: true),
                 "test" => Test(args[1..]),
                 "bench" => Bench(args[1..]),
                 "update" => Update(args[1..]),
@@ -64,6 +66,7 @@ public static class Program
         output.WriteLine("                                 programs —, or the file, to binaries under out/");
         output.WriteLine("  run [<file.lyr>] [options] [-- args]");
         output.WriteLine("                                 build, then run the binary with the arguments");
+        output.WriteLine("  expand [<file.lyr>] [options]  print the program's entry module with its macros expanded");
         output.WriteLine("  update [<package>…] [options]  read the packages from git anew — all, or those named —,");
         output.WriteLine("                                 raise a tag to the newest of its line in lyric.toml, and write");
         output.WriteLine("                                 lyric.lock (options: -C <dir>, --offline)");
@@ -125,9 +128,12 @@ public static class Program
     private static readonly string[] Flags =
         ["--offline", "--locked", .. FieldFlags.SelectMany(f => new[] { "--" + f.Flag, "--no-" + f.Flag })];
 
-    private static int Build(string[] args, bool run)
+    /// <summary><c>build</c>, <c>run</c>, and <c>expand</c> (13 M9b P8), which chooses a program
+    /// as <c>run</c> does and prints its entry module after the macros' expansion instead of
+    /// building it.</summary>
+    private static int Build(string[] args, bool run, bool expand = false)
     {
-        var verb = run ? "run" : "build";
+        var verb = expand ? "expand" : run ? "run" : "build";
         string? file = null;
         var values = new Dictionary<string, string>();
         var flags = new HashSet<string>(StringComparer.Ordinal);
@@ -208,7 +214,7 @@ public static class Program
         {
             // 'build' checks a library (07 B6) — under its profile, below —; there is nothing to
             // run, and nothing to print.
-            if (run || values.ContainsKey("--emit"))
+            if (run || expand || values.ContainsKey("--emit"))
             {
                 Console.Error.WriteLine($"error[LYR-CLI0005]: {refused.Message}");
                 return 2;
@@ -236,14 +242,14 @@ public static class Program
                     return Unknown($"no program '{bin}' in package '{programs[0].Name}': {string.Join(", ", programs.Select(p => p.BinaryName))}");
                 programs = [named];
             }
-            else if (run || values.ContainsKey("--emit"))
+            else if (run || expand || values.ContainsKey("--emit"))
             {
                 var main = programs.FirstOrDefault(p => p.Binary is null) ?? (programs.Count == 1 ? programs[0] : null);
                 if (main is null)
                 {
                     Console.Error.WriteLine($"error[LYR-CLI0007]: package '{programs[0].Name}' has several programs and no src/main.lyr: "
                                             + string.Join(", ", programs.Select(p => p.BinaryName)));
-                    Console.Error.WriteLine($"  = help: --bin <name> names the one to {(run ? "run" : "print")}");
+                    Console.Error.WriteLine($"  = help: --bin <name> names the one to {(run ? "run" : expand ? "expand" : "print")}");
                     return 2;
                 }
                 programs = [main];
@@ -265,9 +271,10 @@ public static class Program
         if (values.TryGetValue("--emit", out var emit))
         {
             if (emit is not ("ir" or "c")) return Unknown($"unknown emission '{emit}': ir, c");
-            if (run) return Unknown("'--emit' prints instead of building; use 'build'");
+            if (run || expand) return Unknown("'--emit' prints instead of building; use 'build'");
             return Pipeline.Emit(programs[0], emit, Console.Out, Console.Error, profile, target);
         }
+        if (expand) return Pipeline.Expand(programs[0], Console.Out, Console.Error, profile, target);
 
         if (CompilerFor(profile) is not { } compiler) return 2;
 

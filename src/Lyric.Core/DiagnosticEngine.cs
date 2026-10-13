@@ -57,28 +57,37 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
             else diagnostic = diagnostic with { Notes = rounds };
             if (_within.LastOrDefault(w => w.Recode is not null).Recode is { } recode) diagnostic = recode(diagnostic);
         }
-        if (_sourceManager.OriginOf(diagnostic.Span.File) is { } origin)
+        if (_sourceManager.OriginOf(diagnostic.Span.File) is not null)
         {
             // Nobody wrote a synthesized file, so a hint or warning about its style is nobody's
             // to act on, and an error in it is the WRITTEN declaration's: a field whose type
             // carries no Equatable, say. The error moves to the node that asked for the
-            // synthesis, named, and the line it stood on comes along so the field can be found.
+            // synthesis, named, and the line it stood on comes along so the field can be found,
+            // then the origin's own notes (the quote a macro's expansion came from, M9b S5). A
+            // node that asked for a synthesis may itself stand in a synthesized file - a site a
+            // macro's result holds -, so the move repeats until the error stands where someone
+            // wrote, the chain innermost first; the diagnostic's own notes close.
             if (diagnostic.Severity is not Severity.Error) return;
-            var line = _sourceManager.LocateStart(diagnostic.Span).Line;
-            var notes = new List<DiagnosticNote>
+            var chain = new List<DiagnosticNote>();
+            while (_sourceManager.OriginOf(diagnostic.Span.File) is { } origin)
             {
-                new($"synthesized as: {_sourceManager.GetLineText(diagnostic.Span.File, line).Trim()}")
-            };
-            if (diagnostic.Notes is { } more) notes.AddRange(more);
-            diagnostic = diagnostic with
-            {
-                Span = origin.At,
-                Message = $"{origin.Label}: {diagnostic.Message}",
-                Notes = notes,
-            };
+                var line = _sourceManager.LocateStart(diagnostic.Span).Line;
+                chain.Add(new($"synthesized as: {_sourceManager.GetLineText(diagnostic.Span.File, line).Trim()}"));
+                if (origin.Notes is { } carried) chain.AddRange(carried);
+                diagnostic = diagnostic with { Span = origin.At, Message = $"{origin.Label}: {diagnostic.Message}" };
+            }
+            if (diagnostic.Notes is { } own) chain.AddRange(own);
+            diagnostic = diagnostic with { Notes = chain };
         }
+        // The same thing said twice at one place is said once: a macro that splices an argument
+        // twice (M9b S5) checks the written node twice, and its one mistake is one.
+        if (_diagnostics.Any(d => Same(d, diagnostic))) return;
         _diagnostics.Add(diagnostic);
     }
+
+    private static bool Same(Diagnostic a, Diagnostic b) =>
+        a.Code == b.Code && a.Severity == b.Severity && a.Span == b.Span && a.Message == b.Message
+        && (a.Notes ?? []).SequenceEqual(b.Notes ?? []);
 
     private readonly List<(DiagnosticNote Note, Span? Primary, Func<Diagnostic, Diagnostic>? Recode)> _within = [];
 

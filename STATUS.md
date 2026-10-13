@@ -1148,6 +1148,21 @@ the report at the close.
   quote, `@Logged` prepends a statement of the macro module's (`AttributeMacroTests`); T5 is the
   pin that the other declarations stay. Spec 11 §5 rules 9–10, 12 names the two structs; three
   cases.
+- **S5** the diagnostics of expanded code and `lyric expand` (P7, P8): what a macro gives back
+  stands in a file of its own — the expander writes the result as source (the formatter), reads
+  it again (the parser) and zips the two trees (`MacroExpander.Resynthesize`/`Zip`): a node the
+  caller wrote keeps its place, since the bridge now builds a node where its value's span says
+  (`SyntaxBridge.Within`), and a node of the macro's stands in the synthesized file, whose origin
+  is the site. The engine's re-pointing of synthesized files does the rest, extended to chain
+  (a site an expansion holds) and to carry an origin's notes: an error in expanded code is said
+  at the site, `in the expansion of 'name!': …`, with `synthesized as:` the line and `from the
+  quote of 'name' here` at the macro's module; a warning in the macro's code falls, one in the
+  caller's block stays; the same diagnostic at one place is said once (an argument spliced
+  twice). `lyric expand [<file>]` prints the entry module after the expansion in the formatter's
+  form (`SourceCompiler.Expand`, `Pipeline.Expand`); the debug print went. The parser reads a
+  value block as an expression where an expansion writes one (`ParseExpressionOrBlock`). The
+  artifacts: `bad!(1)` with the three places (`ExpansionDiagnosticTests`), `lyric expand` over a
+  program with two sites (`ExpandCommandTests`). Spec 11 §5 rule 11, 14 §1.1 rule 6; three cases.
 
 ## Design decisions
 

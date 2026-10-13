@@ -46,7 +46,13 @@ public static class SourceCompiler
     public static CompileResult Lower(ScriptSource source, CompilerOptions? options = null) =>
         Run(source, Stage.Lower, options ?? new CompilerOptions());
 
-    private enum Stage { Check, Lower }
+    /// <summary>The program's entry module with its macros expanded (13 M9b P8, <c>lyric expand</c>):
+    /// resolved and expanded, not checked; <see cref="CompileResult.Expanded"/> holds the tree, the
+    /// parsed one where the program has no site.</summary>
+    public static CompileResult Expand(ScriptSource source, CompilerOptions? options = null) =>
+        Run(source, Stage.Expand, options ?? new CompilerOptions());
+
+    private enum Stage { Check, Lower, Expand }
 
     private static CompileResult Run(ScriptSource source, Stage stage, CompilerOptions options)
     {
@@ -144,6 +150,7 @@ public static class SourceCompiler
             (compilation, binding) = expanded.Value;
             entry = compilation.AstOf(compilation.Entry!);
         }
+        if (stage == Stage.Expand) return new CompileResult(sources, diagnostics, null) { Expanded = diagnostics.HasErrors ? null : entry };
 
         report?.BeginPhase(Phase.Check, ModuleCount(loaded));
         var types = Semantics.Analyze(compilation, binding, diagnostics);
@@ -822,6 +829,10 @@ public sealed record CompileResult(
 
     /// <summary>What the build leaves out (09 B2): a <c>@Test</c> there is no test of this target.</summary>
     public Lyric.Ir.Lowering.Inactivity? Inactive { get; init; }
+
+    /// <summary>The entry module after the macros' expansion (13 M9b P8), from
+    /// <see cref="SourceCompiler.Expand"/> alone; <c>null</c> after an error.</summary>
+    public Module? Expanded { get; init; }
 
     /// <summary>Renders every diagnostic exactly once and reports whether the run was clean.
     /// </summary>
