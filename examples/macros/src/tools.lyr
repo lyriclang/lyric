@@ -1,0 +1,119 @@
+// Macros (design/v5/spec/11 §5; 13 M9b): functions over syntax, run by the compiler at the site.
+//
+// A 'macro' takes trees of std.syntax and gives one back; the result stands in the site's place
+// before the module is checked. A macro expands in the modules that import it, never in its own
+// (11 §5 rule 4) - which is why these three live in a module of their own.
+import std.collections { List };
+import std.string { StringBuilder };
+import std.syntax {
+    Block, Decl, Expr, FieldDecl, FieldInit, FnDecl, Ident, Literal, Param, PostfixOp, Span, Stmt,
+    StructDecl, Type, Visibility, WithField, error, parseExpr,
+};
+
+/// `retry!(n) { body }` runs the body up to n times, until it does not throw.
+///
+/// The quote is hygienic (rule 8): `attempts` and `e` are the quote's own, fresh at every site, so
+/// a caller's `attempts` beside the site is never touched; `#{body}` and `#{n}` are the caller's,
+/// as written.
+pub macro retry(n: Expr, body: Block): Stmt[] {
+    return quote {
+        var attempts = 0;
+        loop {
+            attempts += 1;
+            try {
+                #{body}
+                break;
+            } catch (e) {
+                if (attempts >= #{n}) { throw e; }
+            }
+        }
+    };
+}
+
+/// `@Builder struct P { … }` keeps P and adds PBuilder: a `?T` field per field, a setter per field,
+/// `build()`, built with the constructors of std.syntax (an attribute macro, rules 9-10).
+pub macro Builder(target: StructDecl): Decl[] {
+    let builderName = target.name.name + "Builder";
+    let builderType = Type.Named([builderName], [], [], null, Span.none());
+    let members = List<Decl>.new();
+    let inits = List<FieldInit>.new();
+    for (m in target.members) {
+        match (m) {
+            .Field(f) => {
+                members.push(Decl.Field(FieldDecl {
+                    visibility = Visibility.None, isVar = false, name = f.name,
+                    type = Type.Optional(Box<Type> { value = f.type }, Span.none()),
+                    default = Expr.Literal(Literal.Null, Span.none()), attributes = [], span = Span.none(),
+                }));
+                let v = Ident.of("v");
+                let setterBody = Block { stmts = [Stmt.Return(Expr.With(Box<Expr> { value = Expr.This(Span.none()) },
+                    [WithField { path = [f.name.name], value = Expr.Name(v) }], Span.none()), Span.none())], span = Span.none() };
+                members.push(Decl.Fn(FnDecl {
+                    visibility = target.visibility, isStatic = false, isMut = false, isInline = false,
+                    name = Ident.of("set_" + f.name.name), generics = [],
+                    params = [Param { name = v, type = f.type, default = null, isParams = false, isEllipsis = false, isPlace = false, attributes = [], span = Span.none() }],
+                    ret = builderType, retGrouped = false, throws = null, body = setterBody,
+                    externAbi = null, externSymbol = null, attributes = [], span = Span.none(),
+                }));
+                inits.push(FieldInit { name = f.name, value = Expr.Postfix(Box<Expr> { value = Expr.Member(Box<Expr> { value = Expr.This(Span.none()) }, f.name, false, Span.none()) }, PostfixOp.Unwrap, Span.none()), isShorthand = false });
+            },
+            _ => { },
+        }
+    }
+    let buildBody = Block { stmts = [Stmt.Return(Expr.StructInit([target.name.name], [], inits.toArray(), false, Span.none()), Span.none())], span = Span.none() };
+    members.push(Decl.Fn(FnDecl {
+        visibility = target.visibility, isStatic = false, isMut = false, isInline = false, name = Ident.of("build"), generics = [], params = [],
+        ret = Type.Named([target.name.name], [], [], null, Span.none()), retGrouped = false, throws = null, body = buildBody,
+        externAbi = null, externSymbol = null, attributes = [], span = Span.none(),
+    }));
+    let builder = StructDecl {
+        visibility = target.visibility, name = Ident.of(builderName), generics = [], interfaces = [], delegates = [],
+        members = members.toArray(), attributes = [], span = Span.none(),
+    };
+    return [Decl.Struct(target), Decl.Struct(builder)];
+}
+
+/// `formula!("2x^2 + 3x + 1", x)`: a small language of its own, read while compiling.
+///
+/// The text is a polynomial in `x` as one writes it on paper - a number before `x` multiplies,
+/// `^n` is the power. The macro rewrites it into Lyric (`2 * x.pow(2) + 3 * x + 1`), reads that
+/// with `parseExpr`, and the tree stands at the site; the `x` in it is the caller's name, resolved
+/// where the site stands (rule 3). A text that is no formula is the macro's own error, at the
+/// literal (rule 5).
+pub macro formula(text: Expr, x: Ident): Expr {
+    let source = match (text) {
+        .Literal(.Str(s), _) => s,
+        _ => error(text.span(), "formula! takes a string literal"),
+    };
+    let out = StringBuilder.new();
+    var afterNumber = false;
+    var i = 0;
+    let chars = source.chars().toArray();
+    while (i < chars.length()) {
+        let c = chars[i];
+        if (c.isDigit()) {
+            out.append(c);
+            afterNumber = true;
+        } else if (c == 'x') {
+            if (afterNumber) { out.append(" * "); }
+            out.append(x.name);
+            if (i + 1 < chars.length() && chars[i + 1] == '^') {
+                i += 2;
+                if (i >= chars.length() || !chars[i].isDigit()) {
+                    error(text.span(), "formula!: '^' needs a digit after it");
+                }
+                out.append(".pow(");
+                out.append(chars[i]);
+                out.append(")");
+            }
+            afterNumber = false;
+        } else if (c == '+' || c == '-' || c == ' ') {
+            out.append(c);
+            afterNumber = false;
+        } else {
+            error(text.span(), f"formula!: '{c}' is no part of a formula");
+        }
+        i += 1;
+    }
+    return parseExpr(out.toString());
+}

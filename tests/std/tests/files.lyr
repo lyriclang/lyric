@@ -1,9 +1,12 @@
 // std.fs's File (design/v5/spec/10 O4, O5; 13 M8b P2, P4; M8b S6b): written, read back, sought,
 // appended to, cut; the kinds a file gives; closed is closed; tasks reading at once through the I/O
-// pool; a cancellation seen at the task's next wait, not inside a file's call. The files lie in the
-// test run's working directory.
+// pool; a cancellation seen at the task's next wait, not inside a file's call. Each test that writes
+// works in a directory of its own from fs.tempDir() and removes it: a run leaves nothing in its
+// working directory (M9a's point 104).
+import std.fs;
 import std.fs { File, OpenOptions };
 import std.io { IoError, IoErrorKind };
+import std.path;
 import std.task { Cancelled, sleep, spawn };
 import std.test { assertEq, assertTrue, fail };
 import std.time { Duration };
@@ -32,21 +35,26 @@ fn kindOf(f: fn() -> void throws IoError): ?IoErrorKind {
 
 @Test
 fn aFileReadsBackWhatWasWritten(): void throws [IoError, Cancelled] {
-    try writeText("files-a.txt", "hello, file\nsecond line\n");
-    assertEq(try readText("files-a.txt"), "hello, file\nsecond line\n");
+    let w = try fs.tempDir();
+    let a = path.join(w, "files-a.txt");
+    try writeText(a, "hello, file\nsecond line\n");
+    assertEq(try readText(a), "hello, file\nsecond line\n");
     let big: uint8[] = [7u8] * 100000;
-    let out = try File.create("files-big.bin");
+    let out = try File.create(path.join(w, "files-big.bin"));
     try out.writeAll(big[..]);
     try out.close();
-    let back = try File.open("files-big.bin");
+    let back = try File.open(path.join(w, "files-big.bin"));
     assertEq((try back.readToEnd()).length(), 100000);
     try back.close();
+    try fs.removeAll(w);
 }
 
 @Test
 fn aFileSeeksFromEachEnd(): void throws [IoError, Cancelled] {
-    try writeText("files-seek.txt", "0123456789");
-    let f = try File.open("files-seek.txt");
+    let w = try fs.tempDir();
+    let name = path.join(w, "files-seek.txt");
+    try writeText(name, "0123456789");
+    let f = try File.open(name);
     assertEq(try f.seek(.Start(3)), 3);
     let two: uint8[] = [0u8] * 2;
     try f.readExact(two[..]);
@@ -57,22 +65,26 @@ fn aFileSeeksFromEachEnd(): void throws [IoError, Cancelled] {
     assertEq(two[0], 57u8);
     assertEq(try f.read(two[..]), 0);
     try f.close();
+    try fs.removeAll(w);
 }
 
 @Test
 fn appendWritesAtTheEndAndCreateCuts(): void throws [IoError, Cancelled] {
-    try writeText("files-log.txt", "one\n");
-    let more = try File.openWith("files-log.txt", OpenOptions { append = true });
+    let w = try fs.tempDir();
+    let log = path.join(w, "files-log.txt");
+    try writeText(log, "one\n");
+    let more = try File.openWith(log, OpenOptions { append = true });
     try more.writeString("two\n");
     try more.close();
-    assertEq(try readText("files-log.txt"), "one\ntwo\n");
-    try writeText("files-log.txt", "x");
-    assertEq(try readText("files-log.txt"), "x");
-    let both = try File.openWith("files-log.txt", OpenOptions { read = true, write = true });
+    assertEq(try readText(log), "one\ntwo\n");
+    try writeText(log, "x");
+    assertEq(try readText(log), "x");
+    let both = try File.openWith(log, OpenOptions { read = true, write = true });
     try both.writeString("y");
     try both.seek(.Start(0));
     assertEq(try both.readToString(), "y");
     try both.close();
+    try fs.removeAll(w);
 }
 
 @Test
@@ -93,28 +105,32 @@ fn whatAFileCannotDoIsSaidWithItsPath(): void {
 
 @Test
 fn aClosedFileIsClosed(): void throws [IoError, Cancelled] {
-    try writeText("files-closed.txt", "abc");
-    let f = try File.open("files-closed.txt");
+    let w = try fs.tempDir();
+    try writeText(path.join(w, "files-closed.txt"), "abc");
+    let f = try File.open(path.join(w, "files-closed.txt"));
     try f.close();
     try f.close();
     let one: uint8[] = [0u8];
     for (call in [() => { try f.read(one[..]); }, () => { try f.write(one[..]); }, () => { try f.seek(.Start(0)); }]) {
         assertTrue(kindOf(call) == IoErrorKind.Closed);
     }
+    try fs.removeAll(w);
 }
 
 @Test
 fn tasksReadAtOnceThroughThePool(): void throws Error {
+    let w = try fs.tempDir();
     for (k in 0..4) {
-        try writeText(f"files-task-{k}.txt", "z" * (1000 * (k + 1)));
+        try writeText(path.join(w, f"files-task-{k}.txt"), "z" * (1000 * (k + 1)));
     }
-    let tasks = [spawn(() => (try readText("files-task-0.txt")).length()), spawn(() => (try readText("files-task-1.txt")).length()),
-        spawn(() => (try readText("files-task-2.txt")).length()), spawn(() => (try readText("files-task-3.txt")).length())];
+    let tasks = [spawn(() => (try readText(path.join(w, "files-task-0.txt"))).length()), spawn(() => (try readText(path.join(w, "files-task-1.txt"))).length()),
+        spawn(() => (try readText(path.join(w, "files-task-2.txt"))).length()), spawn(() => (try readText(path.join(w, "files-task-3.txt"))).length())];
     var sum = 0;
     for (t in tasks) {
         sum = sum + try t.await();
     }
     assertEq(sum, 10000);
+    try fs.removeAll(w);
 }
 
 /// What the cancelled task got as far as.
@@ -124,11 +140,13 @@ class Reached {
 
 @Test
 fn aCancelledTaskSeesItAtItsNextWaitNotInAFileCall(): void throws Error {
-    try writeText("files-cancel.txt", "kept");
+    let w = try fs.tempDir();
+    let kept = path.join(w, "files-cancel.txt");
+    try writeText(kept, "kept");
     let reached = Reached { };
     let task = spawn(() => {
         // cancelled before it runs: the file's calls run to their ends all the same
-        reached.text = try readText("files-cancel.txt");
+        reached.text = try readText(kept);
         try sleep(Duration.ofMillis(1));
         return reached.text;
     });
@@ -139,4 +157,5 @@ fn aCancelledTaskSeesItAtItsNextWaitNotInAFileCall(): void throws Error {
     } catch (_: Cancelled) {
         assertEq(reached.text, "kept");
     }
+    try fs.removeAll(w);
 }

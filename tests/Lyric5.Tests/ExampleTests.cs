@@ -186,4 +186,24 @@ public class ExampleTests
         Assert.Equal(2, usage.ExitCode);
         Assert.StartsWith("usage: wordcount", usage.Stderr);
     }
+
+    private static string MacrosExample([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "examples", "macros"));
+
+    /// <summary>M9b's artifact (design/v5/spec/13, S6): <c>examples/macros</c> — <c>retry!</c> from a
+    /// quote, <c>@Builder</c> from the constructors, <c>formula!</c> over <c>parseExpr</c> — built
+    /// and run; and <c>lyric expand</c> shows the three sites replaced.</summary>
+    [Fact]
+    public void The_macro_examples_run_and_expand()
+    {
+        var dir = Package(("x", ""));
+        Copy(MacrosExample(), dir);
+        Assert.Equal("fetched 30 after 3 calls; attempts is still 7\npoint 3 4\n66\n", BuildAndRun(dir, "macros", "build", "-C", dir));
+        var (exit, expanded, error) = Run("expand", "-C", dir);
+        Assert.True(exit == 0, error);
+        Assert.Contains("struct PointBuilder {", expanded);
+        Assert.Contains("println(2 * x.pow(2) + 3 * x + 1);", expanded);
+        Assert.Contains("if (attempts__", expanded);
+        Assert.DoesNotContain("retry!", expanded);
+    }
 }
