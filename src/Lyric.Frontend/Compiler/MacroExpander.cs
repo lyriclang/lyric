@@ -28,23 +28,73 @@ public static class MacroExpander
 
     /// <summary>A site: its module, the call, and the statement it is where it is one
     /// (<c>name!(...);</c> alone on its line), which a result of statements replaces.</summary>
-    public sealed record Site(ModuleSymbol Module, MacroCallExpr Call, ExprStmt? Statement);
+    public sealed record Site(ModuleSymbol Module, MacroCallExpr? Call, ExprStmt? Statement, Decl? Target, AttributeNode? Attribute)
+    {
+        public string Name => Call?.Name ?? Attribute!.Path[^1];
+        public Span Span => Call?.Span ?? Attribute!.Span;
+        public Span NameSpan => Call?.NameSpan ?? Attribute!.NameSpan;
+        /// <summary>Where the note of a diagnostic of the expansion points: the '!', or the '@' path.</summary>
+        public Span BangSpan => Call?.BangSpan ?? Attribute!.PathSpan;
+        public string Written => Call is not null ? Name + "!" : "@" + Name;
+    }
 
     /// <summary>The sites of the compiled modules (not the standard library's, which writes
-    /// none), outermost only: an inner one travels with its argument.</summary>
+    /// none), outermost only: an inner one travels with its argument. An attribute naming a
+    /// macro on a top-level declaration is a site as well (13 M9b S4).</summary>
     public static List<Site> Sites(Compilation compilation)
     {
         var found = new List<Site>();
         foreach (var module in compilation.Modules)
-            if (!compilation.IsNative(module)) Walk(compilation.AstOf(module), null, module, found);
+        {
+            if (compilation.IsNative(module)) continue;
+            var ast = compilation.AstOf(module);
+            foreach (var decl in ast.Declarations)
+                foreach (var attribute in AttributesOf(decl))
+                    if (attribute.Path.Length == 1 && module.Members.Lookup(attribute.Path[0])
+                            is FunctionSymbol { IsMacro: true } or ImportBindingSymbol { Target: FunctionSymbol { IsMacro: true } })
+                        found.Add(new Site(module, null, null, decl, attribute));
+            Walk(ast, null, module, found);
+        }
         return found;
+    }
+
+    private static AttributeNode[] AttributesOf(Decl decl) => decl switch
+    {
+        FunctionDecl f => f.Attributes,
+        StructDecl s => s.Attributes,
+        ClassDecl c => c.Attributes,
+        EnumDecl e => e.Attributes,
+        InterfaceDecl i => i.Attributes,
+        ExtendDecl x => x.Attributes,
+        GlobalBindingDecl g => g.Attributes,
+        TypeAliasDecl a => a.Attributes,
+        _ => [],
+    };
+
+    /// <summary>The declaration without the attribute that is its site (T5: the macro sees the
+    /// rest, and the rest stays).</summary>
+    private static Decl WithoutAttribute(Decl decl, AttributeNode attribute)
+    {
+        AttributeNode[] Rest(AttributeNode[] all) => [.. all.Where(a => !ReferenceEquals(a, attribute))];
+        return decl switch
+        {
+            FunctionDecl f => f with { Attributes = Rest(f.Attributes) },
+            StructDecl s => s with { Attributes = Rest(s.Attributes) },
+            ClassDecl c => c with { Attributes = Rest(c.Attributes) },
+            EnumDecl e => e with { Attributes = Rest(e.Attributes) },
+            InterfaceDecl i => i with { Attributes = Rest(i.Attributes) },
+            ExtendDecl x => x with { Attributes = Rest(x.Attributes) },
+            GlobalBindingDecl g => g with { Attributes = Rest(g.Attributes) },
+            TypeAliasDecl a => a with { Attributes = Rest(a.Attributes) },
+            _ => decl,
+        };
     }
 
     private static void Walk(Node node, Node? parent, ModuleSymbol module, List<Site> found)
     {
         if (node is MacroCallExpr call)
         {
-            found.Add(new Site(module, call, parent as ExprStmt));
+            found.Add(new Site(module, call, parent as ExprStmt, null, null));
             return;
         }
         foreach (var child in AstChildren.Of(node)) Walk(child, node, module, found);
@@ -86,25 +136,25 @@ public static class MacroExpander
             var failed = false;
             foreach (var site in sites)
             {
-                switch (site.Module.Members.Lookup(site.Call.Name))
+                switch (site.Module.Members.Lookup(site.Name))
                 {
                     case ImportBindingSymbol { Target: FunctionSymbol { IsMacro: true } imported }:
                         planned.Add((site, imported, HomeOf(compilation, imported)));
-                        uses.Add((site.Module.FullName, site.Call.Span.File, site.Call.Name));
+                        uses.Add((site.Module.FullName, site.Span.File, site.Name));
                         break;
                     case FunctionSymbol { IsMacro: true } own:
-                        diagnostics.Report("LYR-SEM0189", Severity.Error, site.Call.Span,
-                            $"'{own.Name}!' is written in the module that declares the macro: a macro expands in the modules that import it, and its own module checks it first (13 M9b P6) - move the call, or the macro");
+                        diagnostics.Report("LYR-SEM0189", Severity.Error, site.Span,
+                            $"'{site.Written}' is written in the module that declares the macro '{own.Name}': a macro expands in the modules that import it, and its own module checks it first (13 M9b P6) - move the site, or the macro");
                         failed = true;
                         break;
                     case null:
-                        diagnostics.Report("LYR-SEM0190", Severity.Error, site.Call.NameSpan,
-                            $"no macro named '{site.Call.Name}' is in scope: '{site.Call.Name}!' expands a macro, which a module imports as it imports a function");
+                        diagnostics.Report("LYR-SEM0190", Severity.Error, site.NameSpan,
+                            $"no macro named '{site.Name}' is in scope: '{site.Written}' expands a macro, which a module imports as it imports a function");
                         failed = true;
                         break;
                     default:
-                        diagnostics.Report("LYR-SEM0190", Severity.Error, site.Call.NameSpan,
-                            $"'{site.Call.Name}' is no macro: '{site.Call.Name}!' expands one, and this name is something else");
+                        diagnostics.Report("LYR-SEM0190", Severity.Error, site.NameSpan,
+                            $"'{site.Name}' is no macro: '{site.Written}' expands one, and this name is something else");
                         failed = true;
                         break;
                 }
@@ -142,6 +192,7 @@ public static class MacroExpander
             var bridge = new SyntaxBridge(hoisted, sources);
             var replacements = new Dictionary<Node, Node>(ReferenceEqualityComparer.Instance);
             var splices = new Dictionary<Stmt, Stmt[]>(ReferenceEqualityComparer.Instance);
+            var declSplices = new Dictionary<Decl, Decl[]>(ReferenceEqualityComparer.Instance);
             foreach (var (site, macro, home) in ready)
             {
                 var name = NameMangling.ForFunction(home, macro.Name);
@@ -149,21 +200,25 @@ public static class MacroExpander
                 if (index < 0) index = hoisted.Functions.FindIndex(f => f.Name.StartsWith(name + "$", StringComparison.Ordinal));
                 if (index < 0) throw new InternalCompilationException($"macro '{macro.Name}' of '{home.FullName}' was not lowered for its expansion");
                 var function = hoisted.Functions[index];
-                bridge.At = site.Call.Span;
+                bridge.At = site.Span;
                 try
                 {
-                    if (Arguments(site, macro, function, hoisted, bridge, diagnostics) is not { } args) { failed = true; continue; }
+                    if ((site.Attribute is null ? Arguments(site, macro, function, hoisted, bridge, diagnostics)
+                            : AttributeArguments(site, macro, function, hoisted, bridge, diagnostics)) is not { } args) { failed = true; continue; }
                     interpreter.Refill();
                     var result = interpreter.Run(new FunctionId(index), args);
-                    if (!Splice(site, macro, result, function.ReturnType, hoisted, bridge, replacements, splices, diagnostics)) failed = true;
+                    var placed = site.Attribute is null
+                        ? Splice(site, macro, result, function.ReturnType, hoisted, bridge, replacements, splices, diagnostics)
+                        : SpliceDeclaration(site, macro, result, function.ReturnType, hoisted, bridge, replacements, declSplices, diagnostics);
+                    if (!placed) failed = true;
                 }
                 catch (ComptimeFailure failure)
                 {
                     if (failure.Code == "LYR-MAC0001")
-                        diagnostics.Report(failure.Code, Severity.Error, failure.At == default ? site.Call.Span : failure.At, failure.Message,
-                            [new DiagnosticNote(site.Call.BangSpan, $"in the expansion of '{macro.Name}!'")]);
+                        diagnostics.Report(failure.Code, Severity.Error, failure.At == default ? site.Span : failure.At, failure.Message,
+                            [new DiagnosticNote(site.BangSpan, $"in the expansion of '{site.Written}'")]);
                     else
-                        ComptimeEvaluator.Report(diagnostics, failure, site.Call.Span);
+                        ComptimeEvaluator.Report(diagnostics, failure, site.Span);
                     failed = true;
                 }
             }
@@ -172,7 +227,7 @@ public static class MacroExpander
             foreach (var module in ready.Select(p => p.Site.Module).Distinct())
             {
                 trees[module.FullName] = AstRewriter.Rewrite(compilation.AstOf(module),
-                    n => replacements.GetValueOrDefault(n), s => splices.GetValueOrDefault(s));
+                    n => replacements.GetValueOrDefault(n), s => splices.GetValueOrDefault(s), d => declSplices.GetValueOrDefault(d));
                 if (Environment.GetEnvironmentVariable("LYRIC_EXPAND_DEBUG") is not null)
                     Console.Error.WriteLine($"--- expanded {module.FullName} (round {round}):\n{Formatting.AstFormatter.FormatDeclarations(trees[module.FullName].Declarations)}");
             }
@@ -205,7 +260,8 @@ public static class MacroExpander
     /// <c>Stmt[]</c> parameter; or <c>null</c>, reported.</summary>
     private static Value[]? Arguments(Site site, FunctionSymbol macro, IrFunction function, IrModule module, SyntaxBridge bridge, DiagnosticEngine diagnostics)
     {
-        var written = site.Call.Arguments;
+        var call = site.Call!;
+        var written = call.Arguments;
         var values = new Value[function.ParamCount];
         var next = 0;
         var trailingUsed = false;
@@ -214,7 +270,7 @@ public static class MacroExpander
             var type = function.Locals[i].Type;
             var kind = KindOf(type, module);
             var last = i == function.ParamCount - 1;
-            if (last && site.Call.Trailing is { } block && next == written.Length && kind is "Block" or "Stmt[]")
+            if (last && call.Trailing is { } block && next == written.Length && kind is "Block" or "Stmt[]")
             {
                 values[i] = kind == "Block" ? bridge.BlockValue(block, type) : bridge.Array(block.Statements, type, bridge.Stmt);
                 trailingUsed = true;
@@ -222,7 +278,7 @@ public static class MacroExpander
             }
             if (next >= written.Length)
             {
-                diagnostics.Report("LYR-SEM0191", Severity.Error, site.Call.Span,
+                diagnostics.Report("LYR-SEM0191", Severity.Error, site.Span,
                     $"'{macro.Name}!' takes {function.ParamCount} argument{(function.ParamCount == 1 ? "" : "s")}, {written.Length} {(written.Length == 1 ? "is" : "are")} written"
                     + (kind is "Block" or "Stmt[]" ? $" - the last, '{kind}', may stand as a trailing block" : ""));
                 return null;
@@ -237,19 +293,119 @@ public static class MacroExpander
             }
             values[i] = value.Value;
         }
-        if (next < written.Length || (site.Call.Trailing is not null && !trailingUsed))
+        if (next < written.Length || (call.Trailing is not null && !trailingUsed))
         {
-            diagnostics.Report("LYR-SEM0191", Severity.Error, site.Call.Span,
+            diagnostics.Report("LYR-SEM0191", Severity.Error, site.Span,
                 $"'{macro.Name}!' takes {function.ParamCount} argument{(function.ParamCount == 1 ? "" : "s")}, more are written"
-                + (site.Call.Trailing is not null && !trailingUsed ? " - the trailing block needs a last parameter of type 'Block' or 'Stmt[]'" : ""));
+                + (call.Trailing is not null && !trailingUsed ? " - the trailing block needs a last parameter of type 'Block' or 'Stmt[]'" : ""));
             return null;
         }
         return values;
     }
 
+    /// <summary>An attribute macro's arguments (13 M9b S4): the declaration it sits on, without
+    /// this attribute, as the first parameter's kind; then the attribute's positional argument
+    /// for the parameters after it. Fields are a data attribute's.</summary>
+    private static Value[]? AttributeArguments(Site site, FunctionSymbol macro, IrFunction function, IrModule module, SyntaxBridge bridge, DiagnosticEngine diagnostics)
+    {
+        var target = site.Target!;
+        var attribute = site.Attribute!;
+        if (function.ParamCount == 0)
+        {
+            diagnostics.Report("LYR-SEM0191", Severity.Error, attribute.Span,
+                $"'@{macro.Name}' sits on a declaration, and the macro takes nothing: an attribute macro takes the declaration as its first parameter (a 'StructDecl', a 'FnDecl', a 'Decl' ...)");
+            return null;
+        }
+        var first = function.Locals[0].Type;
+        var kind = KindOf(first, module);
+        var declaration = kind == "Decl" ? bridge.Decl(WithoutAttribute(target, attribute), first) : bridge.DeclPayload(WithoutAttribute(target, attribute), first);
+        if (declaration is null)
+        {
+            diagnostics.Report("LYR-SEM0191", Severity.Error, attribute.Span,
+                $"'@{macro.Name}' takes {Describe(kind)} first, and sits on {DescribeDecl(target)}");
+            return null;
+        }
+        if (attribute.Fields.Length > 0)
+        {
+            diagnostics.Report("LYR-SEM0191", Severity.Error, attribute.Span,
+                $"'@{macro.Name}' is a macro, and its arguments stand in parentheses, '@{macro.Name}(...)': fields are a data attribute's");
+            return null;
+        }
+        var values = new Value[function.ParamCount];
+        values[0] = declaration.Value;
+        Expr[] written = attribute.Positional is { } positional ? [positional] : [];
+        for (var i = 1; i < function.ParamCount; i++)
+        {
+            var type = function.Locals[i].Type;
+            var paramKind = KindOf(type, module);
+            if (i - 1 >= written.Length)
+            {
+                diagnostics.Report("LYR-SEM0191", Severity.Error, attribute.Span,
+                    $"'@{macro.Name}' takes {function.ParamCount - 1} argument{(function.ParamCount == 2 ? "" : "s")} after the declaration, {written.Length} {(written.Length == 1 ? "is" : "are")} written");
+                return null;
+            }
+            var value = Convert(written[i - 1], paramKind, type, bridge);
+            if (value is null)
+            {
+                diagnostics.Report("LYR-SEM0191", Severity.Error, written[i - 1].Span,
+                    $"'@{macro.Name}' takes {Describe(paramKind)} here, and this argument is no {Describe(paramKind)}");
+                return null;
+            }
+            values[i] = value.Value;
+        }
+        if (written.Length > function.ParamCount - 1)
+        {
+            diagnostics.Report("LYR-SEM0191", Severity.Error, attribute.Span,
+                $"'@{macro.Name}' takes {function.ParamCount - 1} argument{(function.ParamCount == 2 ? "" : "s")} after the declaration, more are written");
+            return null;
+        }
+        return values;
+    }
+
+    private static string DescribeDecl(Decl decl) => decl switch
+    {
+        FunctionDecl => "a function",
+        StructDecl => "a struct",
+        ClassDecl => "a class",
+        EnumDecl => "an enum",
+        InterfaceDecl => "an interface",
+        ExtendDecl => "an extend block",
+        GlobalBindingDecl => "a binding",
+        TypeAliasDecl => "a type alias",
+        _ => "a declaration",
+    };
+
+    /// <summary>An attribute macro's result in the declaration's place: a <c>Decl</c> one for one,
+    /// <c>Decl[]</c> spliced into the module.</summary>
+    private static bool SpliceDeclaration(Site site, FunctionSymbol macro, Value result, IrType type, IrModule module, SyntaxBridge bridge,
+        Dictionary<Node, Node> replacements, Dictionary<Decl, Decl[]> declSplices, DiagnosticEngine diagnostics)
+    {
+        switch (KindOf(type, module))
+        {
+            case "Decl":
+                replacements[site.Target!] = bridge.DeclOf(result, type);
+                return true;
+            case "Decl[]":
+                declSplices[site.Target!] = bridge.DeclsOf(result, type);
+                return true;
+            case var kind:
+                diagnostics.Report("LYR-SEM0188", Severity.Error, site.Span,
+                    $"'@{macro.Name}' gives '{kind}' back, and an attribute macro gives a declaration or several, which stand in the declaration's place");
+                return false;
+        }
+    }
+
     private static string Describe(string kind) => kind switch
     {
         "Expr" => "an expression",
+        "StructDecl" => "a struct",
+        "ClassDecl" => "a class",
+        "FnDecl" => "a function",
+        "EnumDecl" => "an enum",
+        "InterfaceDecl" => "an interface",
+        "ExtendDecl" => "an extend block",
+        "LetDecl" => "a binding",
+        "Decl" => "a declaration",
         "Block" => "a block",
         "Stmt[]" => "a block of statements",
         "Ident" => "a name",
@@ -292,13 +448,13 @@ public static class MacroExpander
         switch (kind)
         {
             case "Expr":
-                replacements[site.Call] = bridge.ExprOf(result, type);
+                replacements[site.Call!] = bridge.ExprOf(result, type);
                 return true;
             case "Stmt" or "Stmt[]" or "Block":
             {
                 if (site.Statement is null)
                 {
-                    diagnostics.Report("LYR-SEM0188", Severity.Error, site.Call.Span,
+                    diagnostics.Report("LYR-SEM0188", Severity.Error, site.Span,
                         $"'{macro.Name}!' gives statements back, and stands where an expression is needed - write it as a statement of its own");
                     return false;
                 }
@@ -313,8 +469,8 @@ public static class MacroExpander
                 return true;
             }
             default:
-                diagnostics.Report("LYR-SEM0188", Severity.Error, site.Call.Span,
-                    $"'{macro.Name}!' gives '{kind}' back, which no site of this form takes: an expression or statements stand here (a declaration macro is an attribute, M9b S4)");
+                diagnostics.Report("LYR-SEM0188", Severity.Error, site.Span,
+                    $"'{macro.Name}!' gives '{kind}' back, which no site of this form takes: an expression or statements stand here - a macro that gives declarations is an attribute, '@{macro.Name}' on the declaration it rewrites (13 M9b S4)");
                 return false;
         }
     }

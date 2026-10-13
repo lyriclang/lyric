@@ -18,8 +18,9 @@ public static class AstRewriter
     /// <param name="single">The node that stands in place of a node, or <c>null</c> to keep it.</param>
     /// <param name="splice">The statements that stand in place of a statement of a block, or
     /// <c>null</c> to keep it; asked before <paramref name="single"/> for the statements of blocks.</param>
-    public static T Rewrite<T>(T root, Func<Node, Node?> single, Func<Stmt, Stmt[]?>? splice = null) where T : Node =>
-        (T)RewriteNode(root, single, splice);
+    public static T Rewrite<T>(T root, Func<Node, Node?> single, Func<Stmt, Stmt[]?>? splice = null,
+        Func<Decl, Decl[]?>? spliceDecl = null) where T : Node =>
+        (T)RewriteNode(root, single, splice, spliceDecl);
 
     private static readonly Dictionary<Type, PropertyInfo[]> Properties = new();
     private static readonly Dictionary<Type, MethodInfo> Clones = new();
@@ -63,7 +64,7 @@ public static class AstRewriter
         return (Node)clone.Invoke(node, null)!;
     }
 
-    private static Node RewriteNode(Node node, Func<Node, Node?> single, Func<Stmt, Stmt[]?>? splice)
+    private static Node RewriteNode(Node node, Func<Node, Node?> single, Func<Stmt, Stmt[]?>? splice, Func<Decl, Decl[]?>? spliceDecl)
     {
         if (single(node) is { } replaced) return replaced;
         Node? copy = null;
@@ -72,7 +73,7 @@ public static class AstRewriter
             // the tuples of a call are settled with the arguments, below
             if (node is CallExpr && property.Name is nameof(CallExpr.Parenthesized) or nameof(CallExpr.Spreads)) continue;
             var value = property.GetValue(node);
-            var rewritten = RewriteValue(value, single, splice);
+            var rewritten = RewriteValue(value, single, splice, spliceDecl);
             if (ReferenceEquals(rewritten, value)) continue;
             copy ??= Clone(node);
             property.SetValue(copy, rewritten);
@@ -81,21 +82,34 @@ public static class AstRewriter
         return copy ?? node;
     }
 
-    private static object? RewriteValue(object? value, Func<Node, Node?> single, Func<Stmt, Stmt[]?>? splice)
+    private static object? RewriteValue(object? value, Func<Node, Node?> single, Func<Stmt, Stmt[]?>? splice, Func<Decl, Decl[]?>? spliceDecl)
     {
         switch (value)
         {
             case null:
                 return null;
             case Node child:
-                return RewriteNode(child, single, splice);
+                return RewriteNode(child, single, splice, spliceDecl);
+            case Decl[] declarations when spliceDecl is not null:
+            {
+                List<Decl>? changed = null;
+                for (var i = 0; i < declarations.Length; i++)
+                {
+                    var spliced = spliceDecl(declarations[i]);
+                    var one = spliced is null ? (Decl)RewriteNode(declarations[i], single, splice, spliceDecl) : null;
+                    if (spliced is null && ReferenceEquals(one, declarations[i]) && changed is null) continue;
+                    changed ??= [.. declarations.Take(i)];
+                    if (spliced is not null) changed.AddRange(spliced); else changed.Add(one!);
+                }
+                return changed is null ? declarations : changed.ToArray();
+            }
             case Stmt[] statements when splice is not null:
             {
                 List<Stmt>? changed = null;
                 for (var i = 0; i < statements.Length; i++)
                 {
                     var spliced = splice(statements[i]);
-                    var one = spliced is null ? (Stmt)RewriteNode(statements[i], single, splice) : null;
+                    var one = spliced is null ? (Stmt)RewriteNode(statements[i], single, splice, spliceDecl) : null;
                     if (spliced is null && ReferenceEquals(one, statements[i]) && changed is null) continue;
                     changed ??= [.. statements.Take(i)];
                     if (spliced is not null) changed.AddRange(spliced); else changed.Add(one!);
@@ -108,7 +122,7 @@ public static class AstRewriter
                 for (var i = 0; i < array.Length; i++)
                 {
                     var item = (Node)array.GetValue(i)!;
-                    var one = RewriteNode(item, single, splice);
+                    var one = RewriteNode(item, single, splice, spliceDecl);
                     if (ReferenceEquals(one, item)) continue;
                     changed ??= (Array)array.Clone();
                     changed.SetValue(one, i);

@@ -230,6 +230,8 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
 
     public Stmt[] StmtsOf(Value v, IrType t) => Many(v, t, StmtOf);
 
+    public Decl[] DeclsOf(Value v, IrType t) => Many(v, t, DeclOf);
+
     /// <summary>An <c>Ident</c>: the name, renamed where the quote being built binds it (hygiene,
     /// 13 M9b P5), the splice's own where the content names it as "#i"; <paramref name="from"/>
     /// the module a free name of a quote belongs to.</summary>
@@ -500,6 +502,8 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         var sp = Sp(n.Span);
         switch (n)
         {
+            case NamedType { Path: [var only] } when _splices is not null && only.Length > 1 && only[0] == '#' && int.TryParse(only.AsSpan(1), out var spliced):
+                return _splices[spliced]; // a Type spliced in (M9b S4), its kind checked at the quote
             case NamedType nt:
                 return Variant(t, "Named", Strings(nt.Path), Types(nt.TypeArguments),
                     Strings(nt.ArgumentNames is { } names ? names.Select(x => x ?? "") : []), OptS(nt.QuotedFrom ?? _quoteModule), sp);
@@ -549,6 +553,33 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         ("visibility", vt => Visibility(visibility, vt)), ("name", Label(name, nameSpan)), ("generics", Arr(generics, Generic)),
         ("interfaces", Types(interfaces)), ("delegates", Strings(delegates is { } d ? d.Select(x => x ?? "") : [])),
         ("members", Arr(members, Decl)), ("attributes", Attributes(attributes)), ("span", Sp(span)));
+
+    /// <summary>A declaration as the struct of its kind, for an attribute macro's first parameter
+    /// (13 M9b S4): <paramref name="t"/> is that struct's type, and <c>null</c> where the kind is
+    /// not the declaration's.</summary>
+    public Value? DeclPayload(Decl d, IrType t)
+    {
+        var kind = KindName(t);
+        return (d, kind) switch
+        {
+            (FunctionDecl f, "FnDecl") => Fn(f, t),
+            (StructDecl s, "StructDecl") => TypeDecl(s.Visibility, s.Name, s.NameSpan, s.Generics, s.Interfaces, s.Delegates, s.Members, s.Attributes, s.Span, t),
+            (ClassDecl c, "ClassDecl") => TypeDecl(c.Visibility, c.Name, c.NameSpan, c.Generics, c.Interfaces, c.Delegates, c.Members, c.Attributes, c.Span, t),
+            (EnumDecl, "EnumDecl") or (InterfaceDecl, "InterfaceDecl") or (ExtendDecl, "ExtendDecl") => PayloadOf(Decl(d, EnumTypeOf(t))),
+            (GlobalBindingDecl g, "LetDecl") => Let(g.Visibility, false, g.Binding, g.Attributes, g.Span, t),
+            _ => null,
+        };
+    }
+
+    /// <summary>The <c>Decl</c> enum a payload struct belongs to: the module's.</summary>
+    private IrType EnumTypeOf(IrType payload)
+    {
+        for (var i = 0; i < module.Types.Count; i++)
+            if (module.Types[i].Module == "std.syntax" && module.Types[i].Name == "Decl") return new IrEnumType(new TypeId(i));
+        throw new InternalCompilationException("std.syntax: no 'Decl' in this build");
+    }
+
+    private static Value PayloadOf(Value variant) => ((AggObj)variant.Ref!).Slots[1];
 
     public Value Decl(Decl d, IrType t)
     {

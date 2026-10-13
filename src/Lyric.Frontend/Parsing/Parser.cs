@@ -1794,6 +1794,12 @@ public sealed partial class Parser
         var cur = _buffer.Current;
         switch (cur.TokenKind)
         {
+            // 'v: #{t}' inside a quote (08 Y12 Q3; M9b S4): a Type spliced in, "#i" in the content
+            case TokenKind.Hash when _quoteDepth > 0 && _buffer.Peek(1).TokenKind == TokenKind.LBrace:
+            {
+                var splice = ParseSplice();
+                return new NamedType(["#" + splice.Index], [], splice.Span) { NameSpan = splice.Span };
+            }
             case TokenKind.Fn:
                 return ParseFunctionType(returned);
             case TokenKind.LParen:

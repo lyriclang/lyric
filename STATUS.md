@@ -1133,6 +1133,21 @@ the report at the close.
   beside the quote's, `#{stmts}` spliced, `fn #{name}()`, `helper()` of the macro's module
   though the site never imports it. The formatter writes `quote`, `#{…}` and `macro`. Spec 11
   §5 rules 6–8; three cases.
+- **S4** attribute macros (P4 Art 3, F2, T4, T5): a `macro` whose first parameter is a
+  declaration of `std.syntax` — `StructDecl` and `ClassDecl` are two structs now, beside `FnDecl`,
+  `EnumDecl`, `InterfaceDecl`, `ExtendDecl`, `LetDecl` and `Decl` for any — sits on a top-level
+  declaration as an attribute, no `!` (T4); its result is a `Decl` or a `Decl[]` (`LYR-SEM0186`).
+  The expander collects such attributes as sites beside the `!` ones: the declaration reaches
+  the macro without this attribute and with the rest (T5), the attribute's positional argument
+  fills the parameters after it, fields are refused as a data attribute's and a declaration of
+  another kind than the parameter's (`LYR-SEM0191`); the result stands in the declaration's
+  place, a `Decl[]` spliced into the module (`AstRewriter` splices declarations now). The
+  checker skips an attribute that names a macro in the pass with the sites in. `#{t}` in type
+  position splices a `Type`, which a declaration macro needs. The artifacts: `@Builder struct P`
+  adds `PBuilder` (built with the constructors), `@Retry(3) fn fetch` wraps the body through a
+  quote, `@Logged` prepends a statement of the macro module's (`AttributeMacroTests`); T5 is the
+  pin that the other declarations stay. Spec 11 §5 rules 9–10, 12 names the two structs; three
+  cases.
 
 ## Design decisions
 

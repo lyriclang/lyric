@@ -2693,7 +2693,17 @@ public sealed class TypeChecker
                 $"a macro gives syntax back: '{fn.Name}' needs a return type of std.syntax (Expr, Stmt[], Block, Decl ...), which is what stands at the site");
         if (fn.Generics.Length > 0)
             _de.Report("LYR-SEM0186", Severity.Error, fn.Generics[0].Span, $"a macro has no type parameters: '{fn.Name}' sees syntax, which carries no types (13 M9b P9)");
+        // an attribute macro (13 M9b S4): its first parameter a declaration, its result one or several
+        if (fn.Parameters.Length > 0 && IsDeclarationKind(fn.Parameters[0].Type) && fn.ReturnType is { } ret && Syntactic(ret)
+            && !(ret is NamedType { Path: ["Decl"] } or ArrayType { Element: NamedType { Path: ["Decl"] } }))
+            _de.Report("LYR-SEM0186", Severity.Error, ret.Span,
+                $"an attribute macro gives declarations back: '{fn.Name}' takes a declaration and sits on one, so its result is a 'Decl' or a 'Decl[]' that stands in the declaration's place");
     }
+
+    /// <summary>Whether a parameter type names a declaration of std.syntax: the marker of an
+    /// attribute macro (13 M9b S4).</summary>
+    private static bool IsDeclarationKind(TypeNode type) =>
+        type is NamedType { Path: ["Decl" or "StructDecl" or "ClassDecl" or "FnDecl" or "EnumDecl" or "InterfaceDecl" or "ExtendDecl" or "LetDecl"] };
 
     /// <summary><c>quote { ... }</c> (08 Y12 Q2; 13 M9b P5): a value of std.syntax - an Expr for a
     /// lone tail, Stmt[] or Block for statements, Decl or Decl[] for declarations, the expected type
@@ -2723,6 +2733,7 @@ public sealed class TypeChecker
             var allowed = position switch
             {
                 "name" => kind is "Ident",
+                "type" => kind is "Type",
                 "statement" => kind is "Stmt" or "Stmt[]" or "Block" or "Expr" or "Ident" or "Literal",
                 _ => kind is "Expr" or "Ident" or "Literal" or "Block",
             };
@@ -2731,6 +2742,7 @@ public sealed class TypeChecker
                     $"a splice in {position} position takes " + position switch
                     {
                         "name" => "an Ident",
+                        "type" => "a Type",
                         "statement" => "statements, a block, an expression, a name or a literal",
                         _ => "an expression, a name, a literal or a block",
                     } + $" of std.syntax, not a '{TypeFacts.Display(type)}'");
@@ -2755,6 +2767,9 @@ public sealed class TypeChecker
             {
                 case INamedDecl { Name: ['#', .. var digits] } when int.TryParse(digits, out var named):
                     positions[named] = "name";
+                    break;
+                case NamedType { Path: [['#', .. var typeDigits]] } when int.TryParse(typeDigits, out var typed):
+                    positions[typed] = "type";
                     break;
                 case ExprStmt { Expr: SpliceExpr s }:
                     positions[s.Index] = "statement";
@@ -10041,6 +10056,9 @@ public sealed class TypeChecker
             _ => targetDescription,
         };
         var (sym, _) = ResolveInitPath(attribute.Path, scope, attribute.PathSpan);
+        // an attribute macro's site (13 M9b S4): the expander replaces the declaration before the
+        // module is checked for real; this is the pass with the sites still in
+        if (sym is FunctionSymbol { IsMacro: true } or ImportBindingSymbol { Target: FunctionSymbol { IsMacro: true } }) return null;
         var written = string.Join('.', attribute.Path);
         var admitting = Admitting(site);
         if (sym is null)

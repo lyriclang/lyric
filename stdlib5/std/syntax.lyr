@@ -332,10 +332,22 @@ pub struct AssocType :: [Debug] {
     pub span: Span,
 }
 
-/// A struct or a class: the kind in the variant of `Decl` that holds it. `delegates` names, per
-/// interface, the field it is delegated to (`:: [Walker by legs]`), `""` where none; empty when
-/// none is.
-pub struct TypeDecl :: [Debug] {
+/// A struct. `delegates` names, per interface, the field it is delegated to (`:: [Walker by
+/// legs]`), `""` where none; empty when none is. As the first parameter of a `macro` it marks an
+/// attribute macro for structs (13 M9b S4).
+pub struct StructDecl :: [Debug] {
+    pub visibility: Visibility,
+    pub name: Ident,
+    pub generics: GenericParam[],
+    pub interfaces: Type[],
+    pub delegates: string[],
+    pub members: Decl[],
+    pub attributes: Attribute[],
+    pub span: Span,
+}
+
+/// A class, shaped as a struct is.
+pub struct ClassDecl :: [Debug] {
     pub visibility: Visibility,
     pub name: Ident,
     pub generics: GenericParam[],
@@ -416,8 +428,8 @@ pub struct ImportDecl :: [Debug] {
 @NonExhaustive
 pub enum Decl :: [Debug] {
     Fn(FnDecl),
-    Struct(TypeDecl),
-    Class(TypeDecl),
+    Struct(StructDecl),
+    Class(ClassDecl),
     Enum(EnumDecl),
     Interface(InterfaceDecl),
     Extend(ExtendDecl),
