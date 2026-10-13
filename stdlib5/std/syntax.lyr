@@ -146,7 +146,9 @@ pub struct Catch :: [Debug] {
     pub span: Span,
 }
 
-/// An expression, each form a variant. The spans are of the whole expression.
+/// An expression, each form a variant. The spans are of the whole expression.  is a site
+/// of another macro inside an argument (13 M9b P6): the outer macro hands it on, the next round
+/// expands it.
 @NonExhaustive
 pub enum Expr :: [Debug] {
     Literal(Literal, Span),
@@ -180,6 +182,7 @@ pub enum Expr :: [Debug] {
     Comptime(Box<Expr>, Span),
     Throw(Box<Expr>, Span),
     Try(Box<Expr>, TryKind, Catch[], Span),
+    Macro(string, Expr[], ?Block, Span),
 }
 
 /// A statement, each form a variant. A loop carries its label, if any; a `Let` is `var` by its
@@ -453,6 +456,132 @@ fn sourceOfPattern(p: Pattern): string;
 /// A name no written identifier has: `hint` and a number of its own.
 fn freshName(hint: string): string;
 
+/// A macro's own error (design/v5/spec/13 M9b P7): the message at `at`, a node of the site -
+/// `error(e.span(), "...")` - and a note at the site's `!`. Ends the expansion.
+pub fn error(at: Span, msg: string): never;
+
+extend Expr {
+    /// Where this expression stands: its span, or an `Ident`'s.
+    pub fn span(): Span {
+        return match (this) {
+            .Literal(_, s) => s,
+            .Name(id) => id.span,
+            .Implicit(id) => id.span,
+            .This(s) => s,
+            .At(_, _, s) => s,
+            .Unary(_, _, s) => s,
+            .Postfix(_, _, s) => s,
+            .Binary(_, _, _, s) => s,
+            .Assign(_, _, _, s) => s,
+            .Range(_, _, _, s) => s,
+            .SliceRange(_, _, _, s) => s,
+            .Cast(_, _, s) => s,
+            .Is(_, _, s) => s,
+            .Call(_, _, _, s) => s,
+            .Index(_, _, s) => s,
+            .Member(_, _, _, s) => s,
+            .Array(_, s) => s,
+            .Tuple(_, s) => s,
+            .Interpolated(_, s) => s,
+            .Lambda(_, _, _, _, _, s) => s,
+            .LetCond(_, _, s) => s,
+            .If(_, _, _, s) => s,
+            .Match(_, _, s) => s,
+            .Block(_, s) => s,
+            .Loop(_, _, s) => s,
+            .StructInit(_, _, _, _, s) => s,
+            .TypePath(_, _, s) => s,
+            .With(_, _, s) => s,
+            .Comptime(_, s) => s,
+            .Throw(_, s) => s,
+            .Try(_, _, _, s) => s,
+            .Macro(_, _, _, s) => s,
+            _ => Span.none(),
+        };
+    }
+}
+
+extend Stmt {
+    /// Where this statement stands.
+    pub fn span(): Span {
+        return match (this) {
+            .Expr(_, s) => s,
+            .Tail(_, s) => s,
+            .Let(_, _, _, _, _, s) => s,
+            .LetPattern(_, _, _, _, _, s) => s,
+            .If(_, _, _, _, s) => s,
+            .While(_, _, _, s) => s,
+            .DoWhile(_, _, _, s) => s,
+            .For(_, _, _, _, _, _, s) => s,
+            .Break(_, _, s) => s,
+            .Continue(_, s) => s,
+            .Return(_, s) => s,
+            .Yield(_, s) => s,
+            .Defer(_, s) => s,
+            .Throw(_, s) => s,
+            .Match(_, _, s) => s,
+            .Try(_, _, s) => s,
+            .Block(_, s) => s,
+            _ => Span.none(),
+        };
+    }
+}
+
+extend Decl {
+    /// Where this declaration stands.
+    pub fn span(): Span {
+        return match (this) {
+            .Fn(f) => f.span,
+            .Struct(t) => t.span,
+            .Class(t) => t.span,
+            .Enum(e) => e.span,
+            .Interface(i) => i.span,
+            .Extend(x) => x.span,
+            .Let(l) => l.span,
+            .Field(f) => f.span,
+            .AssocType(a) => a.span,
+            .Alias(a) => a.span,
+            .Import(i) => i.span,
+            _ => Span.none(),
+        };
+    }
+}
+
+extend Type {
+    /// Where this type stands.
+    pub fn span(): Span {
+        return match (this) {
+            .Named(_, _, _, s) => s,
+            .Optional(_, s) => s,
+            .Array(_, _, s) => s,
+            .Tuple(_, _, s) => s,
+            .Fn(_, _, _, _, s) => s,
+            .Throwing(_, _, s) => s,
+            _ => Span.none(),
+        };
+    }
+}
+
+extend Pattern {
+    /// Where this pattern stands.
+    pub fn span(): Span {
+        return match (this) {
+            .Wildcard(s) => s,
+            .Literal(_, s) => s,
+            .Binding(id) => id.span,
+            .TypePat(_, _, s) => s,
+            .TypeSet(_, _, s) => s,
+            .Variant(_, _, _, _, s) => s,
+            .Tuple(_, s) => s,
+            .Range(_, _, _, s) => s,
+            .Or(_, s) => s,
+            .Array(_, s) => s,
+            .Rest(_, s) => s,
+            _ => Span.none(),
+        };
+    }
+}
+
 extend Expr {
     /// This expression as source, as the formatter writes it.
     pub fn toSource(): string {
@@ -700,6 +829,7 @@ extend Expr {
             .Comptime(e, _) => { k.expr(e.value); },
             .Throw(e, _) => { k.expr(e.value); },
             .Try(e, _, cs, _) => { k.expr(e.value); k.catches(cs); },
+            .Macro(_, args, body, _) => { k.exprs(args); k.optBlock(body); },
             _ => { },
         }
         return k.done();

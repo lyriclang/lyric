@@ -87,6 +87,10 @@ public sealed class FunctionSymbol : Symbol
     /// Always <c>false</c> for a free function.</summary>
     public bool IsStatic { get; }
 
+    /// <summary>A <c>macro</c> (13 M9b P3): expanded at its sites by the interpreter, never called
+    /// by the program and never a value.</summary>
+    public bool IsMacro { get; init; }
+
     public GenericParamSymbol[] Generics { get; set; } = [];
 
     public FunctionSymbol(string name, Visibility visibility, bool isMut, Node? declaration,

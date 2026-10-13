@@ -758,7 +758,7 @@ public sealed partial class Parser
 
         // 'xs.forEach { println(it); }' — a statement that ends in a trailing lambda's '}'
         // needs no ';', as a block arm of a match needs no ','. One may still stand there.
-        if (expr is CallExpr { Arguments: [.., LambdaExpr { Form: LambdaForm.Trailing }] } && !_buffer.Check(TokenKind.Semicolon))
+        if ((expr is CallExpr { Arguments: [.., LambdaExpr { Form: LambdaForm.Trailing }] } || expr is MacroCallExpr { Trailing: not null }) && !_buffer.Check(TokenKind.Semicolon))
             return new ExprStmt(expr, Whole(expr));
 
         var semi = ExpectSemicolon();

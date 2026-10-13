@@ -577,6 +577,7 @@ public sealed class TypeChecker
                     module.Members, "a function");
                 if (fnAttributes.Exists(IsCanonicalTest)) CheckTest(fn, module);
                 RequireBody(fn, module);
+                if (fn.IsMacro) CheckMacroSignature(fn);
                 CheckFunction(fn, module.Members, thisType: null);
                 break;
             case StructDecl s:
@@ -2670,6 +2671,38 @@ public sealed class TypeChecker
                 : new DiagnosticNote("previous declaration"));
     }
 
+    /// <summary>A macro takes syntax and gives syntax (design/v5/spec/08 Y12 Q1; 13 M9b P3): every
+    /// parameter and the result are types of <c>std.syntax</c>, or arrays of them; no type
+    /// parameters, since a site hands over trees, not values with types.</summary>
+    private void CheckMacroSignature(FunctionDecl fn)
+    {
+        var syntax = _comp.FindModule(["std", "syntax"]);
+        var file = syntax is null ? FileId.None : _comp.AstOf(syntax).Span.File;
+        bool Syntactic(TypeNode t) => t switch
+        {
+            ArrayType a => Syntactic(a.Element),
+            NamedType n => (_binding.Resolve(n) is ImportBindingSymbol { Target: var imported } ? imported : _binding.Resolve(n)) is TypeSymbol { Declaration: { } d } && d.Span.File == file,
+            _ => false,
+        };
+        foreach (var p in fn.Parameters)
+            if (!Syntactic(p.Type))
+                _de.Report("LYR-SEM0186", Severity.Error, p.Type.Span,
+                    $"a macro takes syntax: '{p.Name}' needs a type of std.syntax (Expr, Block, Ident, Literal, Type, Stmt[] ...), as what a site hands over is a tree, not a value");
+        if (fn.ReturnType is null || !Syntactic(fn.ReturnType))
+            _de.Report("LYR-SEM0186", Severity.Error, fn.ReturnType?.Span ?? fn.NameSpan,
+                $"a macro gives syntax back: '{fn.Name}' needs a return type of std.syntax (Expr, Stmt[], Block, Decl ...), which is what stands at the site");
+        if (fn.Generics.Length > 0)
+            _de.Report("LYR-SEM0186", Severity.Error, fn.Generics[0].Span, $"a macro has no type parameters: '{fn.Name}' sees syntax, which carries no types (13 M9b P9)");
+    }
+
+    /// <summary>The macro a bare name means here, or <c>null</c>.</summary>
+    private static FunctionSymbol? MacroNamed(string name, SymbolTable scope) => scope.Lookup(name) switch
+    {
+        FunctionSymbol { IsMacro: true } f => f,
+        ImportBindingSymbol { Target: FunctionSymbol { IsMacro: true } f } => f,
+        _ => null,
+    };
+
     private void CheckFunction(FunctionDecl fn, SymbolTable outerScope, LyrType? thisType)
     {
         CompilerPosition.At("checking", fn.Name, fn.Span);
@@ -4238,6 +4271,9 @@ public sealed class TypeChecker
             }
             case LambdaExpr lam: return CheckLambda(lam, scope, expected);
             case ComptimeExpr ct: return CheckComptime(ct, scope, expected);
+            // an unexpanded site (13 M9b P6): the expander replaces it before the module is
+            // checked for real; this is the pre-expansion pass, whose findings are buffered
+            case MacroCallExpr: return LyrType.Error;
             case ThrowExpr te:
             {
                 // The same rule as the statement (SEM0030); the difference is the type. 'never'
@@ -6810,6 +6846,13 @@ public sealed class TypeChecker
         // 'label()' beside a field 'label: string' means the function outside. The arguments
         // stay in the call's own scope.
         var calleeScope = scope;
+        // a macro is never called as a function (13 M9b P3): its site is written with the '!'
+        if (call.Callee is IdentifierExpr macroName && MacroNamed(macroName.Name, scope) is { } macro)
+        {
+            foreach (var leftover in call.Arguments) CheckOrphanArgument(leftover, scope);
+            return Report(call.Callee.Span, "LYR-SEM0187",
+                $"'{macro.Name}' is a macro: its expansion is written '{macro.Name}!(...)' (08 Y12), and a macro is never called as a function nor used as a value");
+        }
         if (call.Callee is IdentifierExpr bare && PastAField(bare, scope) is { } past)
         {
             calleeScope = past.Outward;
@@ -10752,7 +10795,7 @@ public sealed class TypeChecker
                         {
                             // An 'if', a 'match' or a 'loop' standing last is the statement it
                             // would be anywhere in the block (the tail rule): no bare value.
-                            if (Unmarked(tail.Expr) is not (CallExpr or AssignExpr or ThrowExpr or ErrorExpr
+                            if (Unmarked(tail.Expr) is not (CallExpr or AssignExpr or ThrowExpr or ErrorExpr or MacroCallExpr
                                 or IfExpr or MatchExpr or LoopExpr))
                                 _de.Report("LYR-SEM0022", Severity.Error, tail.Span,
                                     "expression statement has no effect (only calls and assignments are allowed)");

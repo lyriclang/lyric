@@ -104,6 +104,8 @@ public class SyntaxTests
     [InlineData("let z = -1.5e3 + 'c' + \"q\\\"t\\n\" + b\"ab\" + 0x10u8;")]
     [InlineData("yield x[1..=3][..2];")]
     [InlineData("comptime for (f in fields<T>()) { total += 1; }")]
+    [InlineData("let y = twice!(x, 1) + run! { 2 };")]
+    [InlineData("retry!(3) { try fetch(url) }")]
     public void A_statement_survives_the_round_trip(string text)
     {
         var stmts = ParseStatements(text);

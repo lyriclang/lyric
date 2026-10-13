@@ -244,6 +244,7 @@ public sealed partial class Parser
             case TokenKind.Mut:
             case TokenKind.Fn:
             case TokenKind.Inline:
+            case TokenKind.Macro:
                 return ParseFunctionDecl(isPublic, start) with { Attributes = attributes };
             case TokenKind.Struct:
                 return WithAttributes(ParseStructOrClass(isPublic, start, isClass: false), attributes);
@@ -461,7 +462,10 @@ public sealed partial class Parser
             isStatic = true;
         }
         var isMut = _buffer.Match(TokenKind.Mut);
-        _buffer.Expect(TokenKind.Fn, "LYR-PAR0032", $"expected 'fn', got {_buffer.Current.TokenKind}");
+        // 'macro name(...)' (08 Y12 Q1): a function over syntax, written with its own word in the
+        // place of 'fn' and nothing else about it different
+        var isMacro = _buffer.Match(TokenKind.Macro);
+        if (!isMacro) _buffer.Expect(TokenKind.Fn, "LYR-PAR0032", $"expected 'fn', got {_buffer.Current.TokenKind}");
         var name = ExpectNamed("LYR-PAR0026", "function name");
         var generics = _buffer.Check(TokenKind.Less) ? ParseGenericParams() : [];
 
@@ -518,7 +522,7 @@ public sealed partial class Parser
         }
 
         return new FunctionDecl(isPublic, isMut, isStatic, name.Name, generics, parameters, returnType, throws, body,
-            Span.Union(start, end)) { NameSpan = name.Span, Extern = spec, ReturnGrouped = returnGrouped, IsInline = isInline };
+            Span.Union(start, end)) { NameSpan = name.Span, Extern = spec, ReturnGrouped = returnGrouped, IsInline = isInline, IsMacro = isMacro };
     }
 
     /// <summary>

@@ -1102,6 +1102,22 @@ the report at the close.
   `Box<T>` is `Debug` where `T` is. The artifact: every program of the emitter tests goes
   tree → values → tree to the same text (`SyntaxTests`, 154 programs), and `toSource` of the
   cases equals the formatter. Spec 12 §Syntax rules 1–6; three cases; a std self-test.
+- **S2** `macro` and `name!(…)` (P3, P4 for the expression and the statement form, P6, P7
+  without `quote`): a `macro` is a function over syntax — parameters and result types of
+  `std.syntax`, no type parameters (`LYR-SEM0186`), never called nor a value (`LYR-SEM0187`); a
+  site `name!(args)`, `name!(args) { … }`, `name! { … }` (the `!` directly behind the name) hands
+  its arguments over as trees, by the parameters' kinds (`LYR-SEM0191`), and takes the result in
+  its place — an `Expr`, or statements where the site is a statement (`LYR-SEM0188`). The
+  expansion is a phase per module in import order (`Compiler/MacroExpander.cs`): a round analyzes
+  the compilation with the sites as holes, lowers the round's macros as the roots of a hoisting
+  pass (the unexpanded modules as stubs), runs each site in the interpreter with the bridge's
+  values, rewrites the trees (`AST/AstRewriter.cs`, generic over the records) and resolves a fresh
+  compilation over them; a module's own macro is refused in it (`LYR-SEM0189`), a site inside an
+  argument travels as `Expr.Macro` and expands in the round after, 32 rounds are the limit
+  (`LYR-CT0007`). `error(at, msg)` is the macro's own error (`LYR-MAC0001`) at the node with a note
+  at the `!`; a panic is `LYR-CT0001` at the site. The artifacts: `twice!(x)` as an `Expr` result,
+  a macro from an imported module (and one whose module uses a macro itself), the own module's
+  call refused, `error(node, …)` with both spans (`MacroTests`). Spec 11 §5 rules 1–5; five cases.
 
 ## Design decisions
 

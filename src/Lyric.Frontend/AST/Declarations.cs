@@ -127,6 +127,11 @@ public sealed record FunctionDecl(
     /// arguments with it — no closure, a <c>return</c> in one leaves the function that wrote it.</summary>
     public bool IsInline { get; init; }
 
+    /// <summary><c>macro name(params): Ret { ... }</c> (design/v5/spec/08 Y12 Q1; 13 M9b P3): a
+    /// function over syntax, run by the interpreter at a site's expansion and never by the
+    /// program. Its parameters and its result are types of <c>std.syntax</c>.</summary>
+    public bool IsMacro { get; init; }
+
     public required Span NameSpan { get; init; }
 
     /// <summary>Whether the return type is written in parentheses, <c>fn f(): (Task&lt;int&gt;) throws E</c>.

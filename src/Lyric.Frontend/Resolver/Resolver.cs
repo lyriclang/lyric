@@ -386,7 +386,7 @@ public sealed class Resolver
     }
 
     private FunctionSymbol Fn(FunctionDecl fn, VisibilityWord word) =>
-        new(fn.Name, Vis(word), fn.IsMut, fn, fn.IsStatic) { Generics = MakeGenerics(fn.Generics) };
+        new(fn.Name, Vis(word), fn.IsMut, fn, fn.IsStatic) { Generics = MakeGenerics(fn.Generics), IsMacro = fn.IsMacro };
 
     /// <summary>
     /// The word a method of an <c>extend</c> block has (07 V2 S5): in a conformance block, none

@@ -30,7 +30,7 @@ public sealed class Interpreter
     /// <param name="overflowChecks">The profile's setting (07 P3): a checked operation panics
     /// where the binary would, and wraps where it would.</param>
     /// <param name="embed">What <c>embed</c> reads files through (09 Q4); without one it reads none.</param>
-    public Interpreter(IrModule module, long budget, bool overflowChecks, EmbedReader? embed = null, BuildFacts? build = null)
+    public Interpreter(IrModule module, long budget, bool overflowChecks, EmbedReader? embed = null, BuildFacts? build = null, SourceManager? sources = null)
     {
         _module = module;
         _budgetLimit = budget;
@@ -45,7 +45,7 @@ public sealed class Interpreter
             if (module.Functions[i].Name.StartsWith("<global:", StringComparison.Ordinal)
                 && int.TryParse(module.Functions[i].Name.AsSpan(8, module.Functions[i].Name.Length - 9), out var slot))
                 _globalInits[slot] = new FunctionId(i);
-        _natives = new Natives(this) { Embed = embed, Facts = build ?? BuildFacts.Host };
+        _natives = new Natives(this) { Embed = embed, Facts = build ?? BuildFacts.Host, Sources = sources };
     }
 
     public IrModule Module => _module;
@@ -94,9 +94,13 @@ public sealed class Interpreter
 
     /// <summary>Runs <paramref name="function"/>, which takes no parameters, to its value.</summary>
     /// <exception cref="ComptimeFailure">The run stopped; its trace is the stack where it did.</exception>
-    public Value Run(FunctionId function)
+    public Value Run(FunctionId function) => Run(function, []);
+
+    /// <summary>Runs <paramref name="function"/> with <paramref name="args"/>, one per parameter:
+    /// a macro at its expansion (13 M9b P6), the trees of the site as values.</summary>
+    public Value Run(FunctionId function, Value[] args)
     {
-        var stack = new List<Frame> { NewFrame(_module.Functions[function.Value], [], null) };
+        var stack = new List<Frame> { NewFrame(_module.Functions[function.Value], args, null) };
         try
         {
             return Loop(stack);

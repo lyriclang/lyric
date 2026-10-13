@@ -316,6 +316,11 @@ public static class AstChildren
                 foreach (var a in c.Arguments) yield return a;
                 break;
 
+            case MacroCallExpr mc:
+                foreach (var a in mc.Arguments) yield return a;
+                if (mc.Trailing is not null) yield return mc.Trailing;
+                break;
+
             case IndexExpr i:
                 yield return i.Target;
                 yield return i.Index;
