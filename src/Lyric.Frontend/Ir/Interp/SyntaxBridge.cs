@@ -22,6 +22,8 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
     /// them (an expansion, M9b S2), its own for a bridge of its own.</summary>
     private readonly SourceManager _sources = sources ?? new() { Lyric5 = true };
     private int _fresh;
+    private readonly Dictionary<string, FileId> _fileIds = new(StringComparer.Ordinal);
+    private int _indexed;
     private int _parsed;
 
     // ------------------------------------------------------------------ parsing and writing
@@ -199,22 +201,59 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
     /// such file.</summary>
     public Span SpanAt(string file, int line, int column)
     {
-        for (var i = 1; i <= _sources.FileCount; i++)
+        // the files by their names, once each; a file added since (a synthesized one) is indexed at the next ask
+        for (; _indexed < _sources.FileCount; _indexed++)
+            _fileIds.TryAdd(_sources.GetPath(new FileId(_indexed + 1)), new FileId(_indexed + 1));
+        if (!_fileIds.TryGetValue(file, out var id)) return default;
+        var offset = _sources.OffsetAt(id, line, column);
+        return offset < 0 ? default : new Span(id, offset, Math.Min(offset + 1, _sources.GetText(id).Length));
+    }
+
+    /// <summary>The span a <c>Span</c> value names, as <see cref="SpanAt"/> finds it; none for a
+    /// span of nothing (<c>Span.none()</c>) or of a file the program does not hold.</summary>
+    private Span? SpanOf(Value v, IrType t)
+    {
+        var file = StrOf(FieldOf(v, t, "file"));
+        if (file.Length == 0) return null;
+        var span = SpanAt(file, (int)FieldOf(v, t, "line").AsInt, (int)FieldOf(v, t, "column").AsInt);
+        return span == default ? null : span;
+    }
+
+    /// <summary>The span a node value carries: a struct's <c>span</c> field, a variant's field of
+    /// type <c>Span</c>; none where the value has no such field, or it names nothing.</summary>
+    private Span? SpanIn(Value v, IrType t)
+    {
+        switch (t)
         {
-            var id = new FileId(i);
-            if (_sources.GetPath(id) != file) continue;
-            var text = _sources.GetText(id);
-            var offset = 0;
-            for (var l = 1; l < line && offset < text.Length; l++)
+            case IrStructType s:
             {
-                var next = text.IndexOf('\n', offset);
-                if (next < 0) return default;
-                offset = next + 1;
+                var def = Def(s.Type);
+                var i = System.Array.IndexOf(def.FieldNames, "span");
+                return i >= 0 && def.FieldTypes[i] is IrStructType ? SpanOf(SlotsOf(v)[i], def.FieldTypes[i]) : null;
             }
-            offset += Math.Max(column - 1, 0);
-            return offset <= text.Length ? new Span(id, offset, Math.Min(offset + 1, text.Length)) : default;
+            case IrEnumType:
+            {
+                var (_, f, ft) = Case(v, t);
+                for (var i = 0; i < ft.Length; i++)
+                    if (ft[i] is IrStructType st && Def(st.Type).Name is var name && (name == "Span" || name.EndsWith(".Span", StringComparison.Ordinal)))
+                        return SpanOf(f[i], ft[i]);
+                return null;
+            }
+            default:
+                return null;
         }
-        return default;
+    }
+
+    /// <summary>Reads a node with its own span as the span the nodes built within it get (M9b
+    /// S5): what the caller wrote keeps the place it was written at, through the macro and back;
+    /// a node the macro built with <c>Span.none()</c> stands where the node around it stands, and
+    /// the outermost such at the site.</summary>
+    private T Within<T>(Value v, IrType t, Func<Value, IrType, T> read)
+    {
+        var saved = _current;
+        if (SpanIn(v, t) is { } own) _current = own;
+        try { return read(v, t); }
+        finally { _current = saved; }
     }
 
     /// <summary>The failure <c>error(at, msg)</c> raises (13 M9b P7).</summary>
@@ -770,13 +809,18 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
     private TypeNode BoxedType(Value v, IrType t) { var (p, pt) = Unbox(v, t); return TypeOf(p, pt); }
     private Expr? MaybeBoxedExpr(Value v, IrType t) => OptionOf(v) is { } inner ? BoxedExpr(inner, Inner(t)) : null;
 
-    /// <summary>The span a node built from values gets: the site it is built for (M9b S2), so a
-    /// diagnostic on expanded code points at the site; none for a bridge of its own.</summary>
+    /// <summary>The span a node built from values gets where the values name none: the site it is
+    /// built for (M9b S2), so a diagnostic on expanded code points at the site; none for a bridge
+    /// of its own.</summary>
     public Span At { get; set; }
 
-    private Span NoSpan => At;
+    /// <summary>The span of the node being read, where its value names one (M9b S5).</summary>
+    private Span? _current;
 
-    private (string Name, Span Span) IdentOf(Value v, IrType t) => (StrOf(FieldOf(v, t, "name")), NoSpan);
+    private Span NoSpan => _current ?? At;
+
+    private (string Name, Span Span) IdentOf(Value v, IrType t) =>
+        (StrOf(FieldOf(v, t, "name")), SpanOf(FieldOf(v, t, "span"), FieldTypeOf(t, "span")) ?? NoSpan);
     private (string? Name, Span Span) MaybeIdentOf(Value v, IrType t) => OptionOf(v) is { } inner ? IdentOf(inner, Inner(t)) : (null, NoSpan);
 
     private static BinaryOp BinaryOf(string name) => (BinaryOp)IndexIn(BinaryNames, name);
@@ -798,7 +842,9 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         _ => throw ComptimeFailure.NotYet($"std.syntax: the literal '{name}' has no form in the compiler yet"),
     };
 
-    public Expr ExprOf(Value v, IrType t)
+    public Expr ExprOf(Value v, IrType t) => Within(v, t, ExprOfCore);
+
+    private Expr ExprOfCore(Value v, IrType t)
     {
         var (name, f, ft) = Case(v, t);
         switch (name)
@@ -917,12 +963,16 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         };
     });
 
-    public Block BlockOf(Value v, IrType t)
+    public Block BlockOf(Value v, IrType t) => Within(v, t, BlockOfCore);
+
+    private Block BlockOfCore(Value v, IrType t)
     {
         return new Block(Many(FieldOf(v, t, "stmts"), FieldTypeOf(t, "stmts"), StmtOf), NoSpan);
     }
 
-    public Stmt StmtOf(Value v, IrType t)
+    public Stmt StmtOf(Value v, IrType t) => Within(v, t, StmtOfCore);
+
+    private Stmt StmtOfCore(Value v, IrType t)
     {
         var (name, f, ft) = Case(v, t);
         switch (name)
@@ -981,7 +1031,9 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         }
     }
 
-    public Pattern PatternOf(Value v, IrType t)
+    public Pattern PatternOf(Value v, IrType t) => Within(v, t, PatternOfCore);
+
+    private Pattern PatternOfCore(Value v, IrType t)
     {
         var (name, f, ft) = Case(v, t);
         switch (name)
@@ -1008,7 +1060,9 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         }
     }
 
-    public TypeNode TypeOf(Value v, IrType t)
+    public TypeNode TypeOf(Value v, IrType t) => Within(v, t, TypeOfCore);
+
+    private TypeNode TypeOfCore(Value v, IrType t)
     {
         var (name, f, ft) = Case(v, t);
         switch (name)
@@ -1113,9 +1167,13 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
 
     public Decl DeclOf(Value v, IrType t)
     {
+        var (_, f, ft) = Case(v, t);
+        return Within(f[0], ft[0], (p, pt) => DeclOfCore(v, t, p, pt));
+    }
+
+    private Decl DeclOfCore(Value v, IrType t, Value p, IrType pt)
+    {
         var (name, f, ft) = Case(v, t);
-        var p = f[0];
-        var pt = ft[0];
         Value F(string n) => FieldOf(p, pt, n);
         IrType T(string n) => FieldTypeOf(pt, n);
         switch (name)

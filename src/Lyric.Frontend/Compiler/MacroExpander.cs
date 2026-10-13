@@ -3,6 +3,7 @@ using Lyric.Core;
 using Lyric.Ir;
 using Lyric.Ir.Interp;
 using Lyric.Ir.Lowering;
+using Lyric.Parsing;
 using Lyric.Resolver;
 using Lyric.Sema;
 
@@ -19,6 +20,11 @@ namespace Lyric.Compiler;
 /// sites of its own waits for a later round (the modules in import order, P6); a site inside
 /// another's argument comes back inside the result and is expanded in the round after (outer
 /// before inner). A program without a site never comes here.
+///
+/// <para>What a macro gives back stands in a file of its own (S5, P7): the result is written as
+/// source and read again, so its nodes have places in a synthesized file whose origin is the
+/// site - an error in expanded code is said at the site, with the line of the expansion it stood
+/// on and the quote it came from. What the caller wrote keeps the places it was written at.</para>
 /// </summary>
 public static class MacroExpander
 {
@@ -122,8 +128,6 @@ public static class MacroExpander
                         binding.MarkQualifier(file, symbol);
                 return (compilation, binding);
             }
-            if (Environment.GetEnvironmentVariable("LYRIC_EXPAND_DEBUG") is not null)
-                Console.Error.WriteLine($"--- round {round}: {sites.Count} sites in {string.Join(",", sites.Select(x => x.Module.FullName))}");
             if (round == MaxRounds)
             {
                 diagnostics.Report("LYR-CT0007", Severity.Error, sites[0].Call.Span,
@@ -208,8 +212,8 @@ public static class MacroExpander
                     interpreter.Refill();
                     var result = interpreter.Run(new FunctionId(index), args);
                     var placed = site.Attribute is null
-                        ? Splice(site, macro, result, function.ReturnType, hoisted, bridge, replacements, splices, diagnostics)
-                        : SpliceDeclaration(site, macro, result, function.ReturnType, hoisted, bridge, replacements, declSplices, diagnostics);
+                        ? Splice(site, macro, result, function.ReturnType, hoisted, bridge, replacements, splices, diagnostics, sources)
+                        : SpliceDeclaration(site, macro, result, function.ReturnType, hoisted, bridge, replacements, declSplices, diagnostics, sources);
                     if (!placed) failed = true;
                 }
                 catch (ComptimeFailure failure)
@@ -228,8 +232,6 @@ public static class MacroExpander
             {
                 trees[module.FullName] = AstRewriter.Rewrite(compilation.AstOf(module),
                     n => replacements.GetValueOrDefault(n), s => splices.GetValueOrDefault(s), d => declSplices.GetValueOrDefault(d));
-                if (Environment.GetEnvironmentVariable("LYRIC_EXPAND_DEBUG") is not null)
-                    Console.Error.WriteLine($"--- expanded {module.FullName} (round {round}):\n{Formatting.AstFormatter.FormatDeclarations(trees[module.FullName].Declarations)}");
             }
             (compilation, binding) = rebuild(trees);
             if (diagnostics.HasErrors) return null;
@@ -378,21 +380,103 @@ public static class MacroExpander
     /// <summary>An attribute macro's result in the declaration's place: a <c>Decl</c> one for one,
     /// <c>Decl[]</c> spliced into the module.</summary>
     private static bool SpliceDeclaration(Site site, FunctionSymbol macro, Value result, IrType type, IrModule module, SyntaxBridge bridge,
-        Dictionary<Node, Node> replacements, Dictionary<Decl, Decl[]> declSplices, DiagnosticEngine diagnostics)
+        Dictionary<Node, Node> replacements, Dictionary<Decl, Decl[]> declSplices, DiagnosticEngine diagnostics, SourceManager sources)
     {
         switch (KindOf(type, module))
         {
             case "Decl":
-                replacements[site.Target!] = bridge.DeclOf(result, type);
+                replacements[site.Target!] = Resynthesize(site, macro, sources, new[] { bridge.DeclOf(result, type) },
+                    Formatting.AstFormatter.FormatDeclarations, p => p.ParseModule().Declarations)[0];
                 return true;
             case "Decl[]":
-                declSplices[site.Target!] = bridge.DeclsOf(result, type);
+                declSplices[site.Target!] = Resynthesize(site, macro, sources, bridge.DeclsOf(result, type),
+                    Formatting.AstFormatter.FormatDeclarations, p => p.ParseModule().Declarations);
                 return true;
             case var kind:
                 diagnostics.Report("LYR-SEM0188", Severity.Error, site.Span,
                     $"'@{macro.Name}' gives '{kind}' back, and an attribute macro gives a declaration or several, which stand in the declaration's place");
                 return false;
         }
+    }
+
+    /// <summary>The result in a file of its own (13 M9b S5, P7): the nodes a macro gave back,
+    /// written as source and read again, so each stands in a synthesized file whose origin is the
+    /// site. An error in it is said at the site, with the line it stood on and - where the result
+    /// is a quote's - the quote it came from; a warning in it is nobody's. What the caller wrote
+    /// - an argument, its spans in the site's file - keeps its spans through <see cref="Zip"/>: an
+    /// error in it is the caller's, a warning in it stays. The read-back is the formatter's and
+    /// the parser's own round trip; a tree that does not come back as it went is a bug here.</summary>
+    private static T[] Resynthesize<T>(Site site, FunctionSymbol macro, SourceManager sources, T[] built,
+        Func<IReadOnlyList<T>, string> write, Func<Parser, T[]> read) where T : Node
+    {
+        if (built.Length == 0) return built;
+        var text = write(built);
+        var place = sources.LocateStart(site.Span);
+        var notes = new List<DiagnosticNote>();
+        if (built.Select(n => QuotedNode(n, site, sources)).FirstOrDefault(n => n is not null) is { } quoted)
+            notes.Add(new DiagnosticNote(quoted.Span, $"from the quote of '{macro.Name}' here"));
+        var id = sources.AddSynthesized($"<expansion of {site.Written} at {Path.GetFileName(sources.GetPath(site.Span.File))}:{place.Line}>",
+            text, site.Span, $"in the expansion of '{site.Written}'", notes);
+        var engine = new DiagnosticEngine(sources);
+        var parsed = read(new Parser(sources, id, engine));
+        if (engine.HasErrors)
+        {
+            var first = engine.Diagnostics.First(d => d.Severity == Severity.Error);
+            throw new InternalCompilationException($"the expansion of '{site.Written}' does not read back as it was written: {first.Message}\n{text}");
+        }
+        if (parsed.Length != built.Length)
+            throw new InternalCompilationException($"the expansion of '{site.Written}' read back as {parsed.Length} nodes where {built.Length} were written:\n{text}");
+        var zipped = new T[built.Length];
+        for (var i = 0; i < built.Length; i++) zipped[i] = (T)Zip(built[i], parsed[i], site);
+        return zipped;
+    }
+
+    /// <summary>The first node of a tree a quote wrote: its span in a written file that is not the
+    /// site's - the macro module's. The quote the expansion came from, for the note.</summary>
+    private static Node? QuotedNode(Node node, Site site, SourceManager sources)
+    {
+        if (node.Span != default && node.Span.File != site.Span.File && sources.OriginOf(node.Span.File) is null) return node;
+        foreach (var child in AstChildren.Of(node))
+            if (QuotedNode(child, site, sources) is { } found) return found;
+        return null;
+    }
+
+    /// <summary>The read tree with what the built one knows: a node the caller wrote - its span
+    /// in the site's file, and not the site's own - stays as built, with its spans; a node of the
+    /// macro's takes its place in the synthesized file, with a quote's <c>QuotedFrom</c>. A literal
+    /// a macro built negative reads back as a negation, which is taken as read; a statement whose
+    /// expression ends in a block (<c>loop { }</c>, an <c>if</c>) reads back as a tail where it
+    /// closes a list, and stays the statement it was built as.</summary>
+    private static Node Zip(Node built, Node parsed, Site site)
+    {
+        if (built.GetType() != parsed.GetType())
+        {
+            if (built is IntLiteralExpr or FloatLiteralExpr && parsed is UnaryExpr { Operator: UnaryOp.Neg }) return parsed;
+            if (built is ExprStmt statement && parsed is TailExprStmt tail)
+                return new ExprStmt((Expr)Zip(statement.Expr, tail.Expr, site), tail.Span);
+            throw new InternalCompilationException($"the expansion of '{site.Written}' read back as {parsed.GetType().Name} where {built.GetType().Name} was written");
+        }
+        var builtChildren = AstChildren.Of(built).ToList();
+        var parsedChildren = AstChildren.Of(parsed).ToList();
+        if (builtChildren.Count != parsedChildren.Count)
+            throw new InternalCompilationException($"the expansion of '{site.Written}' read back with {parsedChildren.Count} children of {parsed.GetType().Name} where {builtChildren.Count} were written");
+        var written = built.Span != default && built.Span.File == site.Span.File && built.Span != site.Span;
+        var root = written ? built : parsed;
+        var own = written ? builtChildren : parsedChildren;
+        var changed = new Dictionary<Node, Node>(ReferenceEqualityComparer.Instance);
+        for (var i = 0; i < own.Count; i++)
+        {
+            var child = Zip(builtChildren[i], parsedChildren[i], site);
+            if (!ReferenceEquals(child, own[i])) changed[own[i]] = child;
+        }
+        var node = changed.Count == 0 ? root : AstRewriter.Rewrite(root, n => ReferenceEquals(n, root) ? null : changed.GetValueOrDefault(n));
+        if (written) return node;
+        return (built, node) switch
+        {
+            (IdentifierExpr { QuotedFrom: { } from }, IdentifierExpr id) => id with { QuotedFrom = from },
+            (NamedType { QuotedFrom: { } from }, NamedType named) => named with { QuotedFrom = from },
+            _ => node,
+        };
     }
 
     private static string Describe(string kind) => kind switch
@@ -442,13 +526,14 @@ public static class MacroExpander
     /// <summary>The result into the tree: an expression in place of the site, statements in place
     /// of the statement the site is.</summary>
     private static bool Splice(Site site, FunctionSymbol macro, Value result, IrType type, IrModule module, SyntaxBridge bridge,
-        Dictionary<Node, Node> replacements, Dictionary<Stmt, Stmt[]> splices, DiagnosticEngine diagnostics)
+        Dictionary<Node, Node> replacements, Dictionary<Stmt, Stmt[]> splices, DiagnosticEngine diagnostics, SourceManager sources)
     {
         var kind = KindOf(type, module);
         switch (kind)
         {
             case "Expr":
-                replacements[site.Call!] = bridge.ExprOf(result, type);
+                replacements[site.Call!] = Resynthesize(site, macro, sources, new[] { bridge.ExprOf(result, type) },
+                    e => Formatting.AstFormatter.FormatNode(e[0]), p => new[] { p.ParseExpressionOrBlock() })[0];
                 return true;
             case "Stmt" or "Stmt[]" or "Block":
             {
@@ -465,7 +550,9 @@ public static class MacroExpander
                     "Block" => [bridge.BlockOf(result, type)],
                     _ => bridge.StmtsOf(result, type),
                 };
-                splices[site.Statement] = [.. spliced.Select(s => s is TailExprStmt tail ? new ExprStmt(tail.Expr, tail.Span) : s)];
+                splices[site.Statement] = Resynthesize(site, macro, sources,
+                    [.. spliced.Select(s => s is TailExprStmt tail ? new ExprStmt(tail.Expr, tail.Span) : s)],
+                    Formatting.AstFormatter.FormatStatements, p => p.ParseStatements());
                 return true;
             }
             default:

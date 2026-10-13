@@ -285,7 +285,8 @@ public class DiagnosticEngineTests
         var de = new DiagnosticEngine(new SourceManager());
         de.Report("E", Severity.Error,   default, "");
         de.Report("W", Severity.Warning, default, "");
-        de.Report("W", Severity.Warning, default, "");
+        // the same thing at one place is said once (M9b S5): a second warning says something else
+        de.Report("W", Severity.Warning, default, "again");
         de.Report("I", Severity.Info,    default, "");
         de.Report("H", Severity.Hint,    default, "");
         Assert.Equal(2, de.WarningCount);

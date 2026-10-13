@@ -2748,6 +2748,26 @@ public sealed class TypeChecker
                     } + $" of std.syntax, not a '{TypeFacts.Display(type)}'");
         }
         _result.NoteQuote(q, _currentModule?.FullName ?? "");
+        // A free name of the content is this module's wherever the tree ends up (rule 8): an
+        // import it names is used here, though the content is checked nowhere (M9b S5).
+        if (_currentModule is { } home)
+        {
+            void Mark(string name)
+            {
+                if (home.Members.LookupLocal(name) is ImportBindingSymbol imported) _binding.MarkQualifier(q.Span.File, imported);
+            }
+            void Walk(Node node)
+            {
+                switch (node)
+                {
+                    case IdentifierExpr id: Mark(id.Name); break;
+                    case NamedType { Path: [var head, ..] }: Mark(head); break;
+                    case SpliceExpr: return; // the function's code, checked above
+                }
+                foreach (var child in AstChildren.Of(node)) Walk(child);
+            }
+            foreach (var n in q.Content) Walk(n);
+        }
         if (q.Declarations)
             return q.Content.Length == 1 && KindOf(expected) == "Decl" ? Of("Decl") : new ArrayOf(Of("Decl"));
         var wanted = KindOf(expected);
