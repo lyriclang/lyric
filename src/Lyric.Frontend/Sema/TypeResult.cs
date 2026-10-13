@@ -42,6 +42,17 @@ public sealed class TypeResult
     /// </summary>
     public SiteList ComptimeSites { get; } = new();
 
+    /// <summary>The quotes of the program (13 M9b P5), in the order the checker met them, each
+    /// with the module it stands in: the lowering numbers them for the interpreter, which builds
+    /// the tree, and a free name of the content is that module's.</summary>
+    public List<QuoteExpr> Quotes { get; } = [];
+    private readonly Dictionary<QuoteExpr, string> _quoteModule = new(ReferenceEqualityComparer.Instance);
+    public void NoteQuote(QuoteExpr quote, string module)
+    {
+        if (_quoteModule.TryAdd(quote, module)) Quotes.Add(quote);
+    }
+    public string QuoteModule(QuoteExpr quote) => _quoteModule[quote];
+
     private readonly Dictionary<AttributeNode, ComptimeExpr> _attributeValues = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>A Lyric 5 attribute's value (design/v5/spec/09 F4): the struct it writes, as the

@@ -1160,6 +1160,10 @@ public sealed class Lexer
                 }
                 _pos++;
                 return new Token(TokenKind.Caret, new Span(_file, operatorStart, _pos));
+            case '#':
+                // '#{' inside a 'quote' is a splice (08 Y12 Q3; M9b S3): the parser reads the pair
+                _pos++;
+                return new Token(TokenKind.Hash, new Span(_file, operatorStart, _pos));
             case '!':
                 // '!in' (08 Y-table, 04 D6): one token where 'in' follows as a word of its own —
                 // '!inside' stays '!' and a name, 'x! in xs' an unwrap before 'in'.

@@ -610,6 +610,7 @@ public static class ModuleLowerer
             Impls = impls,
             Attributes = attributes,
             ExportRoots = exportRoots,
+            Quotes = typeTable.Quotes,
         };
         if (failed) return null;
 

@@ -816,6 +816,8 @@ public sealed class Resolver
 
     private Symbol? ResolveTypePath(NamedType node, SymbolTable scope)
     {
+        // a type name a 'quote' wrote (13 M9b P5) is the macro's module's
+        if (node.QuotedFrom is { } quoted && _comp.FindModule(quoted.Split('.')) is { } quotedHome) scope = quotedHome.Members;
         var path = node.Path;
         var file = node.Span.File;
         var head = scope.Lookup(path[0]);

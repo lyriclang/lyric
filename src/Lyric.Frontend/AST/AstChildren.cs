@@ -321,6 +321,15 @@ public static class AstChildren
                 if (mc.Trailing is not null) yield return mc.Trailing;
                 break;
 
+            // a quote's content is syntax, not code: the splices are the code
+            case QuoteExpr q:
+                foreach (var s in q.Splices) yield return s;
+                break;
+
+            case SpliceExpr s:
+                yield return s.Inner;
+                break;
+
             case IndexExpr i:
                 yield return i.Target;
                 yield return i.Index;

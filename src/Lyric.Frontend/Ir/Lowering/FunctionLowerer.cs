@@ -1221,6 +1221,26 @@ internal sealed class FunctionLowerer
     /// round: a global's initializer of the calling module holds one, and that pass runs no
     /// initializer. A trap, so the function stays well-formed; the expander replaces the site
     /// before the module is lowered for real.</summary>
+    /// <summary><c>quote { ... }</c> (13 M9b P5): a call of the native <c>std.syntax.quote#i</c>
+    /// with the splices' values, which builds the tree from the quote's content; the content is
+    /// in the module's table, by the import's index.</summary>
+    private TempId? LowerQuote(QuoteExpr quote)
+    {
+        var index = _typeTable.NoteQuote(quote, _types.QuoteModule(quote));
+        var args = new List<TempId>();
+        var paramTypes = new List<IrType>();
+        foreach (var splice in quote.Splices)
+        {
+            args.Add(LowerExpr(splice));
+            paramTypes.Add(TypeOfExpr(splice));
+        }
+        var returnType = TypeOfExpr(quote);
+        var target = _imports.Intern(new IrImport($"std.syntax.quote#{index}", paramTypes.ToArray(), returnType));
+        var dest = _slots.NewTemp(returnType);
+        _b.Emit(new CallImport(dest, target, [.. args], quote.Span));
+        return dest;
+    }
+
     private TempId? LowerMacroSite(MacroCallExpr site)
     {
         _b.Seal(new Unreachable(site.Span));
@@ -2686,6 +2706,8 @@ internal sealed class FunctionLowerer
         ThisExpr e => LowerThis(e),
         AtIdentifierExpr e => throw NotSupported($"attribute '{e.Name}'", e.Span),
         MacroCallExpr e => LowerMacroSite(e),
+        QuoteExpr e => LowerQuote(e),
+        SpliceExpr e => throw Bug($"a splice outside a quote reached the lowering at {e.Span}"),
         ErrorExpr e => throw Bug($"error expression reached lowering at {e.Span}"),
 
         _ => throw Bug($"unhandled expression {expr.GetType().Name}")

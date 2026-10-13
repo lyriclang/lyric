@@ -407,7 +407,7 @@ public sealed class AstFormatter
             decl.Extern is { } abi ? Doc.Of(Doc.From("extern "), _synthesized ? Doc.From(Quote(abi.Abi)) : Src(abi.AbiSpan), Doc.Space) : Doc.Nil,
             decl.IsStatic ? Doc.From("static ") : Doc.Nil,
             decl.IsMut ? Doc.From("mut ") : Doc.Nil,
-            Doc.From($"fn {decl.Name}"),
+            Doc.From($"{(decl.IsMacro ? "macro" : "fn")} {decl.Name}"),
             GenericsDoc(decl.Generics),
             ParamListDoc(decl.Parameters),
         };
@@ -662,6 +662,8 @@ public sealed class AstFormatter
         MatchStmt s => MatchDoc(s.Scrutinee, s.Arms, s.Span),
         TryStmt s => TryDoc(s),
         ExprStmt { Expr: CallExpr { Arguments: [.., LambdaExpr { Form: LambdaForm.Trailing }] } } s => ExprDoc(s.Expr, Assign),
+        // a splice standing as a statement ends at its brace, as the parser reads it (M9b S3)
+        ExprStmt { Expr: SpliceExpr } s => ExprDoc(s.Expr, Assign),
         // A loop is a statement of its own: no ';' after its block.
         ExprStmt { Expr: LoopExpr } s => ExprDoc(s.Expr, Assign),
         ExprStmt s => Doc.Of(ExprDoc(s.Expr, Assign), Doc.From(";")),
@@ -920,6 +922,10 @@ public sealed class AstFormatter
 
         UnaryExpr u => Doc.Of(Doc.From(PrefixSymbol(u.Operator)), ExprDoc(u.Operand, Prefix)),
         ComptimeExpr c => Doc.Of(Doc.From("comptime "), ExprDoc(c.Inner, Prefix)),
+        QuoteExpr q => Doc.Of(Doc.From("quote "), q.Declarations
+            ? BracedDoc(Doc.Nil, q.Content.Length == 0, () => SequenceDoc(q.Content.Cast<Decl>().ToArray(), DeclDoc, (_, _) => Air.Forced, q.Span.End - 1))
+            : BlockDoc(new Block(q.Content.Cast<Stmt>().ToArray(), q.Span))),
+        SpliceExpr sp => Doc.Of(Doc.From("#{"), ExprDoc(sp.Inner, Assign), Doc.From("}")),
         ThrowExpr t => Doc.Of(Doc.From("throw "), ExprDoc(t.Value, Prefix)),
         TryExpr t => TryExprDoc(t),
         PostfixExpr p => Doc.Of(ExprDoc(p.Operand, Postfix), Doc.From(PostfixSymbol(p.Operator))),

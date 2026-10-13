@@ -25,21 +25,24 @@ extend Span {
     }
 }
 
-/// A name as written, with where it was written.
+/// A name as written, with where it was written. `from` is the module a `quote` wrote the name
+/// in (13 M9b P5): such a name is that module's wherever the tree ends up; `null` for a name a
+/// program wrote, or one built here.
 pub struct Ident :: [Equatable, Debug] {
     pub name: string,
     pub span: Span,
+    pub from: ?string,
 }
 
 extend Ident {
     /// A name of its own for what a `quote` binds (S3): `hint` and a number no written name has.
     pub static fn fresh(hint: string): Ident {
-        return Ident { name = freshName(hint), span = Span.none() };
+        return Ident { name = freshName(hint), span = Span.none(), from = null };
     }
 
     /// The name alone, without a place.
     pub static fn of(name: string): Ident {
-        return Ident { name = name, span = Span.none() };
+        return Ident { name = name, span = Span.none(), from = null };
     }
 }
 
@@ -237,12 +240,13 @@ pub enum Pattern :: [Debug] {
 }
 
 /// A written type, each form a variant: a name with its arguments (and the names of the
-/// arguments that bind an associated type, `""` where positional, none when none is named),
+/// arguments that bind an associated type, `""` where positional, none when none is named; then
+/// the module a `quote` wrote the name in, or `null`),
 /// `?T`, `T[]` and `T[N]`, a tuple with its labels (`""` where none), a function type with its
 /// thrown set and which parameters take a place, a throwing type.
 @NonExhaustive
 pub enum Type :: [Debug] {
-    Named(string[], Type[], string[], Span),
+    Named(string[], Type[], string[], ?string, Span),
     Optional(Box<Type>, Span),
     Array(Box<Type>, ?int, Span),
     Tuple(Type[], string[], Span),
@@ -551,7 +555,7 @@ extend Type {
     /// Where this type stands.
     pub fn span(): Span {
         return match (this) {
-            .Named(_, _, _, s) => s,
+            .Named(_, _, _, _, s) => s,
             .Optional(_, s) => s,
             .Array(_, _, s) => s,
             .Tuple(_, _, s) => s,
@@ -936,7 +940,7 @@ extend Type {
     pub fn children(): Node[] {
         let k = Kids.new();
         match (this) {
-            .Named(_, args, _, _) => { k.types(args); },
+            .Named(_, args, _, _, _) => { k.types(args); },
             .Optional(t, _) => { k.type(t.value); },
             .Array(t, _, _) => { k.type(t.value); },
             .Tuple(ts, _, _) => { k.types(ts); },

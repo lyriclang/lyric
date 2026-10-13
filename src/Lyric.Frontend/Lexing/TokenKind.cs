@@ -101,6 +101,7 @@ public enum TokenKind
     QuestionDot,
     QuestionQuestion,
     Exclamation, // prefix (logical not) and postfix (unwrap); the parser disambiguates
+    Hash,        // '#': before '{' inside a 'quote' a splice (08 Y12 Q3); an error elsewhere, as it was
     
     //Arithmetic
     Plus,

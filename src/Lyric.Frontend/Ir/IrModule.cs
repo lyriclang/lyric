@@ -217,8 +217,15 @@ public record struct IrAttributeValue(IrType Type, ulong Bits, string? Text);
 public record struct IrAttribute(IrAttributeTarget TargetKind, int Target, TypeId Type,
     IrAttributeValue[] Values);
 
+/// <summary>A quote of the program (13 M9b P5): the tree the interpreter builds at the call of
+/// <c>std.syntax.quote#i</c>, and the module whose names its free names are.</summary>
+public sealed record IrQuote(Lyric.AST.QuoteExpr Node, string Module);
+
 public class IrModule(List<IrFunction> Functions)
 {
+    /// <summary>The quotes, by the index the import <c>std.syntax.quote#i</c> names.</summary>
+    public List<IrQuote> Quotes { get; init; } = new();
+
     /// <summary>The native functions this module calls, only the ones actually used.
     /// <c>CallImport</c> references them by index.</summary>
     public List<IrImport> Imports { get; init; } = new();

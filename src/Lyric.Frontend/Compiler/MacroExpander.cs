@@ -302,12 +302,14 @@ public static class MacroExpander
                         $"'{macro.Name}!' gives statements back, and stands where an expression is needed - write it as a statement of its own");
                     return false;
                 }
-                splices[site.Statement] = kind switch
+                // statements stand where no value is taken: a tail among them is the statement it is
+                Stmt[] spliced = kind switch
                 {
                     "Stmt" => [bridge.StmtOf(result, type)],
                     "Block" => [bridge.BlockOf(result, type)],
                     _ => bridge.StmtsOf(result, type),
                 };
+                splices[site.Statement] = [.. spliced.Select(s => s is TailExprStmt tail ? new ExprStmt(tail.Expr, tail.Span) : s)];
                 return true;
             }
             default:
