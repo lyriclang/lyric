@@ -68,6 +68,12 @@ public static class Intrinsics
         ["std.thread.processorCount"] = "lyr_os_cpu_count",
         // The file system's calls (M8b P1, lyr/fs.h): one system call each, run on std.fs's I/O
         // pool; a view crosses as its pointer and length.
+        // The zone database and TZ (M10 S11, std.time): std.fs and std.os import std.time, so it
+        // reads the file and the variable through the same calls itself.
+        ["std.time.zoneFileOpen"] = "lyr_fs_open",
+        ["std.time.zoneFileRead"] = "LYR_FS_READ",
+        ["std.time.zoneFileClose"] = "lyr_fs_close",
+        ["std.time.zoneEnv"] = "LYR_OS_ENV",
         ["std.fs.fsOpen"] = "lyr_fs_open",
         ["std.fs.fsRead"] = "LYR_FS_READ",
         ["std.fs.fsWrite"] = "LYR_FS_WRITE",
