@@ -1699,7 +1699,7 @@ pub struct Deflate {
 /// A reading over memory cannot be cancelled: the `Cancelled` of the signature is impossible here.
 fn unCancelled(body: fn() -> uint8[] throws [IoError, Cancelled]): uint8[] throws IoError {
     try {
-        return try body();
+        return body();
     } catch (e: IoError) {
         throw e;
     } catch (_: Cancelled) {

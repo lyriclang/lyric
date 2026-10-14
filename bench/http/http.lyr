@@ -1,0 +1,63 @@
+// Measurement point 4, 'http' (design/v5/spec/13, M10 P12): HTTP/1.1 throughput in one process
+// — std.http's server answering a kibibyte of JSON, sixty-four client tasks each fetching it
+// five hundred times over their own keep-alive connection. Prints one checksum, the same in
+// every language: the bytes of every body received.
+import std.io { println };
+import std.net { IpAddr, SocketAddr };
+import std.task { spawn, TaskScope };
+import std.http { Client, Request, Response, Server };
+import std.uri { Uri };
+import std.codec { Codable };
+import std.collections { List };
+
+struct Item :: [Codable] {
+    id: int,
+    name: string,
+    price: float,
+    tags: string[],
+}
+
+let items: List<Item> = catalogue();
+
+fn catalogue(): List<Item> {
+    var list: List<Item> = List.new();
+    var i = 0;
+    while (i < 18) {
+        list.push(Item { id = i, name = f"item{i}", price = (i as float) + 0.25, tags = ["new", "sale"] });
+        i = i + 1;
+    }
+    return list;
+}
+
+fn handle(req: Request): Response throws Error {
+    return try Response.withJson(items);
+}
+
+fn main(): int throws Error {
+    var server = try Server.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 });
+    let at = try server.localAddr();
+    let _ = spawn(() => { try server.serve(handle); });
+    let target = try Uri.parse(f"http://127.0.0.1:{at.port}/items");
+    var total = 0;
+    {
+        using let scope = TaskScope.new();
+        var c = 0;
+        while (c < 64) {
+            let _ = scope.spawn(() => {
+                var client = Client.new();
+                var i = 0;
+                while (i < 500) {
+                    let response = try client.get(target);
+                    let body = try response.bytes();
+                    total = total + body.length();
+                    i = i + 1;
+                }
+                client.close();
+            });
+            c = c + 1;
+        }
+    }
+    try server.shutdown();
+    println(f"{total}");
+    return 0;
+}

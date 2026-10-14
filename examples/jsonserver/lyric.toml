@@ -1,0 +1,4 @@
+[package]
+name = "jsonserver"
+version = "0.1.0"
+description = "A JSON server and its client over std.http and std.json (design/v5/spec/13 M10 S8)"

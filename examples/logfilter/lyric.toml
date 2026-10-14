@@ -1,0 +1,4 @@
+[package]
+name = "logfilter"
+version = "0.1.0"
+description = "A log filter over std.regex, its matches in color through std.term (design/v5/spec/13 M10 S6, S10)"

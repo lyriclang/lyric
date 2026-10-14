@@ -15,9 +15,10 @@ import argparse, glob, os, pathlib, shutil, subprocess, sys, time
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
-BENCHES = ['loops', 'arith', 'structs', 'maps', 'sorting', 'strings', 'io_copy', 'echo']
-# M8b's I/O measurement (13, S14): reported, under no bound — the ratchet and --bound pass them by
-UNBOUND = {'io_copy', 'echo'}
+BENCHES = ['loops', 'arith', 'structs', 'maps', 'sorting', 'strings', 'io_copy', 'echo', 'json', 'regex', 'http']
+# M8b's I/O measurement (13, S14) and M10's point 4 (13, P12: JSON, the log filter's regex, HTTP
+# throughput): reported, under no bound — the ratchet and --bound pass them by
+UNBOUND = {'io_copy', 'echo', 'json', 'regex', 'http'}
 OUT = HERE / 'out'
 
 def run(cmd, cwd=None, env=None):

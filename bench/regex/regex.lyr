@@ -1,0 +1,43 @@
+// Measurement point 4, 'regex' (design/v5/spec/13, M10 P12): the log filter — 300 000 log lines
+// built in memory, each asked two questions of std.regex's Pike VM: is it an ERROR or a WARN
+// (`\b(ERROR|WARN)\b`), did its request take a second or more (`\s[1-9]\d{3,}ms$`). Prints one
+// checksum, the same in every language: the lines that match the first, the second, both.
+import std.io { println };
+import std.regex { Regex };
+import std.string { StringBuilder };
+
+fn main(): int {
+    let sb = StringBuilder.new();
+    let levels = ["INFO", "WARN", "ERROR", "DEBUG"];
+    var x: uint = 88172645463325252;
+    var i = 0;
+    while (i < 300000) {
+        x = x ^ (x << 13);
+        x = x ^ (x >> 7);
+        x = x ^ (x << 17);
+        let level = levels[(x % 4) as int];
+        sb.appendStr(f"2026-10-14T12:00:{i % 60} {level} request {x % 1000} took {(x % 5000) as int}ms\n");
+        i = i + 1;
+    }
+    let text = sb.toString();
+    let severe = try! Regex.new("\\b(ERROR|WARN)\\b");
+    let slow = try! Regex.new("\\s[1-9]\\d{3,}ms$");
+    var severeCount = 0;
+    var slowCount = 0;
+    var both = 0;
+    for (line in text.lines()) {
+        let isSevere = severe.isMatch(line);
+        let isSlow = slow.isMatch(line);
+        if (isSevere) {
+            severeCount = severeCount + 1;
+        }
+        if (isSlow) {
+            slowCount = slowCount + 1;
+        }
+        if (isSevere && isSlow) {
+            both = both + 1;
+        }
+    }
+    println(f"{severeCount} {slowCount} {both}");
+    return 0;
+}
