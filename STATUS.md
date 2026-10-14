@@ -1301,6 +1301,21 @@ M9b: no halt until it closes, merged on green CI, open points collected for the 
   jsonserver.lyr`, through `ExampleTests`); `tests/std/tests/http_server.lyr` (3 tests: the
   handler's answers over one connection, HTTP/1.1 on the wire with a raw socket — seven 400s —,
   shutdown). Spec 12 §HTTP rule 4; three cases.
+- **S9** `std.compress` (P6; 10 Q8): DEFLATE, zlib and gzip whole in Lyric — `DeflateReader`
+  (puff's table walk over a 32 KiB window, stored/fixed/dynamic blocks, one byte at a time once a
+  block could be the last so a wrapper finds its trailer), `DeflateWriter` at the levels 0–9
+  (stored; fixed tables over a greedy LZ77; dynamic tables from the block's frequencies with
+  zlib's length limiting and run-length coded lengths; lazy matching from 4 up; hash chains with
+  zlib's configuration; a block stored or fixed where that is smaller; `flush` as a sync flush),
+  `ZlibReader`/`ZlibWriter` (header, Adler-32), `GzipReader`/`GzipWriter` (header with extra
+  field/name/comment/CRC read over, trailer checked, members in a row), `Gzip`/`Zlib`/`Deflate`
+  `.compress`/`.decompress` in memory; the client decodes `Content-Encoding: gzip`/`deflate`
+  (`ClientOptions.decompress`, `Accept-Encoding` sent). The artifacts: the gzip file tool
+  (`tests/Lyric5.Tests/programs/gzipfile.lyr`) read by .NET's `GZipStream` and the platform's
+  `gzip -d` and reading theirs (`ExampleTests`); python's zlib reads every level's output;
+  `tests/std/tests/compress.lyr` (4 tests: every level over six inputs, the formats' bytes with
+  zlib's own vectors, the adapters in pieces, eleven refusals). Spec 12 §Compression rules 1–4;
+  three cases.
 
 ## Design decisions
 

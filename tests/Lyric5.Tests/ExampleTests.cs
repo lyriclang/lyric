@@ -12,7 +12,7 @@ namespace Lyric5.Tests;
 /// And M8b's: the file tool, <c>programs/filetool.lyr</c>, over a tree the test makes. And M8c's:
 /// the word counter, <c>programs/wordcount.lyr</c>, over a text in four scripts. And M10's: the log
 /// filter, <c>programs/logfilter.lyr</c>, over a log; the JSON server, <c>programs/jsonserver.lyr</c>, with its
-/// client.
+/// client; the gzip tool, <c>programs/gzipfile.lyr</c>, against .NET's GZipStream and the platform's gzip.
 /// Through <c>Main</c>, so in the console collection.
 /// </summary>
 [Collection("console")]
@@ -250,6 +250,75 @@ public class ExampleTests
         Assert.True(ran.ExitCode == 0, ran.Stderr);
         Assert.Equal("1 Brot 2.5\n2 Käse 7.0\n201 Created /items/3 Milch\n200 {\"id\":3,\"name\":\"Milch\",\"price\":1.2}\n"
                      + "404 {\"error\":\"no item 9\"}\n", ran.Stdout.Replace("\r\n", "\n"));
+    }
+
+    /// <summary>CRC-32 (IEEE), as gzip's trailer and the tool's output carry it.</summary>
+    private static uint Crc32Of(byte[] bytes)
+    {
+        uint crc = 0xFFFFFFFF;
+        foreach (var b in bytes)
+        {
+            crc ^= b;
+            for (var k = 0; k < 8; k++)
+                crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320 : crc >> 1;
+        }
+        return crc ^ 0xFFFFFFFF;
+    }
+
+    /// <summary>M10's artifact (13, S9): the gzip file tool built as a package — a file compressed
+    /// here is read by .NET's GZipStream and, where the platform has it, by <c>gzip -d</c>; a file
+    /// compressed by GZipStream is read here; the CRC-32 is the same on both sides.</summary>
+    [Fact]
+    public void The_gzip_tool_agrees_with_the_platform()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", ProgramText("gzipfile")));
+        var (built, _, why) = Run("build", "-C", dir);
+        Assert.True(built == 0, why);
+        var host = Target.Host;
+        var exe = Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix);
+        var plain = Path.Combine(dir, "plain.txt");
+        var text = ProgramText("gzipfile") + ProgramText("wordcount");
+        File.WriteAllText(plain, text + text + text);
+        var bytes = File.ReadAllBytes(plain);
+        var crc = Crc32Of(bytes);
+
+        // ours, read by .NET
+        var ours = Path.Combine(dir, "ours.gz");
+        var packed = ProcessRunner.Run(exe, ["-9", plain, ours], TimeSpan.FromMinutes(1));
+        Assert.True(packed.ExitCode == 0, packed.Stderr);
+        Assert.Equal($"{bytes.Length} -> {new FileInfo(ours).Length} bytes, crc32 {crc:x8}\n", packed.Stdout.Replace("\r\n", "\n"));
+        Assert.True(new FileInfo(ours).Length < bytes.Length / 3, "it shrinks");
+        using (var unpacked = new MemoryStream())
+        {
+            using (var gz = new System.IO.Compression.GZipStream(File.OpenRead(ours), System.IO.Compression.CompressionMode.Decompress))
+                gz.CopyTo(unpacked);
+            Assert.Equal(bytes, unpacked.ToArray());
+        }
+
+        // theirs, read by ours
+        var theirs = Path.Combine(dir, "theirs.gz");
+        using (var gz = new System.IO.Compression.GZipStream(File.Create(theirs), System.IO.Compression.CompressionLevel.SmallestSize))
+            gz.Write(bytes);
+        var back = Path.Combine(dir, "back.txt");
+        var unpackedRun = ProcessRunner.Run(exe, ["-d", theirs, back], TimeSpan.FromMinutes(1));
+        Assert.True(unpackedRun.ExitCode == 0, unpackedRun.Stderr);
+        Assert.Equal($"{new FileInfo(theirs).Length} -> {bytes.Length} bytes, crc32 {crc:x8}\n", unpackedRun.Stdout.Replace("\r\n", "\n"));
+        Assert.Equal(bytes, File.ReadAllBytes(back));
+
+        // the platform's gzip, where there is one
+        var gzip = ProcessRunner.Run("gzip", ["--version"], TimeSpan.FromSeconds(10));
+        if (gzip.ExitCode == 0)
+        {
+            var listed = ProcessRunner.Run("gzip", ["-t", ours], TimeSpan.FromSeconds(30));
+            Assert.True(listed.ExitCode == 0, listed.Stderr);
+        }
+
+        // not gzip
+        var bad = ProcessRunner.Run(exe, ["-d", plain, back], TimeSpan.FromMinutes(1));
+        Assert.Equal(1, bad.ExitCode);
+        Assert.Equal("gzipfile: not a gzip stream: the magic bytes are missing\n", bad.Stderr.Replace("\r\n", "\n"));
+        var usage = ProcessRunner.Run(exe, ["-x", plain], TimeSpan.FromMinutes(1));
+        Assert.Equal(2, usage.ExitCode);
     }
 
     private static string MacrosExample([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>

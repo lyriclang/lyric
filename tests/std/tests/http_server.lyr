@@ -10,6 +10,7 @@ import std.time { Duration };
 import std.http { Client, ClientOptions, Request, Response, Server, ServerOptions, Method, Headers, Status, HttpError };
 import std.uri { Uri };
 import std.codec { Codable };
+import std.compress { Gzip };
 import std.test { assertEq, assertTrue, assertNull, fail };
 
 struct Item :: [Codable, Equatable, Debug] {
@@ -70,6 +71,14 @@ fn handle(req: Request): Response throws Error {
     }
     if (path == "/fail") {
         throw IoError { kind = .NotFound, path = null, detail = "the thing is not there", inner = null };
+    }
+    if (path == "/gzipped") {
+        var r = Response.of(200, (try Gzip.compress("the body was gzipped, and the client saw none of it".toBytes()[..], 6))[..], "text/plain");
+        r.headers.set("Content-Encoding", "gzip");
+        return r;
+    }
+    if (path == "/accepts") {
+        return Response.withText(req.headers.get("Accept-Encoding") ?? "-");
     }
     return Response.withText(f"no {path}", 404);
 }
@@ -151,6 +160,19 @@ fn aServerAnswersAndKeepsTheConnection(): void throws Error {
     assertEq(try u.text(), "left it");
     let after = try (try client.get(uri(base, "/echo"))).json<Echo>();
     assertEq(after, Echo { method = "GET", path = "/echo", query = null, length = 0, text = "" });
+    // a gzipped body is decoded as it is read (S9); the headers lose the encoding; the connection stays
+    let gz = try client.get(uri(base, "/gzipped"));
+    assertNull(gz.headers.get("Content-Encoding"));
+    assertNull(gz.headers.get("Content-Length"));
+    assertEq(try gz.text(), "the body was gzipped, and the client saw none of it");
+    assertEq(try (try client.get(uri(base, "/accepts"))).text(), "gzip, deflate");
+    var plain = Client.new(ClientOptions { decompress = false });
+    let raw = try plain.get(uri(base, "/gzipped"));
+    assertEq(raw.headers.get("Content-Encoding"), "gzip");
+    let rawBytes = try raw.bytes();
+    assertEq(rawBytes[0], 0x1Fu8);
+    assertEq(try (try plain.get(uri(base, "/accepts"))).text(), "-");
+    plain.close();
     client.close();
     server.shutdown();
 }

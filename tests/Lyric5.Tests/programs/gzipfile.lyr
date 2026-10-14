@@ -1,0 +1,96 @@
+// A gzip file tool (M10's artifact, design/v5/spec/13 S9): a file compressed to .gz at a level,
+// or a .gz file decompressed - std.compress over std.fs, streamed, the platform's gzip on the
+// other side.
+//
+//     lyric5 run -- [-1 .. -9] <file> <file.gz>
+//     lyric5 run -- -d <file.gz> <file>
+//
+// Prints the sizes in and out and the CRC-32 of the plain bytes. Exit 2 for a usage error, 1
+// for data that is not gzip.
+import std.compress { GzipReader, GzipWriter };
+import std.fs { File, metadata };
+import std.hash { crc32 };
+import std.io { eprintln, println, IoError, BufWriter };
+import std.os { args };
+import std.core { ParseError };
+
+fn usage(): int {
+    eprintln("usage: gzipfile [-1..-9] <file> <file.gz> | -d <file.gz> <file>");
+    return 2;
+}
+
+fn main(): int throws Error {
+    let given = args();
+    var level = 6;
+    var decompress = false;
+    var rest: List<string> = List<string>.new();
+    var i = 1;
+    while (i < given.length()) {
+        let a = given[i];
+        if (a == "-d") {
+            decompress = true;
+        } else if (a.length() == 2 && a.startsWith("-")) {
+            try {
+                level = int.parse(a[1..2]);
+            } catch (_: ParseError) {
+                return usage();
+            }
+        } else if (a.startsWith("-")) {
+            return usage();
+        } else {
+            rest.push(a);
+        }
+        i += 1;
+    }
+    if (rest.length() != 2) {
+        return usage();
+    }
+    let chunk: uint8[] = [0u8] * 65536;
+    var bytesIn = 0;
+    var bytesOut = 0;
+    var crc = 0u32;
+    if (decompress) {
+        var src = try File.open(rest[0]);
+        var reader = GzipReader<File>.new(src);
+        var out = try File.create(rest[1]);
+        try {
+            while (true) {
+                let n = try reader.read(chunk[..]);
+                if (n == 0) {
+                    break;
+                }
+                try out.writeAll(chunk[0..n]);
+                crc = crc32(chunk[0..n], crc);
+                bytesOut += n;
+            }
+        } catch (e: IoError) {
+            eprintln(f"gzipfile: {e.detail}");
+            try out.close();
+            try src.close();
+            return 1;
+        }
+        try out.close();
+        try src.close();
+        bytesIn = (try metadata(rest[0])).size;
+        println(f"{bytesIn} -> {bytesOut} bytes, crc32 {crc:08x}");
+        return 0;
+    }
+    var src = try File.open(rest[0]);
+    var out = try File.create(rest[1]);
+    var writer = try GzipWriter<BufWriter<File>>.new(BufWriter<File>.new(out), level);
+    while (true) {
+        let n = try src.read(chunk[..]);
+        if (n == 0) {
+            break;
+        }
+        try writer.write(chunk[0..n]);
+        crc = crc32(chunk[0..n], crc);
+        bytesIn += n;
+    }
+    try writer.close();
+    try out.close();
+    try src.close();
+    bytesOut = (try metadata(rest[1])).size;
+    println(f"{bytesIn} -> {bytesOut} bytes, crc32 {crc:08x}");
+    return 0;
+}
