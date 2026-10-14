@@ -15,6 +15,9 @@ public static class Intrinsics
         ["std.io.consoleFlush"] = "lyr_console_flush",
         ["std.io.consoleRead"] = "LYR_CONSOLE_READ",
         ["std.io.consoleGone"] = "lyr_console_gone",
+        // The terminal (M10 S10, std.term): whether a standard stream is one, and its size.
+        ["std.term.consoleIsTerminal"] = "lyr_console_is_terminal",
+        ["std.term.consoleSize"] = "lyr_console_size",
         ["std.string.concat"] = "lyr_str_concat",
         ["std.string.fromInt"] = "lyr_str_from_int",
         ["std.string.fromUint"] = "lyr_str_from_uint",

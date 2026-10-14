@@ -43,6 +43,13 @@ void lyr_console_gone(void);
  * most n / 3 characters a read, so they fit; half a surrogate pair waits for the next read. */
 int64_t lyr_console_read(uint8_t *into, int64_t n);
 
+/* Whether the standard stream (0 in, 1 out, 2 err) is a terminal (M10 S10, std.term): 1 or 0. */
+int64_t lyr_console_is_terminal(int64_t stream);
+
+/* The terminal of the standard output (1) or error (2): columns << 16 | rows, or -1 where it is
+ * none. */
+int64_t lyr_console_size(int64_t stream);
+
 /* A Slice<uint8> of emitted code is a pointer and a length (CEmitter). */
 #define LYR_CONSOLE_PUT(stream, slice) lyr_console_put((stream), (slice).ptr, (slice).len)
 #define LYR_CONSOLE_READ(slice) lyr_console_read((slice).ptr, (slice).len)

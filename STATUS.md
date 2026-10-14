@@ -1316,6 +1316,16 @@ M9b: no halt until it closes, merged on green CI, open points collected for the 
   `tests/std/tests/compress.lyr` (4 tests: every level over six inputs, the formats' bytes with
   zlib's own vectors, the adapters in pieces, eleven refusals). Spec 12 §Compression rules 1–4;
   three cases.
+- **S10** `std.term` (P8; 10 Q7): ECMA-48 — `isTerminal(StdStream)` and `size()` over two
+  runtime calls (`lyr_console_is_terminal`, `lyr_console_size`: `isatty`/`TIOCGWINSZ`, Windows
+  `GetConsoleMode`/`GetConsoleScreenBufferInfo`; a Windows console is switched to
+  virtual-terminal processing when the runtime first writes to it), `Style { fg, bg, bold, dim,
+  italic, underline, inverse, strike }` with `Color` (16, `Index`, `Rgb`), `sgr()`, `apply`
+  (where `colorsEnabled()`: `NO_COLOR`, `FORCE_COLOR`, `TERM=dumb`, the terminal) and `force`,
+  `reset()`, the cursor and screen sequences. The artifact: the log filter in color
+  (`programs/logfilter.lyr`: matches bold red, line numbers green, `--color`/`--no-color`,
+  through `ExampleTests`); `tests/std/tests/term.lyr` (4 tests). Spec 12 §The terminal rules
+  1–4; three cases. Raw mode stays a door.
 
 ## Design decisions
 

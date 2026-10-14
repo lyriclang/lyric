@@ -1,0 +1,253 @@
+/// `std.term` (design 10 Q7; 13 M10 S10): the terminal, as ECMA-48 writes it. `isTerminal(stream)`
+/// asks whether a standard stream is one, `size()` how wide and high the output's is. `Style`
+/// is a set of attributes — a foreground and a background `Color` (the 16, the 256, or RGB),
+/// bold, dim, italic, underline, inverse, strike — whose `apply(text)` wraps the text in the SGR
+/// sequence and the reset where styles are on: a terminal on the standard output, unless
+/// `NO_COLOR` says no or `TERM` is `dumb`; `FORCE_COLOR` says yes anyway. `cursorUp` and the
+/// others are the sequences themselves, to print. Under Windows the runtime switches the
+/// console to virtual-terminal processing once, so the same bytes mean the same there. No
+/// raw mode (Q7: a door).
+import std.os { env };
+import std.core { StringBuilder };
+
+fn consoleIsTerminal(stream: int): int;
+fn consoleSize(stream: int): int;
+
+/// A standard stream.
+pub enum StdStream :: [Equatable, Debug] {
+    Stdin,
+    Stdout,
+    Stderr,
+}
+
+fn fdOf(s: StdStream): int {
+    return match (s) {
+        .Stdin => 0,
+        .Stdout => 1,
+        .Stderr => 2,
+    };
+}
+
+/// Whether the stream is a terminal (a pipe, a file or nothing is none).
+pub fn isTerminal(stream: StdStream): bool {
+    return consoleIsTerminal(fdOf(stream)) != 0;
+}
+
+/// The columns and rows of the terminal on the standard output, `null` where it is none.
+pub fn size(): ?(int, int) {
+    let v = consoleSize(1);
+    if (v < 0) {
+        return null;
+    }
+    return (v >> 16, v & 0xFFFF);
+}
+
+/// Whether styles go out: `NO_COLOR` set and not empty says no, else `FORCE_COLOR` set and not
+/// empty says yes, else `TERM=dumb` says no, else the standard output being a terminal decides
+/// (an empty value counts as not set: `std.os` sets, it does not unset).
+pub fn colorsEnabled(): bool {
+    if (let no = env("NO_COLOR")) {
+        if (!no.isEmpty()) {
+            return false;
+        }
+    }
+    if (let force = env("FORCE_COLOR")) {
+        if (!force.isEmpty()) {
+            return true;
+        }
+    }
+    if (let term = env("TERM")) {
+        if (term == "dumb") {
+            return false;
+        }
+    }
+    return isTerminal(StdStream.Stdout);
+}
+
+/// A color: the 16 of ECMA-48 and aixterm, one of the 256, or RGB.
+pub enum Color :: [Equatable, Debug] {
+    Black,
+    Red,
+    Green,
+    Yellow,
+    Blue,
+    Magenta,
+    Cyan,
+    White,
+    BrightBlack,
+    BrightRed,
+    BrightGreen,
+    BrightYellow,
+    BrightBlue,
+    BrightMagenta,
+    BrightCyan,
+    BrightWhite,
+    /// One of the 256 (0..255).
+    Index(int),
+    Rgb(int, int, int),
+}
+
+/// The SGR parameter of the color, as foreground or background.
+fn colorParam(c: Color, background: bool): string {
+    let base = if (background) 40 else 30;
+    let bright = if (background) 100 else 90;
+    return match (c) {
+        .Black => f"{base}",
+        .Red => f"{base + 1}",
+        .Green => f"{base + 2}",
+        .Yellow => f"{base + 3}",
+        .Blue => f"{base + 4}",
+        .Magenta => f"{base + 5}",
+        .Cyan => f"{base + 6}",
+        .White => f"{base + 7}",
+        .BrightBlack => f"{bright}",
+        .BrightRed => f"{bright + 1}",
+        .BrightGreen => f"{bright + 2}",
+        .BrightYellow => f"{bright + 3}",
+        .BrightBlue => f"{bright + 4}",
+        .BrightMagenta => f"{bright + 5}",
+        .BrightCyan => f"{bright + 6}",
+        .BrightWhite => f"{bright + 7}",
+        .Index(i) => f"{base + 8};5;{clamp(i, 255)}",
+        .Rgb(r, g, b) => f"{base + 8};2;{clamp(r, 255)};{clamp(g, 255)};{clamp(b, 255)}",
+    };
+}
+
+fn clamp(v: int, most: int): int {
+    return if (v < 0) 0 else if (v > most) most else v;
+}
+
+/// ESC.
+let escape = "\u{1b}";
+
+/// The sequence that ends every style.
+pub fn reset(): string {
+    return "\u{1b}[0m";
+}
+
+/// A set of attributes to put on a text.
+pub struct Style :: [Equatable, Debug] {
+    pub fg: ?Color = null,
+    pub bg: ?Color = null,
+    pub bold: bool = false,
+    pub dim: bool = false,
+    pub italic: bool = false,
+    pub underline: bool = false,
+    pub inverse: bool = false,
+    pub strike: bool = false,
+
+    /// Whether the style says nothing.
+    pub fn isPlain(): bool {
+        return this.fg == null && this.bg == null && !this.bold && !this.dim && !this.italic && !this.underline && !this.inverse && !this.strike;
+    }
+
+    /// The SGR sequence that turns the style on; empty for a plain style.
+    pub fn sgr(): string {
+        if (this.isPlain()) {
+            return "";
+        }
+        let out = StringBuilder.new();
+        out.appendStr("\u{1b}[");
+        var first = true;
+        let add = (p: string) => {
+            if (!first) {
+                out.appendChar(';');
+            }
+            first = false;
+            out.appendStr(p);
+        };
+        if (this.bold) { add("1"); }
+        if (this.dim) { add("2"); }
+        if (this.italic) { add("3"); }
+        if (this.underline) { add("4"); }
+        if (this.inverse) { add("7"); }
+        if (this.strike) { add("9"); }
+        if (let c = this.fg) { add(colorParam(c, false)); }
+        if (let c = this.bg) { add(colorParam(c, true)); }
+        out.appendChar('m');
+        return out.toString();
+    }
+
+    /// The text in the style where styles are on (`colorsEnabled()`), the text itself else.
+    pub fn apply(text: string): string {
+        if (this.isPlain() || !colorsEnabled()) {
+            return text;
+        }
+        return this.sgr() + text + reset();
+    }
+
+    /// The text in the style, whatever the terminal is.
+    pub fn force(text: string): string {
+        if (this.isPlain()) {
+            return text;
+        }
+        return this.sgr() + text + reset();
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The cursor and the screen (ECMA-48 §8.3): the sequences, to print.
+// ---------------------------------------------------------------------------------------------
+
+pub fn cursorUp(n: int = 1): string {
+    return f"\u{1b}[{n}A";
+}
+
+pub fn cursorDown(n: int = 1): string {
+    return f"\u{1b}[{n}B";
+}
+
+pub fn cursorForward(n: int = 1): string {
+    return f"\u{1b}[{n}C";
+}
+
+pub fn cursorBack(n: int = 1): string {
+    return f"\u{1b}[{n}D";
+}
+
+/// The cursor to the row and column, both counted from 1.
+pub fn cursorTo(row: int, column: int): string {
+    return f"\u{1b}[{row};{column}H";
+}
+
+/// The cursor to the start of the line `n` lines down (`CNL`).
+pub fn cursorNextLine(n: int = 1): string {
+    return f"\u{1b}[{n}E";
+}
+
+pub fn cursorHide(): string {
+    return "\u{1b}[?25l";
+}
+
+pub fn cursorShow(): string {
+    return "\u{1b}[?25h";
+}
+
+/// The cursor's position saved and restored (`SCOSC`/`SCORC`, as xterm and Windows take them).
+pub fn cursorSave(): string {
+    return "\u{1b}[s";
+}
+
+pub fn cursorRestore(): string {
+    return "\u{1b}[u";
+}
+
+/// The whole screen erased, the cursor at the top left.
+pub fn clearScreen(): string {
+    return "\u{1b}[2J\u{1b}[H";
+}
+
+/// From the cursor to the end of the screen erased.
+pub fn clearToEnd(): string {
+    return "\u{1b}[0J";
+}
+
+/// The whole line erased, the cursor at its start.
+pub fn eraseLine(): string {
+    return "\u{1b}[2K\r";
+}
+
+/// From the cursor to the end of the line erased.
+pub fn eraseToEndOfLine(): string {
+    return "\u{1b}[0K";
+}

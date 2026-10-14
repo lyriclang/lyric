@@ -23,6 +23,7 @@ typedef SRWLOCK ConsoleLock;
 #  include <errno.h>
 #  include <pthread.h>
 #  include <signal.h>
+#  include <sys/ioctl.h>
 #  include <unistd.h>
 typedef pthread_mutex_t ConsoleLock;
 #  define CONSOLE_LOCK_INIT PTHREAD_MUTEX_INITIALIZER
@@ -62,6 +63,43 @@ static int64_t failure(int64_t kind, int64_t raw) {
     return -((kind << 32) | (raw & 0xFFFFFFFF));
 }
 
+#if defined(_WIN32)
+/* A Windows console takes ECMA-48's sequences once virtual-terminal processing is on (M10 S10,
+ * std.term): set when the stream's mode is first decided, so the same bytes mean the same there. */
+static void enable_vt(int fd) {
+    HANDLE h = GetStdHandle(fd == 2 ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE);
+    DWORD mode;
+    if (GetConsoleMode(h, &mode) && !(mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING)) {
+        SetConsoleMode(h, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    }
+}
+#endif
+
+int64_t lyr_console_is_terminal(int64_t stream) {
+#if defined(_WIN32)
+    DWORD mode;
+    HANDLE h = GetStdHandle(stream == 0 ? STD_INPUT_HANDLE : stream == 2 ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE);
+    return GetConsoleMode(h, &mode) != 0;
+#else
+    return isatty((int)stream) ? 1 : 0;
+#endif
+}
+
+int64_t lyr_console_size(int64_t stream) {
+#if defined(_WIN32)
+    CONSOLE_SCREEN_BUFFER_INFO info;
+    HANDLE h = GetStdHandle(stream == 2 ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE);
+    if (!GetConsoleScreenBufferInfo(h, &info)) return -1;
+    int64_t cols = (int64_t)info.srWindow.Right - info.srWindow.Left + 1;
+    int64_t rows = (int64_t)info.srWindow.Bottom - info.srWindow.Top + 1;
+    return (cols << 16) | rows;
+#else
+    struct winsize ws;
+    if (ioctl((int)stream, TIOCGWINSZ, &ws) != 0) return -1;
+    return ((int64_t)ws.ws_col << 16) | (int64_t)ws.ws_row;
+#endif
+}
+
 /* `len` bytes to the stream: through a host's writer where one takes it, else to the system. */
 static int64_t write_out(int fd, const uint8_t *bytes, size_t len) {
     if (lyr_stream_hooked(fd)) {
@@ -98,7 +136,12 @@ static int64_t write_out(int fd, const uint8_t *bytes, size_t len) {
 int64_t lyr_console_put(int64_t stream, const uint8_t *from, int64_t n) {
     Stream *s = stream_of(stream);
     console_lock(&s->lock);
-    if (s->mode == UNDECIDED) s->mode = a_line_at_a_time((int)stream) ? BY_LINE : BY_BLOCK;
+    if (s->mode == UNDECIDED) {
+        s->mode = a_line_at_a_time((int)stream) ? BY_LINE : BY_BLOCK;
+#if defined(_WIN32)
+        enable_vt((int)stream);
+#endif
+    }
     size_t room = CONSOLE_ROOM - s->used;
     size_t taken = n < 0 ? 0 : (size_t)n < room ? (size_t)n : room;
     memcpy(s->held + s->used, from, taken);
