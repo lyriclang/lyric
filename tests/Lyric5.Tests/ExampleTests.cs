@@ -234,6 +234,13 @@ public class ExampleTests
         var usage = ProcessRunner.Run(exe, ["-x", "a", log], TimeSpan.FromMinutes(1));
         Assert.Equal(2, usage.ExitCode);
         Assert.StartsWith("usage: logfilter", usage.Stderr);
+
+        // M10 S10: the matches in color where asked (the output here is a pipe: plain unless --color)
+        var colored = ProcessRunner.Run(exe, ["--color", "-n", "ERROR", log], TimeSpan.FromMinutes(1));
+        Assert.Equal("\u001b[32m3\u001b[0m:2026-10-14T08:00:07Z \u001b[1;31mERROR\u001b[0m db: connection refused (attempt 3)\n"
+                     + "\u001b[32m5\u001b[0m:2026-10-14T08:00:11Z \u001b[1;31mERROR\u001b[0m db: timeout after 5000ms\n", colored.Stdout.Replace("\r\n", "\n"));
+        var plain = ProcessRunner.Run(exe, ["-n", "ERROR", log], TimeSpan.FromMinutes(1));
+        Assert.DoesNotContain("\u001b", plain.Stdout);
     }
 
     /// <summary>M10's artifact (13, S8): the JSON server built as a package — the server answers

@@ -1,0 +1,102 @@
+// std.term (design/v5/spec/10 Q7; 13 M10 S10): the styles as ECMA-48's SGR sequences, when they go
+// out (NO_COLOR, FORCE_COLOR, TERM, the terminal), the cursor and the screen sequences, the
+// terminal questions.
+import std.term { StdStream, Color, Style, isTerminal, size, colorsEnabled, reset, cursorUp, cursorDown, cursorForward, cursorBack, cursorTo, cursorNextLine, cursorHide, cursorShow, cursorSave, cursorRestore, clearScreen, clearToEnd, eraseLine, eraseToEndOfLine };
+import std.os { env, setEnv };
+import std.test { assertEq, assertTrue, assertNull };
+
+let esc = "\u{1b}";
+
+/// The environment as the test needs it, the rest put back after.
+fn withEnv(noColor: ?string, forceColor: ?string, term: ?string, body: fn() -> void): void {
+    let hadNo = env("NO_COLOR");
+    let hadForce = env("FORCE_COLOR");
+    let hadTerm = env("TERM");
+    // std.os has no unset: an empty value is "not set" to std.term
+    setEnv("NO_COLOR", noColor ?? "");
+    setEnv("FORCE_COLOR", forceColor ?? "");
+    setEnv("TERM", term ?? "");
+    body();
+    restore("NO_COLOR", hadNo);
+    restore("FORCE_COLOR", hadForce);
+    restore("TERM", hadTerm);
+}
+
+fn restore(name: string, value: ?string): void {
+    setEnv(name, value ?? "");
+}
+
+@Test
+fn aStyleIsItsSgrSequence(): void {
+    assertEq(Style { }.sgr(), "");
+    assertTrue(Style { }.isPlain());
+    assertEq(Style { bold = true }.sgr(), esc + "[1m");
+    assertEq(Style { fg = Color.Red }.sgr(), esc + "[31m");
+    assertEq(Style { bg = Color.Blue }.sgr(), esc + "[44m");
+    assertEq(Style { fg = Color.BrightGreen, bg = Color.BrightBlack }.sgr(), esc + "[92;100m");
+    assertEq(Style { bold = true, dim = true, italic = true, underline = true, inverse = true, strike = true, fg = Color.White }.sgr(), esc + "[1;2;3;4;7;9;37m");
+    assertEq(Style { fg = Color.Index(208) }.sgr(), esc + "[38;5;208m");
+    assertEq(Style { bg = Color.Index(999) }.sgr(), esc + "[48;5;255m");
+    assertEq(Style { fg = Color.Rgb(255, 128, 0) }.sgr(), esc + "[38;2;255;128;0m");
+    assertEq(Style { bg = Color.Rgb(-5, 300, 7) }.sgr(), esc + "[48;2;0;255;7m");
+    assertEq(reset(), esc + "[0m");
+    assertEq(Style { bold = true, fg = Color.Red }.force("warn"), esc + "[1;31mwarn" + esc + "[0m");
+    assertEq(Style { }.force("plain"), "plain");
+}
+
+@Test
+fn whenStylesGoOut(): void {
+    withEnv("1", null, "xterm", () => {
+        assertTrue(!colorsEnabled());
+        assertEq(Style { bold = true }.apply("x"), "x");
+    });
+    withEnv("1", "1", "xterm", () => {
+        // NO_COLOR wins over FORCE_COLOR
+        assertTrue(!colorsEnabled());
+    });
+    withEnv("", "1", "dumb", () => {
+        // an empty NO_COLOR says nothing; FORCE_COLOR wins over a dumb terminal
+        assertTrue(colorsEnabled());
+        assertEq(Style { bold = true }.apply("x"), esc + "[1mx" + esc + "[0m");
+        assertEq(Style { }.apply("x"), "x");
+    });
+    withEnv(null, null, "dumb", () => {
+        assertTrue(!colorsEnabled());
+    });
+    withEnv(null, null, "xterm-256color", () => {
+        // without a say either way, the terminal decides
+        assertEq(colorsEnabled(), isTerminal(StdStream.Stdout));
+    });
+}
+
+@Test
+fn theCursorAndTheScreenSequences(): void {
+    assertEq(cursorUp(), esc + "[1A");
+    assertEq(cursorUp(3), esc + "[3A");
+    assertEq(cursorDown(2), esc + "[2B");
+    assertEq(cursorForward(4), esc + "[4C");
+    assertEq(cursorBack(5), esc + "[5D");
+    assertEq(cursorTo(10, 20), esc + "[10;20H");
+    assertEq(cursorNextLine(), esc + "[1E");
+    assertEq(cursorHide(), esc + "[?25l");
+    assertEq(cursorShow(), esc + "[?25h");
+    assertEq(cursorSave(), esc + "[s");
+    assertEq(cursorRestore(), esc + "[u");
+    assertEq(clearScreen(), esc + "[2J" + esc + "[H");
+    assertEq(clearToEnd(), esc + "[0J");
+    assertEq(eraseLine(), esc + "[2K\r");
+    assertEq(eraseToEndOfLine(), esc + "[0K");
+}
+
+@Test
+fn theTerminalQuestions(): void {
+    // under the test runner the streams are what they are; the answers are consistent
+    let out = isTerminal(StdStream.Stdout);
+    let _ = isTerminal(StdStream.Stdin);
+    let _ = isTerminal(StdStream.Stderr);
+    if (!out) {
+        assertNull(size());
+    } else if (let (cols, rows) = size()) {
+        assertTrue(cols > 0 && rows > 0);
+    }
+}
