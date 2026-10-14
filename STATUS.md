@@ -1258,6 +1258,19 @@ M9b: no halt until it closes, merged on green CI, open points collected for the 
   `Base64Url.encodeUnpadded`/`decodeUnpadded` for JOSE (RFC 7515), as strict as the padded forms —
   the S4a clock closed. The artifacts: the 42 examples of §5.4, each (`tests/std/tests/uri.lyr`,
   5 tests; `encoding.lyr` +1). Spec 12 §URIs rules 1–4, §Encodings rule 2; three cases.
+- **S6** `std.regex` (P5; 10 S8, B1): RE2's syntax in linear time — a parser (literals, `.`,
+  classes with ranges, `\d\w\s`, POSIX names and `\p{..}` over `char.category()`, groups
+  capturing, `(?:)`, `(?P<n>)`/`(?<n>)`, alternation, `* + ? {n,m}` greedy and lazy with a
+  count at most 1000, `^ $ \A \z \b \B`, the flags `i m s` inline and scoped) into a tree,
+  Thompson's construction into `Inst`s, a Pike VM with the captures carried per thread
+  (leftmost-first, an explicit stack for the closure, assertions from the characters around the
+  position, UTF-8 decoded on the fly); `Regex.new` with `RegexError { offset, detail }`,
+  `isMatch`, `find`/`findFrom` with `Match { start, end, value, group, span, named }`,
+  `findAll` (Go's rule for empty matches), `replace`/`replaceAll` with `$1 ${name} $0 $$`,
+  `split` (Go's), `pattern`, `groupCount`, `groupNames`. The artifacts: the log filter
+  (`tests/Lyric5.Tests/programs/logfilter.lyr`, through `ExampleTests`), `(a*)*b` over 10⁵ `a`
+  in one pass (`tests/std/tests/regex.lyr`, 6 tests). Spec 12 §Regular expressions rules 1–4;
+  three cases. The lazy DFA stays a door for Messpunkt 4 (S13).
 
 ## Design decisions
 

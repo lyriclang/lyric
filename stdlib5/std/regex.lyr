@@ -1,0 +1,1410 @@
+/// `std.regex` (design 10 S8, B1; 13 M10 S6): regular expressions in RE2's syntax, matched in
+/// linear time. A pattern is parsed into a tree, compiled into Thompson's NFA, and run by a Pike
+/// VM that carries the captures with each thread: every character of the text is looked at once
+/// per instruction at most, so `(a*)*b` over a hundred thousand `a` ends in milliseconds where a
+/// backtracker would not end. What RE2 leaves out is left out here: no backreferences, no
+/// lookaround — they are what makes the time exponential. Literals, `.`, classes (`[a-z]`,
+/// `[^…]`, `\d \w \s` and their capitals, `[:alpha:]` and the other POSIX names, `\pL` and
+/// `\p{Lu}` over the Unicode categories), groups (capturing, `(?:…)`, `(?P<name>…)` and
+/// `(?<name>…)`), alternation, the repetitions `* + ? {n} {n,} {n,m}` each greedy or lazy with a
+/// `?`, the anchors `^ $ \A \z`, `\b` and `\B`, and the flags `i m s` inline (`(?i)`, `(?i:…)`,
+/// `(?-i)`). Positions are byte offsets into the text, as a string's indices are.
+import std.collections { List, Map };
+import std.core { StringBuilder, viewBytes, UnicodeCategory };
+
+/// What `Regex.new` throws: `offset` is where in the pattern, `detail` what is wrong there.
+pub struct RegexError :: [Error] {
+    pub offset: int,
+    pub detail: string,
+
+    pub fn message(): string {
+        return f"{this.detail} at offset {this.offset}";
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The tree of a pattern.
+// ---------------------------------------------------------------------------------------------
+
+/// A node of the pattern's tree; children are indices into the parser's arena.
+enum Node {
+    Empty,
+    /// A character, matched case-insensitively where the flag says so.
+    Lit(char, bool),
+    /// `.`: any character — a newline too where `s` is set.
+    Any(bool),
+    /// A class, by its index.
+    Class(int),
+    /// `^`: the start of a line where `m` is set, of the text else.
+    Start(bool),
+    /// `$`: the end of a line where `m` is set, of the text else.
+    End(bool),
+    TextStart,
+    TextEnd,
+    WordBoundary,
+    NotWordBoundary,
+    /// A group: its capture index (`null` for `(?:…)`) and its child.
+    Group(?int, int),
+    Concat(List<int>),
+    Alternate(List<int>),
+    /// A repetition: the child, the minimum, the maximum (`-1` for none), greedy.
+    Repeat(int, int, int, bool),
+}
+
+/// A predicate of a class item beyond a range.
+enum Predicate {
+    /// `\d`, `[:digit:]`: `0-9`.
+    Digit,
+    /// `\w`, `[:word:]`: `0-9A-Za-z_`.
+    Word,
+    /// `\s`: `\t \n \v \f \r` and the space.
+    Space,
+    /// `[:alpha:]`.
+    AsciiAlpha,
+    /// `[:alnum:]`.
+    AsciiAlnum,
+    /// `[:upper:]`.
+    AsciiUpper,
+    /// `[:lower:]`.
+    AsciiLower,
+    /// `[:punct:]`.
+    AsciiPunct,
+    /// `[:xdigit:]`.
+    AsciiXDigit,
+    /// `[:cntrl:]`.
+    AsciiCntrl,
+    /// `[:print:]`.
+    AsciiPrint,
+    /// `[:graph:]`.
+    AsciiGraph,
+    /// `[:blank:]`: the space and the tab.
+    AsciiBlank,
+    /// `\pL`, `\p{Lu}`: a Unicode category by its one- or two-letter name.
+    Category(string),
+}
+
+/// A class: ranges and predicates, each predicate with its negation, the whole negated or not,
+/// folded for case where `i` is set.
+class CharClass {
+    var ranges: List<(char, char)>,
+    var predicates: List<(Predicate, bool)>,
+    var negated: bool,
+    var fold: bool,
+
+    static fn new(negated: bool, fold: bool): CharClass {
+        return CharClass { ranges = List.new(), predicates = List.new(), negated = negated, fold = fold };
+    }
+
+    fn matches(c: char): bool {
+        var hit = this.holds(c);
+        if (!hit && this.fold) {
+            hit = this.holds(c.toLower()) || this.holds(c.toUpper());
+        }
+        return hit != this.negated;
+    }
+
+    fn holds(c: char): bool {
+        for ((lo, hi) in this.ranges) {
+            if (c >= lo && c <= hi) {
+                return true;
+            }
+        }
+        for ((p, negated) in this.predicates) {
+            if (predicateHolds(p, c) != negated) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+fn isWordChar(c: char): bool {
+    return c.isAsciiAlpha() || c.isAsciiDigit() || c == '_';
+}
+
+fn predicateHolds(p: Predicate, c: char): bool {
+    let code = c as uint32;
+    return match (p) {
+        .Digit => c.isAsciiDigit(),
+        .Word => isWordChar(c),
+        .Space => c == ' ' || c == '\t' || c == '\n' || code == 11u32 || code == 12u32 || c == '\r',
+        .AsciiAlpha => c.isAsciiAlpha(),
+        .AsciiAlnum => c.isAsciiAlpha() || c.isAsciiDigit(),
+        .AsciiUpper => c >= 'A' && c <= 'Z',
+        .AsciiLower => c >= 'a' && c <= 'z',
+        .AsciiPunct => (code >= 33u32 && code <= 47u32) || (code >= 58u32 && code <= 64u32)
+            || (code >= 91u32 && code <= 96u32) || (code >= 123u32 && code <= 126u32),
+        .AsciiXDigit => c.isAsciiHexDigit(),
+        .AsciiCntrl => code < 32u32 || code == 127u32,
+        .AsciiPrint => code >= 32u32 && code <= 126u32,
+        .AsciiGraph => code >= 33u32 && code <= 126u32,
+        .AsciiBlank => c == ' ' || c == '\t',
+        .Category(name) => categoryNamed(c.category(), name),
+    };
+}
+
+/// The two letters of a category.
+fn categoryLetters(cat: UnicodeCategory): string {
+    return match (cat) {
+        .UppercaseLetter => "Lu",
+        .LowercaseLetter => "Ll",
+        .TitlecaseLetter => "Lt",
+        .ModifierLetter => "Lm",
+        .OtherLetter => "Lo",
+        .NonspacingMark => "Mn",
+        .SpacingMark => "Mc",
+        .EnclosingMark => "Me",
+        .DecimalNumber => "Nd",
+        .LetterNumber => "Nl",
+        .OtherNumber => "No",
+        .ConnectorPunctuation => "Pc",
+        .DashPunctuation => "Pd",
+        .OpenPunctuation => "Ps",
+        .ClosePunctuation => "Pe",
+        .InitialPunctuation => "Pi",
+        .FinalPunctuation => "Pf",
+        .OtherPunctuation => "Po",
+        .MathSymbol => "Sm",
+        .CurrencySymbol => "Sc",
+        .ModifierSymbol => "Sk",
+        .OtherSymbol => "So",
+        .SpaceSeparator => "Zs",
+        .LineSeparator => "Zl",
+        .ParagraphSeparator => "Zp",
+        .Control => "Cc",
+        .Format => "Cf",
+        .Surrogate => "Cs",
+        .PrivateUse => "Co",
+        .Unassigned => "Cn",
+    };
+}
+
+/// Whether the category is the one named — `L` for every letter, `Lu` for the capitals.
+fn categoryNamed(cat: UnicodeCategory, name: string): bool {
+    let letters = categoryLetters(cat);
+    if (name.length() == 1) {
+        return letters.startsWith(name);
+    }
+    return letters == name;
+}
+
+fn isCategoryName(name: string): bool {
+    return match (name) {
+        "L" | "Lu" | "Ll" | "Lt" | "Lm" | "Lo" | "M" | "Mn" | "Mc" | "Me" | "N" | "Nd" | "Nl" | "No"
+            | "P" | "Pc" | "Pd" | "Ps" | "Pe" | "Pi" | "Pf" | "Po" | "S" | "Sm" | "Sc" | "Sk" | "So"
+            | "Z" | "Zs" | "Zl" | "Zp" | "C" | "Cc" | "Cf" | "Cs" | "Co" | "Cn" => true,
+        _ => false,
+    };
+}
+
+// ---------------------------------------------------------------------------------------------
+// The parser: RE2's syntax, recursive descent over the pattern's characters.
+// ---------------------------------------------------------------------------------------------
+
+/// The flags in force: `i` case-insensitive, `m` multi-line anchors, `s` dot matches newline.
+struct Flags {
+    var i: bool = false,
+    var m: bool = false,
+    var s: bool = false,
+}
+
+/// The most a counted repetition may say (RE2's limit).
+let repeatLimit = 1000;
+
+class Parser {
+    var chars: List<char>,
+    var at: int,
+    var nodes: List<Node>,
+    var classes: List<CharClass>,
+    var groups: int,
+    var names: Map<string, int>,
+
+    static fn new(pattern: string): Parser {
+        let cs: List<char> = List.new();
+        for (c in pattern.chars()) {
+            cs.push(c);
+        }
+        return Parser { chars = cs, at = 0, nodes = List.new(), classes = List.new(), groups = 1, names = Map<string, int>.new() };
+    }
+
+    fn fail(detail: string): RegexError {
+        return RegexError { offset = this.offsetAt(this.at), detail = detail };
+    }
+
+    /// The byte offset of the character index, for an error.
+    fn offsetAt(index: int): int {
+        var bytes = 0;
+        var i = 0;
+        while (i < index && i < this.chars.length()) {
+            bytes = bytes + utf8Width(this.chars[i]);
+            i = i + 1;
+        }
+        return bytes;
+    }
+
+    fn more(): bool {
+        return this.at < this.chars.length();
+    }
+
+    fn peek(): char {
+        return this.chars[this.at];
+    }
+
+    fn peekIs(c: char): bool {
+        return this.at < this.chars.length() && this.chars[this.at] == c;
+    }
+
+    mut fn take(): char {
+        let c = this.chars[this.at];
+        this.at = this.at + 1;
+        return c;
+    }
+
+    mut fn add(n: Node): int {
+        this.nodes.push(n);
+        return this.nodes.length() - 1;
+    }
+
+    /// The whole pattern: an alternation up to the end.
+    mut fn parseAll(): int throws RegexError {
+        var flags = Flags {};
+        let root = try this.parseAlternation(&flags);
+        if (this.more()) {
+            throw this.fail("unmatched ')'");
+        }
+        return root;
+    }
+
+    mut fn parseAlternation(&flags: Flags): int throws RegexError {
+        let branches: List<int> = List.new();
+        branches.push(try this.parseConcat(&flags));
+        while (this.peekIs('|')) {
+            let _ = this.take();
+            branches.push(try this.parseConcat(&flags));
+        }
+        if (branches.length() == 1) {
+            return branches[0];
+        }
+        return this.add(Node.Alternate(branches));
+    }
+
+    mut fn parseConcat(&flags: Flags): int throws RegexError {
+        let items: List<int> = List.new();
+        while (this.more() && !this.peekIs('|') && !this.peekIs(')')) {
+            if (let item = try this.parseRepeat(&flags)) {
+                items.push(item);
+            }
+        }
+        if (items.length() == 0) {
+            return this.add(Node.Empty);
+        }
+        if (items.length() == 1) {
+            return items[0];
+        }
+        return this.add(Node.Concat(items));
+    }
+
+    /// An atom with its repetition; `null` for a flag group `(?i)`, which leaves nothing behind.
+    mut fn parseRepeat(&flags: Flags): ?int throws RegexError {
+        let atomStart = this.at;
+        let atom = try this.parseAtom(&flags);
+        if (atom == null) {
+            return null;
+        }
+        var node = atom;
+        var repeated = false;
+        while (this.more()) {
+            let c = this.peek();
+            var min = 0;
+            var max = -1;
+            if (c == '*') {
+                let _ = this.take();
+            } else if (c == '+') {
+                let _ = this.take();
+                min = 1;
+            } else if (c == '?') {
+                let _ = this.take();
+                max = 1;
+            } else if (c == '{') {
+                if (let (lo, hi) = try this.counted()) {
+                    min = lo;
+                    max = hi;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+            if (repeated) {
+                this.at = atomStart;
+                throw this.fail("a repetition of a repetition: group it");
+            }
+            var greedy = true;
+            if (this.peekIs('?')) {
+                let _ = this.take();
+                greedy = false;
+            }
+            if (min > repeatLimit || max > repeatLimit) {
+                throw this.fail(f"a repetition beyond {repeatLimit}");
+            }
+            node = this.add(Node.Repeat(node, min, max, greedy));
+            repeated = true;
+        }
+        return node;
+    }
+
+    /// `{n}`, `{n,}` or `{n,m}` at the cursor, taken; `null` where the braces are not one, the
+    /// cursor left on the `{` (a literal then, as in RE2).
+    mut fn counted(): ?(int, int) throws RegexError {
+        let start = this.at;
+        let _ = this.take();
+        let lo = this.number();
+        if (lo == null) {
+            this.at = start;
+            return null;
+        }
+        var hi = lo;
+        if (this.peekIs(',')) {
+            let _ = this.take();
+            if (this.peekIs('}')) {
+                hi = -1;
+            } else {
+                let h = this.number();
+                if (h == null) {
+                    this.at = start;
+                    return null;
+                }
+                hi = h;
+            }
+        }
+        if (!this.peekIs('}')) {
+            this.at = start;
+            return null;
+        }
+        let _ = this.take();
+        if (hi >= 0 && hi < lo) {
+            this.at = start;
+            throw this.fail("the repetition's maximum is below its minimum");
+        }
+        return (lo, hi);
+    }
+
+    mut fn number(): ?int {
+        var v = 0;
+        var any = false;
+        while (this.more() && this.peek().isAsciiDigit()) {
+            v = v * 10 + (this.take() as uint32 - 48u32) as int;
+            if (v > 100000) {
+                v = 100000;
+            }
+            any = true;
+        }
+        return if (any) v else null;
+    }
+
+    mut fn parseAtom(&flags: Flags): ?int throws RegexError {
+        let c = this.take();
+        if (c == '(') {
+            return try this.parseGroup(&flags);
+        }
+        if (c == '[') {
+            return this.add(Node.Class(try this.parseClass(flags.i)));
+        }
+        if (c == '.') {
+            return this.add(Node.Any(flags.s));
+        }
+        if (c == '^') {
+            return this.add(Node.Start(flags.m));
+        }
+        if (c == '$') {
+            return this.add(Node.End(flags.m));
+        }
+        if (c == '\\') {
+            return try this.parseEscape(flags);
+        }
+        if (c == '*' || c == '+' || c == '?') {
+            this.at = this.at - 1;
+            throw this.fail("a repetition with nothing before it");
+        }
+        return this.add(Node.Lit(c, flags.i));
+    }
+
+    /// After the `(`: a flag group, a non-capturing group, a named group or a capturing one.
+    mut fn parseGroup(&flags: Flags): ?int throws RegexError {
+        let open = this.at - 1;
+        if (this.peekIs('?')) {
+            let _ = this.take();
+            if (!this.more()) {
+                throw this.fail("the group is not closed");
+            }
+            let k = this.take();
+            if (k == 'P' || k == '<') {
+                if (k == 'P') {
+                    if (!this.peekIs('<')) {
+                        throw this.fail("'(?P' takes '<name>'");
+                    }
+                    let _ = this.take();
+                }
+                let name = StringBuilder.new();
+                while (this.more() && !this.peekIs('>')) {
+                    let nc = this.take();
+                    if (!(nc.isAsciiAlpha() || nc.isAsciiDigit() || nc == '_')) {
+                        this.at = this.at - 1;
+                        throw this.fail("a group's name is letters, digits and '_'");
+                    }
+                    name.appendChar(nc);
+                }
+                if (!this.more() || name.length() == 0) {
+                    throw this.fail("the group's name is not closed by '>'");
+                }
+                let _ = this.take();
+                let text = name.toString();
+                if (this.names.get(text) != null) {
+                    throw this.fail(f"the group name '{text}' is used twice");
+                }
+                let index = this.groups;
+                this.groups = this.groups + 1;
+                this.names[text] = index;
+                var inner = flags;
+                let child = try this.parseAlternation(&inner);
+                try this.closeGroup(open);
+                return this.add(Node.Group(index, child));
+            }
+            // flags: (?i), (?-i), (?i:…), (?:…)
+            this.at = this.at - 1;
+            var inner = flags;
+            var negate = false;
+            var sawFlag = false;
+            while (this.more()) {
+                let f = this.take();
+                if (f == ':') {
+                    let child = try this.parseAlternation(&inner);
+                    try this.closeGroup(open);
+                    return this.add(Node.Group(null, child));
+                }
+                if (f == ')') {
+                    if (!sawFlag) {
+                        this.at = this.at - 1;
+                        throw this.fail("'(?)' says nothing");
+                    }
+                    flags = inner;
+                    return null;
+                }
+                if (f == '-') {
+                    if (negate) {
+                        this.at = this.at - 1;
+                        throw this.fail("'-' twice in the flags");
+                    }
+                    negate = true;
+                } else if (f == 'i') {
+                    inner.i = !negate;
+                    sawFlag = true;
+                } else if (f == 'm') {
+                    inner.m = !negate;
+                    sawFlag = true;
+                } else if (f == 's') {
+                    inner.s = !negate;
+                    sawFlag = true;
+                } else {
+                    this.at = this.at - 1;
+                    throw this.fail(f"'{f}' is no flag: 'i', 'm' and 's' are");
+                }
+            }
+            throw this.fail("the group is not closed");
+        }
+        let index = this.groups;
+        this.groups = this.groups + 1;
+        var inner = flags;
+        let child = try this.parseAlternation(&inner);
+        try this.closeGroup(open);
+        return this.add(Node.Group(index, child));
+    }
+
+    mut fn closeGroup(open: int): void throws RegexError {
+        if (!this.peekIs(')')) {
+            this.at = open;
+            throw this.fail("the group is not closed");
+        }
+        let _ = this.take();
+    }
+
+    /// After the `\`: a class, an anchor, a control character, a hex escape, a Unicode
+    /// category, or the character itself where it is no letter or digit.
+    mut fn parseEscape(flags: Flags): int throws RegexError {
+        if (!this.more()) {
+            throw this.fail("the pattern ends in '\\'");
+        }
+        let c = this.take();
+        if (c == 'd' || c == 'w' || c == 's' || c == 'D' || c == 'W' || c == 'S' || c == 'p' || c == 'P') {
+            this.at = this.at - 1;
+            let cls = CharClass.new(false, flags.i);
+            try this.classEscape(cls);
+            this.classes.push(cls);
+            return this.add(Node.Class(this.classes.length() - 1));
+        }
+        if (c == 'b') {
+            return this.add(Node.WordBoundary);
+        }
+        if (c == 'B') {
+            return this.add(Node.NotWordBoundary);
+        }
+        if (c == 'A') {
+            return this.add(Node.TextStart);
+        }
+        if (c == 'z') {
+            return this.add(Node.TextEnd);
+        }
+        this.at = this.at - 1;
+        return this.add(Node.Lit(try this.charEscape(), flags.i));
+    }
+
+    /// After the `\`, one character: `n t r f v a 0`, `xHH`, `x{H…}`, or a punctuation mark.
+    mut fn charEscape(): char throws RegexError {
+        let c = this.take();
+        if (c == 'n') { return '\n'; }
+        if (c == 't') { return '\t'; }
+        if (c == 'r') { return '\r'; }
+        if (c == 'f') { return 12u32 as char; }
+        if (c == 'v') { return 11u32 as char; }
+        if (c == 'a') { return 7u32 as char; }
+        if (c == '0') { return 0u32 as char; }
+        if (c == 'x') {
+            var code = 0u32;
+            if (this.peekIs('{')) {
+                let _ = this.take();
+                var digits = 0;
+                while (this.more() && !this.peekIs('}')) {
+                    let h = this.take();
+                    if (!h.isAsciiHexDigit()) {
+                        this.at = this.at - 1;
+                        throw this.fail("a hex digit was expected");
+                    }
+                    code = code * 16u32 + hexOf(h);
+                    digits = digits + 1;
+                    if (code > 0x10FFFFu32) {
+                        throw this.fail("the code point is beyond U+10FFFF");
+                    }
+                }
+                if (!this.more() || digits == 0) {
+                    throw this.fail("'\\x{' takes hex digits and '}'");
+                }
+                let _ = this.take();
+            } else {
+                var k = 0;
+                while (k < 2) {
+                    if (!this.more() || !this.peek().isAsciiHexDigit()) {
+                        throw this.fail("'\\x' takes two hex digits");
+                    }
+                    code = code * 16u32 + hexOf(this.take());
+                    k = k + 1;
+                }
+            }
+            if (code >= 0xD800u32 && code <= 0xDFFFu32) {
+                throw this.fail("a surrogate is no character");
+            }
+            return code as char;
+        }
+        if (c.isAsciiAlpha() || c.isAsciiDigit()) {
+            this.at = this.at - 1;
+            throw this.fail(f"'\\{c}' is no escape");
+        }
+        return c;
+    }
+
+    /// After the `[`: the items up to the `]`.
+    mut fn parseClass(fold: bool): int throws RegexError {
+        let open = this.at - 1;
+        var negated = false;
+        if (this.peekIs('^')) {
+            let _ = this.take();
+            negated = true;
+        }
+        let cls = CharClass.new(negated, fold);
+        var first = true;
+        while (true) {
+            if (!this.more()) {
+                this.at = open;
+                throw this.fail("the class is not closed");
+            }
+            let c = this.peek();
+            if (c == ']' && !first) {
+                let _ = this.take();
+                break;
+            }
+            first = false;
+            if (c == '[' && this.at + 1 < this.chars.length() && this.chars[this.at + 1] == ':') {
+                try this.posixClass(cls);
+                continue;
+            }
+            if (c == '\\') {
+                let _ = this.take();
+                if (!this.more()) {
+                    throw this.fail("the pattern ends in '\\'");
+                }
+                let e = this.peek();
+                if (e == 'd' || e == 'w' || e == 's' || e == 'D' || e == 'W' || e == 'S' || e == 'p' || e == 'P') {
+                    try this.classEscape(cls);
+                    continue;
+                }
+                let lo = try this.charEscape();
+                try this.rangeFrom(cls, lo);
+                continue;
+            }
+            let lo = this.take();
+            try this.rangeFrom(cls, lo);
+        }
+        this.classes.push(cls);
+        return this.classes.length() - 1;
+    }
+
+    /// `lo` alone, or `lo-hi` where a `-` and a character follow (a `-` before `]` is itself).
+    mut fn rangeFrom(cls: CharClass, lo: char): void throws RegexError {
+        if (this.peekIs('-') && this.at + 1 < this.chars.length() && this.chars[this.at + 1] != ']') {
+            let _ = this.take();
+            var hi = this.take();
+            if (hi == '\\') {
+                hi = try this.charEscape();
+            } else if (hi == '[' && this.peekIs(':')) {
+                this.at = this.at - 1;
+                throw this.fail("a range ends in a character, not a class");
+            }
+            if (hi < lo) {
+                this.at = this.at - 1;
+                throw this.fail("the range's end is below its start");
+            }
+            cls.ranges.push((lo, hi));
+        } else {
+            cls.ranges.push((lo, lo));
+        }
+    }
+
+    /// `[:name:]` inside a class.
+    mut fn posixClass(cls: CharClass): void throws RegexError {
+        let start = this.at;
+        this.at = this.at + 2;
+        var negated = false;
+        if (this.peekIs('^')) {
+            let _ = this.take();
+            negated = true;
+        }
+        let name = StringBuilder.new();
+        while (this.more() && this.peek().isAsciiAlpha()) {
+            name.appendChar(this.take());
+        }
+        if (!(this.peekIs(':') && this.at + 1 < this.chars.length() && this.chars[this.at + 1] == ']')) {
+            this.at = start;
+            throw this.fail("'[:' takes a name and ':]'");
+        }
+        this.at = this.at + 2;
+        let p = match (name.toString()) {
+            "alpha" => Predicate.AsciiAlpha,
+            "digit" => Predicate.Digit,
+            "alnum" => Predicate.AsciiAlnum,
+            "space" => Predicate.Space,
+            "upper" => Predicate.AsciiUpper,
+            "lower" => Predicate.AsciiLower,
+            "punct" => Predicate.AsciiPunct,
+            "xdigit" => Predicate.AsciiXDigit,
+            "word" => Predicate.Word,
+            "cntrl" => Predicate.AsciiCntrl,
+            "print" => Predicate.AsciiPrint,
+            "graph" => Predicate.AsciiGraph,
+            "blank" => Predicate.AsciiBlank,
+            _ => {
+                this.at = start;
+                throw this.fail(f"'[:{name.toString()}:]' is no class");
+            },
+        };
+        cls.predicates.push((p, negated));
+    }
+
+    /// At `d w s D W S p P` after a `\`: the predicate into the class.
+    mut fn classEscape(cls: CharClass): void throws RegexError {
+        let e = this.take();
+        if (e == 'd') { cls.predicates.push((Predicate.Digit, false)); return; }
+        if (e == 'D') { cls.predicates.push((Predicate.Digit, true)); return; }
+        if (e == 'w') { cls.predicates.push((Predicate.Word, false)); return; }
+        if (e == 'W') { cls.predicates.push((Predicate.Word, true)); return; }
+        if (e == 's') { cls.predicates.push((Predicate.Space, false)); return; }
+        if (e == 'S') { cls.predicates.push((Predicate.Space, true)); return; }
+        // \pL, \p{Lu}, \PL, \P{Lu}
+        let negated = e == 'P';
+        let start = this.at - 2;
+        let name = StringBuilder.new();
+        if (this.peekIs('{')) {
+            let _ = this.take();
+            while (this.more() && !this.peekIs('}')) {
+                name.appendChar(this.take());
+            }
+            if (!this.more()) {
+                this.at = start;
+                throw this.fail("'\\p{' takes a name and '}'");
+            }
+            let _ = this.take();
+        } else if (this.more()) {
+            name.appendChar(this.take());
+        }
+        let text = name.toString();
+        if (!isCategoryName(text)) {
+            this.at = start;
+            throw this.fail(f"'{text}' is no Unicode category: L, Lu, N, Nd, P, S, Z, M, C and their kinds are");
+        }
+        cls.predicates.push((Predicate.Category(text), negated));
+    }
+}
+
+fn hexOf(c: char): uint32 {
+    let code = c as uint32;
+    if (code >= 97u32) {
+        return code - 87u32;
+    }
+    if (code >= 65u32) {
+        return code - 55u32;
+    }
+    return code - 48u32;
+}
+
+fn utf8Width(c: char): int {
+    let code = c as uint32;
+    if (code < 0x80u32) { return 1; }
+    if (code < 0x800u32) { return 2; }
+    if (code < 0x10000u32) { return 3; }
+    return 4;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The program: Thompson's construction.
+// ---------------------------------------------------------------------------------------------
+
+enum Assertion {
+    TextStart,
+    TextEnd,
+    LineStart,
+    LineEnd,
+    WordBoundary,
+    NotWordBoundary,
+}
+
+enum Inst {
+    Char(char),
+    CharFold(char),
+    /// Any character but a newline.
+    AnyNoNewline,
+    Any,
+    Class(int),
+    /// Two ways on, the first preferred.
+    Split(int, int),
+    Jump(int),
+    /// The position into the slot.
+    Save(int),
+    Assert(Assertion),
+    Match,
+}
+
+class Compiler {
+    var insts: List<Inst>,
+    var nodes: List<Node>,
+
+    fn emit(i: Inst): int {
+        this.insts.push(i);
+        return this.insts.length() - 1;
+    }
+
+    fn patch(at: int, i: Inst): void {
+        this.insts[at] = i;
+    }
+
+    fn here(): int {
+        return this.insts.length();
+    }
+
+    fn compile(n: int): void {
+        match (this.nodes[n]) {
+            .Empty => { },
+            .Lit(c, fold) => {
+                if (fold && c.toLower() != c.toUpper()) {
+                    let _ = this.emit(Inst.CharFold(c.toLower()));
+                } else {
+                    let _ = this.emit(Inst.Char(c));
+                }
+            },
+            .Any(newline) => { let _ = this.emit(if (newline) Inst.Any else Inst.AnyNoNewline); },
+            .Class(i) => { let _ = this.emit(Inst.Class(i)); },
+            .Start(multi) => { let _ = this.emit(Inst.Assert(if (multi) Assertion.LineStart else Assertion.TextStart)); },
+            .End(multi) => { let _ = this.emit(Inst.Assert(if (multi) Assertion.LineEnd else Assertion.TextEnd)); },
+            .TextStart => { let _ = this.emit(Inst.Assert(Assertion.TextStart)); },
+            .TextEnd => { let _ = this.emit(Inst.Assert(Assertion.TextEnd)); },
+            .WordBoundary => { let _ = this.emit(Inst.Assert(Assertion.WordBoundary)); },
+            .NotWordBoundary => { let _ = this.emit(Inst.Assert(Assertion.NotWordBoundary)); },
+            .Group(index, child) => {
+                if (let k = index) {
+                    let _ = this.emit(Inst.Save(2 * k));
+                    this.compile(child);
+                    let _ = this.emit(Inst.Save(2 * k + 1));
+                } else {
+                    this.compile(child);
+                }
+            },
+            .Concat(items) => {
+                for (item in items) {
+                    this.compile(item);
+                }
+            },
+            .Alternate(branches) => {
+                // split L1, L2; L1: a; jmp end; L2: split …
+                let jumps: List<int> = List.new();
+                var i = 0;
+                while (i < branches.length()) {
+                    if (i + 1 < branches.length()) {
+                        let split = this.emit(Inst.Split(0, 0));
+                        this.compile(branches[i]);
+                        jumps.push(this.emit(Inst.Jump(0)));
+                        this.patch(split, Inst.Split(split + 1, this.here()));
+                    } else {
+                        this.compile(branches[i]);
+                    }
+                    i = i + 1;
+                }
+                for (j in jumps) {
+                    this.patch(j, Inst.Jump(this.here()));
+                }
+            },
+            .Repeat(child, min, max, greedy) => {
+                var k = 0;
+                while (k < min) {
+                    this.compile(child);
+                    k = k + 1;
+                }
+                if (max < 0) {
+                    // star: L1: split L2, L3; L2: x; jmp L1; L3:
+                    let split = this.emit(Inst.Split(0, 0));
+                    this.compile(child);
+                    let _ = this.emit(Inst.Jump(split));
+                    this.patch(split, if (greedy) Inst.Split(split + 1, this.here()) else Inst.Split(this.here(), split + 1));
+                } else {
+                    // (x(x(x)?)?)? for the optional ones
+                    let splits: List<int> = List.new();
+                    var o = min;
+                    while (o < max) {
+                        splits.push(this.emit(Inst.Split(0, 0)));
+                        this.compile(child);
+                        o = o + 1;
+                    }
+                    for (s in splits) {
+                        this.patch(s, if (greedy) Inst.Split(s + 1, this.here()) else Inst.Split(this.here(), s + 1));
+                    }
+                }
+            },
+        }
+    }
+}
+
+/// A compiled pattern: the instructions, the classes, the number of capture slots, the names.
+class Program {
+    var insts: List<Inst>,
+    var classes: List<CharClass>,
+    var groups: int,
+    var names: Map<string, int>,
+}
+
+// ---------------------------------------------------------------------------------------------
+// The Pike VM.
+// ---------------------------------------------------------------------------------------------
+
+/// The character at the byte offset and its width in bytes; the text is UTF-8.
+fn decodeAt(text: Slice<uint8>, at: int): (char, int) {
+    let b0 = text[at] as uint32;
+    if (b0 < 0x80u32) {
+        return (b0 as char, 1);
+    }
+    if (b0 >= 0xF0u32) {
+        let code = ((b0 & 0x07u32) << 18) | (((text[at + 1] as uint32) & 0x3Fu32) << 12)
+            | (((text[at + 2] as uint32) & 0x3Fu32) << 6) | ((text[at + 3] as uint32) & 0x3Fu32);
+        return (code as char, 4);
+    }
+    if (b0 >= 0xE0u32) {
+        let code = ((b0 & 0x0Fu32) << 12) | (((text[at + 1] as uint32) & 0x3Fu32) << 6) | ((text[at + 2] as uint32) & 0x3Fu32);
+        return (code as char, 3);
+    }
+    let code = ((b0 & 0x1Fu32) << 6) | ((text[at + 1] as uint32) & 0x3Fu32);
+    return (code as char, 2);
+}
+
+/// The byte offset of the character before `at`, where a character's first byte is not `10xxxxxx`.
+fn previousStart(text: Slice<uint8>, at: int): int {
+    var i = at - 1;
+    while (i > 0 && (text[i] & 0xC0u8) == 0x80u8) {
+        i = i - 1;
+    }
+    return i;
+}
+
+fn copySlots(slots: int[]): int[] {
+    var out = [0] * slots.length();
+    var i = 0;
+    while (i < slots.length()) {
+        out[i] = slots[i];
+        i = i + 1;
+    }
+    return out;
+}
+
+/// A thread: where in the program, with what captured so far.
+struct Thread {
+    pc: int,
+    slots: int[],
+}
+
+/// The threads alive at one position, in priority order, each program counter at most once.
+class ThreadList {
+    var threads: List<Thread>,
+    var seen: int[],
+    var generation: int,
+
+    static fn new(size: int): ThreadList {
+        return ThreadList { threads = List.new(), seen = [0] * size, generation = 1 };
+    }
+
+    mut fn clear(): void {
+        this.threads = List.new();
+        this.generation = this.generation + 1;
+    }
+}
+
+class Vm {
+    var prog: Program,
+    var text: Slice<uint8>,
+    var stack: List<Thread>,
+
+    /// Whether the assertion holds between the character before `at` and the one at it.
+    fn assertionHolds(a: Assertion, at: int): bool {
+        let n = this.text.length();
+        let before: ?char = if (at > 0) decodeAt(this.text, previousStart(this.text, at)).0 else null;
+        let here: ?char = if (at < n) decodeAt(this.text, at).0 else null;
+        return match (a) {
+            .TextStart => at == 0,
+            .TextEnd => at == n,
+            .LineStart => at == 0 || before == '\n',
+            .LineEnd => at == n || here == '\n',
+            .WordBoundary => wordBefore(before) != wordHere(here),
+            .NotWordBoundary => wordBefore(before) == wordHere(here),
+        };
+    }
+
+    /// The thread and every thread it reaches without a character into `list`, in priority
+    /// order; a program counter already in the list is not added again.
+    fn addThread(list: ThreadList, pc: int, slots: int[], at: int): void {
+        this.stack.push(Thread { pc = pc, slots = slots });
+        while (let t = this.stack.pop()) {
+            if (list.seen[t.pc] == list.generation) {
+                continue;
+            }
+            list.seen[t.pc] = list.generation;
+            match (this.prog.insts[t.pc]) {
+                .Jump(x) => { this.stack.push(Thread { pc = x, slots = t.slots }); },
+                .Split(x, y) => {
+                    // y below x on the stack: x is explored first
+                    this.stack.push(Thread { pc = y, slots = t.slots });
+                    this.stack.push(Thread { pc = x, slots = t.slots });
+                },
+                .Save(k) => {
+                    if (k < t.slots.length()) {
+                        var copy = copySlots(t.slots);
+                        copy[k] = at;
+                        this.stack.push(Thread { pc = t.pc + 1, slots = copy });
+                    } else {
+                        this.stack.push(Thread { pc = t.pc + 1, slots = t.slots });
+                    }
+                },
+                .Assert(a) => {
+                    if (this.assertionHolds(a, at)) {
+                        this.stack.push(Thread { pc = t.pc + 1, slots = t.slots });
+                    }
+                },
+                _ => { list.threads.push(t); },
+            }
+        }
+    }
+
+    /// The leftmost match starting at or after `from`, its slots; `anchored` takes only one
+    /// starting at `from`. With `slotCount` 2 only the whole match is recorded.
+    fn run(from: int, anchored: bool, slotCount: int): ?int[] {
+        let n = this.text.length();
+        let size = this.prog.insts.length();
+        var clist = ThreadList.new(size);
+        var nlist = ThreadList.new(size);
+        var matched: ?int[] = null;
+        var at = from;
+        while (true) {
+            if (matched == null && (!anchored || at == from)) {
+                var fresh = [-1] * slotCount;
+                fresh[0] = at;
+                this.addThread(clist, 0, fresh, at);
+            }
+            if (clist.threads.isEmpty() && (matched != null || anchored)) {
+                break;
+            }
+            var c: ?char = null;
+            var width = 0;
+            if (at < n) {
+                let (ch, w) = decodeAt(this.text, at);
+                c = ch;
+                width = w;
+            }
+            let next = at + width;
+            for (t in clist.threads) {
+                let inst = this.prog.insts[t.pc];
+                var goes = false;
+                match (inst) {
+                    .Match => {
+                        var slots = copySlots(t.slots);
+                        slots[1] = at;
+                        matched = slots;
+                        // the threads after this one have a lower priority
+                        break;
+                    },
+                    .Char(x) => { goes = c == x; },
+                    .CharFold(x) => {
+                        if (let ch = c) {
+                            goes = ch == x || ch.toLower() == x;
+                        }
+                    },
+                    .Any => { goes = c != null; },
+                    .AnyNoNewline => { goes = c != null && c != '\n'; },
+                    .Class(i) => {
+                        if (let ch = c) {
+                            goes = this.prog.classes[i].matches(ch);
+                        }
+                    },
+                    _ => { },
+                }
+                if (goes) {
+                    this.addThread(nlist, t.pc + 1, t.slots, next);
+                }
+            }
+            if (at >= n) {
+                break;
+            }
+            let swap = clist;
+            clist = nlist;
+            nlist = swap;
+            nlist.clear();
+            at = next;
+        }
+        return matched;
+    }
+}
+
+fn wordBefore(c: ?char): bool {
+    if (let ch = c) {
+        return isWordChar(ch);
+    }
+    return false;
+}
+
+fn wordHere(c: ?char): bool {
+    if (let ch = c) {
+        return isWordChar(ch);
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The API.
+// ---------------------------------------------------------------------------------------------
+
+/// A match: where it is in the text (byte offsets), its text, and its groups — group 0 the whole,
+/// a group that took no part `null`.
+pub struct Match :: [Equatable, Debug] {
+    pub start: int,
+    pub end: int,
+    /// The matched text.
+    pub value: string,
+    spans: List<?(int, int)>,
+    texts: List<?string>,
+    names: Map<string, int>,
+
+    /// The text of group `i`, `null` where it took no part or there is no such group.
+    pub fn group(i: int): ?string {
+        if (i < 0 || i >= this.texts.length()) {
+            return null;
+        }
+        return this.texts[i];
+    }
+
+    /// Where group `i` is, start and end.
+    pub fn span(i: int): ?(int, int) {
+        if (i < 0 || i >= this.spans.length()) {
+            return null;
+        }
+        return this.spans[i];
+    }
+
+    /// The text of the group named `name`.
+    pub fn named(name: string): ?string {
+        if (let i = this.names.get(name)) {
+            return this.texts[i];
+        }
+        return null;
+    }
+
+    /// How many groups there are, the whole match counted.
+    pub fn groups(): int {
+        return this.texts.length();
+    }
+}
+
+extend Match :: [Display] {
+    fn show(): string {
+        return this.value;
+    }
+}
+
+/// A compiled regular expression.
+pub class Regex {
+    var prog: Program,
+    var source: string,
+
+    /// The pattern compiled; what is not RE2's syntax is `RegexError { offset, detail }`.
+    pub static fn new(pattern: string): Regex throws RegexError {
+        let parser = Parser.new(pattern);
+        let root = try parser.parseAll();
+        let compiler = Compiler { insts = List.new(), nodes = parser.nodes };
+        let _ = compiler.emit(Inst.Save(0));
+        compiler.compile(root);
+        let _ = compiler.emit(Inst.Save(1));
+        let _ = compiler.emit(Inst.Match);
+        let prog = Program { insts = compiler.insts, classes = parser.classes, groups = parser.groups, names = parser.names };
+        return Regex { prog = prog, source = pattern };
+    }
+
+    /// The pattern as given.
+    pub fn pattern(): string {
+        return this.source;
+    }
+
+    /// How many capture groups the pattern has, the whole match not counted.
+    pub fn groupCount(): int {
+        return this.prog.groups - 1;
+    }
+
+    /// The names of the named groups with their indices.
+    pub fn groupNames(): Map<string, int> {
+        return this.prog.names;
+    }
+
+    fn vm(text: Slice<uint8>): Vm {
+        return Vm { prog = this.prog, text = text, stack = List.new() };
+    }
+
+    /// Whether the text holds a match.
+    pub fn isMatch(s: StringView): bool {
+        return this.vm(viewBytes(s)).run(0, false, 2) != null;
+    }
+
+    /// The leftmost match, with its groups.
+    pub fn find(s: StringView): ?Match {
+        return this.findFrom(s, 0);
+    }
+
+    /// The leftmost match at or after the byte offset `from`.
+    pub fn findFrom(s: StringView, from: int): ?Match {
+        let text = viewBytes(s);
+        if (from > text.length()) {
+            return null;
+        }
+        if (let slots = this.vm(text).run(from, false, 2 * this.prog.groups)) {
+            return this.matchOf(text, slots);
+        }
+        return null;
+    }
+
+    fn matchOf(text: Slice<uint8>, slots: int[]): Match {
+        let spans: List<?(int, int)> = List.new();
+        let texts: List<?string> = List.new();
+        var g = 0;
+        while (g < this.prog.groups) {
+            let a = slots[2 * g];
+            let b = slots[2 * g + 1];
+            if (a >= 0 && b >= 0) {
+                spans.push((a, b));
+                texts.push(string.fromUtf8Lossy(text[a..b]));
+            } else {
+                spans.push(null);
+                texts.push(null);
+            }
+            g = g + 1;
+        }
+        return Match { start = slots[0], end = slots[1], value = texts[0] ?? "", spans = spans, texts = texts, names = this.prog.names };
+    }
+
+    /// Every match in turn, left to right, none overlapping; an empty match right after a match is
+    /// skipped (as Go does).
+    pub fn findAll(s: StringView): Matches {
+        return Matches { re = this, text = s.toString(), at = 0, lastEnd = -1, done = false };
+    }
+
+    /// The first match replaced by the template: `$1` and `${name}` are the groups, `$0` the
+    /// whole, `$$` a `$`; an unmatched group is empty.
+    pub fn replace(s: StringView, template: string): string {
+        return this.replaceUpTo(s, template, 1);
+    }
+
+    /// Every match replaced by the template.
+    pub fn replaceAll(s: StringView, template: string): string {
+        return this.replaceUpTo(s, template, -1);
+    }
+
+    fn replaceUpTo(s: StringView, template: string, limit: int): string {
+        let text = viewBytes(s);
+        let out = StringBuilder.new();
+        var last = 0;
+        var count = 0;
+        var it = this.findAll(s);
+        while (let m = it.next()) {
+            if (limit >= 0 && count == limit) {
+                break;
+            }
+            out.appendStr(string.fromUtf8Lossy(text[last..m.start]));
+            expandTemplate(out, template, m);
+            last = m.end;
+            count = count + 1;
+        }
+        out.appendStr(string.fromUtf8Lossy(text[last..text.length()]));
+        return out.toString();
+    }
+
+    /// The pieces of the text between its matches (as Go's `Split` with no limit): an empty text
+    /// is one empty piece; a match at the very start adds no empty piece before it.
+    pub fn split(s: StringView): string[] {
+        let text = viewBytes(s);
+        let out: List<string> = List.new();
+        if (text.length() == 0) {
+            out.push("");
+            return out.toArray();
+        }
+        var beg = 0;
+        var end = 0;
+        var it = this.findAll(s);
+        while (let m = it.next()) {
+            end = m.start;
+            if (m.end != 0) {
+                out.push(string.fromUtf8Lossy(text[beg..end]));
+            }
+            beg = m.end;
+        }
+        if (end != text.length()) {
+            out.push(string.fromUtf8Lossy(text[beg..text.length()]));
+        }
+        return out.toArray();
+    }
+}
+
+/// `$1`, `${name}`, `$0`, `$$` into `out`; a `$` before anything else is itself.
+fn expandTemplate(out: StringBuilder, template: string, m: Match): void {
+    let t = viewBytes(template);
+    let n = t.length();
+    var i = 0;
+    var plain = 0;
+    while (i < n) {
+        if (t[i] != 36u8) {
+            i = i + 1;
+            continue;
+        }
+        // flush the literal text before the "$"
+        out.appendStr(string.fromUtf8Lossy(t[plain..i]));
+        if (i + 1 < n && t[i + 1] == 36u8) {
+            out.appendChar('$');
+            i = i + 2;
+            plain = i;
+            continue;
+        }
+        if (i + 1 < n && t[i + 1] == 123u8) {
+            var close = i + 2;
+            while (close < n && t[close] != 125u8) {
+                close = close + 1;
+            }
+            if (close < n) {
+                let name = string.fromUtf8Lossy(t[i + 2..close]);
+                if (let g = numberOf(name)) {
+                    out.appendStr(m.group(g) ?? "");
+                } else {
+                    out.appendStr(m.named(name) ?? "");
+                }
+                i = close + 1;
+                plain = i;
+                continue;
+            }
+        }
+        var j = i + 1;
+        var g = 0;
+        var digits = 0;
+        while (j < n && t[j] >= 48u8 && t[j] <= 57u8) {
+            g = g * 10 + (t[j] - 48u8) as int;
+            j = j + 1;
+            digits = digits + 1;
+        }
+        if (digits > 0) {
+            out.appendStr(m.group(g) ?? "");
+            i = j;
+            plain = i;
+            continue;
+        }
+        out.appendChar('$');
+        i = i + 1;
+        plain = i;
+    }
+    out.appendStr(string.fromUtf8Lossy(t[plain..n]));
+}
+
+fn numberOf(s: string): ?int {
+    if (s.isEmpty()) {
+        return null;
+    }
+    var v = 0;
+    for (c in s.chars()) {
+        if (!c.isAsciiDigit()) {
+            return null;
+        }
+        v = v * 10 + (c as uint32 - 48u32) as int;
+    }
+    return v;
+}
+
+/// The matches of a text in turn.
+pub struct Matches :: [Iterator] {
+    type Item = Match;
+    re: Regex,
+    text: string,
+    var at: int,
+    var lastEnd: int,
+    var done: bool,
+
+    pub mut fn next(): ?Match {
+        if (this.done) {
+            return null;
+        }
+        let bytes = viewBytes(this.text);
+        while (this.at <= bytes.length()) {
+            let found = this.re.findFrom(this.text, this.at);
+            if (found == null) {
+                this.done = true;
+                return null;
+            }
+            let m = found;
+            if (m.end == m.start) {
+                // past an empty match by one character; one right after a match is skipped
+                this.at = if (m.end < bytes.length()) m.end + decodeAt(bytes, m.end).1 else m.end + 1;
+                if (m.start == this.lastEnd) {
+                    continue;
+                }
+            } else {
+                this.at = m.end;
+            }
+            this.lastEnd = m.end;
+            return m;
+        }
+        this.done = true;
+        return null;
+    }
+}
