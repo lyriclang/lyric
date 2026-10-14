@@ -1,0 +1,781 @@
+/// `std.uri` (design 10 O11; 13 M10 S5): RFC 3986 strictly. `Uri` is the five parts of a reference
+/// — scheme, authority (user information, host, port), path, query, fragment —, `Uri.parse` reads
+/// them and refuses what the grammar does (a space, a character beyond ASCII, a `%` without two hex
+/// digits, a host that is no IPv6 address inside its brackets), `show` writes them back (§5.3),
+/// `resolve` takes a reference against a base (§5.2), `normalize` the case, the percent-encoding
+/// and the dot segments (§6.2). `percentEncode` and `percentDecode` encode a text for a component
+/// and read it back; `Query` is the pairs of a query in their order. WHATWG's URL is a browser's
+/// leniency, not a library's contract: this module is the RFC.
+import std.collections { List };
+import std.core { Parse, ParseError, StringBuilder, viewBytes, Utf8Error };
+import std.net { IpAddr };
+import std.codec { Codable, Encoder, Decoder, EncodeError, DecodeError };
+
+// ---------------------------------------------------------------------------------------------
+// The characters of RFC 3986 §2.
+// ---------------------------------------------------------------------------------------------
+
+fn isAlpha(b: uint8): bool {
+    return (b >= 65u8 && b <= 90u8) || (b >= 97u8 && b <= 122u8);
+}
+
+fn isDigit(b: uint8): bool {
+    return b >= 48u8 && b <= 57u8;
+}
+
+fn isHex(b: uint8): bool {
+    return isDigit(b) || (b >= 65u8 && b <= 70u8) || (b >= 97u8 && b <= 102u8);
+}
+
+fn hexValue(b: uint8): int {
+    if (isDigit(b)) {
+        return (b - 48u8) as int;
+    }
+    if (b >= 97u8) {
+        return (b - 97u8) as int + 10;
+    }
+    return (b - 65u8) as int + 10;
+}
+
+/// `ALPHA / DIGIT / "-" / "." / "_" / "~"` (§2.3).
+fn isUnreserved(b: uint8): bool {
+    return isAlpha(b) || isDigit(b) || b == 45u8 || b == 46u8 || b == 95u8 || b == 126u8;
+}
+
+/// `"!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="` (§2.2).
+fn isSubDelim(b: uint8): bool {
+    return b == 33u8 || b == 36u8 || b == 38u8 || b == 39u8 || b == 40u8 || b == 41u8
+        || b == 42u8 || b == 43u8 || b == 44u8 || b == 59u8 || b == 61u8;
+}
+
+/// `unreserved / sub-delims / ":" / "@"` (§3.3).
+fn isPchar(b: uint8): bool {
+    return isUnreserved(b) || isSubDelim(b) || b == 58u8 || b == 64u8;
+}
+
+fn isSchemeChar(b: uint8): bool {
+    return isAlpha(b) || isDigit(b) || b == 43u8 || b == 45u8 || b == 46u8;
+}
+
+/// A component of a URI, for the percent-encoding: what each keeps as it is.
+pub enum Component :: [Equatable, Debug] {
+    /// Before the `@`: unreserved, sub-delims and `:`.
+    Userinfo,
+    /// A registered name: unreserved and sub-delims.
+    Host,
+    /// A whole path: pchar and `/`.
+    Path,
+    /// One segment of a path: pchar — a `/` is encoded.
+    Segment,
+    /// A query: pchar, `/` and `?`.
+    Query,
+    /// A fragment: pchar, `/` and `?`.
+    Fragment,
+    /// A key or a value of a `Query`: unreserved alone — `&`, `=`, `+` and the rest are encoded.
+    Pair,
+}
+
+/// Whether `b` stands as it is in the component.
+fn keeps(c: Component, b: uint8): bool {
+    return match (c) {
+        .Userinfo => isUnreserved(b) || isSubDelim(b) || b == 58u8,
+        .Host => isUnreserved(b) || isSubDelim(b),
+        .Path => isPchar(b) || b == 47u8,
+        .Segment => isPchar(b),
+        .Query => isPchar(b) || b == 47u8 || b == 63u8,
+        .Fragment => isPchar(b) || b == 47u8 || b == 63u8,
+        .Pair => isUnreserved(b),
+    };
+}
+
+/// Whether `text[from..to]` is the component's grammar: its characters or `%` with two hex digits.
+fn valid(text: Slice<uint8>, from: int, to: int, c: Component): bool {
+    var i = from;
+    while (i < to) {
+        let b = text[i];
+        if (b == 37u8) {
+            if (i + 2 >= to || !isHex(text[i + 1]) || !isHex(text[i + 2])) {
+                return false;
+            }
+            i = i + 3;
+        } else if (keeps(c, b)) {
+            i = i + 1;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+fn hexDigit(v: int): char {
+    return if (v < 10) ((48 + v) as uint32) as char else ((55 + v) as uint32) as char;
+}
+
+/// The ASCII bytes `text[from..to]` as a text.
+fn ascii(text: Slice<uint8>, from: int, to: int): string {
+    let out = StringBuilder.new();
+    var i = from;
+    while (i < to) {
+        out.appendChar((text[i] as uint32) as char);
+        i = i + 1;
+    }
+    return out.toString();
+}
+
+/// `s` percent-encoded for the component `c` (§2.1): every byte the component does not keep as
+/// `%` and two hex digits in capitals; a character beyond ASCII as the bytes of its UTF-8.
+pub fn percentEncode(s: StringView, c: Component): string {
+    let text = viewBytes(s);
+    let out = StringBuilder.new();
+    for (b in text) {
+        if (keeps(c, b)) {
+            out.appendChar((b as uint32) as char);
+        } else {
+            out.appendChar('%');
+            out.appendChar(hexDigit((b >> 4) as int));
+            out.appendChar(hexDigit((b & 15u8) as int));
+        }
+    }
+    return out.toString();
+}
+
+/// `s` with its percent-encodings decoded: `%` and two hex digits a byte. A `%` without them, or
+/// bytes that are no UTF-8, is `ParseError { kind = .Invalid }`. A `+` stays a `+` — `Query.parse`
+/// reads it as a space, the form convention.
+pub fn percentDecode(s: StringView): string throws ParseError {
+    let text = viewBytes(s);
+    let n = text.length();
+    var out: uint8[] = [0u8] * n;
+    var i = 0;
+    var o = 0;
+    while (i < n) {
+        let b = text[i];
+        if (b == 37u8) {
+            if (i + 2 >= n || !isHex(text[i + 1]) || !isHex(text[i + 2])) {
+                throw ParseError { kind = .Invalid };
+            }
+            out[o] = (hexValue(text[i + 1]) * 16 + hexValue(text[i + 2])) as uint8;
+            i = i + 3;
+        } else {
+            out[o] = b;
+            i = i + 1;
+        }
+        o = o + 1;
+    }
+    try {
+        return string.fromUtf8(out[0..o]);
+    } catch (_: Utf8Error) {
+        throw ParseError { kind = .Invalid };
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The URI.
+// ---------------------------------------------------------------------------------------------
+
+/// A URI reference (§4.1): absolute where it has a scheme, relative else. The host stands without
+/// its brackets — `show` puts them around an address with a `:` —; a `null` host is no authority,
+/// an empty one the empty authority of `file:///etc`. `port` is `null` where none or an empty one
+/// was written.
+pub struct Uri :: [Equatable, Hashable, Debug] {
+    pub scheme: ?string = null,
+    pub userinfo: ?string = null,
+    pub host: ?string = null,
+    pub port: ?int = null,
+    pub path: string = "",
+    pub query: ?string = null,
+    pub fragment: ?string = null,
+
+    /// Whether the reference has a scheme (§4.3).
+    pub fn isAbsolute(): bool {
+        return this.scheme != null;
+    }
+
+    /// The authority as written between `//` and the path, `null` where there is none.
+    pub fn authority(): ?string {
+        if (let h = this.host) {
+            let out = StringBuilder.new();
+            if (let u = this.userinfo) {
+                out.appendStr(u);
+                out.appendChar('@');
+            }
+            writeHost(out, h);
+            if (let p = this.port) {
+                out.appendChar(':');
+                out.append(p);
+            }
+            return out.toString();
+        }
+        return null;
+    }
+
+    /// The query as its pairs, empty where there is no query.
+    pub fn queryPairs(): Query throws ParseError {
+        if (let q = this.query) {
+            return try Query.parse(q);
+        }
+        return Query.new();
+    }
+
+    /// `ref` against this base (§5.2.2, strict: a reference with the base's scheme is absolute).
+    /// The base should be absolute (§5.2.1); a relative base gives a relative result.
+    pub fn resolve(ref: Uri): Uri {
+        if (ref.scheme != null) {
+            return ref with { path = removeDotSegments(ref.path) };
+        }
+        if (ref.host != null) {
+            return ref with { scheme = this.scheme, path = removeDotSegments(ref.path) };
+        }
+        var path = "";
+        var query = ref.query;
+        if (ref.path.isEmpty()) {
+            path = this.path;
+            if (ref.query == null) {
+                query = this.query;
+            }
+        } else if (ref.path.startsWith("/")) {
+            path = removeDotSegments(ref.path);
+        } else {
+            path = removeDotSegments(this.merge(ref.path));
+        }
+        return Uri {
+            scheme = this.scheme, userinfo = this.userinfo, host = this.host, port = this.port,
+            path = path, query = query, fragment = ref.fragment,
+        };
+    }
+
+    /// §5.2.3: the reference's path onto the base's — after the base's last `/`, or as the root
+    /// where the base has an authority and no path.
+    fn merge(relative: string): string {
+        if (this.host != null && this.path.isEmpty()) {
+            return "/" + relative;
+        }
+        let text = viewBytes(this.path);
+        var last = -1;
+        var i = 0;
+        while (i < text.length()) {
+            if (text[i] == 47u8) {
+                last = i;
+            }
+            i = i + 1;
+        }
+        if (last < 0) {
+            return relative;
+        }
+        return ascii(text, 0, last + 1) + relative;
+    }
+
+    /// The URI normalized (§6.2): the scheme and the host in small letters, a percent-encoding of
+    /// an unreserved character decoded and the others' digits in capitals, the dot segments of the
+    /// path removed, an empty path with an authority `/`, the scheme's default port dropped (80
+    /// for `http` and `ws`, 443 for `https` and `wss`, 21 for `ftp`).
+    pub fn normalize(): Uri {
+        let scheme = this.scheme?.toLower();
+        let userinfo = normalizeOpt(this.userinfo);
+        let host = normalizeOpt(this.host)?.toLower();
+        var path = normalizeEncoding(this.path);
+        if (this.scheme != null || this.host != null) {
+            path = removeDotSegments(path);
+        }
+        if (this.host != null && path.isEmpty()) {
+            path = "/";
+        }
+        let query = normalizeOpt(this.query);
+        let fragment = normalizeOpt(this.fragment);
+        var port = this.port;
+        if (let p = this.port) {
+            if (let s = scheme) {
+                if (p == defaultPort(s)) {
+                    port = null;
+                }
+            }
+        }
+        return Uri {
+            scheme = scheme, userinfo = userinfo, host = host, port = port,
+            path = path, query = query, fragment = fragment,
+        };
+    }
+}
+
+/// The port a scheme implies, `-1` where none is known.
+fn defaultPort(scheme: string): int {
+    return match (scheme) {
+        "http" => 80,
+        "ws" => 80,
+        "https" => 443,
+        "wss" => 443,
+        "ftp" => 21,
+        _ => -1,
+    };
+}
+
+fn normalizeOpt(s: ?string): ?string {
+    if (let v = s) {
+        return normalizeEncoding(v);
+    }
+    return null;
+}
+
+/// `%XX` of an unreserved character decoded, the other encodings' digits in capitals (§6.2.2.1–2).
+fn normalizeEncoding(s: string): string {
+    let text = viewBytes(s);
+    let out = StringBuilder.new();
+    var i = 0;
+    while (i < text.length()) {
+        let b = text[i];
+        if (b == 37u8 && i + 2 < text.length() && isHex(text[i + 1]) && isHex(text[i + 2])) {
+            let v = (hexValue(text[i + 1]) * 16 + hexValue(text[i + 2])) as uint8;
+            if (isUnreserved(v)) {
+                out.appendChar((v as uint32) as char);
+            } else {
+                out.appendChar('%');
+                out.appendChar(hexDigit((v >> 4) as int));
+                out.appendChar(hexDigit((v & 15u8) as int));
+            }
+            i = i + 3;
+        } else {
+            out.appendChar((b as uint32) as char);
+            i = i + 1;
+        }
+    }
+    return out.toString();
+}
+
+/// §5.2.4: `.` and `..` segments resolved, as the RFC's algorithm walks them.
+pub fn removeDotSegments(path: string): string {
+    let input = viewBytes(path);
+    var at = 0;
+    let n = input.length();
+    // the output buffer as the list of its segments, each with its leading slash where it has one
+    let out = StringBuilder.new();
+    let outText: List<string> = List.new();
+    while (at < n) {
+        // A: "../" or "./" at the start
+        if (startsAt(input, at, "../")) {
+            at = at + 3;
+        } else if (startsAt(input, at, "./")) {
+            at = at + 2;
+        // B: "/./" or "/." at the end -> "/"
+        } else if (startsAt(input, at, "/./")) {
+            at = at + 2;
+        } else if (startsAt(input, at, "/.") && at + 2 == n) {
+            at = at + 1;
+            pushSegment(outText, "/");
+            at = n;
+        // C: "/../" or "/.." at the end -> "/" and the last segment dropped
+        } else if (startsAt(input, at, "/../")) {
+            at = at + 3;
+            popSegment(outText);
+        } else if (startsAt(input, at, "/..") && at + 3 == n) {
+            popSegment(outText);
+            pushSegment(outText, "/");
+            at = n;
+        // D: "." or ".." alone
+        } else if (at + 1 == n && input[at] == 46u8) {
+            at = n;
+        } else if (at + 2 == n && input[at] == 46u8 && input[at + 1] == 46u8) {
+            at = n;
+        // E: the first segment, with its slash, moves over
+        } else {
+            var end = if (input[at] == 47u8) at + 1 else at;
+            while (end < n && input[end] != 47u8) {
+                end = end + 1;
+            }
+            pushSegment(outText, ascii(input, at, end));
+            at = end;
+        }
+    }
+    for (seg in outText) {
+        out.appendStr(seg);
+    }
+    return out.toString();
+}
+
+fn startsAt(text: Slice<uint8>, at: int, what: string): bool {
+    let w = viewBytes(what);
+    if (at + w.length() > text.length()) {
+        return false;
+    }
+    var i = 0;
+    while (i < w.length()) {
+        if (text[at + i] != w[i]) {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
+}
+
+fn pushSegment(segs: List<string>, s: string): void {
+    segs.push(s);
+}
+
+/// The last segment and its slash dropped (§5.2.4 C).
+fn popSegment(segs: List<string>): void {
+    if (!segs.isEmpty()) {
+        let _ = segs.pop();
+    }
+}
+
+/// A host into `out`: an address with a `:` inside brackets.
+fn writeHost(out: StringBuilder, h: string): void {
+    if (h.contains(':')) {
+        out.appendChar('[');
+        out.appendStr(h);
+        out.appendChar(']');
+    } else {
+        out.appendStr(h);
+    }
+}
+
+extend Uri :: [Display] {
+    /// §5.3: the parts recomposed.
+    fn show(): string {
+        let out = StringBuilder.new();
+        if (let s = this.scheme) {
+            out.appendStr(s);
+            out.appendChar(':');
+        }
+        if (let a = this.authority()) {
+            out.appendStr("//");
+            out.appendStr(a);
+        }
+        out.appendStr(this.path);
+        if (let q = this.query) {
+            out.appendChar('?');
+            out.appendStr(q);
+        }
+        if (let f = this.fragment) {
+            out.appendChar('#');
+            out.appendStr(f);
+        }
+        return out.toString();
+    }
+}
+
+extend Uri :: [Parse] {
+    /// §3 and appendix B: the scheme up to the first `:` where its characters are a scheme's and no
+    /// `/`, `?` or `#` comes first; the authority after `//` up to the next `/`, `?` or `#`, split
+    /// at the last `@` and the port's `:`, a host in brackets an IPv6 address; the path up to `?`
+    /// or `#`; the query up to `#`; the fragment. Every part is checked against its grammar:
+    /// `ParseError { kind = .Invalid }` for what is not — `.Empty` for an empty text is no error,
+    /// the empty reference is one (§4.4): `Uri.parse("")` is `Uri {}`.
+    static fn parse(s: StringView): Uri throws ParseError {
+        let text = viewBytes(s);
+        let n = text.length();
+        var scheme: ?string = null;
+        var userinfo: ?string = null;
+        var host: ?string = null;
+        var port: ?int = null;
+        var query: ?string = null;
+        var fragment: ?string = null;
+        var i = 0;
+        // the scheme
+        var j = 0;
+        while (j < n && text[j] != 58u8 && text[j] != 47u8 && text[j] != 63u8 && text[j] != 35u8) {
+            j = j + 1;
+        }
+        if (j < n && text[j] == 58u8 && j > 0 && isAlpha(text[0])) {
+            var k = 0;
+            var ok = true;
+            while (k < j) {
+                if (!isSchemeChar(text[k])) {
+                    ok = false;
+                }
+                k = k + 1;
+            }
+            if (ok) {
+                scheme = ascii(text, 0, j);
+                i = j + 1;
+            }
+        }
+        // the authority
+        if (i + 1 < n && text[i] == 47u8 && text[i + 1] == 47u8) {
+            var end = i + 2;
+            while (end < n && text[end] != 47u8 && text[end] != 63u8 && text[end] != 35u8) {
+                end = end + 1;
+            }
+            let (u, h, p) = try parseAuthority(text, i + 2, end);
+            userinfo = u;
+            host = h;
+            port = p;
+            i = end;
+        }
+        // the path
+        var end = i;
+        while (end < n && text[end] != 63u8 && text[end] != 35u8) {
+            end = end + 1;
+        }
+        if (!valid(text, i, end, .Path)) {
+            throw ParseError { kind = .Invalid };
+        }
+        if (scheme == null && host == null) {
+            // path-noscheme (§4.2): the first segment holds no ":" - it would read as a scheme
+            var k = i;
+            while (k < end && text[k] != 47u8) {
+                if (text[k] == 58u8) {
+                    throw ParseError { kind = .Invalid };
+                }
+                k = k + 1;
+            }
+        }
+        let path = ascii(text, i, end);
+        i = end;
+        // the query
+        if (i < n && text[i] == 63u8) {
+            var qend = i + 1;
+            while (qend < n && text[qend] != 35u8) {
+                qend = qend + 1;
+            }
+            if (!valid(text, i + 1, qend, .Query)) {
+                throw ParseError { kind = .Invalid };
+            }
+            query = ascii(text, i + 1, qend);
+            i = qend;
+        }
+        // the fragment
+        if (i < n && text[i] == 35u8) {
+            if (!valid(text, i + 1, n, .Fragment)) {
+                throw ParseError { kind = .Invalid };
+            }
+            fragment = ascii(text, i + 1, n);
+        }
+        return Uri {
+            scheme = scheme, userinfo = userinfo, host = host, port = port,
+            path = path, query = query, fragment = fragment,
+        };
+    }
+}
+
+/// `text[from..to]` as `[ userinfo "@" ] host [ ":" port ]`: the three.
+fn parseAuthority(text: Slice<uint8>, from: int, to: int): (?string, string, ?int) throws ParseError {
+    var userinfo: ?string = null;
+    var hostFrom = from;
+    var at = to - 1;
+    while (at >= from) {
+        if (text[at] == 64u8) {
+            if (!valid(text, from, at, .Userinfo)) {
+                throw ParseError { kind = .Invalid };
+            }
+            userinfo = ascii(text, from, at);
+            hostFrom = at + 1;
+            break;
+        }
+        at = at - 1;
+    }
+    var hostTo = to;
+    if (hostFrom < to && text[hostFrom] == 91u8) {
+        // an IP literal: up to the "]", an IPv6 address inside
+        var close = hostFrom;
+        while (close < to && text[close] != 93u8) {
+            close = close + 1;
+        }
+        if (close == to) {
+            throw ParseError { kind = .Invalid };
+        }
+        let inside = ascii(text, hostFrom + 1, close);
+        match (try IpAddr.parse(inside)) {
+            .V6(_, _, _, _, _, _, _, _) => { },
+            _ => { throw ParseError { kind = .Invalid }; },
+        }
+        hostTo = close + 1;
+        var port: ?int = null;
+        if (hostTo < to) {
+            if (text[hostTo] != 58u8) {
+                throw ParseError { kind = .Invalid };
+            }
+            port = try parsePort(text, hostTo + 1, to);
+        }
+        return (userinfo, inside, port);
+    }
+    // a registered name or an IPv4 address, then the port after the last ":"
+    var colon = -1;
+    var k = hostFrom;
+    while (k < to) {
+        if (text[k] == 58u8) {
+            colon = k;
+        }
+        k = k + 1;
+    }
+    var port: ?int = null;
+    if (colon >= 0) {
+        hostTo = colon;
+        port = try parsePort(text, colon + 1, to);
+    }
+    if (!valid(text, hostFrom, hostTo, .Host)) {
+        throw ParseError { kind = .Invalid };
+    }
+    return (userinfo, ascii(text, hostFrom, hostTo), port);
+}
+
+/// Digits, `null` where there are none; beyond 65535 is `Invalid`.
+fn parsePort(text: Slice<uint8>, from: int, to: int): ?int throws ParseError {
+    if (from == to) {
+        return null;
+    }
+    var v = 0;
+    var i = from;
+    while (i < to) {
+        if (!isDigit(text[i])) {
+            throw ParseError { kind = .Invalid };
+        }
+        v = v * 10 + (text[i] - 48u8) as int;
+        if (v > 65535) {
+            throw ParseError { kind = .Invalid };
+        }
+        i = i + 1;
+    }
+    return v;
+}
+
+/// A URI is its text (10 E6, as an `Instant` is).
+extend Uri :: [Codable] {
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
+
+    static fn decode<D :: [Decoder]>(&d: D): Uri throws DecodeError {
+        let s = try d.decodeString();
+        try {
+            return Uri.parse(s);
+        } catch (p: ParseError) {
+            throw DecodeError { kind = .Invalid, path = d.path(), detail = f"'{s}' is no URI: {p.message()}" };
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The query as pairs.
+// ---------------------------------------------------------------------------------------------
+
+/// The pairs of a query, `key=value` joined by `&`, in the order written; a key may stand more
+/// than once. `parse` decodes the percent-encodings and a `+` as a space (the form convention
+/// servers see); `show` percent-encodes each key and value for `Component.Pair`, a space as `%20`.
+pub class Query {
+    var items: List<(string, string)>,
+
+    pub static fn new(): Query {
+        return Query { items = List.new() };
+    }
+
+    /// The pairs in their order.
+    pub fn pairs(): List<(string, string)> {
+        return this.items;
+    }
+
+    /// `a=1&b=2&a=3`: a part without `=` is a key with an empty value; an empty part is skipped.
+    pub static fn parse(s: StringView): Query throws ParseError {
+        let q = Query.new();
+        for (part in s.split('&')) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            if (let (k, v) = part.splitOnce('=')) {
+                q.items.push((try formDecode(k), try formDecode(v)));
+            } else {
+                q.items.push((try formDecode(part), ""));
+            }
+        }
+        return q;
+    }
+
+    /// The first value of the key.
+    pub fn get(key: string): ?string {
+        for ((k, v) in this.items) {
+            if (k == key) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    /// Every value of the key, in order.
+    pub fn all(key: string): string[] {
+        let out: List<string> = List.new();
+        for ((k, v) in this.items) {
+            if (k == key) {
+                out.push(v);
+            }
+        }
+        return out.toArray();
+    }
+
+    pub fn has(key: string): bool {
+        return this.get(key) != null;
+    }
+
+    pub fn length(): int {
+        return this.items.length();
+    }
+
+    pub fn isEmpty(): bool {
+        return this.items.isEmpty();
+    }
+
+    /// A pair at the end.
+    pub mut fn add(key: string, value: string): void {
+        this.items.push((key, value));
+    }
+
+    /// The key's first pair gets the value, its others go; a key not there is added.
+    pub mut fn set(key: string, value: string): void {
+        let kept: List<(string, string)> = List.new();
+        var seen = false;
+        for ((k, v) in this.items) {
+            if (k == key) {
+                if (!seen) {
+                    kept.push((key, value));
+                }
+                seen = true;
+            } else {
+                kept.push((k, v));
+            }
+        }
+        if (!seen) {
+            kept.push((key, value));
+        }
+        this.items = kept;
+    }
+
+    /// Every pair of the key goes.
+    pub mut fn remove(key: string): void {
+        let kept: List<(string, string)> = List.new();
+        for ((k, v) in this.items) {
+            if (k != key) {
+                kept.push((k, v));
+            }
+        }
+        this.items = kept;
+    }
+}
+
+/// A key or a value: `+` a space, then the percent-encodings.
+fn formDecode(s: StringView): string throws ParseError {
+    let text = viewBytes(s);
+    let out = StringBuilder.new();
+    for (b in text) {
+        out.appendChar(if (b == 43u8) ' ' else (b as uint32) as char);
+    }
+    return try percentDecode(out.toString());
+}
+
+extend Query :: [Display] {
+    fn show(): string {
+        let out = StringBuilder.new();
+        var first = true;
+        for ((k, v) in this.items) {
+            if (!first) {
+                out.appendChar('&');
+            }
+            first = false;
+            out.appendStr(percentEncode(k, .Pair));
+            out.appendChar('=');
+            out.appendStr(percentEncode(v, .Pair));
+        }
+        return out.toString();
+    }
+}
+
+extend Query :: [Equatable] {
+    fn equals(o: Query): bool {
+        return this.items == o.items;
+    }
+}

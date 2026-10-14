@@ -1248,6 +1248,16 @@ M9b: no halt until it closes, merged on green CI, open points collected for the 
   date-time); `TomlValue` with **`TomlTable`** keeping its keys in order and `TomlDatetime` in
   four forms. The artifacts: a config's document and back, 18 refusals with line and column
   (`tests/std/tests/toml.lyr`, 4 tests). Spec 12 §TOML rules 1–4; three cases.
+- **S5** `std.uri` + Base64 without padding (P4; 10 O11, S4a): RFC 3986 strictly — `Uri` in its
+  five parts (`scheme`, `userinfo`, `host`, `port`, `path`, `query`, `fragment`; an IPv6 host
+  without its brackets), `Uri.parse` as §3 and appendix B with every part checked against its
+  grammar (`ParseError`; path-noscheme), `show` as §5.3, `resolve` as §5.2.2 strict with
+  `removeDotSegments` (§5.2.4), `normalize` as §6.2.2–3 (case, encoding, dot segments, `/`,
+  default ports), `percentEncode(text, Component)`/`percentDecode`, `Query` as the pairs in
+  order (`+` read as a space, written `%20`); `Display`, `Parse`, `Hashable`, `Codable`.
+  `Base64Url.encodeUnpadded`/`decodeUnpadded` for JOSE (RFC 7515), as strict as the padded forms —
+  the S4a clock closed. The artifacts: the 42 examples of §5.4, each (`tests/std/tests/uri.lyr`,
+  5 tests; `encoding.lyr` +1). Spec 12 §URIs rules 1–4, §Encodings rule 2; three cases.
 
 ## Design decisions
 
