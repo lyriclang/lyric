@@ -1,14 +1,22 @@
 /// Time (design/v5/spec/10 Q1): `Duration`, a span; `Instant`, a moment on the wall clock in UTC;
 /// `Monotonic`, a moment on the clock that only moves forward, for what takes how long. M8b S5a;
-/// the calendar and RFC 3339 come with S5b, the time zones' database and the format patterns with
-/// M10. `sleep` and the timers are `std.task`'s (K3).
+/// the calendar and RFC 3339 with S5b; the time zones' database (TZif, RFC 8536) and the format
+/// patterns (UTS #35) with M10 S11. `sleep` and the timers are `std.task`'s (K3).
 ///
 /// The clocks are the runtime's (lyr/time.h), reached through C — `std.task` imports this module,
-/// so the way back to its own reading of the monotonic clock would close a cycle.
-import std.core { Add, Div, Mul, Parse, ParseError, Sub, viewBytes };
+/// so the way back to its own reading of the monotonic clock would close a cycle. The zone files
+/// and the environment are reached the same way: `std.fs` and `std.os` import this module too.
+import std.collections { List };
+import std.core { Add, Div, Mul, Parse, ParseError, Sub, StringBuilder, viewBytes };
 
 extern "C" fn lyr_clock_realtime_ns(): int;
 extern "C" fn lyr_clock_monotonic_ns(): int;
+
+// The runtime's file and environment calls, as std.fs and std.os bind them (Intrinsics.cs).
+fn zoneFileOpen(path: string, how: int): int;
+fn zoneFileRead(file: int, into: Slice<uint8>): int;
+fn zoneFileClose(file: int): int;
+fn zoneEnv(name: string, into: Slice<uint8>): int;
 
 /// A span of time in whole nanoseconds, negative or not (10 Q1, N3): some 292 years either way.
 /// Arithmetic that leaves that range panics with an overflow (RT0002), as `int`'s does.
@@ -241,12 +249,18 @@ pub struct Instant :: [Equatable, Ordered, TotalOrder, Hashable, Add<Duration>, 
 
     /// The date, the time of day and the offset this moment is in `zone`.
     pub fn toDateTime(zone: Zone): DateTime {
-        let local = this.ns + zone.offset().nanos();
+        let off = zone.offsetAt(this).nanos();
+        let local = this.ns + off;
         let days = floorDiv(local, nanosPerDay);
         let rest = local - days * nanosPerDay;
         let time = Time { h = rest / 3600000000000, mi = rest / 60000000000 % 60,
             s = rest / 1000000000 % 60, n = rest % 1000000000 };
-        return DateTime { d = fromDays(days), t = time, off = zone.offset().nanos() };
+        return DateTime { d = fromDays(days), t = time, off = off, z = zone };
+    }
+
+    /// The seconds since the epoch, floored.
+    fn epochSecondsFloored(): int {
+        return floorDiv(this.ns, 1000000000);
     }
 
     /// RFC 3339 in UTC.
@@ -294,10 +308,18 @@ pub struct Monotonic {
 // Date Algorithms"). The time zones are fixed offsets here; their database comes with M10.
 // ---------------------------------------------------------------------------------------------
 
+/// Why a `TimeError`: what is none; no zone database on the system; a zone the database has not.
+pub enum TimeErrorKind :: [Equatable, Debug] {
+    Invalid,
+    NoZoneData,
+    NoSuchZone,
+}
+
 /// What is no date, no time of day, no offset (10 Q1): February 30th, 24:00, an offset of 90
-/// seconds.
+/// seconds; a zone that cannot be had (M10 S11), its `kind` saying why.
 pub struct TimeError :: [Error] {
     pub detail: string,
+    pub kind: TimeErrorKind = TimeErrorKind.Invalid,
 
     pub fn message(): string {
         return this.detail;
@@ -422,12 +444,17 @@ pub struct Time :: [Equatable, Ordered, TotalOrder, Hashable, Display] {
     }
 }
 
-/// A fixed offset from UTC (10 Q1): `Zone.utc`, `Zone.fixed(offset)`. The zones of a database —
-/// `Zone.load("Europe/Berlin")`, `Zone.local()` — come with M10.
-pub struct Zone :: [Equatable] {
+/// A time zone (10 Q1; M10 S11): UTC, a fixed offset, or a zone of the database — its
+/// transitions and the rule for the years beyond them (TZif, RFC 8536; a POSIX TZ string).
+/// `Zone.utc`, `Zone.fixed(offset)`, `Zone.load("Europe/Berlin")` from the system's database,
+/// `Zone.local()` the system's own, `Zone.fromTzif(name, bytes)` and `Zone.fromPosix(name, tz)`
+/// for data of one's own (a `tzdata` package's). Two zones are equal by name and kind.
+pub struct Zone {
+    label: string,
     off: int,
+    rules: ?ZoneRules,
 
-    pub static let utc: Zone = Zone { off = 0 };
+    pub static let utc: Zone = Zone { label = "UTC", off = 0, rules = null };
 
     /// The zone `offset` east of UTC — west for a negative one —: whole minutes, under 24 hours,
     /// as RFC 3339 writes an offset.
@@ -436,30 +463,801 @@ pub struct Zone :: [Equatable] {
         if (ns % 60000000000 != 0 || ns <= -nanosPerDay || ns >= nanosPerDay) {
             throw TimeError { detail = f"an offset is whole minutes under a day; {offset} is not" };
         }
-        return Zone { off = ns };
+        return Zone { label = if (ns == 0) "UTC" else offsetText(ns), off = ns, rules = null };
     }
 
-    pub fn offset(): Duration {
-        return Duration.ofNanos(this.off);
+    /// The zone of the system's database, `/usr/share/zoneinfo` or `TZDIR`, by its IANA name
+    /// (`Europe/Berlin`): `TimeError { kind = .NoZoneData }` where the system has no database
+    /// (Windows), `.NoSuchZone` where it has no such zone, `.Invalid` for a file that is no TZif.
+    pub static fn load(name: string): Zone throws TimeError {
+        if (name.isEmpty() || name.startsWith("/") || name.contains("..") || name.startsWith(".")) {
+            throw TimeError { detail = f"'{name}' is no zone name", kind = .NoSuchZone };
+        }
+        if (name == "UTC" || name == "Etc/UTC" || name == "Z") {
+            return Zone.utc;
+        }
+        let dir = envText("TZDIR") ?? "/usr/share/zoneinfo";
+        if (let bytes = readWhole(dir + "/" + name)) {
+            return try Zone.fromTzif(name, bytes[..]);
+        }
+        if (readWhole(dir + "/UTC") == null && readWhole(dir + "/Etc/UTC") == null) {
+            throw TimeError { detail = f"no zone database at {dir}: Zone.load needs the system's or TZDIR", kind = .NoZoneData };
+        }
+        throw TimeError { detail = f"the zone database has no '{name}'", kind = .NoSuchZone };
     }
+
+    /// A zone from the bytes of a TZif file (RFC 8536, versions 1 to 4): the transitions, the
+    /// local time types, and the footer's rule for the years beyond.
+    pub static fn fromTzif(name: string, bytes: Slice<uint8>): Zone throws TimeError {
+        return Zone { label = name, off = 0, rules = try parseTzif(bytes) };
+    }
+
+    /// A zone from a POSIX TZ string (RFC 8536 §3.3.1): `CET-1CEST,M3.5.0,M10.5.0/3`, `EST5EDT`,
+    /// `<+0330>-3:30`.
+    pub static fn fromPosix(name: string, tz: string): Zone throws TimeError {
+        let rule = try parsePosix(tz);
+        return Zone { label = name, off = 0, rules = ZoneRules { times = [], idx = [], typeOff = [], typeDst = [], typeAbbr = [], first = 0, footer = rule } };
+    }
+
+    /// The system's own zone: `TZ` where set (a name of the database, or a POSIX string), else
+    /// `/etc/localtime`, else UTC — Windows, without a database, is UTC (its registry's zones
+    /// are a door).
+    pub static fn local(): Zone {
+        if (let tz = envText("TZ")) {
+            var spec = tz;
+            if (spec.startsWith(":")) {
+                spec = string.fromUtf8Lossy(viewBytes(spec)[1..viewBytes(spec).length()]);
+            }
+            if (!spec.isEmpty()) {
+                try {
+                    return Zone.load(spec);
+                } catch (_: TimeError) { }
+                try {
+                    return Zone.fromPosix(spec, spec);
+                } catch (_: TimeError) { }
+            }
+        }
+        if (let bytes = readWhole("/etc/localtime")) {
+            try {
+                return Zone.fromTzif("Local", bytes[..]);
+            } catch (_: TimeError) { }
+        }
+        return Zone.utc;
+    }
+
+    pub fn name(): string {
+        return this.label;
+    }
+
+    /// Whether the zone is one offset for all time.
+    pub fn isFixed(): bool {
+        return this.rules == null;
+    }
+
+    /// The offset of a fixed zone; of a zone of the database, its offset now.
+    pub fn offset(): Duration {
+        if (this.rules == null) {
+            return Duration.ofNanos(this.off);
+        }
+        return this.offsetAt(Instant.now());
+    }
+
+    /// The offset east of UTC at the moment.
+    pub fn offsetAt(at: Instant): Duration {
+        return this.infoAt(at).offset;
+    }
+
+    /// The offset, whether daylight time is in force, and the abbreviation at the moment.
+    pub fn infoAt(at: Instant): ZoneInfo {
+        if (let r = this.rules) {
+            let (off, dst, abbr) = r.infoAt(at.epochSecondsFloored());
+            return ZoneInfo { offset = Duration.ofSecs(off), isDst = dst, abbreviation = abbr };
+        }
+        return ZoneInfo { offset = Duration.ofNanos(this.off), isDst = false, abbreviation = this.label };
+    }
+
+    /// The offset in seconds at the second since the epoch.
+    fn offsetSecsAt(secs: int): int {
+        if (let r = this.rules) {
+            let (off, _, _) = r.infoAt(secs);
+            return off;
+        }
+        return this.off / 1000000000;
+    }
+}
+
+extend Zone :: [Equatable] {
+    fn equals(o: Zone): bool {
+        return this.label == o.label && this.off == o.off && (this.rules == null) == (o.rules == null);
+    }
+}
+
+/// What a zone says about a moment.
+pub struct ZoneInfo :: [Equatable, Debug] {
+    pub offset: Duration,
+    pub isDst: bool,
+    pub abbreviation: string,
+}
+
+/// The transitions of a zone and the rule beyond them.
+class ZoneRules {
+    /// The seconds since the epoch at which a transition happens, ascending.
+    times: int[],
+    /// The local time type each transition switches to.
+    idx: int[],
+    /// The types: the offset east in seconds, whether daylight time, the abbreviation.
+    typeOff: int[],
+    typeDst: int[],
+    typeAbbr: string[],
+    /// The type before the first transition.
+    first: int,
+    footer: ?PosixRule,
+
+    fn infoAt(secs: int): (int, bool, string) {
+        let n = this.times.length();
+        if (n == 0) {
+            if (let f = this.footer) {
+                return f.infoAt(secs);
+            }
+            return this.typeInfo(this.first);
+        }
+        if (secs < this.times[0]) {
+            return this.typeInfo(this.first);
+        }
+        // the last transition at or before the moment
+        var lo = 0;
+        var hi = n - 1;
+        while (lo < hi) {
+            let mid = (lo + hi + 1) / 2;
+            if (this.times[mid] <= secs) {
+                lo = mid;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        if (lo == n - 1) {
+            if (let f = this.footer) {
+                return f.infoAt(secs);
+            }
+        }
+        return this.typeInfo(this.idx[lo]);
+    }
+
+    fn typeInfo(i: int): (int, bool, string) {
+        if (this.typeOff.length() == 0) {
+            return (0, false, "UTC");
+        }
+        let k = if (i < 0 || i >= this.typeOff.length()) 0 else i;
+        return (this.typeOff[k], this.typeDst[k] != 0, this.typeAbbr[k]);
+    }
+}
+
+/// A day a POSIX rule names.
+enum RuleDate {
+    /// `Jn`: the day 1..365, February 29th never counted.
+    Julian1(int),
+    /// `n`: the day 0..365, February 29th counted.
+    Julian0(int),
+    /// `Mm.w.d`: the day `d` (0 Sunday) of the week `w` (5 the last) of the month `m`.
+    Month(int, int, int),
+}
+
+/// A POSIX TZ string (RFC 8536 §3.3.1): the standard time, and daylight time with its rule where
+/// there is one.
+struct PosixRule {
+    stdAbbr: string,
+    /// The offset east of UTC, seconds.
+    stdOff: int,
+    dstAbbr: ?string,
+    dstOff: int,
+    start: RuleDate,
+    end: RuleDate,
+    /// The local time of day the change happens, seconds (standard time at the start, daylight
+    /// time at the end).
+    startTime: int,
+    endTime: int,
+
+    fn infoAt(secs: int): (int, bool, string) {
+        if (let dst = this.dstAbbr) {
+            let year = fromDays(floorDiv(secs + this.stdOff, 86400)).y;
+            let startAt = this.transitionAt(this.start, this.startTime, year) - this.stdOff;
+            let endAt = this.transitionAt(this.end, this.endTime, year) - this.dstOff;
+            var inDst = false;
+            if (startAt < endAt) {
+                inDst = secs >= startAt && secs < endAt;
+            } else {
+                inDst = !(secs >= endAt && secs < startAt);
+            }
+            if (inDst) {
+                return (this.dstOff, true, dst);
+            }
+        }
+        return (this.stdOff, false, this.stdAbbr);
+    }
+
+    /// The local seconds since the epoch of the rule's day in the year, plus the time of day.
+    fn transitionAt(date: RuleDate, time: int, year: int): int {
+        let jan1 = daysOf(Date { y = year, m = 1, d = 1 });
+        var days = jan1;
+        match (date) {
+            .Julian1(n) => {
+                var d = n - 1;
+                if (isLeap(year) && n >= 60) {
+                    d = d + 1;
+                }
+                days = jan1 + d;
+            },
+            .Julian0(n) => { days = jan1 + n; },
+            .Month(m, w, d) => {
+                let firstOfMonth = daysOf(Date { y = year, m = m, d = 1 });
+                // the weekday of the first, 0 Sunday: 1970-01-01 was a Thursday (4)
+                let firstWeekday = floorRem(firstOfMonth + 4, 7);
+                var day = 1 + floorRem(d - firstWeekday, 7) + (w - 1) * 7;
+                let last = daysIn(year, m);
+                while (day > last) {
+                    day = day - 7;
+                }
+                days = firstOfMonth + day - 1;
+            },
+        }
+        return days * 86400 + time;
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// TZif (RFC 8536).
+// ---------------------------------------------------------------------------------------------
+
+fn be32(b: Slice<uint8>, at: int): int {
+    let v = ((b[at] as int) << 24) | ((b[at + 1] as int) << 16) | ((b[at + 2] as int) << 8) | (b[at + 3] as int);
+    return if (v >= 2147483648) v - 4294967296 else v;
+}
+
+fn be64(b: Slice<uint8>, at: int): int {
+    var v = 0;
+    var i = 0;
+    while (i < 8) {
+        v = (v << 8) | (b[at + i] as int);
+        i = i + 1;
+    }
+    return v;
+}
+
+fn notTzif(detail: string): TimeError {
+    return TimeError { detail = f"not TZif: {detail}" };
+}
+
+/// The transitions and types of a TZif file: the 64-bit block of a version 2+ file, the 32-bit
+/// block of a version 1 file; the footer's TZ string as the rule beyond. Leap seconds are read
+/// over.
+fn parseTzif(b: Slice<uint8>): ZoneRules throws TimeError {
+    let n = b.length();
+    if (n < 44 || b[0] != 84u8 || b[1] != 90u8 || b[2] != 105u8 || b[3] != 102u8) {
+        throw notTzif("the magic bytes are missing");
+    }
+    let version = b[4];
+    var at = 0;
+    var wide = false;
+    var counts = tzifCounts(b, at);
+    var dataLen = tzifBlockLength(counts, false);
+    if (version != 0u8) {
+        // past the version 1 block to the second header and its 64-bit block
+        at = 44 + dataLen;
+        if (at + 44 > n) {
+            throw notTzif("the file ends inside its second header");
+        }
+        if (b[at] != 84u8 || b[at + 1] != 90u8 || b[at + 2] != 105u8 || b[at + 3] != 102u8) {
+            throw notTzif("the second header is missing");
+        }
+        counts = tzifCounts(b, at);
+        dataLen = tzifBlockLength(counts, true);
+        wide = true;
+    }
+    let (isutcnt, isstdcnt, leapcnt, timecnt, typecnt, charcnt) = counts;
+    if (typecnt == 0) {
+        throw notTzif("no local time types");
+    }
+    var p = at + 44;
+    if (p + dataLen > n) {
+        throw notTzif("the file ends inside its data");
+    }
+    var times = [0] * timecnt;
+    var i = 0;
+    while (i < timecnt) {
+        times[i] = if (wide) be64(b, p + i * 8) else be32(b, p + i * 4);
+        i = i + 1;
+    }
+    p = p + timecnt * (if (wide) 8 else 4);
+    var idx = [0] * timecnt;
+    i = 0;
+    while (i < timecnt) {
+        idx[i] = b[p + i] as int;
+        if (idx[i] >= typecnt) {
+            throw notTzif("a transition names a type the file has not");
+        }
+        i = i + 1;
+    }
+    p = p + timecnt;
+    var typeOff = [0] * typecnt;
+    var typeDst = [0] * typecnt;
+    var abbrAt = [0] * typecnt;
+    i = 0;
+    while (i < typecnt) {
+        typeOff[i] = be32(b, p + i * 6);
+        typeDst[i] = b[p + i * 6 + 4] as int;
+        abbrAt[i] = b[p + i * 6 + 5] as int;
+        i = i + 1;
+    }
+    p = p + typecnt * 6;
+    let chars = p;
+    var typeAbbr: string[] = [""] * typecnt;
+    i = 0;
+    while (i < typecnt) {
+        var e = chars + abbrAt[i];
+        let start = e;
+        while (e < chars + charcnt && b[e] != 0u8) {
+            e = e + 1;
+        }
+        typeAbbr[i] = string.fromUtf8Lossy(b[start..e]);
+        i = i + 1;
+    }
+    p = p + charcnt + leapcnt * (if (wide) 12 else 8) + isstdcnt + isutcnt;
+    // the type before the first transition: the first non-daylight type, as RFC 8536 §3.2 says
+    var first = 0;
+    i = 0;
+    while (i < typecnt) {
+        if (typeDst[i] == 0) {
+            first = i;
+            break;
+        }
+        i = i + 1;
+    }
+    var footer: ?PosixRule = null;
+    if (wide && p < n && b[p] == 10u8) {
+        var e = p + 1;
+        while (e < n && b[e] != 10u8) {
+            e = e + 1;
+        }
+        let tz = string.fromUtf8Lossy(b[p + 1..e]);
+        if (!tz.isEmpty()) {
+            footer = try parsePosix(tz);
+        }
+    }
+    return ZoneRules { times = times, idx = idx, typeOff = typeOff, typeDst = typeDst, typeAbbr = typeAbbr, first = first, footer = footer };
+}
+
+fn tzifCounts(b: Slice<uint8>, at: int): (int, int, int, int, int, int) {
+    return (be32(b, at + 20), be32(b, at + 24), be32(b, at + 28), be32(b, at + 32), be32(b, at + 36), be32(b, at + 40));
+}
+
+fn tzifBlockLength(counts: (int, int, int, int, int, int), wide: bool): int {
+    let (isutcnt, isstdcnt, leapcnt, timecnt, typecnt, charcnt) = counts;
+    let t = if (wide) 8 else 4;
+    return timecnt * t + timecnt + typecnt * 6 + charcnt + leapcnt * (t + 4) + isstdcnt + isutcnt;
+}
+
+// ---------------------------------------------------------------------------------------------
+// POSIX TZ strings (RFC 8536 §3.3.1).
+// ---------------------------------------------------------------------------------------------
+
+class PosixReader {
+    var b: Slice<uint8>,
+    var at: int,
+
+    fn more(): bool {
+        return this.at < this.b.length();
+    }
+
+    fn peek(): uint8 {
+        return this.b[this.at];
+    }
+
+    fn fail(detail: string): TimeError {
+        return TimeError { detail = f"no POSIX TZ string: {detail}" };
+    }
+
+    /// An abbreviation: letters, or anything but `>` inside `<…>`.
+    mut fn abbreviation(): string throws TimeError {
+        let start = this.at;
+        if (this.more() && this.peek() == 60u8) {
+            this.at = this.at + 1;
+            let from = this.at;
+            while (this.more() && this.peek() != 62u8) {
+                this.at = this.at + 1;
+            }
+            if (!this.more()) {
+                throw this.fail("'<' without '>'");
+            }
+            let name = string.fromUtf8Lossy(this.b[from..this.at]);
+            this.at = this.at + 1;
+            if (name.length() < 3) {
+                throw this.fail("an abbreviation has three characters at least");
+            }
+            return name;
+        }
+        while (this.more() && isAlpha(this.peek())) {
+            this.at = this.at + 1;
+        }
+        if (this.at - start < 3) {
+            throw this.fail("an abbreviation has three letters at least");
+        }
+        return string.fromUtf8Lossy(this.b[start..this.at]);
+    }
+
+    mut fn number(): int throws TimeError {
+        let start = this.at;
+        var v = 0;
+        while (this.more() && isDigit(this.peek())) {
+            v = v * 10 + (this.peek() - 48u8) as int;
+            this.at = this.at + 1;
+        }
+        if (this.at == start) {
+            throw this.fail("a number was expected");
+        }
+        return v;
+    }
+
+    /// `[+-]hh[:mm[:ss]]` as seconds.
+    mut fn time(): int throws TimeError {
+        var sign = 1;
+        if (this.more() && (this.peek() == 43u8 || this.peek() == 45u8)) {
+            if (this.peek() == 45u8) {
+                sign = -1;
+            }
+            this.at = this.at + 1;
+        }
+        var secs = (try this.number()) * 3600;
+        if (this.more() && this.peek() == 58u8) {
+            this.at = this.at + 1;
+            secs = secs + (try this.number()) * 60;
+            if (this.more() && this.peek() == 58u8) {
+                this.at = this.at + 1;
+                secs = secs + (try this.number());
+            }
+        }
+        return sign * secs;
+    }
+
+    /// `Jn`, `n` or `Mm.w.d`, with `/time` where given (2:00 else).
+    mut fn ruleDate(): (RuleDate, int) throws TimeError {
+        var date = RuleDate.Julian0(0);
+        if (this.more() && this.peek() == 74u8) {
+            this.at = this.at + 1;
+            let n = try this.number();
+            if (n < 1 || n > 365) {
+                throw this.fail("Jn takes 1 to 365");
+            }
+            date = RuleDate.Julian1(n);
+        } else if (this.more() && this.peek() == 77u8) {
+            this.at = this.at + 1;
+            let m = try this.number();
+            if (!(this.more() && this.peek() == 46u8)) { throw this.fail("Mm.w.d takes dots"); }
+            this.at = this.at + 1;
+            let w = try this.number();
+            if (!(this.more() && this.peek() == 46u8)) { throw this.fail("Mm.w.d takes dots"); }
+            this.at = this.at + 1;
+            let d = try this.number();
+            if (m < 1 || m > 12 || w < 1 || w > 5 || d > 6) {
+                throw this.fail("Mm.w.d takes a month 1-12, a week 1-5, a day 0-6");
+            }
+            date = RuleDate.Month(m, w, d);
+        } else {
+            let n = try this.number();
+            if (n > 365) {
+                throw this.fail("n takes 0 to 365");
+            }
+            date = RuleDate.Julian0(n);
+        }
+        var time = 7200;
+        if (this.more() && this.peek() == 47u8) {
+            this.at = this.at + 1;
+            time = try this.time();
+        }
+        return (date, time);
+    }
+}
+
+/// `std offset [dst [offset] [,start[/time],end[/time]]]`: the offsets are POSIX's — west is
+/// positive — and come out east; a daylight time without its offset is one hour ahead; without a
+/// rule, the US rule (`M3.2.0,M11.1.0`).
+fn parsePosix(tz: string): PosixRule throws TimeError {
+    var r = PosixReader { b = viewBytes(tz), at = 0 };
+    let stdAbbr = try r.abbreviation();
+    let stdOff = -(try r.time());
+    if (!r.more()) {
+        return PosixRule { stdAbbr = stdAbbr, stdOff = stdOff, dstAbbr = null, dstOff = stdOff, start = RuleDate.Julian0(0), end = RuleDate.Julian0(0), startTime = 0, endTime = 0 };
+    }
+    let dstAbbr = try r.abbreviation();
+    var dstOff = stdOff + 3600;
+    if (r.more() && r.peek() != 44u8) {
+        dstOff = -(try r.time());
+    }
+    var start = RuleDate.Month(3, 2, 0);
+    var end = RuleDate.Month(11, 1, 0);
+    var startTime = 7200;
+    var endTime = 7200;
+    if (r.more()) {
+        if (r.peek() != 44u8) {
+            throw r.fail("',' was expected before the rule");
+        }
+        r.at = r.at + 1;
+        let (sd, st) = try r.ruleDate();
+        if (!(r.more() && r.peek() == 44u8)) {
+            throw r.fail("the rule names a start and an end");
+        }
+        r.at = r.at + 1;
+        let (ed, et) = try r.ruleDate();
+        start = sd;
+        startTime = st;
+        end = ed;
+        endTime = et;
+        if (r.more()) {
+            throw r.fail("text after the rule");
+        }
+    }
+    return PosixRule { stdAbbr = stdAbbr, stdOff = stdOff, dstAbbr = dstAbbr, dstOff = dstOff, start = start, end = end, startTime = startTime, endTime = endTime };
+}
+
+fn isAlpha(b: uint8): bool {
+    return (b >= 65u8 && b <= 90u8) || (b >= 97u8 && b <= 122u8);
+}
+
+// ---------------------------------------------------------------------------------------------
+// The runtime's file and environment, as std.fs and std.os read them.
+// ---------------------------------------------------------------------------------------------
+
+/// The whole file, or `null` where it cannot be read.
+fn readWhole(path: string): ?uint8[] {
+    let file = zoneFileOpen(path, 1);
+    if (file < 0) {
+        return null;
+    }
+    let out: List<uint8> = List.new();
+    let chunk: uint8[] = [0u8] * 8192;
+    var failed = false;
+    while (true) {
+        let n = zoneFileRead(file, chunk[..]);
+        if (n < 0) {
+            failed = true;
+            break;
+        }
+        if (n == 0) {
+            break;
+        }
+        var i = 0;
+        while (i < n) {
+            out.push(chunk[i]);
+            i = i + 1;
+        }
+        if (out.length() > 4194304) {
+            failed = true;
+            break;
+        }
+    }
+    let _ = zoneFileClose(file);
+    if (failed) {
+        return null;
+    }
+    return out.toArray();
+}
+
+/// The variable's value, `null` where it is not set or empty.
+fn envText(name: string): ?string {
+    var buf: uint8[] = [0u8] * 1024;
+    var n = zoneEnv(name, buf[..]);
+    if (n > buf.length()) {
+        buf = [0u8] * n;
+        n = zoneEnv(name, buf[..]);
+    }
+    if (n <= 0) {
+        return null;
+    }
+    return string.fromUtf8Lossy(buf[0..n]);
 }
 
 /// A date and a time of day at an offset from UTC (10 Q1): the moment it names, and how it was
 /// written. Its text is RFC 3339, `2026-10-08T12:34:56.5+02:00`, `Z` for no offset. Two compare
 /// field by field: the same moment at two offsets is two date-times — `toInstant()` compares them
 /// as moments.
-pub struct DateTime :: [Equatable, Display, Parse] {
+pub struct DateTime :: [Display, Parse] {
     d: Date,
     t: Time,
     off: int,
+    z: Zone,
 
+    /// The date and time in the zone: for a zone of the database, the offset in force then; a
+    /// local time that does not exist (the hour a clock springs forward) moves forward by the
+    /// gap, one that exists twice (the hour it falls back) takes the earlier moment.
     pub static fn of(date: Date, time: Time, zone: Zone): DateTime {
-        return DateTime { d = date, t = time, off = zone.offset().nanos() };
+        if (zone.rules == null) {
+            return DateTime { d = date, t = time, off = zone.off, z = zone };
+        }
+        let local = daysOf(date) * 86400 + (time.h * 60 + time.mi) * 60 + time.s;
+        let before = zone.offsetSecsAt(local - 86400);
+        let after = zone.offsetSecsAt(local + 86400);
+        let beforeHolds = zone.offsetSecsAt(local - before) == before;
+        let afterHolds = zone.offsetSecsAt(local - after) == after;
+        if (beforeHolds && afterHolds) {
+            // once, or twice (an overlap): the earlier moment is the larger offset's
+            let off = if (before > after) before else after;
+            return DateTime { d = date, t = time, off = off * 1000000000, z = zone };
+        }
+        if (beforeHolds) {
+            return DateTime { d = date, t = time, off = before * 1000000000, z = zone };
+        }
+        if (afterHolds) {
+            return DateTime { d = date, t = time, off = after * 1000000000, z = zone };
+        }
+        // a gap: forward by it, as the offset before the change reads the local time
+        let moment = Instant { ns = (local - before) * 1000000000 + time.n };
+        return moment.toDateTime(zone);
     }
 
     pub fn date(): Date { return this.d; }
     pub fn time(): Time { return this.t; }
     pub fn offset(): Duration { return Duration.ofNanos(this.off); }
+    pub fn zone(): Zone { return this.z; }
+
+    /// The same local time `n` days on, in the zone: across a change of the clocks the offset
+    /// follows the zone (a day may be 23 or 25 hours).
+    pub fn plusDays(n: int): DateTime {
+        return DateTime.of(this.d.plusDays(n), this.t, this.z);
+    }
+
+    /// The same moment in another zone.
+    pub fn withZone(zone: Zone): DateTime {
+        return this.toInstant().toDateTime(zone);
+    }
+
+    /// What the zone says at this moment: the abbreviation, daylight time.
+    pub fn zoneInfo(): ZoneInfo {
+        return this.z.infoAt(this.toInstant());
+    }
+
+    /// The date and time written by a pattern of UTS #35 (M10 S11): `yyyy-MM-dd HH:mm:ss`. The
+    /// fields: `y` the year (`yy` its last two digits, `yyyy` padded to four), `M` the month
+    /// (`MM` padded, `MMM` `Jan`, `MMMM` `January`, `MMMMM` `J`), `d` the day (`dd` padded), `H`
+    /// the hour of 24 (`HH`), `h` of 12 (`hh`), `m` the minute, `s` the second, `S…` the fraction
+    /// to as many digits, `a` `AM`/`PM`, `E`/`EEE` `Tue`, `EEEE` `Tuesday`, `EEEEE` `T`, `Z`
+    /// `+0100` (`ZZZZZ` `+01:00`, `Z` for none), `X` `+01`/`+0100`/`+01:00` by its count with `Z`
+    /// for none, `x` the same without `Z`; text in `'…'` as it is, `''` a quote; what is no
+    /// letter as it is. Names are English. A letter the pattern does not know is `TimeError`.
+    pub fn format(pattern: string): string throws TimeError {
+        let tokens = try patternTokens(pattern);
+        let out = StringBuilder.new();
+        for (tk in tokens) {
+            let (letter, count, literal) = tk;
+            if (letter == ' ') {
+                out.appendStr(literal);
+                continue;
+            }
+            out.appendStr(try this.field(letter, count));
+        }
+        return out.toString();
+    }
+
+    fn field(letter: char, count: int): string throws TimeError {
+        let t = this.t;
+        let d = this.d;
+        if (letter == 'y') {
+            if (count == 2) {
+                return twoDigits(floorRem(d.y, 100));
+            }
+            return padded(d.y, count);
+        }
+        if (letter == 'M') {
+            if (count >= 5) { return monthName(d.m)[0..1].toString(); }
+            if (count == 4) { return monthName(d.m); }
+            if (count == 3) { return monthName(d.m)[0..3].toString(); }
+            return padded(d.m, count);
+        }
+        if (letter == 'd') { return padded(d.d, count); }
+        if (letter == 'H') { return padded(t.h, count); }
+        if (letter == 'h') {
+            let h12 = if (t.h % 12 == 0) 12 else t.h % 12;
+            return padded(h12, count);
+        }
+        if (letter == 'm') { return padded(t.mi, count); }
+        if (letter == 's') { return padded(t.s, count); }
+        if (letter == 'S') {
+            let nine = padded(t.n, 9);
+            return if (count >= 9) nine else nine[0..count].toString();
+        }
+        if (letter == 'a') { return if (t.h < 12) "AM" else "PM"; }
+        if (letter == 'E') {
+            let name = d.dayOfWeek().show();
+            if (count >= 5) { return name[0..1].toString(); }
+            if (count == 4) { return name; }
+            return name[0..3].toString();
+        }
+        if (letter == 'Z') {
+            if (count >= 5) { return offsetText(this.off); }
+            if (count == 4) { return "GMT" + (if (this.off == 0) "" else offsetText(this.off)); }
+            return offsetBasic(this.off);
+        }
+        if (letter == 'X' || letter == 'x') {
+            if (this.off == 0 && letter == 'X') { return "Z"; }
+            if (count == 1) { return offsetHours(this.off); }
+            if (count == 2 || count == 4) { return offsetBasic(this.off); }
+            return offsetText(if (this.off == 0) 1 else this.off).replace("+00:01", "+00:00");
+        }
+        throw TimeError { detail = f"the pattern letter '{letter}' is none of y M d H h m s S a E Z X x" };
+    }
+
+    /// The date and time read by a pattern of UTS #35, the fields as `format` writes them: a
+    /// number takes as many digits as it finds (a padded field at least its width), a name is
+    /// matched without case, a fraction as many digits as there are. What the pattern does not
+    /// name is 1970-01-01 00:00:00; without an offset field the zone given decides. Text that
+    /// does not fit the pattern is `ParseError { kind = .Invalid }`.
+    pub static fn parseWith(pattern: string, text: string, zone: Zone = Zone.utc): DateTime throws ParseError {
+        var tokens: List<(char, int, string)> = List.new();
+        try {
+            tokens = patternTokens(pattern);
+        } catch (_: TimeError) {
+            throw ParseError { kind = .Invalid };
+        }
+        var r = FieldReader { b = viewBytes(text), at = 0 };
+        var year = 1970;
+        var month = 1;
+        var day = 1;
+        var hour = 0;
+        var minute = 0;
+        var second = 0;
+        var nano = 0;
+        var pm: ?bool = null;
+        var h12: ?int = null;
+        var off: ?int = null;
+        for (tk in tokens) {
+            let (letter, count, literal) = tk;
+            if (letter == ' ') {
+                try r.literal(literal);
+            } else if (letter == 'y') {
+                year = try r.number(if (count == 2) 2 else 1, if (count == 2) 2 else 9);
+                if (count == 2) {
+                    year = year + (if (year < 70) 2000 else 1900);
+                }
+            } else if (letter == 'M') {
+                if (count >= 3) {
+                    month = try r.name(monthNames(), count == 3);
+                } else {
+                    month = try r.number(count, 2);
+                }
+            } else if (letter == 'd') { day = try r.number(count, 2); }
+            else if (letter == 'H') { hour = try r.number(count, 2); }
+            else if (letter == 'h') { h12 = try r.number(count, 2); }
+            else if (letter == 'm') { minute = try r.number(count, 2); }
+            else if (letter == 's') { second = try r.number(count, 2); }
+            else if (letter == 'S') { nano = try r.fraction(); }
+            else if (letter == 'a') {
+                pm = try r.amPm();
+            } else if (letter == 'E') {
+                let _ = try r.name(weekdayNames(), count <= 3);
+            } else if (letter == 'Z' || letter == 'X' || letter == 'x') {
+                off = try r.offset(letter == 'X');
+            } else {
+                throw ParseError { kind = .Invalid };
+            }
+        }
+        if (r.at != r.b.length()) {
+            throw ParseError { kind = .Invalid };
+        }
+        if (let h = h12) {
+            if (h < 1 || h > 12) {
+                throw ParseError { kind = .Invalid };
+            }
+            hour = h % 12 + (if (pm ?? false) 12 else 0);
+        } else if (let p = pm) {
+            if (p && hour < 12) { hour = hour + 12; }
+            if (!p && hour >= 12) { hour = hour - 12; }
+        }
+        let date = try Date.of(year, month, day) catch (e: TimeError) throw ParseError { kind = .Invalid };
+        let time = try Time.of(hour, minute, second, nano) catch (e: TimeError) throw ParseError { kind = .Invalid };
+        if (let o = off) {
+            let fixed = try Zone.fixed(Duration.ofSecs(o)) catch (e: TimeError) throw ParseError { kind = .Invalid };
+            return DateTime { d = date, t = time, off = o * 1000000000, z = fixed };
+        }
+        return DateTime.of(date, time, zone);
+    }
 
     /// The moment this names. One outside the years an `Instant` reaches panics (RT0002).
     pub fn toInstant(): Instant {
@@ -535,7 +1333,7 @@ pub struct DateTime :: [Equatable, Display, Parse] {
             throw ParseError { kind = .Invalid };
         }
         let time = try Time.of(hour, minute, second, nano) catch (e: TimeError) throw ParseError { kind = .Invalid };
-        return DateTime { d = date, t = time, off = offset };
+        return DateTime { d = date, t = time, off = offset, z = fixedOf(offset) };
     }
 }
 
@@ -618,4 +1416,258 @@ fn fromDays(days: int): Date {
     let month = if (mp < 10) mp + 3 else mp - 9;
     let year = yearOfEra + era * 400 + (if (month <= 2) 1 else 0);
     return Date { y = year, m = month, d = day };
+}
+
+/// The same date, time and offset: the zone's name is not compared.
+extend DateTime :: [Equatable] {
+    fn equals(o: DateTime): bool {
+        // field by field, not through Date's and Time's own equality: a build that expands a
+        // macro compiles std without the synthesized defaults, and there neither '==' nor
+        // 'equals' of a Date exists (open point 188)
+        return this.d.y == o.d.y && this.d.m == o.d.m && this.d.d == o.d.d
+            && this.t.h == o.t.h && this.t.mi == o.t.mi && this.t.s == o.t.s && this.t.n == o.t.n
+            && this.off == o.off;
+    }
+}
+
+/// The fixed zone of an offset in nanoseconds, UTC for none; one RFC 3339 wrote is whole minutes.
+fn fixedOf(off: int): Zone {
+    if (off == 0) {
+        return Zone.utc;
+    }
+    return Zone { label = offsetText(off), off = off, rules = null };
+}
+
+// ---------------------------------------------------------------------------------------------
+// UTS #35 patterns.
+// ---------------------------------------------------------------------------------------------
+
+/// The pattern as tokens: a field letter with its count, or `' '` with a literal.
+fn patternTokens(pattern: string): List<(char, int, string)> throws TimeError {
+    let out: List<(char, int, string)> = List.new();
+    let cs: List<char> = List.new();
+    for (c in pattern.chars()) {
+        cs.push(c);
+    }
+    var i = 0;
+    while (i < cs.length()) {
+        let c = cs[i];
+        if (c == '\'') {
+            // a quoted literal; '' is one quote
+            let lit = StringBuilder.new();
+            i = i + 1;
+            var closed = false;
+            while (i < cs.length()) {
+                if (cs[i] == '\'') {
+                    if (i + 1 < cs.length() && cs[i + 1] == '\'') {
+                        lit.appendChar('\'');
+                        i = i + 2;
+                        continue;
+                    }
+                    closed = true;
+                    i = i + 1;
+                    break;
+                }
+                lit.appendChar(cs[i]);
+                i = i + 1;
+            }
+            if (!closed) {
+                throw TimeError { detail = "the pattern's quote is not closed" };
+            }
+            if (lit.length() == 0) {
+                out.push((' ', 0, "'"));
+            } else {
+                out.push((' ', 0, lit.toString()));
+            }
+            continue;
+        }
+        if (c.isAsciiAlpha()) {
+            var count = 0;
+            while (i < cs.length() && cs[i] == c) {
+                count = count + 1;
+                i = i + 1;
+            }
+            if (!(c == 'y' || c == 'M' || c == 'd' || c == 'H' || c == 'h' || c == 'm' || c == 's' || c == 'S' || c == 'a' || c == 'E' || c == 'Z' || c == 'X' || c == 'x')) {
+                throw TimeError { detail = f"the pattern letter '{c}' is none of y M d H h m s S a E Z X x" };
+            }
+            out.push((c, count, ""));
+            continue;
+        }
+        let lit = StringBuilder.new();
+        while (i < cs.length() && !cs[i].isAsciiAlpha() && cs[i] != '\'') {
+            lit.appendChar(cs[i]);
+            i = i + 1;
+        }
+        out.push((' ', 0, lit.toString()));
+    }
+    return out;
+}
+
+fn padded(v: int, width: int): string {
+    let text = if (v < 0) f"{-v}" else f"{v}";
+    let out = StringBuilder.new();
+    if (v < 0) {
+        out.appendChar('-');
+    }
+    var k = text.length();
+    while (k < width) {
+        out.appendChar('0');
+        k = k + 1;
+    }
+    out.appendStr(text);
+    return out.toString();
+}
+
+fn monthNames(): string[] {
+    return ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+}
+
+fn monthName(m: int): string {
+    return monthNames()[m - 1];
+}
+
+fn weekdayNames(): string[] {
+    return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+}
+
+/// `+0100`, `-0530`; `+0000` for none.
+fn offsetBasic(off: int): string {
+    let mins = floorDiv(if (off < 0) -off else off, 60000000000);
+    return (if (off < 0) "-" else "+") + twoDigits(mins / 60) + twoDigits(mins % 60);
+}
+
+/// `+01`, `-05`; `+00` for none.
+fn offsetHours(off: int): string {
+    let mins = floorDiv(if (off < 0) -off else off, 60000000000);
+    return (if (off < 0) "-" else "+") + twoDigits(mins / 60);
+}
+
+/// The text read field by field.
+struct FieldReader {
+    b: Slice<uint8>,
+    var at: int,
+
+    mut fn literal(text: string): void throws ParseError {
+        let want = viewBytes(text);
+        if (this.at + want.length() > this.b.length()) {
+            throw ParseError { kind = .Invalid };
+        }
+        var i = 0;
+        while (i < want.length()) {
+            if (this.b[this.at + i] != want[i]) {
+                throw ParseError { kind = .Invalid };
+            }
+            i = i + 1;
+        }
+        this.at = this.at + want.length();
+    }
+
+    /// At least `least` and at most `most` digits.
+    mut fn number(least: int, most: int): int throws ParseError {
+        var v = 0;
+        var n = 0;
+        while (n < most && this.at < this.b.length() && isDigit(this.b[this.at])) {
+            v = v * 10 + (this.b[this.at] - 48u8) as int;
+            this.at = this.at + 1;
+            n = n + 1;
+        }
+        if (n < least || n == 0) {
+            throw ParseError { kind = .Invalid };
+        }
+        return v;
+    }
+
+    /// Digits as nanoseconds: the first nine count.
+    mut fn fraction(): int throws ParseError {
+        var v = 0;
+        var n = 0;
+        while (this.at < this.b.length() && isDigit(this.b[this.at])) {
+            if (n < 9) {
+                v = v * 10 + (this.b[this.at] - 48u8) as int;
+                n = n + 1;
+            }
+            this.at = this.at + 1;
+        }
+        if (n == 0) {
+            throw ParseError { kind = .Invalid };
+        }
+        while (n < 9) {
+            v = v * 10;
+            n = n + 1;
+        }
+        return v;
+    }
+
+    /// One of the names, the whole name or its first three letters, without case: its number
+    /// from 1.
+    mut fn name(names: string[], short: bool): int throws ParseError {
+        var i = 0;
+        while (i < names.length()) {
+            let full = viewBytes(names[i]);
+            let want = if (short) full[0..3] else full;
+            if (this.at + want.length() <= this.b.length()) {
+                var k = 0;
+                var same = true;
+                while (k < want.length()) {
+                    if (lowerAscii(this.b[this.at + k]) != lowerAscii(want[k])) {
+                        same = false;
+                        break;
+                    }
+                    k = k + 1;
+                }
+                if (same) {
+                    this.at = this.at + want.length();
+                    return i + 1;
+                }
+            }
+            i = i + 1;
+        }
+        throw ParseError { kind = .Invalid };
+    }
+
+    mut fn amPm(): bool throws ParseError {
+        if (this.at + 2 > this.b.length()) {
+            throw ParseError { kind = .Invalid };
+        }
+        let a = lowerAscii(this.b[this.at]);
+        let m = lowerAscii(this.b[this.at + 1]);
+        if (m != 109u8 || !(a == 97u8 || a == 112u8)) {
+            throw ParseError { kind = .Invalid };
+        }
+        this.at = this.at + 2;
+        return a == 112u8;
+    }
+
+    /// `Z` (where allowed), `+hh`, `+hhmm`, `+hh:mm`: seconds east.
+    mut fn offset(zAllowed: bool): int throws ParseError {
+        if (this.at >= this.b.length()) {
+            throw ParseError { kind = .Invalid };
+        }
+        let c = this.b[this.at];
+        if (zAllowed && (c == 90u8 || c == 122u8)) {
+            this.at = this.at + 1;
+            return 0;
+        }
+        if (c != 43u8 && c != 45u8) {
+            throw ParseError { kind = .Invalid };
+        }
+        let sign = if (c == 45u8) -1 else 1;
+        this.at = this.at + 1;
+        let hours = try this.number(2, 2);
+        var minutes = 0;
+        if (this.at < this.b.length() && this.b[this.at] == 58u8) {
+            this.at = this.at + 1;
+            minutes = try this.number(2, 2);
+        } else if (this.at + 2 <= this.b.length() && isDigit(this.b[this.at]) && isDigit(this.b[this.at + 1])) {
+            minutes = try this.number(2, 2);
+        }
+        if (hours > 23 || minutes > 59) {
+            throw ParseError { kind = .Invalid };
+        }
+        return sign * (hours * 3600 + minutes * 60);
+    }
+}
+
+fn lowerAscii(b: uint8): uint8 {
+    return if (b >= 65u8 && b <= 90u8) b + 32u8 else b;
 }

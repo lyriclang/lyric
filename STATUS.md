@@ -1326,6 +1326,20 @@ M9b: no halt until it closes, merged on green CI, open points collected for the 
   (`programs/logfilter.lyr`: matches bold red, line numbers green, `--color`/`--no-color`,
   through `ExampleTests`); `tests/std/tests/term.lyr` (4 tests). Spec 12 §The terminal rules
   1–4; three cases. Raw mode stays a door.
+- **S11** zones and patterns (P9; 10 Q1): `Zone` is UTC, a fixed offset, or a zone of the
+  database — `Zone.load(name)` reads TZif (RFC 8536 v1–v4, the 64-bit block, the footer's POSIX
+  rule for the years beyond, leap seconds read over) from `TZDIR`/`/usr/share/zoneinfo`
+  (`TimeError { kind = .NoZoneData }` on a system without one, `.NoSuchZone`), `Zone.fromTzif`
+  and `Zone.fromPosix` take data of one's own, `Zone.local()` is `TZ`, `/etc/localtime`, else
+  UTC; the files and the variable through the runtime's own calls (`std.fs` and `std.os` import
+  `std.time`). `offsetAt`/`infoAt` (transitions by binary search, the rule beyond), `DateTime.of`
+  resolves a local time (the gap forward, the overlap earlier), a `DateTime` keeps its zone
+  (`plusDays` across a change, `withZone`, `zoneInfo`). UTS #35: `dateTime.format(pattern)` and
+  `DateTime.parseWith(pattern, text, zone)` with `y M d H h m s S a E Z X x`, quotes, English
+  names. The artifacts: Europe/Berlin across 2026-03-29 from the system's database and from a
+  TZif of its own, America/New_York 2040 by the rule, `"yyyy-MM-dd HH:mm Z"` and four more
+  patterns there and back (`tests/std/tests/zones.lyr`, 4 tests). Spec 12 §Time, the zones,
+  rules 1–3; three cases. Windows' registry zones stay a door; localization is `en`.
 
 ## Design decisions
 
