@@ -1,0 +1,1384 @@
+/// JSON (design/v5/spec/10 B10 E7; 13 M10 S3): RFC 8259, strictly — an encoder and a decoder of
+/// `std.codec`'s model, and `JsonValue`, the dynamic tree. `json.encode(v)` writes any `Encode`
+/// value as text, `json.decode<T>(text)` reads any `Decode` value out of one; `json.parse(text)`
+/// is the tree. A struct is an object, a sequence an array, a map an object whose keys are
+/// strings — a number's digits where the key is a number —, bytes a Base64 string, a unit variant
+/// its name, a variant with a payload `{"Name": payload}`. `NaN` and the infinities have no text
+/// (E7, RFC 8259 §6): writing one is an `EncodeError`. The text is read whole into the tree first;
+/// a streaming decoder is a door (E9).
+import std.codec { Encode, Decode, Codable, Encoder, Decoder, EncodeError, DecodeError };
+import std.collections { List, Map, Set };
+import std.core { ParseError };
+import std.encoding { Base64, EncodingError };
+import std.io { Reader, Writer, IoError };
+import std.task { Cancelled };
+import std.string { StringBuilder, fromFloat };
+
+// ------------------------------------------------------------------ the options and the error
+
+/// How the text is written: `pretty` with newlines and `indent` spaces per level, `sortKeys` with
+/// an object's keys in order (which goes through the tree).
+pub struct JsonOptions {
+    pub pretty: bool = false,
+    pub indent: int = 2,
+    pub sortKeys: bool = false,
+}
+
+/// A text that is no JSON (E5): where, and what was wrong.
+pub struct JsonError :: [Error] {
+    pub line: int,
+    pub column: int,
+    pub detail: string,
+
+    pub fn message(): string {
+        return f"{this.detail} at {this.line}:{this.column}";
+    }
+}
+
+// ------------------------------------------------------------------ the tree
+
+/// A JSON document as a value (E7): the six forms, a number as `Int` where it has no fraction or
+/// exponent and fits an `int`, `Float` else.
+pub enum JsonValue {
+    Null,
+    Bool(bool),
+    Int(int),
+    Float(float),
+    String(string),
+    Array(List<JsonValue>),
+    Object(Map<string, JsonValue>),
+}
+
+extend JsonValue :: [Equatable] {
+    /// Equal form and content; two objects with the same keys and equal values, whatever the
+    /// order.
+    fn equals(o: JsonValue): bool {
+        match (this) {
+            .Null => { match (o) { .Null => { return true; }, _ => { return false; } } },
+            .Bool(a) => { match (o) { .Bool(b) => { return a == b; }, _ => { return false; } } },
+            .Int(a) => { match (o) { .Int(b) => { return a == b; }, _ => { return false; } } },
+            .Float(a) => { match (o) { .Float(b) => { return a == b; }, _ => { return false; } } },
+            .String(a) => { match (o) { .String(b) => { return a == b; }, _ => { return false; } } },
+            .Array(a) => {
+                match (o) {
+                    .Array(b) => {
+                        if (a.length() != b.length()) {
+                            return false;
+                        }
+                        var i = 0;
+                        while (i < a.length()) {
+                            if (!(a[i] == b[i])) {
+                                return false;
+                            }
+                            i = i + 1;
+                        }
+                        return true;
+                    },
+                    _ => { return false; },
+                }
+            },
+            .Object(a) => {
+                match (o) {
+                    .Object(b) => {
+                        if (a.length() != b.length()) {
+                            return false;
+                        }
+                        for ((k, v) in a) {
+                            if (let w = b.get(k)) {
+                                if (!(v == w)) {
+                                    return false;
+                                }
+                            } else {
+                                return false;
+                            }
+                        }
+                        return true;
+                    },
+                    _ => { return false; },
+                }
+            },
+        }
+    }
+}
+
+extend JsonValue :: [Display, Debug] {
+    /// The compact text.
+    fn show(): string {
+        var e = JsonWriter { opts = JsonOptions { } };
+        try {
+            this.writeTo(&e);
+        } catch (_: EncodeError) {
+            // a number without a text: what was written stands
+        }
+        return e.text();
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.appendStr(this.show());
+    }
+
+    fn debug(): string {
+        return this.show();
+    }
+
+    fn debugTo(out: StringBuilder): void {
+        out.appendStr(this.show());
+    }
+}
+
+/// `v["key"]`: the member, or `null` where the value is no object or has no such member.
+extend JsonValue :: [Index<string>] {
+    type Output = ?JsonValue;
+
+    fn index(k: string): ?JsonValue {
+        match (this) {
+            .Object(m) => { return m.get(k); },
+            _ => { return null; },
+        }
+    }
+}
+
+extend JsonValue {
+    /// `v.at(3)`: the element, or `null` where the value is no array or the index is out of it
+    /// (one `[]` a type has: the member's, E7).
+    pub fn at(i: int): ?JsonValue {
+        match (this) {
+            .Array(items) => { return if (i >= 0 && i < items.length()) items[i] else null; },
+            _ => { return null; },
+        }
+    }
+
+    /// The value at a path, `"users[0].mail"`: a member by name, an element by index, `null`
+    /// where the path leaves the tree.
+    pub fn path(p: string): ?JsonValue {
+        var current: ?JsonValue = this;
+        var name = "";
+        var index = "";
+        var inIndex = false;
+        for (c in p.chars()) {
+            if (inIndex) {
+                if (c == ']') {
+                    var i = -1;
+                    try {
+                        i = int.parse(index);
+                    } catch (_: ParseError) {
+                    }
+                    if (let v = current) {
+                        current = v.at(i);
+                    }
+                    index = "";
+                    inIndex = false;
+                } else {
+                    index = index + f"{c}";
+                }
+            } else if (c == '.' || c == '[') {
+                if (name != "") {
+                    if (let v = current) {
+                        current = v[name];
+                    }
+                    name = "";
+                }
+                inIndex = c == '[';
+            } else {
+                name = name + f"{c}";
+            }
+        }
+        if (name != "") {
+            if (let v = current) {
+                current = v[name];
+            }
+        }
+        return current;
+    }
+
+    pub fn isNull(): bool {
+        match (this) { .Null => { return true; }, _ => { return false; } }
+    }
+
+    pub fn asBool(): ?bool {
+        match (this) { .Bool(b) => { return b; }, _ => { return null; } }
+    }
+
+    pub fn asInt(): ?int {
+        match (this) { .Int(i) => { return i; }, _ => { return null; } }
+    }
+
+    /// The number as a float: an `Int` widened.
+    pub fn asFloat(): ?float {
+        match (this) { .Float(f) => { return f; }, .Int(i) => { return i as float; }, _ => { return null; } }
+    }
+
+    pub fn asString(): ?string {
+        match (this) { .String(s) => { return s; }, _ => { return null; } }
+    }
+
+    pub fn asArray(): ?List<JsonValue> {
+        match (this) { .Array(a) => { return a; }, _ => { return null; } }
+    }
+
+    pub fn asObject(): ?Map<string, JsonValue> {
+        match (this) { .Object(o) => { return o; }, _ => { return null; } }
+    }
+
+    /// The tree written into any encoder: an object as a map of string keys, an array as a
+    /// sequence.
+    fn writeTo<E :: [Encoder]>(&e: E): void throws EncodeError {
+        match (this) {
+            .Null => { try e.encodeNull(); },
+            .Bool(b) => { try e.encodeBool(b); },
+            .Int(i) => { try e.encodeInt(i); },
+            .Float(f) => { try e.encodeFloat(f); },
+            .String(s) => { try e.encodeString(s); },
+            .Array(items) => {
+                try e.beginSeq(items.length());
+                for (x in items) {
+                    try e.element(x);
+                }
+                try e.endSeq();
+            },
+            .Object(members) => {
+                try e.beginMap(members.length());
+                for ((k, v) in members) {
+                    try e.entry(k, v);
+                }
+                try e.endMap();
+            },
+        }
+    }
+}
+
+/// The tree is `Codable`: it writes its forms into any format, and reads any value's forms from
+/// one — a struct as an object, a variant as its name or an object of one member.
+extend JsonValue :: [Codable] {
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try this.writeTo(&e);
+    }
+
+    static fn decode<D :: [Decoder]>(&d: D): JsonValue throws DecodeError {
+        if (try d.isNull()) {
+            try d.decodeNull();
+            return JsonValue.Null;
+        }
+        if (let b = try? d.decodeBool()) {
+            return JsonValue.Bool(b);
+        }
+        if (let i = try? d.decodeInt()) {
+            return JsonValue.Int(i);
+        }
+        if (let f = try? d.decodeFloat()) {
+            return JsonValue.Float(f);
+        }
+        if (let s = try? d.decodeString()) {
+            return JsonValue.String(s);
+        }
+        if ((try? d.beginSeq()) != null) {
+            let items = List<JsonValue>.new();
+            while (try d.seqHasNext()) {
+                items.push(try JsonValue.decode(&d));
+            }
+            try d.endSeq();
+            return JsonValue.Array(items);
+        }
+        if ((try? d.beginMap()) != null) {
+            let members = Map<string, JsonValue>.new();
+            loop {
+                if (let k = try d.nextKey<string>()) {
+                    members[k] = try d.value<JsonValue>();
+                } else {
+                    break;
+                }
+            }
+            try d.endMap();
+            return JsonValue.Object(members);
+        }
+        throw DecodeError { kind = .TypeMismatch, path = d.path(), detail = "a form JSON has not" };
+    }
+}
+
+// ------------------------------------------------------------------ writing
+
+/// What the writer stands in: an array or an object, how many parts it wrote, whether a key is
+/// due.
+struct Frame {
+    var isObject: bool,
+    var count: int,
+    var keyDue: bool,
+}
+
+/// The encoder that writes text (E7): compact, or pretty with newlines and indentation.
+pub class JsonWriter :: [Encoder] {
+    opts: JsonOptions,
+    var out: StringBuilder = StringBuilder.new(),
+    var stack: List<Frame> = List.new(),
+    var segments: List<string> = List.new(),
+    /// The depth at which a variant with a payload opened its object, innermost last.
+    var variants: List<int> = List.new(),
+
+    /// A writer under the options; a program hands it to `v.encode(&w)` and takes `text()`.
+    pub static fn new(opts: JsonOptions = JsonOptions { }): JsonWriter {
+        return JsonWriter { opts = opts };
+    }
+
+    /// The text written so far.
+    pub fn text(): string {
+        return this.out.toString();
+    }
+
+    fn newline(): void {
+        if (!this.opts.pretty) {
+            return;
+        }
+        this.out.appendChar('\n');
+        var i = 0;
+        while (i < this.stack.length() * this.opts.indent) {
+            this.out.appendChar(' ');
+            i = i + 1;
+        }
+    }
+
+    /// Before a value: the comma and the newline an array or an object needs, or nothing for a
+    /// value that is a key or that follows a key.
+    mut fn beforeValue(): void throws EncodeError {
+        if (this.stack.isEmpty()) {
+            return;
+        }
+        let top = this.stack.length() - 1;
+        let f = this.stack[top];
+        if (f.isObject) {
+            if (f.keyDue) {
+                // the key itself: separated like an element
+                if (f.count > 0) {
+                    this.out.appendChar(',');
+                }
+                this.newline();
+                return;
+            }
+            return; // the value after its key
+        }
+        if (f.count > 0) {
+            this.out.appendChar(',');
+        }
+        this.newline();
+    }
+
+    /// After a value: the part is counted; after a key the value is due.
+    mut fn afterValue(): void {
+        if (this.stack.isEmpty()) {
+            return;
+        }
+        let top = this.stack.length() - 1;
+        let f = this.stack[top];
+        if (f.isObject && f.keyDue) {
+            this.out.appendChar(':');
+            if (this.opts.pretty) {
+                this.out.appendChar(' ');
+            }
+            this.stack[top] = Frame { isObject = true, count = f.count, keyDue = false };
+        } else {
+            this.stack[top] = Frame { isObject = f.isObject, count = f.count + 1, keyDue = f.isObject };
+        }
+    }
+
+    fn inKey(): bool {
+        if (this.stack.isEmpty()) {
+            return false;
+        }
+        let f = this.stack[this.stack.length() - 1];
+        return f.isObject && f.keyDue;
+    }
+
+    mut fn scalar(text: string): void throws EncodeError {
+        try this.beforeValue();
+        if (this.inKey()) {
+            // a number as a key: its digits in quotes
+            this.out.appendChar('"');
+            this.out.appendStr(text);
+            this.out.appendChar('"');
+        } else {
+            this.out.appendStr(text);
+        }
+        this.afterValue();
+    }
+
+    pub mut fn encodeNull(): void throws EncodeError {
+        if (this.inKey()) {
+            throw EncodeError { path = this.path(), detail = "a JSON key is a string, not null" };
+        }
+        try this.scalar("null");
+    }
+
+    pub mut fn encodeBool(v: bool): void throws EncodeError {
+        if (this.inKey()) {
+            throw EncodeError { path = this.path(), detail = "a JSON key is a string, not a bool" };
+        }
+        try this.scalar(if (v) "true" else "false");
+    }
+
+    pub mut fn encodeInt(v: int): void throws EncodeError {
+        try this.scalar(f"{v}");
+    }
+
+    pub mut fn encodeUint(v: uint): void throws EncodeError {
+        try this.scalar(f"{v}");
+    }
+
+    pub mut fn encodeFloat(v: float): void throws EncodeError {
+        if (!v.isFinite()) {
+            throw EncodeError { path = this.path(), detail = f"{v} has no JSON text (RFC 8259 §6)" };
+        }
+        if (this.inKey()) {
+            throw EncodeError { path = this.path(), detail = "a JSON key is a string, not a float" };
+        }
+        try this.scalar(fromFloat(v));
+    }
+
+    pub mut fn encodeString(v: string): void throws EncodeError {
+        try this.beforeValue();
+        writeString(this.out, v);
+        this.afterValue();
+    }
+
+    pub mut fn encodeBytes(v: Slice<uint8>): void throws EncodeError {
+        try this.encodeString(Base64.encode(v));
+    }
+
+    mut fn open(isObject: bool, segment: string): void throws EncodeError {
+        if (this.inKey()) {
+            throw EncodeError { path = this.path(), detail = "a JSON key is a string, not a container" };
+        }
+        try this.beforeValue();
+        this.out.appendChar(if (isObject) '{' else '[');
+        this.stack.push(Frame { isObject = isObject, count = 0, keyDue = isObject });
+        this.segments.push(segment);
+    }
+
+    mut fn close(isObject: bool): void throws EncodeError {
+        let f = this.stack.pop()!;
+        this.segments.pop();
+        if (f.count > 0) {
+            this.newline();
+        }
+        this.out.appendChar(if (isObject) '}' else ']');
+        this.afterValue();
+    }
+
+    pub mut fn beginSeq(count: int): void throws EncodeError { try this.open(false, "[]"); }
+    pub mut fn endSeq(): void throws EncodeError { try this.close(false); }
+    pub mut fn beginMap(count: int): void throws EncodeError { try this.open(true, "{}"); }
+    pub mut fn beginKey(): void throws EncodeError { }
+    pub mut fn endMap(): void throws EncodeError { try this.close(true); }
+    pub mut fn beginStruct(name: string, count: int): void throws EncodeError { try this.open(true, name); }
+
+    pub mut fn beginField(name: string): void throws EncodeError {
+        try this.encodeString(name);
+    }
+
+    pub mut fn endStruct(): void throws EncodeError { try this.close(true); }
+
+    pub mut fn beginVariant(enumName: string, variant: string, index: int, hasPayload: bool): void throws EncodeError {
+        if (!hasPayload) {
+            try this.encodeString(variant);
+            return;
+        }
+        try this.open(true, variant);
+        this.variants.push(this.stack.length());
+        try this.encodeString(variant);
+    }
+
+    pub mut fn endVariant(): void throws EncodeError {
+        // a unit variant opened nothing; a payload's object closes here
+        if (!this.variants.isEmpty() && this.variants[this.variants.length() - 1] == this.stack.length()) {
+            this.variants.pop();
+            try this.close(true);
+        }
+    }
+
+    pub fn path(): string {
+        return this.segments.toArray().join(".");
+    }
+}
+
+/// `s` as a JSON string: quoted, the quote, the backslash and the control characters escaped,
+/// everything else as it is (UTF-8).
+fn writeString(out: StringBuilder, s: string): void {
+    out.appendChar('"');
+    for (c in s.chars()) {
+        if (c == '"') {
+            out.appendStr("\\\"");
+        } else if (c == '\\') {
+            out.appendStr("\\\\");
+        } else if (c == '\n') {
+            out.appendStr("\\n");
+        } else if (c == '\r') {
+            out.appendStr("\\r");
+        } else if (c == '\t') {
+            out.appendStr("\\t");
+        } else if ((c as uint32) < 0x20) {
+            let code = (c as uint32) as int;
+            out.appendStr("\\u00");
+            out.appendChar(hexDigit(code / 16));
+            out.appendChar(hexDigit(code % 16));
+        } else {
+            out.appendChar(c);
+        }
+    }
+    out.appendChar('"');
+}
+
+fn hexDigit(v: int): char {
+    return if (v < 10) ((('0' as uint32) + (v as uint32)) as char) else ((('a' as uint32) + ((v - 10) as uint32)) as char);
+}
+
+/// The text of a value (E7).
+pub fn encode<T :: [Encode]>(v: T, opts: JsonOptions = JsonOptions { }): string throws EncodeError {
+    if (opts.sortKeys) {
+        return try sorted(v, opts);
+    }
+    var w = JsonWriter { opts = opts };
+    try v.encode(&w);
+    return w.text();
+}
+
+/// The text of a value, written into `w`.
+pub fn encodeTo<T :: [Encode], W :: [Writer]>(v: T, &w: W, opts: JsonOptions = JsonOptions { }): void throws [EncodeError, IoError, Cancelled] {
+    let text = try encode(v, opts);
+    try w.writeString(text);
+}
+
+/// With `sortKeys`: the value as a tree, every object's keys in order, then the text.
+fn sorted<T :: [Encode]>(v: T, opts: JsonOptions): string throws EncodeError {
+    var builder = TreeBuilder { };
+    try v.encode(&builder);
+    var w = JsonWriter { opts = JsonOptions { pretty = opts.pretty, indent = opts.indent, sortKeys = false } };
+    try writeSorted(builder.value(), &w);
+    return w.text();
+}
+
+fn writeSorted<E :: [Encoder]>(v: JsonValue, &e: E): void throws EncodeError {
+    match (v) {
+        .Array(items) => {
+            try e.beginSeq(items.length());
+            for (x in items) {
+                try writeSorted(x, &e);
+            }
+            try e.endSeq();
+        },
+        .Object(members) => {
+            let keys = List<string>.new();
+            for ((k, _) in members) {
+                keys.push(k);
+            }
+            let ordered = keys.toArray();
+            ordered.sort();
+            try e.beginMap(ordered.length());
+            for (k in ordered) {
+                try e.beginKey();
+                try e.encodeString(k);
+                try writeSorted(members[k]!, &e);
+            }
+            try e.endMap();
+        },
+        _ => { try v.writeTo(&e); },
+    }
+}
+
+/// What is being built, from the outside in.
+enum Building {
+    Array(List<JsonValue>),
+    Object(Map<string, JsonValue>, ?string),
+}
+
+/// An encoder that builds a `JsonValue` (E7): a struct as an object, a variant as its name or an
+/// object of one member, bytes as a Base64 string, a key as its string.
+pub class TreeBuilder :: [Encoder] {
+    var stack: List<Building> = List.new(),
+    var done: ?Box<JsonValue> = null,
+    var segments: List<string> = List.new(),
+    var variants: List<int> = List.new(),
+
+    /// A builder; a program hands it to `v.encode(&b)` and takes `value()`.
+    pub static fn new(): TreeBuilder {
+        return TreeBuilder { };
+    }
+
+    /// The value built, after one was encoded; `Null` before.
+    pub fn value(): JsonValue {
+        if (let b = this.done) {
+            return b.value;
+        }
+        return JsonValue.Null;
+    }
+
+    fn inKey(): bool {
+        if (this.stack.isEmpty()) {
+            return false;
+        }
+        match (this.stack[this.stack.length() - 1]) {
+            .Object(_, pending) => { return pending == null; },
+            _ => { return false; },
+        }
+    }
+
+    mut fn put(v: JsonValue): void throws EncodeError {
+        if (this.stack.isEmpty()) {
+            this.done = Box<JsonValue> { value = v };
+            return;
+        }
+        let top = this.stack.length() - 1;
+        match (this.stack[top]) {
+            .Array(items) => { items.push(v); },
+            .Object(members, pending) => {
+                if (let key = pending) {
+                    members[key] = v;
+                    this.stack[top] = Building.Object(members, null);
+                } else {
+                    // the key: a string, or a number's digits
+                    let text = match (v) {
+                        .String(s) => s,
+                        .Int(i) => f"{i}",
+                        _ => throw EncodeError { path = this.path(), detail = "a JSON key is a string" },
+                    };
+                    this.stack[top] = Building.Object(members, text);
+                }
+            },
+        }
+    }
+
+    pub mut fn encodeNull(): void throws EncodeError { try this.put(JsonValue.Null); }
+    pub mut fn encodeBool(v: bool): void throws EncodeError { try this.put(JsonValue.Bool(v)); }
+    pub mut fn encodeInt(v: int): void throws EncodeError { try this.put(JsonValue.Int(v)); }
+
+    pub mut fn encodeUint(v: uint): void throws EncodeError {
+        if (v > (int.max as uint)) {
+            try this.put(JsonValue.Float(v as float));
+        } else {
+            try this.put(JsonValue.Int(v as int));
+        }
+    }
+
+    pub mut fn encodeFloat(v: float): void throws EncodeError {
+        if (!v.isFinite()) {
+            throw EncodeError { path = this.path(), detail = f"{v} has no JSON text (RFC 8259 §6)" };
+        }
+        try this.put(JsonValue.Float(v));
+    }
+
+    pub mut fn encodeString(v: string): void throws EncodeError { try this.put(JsonValue.String(v)); }
+    pub mut fn encodeBytes(v: Slice<uint8>): void throws EncodeError { try this.put(JsonValue.String(Base64.encode(v))); }
+
+    pub mut fn beginSeq(count: int): void throws EncodeError {
+        this.stack.push(Building.Array(List<JsonValue>.withCapacity(count)));
+        this.segments.push("[]");
+    }
+
+    pub mut fn endSeq(): void throws EncodeError {
+        match (this.stack.pop()) {
+            .Array(items) => {
+                this.segments.pop();
+                try this.put(JsonValue.Array(items));
+            },
+            _ => { throw EncodeError { path = this.path(), detail = "endSeq without beginSeq" }; },
+        }
+    }
+
+    pub mut fn beginMap(count: int): void throws EncodeError {
+        this.stack.push(Building.Object(Map<string, JsonValue>.new(), null));
+        this.segments.push("{}");
+    }
+
+    pub mut fn beginKey(): void throws EncodeError { }
+
+    pub mut fn endMap(): void throws EncodeError {
+        match (this.stack.pop()) {
+            .Object(members, _) => {
+                this.segments.pop();
+                try this.put(JsonValue.Object(members));
+            },
+            _ => { throw EncodeError { path = this.path(), detail = "endMap without beginMap" }; },
+        }
+    }
+
+    pub mut fn beginStruct(name: string, count: int): void throws EncodeError {
+        this.stack.push(Building.Object(Map<string, JsonValue>.new(), null));
+        this.segments.push(name);
+    }
+
+    pub mut fn beginField(name: string): void throws EncodeError {
+        let top = this.stack.length() - 1;
+        match (this.stack[top]) {
+            .Object(members, _) => { this.stack[top] = Building.Object(members, name); },
+            _ => { throw EncodeError { path = this.path(), detail = "beginField outside a struct" }; },
+        }
+    }
+
+    pub mut fn endStruct(): void throws EncodeError { try this.endMap(); }
+
+    pub mut fn beginVariant(enumName: string, variant: string, index: int, hasPayload: bool): void throws EncodeError {
+        if (!hasPayload) {
+            try this.put(JsonValue.String(variant));
+            return;
+        }
+        this.stack.push(Building.Object(Map<string, JsonValue>.new(), variant));
+        this.variants.push(this.stack.length());
+        this.segments.push(variant);
+    }
+
+    pub mut fn endVariant(): void throws EncodeError {
+        if (!this.variants.isEmpty() && this.variants[this.variants.length() - 1] == this.stack.length()) {
+            this.variants.pop();
+            try this.endMap();
+        }
+    }
+
+    pub fn path(): string {
+        return this.segments.toArray().join(".");
+    }
+}
+
+// ------------------------------------------------------------------ reading
+
+/// The parser (RFC 8259, strict): the bytes, the position, the line and the column for an error.
+class Parser {
+    bytes: uint8[],
+    var at: int = 0,
+    var line: int = 1,
+    var lineStart: int = 0,
+
+    fn fail(detail: string): JsonError {
+        return JsonError { line = this.line, column = this.at - this.lineStart + 1, detail = detail };
+    }
+
+    fn peek(): int {
+        return if (this.at < this.bytes.length()) (this.bytes[this.at] as int) else -1;
+    }
+
+    mut fn skipWhitespace(): void {
+        while (this.at < this.bytes.length()) {
+            let b = this.bytes[this.at] as int;
+            if (b == 0x20 || b == 0x09 || b == 0x0D) {
+                this.at = this.at + 1;
+            } else if (b == 0x0A) {
+                this.at = this.at + 1;
+                this.line = this.line + 1;
+                this.lineStart = this.at;
+            } else {
+                break;
+            }
+        }
+    }
+
+    mut fn expectWord(word: string): void throws JsonError {
+        let w = word.toBytes();
+        var i = 0;
+        while (i < w.length()) {
+            if (this.at + i >= this.bytes.length() || this.bytes[this.at + i] != w[i]) {
+                throw this.fail(f"expected '{word}'");
+            }
+            i = i + 1;
+        }
+        this.at = this.at + w.length();
+    }
+
+    mut fn value(depth: int): JsonValue throws JsonError {
+        if (depth > 512) {
+            throw this.fail("the document nests deeper than 512 levels");
+        }
+        this.skipWhitespace();
+        let b = this.peek();
+        if (b < 0) {
+            throw this.fail("the text ends where a value was expected");
+        }
+        if (b == 0x7B) { return try this.object(depth); }
+        if (b == 0x5B) { return try this.array(depth); }
+        if (b == 0x22) { return JsonValue.String(try this.text()); }
+        if (b == 0x74) { try this.expectWord("true"); return JsonValue.Bool(true); }
+        if (b == 0x66) { try this.expectWord("false"); return JsonValue.Bool(false); }
+        if (b == 0x6E) { try this.expectWord("null"); return JsonValue.Null; }
+        if (b == 0x2D || (b >= 0x30 && b <= 0x39)) { return try this.number(); }
+        throw this.fail("a value was expected");
+    }
+
+    mut fn object(depth: int): JsonValue throws JsonError {
+        this.at = this.at + 1;
+        let members = Map<string, JsonValue>.new();
+        this.skipWhitespace();
+        if (this.peek() == 0x7D) {
+            this.at = this.at + 1;
+            return JsonValue.Object(members);
+        }
+        loop {
+            this.skipWhitespace();
+            if (this.peek() != 0x22) {
+                throw this.fail("a member's name was expected");
+            }
+            let name = try this.text();
+            this.skipWhitespace();
+            if (this.peek() != 0x3A) {
+                throw this.fail("':' was expected after the member's name");
+            }
+            this.at = this.at + 1;
+            members[name] = try this.value(depth + 1);
+            this.skipWhitespace();
+            let b = this.peek();
+            if (b == 0x2C) {
+                this.at = this.at + 1;
+                continue;
+            }
+            if (b == 0x7D) {
+                this.at = this.at + 1;
+                return JsonValue.Object(members);
+            }
+            throw this.fail("',' or '}' was expected");
+        }
+    }
+
+    mut fn array(depth: int): JsonValue throws JsonError {
+        this.at = this.at + 1;
+        let items = List<JsonValue>.new();
+        this.skipWhitespace();
+        if (this.peek() == 0x5D) {
+            this.at = this.at + 1;
+            return JsonValue.Array(items);
+        }
+        loop {
+            items.push(try this.value(depth + 1));
+            this.skipWhitespace();
+            let b = this.peek();
+            if (b == 0x2C) {
+                this.at = this.at + 1;
+                continue;
+            }
+            if (b == 0x5D) {
+                this.at = this.at + 1;
+                return JsonValue.Array(items);
+            }
+            throw this.fail("',' or ']' was expected");
+        }
+    }
+
+    /// A string: the bytes between the quotes, the escapes resolved, the content UTF-8.
+    mut fn text(): string throws JsonError {
+        this.at = this.at + 1;
+        let out = StringBuilder.new();
+        var runStart = this.at;
+        loop {
+            if (this.at >= this.bytes.length()) {
+                throw this.fail("the string is not closed");
+            }
+            let b = this.bytes[this.at] as int;
+            if (b == 0x22) {
+                try this.flushRun(out, runStart);
+                this.at = this.at + 1;
+                return out.toString();
+            }
+            if (b < 0x20) {
+                throw this.fail("a control character stands in a string unescaped");
+            }
+            if (b == 0x5C) {
+                try this.flushRun(out, runStart);
+                this.at = this.at + 1;
+                try this.escape(out);
+                runStart = this.at;
+                continue;
+            }
+            this.at = this.at + 1;
+        }
+    }
+
+    mut fn flushRun(out: StringBuilder, from: int): void throws JsonError {
+        if (from < this.at) {
+            try {
+                out.appendStr(string.fromUtf8(this.bytes[from..this.at]));
+            } catch (_: Error) {
+                throw this.fail("the string is no UTF-8");
+            }
+        }
+    }
+
+    mut fn escape(out: StringBuilder): void throws JsonError {
+        if (this.at >= this.bytes.length()) {
+            throw this.fail("the string ends in a backslash");
+        }
+        let b = this.bytes[this.at] as int;
+        this.at = this.at + 1;
+        if (b == 0x22) { out.appendChar('"'); return; }
+        if (b == 0x5C) { out.appendChar('\\'); return; }
+        if (b == 0x2F) { out.appendChar('/'); return; }
+        if (b == 0x62) { out.appendChar('\u{8}'); return; }
+        if (b == 0x66) { out.appendChar('\u{c}'); return; }
+        if (b == 0x6E) { out.appendChar('\n'); return; }
+        if (b == 0x72) { out.appendChar('\r'); return; }
+        if (b == 0x74) { out.appendChar('\t'); return; }
+        if (b == 0x75) {
+            var code = try this.hex4();
+            if (code >= 0xD800 && code <= 0xDBFF) {
+                // a high surrogate needs its low one
+                if (this.at + 1 < this.bytes.length() && this.bytes[this.at] == 0x5Cu8 && this.bytes[this.at + 1] == 0x75u8) {
+                    this.at = this.at + 2;
+                    let low = try this.hex4();
+                    if (low < 0xDC00 || low > 0xDFFF) {
+                        throw this.fail("a high surrogate is not followed by a low one");
+                    }
+                    code = 0x10000 + ((code - 0xD800) * 0x400) + (low - 0xDC00);
+                } else {
+                    throw this.fail("a lone surrogate is no character");
+                }
+            } else if (code >= 0xDC00 && code <= 0xDFFF) {
+                throw this.fail("a lone surrogate is no character");
+            }
+            out.appendChar((code as uint32) as char);
+            return;
+        }
+        throw this.fail("an unknown escape");
+    }
+
+    mut fn hex4(): int throws JsonError {
+        if (this.at + 4 > this.bytes.length()) {
+            throw this.fail("four hex digits were expected after '\\u'");
+        }
+        var v = 0;
+        var i = 0;
+        while (i < 4) {
+            let b = this.bytes[this.at + i] as int;
+            var digit = -1;
+            if (b >= 0x30 && b <= 0x39) { digit = b - 0x30; }
+            if (b >= 0x41 && b <= 0x46) { digit = b - 0x41 + 10; }
+            if (b >= 0x61 && b <= 0x66) { digit = b - 0x61 + 10; }
+            if (digit < 0) {
+                throw this.fail("four hex digits were expected after '\\u'");
+            }
+            v = v * 16 + digit;
+            i = i + 1;
+        }
+        this.at = this.at + 4;
+        return v;
+    }
+
+    /// A number by the grammar: `-? int frac? exp?`, no leading zero, no `+`, no `.5`.
+    mut fn number(): JsonValue throws JsonError {
+        let start = this.at;
+        var isInt = true;
+        if (this.peek() == 0x2D) {
+            this.at = this.at + 1;
+        }
+        let first = this.peek();
+        if (first == 0x30) {
+            this.at = this.at + 1;
+        } else if (first >= 0x31 && first <= 0x39) {
+            try this.digits();
+        } else {
+            throw this.fail("a digit was expected");
+        }
+        if (this.peek() == 0x2E) {
+            isInt = false;
+            this.at = this.at + 1;
+            try this.digits();
+        }
+        let e = this.peek();
+        if (e == 0x65 || e == 0x45) {
+            isInt = false;
+            this.at = this.at + 1;
+            let sign = this.peek();
+            if (sign == 0x2B || sign == 0x2D) {
+                this.at = this.at + 1;
+            }
+            try this.digits();
+        }
+        let text = string.fromUtf8Lossy(this.bytes[start..this.at]);
+        if (isInt) {
+            try {
+                return JsonValue.Int(int.parse(text));
+            } catch (_: ParseError) {
+                // beyond int: a float, lossy — reading it as an int is Invalid (E6)
+            }
+        }
+        try {
+            return JsonValue.Float(float.parse(text));
+        } catch (_: ParseError) {
+            throw this.fail(f"'{text}' is no number");
+        }
+    }
+
+    mut fn digits(): void throws JsonError {
+        let b = this.peek();
+        if (b < 0x30 || b > 0x39) {
+            throw this.fail("a digit was expected");
+        }
+        while (this.peek() >= 0x30 && this.peek() <= 0x39) {
+            this.at = this.at + 1;
+        }
+    }
+}
+
+/// The tree a text holds (E7): strictly RFC 8259 — one value, with whitespace around it and
+/// nothing else.
+pub fn parse(text: StringView): JsonValue throws JsonError {
+    var p = Parser { bytes = text.toBytes() };
+    let v = try p.value(0);
+    p.skipWhitespace();
+    if (p.at < p.bytes.length()) {
+        throw p.fail("text follows the value");
+    }
+    return v;
+}
+
+/// Where a decoder stands in a tree: the container and the position in it.
+enum Reading {
+    /// the elements, the next position, the position last peeked
+    Array(List<JsonValue>, int, int),
+    Object(List<(string, JsonValue)>, int, bool),
+    /// the members, the struct's name, the member being read, the members read
+    Struct(Map<string, JsonValue>, string, ?string, Set<string>),
+    Variant(string, ?JsonValue, bool),
+}
+
+/// The decoder over a tree (E7): a struct from an object by its members' names, a sequence from
+/// an array, a map from an object (its keys as strings, or as the numbers they spell), a variant
+/// from its name or from an object of one member, bytes from a Base64 string. A read that
+/// mismatches leaves the value where it was.
+pub class JsonReader :: [Decoder] {
+    root: JsonValue,
+    var stack: List<Reading> = List.new(),
+    var taken: bool = false,
+
+    /// The value the next read takes, or what stands for it: a key as a string.
+    mut fn peek(): JsonValue throws DecodeError {
+        if (this.stack.isEmpty()) {
+            if (this.taken) {
+                throw DecodeError { kind = .Missing, path = this.path(), detail = "the value was read already" };
+            }
+            return this.root;
+        }
+        let top = this.stack.length() - 1;
+        match (this.stack[top]) {
+            .Array(items, at, _) => {
+                if (at >= items.length()) {
+                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the array has no more elements" };
+                }
+                this.stack[top] = Reading.Array(items, at, at);
+                return items[at];
+            },
+            .Object(entries, at, keyRead) => {
+                if (at >= entries.length()) {
+                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the object has no more members" };
+                }
+                return if (keyRead) entries[at].1 else JsonValue.String(entries[at].0);
+            },
+            .Struct(members, _, current, _) => {
+                if (current == null) {
+                    throw DecodeError { kind = .Missing, path = this.path(), detail = "a member's value without its name" };
+                }
+                return members[current]!;
+            },
+            .Variant(_, payload, _) => {
+                if (payload == null) {
+                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the variant has no payload" };
+                }
+                return payload;
+            },
+        }
+    }
+
+    mut fn advance(): void {
+        if (this.stack.isEmpty()) {
+            this.taken = true;
+            return;
+        }
+        let top = this.stack.length() - 1;
+        let next: Reading = match (this.stack[top]) {
+            .Array(items, at, current) => Reading.Array(items, at + 1, current),
+            .Object(entries, at, keyRead) => if (keyRead) Reading.Object(entries, at + 1, false) else Reading.Object(entries, at, true),
+            .Struct(members, name, current, seen) => Reading.Struct(members, name, current, seen),
+            .Variant(name, payload, _) => Reading.Variant(name, payload, true),
+        };
+        this.stack[top] = next;
+    }
+
+    fn mismatch(expected: string, got: JsonValue): DecodeError {
+        return DecodeError { kind = .TypeMismatch, path = this.path(), detail = f"expected {expected}, got {formOf(got)}" };
+    }
+
+    /// Whether the next read is a key: a map's key reads a number from its digits.
+    fn inKey(): bool {
+        if (this.stack.isEmpty()) {
+            return false;
+        }
+        match (this.stack[this.stack.length() - 1]) {
+            .Object(_, _, keyRead) => { return !keyRead; },
+            _ => { return false; },
+        }
+    }
+
+    pub mut fn isNull(): bool throws DecodeError {
+        match (try this.peek()) { .Null => { return true; }, _ => { return false; } }
+    }
+
+    pub mut fn decodeNull(): void throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Null => { this.advance(); },
+            _ => { throw this.mismatch("null", v); },
+        }
+    }
+
+    pub mut fn decodeBool(): bool throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Bool(b) => { this.advance(); return b; },
+            _ => { throw this.mismatch("a bool", v); },
+        }
+    }
+
+    pub mut fn decodeInt(): int throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Int(i) => { this.advance(); return i; },
+            .Float(f) => { throw DecodeError { kind = .Invalid, path = this.path(), detail = f"{f} is no int" }; },
+            .String(s) => {
+                if (this.inKey()) {
+                    try {
+                        let i = int.parse(s);
+                        this.advance();
+                        return i;
+                    } catch (_: ParseError) {
+                        throw DecodeError { kind = .Invalid, path = this.path(), detail = f"the key '{s}' is no int" };
+                    }
+                }
+                throw this.mismatch("an int", v);
+            },
+            _ => { throw this.mismatch("an int", v); },
+        }
+    }
+
+    pub mut fn decodeUint(): uint throws DecodeError {
+        let i = try this.decodeInt();
+        if (i < 0) {
+            throw DecodeError { kind = .Invalid, path = this.path(), detail = f"{i} is negative" };
+        }
+        return i as uint;
+    }
+
+    pub mut fn decodeFloat(): float throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Float(f) => { this.advance(); return f; },
+            .Int(i) => { this.advance(); return i as float; },
+            _ => { throw this.mismatch("a number", v); },
+        }
+    }
+
+    pub mut fn decodeString(): string throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .String(s) => { this.advance(); return s; },
+            _ => { throw this.mismatch("a string", v); },
+        }
+    }
+
+    pub mut fn decodeBytes(): uint8[] throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .String(s) => {
+                try {
+                    let bytes = Base64.decode(s);
+                    this.advance();
+                    return bytes;
+                } catch (e: EncodingError) {
+                    throw DecodeError { kind = .Invalid, path = this.path(), detail = f"no Base64: {e.detail}" };
+                }
+            },
+            _ => { throw this.mismatch("a Base64 string", v); },
+        }
+    }
+
+    pub mut fn beginSeq(): ?int throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Array(items) => {
+                this.advance();
+                this.stack.push(Reading.Array(items, 0, 0));
+                return items.length();
+            },
+            _ => { throw this.mismatch("an array", v); },
+        }
+    }
+
+    pub fn seqHasNext(): bool throws DecodeError {
+        match (this.stack[this.stack.length() - 1]) {
+            .Array(items, at, _) => { return at < items.length(); },
+            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in an array" }; },
+        }
+    }
+
+    pub mut fn endSeq(): void throws DecodeError {
+        this.stack.pop();
+    }
+
+    pub mut fn beginMap(): ?int throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Object(members) => {
+                this.advance();
+                let entries = List<(string, JsonValue)>.new();
+                for ((k, m) in members) {
+                    entries.push((k, m));
+                }
+                this.stack.push(Reading.Object(entries, 0, false));
+                return entries.length();
+            },
+            _ => { throw this.mismatch("an object", v); },
+        }
+    }
+
+    pub fn mapHasNext(): bool throws DecodeError {
+        match (this.stack[this.stack.length() - 1]) {
+            .Object(entries, at, _) => { return at < entries.length(); },
+            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in an object" }; },
+        }
+    }
+
+    pub mut fn endMap(): void throws DecodeError {
+        this.stack.pop();
+    }
+
+    pub mut fn beginStruct(name: string, fields: string[]): void throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Object(members) => {
+                this.advance();
+                this.stack.push(Reading.Struct(members, name, null, Set<string>.new()));
+            },
+            _ => { throw this.mismatch("an object", v); },
+        }
+    }
+
+    pub mut fn structField(name: string): bool throws DecodeError {
+        let top = this.stack.length() - 1;
+        match (this.stack[top]) {
+            .Struct(members, structName, _, seen) => {
+                if (members.get(name) == null) {
+                    return false;
+                }
+                seen.insert(name);
+                this.stack[top] = Reading.Struct(members, structName, name, seen);
+                return true;
+            },
+            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in an object" }; },
+        }
+    }
+
+    pub mut fn endStruct(denyUnknown: bool): void throws DecodeError {
+        let top = this.stack.length() - 1;
+        match (this.stack[top]) {
+            .Struct(members, name, _, seen) => {
+                if (denyUnknown) {
+                    this.stack[top] = Reading.Struct(members, name, null, seen);
+                    for ((k, _) in members) {
+                        if (!seen.contains(k)) {
+                            throw DecodeError { kind = .UnknownField, path = this.path(), detail = f"member '{k}'" };
+                        }
+                    }
+                }
+            },
+            _ => { },
+        }
+        this.stack.pop();
+    }
+
+    pub mut fn beginVariant(enumName: string, variants: string[]): int throws DecodeError {
+        let v = try this.peek();
+        var name = "";
+        var payload: ?JsonValue = null;
+        match (v) {
+            .String(s) => { name = s; },
+            .Object(members) => {
+                if (members.length() != 1) {
+                    throw this.mismatch(f"a variant of {enumName}: a string, or an object of one member", v);
+                }
+                for ((k, m) in members) {
+                    name = k;
+                    payload = m;
+                }
+            },
+            _ => { throw this.mismatch(f"a variant of {enumName}", v); },
+        }
+        var i = 0;
+        while (i < variants.length()) {
+            if (variants[i] == name) {
+                this.advance();
+                this.stack.push(Reading.Variant(name, payload, false));
+                return i;
+            }
+            i = i + 1;
+        }
+        throw DecodeError { kind = .UnknownVariant, path = this.path(), detail = f"'{name}' of {enumName}" };
+    }
+
+    pub fn variantHasPayload(): bool throws DecodeError {
+        match (this.stack[this.stack.length() - 1]) {
+            .Variant(_, payload, _) => { return payload != null; },
+            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in a variant" }; },
+        }
+    }
+
+    pub mut fn endVariant(): void throws DecodeError {
+        this.stack.pop();
+    }
+
+    /// `Team.members[0].User`: a struct's name and the member being read with `.` between, an
+    /// array's index without, `{}` for a map, a variant's name.
+    pub fn path(): string {
+        var out = "";
+        for (frame in this.stack) {
+            match (frame) {
+                .Array(_, _, current) => { out = out + f"[{current}]"; },
+                .Object(_, _, _) => { out = out + (if (out.isEmpty()) "" else ".") + "{}"; },
+                .Struct(_, name, current, _) => {
+                    out = out + (if (out.isEmpty()) "" else ".") + name;
+                    if (let member = current) {
+                        out = out + "." + member;
+                    }
+                },
+                .Variant(name, _, _) => { out = out + (if (out.isEmpty()) "" else ".") + name; },
+            }
+        }
+        return out;
+    }
+}
+
+fn formOf(v: JsonValue): string {
+    match (v) {
+        .Null => { return "null"; },
+        .Bool(_) => { return "a bool"; },
+        .Int(_) => { return "a number"; },
+        .Float(_) => { return "a number"; },
+        .String(_) => { return "a string"; },
+        .Array(_) => { return "an array"; },
+        .Object(_) => { return "an object"; },
+    }
+}
+
+/// The value a text holds (E7): parsed, then read out of the tree.
+pub fn decode<T :: [Decode]>(text: StringView): T throws [JsonError, DecodeError] {
+    var r = JsonReader { root = try parse(text) };
+    return try T.decode(&r);
+}
+
+/// The value a reader's text holds, read to its end first.
+pub fn decodeFrom<T :: [Decode], R :: [Reader]>(&r: R): T throws [JsonError, DecodeError, IoError, Cancelled] {
+    let text = try r.readToString();
+    return try decode<T>(text);
+}
+
+extend JsonValue {
+    /// A decoder over this tree, to pass on.
+    pub fn reader(): JsonReader {
+        return JsonReader { root = this };
+    }
+
+    /// The value this tree reads as.
+    pub fn read<T :: [Decode]>(): T throws DecodeError {
+        var r = JsonReader { root = this };
+        return try T.decode(&r);
+    }
+}

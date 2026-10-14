@@ -330,7 +330,7 @@ pub interface Encoder {
 /// value where it was: the next ask sees it again, which is how `Value` reads whatever comes.
 pub interface Decoder {
     /// Whether the next value is null, without taking it.
-    fn isNull(): bool throws DecodeError;
+    mut fn isNull(): bool throws DecodeError;
     mut fn decodeNull(): void throws DecodeError;
     mut fn decodeBool(): bool throws DecodeError;
     mut fn decodeInt(): int throws DecodeError;
@@ -1041,7 +1041,7 @@ pub class ValueDecoder :: [Decoder] {
         return DecodeError { kind = .TypeMismatch, path = this.path(), detail = f"expected {expected}, got {formOf(got)}" };
     }
 
-    pub fn isNull(): bool throws DecodeError {
+    pub mut fn isNull(): bool throws DecodeError {
         return match (try this.peek()) {
             .Null => true,
             _ => false,

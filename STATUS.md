@@ -1224,6 +1224,18 @@ M9b: no halt until it closes, merged on green CI, open points collected for the 
   `struct User :: [Codable]` without a line, `@Codec { name = "mail" }`, `@Codec { tag = "kind" }`,
   an own pair kept (`tests/std/tests/codec_synth.lyr`, 4 tests). Spec 12 §Codecs rules 7–8,
   11 §4 rule 10; three cases.
+- **S3** `std.json` (P3; 10 E7): RFC 8259 strictly — `json.encode(v, opts)` through `JsonWriter`
+  (a struct as an object of its wire names, a sequence as an array, a map as an object of string
+  keys with a number's digits for a number, bytes as Base64, a unit variant as its name, a
+  payload variant as `{"Name": payload}`; `pretty`/`indent`, `sortKeys` through the tree; `nan`
+  and the infinities refused), `json.decode<T>(text)` parsing whole (a trailing comma, a leading
+  zero, an unknown escape, a lone surrogate, a control character, text after the value are
+  `JsonError { line, column }`) and reading through `JsonReader` (members by name, numeric map
+  keys, a variant from a string or an object of one member, `Invalid` for a fraction as an `int`),
+  the path `Team.members[0].User.id`; `JsonValue` (`Equatable` by content, `Display` compact,
+  `[]`/`at`/`path`/`as*`, `Codable` itself), `parse`, `encodeTo`/`decodeFrom`. `Decoder.isNull`
+  is a `mut` method now. The artifacts: a struct's text and back, 18 refusals with line and
+  column (`tests/std/tests/json.lyr`, 6 tests). Spec 12 §JSON rules 1–4; three cases.
 
 ## Design decisions
 

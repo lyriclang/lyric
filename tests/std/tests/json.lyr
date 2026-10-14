@@ -1,0 +1,192 @@
+// std.json (design/v5/spec/10 B10 E7; 13 M10 S3): RFC 8259 strictly, the text of any Encode value
+// and the value of any text, JsonValue the tree, the errors with their place.
+import std.json;
+import std.json { JsonValue, JsonOptions, JsonError, JsonWriter };
+import std.codec { Codable, Codec, Bytes, Value, DecodeError, DecodeErrorKind, EncodeError };
+import std.collections { Map };
+import std.test { assertEq, assertTrue, assertNull, fail };
+import std.time { Instant };
+
+@Codec { rename = .SnakeCase }
+struct User :: [Codable, Equatable] {
+    userId: int,
+    name: string,
+    mail: ?string,
+    tags: string[],
+}
+
+enum Shape :: [Codable, Equatable, Debug] {
+    Dot,
+    Circle(int),
+    Rect(int, int),
+}
+
+@Codec { tag = "kind" }
+enum Event :: [Codable, Equatable, Debug] {
+    Started,
+    Moved(int, int),
+}
+
+struct Team :: [Codable, Equatable] {
+    lead: User,
+    members: User[],
+    scores: Map<string, int>,
+    raw: Bytes,
+}
+
+fn kindOf(f: fn() -> void throws Error): ?DecodeErrorKind {
+    try {
+        f();
+        return null;
+    } catch (e: DecodeError) {
+        return e.kind;
+    } catch (_: Error) {
+        return null;
+    }
+}
+
+fn refused(text: string): string {
+    try {
+        let _ = json.parse(text);
+        return "accepted";
+    } catch (e: JsonError) {
+        return e.message();
+    }
+}
+
+@Test
+fn aValueWritesAsTextAndReadsBack(): void throws Error {
+    let u = User { userId = 7, name = "ada \"q\"", mail = null, tags = ["x", "y"] };
+    let text = try json.encode(u);
+    assertEq(text, "{\"user_id\":7,\"name\":\"ada \\\"q\\\"\",\"mail\":null,\"tags\":[\"x\",\"y\"]}");
+    assertEq(try json.decode<User>(text), u);
+    assertEq(try json.encode(u, JsonOptions { pretty = true }), "{\n  \"user_id\": 7,\n  \"name\": \"ada \\\"q\\\"\",\n  \"mail\": null,\n  \"tags\": [\n    \"x\",\n    \"y\"\n  ]\n}");
+    assertEq(try json.encode(u, JsonOptions { sortKeys = true }), "{\"mail\":null,\"name\":\"ada \\\"q\\\"\",\"tags\":[\"x\",\"y\"],\"user_id\":7}");
+    // the scalars
+    assertEq(try json.encode(true), "true");
+    assertEq(try json.encode(-3), "-3");
+    assertEq(try json.encode(2.5), "2.5");
+    assertEq(try json.encode("a\tb\u{1}"), "\"a\\tb\\u0001\"");
+    assertEq(try json.encode('é'), "\"é\"");
+    let none: ?int = null;
+    assertEq(try json.encode(none), "null");
+    assertEq(try json.decode<?int>("null"), null);
+    assertEq(try json.decode<?int>("4"), 4);
+    assertEq(try json.decode<float>("4"), 4.0);
+    assertEq(try json.decode<string>("\"\\u00e9\\ud83d\\ude00\""), "é😀");
+    assertEq(try json.encode((1, "two")), "[1,\"two\"]");
+    let (a, b) = try json.decode<(int, string)>("[1, \"two\"]");
+    assertEq(a, 1);
+    assertEq(b, "two");
+}
+
+@Test
+fn aMapIsAnObjectWithStringKeysAndBytesAreBase64(): void throws Error {
+    let m = Map<int, string>.new();
+    m[3] = "three";
+    assertEq(try json.encode(m), "{\"3\":\"three\"}");
+    let back = try json.decode<Map<int, string> >("{\"3\": \"three\"}");
+    assertEq(back[3], "three");
+    let bad = Map<bool, int>.new();
+    bad[true] = 1;
+    try {
+        let _ = json.encode(bad);
+        fail("a bool key was written");
+    } catch (e: EncodeError) {
+        assertEq(e.message(), "a JSON key is a string, not a bool (at {})");
+    }
+    assertEq(try json.encode(Bytes { value = [104u8, 105u8] }), "\"aGk=\"");
+    assertEq((try json.decode<Bytes>("\"aGk=\"")).value, [104u8, 105u8]);
+    assertTrue(kindOf(() => { let _ = try json.decode<Bytes>("\"!!\""); }) == DecodeErrorKind.Invalid);
+    let scores = Map<string, int>.new();
+    scores["a"] = 1;
+    let t = Team { lead = User { userId = 1, name = "l", mail = "l@x", tags = [] }, members = [User { userId = 2, name = "m", mail = null, tags = ["t"] }], scores = scores, raw = Bytes { value = [1u8] } };
+    assertEq(try json.decode<Team>(json.encode(t)), t);
+}
+
+@Test
+fn anEnumIsItsNameOrAnObjectOfOneMember(): void throws Error {
+    assertEq(try json.encode(Shape.Dot), "\"Dot\"");
+    assertEq(try json.encode(Shape.Circle(3)), "{\"Circle\":3}");
+    assertEq(try json.encode(Shape.Rect(2, 5)), "{\"Rect\":[2,5]}");
+    for (s in [Shape.Dot, Shape.Circle(3), Shape.Rect(2, 5)]) {
+        assertEq(try json.decode<Shape>(json.encode(s)), s);
+    }
+    assertTrue(kindOf(() => { let _ = try json.decode<Shape>("\"Blob\""); }) == DecodeErrorKind.UnknownVariant);
+    assertTrue(kindOf(() => { let _ = try json.decode<Shape>("{\"Circle\": 1, \"Dot\": 2}"); }) == DecodeErrorKind.TypeMismatch);
+    assertEq(try json.encode(Event.Moved(1, 2)), "{\"kind\":\"Moved\",\"0\":1,\"1\":2}");
+    assertEq(try json.decode<Event>("{\"kind\": \"Moved\", \"0\": 1, \"1\": 2}"), Event.Moved(1, 2));
+    assertEq(try json.decode<Event>("{\"kind\": \"Started\"}"), Event.Started);
+}
+
+@Test
+fn theTreeHoldsADocument(): void throws Error {
+    let v = try json.parse(" {\"a\": [1, 2.5, true, null, \"s\\u00e9\\n\"], \"b\": {\"c\": -0.5e2}} ");
+    assertEq(v.show(), "{\"a\":[1,2.5,true,null,\"sé\\n\"],\"b\":{\"c\":-50.0}}");
+    assertEq(v.path("a[1]")?.asFloat(), 2.5);
+    assertEq(v.path("a[0]")?.asInt(), 1);
+    assertEq(v.path("b.c")?.asFloat(), -50.0);
+    assertEq(v["b"]?.at(0), null);
+    assertNull(v.path("a[9]"));
+    assertNull(v.path("x.y"));
+    assertEq(v["a"]?.at(2)?.asBool(), true);
+    assertTrue(v["a"]?.at(3)?.isNull() ?? false);
+    // the tree round-trips through text and through any format, and compares by content
+    assertEq(try json.parse(v.show()), v);
+    assertEq(try json.decode<JsonValue>(v.show()), v);
+    assertEq(try Value.of(v).read<JsonValue>(), v);
+    assertEq(try json.parse("{\"x\": 1, \"y\": 2}"), try json.parse("{\"y\": 2, \"x\": 1}"));
+    // a number beyond int is a float
+    match (try json.parse("12345678901234567890")) {
+        .Float(_) => { },
+        _ => { fail("a big number is a float"); },
+    }
+    assertTrue(kindOf(() => { let _ = try json.decode<int>("12345678901234567890"); }) == DecodeErrorKind.Invalid);
+    assertTrue(kindOf(() => { let _ = try json.decode<int>("1.5"); }) == DecodeErrorKind.Invalid);
+}
+
+@Test
+fn theTextIsReadStrictly(): void throws Error {
+    assertEq(refused(""), "the text ends where a value was expected at 1:1");
+    assertEq(refused("[1,]"), "a value was expected at 1:4");
+    assertEq(refused("{\"a\" 1}"), "':' was expected after the member's name at 1:6");
+    assertEq(refused("01"), "text follows the value at 1:2");
+    assertEq(refused("1."), "a digit was expected at 1:3");
+    assertEq(refused("+1"), "a value was expected at 1:1");
+    assertEq(refused(".5"), "a value was expected at 1:1");
+    assertEq(refused("\"\\x\""), "an unknown escape at 1:4");
+    assertEq(refused("[1] x"), "text follows the value at 1:5");
+    assertEq(refused("\"\\ud800\""), "a lone surrogate is no character at 1:8");
+    assertEq(refused("\"tab\there\""), "a control character stands in a string unescaped at 1:5");
+    assertEq(refused("{\"a\": 1,}"), "a member's name was expected at 1:9");
+    assertEq(refused("[1\n2]"), "',' or ']' was expected at 2:1");
+    assertEq(refused("nul"), "expected 'null' at 1:1");
+    assertEq(refused("\"open"), "the string is not closed at 1:6");
+    assertEq(refused("[\"\\u12\"]"), "four hex digits were expected after '\\u' at 1:5");
+    assertEq(refused("{\"a\":1,\"a\":2}"), "accepted");
+    assertEq(refused("  [ ]  "), "accepted");
+    assertEq(refused("-0"), "accepted");
+    assertEq(refused("1e5"), "accepted");
+    assertEq(refused("\"\\/\""), "accepted");
+}
+
+@Test
+fn anErrorNamesItsPathAndAWriterTakesTheText(): void throws Error {
+    try {
+        let _ = json.decode<Team>("{\"lead\": {\"user_id\": 1, \"name\": \"l\", \"tags\": []}, \"members\": [{\"user_id\": \"x\"}], \"scores\": {}, \"raw\": \"\"}");
+        fail("a string read as an int");
+    } catch (e: DecodeError) {
+        assertEq(e.message(), "type mismatch: expected an int, got a string (at Team.members[0].User.user_id)");
+    }
+    try {
+        let _ = json.encode(0.0 / 0.0);
+        fail("NaN was written");
+    } catch (e: EncodeError) {
+        assertEq(e.message(), "nan has no JSON text (RFC 8259 §6)");
+    }
+    var w = JsonWriter.new();
+    try (1, 2).encode(&w);
+    assertEq(w.text(), "[1,2]");
+    let t = Instant.now();
+    assertEq(try json.decode<Instant>(json.encode(t)), t);
+}
