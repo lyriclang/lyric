@@ -45,7 +45,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | **done** 2026-10-09 (S15–S19 after the review) |
 | M9a | `comptime` (the IR interpreter), attributes, `std.meta`, the synthesis | XL | **done** 2026-10-13 |
 | M9b | Macros | L | **done** 2026-10-13 |
-| M10 | std after rule D | XL | — |
+| M10 | std after rule D | XL | **open** since 2026-10-14 |
 | M11 | Own GC | XL | — |
 | M12 | Diagnostics and lints | L | — |
 | M13a | fmt, doc, api | M | — |
@@ -1178,6 +1178,15 @@ the report at the close.
 
 M9b closed on 2026-10-13 with S6. The open points of S1–S6 (105–146) went into the report;
 the maintainer is asked before M10.
+
+### M10 — open (2026-10-14)
+
+The standard library after rule D: the plan is design 13's addendum "der Plan für M10" (P1–P13,
+S1–S13) — `std.codec` with the `Codable` synthesis, `std.json`, `std.toml`, `std.uri`, `std.regex`,
+`std.http` client and server, `std.compress`, `std.term`, the time zones and UTS #35 patterns, the
+libm port for compile time, the Windows child pipes over the completion port, measurement point 4.
+Released by the maintainer on 2026-10-14, every reading of the M9b report confirmed; the mode of
+M9b: no halt until it closes, merged on green CI, open points collected for the report at the close.
 
 ## Design decisions
 
