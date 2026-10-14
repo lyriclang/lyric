@@ -48,6 +48,44 @@ pub struct Base64Url {
     pub static fn decode(s: StringView): uint8[] throws EncodingError {
         return try decode64(s, urlValues);
     }
+
+    /// Without the `=` padding (RFC 7515 §2, "Base64url Encoding" as JOSE and JWT write it; 10
+    /// S4a). The text's length is 4k, 4k + 2 or 4k + 3.
+    pub static fn encodeUnpadded(bytes: Slice<uint8>): string {
+        let padded = encode64(bytes, urlDigits);
+        let text = viewBytes(padded);
+        var n = text.length();
+        while (n > 0 && text[n - 1] == 61u8) {
+            n = n - 1;
+        }
+        // what it cut is ASCII
+        return try! string.fromUtf8(text[0..n]);
+    }
+
+    /// The way back, as strict as `decode`: a `=` is no digit here, a length of 4k + 1 fails at its
+    /// end, bits past the last byte that are not zero at their character.
+    pub static fn decodeUnpadded(s: StringView): uint8[] throws EncodingError {
+        let text = viewBytes(s);
+        let n = text.length();
+        if (n % 4 == 1) {
+            throw EncodingError { offset = n, detail = "the text ends inside a group of four" };
+        }
+        var i = 0;
+        while (i < n) {
+            if (text[i] == 61u8) {
+                throw EncodingError { offset = i, detail = "no Base64 digit" };
+            }
+            i = i + 1;
+        }
+        let padded = StringBuilder.new();
+        padded.appendStr(s);
+        var k = (4 - n % 4) % 4;
+        while (k > 0) {
+            padded.appendChar('=');
+            k = k - 1;
+        }
+        return try decode64(padded.toString(), urlValues);
+    }
 }
 
 /// Each byte's value as a digit of `digits`, or -1.
