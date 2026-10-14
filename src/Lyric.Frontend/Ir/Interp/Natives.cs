@@ -27,15 +27,6 @@ public sealed class Natives(Interpreter interpreter)
         "std.task.armOnPoller", "std.task.forgetOnPoller", "std.task.takeFromPoller",
     };
 
-    /// <summary>The C library's functions that each libm rounds its own way: no answer at compile
-    /// time is the same on every platform (Q7) until one implementation serves the compiler and
-    /// the runtime alike (13 M9a S4).</summary>
-    private static readonly HashSet<string> RoundedByEachLibm = new(StringComparer.Ordinal)
-    {
-        "C:cbrt", "C:exp", "C:log", "C:log2", "C:log10", "C:sin", "C:cos", "C:tan", "C:asin", "C:acos",
-        "C:atan", "C:sinh", "C:cosh", "C:tanh", "C:atan2", "C:hypot", "C:pow",
-    };
-
     private readonly ConditionalWeakTable<object, StrongBox<long>> _identities = new();
     private long _nextIdentity = 1;
 
@@ -57,8 +48,6 @@ public sealed class Natives(Interpreter interpreter)
         if (name.StartsWith("std.syntax.quote#", StringComparison.Ordinal))
             return Syntax.Quote(interpreter.Module.Quotes[int.Parse(name["std.syntax.quote#".Length..])], args, types, import.ReturnType);
         if (Table.TryGetValue(name, out var native)) return native(args, types, import.ReturnType);
-        if (RoundedByEachLibm.Contains(name))
-            throw ComptimeFailure.NotYet($"'{Short(name)}' rounds as each C library does, and compile time has no answer the same on every platform yet");
         if (WorldNatives.Contains(name) || WorldModules.Any(m => name.StartsWith(m, StringComparison.Ordinal)) || name.StartsWith("C:", StringComparison.Ordinal))
             throw ComptimeFailure.World($"'{Short(name)}' reaches outside the program — {What(name)} — and code run at compile time does not (09 Q3)");
         throw ComptimeFailure.NotYet($"'{Short(name)}' does not run at compile time yet");
@@ -334,6 +323,25 @@ public sealed class Natives(Interpreter interpreter)
         ["C:ceil"] = (a, _, _) => Value.Double(Math.Ceiling(a[0].AsDouble)),
         ["C:trunc"] = (a, _, _) => Value.Double(Math.Truncate(a[0].AsDouble)),
         ["C:sqrt"] = (a, _, _) => Value.Double(Math.Sqrt(a[0].AsDouble)),
+        // The rest of std.math's functions are musl's, in the runtime under its prefix and here as
+        // the same code (09 D7, 13 M10 S12): the answer at compile time is the program's bits.
+        ["C:lyr_exp"] = (a, _, _) => Value.Double(Libm.Exp(a[0].AsDouble)),
+        ["C:lyr_log"] = (a, _, _) => Value.Double(Libm.Log(a[0].AsDouble)),
+        ["C:lyr_log2"] = (a, _, _) => Value.Double(Libm.Log2(a[0].AsDouble)),
+        ["C:lyr_log10"] = (a, _, _) => Value.Double(Libm.Log10(a[0].AsDouble)),
+        ["C:lyr_pow"] = (a, _, _) => Value.Double(Libm.Pow(a[0].AsDouble, a[1].AsDouble)),
+        ["C:lyr_sin"] = (a, _, _) => Value.Double(Libm.Sin(a[0].AsDouble)),
+        ["C:lyr_cos"] = (a, _, _) => Value.Double(Libm.Cos(a[0].AsDouble)),
+        ["C:lyr_tan"] = (a, _, _) => Value.Double(Libm.Tan(a[0].AsDouble)),
+        ["C:lyr_asin"] = (a, _, _) => Value.Double(Libm.Asin(a[0].AsDouble)),
+        ["C:lyr_acos"] = (a, _, _) => Value.Double(Libm.Acos(a[0].AsDouble)),
+        ["C:lyr_atan"] = (a, _, _) => Value.Double(Libm.Atan(a[0].AsDouble)),
+        ["C:lyr_atan2"] = (a, _, _) => Value.Double(Libm.Atan2(a[0].AsDouble, a[1].AsDouble)),
+        ["C:lyr_sinh"] = (a, _, _) => Value.Double(Libm.Sinh(a[0].AsDouble)),
+        ["C:lyr_cosh"] = (a, _, _) => Value.Double(Libm.Cosh(a[0].AsDouble)),
+        ["C:lyr_tanh"] = (a, _, _) => Value.Double(Libm.Tanh(a[0].AsDouble)),
+        ["C:lyr_cbrt"] = (a, _, _) => Value.Double(Libm.Cbrt(a[0].AsDouble)),
+        ["C:lyr_hypot"] = (a, _, _) => Value.Double(Libm.Hypot(a[0].AsDouble, a[1].AsDouble)),
         ["C:round"] = (a, _, _) =>
         {
             // a half away from zero: the part after the point is exact below 2^52, and above

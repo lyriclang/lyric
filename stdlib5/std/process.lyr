@@ -8,7 +8,7 @@
 /// point of cancellation there, as a file's call —, and a kill is all the signals there are.
 import std.collections { List };
 import std.core { StringBuilder, viewBytes };
-import std.io { IoError, Reader, Writer, failure, onPool };
+import std.io { IoError, Reader, Writer, failure };
 import std.os { Signal, numberOf, signalOf };
 import std.task;
 import std.task { Cancelled, Channel, SpinLock, Waits, awaitDescriptor, forgetDescriptor, here };
@@ -22,13 +22,9 @@ fn processSignal(pid: int, number: int): int;
 fn processRead(fd: int, into: Slice<uint8>): int;
 fn processWrite(fd: int, from: Slice<uint8>): int;
 fn processClose(fd: int): int;
-fn processPipesBlock(): bool;
 
 /// What a call that would block answers (lyr/net.h).
 let wouldBlock = -(64 << 32);
-
-/// Whether a pipe's calls block (Windows): then they run on the I/O pool (13 M8b P2).
-let pipesBlock = processPipesBlock();
 
 /// lyr/process.h's mark of an end by a signal: bit 40, above any exit code.
 let signalled = 1 << 40;
@@ -223,8 +219,8 @@ pub struct Output {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The pipes (13 M8b P2): on POSIX non-blocking, waited for on the thread's poller as a socket is;
-// on Windows blocking, each call on the I/O pool.
+// The pipes (13 M8b P2; M10 P11): non-blocking — on Windows overlapped named pipes, each request's
+// completion on the poller — and waited for on the thread's poller as a socket is.
 // ---------------------------------------------------------------------------------------------
 
 /// The running task waits until `fd` is ready as `interest` says, in `waits`.
@@ -260,7 +256,7 @@ pub class PipeReader :: [Reader, Closeable] {
                 return 0;
             }
             let fd = this.fd;
-            let n = if (pipesBlock) onPool(() => processRead(fd, into)) else processRead(fd, into);
+            let n = processRead(fd, into);
             if (n >= 0) {
                 return n;
             }
@@ -302,7 +298,7 @@ pub class PipeWriter :: [Writer, Closeable] {
                 return 0;
             }
             let fd = this.fd;
-            let n = if (pipesBlock) onPool(() => processWrite(fd, from)) else processWrite(fd, from);
+            let n = processWrite(fd, from);
             if (n >= 0) {
                 return n;
             }

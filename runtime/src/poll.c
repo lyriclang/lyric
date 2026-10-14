@@ -10,6 +10,7 @@
  * port — mio's and wepoll's way, here without wepoll, whose epoll_wait no other thread can wake. */
 #include "lyr/poll.h"
 #include "lyr/fs.h"
+#include "lyr/process.h"
 #include "lyr/panic.h"
 #include "lyr/time.h"
 
@@ -243,7 +244,7 @@ static ULONG wanted(const Armed *a) {
     return (a->read ? READ_EVENTS : 0) | (a->write ? WRITE_EVENTS : 0);
 }
 
-enum { WAKE_KEY = 1, AFD_KEY = 2 };
+enum { WAKE_KEY = 1, AFD_KEY = 2, PIPE_KEY = 3 };
 
 struct LyrPoller {
     HANDLE port;
@@ -326,6 +327,11 @@ int lyr_poller_wait(LyrPoller *poller, int64_t timeout_ns) {
                 woken = 1;
             } else if (entries[i].lpCompletionKey == AFD_KEY && entries[i].lpOverlapped != NULL) {
                 if (completed(poller, (PollOp *)entries[i].lpOverlapped)) woken = 1;
+            } else if (entries[i].lpCompletionKey == PIPE_KEY && entries[i].lpOverlapped != NULL) {
+                /* a child's pipe request (lyr/process.h): the end is ready the way it asked */
+                int writing = 0;
+                int64_t fd = lyr_process_pipe_completed(entries[i].lpOverlapped, &writing);
+                if (fd >= 0 && ready_on(&poller->ready, fd, !writing, writing)) woken = 1;
             }
         }
         if (woken) return 1;
@@ -372,8 +378,21 @@ static void submit(LyrPoller *poller, int64_t fd, Armed *a) {
     a->polled = events;
 }
 
+int64_t lyr_poller_attach(LyrPoller *poller, void *handle) {
+    if (CreateIoCompletionPort((HANDLE)handle, poller->port, PIPE_KEY, 0) == NULL) return failure(0, (int64_t)GetLastError());
+    return 0;
+}
+
 int64_t lyr_poller_arm(LyrPoller *poller, int64_t fd, int64_t interest, int64_t token) {
     if (fd < 0) return failure(LYR_IO_INVALID_INPUT, 0);
+    if (lyr_process_owns(fd)) {
+        /* a child's pipe: its request's completion fires it, there is nothing to ask AFD */
+        Armed *a = armed_at(&poller->ready, fd);
+        if (interest & LYR_POLL_READ) a->read = token;
+        if (interest & LYR_POLL_WRITE) a->write = token;
+        a->added = 1;
+        return 0;
+    }
     int64_t opened = afd_open(poller);
     if (opened < 0) return opened;
     Armed *a = armed_at(&poller->ready, fd);

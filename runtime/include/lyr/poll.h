@@ -30,6 +30,12 @@ void lyr_poller_release(void);
 void lyr_poller_watch(LyrPoller *poller, int fd);
 #endif
 
+#ifdef _WIN32
+/* A child's pipe handle (lyr/process.h) onto the poller's completion port, under the pipes' key:
+ * its requests' completions come through the poller's wait. 0, or the failure. */
+int64_t lyr_poller_attach(LyrPoller *poller, void *handle);
+#endif
+
 /* A descriptor's readiness (13 M8b P2, S10b): `fd` armed for reading (LYR_POLL_READ) or writing
  * (LYR_POLL_WRITE), once — the readiness that comes disarms that direction until it is armed
  * again; the other stays as it is. `token` (> 0) is the caller's: a wait that sees the readiness

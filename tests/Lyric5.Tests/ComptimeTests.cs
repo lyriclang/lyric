@@ -148,17 +148,17 @@ public class ComptimeTests
         Assert.Contains(errors, l => l.Contains("note: in 'app.main.read'"));
     }
 
-    /// <summary>What compile time cannot answer the same on every platform yet is refused, not
-    /// guessed (09 Q7): a function each C library rounds its own way. The exactly rounded ones are
-    /// computed, and Unicode is answered from the runtime's own tables (S4).</summary>
-    [Theory]
-    [InlineData("exp(1.0)", "'exp' rounds as each C library does")]
-    [InlineData("pow(2.0, 0.5)", "'pow' rounds as each C library does")]
-    public void What_compile_time_cannot_answer_alike_is_refused(string site, string message)
+    /// <summary>Compile time answers what every platform answers alike (09 Q7): the exactly
+    /// rounded functions, Unicode from the runtime's own tables (S4), and since M10 S12 the
+    /// functions each C library used to round its own way — musl's, in the runtime and in the
+    /// compiler as the same code (09 D7); that the bits are the program's is LibmTests.</summary>
+    [Fact]
+    public void What_every_platform_answers_alike_is_answered()
     {
-        var errors = Errors(Head + "import std.math { exp, pow, sqrt };\n\n" + $"fn main(): void {{\n    println(f\"{{comptime sqrt(2.0)}} {{comptime 'É'.isUpper()}} {{comptime {site}}}\");\n}}\n");
-        var error = Assert.Single(errors, l => l.Contains("error["));
-        Assert.Contains("error[LYR-CT0005]: " + message, error);
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", Head + "import std.math { exp, pow, sqrt };\n\n"
+            + "fn main(): void {\n    println(f\"{comptime sqrt(2.0)} {comptime 'É'.isUpper()} {comptime exp(1.0)} {comptime pow(2.0, 0.5)}\");\n}\n"));
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.True(exit == 0, $"exit {exit}\n{error}");
     }
 
     /// <summary>A site leaves a value of any value type (09 Q1; 13 M9a P3, S2): the CRC table as

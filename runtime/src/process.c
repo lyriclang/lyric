@@ -26,6 +26,7 @@ static int64_t failure(int64_t kind, int64_t raw) {
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 #  include <stdatomic.h>
+#  include <wchar.h>
 
 /* What GetLastError says, as a failure: the kinds a start or a pipe can give by their names. */
 static int64_t failed_with(DWORD e) {
@@ -41,6 +42,126 @@ static int64_t failed_with(DWORD e) {
     case ERROR_INVALID_PARAMETER: return failure(LYR_IO_INVALID_INPUT, (int64_t)e);
     default: return failure(0, (int64_t)e);
     }
+}
+
+/* A parent's end of a child's pipe (10 S12b, 13 M10 P11): a named pipe opened overlapped, one
+ * request in flight at a time — a read or a write — whose completion comes through the poller's
+ * port (lyr_poller_attach), so that a task parks for it as for a socket and a cancel reaches it.
+ * The request owns its bytes: the caller's slice is the collector's, and a cancelled wait leaves
+ * the request running — a read's bytes are handed over at the next call, a write's were taken when
+ * it started. A close while a request runs is finished at its completion. */
+typedef struct PipeOp {
+    OVERLAPPED overlapped;    /* first: the completion names the request by this address */
+    HANDLE handle;
+    LyrPoller *poller;        /* whose port the handle is on, once it is */
+    uint8_t *bytes;           /* the request's own buffer */
+    DWORD room;
+    DWORD have, taken;        /* bytes read, and how many of them were handed over */
+    int pending;              /* a request is in flight */
+    int done;                 /* it completed, and `result` says how */
+    int writing;
+    int64_t result;           /* bytes, 0 at the end, or a failure */
+    int closed;               /* closed while pending: closed and freed at the completion */
+    struct PipeOp *next;
+} PipeOp;
+
+#define PIPE_ROOM 65536
+
+static PipeOp *pipes;
+static SRWLOCK pipes_lock = SRWLOCK_INIT;
+
+static PipeOp *pipe_of(HANDLE handle) {
+    AcquireSRWLockShared(&pipes_lock);
+    PipeOp *op = pipes;
+    while (op != NULL && op->handle != handle) op = op->next;
+    ReleaseSRWLockShared(&pipes_lock);
+    return op;
+}
+
+static void unlink_pipe(PipeOp *op) {
+    AcquireSRWLockExclusive(&pipes_lock);
+    PipeOp **at = &pipes;
+    while (*at != NULL && *at != op) at = &(*at)->next;
+    if (*at == op) *at = op->next;
+    ReleaseSRWLockExclusive(&pipes_lock);
+}
+
+static void free_pipe(PipeOp *op) {
+    free(op->bytes);
+    free(op);
+}
+
+int lyr_process_owns(int64_t fd) {
+    return pipe_of((HANDLE)(intptr_t)fd) != NULL;
+}
+
+/* The two ends of a pipe for the child's stream `index`: the parent's overlapped, its request
+ * registered; the child's plain and inheritable. The child's, or NULL with the error set. */
+static HANDLE pipe_pair(int index, HANDLE *parent) {
+    static LONG counter;
+    wchar_t name[64];
+    swprintf(name, 64, L"\\\\.\\pipe\\lyric.%lu.%ld", (unsigned long)GetCurrentProcessId(), (long)InterlockedIncrement(&counter));
+    DWORD access = index == 0 ? PIPE_ACCESS_OUTBOUND : PIPE_ACCESS_INBOUND;
+    HANDLE ours = CreateNamedPipeW(name, access | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
+                                   PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+                                   1, PIPE_ROOM, PIPE_ROOM, 0, NULL);
+    if (ours == INVALID_HANDLE_VALUE) return NULL;
+    PipeOp *op = calloc(1, sizeof *op);
+    uint8_t *bytes = malloc(PIPE_ROOM);
+    SECURITY_ATTRIBUTES inherit = { sizeof inherit, NULL, TRUE };
+    HANDLE theirs = op == NULL || bytes == NULL ? INVALID_HANDLE_VALUE
+        : CreateFileW(name, index == 0 ? GENERIC_READ : GENERIC_WRITE, 0, &inherit, OPEN_EXISTING, 0, NULL);
+    if (theirs == INVALID_HANDLE_VALUE) {
+        DWORD e = op == NULL || bytes == NULL ? ERROR_NOT_ENOUGH_MEMORY : GetLastError();
+        free(op);
+        free(bytes);
+        CloseHandle(ours);
+        SetLastError(e);
+        return NULL;
+    }
+    op->handle = ours;
+    op->bytes = bytes;
+    op->room = PIPE_ROOM;
+    AcquireSRWLockExclusive(&pipes_lock);
+    op->next = pipes;
+    pipes = op;
+    ReleaseSRWLockExclusive(&pipes_lock);
+    *parent = ours;
+    return theirs;
+}
+
+/* The handle on the calling thread's poller, once: a pipe is read, and written, where it was first. */
+static int64_t attached(PipeOp *op) {
+    LyrPoller *poller = lyr_poller_current();
+    if (op->poller == poller) return 0;
+    if (op->poller != NULL) return failure(LYR_IO_UNSUPPORTED, 0);
+    int64_t put = lyr_poller_attach(poller, op->handle);
+    if (put < 0) return put;
+    op->poller = poller;
+    return 0;
+}
+
+int64_t lyr_process_pipe_completed(void *overlapped, int *writing) {
+    PipeOp *op = (PipeOp *)overlapped;
+    if (!op->pending) return -1;  /* a packet for a request that failed at once: nothing to say */
+    DWORD got = 0;
+    int64_t result;
+    if (GetOverlappedResult(op->handle, &op->overlapped, &got, FALSE)) {
+        result = (int64_t)got;
+    } else {
+        DWORD e = GetLastError();
+        result = (e == ERROR_BROKEN_PIPE || e == ERROR_HANDLE_EOF) && !op->writing ? 0 : failed_with(e);
+    }
+    op->pending = 0;
+    if (op->closed) {
+        CloseHandle(op->handle);
+        free_pipe(op);
+        return -1;
+    }
+    op->done = 1;
+    op->result = result;
+    *writing = op->writing;
+    return (int64_t)(intptr_t)op->handle;
 }
 
 /* `n` bytes of UTF-8 as a NUL-ended UTF-16 string, allocated; NULL where they are no UTF-8. */
@@ -181,21 +302,7 @@ void lyr_process_nudge(void) {
  * where the system refuses one. */
 static HANDLE stream_for(int index, int mode, HANDLE *parent) {
     SECURITY_ATTRIBUTES inherit = { sizeof inherit, NULL, TRUE };
-    if (mode == LYR_PROCESS_PIPED) {
-        HANDLE read, write;
-        if (!CreatePipe(&read, &write, NULL, 0)) return NULL;
-        HANDLE child = index == 0 ? read : write;
-        *parent = index == 0 ? write : read;
-        if (!SetHandleInformation(child, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT)) {
-            DWORD e = GetLastError();
-            CloseHandle(read);
-            CloseHandle(write);
-            *parent = NULL;
-            SetLastError(e);
-            return NULL;
-        }
-        return child;
-    }
+    if (mode == LYR_PROCESS_PIPED) return pipe_pair(index, parent);
     if (mode == LYR_PROCESS_NULL) {
         HANDLE nul = CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &inherit, OPEN_EXISTING, 0, NULL);
         return nul == INVALID_HANDLE_VALUE ? NULL : nul;
@@ -311,7 +418,7 @@ int64_t lyr_process_spawn(const LyrStr *program, const uint8_t *args, int64_t ar
 done:
     for (int i = 0; i < 3; i++) {
         if (streams[i] != NULL) CloseHandle(streams[i]);
-        if (parents[i] != NULL) CloseHandle(parents[i]);
+        if (parents[i] != NULL) lyr_process_close((int64_t)(intptr_t)parents[i]);
     }
     if (attributes != NULL) {
         DeleteProcThreadAttributeList(attributes);
@@ -358,26 +465,86 @@ int64_t lyr_process_signal(int64_t pid, int64_t number) {
     return 0;
 }
 
-uint8_t lyr_process_pipes_block(void) { return 1; }
-
 int64_t lyr_process_read(int64_t fd, uint8_t *into, int64_t n) {
-    DWORD want = n > 0x40000000 ? 0x40000000 : (DWORD)n, got = 0;
-    if (!ReadFile((HANDLE)(intptr_t)fd, into, want, &got, NULL)) {
-        DWORD e = GetLastError();
-        if (e == ERROR_BROKEN_PIPE) return 0;  /* the child closed its end: the pipe's end */
-        return failed_with(e);
+    PipeOp *op = pipe_of((HANDLE)(intptr_t)fd);
+    if (op == NULL) return failure(LYR_IO_INVALID_INPUT, ERROR_INVALID_HANDLE);
+    if (n <= 0) return 0;
+    if (op->pending) return LYR_NET_WOULD_BLOCK;
+    if (op->done) {
+        op->done = 0;
+        if (op->result <= 0) return op->result;  /* the end, or the failure */
+        op->have = (DWORD)op->result;
+        op->taken = 0;
     }
-    return (int64_t)got;
+    if (op->have > op->taken) {
+        /* the bytes of the request that completed, as far as the slice takes them */
+        DWORD give = op->have - op->taken;
+        if ((int64_t)give > n) give = (DWORD)n;
+        memcpy(into, op->bytes + op->taken, give);
+        op->taken += give;
+        return (int64_t)give;
+    }
+    int64_t put = attached(op);
+    if (put < 0) return put;
+    DWORD want = n > (int64_t)op->room ? op->room : (DWORD)n;
+    memset(&op->overlapped, 0, sizeof op->overlapped);
+    op->writing = 0;
+    op->pending = 1;
+    if (!ReadFile(op->handle, op->bytes, want, NULL, &op->overlapped)) {
+        DWORD e = GetLastError();
+        if (e != ERROR_IO_PENDING) {
+            op->pending = 0;
+            return e == ERROR_BROKEN_PIPE ? 0 : failed_with(e);  /* the child closed its end: the pipe's end */
+        }
+    }
+    /* done at once or later, the completion comes through the port either way */
+    return LYR_NET_WOULD_BLOCK;
 }
 
 int64_t lyr_process_write(int64_t fd, const uint8_t *from, int64_t n) {
-    DWORD want = n > 0x40000000 ? 0x40000000 : (DWORD)n, sent = 0;
-    if (!WriteFile((HANDLE)(intptr_t)fd, from, want, &sent, NULL)) return failed_with(GetLastError());
-    return (int64_t)sent;
+    PipeOp *op = pipe_of((HANDLE)(intptr_t)fd);
+    if (op == NULL) return failure(LYR_IO_INVALID_INPUT, ERROR_INVALID_HANDLE);
+    if (n <= 0) return 0;
+    if (op->pending) return LYR_NET_WOULD_BLOCK;
+    if (op->done) {
+        op->done = 0;
+        if (op->result < 0) return op->result;  /* the request before failed: the child's end is gone */
+    }
+    int64_t put = attached(op);
+    if (put < 0) return put;
+    DWORD want = n > (int64_t)op->room ? op->room : (DWORD)n;
+    memcpy(op->bytes, from, want);
+    memset(&op->overlapped, 0, sizeof op->overlapped);
+    op->writing = 1;
+    op->pending = 1;
+    if (!WriteFile(op->handle, op->bytes, want, NULL, &op->overlapped)) {
+        DWORD e = GetLastError();
+        if (e != ERROR_IO_PENDING) {
+            op->pending = 0;
+            return failed_with(e);
+        }
+    }
+    /* taken: the request carries them, and the next write waits for its completion */
+    return (int64_t)want;
 }
 
 int64_t lyr_process_close(int64_t fd) {
-    if (!CloseHandle((HANDLE)(intptr_t)fd)) return failed_with(GetLastError());
+    HANDLE handle = (HANDLE)(intptr_t)fd;
+    PipeOp *op = pipe_of(handle);
+    if (op == NULL) {
+        if (!CloseHandle(handle)) return failed_with(GetLastError());
+        return 0;
+    }
+    unlink_pipe(op);
+    if (op->pending) {
+        /* a read is cancelled; a write goes through — the child reads it before the end — and
+         * the handle closes at the completion */
+        op->closed = 1;
+        if (!op->writing) CancelIoEx(handle, &op->overlapped);
+        return 0;
+    }
+    free_pipe(op);
+    if (!CloseHandle(handle)) return failed_with(GetLastError());
     return 0;
 }
 
@@ -654,8 +821,6 @@ int64_t lyr_process_reap(int64_t pid) {
     if (WIFSIGNALED(status)) return LYR_PROCESS_SIGNALLED + WTERMSIG(status);
     return -1;
 }
-
-uint8_t lyr_process_pipes_block(void) { return 0; }
 
 int64_t lyr_process_signal(int64_t pid, int64_t number) {
     if (kill((pid_t)pid, (int)number) != 0) return failed_with(errno);

@@ -11,6 +11,8 @@
 //   not found: no-such-program-for-lyric (started)
 //   killed: exit code 1
 //   wait: timed out
+//   read: timed out
+//   killed quiet: exit code 1
 //   20 children, codes summed 190
 //   waited on another thread: exit code 7
 import std.io { IoError, IoErrorKind, println };
@@ -69,6 +71,20 @@ fn main(): void throws Error {
     {
         let _ = try slow.wait();
     }
+
+    // a child that writes nothing holds no thread (10 S12b, M10 P11): the read parks on the poller,
+    // and the timeout ends it at once
+    var quiet = try Command { program = "cmd", args = ["/c", "ping -n 4 127.0.0.1 >NUL"], stdout = Stdio.Piped }.spawn();
+    var quietOut = quiet.stdout!;
+    try {
+        let _ = withTimeout(Duration.ofMillis(100), () => try quietOut.readToEnd());
+        println("read: ended");
+    } catch (_: TimedOut) {
+        println("read: timed out");
+    }
+    try quiet.kill();
+    println(f"killed quiet: {try quiet.wait()}");
+    try quietOut.close();
 
     var sum = 0;
     var count = 0;

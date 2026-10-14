@@ -13,9 +13,12 @@
  * Windows (S12b): CreateProcessW — the arguments quoted as the C runtime reads them back, the
  * environment a UTF-16 block, only the child's three handles inherited (a handle list). A child is
  * its process handle, in the int64_t a pid takes on POSIX; its end wakes the reaper's poller from a
- * registered wait, as a console signal wakes the signals' watcher. Its pipes block: std.process
- * calls them on the I/O pool, as a file's calls (13 M8b P2). There are no signals; a kill is
- * TerminateProcess. */
+ * registered wait, as a console signal wakes the signals' watcher. Its pipes are named pipes opened
+ * overlapped (10 S12b, 13 M10 P11): a read or a write is one request in flight, whose completion on
+ * the poller's port fires the task that waits, as a socket's readiness does; the request owns its
+ * bytes, so a cancelled wait leaves it running, and a close while it runs is finished at its
+ * completion. A pipe is read, and written, on the thread of its first call. There are no signals; a
+ * kill is TerminateProcess. */
 #ifndef LYR_PROCESS_H
 #define LYR_PROCESS_H
 
@@ -55,15 +58,20 @@ int64_t lyr_process_reap(int64_t pid);
  * TerminateProcess). 0. */
 int64_t lyr_process_signal(int64_t pid, int64_t number);
 
-/* Whether a pipe's calls block (Windows): then std.process makes them on the I/O pool. */
-uint8_t lyr_process_pipes_block(void);
-
 /* A pipe's end: at most `n` bytes read into `into` — how many, 0 at its end —; at most `n` of
- * `from` written — how many; on POSIX LYR_NET_WOULD_BLOCK (lyr/net.h) where the call would block;
- * closed. */
+ * `from` written — how many; LYR_NET_WOULD_BLOCK (lyr/net.h) where the call would block, and the
+ * caller waits on the poller for the end's readiness; closed. */
 int64_t lyr_process_read(int64_t fd, uint8_t *into, int64_t n);
 int64_t lyr_process_write(int64_t fd, const uint8_t *from, int64_t n);
 int64_t lyr_process_close(int64_t fd);
+
+#ifdef _WIN32
+/* The poller's side of a child's pipe (10 S12b): whether `fd` is one — its readiness comes from its
+ * request's completion, not from an AFD poll —; and a completion under the pipes' key, by its
+ * OVERLAPPED: the pipe's handle, `writing` set for a write, or -1 where nothing is to fire. */
+int lyr_process_owns(int64_t fd);
+int64_t lyr_process_pipe_completed(void *overlapped, int *writing);
+#endif
 
 /* A Slice<uint8> or Slice<int> of emitted code is a pointer and a length (CEmitter). */
 #define LYR_PROCESS_SPAWN(program, args, argc, env, envc, cwd, modes, ends) \
