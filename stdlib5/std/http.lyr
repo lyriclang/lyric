@@ -21,6 +21,7 @@ import std.uri { Uri };
 import std.json;
 import std.json { JsonError };
 import std.codec { Encode, Decode, DecodeError, EncodeError };
+import std.compress { GzipReader, ZlibReader };
 
 // ---------------------------------------------------------------------------------------------
 // Errors.
@@ -747,6 +748,10 @@ pub struct ClientOptions {
     pub keepAlive: bool = true,
     pub userAgent: string = "lyric5",
     pub transport: ?fn(string, int) -> Stream throws [IoError, Cancelled] = null,
+    /// Whether a response `Content-Encoding: gzip` (or `deflate`) is decoded as the body is read:
+    /// the request then says `Accept-Encoding: gzip, deflate`, and the headers of the response
+    /// lose `Content-Encoding` and `Content-Length`.
+    pub decompress: bool = true,
 }
 
 pub class Client {
@@ -954,6 +959,9 @@ pub class Client {
         if (!req.headers.has("User-Agent") && !this.options.userAgent.isEmpty()) {
             head.appendStr(f"User-Agent: {this.options.userAgent}\r\n");
         }
+        if (this.options.decompress && !req.headers.has("Accept-Encoding")) {
+            head.appendStr("Accept-Encoding: gzip, deflate\r\n");
+        }
         if (!this.options.keepAlive && !req.headers.has("Connection")) {
             head.appendStr("Connection: close\r\n");
         }
@@ -1068,6 +1076,22 @@ pub class Client {
             .Empty => { body.finish(); },
             .Fixed => { if (length == 0) { body.finish(); } },
             _ => { },
+        }
+        // a compressed body is decoded as it is read (S9): the raw body underneath still returns
+        // the connection at its end
+        if (this.options.decompress && !body.isDone()) {
+            if (let encoding = headers.get("Content-Encoding")) {
+                let token = lastToken(encoding);
+                if (sameName(token, "gzip") || sameName(token, "x-gzip")) {
+                    body = Body.from(GzipReader<Body>.new(body), null);
+                    headers.remove("Content-Encoding");
+                    headers.remove("Content-Length");
+                } else if (sameName(token, "deflate")) {
+                    body = Body.from(ZlibReader<Body>.new(body), null);
+                    headers.remove("Content-Encoding");
+                    headers.remove("Content-Length");
+                }
+            }
         }
         return Response { status = status, headers = headers, body = body };
     }
@@ -1303,7 +1327,7 @@ pub class Server {
         let text = f"bad request: {detail}";
         let head = f"HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {viewBytes(text).length()}\r\nConnection: close\r\n\r\n{text}";
         try {
-            try conn.writeAll(viewBytes(head));
+            conn.writeAll(viewBytes(head));
         } catch (_: Error) { }
     }
 

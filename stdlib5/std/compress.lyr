@@ -1,0 +1,1708 @@
+/// `std.compress` (design 10 Q8; 13 M10 S9): DEFLATE (RFC 1951), zlib (RFC 1950) and gzip (RFC
+/// 1952), whole in Lyric. `Inflate` reads stored, fixed and dynamic blocks through a 32 KiB
+/// window; `Deflate` writes them at the levels 0 to 9 — 0 stored, 1 the fixed tables over a
+/// greedy LZ77, 2 and up dynamic tables, 4 and up with lazy matching, the chains longer with the
+/// level. The adapters are streams: `DeflateReader<R>`/`DeflateWriter<W>` raw, `ZlibReader`/
+/// `ZlibWriter` with the zlib header and Adler-32, `GzipReader`/`GzipWriter` with the gzip header
+/// and CRC-32 (members in a row read as one). `Gzip.compress(bytes, level)`, `Gzip.decompress`,
+/// `Zlib.*` and `Deflate.*` for what fits in memory.
+import std.collections { List };
+import std.core { viewBytes, Closeable };
+import std.hash { adler32, crc32 };
+import std.io { Reader, Writer, IoError, ByteBuffer };
+import std.task { Cancelled };
+
+/// What a decoder throws for bytes that are not the format, a checksum or a length that does not
+/// hold, or a level that is none.
+pub struct CompressError :: [Error] {
+    pub detail: string,
+
+    pub fn message(): string {
+        return this.detail;
+    }
+}
+
+fn corrupt(detail: string): IoError {
+    return IoError { kind = .InvalidData, path = null, detail = detail, inner = CompressError { detail = detail } };
+}
+
+// ---------------------------------------------------------------------------------------------
+// The tables of RFC 1951 §3.2.5.
+// ---------------------------------------------------------------------------------------------
+
+fn lengthBase(): int[] {
+    return [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
+}
+
+fn lengthExtra(): int[] {
+    return [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
+}
+
+fn distBase(): int[] {
+    return [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
+}
+
+fn distExtra(): int[] {
+    return [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
+}
+
+/// The order the code length code lengths are written in (§3.2.7).
+fn codeLengthOrder(): int[] {
+    return [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+}
+
+/// The length symbol (257 + index) and the extra bits of a match length 3..258.
+fn lengthCode(len: int): (int, int) {
+    let base = lengthBase();
+    let extra = lengthExtra();
+    var i = 28;
+    while (i > 0 && base[i] > len) {
+        i = i - 1;
+    }
+    return (257 + i, len - base[i]);
+}
+
+/// The distance symbol and the extra bits of a distance 1..32768.
+fn distCode(dist: int): (int, int) {
+    let base = distBase();
+    var i = 29;
+    while (i > 0 && base[i] > dist) {
+        i = i - 1;
+    }
+    return (i, dist - base[i]);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Huffman codes: canonical, from lengths (§3.2.2).
+// ---------------------------------------------------------------------------------------------
+
+/// A decoding table as puff does it: how many codes of each length, the symbols in code order.
+class Huffman {
+    var count: int[],
+    var symbol: int[],
+
+    /// From the code lengths of `n` symbols; a length 0 is no code. Over-subscribed lengths are
+    /// an error; an incomplete code is allowed (one code of length 1 is what a single distance
+    /// code looks like).
+    static fn build(lengths: int[], n: int): Huffman throws IoError {
+        var count = [0] * 16;
+        var i = 0;
+        while (i < n) {
+            count[lengths[i]] = count[lengths[i]] + 1;
+            i = i + 1;
+        }
+        count[0] = 0;
+        var left = 1;
+        var len = 1;
+        while (len <= 15) {
+            left = left << 1;
+            left = left - count[len];
+            if (left < 0) {
+                throw corrupt("a Huffman code is over-subscribed");
+            }
+            len = len + 1;
+        }
+        var offs = [0] * 16;
+        len = 1;
+        while (len < 15) {
+            offs[len + 1] = offs[len] + count[len];
+            len = len + 1;
+        }
+        var symbol = [0] * n;
+        i = 0;
+        while (i < n) {
+            if (lengths[i] != 0) {
+                symbol[offs[lengths[i]]] = i;
+                offs[lengths[i]] = offs[lengths[i]] + 1;
+            }
+            i = i + 1;
+        }
+        return Huffman { count = count, symbol = symbol };
+    }
+}
+
+/// The canonical codes of the lengths, bit-reversed for writing LSB-first (§3.2.2).
+fn canonicalCodes(lengths: int[], n: int): int[] {
+    var count = [0] * 16;
+    var i = 0;
+    while (i < n) {
+        count[lengths[i]] = count[lengths[i]] + 1;
+        i = i + 1;
+    }
+    count[0] = 0;
+    var next = [0] * 16;
+    var code = 0;
+    var bits = 1;
+    while (bits <= 15) {
+        code = (code + count[bits - 1]) << 1;
+        next[bits] = code;
+        bits = bits + 1;
+    }
+    var codes = [0] * n;
+    i = 0;
+    while (i < n) {
+        let len = lengths[i];
+        if (len != 0) {
+            codes[i] = reverseBits(next[len], len);
+            next[len] = next[len] + 1;
+        }
+        i = i + 1;
+    }
+    return codes;
+}
+
+fn reverseBits(code: int, len: int): int {
+    var v = code;
+    var out = 0;
+    var i = 0;
+    while (i < len) {
+        out = (out << 1) | (v & 1);
+        v = v >> 1;
+        i = i + 1;
+    }
+    return out;
+}
+
+/// The fixed lengths of §3.2.6: literals and lengths.
+fn fixedLitLengths(): int[] {
+    var lengths = [0] * 288;
+    var i = 0;
+    while (i < 144) { lengths[i] = 8; i = i + 1; }
+    while (i < 256) { lengths[i] = 9; i = i + 1; }
+    while (i < 280) { lengths[i] = 7; i = i + 1; }
+    while (i < 288) { lengths[i] = 8; i = i + 1; }
+    return lengths;
+}
+
+fn fixedDistLengths(): int[] {
+    return [5] * 30;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Inflate.
+// ---------------------------------------------------------------------------------------------
+
+/// The size of the window: the farthest a match reaches back.
+let windowSize = 32768;
+
+/// DEFLATE's blocks read from `inner`, the bytes they mean given out; `Reader`. Bytes after the
+/// final block stay in `inner` where it was read exactly — the reader takes them one at a time
+/// once the end is near — so a wrapper can read its trailer.
+pub class DeflateReader<R :: [Reader]> :: [Reader] {
+    var inner: R,
+    /// The input: a buffer and the bit accumulator.
+    var inBuf: uint8[],
+    var inPos: int,
+    var inLen: int,
+    var bitBuf: int,
+    var bitCount: int,
+    var innerEnded: bool,
+    /// The output: the window (a ring of 32 KiB) and what of it is not yet given out.
+    var window: uint8[],
+    var wpos: int,
+    /// Bytes decoded and not yet given out, as a queue.
+    var out: uint8[],
+    var outHead: int,
+    var outTail: int,
+    /// The block under way.
+    var finalBlock: bool,
+    var done: bool,
+    var inBlock: bool,
+    var stored: int,
+    var lit: ?Huffman,
+    var dist: ?Huffman,
+    var totalOut: int,
+
+    pub static fn new(inner: R): DeflateReader<R> {
+        return DeflateReader<R> {
+            inner = inner, inBuf = [0u8] * 4096, inPos = 0, inLen = 0, bitBuf = 0, bitCount = 0, innerEnded = false,
+            window = [0u8] * windowSize, wpos = 0, out = [0u8] * 65536, outHead = 0, outTail = 0,
+            finalBlock = false, done = false, inBlock = false, stored = 0, lit = null, dist = null, totalOut = 0,
+        };
+    }
+
+    /// The bytes decoded so far.
+    pub fn bytesOut(): int {
+        return this.totalOut;
+    }
+
+    /// Whether the final block has been read whole.
+    pub fn isDone(): bool {
+        return this.done && this.outHead == this.outTail;
+    }
+
+    // -- input
+
+    mut fn nextByte(): int throws [IoError, Cancelled] {
+        if (this.inPos >= this.inLen) {
+            if (this.innerEnded) {
+                throw corrupt("the deflate stream ends inside a block");
+            }
+            // one byte at a time once a block could be the last: what follows is the wrapper's
+            let want = if (this.finalBlock) 1 else this.inBuf.length();
+            let n = try this.inner.read(this.inBuf[0..want]);
+            if (n == 0) {
+                this.innerEnded = true;
+                throw corrupt("the deflate stream ends inside a block");
+            }
+            this.inPos = 0;
+            this.inLen = n;
+        }
+        let b = this.inBuf[this.inPos] as int;
+        this.inPos = this.inPos + 1;
+        return b;
+    }
+
+    mut fn bits(n: int): int throws [IoError, Cancelled] {
+        while (this.bitCount < n) {
+            this.bitBuf = this.bitBuf | ((try this.nextByte()) << this.bitCount);
+            this.bitCount = this.bitCount + 8;
+        }
+        let v = this.bitBuf & ((1 << n) - 1);
+        this.bitBuf = this.bitBuf >> n;
+        this.bitCount = this.bitCount - n;
+        return v;
+    }
+
+    mut fn decode(h: Huffman): int throws [IoError, Cancelled] {
+        var code = 0;
+        var first = 0;
+        var index = 0;
+        var len = 1;
+        while (len <= 15) {
+            code = code | (try this.bits(1));
+            let count = h.count[len];
+            if (code - count < first) {
+                return h.symbol[index + (code - first)];
+            }
+            index = index + count;
+            first = first + count;
+            first = first << 1;
+            code = code << 1;
+            len = len + 1;
+        }
+        throw corrupt("a Huffman code is none of the table's");
+    }
+
+    // -- output
+
+    mut fn emit(b: uint8): void {
+        this.window[this.wpos] = b;
+        this.wpos = (this.wpos + 1) & (windowSize - 1);
+        this.out[this.outTail] = b;
+        this.outTail = (this.outTail + 1) & 65535;
+        this.totalOut = this.totalOut + 1;
+    }
+
+    fn outAvailable(): int {
+        return (this.outTail - this.outHead) & 65535;
+    }
+
+    // -- blocks
+
+    mut fn beginBlock(): void throws [IoError, Cancelled] {
+        this.finalBlock = (try this.bits(1)) == 1;
+        let kind = try this.bits(2);
+        if (kind == 0) {
+            // stored: to the byte, then LEN and its complement
+            this.bitBuf = 0;
+            this.bitCount = 0;
+            let len = (try this.nextByte()) | ((try this.nextByte()) << 8);
+            let nlen = (try this.nextByte()) | ((try this.nextByte()) << 8);
+            if ((len ^ 0xFFFF) != nlen) {
+                throw corrupt("a stored block's length does not match its complement");
+            }
+            this.stored = len;
+            this.lit = null;
+            this.dist = null;
+        } else if (kind == 1) {
+            this.lit = try Huffman.build(fixedLitLengths(), 288);
+            this.dist = try Huffman.build(fixedDistLengths(), 30);
+            this.stored = -1;
+        } else if (kind == 2) {
+            try this.readDynamicTables();
+            this.stored = -1;
+        } else {
+            throw corrupt("a block of type 3");
+        }
+        this.inBlock = true;
+    }
+
+    mut fn readDynamicTables(): void throws [IoError, Cancelled] {
+        let hlit = (try this.bits(5)) + 257;
+        let hdist = (try this.bits(5)) + 1;
+        let hclen = (try this.bits(4)) + 4;
+        if (hlit > 286 || hdist > 30) {
+            throw corrupt("too many codes in a dynamic block");
+        }
+        let order = codeLengthOrder();
+        var clLengths = [0] * 19;
+        var i = 0;
+        while (i < hclen) {
+            clLengths[order[i]] = try this.bits(3);
+            i = i + 1;
+        }
+        let clCode = try Huffman.build(clLengths, 19);
+        var lengths = [0] * (hlit + hdist);
+        i = 0;
+        while (i < hlit + hdist) {
+            let sym = try this.decode(clCode);
+            if (sym < 16) {
+                lengths[i] = sym;
+                i = i + 1;
+            } else {
+                var repeat = 0;
+                var value = 0;
+                if (sym == 16) {
+                    if (i == 0) {
+                        throw corrupt("a repeat with no length before it");
+                    }
+                    value = lengths[i - 1];
+                    repeat = 3 + (try this.bits(2));
+                } else if (sym == 17) {
+                    repeat = 3 + (try this.bits(3));
+                } else {
+                    repeat = 11 + (try this.bits(7));
+                }
+                if (i + repeat > hlit + hdist) {
+                    throw corrupt("the code lengths run past their count");
+                }
+                while (repeat > 0) {
+                    lengths[i] = value;
+                    i = i + 1;
+                    repeat = repeat - 1;
+                }
+            }
+        }
+        if (lengths[256] == 0) {
+            throw corrupt("the end-of-block code has no length");
+        }
+        var litLengths = [0] * hlit;
+        i = 0;
+        while (i < hlit) { litLengths[i] = lengths[i]; i = i + 1; }
+        var distLengths = [0] * hdist;
+        i = 0;
+        while (i < hdist) { distLengths[i] = lengths[hlit + i]; i = i + 1; }
+        this.lit = try Huffman.build(litLengths, hlit);
+        this.dist = try Huffman.build(distLengths, hdist);
+    }
+
+    /// Some more bytes decoded into the output queue; `false` once everything has been.
+    mut fn produce(): bool throws [IoError, Cancelled] {
+        if (this.done) {
+            return false;
+        }
+        if (!this.inBlock) {
+            try this.beginBlock();
+        }
+        if (this.stored >= 0) {
+            // a stored block, in slices of the queue's free room
+            var room = 65535 - this.outAvailable();
+            while (this.stored > 0 && room > 0) {
+                this.emit((try this.nextByte()) as uint8);
+                this.stored = this.stored - 1;
+                room = room - 1;
+            }
+            if (this.stored == 0) {
+                this.endBlock();
+            }
+            return true;
+        }
+        let lit = this.lit!;
+        let dist = this.dist!;
+        let lengthBases = lengthBase();
+        let lengthExtras = lengthExtra();
+        let distBases = distBase();
+        let distExtras = distExtra();
+        // symbols until the queue is half full or the block ends
+        while (this.outAvailable() < 32768) {
+            let sym = try this.decode(lit);
+            if (sym < 256) {
+                this.emit(sym as uint8);
+            } else if (sym == 256) {
+                this.endBlock();
+                return true;
+            } else {
+                let li = sym - 257;
+                if (li >= 29) {
+                    throw corrupt("a length code beyond 285");
+                }
+                let len = lengthBases[li] + (try this.bits(lengthExtras[li]));
+                let di = try this.decode(dist);
+                if (di >= 30) {
+                    throw corrupt("a distance code beyond 29");
+                }
+                let d = distBases[di] + (try this.bits(distExtras[di]));
+                if (d > this.totalOut) {
+                    throw corrupt("a distance reaches before the start");
+                }
+                var from = (this.wpos - d) & (windowSize - 1);
+                var k = 0;
+                while (k < len) {
+                    this.emit(this.window[from]);
+                    from = (from + 1) & (windowSize - 1);
+                    k = k + 1;
+                }
+            }
+        }
+        return true;
+    }
+
+    mut fn endBlock(): void {
+        this.inBlock = false;
+        if (this.finalBlock) {
+            this.done = true;
+        }
+    }
+
+    pub mut fn read(into: Slice<uint8>): int throws [IoError, Cancelled] {
+        if (into.length() == 0) {
+            return 0;
+        }
+        while (this.outAvailable() == 0) {
+            if (!(try this.produce())) {
+                return 0;
+            }
+        }
+        var n = 0;
+        while (n < into.length() && this.outHead != this.outTail) {
+            into[n] = this.out[this.outHead];
+            this.outHead = (this.outHead + 1) & 65535;
+            n = n + 1;
+        }
+        return n;
+    }
+
+    /// The bytes the reader took from `inner` beyond the deflate stream, for a wrapper's trailer:
+    /// its own buffer first, then `inner`.
+    mut fn readTrailer(into: Slice<uint8>): int throws [IoError, Cancelled] {
+        // the bits left over belong to the trailer as whole bytes
+        var n = 0;
+        while (n < into.length() && this.bitCount >= 8) {
+            into[n] = (this.bitBuf & 0xFF) as uint8;
+            this.bitBuf = this.bitBuf >> 8;
+            this.bitCount = this.bitCount - 8;
+            n = n + 1;
+        }
+        this.bitCount = 0;
+        this.bitBuf = 0;
+        while (n < into.length() && this.inPos < this.inLen) {
+            into[n] = this.inBuf[this.inPos];
+            this.inPos = this.inPos + 1;
+            n = n + 1;
+        }
+        if (n > 0) {
+            return n;
+        }
+        if (this.innerEnded) {
+            return 0;
+        }
+        let m = try this.inner.read(into);
+        if (m == 0) {
+            this.innerEnded = true;
+        }
+        return m;
+    }
+
+    /// Exactly `into.length()` trailer bytes, or an error.
+    mut fn readTrailerExact(into: Slice<uint8>, what: string): void throws [IoError, Cancelled] {
+        var at = 0;
+        while (at < into.length()) {
+            let n = try this.readTrailer(into[at..into.length()]);
+            if (n == 0) {
+                throw corrupt(f"the stream ends inside the {what}");
+            }
+            at = at + n;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Deflate.
+// ---------------------------------------------------------------------------------------------
+
+/// Bits into a `Writer`, LSB first, through a buffer.
+class BitWriter<W :: [Writer]> {
+    var inner: W,
+    var buf: uint8[],
+    var len: int,
+    var bitBuf: int,
+    var bitCount: int,
+    var total: int,
+
+    static fn new(inner: W): BitWriter<W> {
+        return BitWriter<W> { inner = inner, buf = [0u8] * 8192, len = 0, bitBuf = 0, bitCount = 0, total = 0 };
+    }
+
+    mut fn bits(value: int, n: int): void throws [IoError, Cancelled] {
+        this.bitBuf = this.bitBuf | (value << this.bitCount);
+        this.bitCount = this.bitCount + n;
+        while (this.bitCount >= 8) {
+            try this.byte((this.bitBuf & 0xFF) as uint8);
+            this.bitBuf = this.bitBuf >> 8;
+            this.bitCount = this.bitCount - 8;
+        }
+    }
+
+    mut fn byte(b: uint8): void throws [IoError, Cancelled] {
+        if (this.len == this.buf.length()) {
+            try this.flushBuffer();
+        }
+        this.buf[this.len] = b;
+        this.len = this.len + 1;
+        this.total = this.total + 1;
+    }
+
+    /// To the byte: the bits left padded with zeros.
+    mut fn align(): void throws [IoError, Cancelled] {
+        if (this.bitCount > 0) {
+            try this.byte((this.bitBuf & 0xFF) as uint8);
+            this.bitBuf = 0;
+            this.bitCount = 0;
+        }
+    }
+
+    mut fn bytes(from: Slice<uint8>): void throws [IoError, Cancelled] {
+        for (b in from) {
+            try this.byte(b);
+        }
+    }
+
+    mut fn flushBuffer(): void throws [IoError, Cancelled] {
+        var at = 0;
+        while (at < this.len) {
+            let n = try this.inner.write(this.buf[at..this.len]);
+            if (n <= 0) {
+                throw IoError { kind = .BrokenPipe, path = null, detail = "the writer took nothing", inner = null };
+            }
+            at = at + n;
+        }
+        this.len = 0;
+    }
+
+    mut fn flush(): void throws [IoError, Cancelled] {
+        try this.flushBuffer();
+        try this.inner.flush();
+    }
+}
+
+/// The parameters of a level, as zlib's configuration table has them.
+struct LevelConfig {
+    goodLength: int,
+    maxLazy: int,
+    niceLength: int,
+    maxChain: int,
+    lazy: bool,
+}
+
+fn levelConfig(level: int): LevelConfig {
+    return match (level) {
+        1 => LevelConfig { goodLength = 4, maxLazy = 4, niceLength = 8, maxChain = 4, lazy = false },
+        2 => LevelConfig { goodLength = 4, maxLazy = 5, niceLength = 16, maxChain = 8, lazy = false },
+        3 => LevelConfig { goodLength = 4, maxLazy = 6, niceLength = 32, maxChain = 32, lazy = false },
+        4 => LevelConfig { goodLength = 4, maxLazy = 4, niceLength = 16, maxChain = 16, lazy = true },
+        5 => LevelConfig { goodLength = 8, maxLazy = 16, niceLength = 32, maxChain = 32, lazy = true },
+        6 => LevelConfig { goodLength = 8, maxLazy = 16, niceLength = 128, maxChain = 128, lazy = true },
+        7 => LevelConfig { goodLength = 8, maxLazy = 32, niceLength = 128, maxChain = 256, lazy = true },
+        8 => LevelConfig { goodLength = 32, maxLazy = 128, niceLength = 258, maxChain = 1024, lazy = true },
+        _ => LevelConfig { goodLength = 32, maxLazy = 258, niceLength = 258, maxChain = 4096, lazy = true },
+    };
+}
+
+/// The most symbols a block holds before it is written.
+let blockSymbols = 16384;
+let hashBits = 15;
+let hashSize = 32768;
+let minMatch = 3;
+let maxMatch = 258;
+/// The lookahead the matcher needs before it decides, unless the input has ended.
+let minLookahead = 262;
+
+/// DEFLATE's blocks written to `inner` from the bytes given; `Writer` and `Closeable` — `close`
+/// writes the final block. Level 0 stores, 1 uses the fixed tables over a greedy LZ77, 2 and up
+/// dynamic tables, 4 and up lazy matching.
+pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
+    var bits: BitWriter<W>,
+    var level: int,
+    var config: LevelConfig,
+    /// The input window: twice the window size, slid when full.
+    var win: uint8[],
+    /// The bytes in `win` from `start` (the oldest the matcher may reach) to `end` (the newest).
+    var strStart: int,
+    var end: int,
+    /// Hash chains: `head[h]` the newest position with hash `h`, `prev[p & mask]` the one before.
+    var head: int[],
+    var prev: int[],
+    /// The symbols of the block under way: literals (0..255), or a match as 256 + length with
+    /// its distance beside it.
+    var symLen: int[],
+    var symDist: int[],
+    var symCount: int,
+    var litFreq: int[],
+    var distFreq: int[],
+    /// A match kept back for the lazy decision.
+    var prevLength: int,
+    var prevDist: int,
+    var matchAvailable: bool,
+    var closed: bool,
+    var totalIn: int,
+
+    /// At the level 0..9; 6 is the usual; -1 is 6.
+    pub static fn new(inner: W, level: int = 6): DeflateWriter<W> throws CompressError {
+        if (level < -1 || level > 9) {
+            throw CompressError { detail = f"the level {level} is none: 0 to 9" };
+        }
+        let lv = if (level < 0) 6 else level;
+        return DeflateWriter<W> {
+            bits = BitWriter<W>.new(inner), level = lv, config = levelConfig(lv),
+            win = [0u8] * (2 * windowSize), strStart = 0, end = 0,
+            head = [-1] * hashSize, prev = [-1] * windowSize,
+            symLen = [0] * blockSymbols, symDist = [0] * blockSymbols, symCount = 0,
+            litFreq = [0] * 286, distFreq = [0] * 30,
+            prevLength = 0, prevDist = 0, matchAvailable = false, closed = false, totalIn = 0,
+        };
+    }
+
+    /// The bytes taken so far.
+    pub fn bytesIn(): int {
+        return this.totalIn;
+    }
+
+    /// The bytes written so far (the block under way not counted).
+    pub fn bytesOut(): int {
+        return this.bits.total;
+    }
+
+    pub mut fn write(from: Slice<uint8>): int throws [IoError, Cancelled] {
+        if (this.closed) {
+            throw IoError { kind = .Closed, path = null, detail = "the deflate writer is closed", inner = null };
+        }
+        var at = 0;
+        while (at < from.length()) {
+            // room in the window: slide where it is full (at level 0 the window is a queue: compact)
+            if (this.end == this.win.length()) {
+                if (this.level == 0) {
+                    try this.storeReady(false);
+                    let left = this.end - this.strStart;
+                    this.win[this.strStart..this.end].copyInto(this.win[0..left]);
+                    this.strStart = 0;
+                    this.end = left;
+                } else {
+                    this.slide();
+                }
+            }
+            let room = this.win.length() - this.end;
+            let take = if (from.length() - at < room) from.length() - at else room;
+            from[at..at + take].copyInto(this.win[this.end..this.end + take]);
+            this.end = this.end + take;
+            at = at + take;
+            this.totalIn = this.totalIn + take;
+            if (this.level == 0) {
+                try this.storeReady(false);
+            } else {
+                try this.deflateReady(false);
+            }
+        }
+        return from.length();
+    }
+
+    pub mut fn flush(): void throws [IoError, Cancelled] {
+        // what is pending as a block, then an empty stored block so the bytes are whole (a sync flush)
+        if (this.closed) {
+            return;
+        }
+        if (this.level == 0) {
+            try this.storeReady(true);
+        } else {
+            try this.deflateReady(true);
+            try this.writeBlock(false);
+        }
+        try this.bits.bits(0, 3);
+        try this.bits.align();
+        try this.bits.bytes([0u8, 0u8, 255u8, 255u8]);
+        try this.bits.flush();
+    }
+
+    /// The final block written and the inner writer flushed. A second close does nothing.
+    pub fn close(): void throws [IoError, Cancelled] {
+        // through the reference: 'Closeable.close' is no 'mut fn'
+        let me = this;
+        try me.finish();
+    }
+
+    mut fn finish(): void throws [IoError, Cancelled] {
+        if (this.closed) {
+            return;
+        }
+        if (this.level == 0) {
+            try this.storeReady(true);
+            try this.storeFinal();
+        } else {
+            try this.deflateReady(true);
+            try this.writeBlock(true);
+        }
+        try this.bits.align();
+        try this.bits.flush();
+        this.closed = true;
+    }
+
+    /// The window's older half dropped; the positions move down by the window size.
+    mut fn slide(): void {
+        let w = windowSize;
+        this.win[w..2 * w].copyInto(this.win[0..w]);
+        this.end = this.end - w;
+        this.strStart = this.strStart - w;
+        var i = 0;
+        while (i < hashSize) {
+            this.head[i] = if (this.head[i] >= w) this.head[i] - w else -1;
+            i = i + 1;
+        }
+        i = 0;
+        while (i < w) {
+            this.prev[i] = if (this.prev[i] >= w) this.prev[i] - w else -1;
+            i = i + 1;
+        }
+    }
+
+    // -- level 0
+
+    /// Stored blocks of what is ready: 65535 bytes each, the rest kept until `all`.
+    mut fn storeReady(all: bool): void throws [IoError, Cancelled] {
+        while (this.end - this.strStart >= 65535 || (all && this.end > this.strStart)) {
+            let n = if (this.end - this.strStart > 65535) 65535 else this.end - this.strStart;
+            try this.storedBlock(this.win[this.strStart..this.strStart + n], false);
+            this.strStart = this.strStart + n;
+        }
+        // the window is a queue here: what is stored is gone
+        if (this.strStart == this.end) {
+            this.strStart = 0;
+            this.end = 0;
+        }
+    }
+
+    mut fn storeFinal(): void throws [IoError, Cancelled] {
+        try this.storedBlock(this.win[0..0], true);
+    }
+
+    mut fn storedBlock(bytes: Slice<uint8>, final: bool): void throws [IoError, Cancelled] {
+        try this.bits.bits(if (final) 1 else 0, 1);
+        try this.bits.bits(0, 2);
+        try this.bits.align();
+        let n = bytes.length();
+        try this.bits.bytes([(n & 0xFF) as uint8, ((n >> 8) & 0xFF) as uint8, ((n ^ 0xFFFF) & 0xFF) as uint8, (((n ^ 0xFFFF) >> 8) & 0xFF) as uint8]);
+        try this.bits.bytes(bytes);
+    }
+
+    // -- levels 1..9: LZ77 with hash chains
+
+    fn hashAt(p: int): int {
+        return (((this.win[p] as int) << 10) ^ ((this.win[p + 1] as int) << 5) ^ (this.win[p + 2] as int)) & (hashSize - 1);
+    }
+
+    mut fn insert(p: int): void {
+        let h = this.hashAt(p);
+        this.prev[p & (windowSize - 1)] = this.head[h];
+        this.head[h] = p;
+    }
+
+    /// The longest match for the string at `p`, as (length, distance); the length 0 where none.
+    fn longestMatch(p: int): (int, int) {
+        var chain = this.config.maxChain;
+        var bestLen = if (this.prevLength >= minMatch) this.prevLength else minMatch - 1;
+        var bestDist = 0;
+        if (this.prevLength >= this.config.goodLength) {
+            chain = chain >> 2;
+        }
+        let limit = if (p > windowSize - minLookahead) p - (windowSize - minLookahead) else 0;
+        var nice = this.config.niceLength;
+        let avail = this.end - p;
+        if (nice > avail) {
+            nice = avail;
+        }
+        var cur = this.head[this.hashAt(p)];
+        while (cur >= 0 && cur >= limit && chain > 0) {
+            if (cur < p) {
+                // the first bytes and the one past the best so far, then the rest
+                if (this.win[cur + bestLen] == this.win[p + bestLen] && this.win[cur] == this.win[p]) {
+                    var len = 0;
+                    let most = if (avail < maxMatch) avail else maxMatch;
+                    while (len < most && this.win[cur + len] == this.win[p + len]) {
+                        len = len + 1;
+                    }
+                    if (len > bestLen) {
+                        bestLen = len;
+                        bestDist = p - cur;
+                        if (len >= nice) {
+                            break;
+                        }
+                    }
+                }
+            }
+            cur = this.prev[cur & (windowSize - 1)];
+            chain = chain - 1;
+        }
+        if (bestLen > avail) {
+            bestLen = avail;
+        }
+        return if (bestDist > 0 && bestLen >= minMatch) (bestLen, bestDist) else (0, 0);
+    }
+
+    mut fn pushLiteral(b: uint8): void throws [IoError, Cancelled] {
+        this.symLen[this.symCount] = b as int;
+        this.symDist[this.symCount] = 0;
+        this.symCount = this.symCount + 1;
+        this.litFreq[b as int] = this.litFreq[b as int] + 1;
+        if (this.symCount == blockSymbols) {
+            try this.writeBlock(false);
+        }
+    }
+
+    mut fn pushMatch(len: int, dist: int): void throws [IoError, Cancelled] {
+        this.symLen[this.symCount] = 256 + len;
+        this.symDist[this.symCount] = dist;
+        this.symCount = this.symCount + 1;
+        let (lc, _) = lengthCode(len);
+        this.litFreq[lc] = this.litFreq[lc] + 1;
+        let (dc, _) = distCode(dist);
+        this.distFreq[dc] = this.distFreq[dc] + 1;
+        if (this.symCount == blockSymbols) {
+            try this.writeBlock(false);
+        }
+    }
+
+    /// The matcher over what is ready: with `all`, to the very end.
+    mut fn deflateReady(all: bool): void throws [IoError, Cancelled] {
+        while (this.end - this.strStart >= (if (all) 1 else minLookahead)) {
+            let p = this.strStart;
+            let avail = this.end - p;
+            var len = 0;
+            var dist = 0;
+            if (avail >= minMatch) {
+                let (l, d) = this.longestMatch(p);
+                len = l;
+                dist = d;
+            }
+            if (this.config.lazy) {
+                // the match found is kept back one byte: a longer one from the next position wins
+                if (this.matchAvailable) {
+                    if (len > this.prevLength || this.prevLength < minMatch) {
+                        // the previous position goes as a literal; this match waits its turn
+                        try this.pushLiteral(this.win[p - 1]);
+                        this.prevLength = len;
+                        this.prevDist = dist;
+                        if (avail >= minMatch) {
+                            this.insert(p);
+                        }
+                        this.strStart = p + 1;
+                        continue;
+                    }
+                    // the previous match stands
+                    try this.pushMatch(this.prevLength, this.prevDist);
+                    // the positions inside it go into the chains, from the byte after the kept one
+                    var k = p;
+                    let stop = p - 1 + this.prevLength;
+                    while (k < stop) {
+                        if (this.end - k >= minMatch) {
+                            this.insert(k);
+                        }
+                        k = k + 1;
+                    }
+                    this.strStart = stop;
+                    this.matchAvailable = false;
+                    this.prevLength = 0;
+                    continue;
+                }
+                if (len >= minMatch && len < this.config.maxLazy) {
+                    this.matchAvailable = true;
+                    this.prevLength = len;
+                    this.prevDist = dist;
+                    if (avail >= minMatch) {
+                        this.insert(p);
+                    }
+                    this.strStart = p + 1;
+                    continue;
+                }
+            }
+            if (len >= minMatch) {
+                try this.pushMatch(len, dist);
+                var k = p;
+                while (k < p + len) {
+                    if (this.end - k >= minMatch) {
+                        this.insert(k);
+                    }
+                    k = k + 1;
+                }
+                this.strStart = p + len;
+            } else {
+                try this.pushLiteral(this.win[p]);
+                if (avail >= minMatch) {
+                    this.insert(p);
+                }
+                this.strStart = p + 1;
+            }
+        }
+        if (all && this.matchAvailable) {
+            try this.pushLiteral(this.win[this.strStart - 1]);
+            this.matchAvailable = false;
+            this.prevLength = 0;
+        }
+    }
+
+    // -- the block
+
+    /// The symbols so far as a block: fixed tables at level 1, dynamic ones above, stored where
+    /// that is smaller. With `final`, the last.
+    mut fn writeBlock(final: bool): void throws [IoError, Cancelled] {
+        this.litFreq[256] = this.litFreq[256] + 1;
+        var litLengths: int[] = [];
+        var distLengths: int[] = [];
+        var useFixed = this.level == 1;
+        var dynamicBits = 0;
+        var clLengths = [0] * 19;
+        var clSymbols: List<int> = List.new();
+        var clExtra: List<int> = List.new();
+        var hlit = 257;
+        var hdist = 1;
+        var hclen = 4;
+        if (!useFixed) {
+            litLengths = buildLengths(this.litFreq, 286, 15);
+            distLengths = buildLengths(this.distFreq, 30, 15);
+            // a distance code must exist, even where no match was made
+            var anyDist = false;
+            var i = 0;
+            while (i < 30) {
+                if (distLengths[i] > 0) { anyDist = true; }
+                i = i + 1;
+            }
+            if (!anyDist) {
+                distLengths[0] = 1;
+            }
+            hlit = 286;
+            while (hlit > 257 && litLengths[hlit - 1] == 0) { hlit = hlit - 1; }
+            hdist = 30;
+            while (hdist > 1 && distLengths[hdist - 1] == 0) { hdist = hdist - 1; }
+            // the code lengths, run-length coded
+            var all = [0] * (hlit + hdist);
+            i = 0;
+            while (i < hlit) { all[i] = litLengths[i]; i = i + 1; }
+            i = 0;
+            while (i < hdist) { all[hlit + i] = distLengths[i]; i = i + 1; }
+            runLengthCode(all, hlit + hdist, clSymbols, clExtra);
+            var clFreq = [0] * 19;
+            for (sym in clSymbols) {
+                clFreq[sym] = clFreq[sym] + 1;
+            }
+            clLengths = buildLengths(clFreq, 19, 7);
+            let order = codeLengthOrder();
+            hclen = 19;
+            while (hclen > 4 && clLengths[order[hclen - 1]] == 0) { hclen = hclen - 1; }
+            // the size of the block with the dynamic tables, in bits
+            dynamicBits = 3 + 5 + 5 + 4 + 3 * hclen;
+            var k = 0;
+            while (k < clSymbols.length()) {
+                let sym = clSymbols[k];
+                dynamicBits = dynamicBits + clLengths[sym] + (if (sym == 16) 2 else if (sym == 17) 3 else if (sym == 18) 7 else 0);
+                k = k + 1;
+            }
+            i = 0;
+            while (i < 286) { dynamicBits = dynamicBits + this.litFreq[i] * litLengths[i] + this.litFreq[i] * extraBitsOfLit(i); i = i + 1; }
+            i = 0;
+            while (i < 30) { dynamicBits = dynamicBits + this.distFreq[i] * (distLengths[i] + distExtra()[i]); i = i + 1; }
+        }
+        // the size with the fixed tables
+        let fixedLit = fixedLitLengths();
+        var fixedBits = 3;
+        var i = 0;
+        while (i < 286) { fixedBits = fixedBits + this.litFreq[i] * (fixedLit[i] + extraBitsOfLit(i)); i = i + 1; }
+        i = 0;
+        while (i < 30) { fixedBits = fixedBits + this.distFreq[i] * (5 + distExtra()[i]); i = i + 1; }
+        // the size stored: the literal bytes of the block
+        var rawBytes = 0;
+        i = 0;
+        while (i < this.symCount) {
+            rawBytes = rawBytes + (if (this.symLen[i] < 256) 1 else this.symLen[i] - 256);
+            i = i + 1;
+        }
+        let storedBits = (3 + 7) + 32 * ((rawBytes + 65534) / 65535) + 8 * rawBytes;
+        if (!useFixed && fixedBits <= dynamicBits) {
+            useFixed = true;
+        }
+        let huffBits = if (useFixed) fixedBits else dynamicBits;
+        let endAt = this.strStart - (if (this.matchAvailable) 1 else 0);
+        if (storedBits < huffBits && rawBytes > 0 && rawBytes <= endAt) {
+            // stored: the block's bytes are the newest `rawBytes` of the window
+            try this.storedFromSymbols(rawBytes, final);
+        } else {
+            try this.bits.bits(if (final) 1 else 0, 1);
+            if (useFixed) {
+                try this.bits.bits(1, 2);
+                litLengths = fixedLit;
+                distLengths = fixedDistLengths();
+            } else {
+                try this.bits.bits(2, 2);
+                try this.bits.bits(hlit - 257, 5);
+                try this.bits.bits(hdist - 1, 5);
+                try this.bits.bits(hclen - 4, 4);
+                let order = codeLengthOrder();
+                var k = 0;
+                while (k < hclen) {
+                    try this.bits.bits(clLengths[order[k]], 3);
+                    k = k + 1;
+                }
+                let clCodes = canonicalCodes(clLengths, 19);
+                k = 0;
+                while (k < clSymbols.length()) {
+                    let sym = clSymbols[k];
+                    try this.bits.bits(clCodes[sym], clLengths[sym]);
+                    if (sym == 16) { try this.bits.bits(clExtra[k], 2); }
+                    else if (sym == 17) { try this.bits.bits(clExtra[k], 3); }
+                    else if (sym == 18) { try this.bits.bits(clExtra[k], 7); }
+                    k = k + 1;
+                }
+            }
+            let litCodes = canonicalCodes(litLengths, litLengths.length());
+            let distCodes = canonicalCodes(distLengths, distLengths.length());
+            i = 0;
+            while (i < this.symCount) {
+                let s = this.symLen[i];
+                if (s < 256) {
+                    try this.bits.bits(litCodes[s], litLengths[s]);
+                } else {
+                    let len = s - 256;
+                    let (lc, le) = lengthCode(len);
+                    try this.bits.bits(litCodes[lc], litLengths[lc]);
+                    let lextra = lengthExtra()[lc - 257];
+                    if (lextra > 0) { try this.bits.bits(le, lextra); }
+                    let (dc, de) = distCode(this.symDist[i]);
+                    try this.bits.bits(distCodes[dc], distLengths[dc]);
+                    let dextra = distExtra()[dc];
+                    if (dextra > 0) { try this.bits.bits(de, dextra); }
+                }
+                i = i + 1;
+            }
+            try this.bits.bits(litCodes[256], litLengths[256]);
+        }
+        // the next block starts empty
+        this.symCount = 0;
+        this.litFreq = [0] * 286;
+        this.distFreq = [0] * 30;
+    }
+
+    /// The block's bytes as stored blocks: they are the newest `n` bytes before `strStart`
+    /// (less what a lazy match keeps back).
+    mut fn storedFromSymbols(n: int, final: bool): void throws [IoError, Cancelled] {
+        let endAt = this.strStart - (if (this.matchAvailable) 1 else 0);
+        var from = endAt - n;
+        while (endAt - from > 65535) {
+            try this.storedBlock(this.win[from..from + 65535], false);
+            from = from + 65535;
+        }
+        try this.storedBlock(this.win[from..endAt], final);
+    }
+}
+
+/// The extra bits a literal/length symbol carries.
+fn extraBitsOfLit(sym: int): int {
+    if (sym < 257) {
+        return 0;
+    }
+    let i = sym - 257;
+    return if (i < 29) lengthExtra()[i] else 0;
+}
+
+/// The code lengths of `n` symbols with the frequencies, none longer than `limit` (zlib's way:
+/// a Huffman tree from a heap, the overflow moved down).
+fn buildLengths(freq: int[], n: int, limit: int): int[] {
+    var lengths = [0] * n;
+    // the symbols that occur, as leaves
+    var count = 0;
+    var i = 0;
+    while (i < n) {
+        if (freq[i] > 0) { count = count + 1; }
+        i = i + 1;
+    }
+    if (count == 0) {
+        return lengths;
+    }
+    if (count == 1) {
+        i = 0;
+        while (i < n) {
+            if (freq[i] > 0) { lengths[i] = 1; }
+            i = i + 1;
+        }
+        return lengths;
+    }
+    // nodes: 0..n-1 the leaves, n.. the inner ones; parent links give the depths
+    let total = 2 * n;
+    var weight = [0] * total;
+    var parent = [-1] * total;
+    var heap = [0] * total;
+    var heapSize = 0;
+    i = 0;
+    while (i < n) {
+        if (freq[i] > 0) {
+            weight[i] = freq[i];
+            heap[heapSize] = i;
+            heapSize = heapSize + 1;
+        }
+        i = i + 1;
+    }
+    // a binary heap by weight
+    var k = heapSize / 2 - 1;
+    while (k >= 0) {
+        siftDown(heap, heapSize, weight, k);
+        k = k - 1;
+    }
+    var next = n;
+    while (heapSize > 1) {
+        let a = heap[0];
+        heap[0] = heap[heapSize - 1];
+        heapSize = heapSize - 1;
+        siftDown(heap, heapSize, weight, 0);
+        let b = heap[0];
+        weight[next] = weight[a] + weight[b];
+        parent[a] = next;
+        parent[b] = next;
+        heap[0] = next;
+        siftDown(heap, heapSize, weight, 0);
+        next = next + 1;
+    }
+    // the depth of each leaf
+    var maxLen = 0;
+    i = 0;
+    while (i < n) {
+        if (freq[i] > 0) {
+            var d = 0;
+            var p = parent[i];
+            while (p >= 0) {
+                d = d + 1;
+                p = parent[p];
+            }
+            lengths[i] = d;
+            if (d > maxLen) { maxLen = d; }
+        }
+        i = i + 1;
+    }
+    if (maxLen > limit) {
+        limitLengths(lengths, freq, n, limit);
+    }
+    return lengths;
+}
+
+fn siftDown(heap: int[], size: int, weight: int[], at: int): void {
+    var i = at;
+    while (true) {
+        let l = 2 * i + 1;
+        let r = l + 1;
+        var m = i;
+        if (l < size && weight[heap[l]] < weight[heap[m]]) { m = l; }
+        if (r < size && weight[heap[r]] < weight[heap[m]]) { m = r; }
+        if (m == i) {
+            return;
+        }
+        let t = heap[i];
+        heap[i] = heap[m];
+        heap[m] = t;
+        i = m;
+    }
+}
+
+/// Lengths beyond the limit brought down: the counts per length adjusted as zlib's gen_bitlen
+/// does (an overflow of leaves moved to shorter lengths), then the lengths handed out in order
+/// of frequency.
+fn limitLengths(lengths: int[], freq: int[], n: int, limit: int): void {
+    var blCount = [0] * (limit + 2);
+    var overflow = 0;
+    var i = 0;
+    while (i < n) {
+        if (freq[i] > 0) {
+            var l = lengths[i];
+            if (l > limit) {
+                overflow = overflow + 1;
+                l = limit;
+            }
+            blCount[l] = blCount[l] + 1;
+        }
+        i = i + 1;
+    }
+    while (overflow > 0) {
+        var bits = limit - 1;
+        while (blCount[bits] == 0) { bits = bits - 1; }
+        blCount[bits] = blCount[bits] - 1;
+        blCount[bits + 1] = blCount[bits + 1] + 2;
+        blCount[limit] = blCount[limit] - 1;
+        overflow = overflow - 2;
+    }
+    // the leaves sorted by frequency ascending get the longest lengths first (an insertion sort:
+    // at most 286 of them)
+    var sorted = [0] * n;
+    var m = 0;
+    i = 0;
+    while (i < n) {
+        if (freq[i] > 0) {
+            var j = m;
+            while (j > 0 && freq[sorted[j - 1]] > freq[i]) {
+                sorted[j] = sorted[j - 1];
+                j = j - 1;
+            }
+            sorted[j] = i;
+            m = m + 1;
+        }
+        i = i + 1;
+    }
+    var at = 0;
+    var bits = limit;
+    while (bits >= 1) {
+        var c = blCount[bits];
+        while (c > 0) {
+            lengths[sorted[at]] = bits;
+            at = at + 1;
+            c = c - 1;
+        }
+        bits = bits - 1;
+    }
+}
+
+/// The code lengths run-length coded with the symbols 16, 17 and 18 (§3.2.7).
+fn runLengthCode(all: int[], n: int, symbols: List<int>, extra: List<int>): void {
+    var i = 0;
+    while (i < n) {
+        let v = all[i];
+        var run = 1;
+        while (i + run < n && all[i + run] == v) {
+            run = run + 1;
+        }
+        if (v == 0 && run >= 3) {
+            var left = run;
+            while (left >= 3) {
+                if (left >= 11) {
+                    let take = if (left > 138) 138 else left;
+                    symbols.push(18);
+                    extra.push(take - 11);
+                    left = left - take;
+                } else {
+                    symbols.push(17);
+                    extra.push(left - 3);
+                    left = 0;
+                }
+            }
+            while (left > 0) {
+                symbols.push(0);
+                extra.push(0);
+                left = left - 1;
+            }
+            i = i + run;
+        } else if (v != 0 && run >= 4) {
+            symbols.push(v);
+            extra.push(0);
+            var left = run - 1;
+            while (left >= 3) {
+                let take = if (left > 6) 6 else left;
+                symbols.push(16);
+                extra.push(take - 3);
+                left = left - take;
+            }
+            while (left > 0) {
+                symbols.push(v);
+                extra.push(0);
+                left = left - 1;
+            }
+            i = i + run;
+        } else {
+            symbols.push(v);
+            extra.push(0);
+            i = i + 1;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// zlib (RFC 1950).
+// ---------------------------------------------------------------------------------------------
+
+/// A zlib stream read: the two header bytes, the deflate blocks, the Adler-32 checked at the end.
+pub class ZlibReader<R :: [Reader]> :: [Reader] {
+    var inflate: DeflateReader<R>,
+    var headerRead: bool,
+    var adler: uint32,
+    var ended: bool,
+
+    pub static fn new(inner: R): ZlibReader<R> {
+        return ZlibReader<R> { inflate = DeflateReader<R>.new(inner), headerRead = false, adler = 1u32, ended = false };
+    }
+
+    mut fn readHeader(): void throws [IoError, Cancelled] {
+        var head: uint8[] = [0u8, 0u8];
+        try this.inflate.readTrailerExact(head[..], "zlib header");
+        let cmf = head[0] as int;
+        let flg = head[1] as int;
+        if ((cmf & 0x0F) != 8) {
+            throw corrupt("the zlib header names a method that is not deflate");
+        }
+        if ((cmf >> 4) > 7) {
+            throw corrupt("the zlib header names a window beyond 32 KiB");
+        }
+        if (((cmf << 8) | flg) % 31 != 0) {
+            throw corrupt("the zlib header's check fails");
+        }
+        if ((flg & 0x20) != 0) {
+            throw corrupt("a zlib stream with a preset dictionary");
+        }
+        this.headerRead = true;
+    }
+
+    pub mut fn read(into: Slice<uint8>): int throws [IoError, Cancelled] {
+        if (this.ended || into.length() == 0) {
+            return 0;
+        }
+        if (!this.headerRead) {
+            try this.readHeader();
+        }
+        let n = try this.inflate.read(into);
+        if (n > 0) {
+            this.adler = adler32(into[0..n], this.adler);
+            return n;
+        }
+        var trailer: uint8[] = [0u8] * 4;
+        try this.inflate.readTrailerExact(trailer[..], "zlib trailer");
+        let said = ((trailer[0] as uint32) << 24) | ((trailer[1] as uint32) << 16) | ((trailer[2] as uint32) << 8) | (trailer[3] as uint32);
+        if (said != this.adler) {
+            throw corrupt("the zlib Adler-32 does not match");
+        }
+        this.ended = true;
+        return 0;
+    }
+}
+
+/// A zlib stream written: the header, the deflate blocks, the Adler-32 at `close`.
+pub class ZlibWriter<W :: [Writer]> :: [Writer, Closeable] {
+    var deflate: DeflateWriter<W>,
+    var level: int,
+    var headerWritten: bool,
+    var adler: uint32,
+    var closed: bool,
+
+    pub static fn new(inner: W, level: int = 6): ZlibWriter<W> throws CompressError {
+        let d = try DeflateWriter<W>.new(inner, level);
+        return ZlibWriter<W> { deflate = d, level = if (level < 0) 6 else level, headerWritten = false, adler = 1u32, closed = false };
+    }
+
+    mut fn writeHeader(): void throws [IoError, Cancelled] {
+        let cmf = 0x78;
+        var flevel = 2;
+        if (this.level < 2) { flevel = 0; } else if (this.level < 6) { flevel = 1; } else if (this.level >= 7) { flevel = 3; }
+        var flg = flevel << 6;
+        let fcheck = 31 - (((cmf << 8) | flg) % 31);
+        flg = flg | (if (fcheck == 31) 0 else fcheck);
+        try this.deflate.bits.bytes([cmf as uint8, flg as uint8]);
+        this.headerWritten = true;
+    }
+
+    pub mut fn write(from: Slice<uint8>): int throws [IoError, Cancelled] {
+        if (!this.headerWritten) {
+            try this.writeHeader();
+        }
+        this.adler = adler32(from, this.adler);
+        return try this.deflate.write(from);
+    }
+
+    pub mut fn flush(): void throws [IoError, Cancelled] {
+        if (!this.headerWritten) {
+            try this.writeHeader();
+        }
+        try this.deflate.flush();
+    }
+
+    pub fn close(): void throws [IoError, Cancelled] {
+        let me = this;
+        try me.finish();
+    }
+
+    mut fn finish(): void throws [IoError, Cancelled] {
+        if (this.closed) {
+            return;
+        }
+        if (!this.headerWritten) {
+            try this.writeHeader();
+        }
+        try this.deflate.close();
+        let a = this.adler;
+        try this.deflate.bits.bytes([((a >> 24) & 0xFFu32) as uint8, ((a >> 16) & 0xFFu32) as uint8, ((a >> 8) & 0xFFu32) as uint8, (a & 0xFFu32) as uint8]);
+        try this.deflate.bits.flush();
+        this.closed = true;
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// gzip (RFC 1952).
+// ---------------------------------------------------------------------------------------------
+
+/// A gzip file read: the header (its extra field, name, comment and header CRC skipped), the
+/// deflate blocks, the CRC-32 and the size checked at the end; members in a row read as one.
+pub class GzipReader<R :: [Reader]> :: [Reader] {
+    var inflate: DeflateReader<R>,
+    var headerRead: bool,
+    var crc: uint32,
+    var size: int,
+    var ended: bool,
+
+    pub static fn new(inner: R): GzipReader<R> {
+        return GzipReader<R> { inflate = DeflateReader<R>.new(inner), headerRead = false, crc = 0u32, size = 0, ended = false };
+    }
+
+    /// The header; `false` where the stream has ended cleanly before one (a member boundary).
+    mut fn readHeader(first: bool): bool throws [IoError, Cancelled] {
+        var head: uint8[] = [0u8] * 10;
+        var at = 0;
+        while (at < 10) {
+            let n = try this.inflate.readTrailer(head[at..10]);
+            if (n == 0) {
+                if (at == 0 && !first) {
+                    return false;
+                }
+                if (at >= 2 && (head[0] != 0x1Fu8 || head[1] != 0x8Bu8)) {
+                    throw corrupt("not a gzip stream: the magic bytes are missing");
+                }
+                if (at == 1 && head[0] != 0x1Fu8) {
+                    throw corrupt("not a gzip stream: the magic bytes are missing");
+                }
+                throw corrupt("the stream ends inside the gzip header");
+            }
+            at = at + n;
+            if (at >= 2 && (head[0] != 0x1Fu8 || head[1] != 0x8Bu8)) {
+                throw corrupt("not a gzip stream: the magic bytes are missing");
+            }
+        }
+        if (head[2] != 8u8) {
+            throw corrupt("the gzip header names a method that is not deflate");
+        }
+        let flags = head[3] as int;
+        if ((flags & 0x04) != 0) {
+            var lenBytes: uint8[] = [0u8, 0u8];
+            try this.inflate.readTrailerExact(lenBytes[..], "gzip header");
+            var len = (lenBytes[0] as int) | ((lenBytes[1] as int) << 8);
+            var skip: uint8[] = [0u8] * 256;
+            while (len > 0) {
+                let take = if (len > 256) 256 else len;
+                try this.inflate.readTrailerExact(skip[0..take], "gzip header");
+                len = len - take;
+            }
+        }
+        if ((flags & 0x08) != 0) {
+            try this.skipZeroEnded();
+        }
+        if ((flags & 0x10) != 0) {
+            try this.skipZeroEnded();
+        }
+        if ((flags & 0x02) != 0) {
+            var crc16: uint8[] = [0u8, 0u8];
+            try this.inflate.readTrailerExact(crc16[..], "gzip header");
+        }
+        this.headerRead = true;
+        return true;
+    }
+
+    mut fn skipZeroEnded(): void throws [IoError, Cancelled] {
+        var one: uint8[] = [0u8];
+        while (true) {
+            try this.inflate.readTrailerExact(one[..], "gzip header");
+            if (one[0] == 0u8) {
+                return;
+            }
+        }
+    }
+
+    pub mut fn read(into: Slice<uint8>): int throws [IoError, Cancelled] {
+        if (this.ended || into.length() == 0) {
+            return 0;
+        }
+        if (!this.headerRead) {
+            let _ = try this.readHeader(true);
+        }
+        while (true) {
+            let n = try this.inflate.read(into);
+            if (n > 0) {
+                this.crc = crc32(into[0..n], this.crc);
+                this.size = this.size + n;
+                return n;
+            }
+            var trailer: uint8[] = [0u8] * 8;
+            try this.inflate.readTrailerExact(trailer[..], "gzip trailer");
+            let said = (trailer[0] as uint32) | ((trailer[1] as uint32) << 8) | ((trailer[2] as uint32) << 16) | ((trailer[3] as uint32) << 24);
+            if (said != this.crc) {
+                throw corrupt("the gzip CRC-32 does not match");
+            }
+            let isize = (trailer[4] as int) | ((trailer[5] as int) << 8) | ((trailer[6] as int) << 16) | ((trailer[7] as int) << 24);
+            if (isize != (this.size & 0xFFFFFFFF)) {
+                throw corrupt("the gzip size does not match");
+            }
+            // another member?
+            let fresh = DeflateReader<R>.new(this.inflate.inner);
+            // what the old reader buffered beyond the trailer belongs to the next member
+            var carried: uint8[] = [0u8] * 4096;
+            let c = try this.inflate.readTrailer(carried[..]);
+            if (c == 0) {
+                this.ended = true;
+                return 0;
+            }
+            carried[0..c].copyInto(fresh.inBuf[0..c]);
+            fresh.inLen = c;
+            this.inflate = fresh;
+            this.crc = 0u32;
+            this.size = 0;
+            this.headerRead = false;
+            if (!(try this.readHeader(false))) {
+                this.ended = true;
+                return 0;
+            }
+        }
+    }
+}
+
+/// A gzip file written: the header, the deflate blocks, the CRC-32 and the size at `close`.
+pub class GzipWriter<W :: [Writer]> :: [Writer, Closeable] {
+    var deflate: DeflateWriter<W>,
+    var level: int,
+    var headerWritten: bool,
+    var crc: uint32,
+    var size: int,
+    var closed: bool,
+
+    pub static fn new(inner: W, level: int = 6): GzipWriter<W> throws CompressError {
+        let d = try DeflateWriter<W>.new(inner, level);
+        return GzipWriter<W> { deflate = d, level = if (level < 0) 6 else level, headerWritten = false, crc = 0u32, size = 0, closed = false };
+    }
+
+    /// The bytes taken so far.
+    pub fn bytesIn(): int {
+        return this.size;
+    }
+
+    mut fn writeHeader(): void throws [IoError, Cancelled] {
+        let xfl = if (this.level >= 9) 2 else if (this.level == 1) 4 else 0;
+        try this.deflate.bits.bytes([0x1Fu8, 0x8Bu8, 8u8, 0u8, 0u8, 0u8, 0u8, 0u8, xfl as uint8, 255u8]);
+        this.headerWritten = true;
+    }
+
+    pub mut fn write(from: Slice<uint8>): int throws [IoError, Cancelled] {
+        if (!this.headerWritten) {
+            try this.writeHeader();
+        }
+        this.crc = crc32(from, this.crc);
+        this.size = this.size + from.length();
+        return try this.deflate.write(from);
+    }
+
+    pub mut fn flush(): void throws [IoError, Cancelled] {
+        if (!this.headerWritten) {
+            try this.writeHeader();
+        }
+        try this.deflate.flush();
+    }
+
+    pub fn close(): void throws [IoError, Cancelled] {
+        let me = this;
+        try me.finish();
+    }
+
+    mut fn finish(): void throws [IoError, Cancelled] {
+        if (this.closed) {
+            return;
+        }
+        if (!this.headerWritten) {
+            try this.writeHeader();
+        }
+        try this.deflate.close();
+        let c = this.crc;
+        let s = this.size & 0xFFFFFFFF;
+        try this.deflate.bits.bytes([(c & 0xFFu32) as uint8, ((c >> 8) & 0xFFu32) as uint8, ((c >> 16) & 0xFFu32) as uint8, ((c >> 24) & 0xFFu32) as uint8,
+            (s & 0xFF) as uint8, ((s >> 8) & 0xFF) as uint8, ((s >> 16) & 0xFF) as uint8, ((s >> 24) & 0xFF) as uint8]);
+        try this.deflate.bits.flush();
+        this.closed = true;
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Whole in memory.
+// ---------------------------------------------------------------------------------------------
+
+fn readAllOf<R :: [Reader]>(r: R): uint8[] throws [IoError, Cancelled] {
+    var reader = r;
+    let out = ByteBuffer.new();
+    let chunk: uint8[] = [0u8] * 16384;
+    while (true) {
+        let n = try reader.read(chunk[..]);
+        if (n == 0) {
+            break;
+        }
+        try! out.write(chunk[0..n]);
+    }
+    return out.toArray();
+}
+
+/// The gzip format over bytes in memory.
+pub struct Gzip {
+    pub static fn compress(bytes: Slice<uint8>, level: int = 6): uint8[] throws CompressError {
+        let out = ByteBuffer.new();
+        var w = try GzipWriter<ByteBuffer>.new(out, level);
+        try! w.write(bytes);
+        try! w.close();
+        return out.toArray();
+    }
+
+    /// The bytes of the gzip data; what is not gzip, or whose CRC-32 or size does not hold, is
+    /// `IoError { kind = .InvalidData }` with a `CompressError` inside.
+    pub static fn decompress(bytes: Slice<uint8>): uint8[] throws IoError {
+        let src = ByteBuffer.new();
+        try! src.write(bytes);
+        let r = GzipReader<ByteBuffer>.new(src);
+        return try unCancelled(() => try readAllOf(r));
+    }
+}
+
+/// The zlib format over bytes in memory.
+pub struct Zlib {
+    pub static fn compress(bytes: Slice<uint8>, level: int = 6): uint8[] throws CompressError {
+        let out = ByteBuffer.new();
+        var w = try ZlibWriter<ByteBuffer>.new(out, level);
+        try! w.write(bytes);
+        try! w.close();
+        return out.toArray();
+    }
+
+    pub static fn decompress(bytes: Slice<uint8>): uint8[] throws IoError {
+        let src = ByteBuffer.new();
+        try! src.write(bytes);
+        let r = ZlibReader<ByteBuffer>.new(src);
+        return try unCancelled(() => try readAllOf(r));
+    }
+}
+
+/// Raw DEFLATE over bytes in memory.
+pub struct Deflate {
+    pub static fn compress(bytes: Slice<uint8>, level: int = 6): uint8[] throws CompressError {
+        let out = ByteBuffer.new();
+        var w = try DeflateWriter<ByteBuffer>.new(out, level);
+        try! w.write(bytes);
+        try! w.close();
+        return out.toArray();
+    }
+
+    pub static fn decompress(bytes: Slice<uint8>): uint8[] throws IoError {
+        let src = ByteBuffer.new();
+        try! src.write(bytes);
+        let r = DeflateReader<ByteBuffer>.new(src);
+        return try unCancelled(() => try readAllOf(r));
+    }
+}
+
+/// A reading over memory cannot be cancelled: the `Cancelled` of the signature is impossible here.
+fn unCancelled(body: fn() -> uint8[] throws [IoError, Cancelled]): uint8[] throws IoError {
+    try {
+        return try body();
+    } catch (e: IoError) {
+        throw e;
+    } catch (_: Cancelled) {
+        throw IoError { kind = .InvalidData, path = null, detail = "cancelled", inner = null };
+    }
+}
