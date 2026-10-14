@@ -56,6 +56,13 @@ pub class Box<T> {
     pub value: T,
 }
 
+/// A box compares by its value (M10 S1): what it holds is what it is, as its `Debug` text says.
+extend<T :: [Equatable]> Box<T> :: [Equatable] {
+    fn equals(o: Box<T>): bool {
+        return this.value == o.value;
+    }
+}
+
 extend<T :: [Debug]> Box<T> :: [Debug] {
     /// The value, as it shows itself: the box is an indirection and no part of what is said.
     fn debug(): string {

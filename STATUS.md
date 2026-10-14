@@ -1188,6 +1188,25 @@ libm port for compile time, the Windows child pipes over the completion port, me
 Released by the maintainer on 2026-10-14, every reading of the M9b report confirmed; the mode of
 M9b: no halt until it closes, merged on green CI, open points collected for the report at the close.
 
+- **S1** `std.codec` (P1): the pair `Encode`/`Decode`/`Codable`; the ten-form container model
+  a format implements as primitives (the scalars, begin/end around the containers; the decoder
+  pull-based with `isNull`/`seqHasNext`/`structField`/`beginVariant`, a mismatch leaving the
+  value where it was); the layer a conformance writes with on the format itself (`field`,
+  `optional`, `element`, `entry`, `next`, `nextKey`, `value`, the variant forms); the errors with
+  kind, path and detail; the conformances of the integers (the narrow ones through `int`,
+  `Invalid` where they do not fit), the floats, `bool`, `string`, `char`, `Instant`, `?T`, `T[]`,
+  `Slice<T>`, `List`, `Deque`, `Set`, `Map`, the tuples of two and three; `Bytes { value }` as the
+  byte form; `Value`, the tree of the forms with its encoder and decoder, itself `Codable`. Three
+  readings against the plan's letter: the format passed by reference (`&e`, as a hasher — a `mut`
+  method cannot be called on a parameter), the layer on the format rather than sub-encoder
+  objects (which would copy the format), `uint8[]` a sequence and `Bytes` the byte form (a
+  conformance over `T[]` cannot ask what `T` is). The compiler lets a `mut` method's `this` of a
+  type parameter's type be a place (03 §2.3a said so); `Box<T>` is `Equatable` where `T` is.
+  Found: a static conformance call on a generic type inside a generic extend reaches the lowering
+  unsubstituted (worked around), and `>>` closing two type arguments of a call parses as an
+  operator. The artifacts: a struct's fields through the Value encoder in order (`tests/std/tests/
+  codec.lyr`, 7 tests), `missing: field 'name' (at User)`. Spec 12 §Codecs rules 1–6; three cases.
+
 ## Design decisions
 
 All of them are in [`design/v5/spec/`](design/v5/spec/) — one document per area, each with the
