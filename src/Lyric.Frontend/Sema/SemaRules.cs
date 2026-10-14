@@ -779,7 +779,11 @@ public sealed class SemaRules
             case ThisExpr:
                 // 'this = value' replaces a VALUE as a whole, a struct or an enum. Anything else
                 // is the reference (or the scalar copy) the caller handed in, and is not rebound.
-                if (TypeFacts.KindOf(_types.TypeOf(expr)) is not (TypeSymbolKind.Struct or TypeSymbolKind.Enum))
+                // A receiver of a type parameter's type (an extension over a constraint, M10 S1:
+                // 'extend<E :: [Encoder]> E') is a place where the method is 'mut' — '&this'
+                // hands it on, as '&h' hands a hasher on.
+                if (_types.TypeOf(expr) is not TypeParamType
+                    && TypeFacts.KindOf(_types.TypeOf(expr)) is not (TypeSymbolKind.Struct or TypeSymbolKind.Enum))
                     return "'this' is replaced as a whole only in a 'mut fn' of a struct or an enum";
                 return _thisMut ? null : NotMutReason;
 
