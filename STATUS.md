@@ -1236,6 +1236,18 @@ M9b: no halt until it closes, merged on green CI, open points collected for the 
   `[]`/`at`/`path`/`as*`, `Codable` itself), `parse`, `encodeTo`/`decodeFrom`. `Decoder.isNull`
   is a `mut` method now. The artifacts: a struct's text and back, 18 refusals with line and
   column (`tests/std/tests/json.lyr`, 6 tests). Spec 12 §JSON rules 1–4; three cases.
+- **S4** `std.toml` (P3; 10 E8): TOML 1.0 — `toml.encode(v)` writes a value whose form is a
+  table as a document (plain pairs, then `[a.b]` sub-tables — none for a table of sub-tables
+  alone —, then `[[a.b]]` arrays of tables; a map as a table of string keys, bytes as an array of
+  integers, a payload variant as a table of one key, a `null` field left out), `toml.decode<T>`
+  parsing whole (`Parser`: comments, bare/quoted/dotted keys, basic and literal strings both
+  multi-line, integers with underscores and prefixes, floats with `inf`/`nan`, the four
+  date-times over `std.time`, arrays over lines, inline tables, headers; TOML's rules against
+  redefinition through an `Origin` per table — `TomlError { line, column }`) and reading through
+  `TomlReader` (a string from a string or a date-time's text, so an `Instant` reads from a
+  date-time); `TomlValue` with **`TomlTable`** keeping its keys in order and `TomlDatetime` in
+  four forms. The artifacts: a config's document and back, 18 refusals with line and column
+  (`tests/std/tests/toml.lyr`, 4 tests). Spec 12 §TOML rules 1–4; three cases.
 
 ## Design decisions
 

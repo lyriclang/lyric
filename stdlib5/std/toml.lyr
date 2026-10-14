@@ -1,0 +1,1867 @@
+/// TOML (design/v5/spec/10 B10 E8; 13 M10 S4): TOML 1.0 — an encoder and a decoder of
+/// `std.codec`'s model, and `TomlValue`, the tree. `toml.encode(v)` writes any `Encode` value
+/// whose form is a table as a document, `toml.decode<T>(text)` reads any `Decode` value out of
+/// one; `toml.parse(text)` is the tree. A struct is a table of its wire names, a sequence an
+/// array, a map a table whose keys are strings — a number's digits for a number —, bytes an array
+/// of integers (E6), a unit variant its name, a variant with a payload a table of one key. A
+/// table keeps the order its keys were written in. Date-times are TOML's own form, in their four
+/// kinds; an `Instant` writes as a quoted RFC 3339 string and reads from a date-time or a string.
+import std.codec { Encode, Decode, Codable, Encoder, Decoder, EncodeError, DecodeError };
+import std.collections { List, Map, Set };
+import std.core { ParseError };
+import std.io { Reader, Writer, IoError };
+import std.string { StringBuilder, fromFloat };
+import std.task { Cancelled };
+import std.time { Date, Time, DateTime, Zone, Duration, TimeError };
+
+// ------------------------------------------------------------------ the error and the tree
+
+/// A text that is no TOML (E5): where, and what was wrong.
+pub struct TomlError :: [Error] {
+    pub line: int,
+    pub column: int,
+    pub detail: string,
+
+    pub fn message(): string {
+        return f"{this.detail} at {this.line}:{this.column}";
+    }
+}
+
+/// A date-time in one of TOML's four forms: with an offset, local, a date alone, a time alone.
+pub enum TomlDatetime :: [Equatable] {
+    Offset(DateTime),
+    Local(Date, Time),
+    LocalDate(Date),
+    LocalTime(Time),
+}
+
+extend TomlDatetime :: [Display, Debug] {
+    /// The TOML text: `1979-05-27T07:32:00Z`, `1979-05-27T07:32:00`, `1979-05-27`, `07:32:00`.
+    fn show(): string {
+        match (this) {
+            .Offset(dt) => { return dt.show(); },
+            .Local(d, t) => { return f"{d.show()}T{t.show()}"; },
+            .LocalDate(d) => { return d.show(); },
+            .LocalTime(t) => { return t.show(); },
+        }
+    }
+
+    fn showTo(out: StringBuilder): void { out.appendStr(this.show()); }
+    fn debug(): string { return this.show(); }
+    fn debugTo(out: StringBuilder): void { out.appendStr(this.show()); }
+}
+
+/// A table: its keys in the order written, each with its value.
+pub class TomlTable {
+    var entries: List<(string, TomlValue)> = List.new(),
+
+    pub static fn new(): TomlTable {
+        return TomlTable { };
+    }
+
+    pub fn length(): int {
+        return this.entries.length();
+    }
+
+    pub fn get(key: string): ?TomlValue {
+        for ((k, v) in this.entries) {
+            if (k == key) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    /// Sets the key: in place where it exists, at the end where it is new.
+    pub mut fn set(key: string, value: TomlValue): void {
+        var i = 0;
+        while (i < this.entries.length()) {
+            if (this.entries[i].0 == key) {
+                this.entries[i] = (key, value);
+                return;
+            }
+            i = i + 1;
+        }
+        this.entries.push((key, value));
+    }
+
+    pub fn keys(): string[] {
+        let out = List<string>.new();
+        for ((k, _) in this.entries) {
+            out.push(k);
+        }
+        return out.toArray();
+    }
+
+    /// The entries in order.
+    pub fn pairs(): (string, TomlValue)[] {
+        return this.entries.toArray();
+    }
+}
+
+/// A TOML document as a value (E8): the seven forms.
+pub enum TomlValue {
+    String(string),
+    Int(int),
+    Float(float),
+    Bool(bool),
+    Datetime(TomlDatetime),
+    Array(List<TomlValue>),
+    Table(TomlTable),
+}
+
+extend TomlValue :: [Equatable] {
+    /// Equal form and content; two tables with the same keys and equal values, in any order.
+    fn equals(o: TomlValue): bool {
+        match (this) {
+            .String(a) => { match (o) { .String(b) => { return a == b; }, _ => { return false; } } },
+            .Int(a) => { match (o) { .Int(b) => { return a == b; }, _ => { return false; } } },
+            .Float(a) => { match (o) { .Float(b) => { return a == b; }, _ => { return false; } } },
+            .Bool(a) => { match (o) { .Bool(b) => { return a == b; }, _ => { return false; } } },
+            .Datetime(a) => { match (o) { .Datetime(b) => { return a == b; }, _ => { return false; } } },
+            .Array(a) => {
+                match (o) {
+                    .Array(b) => {
+                        if (a.length() != b.length()) {
+                            return false;
+                        }
+                        var i = 0;
+                        while (i < a.length()) {
+                            if (!(a[i] == b[i])) {
+                                return false;
+                            }
+                            i = i + 1;
+                        }
+                        return true;
+                    },
+                    _ => { return false; },
+                }
+            },
+            .Table(a) => {
+                match (o) {
+                    .Table(b) => {
+                        if (a.length() != b.length()) {
+                            return false;
+                        }
+                        for ((k, v) in a.pairs()) {
+                            if (let w = b.get(k)) {
+                                if (!(v == w)) {
+                                    return false;
+                                }
+                            } else {
+                                return false;
+                            }
+                        }
+                        return true;
+                    },
+                    _ => { return false; },
+                }
+            },
+        }
+    }
+}
+
+extend TomlValue :: [Display, Debug] {
+    /// A table as a document, another value as its text in a document.
+    fn show(): string {
+        match (this) {
+            .Table(t) => {
+                let out = StringBuilder.new();
+                writeTable(out, [], t);
+                return out.toString();
+            },
+            _ => {
+                let out = StringBuilder.new();
+                writeValue(out, this);
+                return out.toString();
+            },
+        }
+    }
+
+    fn showTo(out: StringBuilder): void { out.appendStr(this.show()); }
+    fn debug(): string { return this.show(); }
+    fn debugTo(out: StringBuilder): void { out.appendStr(this.show()); }
+}
+
+/// `v["key"]`: the member, or `null` where the value is no table or has no such key.
+extend TomlValue :: [Index<string>] {
+    type Output = ?TomlValue;
+
+    fn index(k: string): ?TomlValue {
+        match (this) {
+            .Table(t) => { return t.get(k); },
+            _ => { return null; },
+        }
+    }
+}
+
+extend TomlValue {
+    /// `v.at(3)`: the element, or `null` where the value is no array or the index is out of it.
+    pub fn at(i: int): ?TomlValue {
+        match (this) {
+            .Array(items) => { return if (i >= 0 && i < items.length()) items[i] else null; },
+            _ => { return null; },
+        }
+    }
+
+    /// The value at a path, `"servers.alpha.ports[0]"`.
+    pub fn path(p: string): ?TomlValue {
+        var current: ?TomlValue = this;
+        var name = "";
+        var index = "";
+        var inIndex = false;
+        for (c in p.chars()) {
+            if (inIndex) {
+                if (c == ']') {
+                    var i = -1;
+                    try {
+                        i = int.parse(index);
+                    } catch (_: ParseError) {
+                    }
+                    if (let v = current) {
+                        current = v.at(i);
+                    }
+                    index = "";
+                    inIndex = false;
+                } else {
+                    index = index + f"{c}";
+                }
+            } else if (c == '.' || c == '[') {
+                if (name != "") {
+                    if (let v = current) {
+                        current = v[name];
+                    }
+                    name = "";
+                }
+                inIndex = c == '[';
+            } else {
+                name = name + f"{c}";
+            }
+        }
+        if (name != "") {
+            if (let v = current) {
+                current = v[name];
+            }
+        }
+        return current;
+    }
+
+    pub fn asString(): ?string {
+        match (this) { .String(s) => { return s; }, _ => { return null; } }
+    }
+
+    pub fn asInt(): ?int {
+        match (this) { .Int(i) => { return i; }, _ => { return null; } }
+    }
+
+    /// The number as a float: an `Int` widened.
+    pub fn asFloat(): ?float {
+        match (this) { .Float(f) => { return f; }, .Int(i) => { return i as float; }, _ => { return null; } }
+    }
+
+    pub fn asBool(): ?bool {
+        match (this) { .Bool(b) => { return b; }, _ => { return null; } }
+    }
+
+    pub fn asDatetime(): ?TomlDatetime {
+        match (this) { .Datetime(d) => { return d; }, _ => { return null; } }
+    }
+
+    pub fn asArray(): ?List<TomlValue> {
+        match (this) { .Array(a) => { return a; }, _ => { return null; } }
+    }
+
+    pub fn asTable(): ?TomlTable {
+        match (this) { .Table(t) => { return t; }, _ => { return null; } }
+    }
+
+    /// The tree written into any encoder: a table as a map of string keys, an array as a
+    /// sequence, a date-time as its text.
+    fn writeTo<E :: [Encoder]>(&e: E): void throws EncodeError {
+        match (this) {
+            .String(s) => { try e.encodeString(s); },
+            .Int(i) => { try e.encodeInt(i); },
+            .Float(f) => { try e.encodeFloat(f); },
+            .Bool(b) => { try e.encodeBool(b); },
+            .Datetime(d) => { try e.encodeString(d.show()); },
+            .Array(items) => {
+                try e.beginSeq(items.length());
+                for (x in items) {
+                    try e.element(x);
+                }
+                try e.endSeq();
+            },
+            .Table(t) => {
+                try e.beginMap(t.length());
+                for ((k, v) in t.pairs()) {
+                    try e.entry(k, v);
+                }
+                try e.endMap();
+            },
+        }
+    }
+}
+
+/// The tree is `Codable`: it writes its forms into any format, and reads any value's forms.
+extend TomlValue :: [Codable] {
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try this.writeTo(&e);
+    }
+
+    static fn decode<D :: [Decoder]>(&d: D): TomlValue throws DecodeError {
+        if (let b = try? d.decodeBool()) {
+            return TomlValue.Bool(b);
+        }
+        if (let i = try? d.decodeInt()) {
+            return TomlValue.Int(i);
+        }
+        if (let f = try? d.decodeFloat()) {
+            return TomlValue.Float(f);
+        }
+        if (let s = try? d.decodeString()) {
+            return TomlValue.String(s);
+        }
+        if ((try? d.beginSeq()) != null) {
+            let items = List<TomlValue>.new();
+            while (try d.seqHasNext()) {
+                items.push(try TomlValue.decode(&d));
+            }
+            try d.endSeq();
+            return TomlValue.Array(items);
+        }
+        if ((try? d.beginMap()) != null) {
+            let table = TomlTable.new();
+            loop {
+                if (let k = try d.nextKey<string>()) {
+                    table.set(k, try d.value<TomlValue>());
+                } else {
+                    break;
+                }
+            }
+            try d.endMap();
+            return TomlValue.Table(table);
+        }
+        throw DecodeError { kind = .TypeMismatch, path = d.path(), detail = "a form TOML has not" };
+    }
+}
+
+// ------------------------------------------------------------------ writing
+
+/// Whether a key is written bare: `[A-Za-z0-9_-]+`.
+fn isBareKey(k: string): bool {
+    if (k.isEmpty()) {
+        return false;
+    }
+    for (c in k.chars()) {
+        if (!(c.isAsciiAlpha() || c.isAsciiDigit() || c == '_' || c == '-')) {
+            return false;
+        }
+    }
+    return true;
+}
+
+fn writeKey(out: StringBuilder, k: string): void {
+    if (isBareKey(k)) {
+        out.appendStr(k);
+    } else {
+        writeString(out, k);
+    }
+}
+
+/// `s` as a basic string: quoted, with TOML's escapes.
+fn writeString(out: StringBuilder, s: string): void {
+    out.appendChar('"');
+    for (c in s.chars()) {
+        if (c == '"') {
+            out.appendStr("\\\"");
+        } else if (c == '\\') {
+            out.appendStr("\\\\");
+        } else if (c == '\n') {
+            out.appendStr("\\n");
+        } else if (c == '\r') {
+            out.appendStr("\\r");
+        } else if (c == '\t') {
+            out.appendStr("\\t");
+        } else if ((c as uint32) < 0x20 || (c as uint32) == 0x7F) {
+            let code = (c as uint32) as int;
+            out.appendStr("\\u00");
+            out.appendChar(hexDigit(code / 16));
+            out.appendChar(hexDigit(code % 16));
+        } else {
+            out.appendChar(c);
+        }
+    }
+    out.appendChar('"');
+}
+
+fn hexDigit(v: int): char {
+    return if (v < 10) ((('0' as uint32) + (v as uint32)) as char) else ((('A' as uint32) + ((v - 10) as uint32)) as char);
+}
+
+/// Whether an array holds tables alone (and at least one): written as an array of tables.
+fn isArrayOfTables(items: List<TomlValue>): bool {
+    if (items.isEmpty()) {
+        return false;
+    }
+    for (x in items) {
+        match (x) {
+            .Table(_) => { },
+            _ => { return false; },
+        }
+    }
+    return true;
+}
+
+/// A value inline: a scalar, an array, an inline table.
+fn writeValue(out: StringBuilder, v: TomlValue): void {
+    match (v) {
+        .String(s) => { writeString(out, s); },
+        .Int(i) => { out.appendStr(f"{i}"); },
+        .Float(f) => {
+            if (f.isNan()) {
+                out.appendStr("nan");
+            } else if (f.isInfinite()) {
+                out.appendStr(if (f > 0.0) "inf" else "-inf");
+            } else {
+                out.appendStr(fromFloat(f));
+            }
+        },
+        .Bool(b) => { out.appendStr(if (b) "true" else "false"); },
+        .Datetime(d) => { out.appendStr(d.show()); },
+        .Array(items) => {
+            out.appendChar('[');
+            var first = true;
+            for (x in items) {
+                if (!first) {
+                    out.appendStr(", ");
+                }
+                first = false;
+                writeValue(out, x);
+            }
+            out.appendChar(']');
+        },
+        .Table(t) => {
+            out.appendStr("{ ");
+            var first = true;
+            for ((k, x) in t.pairs()) {
+                if (!first) {
+                    out.appendStr(", ");
+                }
+                first = false;
+                writeKey(out, k);
+                out.appendStr(" = ");
+                writeValue(out, x);
+            }
+            out.appendStr(if (first) "}" else " }");
+        },
+    }
+}
+
+fn writeHeader(out: StringBuilder, path: string[], array: bool): void {
+    out.appendStr(if (array) "[[" else "[");
+    var i = 0;
+    while (i < path.length()) {
+        if (i > 0) {
+            out.appendChar('.');
+        }
+        writeKey(out, path[i]);
+        i = i + 1;
+    }
+    out.appendStr(if (array) "]]\n" else "]\n");
+}
+
+/// Whether a table has a pair that is written in place (not a sub-table, not an array of tables).
+fn hasPlainPairs(t: TomlTable): bool {
+    for ((_, v) in t.pairs()) {
+        match (v) {
+            .Table(_) => { },
+            .Array(items) => { if (!isArrayOfTables(items)) { return true; } },
+            _ => { return true; },
+        }
+    }
+    return false;
+}
+
+/// A table as a document's section: its plain pairs first, then its sub-tables with their
+/// headers, then its arrays of tables — each under the path. A sub-table that holds sub-tables
+/// alone gets no header of its own: theirs make it.
+fn writeTable(out: StringBuilder, path: string[], t: TomlTable): void {
+    for ((k, v) in t.pairs()) {
+        let plain = match (v) {
+            .Table(_) => false,
+            .Array(items) => !isArrayOfTables(items),
+            _ => true,
+        };
+        if (plain) {
+            writeKey(out, k);
+            out.appendStr(" = ");
+            writeValue(out, v);
+            out.appendChar('\n');
+        }
+    }
+    for ((k, v) in t.pairs()) {
+        let sub: string[] = path + [k];
+        match (v) {
+            .Table(inner) => {
+                if (hasPlainPairs(inner) || inner.length() == 0) {
+                    if (out.length() > 0) {
+                        out.appendChar('\n');
+                    }
+                    writeHeader(out, sub, false);
+                }
+                writeTable(out, sub, inner);
+            },
+            .Array(items) => {
+                if (isArrayOfTables(items)) {
+                    for (x in items) {
+                        match (x) {
+                            .Table(inner) => {
+                                if (out.length() > 0) {
+                                    out.appendChar('\n');
+                                }
+                                writeHeader(out, sub, true);
+                                writeTable(out, sub, inner);
+                            },
+                            _ => { },
+                        }
+                    }
+                }
+            },
+            _ => { },
+        }
+    }
+}
+
+/// What is being built, from the outside in.
+enum Building {
+    Array(List<TomlValue>),
+    Table(TomlTable, ?string),
+}
+
+/// An encoder that builds a `TomlValue` (E8): a struct as a table, a map as a table of string
+/// keys, a sequence as an array, bytes as an array of integers, a unit variant as its name, a
+/// payload variant as a table of one key.
+pub class TreeBuilder :: [Encoder] {
+    var stack: List<Building> = List.new(),
+    var done: ?Box<TomlValue> = null,
+    var segments: List<string> = List.new(),
+    var variants: List<int> = List.new(),
+
+    pub static fn new(): TreeBuilder {
+        return TreeBuilder { };
+    }
+
+    /// The value built, after one was encoded; an empty table before.
+    pub fn value(): TomlValue {
+        if (let b = this.done) {
+            return b.value;
+        }
+        return TomlValue.Table(TomlTable.new());
+    }
+
+    mut fn put(v: TomlValue): void throws EncodeError {
+        if (this.stack.isEmpty()) {
+            this.done = Box<TomlValue> { value = v };
+            return;
+        }
+        let top = this.stack.length() - 1;
+        match (this.stack[top]) {
+            .Array(items) => { items.push(v); },
+            .Table(t, pending) => {
+                if (let key = pending) {
+                    t.set(key, v);
+                    this.stack[top] = Building.Table(t, null);
+                } else {
+                    let text = match (v) {
+                        .String(s) => s,
+                        .Int(i) => f"{i}",
+                        _ => throw EncodeError { path = this.path(), detail = "a TOML key is a string" },
+                    };
+                    this.stack[top] = Building.Table(t, text);
+                }
+            },
+        }
+    }
+
+    /// TOML has no null: a null field is left out of its table; elsewhere it has no text.
+    pub mut fn encodeNull(): void throws EncodeError {
+        if (!this.stack.isEmpty()) {
+            let top = this.stack.length() - 1;
+            match (this.stack[top]) {
+                .Table(t, pending) => {
+                    if (pending != null) {
+                        this.stack[top] = Building.Table(t, null);
+                        return;
+                    }
+                },
+                _ => { },
+            }
+        }
+        throw EncodeError { path = this.path(), detail = "TOML has no null: a null stands in a table's key alone, left out" };
+    }
+
+    pub mut fn encodeBool(v: bool): void throws EncodeError { try this.put(TomlValue.Bool(v)); }
+    pub mut fn encodeInt(v: int): void throws EncodeError { try this.put(TomlValue.Int(v)); }
+
+    pub mut fn encodeUint(v: uint): void throws EncodeError {
+        if (v > (int.max as uint)) {
+            throw EncodeError { path = this.path(), detail = f"{v} does not fit a TOML integer" };
+        }
+        try this.put(TomlValue.Int(v as int));
+    }
+
+    pub mut fn encodeFloat(v: float): void throws EncodeError { try this.put(TomlValue.Float(v)); }
+    pub mut fn encodeString(v: string): void throws EncodeError { try this.put(TomlValue.String(v)); }
+
+    pub mut fn encodeBytes(v: Slice<uint8>): void throws EncodeError {
+        let items = List<TomlValue>.withCapacity(v.length());
+        for (b in v) {
+            items.push(TomlValue.Int(b as int));
+        }
+        try this.put(TomlValue.Array(items));
+    }
+
+    pub mut fn beginSeq(count: int): void throws EncodeError {
+        this.stack.push(Building.Array(List<TomlValue>.withCapacity(count)));
+        this.segments.push("[]");
+    }
+
+    pub mut fn endSeq(): void throws EncodeError {
+        match (this.stack.pop()) {
+            .Array(items) => {
+                this.segments.pop();
+                try this.put(TomlValue.Array(items));
+            },
+            _ => { throw EncodeError { path = this.path(), detail = "endSeq without beginSeq" }; },
+        }
+    }
+
+    pub mut fn beginMap(count: int): void throws EncodeError {
+        this.stack.push(Building.Table(TomlTable.new(), null));
+        this.segments.push("{}");
+    }
+
+    pub mut fn beginKey(): void throws EncodeError { }
+
+    pub mut fn endMap(): void throws EncodeError {
+        match (this.stack.pop()) {
+            .Table(t, _) => {
+                this.segments.pop();
+                try this.put(TomlValue.Table(t));
+            },
+            _ => { throw EncodeError { path = this.path(), detail = "endMap without beginMap" }; },
+        }
+    }
+
+    pub mut fn beginStruct(name: string, count: int): void throws EncodeError {
+        this.stack.push(Building.Table(TomlTable.new(), null));
+        this.segments.push(name);
+    }
+
+    pub mut fn beginField(name: string): void throws EncodeError {
+        let top = this.stack.length() - 1;
+        match (this.stack[top]) {
+            .Table(t, _) => { this.stack[top] = Building.Table(t, name); },
+            _ => { throw EncodeError { path = this.path(), detail = "beginField outside a struct" }; },
+        }
+    }
+
+    pub mut fn endStruct(): void throws EncodeError { try this.endMap(); }
+
+    pub mut fn beginVariant(enumName: string, variant: string, index: int, hasPayload: bool): void throws EncodeError {
+        if (!hasPayload) {
+            try this.put(TomlValue.String(variant));
+            return;
+        }
+        this.stack.push(Building.Table(TomlTable.new(), variant));
+        this.variants.push(this.stack.length());
+        this.segments.push(variant);
+    }
+
+    pub mut fn endVariant(): void throws EncodeError {
+        if (!this.variants.isEmpty() && this.variants[this.variants.length() - 1] == this.stack.length()) {
+            this.variants.pop();
+            try this.endMap();
+        }
+    }
+
+    pub fn path(): string {
+        return this.segments.toArray().join(".");
+    }
+}
+
+/// The document of a value (E8): the value's form must be a table.
+pub fn encode<T :: [Encode]>(v: T): string throws EncodeError {
+    var b = TreeBuilder.new();
+    try v.encode(&b);
+    match (b.value()) {
+        .Table(t) => {
+            let out = StringBuilder.new();
+            writeTable(out, [], t);
+            return out.toString();
+        },
+        _ => { throw EncodeError { path = "", detail = "a TOML document is a table: encode a struct or a map" }; },
+    }
+}
+
+/// The document of a value, written into `w`.
+pub fn encodeTo<T :: [Encode], W :: [Writer]>(v: T, &w: W): void throws [EncodeError, IoError, Cancelled] {
+    let text = try encode(v);
+    try w.writeString(text);
+}
+
+// ------------------------------------------------------------------ reading
+
+/// How a table came to be, for TOML's rules against redefinition.
+enum Origin {
+    /// made on the way to a sub-table's header: a header may still define it
+    Implicit,
+    /// `[name]`
+    Header,
+    /// by a dotted key: a header may not define it again
+    Dotted,
+    /// `{ … }`: closed
+    Inline,
+    /// an element of `[[name]]`
+    ArrayElement,
+}
+
+/// The parser (TOML 1.0): the bytes, the position, the line and the column; the tables with how
+/// they came to be.
+class Parser {
+    bytes: uint8[],
+    var at: int = 0,
+    var line: int = 1,
+    var lineStart: int = 0,
+    root: TomlTable = TomlTable.new(),
+    var origins: Map<string, Origin> = Map.new(),
+
+    fn fail(detail: string): TomlError {
+        return TomlError { line = this.line, column = this.at - this.lineStart + 1, detail = detail };
+    }
+
+    fn peek(): int {
+        return if (this.at < this.bytes.length()) (this.bytes[this.at] as int) else -1;
+    }
+
+    fn peekAt(offset: int): int {
+        return if (this.at + offset < this.bytes.length()) (this.bytes[this.at + offset] as int) else -1;
+    }
+
+    mut fn advance(): void {
+        if (this.at < this.bytes.length() && this.bytes[this.at] == 0x0Au8) {
+            this.line = this.line + 1;
+            this.lineStart = this.at + 1;
+        }
+        this.at = this.at + 1;
+    }
+
+    /// Spaces and tabs.
+    mut fn skipBlanks(): void {
+        while (this.peek() == 0x20 || this.peek() == 0x09) {
+            this.at = this.at + 1;
+        }
+    }
+
+    /// A comment to the end of the line.
+    mut fn skipComment(): void throws TomlError {
+        if (this.peek() != 0x23) {
+            return;
+        }
+        while (this.peek() >= 0 && this.peek() != 0x0A) {
+            let b = this.peek();
+            if (b < 0x20 && b != 0x09) {
+                throw this.fail("a control character stands in a comment");
+            }
+            this.at = this.at + 1;
+        }
+    }
+
+    /// The end of a line: blanks, a comment, then LF or CRLF or the end.
+    mut fn endOfLine(): void throws TomlError {
+        this.skipBlanks();
+        try this.skipComment();
+        let b = this.peek();
+        if (b < 0) {
+            return;
+        }
+        if (b == 0x0D && this.peekAt(1) == 0x0A) {
+            this.at = this.at + 1;
+            this.advance();
+            return;
+        }
+        if (b == 0x0A) {
+            this.advance();
+            return;
+        }
+        throw this.fail("the end of the line was expected");
+    }
+
+    /// Blank lines, comments and whitespace, as between values of a multi-line array.
+    mut fn skipSpaceAndComments(): void throws TomlError {
+        loop {
+            let b = this.peek();
+            if (b == 0x20 || b == 0x09 || b == 0x0D) {
+                this.at = this.at + 1;
+            } else if (b == 0x0A) {
+                this.advance();
+            } else if (b == 0x23) {
+                try this.skipComment();
+            } else {
+                return;
+            }
+        }
+    }
+
+    mut fn document(): void throws TomlError {
+        var current = this.root;
+        var currentPath = "";
+        loop {
+            try this.skipSpaceAndComments();
+            let b = this.peek();
+            if (b < 0) {
+                return;
+            }
+            if (b == 0x5B) {
+                let array = this.peekAt(1) == 0x5B;
+                this.at = this.at + (if (array) 2 else 1);
+                this.skipBlanks();
+                let path = try this.key();
+                this.skipBlanks();
+                if (this.peek() != 0x5D) {
+                    throw this.fail("']' was expected after the table's name");
+                }
+                this.at = this.at + 1;
+                if (array) {
+                    if (this.peek() != 0x5D) {
+                        throw this.fail("']]' was expected after the array's name");
+                    }
+                    this.at = this.at + 1;
+                }
+                try this.endOfLine();
+                current = try this.openTable(path, array);
+                currentPath = joined(path);
+                continue;
+            }
+            let path = try this.key();
+            this.skipBlanks();
+            if (this.peek() != 0x3D) {
+                throw this.fail("'=' was expected after the key");
+            }
+            this.at = this.at + 1;
+            this.skipBlanks();
+            let v = try this.value();
+            try this.assign(current, currentPath, path, v);
+            try this.endOfLine();
+        }
+    }
+
+    /// `[a.b]`: the table at the path, made on the way; `[[a.b]]`: a new element of the array there.
+    mut fn openTable(path: string[], array: bool): TomlTable throws TomlError {
+        var t = this.root;
+        var walked = "";
+        var i = 0;
+        while (i < path.length()) {
+            let k = path[i];
+            walked = if (walked.isEmpty()) k else walked + "." + k;
+            let last = i == path.length() - 1;
+            if (let existing = t.get(k)) {
+                match (existing) {
+                    .Table(inner) => {
+                        if (last) {
+                            if (array) {
+                                throw this.fail(f"'{walked}' is a table, not an array of tables");
+                            }
+                            match (this.origins.get(walked) ?? Origin.Implicit) {
+                                .Implicit => { this.origins[walked] = Origin.Header; },
+                                _ => { throw this.fail(f"the table '{walked}' is defined twice"); },
+                            }
+                        }
+                        t = inner;
+                    },
+                    .Array(items) => {
+                        match (this.origins.get(walked) ?? Origin.Inline) {
+                            .ArrayElement => { },
+                            _ => { throw this.fail(f"'{walked}' is a value, not a table"); },
+                        }
+                        if (last && array) {
+                            let element = TomlTable.new();
+                            items.push(TomlValue.Table(element));
+                            t = element;
+                        } else {
+                            match (items[items.length() - 1]) {
+                                .Table(inner) => { t = inner; },
+                                _ => { throw this.fail(f"'{walked}' is a value, not a table"); },
+                            }
+                            if (last) {
+                                throw this.fail(f"'{walked}' is an array of tables, not a table");
+                            }
+                        }
+                    },
+                    _ => { throw this.fail(f"'{walked}' is a value, not a table"); },
+                }
+            } else {
+                if (last && array) {
+                    let element = TomlTable.new();
+                    let items = List<TomlValue>.new();
+                    items.push(TomlValue.Table(element));
+                    t.set(k, TomlValue.Array(items));
+                    this.origins[walked] = Origin.ArrayElement;
+                    t = element;
+                } else {
+                    let inner = TomlTable.new();
+                    t.set(k, TomlValue.Table(inner));
+                    this.origins[walked] = if (last) Origin.Header else Origin.Implicit;
+                    t = inner;
+                }
+            }
+            i = i + 1;
+        }
+        return t;
+    }
+
+    /// `a.b.c = v` in the current table: the tables on the way made by the dotted key, the last
+    /// key new.
+    mut fn assign(current: TomlTable, currentPath: string, path: string[], v: TomlValue): void throws TomlError {
+        var t = current;
+        var walked = currentPath;
+        var i = 0;
+        while (i < path.length() - 1) {
+            let k = path[i];
+            walked = if (walked.isEmpty()) k else walked + "." + k;
+            if (let existing = t.get(k)) {
+                match (existing) {
+                    .Table(inner) => {
+                        match (this.origins.get(walked) ?? Origin.Dotted) {
+                            .Dotted => { },
+                            .Implicit => { },
+                            _ => { throw this.fail(f"'{walked}' is defined already; a dotted key cannot add to it"); },
+                        }
+                        t = inner;
+                    },
+                    _ => { throw this.fail(f"'{walked}' is a value, not a table"); },
+                }
+            } else {
+                let inner = TomlTable.new();
+                t.set(k, TomlValue.Table(inner));
+                this.origins[walked] = Origin.Dotted;
+                t = inner;
+            }
+            i = i + 1;
+        }
+        let last = path[path.length() - 1];
+        walked = if (walked.isEmpty()) last else walked + "." + last;
+        if (t.get(last) != null) {
+            throw this.fail(f"the key '{walked}' is defined twice");
+        }
+        match (v) {
+            .Table(_) => { this.origins[walked] = Origin.Inline; },
+            .Array(_) => { this.origins[walked] = Origin.Inline; },
+            _ => { },
+        }
+        t.set(last, v);
+    }
+
+    /// A key: bare, quoted, or dotted.
+    mut fn key(): string[] throws TomlError {
+        let parts = List<string>.new();
+        loop {
+            this.skipBlanks();
+            let b = this.peek();
+            if (b == 0x22) {
+                parts.push(try this.basicString());
+            } else if (b == 0x27) {
+                parts.push(try this.literalString());
+            } else {
+                let start = this.at;
+                while (isBareByte(this.peek())) {
+                    this.at = this.at + 1;
+                }
+                if (start == this.at) {
+                    throw this.fail("a key was expected");
+                }
+                parts.push(string.fromUtf8Lossy(this.bytes[start..this.at]));
+            }
+            this.skipBlanks();
+            if (this.peek() == 0x2E) {
+                this.at = this.at + 1;
+                continue;
+            }
+            return parts.toArray();
+        }
+    }
+
+    mut fn value(): TomlValue throws TomlError {
+        let b = this.peek();
+        if (b < 0) {
+            throw this.fail("the text ends where a value was expected");
+        }
+        if (b == 0x22) {
+            if (this.peekAt(1) == 0x22 && this.peekAt(2) == 0x22) {
+                return TomlValue.String(try this.multilineBasic());
+            }
+            return TomlValue.String(try this.basicString());
+        }
+        if (b == 0x27) {
+            if (this.peekAt(1) == 0x27 && this.peekAt(2) == 0x27) {
+                return TomlValue.String(try this.multilineLiteral());
+            }
+            return TomlValue.String(try this.literalString());
+        }
+        if (b == 0x5B) { return try this.array(); }
+        if (b == 0x7B) { return try this.inlineTable(); }
+        if (b == 0x74 && this.word("true")) { this.at = this.at + 4; return TomlValue.Bool(true); }
+        if (b == 0x66 && this.word("false")) { this.at = this.at + 5; return TomlValue.Bool(false); }
+        return try this.numberOrDatetime();
+    }
+
+    fn word(w: string): bool {
+        let bs = w.toBytes();
+        var i = 0;
+        while (i < bs.length()) {
+            if (this.peekAt(i) != (bs[i] as int)) {
+                return false;
+            }
+            i = i + 1;
+        }
+        return !isBareByte(this.peekAt(bs.length()));
+    }
+
+    mut fn basicString(): string throws TomlError {
+        this.at = this.at + 1;
+        let out = StringBuilder.new();
+        var runStart = this.at;
+        loop {
+            let b = this.peek();
+            if (b < 0 || b == 0x0A) {
+                throw this.fail("the string is not closed");
+            }
+            if (b == 0x22) {
+                try this.flushRun(out, runStart);
+                this.at = this.at + 1;
+                return out.toString();
+            }
+            if (b < 0x20 && b != 0x09) {
+                throw this.fail("a control character stands in a string unescaped");
+            }
+            if (b == 0x5C) {
+                try this.flushRun(out, runStart);
+                this.at = this.at + 1;
+                try this.escape(out, false);
+                runStart = this.at;
+                continue;
+            }
+            this.at = this.at + 1;
+        }
+    }
+
+    mut fn literalString(): string throws TomlError {
+        this.at = this.at + 1;
+        let start = this.at;
+        loop {
+            let b = this.peek();
+            if (b < 0 || b == 0x0A) {
+                throw this.fail("the string is not closed");
+            }
+            if (b == 0x27) {
+                let s = try this.utf8(start, this.at);
+                this.at = this.at + 1;
+                return s;
+            }
+            if (b < 0x20 && b != 0x09) {
+                throw this.fail("a control character stands in a string");
+            }
+            this.at = this.at + 1;
+        }
+    }
+
+    /// `"""…"""`: a newline right after the opening is dropped; a backslash at a line's end
+    /// drops the whitespace up to the next non-blank.
+    mut fn multilineBasic(): string throws TomlError {
+        this.at = this.at + 3;
+        try this.trimFirstNewline();
+        let out = StringBuilder.new();
+        var runStart = this.at;
+        loop {
+            let b = this.peek();
+            if (b < 0) {
+                throw this.fail("the string is not closed");
+            }
+            if (b == 0x22 && this.peekAt(1) == 0x22 && this.peekAt(2) == 0x22) {
+                // up to two quotes may precede the closing three
+                var extra = 0;
+                while (this.peekAt(3 + extra) == 0x22 && extra < 2) {
+                    extra = extra + 1;
+                }
+                try this.flushRun(out, runStart);
+                var i = 0;
+                while (i < extra) {
+                    out.appendChar('"');
+                    i = i + 1;
+                }
+                this.at = this.at + 3 + extra;
+                return out.toString();
+            }
+            if (b < 0x20 && b != 0x09 && b != 0x0A && b != 0x0D) {
+                throw this.fail("a control character stands in a string unescaped");
+            }
+            if (b == 0x5C) {
+                try this.flushRun(out, runStart);
+                this.at = this.at + 1;
+                try this.escape(out, true);
+                runStart = this.at;
+                continue;
+            }
+            this.advance();
+        }
+    }
+
+    mut fn multilineLiteral(): string throws TomlError {
+        this.at = this.at + 3;
+        try this.trimFirstNewline();
+        let start = this.at;
+        loop {
+            let b = this.peek();
+            if (b < 0) {
+                throw this.fail("the string is not closed");
+            }
+            if (b == 0x27 && this.peekAt(1) == 0x27 && this.peekAt(2) == 0x27) {
+                var extra = 0;
+                while (this.peekAt(3 + extra) == 0x27 && extra < 2) {
+                    extra = extra + 1;
+                }
+                let s = try this.utf8(start, this.at + extra);
+                this.at = this.at + 3 + extra;
+                return s;
+            }
+            if (b < 0x20 && b != 0x09 && b != 0x0A && b != 0x0D) {
+                throw this.fail("a control character stands in a string");
+            }
+            this.advance();
+        }
+    }
+
+    mut fn trimFirstNewline(): void throws TomlError {
+        if (this.peek() == 0x0D && this.peekAt(1) == 0x0A) {
+            this.at = this.at + 1;
+        }
+        if (this.peek() == 0x0A) {
+            this.advance();
+        }
+    }
+
+    mut fn flushRun(out: StringBuilder, from: int): void throws TomlError {
+        if (from < this.at) {
+            out.appendStr(try this.utf8(from, this.at));
+        }
+    }
+
+    fn utf8(from: int, to: int): string throws TomlError {
+        try {
+            return string.fromUtf8(this.bytes[from..to]);
+        } catch (_: Error) {
+            throw this.fail("the text is no UTF-8");
+        }
+    }
+
+    mut fn escape(out: StringBuilder, multiline: bool): void throws TomlError {
+        let b = this.peek();
+        if (b < 0) {
+            throw this.fail("the string ends in a backslash");
+        }
+        if (multiline && (b == 0x20 || b == 0x09 || b == 0x0A || b == 0x0D)) {
+            // a line-ending backslash: the whitespace up to the next non-blank is dropped
+            var sawNewline = false;
+            loop {
+                let c = this.peek();
+                if (c == 0x0A) {
+                    sawNewline = true;
+                    this.advance();
+                } else if (c == 0x20 || c == 0x09 || c == 0x0D) {
+                    this.at = this.at + 1;
+                } else {
+                    break;
+                }
+            }
+            if (!sawNewline) {
+                throw this.fail("a backslash before whitespace must end its line");
+            }
+            return;
+        }
+        this.at = this.at + 1;
+        if (b == 0x22) { out.appendChar('"'); return; }
+        if (b == 0x5C) { out.appendChar('\\'); return; }
+        if (b == 0x62) { out.appendChar('\u{8}'); return; }
+        if (b == 0x66) { out.appendChar('\u{c}'); return; }
+        if (b == 0x6E) { out.appendChar('\n'); return; }
+        if (b == 0x72) { out.appendChar('\r'); return; }
+        if (b == 0x74) { out.appendChar('\t'); return; }
+        if (b == 0x75 || b == 0x55) {
+            let code = try this.hex(if (b == 0x75) 4 else 8);
+            if ((code >= 0xD800 && code <= 0xDFFF) || code > 0x10FFFF) {
+                throw this.fail("the escape is no Unicode scalar value");
+            }
+            out.appendChar((code as uint32) as char);
+            return;
+        }
+        throw this.fail("an unknown escape");
+    }
+
+    mut fn hex(n: int): int throws TomlError {
+        var v = 0;
+        var i = 0;
+        while (i < n) {
+            let b = this.peekAt(i);
+            var digit = -1;
+            if (b >= 0x30 && b <= 0x39) { digit = b - 0x30; }
+            if (b >= 0x41 && b <= 0x46) { digit = b - 0x41 + 10; }
+            if (b >= 0x61 && b <= 0x66) { digit = b - 0x61 + 10; }
+            if (digit < 0) {
+                throw this.fail(f"{n} hex digits were expected");
+            }
+            v = v * 16 + digit;
+            i = i + 1;
+        }
+        this.at = this.at + n;
+        return v;
+    }
+
+    mut fn array(): TomlValue throws TomlError {
+        this.at = this.at + 1;
+        let items = List<TomlValue>.new();
+        loop {
+            try this.skipSpaceAndComments();
+            if (this.peek() == 0x5D) {
+                this.at = this.at + 1;
+                return TomlValue.Array(items);
+            }
+            items.push(try this.value());
+            try this.skipSpaceAndComments();
+            let b = this.peek();
+            if (b == 0x2C) {
+                this.at = this.at + 1;
+                continue;
+            }
+            if (b == 0x5D) {
+                this.at = this.at + 1;
+                return TomlValue.Array(items);
+            }
+            throw this.fail("',' or ']' was expected in the array");
+        }
+    }
+
+    mut fn inlineTable(): TomlValue throws TomlError {
+        this.at = this.at + 1;
+        let t = TomlTable.new();
+        this.skipBlanks();
+        if (this.peek() == 0x7D) {
+            this.at = this.at + 1;
+            return TomlValue.Table(t);
+        }
+        loop {
+            let path = try this.key();
+            this.skipBlanks();
+            if (this.peek() != 0x3D) {
+                throw this.fail("'=' was expected after the key");
+            }
+            this.at = this.at + 1;
+            this.skipBlanks();
+            let v = try this.value();
+            try this.assign(t, "{}", path, v);
+            this.skipBlanks();
+            let b = this.peek();
+            if (b == 0x2C) {
+                this.at = this.at + 1;
+                this.skipBlanks();
+                continue;
+            }
+            if (b == 0x7D) {
+                this.at = this.at + 1;
+                return TomlValue.Table(t);
+            }
+            throw this.fail("',' or '}' was expected in the inline table");
+        }
+    }
+
+    /// A number, or a date-time: both begin with digits or a sign.
+    mut fn numberOrDatetime(): TomlValue throws TomlError {
+        let start = this.at;
+        // a date: four digits and '-'; a local time: two digits and ':'
+        if (isDigit(this.peek()) && isDigit(this.peekAt(1)) && isDigit(this.peekAt(2)) && isDigit(this.peekAt(3)) && this.peekAt(4) == 0x2D) {
+            return try this.datetime();
+        }
+        if (isDigit(this.peek()) && isDigit(this.peekAt(1)) && this.peekAt(2) == 0x3A) {
+            let t = try this.time();
+            return TomlValue.Datetime(TomlDatetime.LocalTime(t));
+        }
+        if (this.peek() == 0x2B || this.peek() == 0x2D) {
+            this.at = this.at + 1;
+        }
+        if (this.word("inf")) {
+            this.at = this.at + 3;
+            let negative = this.bytes[start] == 0x2Du8;
+            return TomlValue.Float(if (negative) (-1.0 / 0.0) else (1.0 / 0.0));
+        }
+        if (this.word("nan")) {
+            this.at = this.at + 3;
+            return TomlValue.Float(0.0 / 0.0);
+        }
+        if (this.peek() == 0x30 && (this.peekAt(1) == 0x78 || this.peekAt(1) == 0x6F || this.peekAt(1) == 0x62)) {
+            if (this.bytes[start] != 0x30u8) {
+                throw this.fail("a prefixed integer takes no sign");
+            }
+            let radix = if (this.peekAt(1) == 0x78) 16 else if (this.peekAt(1) == 0x6F) 8 else 2;
+            this.at = this.at + 2;
+            let digits = try this.digitRun(radix);
+            try {
+                return TomlValue.Int(int.parse(digits, radix));
+            } catch (_: ParseError) {
+                throw this.fail(f"'{digits}' is no integer");
+            }
+        }
+        let whole = try this.digitRun(10);
+        if (whole.length() > 1 && whole.startsWith("0")) {
+            throw this.fail("a leading zero is not allowed");
+        }
+        var isFloat = false;
+        var text = (if (this.bytes[start] == 0x2Du8) "-" else "") + whole;
+        if (this.peek() == 0x2E) {
+            isFloat = true;
+            this.at = this.at + 1;
+            text = text + "." + (try this.digitRun(10));
+        }
+        if (this.peek() == 0x65 || this.peek() == 0x45) {
+            isFloat = true;
+            this.at = this.at + 1;
+            text = text + "e";
+            if (this.peek() == 0x2B || this.peek() == 0x2D) {
+                text = text + (if (this.peek() == 0x2D) "-" else "");
+                this.at = this.at + 1;
+            }
+            text = text + (try this.digitRun(10));
+        }
+        if (isBareByte(this.peek()) && this.peek() != 0x2D) {
+            throw this.fail("a number was expected");
+        }
+        try {
+            if (isFloat) {
+                return TomlValue.Float(float.parse(text));
+            }
+            return TomlValue.Int(int.parse(text));
+        } catch (_: ParseError) {
+            throw this.fail(f"'{text}' is no number");
+        }
+    }
+
+    /// Digits with underscores between them, the underscores dropped.
+    mut fn digitRun(radix: int): string throws TomlError {
+        let out = StringBuilder.new();
+        var lastWasDigit = false;
+        loop {
+            let b = this.peek();
+            if (b == 0x5F) {
+                if (!lastWasDigit) {
+                    throw this.fail("an underscore stands between digits");
+                }
+                this.at = this.at + 1;
+                lastWasDigit = false;
+                continue;
+            }
+            if (isDigitIn(b, radix)) {
+                out.appendChar((b as uint32) as char);
+                this.at = this.at + 1;
+                lastWasDigit = true;
+                continue;
+            }
+            break;
+        }
+        if (!lastWasDigit) {
+            throw this.fail("a digit was expected");
+        }
+        return out.toString();
+    }
+
+    mut fn digitsExactly(n: int): int throws TomlError {
+        var v = 0;
+        var i = 0;
+        while (i < n) {
+            let b = this.peekAt(i);
+            if (!isDigit(b)) {
+                throw this.fail(f"{n} digits were expected");
+            }
+            v = v * 10 + (b - 0x30);
+            i = i + 1;
+        }
+        this.at = this.at + n;
+        return v;
+    }
+
+    mut fn date(): Date throws TomlError {
+        let y = try this.digitsExactly(4);
+        if (this.peek() != 0x2D) { throw this.fail("'-' was expected in the date"); }
+        this.at = this.at + 1;
+        let m = try this.digitsExactly(2);
+        if (this.peek() != 0x2D) { throw this.fail("'-' was expected in the date"); }
+        this.at = this.at + 1;
+        let d = try this.digitsExactly(2);
+        try {
+            return Date.of(y, m, d);
+        } catch (e: TimeError) {
+            throw this.fail(f"no such date: {e.message()}");
+        }
+    }
+
+    mut fn time(): Time throws TomlError {
+        let h = try this.digitsExactly(2);
+        if (this.peek() != 0x3A) { throw this.fail("':' was expected in the time"); }
+        this.at = this.at + 1;
+        let mi = try this.digitsExactly(2);
+        if (this.peek() != 0x3A) { throw this.fail("':' was expected in the time"); }
+        this.at = this.at + 1;
+        let s = try this.digitsExactly(2);
+        var nano = 0;
+        if (this.peek() == 0x2E) {
+            this.at = this.at + 1;
+            var scale = 100000000;
+            var any = false;
+            while (isDigit(this.peek())) {
+                if (scale > 0) {
+                    nano = nano + (this.peek() - 0x30) * scale;
+                }
+                scale = scale / 10;
+                this.at = this.at + 1;
+                any = true;
+            }
+            if (!any) {
+                throw this.fail("a digit was expected after '.'");
+            }
+        }
+        try {
+            return Time.of(h, mi, s, nano);
+        } catch (e: TimeError) {
+            throw this.fail(f"no such time: {e.message()}");
+        }
+    }
+
+    mut fn datetime(): TomlValue throws TomlError {
+        let d = try this.date();
+        let sep = this.peek();
+        if (!((sep == 0x54 || sep == 0x74 || sep == 0x20) && isDigit(this.peekAt(1)) && isDigit(this.peekAt(2)) && this.peekAt(3) == 0x3A)) {
+            return TomlValue.Datetime(TomlDatetime.LocalDate(d));
+        }
+        this.at = this.at + 1;
+        let t = try this.time();
+        let z = this.peek();
+        if (z == 0x5A || z == 0x7A) {
+            this.at = this.at + 1;
+            return TomlValue.Datetime(TomlDatetime.Offset(try this.withOffset(d, t, 0)));
+        }
+        if (z == 0x2B || z == 0x2D) {
+            this.at = this.at + 1;
+            let oh = try this.digitsExactly(2);
+            if (this.peek() != 0x3A) { throw this.fail("':' was expected in the offset"); }
+            this.at = this.at + 1;
+            let om = try this.digitsExactly(2);
+            let seconds = (oh * 60 + om) * 60 * (if (z == 0x2D) -1 else 1);
+            return TomlValue.Datetime(TomlDatetime.Offset(try this.withOffset(d, t, seconds)));
+        }
+        return TomlValue.Datetime(TomlDatetime.Local(d, t));
+    }
+
+    fn withOffset(d: Date, t: Time, seconds: int): DateTime throws TomlError {
+        try {
+            return DateTime.of(d, t, Zone.fixed(Duration.ofSecs(seconds)));
+        } catch (e: TimeError) {
+            throw this.fail(f"no such offset: {e.message()}");
+        }
+    }
+}
+
+fn isDigit(b: int): bool {
+    return b >= 0x30 && b <= 0x39;
+}
+
+fn isDigitIn(b: int, radix: int): bool {
+    if (radix == 2) { return b == 0x30 || b == 0x31; }
+    if (radix == 8) { return b >= 0x30 && b <= 0x37; }
+    if (radix == 16) { return isDigit(b) || (b >= 0x41 && b <= 0x46) || (b >= 0x61 && b <= 0x66); }
+    return isDigit(b);
+}
+
+fn isBareByte(b: int): bool {
+    return isDigit(b) || (b >= 0x41 && b <= 0x5A) || (b >= 0x61 && b <= 0x7A) || b == 0x5F || b == 0x2D;
+}
+
+fn joined(path: string[]): string {
+    return path.join(".");
+}
+
+/// The tree a text holds (E8): a table.
+pub fn parse(text: StringView): TomlValue throws TomlError {
+    var p = Parser { bytes = text.toBytes() };
+    try p.document();
+    return TomlValue.Table(p.root);
+}
+
+/// Where a decoder stands in a tree.
+enum Reading {
+    Array(List<TomlValue>, int, int),
+    Map(List<(string, TomlValue)>, int, bool),
+    Struct(TomlTable, string, ?string, Set<string>),
+    Variant(string, ?TomlValue, bool),
+}
+
+/// The decoder over a tree (E8): a struct from a table by its keys, a sequence from an array, a
+/// map from a table (its keys as strings, or as the numbers they spell), a variant from a string
+/// or a table of one key, bytes from an array of integers, a string from a string or a date-time's
+/// text. A read that mismatches leaves the value where it was.
+pub class TomlReader :: [Decoder] {
+    root: TomlValue,
+    var stack: List<Reading> = List.new(),
+    var taken: bool = false,
+
+    mut fn peek(): TomlValue throws DecodeError {
+        if (this.stack.isEmpty()) {
+            if (this.taken) {
+                throw DecodeError { kind = .Missing, path = this.path(), detail = "the value was read already" };
+            }
+            return this.root;
+        }
+        let top = this.stack.length() - 1;
+        match (this.stack[top]) {
+            .Array(items, at, _) => {
+                if (at >= items.length()) {
+                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the array has no more elements" };
+                }
+                this.stack[top] = Reading.Array(items, at, at);
+                return items[at];
+            },
+            .Map(entries, at, keyRead) => {
+                if (at >= entries.length()) {
+                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the table has no more keys" };
+                }
+                return if (keyRead) entries[at].1 else TomlValue.String(entries[at].0);
+            },
+            .Struct(t, _, current, _) => {
+                if (current == null) {
+                    throw DecodeError { kind = .Missing, path = this.path(), detail = "a key's value without its key" };
+                }
+                return t.get(current)!;
+            },
+            .Variant(_, payload, _) => {
+                if (payload == null) {
+                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the variant has no payload" };
+                }
+                return payload;
+            },
+        }
+    }
+
+    mut fn advance(): void {
+        if (this.stack.isEmpty()) {
+            this.taken = true;
+            return;
+        }
+        let top = this.stack.length() - 1;
+        let next: Reading = match (this.stack[top]) {
+            .Array(items, at, current) => Reading.Array(items, at + 1, current),
+            .Map(entries, at, keyRead) => if (keyRead) Reading.Map(entries, at + 1, false) else Reading.Map(entries, at, true),
+            .Struct(t, name, current, seen) => Reading.Struct(t, name, current, seen),
+            .Variant(name, payload, _) => Reading.Variant(name, payload, true),
+        };
+        this.stack[top] = next;
+    }
+
+    fn mismatch(expected: string, got: TomlValue): DecodeError {
+        return DecodeError { kind = .TypeMismatch, path = this.path(), detail = f"expected {expected}, got {formOf(got)}" };
+    }
+
+    fn inKey(): bool {
+        if (this.stack.isEmpty()) {
+            return false;
+        }
+        match (this.stack[this.stack.length() - 1]) {
+            .Map(_, _, keyRead) => { return !keyRead; },
+            _ => { return false; },
+        }
+    }
+
+    /// TOML has no null: nothing is null.
+    pub mut fn isNull(): bool throws DecodeError {
+        return false;
+    }
+
+    pub mut fn decodeNull(): void throws DecodeError {
+        throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "TOML has no null" };
+    }
+
+    pub mut fn decodeBool(): bool throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Bool(b) => { this.advance(); return b; },
+            _ => { throw this.mismatch("a bool", v); },
+        }
+    }
+
+    pub mut fn decodeInt(): int throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Int(i) => { this.advance(); return i; },
+            .Float(f) => { throw DecodeError { kind = .Invalid, path = this.path(), detail = f"{f} is no integer" }; },
+            .String(s) => {
+                if (this.inKey()) {
+                    try {
+                        let i = int.parse(s);
+                        this.advance();
+                        return i;
+                    } catch (_: ParseError) {
+                        throw DecodeError { kind = .Invalid, path = this.path(), detail = f"the key '{s}' is no integer" };
+                    }
+                }
+                throw this.mismatch("an integer", v);
+            },
+            _ => { throw this.mismatch("an integer", v); },
+        }
+    }
+
+    pub mut fn decodeUint(): uint throws DecodeError {
+        let i = try this.decodeInt();
+        if (i < 0) {
+            throw DecodeError { kind = .Invalid, path = this.path(), detail = f"{i} is negative" };
+        }
+        return i as uint;
+    }
+
+    pub mut fn decodeFloat(): float throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Float(f) => { this.advance(); return f; },
+            .Int(i) => { this.advance(); return i as float; },
+            _ => { throw this.mismatch("a number", v); },
+        }
+    }
+
+    /// A string, or a date-time's text — so an `Instant` reads from an offset date-time.
+    pub mut fn decodeString(): string throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .String(s) => { this.advance(); return s; },
+            .Datetime(d) => { this.advance(); return d.show(); },
+            _ => { throw this.mismatch("a string", v); },
+        }
+    }
+
+    pub mut fn decodeBytes(): uint8[] throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Array(items) => {
+                let out: uint8[] = [0u8] * items.length();
+                var i = 0;
+                while (i < items.length()) {
+                    match (items[i]) {
+                        .Int(b) => {
+                            if (b < 0 || b > 255) {
+                                throw DecodeError { kind = .Invalid, path = this.path(), detail = f"{b} is no byte" };
+                            }
+                            out[i] = b as uint8;
+                        },
+                        _ => { throw this.mismatch("an array of integers", v); },
+                    }
+                    i = i + 1;
+                }
+                this.advance();
+                return out;
+            },
+            _ => { throw this.mismatch("an array of integers", v); },
+        }
+    }
+
+    pub mut fn beginSeq(): ?int throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Array(items) => {
+                this.advance();
+                this.stack.push(Reading.Array(items, 0, 0));
+                return items.length();
+            },
+            _ => { throw this.mismatch("an array", v); },
+        }
+    }
+
+    pub fn seqHasNext(): bool throws DecodeError {
+        match (this.stack[this.stack.length() - 1]) {
+            .Array(items, at, _) => { return at < items.length(); },
+            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in an array" }; },
+        }
+    }
+
+    pub mut fn endSeq(): void throws DecodeError {
+        this.stack.pop();
+    }
+
+    pub mut fn beginMap(): ?int throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Table(t) => {
+                this.advance();
+                this.stack.push(Reading.Map(List.of(t.pairs()), 0, false));
+                return t.length();
+            },
+            _ => { throw this.mismatch("a table", v); },
+        }
+    }
+
+    pub fn mapHasNext(): bool throws DecodeError {
+        match (this.stack[this.stack.length() - 1]) {
+            .Map(entries, at, _) => { return at < entries.length(); },
+            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in a table" }; },
+        }
+    }
+
+    pub mut fn endMap(): void throws DecodeError {
+        this.stack.pop();
+    }
+
+    pub mut fn beginStruct(name: string, fields: string[]): void throws DecodeError {
+        let v = try this.peek();
+        match (v) {
+            .Table(t) => {
+                this.advance();
+                this.stack.push(Reading.Struct(t, name, null, Set<string>.new()));
+            },
+            _ => { throw this.mismatch("a table", v); },
+        }
+    }
+
+    pub mut fn structField(name: string): bool throws DecodeError {
+        let top = this.stack.length() - 1;
+        match (this.stack[top]) {
+            .Struct(t, structName, _, seen) => {
+                if (t.get(name) == null) {
+                    // the path is the struct's: a missing key is reported at it, not at the one read before
+                    this.stack[top] = Reading.Struct(t, structName, null, seen);
+                    return false;
+                }
+                seen.insert(name);
+                this.stack[top] = Reading.Struct(t, structName, name, seen);
+                return true;
+            },
+            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in a table" }; },
+        }
+    }
+
+    pub mut fn endStruct(denyUnknown: bool): void throws DecodeError {
+        let top = this.stack.length() - 1;
+        match (this.stack[top]) {
+            .Struct(t, name, _, seen) => {
+                if (denyUnknown) {
+                    this.stack[top] = Reading.Struct(t, name, null, seen);
+                    for (k in t.keys()) {
+                        if (!seen.contains(k)) {
+                            throw DecodeError { kind = .UnknownField, path = this.path(), detail = f"key '{k}'" };
+                        }
+                    }
+                }
+            },
+            _ => { },
+        }
+        this.stack.pop();
+    }
+
+    pub mut fn beginVariant(enumName: string, variants: string[]): int throws DecodeError {
+        let v = try this.peek();
+        var name = "";
+        var payload: ?TomlValue = null;
+        match (v) {
+            .String(s) => { name = s; },
+            .Table(t) => {
+                if (t.length() != 1) {
+                    throw this.mismatch(f"a variant of {enumName}: a string, or a table of one key", v);
+                }
+                for ((k, m) in t.pairs()) {
+                    name = k;
+                    payload = m;
+                }
+            },
+            _ => { throw this.mismatch(f"a variant of {enumName}", v); },
+        }
+        var i = 0;
+        while (i < variants.length()) {
+            if (variants[i] == name) {
+                this.advance();
+                this.stack.push(Reading.Variant(name, payload, false));
+                return i;
+            }
+            i = i + 1;
+        }
+        throw DecodeError { kind = .UnknownVariant, path = this.path(), detail = f"'{name}' of {enumName}" };
+    }
+
+    pub fn variantHasPayload(): bool throws DecodeError {
+        match (this.stack[this.stack.length() - 1]) {
+            .Variant(_, payload, _) => { return payload != null; },
+            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in a variant" }; },
+        }
+    }
+
+    pub mut fn endVariant(): void throws DecodeError {
+        this.stack.pop();
+    }
+
+    /// `Config.servers[0].Server.port`: a struct's name and the key being read with `.` between,
+    /// an array's index without, `{}` for a map, a variant's name.
+    pub fn path(): string {
+        var out = "";
+        for (frame in this.stack) {
+            match (frame) {
+                .Array(_, _, current) => { out = out + f"[{current}]"; },
+                .Map(_, _, _) => { out = out + (if (out.isEmpty()) "" else ".") + "{}"; },
+                .Struct(_, name, current, _) => {
+                    out = out + (if (out.isEmpty()) "" else ".") + name;
+                    if (let key = current) {
+                        out = out + "." + key;
+                    }
+                },
+                .Variant(name, _, _) => { out = out + (if (out.isEmpty()) "" else ".") + name; },
+            }
+        }
+        return out;
+    }
+}
+
+fn formOf(v: TomlValue): string {
+    match (v) {
+        .String(_) => { return "a string"; },
+        .Int(_) => { return "an integer"; },
+        .Float(_) => { return "a float"; },
+        .Bool(_) => { return "a bool"; },
+        .Datetime(_) => { return "a date-time"; },
+        .Array(_) => { return "an array"; },
+        .Table(_) => { return "a table"; },
+    }
+}
+
+/// The value a document holds (E8): parsed, then read out of the tree.
+pub fn decode<T :: [Decode]>(text: StringView): T throws [TomlError, DecodeError] {
+    var r = TomlReader { root = try parse(text) };
+    return try T.decode(&r);
+}
+
+/// The value a reader's document holds, read to its end first.
+pub fn decodeFrom<T :: [Decode], R :: [Reader]>(&r: R): T throws [TomlError, DecodeError, IoError, Cancelled] {
+    let text = try r.readToString();
+    return try decode<T>(text);
+}
+
+extend TomlValue {
+    /// A decoder over this tree, to pass on.
+    pub fn reader(): TomlReader {
+        return TomlReader { root = this };
+    }
+
+    /// The value this tree reads as.
+    pub fn read<T :: [Decode]>(): T throws DecodeError {
+        var r = TomlReader { root = this };
+        return try T.decode(&r);
+    }
+}
