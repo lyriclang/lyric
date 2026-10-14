@@ -1,0 +1,111 @@
+// std.math's seventeen musl functions over a million inputs each — the bit patterns of a xorshift
+// stream, and the same stream ranged into where each function has a value — the result bits
+// hashed; the compiler's own port of the same code (Lyric.Frontend's Libm.cs) computes the hashes
+// again in LibmTests (09 D7, 13 M10 S12). The last line: the compile-time answers are the
+// run-time bits.
+import std.io { println };
+import std.math { exp, ln, log2, log10, pow, sin, cos, tan, asin, acos, atan, atan2, sinh, cosh, tanh, cbrt, hypot, floor };
+
+struct Rng {
+    var s: uint64,
+
+    mut fn next(): uint64 {
+        var x = this.s;
+        x = x ^ (x >> 12);
+        x = x ^ (x << 25);
+        x = x ^ (x >> 27);
+        this.s = x;
+        return x *% 0x2545F4914F6CDD1D;
+    }
+}
+
+struct Hash {
+    var h: uint64,
+
+    mut fn add(v: float): void {
+        this.h = (this.h ^ v.toBits()) *% 0x100000001b3;
+    }
+}
+
+/// A value in [0, 1) from the high 53 bits.
+fn unit(u: uint64): float {
+    return ((u >> 11) as float) / 9007199254740992.0;
+}
+
+fn main(): void {
+    var rng = Rng { s = 0x1E3779B97F4A7C15 };
+    var hExp = Hash { h = 0x4bf29ce484222325 };
+    var hLn = Hash { h = 0x4bf29ce484222325 };
+    var hLog2 = Hash { h = 0x4bf29ce484222325 };
+    var hLog10 = Hash { h = 0x4bf29ce484222325 };
+    var hPow = Hash { h = 0x4bf29ce484222325 };
+    var hSin = Hash { h = 0x4bf29ce484222325 };
+    var hCos = Hash { h = 0x4bf29ce484222325 };
+    var hTan = Hash { h = 0x4bf29ce484222325 };
+    var hAsin = Hash { h = 0x4bf29ce484222325 };
+    var hAcos = Hash { h = 0x4bf29ce484222325 };
+    var hAtan = Hash { h = 0x4bf29ce484222325 };
+    var hAtan2 = Hash { h = 0x4bf29ce484222325 };
+    var hSinh = Hash { h = 0x4bf29ce484222325 };
+    var hCosh = Hash { h = 0x4bf29ce484222325 };
+    var hTanh = Hash { h = 0x4bf29ce484222325 };
+    var hCbrt = Hash { h = 0x4bf29ce484222325 };
+    var hHypot = Hash { h = 0x4bf29ce484222325 };
+    var i = 0;
+    while (i < 500000) {
+        let u1 = rng.next();
+        let u2 = rng.next();
+        let x = float.fromBits(u1);
+        let y = float.fromBits(u2);
+        let r = unit(u1);
+        let s = unit(u2);
+        let wide = (r - 0.5) * 1500.0;      // [-750, 750): exp's range and past both ends
+        let twenty = (r - 0.5) * 40.0;      // [-20, 20)
+        let one = (s - 0.5) * 2.0;          // [-1, 1)
+        let big = r * 1000000.0;            // [0, 1e6)
+        let near = (s - 0.5) / 8.0 + 1.0;   // [0.9375, 1.0625): the logs' path close to one
+        let medium = (s - 0.5) * 2000000.0; // |x| < 2^20 * pi/2: the medium reduction
+        hExp.add(exp(x)); hExp.add(exp(wide));
+        hLn.add(ln(x)); hLn.add(ln(big)); hLn.add(ln(near));
+        hLog2.add(log2(x)); hLog2.add(log2(big)); hLog2.add(log2(near));
+        hLog10.add(log10(x)); hLog10.add(log10(big)); hLog10.add(log10(near));
+        hPow.add(pow(x, y)); hPow.add(pow(r * 100.0, twenty)); hPow.add(pow(-(r * 4.0), floor(s * 10.0)));
+        hSin.add(sin(x)); hSin.add(sin(twenty)); hSin.add(sin(medium));
+        hCos.add(cos(x)); hCos.add(cos(twenty)); hCos.add(cos(medium));
+        hTan.add(tan(x)); hTan.add(tan(twenty)); hTan.add(tan(medium));
+        hAsin.add(asin(x)); hAsin.add(asin(one));
+        hAcos.add(acos(x)); hAcos.add(acos(one));
+        hAtan.add(atan(x)); hAtan.add(atan(twenty));
+        hAtan2.add(atan2(x, y)); hAtan2.add(atan2(twenty, one));
+        hSinh.add(sinh(x)); hSinh.add(sinh(twenty)); hSinh.add(sinh(one));
+        hCosh.add(cosh(x)); hCosh.add(cosh(twenty)); hCosh.add(cosh(one));
+        hTanh.add(tanh(x)); hTanh.add(tanh(twenty)); hTanh.add(tanh(one));
+        hCbrt.add(cbrt(x)); hCbrt.add(cbrt(medium));
+        hHypot.add(hypot(x, y)); hHypot.add(hypot(big, medium));
+        i += 1;
+    }
+    println(f"exp {hExp.h}");
+    println(f"ln {hLn.h}");
+    println(f"log2 {hLog2.h}");
+    println(f"log10 {hLog10.h}");
+    println(f"pow {hPow.h}");
+    println(f"sin {hSin.h}");
+    println(f"cos {hCos.h}");
+    println(f"tan {hTan.h}");
+    println(f"asin {hAsin.h}");
+    println(f"acos {hAcos.h}");
+    println(f"atan {hAtan.h}");
+    println(f"atan2 {hAtan2.h}");
+    println(f"sinh {hSinh.h}");
+    println(f"cosh {hCosh.h}");
+    println(f"tanh {hTanh.h}");
+    println(f"cbrt {hCbrt.h}");
+    println(f"hypot {hHypot.h}");
+    let ce = comptime exp(1.0);
+    let cp = comptime pow(2.0, 0.5);
+    let cs = comptime sin(1.0e22);
+    let cl = comptime ln(10.0);
+    let ca = comptime atan2(1.0, -1.0);
+    let ct = comptime tanh(0.3);
+    println(f"same {ce.toBits() == exp(1.0).toBits()} {cp.toBits() == pow(2.0, 0.5).toBits()} {cs.toBits() == sin(1.0e22).toBits()} {cl.toBits() == ln(10.0).toBits()} {ca.toBits() == atan2(1.0, -1.0).toBits()} {ct.toBits() == tanh(0.3).toBits()}");
+}

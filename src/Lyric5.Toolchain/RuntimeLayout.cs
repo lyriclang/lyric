@@ -24,6 +24,11 @@ public static class RuntimeLayout
 
     private static string BacktraceConfigDir(string root) => Path.Combine(root, "runtime", "src", "backtrace_config");
 
+    /// <summary>musl's double math functions (design 09 D7, 13 M10 S12): exp, log, pow, the trigonometric
+    /// and hyperbolic ones, cbrt and hypot, under the runtime's prefix (lyr_names.h), so every
+    /// tier-1 target computes the same bits as the compiler's own port of them (Libm.cs).</summary>
+    private static string MuslMathDir(string root) => Path.Combine(root, "runtime", "third_party", "musl-math");
+
     /// <summary>
     /// The libbacktrace files a target needs (panic backtraces, 01 E8): the DWARF reader, the
     /// reader for the target's executable format, and mapped file access. Windows has none: the
@@ -84,6 +89,15 @@ public static class RuntimeLayout
         {
             units.Add(new CUnit(Path.Combine(libbacktrace, file), [], [BacktraceConfigDir(root), libbacktrace],
                 Instrument: false, ExtraFlags: ["-w", "-std=gnu11", map]));
+        }
+
+        // Third-party too; compiled without contraction and without fast math: a fused multiply-add
+        // or a reassociation would change the bits, and the bits are the contract.
+        var musl = MuslMathDir(root);
+        foreach (var source in Directory.EnumerateFiles(musl, "*.c").Order(StringComparer.Ordinal))
+        {
+            units.Add(new CUnit(source, [], [musl], Instrument: false,
+                ExtraFlags: ["-w", "-std=gnu11", "-ffp-contract=off", "-fno-fast-math", map]));
         }
 
         var own = Path.Combine(root, "runtime", "src");

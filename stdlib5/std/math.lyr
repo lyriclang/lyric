@@ -190,25 +190,28 @@ pub fn signum<T :: [Signed]>(x: T): T {
 }
 
 // libm's functions, in double (11 W4).
+// The ones every libm computes exactly stay the system's; the rest are musl's, carried by the
+// runtime under its prefix (runtime/third_party/musl-math; 09 D7, M10 S12), so a program
+// computes the same bits on every tier-1 target and `comptime` the same bits as the program.
 extern "C" fn libmFloor(x: float): float = "floor";
 extern "C" fn libmCeil(x: float): float = "ceil";
 extern "C" fn libmRound(x: float): float = "round";
 extern "C" fn libmTrunc(x: float): float = "trunc";
 extern "C" fn libmSqrt(x: float): float = "sqrt";
-extern "C" fn libmCbrt(x: float): float = "cbrt";
-extern "C" fn libmExp(x: float): float = "exp";
-extern "C" fn libmLn(x: float): float = "log";
-extern "C" fn libmLog2(x: float): float = "log2";
-extern "C" fn libmLog10(x: float): float = "log10";
-extern "C" fn libmSin(x: float): float = "sin";
-extern "C" fn libmCos(x: float): float = "cos";
-extern "C" fn libmTan(x: float): float = "tan";
-extern "C" fn libmAsin(x: float): float = "asin";
-extern "C" fn libmAcos(x: float): float = "acos";
-extern "C" fn libmAtan(x: float): float = "atan";
-extern "C" fn libmSinh(x: float): float = "sinh";
-extern "C" fn libmCosh(x: float): float = "cosh";
-extern "C" fn libmTanh(x: float): float = "tanh";
-extern "C" fn libmAtan2(y: float, x: float): float = "atan2";
-extern "C" fn libmHypot(x: float, y: float): float = "hypot";
-extern "C" fn libmPow(x: float, e: float): float = "pow";
+extern "C" fn libmCbrt(x: float): float = "lyr_cbrt";
+extern "C" fn libmExp(x: float): float = "lyr_exp";
+extern "C" fn libmLn(x: float): float = "lyr_log";
+extern "C" fn libmLog2(x: float): float = "lyr_log2";
+extern "C" fn libmLog10(x: float): float = "lyr_log10";
+extern "C" fn libmSin(x: float): float = "lyr_sin";
+extern "C" fn libmCos(x: float): float = "lyr_cos";
+extern "C" fn libmTan(x: float): float = "lyr_tan";
+extern "C" fn libmAsin(x: float): float = "lyr_asin";
+extern "C" fn libmAcos(x: float): float = "lyr_acos";
+extern "C" fn libmAtan(x: float): float = "lyr_atan";
+extern "C" fn libmSinh(x: float): float = "lyr_sinh";
+extern "C" fn libmCosh(x: float): float = "lyr_cosh";
+extern "C" fn libmTanh(x: float): float = "lyr_tanh";
+extern "C" fn libmAtan2(y: float, x: float): float = "lyr_atan2";
+extern "C" fn libmHypot(x: float, y: float): float = "lyr_hypot";
+extern "C" fn libmPow(x: float, e: float): float = "lyr_pow";

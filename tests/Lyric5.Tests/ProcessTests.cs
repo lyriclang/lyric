@@ -66,6 +66,7 @@ public class ProcessTests
         Assert.Equal(
             "hello world | exit code 0\nout | err | 3\nsorted: a\nb\nc\nenv: set | cwd: C:\\\n"
             + "not found: no-such-program-for-lyric (started)\nkilled: exit code 1\nwait: timed out\n"
+            + "read: timed out\nkilled quiet: exit code 1\n"
             + "20 children, codes summed 190\nwaited on another thread: exit code 7\n",
             Run("processes_windows"));
     }
