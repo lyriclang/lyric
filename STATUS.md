@@ -1271,6 +1271,21 @@ M9b: no halt until it closes, merged on green CI, open points collected for the 
   (`tests/Lyric5.Tests/programs/logfilter.lyr`, through `ExampleTests`), `(a*)*b` over 10⁵ `a`
   in one pass (`tests/std/tests/regex.lyr`, 6 tests). Spec 12 §Regular expressions rules 1–4;
   three cases. The lazy DFA stays a door for Messpunkt 4 (S13).
+- **S7** `std.http`, the client (P7; 10 Q6): the message types (`Method`, `Status` with RFC
+  9110's phrases, `Headers` in order and without case, `Request { method, uri, headers, body:
+  ?Reader, contentLength }`, `Response { status, headers, body }` with `bytes`/`text`/`json<T>`)
+  and `Client` over a `Stream` (`Reader + Writer + Closeable`; a `TcpStream` is one, the
+  `transport` option brings another): the request as RFC 9112 writes it (`Host`, `User-Agent`,
+  `Content-Length` or chunks), the head read with interim responses skipped, the body framed
+  (none / `Content-Length` / chunked with extensions and trailers / until close) as a `Reader`
+  that returns the connection to the client at its end — keep-alive per authority, an unread
+  body gives it up, an idle connection the peer closed is retried; redirects (301/302/303 as
+  GET, 307/308 keep the method, a bound), `timeout` over the whole exchange with the connection
+  closed, `HttpError { kind: Protocol | Redirects | Unsupported }`. The artifact: the client
+  against a server of the test on a loopback port (`tests/std/tests/http_client.lyr`, 4
+  tests: keep-alive counted by the server's connections, chunked, HEAD, 204, 100, HTTP/1.0,
+  POST with a length and in chunks, redirects, timeout, refusals). Spec 12 §HTTP rules 1–3;
+  three cases. `resolve` gets its deadline through the `timeout` around the exchange (S10c).
 
 ## Design decisions
 
