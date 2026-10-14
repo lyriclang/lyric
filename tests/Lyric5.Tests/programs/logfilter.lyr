@@ -1,0 +1,75 @@
+// A log filter (M10's artifact, design/v5/spec/13 S6): the lines of a file that a regular
+// expression matches, as grep prints them.
+//
+//     lyric5 run -- [-v] [-c] [-n] <pattern> <file>
+//
+// -v prints the lines that do not match, -c the count alone, -n each line with its number. The
+// pattern is RE2's syntax (std.regex); one it refuses is reported with its offset. The exit is 0
+// where a line was selected, 1 where none was, 2 for a usage error.
+import std.fs { readText };
+import std.io { eprintln, println };
+import std.os { args };
+import std.regex { Regex, RegexError };
+
+fn usage(): int {
+    eprintln("usage: logfilter [-v] [-c] [-n] <pattern> <file>");
+    return 2;
+}
+
+fn main(): int throws Error {
+    let given = args();
+    var invert = false;
+    var countOnly = false;
+    var numbered = false;
+    var rest: List<string> = List.new();
+    var i = 1;
+    while (i < given.length()) {
+        let a = given[i];
+        if (a == "-v") {
+            invert = true;
+        } else if (a == "-c") {
+            countOnly = true;
+        } else if (a == "-n") {
+            numbered = true;
+        } else if (a.startsWith("-") && a.length() > 1) {
+            return usage();
+        } else {
+            rest.push(a);
+        }
+        i += 1;
+    }
+    if (rest.length() != 2) {
+        return usage();
+    }
+    var pattern: ?Regex = null;
+    try {
+        pattern = Regex.new(rest[0]);
+    } catch (e: RegexError) {
+        eprintln(f"logfilter: {e.message()}");
+        return 2;
+    }
+    let re = pattern!;
+    let text = try readText(rest[1]);
+
+    var selected = 0;
+    var lineNo = 0;
+    for (line in text.lines()) {
+        lineNo += 1;
+        if (re.isMatch(line) == invert) {
+            continue;
+        }
+        selected += 1;
+        if (countOnly) {
+            continue;
+        }
+        if (numbered) {
+            println(f"{lineNo}:{line}");
+        } else {
+            println(f"{line}");
+        }
+    }
+    if (countOnly) {
+        println(selected);
+    }
+    return if (selected > 0) 0 else 1;
+}

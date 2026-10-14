@@ -1,0 +1,225 @@
+// std.regex (design/v5/spec/10 S8, B1; 13 M10 S6): RE2's syntax matched in linear time by a Pike
+// VM - the matches and their groups, the syntax, leftmost-first alternation with greedy and lazy
+// repetition, replace and split, what is refused with its offset, and the time over a pattern a
+// backtracker would not survive.
+import std.regex { Regex, RegexError, Match };
+import std.time { Instant };
+import std.test { assertEq, assertTrue, assertNull, fail };
+
+fn re(p: string): Regex throws Error {
+    return try Regex.new(p);
+}
+
+/// `[text]@start..end` of the first match, or `null`.
+fn found(p: string, s: string): string throws Error {
+    if (let m = (try re(p)).find(s)) {
+        return f"[{m.value}]@{m.start}..{m.end}";
+    }
+    return "null";
+}
+
+fn refused(p: string): string {
+    try {
+        let _ = Regex.new(p);
+        return "accepted";
+    } catch (e: RegexError) {
+        return e.message();
+    }
+}
+
+fn all(p: string, s: string): string[] throws Error {
+    let out: List<string> = List.new();
+    var it = (try re(p)).findAll(s);
+    while (let m = it.next()) {
+        out.push(m.value);
+    }
+    return out.toArray();
+}
+
+@Test
+fn aMatchHasItsPlaceAndItsGroups(): void throws Error {
+    let r = try re("(\\w+)=(\\d+)");
+    assertTrue(r.isMatch("x=12") && !r.isMatch("x=y"));
+    let m = r.find("ab, x=12, y=345")!;
+    assertEq(m.start, 4);
+    assertEq(m.end, 8);
+    assertEq(m.value, "x=12");
+    assertEq(m.show(), "x=12");
+    assertEq(m.group(0), "x=12");
+    assertEq(m.group(1), "x");
+    assertEq(m.group(2), "12");
+    assertNull(m.group(3));
+    assertEq(m.span(2), (6, 8));
+    assertEq(m.groups(), 3);
+    assertEq(r.groupCount(), 2);
+    assertEq(r.findFrom("x=1 y=2", 3)!.value, "y=2");
+    assertNull(r.findFrom("x=1", 10));
+    assertNull(r.find("none"));
+    // named groups, both spellings
+    let named = try re("(?P<key>\\w+)=(?<value>\\d+)");
+    let n = named.find("x=12")!;
+    assertEq(n.named("key"), "x");
+    assertEq(n.named("value"), "12");
+    assertNull(n.named("other"));
+    assertEq(named.groupNames()["value"], 2);
+    // a group that took no part is null; the last iteration's capture stands
+    let alt = (try re("(a)|(b)")).find("b")!;
+    assertNull(alt.group(1));
+    assertEq(alt.group(2), "b");
+    let rep = (try re("((a)|(b))+")).find("ab")!;
+    assertEq(rep.group(1), "b");
+    assertEq(rep.group(2), "a");
+    assertEq(rep.group(3), "b");
+    // positions are bytes; a character beyond ASCII is one character to the pattern
+    assertEq(try found("é+", "aéé"), "[éé]@1..5");
+    assertTrue((try re("^.$")).isMatch("é"));
+    assertEq(r.pattern(), "(\\w+)=(\\d+)");
+}
+
+@Test
+fn theSyntaxIsRe2s(): void throws Error {
+    // classes
+    assertEq(try found("[a-c]+", "xabcy"), "[abc]@1..4");
+    assertEq(try found("[^a-c]+", "xabcy"), "[x]@0..1");
+    assertEq(try found("[]a]+", "x]a]"), "[]a]]@1..4");
+    assertEq(try found("[a\\-z]+", "x-az"), "[-az]@1..4");
+    assertEq(try found("[a-]+", "x-a"), "[-a]@1..3");
+    assertEq(try found("\\d+", "ab123"), "[123]@2..5");
+    assertEq(try found("\\D+", "12ab3"), "[ab]@2..4");
+    assertEq(try found("\\w+", " ab_1 "), "[ab_1]@1..5");
+    assertEq(try found("\\W+", "a, b"), "[, ]@1..3");
+    assertEq(try found("\\s+", "a \t\nb"), "[ \t\n]@1..4");
+    assertEq(try found("[\\d\\s]+", "a1 2b"), "[1 2]@1..4");
+    assertEq(try found("[[:alpha:]]+", "12ab"), "[ab]@2..4");
+    assertEq(try found("[[:^alpha:]]+", "ab12"), "[12]@2..4");
+    assertEq(try found("[[:xdigit:]]+", "xffg"), "[ff]@1..3");
+    assertEq(try found("\\pL+", "1 é2"), "[é]@2..4");
+    assertEq(try found("\\p{Lu}+", "aBCd"), "[BC]@1..3");
+    assertEq(try found("\\PL+", "ab12"), "[12]@2..4");
+    assertEq(try found("\\p{N}+", "x٣4y"), "[٣4]@1..4");
+    assertEq(try found("[\\p{Lu}\\d]+", "aB1c"), "[B1]@1..3");
+    // dot, anchors, boundaries
+    assertEq(try found("a.c", "a\nc"), "null");
+    assertEq(try found("(?s)a.c", "a\nc"), "[a\nc]@0..3");
+    assertEq(try found("^a", "ba"), "null");
+    assertEq(try found("(?m)^b", "a\nb"), "[b]@2..3");
+    assertEq(try found("a$", "a\n"), "null");
+    assertEq(try found("(?m)a$", "a\n"), "[a]@0..1");
+    assertEq(try found("\\Aa", "a"), "[a]@0..1");
+    assertEq(try found("a\\z", "ab"), "null");
+    assertEq(try found("\\bfoo\\b", "a foo b"), "[foo]@2..5");
+    assertEq(try found("\\bfoo\\b", "afoo"), "null");
+    assertEq(try found("\\Bo", "foo"), "[o]@1..2");
+    // flags: inline, scoped, negated
+    assertEq(try found("(?i)abc", "xABCx"), "[ABC]@1..4");
+    assertEq(try found("(?i)[a-z]+", "ABC"), "[ABC]@0..3");
+    assertEq(try found("a(?i:b)c", "aBc"), "[aBc]@0..3");
+    assertEq(try found("a(?i:b)c", "aBC"), "null");
+    assertEq(try found("(?i)a(?-i)b", "AB"), "null");
+    assertEq(try found("(?i)a(?-i)b", "Ab"), "[Ab]@0..2");
+    assertEq(try found("(?i)é", "É"), "[É]@0..2");
+    // escapes
+    assertEq(try found("a\\.c", "abc a.c"), "[a.c]@4..7");
+    assertEq(try found("\\x41\\x{e9}", "Aé"), "[Aé]@0..3");
+    assertEq(try found("\\t\\n", "a\t\nb"), "[\t\n]@1..3");
+    assertEq(try found("\\(\\)", "()"), "[()]@0..2");
+    // repetitions, counted ones unfolded
+    assertEq(try found("a{2,3}", "aaaa"), "[aaa]@0..3");
+    assertEq(try found("a{2}", "aaaa"), "[aa]@0..2");
+    assertEq(try found("a{2,}", "aaaa"), "[aaaa]@0..4");
+    assertEq(try found("a{0}b", "ab"), "[b]@1..2");
+    assertEq(try found("a{", "a{"), "[a{]@0..2");
+    assertEq(try found("a{,3}", "a{,3}"), "[a{,3}]@0..5");
+    assertEq(try found("(ab){2}", "ababab"), "[abab]@0..4");
+    // the empty pattern and empty alternatives
+    assertEq(try found("", "abc"), "[]@0..0");
+    assertEq(try found("a|", "b"), "[]@0..0");
+    assertEq(try found("(|a)b", "ab"), "[ab]@0..2");
+}
+
+@Test
+fn alternationIsLeftmostFirstAndRepetitionGreedyOrLazy(): void throws Error {
+    assertEq(try found("a|ab", "ab"), "[a]@0..1");
+    assertEq(try found("ab|a", "ab"), "[ab]@0..2");
+    assertEq(try found("a+", "aaa"), "[aaa]@0..3");
+    assertEq(try found("a+?", "aaa"), "[a]@0..1");
+    assertEq(try found("a*?b", "aab"), "[aab]@0..3");
+    assertEq(try found("a??b", "ab"), "[ab]@0..2");
+    assertEq(try found("a{2,3}?", "aaaa"), "[aa]@0..2");
+    assertEq(try found("<.+>", "<a><b>"), "[<a><b>]@0..6");
+    assertEq(try found("<.+?>", "<a><b>"), "[<a>]@0..3");
+    assertEq(try found("x*", "aaa"), "[]@0..0");
+    // the leftmost match wins over a longer one further right
+    assertEq(try found("b+|a", "ab"), "[a]@0..1");
+    // a group's capture follows the alternative taken
+    let m = (try re("(a+)(a*)")).find("aaa")!;
+    assertEq(m.group(1), "aaa");
+    assertEq(m.group(2), "");
+    let l = (try re("(a+?)(a*)")).find("aaa")!;
+    assertEq(l.group(1), "a");
+    assertEq(l.group(2), "aa");
+}
+
+@Test
+fn findAllReplaceAndSplit(): void throws Error {
+    assertEq(try all("\\d+", "a1b22c333"), ["1", "22", "333"]);
+    assertEq(try all("a*", "baaa"), ["", "aaa"]);
+    assertEq(try all("", "ab"), ["", "", ""]);
+    assertEq(try all("x", "abc"), []);
+    let r = try re("(?P<k>\\w+)=(\\d+)");
+    assertEq(r.replaceAll("x=12, y=345", "${k}:$2"), "x:12, y:345");
+    assertEq(r.replace("x=12, y=345", "[$0]"), "[x=12], y=345");
+    assertEq(r.replaceAll("x=12", "$$ $1$ ${9}|${none}|"), "$ x$ ||");
+    assertEq(r.replaceAll("none", "z"), "none");
+    assertEq((try re("a")).replaceAll("banana", "o"), "bonono");
+    assertEq((try re("")).replaceAll("ab", "-"), "-a-b-");
+    assertEq((try re("é")).replaceAll("aéb", "e"), "aeb");
+    assertEq((try re("a*b")).split("xbyabz"), ["x", "y", "z"]);
+    assertEq((try re(",")).split("a,b,,c"), ["a", "b", "", "c"]);
+    assertEq((try re(",")).split(""), [""]);
+    assertEq((try re(",")).split("a"), ["a"]);
+    assertEq((try re("x*")).split("ab"), ["a", "b"]);
+    assertEq((try re("\\s+")).split("  a  b "), ["", "a", "b", ""]);
+    assertEq((try re(",")).split("a,"), ["a", ""]);
+}
+
+@Test
+fn whatIsRefusedIsRefusedWithItsOffset(): void {
+    assertEq(refused("("), "the group is not closed at offset 0");
+    assertEq(refused("a(b"), "the group is not closed at offset 1");
+    assertEq(refused(")"), "unmatched ')' at offset 0");
+    assertEq(refused("a**"), "a repetition of a repetition: group it at offset 0");
+    assertEq(refused("*a"), "a repetition with nothing before it at offset 0");
+    assertEq(refused("[a"), "the class is not closed at offset 0");
+    assertEq(refused("[z-a]"), "the range's end is below its start at offset 3");
+    assertEq(refused("\\q"), "'\\q' is no escape at offset 1");
+    assertEq(refused("a\\"), "the pattern ends in '\\' at offset 2");
+    assertEq(refused("a{3,2}"), "the repetition's maximum is below its minimum at offset 1");
+    assertEq(refused("a{1001}"), "a repetition beyond 1000 at offset 7");
+    assertEq(refused("(?x)"), "'x' is no flag: 'i', 'm' and 's' are at offset 2");
+    assertEq(refused("(?)"), "'(?)' says nothing at offset 2");
+    assertEq(refused("(?P<n>a)(?P<n>b)"), "the group name 'n' is used twice at offset 14");
+    assertEq(refused("(?P<a-b>x)"), "a group's name is letters, digits and '_' at offset 5");
+    assertEq(refused("(?P<1x>a)"), "accepted");
+    assertEq(refused("\\p{Greek}"), "'Greek' is no Unicode category: L, Lu, N, Nd, P, S, Z, M, C and their kinds are at offset 0");
+    assertEq(refused("[[:foo:]]"), "'[:foo:]' is no class at offset 1");
+    assertEq(refused("\\x{110000}"), "the code point is beyond U+10FFFF at offset 9");
+    assertEq(refused("\\xZ1"), "'\\x' takes two hex digits at offset 2");
+    // what RE2 has not: a backreference, a lookaround
+    assertEq(refused("(a)\\1"), "'\\1' is no escape at offset 4");
+    assertEq(refused("(?=a)"), "'=' is no flag: 'i', 'm' and 's' are at offset 2");
+    assertEq(refused("(?<=a)"), "a group's name is letters, digits and '_' at offset 3");
+    // accepted
+    assertEq(refused("a{1000}"), "accepted");
+    assertEq(refused("[]]"), "accepted");
+    assertEq(refused("\\p{Lu}\\PN\\x{10FFFF}"), "accepted");
+}
+
+@Test
+fn theTimeIsLinear(): void throws Error {
+    let started = Instant.now();
+    assertTrue(!(try re("(a*)*b")).isMatch("a" * 100000));
+    assertTrue(!(try re("(x+x+)+y")).isMatch("x" * 20000));
+    assertTrue((try re("(a?){30}a{30}")).isMatch("a" * 30));
+    assertTrue(Instant.now().since(started).millis() < 10000);
+}
