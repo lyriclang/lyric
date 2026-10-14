@@ -1007,7 +1007,7 @@ pub class Client {
 
     fn readResponse(conn: Conn, req: Request, authority: string): Response throws [HttpError, IoError, Cancelled] {
         try {
-            return try this.readResponseHead(conn, req, authority);
+            return this.readResponseHead(conn, req, authority);
         } catch (e: HttpError) {
             conn.close();
             throw e;
@@ -1258,7 +1258,7 @@ pub class Server {
             if (let expect = h.request.headers.get("Expect")) {
                 if (sameName(expect.trim().toString(), "100-continue")) {
                     try {
-                        try conn.writeAll(viewBytes("HTTP/1.1 100 Continue\r\n\r\n"));
+                        conn.writeAll(viewBytes("HTTP/1.1 100 Continue\r\n\r\n"));
                     } catch (_: Error) {
                         conn.close();
                         return;
@@ -1267,7 +1267,7 @@ pub class Server {
             }
             var response: Response = Response.empty(500);
             try {
-                response = try handler(h.request);
+                response = handler(h.request);
             } catch (e: Error) {
                 response = Response.withText(e.message(), 500);
             }
@@ -1278,14 +1278,14 @@ pub class Server {
             // the request's body read away, so the next request starts clean
             if (keep && !h.body.isDone()) {
                 try {
-                    let _ = try h.body.readAll();
+                    let _ = h.body.readAll();
                 } catch (_: Error) {
                     conn.close();
                     return;
                 }
             }
             try {
-                try this.writeResponse(conn, h, response, keep);
+                this.writeResponse(conn, h, response, keep);
             } catch (_: Error) {
                 conn.close();
                 return;
