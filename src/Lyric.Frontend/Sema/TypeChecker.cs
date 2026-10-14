@@ -7248,7 +7248,7 @@ public sealed class TypeChecker
             // position expects is the one already said ('let xs: List<Equatable> = List.new()',
             // LYR-SEM0126 at the type; M8c S18): it would have determined the argument.
             var faulty = argTypes.Any(t => t is not null && ContainsError(t)) || expected is { IsError: true };
-            if (!faulty && fsym is not null)
+            if (!faulty && fsym is not null && _pendingRounds == 0)
                 foreach (var generic in fsym.Generics)
                     if (!map.ContainsKey(generic))
                         _de.Report("LYR-SEM0060", Severity.Error, call.Span,
@@ -12594,8 +12594,10 @@ public sealed class TypeChecker
     };
 
     private static bool IsFamily(TypeSymbol iface) =>
-        iface.Home is { FullName: "std.core" }
-        && iface.Name is "Equatable" or "Hashable" or "Ordered" or "TotalOrder" or "Clone" or "VariantName" or "Variants";
+        (iface.Home is { FullName: "std.core" }
+         && iface.Name is "Equatable" or "Hashable" or "Ordered" or "TotalOrder" or "Clone" or "VariantName" or "Variants")
+        // the serialization pair (10 E3; M10 S2): a type's private fields are written and read as its pub ones are
+        || (iface.Home is { FullName: "std.codec" } && iface.Name is "Encode" or "Decode");
 
     /// <summary>A static default of an interface <paramref name="ts"/> conforms to (03 T5; M9a
     /// S11), reached as <c>E.m(…)</c>: its type with <c>Self</c> the conformer, or nothing.</summary>
@@ -12727,6 +12729,20 @@ public sealed class TypeChecker
                 if (_result.KnownVariantOf(rv) is { } v)
                     return m.Member switch { "index" => (long)v.Index, "name" => v.Name, _ => null };
                 return null;
+            // 'f.type.name' (M10 S2): the field's type as 'typeName' writes it
+            case MemberExpr { Target: MemberExpr { Target: IdentifierExpr tid, Member: "type", IsOptional: false }, Member: "name", IsOptional: false }
+                when RoundVariable(tid, scope) is { } trv && _result.KnownFieldOf(trv) is { } tf:
+                touched = true;
+                return TypeFacts.Display(tf.Type);
+            // 'v.payload.length()' (M10 S2): how many fields a variant's payload has
+            case CallExpr { Callee: MemberExpr { Target: MemberExpr { Target: IdentifierExpr pid, Member: "payload", IsOptional: false }, Member: "length" }, Arguments.Length: 0 }
+                when RoundVariable(pid, scope) is { } prv && _result.KnownVariantOf(prv) is { } pv:
+                touched = true;
+                return (long)pv.Payload.Length;
+            // 's.startsWith("…")' over a string the round decides
+            case CallExpr { Callee: MemberExpr { Target: var receiver, Member: "startsWith" }, Arguments: [StringLiteralExpr prefix] }
+                when RoundConstant(receiver, scope, ref touched) is string text:
+                return text.StartsWith(prefix.Value, StringComparison.Ordinal);
             case CallExpr { Arguments: [IdentifierExpr arg], TypeArguments: [NamedType attribute] } call
                 when call.Callee is IdentifierExpr { Name: "attribute" } or MemberExpr { Member: "attribute" }
                      && RoundVariable(arg, scope) is { } rv && _result.KnownFieldOf(rv) is { } field:
@@ -12921,9 +12937,17 @@ public sealed class TypeChecker
         _metaPending.Add(loopVar);
         _metaPendingEver.Add(loopVar);
         if (round.Item.Info is not null) CheckExpr(round.Item.Info, loopScope);
+        // The field's type is the instance's (M10 S2): a type argument the value's call leaves
+        // open here is bound in the round of each instance, where the field is known.
+        _pendingRounds++;
         CheckExpr(round.Item.Value, loopScope);
+        _pendingRounds--;
         _metaPending.Remove(loopVar);
     }
+
+    /// <summary>Inside the value of an initializer round whose type is not known yet (a default
+    /// checked once, over <c>Self</c>): an inference the field's type would settle is no error.</summary>
+    private int _pendingRounds;
 
     /// <summary><c>E.[v] { … }</c> (M9a S10): the variant <c>v</c> of <c>E</c> built from its
     /// payload's infos — <c>[p] = e</c> per field, or <c>comptime for (p in v.payload) [p] = e</c>.

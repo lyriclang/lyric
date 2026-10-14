@@ -13,20 +13,208 @@
 /// decoder is passed by reference, `&e`, as a hasher is (10 K2): a conformance is generic over the
 /// format's type, and the format keeps its state.
 import std.collections { List, Map, Set, Deque };
-import std.core { Hasher, ParseError };
+import std.core { Hasher, ParseError, OnField, OnType, fields, variants, attribute, typeAttribute, typeName, isEnum, FieldInfo };
 import std.hash { DefaultHasher };
 import std.time { Instant };
+
+// ------------------------------------------------------------------ the attribute
+
+/// How a name is rewritten on the wire (E4): as written, `camelCase`, or `snake_case`.
+pub enum Case :: [Equatable, Debug] { Same, CamelCase, SnakeCase }
+
+/// What steers the synthesis (E4, 09 A2 F2): on a field, `@Codec { name = "user_id" }` writes
+/// the field under that name, `@Codec { skip = true }` leaves it out (it reads as `null`, so it
+/// is an optional); on an enum, `@Codec { tag = "kind" }` writes a variant as a struct holding
+/// the tag beside the payload's fields (internally tagged); on a struct or a class,
+/// `@Codec { rename = .SnakeCase }` rewrites every field's name and `@Codec { denyUnknown = true }`
+/// refuses a field the data has and the type has not.
+pub struct Codec :: [OnField, OnType] {
+    pub name: string = "",
+    pub skip: bool = false,
+    pub tag: string = "",
+    pub rename: Case = .Same,
+    pub denyUnknown: bool = false,
+}
+
+/// The name a field is written under: its own `@Codec { name }`, else its name under the type's
+/// `rename`.
+pub fn wireName(f: FieldInfo, own: ?Codec, type: ?Codec): string {
+    if (let a = own) {
+        if (a.name != "") {
+            return a.name;
+        }
+    }
+    if (let t = type) {
+        if (t.rename == Case.SnakeCase) {
+            return snakeCase(f.name);
+        }
+        if (t.rename == Case.CamelCase) {
+            return camelCase(f.name);
+        }
+    }
+    return f.name;
+}
+
+/// `userId` as `user_id`.
+pub fn snakeCase(name: string): string {
+    var out = "";
+    for (c in name.chars()) {
+        if (c.isUpper()) {
+            out = out + "_" + f"{c.toLower()}";
+        } else {
+            out = out + f"{c}";
+        }
+    }
+    return out;
+}
+
+/// `user_id` as `userId`.
+pub fn camelCase(name: string): string {
+    var out = "";
+    var up = false;
+    for (c in name.chars()) {
+        if (c == '_') {
+            up = true;
+        } else if (up) {
+            out = out + f"{c.toUpper()}";
+            up = false;
+        } else {
+            out = out + f"{c}";
+        }
+    }
+    return out;
+}
+
+/// The names of `E`'s variants, in order.
+pub fn variantNames<E>(): string[] {
+    let out = List<string>.new();
+    comptime for (v in variants<E>()) {
+        out.push(v.name);
+    }
+    return out.toArray();
+}
 
 // ------------------------------------------------------------------ the pair
 
 /// A value that writes itself into any encoder (E1).
 pub interface Encode {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError;
+    /// Synthesized for a conformance without the member (05 §14; 10 E3): a struct's fields in
+    /// declaration order under their wire names, a `@Codec { skip }` field left out; an enum's
+    /// variant — a unit one as its name, one payload field as the value, several as a sequence
+    /// — or, under the enum's `@Codec { tag }`, as a struct of the tag and the payload's fields.
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        comptime if (isEnum<Self>()) {
+            let tag = typeAttribute<Self, Codec>()?.tag ?? "";
+            comptime for (v in variants<Self>()) {
+                if (this is v) {
+                    if (tag != "") {
+                        try e.beginStruct(typeName<Self>(), 1 + v.payload.length());
+                        try e.field(tag, v.name);
+                        comptime for (p in v.payload) {
+                            try e.field(p.name, this.[v, p]);
+                        }
+                        try e.endStruct();
+                        return;
+                    }
+                    comptime if (v.payload.length() == 0) {
+                        try e.encodeUnitVariant(typeName<Self>(), v.name, v.index);
+                    } else {
+                        comptime if (v.payload.length() == 1) {
+                            comptime for (p in v.payload) {
+                                try e.encodeVariant(typeName<Self>(), v.name, v.index, this.[v, p]);
+                            }
+                        } else {
+                            try e.beginVariant(typeName<Self>(), v.name, v.index, true);
+                            try e.beginSeq(v.payload.length());
+                            comptime for (p in v.payload) {
+                                try e.element(this.[v, p]);
+                            }
+                            try e.endSeq();
+                            try e.endVariant();
+                        }
+                    }
+                }
+            }
+        } else {
+            var count = 0;
+            comptime for (f in fields<Self>()) {
+                if (!(attribute<Codec>(f)?.skip ?? false)) {
+                    count = count + 1;
+                }
+            }
+            try e.beginStruct(typeName<Self>(), count);
+            comptime for (f in fields<Self>()) {
+                if (!(attribute<Codec>(f)?.skip ?? false)) {
+                    try e.field(wireName(f, attribute<Codec>(f), typeAttribute<Self, Codec>()), this.[f]);
+                }
+            }
+            try e.endStruct();
+        }
+    }
 }
 
 /// A value that reads itself out of any decoder (E1).
 pub interface Decode {
-    static fn decode<D :: [Decoder]>(&d: D): Self throws DecodeError;
+    /// Synthesized (05 §14; 10 E3): the mirror of `encode` — a struct's fields by their wire
+    /// names, a field the data lacks as `decodeAbsent` gives it (`null` for an optional, `Missing`
+    /// else), unknown fields passed unless `@Codec { denyUnknown }`; an enum's variant by its
+    /// name, or by the tag.
+    static fn decode<D :: [Decoder]>(&d: D): Self throws DecodeError {
+        comptime if (isEnum<Self>()) {
+            let tag = typeAttribute<Self, Codec>()?.tag ?? "";
+            if (tag != "") {
+                try d.beginStruct(typeName<Self>(), [tag]);
+                let which = try d.field<string>(tag);
+                comptime for (v in variants<Self>()) {
+                    if (which == v.name) {
+                        let r = Self.[v] { comptime for (p in v.payload) [p] = try d.field(p.name) };
+                        try d.endStruct(typeAttribute<Self, Codec>()?.denyUnknown ?? false);
+                        return r;
+                    }
+                }
+                throw DecodeError { kind = .UnknownVariant, path = d.path(), detail = f"'{which}' of {typeName<Self>()}" };
+            }
+            let i = try d.beginVariant(typeName<Self>(), variantNames<Self>());
+            comptime for (v in variants<Self>()) {
+                if (i == v.index) {
+                    comptime if (v.payload.length() == 0) {
+                        try d.endVariant();
+                        return Self.[v];
+                    } else {
+                        comptime if (v.payload.length() == 1) {
+                            let r = Self.[v] { comptime for (p in v.payload) [p] = try d.payload() };
+                            try d.endVariant();
+                            return r;
+                        } else {
+                            let _ = try d.beginSeq();
+                            let r = Self.[v] { comptime for (p in v.payload) [p] = try d.element() };
+                            try d.endSeq();
+                            try d.endVariant();
+                            return r;
+                        }
+                    }
+                }
+            }
+            throw DecodeError { kind = .UnknownVariant, path = d.path(), detail = f"variant {i} of {typeName<Self>()}" };
+        } else {
+            let names = List<string>.new();
+            comptime for (f in fields<Self>()) {
+                if (!(attribute<Codec>(f)?.skip ?? false)) {
+                    names.push(wireName(f, attribute<Codec>(f), typeAttribute<Self, Codec>()));
+                }
+            }
+            try d.beginStruct(typeName<Self>(), names.toArray());
+            let r = Self { comptime for (f in fields<Self>()) [f] = try d.fieldOrAbsent(wireName(f, attribute<Codec>(f), typeAttribute<Self, Codec>()), attribute<Codec>(f)?.skip ?? false) };
+            try d.endStruct(typeAttribute<Self, Codec>()?.denyUnknown ?? false);
+            return r;
+        }
+    }
+
+    /// What a field the data lacks reads as (E6): `null` for an optional; for anything else the
+    /// field is `Missing`.
+    static fn decodeAbsent<D :: [Decoder]>(&d: D, name: string): Self throws DecodeError {
+        throw DecodeError { kind = .Missing, path = d.path(), detail = f"field '{name}'" };
+    }
 }
 
 /// Both (E1): what `std.json.encode` takes and `std.json.decode<T>` gives.
@@ -252,6 +440,29 @@ extend<D :: [Decoder]> D {
         }
         return try T.decode(&this);
     }
+
+    /// The next element of the sequence begun, `Missing` at its end.
+    pub mut fn element<T :: [Decode]>(): T throws DecodeError {
+        if (let x = try this.next<T>()) {
+            return x;
+        }
+        throw DecodeError { kind = .Missing, path = this.path(), detail = "an element" };
+    }
+
+    /// The payload of the variant begun.
+    pub mut fn payload<T :: [Decode]>(): T throws DecodeError {
+        return try T.decode(&this);
+    }
+
+    /// A field as the synthesis reads it: the value where the data has it, else what the type
+    /// gives for an absent field — `null` for an optional, `Missing` else; a skipped field is
+    /// never read.
+    pub mut fn fieldOrAbsent<T :: [Decode]>(name: string, skipped: bool = false): T throws DecodeError {
+        if (skipped || !(try this.structField(name))) {
+            return try T.decodeAbsent(&this, name);
+        }
+        return try T.decode(&this);
+    }
 }
 
 // ------------------------------------------------------------------ the scalars
@@ -380,6 +591,10 @@ extend<T :: [Encode]> ?T :: [Encode] {
 extend<T :: [Decode]> ?T :: [Decode] {
     static fn decode<D :: [Decoder]>(&d: D): ?T throws DecodeError {
         return try d.decodeNullable<T>();
+    }
+
+    static fn decodeAbsent<D :: [Decoder]>(&d: D, name: string): ?T throws DecodeError {
+        return null;
     }
 }
 
