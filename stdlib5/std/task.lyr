@@ -1737,6 +1737,11 @@ class Scheduler {
             if (this.turns % 61 == 0) {
                 if (waitOnPoller(0)) { this.pollerWoke(); }
                 this.takeFired();
+                // the wake this poll consumed may have carried a hand-over from another thread:
+                // the inbox once more, or the wait below sleeps on a context already posted and
+                // nobody wakes it again (M10 S13: a pool call never came back on macOS after a
+                // wait stayed armed)
+                this.takeInbox();
             }
         }
         if (let c = this.takeReady()) {
