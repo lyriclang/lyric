@@ -1206,6 +1206,24 @@ M9b: no halt until it closes, merged on green CI, open points collected for the 
   unsubstituted (worked around), and `>>` closing two type arguments of a call parses as an
   operator. The artifacts: a struct's fields through the Value encoder in order (`tests/std/tests/
   codec.lyr`, 7 tests), `missing: field 'name' (at User)`. Spec 12 §Codecs rules 1–6; three cases.
+- **S2** the `Codable` synthesis and `@Codec` (P2; 10 E3, E4): `Encode.encode` and `Decode.decode`
+  are defaults written over `std.meta` — a struct's fields in declaration order under their wire
+  names, a field the data lacks as `decodeAbsent` gives it (`null` for an optional, `Missing`
+  else; `?T` overrides the static default), an enum's variant as its name with the payload (one
+  field the value, several a sequence) or, under `@Codec { tag }`, as a struct of the tag and the
+  payload's fields. `@Codec :: [OnField, OnType] { name, skip, tag, rename: Case, denyUnknown }`
+  with `Case { Same, CamelCase, SnakeCase }`; `wireName`, `snakeCase`, `camelCase`; the layer
+  gained `element`, `payload`, `fieldOrAbsent`. The compiler: a pending initializer round (a
+  default checked once over `Self`) reports no open type argument — the instance's round binds
+  it from the field's type (`[f] = try d.field(name)` infers); a round decides `f.type.name`,
+  `v.payload.length()` and `startsWith` over such a string; `Encode`/`Decode` joined the family
+  that asks with the conformer's module (11 §4 rule 10), so private fields serialize. Readings:
+  `default = true` is not read (a `Default` fallback needs the field's type in a constraint
+  position — door); `attribute<A>(f)` is read in a default's rounds only, not in a generic
+  helper over `T` (`LYR-SEM0185`), so the name list is built inside the defaults. The artifacts:
+  `struct User :: [Codable]` without a line, `@Codec { name = "mail" }`, `@Codec { tag = "kind" }`,
+  an own pair kept (`tests/std/tests/codec_synth.lyr`, 4 tests). Spec 12 §Codecs rules 7–8,
+  11 §4 rule 10; three cases.
 
 ## Design decisions
 
