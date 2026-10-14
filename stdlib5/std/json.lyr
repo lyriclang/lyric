@@ -1257,6 +1257,8 @@ pub class JsonReader :: [Decoder] {
         match (this.stack[top]) {
             .Struct(members, structName, _, seen) => {
                 if (members.get(name) == null) {
+                    // the path is the struct's: a missing member is reported at it, not at the one read before
+                    this.stack[top] = Reading.Struct(members, structName, null, seen);
                     return false;
                 }
                 seen.insert(name);

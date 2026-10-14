@@ -179,6 +179,13 @@ fn anErrorNamesItsPathAndAWriterTakesTheText(): void throws Error {
         assertEq(e.message(), "type mismatch: expected an int, got a string (at Team.members[0].User.user_id)");
     }
     try {
+        let _ = json.decode<Team>("{\"lead\": {\"user_id\": 1, \"name\": \"l\"}, \"members\": [], \"scores\": {}, \"raw\": \"\"}");
+        fail("a missing member read");
+    } catch (e: DecodeError) {
+        // at the struct, not at the member read before
+        assertEq(e.message(), "missing: field 'tags' (at Team.lead.User)");
+    }
+    try {
         let _ = json.encode(0.0 / 0.0);
         fail("NaN was written");
     } catch (e: EncodeError) {

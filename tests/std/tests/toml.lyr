@@ -1,0 +1,178 @@
+// std.toml (design/v5/spec/10 B10 E8; 13 M10 S4): TOML 1.0 - the document of a value and the
+// value of a document, TomlValue the tree with its tables in order, the rules against redefinition,
+// the four date-times.
+import std.toml;
+import std.toml { TomlValue, TomlDatetime, TomlError };
+import std.codec { Codable, Codec, Bytes, DecodeError, DecodeErrorKind, EncodeError };
+import std.collections { List, Map };
+import std.test { assertEq, assertTrue, assertNull, fail };
+import std.time { Instant };
+
+struct Server :: [Codable, Equatable] {
+    host: string,
+    port: int,
+    tags: string[],
+}
+
+struct Owner :: [Codable, Equatable] {
+    name: string,
+    bio: ?string,
+}
+
+@Codec { rename = .SnakeCase }
+struct Config :: [Codable, Equatable] {
+    title: string,
+    debugMode: bool,
+    ratio: float,
+    servers: Server[],
+    owner: Owner,
+    ports: Map<string, int>,
+    raw: Bytes,
+}
+
+enum Shape :: [Codable, Equatable, Debug] {
+    Dot,
+    Circle(int),
+    Rect(int, int),
+}
+
+struct Holder :: [Codable, Equatable] {
+    shapes: Shape[],
+    one: Shape,
+}
+
+fn kindOf(f: fn() -> void throws Error): ?DecodeErrorKind {
+    try {
+        f();
+        return null;
+    } catch (e: DecodeError) {
+        return e.kind;
+    } catch (_: Error) {
+        return null;
+    }
+}
+
+fn refused(text: string): string {
+    try {
+        let _ = toml.parse(text);
+        return "accepted";
+    } catch (e: TomlError) {
+        return e.message();
+    }
+}
+
+@Test
+fn aValueWritesAsADocumentAndReadsBack(): void throws Error {
+    let ports = Map<string, int>.new();
+    ports["http"] = 80;
+    let c = Config {
+        title = "Example \"T\"", debugMode = true, ratio = 0.5,
+        servers = [Server { host = "a", port = 1, tags = ["x"] }, Server { host = "b", port = 2, tags = [] }],
+        owner = Owner { name = "ada", bio = null }, ports = ports, raw = Bytes { value = [1u8, 255u8] },
+    };
+    let text = try toml.encode(c);
+    assertEq(text, "title = \"Example \\\"T\\\"\"\ndebug_mode = true\nratio = 0.5\nraw = [1, 255]\n\n[[servers]]\nhost = \"a\"\nport = 1\ntags = [\"x\"]\n\n[[servers]]\nhost = \"b\"\nport = 2\ntags = []\n\n[owner]\nname = \"ada\"\n\n[ports]\nhttp = 80\n");
+    assertEq(try toml.decode<Config>(text), c);
+    // a value that is no table has no document
+    try {
+        let _ = toml.encode(3);
+        fail("an integer was a document");
+    } catch (e: EncodeError) {
+        assertEq(e.message(), "a TOML document is a table: encode a struct or a map");
+    }
+    // a null stands in a table's key alone, left out
+    let h = Holder { shapes = [Shape.Dot, Shape.Circle(3), Shape.Rect(2, 5)], one = Shape.Circle(1) };
+    assertEq(try toml.encode(h), "shapes = [\"Dot\", { Circle = 3 }, { Rect = [2, 5] }]\n\n[one]\nCircle = 1\n");
+    assertEq(try toml.decode<Holder>(try toml.encode(h)), h);
+}
+
+@Test
+fn theGrammarIsToml10(): void throws Error {
+    let doc = try toml.parse("# a comment\ntitle = 'lit'\nn = 1_000\nh = 0xff\no = 0o17\nb = 0b101\nf = 6.02e+23\nneg = -inf\nnan = nan\n\"quoted key\" = true\n[a.b]\nc = [1, 2,\n  3, # trailing\n]\nd = { x = 1, y.z = \"w\" }\ndt = 1979-05-27T07:32:00Z\ndt2 = 1979-05-27 07:32:00+01:00\nldt = 1979-05-27T07:32:00.25\nld = 1979-05-27\nlt = 07:32:00.5\n[[fruit]]\nname = \"apple\"\n[[fruit]]\nname = \"pear\"\n");
+    assertEq(doc.path("title")?.asString(), "lit");
+    assertEq(doc.path("n")?.asInt(), 1000);
+    assertEq(doc.path("h")?.asInt(), 255);
+    assertEq(doc.path("o")?.asInt(), 15);
+    assertEq(doc.path("b")?.asInt(), 5);
+    assertEq(doc.path("f")?.asFloat(), 6.02e23);
+    assertTrue(doc.path("neg")?.asFloat()?.isInfinite() ?? false);
+    assertTrue(doc.path("nan")?.asFloat()?.isNan() ?? false);
+    assertEq(doc.path("quoted key")?.asBool(), true);
+    assertEq(doc.path("a.b.c[2]")?.asInt(), 3);
+    assertEq(doc.path("a.b.d.y.z")?.asString(), "w");
+    assertEq(doc.path("a.b.dt")?.asDatetime()?.show(), "1979-05-27T07:32:00Z");
+    assertEq(doc.path("a.b.dt2")?.asDatetime()?.show(), "1979-05-27T07:32:00+01:00");
+    assertEq(doc.path("a.b.ldt")?.asDatetime()?.show(), "1979-05-27T07:32:00.25");
+    assertEq(doc.path("a.b.ld")?.asDatetime()?.show(), "1979-05-27");
+    assertEq(doc.path("a.b.lt")?.asDatetime()?.show(), "07:32:00.5");
+    assertEq(doc.path("fruit[1].name")?.asString(), "pear");
+    assertNull(doc.path("fruit[2]"));
+    // the order of a table is the order written
+    assertEq(doc.asTable()!.keys()[0], "title");
+    assertEq((try toml.parse(doc.show())).show(), doc.show()); // not ==: nan is not nan
+    // strings: escapes, literal, multi-line with a line-ending backslash, and the first newline dropped
+    let s = try toml.parse("a = \"tab\\tq\\\"u\\u00e9\"\nb = 'C:\\path'\nc = \"\"\"\nfirst \\\n   second\"\"\"\nd = '''\nraw \\n'''\ne = \"\"\"two \"\"quotes\"\"\"\"\"");
+    assertEq(s.path("a")?.asString(), "tab\tq\"u\u{e9}");
+    assertEq(s.path("b")?.asString(), "C:\\path");
+    assertEq(s.path("c")?.asString(), "first second");
+    assertEq(s.path("d")?.asString(), "raw \\n");
+    assertEq(s.path("e")?.asString(), "two \"\"quotes\"\"");
+}
+
+@Test
+fn whatTomlRefusesIsRefused(): void throws Error {
+    assertEq(refused("a = 1\na = 2"), "the key 'a' is defined twice at 2:6");
+    assertEq(refused("[t]\n[t]"), "the table 't' is defined twice at 2:4");
+    assertEq(refused("a.b = 1\n[a.b]"), "'a.b' is a value, not a table at 2:6");
+    assertEq(refused("a.b.c = 1\n[a.b]"), "the table 'a.b' is defined twice at 2:6");
+    assertEq(refused("[a.b]\nx = 1\n[a]\nb.y = 2"), "'a.b' is defined already; a dotted key cannot add to it at 4:8");
+    assertEq(refused("x = 01"), "a leading zero is not allowed at 1:7");
+    assertEq(refused("x = 1_"), "a digit was expected at 1:7");
+    assertEq(refused("x = +0x1"), "a prefixed integer takes no sign at 1:6");
+    assertEq(refused("x = \"\\q\""), "an unknown escape at 1:8");
+    assertEq(refused("[t] x = 1"), "the end of the line was expected at 1:5");
+    assertEq(refused("x = {a = 1,}"), "a key was expected at 1:12");
+    assertEq(refused("x = [1 2]"), "',' or ']' was expected in the array at 1:8");
+    assertEq(refused("x = 1979-13-01"), "no such date: there is no month 13 at 1:15");
+    assertEq(refused("x = \"open"), "the string is not closed at 1:10");
+    assertEq(refused("x = 1 # ok\ny = 2 z"), "the end of the line was expected at 2:7");
+    assertEq(refused("x = {a = 1}\nx.b = 2"), "'x' is defined already; a dotted key cannot add to it at 2:8");
+    assertEq(refused("[[a]]\n[a]"), "'a' is an array of tables, not a table at 2:4");
+    assertEq(refused("a = [1]\n[[a]]"), "'a' is a value, not a table at 2:6");
+    assertEq(refused("key = \"v\" # c\n\n[t] # c\nk = 'v'\n"), "accepted");
+    assertEq(refused("x = [\n]\ny = { }\nz = 1979-05-27T07:32:00.999999-07:00"), "accepted");
+}
+
+@Test
+fn theTreeAndTheErrorsHaveTheirPlaces(): void throws Error {
+    let v = try toml.parse("[servers]\n[servers.alpha]\nip = \"10.0.0.1\"\nports = [8001, 8002]");
+    assertEq(v.path("servers.alpha.ports[1]")?.asInt(), 8002);
+    assertEq(v["servers"]?.path("alpha.ip")?.asString(), "10.0.0.1");
+    assertEq(v["servers"]!.at(0), null);
+    assertEq(v.show(), "[servers.alpha]\nip = \"10.0.0.1\"\nports = [8001, 8002]\n");
+    try {
+        let _ = toml.decode<Config>("title = 1");
+        fail("an integer read as a string");
+    } catch (e: DecodeError) {
+        assertEq(e.message(), "type mismatch: expected a string, got an integer (at Config.title)");
+    }
+    try {
+        let _ = toml.decode<Config>("title = \"t\"\ndebug_mode = true\nratio = 1.0\nraw = [1]\nowner = { name = \"o\" }\n[ports]\n[[servers]]\nhost = \"h\"\nport = \"no\"\ntags = []");
+        fail("a string read as an int");
+    } catch (e: DecodeError) {
+        assertEq(e.message(), "type mismatch: expected an integer, got a string (at Config.servers[0].Server.port)");
+    }
+    assertTrue(kindOf(() => { let _ = try toml.decode<Config>("title = \"t\""); }) == DecodeErrorKind.Missing);
+    try {
+        let _ = toml.decode<Config>("title = \"t\"");
+        fail("a missing field read");
+    } catch (e: DecodeError) {
+        // at the struct, not at the key read before
+        assertEq(e.message(), "missing: field 'debug_mode' (at Config)");
+    }
+    assertTrue(kindOf(() => { let _ = try (try toml.parse("x = 1")).path("x")!.read<Bytes>(); }) == DecodeErrorKind.TypeMismatch);
+    // an Instant writes as a string and reads from a date-time or a string
+    let when = try Instant.parse("1979-05-27T07:32:00Z");
+    assertEq(try (try toml.parse("t = 1979-05-27T07:32:00Z")).path("t")!.read<Instant>(), when);
+    assertEq(try (try toml.parse("t = \"1979-05-27T07:32:00Z\"")).path("t")!.read<Instant>(), when);
+}
