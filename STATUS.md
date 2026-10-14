@@ -45,7 +45,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M8c | std rest: Unicode, the remaining adapters, `Result`, `std.fmt`, `@Bench` | L | **done** 2026-10-09 (S15–S19 after the review) |
 | M9a | `comptime` (the IR interpreter), attributes, `std.meta`, the synthesis | XL | **done** 2026-10-13 |
 | M9b | Macros | L | **done** 2026-10-13 |
-| M10 | std after rule D | XL | **open** since 2026-10-14 |
+| M10 | std after rule D | XL | **done** 2026-10-14 |
 | M11 | Own GC | XL | — |
 | M12 | Diagnostics and lints | L | — |
 | M13a | fmt, doc, api | M | — |
@@ -1179,7 +1179,7 @@ the report at the close.
 M9b closed on 2026-10-13 with S6. The open points of S1–S6 (105–146) went into the report;
 the maintainer is asked before M10.
 
-### M10 — open (2026-10-14)
+### M10 — done (2026-10-14)
 
 The standard library after rule D: the plan is design 13's addendum "der Plan für M10" (P1–P13,
 S1–S13) — `std.codec` with the `Codable` synthesis, `std.json`, `std.toml`, `std.uri`, `std.regex`,
@@ -1356,6 +1356,19 @@ M9b: no halt until it closes, merged on green CI, open points collected for the 
   `programs/libm_bits.lyr`); the compile-time answers equal to the run-time bits; a read of a
   silent child on Windows ends at its timeout (`processes_windows.lyr`). Spec 12 §std.math; one
   case. A pipe is read on the thread of its first call (a reading).
+- **S13** the close (P12): **measurement point 4** — `bench/http`, `bench/json`, `bench/regex` with
+  their Go twins (`bench/README.md`): http 2.36× Go (the plan hoped for 2×), json 3.90×, regex
+  2.96×. What the point found and the close did: `std.http` had left Nagle on (40 ms a request,
+  19× Go) — `setNoDelay(true)` on both ends and a body of known length written with its head;
+  the Pike VM allocated at every position (10× Go) — `isMatch` without saves, ending at the first
+  match, the thread lists reused; JSON's decode is four fifths of its time (the tree, then the
+  layer's hashed lookups per field) — doors. `examples/jsonserver` and `examples/logfilter` as
+  packages. The report with the open points 147–190 in the pull request; the doors checked: the
+  lazy DFA stays one (2.96×), JSON5, CBOR, HTTP/2, raw mode and localization stay closed.
+  Found on the way: a build that expands a macro compiles std without the synthesized
+  conformance defaults (188, a compiler bug for the sweep; S11 worked around it); main's macOS
+  job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
+  step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
 
 ## Design decisions
 

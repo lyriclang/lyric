@@ -1,0 +1,59 @@
+// Measurement point 4, 'json' (design/v5/spec/13, M10 P12): a document of six thousand records
+// — about a mebibyte of text — encoded with std.json and decoded back through the Codable
+// synthesis, twenty rounds. Prints one checksum, the same in every language: the records read
+// back, the sum of their ids, the sum of their zip codes.
+import std.io { println };
+import std.json;
+import std.codec { Codable };
+import std.collections { List };
+
+struct Address :: [Codable] {
+    street: string,
+    city: string,
+    zip: int,
+}
+
+struct Record :: [Codable] {
+    id: int,
+    name: string,
+    score: float,
+    active: bool,
+    tags: string[],
+    address: Address,
+}
+
+fn main(): int {
+    var records: List<Record> = List.new();
+    var x: uint = 88172645463325252;
+    var i = 0;
+    while (i < 6000) {
+        x = x ^ (x << 13);
+        x = x ^ (x >> 7);
+        x = x ^ (x << 17);
+        records.push(Record {
+            id = i,
+            name = f"user{x % 100000}",
+            score = ((x % 10000) as float) / 100.0,
+            active = x % 2 == 0,
+            tags = [f"t{x % 7}", f"t{x % 11}", f"t{x % 13}"],
+            address = Address { street = f"{x % 999} Main St", city = f"city{x % 50}", zip = ((x % 90000) as int) + 10000 },
+        });
+        i = i + 1;
+    }
+    var count = 0;
+    var ids = 0;
+    var zips = 0;
+    var round = 0;
+    while (round < 20) {
+        let text = try! json.encode(records);
+        let back: Record[] = try! json.decode<Record[]>(text[..]);
+        count = count + back.length();
+        for (r in back) {
+            ids = ids + r.id;
+            zips = zips + r.address.zip;
+        }
+        round = round + 1;
+    }
+    println(f"{count} {ids} {zips}");
+    return 0;
+}

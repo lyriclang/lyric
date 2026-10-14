@@ -78,7 +78,7 @@ fn main(): int throws Error {
     let serving = spawn(() => { try server.serve(handle); });
 
     var client = Client.new();
-    let all = try (try client.get(try Uri.parse(base + "/items"))).json<Item[]>();
+    let all = try (client.get(Uri.parse(base + "/items"))).json<Item[]>();
     for (item in all) {
         println(f"{item.id} {item.name} {item.price}");
     }
@@ -87,7 +87,7 @@ fn main(): int throws Error {
     post.setText("{\"name\": \"Milch\", \"price\": 1.2}", "application/json");
     let made = try client.send(post);
     println(f"{made.status.show()} {made.headers.get("Location") ?? "-"} {(try made.json<Item>()).name}");
-    let one = try client.get(try Uri.parse(base + "/items/3"));
+    let one = try client.get(Uri.parse(base + "/items/3"));
     println(f"{one.status.code} {try one.text()}");
     let none = try client.get(try Uri.parse(base + "/items/9"));
     println(f"{none.status.code} {try none.text()}");

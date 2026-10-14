@@ -500,7 +500,7 @@ class Conn {
         this.end = 0;
         try {
             while (total < 65536) {
-                let n = try this.stream.read(scratch[..]);
+                let n = this.stream.read(scratch[..]);
                 if (n == 0) {
                     break;
                 }
@@ -885,7 +885,11 @@ pub class Client {
             }
             ip = found[0];
         }
-        return try TcpStream.connect(SocketAddr { ip = ip!, port = port as uint16 });
+        let stream = try TcpStream.connect(SocketAddr { ip = ip!, port = port as uint16 });
+        // a request is a small write, and its answer comes back before the next: Nagle's waiting
+        // would hold each one for the delayed ACK (M10 S13, Messpunkt 4 found 40 ms a request)
+        try stream.setNoDelay(true);
+        return stream;
     }
 
     mut fn takeIdle(authority: string): ?Conn {
@@ -1236,6 +1240,11 @@ pub class Server {
                 return;
             }
             let stream = accepted!;
+            try {
+                // the head and the body go out as two writes: without this the second waits for
+                // the peer's delayed ACK of the first (M10 S13, Messpunkt 4)
+                stream.setNoDelay(true);
+            } catch (_: IoError) { }
             this.nextConn = this.nextConn + 1;
             let id = this.nextConn;
             let _ = spawn(() => { this.connection(id, Conn.new(stream), handler); });
@@ -1431,12 +1440,29 @@ pub class Server {
             head.appendStr(f"{k}: {v}\r\n");
         }
         head.appendStr("\r\n");
+        var body = response.body;
+        if (!isHead && !bodiless && !chunked && (length ?? 0) <= 65536) {
+            // a body of known, modest length goes out with its head in one write: one system
+            // call, one wake of the peer (M10 S13, Messpunkt 4)
+            let whole = ByteBuffer.new();
+            try whole.write(viewBytes(head.toString()));
+            let piece: uint8[] = [0u8] * 8192;
+            while (true) {
+                let n = try body.read(piece[..]);
+                if (n == 0) {
+                    break;
+                }
+                try whole.write(piece[0..n]);
+            }
+            try conn.writeAll(whole.toArray()[..]);
+            try conn.stream.flush();
+            return;
+        }
         try conn.writeAll(viewBytes(head.toString()));
         if (isHead || bodiless) {
             try conn.stream.flush();
             return;
         }
-        var body = response.body;
         let chunk: uint8[] = [0u8] * 8192;
         while (true) {
             let n = try body.read(chunk[..]);

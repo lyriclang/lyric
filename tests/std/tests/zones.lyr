@@ -99,14 +99,14 @@ fn aTzifFileIsAZone(): void throws Error {
     // what is no TZif
     for ((bad, said) in [("hello", "the magic bytes are missing"), (tzifHex[0..40].toString(), "the magic bytes are missing")]) {
         try {
-            let _ = try Zone.fromTzif("bad", (try Hex.decode(if (bad == "hello") "68656c6c6f" else bad))[..]);
+            let _ = Zone.fromTzif("bad", (Hex.decode(if (bad == "hello") "68656c6c6f" else bad))[..]);
             fail("took bytes that are no TZif");
         } catch (e: TimeError) {
             assertEq(e.message(), f"not TZif: {said}");
         }
     }
     try {
-        let _ = try Zone.fromTzif("short", bytes[0..100]);
+        let _ = Zone.fromTzif("short", bytes[0..100]);
         fail("took a cut file");
     } catch (e: TimeError) {
         assertTrue(e.message().startsWith("not TZif: "), e.message());
@@ -117,7 +117,7 @@ fn aTzifFileIsAZone(): void throws Error {
 fn theSystemsDatabaseWhereThereIsOne(): void throws Error {
     var berlin: ?Zone = null;
     try {
-        berlin = try Zone.load("Europe/Berlin");
+        berlin = Zone.load("Europe/Berlin");
     } catch (e: TimeError) {
         // Windows has no database: the error says so, and the rest of the test does not apply
         assertTrue(e.kind == TimeErrorKind.NoZoneData, e.message());
@@ -136,7 +136,7 @@ fn theSystemsDatabaseWhereThereIsOne(): void throws Error {
     assertEq((try at(zone, "2026-07-01T00:00:00Z")).zoneInfo().abbreviation, "CEST");
     assertEq(try Zone.load("UTC"), Zone.utc);
     try {
-        let _ = try Zone.load("No/Such");
+        let _ = Zone.load("No/Such");
         fail("found No/Such");
     } catch (e: TimeError) {
         assertTrue(e.kind == TimeErrorKind.NoSuchZone);
@@ -144,7 +144,7 @@ fn theSystemsDatabaseWhereThereIsOne(): void throws Error {
     }
     for (bad in ["", "../etc/passwd", "/etc/localtime", ".hidden"]) {
         try {
-            let _ = try Zone.load(bad);
+            let _ = Zone.load(bad);
             fail(f"loaded '{bad}'");
         } catch (e: TimeError) {
             assertTrue(e.kind == TimeErrorKind.NoSuchZone);
@@ -171,11 +171,11 @@ fn aPatternFormatsAndParses(): void throws Error {
     assertEq(try dt.format("yyyyyy MMMMM EEEEE SSSSSSSSS"), "002026 M S 000000000");
     let evening = DateTime.of(try Date.of(1999, 12, 31), try Time.of(23, 59, 59, 123456789), Zone.utc);
     assertEq(try evening.format("hh:mm:ss.SS a E, dd.MM.yy"), "11:59:59.12 PM Fri, 31.12.99");
-    assertEq(try DateTime.of(try Date.of(2026, 1, 1), try Time.of(12, 0, 0), Zone.utc).format("h a"), "12 PM");
-    assertEq(try DateTime.of(try Date.of(2026, 1, 1), try Time.of(0, 5, 0), Zone.utc).format("h:mm a"), "12:05 AM");
+    assertEq(try DateTime.of(Date.of(2026, 1, 1), Time.of(12, 0, 0), Zone.utc).format("h a"), "12 PM");
+    assertEq(try DateTime.of(Date.of(2026, 1, 1), Time.of(0, 5, 0), Zone.utc).format("h:mm a"), "12:05 AM");
     for (bad in ["Q", "yyyy 'open", "GGGG"]) {
         try {
-            let _ = try dt.format(bad);
+            let _ = dt.format(bad);
             fail(f"formatted '{bad}'");
         } catch (_: TimeError) { }
     }
@@ -193,7 +193,7 @@ fn aPatternFormatsAndParses(): void throws Error {
     assertEq((try DateTime.parseWith("EEE d.M.yyyy", "wed 1.4.2026")).show(), "2026-04-01T00:00:00Z");
     for ((pattern, text) in [("yyyy-MM-dd", "2026/03/29"), ("yyyy-MM-dd", "2026-13-01"), ("HH:mm", "24:00"), ("d MMM yyyy", "5 mxr 2026"), ("h:mm a", "13:05 pm"), ("yyyy-MM-dd", "2026-03-29 extra"), ("yyyy-MM-dd Z", "2026-03-29 +99:00")]) {
         try {
-            let _ = try DateTime.parseWith(pattern, text);
+            let _ = DateTime.parseWith(pattern, text);
             fail(f"parsed '{text}' by '{pattern}'");
         } catch (_: ParseError) { }
     }

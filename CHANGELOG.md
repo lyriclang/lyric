@@ -172,6 +172,25 @@ promise. This entry fills with the milestones.
   `error(at, msg)` is the macro's own error. `lyric expand [<file>]` prints the entry module with
   its macros expanded. `examples/macros` shows the three forms. Codes `LYR-SEM0186`–`0194`,
   `LYR-CT0007`, `LYR-MAC0001`, `LYR-CG0002`, `LYR-PAR0063`.
+- **The standard library after rule D (M10** — `design/v5/spec/10` B10, B11, Q1, Q6, Q7, S12b; 09 D7; spec chapter 12 §Codecs, §JSON, §TOML, §URI, §Regex, §HTTP, §Compression, §Terminal, §Time, §std.math**):**
+  `std.codec` is the pair `Encode`/`Decode` (`Codable` both) over a ten-form container model a
+  format implements as primitives, with `Value` as the tree of the forms; a struct or an enum
+  writes itself through the synthesis (`Codable` without a line; `@Codec { name, skip, tag,
+  rename, denyUnknown }`). `std.json` (RFC 8259, strictly; `JsonValue`, `pretty`, `sortKeys`,
+  errors with line and column) and `std.toml` (TOML 1.0; `TomlValue`) encode and decode through it.
+  `std.uri` is RFC 3986: `Uri.parse`, the five parts, `resolve`, `normalize`, `Query`;
+  `Base64Url.encodeUnpadded`/`decodeUnpadded`. `std.regex` is RE2's syntax in linear time (a Pike
+  VM with captures: `isMatch`, `find`, `findAll`, `replaceAll`, `split`, named groups, `\b`, the
+  flags `i m s`; no backreferences, no lookaround). `std.http` is HTTP/1.1 whole: a `Client` with
+  keep-alive, redirects, a timeout spanning the exchange, chunked bodies, gzip decoding, a
+  `Transport` hook for TLS; a `Server` with a handler per request and a task per connection,
+  `Expect: 100-continue`, `shutdown`. `std.compress` is DEFLATE, zlib and gzip in Lyric (levels 0–9,
+  streaming readers and writers, `flush`). `std.term` writes ECMA-48: styles, colors, the cursor
+  and the screen, `NO_COLOR`/`FORCE_COLOR`, `isTerminal`, `size`. `std.time` gained the zones —
+  `Zone.load` from TZif, POSIX rules for the years beyond, `Zone.local()`, a local time resolved
+  across a gap or an overlap — and UTS #35 `format`/`parseWith`. `std.math`'s transcendental
+  functions are musl's on every platform, bit for bit, and `comptime exp(1.0)` answers. A child's
+  pipes on Windows park on the poller. `examples/jsonserver` and `examples/logfilter`.
 
 ---
 

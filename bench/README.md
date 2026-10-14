@@ -149,3 +149,35 @@ through two pool calls per MiB where Go hands the whole file to `copy_file_range
 on a tmpfs the copy is a copy in memory either way, and what both twins do besides — write the
 file, read the copy back, sum it — is in both numbers. A disk would measure the system more than
 the language.
+
+## Measurement point 4 (after M10): HTTP throughput, JSON, the log filter's regex
+
+| Program | What it measures |
+|---|---|
+| `http` | HTTP/1.1 throughput in one process: `std.http`'s server answering a kibibyte of JSON, sixty-four client tasks each fetching it five hundred times over their own keep-alive connection (10 Q6) |
+| `json` | six thousand records — about a mebibyte of text — encoded with `std.json` and decoded back through the `Codable` synthesis, twenty rounds (10 B10, E7) |
+| `regex` | the log filter: 300 000 log lines built in memory, each asked two questions of `std.regex`'s Pike VM — `\b(ERROR|WARN)\b` and `\s[1-9]\d{3,}ms$` (10 B1) |
+
+The plan asks for these as a report, not a ratchet (13, P12): `run.py --ratchet` and `--bound`
+pass them by; the plan's hope for `http` was 2× Go. The twins are Go — `net/http`, `encoding/json`,
+`regexp` —; C# has none here.
+
+Measured 2026-10-14 (WSL2 x86-64, the release profile through `zig cc 0.16`, Go 1.27; minimum
+of 3 runs):
+
+| bench | Lyric | Go | Lyric / Go |
+|---|---|---|---|
+| http | 1.160 s | 0.492 s | 2.36 |
+| json | 1.129 s | 0.289 s | 3.90 |
+| regex | 1.274 s | 0.431 s | 2.96 |
+
+What the first run found, and what M10's close (S13) did about it: `std.http` had left Nagle on —
+a request's head, and an answer's head and body, were small separate writes, each waiting for the
+peer's delayed ACK, 40 ms a request (23 s, 19× Go); `setNoDelay(true)` on both ends, as Go sets
+it, gave 2.4×, and a body of known length written with its head in one call 2.36×. The Pike VM
+allocated at every position (fresh slots, a new thread list a step, a slot copy at every `Save`):
+10.1× Go; `isMatch` now runs without saves and ends at the first match, and the thread lists keep
+their storage: 2.96× — the lazy DFA (13 P5, S9b) stays a door. JSON's time is the decode (four
+fifths): the tree first (a `Map` per object) and then the layer's work per field — the member
+looked up by its hashed name, the `seen` set, the reader's state rebuilt —; both are doors
+(a streaming decoder, an ordered object with a linear search for small ones).

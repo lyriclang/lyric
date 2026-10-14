@@ -966,7 +966,7 @@ class ThreadList {
     }
 
     mut fn clear(): void {
-        this.threads = List.new();
+        this.threads.clear();
         this.generation = this.generation + 1;
     }
 }
@@ -975,6 +975,9 @@ class Vm {
     var prog: Program,
     var text: Slice<uint8>,
     var stack: List<Thread>,
+    /// Only whether there is a match (M10 S13, Messpunkt 4): the saves are not recorded — every
+    /// start would copy the slots —, and the first match ends the run.
+    var any: bool = false,
 
     /// Whether the assertion holds between the character before `at` and the one at it.
     fn assertionHolds(a: Assertion, at: int): bool {
@@ -1008,7 +1011,7 @@ class Vm {
                     this.stack.push(Thread { pc = x, slots = t.slots });
                 },
                 .Save(k) => {
-                    if (k < t.slots.length()) {
+                    if (!this.any && k < t.slots.length()) {
                         var copy = copySlots(t.slots);
                         copy[k] = at;
                         this.stack.push(Thread { pc = t.pc + 1, slots = copy });
@@ -1035,11 +1038,16 @@ class Vm {
         var nlist = ThreadList.new(size);
         var matched: ?int[] = null;
         var at = from;
+        let shared = [-1] * slotCount;
         while (true) {
             if (matched == null && (!anchored || at == from)) {
-                var fresh = [-1] * slotCount;
-                fresh[0] = at;
-                this.addThread(clist, 0, fresh, at);
+                if (this.any) {
+                    this.addThread(clist, 0, shared, at);
+                } else {
+                    var fresh = [-1] * slotCount;
+                    fresh[0] = at;
+                    this.addThread(clist, 0, fresh, at);
+                }
             }
             if (clist.threads.isEmpty() && (matched != null || anchored)) {
                 break;
@@ -1057,6 +1065,9 @@ class Vm {
                 var goes = false;
                 match (inst) {
                     .Match => {
+                        if (this.any) {
+                            return t.slots;
+                        }
                         var slots = copySlots(t.slots);
                         slots[1] = at;
                         matched = slots;
@@ -1199,7 +1210,9 @@ pub class Regex {
 
     /// Whether the text holds a match.
     pub fn isMatch(s: StringView): bool {
-        return this.vm(viewBytes(s)).run(0, false, 2) != null;
+        var vm = this.vm(viewBytes(s));
+        vm.any = true;
+        return vm.run(0, false, 2) != null;
     }
 
     /// The leftmost match, with its groups.
