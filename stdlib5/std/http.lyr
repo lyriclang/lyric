@@ -1,21 +1,26 @@
 /// `std.http` (design 10 Q6; 13 M10 S7, S8): HTTP/1.1 over `Reader` and `Writer`. The message
-/// types — `Method`, `Status`, `Headers`, `Request`, `Response` — and the client: `Client.send`
+/// types — `Method`, `Status`, `Headers`, `Request`, `Response` —, the client and the server.
+/// The client: `Client.send`
 /// writes a request over a connection it keeps alive for the next one to the same authority,
 /// reads the status line and the headers, and hands the body back as a `Reader` that knows its
 /// length (`Content-Length`), its chunks (`Transfer-Encoding: chunked`) or its end (the
 /// connection's close). Redirects are followed where asked, a timeout spans the whole exchange,
 /// and the `transport` hook of the options makes the connection — TCP here, TLS where a package
-/// puts its own `Stream` into it. No TLS of its own, no HTTP/2, no cookies (Q6: doors).
+/// puts its own `Stream` into it. The server: `Server.bind(addr).serve(handler)` takes a task per
+/// connection, reads each request as the client writes one (its body a `Reader` the handler may
+/// read or leave), answers `Expect: 100-continue`, writes the handler's `Response` with its
+/// length or in chunks, keeps the connection for the next request, and ends with `shutdown()`.
+/// No TLS of its own, no HTTP/2, no cookies (Q6: doors).
 import std.collections { List, Map };
 import std.core { StringBuilder, viewBytes, Closeable, ParseError };
 import std.io { Reader, Writer, IoError, IoErrorKind, ByteBuffer };
-import std.net { TcpStream, SocketAddr, IpAddr, resolve };
-import std.task { Cancelled, TimedOut, withTimeout };
+import std.net { TcpStream, TcpListener, SocketAddr, IpAddr, resolve };
+import std.task { Cancelled, TimedOut, withTimeout, spawn };
 import std.time { Duration };
 import std.uri { Uri };
 import std.json;
 import std.json { JsonError };
-import std.codec { Decode, DecodeError };
+import std.codec { Encode, Decode, DecodeError, EncodeError };
 
 // ---------------------------------------------------------------------------------------------
 // Errors.
@@ -282,13 +287,81 @@ pub struct Request {
         this.headers.set("Content-Type", contentType);
         this.setBody(viewBytes(text));
     }
+
+    /// The body read whole (a server's handler reads the request it was given this way); empty
+    /// where there is none.
+    pub fn bytes(): uint8[] throws [IoError, Cancelled] {
+        if (let b = this.body) {
+            return try readWhole(b);
+        }
+        return [];
+    }
+
+    /// The body read whole as text.
+    pub fn text(): string throws [IoError, Cancelled] {
+        return string.fromUtf8Lossy((try this.bytes())[..]);
+    }
+
+    /// The body read whole and decoded as JSON into `T`.
+    pub fn json<T :: [Decode]>(): T throws [JsonError, DecodeError, IoError, Cancelled] {
+        return try jsonOf<T>(this.text());
+    }
+}
+
+/// Every byte of a reader.
+fn readWhole(r: Reader): uint8[] throws [IoError, Cancelled] {
+    var reader = r;
+    let out = ByteBuffer.new();
+    let chunk: uint8[] = [0u8] * 8192;
+    while (true) {
+        let n = try reader.read(chunk[..]);
+        if (n == 0) {
+            break;
+        }
+        try! out.write(chunk[0..n]);
+    }
+    return out.toArray();
 }
 
 /// A response: the status, the headers, the body as a `Reader` that ends where the message does.
+/// A handler makes one with `Response.of`, `Response.withText`, `Response.withJson`, `Response.stream`
+/// or `Response.empty`.
 pub class Response {
-    pub status: Status,
-    pub headers: Headers,
-    pub body: Body,
+    pub var status: Status,
+    pub var headers: Headers,
+    pub var body: Body,
+
+    /// A response of the bytes, their length known.
+    pub static fn of(status: int, body: Slice<uint8> = [], contentType: string = "application/octet-stream"): Response {
+        let headers = Headers.new();
+        if (body.length() > 0) {
+            headers.set("Content-Type", contentType);
+        }
+        return Response { status = Status.of(status), headers = headers, body = Body.of(body) };
+    }
+
+    /// A response of the text, UTF-8.
+    pub static fn withText(text: string, status: int = 200, contentType: string = "text/plain; charset=utf-8"): Response {
+        return Response.of(status, viewBytes(text), contentType);
+    }
+
+    /// A response of the value as JSON.
+    pub static fn withJson<T :: [Encode]>(value: T, status: int = 200): Response throws EncodeError {
+        return Response.of(status, viewBytes(try jsonText(value)), "application/json");
+    }
+
+    /// A response whose body is read from `source` as it is written — in chunks where `length`
+    /// is `null`, with `Content-Length` else.
+    pub static fn stream(status: int, source: Reader, length: ?int = null, contentType: string = "application/octet-stream"): Response {
+        let headers = Headers.new();
+        headers.set("Content-Type", contentType);
+        return Response { status = Status.of(status), headers = headers, body = Body.from(source, length) };
+    }
+
+    /// A response without a body.
+    pub static fn empty(status: int): Response {
+        return Response { status = Status.of(status), headers = Headers.new(), body = Body.empty() };
+    }
 
     /// The body read whole.
     pub fn bytes(): uint8[] throws [IoError, Cancelled] {
@@ -309,6 +382,10 @@ pub class Response {
 /// The text decoded (outside the class: inside it, `json` is the method).
 fn jsonOf<T :: [Decode]>(text: string): T throws [JsonError, DecodeError] {
     return try json.decode<T>(text);
+}
+
+fn jsonText<T :: [Encode]>(value: T): string throws EncodeError {
+    return try json.encode(value);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -412,6 +489,25 @@ class Conn {
             this.stream.close();
         } catch (_: Error) { }
     }
+
+    /// What the peer still sends read away — up to 64 KiB or its end — then closed: a close with
+    /// unread bytes resets the connection, and the peer loses the answer it was given.
+    mut fn drainAndClose(): void {
+        let scratch: uint8[] = [0u8] * 4096;
+        var total = this.end - this.start;
+        this.start = 0;
+        this.end = 0;
+        try {
+            while (total < 65536) {
+                let n = try this.stream.read(scratch[..]);
+                if (n == 0) {
+                    break;
+                }
+                total = total + n;
+            }
+        } catch (_: Error) { }
+        this.close();
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -439,14 +535,55 @@ pub class Body :: [Reader] {
     var done: bool,
     var client: ?Client,
     var authority: string,
+    /// A body that is no connection's: a reader of its own, with its length where known.
+    var source: ?Reader,
+    var sourceLength: ?int,
+    /// Whether the body owns its connection (a client's response): at its end the connection goes
+    /// back to the client or is closed. A server's request body leaves the connection to the
+    /// server.
+    var owns: bool,
+    /// Set where the body ended wrongly: the connection's bytes are out of step.
+    var failed: bool,
 
     static fn empty(): Body {
-        return Body { conn = null, framing = Framing.Empty, left = 0, done = true, client = null, authority = "" };
+        return Body { conn = null, framing = Framing.Empty, left = 0, done = true, client = null, authority = "", source = null, sourceLength = null, owns = false, failed = false };
+    }
+
+    /// A body of the bytes.
+    pub static fn of(bytes: Slice<uint8>): Body {
+        let buf = ByteBuffer.new();
+        try! buf.write(bytes);
+        return Body { conn = null, framing = Framing.Fixed, left = bytes.length(), done = bytes.length() == 0, client = null, authority = "", source = buf, sourceLength = bytes.length(), owns = false, failed = false };
+    }
+
+    /// A body read from `source`, its length where known.
+    pub static fn from(source: Reader, length: ?int): Body {
+        return Body { conn = null, framing = Framing.UntilClose, left = 0, done = false, client = null, authority = "", source = source, sourceLength = length, owns = false, failed = false };
+    }
+
+    /// The body's length where it is known before it is read.
+    pub fn length(): ?int {
+        if (this.source != null) {
+            return this.sourceLength;
+        }
+        return match (this.framing) {
+            .Empty => 0,
+            .Fixed => this.left,
+            _ => null,
+        };
     }
 
     pub mut fn read(into: Slice<uint8>): int throws [IoError, Cancelled] {
         if (this.done || into.length() == 0) {
             return 0;
+        }
+        if (let src = this.source) {
+            var reader = src;
+            let n = try reader.read(into);
+            if (n == 0) {
+                this.done = true;
+            }
+            return n;
         }
         let conn = this.conn!;
         match (this.framing) {
@@ -543,11 +680,15 @@ pub class Body :: [Reader] {
         return size;
     }
 
-    /// The body is complete: the connection goes back for the next request, or is closed.
+    /// The body is complete: the connection goes back for the next request, or is closed — where
+    /// the body owns it.
     mut fn finish(): void {
         this.done = true;
         if (let conn = this.conn) {
             this.conn = null;
+            if (!this.owns) {
+                return;
+            }
             if (conn.reusable) {
                 if (let c = this.client) {
                     c.putIdle(this.authority, conn);
@@ -558,12 +699,16 @@ pub class Body :: [Reader] {
         }
     }
 
-    /// The body ended wrongly or with the connection: nothing is kept.
+    /// The body ended wrongly or with the connection: nothing is kept (a server's connection is
+    /// the server's to close).
     mut fn drop(): void {
         this.done = true;
+        this.failed = true;
         if (let conn = this.conn) {
             this.conn = null;
-            conn.close();
+            if (this.owns) {
+                conn.close();
+            }
         }
     }
 
@@ -861,6 +1006,18 @@ pub class Client {
     }
 
     fn readResponse(conn: Conn, req: Request, authority: string): Response throws [HttpError, IoError, Cancelled] {
+        try {
+            return this.readResponseHead(conn, req, authority);
+        } catch (e: HttpError) {
+            conn.close();
+            throw e;
+        } catch (e: IoError) {
+            conn.close();
+            throw e;
+        }
+    }
+
+    fn readResponseHead(conn: Conn, req: Request, authority: string): Response throws [HttpError, IoError, Cancelled] {
         var status = Status { code = 0 };
         var headers = Headers.new();
         var version11 = true;
@@ -868,13 +1025,12 @@ pub class Client {
         while (true) {
             let line = try conn.readLine();
             if (line == null) {
-                conn.close();
                 throw IoError { kind = .UnexpectedEof, path = null, detail = "the connection closed before a response", inner = null };
             }
             if (line.isEmpty()) {
                 continue;
             }
-            let (s, v11) = try parseStatusLine(line, conn);
+            let (s, v11) = try parseStatusLine(line);
             status = s;
             version11 = v11;
             headers = try readHeaders(conn);
@@ -889,7 +1045,6 @@ pub class Client {
             framing = Framing.Empty;
         } else if (let te = headers.get("Transfer-Encoding")) {
             if (!sameName(lastToken(te), "chunked")) {
-                conn.close();
                 throw HttpError { kind = .Protocol, detail = f"the transfer encoding '{te}' is not understood" };
             }
             framing = Framing.Chunked;
@@ -898,7 +1053,6 @@ pub class Client {
                 framing = Framing.Fixed;
                 length = n;
             } else {
-                conn.close();
                 throw HttpError { kind = .Protocol, detail = f"'{cl}' is no Content-Length" };
             }
         }
@@ -909,7 +1063,7 @@ pub class Client {
             _ => { },
         }
         conn.reusable = reusable;
-        var body = Body { conn = conn, framing = framing, left = length, done = false, client = this, authority = authority };
+        var body = Body { conn = conn, framing = framing, left = length, done = false, client = this, authority = authority, source = null, sourceLength = null, owns = true, failed = false };
         match (framing) {
             .Empty => { body.finish(); },
             .Fixed => { if (length == 0) { body.finish(); } },
@@ -920,7 +1074,7 @@ pub class Client {
 }
 
 /// `HTTP/1.1 200 OK`: the status and whether the version is 1.1.
-fn parseStatusLine(line: string, conn: Conn): (Status, bool) throws HttpError {
+fn parseStatusLine(line: string): (Status, bool) throws HttpError {
     let parts = line.splitN(' ', 3);
     var version = "";
     var codeText = "";
@@ -933,17 +1087,14 @@ fn parseStatusLine(line: string, conn: Conn): (Status, bool) throws HttpError {
         i = i + 1;
     }
     if (!(version == "HTTP/1.1" || version == "HTTP/1.0")) {
-        conn.close();
         throw HttpError { kind = .Protocol, detail = f"the status line is '{line}'" };
     }
     if (codeText.length() != 3) {
-        conn.close();
         throw HttpError { kind = .Protocol, detail = f"the status line is '{line}'" };
     }
     var code = 0;
     for (c in codeText.chars()) {
         if (!c.isAsciiDigit()) {
-            conn.close();
             throw HttpError { kind = .Protocol, detail = f"the status line is '{line}'" };
         }
         code = code * 10 + ((c as uint32) - 48u32) as int;
@@ -951,14 +1102,13 @@ fn parseStatusLine(line: string, conn: Conn): (Status, bool) throws HttpError {
     return (Status { code = code, reason = reason }, version == "HTTP/1.1");
 }
 
-/// The header lines up to the empty one.
+/// The header lines up to the empty one. The connection is the caller's to close on an error.
 fn readHeaders(conn: Conn): Headers throws [HttpError, IoError, Cancelled] {
     let headers = Headers.new();
     var count = 0;
     while (true) {
         let line = try conn.readLine();
         if (line == null) {
-            conn.close();
             throw IoError { kind = .UnexpectedEof, path = null, detail = "the head is not ended", inner = null };
         }
         if (line.isEmpty()) {
@@ -966,22 +1116,18 @@ fn readHeaders(conn: Conn): Headers throws [HttpError, IoError, Cancelled] {
         }
         count = count + 1;
         if (count > maxHeaderLines) {
-            conn.close();
             throw HttpError { kind = .Protocol, detail = f"more than {maxHeaderLines} header lines" };
         }
         if (line.startsWith(" ") || line.startsWith("\t")) {
-            conn.close();
             throw HttpError { kind = .Protocol, detail = "a folded header line (obs-fold)" };
         }
         if (let (name, value) = line.splitOnce(':')) {
             let n = name.toString();
             if (n.isEmpty() || n.contains(' ')) {
-                conn.close();
                 throw HttpError { kind = .Protocol, detail = f"the header line '{line}'" };
             }
             headers.add(n, value.trim().toString());
         } else {
-            conn.close();
             throw HttpError { kind = .Protocol, detail = f"the header line '{line}'" };
         }
     }
@@ -1019,4 +1165,295 @@ fn lengthOf(value: string): ?int {
 pub fn get(uri: string): Response throws [HttpError, IoError, TimedOut, Cancelled, ParseError] {
     var client = Client.new(ClientOptions { followRedirects = true });
     return try client.get(Uri.parse(uri));
+}
+
+// ---------------------------------------------------------------------------------------------
+// The server.
+// ---------------------------------------------------------------------------------------------
+
+/// How a server behaves.
+pub struct ServerOptions {
+    /// Whether a connection is kept for the next request.
+    pub keepAlive: bool = true,
+    /// The `Server` header; none where empty.
+    pub serverName: string = "lyric5",
+}
+
+/// An HTTP/1.1 server over a `TcpListener`: `serve` runs until `shutdown`.
+pub class Server {
+    var listener: TcpListener,
+    var options: ServerOptions,
+    /// The connections waiting for their next request, by number: closed at `shutdown`.
+    var idle: Map<int, Conn>,
+    var nextConn: int,
+    var closing: bool,
+
+    /// A server bound to the address — port 0 for any; `localAddr()` says which.
+    pub static fn bind(addr: SocketAddr, options: ServerOptions = ServerOptions { }): Server throws IoError {
+        let listener = try TcpListener.bind(addr);
+        return Server { listener = listener, options = options, idle = Map<int, Conn>.new(), nextConn = 0, closing = false };
+    }
+
+    pub fn localAddr(): SocketAddr throws IoError {
+        return try this.listener.localAddr();
+    }
+
+    /// Connections accepted and served, each on a task of its own, until `shutdown()` closes the
+    /// listener. The handler's response is written as it is; a handler that throws answers 500
+    /// with the error's message. A request the server cannot read is answered 400 and the
+    /// connection closed.
+    pub mut fn serve(handler: fn(Request) -> Response throws Error): void throws Cancelled {
+        while (true) {
+            var accepted: ?TcpStream = null;
+            try {
+                accepted = this.listener.accept();
+            } catch (_: IoError) {
+                // the listener is closed: shutdown
+                return;
+            }
+            let stream = accepted!;
+            this.nextConn = this.nextConn + 1;
+            let id = this.nextConn;
+            let _ = spawn(() => { this.connection(id, Conn.new(stream), handler); });
+        }
+    }
+
+    /// The listener closed — `serve` returns — and the connections waiting for a request closed;
+    /// a request under way is answered first, then its connection closes.
+    pub mut fn shutdown(): void {
+        this.closing = true;
+        try {
+            this.listener.close();
+        } catch (_: Error) { }
+        for ((_, c) in this.idle) {
+            c.close();
+        }
+        this.idle = Map<int, Conn>.new();
+    }
+
+    /// One connection: requests read and answered until a side closes.
+    mut fn connection(id: int, conn: Conn, handler: fn(Request) -> Response throws Error): void {
+        while (!this.closing) {
+            this.idle[id] = conn;
+            var head: ?RequestHead = null;
+            try {
+                head = this.readRequestHead(conn);
+            } catch (e: HttpError) {
+                this.idle.remove(id);
+                this.answerBad(conn, e.detail);
+                conn.drainAndClose();
+                return;
+            } catch (_: Error) {
+                this.idle.remove(id);
+                conn.close();
+                return;
+            }
+            this.idle.remove(id);
+            if (head == null || this.closing) {
+                conn.close();
+                return;
+            }
+            let h = head;
+            // Expect: 100-continue — the client waits for the go before it sends the body
+            if (let expect = h.request.headers.get("Expect")) {
+                if (sameName(expect.trim().toString(), "100-continue")) {
+                    try {
+                        conn.writeAll(viewBytes("HTTP/1.1 100 Continue\r\n\r\n"));
+                    } catch (_: Error) {
+                        conn.close();
+                        return;
+                    }
+                }
+            }
+            var response: Response = Response.empty(500);
+            try {
+                response = handler(h.request);
+            } catch (e: Error) {
+                response = Response.withText(e.message(), 500);
+            }
+            var keep = this.options.keepAlive && h.keepAlive && !response.headers.connectionHas("close") && !this.closing;
+            if (h.body.isDone() && h.body.conn == null && h.body.failed) {
+                keep = false;
+            }
+            // the request's body read away, so the next request starts clean
+            if (keep && !h.body.isDone()) {
+                try {
+                    let _ = h.body.readAll();
+                } catch (_: Error) {
+                    conn.close();
+                    return;
+                }
+            }
+            try {
+                this.writeResponse(conn, h, response, keep);
+            } catch (_: Error) {
+                conn.close();
+                return;
+            }
+            if (!keep) {
+                conn.drainAndClose();
+                return;
+            }
+        }
+        conn.close();
+    }
+
+    /// `400 Bad Request` with the reason as text; the connection is closed by the caller.
+    fn answerBad(conn: Conn, detail: string): void {
+        let text = f"bad request: {detail}";
+        let head = f"HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {viewBytes(text).length()}\r\nConnection: close\r\n\r\n{text}";
+        try {
+            try conn.writeAll(viewBytes(head));
+        } catch (_: Error) { }
+    }
+
+    /// The request line and the headers; `null` where the connection ended before a request.
+    fn readRequestHead(conn: Conn): ?RequestHead throws [HttpError, IoError, Cancelled] {
+        var line = try conn.readLine();
+        // a stray CRLF before the request line is allowed (RFC 9112 §2.2)
+        while (line != null && line.isEmpty()) {
+            line = try conn.readLine();
+        }
+        if (line == null) {
+            return null;
+        }
+        let parts = line.splitN(' ', 3).toArray();
+        if (parts.length() != 3) {
+            throw HttpError { kind = .Protocol, detail = f"the request line is '{line}'" };
+        }
+        let methodText = parts[0].toString();
+        let target = parts[1].toString();
+        let version = parts[2].toString();
+        if (!(version == "HTTP/1.1" || version == "HTTP/1.0")) {
+            throw HttpError { kind = .Protocol, detail = f"the version is '{version}'" };
+        }
+        if (methodText.isEmpty() || !isToken(methodText)) {
+            throw HttpError { kind = .Protocol, detail = f"the method is '{methodText}'" };
+        }
+        var uri = Uri { };
+        try {
+            uri = Uri.parse(target);
+        } catch (_: ParseError) {
+            throw HttpError { kind = .Protocol, detail = f"the target is '{target}'" };
+        }
+        if (!(target.startsWith("/") || uri.scheme != null || target == "*")) {
+            throw HttpError { kind = .Protocol, detail = f"the target is '{target}'" };
+        }
+        let headers = try readHeaders(conn);
+        let version11 = version == "HTTP/1.1";
+        if (version11 && !headers.has("Host")) {
+            throw HttpError { kind = .Protocol, detail = "no Host" };
+        }
+        // the body's framing
+        var framing = Framing.Empty;
+        var length = 0;
+        if (let te = headers.get("Transfer-Encoding")) {
+            if (!sameName(lastToken(te), "chunked")) {
+                throw HttpError { kind = .Protocol, detail = f"the transfer encoding '{te}' is not understood" };
+            }
+            framing = Framing.Chunked;
+        } else if (let cl = headers.get("Content-Length")) {
+            if (let n = lengthOf(cl)) {
+                framing = if (n == 0) Framing.Empty else Framing.Fixed;
+                length = n;
+            } else {
+                throw HttpError { kind = .Protocol, detail = f"'{cl}' is no Content-Length" };
+            }
+        }
+        conn.reusable = false;
+        let body = Body { conn = conn, framing = framing, left = length, done = false, client = null, authority = "", source = null, sourceLength = null, owns = false, failed = false };
+        match (framing) {
+            .Empty => { body.finish(); },
+            _ => { },
+        }
+        let keepAlive = if (version11) !headers.connectionHas("close") else headers.connectionHas("keep-alive");
+        var contentLength: ?int = null;
+        match (framing) {
+            .Fixed => { contentLength = length; },
+            .Empty => { contentLength = 0; },
+            _ => { },
+        }
+        let request = Request { method = Method.of(methodText), uri = uri, headers = headers, body = body, contentLength = contentLength };
+        return RequestHead { request = request, body = body, keepAlive = keepAlive, version11 = version11 };
+    }
+
+    fn writeResponse(conn: Conn, h: RequestHead, response: Response, keep: bool): void throws [IoError, Cancelled] {
+        let head = StringBuilder.new();
+        let status = response.status;
+        let reason = if (status.reason.isEmpty()) reasonOf(status.code) else status.reason;
+        head.appendStr(f"HTTP/1.1 {status.code} {reason}\r\n");
+        if (!this.options.serverName.isEmpty() && !response.headers.has("Server")) {
+            head.appendStr(f"Server: {this.options.serverName}\r\n");
+        }
+        let isHead = h.request.method == Method.Head;
+        let bodiless = status.code == 204 || status.code == 304 || status.isInformational();
+        var chunked = false;
+        var length: ?int = response.body.length();
+        if (bodiless) {
+            length = null;
+        } else if (let n = length) {
+            head.appendStr(f"Content-Length: {n}\r\n");
+        } else {
+            head.appendStr("Transfer-Encoding: chunked\r\n");
+            chunked = true;
+        }
+        if (!keep && !response.headers.connectionHas("close")) {
+            head.appendStr("Connection: close\r\n");
+        }
+        for ((k, v) in response.headers.pairs()) {
+            if (sameName(k, "Content-Length") || sameName(k, "Transfer-Encoding")) {
+                continue;
+            }
+            head.appendStr(f"{k}: {v}\r\n");
+        }
+        head.appendStr("\r\n");
+        try conn.writeAll(viewBytes(head.toString()));
+        if (isHead || bodiless) {
+            try conn.stream.flush();
+            return;
+        }
+        var body = response.body;
+        let chunk: uint8[] = [0u8] * 8192;
+        while (true) {
+            let n = try body.read(chunk[..]);
+            if (n == 0) {
+                break;
+            }
+            if (chunked) {
+                try conn.writeAll(viewBytes(f"{n:x}\r\n"));
+                try conn.writeAll(chunk[0..n]);
+                try conn.writeAll(viewBytes("\r\n"));
+            } else {
+                try conn.writeAll(chunk[0..n]);
+            }
+        }
+        if (chunked) {
+            try conn.writeAll(viewBytes("0\r\n\r\n"));
+        }
+        try conn.stream.flush();
+    }
+}
+
+/// A request as read: with whether the connection may go on after it.
+struct RequestHead {
+    request: Request,
+    body: Body,
+    keepAlive: bool,
+    version11: bool,
+}
+
+/// RFC 9110's token characters.
+fn isToken(s: string): bool {
+    for (b in viewBytes(s)) {
+        let ok = isWordByte(b) || b == 33u8 || b == 35u8 || b == 36u8 || b == 37u8 || b == 38u8 || b == 39u8 || b == 42u8
+            || b == 43u8 || b == 45u8 || b == 46u8 || b == 94u8 || b == 96u8 || b == 124u8 || b == 126u8;
+        if (!ok) {
+            return false;
+        }
+    }
+    return true;
+}
+
+fn isWordByte(b: uint8): bool {
+    return (b >= 48u8 && b <= 57u8) || (b >= 65u8 && b <= 90u8) || (b >= 97u8 && b <= 122u8) || b == 95u8;
 }

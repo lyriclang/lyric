@@ -1286,6 +1286,21 @@ M9b: no halt until it closes, merged on green CI, open points collected for the 
   tests: keep-alive counted by the server's connections, chunked, HEAD, 204, 100, HTTP/1.0,
   POST with a length and in chunks, redirects, timeout, refusals). Spec 12 §HTTP rules 1–3;
   three cases. `resolve` gets its deadline through the `timeout` around the exchange (S10c).
+- **S8** `std.http`, the server (P7; 10 Q6): `Server.bind(addr, ServerOptions { keepAlive,
+  serverName }).serve(handler)` — a task per connection; each request read as the client writes
+  one (request line in origin-, absolute- or `*`-form, the headers within §3's limits, the body
+  framed by `Content-Length` or chunked and given to the handler as a `Reader` — `request.bytes`
+  /`text`/`json<T>` —, a body left unread read away), `Expect: 100-continue` answered, the
+  handler's `Response` (`of`, `withText`, `withJson`, `stream`, `empty`; its `headers` the
+  handler's) written with `Content-Length` or in chunks, none for HEAD/204/304, a throwing
+  handler answered 500 with its message, a request that is none answered 400 with the reason,
+  keep-alive as HTTP/1.1 and 1.0 say, the peer's remaining bytes read away before a close (no
+  reset), `shutdown()` closing the listener and the idle connections while a request under way
+  is answered; `Body` knows whether it owns its connection (a client's) or not (a server's). The
+  artifacts: the JSON server with the client of the same program (`tests/Lyric5.Tests/programs/
+  jsonserver.lyr`, through `ExampleTests`); `tests/std/tests/http_server.lyr` (3 tests: the
+  handler's answers over one connection, HTTP/1.1 on the wire with a raw socket — seven 400s —,
+  shutdown). Spec 12 §HTTP rule 4; three cases.
 
 ## Design decisions
 

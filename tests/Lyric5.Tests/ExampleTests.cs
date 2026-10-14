@@ -11,7 +11,8 @@ namespace Lyric5.Tests;
 /// other operating system; a dependency's globals are ready before the importer's (07 G2).
 /// And M8b's: the file tool, <c>programs/filetool.lyr</c>, over a tree the test makes. And M8c's:
 /// the word counter, <c>programs/wordcount.lyr</c>, over a text in four scripts. And M10's: the log
-/// filter, <c>programs/logfilter.lyr</c>, over a log.
+/// filter, <c>programs/logfilter.lyr</c>, over a log; the JSON server, <c>programs/jsonserver.lyr</c>, with its
+/// client.
 /// Through <c>Main</c>, so in the console collection.
 /// </summary>
 [Collection("console")]
@@ -233,6 +234,22 @@ public class ExampleTests
         var usage = ProcessRunner.Run(exe, ["-x", "a", log], TimeSpan.FromMinutes(1));
         Assert.Equal(2, usage.ExitCode);
         Assert.StartsWith("usage: logfilter", usage.Stderr);
+    }
+
+    /// <summary>M10's artifact (13, S8): the JSON server built as a package — the server answers
+    /// JSON, the client of the same program fetches it, posts one, reads it back, misses one.</summary>
+    [Fact]
+    public void The_json_server_serves_and_its_client_fetches()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", ProgramText("jsonserver")));
+        var (built, _, why) = Run("build", "-C", dir);
+        Assert.True(built == 0, why);
+        var host = Target.Host;
+        var exe = Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix);
+        var ran = ProcessRunner.Run(exe, [], TimeSpan.FromMinutes(1));
+        Assert.True(ran.ExitCode == 0, ran.Stderr);
+        Assert.Equal("1 Brot 2.5\n2 Käse 7.0\n201 Created /items/3 Milch\n200 {\"id\":3,\"name\":\"Milch\",\"price\":1.2}\n"
+                     + "404 {\"error\":\"no item 9\"}\n", ran.Stdout.Replace("\r\n", "\n"));
     }
 
     private static string MacrosExample([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>

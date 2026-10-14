@@ -1,0 +1,219 @@
+// std.http, the server (design/v5/spec/10 Q6; 13 M10 S8): a handler per request, a task per
+// connection, the body framed as the client wrote it, Expect: 100-continue answered, the response
+// with its length or in chunks, keep-alive, a request that is none answered 400, a handler that
+// throws answered 500, shutdown. The client of S7 on the other side, a raw socket where the
+// client would not misbehave.
+import std.io { IoError, IoErrorKind, ByteBuffer };
+import std.net { IpAddr, SocketAddr, TcpStream };
+import std.task { spawn, sleep, Cancelled };
+import std.time { Duration };
+import std.http { Client, ClientOptions, Request, Response, Server, ServerOptions, Method, Headers, Status, HttpError };
+import std.uri { Uri };
+import std.codec { Codable };
+import std.test { assertEq, assertTrue, assertNull, fail };
+
+struct Item :: [Codable, Equatable, Debug] {
+    id: int,
+    name: string,
+}
+
+struct Echo :: [Codable, Equatable, Debug] {
+    method: string,
+    path: string,
+    query: ?string,
+    length: int,
+    text: string,
+}
+
+fn handle(req: Request): Response throws Error {
+    let path = req.uri.path;
+    if (path == "/hello") {
+        return Response.withText("hello, world");
+    }
+    if (path == "/items") {
+        return try Response.withJson([Item { id = 1, name = "one" }, Item { id = 2, name = "zwei" }]);
+    }
+    if (path == "/echo") {
+        let bytes = try req.bytes();
+        return try Response.withJson(Echo { method = req.method.show(), path = path, query = req.uri.query, length = bytes.length(), text = string.fromUtf8Lossy(bytes[..]) });
+    }
+    if (path == "/stream") {
+        let src = ByteBuffer.new();
+        try src.write("streamed in chunks".toBytes()[..]);
+        return Response.stream(200, src, null, "text/plain");
+    }
+    if (path == "/sized") {
+        let src = ByteBuffer.new();
+        try src.write("sized".toBytes()[..]);
+        return Response.stream(200, src, 5, "text/plain");
+    }
+    if (path == "/created") {
+        var r = Response.withText("made", 201);
+        r.headers.set("Location", "/items/3");
+        return r;
+    }
+    if (path == "/nothing") {
+        return Response.empty(204);
+    }
+    if (path == "/close") {
+        var r = Response.withText("bye");
+        r.headers.set("Connection", "close");
+        return r;
+    }
+    if (path == "/unread") {
+        // the body is left to the server to read away
+        return Response.withText("left it");
+    }
+    if (path == "/slow") {
+        try sleep(Duration.ofMillis(200));
+        return Response.withText("slow");
+    }
+    if (path == "/fail") {
+        throw IoError { kind = .NotFound, path = null, detail = "the thing is not there", inner = null };
+    }
+    return Response.withText(f"no {path}", 404);
+}
+
+/// A server on a loopback port, serving on a task of its own: the server and the base URI.
+fn start(options: ServerOptions = ServerOptions { }): (Server, string) throws Error {
+    var server = try Server.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 }, options);
+    let at = try server.localAddr();
+    let _ = spawn(() => { try server.serve(handle); });
+    return (server, f"http://127.0.0.1:{at.port}");
+}
+
+fn uri(base: string, path: string): Uri {
+    return try! Uri.parse(base + path);
+}
+
+/// Raw bytes to the server, the whole answer back (the server closes or we stop at the length).
+fn raw(base: string, text: string): string throws Error {
+    let port = try int.parse(base.splitOnce("127.0.0.1:")!.1);
+    var conn = try TcpStream.connect(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = port as uint16 });
+    try conn.writeAll(text.toBytes()[..]);
+    try conn.shutdown(.Write);
+    let back = try conn.readToString();
+    try conn.close();
+    return back;
+}
+
+@Test
+fn aServerAnswersAndKeepsTheConnection(): void throws Error {
+    let (server, base) = try start();
+    var client = Client.new();
+    let r = try client.get(uri(base, "/hello"));
+    assertEq(r.status.code, 200);
+    assertEq(r.headers.get("Content-Type"), "text/plain; charset=utf-8");
+    assertEq(r.headers.get("Content-Length"), "12");
+    assertEq(r.headers.get("Server"), "lyric5");
+    assertEq(try r.text(), "hello, world");
+    // JSON
+    let items = try (try client.get(uri(base, "/items"))).json<Item[]>();
+    assertEq(items, [Item { id = 1, name = "one" }, Item { id = 2, name = "zwei" }]);
+    // the request's parts and body reach the handler
+    let e = try (try client.send(Request.post(uri(base, "/echo?x=1"), "payload".toBytes()[..], "text/plain"))).json<Echo>();
+    assertEq(e, Echo { method = "POST", path = "/echo", query = "x=1", length = 7, text = "payload" });
+    // a chunked request body
+    var put = Request { method = Method.Put, uri = uri(base, "/echo") };
+    let src = ByteBuffer.new();
+    try src.write("chunked in".toBytes()[..]);
+    put.body = src;
+    assertEq((try (try client.send(put)).json<Echo>()).text, "chunked in");
+    // a streamed response in chunks, and one with its length
+    let s = try client.get(uri(base, "/stream"));
+    assertEq(s.headers.get("Transfer-Encoding"), "chunked");
+    assertNull(s.headers.get("Content-Length"));
+    assertEq(try s.text(), "streamed in chunks");
+    let z = try client.get(uri(base, "/sized"));
+    assertEq(z.headers.get("Content-Length"), "5");
+    assertEq(try z.text(), "sized");
+    // status, headers, 204, HEAD
+    let c = try client.get(uri(base, "/created"));
+    assertEq(c.status, Status { code = 201, reason = "Created" });
+    assertEq(c.headers.get("Location"), "/items/3");
+    assertEq(try c.text(), "made");
+    let n = try client.get(uri(base, "/nothing"));
+    assertEq(n.status.code, 204);
+    assertEq(try n.text(), "");
+    let h = try client.send(Request { method = Method.Head, uri = uri(base, "/hello") });
+    assertEq(h.headers.get("Content-Length"), "12");
+    assertEq(try h.text(), "");
+    // 404 for the rest, 500 for a handler that throws
+    let missing = try client.get(uri(base, "/nope"));
+    assertEq(missing.status.code, 404);
+    assertEq(try missing.text(), "no /nope");
+    let failed = try client.get(uri(base, "/fail"));
+    assertEq(failed.status.code, 500);
+    assertEq(try failed.text(), "not found (the thing is not there)");
+    // all of it over one connection: the server read the unread body away too - the next request
+    // starts clean (its method is seen whole, not glued to the body's bytes)
+    let u = try client.send(Request.post(uri(base, "/unread"), "ignored".toBytes()[..]));
+    assertEq(try u.text(), "left it");
+    let after = try (try client.get(uri(base, "/echo"))).json<Echo>();
+    assertEq(after, Echo { method = "GET", path = "/echo", query = null, length = 0, text = "" });
+    client.close();
+    server.shutdown();
+}
+
+@Test
+fn aServerTalksHttp11OnTheWire(): void throws Error {
+    let (server, base) = try start();
+    // two requests on one connection, the second with Connection: close
+    let two = try raw(base, "GET /hello HTTP/1.1\r\nHost: x\r\n\r\nGET /created HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+    assertTrue(two.startsWith("HTTP/1.1 200 OK\r\n"));
+    assertTrue(two.contains("\r\nContent-Length: 12\r\n"));
+    assertTrue(two.contains("hello, worldHTTP/1.1 201 Created\r\n"));
+    assertTrue(two.contains("\r\nLocation: /items/3\r\n"));
+    assertTrue(two.contains("\r\nConnection: close\r\n"));
+    assertTrue(two.endsWith("made"));
+    // Expect: 100-continue is answered before the body is read
+    let cont = try raw(base, "POST /echo HTTP/1.1\r\nHost: x\r\nExpect: 100-continue\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi");
+    assertTrue(cont.startsWith("HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\n"));
+    assertTrue(cont.contains("\"length\":2"));
+    // HTTP/1.0 closes unless keep-alive is asked
+    let old = try raw(base, "GET /hello HTTP/1.0\r\n\r\n");
+    assertTrue(old.startsWith("HTTP/1.1 200 OK\r\n"));
+    assertTrue(old.contains("\r\nConnection: close\r\n"));
+    // what is no request: 400 with the reason, the connection closed
+    for ((text, said) in [("GARBAGE\r\n\r\n", "the request line is 'GARBAGE'"),
+                          ("GET /x HTTP/9\r\n\r\n", "the version is 'HTTP/9'"),
+                          ("GET /x HTTP/1.1\r\n\r\n", "no Host"),
+                          ("GET x HTTP/1.1\r\nHost: x\r\n\r\n", "the target is 'x'"),
+                          ("GET /x HTTP/1.1\r\nHost: x\r\nContent-Length: many\r\n\r\n", "'many' is no Content-Length"),
+                          ("GET /x HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: gzip\r\n\r\n", "the transfer encoding 'gzip' is not understood"),
+                          ("GET /x HTTP/1.1\r\nHost: x\r\n folded\r\n\r\n", "a folded header line (obs-fold)")]) {
+        let back = try raw(base, text);
+        assertTrue(back.startsWith("HTTP/1.1 400 Bad Request\r\n"), back);
+        assertTrue(back.endsWith(f"bad request: {said}"), back);
+    }
+    // an empty connection is no request
+    assertEq(try raw(base, ""), "");
+    server.shutdown();
+}
+
+@Test
+fn aServerShutsDown(): void throws Error {
+    let (server, base) = try start();
+    var client = Client.new();
+    assertEq(try (try client.get(uri(base, "/hello"))).text(), "hello, world");
+    // a request under way is answered; the idle connection is closed; nothing new is accepted
+    let slow = spawn(() => try (try client.get(uri(base, "/slow"))).text());
+    try sleep(Duration.ofMillis(50));
+    server.shutdown();
+    assertEq(try slow.await(), "slow");
+    var fresh = Client.new();
+    try {
+        let _ = try fresh.get(uri(base, "/hello"));
+        fail("accepted after shutdown");
+    } catch (e: IoError) {
+        assertTrue(e.kind == IoErrorKind.ConnectionRefused);
+    }
+    client.close();
+    // keep-alive off: every response says close
+    let (once, base2) = try start(ServerOptions { keepAlive = false, serverName = "" });
+    let r = try client.get(uri(base2, "/hello"));
+    assertEq(r.headers.get("Connection"), "close");
+    assertNull(r.headers.get("Server"));
+    assertEq(try r.text(), "hello, world");
+    once.shutdown();
+}
