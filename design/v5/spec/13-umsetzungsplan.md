@@ -133,6 +133,7 @@ Nach M8a S11a hat der Maintainer die offenen Punkte aus M4 bis M8a durchgesehen 
 | **Abgeschlossen** | 2026-10-13: M9a S1–S12 (#444–#457, dazu S11b, S11c, S12b), Suite 1391 in beiden Profilen, Spec-Pin lyric-spec#292. Messpunkt 1: hello 1 362 896 Bytes, 841 Zeilen C, Start 1,28 ms gegen 0,94 ms plain C. Lesarten, die der Maintainer sehen soll: statische Defaults (03 Review 2026-10-12), `Variants.all` statt `variants`, der Integer-`pow(n)` bleibt Methode, `std.iter` als Prelude-Modul, ein `inline`-Rumpf trägt die Aufrufzeile. Türen: `Default` nach `std.core` (braucht `f.type` in Typposition, M9b), `comptime for` über Tupelelemente, `std.unicode`, libm-Port (M10, D7) |
 | **Abgeschlossen** | 2026-10-13: M9b S1–S6 (lyric#460–#465, Spec lyric-spec#293–#297): `std.syntax` und die Brücke, `macro` und `name!(…)`, `quote`/`#{}` mit Hygiene, Attribut-Makros, die Diagnosen expandierten Codes (eine synthetisierte Datei je Expansion) und `lyric expand`, `examples/macros`. Messpunkt 1: hello 791 936 Bytes, 841 Zeilen C, Start 1,48 ms gegen 1,03 ms plain C; ein Bau mit einer Stelle 2,2 s gegen 1,57 s ohne (Punkt 117). Türen geprüft (S6): `Default` bleibt beim Compiler (bestätigt 2026-10-13); `comptime for` über Tupel bleibt Tür — ein Makro könnte die Tupelblöcke je Größe schreiben, aber `std.core` trägt keine Stelle eines eigenen Makros (P6), und ein Makro-Modul in std kostete jedes Programm eine Runde. Punkt 104 erledigt. Offene Punkte 105–146 im Bericht; vor M10 wird der Maintainer gefragt |
 | **Durchsicht 2026-10-13** | Der M9a-Abschlussbericht: die sieben Lesarten — statische Interface-Defaults (03 Review 2026-10-12), `Variants.all()`, der Integer-`pow(n)` als Methode, `std.iter` als Prelude-Modul ohne Namen, ein `inline`-Rumpf trägt die Aufrufzeile, `Default` bleibt beim Compiler, was in `std.core` bleibt (10 Review 2026-10-13 A3) — **alle bestätigt** („Alle sieben Lesarten bestätigt, M9b planen“). Die Punkte 81–84 (CI) und 85–104 (S10–S12b) bleiben gesammelt; 104 (die std-Selbsttests schreiben ins Arbeitsverzeichnis) bekommt die Uhr M9b S6 |
+| **Durchsicht 2026-10-14** | Der M9b-Abschlussbericht liegt vor (Lesarten L1–L9: die Engine sagt eine Diagnose einmal, Aufrufer-Knoten behalten ihren Ort, die Noten-Kette innen zuerst, `lyric expand` druckt die Deklarationen, freie Namen im Quote-Inhalt zählen als Import-Gebrauch, ein Paket unter `examples/` ist nicht der 4.x-Korpus, Punkt 104 über `tempDir()`, die beiden Türen; die offenen Punkte 105–146) — **die Bestätigung steht aus**. M10 wird geplant: der Nachtrag „der Plan für M10" unten, freigegeben wird er vom Maintainer |
 
 ## Nachtrag 2026-10-07 — der Plan für M8b
 
@@ -485,3 +486,116 @@ Nach Aufwand: groß S1, S3; mittel S2, S4; klein S5, S6. Etwa fünf Sessions.
 
 **Damit ist die Runde vollständig** (Bereiche 0–12 entschieden, 2026-09-28/29). Die Dokumente
 `design/v5/spec/00–13` sind die Grundlage der Spec 5.0 (R4) und der Arbeitsplan (M0–M18).
+
+## Nachtrag 2026-10-14 — der Plan für M10
+
+M10 nach seiner Zeile oben (10 B10 E1–E9, B11 Q1 Zonen und UTS #35, Q6 `http`, Q7 `term`, Q8 `compress`, B1 `uri`
+und `regex`), dazu jede Uhr, die auf M10 steht: Base64 ohne Padding (10 S4a, mit `http`/`uri`), Fristen für `resolve`
+(10 S10c, mit `http`), die Pipes eines Kindes unter Windows über den Completion-Port (10 S12b), der libm-Port für
+Compile-Zeit und Laufzeit (09 D7, 13 Durchsicht 2026-10-12), die Synthese von `Display` für Enums (03 Zusage an
+Bereich 4/8 — `Equatable`/`Hashable` stehen seit M9a, `Display` wird geprüft), `Coroutine :: Identity` (06 A7 —
+steht seit N2d, die Uhr fällt).
+
+Grundlage ist eine Prüfung jedes Punkts gegen den Code (2026-10-14). Von M10 steht:
+
+- `std.time` mit `Duration`, `Instant`, `Monotonic`, `Date`, `Time`, `DateTime`, `Zone.utc`/`Zone.fixed`, RFC 3339
+  (M8b S5) — es fehlen `Zone.load`/`Zone.local` (TZif) und die UTS-#35-Muster;
+- `std.encoding` (Base64/Base64Url/Hex/UTF-16, gepaddet und streng), `std.crypto` (Digests, HMAC, `randomBytes`),
+  `std.hash`, `std.random` (ChaCha8) — M8b/M8c;
+- `std.net` (TCP, UDP, `resolve`, der Windows-Poller über AFD), `std.io` (`Reader`/`Writer` mit `[IoError,
+  Cancelled]`, Puffer- und Text-Hüllen, `ByteBuffer`), `std.process`, `std.os.signals` — M8b: alles, worauf ein
+  HTTP/1.1-Client und -Server stehen;
+- die Unicode-Tabellen und `char`-Prädikate (M8c S1/S2) — was `regex` für seine Klassen braucht;
+- die Synthese nach A5 über `comptime for (f in fields<Self>())` mit `attribute<A>(f)` (M9a S9–S10) — die Maschine,
+  mit der `Codable` sich selbst schreibt; Art-1-Attribute als Werte des Baus (`@Codec`);
+- `std.math`s freie Elementarfunktionen (M9a S11) über libm — zur Compile-Zeit `LYR-CT0005`;
+- kein `codec`, `json`, `toml`, `uri`, `regex`, `http`, `term`, `compress`: nichts davon existiert, auch nicht als
+  Stub.
+
+Die Slices heißen **M10 S1–S13**; jeder ist ein PR, sein Regel-PR in der Spec (12 §je Modul, 16 die Codes) geht
+voran. Größe: **XL** wie die Zeile — die Reihenfolge ist so gewählt, dass das Artefakt der Zeile („HTTP-Server liefert
+JSON, Client holt es; Log-Filter mit Regex") mit S8 steht und der Rest es verfeinert.
+
+### Architektur
+
+| # | Entscheidung | Warum — und warum nicht die Alternativen |
+|---|---|---|
+| P1 | **`std.codec` ist das Paar, nicht ein Format** (E1, E2): `Encode { fn encode(&e: Encoder) }`, `Decode { static fn decode(&d: Decoder): Self }`, `Codable`; `Encoder`/`Decoder` als Interfaces mit dem Container-Modell (`encodeSeq(len): SeqEncoder`, `encodeStruct(name, n): StructEncoder`, `decodeStruct(name, fields): StructDecoder` …), zehn Formen; die Fehler `EncodeError { path, detail }`, `DecodeError { kind, path, detail }`. Die Skalare, `?T`, `T[]`, `List`, `Map` (Schlüssel `string`/`Integer`), Tupel bis 8, `Instant` konformieren in `std.codec` (nicht in `core`: die Trägerklausel hält `core` frei von Formaten). | Swift `Codable`, Rust `serde` ohne Visitor-Doppeldispatch (E2). Verworfen: `ToJson`/`FromJson` je Format (4.x). |
+| P2 | **`Codable` schreibt sich selbst** (E3, A5): die Defaults von `encode`/`decode` laufen `comptime for (f in fields<Self>())` in Deklarationsreihenfolge, lesen `attribute<Codec>(f)` (E4: `name`, `skip`, `default`) und das Typ-Attribut (`rename`, `denyUnknown`, `tag`); Enums: Unit-Varianten als String, Nutzlast extern getaggt, `@Codec { tag = "kind" }` intern. Eine eigene `encode`/`decode` ersetzt die Synthese (05 §14). **Der Interpreter trägt die Synthese**, nicht der Compiler: kein neues Provisorium. | serde-Attribute; Swifts `CodingKeys` verworfen (E4). Die Synthese ist der Test der A5-Maschine über einen echten Vertrag — findet sie Lücken, sind die Lücken M10s. |
+| P3 | **`std.json` und `std.toml` sind je ein `Encoder`/`Decoder` plus ein dynamischer Baum** (E7, E8): `json.encode<T :: [Encode]>(v, opts)`, `encodeTo(v, w)`, `decode<T :: [Decode]>(text)`, `decodeFrom<T>(r)`; `JsonValue` als rekursives Enum, selbst `Codable`, mit `[]`-Index zu `?JsonValue`, `path("a.b[0]")`, kompaktes `Display`; strikt RFC 8259 (JSON5 Tür). `TomlValue` mit `Datetime`, TOML 1.0 vollständig (Tabellen, Arrays von Tabellen, Inline-Tabellen, Mehrzeilenstrings, die vier Datumsformen). Der Manifest-Leser der Toolchain bleibt C# (11 P1): `std.toml` ist für Programme; ein Selbsttest liest das eigene `lyric.toml`. | Rust `serde_json::Value`, `toml`; Go `encoding/json`. Verworfen: ein Parser je Format ohne das Paar (SL-14). |
+| P4 | **`std.uri` nach RFC 3986** vollständig: `Uri.parse`, die fünf Teile, `resolve(base, ref)` (§5.2), `normalize` (§6), Prozentkodierung je Komponente, `Query` als geordnete Paare, `Display`/`Parse`/`Codable`, IPv6-Host. **Base64 ohne Padding** (S4a) landet hier als `Base64Url.encodeUnpadded`/`decodeUnpadded` (JOSE braucht es; die gepaddeten Formen bleiben streng). | WHATWG-URL verworfen (Browser-Semantik, kein RFC); Go `net/url` als Vorbild. |
+| P5 | **`std.regex` mit RE2-Syntax in linearer Zeit** (B1): Parser → NFA (Thompson), **Pike-VM** mit Captures als Grundlage (benannte Gruppen, Alternativen, Zähler `{m,n}` entfaltet, Klassen über die Unicode-Tabellen, `\b`, `^`/`$`, Flags `i m s`); `Regex.new(pattern) throws RegexError { offset }`, `isMatch`, `find`, `findAll` (Iterator), `captures`, `replace`/`replaceAll` (`$1`, `${name}`), `split`; **lazy DFA** für `isMatch`/`find` ohne Captures als S9b, wenn Messpunkt 4 (der Log-Filter) es braucht — sonst Tür. Keine Rückverweise, kein Lookaround (RE2: lineare Zeit ist die Zusage). | RE2, Rusts `regex` (Pike + lazy DFA), Go `regexp`. Verworfen: Backtracking (PCRE — exponentiell), ein `comptime`-kompiliertes Regex-Literal (Tür: `regex!("…")` ist ein Makro-Fall für später). |
+| P6 | **`std.compress` als Strom-Adapter** (Q8): Inflate (feste und dynamische Huffman-Tabellen, LZ77-Fenster 32 KiB) und Deflate (Stufen 0–9: gespeichert, feste Tabellen, dynamische mit Lazy-Matching), Zlib (RFC 1950, Adler-32 aus `std.hash`) und Gzip (RFC 1952, CRC-32) als `GzipReader<R :: [Reader]>`/`GzipWriter<W :: [Writer]>` und Zlib-/Deflate-Zwillinge, dazu `gzip.compress(bytes, level)`/`decompress(bytes)`. Ganz in Lyric (L9: keine Systembibliothek — kein zlib). | Go `compress/flate`, Rust `miniz_oxide`; `flate2` als API-Vorbild. |
+| P7 | **`std.http` Client und Server über `Reader`+`Writer`** (Q6): `Request`, `Response`, `Headers` (case-insensitiv, geordnet), `Method`, `Status`; HTTP/1.1 vollständig: Chunked, Content-Length, Keep-Alive, `Expect: 100-continue` (Server), `Host`, Redirects (Client, `followRedirects`), Fristen (`timeout` je Anfrage — **hier bekommt `resolve` seine Frist**: S10c, über `std.task.timeout` um den Pool-Aufruf); `Client.get/post/send`, `Response.text()/bytes()/json<T>()` (über `std.json`); `Server.bind(addr).serve(handler)` — ein Task je Verbindung, `Server.shutdown()` über `os.signals`; **TLS über den `Transport`-Haken** (`fn(SocketAddr) -> Stream`), den das Ring-Paket `tls` besetzt; HTTP/2, Cookies, Proxys: Türen. | Go `net/http` (Form), Rust `hyper` (Trennung TLS). Verworfen: eigenes TLS (U2). |
+| P8 | **`std.term` nach ECMA-48** (Q7): `isTerminal(stream)`, `size()`, `Style { fg, bg, bold, dim, italic, underline }.apply(s)`, `Color` (16/256/RGB), `cursor`/`clear`/`eraseLine`, `NO_COLOR`/`TERM`/`FORCE_COLOR`; unter Windows wird `ENABLE_VIRTUAL_TERMINAL_PROCESSING` einmal gesetzt (runtime `console.c`), sonst keine Plattformzweige; Raw-Mode Tür. | Rust `crossterm` (Teilmenge), Go `golang.org/x/term`. |
+| P9 | **Zeitzonen aus TZif** (Q1): `Zone.load(name)` liest RFC 8536 (v1–v3, inkl. Footer-TZ-String für die Zukunft) aus der System-Datenbank (`/usr/share/zoneinfo`, `TZDIR`, macOS gleich; Windows hat keine → `TimeError { kind = NoZoneData }`, Ring `tzdata`), `Zone.local()` (`TZ`, `/etc/localtime`; Windows: `Zone.utc` plus Hinweis — die Registry-Abbildung ist Tür), `instant.toDateTime(zone)`, `DateTime.toInstant()` mit Lücken-/Überlappungsregel (nach vorn, die frühere), `plusDays` über DST. **UTS #35** als `format(pattern)`/`parse(pattern)` mit den Feldern `y M d H h m s S a E Z X x` und Literalen in `'…'`; Lokalisierung nur `en` (Monats-/Tagesnamen), Tür. | Java `java.time`, Go `time.LoadLocation`; verworfen: Gos Referenz-Layout, ein eingebautes tzdata (Trägerklausel: Pflege). |
+| P10 | **Der libm-Port** (09 D7): `exp`, `ln`, `log2`, `log10`, `pow`, `sin`/`cos`/`tan`, `asin`/`acos`/`atan`/`atan2`, `sinh`/`cosh`/`tanh`, `cbrt`, `hypot` als **musl-Port in C** (`runtime/src/libm/`, MIT), den die Laufzeit statt des System-libm bindet — plattformgleich auf Tier 1 —, und als **Zeile-für-Zeile-Port in C#** (`Lyric.Frontend/Ir/Interp/Libm.cs`) für den Interpreter; ein Test läuft beide über denselben Eingabevektor (1 M Werte je Funktion, Bitgleichheit). `sqrt`, `floor`, `ceil`, `round`, `trunc`, `abs` sind IEEE-exakt und bleiben beim Compiler. | musl (klein, korrekt gerundet genug, MIT); CORE-MATH (korrekt gerundet, aber größer) als Tür. Verworfen: `LYR-CT0005` dauerhaft (D7 wollte die Antwort), ein Interpreter, der die C-Laufzeit lädt (zweiter Übersetzungsweg). |
+| P11 | **Die Pipes eines Kindes unter Windows parken** (S12b): überlappte Named Pipes (`FILE_FLAG_OVERLAPPED`) über den Completion-Port des Pollers wie Sockets seit M8b S11 — ein Kind, das nie schreibt, hält keinen Pool-Thread, ein Abbruch wirkt sofort. POSIX bleibt wie es ist (Pipes im Poller). | Go `os/exec` (IOCP), Rusts `read2`. |
+| P12 | **Messpunkt 4**: HTTP-Durchsatz (Keep-Alive, 1 KiB JSON-Antwort, 64 Verbindungen) gegen Go `net/http` ≤ 2×; JSON-Kodierung/-Dekodierung eines 1-MiB-Dokuments gegen Go `encoding/json`; der Log-Filter (`regex`) gegen Go `regexp` — gemessen mit `bench/` wie Messpunkt 3, berichtet, nicht gegated. | wie 13 Messpunkte. |
+| P13 | **Spec:** 12 §Codec/JSON/TOML/URI/Regex/Compress/HTTP/Term, 12 §Time (Zonen, Muster), 12 §Math (Compile-Zeit-Antwort), 16 die Codes (`LYR-RT`/`LYR-SEM` für `@Codec`-Fehler: ein `@Codec` an einem Nicht-Feld, `tag` an einem Struct); je Slice die Fälle rot gegen den Compiler davor. | wie M9b P10 |
+
+### Slices
+
+| Slice | Inhalt | Artefakt, Prüfung |
+|---|---|---|
+| **S1** `std.codec` | P1: das Paar, die Container, die Fehler, die Konformanzen der Skalare/Container/`Instant`; ein Test-Encoder in `std.test`-Nähe (`codec.debugEncoder`, der die Formen als Text schreibt) | ein Struct über den Debug-Encoder: Formen in Deklarationsreihenfolge; `?T` und `Map<string, V>` |
+| **S2** `Codable`-Synthese, `@Codec` | P2: die Defaults über `fields<Self>()`, das Attribut (Feld/Enum/Typ), extern/intern getaggte Enums, `denyUnknown`, `default` | `struct User :: [Codable]` ohne eine Zeile; `@Codec { name = "user_id" }`; eine eigene `decode` ersetzt |
+| **S3** `std.json` | P3: Encoder/Decoder, `JsonValue`, `encode`/`decode`/`encodeTo`/`decodeFrom`, `pretty`/`sortKeys`, `JsonError { line, column }`; strikt RFC 8259 (JSONTestSuite als Konformanz: `y_*` an, `n_*` ab) | Rundreise `User` → Text → `User`; `JsonValue.path("a.b[0]")`; die Testsuite |
+| **S4** `std.toml` | P3: Lexer/Parser TOML 1.0, `TomlValue`, Encoder/Decoder; `toml-test` (BurntSushi) als Konformanz | das eigene `lyric.toml` gelesen; `toml-test` valid/invalid |
+| **S5** `std.uri` + Base64 unpadded | P4: Parse/Resolve/Normalize/Prozentkodierung/`Query`; S4a | die RFC-3986-§5.4-Beispiele (normal und abnormal) als Fälle; JOSE-Beispiel aus RFC 7515 |
+| **S6** `std.regex` (Pike) | P5: Parser, NFA, Pike-VM mit Captures, die API; Unicode-Klassen über M8c | der Log-Filter (`programs/logfilter.lyr`) über einen Text; lineare Zeit: `(a*)*b` über 10⁵ `a` in Millisekunden |
+| **S7** `std.http` Client | P7 Client: Verbindung, Anfrage, Antwort, Chunked, Keep-Alive, Redirects, Fristen (`resolve` inklusive, S10c), `Transport`-Haken | Client gegen den eigenen Testserver (aus S8, hier ein minimaler `net`-Handler) und gegen `httpbin`-Fälle lokal |
+| **S8** `std.http` Server | P7 Server: `bind`/`serve`, ein Task je Verbindung, Keep-Alive, Chunked, `100-continue`, `shutdown` | **das Artefakt der Zeile**: Server liefert JSON (`std.json`), Client holt es — `programs/jsonserver.lyr` |
+| **S9** `std.compress` | P6: Inflate, Deflate 0–9, Zlib, Gzip, Adapter; die Konformanz: Rundreise über die std-Quellen, Vergleich mit `gzip -d` der Plattform (ein Testprozess) | `GzipReader` über `fs`; `Content-Encoding: gzip` im Client (S7 wird erweitert) |
+| **S10** `std.term` | P8: die API, VT unter Windows, `NO_COLOR` | ein farbiger Logfilter (S6s Programm, jetzt mit Stil) |
+| **S11** Zonen und Muster | P9: TZif-Parser, `Zone.load/local`, DST-Regeln, UTS #35 `format`/`parse` | `Europe/Berlin` über die Umstellung 2026-03-29; `America/New_York` Footer-Regel 2040; `"yyyy-MM-dd HH:mm Z"` hin und zurück |
+| **S12** libm und Windows-Pipes | P10, P11: der musl-Port in C und C#, der Bitgleichheitstest; die überlappten Pipes | `comptime exp(1.0)` gibt die Laufzeit-Antwort; ein Kind, das schweigt, hält keinen Pool-Thread (Windows-Test wie M8b S12b) |
+| **S13** Abschluss | P12: Messpunkt 4; `examples/` (jsonserver, logfilter); Dogfood (std-Tests, `lyric5 test`); STATUS, CHANGELOG, Bericht mit offenen Punkten; die Türen geprüft (lazy DFA, JSON5, CBOR, HTTP/2, Raw-Mode, Lokalisierung) | die Zeile oben erfüllt |
+
+**Nicht in M10:**
+
+- TLS (Ring `tls`), HTTP/2, Cookies, Proxys — Türen (Q6);
+- `tzdata` eingebaut, Windows-Registry-Zonen, Lokalisierung über `en` — Türen (Q1);
+- CBOR, MessagePack, CSV, JSON5/JSONC, streamender `SeqDecoder` — Türen (E9);
+- Rückverweise und Lookaround im Regex — nie (RE2-Zusage);
+- Ed25519/X25519/ChaCha20-Poly1305/Argon2 — Türen (Q4, U2);
+- der Manifest-Leser der Toolchain über `std.toml` — M18 frühestens (die Toolchain ist C# bis dahin).
+
+### Tests
+
+- Je Slice die Regel-Fälle der Spec (12 §Modul), rot gegen den Compiler davor; die externen Suiten (JSONTestSuite,
+  `toml-test`, RFC-3986-Beispiele, TZif-Dateien der Plattform) als Fixturen unter `tests/std/fixtures/` mit Lizenz.
+- Eine Mutationskontrolle je Regel: `denyUnknown` aus (das unbekannte Feld geht durch), die Chunked-Länge falsch
+  (der Client liest zu viel), die Pike-VM ohne Thread-Dedup (`(a*)*b` wird exponentiell), die DST-Lückenregel
+  umgedreht.
+- Messpunkt 4 vor S13 vorbereitet (die Go-Referenzen in `bench/http`, `bench/json`, `bench/regex`), damit S8 und S6
+  schon messen.
+
+### Umfang
+
+| | Umfang |
+|---|---|
+| `codec` + Synthese (Lyric) | etwa 900 Zeilen |
+| `json` + `toml` | etwa 1 600 |
+| `uri` | etwa 500 |
+| `regex` | etwa 1 800 |
+| `http` Client + Server | etwa 1 800 |
+| `compress` | etwa 1 400 |
+| `term`, Zonen + Muster | etwa 900 |
+| libm (C + C#) | etwa 2 500, davon 2 000 Port |
+| Windows-Pipes (C) | etwa 300 |
+| Spec | etwa 900 Zeilen, ~70 Fälle |
+
+Nach Aufwand: groß S3, S6, S7/S8, S9, S12; mittel S1, S2, S4, S11; klein S5, S10, S13. Etwa zehn Sessions — XL.
+
+### Reflexion
+
+- **Go** ist das Vorbild der Zeile: eine std, die HTTP, JSON, Regex, Gzip und Zeitzonen trägt, ohne Registry. Go
+  bringt tzdata mit (`time/tzdata`), Lyric nicht (Trägerklausel: Pflege); Go hat `encoding/json` über Reflexion,
+  Lyric über die Synthese zur Compile-Zeit (A5) — der Weg, den Rust mit `serde_derive` geht, hier ohne Proc-Macro.
+- **Rust** trennt `hyper`/`rustls`, `regex` (Pike + lazy DFA) und `miniz_oxide` — die Architektur von P5–P7; Lyric
+  hat sie in `std`, weil Regel D sie dorthin stellt.
+- **Swift** `Codable` ist das Paar (P1); Lyrics Container-Modell nimmt Swifts Form ohne die `CodingKeys`-Enums.
+- **Zig** hat eigenes TLS in `std` — verworfen (U2); Zig hat `std.compress` und `std.json` ganz in der Sprache,
+  wie hier.
+- **Java** `java.time` für Zonen und Muster (P9); `DateTimeFormatter`s Lokalisierung bleibt Tür.
