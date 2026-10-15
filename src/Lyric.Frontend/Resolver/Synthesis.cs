@@ -75,6 +75,24 @@ internal static class Synthesis
         return requests;
     }
 
+    /// <summary>The members of the family the compiler writes — <c>Default</c>, <c>Display</c> —
+    /// that an interface of the program implies for a type listing it: <c>struct Start :: [Args]</c>
+    /// under <c>interface Args :: [Default]</c> (05 §14 rule 5; the sweep after M10, W7b), as
+    /// requests where the type neither lists the interface nor writes the member. The std.core
+    /// defaults a parent brings need none: a parent's defaults are inherited (05 §1 rule 3).</summary>
+    public static List<Request> ImpliedRequests(IEnumerable<(string Interface, TypeNode Via)> implied,
+        TypeNode[] interfaces, IEnumerable<FunctionDecl> methods)
+    {
+        var written = new HashSet<string>(methods.Select(m => m.Name), StringComparer.Ordinal);
+        var listed = new HashSet<string>(interfaces.OfType<NamedType>().Where(n => n.Path.Length == 1).Select(n => n.Path[0]), StringComparer.Ordinal);
+        var requests = new List<Request>();
+        foreach (var (iface, via) in implied)
+            if (iface is "Default" or "Display" && !listed.Contains(iface) && !written.Contains(MethodOf(iface))
+                && requests.All(r => r.Interface != iface))
+                requests.Add(new Request(iface, via));
+        return requests;
+    }
+
     /// <summary>The refusal of <c>Identity</c> to a struct or an enum, said alike where the
     /// synthesis meets it and where a block written by hand does.</summary>
     public static string IdentityOfAValue(string name) =>

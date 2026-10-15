@@ -45,6 +45,7 @@ public sealed class Resolver
         foreach (var module in _comp.Modules) ResolveImports(module);
         if (_comp.Lyric5Modules) CheckOneNamespace();
         DetectImportCycles();
+        foreach (var module in _comp.Modules) SynthesizeImplied(module);
         foreach (var module in _comp.Modules) BindTypeNames(module);
         ResolveExtensionTargets();
         _comp.Extensions.BuildIndex();
@@ -233,6 +234,86 @@ public sealed class Resolver
     }
 
     /// <summary>
+    /// The conformances an interface of the program implies for a type that lists it (05 §14
+    /// rule 5; the sweep after M10, W7b): <c>struct Start :: [Args]</c> under
+    /// <c>interface Args :: [Default]</c> has <c>default</c> synthesized as <c>:: [Default]</c>
+    /// would — after the imports, since the interface may be another module's. The compiler
+    /// writes <c>Default</c> and <c>Display</c>; the std.core defaults a parent brings are
+    /// inherited as every default is (05 §1 rule 3) and need no block. The listed node stays in
+    /// the type's list: the block adds to what the list implies.
+    /// </summary>
+    private readonly HashSet<(ModuleSymbol Module, string Type, string Interface)> _synthesized = new();
+
+    /// <summary>Whether the type's module gives it the interface in a block of its own — written,
+    /// or synthesized in pass 1 for the listed node, which then left the list.</summary>
+    private bool GivenByABlock(ModuleSymbol module, string type, string iface) =>
+        _synthesized.Contains((module, type, iface))
+        || _comp.AstOf(module).Declarations.OfType<ExtendDecl>().Any(ex =>
+            ex.Target is NamedType { Path: var path } && path[^1] == type
+            && ex.Interfaces.Any(n => n is NamedType { Path: [var only] } && only == iface));
+
+    private void SynthesizeImplied(ModuleSymbol module)
+    {
+        var streamsHash = _comp.Modules.Any(m => m.FullName == "std.core"
+            && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Hashable" } h
+                && h.Members.Any(f => f.Name == "hash" && f.Generics.Length == 1)));
+        foreach (var decl in _comp.AstOf(module).Declarations)
+        {
+            string name; GenericParam[] generics; TypeNode[] interfaces; FieldDecl[] fields; EnumVariant[]? variants; IEnumerable<FunctionDecl> methods;
+            switch (decl)
+            {
+                case StructDecl s: (name, generics, interfaces, fields, variants, methods) = (s.Name, s.Generics, s.Interfaces, s.Members.OfType<FieldDecl>().ToArray(), null, s.Members.OfType<FunctionDecl>()); break;
+                case ClassDecl c: (name, generics, interfaces, fields, variants, methods) = (c.Name, c.Generics, c.Interfaces, c.Members.OfType<FieldDecl>().ToArray(), null, c.Members.OfType<FunctionDecl>()); break;
+                case EnumDecl e: (name, generics, interfaces, fields, variants, methods) = (e.Name, e.Generics, e.Interfaces, [], e.Variants, e.Methods); break;
+                default: continue;
+            }
+            var implied = new List<(string Interface, TypeNode Via)>();
+            var visited = new HashSet<TypeSymbol>(ReferenceEqualityComparer.Instance);
+            foreach (var node in interfaces.OfType<NamedType>())
+                if (ResolveTypePath(node, module.Members) is { } found && Unwrapped(found) is TypeSymbol { Kind: TypeSymbolKind.Interface } iface)
+                    CollectImplied(iface, node, implied, visited);
+            implied.RemoveAll(i => GivenByABlock(module, name, i.Interface));
+            if (implied.Count == 0) continue;
+            foreach (var request in Synthesis.ImpliedRequests(implied, interfaces, methods))
+            {
+                var text = Synthesis.Block(request, name, generics, fields, variants, decl is ClassDecl, _sm, streamsHash, out var refusal);
+                if (text is null)
+                {
+                    _de.Report("LYR-SEM0135", Severity.Error, request.Node?.Span ?? decl.Span,
+                        $"'{request.Interface}' is not synthesized for '{name}': {refusal} — write the member");
+                    continue;
+                }
+                var id = _sm.AddSynthesized($"<synthesized {request.Interface} for {module.FullName}.{name}>", text,
+                    request.Node?.Span ?? decl.Span, $"in the '{request.Interface}' synthesized for '{name}'");
+                var parsed = new Parser(_sm, id, _de).ParseModule();
+                foreach (var synthesized in parsed.Declarations)
+                    if (synthesized is ExtendDecl block) DeclareExtend(module, block);
+            }
+        }
+    }
+
+    /// <summary>The family's compiler-written interfaces among the parents of <paramref name="iface"/>,
+    /// through the whole chain, each with the listed node it came by.</summary>
+    private void CollectImplied(TypeSymbol iface, TypeNode via, List<(string Interface, TypeNode Via)> implied, HashSet<TypeSymbol> visited)
+    {
+        if (!visited.Add(iface) || iface.Declaration is not InterfaceDecl decl) return;
+        var scope = iface.Members;
+        foreach (var parentNode in decl.Interfaces.OfType<NamedType>())
+        {
+            if (ResolveTypePath(parentNode, scope) is not { } found || Unwrapped(found) is not TypeSymbol { Kind: TypeSymbolKind.Interface } parent) continue;
+            if (parent.Home?.FullName == "std.core" && parent.Name is "Default" or "Display") implied.Add((parent.Name, via));
+            CollectImplied(parent, via, implied, visited);
+        }
+    }
+
+    /// <summary>What an import binding stands for, through every re-export.</summary>
+    private static Symbol Unwrapped(Symbol symbol)
+    {
+        while (symbol is ImportBindingSymbol { Target: { } target }) symbol = target;
+        return symbol;
+    }
+
+    /// <summary>
     /// Conformance synthesis (04 D7) for one type declaration: every listed interface of the
     /// family without its member written, and <c>Debug</c> unasked, become an extend block of
     /// this module — written as source, parsed, declared like any block — and the listed node
@@ -255,6 +336,7 @@ public sealed class Resolver
         var taken = new HashSet<TypeNode>(ReferenceEqualityComparer.Instance);
         foreach (var request in requests)
         {
+            _synthesized.Add((module, name, request.Interface));
             var text = Synthesis.Block(request, name, generics, fields, variants, decl is ClassDecl, _sm, streamsHash, out var refusal);
             if (text is null)
             {
