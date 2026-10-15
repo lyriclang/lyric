@@ -3227,6 +3227,13 @@ public sealed class TypeChecker
                 _de.Report("LYR-SEM0100", Severity.Error, fo.Iterable.Span,
                     $"a 'comptime for' walks an array its site computes — this one is '{TypeFacts.Display(iterType)}'");
         }
+        // 'comptime for (p in m.parameters)' (X4): the body once per parameter of the member's function
+        if (fo.Comptime && fo.Pattern is null && fo.Iterable is ComptimeExpr { Inner: MemberExpr { Member: "parameters", Target: IdentifierExpr overParams } }
+            && RoundVariable(overParams, scope) is { } overMember && iterType is ArrayOf paramArray)
+        {
+            CheckParameterLoop(fo, overMember, paramArray.Element, scope);
+            return;
+        }
         // 'comptime for (p in v.payload)' (M9a S10): the body once per field of the variant's payload
         if (fo.Comptime && fo.Pattern is null && fo.Iterable is ComptimeExpr { Inner: MemberExpr { Member: "payload", Target: IdentifierExpr over } }
             && RoundVariable(over, scope) is { } overVariant && iterType is ArrayOf payloadArray)
@@ -7124,7 +7131,7 @@ public sealed class TypeChecker
         var args = ArrangeArguments(call, decl);
         _callees.Add(call.Callee);
         if (_currentModule is { } asker && IsMetaQuery(fsym)) _result.SetMetaFrom(call, asker);
-        if (IsMetaQuery(fsym) && fsym!.Name is "attribute" or "variantAttribute" or "memberAttribute") _metaAttributeCalls.Add(call);
+        if (IsMetaQuery(fsym) && fsym!.Name is "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute") _metaAttributeCalls.Add(call);
         // 'typeAttribute<Alias, A>()' (R4; the sweep after M10, W6): the alias's own attributes, not
         // its target's — the written name is kept, since the type argument resolves through the alias
         if (IsMetaQuery(fsym) && fsym!.Name == "typeAttribute" && call.TypeArguments is [NamedType aliasName, ..]
@@ -12043,7 +12050,8 @@ public sealed class TypeChecker
                 // later stands in a body checked once and never built — its site is the rounds'.
                 case IdentifierExpr known when _result.RefOf(known) is LocalSymbol round
                                               && (_result.KnownFieldOf(round) is not null || _result.KnownVariantOf(round) is not null
-                                                  || _result.KnownMemberOf(round) is not null || _metaPending.Contains(round)):
+                                                  || _result.KnownMemberOf(round) is not null || _result.KnownParamOf(round) is not null
+                                                  || _metaPending.Contains(round)):
                     if (_metaPending.Contains(round)) pure = false;
                     return;
                 // a question to std.meta about a type known per instance, inside a larger site
@@ -12390,7 +12398,7 @@ public sealed class TypeChecker
     /// <summary>A question of std.meta (09 A7): a function of its without a body, which the
     /// compiler answers.</summary>
     private static bool IsMetaQuery(Symbol? symbol) =>
-        symbol is FunctionSymbol { Declaration: FunctionDecl { Body: null }, Name: "fields" or "members" or "attribute" or "variantAttribute" or "memberAttribute" or "typeAttribute" or "variants" or "conformances" or "hasConformance" or "typeName" or "isStruct" or "isClass" or "isEnum" or "isInterface" }
+        symbol is FunctionSymbol { Declaration: FunctionDecl { Body: null }, Name: "fields" or "members" or "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute" or "typeAttribute" or "variants" or "conformances" or "hasConformance" or "typeName" or "isStruct" or "isClass" or "isEnum" or "isInterface" }
         && symbol.Home is { FullName: "std.meta" or "std.core" };
 
     /// <summary>
@@ -12411,8 +12419,8 @@ public sealed class TypeChecker
         var about = _result.TypeArgumentsOf(asked) is [var only, ..] ? only : LyrType.Error;
         var reads = Descendants(fo.Body).Any(n => n is FieldByInfoExpr or PayloadByInfoExpr or TypeTestExpr or VariantInitExpr or ComptimeIfExpr
             or StructInitRound or ComptimeExpr or IfStmt { Comptime: true } or ForInStmt { Comptime: true }
-            || n is CallExpr { Callee: IdentifierExpr { Name: "attribute" or "variantAttribute" or "memberAttribute" }
-                                   or MemberExpr { Member: "attribute" or "variantAttribute" or "memberAttribute" } });
+            || n is CallExpr { Callee: IdentifierExpr { Name: "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute" }
+                                   or MemberExpr { Member: "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute" } });
         var overFields = question?.Name == "fields";
         var overVariants = question?.Name == "variants";
         var overMembers = question?.Name == "members";
@@ -12524,6 +12532,7 @@ public sealed class TypeChecker
                 {
                     "variantAttribute" => _result.KnownVariantOf(round) is not null,
                     "memberAttribute" => _result.KnownMemberOf(round) is not null,
+                    "parameterAttribute" => _result.KnownParamOf(round) is not null,
                     _ => _result.KnownFieldOf(round) is not null,
                 } || _metaPendingEver.Contains(round)))
             return;
@@ -12531,6 +12540,7 @@ public sealed class TypeChecker
         {
             "variantAttribute" => ("variant", "std.meta.variants"),
             "memberAttribute" => ("member", "std.meta.members"),
+            "parameterAttribute" => ("parameter", "a member's parameters"),
             _ => ("field", "std.meta.fields"),
         };
         _de.Report("LYR-SEM0185", Severity.Error, call.Span,
@@ -12541,7 +12551,8 @@ public sealed class TypeChecker
     /// <summary>The attributes of what a round's variable holds — its field's, variant's or
     /// member's —, or none where it is pending.</summary>
     private AttributeNode[]? RoundAttributesOf(LocalSymbol round) =>
-        _result.KnownFieldOf(round)?.Attributes ?? _result.KnownVariantOf(round)?.Attributes ?? _result.KnownMemberOf(round)?.Attributes;
+        _result.KnownFieldOf(round)?.Attributes ?? _result.KnownVariantOf(round)?.Attributes ?? _result.KnownMemberOf(round)?.Attributes
+        ?? _result.KnownParamOf(round)?.Attributes;
 
     /// <summary><c>e.[f]</c> (09 A7 R2; M9a S9): in a round, the field whose info <c>f</c> holds —
     /// the member access it is, checked as one; in a body checked once whose rounds come later,
@@ -12650,7 +12661,7 @@ public sealed class TypeChecker
     private LocalSymbol? RoundVariable(Expr e, SymbolTable scope) =>
         e is IdentifierExpr id && scope.Lookup(id.Name) is LocalSymbol local
         && (_result.KnownFieldOf(local) is not null || _result.KnownVariantOf(local) is not null || _result.KnownMemberOf(local) is not null
-            || _metaPendingEver.Contains(local))
+            || _result.KnownParamOf(local) is not null || _metaPendingEver.Contains(local))
             ? local : null;
 
     /// <summary>The five of 05 §14 and <c>TotalOrder</c> (09 A5; M9a S10): their defaults in
@@ -12714,6 +12725,43 @@ public sealed class TypeChecker
 
     private const string RoundsMessage =
         "in a round of its own — here there is none: the type is known only per instance, or this is no such loop's variable";
+
+    /// <summary><c>comptime for (p in m.parameters)</c> (the sweep after M10, X4): the body once per
+    /// parameter of the function the member round names, <c>p</c> that parameter's info —
+    /// <c>parameterAttribute&lt;A&gt;(p)</c> what it carries. Where <c>m</c> is pending, the body is
+    /// checked once and the rounds come with <c>m</c>'s.</summary>
+    private void CheckParameterLoop(ForInStmt fo, LocalSymbol over, LyrType element, SymbolTable scope)
+    {
+        var known = _result.KnownMemberOf(over);
+        var loopScope = new SymbolTable(scope);
+        var loopVar = new LocalSymbol(fo.Variable, element, false, fo);
+        loopScope.TryDeclare(loopVar);
+        _result.BindRef(fo, loopVar);
+        _metaPending.Add(loopVar);
+        _metaPendingEver.Add(loopVar);
+        var errorsBefore = _de.ErrorCount;
+        CheckBlock(fo.Body, loopScope);
+        _metaPending.Remove(loopVar);
+        if (known is null || _de.ErrorCount != errorsBefore || _outerFunction is null) return;
+        var owner = _roundOwner[over];
+        var built = new List<TypeResult.MetaRound>();
+        foreach (var parameter in known.Parameters)
+        {
+            if (ReparsedLoop(fo) is not { } fresh) return;
+            var roundScope = new SymbolTable(scope);
+            var variable = new LocalSymbol(fo.Variable, element, false, fresh);
+            roundScope.TryDeclare(variable);
+            _result.BindRef(fresh, variable);
+            _result.SetKnownParam(variable, parameter);
+            _roundOwner[variable] = owner;
+            _result.SetReparsedOwner(fresh, _outerFunction);
+            using (_de.Within(new DiagnosticNote(fo.Span, $"in the round for the parameter '{parameter.Name}' of '{known.Name}'")))
+                CheckBlock(fresh.Body, roundScope);
+            built.Add(new TypeResult.MetaRound(fresh.Body, variable, new TypeResult.MetaField(parameter.Name, parameter.Type, parameter.Index, Visibility.Public, false, null)));
+            _result.ReparsedRoots.Add(fresh);
+        }
+        _result.SetMetaRounds(fo, [.. built]);
+    }
 
     /// <summary><c>comptime for (p in v.payload)</c> (M9a S10): the body once per field of the
     /// variant's payload, <c>p</c> that field's info — <c>e.[v, p]</c> the field, <c>[p] = …</c>
@@ -12832,18 +12880,24 @@ public sealed class TypeChecker
                 if (_result.KnownVariantOf(rv) is { } v)
                     return m.Member switch { "index" => (long)v.Index, "name" => v.Name, _ => null };
                 if (_result.KnownMemberOf(rv) is { } km)
-                    return m.Member switch { "name" => km.Name, "isStatic" => km.IsStatic, "isMut" => km.IsMut, _ => null };
+                    return m.Member switch { "name" => km.Name, "isStatic" => km.IsStatic, "isMut" => km.IsMut, "kind" => new KindMark(km.Kind), _ => null };
+                if (_result.KnownParamOf(rv) is { } kp)
+                    return m.Member switch { "name" => kp.Name, "index" => (long)kp.Index, "hasDefault" => kp.HasDefault, _ => null };
                 return null;
             // 'f.type.kind' (W9): the kind of the field's type, decided against a 'TypeKind'
             case MemberExpr { Target: MemberExpr { Target: IdentifierExpr kid, Member: "type", IsOptional: false }, Member: "kind", IsOptional: false }
                 when RoundVariable(kid, scope) is { } krv && _result.KnownFieldOf(krv) is { } kf:
                 touched = true;
                 return new KindMark(TypeFacts.TypeKindNameOf(kf.Type));
-            case ImplicitMemberExpr { Name: var shortKind } when Array.IndexOf(TypeFacts.TypeKindNames, shortKind) >= 0:
+            case ImplicitMemberExpr { Name: var shortKind }
+                when Array.IndexOf(TypeFacts.TypeKindNames, shortKind) >= 0 || Array.IndexOf(TypeFacts.MemberKindNames, shortKind) >= 0:
                 return new KindMark(shortKind);
             case MemberExpr { Target: IdentifierExpr { Name: "TypeKind" }, Member: var fullKind, IsOptional: false }
                 when Array.IndexOf(TypeFacts.TypeKindNames, fullKind) >= 0:
                 return new KindMark(fullKind);
+            case MemberExpr { Target: IdentifierExpr { Name: "MemberKind" }, Member: var memberKind, IsOptional: false }
+                when Array.IndexOf(TypeFacts.MemberKindNames, memberKind) >= 0:
+                return new KindMark(memberKind);
             // 'f.type.name' (M10 S2): the field's type as 'typeName' writes it
             case MemberExpr { Target: MemberExpr { Target: IdentifierExpr tid, Member: "type", IsOptional: false }, Member: "name", IsOptional: false }
                 when RoundVariable(tid, scope) is { } trv && _result.KnownFieldOf(trv) is { } tf:
@@ -13250,20 +13304,45 @@ public sealed class TypeChecker
     private TypeResult.MetaMember[] MetaMembersOf(LyrType type, ModuleSymbol? from)
     {
         if (TypeFacts.SymbolOf(type) is not { } ts) return [];
-        IEnumerable<FunctionDecl> own = ts.Declaration switch
+        // the functions, the constants and the associated types of its own body, in the order
+        // written (X4)
+        IEnumerable<Decl> own = ts.Declaration switch
         {
-            StructDecl s => s.Members.OfType<FunctionDecl>(),
-            ClassDecl c => c.Members.OfType<FunctionDecl>(),
-            EnumDecl e => e.Methods,
-            InterfaceDecl i => i.Members,
+            StructDecl s => s.Members.Where(m => m is FunctionDecl or StaticBindingDecl or AssociatedTypeDecl),
+            ClassDecl c => c.Members.Where(m => m is FunctionDecl or StaticBindingDecl or AssociatedTypeDecl),
+            EnumDecl e => [.. e.Methods, .. e.Statics, .. e.Types],
+            InterfaceDecl i => [.. i.Members, .. i.Statics, .. i.Types],
             _ => [],
         };
+        var subst = type is GenericInstance gi ? SubstMap(gi) : EmptySubst;
         var members = new List<TypeResult.MetaMember>();
-        foreach (var fn in own)
+        foreach (var decl in own.OrderBy(d => d.Span.Start))
         {
-            if (ts.Members.FunctionFor(fn.Name, fn) is not { } symbol) continue;
-            if (from is not null && !_comp.Visible(symbol, from)) continue;
-            members.Add(new(fn.Name, symbol.Visibility, fn.IsStatic, fn.IsMut) { Declaration = fn });
+            switch (decl)
+            {
+                case FunctionDecl fn:
+                {
+                    if (ts.Members.FunctionFor(fn.Name, fn) is not { } symbol) continue;
+                    if (from is not null && !_comp.Visible(symbol, from)) continue;
+                    var signature = FnTypeOf(symbol);
+                    var parameters = fn.Parameters.Select((p, i) => new TypeResult.MetaParam(p.Name,
+                        i < signature.Parameters.Length ? (type is GenericInstance ? Substitute(signature.Parameters[i], subst) : signature.Parameters[i]) : LyrType.Error,
+                        i, p)).ToArray();
+                    members.Add(new(fn.Name, symbol.Visibility, fn.IsStatic, fn.IsMut) { Declaration = fn, Parameters = parameters });
+                    break;
+                }
+                case StaticBindingDecl constant:
+                {
+                    var symbol = ts.Members.LookupLocal(constant.Name);
+                    if (symbol is not null && from is not null && !_comp.Visible(symbol, from)) continue;
+                    var word = symbol is GlobalSymbol global ? global.Visibility : Visibility.Public;
+                    members.Add(new(constant.Name, word, true, false) { Declaration = constant, Kind = "Constant" });
+                    break;
+                }
+                case AssociatedTypeDecl associated:
+                    members.Add(new(associated.Name, Visibility.Public, true, false) { Declaration = associated, Kind = "AssociatedType" });
+                    break;
+            }
         }
         return [.. members];
     }

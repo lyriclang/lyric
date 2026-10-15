@@ -2750,6 +2750,8 @@ internal sealed class FunctionLowerer
             return EmitComptimeValue(VariantInfoConst(knownVariant), LowerType(variantRound.Type, expr.Span), expr.Span);
         if (symbol is LocalSymbol memberRound && _types.KnownMemberOf(memberRound) is { } knownMember && !_slots.TryLookup(memberRound, out _))
             return EmitComptimeValue(MemberInfoConst(knownMember), LowerType(memberRound.Type, expr.Span), expr.Span);
+        if (symbol is LocalSymbol paramRound && _types.KnownParamOf(paramRound) is { } knownParam && !_slots.TryLookup(paramRound, out _))
+            return EmitComptimeValue(ParameterInfoConst(knownParam), LowerType(paramRound.Type, expr.Span), expr.Span);
 
         // A parameter of the CALLEE, named in a default that is being lowered at this call site
         // (04 D5 F2): the argument materialized for it.
@@ -5692,7 +5694,8 @@ internal sealed class FunctionLowerer
     {
         ["FieldInfo"] = ["name", "type", "index", "visibility", "isVar", "hasDefault"],
         ["VariantInfo"] = ["name", "index", "payload"],
-        ["MemberInfo"] = ["name", "visibility", "isStatic", "isMut"],
+        ["MemberInfo"] = ["name", "visibility", "isStatic", "isMut", "kind", "parameters"],
+        ["ParameterInfo"] = ["name", "type", "index", "hasDefault"],
         ["Type"] = ["name", "kind"],
     };
 
@@ -5708,6 +5711,7 @@ internal sealed class FunctionLowerer
                 if (_types.KnownFieldOf(round) is { } known) return FieldInfoConst(known);
                 if (_types.KnownVariantOf(round) is { } variant) return VariantInfoConst(variant);
                 if (_types.KnownMemberOf(round) is { } member) return MemberInfoConst(member);
+                if (_types.KnownParamOf(round) is { } parameter) return ParameterInfoConst(parameter);
                 return null;
             case MemberExpr m when RoundInfoConst(m.Target) is StructConst s
                 && SubstituteType(_types.TypeOf(m.Target)) is NamedRef { Symbol: { } info } && info.Home?.FullName == "std.core"
@@ -6962,7 +6966,7 @@ internal sealed class FunctionLowerer
     /// <summary>The question to std.meta a call asks — a function of its without a body — or none.</summary>
     private FunctionSymbol? MetaQueryOf(CallExpr call) =>
         (_types.RefOf(call.Callee) is ImportBindingSymbol { Target: var target } ? target : _types.RefOf(call.Callee))
-            is FunctionSymbol { Declaration: FunctionDecl { Body: null }, Name: "fields" or "members" or "attribute" or "variantAttribute" or "memberAttribute" or "typeAttribute" or "variants" or "conformances" or "hasConformance" or "typeName" or "isStruct" or "isClass" or "isEnum" or "isInterface" } query
+            is FunctionSymbol { Declaration: FunctionDecl { Body: null }, Name: "fields" or "members" or "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute" or "typeAttribute" or "variants" or "conformances" or "hasConformance" or "typeName" or "isStruct" or "isClass" or "isEnum" or "isInterface" } query
         && query.Home is { FullName: "std.meta" or "std.core" }
             ? query
             : null;
@@ -7017,9 +7021,15 @@ internal sealed class FunctionLowerer
     private static IrConstValue VariantInfoConst(TypeResult.MetaVariant variant) => new StructConst(
         [new StringConst(variant.Name), new IntConst((ulong)variant.Index), new ArrayConst([.. variant.Payload.Select(FieldInfoConst)])]);
 
-    /// <summary>std.meta's <c>MemberInfo</c> — name, visibility, isStatic, isMut — of a member.</summary>
+    /// <summary>std.meta's <c>MemberInfo</c> — name, visibility, isStatic, isMut, kind, parameters — of a member.</summary>
     private static IrConstValue MemberInfoConst(TypeResult.MetaMember member) => new StructConst(
-        [new StringConst(member.Name), VisibilityConst(member.Visibility), new BoolConst(member.IsStatic), new BoolConst(member.IsMut)]);
+        [new StringConst(member.Name), VisibilityConst(member.Visibility), new BoolConst(member.IsStatic), new BoolConst(member.IsMut),
+         new VariantConst(Array.IndexOf(TypeFacts.MemberKindNames, member.Kind), []),
+         new ArrayConst([.. member.Parameters.Select(ParameterInfoConst)])]);
+
+    /// <summary>std.meta's <c>ParameterInfo</c> — name, type, index, hasDefault — of a parameter (X4).</summary>
+    private static IrConstValue ParameterInfoConst(TypeResult.MetaParam parameter) => new StructConst(
+        [new StringConst(parameter.Name), TypeConst(parameter.Type), new IntConst((ulong)parameter.Index), new BoolConst(parameter.HasDefault)]);
 
     /// <summary>std.meta's <c>Visibility</c>: <c>Pub</c>, <c>Internal</c>, <c>Private</c>.</summary>
     private static IrConstValue VisibilityConst(Visibility visibility) =>
@@ -7043,6 +7053,7 @@ internal sealed class FunctionLowerer
             "attribute" => round is not null ? _types.KnownFieldOf(round)?.Attributes ?? [] : [],
             "variantAttribute" => round is not null ? _types.KnownVariantOf(round)?.Attributes ?? [] : [],
             "memberAttribute" => round is not null ? _types.KnownMemberOf(round)?.Attributes ?? [] : [],
+            "parameterAttribute" => round is not null ? _types.KnownParamOf(round)?.Attributes ?? [] : [],
             _ => _types.AliasAskedOf(call) is { } alias ? alias.Attributes
                 : SubstitutedTypeArguments(call) is [var holder, ..] && TypeFacts.SymbolOf(holder)?.Declaration is { } declared
                     ? AttributesOf(declared)
@@ -7747,7 +7758,7 @@ internal sealed class FunctionLowerer
 
         // a question to std.meta (09 A7; M9a S9): a constant of the type asked about, here
         if (MetaQueryOf(expr) is { } metaQuery)
-            return metaQuery.Name is "attribute" or "variantAttribute" or "memberAttribute" or "typeAttribute"
+            return metaQuery.Name is "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute" or "typeAttribute"
                 ? LowerAttributeQuery(expr, metaQuery)
                 : EmitComptimeValue(MetaAnswer(expr, metaQuery), TypeOfExpr(expr), expr.Span);
 

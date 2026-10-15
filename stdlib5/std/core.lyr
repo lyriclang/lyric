@@ -5295,20 +5295,38 @@ pub struct VariantInfo :: [Equatable, Debug] {
     pub payload: FieldInfo[],
 }
 
-/// A function of a type's own body: its name, its word, whether it is static, whether it is `mut`.
+/// What a member of a type's own body is (the sweep after M10, X4): a function, a constant — a
+/// `static let` —, an associated type.
+pub enum MemberKind :: [Equatable, Debug] { Function, Constant, AssociatedType }
+
+/// A parameter of a function, in declaration order (X4): its name, its type, its place, and whether
+/// its declaration writes a default; in a round over it, `parameterAttribute<A>(p)` reads what it
+/// carries.
+pub struct ParameterInfo :: [Equatable, Debug] {
+    pub name: string,
+    pub type: Type,
+    pub index: int,
+    pub hasDefault: bool,
+}
+
+/// A member of a type's own body: its name, its word, whether it is static, whether it is `mut`,
+/// what it is, and a function's parameters — none for a constant or an associated type, both of
+/// which are static.
 pub struct MemberInfo :: [Equatable, Debug] {
     pub name: string,
     pub visibility: Visibility,
     pub isStatic: bool,
     pub isMut: bool,
+    pub kind: MemberKind,
+    pub parameters: ParameterInfo[],
 }
 
 /// The fields of a struct or a class that the asking code may name, in declaration order; none
 /// for any other type.
 pub fn fields<T>(): FieldInfo[];
 
-/// The functions of a type's own body that the asking code may name, in declaration order — a
-/// block's members are the block's.
+/// The functions, constants and associated types of a type's own body that the asking code may
+/// name, in declaration order — a block's members are the block's.
 pub fn members<T>(): MemberInfo[];
 
 /// The attribute `A` the field `f` carries, its value — none where it carries none (R4). `f` is
@@ -5322,6 +5340,10 @@ pub fn variantAttribute<A>(v: VariantInfo): ?A;
 /// The attribute `A` the member `m` carries, its value — none where it carries none. `m` is the
 /// variable of a `comptime for` over `members`, read in its round.
 pub fn memberAttribute<A>(m: MemberInfo): ?A;
+
+/// The attribute `A` the parameter `p` carries, its value — none where it carries none. `p` is the
+/// variable of a `comptime for` over a member's `parameters`, read in its round (X4).
+pub fn parameterAttribute<A>(p: ParameterInfo): ?A;
 
 /// The attribute `A` the declaration of `T` carries, its value; none where it carries none. A `T`
 /// written as an alias answers with the alias's own attributes, not its target's.

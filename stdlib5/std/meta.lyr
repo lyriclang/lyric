@@ -9,8 +9,10 @@
 /// (M9a S10); one over `members<T>()` once per member. A field is listed where the code that asks
 /// may name it (R7): an interface of another package sees the `pub` fields alone. What a
 /// declaration carries, a round reads: `attribute<A>(f)` of a field — a payload's too —,
-/// `variantAttribute<A>(v)` of a variant, `memberAttribute<A>(m)` of a member, and
-/// `typeAttribute<T, A>()` of a type, an interface or an alias.
+/// `variantAttribute<A>(v)` of a variant, `memberAttribute<A>(m)` of a member — a function, a
+/// constant, an associated type —, `parameterAttribute<A>(p)` of a parameter in a round over
+/// `m.parameters`, and `typeAttribute<T, A>()` of a type, an interface or an alias. What stands at a
+/// module's top level a macro reads through std.syntax.
 ///
 /// The questions and the infos are declared in std.core, whose synthesized members (05 §14; 09 A5)
 /// are written over them and which imports nothing: this module is their name to the program.
@@ -21,11 +23,14 @@ pub import std.core {
     FieldInfo,
     VariantInfo,
     MemberInfo,
+    MemberKind,
+    ParameterInfo,
     fields,
     members,
     attribute,
     variantAttribute,
     memberAttribute,
+    parameterAttribute,
     typeAttribute,
     variants,
     conformances,
