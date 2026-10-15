@@ -83,7 +83,7 @@ public class CEmitterTests
     [InlineData("valueblocks")]
     public void The_emission_matches_its_golden(string name)
     {
-        var actual = CEmitter.Join(EmitC(name));
+        var actual = WithoutStdLines(CEmitter.Join(EmitC(name)));
         var path = Path.Combine(Golden, name + ".c");
         if (Environment.GetEnvironmentVariable("LYRIC_UPDATE_SNAPSHOTS") == "1")
         {
@@ -92,6 +92,30 @@ public class CEmitterTests
         }
         Assert.True(File.Exists(path), $"no golden at {path}; set LYRIC_UPDATE_SNAPSHOTS=1 to write it");
         Assert.Equal(File.ReadAllText(path).Replace("\r\n", "\n"), actual);
+    }
+
+    /// <summary>
+    /// The emission with the line numbers of <c>#line</c> directives into the standard library
+    /// replaced by <c>_</c> (the sweep after M10, X1): a declaration added to std.core moved every
+    /// such line in every golden (45 files in W10) and the goldens said nothing about the program.
+    /// The lines into the program's own files stay, and so does the file each directive names.
+    /// </summary>
+    internal static string WithoutStdLines(string c)
+    {
+        var lines = c.Split('\n');
+        var inStd = false;
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (!line.StartsWith("#line ", StringComparison.Ordinal)) continue;
+            var rest = line.AsSpan(6);
+            var space = rest.IndexOf(' ');
+            var number = space < 0 ? rest : rest[..space];
+            if (number.Length == 0 || !int.TryParse(number, out _)) continue;
+            if (space >= 0) inStd = rest[(space + 1)..].StartsWith("\"stdlib5/", StringComparison.Ordinal);
+            if (inStd) lines[i] = "#line _" + (space < 0 ? "" : rest[space..].ToString());
+        }
+        return string.Join('\n', lines);
     }
 
     private const string TUPLES_EXPECTED =

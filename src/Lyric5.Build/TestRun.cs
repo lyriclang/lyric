@@ -51,7 +51,9 @@ public static class TestRun
     }
 
     /// <summary>The program built for <paramref name="target"/> and run — on this machine only; for
-    /// another, the binary is built and named, as <c>run</c> does (14 §1.1), exit 2.</summary>
+    /// another, the binary is built and named, as <c>run</c> does (14 §1.1), exit 2. It runs in the
+    /// package's directory, wherever <c>lyric</c> was called (14 §3 rule 1, §4 rule 1; the sweep after
+    /// M10, X1): a test reads its package's files by their paths in it, as cargo's do.</summary>
     internal static int BuildAndRun(Project program, BuildProfile profile, Target target, CCompiler compiler, string version,
         TextWriter output, TextWriter error)
     {
@@ -62,7 +64,7 @@ public static class TestRun
             error.WriteLine($"error[LYR-CLI0003]: '{target.Triple}' is not this machine; the binary is at {built}");
             return 2;
         }
-        return ProcessRunner.Stream(built, [], output, error);
+        return ProcessRunner.Stream(built, [], output, error, program.Manifest?.Root ?? program.Root);
     }
 
     /// <summary>

@@ -28,6 +28,22 @@ public class TestCommandTests
     private static string App(params (string Path, string Text)[] more) =>
         Package([("lyric.toml", AppManifest), ("src/math.lyr", MathModule), ("tests/arith.lyr", ArithTests), .. more]);
 
+    /// <summary>14 §3 rule 1 (the sweep after M10, X1): the program runs in the package's directory,
+    /// wherever <c>lyric</c> is called — here from the test assembly's — so a test reads its
+    /// package's files by their paths in it.</summary>
+    [Fact]
+    public void A_test_runs_in_its_packages_directory()
+    {
+        var dir = App(("tests/data/greeting.txt", "hello"), ("tests/files.lyr",
+            "import std.fs;\nimport std.test { assertEq };\n\n"
+            + "@Test\nfn readsByThePathInThePackage(): void throws Error {\n"
+            + "    assertEq(try fs.readText(\"tests/data/greeting.txt\"), \"hello\");\n}\n"));
+        Assert.NotEqual(Path.GetFullPath(dir), Path.GetFullPath(Environment.CurrentDirectory));
+        var (exit, output, error) = Run("test", "-C", dir, "-f", "readsByThePathInThePackage");
+        Assert.True(exit == 0, output + error);
+        Assert.Contains("ok    app.tests.files.readsByThePathInThePackage", output);
+    }
+
     [Fact]
     public void Tests_beside_the_code_and_under_tests_run_in_the_order_of_their_modules()
     {

@@ -69,6 +69,23 @@ public class BenchCommandTests
             Lines(output)[0]);
     }
 
+    /// <summary>14 §4 rule 1 (the sweep after M10, X1): the program runs in the package's directory,
+    /// as a test's does; a file it saves to stays where the command line named it.</summary>
+    [Fact]
+    public void A_benchmark_runs_in_its_packages_directory()
+    {
+        const string Here =
+            "import std.core { blackBox };\nimport std.fs;\n\n"
+            + "@Bench\nfn inThePackage(&b: Bench): void {\n    if (!fs.exists(\"lyric.toml\")) {\n"
+            + "        panic(\"not in the package's directory\");\n    }\n"
+            + "    b.iter {\n        let _ = blackBox(1);\n    }\n}\n";
+        var dir = App(("tests/here.lyr", Here));
+        var saved = Path.Combine(Package(("x", "")), "here.txt");
+        var (exit, output, error) = Run("bench", "-C", dir, "--save", saved);
+        Assert.True(exit == 0, output + error);
+        Assert.Single(File.ReadAllLines(saved));
+    }
+
     [Fact]
     public void A_file_to_compare_with_that_is_not_there_is_exit_1()
     {
