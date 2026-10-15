@@ -1276,6 +1276,7 @@ public sealed class AstFormatter
     {
         NamedType n => Doc.Of(Doc.From(string.Join(".", n.Path)), TypeArgsDoc(n.TypeArguments, n.ArgumentNames)),
         NullableType n => Doc.Of(Doc.From("?"), TypeDoc(n.Inner)),
+        FieldTypeByInfo n => Doc.Of(TypeDoc(n.Owner), Doc.From(".[" + n.Info + "]")),
         ThrowingType n => n.Thrown is { } thrown
             ? Doc.Of(TypeDoc(n.Inner), Doc.From(" throws "), TypeDoc(thrown))
             : Doc.Of(TypeDoc(n.Inner), Doc.From(" throws")),

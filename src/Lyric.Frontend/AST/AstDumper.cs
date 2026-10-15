@@ -171,6 +171,10 @@ public static class AstDumper
                 Line(sb, indent, "Nullable", n.Span);
                 Write(n.Inner, indent + 1, sb);
                 break;
+            case FieldTypeByInfo n:
+                Line(sb, indent, $"TypeByInfo [{n.Info}]", n.Span);
+                Write(n.Owner, indent + 1, sb);
+                break;
             case ThrowingType n:
                 Line(sb, indent, n.Thrown is null ? "Throwing (any)" : "Throwing", n.Span);
                 Write(n.Inner, indent + 1, sb);

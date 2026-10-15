@@ -67,3 +67,8 @@ public sealed record FunctionType(TypeNode[] Parameters, TypeNode ReturnType, Sp
 // Recovery placeholder, set when ParseType cannot continue, so later stages do not meet a null.
 // The counterpart of ErrorExpr.
 public sealed record ErrorType(Span Span) : TypeNode(Span);
+
+/// <summary><c>T.[f]</c> in a type's place (design/v5/spec/09 A7; the sweep after M10, X5): the type of
+/// the field the variable <c>f</c> of a round over <c>fields&lt;T&gt;()</c> names — <c>Owner</c> the
+/// type the round walks, as <c>e.[f]</c> reads that field of a value.</summary>
+public sealed record FieldTypeByInfo(TypeNode Owner, string Info, Span InfoSpan, Span Span) : TypeNode(Span);
