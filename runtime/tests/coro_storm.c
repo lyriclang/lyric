@@ -32,16 +32,23 @@ static const LyrDesc node_desc = { .size = sizeof(Node), .flags = LYR_DESC_HAS_R
 
 static atomic_int collecting_done;
 
+/* The C here stands for compiled code, which polls at every loop's head (13 M11 P5), and a wait
+ * for another thread is a safe region, as the runtime's own waits are: the own collector stops the
+ * world at safepoints, not with signals. */
 static void chain_body(void *arg) {
     int64_t id = (int64_t)(intptr_t)arg;
     Node *head = NULL;
     for (int64_t i = 0; i < LINKS; i++) {
+        LYR_SAFEPOINT();
         Node *node = lyr_alloc(&node_desc);
         node->value = id * 1000 + i;
         LYR_WRITE_BARRIER(node, &node->next, head);
         head = node;
     }
-    while (!atomic_load_explicit(&collecting_done, memory_order_relaxed)) lyr_coro_yield();
+    while (!atomic_load_explicit(&collecting_done, memory_order_relaxed)) {
+        LYR_SAFEPOINT();
+        lyr_coro_yield();
+    }
     int64_t expected = id * 1000 + LINKS - 1;
     int count = 0;
     for (Node *node = head; node != NULL; node = node->next) {
@@ -53,12 +60,14 @@ static void chain_body(void *arg) {
 }
 
 static void pause_briefly(void) {
+    LYR_GC_ENTER_SAFE();
 #ifdef _WIN32
     Sleep(0);
 #else
     struct timespec pause = { 0, 100 * 1000 };  /* 100 µs */
     nanosleep(&pause, NULL);
 #endif
+    LYR_GC_LEAVE_SAFE();
 }
 
 static void collect_repeatedly(void) {
@@ -93,6 +102,7 @@ static int64_t program(void) {
     int64_t switches = 0;
     int running = COROUTINES;
     while (running > 0) {
+        LYR_SAFEPOINT();
         for (int i = 0; i < COROUTINES; i++) {
             if (lyr_coro_status(coroutines[i]) == LYR_CORO_DONE) continue;
             lyr_coro_resume(coroutines[i]);
@@ -100,12 +110,14 @@ static int64_t program(void) {
             if (lyr_coro_status(coroutines[i]) == LYR_CORO_DONE) running--;
         }
     }
+    LYR_GC_ENTER_SAFE();
 #ifdef _WIN32
     WaitForSingleObject(thread, INFINITE);
     CloseHandle(thread);
 #else
     CHECK(pthread_join(thread, NULL) == 0);
 #endif
+    LYR_GC_LEAVE_SAFE();
     CHECK(switches > 1000);
     CHECK(lyr_gc_collections() >= COLLECTIONS);
     lyr_println(lyr_str_from_cstr("coro storm ok"));

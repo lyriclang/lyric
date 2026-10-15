@@ -10,6 +10,7 @@
 #endif
 
 #include "lyr/net.h"
+#include "lyr/gc.h"
 #include "lyr/console.h"
 #include "lyr/fs.h"
 
@@ -415,7 +416,9 @@ int64_t lyr_net_resolve(const LyrStr *host, uint8_t *into, int64_t n) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;  /* one entry an address, not one a kind of socket */
     ADDRINFOW *found = NULL;
+    LYR_GC_ENTER_SAFE();
     int code = GetAddrInfoW(name, NULL, &hints, &found);
+    LYR_GC_LEAVE_SAFE();
     free(name);
     if (code != 0) return code == WSAHOST_NOT_FOUND || code == WSANO_DATA ? failure(LYR_IO_NOT_FOUND, code) : failure(0, code);
     int64_t count = 0;
@@ -449,7 +452,9 @@ int64_t lyr_net_resolve(const LyrStr *host, uint8_t *into, int64_t n) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;  /* one entry an address, not one a kind of socket */
     struct addrinfo *found = NULL;
+    LYR_GC_ENTER_SAFE();
     int code = getaddrinfo(host->bytes, NULL, &hints, &found);
+    LYR_GC_LEAVE_SAFE();
     if (code != 0) return unresolved(code);
     int64_t count = 0;
     for (struct addrinfo *at = found; at != NULL; at = at->ai_next) {

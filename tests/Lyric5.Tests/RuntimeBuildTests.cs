@@ -99,7 +99,8 @@ public class RuntimeBuildTests
     [InlineData(Profile.Release)]
     public void The_collector_smoke_runs_on_the_host(Profile profile)
     {
-        var result = RunTest("gc_smoke", profile);
+        // Boehm's own smoke test: it calls Boehm (13 M11 P11 keeps it to compare against)
+        var result = RunTest("gc_smoke", BuildProfile.Of(profile) with { Gc = Collector.Boehm });
         Assert.Equal(0, result.ExitCode);
         Assert.Equal("gc ok\n", result.Stdout.Replace("\r\n", "\n"));
     }

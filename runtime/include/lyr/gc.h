@@ -35,8 +35,10 @@ LyrStr *lyr_alloc_string(int64_t len);
  * functions promise what they promise under Boehm: memory zeroed (a buffer is zeroed when it is
  * handed out), the header set, the length set. */
 typedef struct LyrMutator {
-    uintptr_t cursor;  /* the buffer's next free byte */
-    uintptr_t limit;   /* its end */
+    uintptr_t cursor;       /* the buffer's next free byte */
+    uintptr_t limit;        /* its end */
+    uintptr_t stack_limit;  /* the prologue's bound (P6): a frame below it stops — the maximum while a
+                               collection asks the thread to stop */
 } LyrMutator;
 
 #if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
@@ -114,6 +116,52 @@ static inline LyrStr *lyr_alloc_string(int64_t len) {
     return string;
 }
 
+/* Safepoints (13 M11 P5): a collection that stops the world sets the flag, and each thread stops at
+ * its next loop back-edge — or at its next function entry, whose check of the stack (P6) the
+ * collection makes fail by setting the thread's bound to the maximum. Compiled code polls; the
+ * runtime's blocking calls are safe regions instead (below). */
+extern int lyr_gc_stop_requested;
+void lyr_gc_safepoint_slow(void);
+
+#define LYR_SAFEPOINT()                                                                  \
+    do {                                                                                 \
+        if (LYR_GC_SLOW(__atomic_load_n(&lyr_gc_stop_requested, __ATOMIC_RELAXED)))       \
+            lyr_gc_safepoint_slow();                                                      \
+    } while (0)
+
+/* The frame's address, not a local's: a local whose address is taken keeps the C compiler from
+ * turning a call in tail position into a jump (measured: clang 21 kept the recursion), and a
+ * program's tail recursion would overflow where it ran in place before. */
+#define LYR_STACK_CHECK()                                                                \
+    do {                                                                                 \
+        if (LYR_GC_SLOW((uintptr_t)__builtin_frame_address(0)                            \
+                        < __atomic_load_n(&lyr_mutator.stack_limit, __ATOMIC_RELAXED)))  \
+            lyr_gc_safepoint_slow();                                                      \
+    } while (0)
+
+/* A safe region: a thread blocked in the system (a poller's wait, a read, a child's end) is
+ * stopped already as far as a collection is concerned — its frames above the region hold still.
+ * Entering saves the callers' registers (a reference held in one stays visible) and where the
+ * frames begin; leaving waits while a collection runs. Inside, the thread touches no object it
+ * does not hold through its frames, and allocates nothing. Used by the runtime around each call
+ * that can block. */
+void lyr_gc_enter_safe(void *marker);
+void lyr_gc_leave_safe(void);
+#define LYR_GC_ENTER_SAFE()                                                              \
+    do {                                                                                 \
+        volatile char lyr_safe_marker_ = 0;                                              \
+        lyr_gc_enter_safe((void *)&lyr_safe_marker_);                                     \
+    } while (0)
+#define LYR_GC_LEAVE_SAFE() lyr_gc_leave_safe()
+
+#endif
+
+#ifdef LYR_GC_BOEHM
+/* Boehm stops the world with signals: no poll, no region. */
+#define LYR_SAFEPOINT() ((void)0)
+#define LYR_STACK_CHECK() ((void)0)
+#define LYR_GC_ENTER_SAFE() ((void)0)
+#define LYR_GC_LEAVE_SAFE() ((void)0)
 #endif
 
 /* Stores a reference into a slot. A plain store in stage 1; stage 3 records old-to-young stores.
@@ -126,9 +174,6 @@ static inline LyrStr *lyr_alloc_string(int64_t len) {
 /* The same for a struct value that holds references, stored whole: every reference word of the
  * value is a reference store. */
 #define LYR_WRITE_BARRIER_VALUE(object, slot, value) ((void)(object), (*(slot) = (value)))
-
-/* A point where a stop-the-world collection may stop this thread. Empty until stage 2. */
-#define LYR_SAFEPOINT() ((void)0)
 
 /* Strong roots for pointers the collector cannot see — held by C code or a host (11 X6 GcHandle).
  * A root keeps its object alive until it is freed. Drop the handle with it: while the collector is

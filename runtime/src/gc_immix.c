@@ -18,8 +18,9 @@
  * descriptors' maps, and leaves the rest to the allocators: a block is looked at again only when
  * one takes it, line by line (P7). Large objects without a mark are freed in the pause.
  *
- * M11 S2 collects only while one thread is attached: the stop of several comes with S3, and until
- * then a program with more threads only grows its heap. */
+ * The world stops at safepoints (P5): compiled code polls at loop back-edges and function entries,
+ * and the runtime's blocking calls are safe regions. A thread stopped either way has its registers
+ * on its stack and its stack scanned from where it stopped. No signal is involved. */
 #if defined(__linux__) && !defined(_GNU_SOURCE)
 #  define _GNU_SOURCE  /* pthread_getattr_np */
 #endif
@@ -38,6 +39,7 @@
 #  include <windows.h>
 #else
 #  include <pthread.h>
+#  include <sched.h>
 #  include <sys/mman.h>
 #  include <unistd.h>
 #endif
@@ -159,7 +161,7 @@ static size_t heap_limit;
  * counted as runs are handed out, by every thread. */
 static atomic_size_t since_collection;
 static size_t budget = MIN_BUDGET;
-static size_t collections;
+static atomic_size_t collections;
 
 static inline size_t granule_of(uintptr_t at) { return (at - heap_base) / GRANULE; }
 static inline size_t line_of(uintptr_t at) { return (at - heap_base) / LINE; }
@@ -435,6 +437,10 @@ typedef struct Buffer {
     uint32_t line;      /* where the search for the block's next run goes on */
 } Buffer;
 
+/* Where a thread stands for a collection: running compiled code (it must be stopped), in a safe
+ * region (blocked in the system: stopped already), or parked at a safepoint. */
+enum { RUNNING, SAFE, PARKED };
+
 typedef struct Thread {
     struct Thread *next, *prev;
     LyrMutator *mutator;   /* the thread's lyr_mutator */
@@ -444,11 +450,61 @@ typedef struct Thread {
     LyrStackCtx *own;      /* coro.c's record of the thread's own stack */
     LyrStackCtx *running;  /* the stack the thread runs on: its own, or a coroutine's */
     void *stack_base;      /* the cold end of its own stack */
+    atomic_int state;
+    uintptr_t stop_sp;     /* SAFE or PARKED: where its frames begin */
+    uintptr_t *saved;      /* SAFE: the frames of the region's entry, copied — the callers' registers */
+    size_t saved_words, saved_capacity;
+    uintptr_t stack_limit; /* its own bound for the prologue's check, put back after a stop */
 } Thread;
 
 _Thread_local LyrMutator lyr_mutator;
 static _Thread_local Thread *self;
-static Thread *threads;
+static Thread *threads;   /* under registry_lock */
+
+/* The thread that has stopped the world: a region it enters during the collection (a warning
+ * written by a coroutine's hook) is no region — it would wait for its own restart. */
+static _Thread_local bool collecting_here;
+
+/* The locks around a collection, taken in this order: one collection at a time (a mutator waits
+ * for it in a safe region); the registry of threads, fixed from the stop to the restart; the heap,
+ * once the world stands (a thread blocked on it is not stopped and would never park). */
+#ifdef _WIN32
+static SRWLOCK collect_lock = SRWLOCK_INIT, registry_lock = SRWLOCK_INIT, stop_lock = SRWLOCK_INIT;
+static CONDITION_VARIABLE restarted = CONDITION_VARIABLE_INIT;
+static void take(SRWLOCK *l) { AcquireSRWLockExclusive(l); }
+static void give(SRWLOCK *l) { ReleaseSRWLockExclusive(l); }
+static void wait_restart(void) { SleepConditionVariableSRW(&restarted, &stop_lock, INFINITE, 0); }
+static void signal_restart(void) { WakeAllConditionVariable(&restarted); }
+#else
+static pthread_mutex_t collect_lock = PTHREAD_MUTEX_INITIALIZER, registry_lock = PTHREAD_MUTEX_INITIALIZER,
+                       stop_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t restarted = PTHREAD_COND_INITIALIZER;
+static void take(pthread_mutex_t *l) { pthread_mutex_lock(l); }
+static void give(pthread_mutex_t *l) { pthread_mutex_unlock(l); }
+static void wait_restart(void) { pthread_cond_wait(&restarted, &stop_lock); }
+static void signal_restart(void) { pthread_cond_broadcast(&restarted); }
+#endif
+
+int lyr_gc_stop_requested;
+
+/* Waits until no stop is asked for. */
+static void wait_for_restart(void) {
+    take(&stop_lock);
+    while (__atomic_load_n(&lyr_gc_stop_requested, __ATOMIC_SEQ_CST)) wait_restart();
+    give(&stop_lock);
+}
+
+/* A thread stopped (SAFE or PARKED) running again: its state set first, the flag read after —
+ * the collector sets the flag first and reads the state after, so one of the two sees the other.
+ * When a stop is asked for meanwhile, the thread goes back to `stopped` and waits for its end. */
+static void resume_running(Thread *t, int stopped) {
+    for (;;) {
+        atomic_store_explicit(&t->state, RUNNING, memory_order_seq_cst);
+        if (!__atomic_load_n(&lyr_gc_stop_requested, __ATOMIC_SEQ_CST)) return;
+        atomic_store_explicit(&t->state, stopped, memory_order_seq_cst);
+        wait_for_restart();
+    }
+}
 
 static Thread *current(void) {
     Thread *t = self;
@@ -1041,6 +1097,19 @@ static void drain(void) {
     }
 }
 
+/* A stopped thread's stacks: the one it runs on from where it stopped, the copy of a safe region's
+ * entry, and its own stack when a coroutine runs on it. */
+static void scan_stopped_thread(Thread *t) {
+    uintptr_t base = (uintptr_t)(t->running != NULL ? t->running->base : t->stack_base);
+    scan_range(t->stop_sp, base);
+    if (atomic_load_explicit(&t->state, memory_order_acquire) == SAFE && t->saved_words > 0) {
+        scan_range((uintptr_t)t->saved, (uintptr_t)(t->saved + t->saved_words));
+    }
+    if (t->own != NULL && t->running != t->own && !t->own->on_cpu && t->own->sp != NULL) {
+        scan_range((uintptr_t)t->own->sp, (uintptr_t)t->own->base);
+    }
+}
+
 /* The stack the calling thread runs on, from here up — its registers spilled first, so a reference
  * held only in one is on the stack too —, and its own stack when a coroutine runs on it. */
 static LYR_NOINLINE LYR_NO_SANITIZE void scan_from_here(Thread *t) {
@@ -1061,6 +1130,9 @@ static LYR_NOINLINE void scan_this_thread(Thread *t) {
 
 static void mark_roots(Thread *t) {
     scan_this_thread(t);
+    for (Thread *other = threads; other != NULL; other = other->next) {
+        if (other != t) scan_stopped_thread(other);
+    }
     for (size_t i = 0; i < globals_count; i++) {
         for (size_t j = 0; j < globals[i].count; j++) mark_word((uintptr_t)*globals[i].slots[j]);
     }
@@ -1194,22 +1266,65 @@ static void unsweep_blocks(void) {
     sweep_end = chunks_taken * (size_t)BLOCKS_PER_CHUNK;
 }
 
-/* A collection, when the calling thread is the only one attached (S2); false otherwise. */
-static bool collect(void) {
-    Thread *t = current();
-    lock();
-    if (threads == NULL || threads->next != NULL) {
-        unlock();
-        return false;
+/* A thread's buffers given up for a collection: what they made parsed, the blocks retired. Its
+ * mutator record is its truth unless it stopped in the slow path. */
+static void give_up_buffers(Thread *t) {
+    if (!t->in_slow_path) {
+        t->small.cursor = t->mutator->cursor;
+        t->small.limit = t->mutator->limit;
     }
-    /* the thread's buffers: what they made parsed, the blocks given up */
-    sync_in(t);
     parse(t, &t->small);
     parse(t, &t->medium);
     retire(&t->small);
     retire(&t->medium);
-    sync_out(t);
     if (!t->in_slow_path) t->mutator->cursor = t->mutator->limit = 0;
+}
+
+/* Every other thread asked to stop and waited for: parked at a safepoint or in a safe region. */
+static void stop_the_world(Thread *t) {
+    __atomic_store_n(&lyr_gc_stop_requested, 1, __ATOMIC_SEQ_CST);
+    for (Thread *other = threads; other != NULL; other = other->next) {
+        if (other != t) __atomic_store_n(&other->mutator->stack_limit, UINTPTR_MAX, __ATOMIC_RELAXED);
+    }
+    for (Thread *other = threads; other != NULL; other = other->next) {
+        if (other == t) continue;
+        for (unsigned spins = 0; atomic_load_explicit(&other->state, memory_order_seq_cst) == RUNNING; spins++) {
+#ifdef _WIN32
+            if (spins > 64) SwitchToThread();
+#else
+            if (spins > 64) sched_yield();
+#endif
+        }
+    }
+}
+
+static void restart_the_world(Thread *t) {
+    for (Thread *other = threads; other != NULL; other = other->next) {
+        if (other != t) __atomic_store_n(&other->mutator->stack_limit, other->stack_limit, __ATOMIC_RELAXED);
+    }
+    take(&stop_lock);
+    __atomic_store_n(&lyr_gc_stop_requested, 0, __ATOMIC_SEQ_CST);
+    signal_restart();
+    give(&stop_lock);
+}
+
+/* A collection of the whole heap, with the world stopped. A thread that finds one under way waits
+ * for it in a safe region and does not collect again: true either way. */
+static bool collect(void) {
+    Thread *t = current();
+    size_t seen = atomic_load(&collections);
+    LYR_GC_ENTER_SAFE();
+    take(&collect_lock);
+    resume_running(t, SAFE);  /* nobody stops the world while this thread holds the lock */
+    if (atomic_load(&collections) != seen) {
+        give(&collect_lock);
+        return true;
+    }
+    take(&registry_lock);
+    stop_the_world(t);
+    collecting_here = true;
+    lock();
+    for (Thread *other = threads; other != NULL; other = other->next) give_up_buffers(other);
 
     /* a new epoch: no line is live until this collection finds it so */
     if (++epoch == 0) {
@@ -1232,9 +1347,70 @@ static bool collect(void) {
     unsweep_blocks();
     atomic_store_explicit(&since_collection, 0, memory_order_relaxed);
     budget = live_bytes > MIN_BUDGET ? live_bytes : MIN_BUDGET;
-    collections++;
+    atomic_fetch_add(&collections, 1);
     unlock();
+    collecting_here = false;
+    restart_the_world(t);
+    give(&registry_lock);
+    give(&collect_lock);
     return true;
+}
+
+/* --- safepoints and safe regions ------------------------------------------------------------- */
+
+/* Parked: the frames above stand still, the registers lie in the frame below (park_here). */
+static LYR_NOINLINE void park_with_registers_saved(Thread *t) {
+    volatile uintptr_t anchor = 0;
+    t->stop_sp = (uintptr_t)&anchor;
+    atomic_store_explicit(&t->state, PARKED, memory_order_seq_cst);
+    wait_for_restart();
+    resume_running(t, PARKED);
+    (void)anchor;
+}
+
+static LYR_NOINLINE void park_here(Thread *t) {
+    __builtin_unwind_init();
+    park_with_registers_saved(t);
+    __asm__ volatile("" ::: "memory");  /* no tail call: the spilled registers stay in this frame */
+}
+
+/* A loop back-edge's or a function entry's poll found a stop asked for (or the stack check
+ * failed: with S4 an overflow, until then never). */
+void lyr_gc_safepoint_slow(void) {
+    Thread *t = self;
+    if (t == NULL || !__atomic_load_n(&lyr_gc_stop_requested, __ATOMIC_SEQ_CST)) return;
+    park_here(t);
+}
+
+/* The region's entry frames, from here up to the caller's marker, copied: the registers of every
+ * caller lie there since __builtin_unwind_init spilled them in lyr_gc_enter_safe's prologue. */
+static LYR_NOINLINE LYR_NO_SANITIZE void save_entry_frames(Thread *t, uintptr_t marker) {
+    volatile uintptr_t anchor = 0;
+    uintptr_t low = (uintptr_t)&anchor & ~(uintptr_t)(sizeof(uintptr_t) - 1);
+    size_t words = marker > low ? (marker - low) / sizeof(uintptr_t) : 0;
+    if (words > t->saved_capacity) {
+        uintptr_t *grown = realloc(t->saved, words * sizeof *grown);
+        if (grown == NULL) lyr_panic(LYR_RT_OUT_OF_MEMORY, "out of memory entering a safe region");
+        t->saved = grown;
+        t->saved_capacity = words;
+    }
+    for (size_t i = 0; i < words; i++) t->saved[i] = ((const uintptr_t *)low)[i];
+    t->saved_words = words;
+    t->stop_sp = marker;
+    atomic_store_explicit(&t->state, SAFE, memory_order_seq_cst);
+    (void)anchor;
+}
+
+LYR_NOINLINE void lyr_gc_enter_safe(void *marker) {
+    __builtin_unwind_init();
+    Thread *t = self;
+    if (t != NULL && !collecting_here) save_entry_frames(t, (uintptr_t)marker);
+    __asm__ volatile("" ::: "memory");
+}
+
+void lyr_gc_leave_safe(void) {
+    Thread *t = self;
+    if (t != NULL && !collecting_here) resume_running(t, SAFE);
 }
 
 /* --- start ------------------------------------------------------------------------------------- */
@@ -1262,18 +1438,26 @@ static void *stack_base_of_this_thread(void) {
 #endif
 }
 
+/* The calling thread in the registry: registered stopped (SAFE), so a collection under way waits
+ * for nothing of it, then running — after that collection, when there is one. */
 static Thread *register_this_thread(void) {
     Thread *t = calloc(1, sizeof *t);
     if (t == NULL) return NULL;
     t->mutator = &lyr_mutator;
     t->small.block = t->medium.block = NO_BLOCK;
     t->stack_base = stack_base_of_this_thread();
-    lock();
+    atomic_init(&t->state, SAFE);
+    {
+        volatile uintptr_t here = 0;
+        t->stop_sp = (uintptr_t)&here;  /* nothing of the program on the stack yet */
+    }
+    self = t;
+    take(&registry_lock);
     t->next = threads;
     if (threads) threads->prev = t;
     threads = t;
-    unlock();
-    self = t;
+    give(&registry_lock);
+    resume_running(t, SAFE);
     return t;
 }
 
@@ -1330,15 +1514,19 @@ void lyr_thread_detach(void) {
     retire(&t->small);
     retire(&t->medium);
     unlock();
+    sync_out(t);
     lyr_coro_thread_end();
     lyr_crash_thread_end();
-    lock();
+    /* out of the registry stopped: a collection under way has it SAFE, with nothing to scan */
+    LYR_GC_ENTER_SAFE();
+    take(&registry_lock);
     if (t->prev) t->prev->next = t->next;
     else threads = t->next;
     if (t->next) t->next->prev = t->prev;
-    unlock();
+    give(&registry_lock);
     self = NULL;
     lyr_mutator.cursor = lyr_mutator.limit = 0;
+    free(t->saved);
     free(t);
 }
 
@@ -1351,12 +1539,7 @@ void lyr_gc_collect(void) {
 
 size_t lyr_gc_heap_size(void) { return heap_in_use(); }
 
-size_t lyr_gc_collections(void) {
-    lock();
-    size_t n = collections;
-    unlock();
-    return n;
-}
+size_t lyr_gc_collections(void) { return atomic_load(&collections); }
 
 int64_t lyr_gc_thread_allocations(void) {
     Thread *t = current();

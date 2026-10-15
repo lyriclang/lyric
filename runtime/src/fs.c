@@ -15,6 +15,7 @@
 #endif
 
 #include "lyr/fs.h"
+#include "lyr/gc.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -113,7 +114,10 @@ int64_t lyr_fs_open(const LyrStr *path, int64_t how) {
 int64_t lyr_fs_read(int64_t file, uint8_t *into, int64_t n) {
     DWORD want = n > 0x40000000 ? 0x40000000 : (DWORD)n;
     DWORD got = 0;
-    if (!ReadFile((HANDLE)(intptr_t)file, into, want, &got, NULL)) {
+    LYR_GC_ENTER_SAFE();
+    BOOL read_ok = ReadFile((HANDLE)(intptr_t)file, into, want, &got, NULL);
+    LYR_GC_LEAVE_SAFE();
+    if (!read_ok) {
         if (GetLastError() == ERROR_BROKEN_PIPE) return 0;
         return last_failure();
     }
@@ -123,7 +127,10 @@ int64_t lyr_fs_read(int64_t file, uint8_t *into, int64_t n) {
 int64_t lyr_fs_write(int64_t file, const uint8_t *from, int64_t n) {
     DWORD want = n > 0x40000000 ? 0x40000000 : (DWORD)n;
     DWORD put = 0;
-    if (!WriteFile((HANDLE)(intptr_t)file, from, want, &put, NULL)) return last_failure();
+    LYR_GC_ENTER_SAFE();
+    BOOL write_ok = WriteFile((HANDLE)(intptr_t)file, from, want, &put, NULL);
+    LYR_GC_LEAVE_SAFE();
+    if (!write_ok) return last_failure();
     return (int64_t)put;
 }
 
@@ -416,18 +423,22 @@ int64_t lyr_fs_open(const LyrStr *path, int64_t how) {
 
 int64_t lyr_fs_read(int64_t file, uint8_t *into, int64_t n) {
     ssize_t got;
+    LYR_GC_ENTER_SAFE();
     do {
         got = read((int)file, into, (size_t)n);
     } while (got < 0 && errno == EINTR);
+    LYR_GC_LEAVE_SAFE();
     if (got < 0) return last_failure();
     return (int64_t)got;
 }
 
 int64_t lyr_fs_write(int64_t file, const uint8_t *from, int64_t n) {
     ssize_t put;
+    LYR_GC_ENTER_SAFE();
     do {
         put = write((int)file, from, (size_t)n);
     } while (put < 0 && errno == EINTR);
+    LYR_GC_LEAVE_SAFE();
     if (put < 0) return last_failure();
     return (int64_t)put;
 }

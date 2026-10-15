@@ -489,6 +489,27 @@ public class CEmitterTests
     }
 
     /// <summary>
+    /// The own collector stops the world at safepoints (13 M11 P5): a thread spinning on an atomic
+    /// (each turn's call checks the stack at its entry), one blocked in its poller waiting for the
+    /// spinner, and as the third either one spinning on a field — a loop without a call, which
+    /// only its head's poll stops; debug only, where the C compiler reads the field every turn —
+    /// or, in the release profile, where the C compiler makes a loop of a tail call, one recursing
+    /// in tail position, which only its entry's check stops. Without one of them a collection would
+    /// wait for its thread for ever; the run has two minutes.
+    /// </summary>
+    [Theory]
+    [InlineData(Profile.Debug, new string[0], "stopped 2")]
+    [InlineData(Profile.Debug, new[] { "plain" }, "stopped 3")]
+    [InlineData(Profile.Release, new[] { "recurse" }, "stopped 3")]
+    public void The_world_stops_at_every_kind_of_safepoint(Profile profile, string[] args, string line)
+    {
+        var build = BuildProfile.Of(profile) with { Gc = Collector.Immix };
+        var result = RuntimeBuildTests.RunEmitted(EmitC("stop_the_world"), "stop_the_world", build, args);
+        Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.Equal(line, result.Stdout.Replace("\r\n", "\n").Trim());
+    }
+
+    /// <summary>
     /// Coroutines dropped while suspended, without close() (design/v5/spec/06 A5): nothing of them
     /// runs, and the debug profile reports each one with cleanup when the collector takes it —
     /// the ones without cleanup go in silence, so at most the hundred guarded ones are reported, and

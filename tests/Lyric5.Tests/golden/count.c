@@ -65,7 +65,7 @@ bb0:;
     l2__last1 = t2;
 #line 5
     goto bb1;
-bb1:;
+bb1:; LYR_SAFEPOINT();
 #line 5
     t3 = l1__range0;
 #line 5
@@ -89,7 +89,7 @@ bb2:;
     t10 = (uint8_t)(t8 == t9);
 #line 6
     if (t10) goto bb5; else goto bb6;
-bb3:;
+bb3:; LYR_SAFEPOINT();
 #line 5
     t14 = l1__range0;
 #line 5
@@ -132,7 +132,7 @@ bb7:;
     l1__range0 = t18;
 #line 5
     goto bb1;
-bb8:;
+bb8:; LYR_SAFEPOINT();
 #line 9
     t21 = l4__range2;
 #line 9
@@ -152,7 +152,7 @@ bb9:;
     t26 = (uint8_t)(t24 == t25);
 #line 10
     if (t26) goto bb12; else goto bb13;
-bb10:;
+bb10:; LYR_SAFEPOINT();
 #line 9
     t30 = l4__range2;
 #line 9
@@ -163,7 +163,7 @@ bb10:;
     l4__range2 = t32;
 #line 9
     goto bb8;
-bb11:;
+bb11:; LYR_SAFEPOINT();
 #line 13
     t33 = l0_total;
 #line 13

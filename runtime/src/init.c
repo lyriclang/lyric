@@ -64,13 +64,18 @@ static void write_fd(int fd, const void *bytes, size_t len) {
     HANDLE handle = GetStdHandle(fd == 1 ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE);
     while (len > 0) {
         DWORD chunk = len > 0x40000000u ? 0x40000000u : (DWORD)len, written = 0;
-        if (!WriteFile(handle, p, chunk, &written, NULL) || written == 0) return;
+        LYR_GC_ENTER_SAFE();
+        BOOL write_ok = WriteFile(handle, p, chunk, &written, NULL);
+        LYR_GC_LEAVE_SAFE();
+        if (!write_ok || written == 0) return;
         p += written;
         len -= written;
     }
 #else
     while (len > 0) {
+        LYR_GC_ENTER_SAFE();
         ssize_t written = write(fd, p, len);
+        LYR_GC_LEAVE_SAFE();
         if (written < 0) {
             if (errno == EINTR) continue;
             return;

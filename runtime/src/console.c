@@ -7,6 +7,7 @@
 #include "lyr/fs.h"
 #include "lyr/init.h"
 #include "internal.h"
+#include "lyr/gc.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -16,7 +17,7 @@
 #  include <windows.h>
 typedef SRWLOCK ConsoleLock;
 #  define CONSOLE_LOCK_INIT SRWLOCK_INIT
-#  define console_lock(l) AcquireSRWLockExclusive(l)
+#  define console_take(l) AcquireSRWLockExclusive(l)
 #  define console_try(l) TryAcquireSRWLockExclusive(l)
 #  define console_unlock(l) ReleaseSRWLockExclusive(l)
 #else
@@ -27,10 +28,19 @@ typedef SRWLOCK ConsoleLock;
 #  include <unistd.h>
 typedef pthread_mutex_t ConsoleLock;
 #  define CONSOLE_LOCK_INIT PTHREAD_MUTEX_INITIALIZER
-#  define console_lock(l) pthread_mutex_lock(l)
+#  define console_take(l) pthread_mutex_lock(l)
 #  define console_try(l) (pthread_mutex_trylock(l) == 0)
 #  define console_unlock(l) pthread_mutex_unlock(l)
 #endif
+
+/* A stream's lock, waited for in a safe region when another thread holds it: the holder may be
+ * blocked in a write the collector does not wait for (13 M11 P5). */
+static void console_lock(ConsoleLock *l) {
+    if (console_try(l)) return;
+    LYR_GC_ENTER_SAFE();
+    console_take(l);
+    LYR_GC_LEAVE_SAFE();
+}
 
 #define CONSOLE_ROOM 8192
 
@@ -107,15 +117,21 @@ static int64_t write_out(int fd, const uint8_t *bytes, size_t len) {
         else lyr_write_stdout(bytes, len);
         return 0;
     }
+    LYR_GC_ENTER_SAFE();
+    int64_t result = 0;
 #if defined(_WIN32)
     HANDLE handle = GetStdHandle(fd == 1 ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE);
     while (len > 0) {
         DWORD chunk = len > 0x40000000u ? 0x40000000u : (DWORD)len, written = 0;
         if (!WriteFile(handle, bytes, chunk, &written, NULL)) {
             DWORD error = GetLastError();
-            return failure(error == ERROR_BROKEN_PIPE || error == ERROR_NO_DATA ? LYR_IO_BROKEN_PIPE : 0, (int64_t)error);
+            result = failure(error == ERROR_BROKEN_PIPE || error == ERROR_NO_DATA ? LYR_IO_BROKEN_PIPE : 0, (int64_t)error);
+            break;
         }
-        if (written == 0) return failure(0, 0);
+        if (written == 0) {
+            result = failure(0, 0);
+            break;
+        }
         bytes += written;
         len -= written;
     }
@@ -124,13 +140,15 @@ static int64_t write_out(int fd, const uint8_t *bytes, size_t len) {
         ssize_t written = write(fd, bytes, len);
         if (written < 0) {
             if (errno == EINTR) continue;
-            return failure(errno == EPIPE ? LYR_IO_BROKEN_PIPE : 0, errno);
+            result = failure(errno == EPIPE ? LYR_IO_BROKEN_PIPE : 0, errno);
+            break;
         }
         bytes += written;
         len -= (size_t)written;
     }
 #endif
-    return 0;
+    LYR_GC_LEAVE_SAFE();
+    return result;
 }
 
 int64_t lyr_console_put(int64_t stream, const uint8_t *from, int64_t n) {
@@ -199,6 +217,7 @@ static int64_t read_console(HANDLE in, uint8_t *into, int64_t n) {
     int64_t room = n / 3 < 1023 ? n / 3 : 1023;
     if (room < 2) return failure(LYR_IO_INVALID_INPUT, 0);
     console_lock(&reading);
+    LYR_GC_ENTER_SAFE();
     int have = 0;
     if (held_unit) {
         units[have++] = held_unit;
@@ -208,6 +227,7 @@ static int64_t read_console(HANDLE in, uint8_t *into, int64_t n) {
         DWORD got = 0;
         if (!ReadConsoleW(in, units + have, (DWORD)(room - have), &got, NULL)) {
             DWORD error = GetLastError();
+            LYR_GC_LEAVE_SAFE();
             console_unlock(&reading);
             return failure(0, (int64_t)error);
         }
@@ -218,6 +238,7 @@ static int64_t read_console(HANDLE in, uint8_t *into, int64_t n) {
         held_unit = units[--have];
         break;
     }
+    LYR_GC_LEAVE_SAFE();
     int bytes = have == 0 ? 0 : WideCharToMultiByte(CP_UTF8, 0, units, have, (char *)into, (int)n, NULL, NULL);
     console_unlock(&reading);
     return bytes;
@@ -230,7 +251,10 @@ int64_t lyr_console_read(uint8_t *into, int64_t n) {
     DWORD mode;
     if (GetConsoleMode(in, &mode)) return read_console(in, into, n);
     DWORD want = n > 0x40000000 ? 0x40000000 : (DWORD)n, got = 0;
-    if (!ReadFile(in, into, want, &got, NULL)) {
+    LYR_GC_ENTER_SAFE();
+    BOOL read_ok = ReadFile(in, into, want, &got, NULL);
+    LYR_GC_LEAVE_SAFE();
+    if (!read_ok) {
         DWORD error = GetLastError();
         if (error == ERROR_BROKEN_PIPE || error == ERROR_HANDLE_EOF) return 0;
         return failure(0, (int64_t)error);
@@ -238,9 +262,11 @@ int64_t lyr_console_read(uint8_t *into, int64_t n) {
     return (int64_t)got;
 #else
     ssize_t got;
+    LYR_GC_ENTER_SAFE();
     do {
         got = read(0, into, (size_t)n);
     } while (got < 0 && errno == EINTR);
+    LYR_GC_LEAVE_SAFE();
     if (got < 0) return failure(0, errno);
     return (int64_t)got;
 #endif

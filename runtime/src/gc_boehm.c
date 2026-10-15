@@ -183,6 +183,11 @@ void lyr_root_free(LyrRoot *root) {
 
 void lyr_register_stack(void *low, void *high) { GC_add_roots(low, high); }
 
+/* Boehm stops threads with signals: a safe region and a safepoint ask nothing of it. */
+void lyr_gc_safepoint_slow(void) {}
+void lyr_gc_enter_safe(void *marker) { (void)marker; }
+void lyr_gc_leave_safe(void) {}
+
 /* Boehm scans the program's data segments whole: the globals need no table. */
 void lyr_gc_add_globals(void **const *slots, size_t count) {
     (void)slots;

@@ -9,6 +9,7 @@
 #endif
 
 #include "lyr/process.h"
+#include "lyr/gc.h"
 #include "lyr/console.h"
 #include "lyr/fs.h"
 #include "lyr/net.h"
@@ -779,13 +780,17 @@ int64_t lyr_process_spawn(const LyrStr *program, const uint8_t *args, int64_t ar
     report[1] = -1;
     int e = 0;
     ssize_t got;
+    LYR_GC_ENTER_SAFE();
     do {
         got = read(report[0], &e, sizeof e);
     } while (got < 0 && errno == EINTR);
+    LYR_GC_LEAVE_SAFE();
     if (got > 0) {
         /* the exec failed: the child is gone already, its end taken here */
         int status;
+        LYR_GC_ENTER_SAFE();
         while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+        LYR_GC_LEAVE_SAFE();
         answer = failed_with(e);
         goto done;
     }
@@ -829,18 +834,22 @@ int64_t lyr_process_signal(int64_t pid, int64_t number) {
 
 int64_t lyr_process_read(int64_t fd, uint8_t *into, int64_t n) {
     ssize_t got;
+    LYR_GC_ENTER_SAFE();
     do {
         got = read((int)fd, into, (size_t)n);
     } while (got < 0 && errno == EINTR);
+    LYR_GC_LEAVE_SAFE();
     if (got < 0) return failed_with(errno);
     return (int64_t)got;
 }
 
 int64_t lyr_process_write(int64_t fd, const uint8_t *from, int64_t n) {
     ssize_t sent;
+    LYR_GC_ENTER_SAFE();
     do {
         sent = write((int)fd, from, (size_t)n);
     } while (sent < 0 && errno == EINTR);
+    LYR_GC_LEAVE_SAFE();
     if (sent < 0) return failed_with(errno);
     return (int64_t)sent;
 }
