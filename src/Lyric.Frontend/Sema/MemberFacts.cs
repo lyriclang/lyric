@@ -140,7 +140,7 @@ public static class MemberFacts
     private static IEnumerable<FunctionSymbol> VisibleExtensions(
         Compilation compilation, TypeSymbol type, ModuleSymbol? from) =>
         compilation.Extensions.MethodsFor(type)
-            .Where(extension => from is null || compilation.Sees(from, extension.Module))
+            .Where(extension => compilation.Reaches(from, extension))
             .Select(extension => extension.Symbol);
 
     /// <summary>
@@ -155,7 +155,7 @@ public static class MemberFacts
         foreach (var block in compilation.Extensions.Blocks)
         {
             if (!ReferenceEquals(block.Target, type)) continue;
-            if (from is not null && !compilation.Sees(from, block.Module)) continue;
+            if (!compilation.Reaches(from, block)) continue;
 
             foreach (var node in block.Decl.Interfaces)
                 if (Conformance.InterfaceOf(node, binding) is { } iface)
