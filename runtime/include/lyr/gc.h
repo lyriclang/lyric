@@ -139,6 +139,11 @@ void *lyr_root_get(const LyrRoot *root);
 void lyr_root_set(LyrRoot *root, void *object);
 void lyr_root_free(LyrRoot *root);
 
+/* The program's module globals (07 V5): the addresses of their reference words, a table the
+ * emitted program registers before its initializer runs. The own collector reads them as roots
+ * (13 M11 P4); Boehm scans the program's data itself and ignores them. */
+void lyr_gc_add_globals(void **const *slots, size_t count);
+
 /* Memory ranges scanned conservatively besides the thread stacks the collector knows: coroutine
  * stacks (M6) and any C memory that holds object pointers. */
 void lyr_register_stack(void *low, void *high);

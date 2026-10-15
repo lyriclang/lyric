@@ -452,22 +452,40 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// The same class graphs under the own collector (13 M11 S1): it allocates through the inline
-    /// fast path and its slow path — small objects, medium ones, large ones, coroutines' records —
-    /// and collects nothing yet, so the programs run without the heap limit and print what they
-    /// print under Boehm. With S2 they move under the limit with the rest.
+    /// The same class graphs under the own collector (13 M11 S2), which reads the maps the stage-1
+    /// collector never read: each program ends under the 16 MiB only because its garbage is
+    /// collected, and right only because what it keeps is marked through the maps. The runtime is
+    /// built with its check of the maps (<c>LYR_GC_VERIFY</c>): a word of a marked object that the
+    /// map does not name and that points at an unmarked object ends the program — so here the bits
+    /// of the bitmaps are tested, which the test above leaves to the layout asserts.
     /// </summary>
     [Theory]
     [InlineData("objects_gc", Profile.Debug, "kept 499500 held-999999 held-0 alice")]
     [InlineData("objects_gc", Profile.Release, "kept 499500 held-999999 held-0 alice")]
-    [InlineData("maps_gc", Profile.Debug, "kept 1500 2000 value-999999 1500")]
+    [InlineData("optionals_gc", Profile.Debug, "list 1000 499500 node-999 tag-999")]
+    [InlineData("optionals_gc", Profile.Release, "list 1000 499500 node-999 tag-999")]
+    [InlineData("enums_gc", Profile.Debug, "kept label-999999 tree 499500")]
+    [InlineData("enums_gc", Profile.Release, "kept label-999999 tree 499500")]
+    [InlineData("interfaces_gc", Profile.Debug, "kept 1000 junk-999999 500499000")]
     [InlineData("interfaces_gc", Profile.Release, "kept 1000 junk-999999 500499000")]
     [InlineData("arrays_gc", Profile.Debug, "kept 499500 item-999999 tag-999999 500")]
-    public void A_class_graph_is_allocated_by_the_own_collector(string name, Profile profile, string line)
+    [InlineData("arrays_gc", Profile.Release, "kept 499500 item-999999 tag-999999 500")]
+    [InlineData("globals_gc", Profile.Debug, "kept 499500 item-999999 anchor")]
+    [InlineData("globals_gc", Profile.Release, "kept 499500 item-999999 anchor")]
+    [InlineData("generators_gc", Profile.Debug, "kept item-7:0 item-7:1 item-7:2 true 7 item-199999:1 200000")]
+    [InlineData("generators_gc", Profile.Release, "kept item-7:0 item-7:1 item-7:2 true 7 item-199999:1 200000")]
+    [InlineData("maps_gc", Profile.Debug, "kept 1500 2000 value-999999 1500")]
+    [InlineData("maps_gc", Profile.Release, "kept 1500 2000 value-999999 1500")]
+    public void A_class_graph_survives_the_own_collector(string name, Profile profile, string line)
     {
-        var result = RuntimeBuildTests.RunEmitted(EmitC(name), name, BuildProfile.Of(profile) with { Gc = Collector.Immix });
+        var build = BuildProfile.Of(profile) with { Gc = Collector.Immix, GcVerify = true };
+        var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC(name), name, build);
         Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
-        Assert.Equal(line, result.Stdout.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)[0]);
+        var lines = result.Stdout.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(line, lines[0]);
+        Assert.StartsWith("collections ", lines[1]);
+        var collections = int.Parse(lines[1]["collections ".Length..]);
+        Assert.True(collections >= 5, $"only {collections} collections ran: the graph was not tested against the collector");
     }
 
     /// <summary>

@@ -476,6 +476,14 @@ lyr_ty_std_thread_Pool *lyr_g_std_io_ioPool = NULL;
 lyr_ty_std_task_SpinLock *lyr_g_std_io_ioPoolGuard = NULL;
 LyrStr *lyr_g_app_main_log = NULL;
 
+/* the globals' reference words, the collector's roots */
+static void **const lyr_global_refs[] = {
+    (void **)&lyr_g_std_task_living,
+    (void **)&lyr_g_std_io_ioPool,
+    (void **)&lyr_g_std_io_ioPoolGuard,
+    (void **)&lyr_g_app_main_log,
+};
+
 /* string literals */
 static const LyrStaticStr(1) lyr_lit0 = LYR_STR_INIT("");
 static const LyrStaticStr(2) lyr_lit1 = LYR_STR_INIT(" ");
@@ -8754,7 +8762,7 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); LyrErr *lyr_e = NULL; lyr_app_main_main(&lyr_e); int64_t lyr_r = 0; if (LYR_UNLIKELY(lyr_e != NULL)) return lyr_err_report(lyr_e, lyr_error_message, lyr_error_cause); return lyr_r; }
+static int64_t lyr_entry(void) { lyr_gc_add_globals(lyr_global_refs, 4); lyr__globals__9ee5f9b5(); LyrErr *lyr_e = NULL; lyr_app_main_main(&lyr_e); int64_t lyr_r = 0; if (LYR_UNLIKELY(lyr_e != NULL)) return lyr_err_report(lyr_e, lyr_error_message, lyr_error_cause); return lyr_r; }
 int main(int argc, char **argv) { return lyr_run_main_task(argc, argv, lyr_entry, lyr_std_task_runMain); }
 
 /* ==== unit: std.core.<extend>.Slice<uint8> ==== */

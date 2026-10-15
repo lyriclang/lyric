@@ -12,6 +12,7 @@
 typedef struct Cell { LyrObj header; int64_t value; } Cell;
 static const LyrDesc cell_desc = { .size = sizeof(Cell), .name = "test.Cell" };
 
+/* the ready queue is C memory holding coroutines: registered as a root in scheduler() (gc.h) */
 static LyrCoro *ready[8];
 static int head, tail;
 static void make_ready(LyrCoro *co) { ready[tail++ % 8] = co; }
@@ -32,6 +33,7 @@ static void task_code(void *env, LyrErr **error) {
 }
 
 static void scheduler(LyrCoro *main) {
+    lyr_register_stack(ready, ready + 8);
     CHECK(lyr_task_scheduler() == NULL);
     lyr_task_set_scheduler(&scheduler_token);
     make_ready(main);

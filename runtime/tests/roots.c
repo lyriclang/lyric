@@ -60,8 +60,8 @@ static int64_t program(void) {
     lyr_unpin(pinned);
     pinned = NULL;
 
-    /* Clear the handles too: this array is static data, which the collector scans conservatively,
-     * and freed root cells get reused for new objects - a stale handle would keep them alive. */
+    /* Clear the handles too: this array is static data, which Boehm scans conservatively, and
+     * freed root cells get reused for new objects - a stale handle would keep them alive. */
     for (int i = 0; i < N; i++) {
         lyr_root_free(roots[i]);
         roots[i] = NULL;

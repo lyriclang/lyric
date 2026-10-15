@@ -24,6 +24,11 @@ public sealed record BuildProfile(string Name, Profile Base, int Opt, bool Debug
     /// <summary>The runtime's collector the build links (13 M11 P11).</summary>
     public Collector Gc { get; init; } = Collectors.Default;
 
+    /// <summary>The own collector's check of the descriptors' maps (13 M11 S2): a word of a marked
+    /// object that its map does not name and that points at an unmarked object ends the program
+    /// with the type and the word. For the toolchain's tests; no profile field sets it.</summary>
+    public bool GcVerify { get; init; }
+
     /// <summary>The names <c>--profile</c> knows without a manifest.</summary>
     public static readonly IReadOnlyList<string> BuiltIn = ["debug", "release", "asan", "tsan"];
 
@@ -62,6 +67,7 @@ public sealed record BuildProfile(string Name, Profile Base, int Opt, bool Debug
             if (Base is Profile.Asan or Profile.Tsan) flags.Add("-fno-omit-frame-pointer");
             if (Lto) flags.Add("-flto=thin");
             if (Gc == Collector.Boehm) flags.Add("-DLYR_GC_BOEHM");
+            if (GcVerify) flags.Add("-DLYR_GC_VERIFY");
             return flags;
         }
     }

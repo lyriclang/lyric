@@ -587,6 +587,30 @@ public sealed class CEmitter
         else if (type is IrOptionalType optional) ReferenceWords(optional.Inner, offset, words, ref ambiguous);
     }
 
+    /// <summary>
+    /// The module globals as the collector's roots (13 M11 P4): the address of every reference
+    /// word — a reference global's own, and through a struct, a view, a closure or an interface the
+    /// words <see cref="ReferenceWords(IrType, int, List{int}, ref bool)"/> names —, and the globals
+    /// holding an enum with references, whose words are references only under some tags: those are
+    /// registered whole, to be read conservatively.
+    /// </summary>
+    private (List<string> Words, List<string> Whole) GlobalRoots()
+    {
+        var words = new List<string>();
+        var whole = new List<string>();
+        for (var i = 0; i < _module.Globals.Count; i++)
+        {
+            var found = new List<int>();
+            var ambiguous = false;
+            ReferenceWords(_module.Globals[i].Type, 0, found, ref ambiguous);
+            var name = GlobalName(i);
+            if (ambiguous) whole.Add(name);
+            foreach (var word in found.Distinct().Order())
+                words.Add(word == 0 ? $"(void **)&{name}" : $"(void **)((char *)&{name} + {word * 8})");
+        }
+        return (words, whole);
+    }
+
     private string DescriptorName(TypeId id) => "lyr_desc_ty_" + TypeToken(id.Value);
 
     /// <summary>The descriptor of <c>T[]</c>, one per element type (V10).</summary>
@@ -642,14 +666,23 @@ public sealed class CEmitter
         Structs();
 
         // The module's globals (07 V5): variables of the module's unit, filled by the initializer
-        // before the entry runs; an instance's unit declares the ones it touches. Static data is
-        // a root the collector scans (01 L1).
+        // before the entry runs; an instance's unit declares the ones it touches. They are roots of
+        // the collector (01 L1): the table of their reference words follows them (13 M11 P4).
         if (_main && _module.Globals.Count > 0)
         {
             _out.AppendLine("/* module-level bindings */");
             for (var i = 0; i < _module.Globals.Count; i++)
                 _out.AppendLine($"{Declare(_module.Globals[i].Type, GlobalName(i))} = {Zero(_module.Globals[i].Type)};");
             _out.AppendLine();
+            var (words, whole) = GlobalRoots();
+            if (words.Count > 0)
+            {
+                _out.AppendLine("/* the globals' reference words, the collector's roots */");
+                _out.AppendLine("static void **const lyr_global_refs[] = {");
+                foreach (var word in words) _out.AppendLine($"    {word},");
+                _out.AppendLine("};");
+                _out.AppendLine();
+            }
         }
         else if (!_main)
         {
@@ -1481,8 +1514,16 @@ public sealed class CEmitter
         var text = new StringBuilder();
         text.AppendLine();
         text.AppendLine("/* the program */");
-        // The globals are filled first (07 V5 G2), in declaration order, then the entry runs.
+        // The globals are filled first (07 V5 G2), in declaration order, then the entry runs —
+        // registered with the collector before anything is stored in them (13 M11 P4).
         var init = _module.GlobalInit is { } id ? FunctionName(_module.Functions[id.Value].Name) + "(); " : "";
+        if (_module.Globals.Count > 0)
+        {
+            var (words, whole) = GlobalRoots();
+            var register = words.Count > 0 ? $"lyr_gc_add_globals(lyr_global_refs, {words.Count}); " : "";
+            foreach (var global in whole) register += $"lyr_register_stack((void *)&{global}, (void *)(&{global} + 1)); ";
+            init = register + init;
+        }
         if (entry.Throws)
         {
             // An error that escapes main (05 E6 O4): its message and its causes on the error

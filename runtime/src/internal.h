@@ -133,6 +133,9 @@ struct LyrCoro {
     struct LyrStr *panic_code;     /* PANICKED: the report it left — code, message, frames */
     struct LyrStr *panic_message;
     struct LyrStr *panic_trace;
+    struct LyrCoro *gc_next;       /* the own collector's list of watched coroutines (13 M11 P9): */
+    struct LyrCoro *gc_prev;       /* no references — the marking does not follow them */
+    int gc_watched;
 };
 
 /* coro.c — a suspended coroutine the collector found unreachable: its stack goes (06 A5). */

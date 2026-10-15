@@ -146,7 +146,8 @@ public class RuntimeBuildTests
     /// program built under Boehm and the same one under the own collector (13 M11 P11) never
     /// overwrite each other.</summary>
     private static string BinDir(BuildProfile profile) =>
-        Path.Combine(Cache, "bin", Target.Host.Triple, profile.Gc == Collector.Boehm ? profile.Name : profile.Name + "-immix");
+        Path.Combine(Cache, "bin", Target.Host.Triple,
+            profile.Name + (profile.Gc == Collector.Boehm ? "" : "-immix") + (profile.GcVerify ? "-verify" : ""));
 
     /// <summary>One file per unit under <c>emitted/&lt;name&gt;/</c>, the module's first.</summary>
     private static string[] WriteUnits(IReadOnlyList<CEmitter.Unit> units, string name)
