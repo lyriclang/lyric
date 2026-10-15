@@ -8,6 +8,7 @@ namespace Lyric5.Tests;
 /// type that comes through a re-export, a return value or a field brings its conformances; a
 /// block of methods alone stays its module's (04 rule 9).
 /// </summary>
+[Collection("console")]
 public class ConformanceVisibilityTests
 {
     private const string Lib = """
