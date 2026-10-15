@@ -94,6 +94,45 @@ public class MacroTests
 
     /// <summary>A macro module that uses a macro of a third module: its sites go first, then the
     /// modules that import it (P6, import order).</summary>
+    /// <summary>A build that expands a macro resolves its modules twice, and the second time
+    /// must synthesize the conformances again (04 D7): the first resolver used to write the
+    /// declarations without their synthesized interfaces into the shared parse, so an `extend`
+    /// equality over a synthesized type — and std's own `DateTime` over `Date` — failed only in
+    /// such a build (sweep after M10, open point 188).</summary>
+    [Fact]
+    public void A_synthesized_conformance_survives_the_macro_round()
+    {
+        var dir = Build("""
+            import std.io { println };
+            import app.macros { twice };
+            import std.time { Date, Time, DateTime, Zone };
+
+            struct Pt :: [Equatable] {
+                x: int,
+                y: int,
+            }
+
+            struct Pair {
+                a: Pt,
+                b: Pt,
+            }
+
+            extend Pair :: [Equatable] {
+                fn equals(o: Pair): bool {
+                    return this.a == o.a && this.b == o.b;
+                }
+            }
+
+            fn main(): void {
+                let p = Pair { a = Pt { x = 1, y = 2 }, b = Pt { x = 3, y = 4 } };
+                let q = Pair { a = Pt { x = 1, y = 2 }, b = Pt { x = 3, y = 4 } };
+                let d = try! DateTime.of(try! Date.of(2026, 10, 15), try! Time.of(9, 30, 0), Zone.utc);
+                println(f"{p == q} {twice!(21)} {d == d}");
+            }
+            """);
+        Assert.Equal("true 42 true\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
     [Fact]
     public void A_macro_module_with_sites_of_its_own_expands_first()
     {

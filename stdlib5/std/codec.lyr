@@ -5,6 +5,10 @@
 /// `Value`, a tree of the ten forms that any format could write — the format of no format, for
 /// tests and for data that is passed on unread.
 ///
+/// Not `std.encoding`: that module turns bytes into text and back — Base64, hexadecimal — a
+/// method a form; this one writes the form of a value, in whatever format (the maintainer's
+/// review of M10, 2026-10-15).
+///
 /// The model has ten forms: null, bool, int, uint, float, string, bytes, a sequence, a map, a
 /// struct of named fields, and a variant of an enum with or without a payload. A format implements
 /// the primitives of `Encoder` and `Decoder` — the scalars, and begin/end around the containers —;

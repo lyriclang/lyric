@@ -28,6 +28,13 @@ public sealed class Compilation
     private readonly List<ModuleSymbol> _modules = new();
     private readonly Dictionary<ModuleSymbol, Module> _asts = new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>Each module's tree as it was loaded, before the resolver's synthesis took the
+    /// synthesized interfaces off its type declarations (04 D7): what a rebuild after a macro
+    /// round starts from, so that the round's resolver synthesizes them again (sweep after M10,
+    /// open point 188 — the first resolver wrote the stripped declarations into the shared parse,
+    /// and the second found nothing to synthesize).</summary>
+    private readonly Dictionary<ModuleSymbol, Module> _loaded = new(ReferenceEqualityComparer.Instance);
+
     public Compilation(SourceManager sm, DiagnosticEngine de)
     {
         _sm = sm;
@@ -271,6 +278,7 @@ public sealed class Compilation
         var symbol = new ModuleSymbol(path, members, ast);
         _modules.Add(symbol);
         _asts[symbol] = ast;
+        _loaded[symbol] = ast;
         if (isNative) _native.Add(symbol);
         if (documentation is not null) Documentation.Absorb(documentation);
         return symbol;
@@ -369,6 +377,13 @@ public sealed class Compilation
     }
 
     public Module AstOf(ModuleSymbol module) => _asts[module];
+
+    /// <summary>The module's tree as it was loaded (see <c>_loaded</c>).</summary>
+    public Module LoadedAstOf(ModuleSymbol module) => _loaded[module];
+
+    /// <summary>The resolver's view of the module's tree, with what the synthesis took off its
+    /// declarations: this compilation's alone, the loaded tree stays as it was.</summary>
+    public void ReplaceAst(ModuleSymbol module, Module ast) => _asts[module] = ast;
 
     public ModuleSymbol? FindModule(string[] path) =>
         _modules.FirstOrDefault(m => m.Path.Length == path.Length && m.Path.SequenceEqual(path));

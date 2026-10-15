@@ -3,6 +3,10 @@
 /// a struct of static members — a name space, `Base64.encode(bytes)`. 4.x's `std.bytes` goes up in
 /// this module.
 ///
+/// Not `std.codec`: that module writes the form of a value — its fields, its variants, its
+/// elements — into a format such as JSON; this one turns bytes into text and back, nothing of a
+/// value's shape (the maintainer's review of M10, 2026-10-15).
+///
 /// The decoders are strict, as the RFC allows them to be (§3.3, §3.5): Base64 asks for its padding
 /// and for zero bits past the last byte, and takes no whitespace; what is not the encoding throws
 /// an `EncodingError` at the first offset that is wrong.

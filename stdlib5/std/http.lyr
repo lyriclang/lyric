@@ -921,9 +921,23 @@ pub class Client {
 
     mut fn exchange(conn: Conn, req: Request, authority: string): Response throws [HttpError, IoError, Cancelled] {
         this.inFlight = conn;
-        defer this.inFlight = null;
-        try this.writeRequest(conn, req);
-        return try this.readResponse(conn, req, authority);
+        try {
+            this.writeRequest(conn, req);
+            let response = this.readResponse(conn, req, authority);
+            this.inFlight = null;
+            return response;
+        } catch (e: Cancelled) {
+            // the connection stays in flight: `send` drops it, and the drop closes it. A `defer`
+            // here cleared it first, so a timed-out request left its socket open and the peer's
+            // task waiting for the next request for ever (sweep after M10, open point 191)
+            throw e;
+        } catch (e: HttpError) {
+            this.inFlight = null;
+            throw e;
+        } catch (e: IoError) {
+            this.inFlight = null;
+            throw e;
+        }
     }
 
     /// The exchange was cut short: its connection is closed, so the peer sees the end.

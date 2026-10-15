@@ -1,7 +1,7 @@
 // std.uri (design/v5/spec/10 O11; 13 M10 S5): RFC 3986 strictly - the five parts and their text,
 // the reference resolution of §5.4, the normalization of §6.2, the percent-encoding per component,
 // the query as pairs, what the grammar refuses.
-import std.uri { Uri, Query, Component, percentEncode, percentDecode, removeDotSegments };
+import std.uri { Uri, Query, percentEncode, percentDecode, removeDotSegments };
 import std.core { ParseError };
 import std.codec { DecodeError };
 import std.json;
@@ -57,7 +57,7 @@ fn aUriIsItsFivePartsAndTheirText(): void throws Error {
     assertEq(Uri { scheme = "https", host = "h", port = 8443, path = "/p", query = "q" }.show(), "https://h:8443/p?q");
     assertEq(Uri { host = "::1", path = "/" }.show(), "//[::1]/");
     // Codable: its text
-    assertEq(try json.encode(try Uri.parse("http://h/p")), "\"http://h/p\"");
+    assertEq(try json.encode(Uri.parse("http://h/p")), "\"http://h/p\"");
     assertEq(try json.decode<Uri>("\"http://h/p?q\""), try Uri.parse("http://h/p?q"));
     try {
         let _ = json.decode<Uri>("\"http://a b\"");
@@ -149,7 +149,7 @@ fn aQueryIsItsPairsInOrder(): void throws Error {
     let u = try Uri.parse("http://h/p?k=v&k=w&n=%C3%A9");
     assertEq((try u.queryPairs()).all("k"), ["v", "w"]);
     assertEq((try u.queryPairs()).get("n"), "\u{e9}");
-    assertTrue((try (try Uri.parse("http://h/p")).queryPairs()).isEmpty());
+    assertTrue((try (Uri.parse("http://h/p")).queryPairs()).isEmpty());
     // the query written back into a URI
     assertEq((u with { query = q.show() }).show(), "http://h/p?a=9&c=&d=x%20y%26z&e=1");
 }

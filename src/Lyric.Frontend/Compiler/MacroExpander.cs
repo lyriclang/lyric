@@ -230,7 +230,9 @@ public static class MacroExpander
 
             foreach (var module in ready.Select(p => p.Site.Module).Distinct())
             {
-                trees[module.FullName] = AstRewriter.Rewrite(compilation.AstOf(module),
+                // from the tree as loaded, not the resolver's: the rebuild synthesizes the
+                // conformances again from the declarations' own lists (open point 188)
+                trees[module.FullName] = AstRewriter.Rewrite(compilation.LoadedAstOf(module),
                     n => replacements.GetValueOrDefault(n), s => splices.GetValueOrDefault(s), d => declSplices.GetValueOrDefault(d));
             }
             (compilation, binding) = rebuild(trees);

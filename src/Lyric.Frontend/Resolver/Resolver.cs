@@ -184,7 +184,10 @@ public sealed class Resolver
 
     private void DeclareModule(ModuleSymbol module)
     {
-        var declarations = _comp.AstOf(module).Declarations;
+        // a copy: the synthesis replaces a declaration by one without its synthesized interfaces,
+        // and that must not reach the loaded tree, which a rebuild after a macro round resolves
+        // again (open point 188)
+        var declarations = _comp.AstOf(module).Declarations.ToArray();
         var coreHasDebug = _comp.Modules.Any(m => m.FullName == "std.core"
             && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Debug" }));
         // The form std.core's Hashable asks for (10 K2): 'hash<H :: [Hasher]>(&h: H)' writes into a
@@ -196,7 +199,10 @@ public sealed class Resolver
             && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Identity" }));
         for (var k = 0; k < declarations.Length; k++)
         {
-            declarations[k] = Synthesize(module, declarations[k], coreHasDebug, streamsHash, coreHasIdentity);
+            var before = declarations[k];
+            declarations[k] = Synthesize(module, before, coreHasDebug, streamsHash, coreHasIdentity);
+            if (!ReferenceEquals(declarations[k], before))
+                _comp.ReplaceAst(module, _comp.AstOf(module) with { Declarations = declarations });
             var decl = declarations[k];
             switch (decl)
             {
