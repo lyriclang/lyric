@@ -1,0 +1,77 @@
+// The own collector stops the world at safepoints (design/v5/spec/13 M11 P5): threads that hold
+// still in their own ways while main allocates enough for many collections, none waited for in
+// vain —
+//   - one spins on an atomic: each turn calls `load`, whose entry checks the stack (P6);
+//   - one waits for the spinner's task: it is blocked in its poller, a safe region;
+//   - with the argument "plain", one spins on a field, a loop without a call: it stops at the
+//     loop's head (debug only: an optimizing C compiler may read the field once — a race);
+//   - with the argument "recurse", one recurses in tail position: the C compiler of the release
+//     profile makes a loop of it whose only safepoint is the function's entry check.
+// main lets them go only after its collections. Expected stdout: "stopped 2", "stopped 3" with an
+// argument. Exit 0.
+import std.io { println };
+import std.os { args };
+import std.sync { Atomic };
+import std.thread { Thread };
+
+class Node { next: ?Node, value: int }
+
+class Flag { var down: bool }
+
+fn spinUntil(go: Atomic<bool>): int {
+    while (!go.load()) {
+    }
+    return 1;
+}
+
+fn spinOnField(flag: Flag): int {
+    while (!flag.down) {
+    }
+    return 1;
+}
+
+fn recurseUntil(go: Atomic<bool>, turns: int): int {
+    if (go.load()) {
+        return 1;
+    }
+    return recurseUntil(go, turns + 1);
+}
+
+fn churn(): int {
+    var kept: ?Node = null;
+    var sum = 0;
+    for (i in 0..2000000) {
+        let node = Node { next = null, value = i };
+        sum += node.value % 7;
+        if (i % 100000 == 0) {
+            kept = Node { next = kept, value = i };
+        }
+    }
+    var count = 0;
+    var at = kept;
+    while (at != null) {
+        count += 1;
+        at = at.next;
+    }
+    return if (count == 20 && sum > 0) 1 else 0;
+}
+
+fn main(): int throws Error {
+    let go = Atomic.new(false);
+    let flag = Flag { down = false };
+    let mode = if (args().length() > 1) args()[1] else "";
+    let spinner = Thread.spawn(() => spinUntil(go));
+    let waiter = Thread.spawn(() => {
+        let spun = try spinner.await();
+        return spun;
+    });
+    let third = if (mode == "recurse") Thread.spawn(() => recurseUntil(go, 0))
+        else if (mode == "plain") Thread.spawn(() => spinOnField(flag))
+        else Thread.spawn(() => 0);
+    let churned = churn();
+    flag.down = true;
+    go.store(true);
+    let stopped = (try waiter.await()) + (try third.await()) + churned;
+    println(f"stopped {stopped}");
+    return 0;
+}

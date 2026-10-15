@@ -22,11 +22,15 @@ static const uint64_t node_refs[] = { 1u << 1 };
 static const LyrDesc node_desc = { .size = sizeof(Node), .flags = LYR_DESC_HAS_REFS,
                                    .refmap_words = 1, .refmap = node_refs, .name = "test.Node" };
 
+/* The C here stands for compiled code, which polls at every loop's head (13 M11 P5), and a wait
+ * for another thread is a safe region, as the runtime's own waits are: the own collector stops the
+ * world at safepoints, not with signals. */
 static void chain_body(void *arg) {
     int64_t id = (int64_t)(intptr_t)arg;
     Node *head = NULL;
     for (int64_t round = 0; round < ROUNDS; round++) {
         for (int64_t i = 0; i < PER_ROUND; i++) {
+            LYR_SAFEPOINT();
             Node *node = lyr_alloc(&node_desc);
             node->value = id * 1000000 + round * PER_ROUND + i;
             if (i % KEEP_EVERY == 0) {
@@ -72,12 +76,16 @@ static int64_t program(void) {
         handles[i] = CreateThread(NULL, 0, entry, (LPVOID)(intptr_t)i, 0, NULL);
         CHECK(handles[i] != NULL);
     }
+    LYR_GC_ENTER_SAFE();
     WaitForMultipleObjects(THREADS, handles, TRUE, INFINITE);
+    LYR_GC_LEAVE_SAFE();
     for (int i = 0; i < THREADS; i++) CloseHandle(handles[i]);
 #else
     pthread_t threads[THREADS];
     for (int i = 0; i < THREADS; i++) CHECK(pthread_create(&threads[i], NULL, entry, (void *)(intptr_t)i) == 0);
+    LYR_GC_ENTER_SAFE();
     for (int i = 0; i < THREADS; i++) CHECK(pthread_join(threads[i], NULL) == 0);
+    LYR_GC_LEAVE_SAFE();
 #endif
     CHECK(lyr_gc_collections() > 0);
     CHECK(lyr_coro_stacks() == 0);

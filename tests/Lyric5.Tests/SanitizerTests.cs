@@ -87,6 +87,22 @@ public class SanitizerTests
         RunClean(name, Profile.Tsan, args, exit);
 
     /// <summary>
+    /// The threaded programs under TSan with the own collector (13 M11 S3), the threads program
+    /// among them: it stops the world at safepoints, with atomics and a condition variable TSan
+    /// sees, not with the signals that make Boehm's stop abort here (the test below). Its stop and
+    /// restart order what one thread wrote before a collection and another reads after it.
+    /// </summary>
+    [Theory]
+    [InlineData("threads")]
+    [InlineData("coro_threads")]
+    [InlineData("coro_storm")]
+    [InlineData("poll_basic")]
+    [InlineData("coro_gc")]
+    [InlineData("weak")]
+    public void A_threaded_program_runs_clean_under_TSan_with_the_own_collector(string name) =>
+        RunClean(name, BuildProfile.Of(Profile.Tsan) with { Gc = Collector.Immix }, [], 0);
+
+    /// <summary>
     /// The throw paths under ASan and UBSan (13, M5): the emitter's C for every program that throws,
     /// catches, runs a defer or a close on the error path, suppresses, asks a clause's binding of
     /// its record, rethrows, or lets an error leave main — and the floor under the blocks the
@@ -220,9 +236,11 @@ public class SanitizerTests
         Assert.Contains("tsan_race.c", result.Stderr);
     }
 
-    private static void RunClean(string name, Profile profile, string[] args, int exit)
+    private static void RunClean(string name, BuildProfile profile, string[] args, int exit)
     {
         if (!Applies) return;
+        // gc_smoke is Boehm's own smoke test: it calls Boehm, whatever the default collector
+        if (name == "gc_smoke") profile = profile with { Gc = Collector.Boehm };
         var result = RuntimeBuildTests.RunTest(name, profile, Clang(), args);
         Assert.True(result.ExitCode == exit, $"exit {result.ExitCode}, expected {exit}\nstderr:\n{result.Stderr}");
         foreach (var report in Reports) Assert.DoesNotContain(report, result.Stderr);

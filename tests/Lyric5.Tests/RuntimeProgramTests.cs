@@ -41,36 +41,12 @@ public class RuntimeProgramTests
     }
 
     /// <summary>
-    /// The runtime programs the own collector runs already (13 M11), whatever the build's default
-    /// is: since S2 it collects while one thread is attached, so the programs here are all but those
-    /// that need a collection with several threads at once (S3). The list grows with each slice
-    /// until the own collector is the default (S5).
+    /// Every runtime program under the own collector too (13 M11), whatever the build's default is
+    /// until S5: since S3 it stops every thread at safepoints, and the programs that stand for
+    /// compiled code poll as compiled code does.
     /// </summary>
-    public static TheoryData<string, Profile, int, string, string[]> UnderImmix()
-    {
-        var data = new TheoryData<string, Profile, int, string, string[]>();
-        foreach (var profile in new[] { Profile.Debug, Profile.Release })
-        {
-            data.Add("alloc", profile, 0, "alloc ok\n", []);
-            data.Add("alloc_shapes", profile, 0, "shapes ok\n", []);
-            data.Add("strings", profile, 0, "strings ok\n", []);
-            data.Add("arrays", profile, 0, "arrays ok\n", []);
-            data.Add("hello", profile, 7, "Hello, Lyric!\nargs: 2\n", ["one", "two"]);
-            data.Add("roots", profile, 0, "roots ok\n", []);
-            data.Add("weak", profile, 0, "weak ok\n", []);
-            data.Add("threads", profile, 0, "threads ok\n", []);
-            data.Add("coro_basic", profile, 0, "coro ok\n", []);
-            data.Add("coro_gc", profile, 0, "coro gc ok\n", []);
-            data.Add("coro_pace", profile, 0, "coro pace ok\n", []);
-            data.Add("coro_park", profile, 0, "coro park ok\n", []);
-            data.Add("task_main", profile, 7, "task ok\n", []);
-            data.Add("coro_panic", profile, 0, "coro panic ok\n", []);
-        }
-        return data;
-    }
-
     [Theory]
-    [MemberData(nameof(UnderImmix))]
+    [MemberData(nameof(Programs))]
     public void A_runtime_program_runs_under_the_own_collector(string name, Profile profile, int exit, string stdout, string[] args)
     {
         var result = RuntimeBuildTests.RunTest(name, BuildProfile.Of(profile) with { Gc = Collector.Immix }, args: args, binary: name + "-immix");

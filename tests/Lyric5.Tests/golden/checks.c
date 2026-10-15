@@ -109,6 +109,7 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     uint8_t t30 = 0;
     int64_t t31 = 0;
     int64_t t32 = 0;
+    LYR_STACK_CHECK();
 bb0:;
 #line 8
     t0 = (int64_t)INT64_C(40);

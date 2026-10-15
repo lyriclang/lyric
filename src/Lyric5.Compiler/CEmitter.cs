@@ -1643,12 +1643,19 @@ public sealed class CEmitter
             else _fn.AppendLine($"    {Declare(temp.Type, Temp(temp.Id))} = {Zero(temp.Type)};");
         }
 
+        // The safepoints (13 M11 P5): a function that calls checks its stack at its entry — the
+        // check a collection makes fail to stop the thread there (P6) —, and a loop polls at its
+        // head, the target of a jump from where the loop's body ends.
+        if (function.Blocks.Any(b => b.Insts.Any(i => i is Call or CallImport or CallIndirect or CallVirt)))
+            _fn.AppendLine("    LYR_STACK_CHECK();");
+        var loopHeads = LoopHeads(function);
+
         if (function.Blocks.Count > 0 && function.Blocks[0].Id != function.Entry)
             _fn.AppendLine($"    goto bb{function.Entry.Value};");
 
         foreach (var block in function.Blocks)
         {
-            _fn.AppendLine($"bb{block.Id.Value}:;");
+            _fn.AppendLine(loopHeads.Contains(block.Id.Value) ? $"bb{block.Id.Value}:; LYR_SAFEPOINT();" : $"bb{block.Id.Value}:;");
             foreach (var inst in block.Insts)
             {
                 Line(inst.Span);
@@ -1663,6 +1670,29 @@ public sealed class CEmitter
         _fn.AppendLine("}");
         _fn.AppendLine();
         return _fn.ToString();
+    }
+
+    /// <summary>The blocks a jump reaches backward — from a block at or after them in the order the
+    /// function is written: the heads of its loops, where a poll catches every turn.</summary>
+    private static HashSet<int> LoopHeads(IrFunction function)
+    {
+        var position = new Dictionary<int, int>();
+        for (var i = 0; i < function.Blocks.Count; i++) position[function.Blocks[i].Id.Value] = i;
+        var heads = new HashSet<int>();
+        for (var i = 0; i < function.Blocks.Count; i++)
+        {
+            IEnumerable<BlockId> targets = function.Blocks[i].Terminator switch
+            {
+                Branch b => [b.Target],
+                CondBranch c => [c.IfTrue, c.IfFalse],
+                Throw t => [t.Landing],
+                ErrorBranch e => [e.OnError, e.Continue],
+                _ => [],
+            };
+            foreach (var target in targets)
+                if (position.TryGetValue(target.Value, out var at) && at <= i) heads.Add(target.Value);
+        }
+        return heads;
     }
 
     private static Span FirstSpan(IrFunction function)

@@ -24,6 +24,7 @@ int64_t lyr_app_main_fib(int64_t l0_n) {
     int64_t t10 = 0;
     int64_t t11 = 0;
     int64_t t12 = 0;
+    LYR_STACK_CHECK();
 bb0:;
 #line 3
     t0 = l0_n;
@@ -104,7 +105,7 @@ bb0:;
     l4__last1 = t3;
 #line 10
     goto bb1;
-bb1:;
+bb1:; LYR_SAFEPOINT();
 #line 10
     t4 = l3__range0;
 #line 10
@@ -162,6 +163,7 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     int64_t t5 = 0;
     int64_t t6 = 0;
     int64_t t7 = 0;
+    LYR_STACK_CHECK();
 bb0:;
 #line 19
     t0 = (int64_t)INT64_C(10);

@@ -1,5 +1,6 @@
 /* The panic path (05 E8): message, backtrace, hook, exit 101. */
 #include "internal.h"
+#include "lyr/gc.h"
 #include "lyr/console.h"
 #include "lyr/init.h"
 #include "lyr/types.h"
@@ -35,6 +36,7 @@ static char report[32 * 1024];
 static char message_copy[1024];
 
 LYR_NORETURN static void lyr_panic_wait(void) {
+    LYR_GC_ENTER_SAFE();  /* for good: the process ends around it */
     for (;;) {
 #ifdef _WIN32
         Sleep(1000);

@@ -9,6 +9,7 @@
  * S11: an AFD poll request each way and wait (06 S2, the review's M6-29), its completion on the
  * port — mio's and wepoll's way, here without wepoll, whose epoll_wait no other thread can wake. */
 #include "lyr/poll.h"
+#include "lyr/gc.h"
 #include "lyr/fs.h"
 #include "lyr/process.h"
 #include "lyr/panic.h"
@@ -316,7 +317,10 @@ int lyr_poller_wait(LyrPoller *poller, int64_t timeout_ns) {
         DWORD ms = deadline < 0 ? INFINITE : (DWORD)left_ms(deadline, INFINITE - 1);
         OVERLAPPED_ENTRY entries[EVENTS];
         ULONG n = 0;
-        if (!GetQueuedCompletionStatusEx(poller->port, entries, EVENTS, &n, ms, FALSE)) {
+        LYR_GC_ENTER_SAFE();
+        BOOL waited = GetQueuedCompletionStatusEx(poller->port, entries, EVENTS, &n, ms, FALSE);
+        LYR_GC_LEAVE_SAFE();
+        if (!waited) {
             DWORD error = GetLastError();
             if (error != WAIT_TIMEOUT) lyr_panic(LYR_RT_SYSTEM, "a poller's wait failed (error %lu)", (unsigned long)error);
             n = 0;
@@ -475,7 +479,9 @@ int lyr_poller_wait(LyrPoller *poller, int64_t timeout_ns) {
     for (;;) {
         int ms = deadline < 0 ? -1 : (int)left_ms(deadline, INT_MAX);
         struct epoll_event events[EVENTS];
+        LYR_GC_ENTER_SAFE();
         int ready = epoll_wait(poller->epoll, events, EVENTS, ms);
+        LYR_GC_LEAVE_SAFE();
         if (ready < 0 && errno != EINTR) lyr_panic(LYR_RT_SYSTEM, "a poller's wait failed: %s", strerror(errno));
         int woken = 0;
         for (int i = 0; i < ready; i++) {
@@ -582,7 +588,9 @@ int lyr_poller_wait(LyrPoller *poller, int64_t timeout_ns) {
             timeout = &left_time;
         }
         struct kevent events[EVENTS];
+        LYR_GC_ENTER_SAFE();
         int ready = kevent(poller->queue, NULL, 0, events, EVENTS, timeout);
+        LYR_GC_LEAVE_SAFE();
         if (ready < 0 && errno != EINTR) lyr_panic(LYR_RT_SYSTEM, "a poller's wait failed: %s", strerror(errno));
         int woken = 0;
         for (int i = 0; i < ready; i++) {

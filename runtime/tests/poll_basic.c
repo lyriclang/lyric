@@ -30,9 +30,15 @@ static void wake_later(void) {
     lyr_thread_detach();
 }
 
+/* The C here stands for compiled code, which polls at every loop's head (13 M11 P5), and a wait
+ * for another thread is a safe region, as the runtime's own waits are: the own collector stops the
+ * world at safepoints, not with signals. */
 static void allocate(void) {
     CHECK(lyr_thread_attach() == 0);
-    for (int i = 0; i < 400000; i++) (void)lyr_alloc(&node_desc);
+    for (int i = 0; i < 400000; i++) {
+        LYR_SAFEPOINT();
+        (void)lyr_alloc(&node_desc);
+    }
     lyr_thread_detach();
 }
 
@@ -55,7 +61,9 @@ static void run_beside(LPTHREAD_START_ROUTINE entry, void (*meanwhile)(void)) {
     HANDLE thread = CreateThread(NULL, 0, entry, NULL, 0, NULL);
     CHECK(thread != NULL);
     meanwhile();
+    LYR_GC_ENTER_SAFE();
     WaitForSingleObject(thread, INFINITE);
+    LYR_GC_LEAVE_SAFE();
     CloseHandle(thread);
 }
 #else
@@ -65,7 +73,9 @@ static void run_beside(void *(*entry)(void *), void (*meanwhile)(void)) {
     pthread_t thread;
     CHECK(pthread_create(&thread, NULL, entry, NULL) == 0);
     meanwhile();
+    LYR_GC_ENTER_SAFE();
     CHECK(pthread_join(thread, NULL) == 0);
+    LYR_GC_LEAVE_SAFE();
 }
 #endif
 
