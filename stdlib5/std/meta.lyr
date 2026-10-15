@@ -6,8 +6,11 @@
 /// A `comptime for (f in fields<T>())` sets its body in place once per field, where `e.[f]` is the
 /// field `f` names, of the field's own type (R2); one over `variants<E>()` once per variant, where
 /// `e is v` tests the variant, `E.[v]` is a unit variant's value and `e.[v, p]` a payload field
-/// (M9a S10). A field is listed where the code that asks may name it (R7): an interface of another
-/// package sees the `pub` fields alone.
+/// (M9a S10); one over `members<T>()` once per member. A field is listed where the code that asks
+/// may name it (R7): an interface of another package sees the `pub` fields alone. What a
+/// declaration carries, a round reads: `attribute<A>(f)` of a field — a payload's too —,
+/// `variantAttribute<A>(v)` of a variant, `memberAttribute<A>(m)` of a member, and
+/// `typeAttribute<T, A>()` of a type, an interface or an alias.
 ///
 /// The questions and the infos are declared in std.core, whose synthesized members (05 §14; 09 A5)
 /// are written over them and which imports nothing: this module is their name to the program.
@@ -20,6 +23,8 @@ pub import std.core {
     fields,
     members,
     attribute,
+    variantAttribute,
+    memberAttribute,
     typeAttribute,
     variants,
     conformances,

@@ -548,10 +548,21 @@ public sealed class TypeResult
 
     /// <summary>A field as <c>std.meta.fields</c> answers it: name, type, position in the
     /// declaration, word, whether it is a <c>var</c>.</summary>
-    public sealed record MetaField(string Name, LyrType Type, int Index, Visibility Visibility, bool IsVar, FieldSymbol? Symbol);
+    public sealed record MetaField(string Name, LyrType Type, int Index, Visibility Visibility, bool IsVar, FieldSymbol? Symbol)
+    {
+        /// <summary>The field's declaration where it has no symbol — a variant's payload field.</summary>
+        public FieldDecl? Declaration { get; init; }
+
+        /// <summary>The attributes the field carries (R4): what <c>attribute&lt;A&gt;(f)</c> reads.</summary>
+        public AttributeNode[] Attributes => (Declaration ?? Symbol?.Declaration as FieldDecl)?.Attributes ?? [];
+    }
 
     /// <summary>A variant as <c>std.meta.variants</c> answers it, its payload's fields.</summary>
-    public sealed record MetaVariant(string Name, int Index, MetaField[] Payload);
+    public sealed record MetaVariant(string Name, int Index, MetaField[] Payload)
+    {
+        /// <summary>The attributes the variant carries: what <c>variantAttribute&lt;A&gt;(v)</c> reads.</summary>
+        public AttributeNode[] Attributes { get; init; } = [];
+    }
 
     /// <summary>One round of a <c>comptime for</c> over the fields of a known type: its own body,
     /// parsed again, its variable — whose value is the field's info —, the field.</summary>
@@ -562,7 +573,13 @@ public sealed class TypeResult
     public Func<LyrType, ModuleSymbol?, MetaField[]>? MetaFields { get; internal set; }
 
     /// <summary>A function of a type's own body as <c>std.meta.members</c> answers it.</summary>
-    public sealed record MetaMember(string Name, Visibility Visibility, bool IsStatic, bool IsMut);
+    public sealed record MetaMember(string Name, Visibility Visibility, bool IsStatic, bool IsMut)
+    {
+        /// <summary>The member's declaration, whose attributes <c>memberAttribute&lt;A&gt;(m)</c> reads.</summary>
+        public FunctionDecl? Declaration { get; init; }
+
+        public AttributeNode[] Attributes => Declaration?.Attributes ?? [];
+    }
 
     /// <summary>The functions of a type's own body that a module may name (R7).</summary>
     public Func<LyrType, ModuleSymbol?, MetaMember[]>? MetaMembers { get; internal set; }
@@ -615,6 +632,8 @@ public sealed class TypeResult
     // ------------------------------------------------------------------ M9a S10: variants and initializers over infos
     private readonly Dictionary<LocalSymbol, MetaVariant> _knownVariants = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<LocalSymbol, MetaVariant> _knownPayloads = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<LocalSymbol, MetaMember> _knownMembers = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<CallExpr, TypeAliasDecl> _aliasAsked = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<TypeTestExpr, MetaVariant> _variantTests = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<PayloadByInfoExpr, (MetaVariant Variant, MetaField Field)> _payloadAccesses = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<Expr, Expr> _rewrites = new(ReferenceEqualityComparer.Instance);
@@ -628,6 +647,15 @@ public sealed class TypeResult
     /// the field itself is <see cref="KnownFieldOf"/>.</summary>
     public MetaVariant? KnownPayloadOf(LocalSymbol variable) => _knownPayloads.GetValueOrDefault(variable);
     internal void SetKnownPayload(LocalSymbol variable, MetaVariant variant) => _knownPayloads[variable] = variant;
+
+    /// <summary>The member a round's variable holds the info of (a loop over <c>members</c>).</summary>
+    public MetaMember? KnownMemberOf(LocalSymbol variable) => _knownMembers.GetValueOrDefault(variable);
+    internal void SetKnownMember(LocalSymbol variable, MetaMember member) => _knownMembers[variable] = member;
+
+    /// <summary><c>typeAttribute&lt;T, A&gt;()</c> whose <c>T</c> is written as an alias: the alias, whose
+    /// own attributes are the answer — the type argument itself resolves through it.</summary>
+    public TypeAliasDecl? AliasAskedOf(CallExpr call) => _aliasAsked.GetValueOrDefault(call);
+    internal void SetAliasAsked(CallExpr call, TypeAliasDecl alias) => _aliasAsked[call] = alias;
 
     /// <summary><c>e is v</c> in a round: the variant tested, by its position.</summary>
     public MetaVariant? VariantTestOf(TypeTestExpr test) => _variantTests.GetValueOrDefault(test);

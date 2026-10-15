@@ -845,7 +845,10 @@ public sealed partial class Parser
             var fields = new List<FieldDecl>();
             while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
             {
-                fields.Add(ParseField());
+                // a payload's field is a field (Lyric 5, 11 §1 rule 4): it takes attributes as a struct's does
+                var fieldStart = _buffer.Current.Span;
+                var fieldAttributes = _sm.Lyric5 && AtAttributeStart ? ParseAttributeList() : [];
+                fields.Add(ParseField(fieldStart, isVar: false, VisibilityWord.None) with { Attributes = fieldAttributes });
                 if (!_buffer.Match(TokenKind.Comma)) break;
             }
             var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close struct variant");

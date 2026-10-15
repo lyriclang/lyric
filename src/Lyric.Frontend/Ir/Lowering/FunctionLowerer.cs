@@ -2748,6 +2748,8 @@ internal sealed class FunctionLowerer
             return EmitComptimeValue(FieldInfoConst(known), LowerType(round.Type, expr.Span), expr.Span);
         if (symbol is LocalSymbol variantRound && _types.KnownVariantOf(variantRound) is { } knownVariant && !_slots.TryLookup(variantRound, out _))
             return EmitComptimeValue(VariantInfoConst(knownVariant), LowerType(variantRound.Type, expr.Span), expr.Span);
+        if (symbol is LocalSymbol memberRound && _types.KnownMemberOf(memberRound) is { } knownMember && !_slots.TryLookup(memberRound, out _))
+            return EmitComptimeValue(MemberInfoConst(knownMember), LowerType(memberRound.Type, expr.Span), expr.Span);
 
         // A parameter of the CALLEE, named in a default that is being lowered at this call site
         // (04 D5 F2): the argument materialized for it.
@@ -5692,6 +5694,7 @@ internal sealed class FunctionLowerer
     {
         ["FieldInfo"] = ["name", "type", "index", "visibility", "isVar"],
         ["VariantInfo"] = ["name", "index", "payload"],
+        ["MemberInfo"] = ["name", "visibility", "isStatic", "isMut"],
         ["Type"] = ["name"],
     };
 
@@ -5706,6 +5709,7 @@ internal sealed class FunctionLowerer
             case IdentifierExpr id when _types.RefOf(id) is LocalSymbol round && !_slots.TryLookup(round, out _):
                 if (_types.KnownFieldOf(round) is { } known) return FieldInfoConst(known);
                 if (_types.KnownVariantOf(round) is { } variant) return VariantInfoConst(variant);
+                if (_types.KnownMemberOf(round) is { } member) return MemberInfoConst(member);
                 return null;
             case MemberExpr m when RoundInfoConst(m.Target) is StructConst s
                 && SubstituteType(_types.TypeOf(m.Target)) is NamedRef { Symbol: { } info } && info.Home?.FullName == "std.core"
@@ -6936,7 +6940,7 @@ internal sealed class FunctionLowerer
     /// <summary>The question to std.meta a call asks — a function of its without a body — or none.</summary>
     private FunctionSymbol? MetaQueryOf(CallExpr call) =>
         (_types.RefOf(call.Callee) is ImportBindingSymbol { Target: var target } ? target : _types.RefOf(call.Callee))
-            is FunctionSymbol { Declaration: FunctionDecl { Body: null }, Name: "fields" or "members" or "attribute" or "typeAttribute" or "variants" or "conformances" or "hasConformance" or "typeName" or "isStruct" or "isClass" or "isEnum" or "isInterface" } query
+            is FunctionSymbol { Declaration: FunctionDecl { Body: null }, Name: "fields" or "members" or "attribute" or "variantAttribute" or "memberAttribute" or "typeAttribute" or "variants" or "conformances" or "hasConformance" or "typeName" or "isStruct" or "isClass" or "isEnum" or "isInterface" } query
         && query.Home is { FullName: "std.meta" or "std.core" }
             ? query
             : null;
@@ -6958,8 +6962,7 @@ internal sealed class FunctionLowerer
             "conformances" => new ArrayConst([.. (_types.MetaConformances?.Invoke(about) ?? []).Select(i => TypeConst(TypeFacts.Display(new NamedRef(i))))]),
             "hasConformance" => new BoolConst(asked.Length > 1 && TypeFacts.SymbolOf(asked[1]) is { Kind: TypeSymbolKind.Interface } iface
                                               && _types.Satisfies?.Invoke(about, iface) == true),
-            "members" => new ArrayConst([.. (_types.MetaMembers?.Invoke(about, _types.MetaFromOf(call)) ?? []).Select(m => (IrConstValue)new StructConst(
-                [new StringConst(m.Name), VisibilityConst(m.Visibility), new BoolConst(m.IsStatic), new BoolConst(m.IsMut)]))]),
+            "members" => new ArrayConst([.. (_types.MetaMembers?.Invoke(about, _types.MetaFromOf(call)) ?? []).Select(MemberInfoConst)]),
             "typeName" => new StringConst(TypeFacts.Display(about)),
             "isStruct" => new BoolConst(TypeFacts.KindOf(about) == TypeSymbolKind.Struct),
             "isClass" => new BoolConst(TypeFacts.KindOf(about) == TypeSymbolKind.Class),
@@ -6984,26 +6987,37 @@ internal sealed class FunctionLowerer
     private static IrConstValue VariantInfoConst(TypeResult.MetaVariant variant) => new StructConst(
         [new StringConst(variant.Name), new IntConst((ulong)variant.Index), new ArrayConst([.. variant.Payload.Select(FieldInfoConst)])]);
 
+    /// <summary>std.meta's <c>MemberInfo</c> — name, visibility, isStatic, isMut — of a member.</summary>
+    private static IrConstValue MemberInfoConst(TypeResult.MetaMember member) => new StructConst(
+        [new StringConst(member.Name), VisibilityConst(member.Visibility), new BoolConst(member.IsStatic), new BoolConst(member.IsMut)]);
+
     /// <summary>std.meta's <c>Visibility</c>: <c>Pub</c>, <c>Internal</c>, <c>Private</c>.</summary>
     private static IrConstValue VisibilityConst(Visibility visibility) =>
         new VariantConst(visibility switch { Visibility.Public => 0, Visibility.Internal => 1, _ => 2 }, []);
 
     /// <summary>
-    /// <c>attribute&lt;A&gt;(f)</c> and <c>typeAttribute&lt;T, A&gt;()</c> (09 A7 R4): the attribute of
-    /// type <c>A</c> the field — the one a round's variable holds — or the type's declaration
-    /// carries, its value as its site computed it; none where it carries none. Where the value is
-    /// not computed yet — in a site lifted out to be evaluated — its initializer, lowered here.
+    /// <c>attribute&lt;A&gt;(f)</c>, <c>variantAttribute&lt;A&gt;(v)</c>, <c>memberAttribute&lt;A&gt;(m)</c>
+    /// and <c>typeAttribute&lt;T, A&gt;()</c> (09 A7 R4; W6): the attribute of type <c>A</c> the
+    /// field, variant or member — the one a round's variable holds — or the type's declaration
+    /// carries, its value as its site computed it; none where it carries none. A <c>T</c> written
+    /// as an alias answers with the alias's own. Where the value is not computed yet — in a site
+    /// lifted out to be evaluated — its initializer, lowered here.
     /// </summary>
     private TempId LowerAttributeQuery(CallExpr call, FunctionSymbol query)
     {
         var resultType = TypeOfExpr(call);
         var wanted = SubstitutedTypeArguments(call) is { Length: > 0 } asked ? asked[^1] : LyrType.Error;
-        AttributeNode[] carried = query.Name == "attribute"
-            ? call.Arguments is [IdentifierExpr named] && _types.RefOf(named) is LocalSymbol round
-              && _types.KnownFieldOf(round) is { Symbol.Declaration: FieldDecl field } ? field.Attributes : []
-            : SubstitutedTypeArguments(call) is [var holder, ..] && TypeFacts.SymbolOf(holder)?.Declaration is { } declared
-                ? AttributesOf(declared)
-                : [];
+        var round = call.Arguments is [IdentifierExpr named] ? _types.RefOf(named) as LocalSymbol : null;
+        AttributeNode[] carried = query.Name switch
+        {
+            "attribute" => round is not null ? _types.KnownFieldOf(round)?.Attributes ?? [] : [],
+            "variantAttribute" => round is not null ? _types.KnownVariantOf(round)?.Attributes ?? [] : [],
+            "memberAttribute" => round is not null ? _types.KnownMemberOf(round)?.Attributes ?? [] : [],
+            _ => _types.AliasAskedOf(call) is { } alias ? alias.Attributes
+                : SubstitutedTypeArguments(call) is [var holder, ..] && TypeFacts.SymbolOf(holder)?.Declaration is { } declared
+                    ? AttributesOf(declared)
+                    : [],
+        };
         var dest = _slots.NewTemp(resultType);
         var inner = resultType is IrOptionalType optional ? optional.Inner : throw Bug("an attribute query answers no optional");
         foreach (var attribute in carried)
@@ -7703,7 +7717,7 @@ internal sealed class FunctionLowerer
 
         // a question to std.meta (09 A7; M9a S9): a constant of the type asked about, here
         if (MetaQueryOf(expr) is { } metaQuery)
-            return metaQuery.Name is "attribute" or "typeAttribute"
+            return metaQuery.Name is "attribute" or "variantAttribute" or "memberAttribute" or "typeAttribute"
                 ? LowerAttributeQuery(expr, metaQuery)
                 : EmitComptimeValue(MetaAnswer(expr, metaQuery), TypeOfExpr(expr), expr.Span);
 
