@@ -5245,20 +5245,32 @@ pub struct Shared :: [OnField] { }
 /// Who may name a declaration (07 V2).
 pub enum Visibility :: [Equatable, Debug] { Pub, Internal, Private }
 
-/// A type as a value while compiling: its name, as `typeName` gives it. What else a type is — set
-/// into a `quote` — comes with the macros (13 M9b).
+/// What a type is (the review's W9): a round decides on it — `comptime if (f.type.kind == .Optional)`.
+/// A struct, a class, an enum, an interface; `Primitive` the built-in scalars and `string`;
+/// `Opaque` an opaque alias; the shapes `?T`, `T[]`, `T[N]`, a view, a tuple, a function; a type
+/// parameter in a generic body; `Other` what none of these names.
+pub enum TypeKind :: [Equatable, Debug] {
+    Primitive, Struct, Class, Enum, Interface, Opaque, Optional, Array, InlineArray, Slice, Tuple, Function, Parameter, Other,
+}
+
+/// A type as a value while compiling: its name, as `typeName` gives it, and its kind. What else a
+/// type is — set into a `quote` — comes with the macros (13 M9b).
 pub struct Type :: [Equatable, Debug] {
     pub name: string,
+    pub kind: TypeKind,
 }
 
 /// A field of a struct or a class, in declaration order; in a round over it, `f.type` names its
-/// type and `e.[f]` is the field.
+/// type and `e.[f]` is the field. `hasDefault` is whether the declaration writes an initializer —
+/// the type's own default counts for nothing, and a payload's field has none — so a round
+/// tells an optional argument from a required one.
 pub struct FieldInfo :: [Equatable, Debug] {
     pub name: string,
     pub type: Type,
     pub index: int,
     pub visibility: Visibility,
     pub isVar: bool,
+    pub hasDefault: bool,
 }
 
 /// A variant of an enum, in declaration order, and the fields of its payload — a positional one

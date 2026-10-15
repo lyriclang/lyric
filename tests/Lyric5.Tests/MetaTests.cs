@@ -401,6 +401,56 @@ public class MetaTests
         Assert.Contains(errors, l => l.Contains("main.lyr:25:40: error[LYR-SEM0001]") && l.Contains("'VariantInfo'"));
     }
 
+    /// <summary>11 §4 rules 1 and 9, the sweep after M10 (W9): <c>hasDefault</c> is whether the
+    /// field's declaration writes an initializer, <c>f.type.kind</c> what its type is, and a round
+    /// decides a <c>comptime if</c> over both — written short or qualified. A payload's field has
+    /// no default.</summary>
+    [Fact]
+    public void A_field_info_says_its_kind_and_its_default()
+    {
+        var dir = App("""
+            import std.io { println };
+            import std.meta { fields, variants, TypeKind };
+
+            enum Color { Red, Green, Box { w: int = 1, h: int } }
+
+            interface Greets { fn greet(): string; }
+
+            struct Opts {
+                port: int = 8080,
+                name: ?string,
+                verbose: bool = false,
+                tags: string[],
+                color: Color = .Red,
+                pair: (int, int),
+                hello: Greets,
+                text: string = "",
+            }
+
+            fn main(): void {
+                var out = "";
+                comptime for (f in fields<Opts>()) {
+                    out = out + f.name + ":" + f.type.kind.debug() + ":" + f"{f.hasDefault}";
+                    comptime if (f.hasDefault) { out = out + ":d"; }
+                    comptime if (f.type.kind == .Optional) { out = out + ":o"; }
+                    comptime if (f.type.kind == TypeKind.Enum) { out = out + ":e"; }
+                    comptime if (f.type.kind != .Primitive && !f.hasDefault) { out = out + ":req"; }
+                    out = out + " ";
+                }
+                println(out);
+                var pay = "";
+                comptime for (v in variants<Color>()) {
+                    comptime for (p in v.payload) { pay = pay + p.name + f"{p.hasDefault}" + " "; }
+                }
+                println(pay);
+            }
+            """);
+        Assert.Equal("port:TypeKind.Primitive:true:d name:TypeKind.Optional:false:o:req verbose:TypeKind.Primitive:true:d "
+                     + "tags:TypeKind.Array:false:req color:TypeKind.Enum:true:d:e pair:TypeKind.Tuple:false:req "
+                     + "hello:TypeKind.Interface:false:req text:TypeKind.Primitive:true:d \nwfalse hfalse \n",
+            BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
     /// <summary>An error in a default set in place says where: the round's field and the conformer
     /// that takes the default, as notes of the line written once.</summary>
     [Fact]
