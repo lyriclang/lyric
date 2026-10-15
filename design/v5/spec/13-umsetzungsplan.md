@@ -601,3 +601,127 @@ Nach Aufwand: groß S3, S6, S7/S8, S9, S12; mittel S1, S2, S4, S11; klein S5, S1
 - **Zig** hat eigenes TLS in `std` — verworfen (U2); Zig hat `std.compress` und `std.json` ganz in der Sprache,
   wie hier.
 - **Java** `java.time` für Zonen und Muster (P9); `DateTimeFormatter`s Lokalisierung bleibt Tür.
+
+## Nachtrag 2026-10-15 — der Plan für M11
+
+M11 nach seiner Zeile oben (01 L1 Stufen 2–3, L6, V3; Messpunkt 5), dazu jede Uhr, die auf M11 steht: die
+Stack-Prüfung im Prolog (01 S3, M6-25 — mit ihr fallen die Abweichung von 05 E8 und der offene Punkt 192 der zweiten
+Sweep-Runde: eine Überlauf-Panik aus dem Signal-Handler leert stdout nicht), `Atomic<Klasse>` (06 M6-23),
+Messpunkt 3 (erreicht nach M11, sonst neu entscheiden), der Vorgabe-Hasher (10 R9c, spätestens mit Messpunkt 3), der
+GC-Test `weak` (Review D1: M11 verlangt wieder alle Rückrufe). Dazu zwei Notizen, die in Testtexten stehen: der
+TSan-Lauf des Thread-Programms läuft nur lokal, weil Boehms Stopp über Signale in der CI scheitert
+(`SanitizerTests`: „geht mit dem Stopp an Safepoints“), und ein Weak-Ref auf eine Koroutine kollidiert mit deren
+Finalizer (Boehm hält einen je Objekt).
+
+Grundlage ist eine Prüfung jedes Punkts gegen den Code (2026-10-15). Von M11 steht:
+
+- der **Vertrag der Stufe 0** (`lyr/gc.h`, `lyr/types.h`): `lyr_alloc(desc)`, `lyr_alloc_array`, `lyr_alloc_string`;
+  je Klasse, Box, Closure-Umgebung und Array-Elementtyp ein Deskriptor mit Referenz-Bitmap (CEmitter);
+  `LYR_DESC_CONSERVATIVE`, wo ein Enum mit Referenzen im Objekt liegt; die Barriere an jedem Referenz-Store des
+  emittierten Codes (Feld, Platz, Element, ganzer Wert) und in `coro.c`/`task.c`; `LyrRoot`, `lyr_register_stack`,
+  `LyrWeak` mit Rückruf, `lyr_thread_attach`/`detach`, die Zähler;
+- **Stufe 1**: Boehm 8.2.12 (`gc_boehm.c`), der die Bitmaps nie liest; eine eigene Art für Koroutinen
+  (Markierprozedur über Felder und Stack), ein Stopp über Signale, ein Handshake um jeden Stackwechsel;
+- **Lücken**, die erst ein präziser oder generationaler Sammler sieht: `LYR_SAFEPOINT()` ist definiert und wird nie
+  emittiert; die Modul-Globalen sind schlichte C-Globale, die Boehm mit `.data`/`.bss` abtastet; keine Barriere in
+  `LYR_SLICE_MOVE` (array.h nennt die Stelle) und an `into->suppressed = grown` (error.c, ein bestehendes Objekt);
+  `Atomic<T>` nur für `int` und `bool`;
+- der **Überlauf** über Guard-Page und Handler allein: er beendet den Prozess, auch in einem Task (crash.c);
+- die **Tests** in `runtime/tests` (`alloc`, `gc_smoke`, `heap_limit`, `roots`, `weak` mit 900 von 1000,
+  `coro_gc`, `coro_pace`, `coro_storm`, `threads`, `stack_overflow`, `coro_overflow` …) und die `*_gc.lyr`-Programme
+  unter Heap-Grenze; `CEmitterTests` vertagt den Test der Bitmaps, „bis ein Sammler sie liest (Stufe 2, M11)“;
+- kein `bench/gc/`.
+
+Die Slices heißen **M11 S1–S10**; jeder ist ein PR, sein Regel-PR in der Spec geht voran, wo sich eine Regel ändert
+(13 §1.6 der Überlauf, 10 §8 die Atomics, 15 §4 und 14 das Profilfeld). Größe: **XL** wie die Zeile. Der eigene
+Sammler wächst **hinter einem Entwicklungsschalter der Tests**; Boehm bleibt Vorgabe, bis die ganze Suite unter Immix
+grün ist (S5) — dann kommt das Profilfeld `gc`, und Boehm ist das Vergleichsprofil der Zeile.
+
+### Architektur
+
+| # | Entscheidung | Warum — und warum nicht die Alternativen |
+|---|---|---|
+| P1 | **Eine zusammenhängende Reservierung**: `lyr_gc_init` reserviert den Adressraum des Heaps an einem Stück (256 GiB, bei Ablehnung halbiert bis 4 GiB; `PROT_NONE`/`MEM_RESERVE` — nur Adressraum), committet wird je **Chunk von 4 MiB**; `heap_limit` (11 H1) begrenzt das Committete. Daneben, parallel adressiert, die Seitentabellen: je 256-B-Zeile ein Markier- und ein Kartenbyte, je 16-B-Granulat ein Markier- und ein Startbit. „Ist das eine Heap-Adresse?“ ist dann eine Subtraktion und ein Vergleich — für den konservativen Filter, für Referenzen auf statische Objekte (String-Literale) und für die Kartenbarriere (P8). | V8 (Pointer-Cage), Go bis 1.10 (eine Arena von 512 GB), JSC (Gigacage). Verworfen: eine Chunk-Tabelle über den ganzen Adressraum (Gos zweistufiger Arena-Index — zwei abhängige Loads in jeder Barriere); Objekte je `malloc` (Boehm). Die Folge — kein Heap über die Reservierung hinaus — liegt mit 256 GiB über jeder Messung. |
+| P2 | **Immix nach 01 L1**: Blöcke 32 KiB, Zeilen 256 B, **drei Größenklassen** — klein (≤ 256 B) und mittel (≤ 8 KiB) per Bump in Zeilenlücken, mittel bei zu kleiner Lücke in einen eigenen Überlaufblock, groß (> 8 KiB) im **Large-Object-Space**: seitengenau (4 KiB) in eigenen Chunks, über 2 MiB je eine eigene Chunk-Folge. Granulat und Ausrichtung 16 B (`LyrArr.data`); kein Objekt kreuzt einen Block. | Immix (Blackburn/McKinley 2008): Bump-Geschwindigkeit ohne Bewegen, Fragmentierung über Zeilenrecycling. „Größenklassen“ in L1 lese ich als Immix' drei Klassen, nicht als getrennte Freilisten je Größe (JSC, Go, Boehm) — die kosten den Bump, den L1 will. |
+| P3 | **Allokation je Thread** (L6.1): ein thread-lokaler Puffer (Cursor, Grenze) im TLS-Block des Mutators; `lyr_alloc`, `lyr_alloc_array` und `lyr_alloc_string` werden `static inline` in `gc.h`: Bump, Vergleich, Header — **rund fünf Instruktionen** —, sonst `lyr_gc_alloc_slow` (nächste Lücke, wiederverwendbarer Block, freier Block, Sammlung). **Die Startbits schreibt nicht der Fast-Path**: ein Puffer wird beim Wechsel einmal über seine Header geparst (Größe aus Deskriptor und Länge), die laufenden Puffer aller Threads zu Beginn jeder Sammlung; beim selben Parsen entstehen die Zähler aus 10 X4 (Allokationen und Bytes je Thread). Lücken werden beim Nehmen genullt (der Vertrag verspricht genullte Objekte; Strings bis auf das NUL nicht). TLS-Modell `initial-exec`. Unter ASan nimmt jede Allokation den Slow-Path (L12), der entgiftet; freie Zeilen bleiben vergiftet. | Der Fast-Path ist die Stelle, an der L1 Boehm verwirft. Die konservative Immix-Variante (Shahriyar et al. 2014) führt dieselbe Objektkarte; P3 schreibt sie beim Pufferwechsel statt je Allokation, weil nur eine Sammlung sie liest. Verworfen: Zähler je Allokation (zwei Additionen mehr im Fast-Path, wie heute unter Boehm). |
+| P4 | **Markieren**: Stop-the-World (Stufe 2) mit einem expliziten Markierstapel, ohne Rekursion. Präzise über die Bitmap (Wort i des Objekts, bei Arrays je Element); **Innenzeiger** (Views, `StringView`) über die Startbits zum Objektanfang; Wörter außerhalb der Reservierung (statische Objekte) werden übergangen. Objekte mit `LYR_DESC_CONSERVATIVE` (ein Enum mit Referenzen, V6) werden wortweise mit dem konservativen Filter gelesen — die Lesart von L1s „präzise über Typdeskriptoren“: für ein Union-Wort sagt der Deskriptor „vielleicht“. **Wurzeln**: (1) jeder Stack konservativ — der laufende eines Threads ab seinem Stack-Pointer, nachdem die Register gesichert sind (`setjmp`), und der eigene Stack eines Threads, auf dem gerade eine Koroutine läuft, ab seinem gesicherten `sp`; (2) eine Koroutine über ihr Objekt: Felder präzise, ihr Stack konservativ, solange er gemappt und nicht auf der CPU ist (wie heute); (3) die Modul-Globalen: der Emitter legt je Programm eine Tabelle ihrer Referenzwörter an, die der Start registriert; (4) `LyrRoot`-Zellen; (5) Bereiche aus `lyr_register_stack`, konservativ. Der **konservative Filter**: in der Reservierung, in einem benutzten Block oder LOS-Objekt, ein Startbit an oder vor dem Wort, und das Objekt reicht über das Wort. | Ruby ≥ 2.7, JSC: konservativer Stack, präziser Heap. Verworfen: präzise Enum-Karten je Variante (Tag-Offset und eine Bitmap je Variante, rekursiv) — eine Tür mit Auslöser: wenn `bench/gc` falsche Rückhaltung über Enum-Wörter misst. |
+| P5 | **Safepoints und der Stopp**: der Emitter setzt `LYR_SAFEPOINT()` an jeden Schleifenrücksprung (Load eines globalen Flags und ein Branch, L6.3) und an jeden Funktionseingang die Prolog-Prüfung (P6), die zugleich Poll ist. Eine Sammlung setzt das Flag und jede Mutator-Grenze auf „sofort“ und wartet, bis jeder angemeldete Thread an einem Safepoint steht oder in einem **sicheren Bereich** ist; dann markiert sie, teilt Puffer und Blöcke neu ein und lässt weiterlaufen. Sicher ist ein Thread in jedem blockierenden Laufzeitaufruf — Poller-Warten, `lyr_task_wait`, die Syscalls der I/O-Pool-Threads, `waitpid`, Konsolen-Lesen, `getaddrinfo`, Schlafen, `join`: er klammert sich mit `lyr_gc_enter_safe`/`lyr_gc_leave_safe`, sichert vorher Register und Stack-Pointer und wartet beim Verlassen, solange eine Sammlung läuft. Es sammelt der Thread, dessen Allokation die Sammlung auslöst — kein eigener GC-Thread. Ein Koroutinenwechsel braucht keinen Handshake mehr: zwischen zwei Safepoints hält niemand die Welt an. | Go (`entersyscall`, kooperative Preemption bis 1.14), HotSpot (Poll, Thread-Zustände), .NET (kooperativer und präemptiver Modus). Verworfen: Signale — Boehms Weg; L6 schließt sie aus (unbekannter Compilerzustand), die CI sieht unter TSan „Signals delivery fails constantly“. |
+| P6 | **Die Stack-Prüfung im Prolog** (01 S3): jede emittierte Funktion mit einem Aufruf beginnt mit einem Vergleich ihrer Stackadresse gegen die Grenze des Threads (TLS): untere Stackgrenze + Guard + Reserve; ein Koroutinenwechsel setzt die Grenze des Zielstacks mit, wie heute den Guard-Bereich. Eine Sammlung fordert den Halt an, indem sie jede Grenze auf das Maximum setzt — **ein Vergleich ist Poll und Überlaufprüfung** (Gos `stackguard0 = stackPreempt`). Der Slow-Path unterscheidet: angeforderte Sammlung → parken; sonst Überlauf → **Panik `LYR-RT0006` mit Backtrace**, gebaut auf dem Notstack des Threads (dem Speicher, den crash.c für den Signalstack hält), die die Koroutine verlässt wie jede Panik (05 E8; Spec 13 §1.6 Regel 10) — die Abweichung M6-25 fällt und mit ihr Punkt 192 (der normale Panikpfad leert stdout). Eine Funktion ohne Aufruf prüft nicht (die Reserve deckt ihren Rahmen); eine, deren Rahmen der Emitter größer als die Reserve kennt (Inline-Arrays), prüft mit ihrer Größe. Die Reserve bleibt so klein, dass Spec 12 JSON Regel 3 hält (512 Ebenen in jedem Task, 256 KiB im Release) — in S4 gemessen. Guard-Page und Handler bleiben das Netz für die C-Rahmen der Laufzeit und fremden Code. | Go (Prolog gegen `stackguard`), Rust (Guard-Page und Stack-Probes; Überlauf bricht ab). Verworfen: ein Tiefenzähler (S3); `-fsplit-stack`/`-fstack-check` (über `zig cc` nicht portabel; Split-Stacks haben Go und Rust aufgegeben). |
+| P7 | **Wiederverwenden ohne Sweep-Phase**: nach dem Markieren sagen die Zeilenmarken, welche Zeilen frei sind; ein Block wird erst eingeordnet (frei, wiederverwendbar, voll), wenn ein Allokator ihn nimmt — „Sweep faul je Zeile“ (L1). Zeilenmarken über eine Epoche, damit sie nicht gelöscht werden müssen; die Markierbits einer vollen Sammlung werden je benutztem Block gelöscht (1/128 des Heaps). Große Objekte ohne Marke werden am Ende der Pause frei. **Auslöser**: allokierte Bytes seit der letzten Sammlung gegen ein Budget, das mit dem lebenden Heap wächst (die Grundform von Gos `GOGC = 100`); an `heap_limit` erst eine volle Sammlung, dann `LYR-RT0005`. **Keine Stellschraube** außer `heap_limit`. Blöcke, die mehrere Sammlungen frei blieben, gehen an das System zurück (`madvise`/`MEM_DECOMMIT`) — RSS ist eine der drei Größen von Messpunkt 5. | Immix (Zeilenmarken, Epochen), Go (Pacer). Verworfen: eine Sweep-Phase in der Pause; `GOGC` als Umgebungsvariable — eine Tür, die erst ein Nutzer öffnet. |
+| P8 | **Generationen über Sticky-Mark-Bits** (Stufe 3): eine junge Sammlung löscht keine Markierbits — markiert heißt alt —, markiert von den Wurzeln und den **schmutzigen Karten** aus und steigt nie in ein markiertes Objekt ab; was überlebt, ist danach alt, ohne zu wandern. Eine volle Sammlung löscht alle Bits. **Die Barriere** wird echt: der Store, dann das Kartenbyte der Zeile des Slots (`slot − Heapbasis < Reservierung → Karte = 1`) — unbedingt im Heap, ohne Alt-/Jung-Test: der Emitter hat für den Slot nicht immer den Objektanfang (gc.h), die Karte braucht ihn nicht. `LYR_WRITE_BARRIER_VALUE` markiert die Karten des ganzen Werts, `LYR_SLICE_MOVE` die des Zielbereichs (die Span-Barriere aus array.h), `error.c` bekommt die fehlende. Globale, Thread-Stacks und registrierte Bereiche sind in jeder Sammlung Wurzeln; **eine Koroutine, die seit der letzten Sammlung lief**, wird in der jungen Sammlung als Wurzel gelesen — ihr Stack hat keine Barriere; die Laufzeit führt beim Fortsetzen die Liste. Jung nach dem Budget aus P7, voll, wenn sich der alte Heap seit der letzten vollen Sammlung verdoppelt hat. | Sticky Immix (Blackburn/McKinley 2008), JSC Riptide (Sticky-Mark-Bits, nicht bewegend, konservativer Stack), Demmers et al. 1990. Verworfen: eine Barriere mit Log-Bit je Objekt (braucht den Objektanfang); Schmutzbits über `mprotect` (Boehms inkrementeller Modus — Signale, Seitenkörnung). |
+| P9 | **Weak-Refs und der Tod einer Koroutine**: die Weak-Records in einer `malloc`-Tabelle; nach dem Markieren wird jeder geleert, dessen Objekt unmarkiert ist, und sein Rückruf eingereiht; die Rückrufe laufen nach dem Neustart auf dem sammelnden Thread (der Vertrag aus gc.h: beim nächsten Allokieren oder `lyr_gc_collect`). Eine junge Sammlung leert, was jung starb. Mehrere Weak-Refs je Objekt sind keine Verkettung mehr — die Kollision mit der Koroutine fällt. Eine Koroutine bekommt das Deskriptor-Flag `LYR_DESC_CORO` (Felder präzise, Stack konservativ); eine beobachtete, unmarkierte Koroutine geht in der Pause an `lyr_coro_abandoned` (ihr Stack geht, 06 A5) — ein Haken der Laufzeit, kein Finalizer: nichts von ihr läuft, nichts wird wieder lebendig. Der Test `weak` verlangt wieder alle 1000 Rückrufe (D1). | Java `Cleaner`, Go `runtime.AddCleanup` (1.24). |
+| P10 | **`Atomic<Klasse>`** (06 M6-23): `AtomicValue` nimmt Klassentypen auf; `load`, `store`, `exchange` und `compareAndSet` (nach Identität) als `__atomic_*` auf dem Zeigerwort, nach jedem Schreiben die Karte (P8); sequentiell konsistent wie `int` und `bool` (Spec 10 §8 Regel 4). `fetchAndAdd`/`addAndFetch` bleiben bei `int`. | Java `AtomicReference`, Go `atomic.Pointer[T]`. |
+| P11 | **Boehm als Vergleichsprofil**: ein Profilfeld **`gc`** (`"immix"` oder `"boehm"`, Spec 15 §4 Regel 2) mit seinem Feldflag `--gc` (Spec 14); die Laufzeit wird je Sammler gebaut (bdwgc nur für `boehm`), der Laufzeit-Cache trägt den Sammler im Schlüssel. Beide erfüllen denselben Vertrag in `gc.h`; Safepoint-Flag und Karten sind unter Boehm leer, die Prolog-Prüfung bleibt (der Überlauf hängt nicht am Sammler). **Das Feld kommt mit S5**, wenn Immix Vorgabe wird: eine Regel über einen Sammler, der noch nicht sammelt, wäre falsch. Bis dahin wählt ein Entwicklungsschalter (`LYRIC5_GC=immix`, undokumentiert, fällt mit S5) den Sammler für jeden Bau, damit S1–S4 die ganze Suite vor dem Wechsel laufen. | 13: „Boehm bleibt als Profil zum Vergleich“. Das Wachsen hinter einem Schalter wie Gos `GOEXPERIMENT`. |
+| P12 | **Messpunkt 5** (`bench/gc/`): `binarytrees` (Allokationsdurchsatz), `cache` (1 GB lebend in einer `Map` von Objekten, darüber stetige Kurzlebige und Ersetzungen alt → jung: Pausen, RSS, Barriere), `lru` (eine Liste über einer `Map`, viele Stores alt → jung); je Programm der Go-Zwilling und dasselbe Lyric-Programm unter `gc = "boehm"`. Die **Pausen aus `lyr_gc_stats()`** (11 H5, hier gebaut: Sammlungen jung und voll, Summe, Maximum, ein log2-Histogramm der Pausen, Heap- und Lebend-Bytes), vom Programm über `extern "C"` gelesen und neben der Prüfsumme ausgegeben; Go liest seine aus `runtime/metrics`; RSS misst `run.py` (`getrusage` der Kinder). Ratchet: **besser als Boehm in Durchsatz, Pausen und RSS; p99 der Pausen unter 10 ms bei 1 GB lebendem Heap** — die Lesart von „Pausen < 10 ms bei 1 GB“ unter Stufe 3: eine volle Sammlung über 1 GB Lebendes markiert länger als 10 ms, solange nicht nebenläufig markiert wird (Stufe 4, nach 5.0); ihr Maximum wird berichtet und gegen Boehm verglichen. **Paralleles Markieren** ist S9b, wenn dieses Maximum gegen Boehms parallelen Markierer verliert — sonst Tür. | wie die Messpunkte in 13; `binarytrees` aus dem Benchmarks Game. |
+| P13 | **Die Uhren der Messung**: Messpunkt 3 wird nach M11 neu gemessen; bleibt `strings` über 1,5× Go, entscheidet der Maintainer neu (13). Der Vorgabe-Hasher (10 R9c) kommt mit derselben Messung zur Entscheidung: SipHash-1-3 gegen einen schnellen Hash mit Prozessschlüssel, auf `maps` und auf Header-Schlüsseln aus `http` — die Entscheidung trifft der Maintainer, mit einer Empfehlung. | wie die Uhren es verlangen. |
+| P14 | **Spec**: 15 §4 (das Feld `gc`) und 14 (`--gc`) mit S5, 13 §1.4 Punkt 7 und §1.6 Regel 10 (ein Überlauf verlässt die Koroutine wie jede Panik), 10 §8 (`Atomic<Klasse>`); je Slice die Fälle rot gegen den Compiler davor. Der Sammler selbst ist keine Regel; was ein Programm von ihm sieht — genullte Objekte, stabile Adressen, Identität —, steht schon. | wie M10 P13 |
+
+### Slices
+
+| Slice | Inhalt | Artefakt, Prüfung |
+|---|---|---|
+| **S1** Sammlerwahl und Immix-Heap | P11 (der Bau je Sammler, der Entwicklungsschalter); P1–P3: Reservierung, Chunks, Blöcke, Zeilen, LOS, Puffer, der Fast-Path inline, Startbits und Zähler beim Pufferwechsel; noch keine Sammlung — der Heap wächst bis `heap_limit` | unter Immix bauen und laufen die Laufzeittests, die keine Sammlung brauchen (`alloc`, `strings`, `arrays`, `hello` …); eine Allokationsschleife gegen Boehm gemessen |
+| **S2** Markieren und Wiederverwenden | P4, P7 und P9 für einen Thread: Markierstapel, Bitmaps, Innenzeiger, konservative Wörter, der Stack des Threads und die Stacks seiner Koroutinen (`main` läuft selbst als Koroutine), die Globalen-Tabelle (Emitter), `LyrRoot`, Bereiche; Zeilenmarken, Blockeinteilung, Auslöser, `heap_limit`; der Koroutinen-Haken und die Weak-Refs; die Laufzeit auf Referenzen in C-Statics geprüft (nur über `LyrRoot`). Solange mehr als ein Thread angemeldet ist, sammelt S2 nicht — der Heap wächst, der Stopp kommt mit S3. Dazu eine **Prüf-Variante** der Laufzeit (`LYR_GC_VERIFY`, nur für Tests): ein Wort eines markierten Objekts, das auf einen unmarkierten Objektanfang zeigt, bricht mit Typ und Wortindex ab — der Bitmap-Test, den `CEmitterTests` vertagt | `alloc`, `gc_smoke`, `roots`, `heap_limit`, `conservative`, `coro_gc`, `coro_pace`, `weak` mit allen 1000 und die `*_gc.lyr`-Programme unter Immix mit kleiner Heap-Grenze, auch unter der Prüf-Variante |
+| **S3** Safepoints und Threads | P5: die Polls im Emitter (Rücksprung; Eingang gegen die Grenze aus P6, noch ohne Überlaufzweig), das Mutator-Register, der Stopp, die sicheren Bereiche in jedem blockierenden Aufruf, die Stacks eines Threads, auf dem eine Koroutine läuft, für jeden Thread | `threads`, `coro_threads`, `coro_storm`, `poll_basic`; die ganze Suite (Lyric5.Tests, Konformanz, std-Tests) mit `LYRIC5_GC=immix` grün; der TSan-Lauf des Thread-Programms in der CI |
+| **S4** Stack-Prüfung im Prolog | P6: die echte Grenze, der Slow-Path, der Notstack, die Panik verlässt die Koroutine; Windows (Grenze aus dem TEB) und macOS; das Netz bleibt | `stack_overflow` und `coro_overflow` erwarten die Panik; ein Fall „ein Task läuft über, `main` läuft weiter“ (rot davor: der Prozess endet); JSON mit 512 Ebenen in einem Task im Release |
+| **S5** Immix wird Vorgabe | das Profilfeld `gc` und `--gc` (Spec 15 §4, 14), Vorgabe `immix`, der Schalter fällt; ASan (Slow-Path, vergiftete freie Zeilen), TSan (die Boehm-Annotationen fallen, wo der Stopp ordnet), Windows und macOS (Reservierung, TLS); Messpunkt 2 und 3 ohne Rückschritt durch Poll und Prolog — kostet der Poll im Rücksprung die Vektorisierung einer Schleife, pollt sie je 2^k Durchläufe (Entscheidung mit der Messung) | die Plattform-Jobs grün mit dem eigenen Sammler; `gc = "boehm"` bleibt grün |
+| **S6** Generationen | P8: Sticky-Bits, die Kartenbarriere in `gc.h`, Wert- und Span-Barriere, `error.c`, die junge Sammlung über Karten und die Liste gelaufener Koroutinen, das Verhältnis jung zu voll | ein Laufzeittest alt → jung über jede Barrierenform und über einen Koroutinenstack; Kontrollen: Barriere leer → das junge Objekt stirbt, Liste aus → der Koroutinenfall stirbt |
+| **S7** `Atomic<Klasse>` | P10 in `std.sync` und den Intrinsics; Spec 10 §8 | Fälle: ein Stack nach Treiber über `Atomic<?Node>`, `compareAndSet` nach Identität — rot davor (`LYR-SEM0028`) |
+| **S8** Speicher zurück, Wachstum | P7: freie Blöcke und LOS-Chunks zurück an das System, das Budget nach dem lebenden Heap | das RSS eines Programms, das 1 GB aufbaut und loslässt, fällt wieder |
+| **S9** Messpunkt 5 | P12: `bench/gc/` mit den Go-Zwillingen, `lyr_gc_stats()`, `run.py` (Pausen, RSS, die Boehm-Spalte); **S9b** paralleles Markieren, nur wenn verlangt | die Tabelle der Zeile; der Ratchet in `run.py --ratchet` |
+| **S10** Abschluss | P13: Messpunkt 3 neu, die Vorlage zum Hasher; STATUS, CHANGELOG, Bericht mit offenen Punkten; die Türen geprüft (Stufe 4, präzise Enum-Karten, Stellschrauben, Bewegen nie) | die Zeile oben erfüllt |
+
+**Nicht in M11:**
+
+- Stufe 4 — nebenläufiges Markieren, paralleles Sweeping —: Minor nach 5.0 (01 L1);
+- Bewegen, Kompaktieren, Pinning mit Wirkung — nie (01 L1: die Tür, die zugeht); Finalizer — nie;
+- `GcHandle`, `lyr_gc_stats()` als Host-API mit Header-Zusage, fremde Threads (11 X6, X7, H5) — M14; hier ist
+  `lyr_gc_stats()` intern und für `bench/gc`;
+- eine Weak-Ref-API in Lyric — nicht entschieden (L1 meint das Netz für FFI-Handles, M14);
+- Stellschrauben (`GOGC`, die Größe der jungen Generation) — Tür;
+- Präemption über die Polls (01 K6) und ein Zeitbudget (01 L10) — Türen.
+
+### Tests
+
+- Die Laufzeittests laufen unter beiden Sammlern (`RuntimeProgramTests` mit dem Sammler als Achse, Boehm mit einer
+  Auswahl), die Sanitizer-Profile unter Immix.
+- Die Prüf-Variante (S2) über die `*_gc.lyr`-Programme und die std-Tests: sie fängt jede Bitmap, die eine Referenz
+  verschweigt.
+- Je Mechanismus ein Stresstest mit kleiner Heap-Grenze, der viele Sammlungen erzwingt: Threads × Koroutinen ×
+  Allokation (`coro_storm` unter Immix), alt → jung über jede Barrierenform.
+- Eine Mutationskontrolle je Regel: die Startbits beim Pufferwechsel aus (ein Innenzeiger verliert sein Objekt), ein
+  sicherer Bereich ohne Klammer (der Stopp hängt — der Test hat eine Frist), die Karte nicht gesetzt, die Liste
+  gelaufener Koroutinen aus, der Überlaufzweig auf „parken“ (die Panik bleibt aus).
+- Messpunkt 5 wird in S6 vorbereitet (die Go-Zwillinge in `bench/gc`), damit die Generationen schon messen.
+
+### Umfang
+
+| | Umfang |
+|---|---|
+| `gc_immix.c`: Heap, Allokation, LOS, Markieren, Wiederverwenden | etwa 2 200 Zeilen C |
+| Safepoints, Stopp, sichere Bereiche | etwa 600, dazu Klammern in neun Dateien |
+| Generationen (Karten, junge Sammlung) | etwa 500 |
+| `gc.h`: Fast-Path, Barrieren, Polls | etwa 200 |
+| Emitter (Polls, Prolog, Globalen-Tabelle) und das Profilfeld | etwa 400 Zeilen C# |
+| `Atomic<Klasse>` | etwa 150 |
+| Tests (C und C#) | etwa 1 500 |
+| `bench/gc` (Lyric, Go, `run.py`) | etwa 700 |
+| Spec | etwa 120 Zeilen, ~10 Fälle |
+
+Nach Aufwand: groß S2, S3, S6; mittel S1, S4, S5, S9; klein S7, S8, S10. Etwa acht bis zehn Sessions — XL.
+
+### Reflexion
+
+- **Go** ist der nächste Verwandte: nicht bewegend, ein Pacer über den lebenden Heap, und die Prolog-Prüfung, die
+  zugleich Preemptionspunkt ist — P6 übernimmt sie. Go hat Stack-Maps aus dem eigenen Compiler, Lyric hinter einem
+  C-Backend nicht, daher der konservative Stack. Go hat keine Generationen und markiert stattdessen nebenläufig;
+  Lyric nimmt die Generationen zuerst, weil Sticky-Bits keine Änderung im Backend brauchen (L1).
+- **JavaScriptCore (Riptide)** ist das Muster der Kombination: konservativer Stack, präziser Heap, nicht bewegend,
+  generational über Sticky-Mark-Bits. JSC trennt Größenklassen in Freilisten; Lyric nimmt den Bump aus Immix (P2).
+- **Immix** (Blackburn/McKinley 2008) ist der Heap, **Sticky Immix** dieselbe Arbeit ohne Kopieren, und die
+  konservative Variante (Shahriyar et al. 2014) zeigt, dass eine Objektkarte die Lücke zum konservativen Stack
+  schließt.
+- **Ruby** (RGenGC ab 2.1) ging denselben Weg zu Generationen ohne Bewegen und lebt mit Objekten ohne Barriere
+  („shady“). Lyric emittiert die Barriere seit Stufe 0, daher gibt es solche Objekte nicht.
+- **Boehm** bleibt als Messlatte (P11): konservativer Heap, Signale, langsame Allokation — die drei Gründe aus L1,
+  jetzt gemessen statt behauptet. **MMTk** bleibt verworfen (L1): sein Binding-Vertrag wäre so groß wie dieser Plan.
