@@ -5286,10 +5286,19 @@ pub fn fields<T>(): FieldInfo[];
 pub fn members<T>(): MemberInfo[];
 
 /// The attribute `A` the field `f` carries, its value — none where it carries none (R4). `f` is
-/// the variable of a `comptime for` over `fields`, read in its round.
+/// the variable of a `comptime for` over `fields` or over a variant's `payload`, read in its round.
 pub fn attribute<A>(f: FieldInfo): ?A;
 
-/// The attribute `A` the declaration of `T` carries, its value; none where it carries none.
+/// The attribute `A` the variant `v` carries, its value — none where it carries none. `v` is the
+/// variable of a `comptime for` over `variants`, read in its round.
+pub fn variantAttribute<A>(v: VariantInfo): ?A;
+
+/// The attribute `A` the member `m` carries, its value — none where it carries none. `m` is the
+/// variable of a `comptime for` over `members`, read in its round.
+pub fn memberAttribute<A>(m: MemberInfo): ?A;
+
+/// The attribute `A` the declaration of `T` carries, its value; none where it carries none. A `T`
+/// written as an alias answers with the alias's own attributes, not its target's.
 pub fn typeAttribute<T, A>(): ?A;
 
 /// The variants of an enum, in declaration order; none for any other type.

@@ -287,6 +287,120 @@ public class MetaTests
         Assert.Contains(errors, l => l.Contains("main.lyr:32:21: error[LYR-SEM0100]") && l.Contains("std.meta"));
     }
 
+    /// <summary>R4, the sweep after M10 (W6): every declaration that takes an attribute has a reader —
+    /// a variant's through <c>variantAttribute</c>, a member's through <c>memberAttribute</c>, a
+    /// payload field's through <c>attribute</c> in a round over the payload, a type's, an interface's
+    /// and an alias's own through <c>typeAttribute</c>. A round over members decides a
+    /// <c>comptime if</c> with the reader and with <c>m.isStatic</c>.</summary>
+    [Fact]
+    public void Every_attribute_target_has_its_reader()
+    {
+        var dir = App("""
+            import std.io { println };
+            import std.meta { variants, members, attribute, variantAttribute, memberAttribute, typeAttribute };
+            import std.core { OnField, OnVariant, OnMethod, OnTypeLike };
+
+            struct Tag :: [OnTypeLike] { name: string }
+            struct Mark :: [OnField] { to: string }
+            struct Wire :: [OnVariant] { code: int }
+            struct Route :: [OnMethod] { path: string }
+
+            @Tag("iface")
+            interface Greets { fn greet(): string; }
+
+            @Tag("alias")
+            type Id = int;
+
+            @Tag("st")
+            struct S :: [Greets] {
+                @Mark("k") key: int,
+                fn greet(): string { return "hi"; }
+                @Route("/make") static fn make(): S { return S { key = 1 }; }
+            }
+
+            enum Shape {
+                @Wire(1) Dot,
+                @Wire(2) Box { @Mark("w") width: int, height: int },
+                Line(int),
+            }
+
+            fn main(): void {
+                println(typeAttribute<S, Tag>()?.name ?? "none");
+                println(typeAttribute<Greets, Tag>()?.name ?? "none");
+                println(typeAttribute<Id, Tag>()?.name ?? "none");
+                println(typeAttribute<int, Tag>()?.name ?? "none");
+                var out = "";
+                comptime for (v in variants<Shape>()) {
+                    let code = variantAttribute<Wire>(v)?.code ?? 0;
+                    out = out + v.name + "#" + f"{code}";
+                    comptime for (p in v.payload) {
+                        out = out + " " + p.name + "=" + (attribute<Mark>(p)?.to ?? "-");
+                    }
+                    out = out + ";";
+                }
+                println(out);
+                var routes = "";
+                comptime for (m in members<S>()) {
+                    comptime if (memberAttribute<Route>(m) != null) {
+                        routes = routes + m.name + "->" + (memberAttribute<Route>(m)?.path ?? "") + ";";
+                    }
+                    comptime if (m.isStatic) {
+                        routes = routes + m.name + "!;";
+                    }
+                }
+                println(routes);
+            }
+            """);
+        Assert.Equal("st\niface\nalias\nnone\nDot#1;Box#2 width=w height=-;Line#0 0=-;\nmake->/make;make!;\n",
+            BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    /// <summary>Each reader asks its own loop's variable: a type parameter's loop over members or
+    /// variants has no rounds (<c>LYR-SEM0185</c>), and a field's info is no variant's.</summary>
+    [Fact]
+    public void A_reader_asks_its_own_round()
+    {
+        var dir = App("""
+            import std.meta { fields, variants, members, variantAttribute, memberAttribute };
+            import std.core { OnVariant, OnMethod };
+
+            struct Wire :: [OnVariant] { }
+            struct Route :: [OnMethod] { }
+
+            fn routesOf<T>(): int {
+                comptime for (m in members<T>()) {
+                    let r = memberAttribute<Route>(m);
+                }
+                return 0;
+            }
+
+            fn wiresOf<E>(): int {
+                comptime for (v in variants<E>()) {
+                    let r = variantAttribute<Wire>(v);
+                }
+                return 0;
+            }
+
+            struct P { a: int }
+
+            fn mixed(): int {
+                comptime for (f in fields<P>()) {
+                    let r = variantAttribute<Wire>(f);
+                }
+                return 0;
+            }
+
+            fn main(): void { }
+            """);
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.Equal(1, exit);
+        var errors = error.Split('\n').Where(l => l.Contains("error[")).ToArray();
+        Assert.Equal(3, errors.Length);
+        Assert.Contains(errors, l => l.Contains("main.lyr:9:17: error[LYR-SEM0185]") && l.Contains("'memberAttribute' reads the member"));
+        Assert.Contains(errors, l => l.Contains("main.lyr:16:17: error[LYR-SEM0185]") && l.Contains("'variantAttribute' reads the variant"));
+        Assert.Contains(errors, l => l.Contains("main.lyr:25:40: error[LYR-SEM0001]") && l.Contains("'VariantInfo'"));
+    }
+
     /// <summary>An error in a default set in place says where: the round's field and the conformer
     /// that takes the default, as notes of the line written once.</summary>
     [Fact]

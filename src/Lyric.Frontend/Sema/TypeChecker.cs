@@ -601,8 +601,14 @@ public sealed class TypeChecker
                 CheckAttributes(e.Attributes, AttributeSite.Type, e.Generics.Length > 0,
                     module.Members, "an enum");
                 foreach (var variant in e.Variants)
+                {
                     CheckAttributes(variant.Attributes, AttributeSite.Variant, e.Generics.Length > 0,
                         module.Members, "a variant");
+                    // a struct payload's field is a field (11 §1 rule 4): it takes what 'OnField' admits
+                    foreach (var payloadField in variant.StructFields ?? [])
+                        CheckAttributes(payloadField.Attributes, AttributeSite.Field, e.Generics.Length > 0,
+                            module.Members, "a field");
+                }
                 CheckValueTypeIsFinite(e, e.Name, "enum", module);
                 if (module.Members.LookupLocal(e.Name) is TypeSymbol eType)
                     CheckOverloadSets(eType.Members, $"'{e.Name}'", inInterface: false);
@@ -7103,7 +7109,13 @@ public sealed class TypeChecker
         var args = ArrangeArguments(call, decl);
         _callees.Add(call.Callee);
         if (_currentModule is { } asker && IsMetaQuery(fsym)) _result.SetMetaFrom(call, asker);
-        if (IsMetaQuery(fsym) && fsym!.Name == "attribute") _metaAttributeCalls.Add(call);
+        if (IsMetaQuery(fsym) && fsym!.Name is "attribute" or "variantAttribute" or "memberAttribute") _metaAttributeCalls.Add(call);
+        // 'typeAttribute<Alias, A>()' (R4; the sweep after M10, W6): the alias's own attributes, not
+        // its target's — the written name is kept, since the type argument resolves through the alias
+        if (IsMetaQuery(fsym) && fsym!.Name == "typeAttribute" && call.TypeArguments is [NamedType aliasName, ..]
+            && (_binding.Resolve(aliasName) ?? ResolveTypePath(aliasName.Path, scope, aliasName.Span))
+                is TypeSymbol { Kind: TypeSymbolKind.Alias, Declaration: TypeAliasDecl aliasDecl })
+            _result.SetAliasAsked(call, aliasDecl);
         // An 'inline fn' (08 F6) sets the lambda literals at its function parameters in place:
         // marked before phase C checks them, so their 'return' is the enclosing function's
         if (decl is { IsInline: true })
@@ -12011,7 +12023,8 @@ public sealed class TypeChecker
                 // A round's variable (M9a S9) is its field's info, a constant. One whose rounds come
                 // later stands in a body checked once and never built — its site is the rounds'.
                 case IdentifierExpr known when _result.RefOf(known) is LocalSymbol round
-                                              && (_result.KnownFieldOf(round) is not null || _result.KnownVariantOf(round) is not null || _metaPending.Contains(round)):
+                                              && (_result.KnownFieldOf(round) is not null || _result.KnownVariantOf(round) is not null
+                                                  || _result.KnownMemberOf(round) is not null || _metaPending.Contains(round)):
                     if (_metaPending.Contains(round)) pure = false;
                     return;
                 // a question to std.meta about a type known per instance, inside a larger site
@@ -12358,7 +12371,7 @@ public sealed class TypeChecker
     /// <summary>A question of std.meta (09 A7): a function of its without a body, which the
     /// compiler answers.</summary>
     private static bool IsMetaQuery(Symbol? symbol) =>
-        symbol is FunctionSymbol { Declaration: FunctionDecl { Body: null }, Name: "fields" or "members" or "attribute" or "typeAttribute" or "variants" or "conformances" or "hasConformance" or "typeName" or "isStruct" or "isClass" or "isEnum" or "isInterface" }
+        symbol is FunctionSymbol { Declaration: FunctionDecl { Body: null }, Name: "fields" or "members" or "attribute" or "variantAttribute" or "memberAttribute" or "typeAttribute" or "variants" or "conformances" or "hasConformance" or "typeName" or "isStruct" or "isClass" or "isEnum" or "isInterface" }
         && symbol.Home is { FullName: "std.meta" or "std.core" };
 
     /// <summary>
@@ -12379,11 +12392,14 @@ public sealed class TypeChecker
         var about = _result.TypeArgumentsOf(asked) is [var only, ..] ? only : LyrType.Error;
         var reads = Descendants(fo.Body).Any(n => n is FieldByInfoExpr or PayloadByInfoExpr or TypeTestExpr or VariantInitExpr or ComptimeIfExpr
             or StructInitRound or ComptimeExpr or IfStmt { Comptime: true } or ForInStmt { Comptime: true }
-            || n is CallExpr { Callee: IdentifierExpr { Name: "attribute" } or MemberExpr { Member: "attribute" } });
+            || n is CallExpr { Callee: IdentifierExpr { Name: "attribute" or "variantAttribute" or "memberAttribute" }
+                                   or MemberExpr { Member: "attribute" or "variantAttribute" or "memberAttribute" } });
         var overFields = question?.Name == "fields";
         var overVariants = question?.Name == "variants";
-        var known = (overFields || overVariants) && about is not (TypeParamType or AssocOf or ErrorType);
-        var perConformer = (overFields || overVariants) && about is TypeParamType { Param: var param }
+        var overMembers = question?.Name == "members";
+        var walks = overFields || overVariants || overMembers;
+        var known = walks && about is not (TypeParamType or AssocOf or ErrorType);
+        var perConformer = walks && about is TypeParamType { Param: var param }
                            && _metaIface?.SelfParam is { } self && ReferenceEquals(param, self);
         var rounds = reads && known && _outerFunction is not null;
 
@@ -12432,6 +12448,27 @@ public sealed class TypeChecker
             _result.SetMetaRounds(fo, [.. built]);
             return;
         }
+        if (overMembers)
+        {
+            // a round per member (the sweep after M10, W6): 'm' that member's info, 'memberAttribute<A>(m)' what it carries
+            foreach (var member in MetaMembersOf(about, _currentModule))
+            {
+                if (ReparsedLoop(fo) is not { } fresh) return;
+                var roundScope = new SymbolTable(scope);
+                var variable = new LocalSymbol(fo.Variable, element, false, fresh);
+                roundScope.TryDeclare(variable);
+                _result.BindRef(fresh, variable);
+                _result.SetKnownMember(variable, member);
+                _roundOwner[variable] = about;
+                _result.SetReparsedOwner(fresh, _outerFunction);
+                using (_de.Within(new DiagnosticNote(member.Declaration?.Span ?? fo.Span, $"in the round for the member '{member.Name}' of '{TypeFacts.Display(about)}'")))
+                    CheckBlock(fresh.Body, roundScope);
+                built.Add(new TypeResult.MetaRound(fresh.Body, variable, new TypeResult.MetaField(member.Name, LyrType.Error, 0, member.Visibility, false, null)));
+                _result.ReparsedRoots.Add(fresh);
+            }
+            _result.SetMetaRounds(fo, [.. built]);
+            return;
+        }
         foreach (var field in MetaFieldsOf(about, _currentModule))
         {
             // a shape the family's synthesis has no form for (05 §14 rule 6): said as such, not as a missing member
@@ -12457,17 +12494,35 @@ public sealed class TypeChecker
         _result.SetMetaRounds(fo, [.. built]);
     }
 
-    /// <summary><c>std.meta.attribute&lt;A&gt;(f)</c> (R4): <c>f</c> the variable of a loop over
-    /// fields, whose round knows the field — or whose rounds come later.</summary>
+    /// <summary><c>std.meta.attribute&lt;A&gt;(f)</c>, <c>variantAttribute&lt;A&gt;(v)</c>,
+    /// <c>memberAttribute&lt;A&gt;(m)</c> (R4; W6): the argument is the variable of a loop over
+    /// fields, variants or members, whose round knows what it holds — or whose rounds come later.</summary>
     private void CheckFieldAttributeQuery(CallExpr call)
     {
+        var query = (TargetSymbol(call.Callee) as FunctionSymbol)?.Name ?? "attribute";
         if (call.Arguments is [IdentifierExpr named] && _result.RefOf(named) is LocalSymbol round
-            && (_result.KnownFieldOf(round) is not null || _metaPendingEver.Contains(round)))
+            && (query switch
+                {
+                    "variantAttribute" => _result.KnownVariantOf(round) is not null,
+                    "memberAttribute" => _result.KnownMemberOf(round) is not null,
+                    _ => _result.KnownFieldOf(round) is not null,
+                } || _metaPendingEver.Contains(round)))
             return;
+        var (what, over) = query switch
+        {
+            "variantAttribute" => ("variant", "std.meta.variants"),
+            "memberAttribute" => ("member", "std.meta.members"),
+            _ => ("field", "std.meta.fields"),
+        };
         _de.Report("LYR-SEM0185", Severity.Error, call.Span,
-            "'attribute' reads the field that the variable of a 'comptime for' over 'std.meta.fields' names, in a round of its own — "
-            + "here there is none: the type's fields are known only per instance, or this is no such loop's variable");
+            $"'{query}' reads the {what} that the variable of a 'comptime for' over '{over}' names, in a round of its own — "
+            + $"here there is none: the type's {what}s are known only per instance, or this is no such loop's variable");
     }
+
+    /// <summary>The attributes of what a round's variable holds — its field's, variant's or
+    /// member's —, or none where it is pending.</summary>
+    private AttributeNode[]? RoundAttributesOf(LocalSymbol round) =>
+        _result.KnownFieldOf(round)?.Attributes ?? _result.KnownVariantOf(round)?.Attributes ?? _result.KnownMemberOf(round)?.Attributes;
 
     /// <summary><c>e.[f]</c> (09 A7 R2; M9a S9): in a round, the field whose info <c>f</c> holds —
     /// the member access it is, checked as one; in a body checked once whose rounds come later,
@@ -12575,7 +12630,8 @@ public sealed class TypeChecker
     /// once, or nothing.</summary>
     private LocalSymbol? RoundVariable(Expr e, SymbolTable scope) =>
         e is IdentifierExpr id && scope.Lookup(id.Name) is LocalSymbol local
-        && (_result.KnownFieldOf(local) is not null || _result.KnownVariantOf(local) is not null || _metaPendingEver.Contains(local))
+        && (_result.KnownFieldOf(local) is not null || _result.KnownVariantOf(local) is not null || _result.KnownMemberOf(local) is not null
+            || _metaPendingEver.Contains(local))
             ? local : null;
 
     /// <summary>The five of 05 §14 and <c>TotalOrder</c> (09 A5; M9a S10): their defaults in
@@ -12728,6 +12784,8 @@ public sealed class TypeChecker
                     return m.Member switch { "isVar" => f.IsVar, "index" => (long)f.Index, "name" => f.Name, _ => null };
                 if (_result.KnownVariantOf(rv) is { } v)
                     return m.Member switch { "index" => (long)v.Index, "name" => v.Name, _ => null };
+                if (_result.KnownMemberOf(rv) is { } km)
+                    return m.Member switch { "name" => km.Name, "isStatic" => km.IsStatic, "isMut" => km.IsMut, _ => null };
                 return null;
             // 'f.type.name' (M10 S2): the field's type as 'typeName' writes it
             case MemberExpr { Target: MemberExpr { Target: IdentifierExpr tid, Member: "type", IsOptional: false }, Member: "name", IsOptional: false }
@@ -12744,11 +12802,11 @@ public sealed class TypeChecker
                 when RoundConstant(receiver, scope, ref touched) is string text:
                 return text.StartsWith(prefix.Value, StringComparison.Ordinal);
             case CallExpr { Arguments: [IdentifierExpr arg], TypeArguments: [NamedType attribute] } call
-                when call.Callee is IdentifierExpr { Name: "attribute" } or MemberExpr { Member: "attribute" }
-                     && RoundVariable(arg, scope) is { } rv && _result.KnownFieldOf(rv) is { } field:
+                when call.Callee is IdentifierExpr { Name: "attribute" or "variantAttribute" or "memberAttribute" }
+                                    or MemberExpr { Member: "attribute" or "variantAttribute" or "memberAttribute" }
+                     && RoundVariable(arg, scope) is { } rv && RoundAttributesOf(rv) is { } carried:
                 touched = true;
-                return field.Symbol?.Declaration is FieldDecl fd && fd.Attributes.Any(a => a.Path[^1] == attribute.Path[^1])
-                    ? Present : NullMark;
+                return carried.Any(a => a.Path[^1] == attribute.Path[^1]) ? Present : NullMark;
             // the kind of Self in a default set in place: decided, as the round's variables are
             case CallExpr { Arguments.Length: 0, TypeArguments: [NamedType { Path: ["Self"] } asked] } kind
                 when _selfAs is not null && kind.Callee is IdentifierExpr { Name: "isEnum" or "isStruct" or "isClass" or "isInterface" } or MemberExpr { Member: "isEnum" or "isStruct" or "isClass" or "isInterface" }
@@ -13113,7 +13171,7 @@ public sealed class TypeChecker
         {
             if (ts.Members.FunctionFor(fn.Name, fn) is not { } symbol) continue;
             if (from is not null && !_comp.Visible(symbol, from)) continue;
-            members.Add(new(fn.Name, symbol.Visibility, fn.IsStatic, fn.IsMut));
+            members.Add(new(fn.Name, symbol.Visibility, fn.IsStatic, fn.IsMut) { Declaration = fn });
         }
         return [.. members];
     }
@@ -13127,9 +13185,9 @@ public sealed class TypeChecker
         LyrType Of(TypeNode written) =>
             type is GenericInstance ? Substitute(ResolveType(written, ts.Members), subst) : ResolveType(written, ts.Members);
         return [.. e.Variants.Select((v, i) => new TypeResult.MetaVariant(v.Name, i, v.StructFields is { } named
-            ? [.. named.Select((f, j) => new TypeResult.MetaField(f.Name, Of(f.Type), j, Visibility.Public, false, null))]
+            ? [.. named.Select((f, j) => new TypeResult.MetaField(f.Name, Of(f.Type), j, Visibility.Public, false, null) { Declaration = f })]
             : [.. (v.TupleFields ?? []).Select((t, j) => new TypeResult.MetaField(
-                j.ToString(System.Globalization.CultureInfo.InvariantCulture), Of(t), j, Visibility.Public, false, null))]))];
+                j.ToString(System.Globalization.CultureInfo.InvariantCulture), Of(t), j, Visibility.Public, false, null))]) { Attributes = v.Attributes })];
     }
 
     /// <summary>The interfaces a type conforms to — its list's, its blocks', their parents —, in

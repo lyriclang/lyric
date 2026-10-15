@@ -31,6 +31,25 @@ public class AttributeParsingTests
         return module;
     }
 
+    /// <summary>A struct payload's field takes attributes as a struct's field does (Lyric 5; the
+    /// sweep after M10, W6): read before the field's name, carried by the field.</summary>
+    [Fact]
+    public void A_payload_field_takes_attributes()
+    {
+        var sm = new SourceManager { Lyric5 = true };
+        var id = sm.AddVirtual("test.lyr", "enum Shape { Dot, Box { @Mark(\"w\") width: int, height: int } }");
+        var de = new DiagnosticEngine(sm);
+        var module = new Parser(sm, id, de).ParseModule();
+        Assert.Empty(de.Diagnostics);
+
+        var shape = Assert.IsType<EnumDecl>(Assert.Single(module.Declarations));
+        var box = shape.Variants[1];
+        var fields = Assert.IsType<FieldDecl[]>(box.StructFields);
+        Assert.Equal(["Mark"], Assert.Single(fields[0].Attributes).Path);
+        Assert.Equal("width", fields[0].Name);
+        Assert.Empty(fields[1].Attributes);
+    }
+
     [Fact]
     public void An_attribute_before_the_header_binds_to_the_module()
     {
