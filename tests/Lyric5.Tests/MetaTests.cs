@@ -447,7 +447,7 @@ public class MetaTests
             """);
         Assert.Equal("port:TypeKind.Primitive:true:d name:TypeKind.Optional:false:o:req verbose:TypeKind.Primitive:true:d "
                      + "tags:TypeKind.Array:false:req color:TypeKind.Enum:true:d:e pair:TypeKind.Tuple:false:req "
-                     + "hello:TypeKind.Interface:false:req text:TypeKind.Primitive:true:d \nwfalse hfalse \n",
+                     + "hello:TypeKind.Interface:false:req text:TypeKind.Primitive:true:d \nwtrue hfalse \n",
             BuildAndRun(dir, "app", "build", "-C", dir));
     }
 

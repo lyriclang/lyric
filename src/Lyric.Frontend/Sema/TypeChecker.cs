@@ -608,6 +608,21 @@ public sealed class TypeChecker
                     foreach (var payloadField in variant.StructFields ?? [])
                         CheckAttributes(payloadField.Attributes, AttributeSite.Field, e.Generics.Length > 0,
                             module.Members, "a field");
+                    // and its default is checked as a struct field's (03 §4 rule 2 under §2.4; the sweep
+                    // after M10, X2): against the field's type, the enum's parameters in scope
+                    foreach (var payloadField in variant.StructFields ?? [])
+                    {
+                        if (payloadField.Default is null) continue;
+                        var defaults = module.Members;
+                        if (module.Members.LookupLocal(e.Name) is TypeSymbol { Generics.Length: > 0 } generic)
+                        {
+                            defaults = new SymbolTable(module.Members);
+                            foreach (var parameter in generic.Generics) defaults.TryDeclare(parameter);
+                        }
+                        var fieldType = ResolveType(payloadField.Type, defaults);
+                        CheckAssignable(payloadField.Default, CheckExpr(payloadField.Default, defaults, fieldType),
+                            fieldType, payloadField.Default.Span);
+                    }
                 }
                 CheckValueTypeIsFinite(e, e.Name, "enum", module);
                 if (module.Members.LookupLocal(e.Name) is TypeSymbol eType)
@@ -13133,9 +13148,15 @@ public sealed class TypeChecker
                     Set(field, fresh.Item.Value, fresh.Item.Span, CheckExpr(fresh.Item.Value, roundScope, field.Type));
             }
         }
-        for (var i = 0; i < values.Length; i++)
-            if (values[i] is null)
-                _de.Report("LYR-SEM0031", Severity.Error, vi.Span, $"the initializer for variant '{variant.Name}' omits the payload field '{variant.Payload[i].Name}'");
+        // an omitted field as for a written initializer (11 §4 rule 8; the sweep after M10, X2): its
+        // default, 'null' for a '?T', or LYR-SEM0106
+        var omitted = variant.Payload.Where((field, i) => values[i] is null
+            && field.Declaration?.Default is null && field.Type is not Optional).Select(field => field.Name).ToArray();
+        if (omitted.Length > 0)
+            _de.Report("LYR-SEM0106", Severity.Error, vi.Span, omitted.Length == 1
+                ? $"initializer for variant '{variant.Name}' omits field '{omitted[0]}', which has no default"
+                : $"initializer for variant '{variant.Name}' omits {omitted.Length} fields with no default: "
+                  + string.Join(", ", omitted.Select(m => $"'{m}'")));
         _result.SetVariantInit(vi, (ev, owner, values));
         return owner;
     }

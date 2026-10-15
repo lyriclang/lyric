@@ -557,8 +557,8 @@ public sealed class TypeResult
         public AttributeNode[] Attributes => (Declaration ?? Symbol?.Declaration as FieldDecl)?.Attributes ?? [];
 
         /// <summary>Whether the field's declaration writes an initializer (W9): the type's own
-        /// default counts for nothing, and a payload's field has none.</summary>
-        public bool HasDefault => Symbol?.Declaration is FieldDecl { Default: not null };
+        /// default counts for nothing; a payload's field as a struct's (X2).</summary>
+        public bool HasDefault => (Declaration ?? Symbol?.Declaration as FieldDecl)?.Default is not null;
     }
 
     /// <summary>A variant as <c>std.meta.variants</c> answers it, its payload's fields.</summary>

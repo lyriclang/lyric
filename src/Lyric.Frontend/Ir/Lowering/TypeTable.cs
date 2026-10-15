@@ -933,11 +933,10 @@ internal sealed class TypeTable
                 types.Add(ValueOf(Lower(tuple[i], tuple[i].Span)));
             }
         else if (variant.StructFields is { } fields)
+            // a field's default is no part of the layout: the construction site evaluates it (03 §4
+            // rule 2 under §2.4; the sweep after M10, X2), as for a struct's field
             foreach (var field in fields)
             {
-                if (field.Default is not null)
-                    throw new UnsupportedConstructException(
-                        "a field default", field.Span);
                 names.Add(field.Name);
                 types.Add(ValueOf(Lower(field.Type, field.Span)));
             }
