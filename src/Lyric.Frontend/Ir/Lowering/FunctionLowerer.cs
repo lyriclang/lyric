@@ -3898,11 +3898,9 @@ internal sealed class FunctionLowerer
 
         var fields = new TempId[layout.FieldNames.Length - 1];
         for (var i = 1; i < layout.FieldNames.Length; i++)
-        {
-            if (!values.TryGetValue(layout.FieldNames[i], out var value))
-                throw NotSupported($"initializer omits field '{layout.FieldNames[i]}'", expr.Span);
-            fields[i - 1] = value;
-        }
+            fields[i - 1] = values.TryGetValue(layout.FieldNames[i], out var value)
+                ? value
+                : OmittedPayloadField(_types.TypeOf(expr), variantName, layout.FieldNames[i], layout.FieldTypes[i], expr.Span);
 
         var dest = _slots.NewTemp(enumType);
         _b.Emit(new NewVariant(dest, variant, enumType.Type, fields, expr.Span));
@@ -6928,10 +6926,34 @@ internal sealed class FunctionLowerer
         var layout = _typeTable.Defs[variantType.Value];
         var fields = new TempId[layout.FieldNames.Length - 1];
         for (var i = 1; i < layout.FieldNames.Length; i++)
-            fields[i - 1] = LowerExprAs(values[i - 1] ?? throw Bug($"the initializer at {init.Span} omits a payload field"), layout.FieldTypes[i]);
+            fields[i - 1] = values[i - 1] is { } given
+                ? LowerExprAs(given, layout.FieldTypes[i])
+                : OmittedPayloadField(_types.TypeOf(init), variant.Name, layout.FieldNames[i], layout.FieldTypes[i], init.Span);
         var dest = _slots.NewTemp(enumType);
         _b.Emit(new NewVariant(dest, variantType, enumType.Type, fields, init.Span));
         return dest;
+    }
+
+    /// <summary>
+    /// A payload field the initializer leaves out (03 §4 rule 2 under §2.4; the sweep after M10, X2):
+    /// its default, evaluated here at the construction site as a struct's field's is — under the
+    /// enum's instance, since a default may name its parameters —, or <c>null</c> for a <c>?T</c>
+    /// without one. The checker has refused an omission with neither (<c>LYR-SEM0106</c>).
+    /// </summary>
+    private TempId OmittedPayloadField(LyrType constructed, string variantName, string fieldName, IrType fieldType, Span span)
+    {
+        var instance = SubstituteType(constructed);
+        var written = (TypeFacts.SymbolOf(instance)?.Declaration as EnumDecl)?.Variants
+            .FirstOrDefault(v => v.Name == variantName)?.StructFields?.FirstOrDefault(f => f.Name == fieldName);
+        if (written?.Default is { } fallback)
+            return UnderInstance(instance as GenericInstance, () => LowerExprAs(fallback, fieldType));
+        if (fieldType is IrOptionalType absent)
+        {
+            var none = _slots.NewTemp(absent);
+            _b.Emit(new OptNone(none, absent.Inner, span));
+            return none;
+        }
+        throw Bug($"the initializer at {span} omits the payload field '{fieldName}', which has no default");
     }
 
     private MemberExpr MemberOfInfo(FieldByInfoExpr access) =>
