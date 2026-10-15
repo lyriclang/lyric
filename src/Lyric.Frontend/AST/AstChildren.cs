@@ -507,6 +507,10 @@ public static class AstChildren
                 if (n.Thrown is not null) yield return n.Thrown;
                 break;
 
+            case FieldTypeByInfo n:
+                yield return n.Owner;
+                break;
+
             case NamedType n:
                 foreach (var a in n.TypeArguments) yield return a;
                 break;

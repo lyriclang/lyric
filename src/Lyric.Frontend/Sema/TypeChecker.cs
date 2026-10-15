@@ -12417,7 +12417,7 @@ public sealed class TypeChecker
     {
         var question = TargetSymbol(asked.Callee) as FunctionSymbol;
         var about = _result.TypeArgumentsOf(asked) is [var only, ..] ? only : LyrType.Error;
-        var reads = Descendants(fo.Body).Any(n => n is FieldByInfoExpr or PayloadByInfoExpr or TypeTestExpr or VariantInitExpr or ComptimeIfExpr
+        var reads = Descendants(fo.Body).Any(n => n is FieldByInfoExpr or FieldTypeByInfo or PayloadByInfoExpr or TypeTestExpr or VariantInitExpr or ComptimeIfExpr
             or StructInitRound or ComptimeExpr or IfStmt { Comptime: true } or ForInStmt { Comptime: true }
             || n is CallExpr { Callee: IdentifierExpr { Name: "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute" }
                                    or MemberExpr { Member: "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute" } });
@@ -12428,13 +12428,16 @@ public sealed class TypeChecker
         var known = walks && about is not (TypeParamType or AssocOf or ErrorType);
         var perConformer = walks && about is TypeParamType { Param: var param }
                            && _metaIface?.SelfParam is { } self && ReferenceEquals(param, self);
+        // a question about 'T.[f]' in the body checked once (X5): the rounds come with f's
+        var nestedPending = asked.TypeArguments is [FieldTypeByInfo { Info: var fieldVariable }, ..]
+                            && scope.Lookup(fieldVariable) is LocalSymbol outer && _metaPending.Contains(outer);
         var rounds = reads && known && _outerFunction is not null;
 
         var loopScope = new SymbolTable(scope);
         var loopVar = new LocalSymbol(fo.Variable, element, false, fo);
         loopScope.TryDeclare(loopVar);
         _result.BindRef(fo, loopVar);
-        if (rounds || perConformer && reads)
+        if (rounds || perConformer && reads || nestedPending && reads)
         {
             _metaPending.Add(loopVar);
             _metaPendingEver.Add(loopVar);
@@ -14303,6 +14306,26 @@ public sealed class TypeChecker
                     return MakeGenericInstance(gts, n, scope);
                 }
                 return SymbolToType(sym, scope, n.Span);
+            // 'T.[f]' (11 §4 rule 3; the sweep after M10, X5): the type of the field the round's
+            // variable names — of the type the round walks; in the body checked once, before the
+            // rounds, no type yet
+            case FieldTypeByInfo byInfo:
+            {
+                if (scope.Lookup(byInfo.Info) is LocalSymbol round)
+                {
+                    if (_result.KnownFieldOf(round) is { } field)
+                    {
+                        var owner = ResolveType(byInfo.Owner, scope);
+                        if (!owner.IsError && _roundOwner.TryGetValue(round, out var walked) && !LyrType.Equal(owner, walked))
+                            return Report(byInfo.Owner.Span, "LYR-SEM0185",
+                                $"'{byInfo.Info}' holds a field of '{TypeFacts.Display(walked)}', and this is '{TypeFacts.Display(owner)}'");
+                        return field.Type;
+                    }
+                    if (_metaPending.Contains(round)) return LyrType.Error;
+                }
+                return Report(byInfo.Span, "LYR-SEM0185",
+                    "'T.[f]' is the type of the field that the variable of a 'comptime for' over 'std.meta.fields' names, " + RoundsMessage);
+            }
             case ThrowingType tt:
             {
                 var carried = ResolveType(tt.Inner, scope);

@@ -31,6 +31,29 @@ public class AttributeParsingTests
         return module;
     }
 
+    /// <summary><c>T.[f]</c> in a type's place (Lyric 5; the sweep after M10, X5): the path stops at
+    /// <c>.[</c>, and the node holds the owner and the round's variable; in an expression
+    /// <c>e.[f]</c> is still the field.</summary>
+    [Fact]
+    public void A_type_through_an_info_is_its_own_node()
+    {
+        var sm = new SourceManager { Lyric5 = true };
+        var id = sm.AddVirtual("test.lyr", "fn f(): void { let x: Self.[f] = e.[f]; let y: a.B.[g][] = []; }");
+        var de = new DiagnosticEngine(sm);
+        var module = new Parser(sm, id, de).ParseModule();
+        Assert.Empty(de.Diagnostics);
+
+        var body = Assert.IsType<FunctionDecl>(Assert.Single(module.Declarations)).Body!;
+        var first = Assert.IsType<BindingStmt>(body.Statements[0]);
+        var byInfo = Assert.IsType<FieldTypeByInfo>(first.Type);
+        Assert.Equal(["Self"], Assert.IsType<NamedType>(byInfo.Owner).Path);
+        Assert.Equal("f", byInfo.Info);
+        Assert.IsType<FieldByInfoExpr>(first.Initializer);
+        var array = Assert.IsType<ArrayType>(Assert.IsType<BindingStmt>(body.Statements[1]).Type);
+        var inner = Assert.IsType<FieldTypeByInfo>(array.Element);
+        Assert.Equal(["a", "B"], Assert.IsType<NamedType>(inner.Owner).Path);
+    }
+
     /// <summary>A struct payload's field takes attributes as a struct's field does (Lyric 5; the
     /// sweep after M10, W6): read before the field's name, carried by the field.</summary>
     [Fact]

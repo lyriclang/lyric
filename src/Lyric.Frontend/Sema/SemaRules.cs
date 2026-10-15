@@ -194,6 +194,7 @@ public sealed class SemaRules
                 foreach (var a in n.TypeArguments) Names(a, level, what);
                 break;
             case NullableType o: Names(o.Inner, level, what); break;
+            case FieldTypeByInfo byInfo: Names(byInfo.Owner, level, what); break;
             case ThrowingType t:
                 Names(t.Inner, level, what);
                 if (t.Thrown is { } written) Names(written, level, what);

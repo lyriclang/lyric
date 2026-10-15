@@ -1766,6 +1766,16 @@ public sealed partial class Parser
 
         var type = ParseTypeAtom(returned: !allowThrows);
 
+        // 'Self.[f]' (Lyric 5; the sweep after M10, X5): the type of the field a round's variable names
+        if (_sm.Lyric5 && type is NamedType && _buffer.Check(TokenKind.Dot) && _buffer.Peek(1).TokenKind == TokenKind.LBracket)
+        {
+            _buffer.Advance();
+            _buffer.Advance();
+            var info = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026", "expected the name of a round's variable in 'T.[f]'");
+            var close = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close 'T.[f]'");
+            type = new FieldTypeByInfo(type, _sm.Slice(info.Span).ToString(), info.Span, Span.Union(type.Span, close.Span));
+        }
+
         while (_buffer.Check(TokenKind.LBracket)) // T[]
         {
             _buffer.Advance();
@@ -1831,7 +1841,9 @@ public sealed partial class Parser
                 var path = new List<string> { _sm.Slice(cur.Span).ToString() };
                 var end = cur.Span;
                 var nameSpan = cur.Span;
-                while (_buffer.Match(TokenKind.Dot))
+                // a '.[' ends the path: 'Self.[f]' is the type of a round's field (X5)
+                while (!(_sm.Lyric5 && _buffer.Check(TokenKind.Dot) && _buffer.Peek(1).TokenKind == TokenKind.LBracket)
+                       && _buffer.Match(TokenKind.Dot))
                 {
                     var seg = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0011",
                         $"expected identifier in type path, got {_buffer.Current.TokenKind}");

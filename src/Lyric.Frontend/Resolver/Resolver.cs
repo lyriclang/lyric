@@ -891,6 +891,7 @@ public sealed class Resolver
                 BindType(th.Inner, scope);
                 if (th.Thrown is not null) BindType(th.Thrown, scope);
                 break;
+            case FieldTypeByInfo byInfo: BindType(byInfo.Owner, scope); break; // the field is the round's (X5)
             case ArrayType a: BindType(a.Element, scope); break;
             case TupleType t: foreach (var e in t.Elements) BindType(e, scope); break;
             case FunctionType f:
