@@ -516,6 +516,7 @@ pub interface Shr<Rhs = int> {
 
 /// `a == b` is `a.equals(b)`, `!=` its negation (04 D6). Both sides are the conformer's own
 /// type: there is no heterogeneous equality.
+@SeesConformer
 pub interface Equatable {
     /// Synthesized for a conformance without the member (05 §14; 09 A5): field by field in
     /// declaration order; an enum the same variant with equal payloads.
@@ -553,6 +554,7 @@ pub enum Ordering :: [Equatable, Hashable, Debug] { Less, Equal, Greater }
 /// `a < b`, `<=`, `>`, `>=` read `a.compare(b)` (04 D6): `.Less` for `<`, and `null` where the
 /// two are not ordered — `float` is partial, NaN compares with nothing — in which case every one
 /// of the four is false.
+@SeesConformer
 pub interface Ordered :: [Equatable] {
     /// Synthesized (05 §14): lexicographic over the fields, the first that is not `.Equal`
     /// decides, and a field unordered — `null` — is the answer; an enum by the variant's position
@@ -618,6 +620,7 @@ pub interface Ordered :: [Equatable] {
 }
 
 /// A total order, what sorting and keys need; `float` has none of its own (D6).
+@SeesConformer
 pub interface TotalOrder :: [Ordered] {
     /// Synthesized as `compare` is, every field total.
     fn totalCompare(o: Self): Ordering {
@@ -693,6 +696,7 @@ pub interface Hasher {
 
 /// What a `Map` key and a `Set` element need (10 K2): the value's parts written into a hasher, in an
 /// order of the type's. Equal values write the same; nothing checks it.
+@SeesConformer
 pub interface Hashable :: [Equatable] {
     /// Synthesized (05 §14; 10 K2): the fields into the hasher in declaration order; an enum its
     /// variant's position, then the payload.
@@ -723,6 +727,7 @@ pub interface Identity :: [Hashable] {
 
 /// The name of the variant an enum value holds, as written (09 A7 R5; M9a S11):
 /// `Color.Red.name()` is `"Red"`. A default over the variants, for any enum.
+@SeesConformer
 pub interface VariantName {
     /// The variant's name.
     fn name(): string {
@@ -738,6 +743,7 @@ pub interface VariantName {
 /// An enum's variants as values (09 A7 R5; M9a S11; Swift's `CaseIterable`): all of them in
 /// declaration order, and one by its name. For an enum whose variants all are units — a variant
 /// with a payload has no value without it, and such an enum is refused at its entry.
+@SeesConformer
 pub interface Variants :: [VariantName] {
     /// Every variant, in declaration order. (Named `all`, not `variants`: inside the default the
     /// latter is the question `variants<Self>()` itself.)
@@ -1116,6 +1122,7 @@ pub interface Debug {
 
 /// A copy of the value: value fields copied, reference fields cloned (04 D13). Synthesized for a
 /// conformance without a body.
+@SeesConformer
 pub interface Clone {
     /// Synthesized (05 §14): every field cloned — a `@Shared` field copied as it stands (04
     /// Clone; 09 A11) —; an enum its variant rebuilt from the payload cloned.
@@ -5236,6 +5243,13 @@ fn buildDebug(): bool;
 /// `@Shared` on a field (04 Clone; 09 A11): a synthesized `clone()` copies the field as it stands
 /// instead of cloning it — a parent, a service, a cycle: what both copies share.
 pub struct Shared :: [OnField] { }
+
+/// `@SeesConformer` on an interface (11 §4 rule 10; the sweep after M10, W10): its defaults over
+/// `fields<Self>()`, `variants<Self>()` and `members<Self>()` ask with the module of the conformer
+/// they are set in place for, and see every field of it, whatever its word — as the family below
+/// and std.codec's `Encode` and `Decode` do, which carry it. Without it a default sees what the
+/// interface's module may name (R7): another package's `pub` fields alone.
+pub struct SeesConformer :: [OnInterface] { }
 
 // ---------------------------------------------------------------------------------------------
 // Type information while compiling (design/v5/spec/09 A7; 10 B13 M1; M9a S9, S10). Declared here,
