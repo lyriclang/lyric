@@ -1083,7 +1083,7 @@ public sealed class TypeChecker
         foreach (var block in _comp.Extensions.Blocks)
         {
             if (!ReferenceEquals(block.Target, type) || block.Decl.Generics.Length > 0) continue;
-            if (seen && _currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (seen && !_comp.Reaches(_currentModule, block)) continue;
             if (block.MethodScope.LookupLocal(name) is GlobalSymbol added) return added;
         }
         return null;
@@ -1096,7 +1096,7 @@ public sealed class TypeChecker
         foreach (var block in _comp.Extensions.Blocks)
         {
             if (!ReferenceEquals(block.Target, type) || block.Decl.Generics.Length == 0) continue;
-            if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (!_comp.Reaches(_currentModule, block)) continue;
             if (block.MethodScope.LookupLocal(name) is GlobalSymbol added) return (block, added);
         }
         return null;
@@ -2562,7 +2562,7 @@ public sealed class TypeChecker
         foreach (var s in ts.Members.Symbols)
             if (s is FunctionSymbol fn) Add(fn);
         foreach (var ext in _comp.Extensions.MethodsFor(ts))
-            if (_comp.Sees(module, ext.Module)) Add(ext.Symbol);
+            if (_comp.Reaches(module, ext)) Add(ext.Symbol);
         return map;
     }
 
@@ -4791,7 +4791,7 @@ public sealed class TypeChecker
         var scoped = ConformanceBlocksNaming(ts, member) > 1;
         foreach (var ext in _comp.Extensions.MethodsFor(ts))
             if (ext.Symbol.Name == member
-                && (_currentModule is null || _comp.Sees(_currentModule, ext.Module))
+                && _comp.Reaches(_currentModule, ext)
                 && MayName(ext.Symbol)
                 && !(scoped && ext.InConformanceBlock)
                 && !found.Any(c => ReferenceEquals(c.Fn, ext.Symbol)))
@@ -5967,7 +5967,7 @@ public sealed class TypeChecker
         foreach (var block in _comp.Extensions.Blocks)
         {
             if (!ReferenceEquals(block.Target, ts)) continue;
-            if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (!_comp.Reaches(_currentModule, block)) continue;
             var map = ofInstance;
             if (block.Generics.Length > 0)
             {
@@ -6006,7 +6006,7 @@ public sealed class TypeChecker
         foreach (var ext in _comp.Extensions.MethodsFor(ts))
         {
             if (ext.Symbol.Name != method) continue;
-            if (_currentModule is not null && !_comp.Sees(_currentModule, ext.Module)) continue;
+            if (!_comp.Reaches(_currentModule, ext)) continue;
             if (Substitute(FnTypeOf(ext.Symbol), ofInstance) is FnType { Parameters.Length: 1 } fn
                 && LyrType.Equal(fn.Parameters[0], parameter))
                 return ext.Symbol;
@@ -7876,7 +7876,7 @@ public sealed class TypeChecker
         foreach (var block in _comp.Extensions.Blocks)
         {
             if (!IsShapeBlock(block)) continue;
-            if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (!_comp.Reaches(_currentModule, block)) continue;
             if (block.MethodScope.LookupLocal(mem.Member) is not FunctionSymbol found) continue;
             if (BlockSubstitution(block, receiver) is not { } map)
             {
@@ -7916,7 +7916,7 @@ public sealed class TypeChecker
         foreach (var block in _comp.Extensions.Blocks)
         {
             if (!block.IsBlanketTarget) continue;
-            if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (!_comp.Reaches(_currentModule, block)) continue;
             if (block.MethodScope.LookupLocal(member) is not FunctionSymbol found || !MayName(found)) continue;
             // A parameter only the conformance names stays open; the call binds it (05 §13 rule 9).
             if (BlockSubstitution(block, receiver, open: true) is not { } map) continue;
@@ -7936,7 +7936,7 @@ public sealed class TypeChecker
     private bool BlocksGive(TypeSymbol builtin, string member) =>
         builtin.Members.LookupLocal(member) is not null
         || _comp.Extensions.Blocks.Any(block => ReferenceEquals(block.Target, builtin)
-            && (_currentModule is null || _comp.Sees(_currentModule, block.Module))
+            && _comp.Reaches(_currentModule, block)
             && block.MethodScope.LookupLocal(member) is FunctionSymbol);
 
     // Members on a type parameter T: what its constraint interfaces provide — the closure, since
@@ -9072,7 +9072,7 @@ public sealed class TypeChecker
         foreach (var block in _comp.Extensions.Blocks)
         {
             if (!ReferenceEquals(block.Target, ts)) continue;
-            if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (!_comp.Reaches(_currentModule, block)) continue;
             if (block.Decl.Target is not NamedType { TypeArguments.Length: > 0 })
             {
                 foreach (var node in block.Decl.Interfaces)
@@ -9133,7 +9133,7 @@ public sealed class TypeChecker
             if (block.Decl.Interfaces.Length == 0) continue;
             if (!(block.IsBlanketTarget || (shapes && IsShapeBlock(block))))
                 continue;
-            if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (!_comp.Reaches(_currentModule, block)) continue;
             var probe = (block, TypeFacts.Display(type));
             if (!_blockProbes.Add(probe)) continue;
             try
@@ -9489,7 +9489,7 @@ public sealed class TypeChecker
         foreach (var ext in _comp.Extensions.MethodsFor(ts))
         {
             if (ext.Symbol.Name != member) continue;
-            if (_currentModule is not null && !_comp.Sees(_currentModule, ext.Module)) continue;
+            if (!_comp.Reaches(_currentModule, ext)) continue;
             // A method its module keeps to itself is not there for this one (07 V2 S5).
             if (!MayName(ext.Symbol)) continue;
             if (!visible.Any(f => ReferenceEquals(f.Symbol, ext.Symbol))) visible.Add(ext);
@@ -9559,7 +9559,7 @@ public sealed class TypeChecker
         foreach (var block in _comp.Extensions.Blocks)
         {
             if (!ReferenceEquals(block.Target, ts)) continue;
-            if (_currentModule is not null && !_comp.Sees(_currentModule, block.Module)) continue;
+            if (!_comp.Reaches(_currentModule, block)) continue;
             foreach (var node in block.Decl.Interfaces)
                 foreach (var r in ClosureOfNode(node, seen)) yield return r;
         }

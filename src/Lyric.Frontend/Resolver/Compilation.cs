@@ -216,6 +216,23 @@ public sealed class Compilation
 
     /// <summary>Does module <paramref name="from"/> see declarations from <paramref name="to"/>?
     /// The same module, or an import of <paramref name="to"/>.</summary>
+    /// <summary>
+    /// Whether a block reaches the code of <paramref name="from"/> (design/v5/spec/04; spec 04 rule
+    /// 10; the sweep after M10, W7): a conformance block — <c>extend T :: [I] { … }</c>, the
+    /// synthesized ones among them — wherever its type is, its module imported or not, since the
+    /// conformance is the program's (05 §13 rule 4: one per type and interface in the whole
+    /// program); a block of methods alone where its module is seen (04 rule 9). Before W7 every
+    /// block asked <see cref="Sees"/>, and a type reached through a re-export, a return value or
+    /// a field came without the conformances its own module gave it.
+    /// </summary>
+    public bool Reaches(ModuleSymbol? from, ExtensionBlock block) =>
+        block.Decl.Interfaces.Length > 0 || from is null || Sees(from, block.Module);
+
+    /// <summary>Whether a block's method reaches the code of <paramref name="from"/>: with its
+    /// block (<see cref="Reaches(ModuleSymbol?, ExtensionBlock)"/>).</summary>
+    public bool Reaches(ModuleSymbol? from, ExtensionMethod method) =>
+        method.InConformanceBlock || from is null || Sees(from, method.Module);
+
     public bool Sees(ModuleSymbol from, ModuleSymbol to)
     {
         if (ReferenceEquals(from, to)) return true;
