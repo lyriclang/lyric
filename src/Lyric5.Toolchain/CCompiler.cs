@@ -144,7 +144,8 @@ public static class ProcessRunner
     /// <summary>Runs a program and passes on what it writes as it writes it, line by line —
     /// to writers rather than to the console, so a caller that redirects the console gets it —;
     /// answers its exit code. <c>lyric test</c>'s program (10 B12).</summary>
-    public static int Stream(string file, IEnumerable<string> arguments, TextWriter output, TextWriter error)
+    public static int Stream(string file, IEnumerable<string> arguments, TextWriter output, TextWriter error,
+        string? workingDirectory = null)
     {
         var info = new ProcessStartInfo(file)
         {
@@ -154,6 +155,7 @@ public static class ProcessRunner
             StandardErrorEncoding = Utf8,
             UseShellExecute = false,
         };
+        if (workingDirectory is not null) info.WorkingDirectory = workingDirectory;
         foreach (var argument in arguments) info.ArgumentList.Add(argument);
         using var process = new Process { StartInfo = info };
         var gate = new object();

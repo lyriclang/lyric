@@ -6,8 +6,6 @@ import std.core { Utf8Error };
 import std.fs;
 import std.json;
 import std.json { JsonError };
-import std.os;
-import std.path;
 import std.test { assertEq, fail };
 
 /// Whether the file's bytes parse as a JSON document: no UTF-8 is no document.
@@ -27,29 +25,14 @@ fn parses(path: string): bool throws Error {
     }
 }
 
-/// The suite's directory, in the package beside `tests/`. `lyric test` runs the program it built
-/// under the package's `out/` and says nothing of the working directory (14 §3), so the search
-/// climbs from the program's own path — its first argument — to the directory that holds the
-/// fixtures, and tries the working directory after.
+/// The suite's directory, by its path in the package: `lyric test` runs the program in the
+/// package's directory (14 §3 rule 1).
 fn suiteDir(): string {
-    var dir = path.parent(os.args()[0][..]);
-    loop {
-        let candidate = path.join(dir, "fixtures", "json", "test_parsing");
-        if (fs.exists(candidate)) {
-            return candidate;
-        }
-        let up = path.parent(dir[..]);
-        if (up == dir) {
-            break;
-        }
-        dir = up;
+    let dir = "fixtures/json/test_parsing";
+    if (!fs.exists(dir)) {
+        fail("the JSONTestSuite fixtures are not in the package's fixtures/json");
     }
-    for (rel in ["fixtures/json/test_parsing", "tests/std/fixtures/json/test_parsing"]) {
-        if (fs.exists(rel)) {
-            return rel;
-        }
-    }
-    fail("the JSONTestSuite fixtures are not where the test looks");
+    return dir;
 }
 
 @Test
