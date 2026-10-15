@@ -3,7 +3,7 @@
 import std.core { ParseError, ParseErrorKind };
 import std.task { sleep };
 import std.test { assertEq, assertFalse, assertTrue, fail };
-import std.time { Duration, Instant, Monotonic };
+import std.time { Duration, Instant, Monotonic, Time };
 
 fn kindOf(s: string): ParseErrorKind {
     try {
@@ -103,4 +103,39 @@ fn theMonotonicClockMovesForward(): void throws Error {
     let first = start.elapsed();
     assertTrue(first >= Duration.ofMillis(10));
     assertTrue(start.elapsed() >= first);
+}
+
+/// A time of day reads from its text (the review of M10, M15): what `show()` writes, and the
+/// refusals with their reasons.
+@Test
+fn aTimeOfDayReadsFromItsText(): void throws Error {
+    let t = try Time.parse("09:30:00");
+    assertEq(t.hour(), 9);
+    assertEq(t.minute(), 30);
+    assertEq(t.nano(), 0);
+    assertEq((try Time.parse("23:59:59.5")).nano(), 500000000);
+    assertEq((try Time.parse("23:59:59.123456789123")).nano(), 123456789);
+    assertEq(try Time.parse((try Time.of(7, 5, 3, 40000000)).show()), try Time.of(7, 5, 3, 40000000));
+    for ((text, detail) in [("9:30", "a time of day is HH:MM:SS, a fraction after it"), ("09:30:00x", "only a fraction may follow the seconds"),
+                            ("09:30:00.", "the fraction is digits, and nothing follows it"), ("09:30:00.5s", "the fraction is digits, and nothing follows it")]) {
+        try {
+            let _ = try Time.parse(text);
+            fail(f"took '{text}'");
+        } catch (e: ParseError) {
+            assertEq(e.kind, ParseErrorKind.Invalid);
+            assertEq(e.detail, detail);
+        }
+    }
+    try {
+        let _ = try Time.parse("24:00:00");
+        fail("took 24:00:00");
+    } catch (e: ParseError) {
+        assertEq(e.kind, ParseErrorKind.Invalid);
+    }
+    try {
+        let _ = try Time.parse("");
+        fail("took the empty text");
+    } catch (e: ParseError) {
+        assertEq(e.kind, ParseErrorKind.Empty);
+    }
 }

@@ -2,7 +2,7 @@
 // the reference resolution of §5.4, the normalization of §6.2, the percent-encoding per component,
 // the query as pairs, what the grammar refuses.
 import std.uri { Uri, Query, percentEncode, percentDecode, removeDotSegments };
-import std.core { ParseError };
+import std.core { ParseError, ParseErrorKind };
 import std.codec { DecodeError };
 import std.json;
 import std.test { assertEq, assertTrue, assertNull, fail };
@@ -63,7 +63,7 @@ fn aUriIsItsFivePartsAndTheirText(): void throws Error {
         let _ = json.decode<Uri>("\"http://a b\"");
         fail("a space in a host decoded");
     } catch (e: DecodeError) {
-        assertEq(e.message(), "invalid: 'http://a b' is no URI: the text is not a value of the type");
+        assertEq(e.message(), "invalid: 'http://a b' is no URI: the text is not a value of the type: a character the host does not allow (at byte 7)");
     }
 }
 
@@ -167,4 +167,41 @@ fn whatTheGrammarRefusesIsRefused(): void {
     }
     // an IPvFuture literal is refused: only an IPv6 address stands in brackets (a reading)
     assertTrue(refused("http://[v6.fe80::a]/"));
+}
+
+/// A refusal says where and why (the review of M10, M14): `detail` and `offset` beside the kind,
+/// and `message()` carries them.
+@Test
+fn aRefusalSaysWhereAndWhy(): void {
+    for ((text, detail, offset) in [
+        ("http://[::1", "an '[' without its ']'", 7),
+        ("http://h:99999/", "the port is beyond 65535", 9),
+        ("http://h:9x/", "the port is digits", 10),
+        ("http://h/a b", "a character the path does not allow", 8),
+        ("http://h/p#f g", "a character the fragment does not allow", 11),
+        ("a:b/c", "", -1),
+    ]) {
+        if (detail.isEmpty()) {
+            // 'a:b/c' is a scheme 'a' with the path 'b/c': no refusal at all
+            let u = try! Uri.parse(text);
+            assertEq(u.scheme ?? "", "a");
+            continue;
+        }
+        try {
+            let _ = Uri.parse(text);
+            fail(f"took '{text}'");
+        } catch (e: ParseError) {
+            assertEq(e.kind, ParseErrorKind.Invalid);
+            assertEq(e.detail, detail);
+            assertEq(e.offset ?? -1, offset);
+            assertEq(e.message(), f"the text is not a value of the type: {detail} (at byte {offset})");
+        }
+    }
+    try {
+        let _ = percentDecode("a%2");
+        fail("took a%2");
+    } catch (e: ParseError) {
+        assertEq(e.detail, "a '%' without two hexadecimal digits after it");
+        assertEq(e.offset ?? -1, 1);
+    }
 }

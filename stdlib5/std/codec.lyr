@@ -19,7 +19,7 @@
 import std.collections { List, Map, Set, Deque };
 import std.core { Hasher, ParseError, OnField, OnType, fields, variants, attribute, typeAttribute, typeName, isEnum, FieldInfo };
 import std.hash { DefaultHasher };
-import std.time { Instant };
+import std.time { Instant, Duration, Date, Time, DateTime };
 
 // ------------------------------------------------------------------ the attribute
 
@@ -575,6 +575,61 @@ extend Instant :: [Codable] {
             return Instant.parse(s);
         } catch (p: ParseError) {
             throw DecodeError { kind = .Invalid, path = d.path(), detail = f"'{s}' is no instant: {p.message()}" };
+        }
+    }
+}
+
+/// The other time types are their texts too (the review of M10, M15): a `Duration` as Go writes
+/// it (`1h30m`), a `Date` as RFC 3339's full-date, a `Time` as `HH:MM:SS` with its fraction, a
+/// `DateTime` as RFC 3339's date-time with its offset.
+extend Duration :: [Codable] {
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
+
+    static fn decode<D :: [Decoder]>(&d: D): Duration throws DecodeError {
+        let s = try d.decodeString();
+        try {
+            return Duration.parse(s);
+        } catch (p: ParseError) {
+            throw DecodeError { kind = .Invalid, path = d.path(), detail = f"'{s}' is no duration: {p.message()}" };
+        }
+    }
+}
+
+extend Date :: [Codable] {
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
+
+    static fn decode<D :: [Decoder]>(&d: D): Date throws DecodeError {
+        let s = try d.decodeString();
+        try {
+            return Date.parse(s);
+        } catch (p: ParseError) {
+            throw DecodeError { kind = .Invalid, path = d.path(), detail = f"'{s}' is no date: {p.message()}" };
+        }
+    }
+}
+
+extend Time :: [Codable] {
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
+
+    static fn decode<D :: [Decoder]>(&d: D): Time throws DecodeError {
+        let s = try d.decodeString();
+        try {
+            return Time.parse(s);
+        } catch (p: ParseError) {
+            throw DecodeError { kind = .Invalid, path = d.path(), detail = f"'{s}' is no time of day: {p.message()}" };
+        }
+    }
+}
+
+extend DateTime :: [Codable] {
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
+
+    static fn decode<D :: [Decoder]>(&d: D): DateTime throws DecodeError {
+        let s = try d.decodeString();
+        try {
+            return DateTime.parse(s);
+        } catch (p: ParseError) {
+            throw DecodeError { kind = .Invalid, path = d.path(), detail = f"'{s}' is no date-time: {p.message()}" };
         }
     }
 }

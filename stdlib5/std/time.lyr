@@ -410,7 +410,7 @@ pub struct Date :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
             throw ParseError { kind = .Empty };
         }
         if (b.length() != 10) {
-            throw ParseError { kind = .Invalid };
+            throw ParseError { kind = .Invalid, detail = "a date is YYYY-MM-DD", offset = 0 };
         }
         return try readDate(b);
     }
@@ -418,11 +418,50 @@ pub struct Date :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
 
 /// A time of day (10 Q1): hours 0–23, minutes and seconds 0–59 — no leap second, which POSIX time
 /// does not count —, nanoseconds. Its text is `HH:MM:SS` and the fraction, without trailing zeros.
-pub struct Time :: [Equatable, Ordered, TotalOrder, Hashable, Display] {
+pub struct Time :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
     h: int,
     mi: int,
     s: int,
     n: int,
+
+    /// `HH:MM:SS` and a fraction of up to nine digits (RFC 3339's partial-time, no offset): the
+    /// text `show()` writes, read back.
+    pub static fn parse(s: StringView): Time throws ParseError {
+        let b = viewBytes(s);
+        let n = b.length();
+        if (n == 0) {
+            throw ParseError { kind = .Empty };
+        }
+        if (n < 8 || b[2] != 58u8 || b[5] != 58u8) {
+            throw ParseError { kind = .Invalid, detail = "a time of day is HH:MM:SS, a fraction after it", offset = 0 };
+        }
+        let hour = try twoDigitsAt(b, 0);
+        let minute = try twoDigitsAt(b, 3);
+        let second = try twoDigitsAt(b, 6);
+        var nano = 0;
+        if (n > 8) {
+            if (b[8] != 46u8) {
+                throw ParseError { kind = .Invalid, detail = "only a fraction may follow the seconds", offset = 8 };
+            }
+            var at = 9;
+            var digits = 0;
+            while (at < n && isDigit(b[at])) {
+                if (digits < 9) {
+                    nano = nano * 10 + ((b[at] - 48u8) as int);
+                }
+                digits = digits + 1;
+                at = at + 1;
+            }
+            if (digits == 0 || at != n) {
+                throw ParseError { kind = .Invalid, detail = "the fraction is digits, and nothing follows it", offset = at };
+            }
+            while (digits < 9) {
+                nano = nano * 10;
+                digits = digits + 1;
+            }
+        }
+        return try Time.of(hour, minute, second, nano) catch (e: TimeError) throw ParseError { kind = .Invalid, detail = e.message(), offset = 0 };
+    }
 
     /// The time of day, or a `TimeError` where there is none.
     pub static fn of(hour: int, minute: int, second: int, nano: int = 0): Time throws TimeError {
@@ -1280,11 +1319,11 @@ pub struct DateTime :: [Display, Parse] {
             throw ParseError { kind = .Empty };
         }
         if (n < 20 || (b[10] != 84u8 && b[10] != 116u8)) {
-            throw ParseError { kind = .Invalid };
+            throw ParseError { kind = .Invalid, detail = "a date-time is YYYY-MM-DDTHH:MM:SS with 'Z' or an offset", offset = 0 };
         }
         let date = try readDate(b[..10]);
         if (b[13] != 58u8 || b[16] != 58u8) {
-            throw ParseError { kind = .Invalid };
+            throw ParseError { kind = .Invalid, detail = "the time of day is HH:MM:SS", offset = 11 };
         }
         let hour = try twoDigitsAt(b, 11);
         let minute = try twoDigitsAt(b, 14);
@@ -1310,7 +1349,7 @@ pub struct DateTime :: [Display, Parse] {
             }
         }
         if (at >= n) {
-            throw ParseError { kind = .Invalid };
+            throw ParseError { kind = .Invalid, detail = "the offset is missing: 'Z', or +HH:MM", offset = at };
         }
         var offset = 0;
         if (b[at] == 90u8 || b[at] == 122u8) {
@@ -1327,12 +1366,12 @@ pub struct DateTime :: [Display, Parse] {
             }
             at = at + 6;
         } else {
-            throw ParseError { kind = .Invalid };
+            throw ParseError { kind = .Invalid, detail = "the offset is 'Z', or +HH:MM", offset = at };
         }
         if (at != n) {
-            throw ParseError { kind = .Invalid };
+            throw ParseError { kind = .Invalid, detail = "text after the date-time", offset = at };
         }
-        let time = try Time.of(hour, minute, second, nano) catch (e: TimeError) throw ParseError { kind = .Invalid };
+        let time = try Time.of(hour, minute, second, nano) catch (e: TimeError) throw ParseError { kind = .Invalid, detail = e.message(), offset = 11 };
         return DateTime { d = date, t = time, off = offset, z = fixedOf(offset) };
     }
 }

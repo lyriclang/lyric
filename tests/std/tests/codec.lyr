@@ -4,7 +4,7 @@
 import std.codec { Codable, Encoder, Decoder, Value, Bytes, DecodeError, DecodeErrorKind, EncodeError };
 import std.collections { List, Map, Set, Deque };
 import std.test { assertEq, assertTrue, fail };
-import std.time { Instant };
+import std.time { Instant, Duration, Date, Time, DateTime, Zone };
 
 struct User :: [Codable, Equatable] {
     id: int,
@@ -211,6 +211,36 @@ fn anEnumIsItsVariantWithOrWithoutAPayload(): void throws Error {
     assertEq(try Value.of(Shape.Dot).read<Shape>(), Shape.Dot);
     assertTrue(kindOf(() => { let _ = try Value.Variant("Shape", "Blob", 9, null).read<Shape>(); }) == DecodeErrorKind.UnknownVariant);
     assertTrue(kindOf(() => { let _ = try Value.Int(1).read<Shape>(); }) == DecodeErrorKind.TypeMismatch);
+}
+
+/// The string a value writes, or a failure.
+fn textOf(v: Value): string {
+    match (v) {
+        .String(s) => { return s; },
+        _ => { fail("not a string"); return ""; },
+    }
+}
+
+/// The other time types are their texts (the review of M10, M15): written as a string, read back
+/// the same; a text that is none is `Invalid` with the parser's reason.
+@Test
+fn theTimeTypesAreTheirTexts(): void throws Error {
+    let d = Duration.ofMillis(5400000);
+    assertEq(textOf(try Value.of(d)), d.show());
+    assertEq(try (try Value.of(d)).read<Duration>(), d);
+    let day = try Date.of(2026, 10, 15);
+    assertEq(textOf(try Value.of(day)), "2026-10-15");
+    assertEq(try (try Value.of(day)).read<Date>(), day);
+    let t = try Time.of(9, 30, 0, 500000000);
+    assertEq(textOf(try Value.of(t)), "09:30:00.5");
+    assertEq(try (try Value.of(t)).read<Time>(), t);
+    let dt = try DateTime.of(day, t, Zone.utc);
+    assertEq(textOf(try Value.of(dt)), dt.show());
+    assertEq(try (try Value.of(dt)).read<DateTime>(), dt);
+    assertTrue(kindOf(() => { let _ = try Value.String("soon").read<Duration>(); }) == DecodeErrorKind.Invalid);
+    assertTrue(kindOf(() => { let _ = try Value.String("15.10.2026").read<Date>(); }) == DecodeErrorKind.Invalid);
+    assertTrue(kindOf(() => { let _ = try Value.String("9:30").read<Time>(); }) == DecodeErrorKind.Invalid);
+    assertTrue(kindOf(() => { let _ = try Value.String("2026-10-15 09:30").read<DateTime>(); }) == DecodeErrorKind.Invalid);
 }
 
 @Test
