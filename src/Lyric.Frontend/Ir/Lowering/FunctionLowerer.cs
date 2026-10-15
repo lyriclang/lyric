@@ -5692,10 +5692,10 @@ internal sealed class FunctionLowerer
     /// (<see cref="FieldInfoConst"/>, <see cref="VariantInfoConst"/>, <see cref="TypeConst"/>).</summary>
     private static readonly Dictionary<string, string[]> InfoMembers = new(StringComparer.Ordinal)
     {
-        ["FieldInfo"] = ["name", "type", "index", "visibility", "isVar"],
+        ["FieldInfo"] = ["name", "type", "index", "visibility", "isVar", "hasDefault"],
         ["VariantInfo"] = ["name", "index", "payload"],
         ["MemberInfo"] = ["name", "visibility", "isStatic", "isMut"],
-        ["Type"] = ["name"],
+        ["Type"] = ["name", "kind"],
     };
 
     /// <summary>A round's info, or a member of it, as the constant it is (M9a S10): <c>v</c>,
@@ -6959,7 +6959,7 @@ internal sealed class FunctionLowerer
         {
             "fields" => new ArrayConst([.. (_types.MetaFields?.Invoke(about, _types.MetaFromOf(call)) ?? []).Select(FieldInfoConst)]),
             "variants" => new ArrayConst([.. (_types.MetaVariants?.Invoke(about) ?? []).Select(VariantInfoConst)]),
-            "conformances" => new ArrayConst([.. (_types.MetaConformances?.Invoke(about) ?? []).Select(i => TypeConst(TypeFacts.Display(new NamedRef(i))))]),
+            "conformances" => new ArrayConst([.. (_types.MetaConformances?.Invoke(about) ?? []).Select(i => TypeConst(new NamedRef(i)))]),
             "hasConformance" => new BoolConst(asked.Length > 1 && TypeFacts.SymbolOf(asked[1]) is { Kind: TypeSymbolKind.Interface } iface
                                               && _types.Satisfies?.Invoke(about, iface) == true),
             "members" => new ArrayConst([.. (_types.MetaMembers?.Invoke(about, _types.MetaFromOf(call)) ?? []).Select(MemberInfoConst)]),
@@ -6972,15 +6972,17 @@ internal sealed class FunctionLowerer
         };
     }
 
-    /// <summary>std.meta's <c>Type</c>: its name.</summary>
-    private static IrConstValue TypeConst(string name) => new StructConst([new StringConst(name)]);
+    /// <summary>std.meta's <c>Type</c>: its name and its kind (W9).</summary>
+    private static IrConstValue TypeConst(LyrType type) => new StructConst(
+        [new StringConst(TypeFacts.Display(type)), new VariantConst(Array.IndexOf(TypeFacts.TypeKindNames, TypeFacts.TypeKindNameOf(type)), [])]);
 
-    /// <summary>std.meta's <c>FieldInfo</c> — name, type, index, visibility, isVar — of a field.</summary>
+    /// <summary>std.meta's <c>FieldInfo</c> — name, type, index, visibility, isVar, hasDefault — of a field.</summary>
     private static IrConstValue FieldInfoConst(TypeResult.MetaField field) => new StructConst(
     [
-        new StringConst(field.Name), TypeConst(TypeFacts.Display(field.Type)), new IntConst((ulong)field.Index),
+        new StringConst(field.Name), TypeConst(field.Type), new IntConst((ulong)field.Index),
         VisibilityConst(field.Visibility),
         new BoolConst(field.IsVar),
+        new BoolConst(field.HasDefault),
     ]);
 
     /// <summary>std.meta's <c>VariantInfo</c> — name, index, payload — of a variant.</summary>

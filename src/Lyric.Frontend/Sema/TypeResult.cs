@@ -555,6 +555,10 @@ public sealed class TypeResult
 
         /// <summary>The attributes the field carries (R4): what <c>attribute&lt;A&gt;(f)</c> reads.</summary>
         public AttributeNode[] Attributes => (Declaration ?? Symbol?.Declaration as FieldDecl)?.Attributes ?? [];
+
+        /// <summary>Whether the field's declaration writes an initializer (W9): the type's own
+        /// default counts for nothing, and a payload's field has none.</summary>
+        public bool HasDefault => Symbol?.Declaration is FieldDecl { Default: not null };
     }
 
     /// <summary>A variant as <c>std.meta.variants</c> answers it, its payload's fields.</summary>

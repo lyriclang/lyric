@@ -12781,12 +12781,22 @@ public sealed class TypeChecker
             case MemberExpr { Target: IdentifierExpr id, IsOptional: false } m when RoundVariable(id, scope) is { } rv:
                 touched = true;
                 if (_result.KnownFieldOf(rv) is { } f)
-                    return m.Member switch { "isVar" => f.IsVar, "index" => (long)f.Index, "name" => f.Name, _ => null };
+                    return m.Member switch { "isVar" => f.IsVar, "index" => (long)f.Index, "name" => f.Name, "hasDefault" => f.HasDefault, _ => null };
                 if (_result.KnownVariantOf(rv) is { } v)
                     return m.Member switch { "index" => (long)v.Index, "name" => v.Name, _ => null };
                 if (_result.KnownMemberOf(rv) is { } km)
                     return m.Member switch { "name" => km.Name, "isStatic" => km.IsStatic, "isMut" => km.IsMut, _ => null };
                 return null;
+            // 'f.type.kind' (W9): the kind of the field's type, decided against a 'TypeKind'
+            case MemberExpr { Target: MemberExpr { Target: IdentifierExpr kid, Member: "type", IsOptional: false }, Member: "kind", IsOptional: false }
+                when RoundVariable(kid, scope) is { } krv && _result.KnownFieldOf(krv) is { } kf:
+                touched = true;
+                return new KindMark(TypeFacts.TypeKindNameOf(kf.Type));
+            case ImplicitMemberExpr { Name: var shortKind } when Array.IndexOf(TypeFacts.TypeKindNames, shortKind) >= 0:
+                return new KindMark(shortKind);
+            case MemberExpr { Target: IdentifierExpr { Name: "TypeKind" }, Member: var fullKind, IsOptional: false }
+                when Array.IndexOf(TypeFacts.TypeKindNames, fullKind) >= 0:
+                return new KindMark(fullKind);
             // 'f.type.name' (M10 S2): the field's type as 'typeName' writes it
             case MemberExpr { Target: MemberExpr { Target: IdentifierExpr tid, Member: "type", IsOptional: false }, Member: "name", IsOptional: false }
                 when RoundVariable(tid, scope) is { } trv && _result.KnownFieldOf(trv) is { } tf:
@@ -12848,9 +12858,13 @@ public sealed class TypeChecker
         }
     }
 
+    /// <summary>A <c>TypeKind</c> a round decides: of <c>f.type.kind</c>, or written.</summary>
+    private sealed record KindMark(string Name);
+
     private static bool ConstantEqual(object l, object r) =>
         (l, r) switch
         {
+            (KindMark a, KindMark b) => a.Name == b.Name,
             (long a, long b) => a == b,
             (string a, string b) => a == b,
             (bool a, bool b) => a == b,

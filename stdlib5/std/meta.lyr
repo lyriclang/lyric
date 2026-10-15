@@ -16,6 +16,7 @@
 /// are written over them and which imports nothing: this module is their name to the program.
 pub import std.core {
     Visibility,
+    TypeKind,
     Type,
     FieldInfo,
     VariantInfo,

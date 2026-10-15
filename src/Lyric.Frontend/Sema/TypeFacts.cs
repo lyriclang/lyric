@@ -138,6 +138,36 @@ public static class TypeFacts
     /// not a named type.</summary>
     public static TypeSymbolKind? KindOf(LyrType type) => SymbolOf(type)?.Kind;
 
+    /// <summary>std.core's <c>TypeKind</c>, in its declaration order: what a <c>Type</c> says a
+    /// type is (11 §4 rule 1; the sweep after M10, W9). The lowering writes the variant by this
+    /// index.</summary>
+    public static readonly string[] TypeKindNames =
+        ["Primitive", "Struct", "Class", "Enum", "Interface", "Opaque", "Optional", "Array", "InlineArray", "Slice", "Tuple", "Function", "Parameter", "Other"];
+
+    /// <summary>The <c>TypeKind</c> of a type, by name.</summary>
+    public static string TypeKindNameOf(LyrType type) => type switch
+    {
+        PrimitiveType => "Primitive",
+        OpaqueRef => "Opaque",
+        Optional => "Optional",
+        ArrayOf => "Array",
+        InlineArrayOf => "InlineArray",
+        SliceOf or StringViewType => "Slice",
+        TupleOf => "Tuple",
+        FnType => "Function",
+        TypeParamType => "Parameter",
+        NamedRef or GenericInstance => KindOf(type) switch
+        {
+            TypeSymbolKind.Struct => "Struct",
+            TypeSymbolKind.Class => "Class",
+            TypeSymbolKind.Enum => "Enum",
+            TypeSymbolKind.Interface => "Interface",
+            TypeSymbolKind.Builtin => "Primitive",
+            _ => "Other",
+        },
+        _ => "Other",
+    };
+
     /// <summary>Is this a named type of that kind? The case most callers need, instances
     /// included.</summary>
     public static bool Is(LyrType type, TypeSymbolKind kind) => KindOf(type) == kind;
