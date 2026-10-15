@@ -4,7 +4,7 @@
 import std.time { Zone, ZoneInfo, Instant, DateTime, Date, Time, Duration, TimeError, TimeErrorKind };
 import std.encoding { Hex };
 import std.core { ParseError };
-import std.test { assertEq, assertTrue, assertNull, fail };
+import std.test { assertEq, assertTrue, fail };
 
 /// A minimal TZif (version 2): the two transitions of 2026 for CET/CEST, and the rule beyond.
 let tzifHex = "545a69663200000000000000000000000000000000000000000000000000000000000002000000020000000969c879906add5490010000000e10000000001c200104434554004345535400545a6966320000000000000000000000000000000000000000000000000000000000000200000002000000090000000069c87990000000006add5490010000000e10000000001c2001044345540043455354000a4345542d31434553542c4d332e352e302c4d31302e352e302f330a";
@@ -69,7 +69,7 @@ fn aRuleZoneSwitchesItsClocks(): void throws Error {
     // what is no rule
     for (bad in ["", "C", "CET-1CEST,M3.5.0", "CET-1CEST,M13.1.0,M10.5.0", "CET-x", "<+03"]) {
         try {
-            let _ = try Zone.fromPosix("bad", bad);
+            let _ = Zone.fromPosix("bad", bad);
             fail(f"took '{bad}'");
         } catch (e: TimeError) {
             assertTrue(e.message().startsWith("no POSIX TZ string: "), e.message());

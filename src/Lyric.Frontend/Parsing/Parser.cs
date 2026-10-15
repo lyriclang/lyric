@@ -457,6 +457,14 @@ public sealed partial class Parser
                     if (depth == 0) return _buffer.Peek(offset + 1).TokenKind == TokenKind.LParen;
                     break;
 
+                // '>>' closes two: 'read<List<int>>()' (sweep after M10, open point 148 — the
+                // lexer's one token read as an operator here, and the '<' became a comparison)
+                case TokenKind.Shr:
+                    depth -= 2;
+                    if (depth == 0) return _buffer.Peek(offset + 1).TokenKind == TokenKind.LParen;
+                    if (depth < 0) return false;
+                    break;
+
                 // What may occur in a type expression: named types with
                 // Paths, arrays, optionals, function types, tuples.
                 case TokenKind.Identifier:

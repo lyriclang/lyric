@@ -6087,16 +6087,23 @@ internal sealed class FunctionLowerer
         // 'extend<T :: [Default]> Box<T>'. The block's parameters are bound by the named instance
         // and the method is an instance of its own, as the instance form is — the sema already
         // answered the call's type in the instance's terms.
-        if (method.Generics.Length == 0 && _typeTable.BlockOf(method) is { Target: not null, Generics.Length: > 0 } block)
+        if (_typeTable.BlockOf(method) is { Target: not null, Generics.Length: > 0 } block)
         {
             var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
             if (block.TargetType is not { } pattern || !TypeFacts.Match(pattern, owner, map))
                 throw NotSupported($"'{TypeFacts.Display(owner)}' does not match the block's target", expr.Span);
+            // the method's own arguments beside the block's — 'Pack<int>.rd<StringBuilder>(&sb)'
+            // (sweep after M10, open point 147: a generic static of a generic block went the
+            // type's way below, where only the type's parameters are bound, and its body kept
+            // the block's 'T')
+            var ownArguments = method.Generics.Length > 0 ? SubstitutedTypeArguments(expr) : [];
+            for (var i = 0; i < method.Generics.Length && i < ownArguments.Length; i++)
+                map[method.Generics[i]] = ownArguments[i];
             // an inline static of the block (08 F6): set in place under the instance's binding
             if (declaration is { IsInline: true, Body: not null })
                 return LowerInline(expr, declaration, null, null, map,
                     map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal));
-            var blockTarget = _instances.RequestExtension(method, declaration, block, map, owner, expr.Span);
+            var blockTarget = _instances.RequestExtension(method, declaration, block, map, owner, expr.Span, ownArguments);
             var byName = map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal);
             var blockArgs = MaterializeArguments(declaration, ArgumentsOf(expr), member.Member, expr.Span, byName);
             var blockReturns = TypeOfExpr(expr);

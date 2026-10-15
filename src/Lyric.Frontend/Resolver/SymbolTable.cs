@@ -53,6 +53,17 @@ public sealed class SymbolTable
         return true;
     }
 
+    /// <summary>Declares <paramref name="symbol"/> under another name as well: a second name for
+    /// the same symbol, so that what either name resolves to is one identity (the 64-bit aliases of
+    /// 03 T1a: <c>uint64</c> IS <c>uint</c> — sweep after M10, open point 149: an extend of
+    /// <c>uint64</c> did not reach a <c>uint</c>). False where the name is taken.</summary>
+    public bool TryDeclareAs(string name, Symbol symbol)
+    {
+        if (_byName.ContainsKey(name)) return false;
+        _byName[name] = symbol;
+        return true;
+    }
+
     /// <summary>Every function of this name in THIS scope, declaration order, empty when the name
     /// is not a function. One entry is the ordinary case and is not an overload set.</summary>
     public IReadOnlyList<FunctionSymbol> OverloadsLocal(string name)

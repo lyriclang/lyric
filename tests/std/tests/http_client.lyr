@@ -83,6 +83,15 @@ fn decodeChunks(raw: Slice<uint8>): string {
     return string.fromUtf8Lossy(out.toArray()[..]);
 }
 
+/// How many connection tasks of the server have ended: a client that gives a connection up — a
+/// timeout cuts the exchange short — closes it, so the task sees the end and ends (sweep after
+/// M10, open point 191: it used to stay open, and the task waited for the next request for ever).
+class Counter {
+    var n: int = 0,
+}
+
+let ended: Counter = Counter { };
+
 /// The server: one task per connection, each request answered by its path; it ends with the
 /// listener's close.
 fn serve(listener: TcpListener): void throws Error {
@@ -98,6 +107,7 @@ fn serve(listener: TcpListener): void throws Error {
         conns += 1;
         let id = conns;
         let _ = spawn(() => {
+            defer ended.n = ended.n + 1;
             while (let (head, body) = try readRequest(conn)) {
                 let line = head.splitOnce("\r\n")!.0.toString();
                 let parts = line.splitN(' ', 3).toArray();
@@ -289,10 +299,17 @@ fn whatIsNotHttpIsRefused(): void throws Error {
     var client = Client.new();
     // a timeout spans the exchange
     var hasty = Client.new(ClientOptions { timeout = Duration.ofMillis(100) });
+    // the connection tasks of the tests before end on their next turn: let them, then count
+    try sleep(Duration.ofMillis(200));
+    let before = ended.n;
     try {
         let _ = try hasty.get(uri(base, "/slow"));
         fail("no timeout");
     } catch (_: TimedOut) { }
+    // the connection the timeout cut short is closed: the server's task for it ends once its
+    // slow answer is written (open point 191)
+    try sleep(Duration.ofMillis(900));
+    assertEq(ended.n, before + 1);
     assertEq(try (try client.get(uri(base, "/slow"))).text(), "slow");
     // nothing listens
     try {

@@ -173,6 +173,6 @@ fn theTreeAndTheErrorsHaveTheirPlaces(): void throws Error {
     assertTrue(kindOf(() => { let _ = try (try toml.parse("x = 1")).path("x")!.read<Bytes>(); }) == DecodeErrorKind.TypeMismatch);
     // an Instant writes as a string and reads from a date-time or a string
     let when = try Instant.parse("1979-05-27T07:32:00Z");
-    assertEq(try (try toml.parse("t = 1979-05-27T07:32:00Z")).path("t")!.read<Instant>(), when);
-    assertEq(try (try toml.parse("t = \"1979-05-27T07:32:00Z\"")).path("t")!.read<Instant>(), when);
+    assertEq(try (toml.parse("t = 1979-05-27T07:32:00Z")).path("t")!.read<Instant>(), when);
+    assertEq(try (toml.parse("t = \"1979-05-27T07:32:00Z\"")).path("t")!.read<Instant>(), when);
 }

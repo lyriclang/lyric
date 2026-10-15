@@ -1187,6 +1187,8 @@ S1–S13) — `std.codec` with the `Codable` synthesis, `std.json`, `std.toml`, 
 libm port for compile time, the Windows child pipes over the completion port, measurement point 4.
 Released by the maintainer on 2026-10-14, every reading of the M9b report confirmed; the mode of
 M9b: no halt until it closes, merged on green CI, open points collected for the report at the close.
+Reviewed on 2026-10-15: the thirteen readings of the report confirmed as recommended, three points
+released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "Durchsicht 2026-10-15").
 
 - **S1** `std.codec` (P1): the pair `Encode`/`Decode`/`Codable`; the ten-form container model
   a format implements as primitives (the scalars, begin/end around the containers; the decoder

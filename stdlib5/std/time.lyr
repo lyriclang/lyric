@@ -1421,12 +1421,7 @@ fn fromDays(days: int): Date {
 /// The same date, time and offset: the zone's name is not compared.
 extend DateTime :: [Equatable] {
     fn equals(o: DateTime): bool {
-        // field by field, not through Date's and Time's own equality: a build that expands a
-        // macro compiles std without the synthesized defaults, and there neither '==' nor
-        // 'equals' of a Date exists (open point 188)
-        return this.d.y == o.d.y && this.d.m == o.d.m && this.d.d == o.d.d
-            && this.t.h == o.t.h && this.t.mi == o.t.mi && this.t.s == o.t.s && this.t.n == o.t.n
-            && this.off == o.off;
+        return this.d == o.d && this.t == o.t && this.off == o.off;
     }
 }
 

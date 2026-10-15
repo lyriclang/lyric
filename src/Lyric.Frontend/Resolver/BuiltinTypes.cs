@@ -17,10 +17,17 @@ public static class BuiltinTypes
     public static readonly string[] Names =
     {
         "int", "uint", "float",
-        "int8", "int16", "int32", "int64",
-        "uint8", "uint16", "uint32", "uint64",
-        "float32", "float64",
+        "int8", "int16", "int32",
+        "uint8", "uint16", "uint32",
+        "float32",
         "bool", "char", "string", "void", "never"
+    };
+
+    /// <summary>The 64-bit names are aliases (03 T1a): <c>int64</c> IS <c>int</c>, one symbol under
+    /// two names, so that an extend of either reaches both (open point 149).</summary>
+    public static readonly (string Alias, string Of)[] Aliases =
+    {
+        ("int64", "int"), ("uint64", "uint"), ("float64", "float"),
     };
 
     /// <summary>Creates a fresh scope holding every built-in type symbol.</summary>
@@ -30,6 +37,8 @@ public static class BuiltinTypes
         foreach (var name in Names)
             scope.TryDeclare(new TypeSymbol(name, TypeSymbolKind.Builtin, Visibility.Public,
                 new SymbolTable(), declaration: null));
+        foreach (var (alias, of) in Aliases)
+            scope.TryDeclareAs(alias, scope.LookupLocal(of)!);
         scope.TryDeclare(CreatePanic());
         scope.TryDeclare(CreateSame());
         // Coroutine<T>: the name resolves here, the type form is built by the sema.

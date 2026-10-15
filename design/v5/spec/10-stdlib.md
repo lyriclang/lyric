@@ -512,6 +512,34 @@ geladen) sortiert, verdichtet und um Fremdes erleichtert sehen (2026-10-12). Bef
 | A3 | **Was bleibt, mit Grund.** Die Formatsprache (460 Zeilen): die Skalare konformieren `Format` in `std.core`, und `std.fmt` importiert `std.core` — ein Zyklus. Die Tupelblöcke (440: `Debug`/`Display`/`Equatable` … je Größe 2–8): keine Form schreibt sie einmal (eine `comptime for` über Tupelelemente ist eine M9b-Tür). Die Skalarblöcke (je Typ eigene Natives). `UnicodeCategory`/`categoryOf` (75; `char.category()` müsste mit — Tür `std.unicode`). `Bench`/`blackBox` (Marker, die der Compiler liest). Das Parsen der Zahlen (`Parse` ist Member der Typen) | Z2, S7, T16 |
 | A4 | **Die Kosten** sind die des Baus, nicht des Programms: die Senkung nimmt nur Erreichtes (hello: 841 Zeilen C vor wie nach). Gemessen `build --emit c` von hello (7 Läufe): vorher 1554 ms, nachher 1555 ms; `std.core` 6363 → 6200 (Math) → 5275 Zeilen, `std.iter` 942 | 11 P11 |
 
+## Review 2026-10-15 — die offenen Punkte aus M10
+
+Der M10-Abschlussbericht (lyric#480): die Lesarten der Slices S1–S12, mit dem Maintainer entschieden („alle nach
+Empfehlung"), dazu drei Freigaben. Die Nummern sind die der Sammelliste des Berichts.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| M1 | **Das Format wird per Referenz übergeben** (`&e`, wie ein Hasher), **die Schicht liegt am Format** (`field`, `element`, `entry`, `next`, `nextKey`, `value`), nicht an Unter-Encodern: ein `SeqEncoder`-Struct müsste das Format halten, per Kopie bei einem Struct-Format [152] | E2 |
+| M2 | **`Bytes { value }` ist die Byteform**, `uint8[]` eine Sequenz: ein generisches Extend kann nicht fragen, was `T` ist (11 §4 Regel 6) [151] | E6 |
+| M3 | **`@Codec { default = true }` bleibt Tür**: der Rückfall braucht `f.type` in Constraint-Position (M9b-Tür); `default` liest wie `skip` ohne Wert [157] | E4 |
+| M4 | **Ein `JsonValue`-Objekt ist eine `Map`**, Reihenfolge unbestimmt, `sortKeys` ordnet; eine geordnete Liste (schneller bei kleinen Objekten, Messpunkt 4) ist Tür [164] | E7 |
+| M5 | **`v["key"]` und `v.at(i)`** statt zweier `Index`-Konformanzen (SEM0122) [167] | E7 |
+| M6 | **`Query.show` schreibt `%20`** (RFC 3986), `parse` liest `+` als Leerzeichen; Go schreibt `+` [172] | B4 |
+| M7 | **IPvFuture-Literale abgelehnt**; `resolve` mit relativer Basis gibt ein relatives Ergebnis (Go ebenso) [173, 174] | B4 |
+| M8 | **`find` trägt die Gruppen**, kein `captures`; **`Regex :: [Pattern]` nicht gebaut** (`matchBefore` bräuchte ein Rückwärtsprogramm) — `re.split`, `re.isMatch` [175, 176] | B1, S8 |
+| M9 | **`Response.withText`/`withJson`** (ein statisches und ein Instanz-Member teilen keinen Namen); der Server ohne Lese-/Schreibfristen und ohne Peer-Adresse im Handler, `shutdown` wartet nicht auf die Verbindungs-Tasks — Fristen und Peer-Adresse sind Türen [178, 179] | Q6 |
+| M10 | **Ein leeres `NO_COLOR`/`FORCE_COLOR` zählt als nicht gesetzt** (`std.os` kann nicht unsetzen) [181] | Q7 |
+| M11 | **`Zone.offset()` ist der Offset jetzt**; die Lückenregel schiebt vorwärts durch den Offset vor dem Wechsel (Java, Go); `TZ` als Regelstring heißt die Zone so [182] | Q1 |
+| M12 | **Eine Kind-Pipe unter Windows wird auf dem Thread ihres ersten Aufrufs gelesen und geschrieben**; ein offener Write beim Close hält den Handle, bis das Kind liest [185] | S12b |
+| M13 | **`std.codec` neben `std.encoding` bleibt**, kein Rename: je ein Satz im Modulkopf zeigt auf das andere [169] | B10, Q5 |
+| M14 | **`ParseError` bekommt `detail` und `offset`** (freigegeben): eine URI-Ablehnung sagt, wo und warum; `Instant`, `IpAddr`, `Uri` füllen sie — Sweep nach M10 [171] | B3 |
+| M15 | **`Duration`, `Date`, `Time`, `DateTime` werden `Codable` über ihren Text** (RFC 3339 / ISO 8601, freigegeben) — Sweep nach M10 [155] | E6, Q1 |
+| M16 | **JSONTestSuite als Fixtures** unter `tests/std/fixtures/json/` (Download freigegeben, wie die UCD) — Sweep nach M10 [168] | E7 |
+
+Türen geprüft (S13): lazy DFA zu (2,96× Go nach den Allokationsgewinnen), JSON5, CBOR, HTTP/2, Raw-Mode,
+Lokalisierung zu. Neu notiert: streamender JSON-Decoder [165], Int128/Dezimal im Baum [166], Server-Fristen [179],
+tabellengetriebener Inflater [180], Windows-Registry-Zonen [182].
+
 ---
 
 **Bereich 10 ist damit vollständig entschieden** (B1–B13, 2026-09-29). Nachträge in anderen
