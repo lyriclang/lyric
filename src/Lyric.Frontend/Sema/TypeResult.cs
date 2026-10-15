@@ -579,8 +579,30 @@ public sealed class TypeResult
     /// <summary>A function of a type's own body as <c>std.meta.members</c> answers it.</summary>
     public sealed record MetaMember(string Name, Visibility Visibility, bool IsStatic, bool IsMut)
     {
-        /// <summary>The member's declaration, whose attributes <c>memberAttribute&lt;A&gt;(m)</c> reads.</summary>
-        public FunctionDecl? Declaration { get; init; }
+        /// <summary>The member's declaration — a function, a <c>static let</c>, an associated type —,
+        /// whose attributes <c>memberAttribute&lt;A&gt;(m)</c> reads.</summary>
+        public Decl? Declaration { get; init; }
+
+        /// <summary>What it is, by std.core's <c>MemberKind</c> (X4).</summary>
+        public string Kind { get; init; } = "Function";
+
+        /// <summary>A function's parameters, in declaration order; none for another member (X4).</summary>
+        public MetaParam[] Parameters { get; init; } = [];
+
+        public AttributeNode[] Attributes => Declaration switch
+        {
+            FunctionDecl f => f.Attributes,
+            StaticBindingDecl s => s.Attributes,
+            AssociatedTypeDecl a => a.Attributes,
+            _ => [],
+        };
+    }
+
+    /// <summary>A parameter as <c>m.parameters</c> answers it (X4): its declaration carries its default
+    /// and its attributes.</summary>
+    public sealed record MetaParam(string Name, LyrType Type, int Index, Param? Declaration)
+    {
+        public bool HasDefault => Declaration?.Default is not null;
 
         public AttributeNode[] Attributes => Declaration?.Attributes ?? [];
     }
@@ -645,6 +667,7 @@ public sealed class TypeResult
     private readonly Dictionary<LocalSymbol, MetaVariant> _knownVariants = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<LocalSymbol, MetaVariant> _knownPayloads = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<LocalSymbol, MetaMember> _knownMembers = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<LocalSymbol, MetaParam> _knownParams = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<CallExpr, TypeAliasDecl> _aliasAsked = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<TypeTestExpr, MetaVariant> _variantTests = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<PayloadByInfoExpr, (MetaVariant Variant, MetaField Field)> _payloadAccesses = new(ReferenceEqualityComparer.Instance);
@@ -663,6 +686,10 @@ public sealed class TypeResult
     /// <summary>The member a round's variable holds the info of (a loop over <c>members</c>).</summary>
     public MetaMember? KnownMemberOf(LocalSymbol variable) => _knownMembers.GetValueOrDefault(variable);
     internal void SetKnownMember(LocalSymbol variable, MetaMember member) => _knownMembers[variable] = member;
+
+    /// <summary>The parameter a round's variable holds the info of (a loop over <c>m.parameters</c>; X4).</summary>
+    public MetaParam? KnownParamOf(LocalSymbol variable) => _knownParams.GetValueOrDefault(variable);
+    internal void SetKnownParam(LocalSymbol variable, MetaParam parameter) => _knownParams[variable] = parameter;
 
     /// <summary><c>typeAttribute&lt;T, A&gt;()</c> whose <c>T</c> is written as an alias: the alias, whose
     /// own attributes are the answer — the type argument itself resolves through it.</summary>

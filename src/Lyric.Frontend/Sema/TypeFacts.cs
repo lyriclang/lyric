@@ -144,6 +144,9 @@ public static class TypeFacts
     public static readonly string[] TypeKindNames =
         ["Primitive", "Struct", "Class", "Enum", "Interface", "Opaque", "Optional", "Array", "InlineArray", "Slice", "Tuple", "Function", "Parameter", "Other"];
 
+    /// <summary>std.core's <c>MemberKind</c>, in its declaration order (X4).</summary>
+    public static readonly string[] MemberKindNames = ["Function", "Constant", "AssociatedType"];
+
     /// <summary>The <c>TypeKind</c> of a type, by name.</summary>
     public static string TypeKindNameOf(LyrType type) => type switch
     {
