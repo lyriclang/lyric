@@ -13171,7 +13171,9 @@ public sealed class TypeChecker
     }
 
     /// <summary><c>E.[v](…)</c>: the variant's constructor, called — checked as the call it stands
-    /// for, <c>E.Name(…)</c>, which the lowering takes.</summary>
+    /// for, <c>E.Name(…)</c>, which the lowering takes. <c>e.[m](…)</c> and <c>T.[m](…)</c> (11 §4
+    /// rule 4; the sweep after M10, X3): the member the round's <c>m</c> names, called — checked as
+    /// <c>e.name(…)</c> and <c>T.name(…)</c>, among overloads the arguments choose.</summary>
     private LyrType CheckVariantCallByInfo(CallExpr call, FieldByInfoExpr callee, SymbolTable scope, LyrType? expected)
     {
         CheckExpr(callee.Info, scope);
@@ -13181,10 +13183,33 @@ public sealed class TypeChecker
             foreach (var a in call.Arguments) CheckExpr(a, scope);
             return LyrType.Error;
         }
+        if (rv is not null && _result.KnownMemberOf(rv) is { } called)
+        {
+            var owner = _roundOwner[rv];
+            var named = TypeOfTypeExpr(callee.Target, scope);
+            var target = named ?? CheckExpr(callee.Target, scope);
+            if (!target.IsError && !LyrType.Equal(target, owner))
+            {
+                foreach (var a in call.Arguments) CheckExpr(a, scope);
+                return Report(callee.Target.Span, "LYR-SEM0185",
+                    $"'{_comp.TextOf(callee.Info.Span)}' holds a member of '{TypeFacts.Display(owner)}', and this is '{TypeFacts.Display(target)}'");
+            }
+            var memberCall = new MemberExpr(callee.Target, called.Name, false, callee.Span) { MemberSpan = callee.Info.Span };
+            var byName = call with { Callee = memberCall };
+            var saved = _typedTarget;
+            if (named is null) _typedTarget = callee.Target;
+            LyrType result;
+            try { result = CheckExpr(byName, scope, expected); }
+            finally { _typedTarget = saved; }
+            _result.SetRewrite(call, byName);
+            return result;
+        }
         if (rv is null || _result.KnownVariantOf(rv) is not { } variant)
         {
             foreach (var a in call.Arguments) CheckExpr(a, scope);
-            return Report(callee.Span, "LYR-SEM0185", "'E.[v](…)' builds the variant that the variable of a 'comptime for' over 'std.meta.variants' names " + RoundsMessage);
+            return Report(callee.Span, "LYR-SEM0185", _result.TypeOf(callee.Info) is NamedRef { Symbol.Name: "MemberInfo" }
+                ? "'e.[m](…)' calls the member that the variable of a 'comptime for' over 'std.meta.members' names " + RoundsMessage
+                : "'E.[v](…)' builds the variant that the variable of a 'comptime for' over 'std.meta.variants' names " + RoundsMessage);
         }
         var member = new MemberExpr(callee.Target, variant.Name, false, callee.Span) { MemberSpan = callee.Info.Span };
         var rewritten = new CallExpr(member, call.Arguments, call.Span, call.TypeArguments) { ArgumentNames = call.ArgumentNames };
