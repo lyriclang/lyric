@@ -7,7 +7,7 @@
 #include "lyr/lyr.h"
 #include "check.h"
 
-static const LyrDesc coroutine_desc = { .size = 0, .name = "test.Coroutine" };
+static const LyrDesc coroutine_desc = { .size = 0, .flags = LYR_DESC_CORO, .name = "test.Coroutine" };
 
 static int64_t down(int64_t n) {
     volatile char pad[256];

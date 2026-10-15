@@ -128,8 +128,8 @@ LyrStr * lyr_std_task__extend__Cancelled_debug_2f8c997b(lyr_ty_std_task_Cancelle
 LyrStr * lyr_app_main__extend__Oops_debug_fc09f9a3(lyr_ty_app_main_Oops *l0_this);
 
 /* coroutines: the environment a body starts from, and the body as the runtime runs it */
-static const LyrDesc lyr_desc_coro_i64_to_void = { 0, 0, 0, 0, NULL, "Coroutine<int>", NULL };
-static const LyrDesc lyr_desc_coro_i64_to_str = { 0, 0, 0, 0, NULL, "Coroutine<int, string>", NULL };
+static const LyrDesc lyr_desc_coro_i64_to_void = { 0, LYR_DESC_CORO, 0, 0, NULL, "Coroutine<int>", NULL };
+static const LyrDesc lyr_desc_coro_i64_to_str = { 0, LYR_DESC_CORO, 0, 0, NULL, "Coroutine<int, string>", NULL };
 typedef struct { LyrObj header; LyrStr *a0; } lyr_coenv_app_main_walk__body__6b4b40da;
 _Static_assert(sizeof(lyr_coenv_app_main_walk__body__6b4b40da) == 16, "layout of lyr_coenv_app_main_walk__body__6b4b40da");
 _Static_assert(offsetof(lyr_coenv_app_main_walk__body__6b4b40da, a0) == 8, "layout of lyr_coenv_app_main_walk__body__6b4b40da");

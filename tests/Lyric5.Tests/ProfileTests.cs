@@ -21,21 +21,25 @@ public class ProfileTests
     }
 
     /// <summary>The built-in profiles' flags are what the build always gave them: a profile record
-    /// changed no object's cache key.</summary>
+    /// changed no object's cache key. The own collector adds nothing; Boehm says so with a define
+    /// that keeps the allocation functions out of line (13 M11 P11) — asked of both explicitly, since
+    /// the default follows the development switch until M11 S5.</summary>
     [Fact]
     public void The_built_in_profiles_keep_their_flags()
     {
-        Assert.Equal(["-O0", "-g"], BuildProfile.Of(Profile.Debug).Codegen);
-        Assert.Equal(["-O2", "-g", "-DNDEBUG"], BuildProfile.Of(Profile.Release).Codegen);
-        Assert.Equal(["-O1", "-g", "-fno-omit-frame-pointer"], BuildProfile.Of(Profile.Asan).Codegen);
-        Assert.Equal(["-O1", "-g", "-fno-omit-frame-pointer"], BuildProfile.Of(Profile.Tsan).Codegen);
+        BuildProfile Own(Profile p) => BuildProfile.Of(p) with { Gc = Collector.Immix };
+        Assert.Equal(["-O0", "-g"], Own(Profile.Debug).Codegen);
+        Assert.Equal(["-O2", "-g", "-DNDEBUG"], Own(Profile.Release).Codegen);
+        Assert.Equal(["-O1", "-g", "-fno-omit-frame-pointer"], Own(Profile.Asan).Codegen);
+        Assert.Equal(["-O1", "-g", "-fno-omit-frame-pointer"], Own(Profile.Tsan).Codegen);
         Assert.Empty(BuildProfile.Of(Profile.Release).ProgramFlags);
+        Assert.Equal(["-O2", "-g", "-DNDEBUG", "-DLYR_GC_BOEHM"], (BuildProfile.Of(Profile.Release) with { Gc = Collector.Boehm }).Codegen);
     }
 
     [Fact]
     public void A_field_is_a_flag()
     {
-        var release = BuildProfile.Of(Profile.Release) with { Opt = 3, DebugInfo = false, Lto = true, FastMath = true };
+        var release = BuildProfile.Of(Profile.Release) with { Opt = 3, DebugInfo = false, Lto = true, FastMath = true, Gc = Collector.Immix };
         Assert.Equal(["-O3", "-g0", "-DNDEBUG", "-flto=thin"], release.Codegen);
         Assert.Equal(["-ffast-math", "-ffp-contract=fast"], release.ProgramFlags);
     }

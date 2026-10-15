@@ -11,7 +11,7 @@
 
 #include <string.h>
 
-static const LyrDesc coroutine_desc = { .size = 0, .name = "test.Coroutine" };
+static const LyrDesc coroutine_desc = { .size = 0, .flags = LYR_DESC_CORO, .name = "test.Coroutine" };
 
 /* --- values through the argument --- */
 

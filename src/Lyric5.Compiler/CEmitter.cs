@@ -717,7 +717,7 @@ public sealed class CEmitter
             prototypes.AppendLine();
             prototypes.AppendLine("/* coroutines: the environment a body starts from, and the body as the runtime runs it */");
             foreach (var type in started.Select(m => m.Type).DistinctBy(t => Mangle(t)))
-                prototypes.AppendLine($"static const LyrDesc {CoroutineDesc(type)} = {{ 0, 0, 0, 0, NULL, \"{Display(type).Replace("\\", "\\\\").Replace("\"", "\\\"")}\", NULL }};");
+                prototypes.AppendLine($"static const LyrDesc {CoroutineDesc(type)} = {{ 0, LYR_DESC_CORO, 0, 0, NULL, \"{Display(type).Replace("\\", "\\\\").Replace("\"", "\\\"")}\", NULL }};");
             foreach (var made in started) prototypes.Append(CoroutineBody(made.Body.Value, made.Type));
         }
 

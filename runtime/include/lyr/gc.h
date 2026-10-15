@@ -1,13 +1,20 @@
 /* The collector contract, stage 0 (design/v5/spec/01 L1). Emitted code and the runtime talk to
  * the collector only through this header; what sits behind it changes by stage (1: Boehm,
- * 2: own Immix heap, 3: generational) without touching the emitter. */
+ * 2: own Immix heap, 3: generational) without touching the emitter. Which collector a build has
+ * is a define of the build: LYR_GC_BOEHM for stage 1, kept to compare against (13 M11 P11);
+ * without it, the runtime's own (gc_immix.c). */
 #ifndef LYR_GC_H
 #define LYR_GC_H
 
 #include "lyr/types.h"
 
+#include <stddef.h>
+#include <stdint.h>
+
 /* Starts the collector for the calling (main) thread. Idempotent. */
 void lyr_gc_init(void);
+
+#ifdef LYR_GC_BOEHM
 
 /* A fixed-size object of `desc->size` bytes, zeroed, header set. Never NULL: exhaustion panics. */
 void *lyr_alloc(const LyrDesc *desc);
@@ -19,6 +26,95 @@ LyrArr *lyr_alloc_array(const LyrDesc *desc, int64_t count);
 /* A string of `len` bytes, contents unset except the terminating NUL; the caller fills it before
  * anyone else can see it. */
 LyrStr *lyr_alloc_string(int64_t len);
+
+#else
+
+/* The own collector (13 M11 P3): each thread bumps through a buffer of its own — a run of free
+ * lines in an Immix block — so an allocation is a few instructions inline, and everything else
+ * (the next run, a block, a large object, a collection, exhaustion) is the slow path's. The three
+ * functions promise what they promise under Boehm: memory zeroed (a buffer is zeroed when it is
+ * handed out), the header set, the length set. */
+typedef struct LyrMutator {
+    uintptr_t cursor;  /* the buffer's next free byte */
+    uintptr_t limit;   /* its end */
+} LyrMutator;
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+extern _Thread_local LyrMutator lyr_mutator __attribute__((tls_model("initial-exec")));
+#else
+extern _Thread_local LyrMutator lyr_mutator;
+#endif
+
+/* The slow paths, with `bytes` as asked (not rounded). Each returns its object zeroed with the
+ * header set — the array's and the string's length too —, or panics: RT0005 when no memory is
+ * left, RT0007 for a negative length. */
+void *lyr_gc_alloc_slow(const LyrDesc *desc, size_t bytes);
+LyrArr *lyr_gc_alloc_array_slow(const LyrDesc *desc, int64_t count);
+LyrStr *lyr_gc_alloc_string_slow(int64_t len);
+
+/* Objects lie on 16-byte granules: an array's elements are aligned to 16 (types.h). */
+#define LYR_GC_GRANULE 16
+#define LYR_GC_ROUND(bytes) (((size_t)(bytes) + (LYR_GC_GRANULE - 1)) & ~(size_t)(LYR_GC_GRANULE - 1))
+
+/* A length from here up goes to the slow path whole, which checks it: below it the arithmetic
+ * inline cannot overflow. A negative one is a huge one as unsigned. */
+#define LYR_GC_INLINE_LENGTH ((uint64_t)1 << 40)
+
+/* Under ASan every allocation takes the slow path (01 L12), which tells ASan what it hands out. */
+#if defined(__SANITIZE_ADDRESS__)
+#  define LYR_GC_INLINE 0
+#elif defined(__has_feature)
+#  if __has_feature(address_sanitizer)
+#    define LYR_GC_INLINE 0
+#  endif
+#endif
+#ifndef LYR_GC_INLINE
+#  define LYR_GC_INLINE 1
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#  define LYR_GC_SLOW(x) __builtin_expect(!!(x), 0)
+#else
+#  define LYR_GC_SLOW(x) (x)
+#endif
+
+/* The bump: `rounded` bytes from the buffer, or NULL for the slow path. A load of the two
+ * bounds, a compare, a store — with the header, the fast path 01 L1 asks for. */
+static inline void *lyr_gc_bump(size_t rounded) {
+    uintptr_t at = lyr_mutator.cursor;
+    if (LYR_GC_SLOW(!LYR_GC_INLINE || rounded > lyr_mutator.limit - at)) return NULL;
+    lyr_mutator.cursor = at + rounded;
+    return (void *)at;
+}
+
+static inline void *lyr_alloc(const LyrDesc *desc) {
+    LyrObj *object = (LyrObj *)lyr_gc_bump(LYR_GC_ROUND(desc->size));
+    if (LYR_GC_SLOW(object == NULL)) return lyr_gc_alloc_slow(desc, desc->size);
+    object->desc = desc;
+    return object;
+}
+
+static inline LyrArr *lyr_alloc_array(const LyrDesc *desc, int64_t count) {
+    if (LYR_GC_SLOW((uint64_t)count >= LYR_GC_INLINE_LENGTH)) return lyr_gc_alloc_array_slow(desc, count);
+    LyrArr *array = (LyrArr *)lyr_gc_bump(LYR_GC_ROUND(offsetof(LyrArr, data) + (size_t)count * desc->elem_size));
+    if (LYR_GC_SLOW(array == NULL)) return lyr_gc_alloc_array_slow(desc, count);
+    array->header.desc = desc;
+    array->len = count;
+    return array;
+}
+
+extern const LyrDesc lyr_desc_string;
+
+static inline LyrStr *lyr_alloc_string(int64_t len) {
+    if (LYR_GC_SLOW((uint64_t)len >= LYR_GC_INLINE_LENGTH)) return lyr_gc_alloc_string_slow(len);
+    LyrStr *string = (LyrStr *)lyr_gc_bump(LYR_GC_ROUND(offsetof(LyrStr, bytes) + (size_t)len + 1));
+    if (LYR_GC_SLOW(string == NULL)) return lyr_gc_alloc_string_slow(len);
+    string->header.desc = &lyr_desc_string;
+    string->len = len;
+    return string;
+}
+
+#endif
 
 /* Stores a reference into a slot. A plain store in stage 1; stage 3 records old-to-young stores.
  * Emitted code writes every reference field through it from day one. `object` is the place the
