@@ -6986,7 +6986,11 @@ internal sealed class FunctionLowerer
             "conformances" => new ArrayConst([.. (_types.MetaConformances?.Invoke(about) ?? []).Select(i => TypeConst(new NamedRef(i)))]),
             "hasConformance" => new BoolConst(asked.Length > 1 && TypeFacts.SymbolOf(asked[1]) is { Kind: TypeSymbolKind.Interface } iface
                                               && _types.Satisfies?.Invoke(about, iface) == true),
-            "members" => new ArrayConst([.. (_types.MetaMembers?.Invoke(about, from) ?? []).Select(MemberInfoConst)]),
+            // 'members<Self>()' where 'Self' is the interface itself — its default's own body,
+            // lowered beside the conformers' expansions: none, as its fields and variants are none;
+            // an interface is no conformer of itself (the sweep after M10, X3)
+            "members" => new ArrayConst([.. (call.TypeArguments is [NamedType { Path: ["Self"] }, ..] && TypeFacts.KindOf(about) == TypeSymbolKind.Interface
+                ? [] : _types.MetaMembers?.Invoke(about, from) ?? []).Select(MemberInfoConst)]),
             "typeName" => new StringConst(TypeFacts.Display(about)),
             "isStruct" => new BoolConst(TypeFacts.KindOf(about) == TypeSymbolKind.Struct),
             "isClass" => new BoolConst(TypeFacts.KindOf(about) == TypeSymbolKind.Class),
