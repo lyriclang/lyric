@@ -5,6 +5,7 @@ import std.toml;
 import std.toml { TomlValue, TomlDatetime, TomlError };
 import std.codec { Codable, Codec, Bytes, DecodeError, DecodeErrorKind, EncodeError };
 import std.collections { List, Map };
+import std.string { StringBuilder };
 import std.test { assertEq, assertTrue, assertNull, fail };
 import std.time { Instant };
 
@@ -175,4 +176,55 @@ fn theTreeAndTheErrorsHaveTheirPlaces(): void throws Error {
     let when = try Instant.parse("1979-05-27T07:32:00Z");
     assertEq(try (toml.parse("t = 1979-05-27T07:32:00Z")).path("t")!.read<Instant>(), when);
     assertEq(try (toml.parse("t = \"1979-05-27T07:32:00Z\"")).path("t")!.read<Instant>(), when);
+}
+
+/// `a = [[…]]`: the root table is level 1 and `a` level 2, so `n - 1` brackets nest the document `n`.
+fn tomlArrays(n: int): string {
+    let b = StringBuilder.new();
+    b.append("a = ");
+    for (_ in 0..n - 1) { b.append("["); }
+    for (_ in 0..n - 1) { b.append("]"); }
+    b.append("\n");
+    return b.toString();
+}
+
+/// `a = {b = {b = … 1}}`: an inline table per level below `a`, the `1` at level `n`.
+fn tomlTables(n: int): string {
+    let b = StringBuilder.new();
+    b.append("a = ");
+    for (_ in 0..n - 2) { b.append("{b = "); }
+    b.append("1");
+    for (_ in 0..n - 2) { b.append("}"); }
+    b.append("\n");
+    return b.toString();
+}
+
+/// `[k.k.…]` of `n - 2` segments, a table at level `n - 1`, its `x` at level `n`.
+fn tomlHeader(n: int): string {
+    let b = StringBuilder.new();
+    b.append("[k");
+    for (_ in 0..n - 3) { b.append(".k"); }
+    b.append("]\nx = 1\n");
+    return b.toString();
+}
+
+/// 12 §TOML rule 3 (the sweep after M10, W5): a document may nest 128 levels, the root table the
+/// first, and what the library does with it holds in a test's task; the 129th level is refused —
+/// through an array, an inline table or a header — before it is read, not overflowed.
+@Test
+fn aDocumentNests128LevelsInATask(): void throws Error {
+    for (text in [tomlArrays(128), tomlTables(128), tomlHeader(128)]) {
+        let deep = try toml.parse(text[..]);
+        assertTrue(deep == deep);
+        assertTrue((try toml.encode(deep)).length() > 0);
+        assertTrue(deep.debug().length() > 0);
+    }
+    for (text in [tomlArrays(129), tomlTables(129), tomlHeader(129), tomlArrays(100000), tomlHeader(100000)]) {
+        try {
+            let _ = toml.parse(text[..]);
+            fail("a document deeper than 128 levels was read");
+        } catch (e: TomlError) {
+            assertTrue(e.message().contains("deeper than 128 levels"));
+        }
+    }
 }

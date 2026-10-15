@@ -813,9 +813,17 @@ class Parser {
         }
     }
 
+    /// The document, line by line. Its levels (12 §TOML rule 3; the sweep after M10, W5): the root
+    /// table the first, each segment of a header or a key one more, an array of tables one more
+    /// for its element, an array's elements and an inline table's values below them — past the
+    /// 128th a document is refused, before what nests deeper is read. 128, not JSON's 512: a
+    /// `TomlValue` carries a date-time and weighs some five `JsonValue`s, and a release task's
+    /// 256 KiB held the comparison of 256 levels and no more (measured); 128 leaves room for the
+    /// frames of whoever calls.
     mut fn document(): void throws TomlError {
         var current = this.root;
         var currentPath = "";
+        var currentLevel = 1;
         loop {
             try this.skipSpaceAndComments();
             let b = this.peek();
@@ -839,6 +847,10 @@ class Parser {
                     this.at = this.at + 1;
                 }
                 try this.endOfLine();
+                currentLevel = 1 + path.length() + (if (array) 1 else 0);
+                if (currentLevel > 128) {
+                    throw this.fail("the document nests deeper than 128 levels");
+                }
                 current = try this.openTable(path, array);
                 currentPath = joined(path);
                 continue;
@@ -850,7 +862,7 @@ class Parser {
             }
             this.at = this.at + 1;
             this.skipBlanks();
-            let v = try this.value();
+            let v = try this.value(currentLevel + path.length());
             try this.assign(current, currentPath, path, v);
             try this.endOfLine();
         }
@@ -991,7 +1003,11 @@ class Parser {
         }
     }
 
-    mut fn value(): TomlValue throws TomlError {
+    /// A value at the level `level` (`document`): one past the 128th is refused before it is read.
+    mut fn value(level: int): TomlValue throws TomlError {
+        if (level > 128) {
+            throw this.fail("the document nests deeper than 128 levels");
+        }
         let b = this.peek();
         if (b < 0) {
             throw this.fail("the text ends where a value was expected");
@@ -1008,8 +1024,8 @@ class Parser {
             }
             return TomlValue.String(try this.literalString());
         }
-        if (b == 0x5B) { return try this.array(); }
-        if (b == 0x7B) { return try this.inlineTable(); }
+        if (b == 0x5B) { return try this.array(level); }
+        if (b == 0x7B) { return try this.inlineTable(level); }
         if (b == 0x74 && this.word("true")) { this.at = this.at + 4; return TomlValue.Bool(true); }
         if (b == 0x66 && this.word("false")) { this.at = this.at + 5; return TomlValue.Bool(false); }
         return try this.numberOrDatetime();
@@ -1226,7 +1242,7 @@ class Parser {
         return v;
     }
 
-    mut fn array(): TomlValue throws TomlError {
+    mut fn array(level: int): TomlValue throws TomlError {
         this.at = this.at + 1;
         let items = List<TomlValue>.new();
         loop {
@@ -1235,7 +1251,7 @@ class Parser {
                 this.at = this.at + 1;
                 return TomlValue.Array(items);
             }
-            items.push(try this.value());
+            items.push(try this.value(level + 1));
             try this.skipSpaceAndComments();
             let b = this.peek();
             if (b == 0x2C) {
@@ -1250,7 +1266,7 @@ class Parser {
         }
     }
 
-    mut fn inlineTable(): TomlValue throws TomlError {
+    mut fn inlineTable(level: int): TomlValue throws TomlError {
         this.at = this.at + 1;
         let t = TomlTable.new();
         this.skipBlanks();
@@ -1266,7 +1282,7 @@ class Parser {
             }
             this.at = this.at + 1;
             this.skipBlanks();
-            let v = try this.value();
+            let v = try this.value(level + path.length());
             try this.assign(t, "{}", path, v);
             this.skipBlanks();
             let b = this.peek();

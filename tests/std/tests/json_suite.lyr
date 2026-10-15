@@ -1,0 +1,86 @@
+// JSONTestSuite (Nicolas Seriot, MIT; `fixtures/json/LICENSE`): every parsing case of the suite
+// through `json.parse` — a `y_` file parses, an `n_` file is refused, an `i_` file goes either
+// way without a panic (12 §JSON rule 2; the review of M10, M16). The suite's counts: 95, 188, 35.
+import std.collections { List };
+import std.core { Utf8Error };
+import std.fs;
+import std.json;
+import std.json { JsonError };
+import std.os;
+import std.path;
+import std.test { assertEq, fail };
+
+/// Whether the file's bytes parse as a JSON document: no UTF-8 is no document.
+fn parses(path: string): bool throws Error {
+    let bytes = try fs.readBytes(path);
+    var text = "";
+    try {
+        text = string.fromUtf8(bytes[..]);
+    } catch (_: Utf8Error) {
+        return false;
+    }
+    try {
+        let _ = json.parse(text[..]);
+        return true;
+    } catch (_: JsonError) {
+        return false;
+    }
+}
+
+/// The suite's directory, in the package beside `tests/`. `lyric test` runs the program it built
+/// under the package's `out/` and says nothing of the working directory (14 §3), so the search
+/// climbs from the program's own path — its first argument — to the directory that holds the
+/// fixtures, and tries the working directory after.
+fn suiteDir(): string {
+    var dir = path.parent(os.args()[0][..]);
+    loop {
+        let candidate = path.join(dir, "fixtures", "json", "test_parsing");
+        if (fs.exists(candidate)) {
+            return candidate;
+        }
+        let up = path.parent(dir[..]);
+        if (up == dir) {
+            break;
+        }
+        dir = up;
+    }
+    for (rel in ["fixtures/json/test_parsing", "tests/std/fixtures/json/test_parsing"]) {
+        if (fs.exists(rel)) {
+            return rel;
+        }
+    }
+    fail("the JSONTestSuite fixtures are not where the test looks");
+}
+
+@Test
+fn theSuitesCasesParseOrAreRefusedAsTheyShould(): void throws Error {
+    var y = 0;
+    var n = 0;
+    var i = 0;
+    let wrong: List<string> = List.new();
+    for (e in try fs.readDir(suiteDir())) {
+        if (!e.name.endsWith(".json")) {
+            continue;
+        }
+        let parsed = try parses(e.path);
+        if (e.name.startsWith("y_")) {
+            y = y + 1;
+            if (!parsed) {
+                wrong.push(e.name);
+            }
+        } else if (e.name.startsWith("n_")) {
+            n = n + 1;
+            if (parsed) {
+                wrong.push(e.name);
+            }
+        } else {
+            i = i + 1;
+        }
+    }
+    assertEq(y, 95);
+    assertEq(n, 188);
+    assertEq(i, 35);
+    if (!wrong.isEmpty()) {
+        fail(f"{wrong.length()} of the suite's cases went the wrong way, the first: {wrong[0]}");
+    }
+}

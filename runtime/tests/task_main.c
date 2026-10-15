@@ -42,7 +42,8 @@ static void scheduler(LyrCoro *main) {
     lyr_task_set_scheduler(NULL);
 }
 
-/* 4 KiB a frame: 400 of them overflow a default coroutine stack of 256 KiB. */
+/* 4 KiB a frame: 400 of them overflow a release task's default stack of 256 KiB, and need the
+ * main task's own (LYR_MAIN_TASK_STACK). */
 static int64_t deep(int64_t n) {
     volatile char pad[4096];
     pad[n % 4096] = (char)n;

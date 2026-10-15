@@ -535,6 +535,7 @@ Empfehlung"), dazu drei Freigaben. Die Nummern sind die der Sammelliste des Beri
 | M14 | **`ParseError` bekommt `detail` und `offset`** (freigegeben): eine URI-Ablehnung sagt, wo und warum; `Instant`, `IpAddr`, `Uri` füllen sie — Sweep nach M10 [171] | B3 |
 | M15 | **`Duration`, `Date`, `Time`, `DateTime` werden `Codable` über ihren Text** (RFC 3339 / ISO 8601, freigegeben) — Sweep nach M10 [155] | E6, Q1 |
 | M16 | **JSONTestSuite als Fixtures** unter `tests/std/fixtures/json/` (Download freigegeben, wie die UCD) — Sweep nach M10 [168] | E7 |
+| M17 | **Tiefe in jedem Task** (Befund der Suite, entschieden): JSON 512 Ebenen ab der äußersten, in beiden Profilen (Debug-Task-Stack 2 MB, 01 K1); **TOML 128** ab der Wurzeltabelle — Kopf- und Schlüsselsegmente, Arrays, Inline-Tabellen zählen; gemessen hielt Release (256 KB) den TOML-Vergleich bis 256 Ebenen — Sweep nach M10, W5 | E7, E8 |
 
 Türen geprüft (S13): lazy DFA zu (2,96× Go nach den Allokationsgewinnen), JSON5, CBOR, HTTP/2, Raw-Mode,
 Lokalisierung zu. Neu notiert: streamender JSON-Decoder [165], Int128/Dezimal im Baum [166], Server-Fristen [179],
