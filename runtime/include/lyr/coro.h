@@ -23,8 +23,16 @@ typedef enum LyrCoroStatus {
 /* A coroutine's body, run on the coroutine's stack at its first resume; returning ends it. */
 typedef void (*LyrCoroBody)(void *arg);
 
-/* The default stack reservation (01 K1). */
+/* The default stack reservation (01 K1): 256 KiB in the release profile, 2 MiB in the others
+ * (spec 13 rule 2; the sweep after M10, W5). Unoptimized frames are about four times an optimized
+ * one's: a JSON document of 512 levels took about 1.9 KiB a level at -O0 and overflowed 256 KiB at
+ * 140, where the limit the library promises is 512 in every task. The reservation is address
+ * space; pages are committed as they are reached. Only release defines NDEBUG (Target.cs). */
+#ifdef NDEBUG
 enum { LYR_CORO_STACK_DEFAULT = 256 * 1024 };
+#else
+enum { LYR_CORO_STACK_DEFAULT = 2 * 1024 * 1024 };
+#endif
 
 /* A coroutine around `body`, not started. `desc` is its type's descriptor — the coroutine is a
  * heap object like any other; `arg` is handed to the body and kept alive by the coroutine, the

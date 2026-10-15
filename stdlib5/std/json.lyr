@@ -779,6 +779,8 @@ class Parser {
         this.at = this.at + w.length();
     }
 
+    /// A value at the level `depth`, the document's own the first (12 §JSON rule 3): one past the
+    /// 512th is refused before it is read, so a deep document costs no more stack than 512 levels.
     mut fn value(depth: int): JsonValue throws JsonError {
         if (depth > 512) {
             throw this.fail("the document nests deeper than 512 levels");
@@ -1014,7 +1016,7 @@ class Parser {
 /// nothing else.
 pub fn parse(text: StringView): JsonValue throws JsonError {
     var p = Parser { bytes = text.toBytes() };
-    let v = try p.value(0);
+    let v = try p.value(1);
     p.skipWhitespace();
     if (p.at < p.bytes.length()) {
         throw p.fail("text follows the value");

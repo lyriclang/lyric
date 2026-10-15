@@ -4,6 +4,7 @@ import std.json;
 import std.json { JsonValue, JsonOptions, JsonError, JsonWriter };
 import std.codec { Codable, Codec, Bytes, Value, DecodeError, DecodeErrorKind, EncodeError };
 import std.collections { Map };
+import std.string { StringBuilder };
 import std.test { assertEq, assertTrue, assertNull, fail };
 import std.time { Instant };
 
@@ -196,4 +197,31 @@ fn anErrorNamesItsPathAndAWriterTakesTheText(): void throws Error {
     assertEq(w.text(), "[1,2]");
     let t = Instant.now();
     assertEq(try json.decode<Instant>(json.encode(t)), t);
+}
+
+/// `[[…]]` of `n` levels.
+fn nestedArrays(n: int): string {
+    let b = StringBuilder.new();
+    for (_ in 0..n) { b.append("["); }
+    for (_ in 0..n) { b.append("]"); }
+    return b.toString();
+}
+
+/// 12 §JSON rule 3 (the sweep after M10, W5): a document may nest 512 levels, the outermost the
+/// first, and what the library does with it holds in a test's task — whose stack is a task's
+/// default, in the debug profile too; the 513th level is refused, not overflowed.
+@Test
+fn aDocumentNests512LevelsInATask(): void throws Error {
+    let deep = try json.parse(nestedArrays(512)[..]);
+    assertTrue(deep == deep);
+    assertEq((try json.encode(deep)).length(), 1024);
+    assertTrue(deep.debug().length() > 0);
+    for (n in [513, 100000]) {
+        try {
+            let _ = json.parse(nestedArrays(n)[..]);
+            fail(f"{n} levels were read");
+        } catch (e: JsonError) {
+            assertTrue(e.message().contains("deeper than 512 levels"));
+        }
+    }
 }
