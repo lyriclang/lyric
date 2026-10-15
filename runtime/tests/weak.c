@@ -1,8 +1,9 @@
 /* Weak references with death callbacks (01 L1, Cleaner form).
  * Expected: an object kept alive by a strong local keeps its weak reference answering and its
- * callback silent; 1000 unreachable objects: at least 900 callbacks run, each with its own context,
- * and those weak references answer NULL; a weak reference freed before death never calls back;
- * two weak references on one object both call back. Prints "weak ok". */
+ * callback silent; 1000 unreachable objects: under the own collector every callback runs (13 M11,
+ * the review's D1), under Boehm at least 900, each with its own context, and those weak references
+ * answer NULL; a weak reference freed before death never calls back; two weak references on one
+ * object both call back. Prints "weak ok". */
 #include "lyr/lyr.h"
 #include "check.h"
 #include "conservative.h"
@@ -60,11 +61,16 @@ static int64_t program(void) {
         called += seen[i];
         if (lyr_weak_get(weaks[i]) == NULL) null_answers++;
     }
-    /* Boehm scans the stack conservatively: a stale word that looks like a pointer keeps its
-     * object alive, more of them in a debug build. 949 failed three CI runs in a day; the test
-     * asks that the callbacks work, not how conservative the scan is. */
-    if (called < 900) fprintf(stderr, "weak: %d of %d callbacks ran\n", called, N - 1);
+    /* Boehm scans the heap conservatively too: a stale word that looks like a pointer keeps its
+     * object alive, more of them in a debug build. 949 failed three CI runs in a day; under Boehm
+     * the test asks that the callbacks work, not how conservative the scan is. The own collector
+     * reads the heap by its maps and the stack below the allocations is wiped: every one runs. */
+    if (called < N - 1) fprintf(stderr, "weak: %d of %d callbacks ran\n", called, N - 1);
+#ifdef LYR_GC_BOEHM
     CHECK(called >= 900);
+#else
+    CHECK(called == N - 1);
+#endif
     CHECK(null_answers >= called);
     CHECK(seen[N] == 0);        /* cancelled */
     CHECK(seen[N + 1] == 2);    /* two weak references, two callbacks */

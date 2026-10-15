@@ -182,6 +182,12 @@ void lyr_root_free(LyrRoot *root) {
 }
 
 void lyr_register_stack(void *low, void *high) { GC_add_roots(low, high); }
+
+/* Boehm scans the program's data segments whole: the globals need no table. */
+void lyr_gc_add_globals(void **const *slots, size_t count) {
+    (void)slots;
+    (void)count;
+}
 void lyr_unregister_stack(void *low, void *high) { GC_remove_roots(low, high); }
 
 /* --- weak references ------------------------------------------------------------------------- */

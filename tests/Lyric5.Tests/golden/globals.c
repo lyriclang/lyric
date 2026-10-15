@@ -57,6 +57,13 @@ int64_t lyr_g_app_main_counter = 0;
 lyr_ty_app_main_Log *lyr_g_app_main_log = NULL;
 LyrArr *lyr_g_app_main_points = NULL;
 
+/* the globals' reference words, the collector's roots */
+static void **const lyr_global_refs[] = {
+    (void **)&lyr_g_app_main_greeting,
+    (void **)&lyr_g_app_main_log,
+    (void **)&lyr_g_app_main_points,
+};
+
 /* string literals */
 static const LyrStaticStr(7) lyr_lit0 = LYR_STR_INIT("start ");
 static const LyrStaticStr(2) lyr_lit1 = LYR_STR_INIT(" ");
@@ -1401,7 +1408,7 @@ bb0:;
 
 
 /* the program */
-static int64_t lyr_entry(void) { lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
+static int64_t lyr_entry(void) { lyr_gc_add_globals(lyr_global_refs, 3); lyr__globals__9ee5f9b5(); return lyr_app_main_main(); }
 int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }
 
 /* ==== unit: std.core.<extend>.Slice<uint8> ==== */

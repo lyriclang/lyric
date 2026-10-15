@@ -224,6 +224,18 @@ public partial class PanicTests
         Assert.All(lines.Skip(1), line => Assert.StartsWith("    ", line));
     }
 
+    /// <summary>The same under the own collector (13 M11 S2): it collects first, then panics.</summary>
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void Allocation_beyond_the_heap_limit_panics_under_the_own_collector(Profile profile)
+    {
+        var result = RuntimeBuildTests.RunTest("heap_limit", BuildProfile.Of(profile) with { Gc = Collector.Immix });
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        var lines = Lines(result.Stderr);
+        Assert.StartsWith("panic [LYR-RT0005]: out of memory allocating 1016 bytes (heap ", lines[0]);
+        Assert.All(lines.Skip(1), line => Assert.StartsWith("    ", line));
+    }
+
     [Theory]
     [MemberData(nameof(Profiles))]
     public void An_abort_is_a_crash_with_a_trace(Profile profile)

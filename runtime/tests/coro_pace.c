@@ -13,7 +13,9 @@ static const LyrDesc bytes_desc = { .size = (uint32_t)offsetof(LyrArr, data), .f
 
 enum { LIVE_BLOCKS = 64, BLOCK = 2 * 1024 * 1024, DROPPED = 50000, BOUND = 2 * 1024 + 64 };
 
-static LyrArr *live[LIVE_BLOCKS];  /* static data is a root */
+/* C memory that holds objects is a root once registered (gc.h): Boehm scans static data whole,
+ * the own collector only what it is told (13 M11 P4). */
+static LyrArr *live[LIVE_BLOCKS];
 
 static void body(void *arg) {
     (void)arg;
@@ -21,6 +23,7 @@ static void body(void *arg) {
 }
 
 static int64_t program(void) {
+    lyr_register_stack(live, live + LIVE_BLOCKS);
     for (int i = 0; i < LIVE_BLOCKS; i++) live[i] = lyr_alloc_array(&bytes_desc, BLOCK);
     size_t peak = 0;
     for (int i = 0; i < DROPPED; i++) {
