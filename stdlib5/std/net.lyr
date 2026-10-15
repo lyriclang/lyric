@@ -69,7 +69,7 @@ extend IpAddr :: [Parse] {
         if (let g = v6Of(text)) {
             return IpAddr.V6(g[0], g[1], g[2], g[3], g[4], g[5], g[6], g[7]);
         }
-        throw ParseError { kind = .Invalid };
+        throw ParseError { kind = .Invalid, detail = "neither an IPv4 address (four decimal octets) nor an IPv6 one (RFC 4291 section 2.2)", offset = 0 };
     }
 }
 
@@ -102,23 +102,23 @@ extend SocketAddr :: [Parse] {
             colon -= 1;
         }
         if (colon <= 0) {
-            throw ParseError { kind = .Invalid };
+            throw ParseError { kind = .Invalid, detail = "an address and a port, separated by ':'", offset = 0 };
         }
         let port = portOf(text[colon + 1..]);
         if (port == null) {
-            throw ParseError { kind = .Invalid };
+            throw ParseError { kind = .Invalid, detail = "the port is digits up to 65535", offset = colon + 1 };
         }
         var host = text[..colon];
         let bracketed = host[0] == 91u8;
         if (bracketed) {
             if (host.length() < 2 || host[host.length() - 1] != 93u8) {
-                throw ParseError { kind = .Invalid };
+                throw ParseError { kind = .Invalid, detail = "an '[' without its ']'", offset = 0 };
             }
             host = host[1..host.length() - 1];
         }
         if (let v4 = v4Of(host)) {
             if (bracketed) {
-                throw ParseError { kind = .Invalid };
+                throw ParseError { kind = .Invalid, detail = "brackets hold an IPv6 address, not an IPv4 one", offset = 0 };
             }
             return SocketAddr { ip = IpAddr.V4(v4[0], v4[1], v4[2], v4[3]), port = port };
         }

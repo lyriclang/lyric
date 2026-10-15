@@ -2064,13 +2064,26 @@ pub enum ParseErrorKind :: [Equatable, Debug] { Empty, Invalid, Overflow }
 pub struct ParseError :: [Error] {
     /// Why.
     pub kind: ParseErrorKind,
+    /// What the parser can say beyond the kind — what it expected where it stopped —; empty where
+    /// it says nothing (the number parsers), filled by `Uri.parse`, the address parsers and the
+    /// time parsers (design 10 B3; the review of M10, M14).
+    pub detail: string = "",
+    /// The byte offset in the text the refusal points at, where the parser knows one.
+    pub offset: ?int = null,
 
     pub fn message(): string {
-        return match (this.kind) {
+        var text = match (this.kind) {
             .Empty => "cannot parse a value from an empty text",
             .Invalid => "the text is not a value of the type",
             .Overflow => "the number is beyond the type's range",
         };
+        if (!this.detail.isEmpty()) {
+            text = f"{text}: {this.detail}";
+        }
+        if (let at = this.offset) {
+            text = f"{text} (at byte {at})";
+        }
+        return text;
     }
 }
 

@@ -152,7 +152,7 @@ pub fn percentDecode(s: StringView): string throws ParseError {
         let b = text[i];
         if (b == 37u8) {
             if (i + 2 >= n || !isHex(text[i + 1]) || !isHex(text[i + 2])) {
-                throw ParseError { kind = .Invalid };
+                throw ParseError { kind = .Invalid, detail = "a '%' without two hexadecimal digits after it", offset = i };
             }
             out[o] = (hexValue(text[i + 1]) * 16 + hexValue(text[i + 2])) as uint8;
             i = i + 3;
@@ -165,7 +165,7 @@ pub fn percentDecode(s: StringView): string throws ParseError {
     try {
         return string.fromUtf8(out[0..o]);
     } catch (_: Utf8Error) {
-        throw ParseError { kind = .Invalid };
+        throw ParseError { kind = .Invalid, detail = "the decoded bytes are no UTF-8", offset = 0 };
     }
 }
 
@@ -507,14 +507,14 @@ extend Uri :: [Parse] {
             end = end + 1;
         }
         if (!valid(text, i, end, .Path)) {
-            throw ParseError { kind = .Invalid };
+            throw ParseError { kind = .Invalid, detail = "a character the path does not allow", offset = i };
         }
         if (scheme == null && host == null) {
             // path-noscheme (§4.2): the first segment holds no ":" - it would read as a scheme
             var k = i;
             while (k < end && text[k] != 47u8) {
                 if (text[k] == 58u8) {
-                    throw ParseError { kind = .Invalid };
+                    throw ParseError { kind = .Invalid, detail = "a ':' in the first segment of a relative path reads as a scheme", offset = k };
                 }
                 k = k + 1;
             }
@@ -528,7 +528,7 @@ extend Uri :: [Parse] {
                 qend = qend + 1;
             }
             if (!valid(text, i + 1, qend, .Query)) {
-                throw ParseError { kind = .Invalid };
+                throw ParseError { kind = .Invalid, detail = "a character the query does not allow", offset = i + 1 };
             }
             query = ascii(text, i + 1, qend);
             i = qend;
@@ -536,7 +536,7 @@ extend Uri :: [Parse] {
         // the fragment
         if (i < n && text[i] == 35u8) {
             if (!valid(text, i + 1, n, .Fragment)) {
-                throw ParseError { kind = .Invalid };
+                throw ParseError { kind = .Invalid, detail = "a character the fragment does not allow", offset = i + 1 };
             }
             fragment = ascii(text, i + 1, n);
         }
@@ -555,7 +555,7 @@ fn parseAuthority(text: Slice<uint8>, from: int, to: int): (?string, string, ?in
     while (at >= from) {
         if (text[at] == 64u8) {
             if (!valid(text, from, at, .Userinfo)) {
-                throw ParseError { kind = .Invalid };
+                throw ParseError { kind = .Invalid, detail = "a character the user information does not allow", offset = from };
             }
             userinfo = ascii(text, from, at);
             hostFrom = at + 1;
@@ -571,18 +571,18 @@ fn parseAuthority(text: Slice<uint8>, from: int, to: int): (?string, string, ?in
             close = close + 1;
         }
         if (close == to) {
-            throw ParseError { kind = .Invalid };
+            throw ParseError { kind = .Invalid, detail = "an '[' without its ']'", offset = hostFrom };
         }
         let inside = ascii(text, hostFrom + 1, close);
         match (try IpAddr.parse(inside)) {
             .V6(_, _, _, _, _, _, _, _) => { },
-            _ => { throw ParseError { kind = .Invalid }; },
+            _ => { throw ParseError { kind = .Invalid, detail = "the brackets hold no IPv6 address", offset = hostFrom + 1 }; },
         }
         hostTo = close + 1;
         var port: ?int = null;
         if (hostTo < to) {
             if (text[hostTo] != 58u8) {
-                throw ParseError { kind = .Invalid };
+                throw ParseError { kind = .Invalid, detail = "only a ':' and a port may follow the brackets", offset = hostTo };
             }
             port = try parsePort(text, hostTo + 1, to);
         }
@@ -603,7 +603,7 @@ fn parseAuthority(text: Slice<uint8>, from: int, to: int): (?string, string, ?in
         port = try parsePort(text, colon + 1, to);
     }
     if (!valid(text, hostFrom, hostTo, .Host)) {
-        throw ParseError { kind = .Invalid };
+        throw ParseError { kind = .Invalid, detail = "a character the host does not allow", offset = hostFrom };
     }
     return (userinfo, ascii(text, hostFrom, hostTo), port);
 }
@@ -617,11 +617,11 @@ fn parsePort(text: Slice<uint8>, from: int, to: int): ?int throws ParseError {
     var i = from;
     while (i < to) {
         if (!isDigit(text[i])) {
-            throw ParseError { kind = .Invalid };
+            throw ParseError { kind = .Invalid, detail = "the port is digits", offset = i };
         }
         v = v * 10 + (text[i] - 48u8) as int;
         if (v > 65535) {
-            throw ParseError { kind = .Invalid };
+            throw ParseError { kind = .Invalid, detail = "the port is beyond 65535", offset = from };
         }
         i = i + 1;
     }
