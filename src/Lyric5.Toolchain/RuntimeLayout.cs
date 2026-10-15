@@ -1,8 +1,10 @@
 namespace Lyric5.Toolchain;
 
 /// <summary>
-/// What the Lyric 5 runtime is made of, per target: the vendored collector (stage 1 of
-/// design/v5/spec/01 L1), and the runtime's own sources under <c>runtime/src</c>.
+/// What the Lyric 5 runtime is made of, per target and collector: the runtime's own sources under
+/// <c>runtime/src</c> with the collector the build asks for — its own (<c>gc_immix.c</c>, stages 2
+/// and 3 of design/v5/spec/01 L1) or the vendored Boehm collector (stage 1) with its binding
+/// (<c>gc_boehm.c</c>), kept to compare against (13 M11 P11).
 /// </summary>
 public static class RuntimeLayout
 {
@@ -65,22 +67,23 @@ public static class RuntimeLayout
         return defines;
     }
 
-    public static IReadOnlyList<CUnit> Units(string root, Target target)
+    public static IReadOnlyList<CUnit> Units(string root, Target target, Collector gc)
     {
         // Where the toolchain lies is no part of what it builds (11 W2 P6).
         var map = $"-ffile-prefix-map={Path.TrimEndingDirectorySeparator(Path.GetFullPath(root))}=lyric";
         var bdwgc = BdwgcDir(root);
         var bdwgcInclude = Path.Combine(bdwgc, "include");
-        var units = new List<CUnit>
+        var units = new List<CUnit>();
+        if (gc == Collector.Boehm)
         {
             // The amalgamation compiles the whole collector as one unit. Third-party code: its own
             // warnings are not ours to fix, and it is never instrumented (it reads memory it does
             // not own, on purpose — that is what a conservative scan is). Not under TSan either:
             // instrumented, it switches to its TSan mode, whose mutex is a place where TSan does
             // NOT deliver the collector's stop signal — measured, 31 of 32 stressed runs aborted.
-            new(Path.Combine(bdwgc, "extra", "gc.c"), CollectorDefines(target), [bdwgcInclude],
-                Instrument: false, ExtraFlags: ["-w", "-std=gnu11", map]),
-        };
+            units.Add(new(Path.Combine(bdwgc, "extra", "gc.c"), CollectorDefines(target), [bdwgcInclude],
+                Instrument: false, ExtraFlags: ["-w", "-std=gnu11", map]));
+        }
 
         // Third-party as well, and uninstrumented for the same reason as the collector: its readers
         // walk the executable's own bytes in ways a sanitizer has no business judging.
@@ -100,12 +103,17 @@ public static class RuntimeLayout
                 ExtraFlags: ["-w", "-std=gnu11", "-ffp-contract=off", "-fno-fast-math", map]));
         }
 
+        // The runtime's own sources, with one collector's binding: the other one is left out.
         var own = Path.Combine(root, "runtime", "src");
-        var runtimeDefines = CollectorDefines(target).Where(d => d is "GC_THREADS" or "GC_NOT_DLL" or "GC_NO_THREAD_REDIRECTS").ToList();
+        var runtimeDefines = gc == Collector.Boehm
+            ? CollectorDefines(target).Where(d => d is "GC_THREADS" or "GC_NOT_DLL" or "GC_NO_THREAD_REDIRECTS").ToList()
+            : [];
+        var leftOut = gc == Collector.Boehm ? "gc_immix.c" : "gc_boehm.c";
+        IReadOnlyList<string> includes = gc == Collector.Boehm ? [IncludeDir(root), bdwgcInclude, libbacktrace] : [IncludeDir(root), libbacktrace];
         foreach (var source in Directory.EnumerateFiles(own, "*.c").Order(StringComparer.Ordinal))
         {
-            units.Add(new CUnit(source, runtimeDefines, [IncludeDir(root), bdwgcInclude, libbacktrace],
-                ExtraFlags: ["-Wall", "-Wextra", map]));
+            if (Path.GetFileName(source) == leftOut) continue;
+            units.Add(new CUnit(source, runtimeDefines, includes, ExtraFlags: ["-Wall", "-Wextra", map]));
         }
         return units;
     }
@@ -117,7 +125,7 @@ public static class RuntimeLayout
     /// </summary>
     public static string BuildArchive(CBuild build, string root, string outputDir)
     {
-        var objects = build.Compile(Units(root, build.Target));
+        var objects = build.Compile(Units(root, build.Target, build.Profile.Gc));
         return build.Archive(objects, Path.Combine(outputDir, build.Target.Triple, build.Profile.Name, "liblyr.a"));
     }
 }

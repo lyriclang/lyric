@@ -28,7 +28,7 @@ typedef struct TaskBody {
 static const uint64_t task_body_refs[] = { 1u << 2 };  /* the environment, the third word */
 static const LyrDesc task_body_desc = { .size = sizeof(TaskBody), .flags = LYR_DESC_HAS_REFS,
                                         .refmap_words = 1, .refmap = task_body_refs, .name = "std.task.<body>" };
-static const LyrDesc task_desc = { .size = 0, .name = "std.task.<context>" };
+static const LyrDesc task_desc = { .size = 0, .flags = LYR_DESC_CORO, .name = "std.task.<context>" };
 
 /* A task's body: the function value, whose type throws nothing — so its code gets no error slot
  * (03 T17). The trace ends here, as at the runner of a generator's body. */

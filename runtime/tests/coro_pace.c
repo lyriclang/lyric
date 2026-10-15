@@ -7,8 +7,9 @@
 #include "lyr/lyr.h"
 #include "check.h"
 
-static const LyrDesc coroutine_desc = { .size = 0, .name = "test.Coroutine" };
-static const LyrDesc bytes_desc = { .size = 0, .elem_size = 1, .name = "test.Bytes" };
+static const LyrDesc coroutine_desc = { .size = 0, .flags = LYR_DESC_CORO, .name = "test.Coroutine" };
+static const LyrDesc bytes_desc = { .size = (uint32_t)offsetof(LyrArr, data), .flags = LYR_DESC_ARRAY,
+                                    .elem_size = 1, .name = "test.Bytes" };
 
 enum { LIVE_BLOCKS = 64, BLOCK = 2 * 1024 * 1024, DROPPED = 50000, BOUND = 2 * 1024 + 64 };
 

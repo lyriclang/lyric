@@ -15,7 +15,7 @@
 
 enum { THREADS = 4, PER_THREAD = 8, ROUNDS = 10, PER_ROUND = 2000, KEEP_EVERY = 200 };
 
-static const LyrDesc coroutine_desc = { .size = 0, .name = "test.Coroutine" };
+static const LyrDesc coroutine_desc = { .size = 0, .flags = LYR_DESC_CORO, .name = "test.Coroutine" };
 
 typedef struct Node { LyrObj header; struct Node *next; int64_t value; } Node;
 static const uint64_t node_refs[] = { 1u << 1 };

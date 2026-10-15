@@ -18,6 +18,9 @@ enum {
                                         some states of the object — a union under a tag (01 V6). A
                                         collector that reads the map scans this object as it scans a
                                         stack, word by word; nothing moves, so that is sound */
+    LYR_DESC_CORO     = 1u << 4, /* a coroutine object (lyr/coro.h): the runtime's layout whatever
+                                    the size says, its stack traced with it (13 M11 P9). Every
+                                    descriptor lyr_coro_new is given says so */
 };
 
 /* The tag of an absent `?Enum` (01 V5): the optional is the enum itself, with a tag no variant has. */

@@ -15,6 +15,7 @@ public class RuntimeProgramTests
         foreach (var profile in new[] { Profile.Debug, Profile.Release })
         {
             data.Add("alloc", profile, 0, "alloc ok\n", []);
+            data.Add("alloc_shapes", profile, 0, "shapes ok\n", []);
             data.Add("strings", profile, 0, "strings ok\n", []);
             data.Add("numeric", profile, 0, "numeric ok\n", []);
             data.Add("arrays", profile, 0, "arrays ok\n", []);
@@ -37,6 +38,37 @@ public class RuntimeProgramTests
             data.Add("platform", profile, 0, "platform ok\n", []);
         }
         return data;
+    }
+
+    /// <summary>
+    /// The runtime programs the own collector runs already (13 M11), whatever the build's default
+    /// is: S1 allocates without collecting, so the programs here are those that need no
+    /// collection. The list grows with each slice until the own collector is the default (S5).
+    /// </summary>
+    public static TheoryData<string, Profile, int, string, string[]> UnderImmix()
+    {
+        var data = new TheoryData<string, Profile, int, string, string[]>();
+        foreach (var profile in new[] { Profile.Debug, Profile.Release })
+        {
+            data.Add("alloc_shapes", profile, 0, "shapes ok\n", []);
+            data.Add("strings", profile, 0, "strings ok\n", []);
+            data.Add("arrays", profile, 0, "arrays ok\n", []);
+            data.Add("hello", profile, 7, "Hello, Lyric!\nargs: 2\n", ["one", "two"]);
+            data.Add("coro_basic", profile, 0, "coro ok\n", []);
+            data.Add("coro_park", profile, 0, "coro park ok\n", []);
+            data.Add("task_main", profile, 7, "task ok\n", []);
+            data.Add("coro_panic", profile, 0, "coro panic ok\n", []);
+        }
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(UnderImmix))]
+    public void A_runtime_program_runs_under_the_own_collector(string name, Profile profile, int exit, string stdout, string[] args)
+    {
+        var result = RuntimeBuildTests.RunTest(name, BuildProfile.Of(profile) with { Gc = Collector.Immix }, args: args, binary: name + "-immix");
+        Assert.True(result.ExitCode == exit, $"exit {result.ExitCode}, expected {exit}\nstderr:\n{result.Stderr}");
+        Assert.Equal(stdout, result.Stdout.Replace("\r\n", "\n"));
     }
 
     /// <summary>A coroutine resumed while it runs or after it ended, and a yield on a thread's own

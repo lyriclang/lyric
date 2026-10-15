@@ -21,6 +21,9 @@ namespace Lyric5.Toolchain;
 public sealed record BuildProfile(string Name, Profile Base, int Opt, bool DebugInfo, bool Lto,
     bool DenyWarnings, bool OverflowChecks, bool FastMath)
 {
+    /// <summary>The runtime's collector the build links (13 M11 P11).</summary>
+    public Collector Gc { get; init; } = Collectors.Default;
+
     /// <summary>The names <c>--profile</c> knows without a manifest.</summary>
     public static readonly IReadOnlyList<string> BuiltIn = ["debug", "release", "asan", "tsan"];
 
@@ -58,6 +61,7 @@ public sealed record BuildProfile(string Name, Profile Base, int Opt, bool Debug
             if (Base == Profile.Release) flags.Add("-DNDEBUG");
             if (Base is Profile.Asan or Profile.Tsan) flags.Add("-fno-omit-frame-pointer");
             if (Lto) flags.Add("-flto=thin");
+            if (Gc == Collector.Boehm) flags.Add("-DLYR_GC_BOEHM");
             return flags;
         }
     }

@@ -9,8 +9,9 @@
 
 #include <string.h>
 
-static const LyrDesc coroutine_desc = { .size = 0, .name = "test.Coroutine" };
-static const LyrDesc bytes_desc = { .size = 0, .elem_size = 1, .name = "test.Bytes" };
+static const LyrDesc coroutine_desc = { .size = 0, .flags = LYR_DESC_CORO, .name = "test.Coroutine" };
+static const LyrDesc bytes_desc = { .size = (uint32_t)offsetof(LyrArr, data), .flags = LYR_DESC_ARRAY,
+                                    .elem_size = 1, .name = "test.Bytes" };
 
 static int events[16];
 static int logged;

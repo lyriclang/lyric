@@ -632,7 +632,7 @@ static void lyr_thunk_app_main_main__lambda9__044a8340(void *lyr_env, LyrErr **l
 static void lyr_thunk_app_main_main__lambda10__d888f8d4(void *lyr_env, LyrErr **lyr_err) { (void)lyr_env; lyr_app_main_main__lambda10__d888f8d4(lyr_err); }
 
 /* coroutines: the environment a body starts from, and the body as the runtime runs it */
-static const LyrDesc lyr_desc_coro_i64_to_void = { 0, 0, 0, 0, NULL, "Coroutine<int>", NULL };
+static const LyrDesc lyr_desc_coro_i64_to_void = { 0, LYR_DESC_CORO, 0, 0, NULL, "Coroutine<int>", NULL };
 static void lyr_corun_app_main_numbers__body__12de241d(void *lyr_arg) { (void)lyr_arg; LyrErr *lyr_e = NULL; lyr_app_main_numbers__body__12de241d(&lyr_e); LyrCoro *lyr_co = lyr_coro_current(); if (LYR_UNLIKELY(lyr_e != NULL)) { lyr_coro_set_error(lyr_co, lyr_e); lyr_coro_set_transfer(lyr_co, NULL); return; } lyr_coro_set_transfer(lyr_co, NULL); }
 
 /* interface tables: the descriptor, then the implementation of every slot */

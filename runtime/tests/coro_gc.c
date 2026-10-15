@@ -8,13 +8,14 @@
 #include "lyr/lyr.h"
 #include "check.h"
 
-static const LyrDesc coroutine_desc = { .size = 0, .name = "test.Coroutine" };
+static const LyrDesc coroutine_desc = { .size = 0, .flags = LYR_DESC_CORO, .name = "test.Coroutine" };
 
 typedef struct Node { LyrObj header; struct Node *next; int64_t value; } Node;
 static const uint64_t node_refs[] = { 1u << 1 };
 static const LyrDesc node_desc = { .size = sizeof(Node), .flags = LYR_DESC_HAS_REFS,
                                    .refmap_words = 1, .refmap = node_refs, .name = "test.Node" };
-static const LyrDesc bytes_desc = { .size = 0, .elem_size = 1, .name = "test.Bytes" };
+static const LyrDesc bytes_desc = { .size = (uint32_t)offsetof(LyrArr, data), .flags = LYR_DESC_ARRAY,
+                                    .elem_size = 1, .name = "test.Bytes" };
 
 enum { KEEPERS = 16, ROUNDS = 10, PER_ROUND = 1000, KEEP_EVERY = 100, ABANDONED = 200 };
 

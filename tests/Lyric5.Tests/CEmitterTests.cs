@@ -452,6 +452,25 @@ public class CEmitterTests
     }
 
     /// <summary>
+    /// The same class graphs under the own collector (13 M11 S1): it allocates through the inline
+    /// fast path and its slow path — small objects, medium ones, large ones, coroutines' records —
+    /// and collects nothing yet, so the programs run without the heap limit and print what they
+    /// print under Boehm. With S2 they move under the limit with the rest.
+    /// </summary>
+    [Theory]
+    [InlineData("objects_gc", Profile.Debug, "kept 499500 held-999999 held-0 alice")]
+    [InlineData("objects_gc", Profile.Release, "kept 499500 held-999999 held-0 alice")]
+    [InlineData("maps_gc", Profile.Debug, "kept 1500 2000 value-999999 1500")]
+    [InlineData("interfaces_gc", Profile.Release, "kept 1000 junk-999999 500499000")]
+    [InlineData("arrays_gc", Profile.Debug, "kept 499500 item-999999 tag-999999 500")]
+    public void A_class_graph_is_allocated_by_the_own_collector(string name, Profile profile, string line)
+    {
+        var result = RuntimeBuildTests.RunEmitted(EmitC(name), name, BuildProfile.Of(profile) with { Gc = Collector.Immix });
+        Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.Equal(line, result.Stdout.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)[0]);
+    }
+
+    /// <summary>
     /// Coroutines dropped while suspended, without close() (design/v5/spec/06 A5): nothing of them
     /// runs, and the debug profile reports each one with cleanup when the collector takes it —
     /// the ones without cleanup go in silence, so at most the hundred guarded ones are reported, and
