@@ -605,6 +605,14 @@ public sealed class TypeResult
     public ModuleSymbol? MetaFromOf(CallExpr call) => _metaFrom.GetValueOrDefault(call);
     internal void SetMetaFrom(CallExpr call, ModuleSymbol module) => _metaFrom[call] = module;
 
+    private readonly HashSet<CallExpr> _metaFromConformer = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>A question about <c>Self</c> in a default of an interface marked
+    /// <c>@SeesConformer</c> (11 §4 rule 10; W10), checked once for every conformer: the lowering
+    /// asks it with the module of the conformer it answers for, not the interface's.</summary>
+    public bool MetaFromConformer(CallExpr call) => _metaFromConformer.Contains(call);
+    internal void MarkMetaFromConformer(CallExpr call) => _metaFromConformer.Add(call);
+
     /// <summary>A <c>comptime</c> expression that is a question to <c>std.meta</c>: answered per
     /// instance by the lowering, never a site of its own.</summary>
     public bool IsMetaSite(ComptimeExpr site) => _metaSites.Contains(site);

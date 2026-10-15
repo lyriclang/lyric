@@ -7116,6 +7116,10 @@ public sealed class TypeChecker
             && (_binding.Resolve(aliasName) ?? ResolveTypePath(aliasName.Path, scope, aliasName.Span))
                 is TypeSymbol { Kind: TypeSymbolKind.Alias, Declaration: TypeAliasDecl aliasDecl })
             _result.SetAliasAsked(call, aliasDecl);
+        // a question about Self in a default of an interface marked @SeesConformer (W10), checked
+        // once for every conformer: the lowering asks with the conformer's module
+        if (IsMetaQuery(fsym) && _metaIface is { } owner && call.TypeArguments is [NamedType { Path: ["Self"] }, ..] && SeesConformer(owner))
+            _result.MarkMetaFromConformer(call);
         // An 'inline fn' (08 F6) sets the lambda literals at its function parameters in place:
         // marked before phase C checks them, so their 'return' is the enclosing function's
         if (decl is { IsInline: true })
@@ -12593,7 +12597,7 @@ public sealed class TypeChecker
             // wrong in them is said at the conformer's entry (05 §14 rule 6).
             var family = IsFamily(iface);
             _familyExpanding = family ? iface.Name : null;
-            (_currentModule, _selfAs, _metaIface) = (family ? conformer.Home : iface.Home, (selfParam, self), null);
+            (_currentModule, _selfAs, _metaIface) = (SeesConformer(iface) ? conformer.Home : iface.Home, (selfParam, self), null);
             var at = conformer.Declaration is INamedDecl named ? named.NameSpan : conformer.Declaration?.Span ?? member.Span;
             var ifaceName = iface.Name;
             var conformerName = conformer.Name;
@@ -12654,6 +12658,34 @@ public sealed class TypeChecker
          && iface.Name is "Equatable" or "Hashable" or "Ordered" or "TotalOrder" or "Clone" or "VariantName" or "Variants")
         // the serialization pair (10 E3; M10 S2): a type's private fields are written and read as its pub ones are
         || (iface.Home is { FullName: "std.codec" } && iface.Name is "Encode" or "Decode");
+
+    /// <summary>Whether the interface's defaults ask with the conformer's module (11 §4 rule 10;
+    /// the sweep after M10, W10): one marked <c>@SeesConformer</c> — std.core's family and
+    /// std.codec's pair carry the marker, and a program's interface may —, and the family by
+    /// name, for the std of a build without the marker.</summary>
+    private bool SeesConformer(TypeSymbol iface)
+    {
+        if (IsFamily(iface)) return true;
+        if (iface.Declaration is not InterfaceDecl { Attributes: { Length: > 0 } attributes }
+            || _coreMembers?.LookupLocal("SeesConformer") is not TypeSymbol marker)
+            return false;
+        static Symbol? Through(Symbol? symbol)
+        {
+            while (symbol is ImportBindingSymbol { Target: { } target }) symbol = target;
+            return symbol;
+        }
+        foreach (var attribute in attributes)
+        {
+            // bound where its module was checked, or looked up in the interface's module — the
+            // prelude's name or a written path
+            if (ReferenceEquals(Through(_result.RefOf(attribute)), marker)) return true;
+            var named = attribute.Path is [var name]
+                ? iface.Home?.Members.Lookup(name)
+                : _comp.FindModule(attribute.Path[..^1])?.Members.LookupLocal(attribute.Path[^1]);
+            if (ReferenceEquals(Through(named), marker)) return true;
+        }
+        return false;
+    }
 
     /// <summary>A static default of an interface <paramref name="ts"/> conforms to (03 T5; M9a
     /// S11), reached as <c>E.m(…)</c>: its type with <c>Self</c> the conformer, or nothing.</summary>
@@ -14482,7 +14514,7 @@ public sealed class TypeChecker
     /// <summary>The compiler instructions of <c>std.core</c> beside <c>@Test</c>, <c>@Bench</c> and
     /// <c>@callerExpr</c> (09 A11, the closed list of T2): what changes what the compiler does.</summary>
     private static readonly string[] CompilerInstructions =
-        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "When", "Shared"];
+        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "When", "Shared", "SeesConformer"];
 
     /// <summary>Whether this is one of <see cref="CompilerInstructions"/>, by identity (09 T6).</summary>
     private bool IsCompilerInstruction(TypeSymbol ts) =>

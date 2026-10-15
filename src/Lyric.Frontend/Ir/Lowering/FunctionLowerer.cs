@@ -6955,14 +6955,16 @@ internal sealed class FunctionLowerer
     {
         var asked = SubstitutedTypeArguments(call);
         var about = asked.Length > 0 ? asked[0] : LyrType.Error;
+        // asked with the conformer's module where the interface says so (W10), else the asker's
+        var from = _types.MetaFromConformer(call) && TypeFacts.SymbolOf(about)?.Home is { } home ? home : _types.MetaFromOf(call);
         return query.Name switch
         {
-            "fields" => new ArrayConst([.. (_types.MetaFields?.Invoke(about, _types.MetaFromOf(call)) ?? []).Select(FieldInfoConst)]),
+            "fields" => new ArrayConst([.. (_types.MetaFields?.Invoke(about, from) ?? []).Select(FieldInfoConst)]),
             "variants" => new ArrayConst([.. (_types.MetaVariants?.Invoke(about) ?? []).Select(VariantInfoConst)]),
             "conformances" => new ArrayConst([.. (_types.MetaConformances?.Invoke(about) ?? []).Select(i => TypeConst(new NamedRef(i)))]),
             "hasConformance" => new BoolConst(asked.Length > 1 && TypeFacts.SymbolOf(asked[1]) is { Kind: TypeSymbolKind.Interface } iface
                                               && _types.Satisfies?.Invoke(about, iface) == true),
-            "members" => new ArrayConst([.. (_types.MetaMembers?.Invoke(about, _types.MetaFromOf(call)) ?? []).Select(MemberInfoConst)]),
+            "members" => new ArrayConst([.. (_types.MetaMembers?.Invoke(about, from) ?? []).Select(MemberInfoConst)]),
             "typeName" => new StringConst(TypeFacts.Display(about)),
             "isStruct" => new BoolConst(TypeFacts.KindOf(about) == TypeSymbolKind.Struct),
             "isClass" => new BoolConst(TypeFacts.KindOf(about) == TypeSymbolKind.Class),

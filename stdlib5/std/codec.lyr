@@ -101,6 +101,7 @@ pub fn variantNames<E>(): string[] {
 // ------------------------------------------------------------------ the pair
 
 /// A value that writes itself into any encoder (E1).
+@SeesConformer
 pub interface Encode {
     /// Synthesized for a conformance without the member (05 §14; 10 E3): a struct's fields in
     /// declaration order under their wire names, a `@Codec { skip }` field left out; an enum's
@@ -158,6 +159,7 @@ pub interface Encode {
 }
 
 /// A value that reads itself out of any decoder (E1).
+@SeesConformer
 pub interface Decode {
     /// Synthesized (05 §14; 10 E3): the mirror of `encode` — a struct's fields by their wire
     /// names, a field the data lacks as `decodeAbsent` gives it (`null` for an optional, `Missing`
