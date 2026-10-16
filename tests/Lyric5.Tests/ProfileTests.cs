@@ -44,6 +44,26 @@ public class ProfileTests
         Assert.Equal(["-ffast-math", "-ffp-contract=fast"], release.ProgramFlags);
     }
 
+    /// <summary>The field <c>gc</c> (13 M11 P11): the own collector unless a profile asks for Boehm;
+    /// a profile of the manifest inherits it like any field.</summary>
+    [Fact]
+    public void A_profile_chooses_its_collector()
+    {
+        Assert.Equal(Collector.Immix, BuildProfile.Of(Profile.Release).Gc);
+        var manifest = Read("[profile.release]\ngc = \"boehm\"\n\n[profile.bench]\ninherits = \"release\"\n");
+        Assert.Equal(Collector.Boehm, Profiles.Resolve(manifest, "release").Gc);
+        Assert.Equal(Collector.Boehm, Profiles.Resolve(manifest, "bench").Gc);
+        Assert.Equal(Collector.Immix, Profiles.Resolve(manifest, "debug").Gc);
+    }
+
+    [Fact]
+    public void The_gc_flag_chooses_the_collector_for_one_build()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", Increment));
+        Assert.Equal("-2147483648\n", BuildAndRun(dir, "app", "build", "-C", dir, "--gc", "boehm", "--no-overflow-checks"));
+        Assert.Equal("-2147483648\n", BuildAndRun(dir, "app", "build", "-C", dir, "--gc", "immix", "--no-overflow-checks"));
+    }
+
     [Fact]
     public void A_manifest_changes_a_built_in_profile()
     {
@@ -74,6 +94,8 @@ public class ProfileTests
     [InlineData("[profile.debug]\nopt = 4\n", "LYR-PKG0002", "'opt' of [profile.debug] is a level from 0 to 3")]
     [InlineData("[profile.debug]\nlto = \"yes\"\n", "LYR-PKG0002", "'lto' of [profile.debug] is true or false")]
     [InlineData("[profile.debug]\nspeed = 3\n", "LYR-PKG0003", "[profile.debug] has no key 'speed'")]
+    [InlineData("[profile.debug]\ngc = \"mark-sweep\"\n", "LYR-PKG0002", "'gc' of [profile.debug] is \"immix\" or \"boehm\"")]
+    [InlineData("[profile.debug]\ngc = true\n", "LYR-PKG0002", "'gc' of [profile.debug] is \"immix\" or \"boehm\"")]
     [InlineData("[profile.Fast]\ninherits = \"release\"\n", "LYR-PKG0002", "'Fast' is no profile name")]
     public void A_profile_table_is_checked(string profiles, string code, string why)
     {
@@ -188,6 +210,7 @@ public class ProfileTests
     [InlineData(new[] { "--opt", "4" }, "'--opt' is a level from 0 to 3, not '4'")]
     [InlineData(new[] { "--lto", "--no-lto" }, "'--lto' and '--no-lto' ask for opposite things")]
     [InlineData(new[] { "--profile", "fast" }, "unknown profile 'fast': debug, release, asan, tsan")]
+    [InlineData(new[] { "--gc", "refcount" }, "'--gc' is immix or boehm, not 'refcount'")]
     public void A_profile_option_is_checked(string[] options, string why)
     {
         var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", "fn main(): void {\n}\n"));

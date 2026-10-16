@@ -45,7 +45,7 @@ Perceus/ORC/ARC (siehe Refcount).
 |---|---|---|
 | 0 | **Runtime-Vertrag**: `lyr_alloc(desc, size)`; Typdeskriptor (Größe, Referenzfeld-Bitmap, VTable-Anker); `LYR_WRITE_BARRIER(obj, field, val)`; `LYR_SAFEPOINT()`; Stack-Registrierung (Thread- und Koroutinen-Stacks); `lyr_pin`/`lyr_unpin` als No-Op-Platzhalter der FFI-Regel; Weak-Handles mit Rückruf | Barrier-Makro, Poll-Makro, Deskriptor je Allokation — **ab Tag eins emittiert** |
 | 1 | Boehm dahinter; Barrier und Poll leer | — |
-| 2 | eigener GC: Immix-Heap, präzises Marking, konservativer Scan aller registrierten Stacks, Stop-the-World | Bump-Fast-Path inline (~5 Instruktionen), Slow-Path-Aufruf |
+| 2 | eigener GC: Immix-Heap, präzises Marking, konservativer Scan aller registrierten Stacks, Stop-the-World *(gebaut M11 S1–S4, Vorgabe seit M11 S5; Boehm bleibt als Profilfeld `gc = "boehm"`)* | Bump-Fast-Path inline (~5 Instruktionen), Slow-Path-Aufruf |
 | 3 | Sticky-Mark-Bits generational; Barrier wird echt (Remembered-Set) | Barrier-Makro bekommt Körper |
 | 4 | nebenläufiges Marking, paralleles Sweeping | Barrier-Körper ändert sich, Polls tragen Phasenwechsel |
 

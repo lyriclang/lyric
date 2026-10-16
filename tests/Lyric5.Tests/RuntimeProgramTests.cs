@@ -42,15 +42,32 @@ public class RuntimeProgramTests
     }
 
     /// <summary>
-    /// Every runtime program under the own collector too (13 M11), whatever the build's default is
-    /// until S5: since S3 it stops every thread at safepoints, and the programs that stand for
-    /// compiled code poll as compiled code does.
+    /// The programs that ask the collector most, under Boehm too (13 M11 P11: kept to compare
+    /// against) — the table above runs under the default, the own collector.
     /// </summary>
-    [Theory]
-    [MemberData(nameof(Programs))]
-    public void A_runtime_program_runs_under_the_own_collector(string name, Profile profile, int exit, string stdout, string[] args)
+    public static TheoryData<string, Profile, int, string, string[]> UnderBoehm()
     {
-        var result = RuntimeBuildTests.RunTest(name, BuildProfile.Of(profile) with { Gc = Collector.Immix }, args: args, binary: name + "-immix");
+        var data = new TheoryData<string, Profile, int, string, string[]>();
+        foreach (var profile in new[] { Profile.Debug, Profile.Release })
+        {
+            data.Add("alloc", profile, 0, "alloc ok\n", []);
+            data.Add("alloc_shapes", profile, 0, "shapes ok\n", []);
+            data.Add("roots", profile, 0, "roots ok\n", []);
+            data.Add("weak", profile, 0, "weak ok\n", []);
+            data.Add("threads", profile, 0, "threads ok\n", []);
+            data.Add("coro_gc", profile, 0, "coro gc ok\n", []);
+            data.Add("coro_storm", profile, 0, "coro storm ok\n", []);
+            data.Add("poll_basic", profile, 0, "poll ok\n", []);
+            data.Add("prologue_overflow", profile, 0, "coroutine overflow: LYR-RT0006\n", ["coroutine"]);
+        }
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(UnderBoehm))]
+    public void A_runtime_program_runs_under_boehm(string name, Profile profile, int exit, string stdout, string[] args)
+    {
+        var result = RuntimeBuildTests.RunTest(name, BuildProfile.Of(profile) with { Gc = Collector.Boehm }, args: args, binary: name + "-boehm");
         Assert.True(result.ExitCode == exit, $"exit {result.ExitCode}, expected {exit}\nstderr:\n{result.Stderr}");
         Assert.Equal(stdout, result.Stdout.Replace("\r\n", "\n"));
     }

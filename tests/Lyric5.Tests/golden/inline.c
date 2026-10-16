@@ -114,6 +114,7 @@ int64_t lyr_app_main_sum(lyr_slice_i64 l0_xs) {
     int64_t t13 = 0;
     int64_t t14 = 0;
     int64_t t15 = 0;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 18
     t0 = (int64_t)INT64_C(0);
@@ -131,7 +132,7 @@ bb0:;
     l3__last1 = t3;
 #line 19
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line 19
     t4 = l2__range0;
 #line 19
@@ -199,6 +200,7 @@ int64_t lyr_app_main_sumInline(lyr_inl4_i64 l0_xs) {
     int64_t t13 = 0;
     int64_t t14 = 0;
     int64_t t15 = 0;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 24
     t0 = (int64_t)INT64_C(0);
@@ -216,7 +218,7 @@ bb0:;
     l3__last1 = t3;
 #line 25
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line 25
     t4 = l2__range0;
 #line 25
@@ -1744,6 +1746,7 @@ void lyr_std_core_StringBuilder_grow(lyr_ty_std_core_StringBuilder *l0_this, int
     int64_t t27 = 0;
     lyr_ty_std_core_StringBuilder *t28 = NULL;
     LyrArr *t29 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l0_this;
@@ -1786,7 +1789,7 @@ bb3:;
     l2_room = t11;
 #line _
     goto bb4;
-bb4:; LYR_SAFEPOINT();
+bb4:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t12 = l2_room;
 #line _
@@ -1868,6 +1871,7 @@ void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text) {
     int64_t t17 = 0;
     int64_t t18 = 0;
     lyr_slice_u8 t19 = {0};
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l1_text;
@@ -1877,7 +1881,7 @@ bb0:;
     l2_rest = t1;
 #line _
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t2 = l2_rest;
 #line _

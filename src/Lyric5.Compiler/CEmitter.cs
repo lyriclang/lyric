@@ -1657,15 +1657,18 @@ public sealed class CEmitter
             else _fn.AppendLine($"    {Declare(temp.Type, Temp(temp.Id))} = {Zero(temp.Type)};");
         }
 
-        // A loop polls at its head, the target of a jump from where the loop's body ends (13 M11 P5).
+        // A loop polls at its head, the target of a jump from where the loop's body ends (13 M11 P5) —
+        // every LYR_POLL_EVERY passes, counted down in a local of the function (S5: the flag read at
+        // every pass cost a loop without a call a tenth of its time).
         var loopHeads = LoopHeads(function);
+        if (loopHeads.Count > 0) _fn.AppendLine("    uint32_t lyr_poll = LYR_POLL_EVERY;");
 
         if (function.Blocks.Count > 0 && function.Blocks[0].Id != function.Entry)
             _fn.AppendLine($"    goto bb{function.Entry.Value};");
 
         foreach (var block in function.Blocks)
         {
-            _fn.AppendLine(loopHeads.Contains(block.Id.Value) ? $"bb{block.Id.Value}:; LYR_SAFEPOINT();" : $"bb{block.Id.Value}:;");
+            _fn.AppendLine(loopHeads.Contains(block.Id.Value) ? $"bb{block.Id.Value}:; LYR_LOOP_POLL(lyr_poll);" : $"bb{block.Id.Value}:;");
             foreach (var inst in block.Insts)
             {
                 Line(inst.Span);

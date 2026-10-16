@@ -86,6 +86,7 @@ int64_t lyr_app_main_fibIter(int64_t l0_n) {
     int64_t t13 = 0;
     int64_t t14 = 0;
     int64_t t15 = 0;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 8
     t0 = (int64_t)INT64_C(0);
@@ -105,7 +106,7 @@ bb0:;
     l4__last1 = t3;
 #line 10
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line 10
     t4 = l3__range0;
 #line 10

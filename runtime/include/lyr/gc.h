@@ -140,7 +140,8 @@ static inline LyrStr *lyr_alloc_string(int64_t len) {
 /* Safepoints (13 M11 P5): a collection that stops the world sets the flag, and each thread stops at
  * its next loop back-edge — or at its next function entry, whose check of the stack (P6) the
  * collection makes fail by setting the thread's bound to the maximum. Compiled code polls; the
- * runtime's blocking calls are safe regions instead (below). */
+ * runtime's blocking calls are safe regions instead (below). A loop's head polls every
+ * LYR_POLL_EVERY passes (LYR_LOOP_POLL). */
 extern int lyr_gc_stop_requested;
 void lyr_gc_safepoint_slow(void);
 
@@ -148,6 +149,18 @@ void lyr_gc_safepoint_slow(void);
     do {                                                                                 \
         if (LYR_GC_SLOW(__atomic_load_n(&lyr_gc_stop_requested, __ATOMIC_RELAXED)))       \
             lyr_gc_safepoint_slow();                                                      \
+    } while (0)
+
+/* A loop's poll (13 M11 S5): the flag read every LYR_POLL_EVERY passes of the loop's head, counted
+ * down in a local of the function. Read at every pass, the flag's load and its branch cost a loop
+ * without a call a tenth of its time (measured: bench/structs, 0.168 s against 0.152 s); a stop
+ * waits at most that many passes of such a loop — a loop that calls stops at the call's entry. */
+#define LYR_LOOP_POLL(countdown)                                                         \
+    do {                                                                                 \
+        if (LYR_GC_SLOW(--(countdown) == 0)) {                                           \
+            (countdown) = LYR_POLL_EVERY;                                                \
+            LYR_SAFEPOINT();                                                             \
+        }                                                                                \
     } while (0)
 
 /* A safe region: a thread blocked in the system (a poller's wait, a read, a child's end) is
@@ -167,9 +180,14 @@ void lyr_gc_leave_safe(void);
 
 #endif
 
+/* The passes of a loop's head between two polls (LYR_LOOP_POLL); under Boehm, which does not poll,
+ * the countdown is declared and left alone. */
+#define LYR_POLL_EVERY 1024u
+
 #ifdef LYR_GC_BOEHM
 /* Boehm stops the world with signals: no poll, no region. */
 #define LYR_SAFEPOINT() ((void)0)
+#define LYR_LOOP_POLL(countdown) ((void)(countdown))
 #define LYR_GC_ENTER_SAFE() ((void)0)
 #define LYR_GC_LEAVE_SAFE() ((void)0)
 #endif

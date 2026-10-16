@@ -1589,6 +1589,7 @@ void lyr_app_main_sister(void) {
     int64_t t28 = 0;
     lyr_ty_std_core_StringBuilder *t29 = NULL;
     LyrStr *t30 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 93
     t0 = lyr_app_main_risky(&lyr_e);
@@ -1638,7 +1639,7 @@ bb4:;
     t11 = (lyr_iface_find((*(const LyrDesc *const *)t7.vt), lyr_ifid_ty_app_main_IoError) != NULL);
 #line 95
     if (t11) goto bb6; else goto bb7;
-bb5:; LYR_SAFEPOINT();
+bb5:; LYR_LOOP_POLL(lyr_poll);
 #line 92
     t13 = lyr_e->value;
 #line 96
@@ -2161,6 +2162,7 @@ void lyr_std_core_escapeTo(lyr_ty_std_core_StringBuilder *l0_out, uint32_t l1_c,
     int64_t t88 = 0;
     lyr_ty_std_core_StringBuilder *t89 = NULL;
     uint32_t t90 = 0;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l1_c;
@@ -2348,7 +2350,7 @@ bb14:;
     l7_started = t56;
 #line _
     goto bb15;
-bb15:; LYR_SAFEPOINT();
+bb15:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t57 = l6_k;
 #line _
@@ -3298,6 +3300,7 @@ void lyr_std_core_StringBuilder_grow(lyr_ty_std_core_StringBuilder *l0_this, int
     int64_t t27 = 0;
     lyr_ty_std_core_StringBuilder *t28 = NULL;
     LyrArr *t29 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l0_this;
@@ -3340,7 +3343,7 @@ bb3:;
     l2_room = t11;
 #line _
     goto bb4;
-bb4:; LYR_SAFEPOINT();
+bb4:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t12 = l2_room;
 #line _
@@ -3422,6 +3425,7 @@ void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text) {
     int64_t t17 = 0;
     int64_t t18 = 0;
     lyr_slice_u8 t19 = {0};
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l1_text;
@@ -3431,7 +3435,7 @@ bb0:;
     l2_rest = t1;
 #line _
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t2 = l2_rest;
 #line _
