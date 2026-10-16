@@ -14,6 +14,46 @@
 /* Starts the collector for the calling (main) thread. Idempotent. */
 void lyr_gc_init(void);
 
+#if defined(__GNUC__) || defined(__clang__)
+#  define LYR_GC_SLOW(x) __builtin_expect(!!(x), 0)
+#else
+#  define LYR_GC_SLOW(x) (x)
+#endif
+
+/* What compiled code reads of its thread, thread-local: the own collector's allocation buffer
+ * (13 M11 P3) and, under either collector, the bound of the stack (P6). */
+typedef struct LyrMutator {
+    uintptr_t cursor;       /* the buffer's next free byte (the own collector) */
+    uintptr_t limit;        /* its end */
+    uintptr_t stack_limit;  /* the prologue's bound: the stack's low end and a reserve above it — the
+                               maximum while a collection asks the thread to stop */
+} LyrMutator;
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+extern _Thread_local LyrMutator lyr_mutator __attribute__((tls_model("initial-exec")));
+#else
+extern _Thread_local LyrMutator lyr_mutator;
+#endif
+
+/* The prologue's check (01 S3, 13 M11 P6): a function that calls compares its frame with the
+ * thread's bound. Below it the stack has a reserve left — room for the panic that a stack
+ * overflow is (LYR-RT0006), which leaves the coroutine like any panic — or a collection asked the
+ * thread to stop, which it does there. One compare for both. The frame's address, not a local's:
+ * a local whose address is taken keeps the C compiler from turning a call in tail position into
+ * a jump (measured: clang 21 kept the recursion), and tail recursion would overflow. */
+void lyr_gc_stack_slow(uintptr_t frame);
+
+#define LYR_STACK_CHECK() LYR_STACK_CHECK_FRAME(0)
+
+/* The same for a frame whose locals are `bytes` large (inline arrays): checked against where they
+ * end, before any of them is written. */
+#define LYR_STACK_CHECK_FRAME(bytes)                                                     \
+    do {                                                                                 \
+        uintptr_t lyr_frame_ = (uintptr_t)__builtin_frame_address(0) - (uintptr_t)(bytes); \
+        if (LYR_GC_SLOW(lyr_frame_ < __atomic_load_n(&lyr_mutator.stack_limit, __ATOMIC_RELAXED))) \
+            lyr_gc_stack_slow(lyr_frame_);                                                \
+    } while (0)
+
 #ifdef LYR_GC_BOEHM
 
 /* A fixed-size object of `desc->size` bytes, zeroed, header set. Never NULL: exhaustion panics. */
@@ -34,19 +74,6 @@ LyrStr *lyr_alloc_string(int64_t len);
  * (the next run, a block, a large object, a collection, exhaustion) is the slow path's. The three
  * functions promise what they promise under Boehm: memory zeroed (a buffer is zeroed when it is
  * handed out), the header set, the length set. */
-typedef struct LyrMutator {
-    uintptr_t cursor;       /* the buffer's next free byte */
-    uintptr_t limit;        /* its end */
-    uintptr_t stack_limit;  /* the prologue's bound (P6): a frame below it stops — the maximum while a
-                               collection asks the thread to stop */
-} LyrMutator;
-
-#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
-extern _Thread_local LyrMutator lyr_mutator __attribute__((tls_model("initial-exec")));
-#else
-extern _Thread_local LyrMutator lyr_mutator;
-#endif
-
 /* The slow paths, with `bytes` as asked (not rounded). Each returns its object zeroed with the
  * header set — the array's and the string's length too —, or panics: RT0005 when no memory is
  * left, RT0007 for a negative length. */
@@ -72,12 +99,6 @@ LyrStr *lyr_gc_alloc_string_slow(int64_t len);
 #endif
 #ifndef LYR_GC_INLINE
 #  define LYR_GC_INLINE 1
-#endif
-
-#if defined(__GNUC__) || defined(__clang__)
-#  define LYR_GC_SLOW(x) __builtin_expect(!!(x), 0)
-#else
-#  define LYR_GC_SLOW(x) (x)
 #endif
 
 /* The bump: `rounded` bytes from the buffer, or NULL for the slow path. A load of the two
@@ -129,16 +150,6 @@ void lyr_gc_safepoint_slow(void);
             lyr_gc_safepoint_slow();                                                      \
     } while (0)
 
-/* The frame's address, not a local's: a local whose address is taken keeps the C compiler from
- * turning a call in tail position into a jump (measured: clang 21 kept the recursion), and a
- * program's tail recursion would overflow where it ran in place before. */
-#define LYR_STACK_CHECK()                                                                \
-    do {                                                                                 \
-        if (LYR_GC_SLOW((uintptr_t)__builtin_frame_address(0)                            \
-                        < __atomic_load_n(&lyr_mutator.stack_limit, __ATOMIC_RELAXED)))  \
-            lyr_gc_safepoint_slow();                                                      \
-    } while (0)
-
 /* A safe region: a thread blocked in the system (a poller's wait, a read, a child's end) is
  * stopped already as far as a collection is concerned — its frames above the region hold still.
  * Entering saves the callers' registers (a reference held in one stays visible) and where the
@@ -159,7 +170,6 @@ void lyr_gc_leave_safe(void);
 #ifdef LYR_GC_BOEHM
 /* Boehm stops the world with signals: no poll, no region. */
 #define LYR_SAFEPOINT() ((void)0)
-#define LYR_STACK_CHECK() ((void)0)
 #define LYR_GC_ENTER_SAFE() ((void)0)
 #define LYR_GC_LEAVE_SAFE() ((void)0)
 #endif

@@ -393,6 +393,7 @@ static CoroThread *this_thread(void) {
         if (ts == NULL) lyr_panic(LYR_RT_OUT_OF_MEMORY, "out of memory starting coroutines on a thread");
         ts->id = atomic_fetch_add(&thread_ids, 1) + 1;
         ts->gc_handle = lyr_gc_thread_stack(&ts->own.base);
+        ts->own.limit = lyr_stack_own_limit();
         ts->own.on_cpu = 1;
         lyr_crash_get_guard(&ts->own.guard_low, &ts->own.guard_high);
 #ifdef LYR_TSAN
@@ -442,6 +443,7 @@ static void transfer(LyrStackCtx *from, LyrStackCtx *to, int from_ends) {
     from->on_cpu = 0;
     to->on_cpu = 1;
     lyr_crash_set_guard(to->guard_low, to->guard_high);
+    lyr_gc_stack_limit(to->limit);
     thread_state->last_from = from;
 #ifdef LYR_ASAN
     __sanitizer_start_switch_fiber(from_ends ? NULL : &from->asan_fake, to->asan_bottom, to->asan_size);
@@ -522,6 +524,7 @@ static void acquire_stack(LyrCoro *co) {
     co->mapping_size = mapping_size;
     co->ctx.low = low;
     co->ctx.base = low + co->stack_size;
+    co->ctx.limit = (uintptr_t)low + LYR_STACK_RESERVE;
     /* A fault in the guard page, or up to 1 MiB below it (one frame may be large), is an overflow. */
     uintptr_t guard = (uintptr_t)mapping;
     co->ctx.guard_low = guard > ((uintptr_t)1 << 20) ? guard - ((uintptr_t)1 << 20) : 0;
@@ -622,7 +625,20 @@ static void resume_parked(CoroThread *ts, LyrCoro *co);
 
 /* Back from a resume: the coroutine yielded or parked — or its body returned, or it panicked, and
  * its stack goes. */
+/* A panic's frames named on the resumer's stack, which has room (lyr_coro_panic_leave). */
+static void name_panic(LyrCoro *co) {
+    enum { FRAMES = 32 * 1024 };
+    char *frames = malloc(FRAMES);
+    if (frames != NULL) lyr_trace_format_pcs(frames, FRAMES, co->panic_pcs, co->panic_pc_count);
+    LyrStr *trace = lyr_str_from_cstr(frames != NULL ? frames : "");
+    free(frames);
+    free(co->panic_pcs);
+    co->panic_pcs = NULL;
+    LYR_WRITE_BARRIER(co, &co->panic_trace, trace);
+}
+
 static void came_back(LyrCoro *co) {
+    if (co->panic_pcs != NULL) name_panic(co);
     if (co->status == LYR_CORO_DONE || co->status == LYR_CORO_PANICKED) {
         lyr_gc_unwatch_coro(co);
         release_stack(co);
@@ -685,18 +701,17 @@ void lyr_coro_panic_leave(const char *code, const char *message, const char *tra
     CoroThread *ts = thread_state;
     LyrCoro *co = ts != NULL ? ts->current : NULL;
     if (co == NULL || co->foreign > 0) return;
-    enum { FRAMES = 32 * 1024 };
-    char *frames = NULL;
+    /* Only the frames' addresses here; their names come on the resumer's stack (came_back): a stack
+     * overflow leaves the reserve below the bound, and naming takes more — DbgHelp loads its modules
+     * the first time on Windows (S4: the coroutine's overflow ended the process there). */
     if (trace == NULL) {
-        frames = malloc(FRAMES);
-        if (frames == NULL) return;
-        lyr_trace_format(frames, FRAMES, NULL);
-        trace = frames;
+        co->panic_pcs = malloc(LYR_TRACE_PCS * sizeof(uintptr_t));
+        if (co->panic_pcs == NULL) return;
+        co->panic_pc_count = lyr_trace_capture(co->panic_pcs, LYR_TRACE_PCS);
     }
     LyrStr *kept_code = lyr_str_from_cstr(code);
     LyrStr *kept_message = lyr_str_from_cstr(message);
-    LyrStr *kept_trace = lyr_str_from_cstr(trace);
-    free(frames);
+    LyrStr *kept_trace = trace != NULL ? lyr_str_from_cstr(trace) : NULL;
     LYR_WRITE_BARRIER(co, &co->panic_code, kept_code);
     LYR_WRITE_BARRIER(co, &co->panic_message, kept_message);
     LYR_WRITE_BARRIER(co, &co->panic_trace, kept_trace);

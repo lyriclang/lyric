@@ -208,7 +208,7 @@ Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert 
 | A7 | **`never` an drei weiteren Stellen**, nur unter der Schranke `Error`: als Default, als Antwort und als Fixierung eines assoziierten Typs (`type Error :: [Error] = never`, `Iterator<Error = never>`). `type Item = never` und ein geschriebenes `f<never>(…)` bleiben Fehler | E12 |
 | M6-10 | **`close()` eines Generators wirft den ersten Fehler weiter**, den ein `defer` während des Abwickelns geworfen hat. Das `Cancelled` selbst bleibt verworfen | E7 |
 | M8a-4 | **Die Instanz schließt**: jede Schleife, auch eine generische, ruft beim frühen Verlassen `close()`, wenn der konkrete Iterator `Closeable` ist. Die Regel dazu steht an der Deklaration: wer `Iterator` und `Closeable` ist, wirft in `close()` nur, was sein `Error` erlaubt — so deckt das `try` der Schleife das Schließen | E7 R7 |
-| M6-25 | Abweichung von E8 mit Uhr: der Stacküberlauf beendet bis M11 den Prozess (01 S3) | E8 |
+| M6-25 | Abweichung von E8 mit Uhr: der Stacküberlauf beendet bis M11 den Prozess (01 S3). *Erledigt mit M11 S4 (2026-10-15): ein Überlauf ist eine Panik wie jede, er verlässt den Task* | E8 |
 | M6-21 | Eine Panik im Rumpf eines Schlosses gibt es frei und vergiftet es (06) | E8 |
 
 ## Review 2026-10-09 — die offenen Punkte aus M8c

@@ -11,6 +11,7 @@ void lyr__globals__9ee5f9b5(void);
 
 #line 3 "programs/fib.lyr"
 int64_t lyr_app_main_fib(int64_t l0_n) {
+    LYR_STACK_CHECK();
     int64_t t0 = 0;
     int64_t t1 = 0;
     uint8_t t2 = 0;
@@ -24,7 +25,6 @@ int64_t lyr_app_main_fib(int64_t l0_n) {
     int64_t t10 = 0;
     int64_t t11 = 0;
     int64_t t12 = 0;
-    LYR_STACK_CHECK();
 bb0:;
 #line 3
     t0 = l0_n;
@@ -155,6 +155,7 @@ bb4:;
 
 #line 19 "programs/fib.lyr"
 LYR_NOINLINE int64_t lyr_app_main_main(void) {
+    LYR_STACK_CHECK();
     int64_t t0 = 0;
     int64_t t1 = 0;
     int64_t t2 = 0;
@@ -163,7 +164,6 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     int64_t t5 = 0;
     int64_t t6 = 0;
     int64_t t7 = 0;
-    LYR_STACK_CHECK();
 bb0:;
 #line 19
     t0 = (int64_t)INT64_C(10);

@@ -457,7 +457,6 @@ typedef struct Thread {
     uintptr_t stack_limit; /* its own bound for the prologue's check, put back after a stop */
 } Thread;
 
-_Thread_local LyrMutator lyr_mutator;
 static _Thread_local Thread *self;
 static Thread *threads;   /* under registry_lock */
 
@@ -1374,12 +1373,38 @@ static LYR_NOINLINE void park_here(Thread *t) {
     __asm__ volatile("" ::: "memory");  /* no tail call: the spilled registers stay in this frame */
 }
 
-/* A loop back-edge's or a function entry's poll found a stop asked for (or the stack check
- * failed: with S4 an overflow, until then never). */
+/* A loop back-edge's poll found a stop asked for. */
 void lyr_gc_safepoint_slow(void) {
     Thread *t = self;
     if (t == NULL || !__atomic_load_n(&lyr_gc_stop_requested, __ATOMIC_SEQ_CST)) return;
     park_here(t);
+}
+
+/* A function entry's check failed: a stop asked for — or, below the thread's own bound, a stack
+ * overflow, the panic it is (13 §1.4 item 7). */
+void lyr_gc_stack_slow(uintptr_t frame) {
+    Thread *t = self;
+    if (t == NULL) {
+        if (frame < lyr_mutator.stack_limit) lyr_stack_overflow();
+        return;
+    }
+    if (__atomic_load_n(&lyr_gc_stop_requested, __ATOMIC_SEQ_CST)) {
+        park_here(t);
+        return;
+    }
+    if (frame < t->stack_limit) lyr_stack_overflow();
+}
+
+/* The bound for the stack the thread runs on now (a switch, a start): the thread's own record,
+ * and the one compiled code reads unless a stop is asked for — that maximum stays until the
+ * restart, which puts back the record. */
+void lyr_gc_stack_limit(uintptr_t limit) {
+    Thread *t = self;
+    if (t != NULL) t->stack_limit = limit;
+    uintptr_t seen = __atomic_load_n(&lyr_mutator.stack_limit, __ATOMIC_SEQ_CST);
+    while (seen != UINTPTR_MAX &&
+           !__atomic_compare_exchange_n(&lyr_mutator.stack_limit, &seen, limit, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    }
 }
 
 /* The region's entry frames, from here up to the caller's marker, copied: the registers of every
@@ -1447,6 +1472,8 @@ static Thread *register_this_thread(void) {
     t->small.block = t->medium.block = NO_BLOCK;
     t->stack_base = stack_base_of_this_thread();
     atomic_init(&t->state, SAFE);
+    t->stack_limit = lyr_stack_own_limit();
+    lyr_mutator.stack_limit = t->stack_limit;
     {
         volatile uintptr_t here = 0;
         t->stop_sp = (uintptr_t)&here;  /* nothing of the program on the stack yet */

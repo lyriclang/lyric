@@ -36,6 +36,7 @@ public class RuntimeProgramTests
             data.Add("random", profile, 0, "random ok\n", []);
             data.Add("clock", profile, 0, "clock ok\n", []);
             data.Add("platform", profile, 0, "platform ok\n", []);
+            data.Add("prologue_overflow", profile, 0, "coroutine overflow: LYR-RT0006\n", ["coroutine"]);
         }
         return data;
     }

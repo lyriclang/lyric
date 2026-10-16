@@ -74,6 +74,7 @@ bb0:;
 
 #line 8 "programs/checks.lyr"
 LYR_NOINLINE int64_t lyr_app_main_main(void) {
+    LYR_STACK_CHECK();
     int64_t l0_v = 0;
     int64_t l1_bits = 0;
     int64_t t0 = 0;
@@ -109,7 +110,6 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     uint8_t t30 = 0;
     int64_t t31 = 0;
     int64_t t32 = 0;
-    LYR_STACK_CHECK();
 bb0:;
 #line 8
     t0 = (int64_t)INT64_C(40);

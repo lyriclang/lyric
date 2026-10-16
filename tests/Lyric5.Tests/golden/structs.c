@@ -67,6 +67,7 @@ bb0:;
 
 #line 13 "programs/structs.lyr"
 LYR_NOINLINE int64_t lyr_app_main_main(void) {
+    LYR_STACK_CHECK();
     lyr_ty_app_main_Point l0_p = {0};
     lyr_ty_app_main_Segment l1_s = {0};
     int64_t t0 = 0;
@@ -112,7 +113,6 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
     lyr_ty_app_main_Point *t25 = &t25_s;
     int64_t t26 = 0;
     int64_t t27 = 0;
-    LYR_STACK_CHECK();
 bb0:;
 #line 13
     t0 = (int64_t)INT64_C(1);
