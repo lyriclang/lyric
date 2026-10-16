@@ -224,6 +224,28 @@ public partial class PanicTests
         Assert.All(lines.Skip(1), line => Assert.StartsWith("    ", line));
     }
 
+    /// <summary>
+    /// The prologue's check (01 S3, 13 M11 S4): a function that checks its stack at its entry, as
+    /// compiled code does, overflows into a panic on the thread's own stack — the report of every
+    /// panic, with the frames of the recursion, and what the program printed before written out
+    /// first (the sweep's open point 192: the fault handler's path did not write it). Under either
+    /// collector: the overflow is the stack's, not the collector's.
+    /// </summary>
+    [Theory]
+    [InlineData(Profile.Debug, Collector.Boehm)]
+    [InlineData(Profile.Release, Collector.Boehm)]
+    [InlineData(Profile.Debug, Collector.Immix)]
+    [InlineData(Profile.Release, Collector.Immix)]
+    public void A_stack_overflow_found_at_a_prologue_is_a_panic(Profile profile, Collector gc)
+    {
+        var result = RuntimeBuildTests.RunTest("prologue_overflow", BuildProfile.Of(profile) with { Gc = gc }, args: ["main"], binary: "prologue_overflow_main");
+        Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        Assert.Equal("before\n", result.Stdout.Replace("\r\n", "\n"));
+        var lines = Lines(result.Stderr);
+        Assert.Equal("panic [LYR-RT0006]: stack overflow", lines[0]);
+        Assert.Contains(lines, line => line.StartsWith("    at down (prologue_overflow.c:"));
+    }
+
     /// <summary>The same under the own collector (13 M11 S2): it collects first, then panics.</summary>
     [Theory]
     [MemberData(nameof(Profiles))]

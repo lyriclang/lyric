@@ -1616,6 +1616,20 @@ public sealed class CEmitter
         Line(FirstSpan(function));
         _fn.Append(Signature(function)).AppendLine(" {");
 
+        // The prologue's check of the stack (01 S3; 13 M11 P6) — the first statement, before the
+        // locals are zeroed: a function that calls compares its frame with the thread's bound; one
+        // whose locals reach past the reserve below the bound (an inline array) does so with their
+        // size, whether it calls or not. It is the safepoint at a function's entry too (P5).
+        var frameBytes = function.Locals.Select(l => l.Type).Concat(function.Temps.Select(t => t.Type))
+            .Where(t => !IsVoid(t))
+            .Sum(t => t is IrInlineArrayType or IrStructType or IrEnumType or IrOptionalType ? (long)LayoutOf(t).Size : 16);
+        // Twice the locals: an unoptimized build keeps copies of large values the IR does not name
+        // (measured: a 32 KiB repetition literal took 160 KiB of frame where 128 KiB were counted).
+        if (frameBytes > StackCheckedFrame)
+            _fn.AppendLine($"    LYR_STACK_CHECK_FRAME({frameBytes * 2});");
+        else if (function.Blocks.Any(b => b.Insts.Any(i => i is Call or CallImport or CallIndirect or CallVirt)))
+            _fn.AppendLine("    LYR_STACK_CHECK();");
+
         // The environment arrives as 'void *' — one code pointer type per function type, whatever
         // the environment's own type — and is cast to it once, here.
         if (TakesEnvironment(function))
@@ -1643,11 +1657,7 @@ public sealed class CEmitter
             else _fn.AppendLine($"    {Declare(temp.Type, Temp(temp.Id))} = {Zero(temp.Type)};");
         }
 
-        // The safepoints (13 M11 P5): a function that calls checks its stack at its entry — the
-        // check a collection makes fail to stop the thread there (P6) —, and a loop polls at its
-        // head, the target of a jump from where the loop's body ends.
-        if (function.Blocks.Any(b => b.Insts.Any(i => i is Call or CallImport or CallIndirect or CallVirt)))
-            _fn.AppendLine("    LYR_STACK_CHECK();");
+        // A loop polls at its head, the target of a jump from where the loop's body ends (13 M11 P5).
         var loopHeads = LoopHeads(function);
 
         if (function.Blocks.Count > 0 && function.Blocks[0].Id != function.Entry)
@@ -1671,6 +1681,11 @@ public sealed class CEmitter
         _fn.AppendLine();
         return _fn.ToString();
     }
+
+    /// <summary>The locals of a frame beyond which a function checks its stack with their size: a
+    /// quarter of the reserve the runtime keeps below the bound (<c>LYR_STACK_RESERVE</c>, 16 KiB),
+    /// so that a function that does not check never reaches past it.</summary>
+    private const long StackCheckedFrame = 4096;
 
     /// <summary>The blocks a jump reaches backward — from a block at or after them in the order the
     /// function is written: the heads of its loops, where a poll catches every turn.</summary>

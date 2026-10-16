@@ -87,6 +87,7 @@ static void run_callbacks(void) {
 
 void lyr_gc_init(void) {
     if (initialized) return;
+    lyr_mutator.stack_limit = lyr_stack_own_limit();
     GC_INIT();
     GC_allow_register_threads();
     /* The collector's warnings ("Out of Memory! Returning NULL!", "Repeated allocation of very
@@ -183,8 +184,13 @@ void lyr_root_free(LyrRoot *root) {
 
 void lyr_register_stack(void *low, void *high) { GC_add_roots(low, high); }
 
-/* Boehm stops threads with signals: a safe region and a safepoint ask nothing of it. */
+/* Boehm stops threads with signals: a safe region and a safepoint ask nothing of it. The stack
+ * check is the overflow's alone. */
 void lyr_gc_safepoint_slow(void) {}
+void lyr_gc_stack_slow(uintptr_t frame) {
+    if (frame < lyr_mutator.stack_limit) lyr_stack_overflow();
+}
+void lyr_gc_stack_limit(uintptr_t limit) { lyr_mutator.stack_limit = limit; }
 void lyr_gc_enter_safe(void *marker) { (void)marker; }
 void lyr_gc_leave_safe(void) {}
 
@@ -266,7 +272,10 @@ int lyr_thread_attach(void) {
     if (result != GC_SUCCESS && result != GC_DUPLICATE) return -1;
     /* The thread's net for faults and stack overflow (crash.c), when the handlers are installed;
      * a thread the collector knew already (the main thread) has it from lyr_init. */
-    if (result == GC_SUCCESS) lyr_crash_thread_start();
+    if (result == GC_SUCCESS) {
+        lyr_crash_thread_start();
+        lyr_mutator.stack_limit = lyr_stack_own_limit();
+    }
     return 0;
 }
 

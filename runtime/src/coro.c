@@ -393,6 +393,7 @@ static CoroThread *this_thread(void) {
         if (ts == NULL) lyr_panic(LYR_RT_OUT_OF_MEMORY, "out of memory starting coroutines on a thread");
         ts->id = atomic_fetch_add(&thread_ids, 1) + 1;
         ts->gc_handle = lyr_gc_thread_stack(&ts->own.base);
+        ts->own.limit = lyr_stack_own_limit();
         ts->own.on_cpu = 1;
         lyr_crash_get_guard(&ts->own.guard_low, &ts->own.guard_high);
 #ifdef LYR_TSAN
@@ -442,6 +443,7 @@ static void transfer(LyrStackCtx *from, LyrStackCtx *to, int from_ends) {
     from->on_cpu = 0;
     to->on_cpu = 1;
     lyr_crash_set_guard(to->guard_low, to->guard_high);
+    lyr_gc_stack_limit(to->limit);
     thread_state->last_from = from;
 #ifdef LYR_ASAN
     __sanitizer_start_switch_fiber(from_ends ? NULL : &from->asan_fake, to->asan_bottom, to->asan_size);
@@ -522,6 +524,7 @@ static void acquire_stack(LyrCoro *co) {
     co->mapping_size = mapping_size;
     co->ctx.low = low;
     co->ctx.base = low + co->stack_size;
+    co->ctx.limit = (uintptr_t)low + LYR_STACK_RESERVE;
     /* A fault in the guard page, or up to 1 MiB below it (one frame may be large), is an overflow. */
     uintptr_t guard = (uintptr_t)mapping;
     co->ctx.guard_low = guard > ((uintptr_t)1 << 20) ? guard - ((uintptr_t)1 << 20) : 0;

@@ -98,6 +98,7 @@ typedef struct LyrStackCtx {
     void *sp;
     void *base;                       /* the cold end, the highest address */
     void *low;                        /* the lowest usable address, above the guard page */
+    uintptr_t limit;                  /* the prologue's bound on it: low and the reserve (stack.c) */
     int on_cpu;                       /* the thread runs on this stack now */
     uintptr_t guard_low, guard_high;  /* a fault in this range is a stack overflow */
     void *asan_fake;                  /* ASan's handle on the stack's fake frames across a switch */
@@ -137,6 +138,17 @@ struct LyrCoro {
     struct LyrCoro *gc_prev;       /* no references — the marking does not follow them */
     int gc_watched;
 };
+
+/* stack.c — the prologue's check (01 S3, 13 M11 P6). The reserve a stack keeps below the bound:
+ * room for the panic of an overflow — measured 6 to 8 KiB in the release profile, 4 to 6 in the
+ * debug one (inlined frames are larger) — and for a function that does not check, which calls
+ * nothing. The lowest address the calling thread's own stack may reach, 0 when unknown; its bound
+ * from it; the thread's bound set (the collector keeps a stop asked for); an overflow's panic. */
+enum { LYR_STACK_RESERVE = 16 * 1024 };
+uintptr_t lyr_stack_low(void);
+uintptr_t lyr_stack_own_limit(void);
+void lyr_gc_stack_limit(uintptr_t limit);
+LYR_NORETURN void lyr_stack_overflow(void);
 
 /* coro.c — a suspended coroutine the collector found unreachable: its stack goes (06 A5). */
 void lyr_coro_abandoned(LyrCoro *co);
