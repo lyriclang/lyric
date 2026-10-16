@@ -1476,6 +1476,7 @@ void lyr_std_core_StringBuilder_grow(lyr_ty_std_core_StringBuilder *l0_this, int
     int64_t t27 = 0;
     lyr_ty_std_core_StringBuilder *t28 = NULL;
     LyrArr *t29 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l0_this;
@@ -1518,7 +1519,7 @@ bb3:;
     l2_room = t11;
 #line _
     goto bb4;
-bb4:; LYR_SAFEPOINT();
+bb4:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t12 = l2_room;
 #line _
@@ -1600,6 +1601,7 @@ void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text) {
     int64_t t17 = 0;
     int64_t t18 = 0;
     lyr_slice_u8 t19 = {0};
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l1_text;
@@ -1609,7 +1611,7 @@ bb0:;
     l2_rest = t1;
 #line _
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t2 = l2_rest;
 #line _
@@ -2105,6 +2107,7 @@ LyrArr * lyr_std_core_arrayOf_app_main_Cell__never__e4cfc0c5(int64_t l0_n, lyr_f
     int64_t t25 = 0;
     int64_t t26 = 0;
     LyrArr *t27 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l0_n;
@@ -2160,7 +2163,7 @@ bb4:;
     l4_i = t15;
 #line _
     goto bb5;
-bb5:; LYR_SAFEPOINT();
+bb5:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t16 = l4_i;
 #line _
@@ -2265,6 +2268,7 @@ LyrArr * lyr_std_core_arrayOf_app_main_Holder__never__a8c389f7(int64_t l0_n, lyr
     int64_t t26 = 0;
     int64_t t27 = 0;
     LyrArr *t28 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l0_n;
@@ -2322,7 +2326,7 @@ bb4:;
     l4_i = t16;
 #line _
     goto bb5;
-bb5:; LYR_SAFEPOINT();
+bb5:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t17 = l4_i;
 #line _
@@ -2415,6 +2419,7 @@ LyrArr * lyr_std_core_arrayOf_int__never__ee22aa54(int64_t l0_n, lyr_fn_i64_to_i
     int64_t t25 = 0;
     int64_t t26 = 0;
     LyrArr *t27 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l0_n;
@@ -2470,7 +2475,7 @@ bb4:;
     l4_i = t15;
 #line _
     goto bb5;
-bb5:; LYR_SAFEPOINT();
+bb5:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t16 = l4_i;
 #line _

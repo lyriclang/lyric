@@ -23,17 +23,8 @@ static int initialized;
 static void init_coroutine_kind(void);
 static void GC_CALLBACK on_collection_event(GC_EventType event);
 
-/* Under ASan (the asan profile, 01 C7) two of its defaults fight a conservative collector: fake
- * stacks move locals into memory the collector's stack scan never sees, so live objects would be
- * collected; and LeakSanitizer does not scan the collector's heap, so malloc blocks referenced
- * only from there (weak records, via the finalizer table) would be reported as leaks. */
+/* ASan's defaults for a conservative stack scan: stack.c, for either collector. */
 #if defined(__has_feature)
-#  if __has_feature(address_sanitizer)
-const char *__asan_default_options(void);
-const char *__asan_default_options(void) {
-    return "detect_stack_use_after_return=0:detect_leaks=0";
-}
-#  endif
 /* Under TSan (the tsan profile) the collector is uninstrumented, so TSan sees neither its lock nor
  * the stopped world — only memory that one thread wrote and, after a collection recycled it,
  * another thread received. A collection does order those: it stops every thread (signals and

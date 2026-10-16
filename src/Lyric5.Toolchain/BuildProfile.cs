@@ -21,8 +21,9 @@ namespace Lyric5.Toolchain;
 public sealed record BuildProfile(string Name, Profile Base, int Opt, bool DebugInfo, bool Lto,
     bool DenyWarnings, bool OverflowChecks, bool FastMath)
 {
-    /// <summary>The runtime's collector the build links (13 M11 P11).</summary>
-    public Collector Gc { get; init; } = Collectors.Default;
+    /// <summary>The runtime's collector the build links (13 M11 P11): the own one unless the profile's
+    /// field <c>gc</c> or <c>--gc</c> asks for Boehm.</summary>
+    public Collector Gc { get; init; } = Collector.Immix;
 
     /// <summary>The own collector's check of the descriptors' maps (13 M11 S2): a word of a marked
     /// object that its map does not name and that points at an unmarked object ends the program

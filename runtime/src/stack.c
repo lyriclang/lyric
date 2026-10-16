@@ -22,6 +22,19 @@
 
 _Thread_local LyrMutator lyr_mutator;
 
+/* Under ASan (the asan profile, 01 C7) two of its defaults fight a collector that scans stacks
+ * conservatively, whichever it is: fake stacks move locals into memory the scan never sees, so
+ * live objects would be collected; and LeakSanitizer does not scan the collector's heap, so malloc
+ * blocks referenced only from there would be reported as leaks. */
+#if defined(__has_feature)
+#  if __has_feature(address_sanitizer)
+const char *__asan_default_options(void);
+const char *__asan_default_options(void) {
+    return "detect_stack_use_after_return=0:detect_leaks=0";
+}
+#  endif
+#endif
+
 uintptr_t lyr_stack_low(void) {
 #if defined(_WIN32)
     ULONG_PTR low = 0, high = 0;

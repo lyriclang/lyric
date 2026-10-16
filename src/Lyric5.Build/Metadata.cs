@@ -76,6 +76,7 @@ public static class Metadata
                 json.WriteBoolean("denyWarnings", profile.DenyWarnings);
                 json.WriteBoolean("overflowChecks", profile.OverflowChecks);
                 json.WriteBoolean("fastMath", profile.FastMath);
+                json.WriteString("gc", profile.Gc.Name());
                 json.WriteEndObject();
             }
             json.WriteEndArray();

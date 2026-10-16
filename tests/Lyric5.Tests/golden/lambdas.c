@@ -203,6 +203,7 @@ int64_t lyr_app_main_fold(LyrArr *l0_xs, int64_t l1_seed, lyr_fn_i64_i64_to_i64 
     int64_t t14 = 0;
     int64_t t15 = 0;
     int64_t t16 = 0;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 17
     t0 = l1_seed;
@@ -220,7 +221,7 @@ bb0:;
     l5__last1 = t3;
 #line 18
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line 18
     t4 = l4__range0;
 #line 18
@@ -285,6 +286,7 @@ void lyr_app_main_each(LyrArr *l0_xs, lyr_fn_i64_to_void l1_f) {
     int64_t t10 = 0;
     int64_t t11 = 0;
     int64_t t12 = 0;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 21
     t0 = (int64_t)INT64_C(0);
@@ -298,7 +300,7 @@ bb0:;
     l3__last1 = t2;
 #line 21
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line 21
     t3 = l2__range0;
 #line 21
@@ -365,6 +367,7 @@ int64_t lyr_app_main_pairs(LyrArr *l0_ps, lyr_fn_i64_ty12_0tup_i64_i64_to_i64 l1
     int64_t t15 = 0;
     int64_t t16 = 0;
     int64_t t17 = 0;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 23
     t0 = (int64_t)INT64_C(0);
@@ -382,7 +385,7 @@ bb0:;
     l4__last1 = t3;
 #line 24
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line 24
     t4 = l3__range0;
 #line 24
@@ -1399,6 +1402,7 @@ void lyr_std_core_StringBuilder_grow(lyr_ty_std_core_StringBuilder *l0_this, int
     int64_t t27 = 0;
     lyr_ty_std_core_StringBuilder *t28 = NULL;
     LyrArr *t29 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l0_this;
@@ -1441,7 +1445,7 @@ bb3:;
     l2_room = t11;
 #line _
     goto bb4;
-bb4:; LYR_SAFEPOINT();
+bb4:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t12 = l2_room;
 #line _
@@ -1523,6 +1527,7 @@ void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text) {
     int64_t t17 = 0;
     int64_t t18 = 0;
     lyr_slice_u8 t19 = {0};
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l1_text;
@@ -1532,7 +1537,7 @@ bb0:;
     l2_rest = t1;
 #line _
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t2 = l2_rest;
 #line _
