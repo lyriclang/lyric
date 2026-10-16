@@ -181,3 +181,27 @@ their storage: 2.96× — the lazy DFA (13 P5, S9b) stays a door. JSON's time is
 fifths): the tree first (a `Map` per object) and then the layer's work per field — the member
 looked up by its hashed name, the `seen` set, the reader's state rebuilt —; both are doors
 (a streaming decoder, an ordered object with a linear search for small ones).
+
+## M11: the safepoints, the prologue's check, the own collector (points 2 and 3 again)
+
+M11 put a poll at every loop's head (S3), the prologue's check of the stack at every function's entry (S4)
+and made the own collector the default (S5). Measured against the tree before them — M11 S2: Boehm the
+default, no poll, no check — 2026-10-16 (WSL2 x86-64, the release profile through `zig cc 0.16`, Go 1.27;
+the minimum of 7 alternating rounds; the machine busy, a load of 1.5):
+
+| bench | before | S5 | Go | S5 / before | S5 / Go |
+|---|---|---|---|---|---|
+| loops | 0.642 s | 0.651 s | 0.656 s | 1.01 | 0.99 |
+| arith | 0.295 s | 0.302 s | 0.299 s | 1.03 | 1.01 |
+| structs | 0.148 s | 0.146 s | 0.240 s | 0.99 | 0.61 |
+| maps | 0.296 s | 0.302 s | 0.210 s | 1.02 | 1.44 |
+| sorting | 0.094 s | 0.100 s | 0.078 s | 1.07 | 1.28 |
+| strings | 0.049 s | 0.049 s | 0.030 s | 0.99 | 1.64 |
+
+With the flag read at every pass, `structs` lost 13 % — the load and its branch in the inner loop, not the
+vectorization (the loop vectorized neither before nor after; the packed instructions that went were in cold
+loops). The poll now counts down a local and reads the flag every 1024 passes of the head (13 M11 S5, the
+2^k): `structs` is back. `sorting` keeps 4–7 % over four measurements: its emitted C with the poll taken out
+runs as before, and the prologue's check costs nothing measurable — what remains is the countdown's decrement
+and branch in a tight merge loop; strip-mining counted loops would take it (design 13, the S5 note: decided at P13's
+measurement). The bounds hold: `sorting` 1.28× Go, `maps` 1.44×; `strings` stays over 1.5× as before M11.

@@ -64,8 +64,15 @@ public class SanitizerTests
         { "coro_storm", [], 0 },
     };
 
+    /// <summary>The threaded programs under TSan with the own collector, the default (13 M11 S3): it
+    /// stops the world at safepoints, with atomics and a condition variable TSan sees — Boehm's
+    /// signals make its stop abort here (the test below). The threads program among them.</summary>
     public static TheoryData<string, string[], int> TsanPrograms() => new()
     {
+        { "threads", [], 0 },
+        { "coro_threads", [], 0 },
+        { "coro_storm", [], 0 },
+        { "poll_basic", [], 0 },
         { "weak", [], 0 },
         { "gc_smoke", [], 0 },
         // A coroutine is a fiber to TSan; the collections between the switches order them.
@@ -86,21 +93,6 @@ public class SanitizerTests
     public void A_threaded_program_runs_clean_under_TSan(string name, string[] args, int exit) =>
         RunClean(name, Profile.Tsan, args, exit);
 
-    /// <summary>
-    /// The threaded programs under TSan with the own collector (13 M11 S3), the threads program
-    /// among them: it stops the world at safepoints, with atomics and a condition variable TSan
-    /// sees, not with the signals that make Boehm's stop abort here (the test below). Its stop and
-    /// restart order what one thread wrote before a collection and another reads after it.
-    /// </summary>
-    [Theory]
-    [InlineData("threads")]
-    [InlineData("coro_threads")]
-    [InlineData("coro_storm")]
-    [InlineData("poll_basic")]
-    [InlineData("coro_gc")]
-    [InlineData("weak")]
-    public void A_threaded_program_runs_clean_under_TSan_with_the_own_collector(string name) =>
-        RunClean(name, BuildProfile.Of(Profile.Tsan) with { Gc = Collector.Immix }, [], 0);
 
     /// <summary>
     /// The throw paths under ASan and UBSan (13, M5): the emitter's C for every program that throws,
@@ -191,9 +183,10 @@ public class SanitizerTests
     public void The_threads_program_runs_clean_under_TSan_where_asked_for()
     {
         if (Asked != "all") return;
-        RunClean("threads", Profile.Tsan, [], 0);
-        RunClean("coro_threads", Profile.Tsan, [], 0);
-        RunClean("coro_storm", Profile.Tsan, [], 0);
+        var boehm = BuildProfile.Of(Profile.Tsan) with { Gc = Collector.Boehm };
+        RunClean("threads", boehm, [], 0);
+        RunClean("coro_threads", boehm, [], 0);
+        RunClean("coro_storm", boehm, [], 0);
         RunClean("poll_basic", Profile.Tsan, [], 0);
         RunEmittedClean("threads", 0, Profile.Tsan);
         RunEmittedClean("thread_channels", 0, Profile.Tsan);
@@ -223,14 +216,17 @@ public class SanitizerTests
     }
 
     /// <summary>
-    /// The control for the model the runtime gives TSan (a collection orders the threads): two
-    /// threads that allocate and then race on a global, with no collection between, are reported.
+    /// The control for the model the runtime gives TSan (a collection orders the threads, and so do
+    /// the collector's locks): two threads that race on a global at the same time, with nothing of
+    /// the runtime between their writes, are reported — under either collector.
     /// </summary>
-    [Fact]
-    public void A_race_the_collector_does_not_order_is_still_reported()
+    [Theory]
+    [InlineData(Collector.Immix)]
+    [InlineData(Collector.Boehm)]
+    public void A_race_the_collector_does_not_order_is_still_reported(Collector gc)
     {
         if (!Applies) return;
-        var result = RuntimeBuildTests.RunTest("tsan_race", Profile.Tsan, Clang());
+        var result = RuntimeBuildTests.RunTest("tsan_race", BuildProfile.Of(Profile.Tsan) with { Gc = gc }, Clang());
         Assert.Equal(66, result.ExitCode);
         Assert.Contains("WARNING: ThreadSanitizer: data race", result.Stderr);
         Assert.Contains("tsan_race.c", result.Stderr);

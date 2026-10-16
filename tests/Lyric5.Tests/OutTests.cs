@@ -99,6 +99,7 @@ public class OutTests
         Assert.Equal("release", staging.GetProperty("base").GetString());
         Assert.Equal(2, staging.GetProperty("opt").GetInt32());
         Assert.True(staging.GetProperty("lto").GetBoolean());
+        Assert.Equal("immix", staging.GetProperty("gc").GetString());
 
         Assert.Contains(Target.Host.Triple, root.GetProperty("targets").EnumerateArray().Select(t => t.GetString()));
         Assert.Equal(Target.Host.Triple, root.GetProperty("host").GetString());

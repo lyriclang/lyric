@@ -725,3 +725,16 @@ Nach Aufwand: groß S2, S3, S6; mittel S1, S4, S5, S9; klein S7, S8, S10. Etwa a
   („shady“). Lyric emittiert die Barriere seit Stufe 0, daher gibt es solche Objekte nicht.
 - **Boehm** bleibt als Messlatte (P11): konservativer Heap, Signale, langsame Allokation — die drei Gründe aus L1,
   jetzt gemessen statt behauptet. **MMTk** bleibt verworfen (L1): sein Binding-Vertrag wäre so groß wie dieser Plan.
+
+### Nachtrag 2026-10-16 — S5 gemessen: der Poll zählt
+
+- Messpunkt 2 und 3 gegen den Baum vor den Polls (M11 S2): mit dem Flag in jedem Durchlauf verlor `structs`
+  13 % — der Load und sein Sprung in der inneren Schleife, nicht die Vektorisierung (sie vektorisierte weder
+  davor noch danach). Entschieden mit der Messung: eine Schleife pollt je **2^10 Durchläufe** ihres Kopfes,
+  heruntergezählt in einer lokalen Variable der Funktion (`LYR_LOOP_POLL`, `LYR_POLL_EVERY`); `structs` ist
+  zurück (0,99). Ein Stopp wartet höchstens so viele Durchläufe einer Schleife ohne Aufruf — eine mit Aufruf hält
+  am Eingang des Gerufenen.
+- `sorting` behält 4–7 %: sein C ohne den Poll läuft wie zuvor, die Prolog-Prüfung kostet nichts Messbares; es
+  bleibt das Dekrement mit Sprung in einer engen Merge-Schleife. Strip-Mining gezählter Schleifen (die innere
+  Grenze `min(last, i + 1024)`, der Poll in einem äußeren Kopf — HotSpots `LoopStripMiningIter`) nähme auch das;
+  die Entscheidung fällt mit der Messung aus P13. Die Ratschen halten (`sorting` 1,28× Go, `maps` 1,44×).
