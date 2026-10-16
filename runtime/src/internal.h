@@ -134,6 +134,8 @@ struct LyrCoro {
     struct LyrStr *panic_code;     /* PANICKED: the report it left — code, message, frames */
     struct LyrStr *panic_message;
     struct LyrStr *panic_trace;
+    uintptr_t *panic_pcs;          /* the frames' addresses until its resumer names them (malloc) */
+    int panic_pc_count;
     struct LyrCoro *gc_next;       /* the own collector's list of watched coroutines (13 M11 P9): */
     struct LyrCoro *gc_prev;       /* no references — the marking does not follow them */
     int gc_watched;
