@@ -147,6 +147,10 @@ struct LyrCoro {
  * nothing. The lowest address the calling thread's own stack may reach, 0 when unknown; its bound
  * from it; the thread's bound set (the collector keeps a stop asked for); an overflow's panic. */
 enum { LYR_STACK_RESERVE = 16 * 1024 };
+/* A thread's own stack of a mebibyte or more keeps more: its overflow's panic is named where it
+ * happened — no resumer names it later, as a coroutine's — and naming takes more than 16 KiB where
+ * the system's unwinder or symbols do (macOS; measured by the CI, M11 S4). */
+enum { LYR_STACK_OWN_RESERVE = 64 * 1024 };
 uintptr_t lyr_stack_low(void);
 uintptr_t lyr_stack_own_limit(void);
 void lyr_gc_stack_limit(uintptr_t limit);

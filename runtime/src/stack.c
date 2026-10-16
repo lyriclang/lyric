@@ -46,7 +46,10 @@ uintptr_t lyr_stack_low(void) {
 
 uintptr_t lyr_stack_own_limit(void) {
     uintptr_t low = lyr_stack_low();
-    return low == 0 ? 0 : low + LYR_STACK_RESERVE;
+    if (low == 0) return 0;
+    /* called near the stack's top, when the thread starts: what lies below is about its size */
+    uintptr_t here = (uintptr_t)__builtin_frame_address(0);
+    return low + (here - low >= ((uintptr_t)1 << 20) ? LYR_STACK_OWN_RESERVE : LYR_STACK_RESERVE);
 }
 
 void lyr_stack_overflow(void) {

@@ -132,6 +132,20 @@ static void walk_frames(struct backtrace_state *st, Pcs *pcs, const LyrFault *fa
         aligned = fp % sizeof(uintptr_t) == 0;
     }
 }
+
+/* Without a fault, the calling thread's own frames by the same chain: Apple's unwinder takes more
+ * stack than the reserve a stack overflow leaves (M11 S4: on macOS a coroutine's overflow ran out
+ * of it inside the unwinder, and the thread's own overflow panicked while it panicked). */
+static __attribute__((noinline)) void walk_here(Pcs *pcs) {
+    uintptr_t fp = (uintptr_t)__builtin_frame_address(0);
+    while (fp != 0 && fp % sizeof(uintptr_t) == 0) {
+        const uintptr_t *record = (const uintptr_t *)fp;
+        uintptr_t next = record[0], ret = record[1];
+        if (ret == 0 || collect_pc(pcs, ret - 1)) break;
+        if (next <= fp || next - fp > ((uintptr_t)8 << 20)) break;
+        fp = next;
+    }
+}
 #endif
 
 /* The program counters of the calling thread's stack — of the faulting frame first, for a fault. */
@@ -139,7 +153,11 @@ static void collect(struct backtrace_state *st, Pcs *pcs, const LyrFault *fault)
     pcs->count = 0;
     pcs->full = 0;
 #if defined(__APPLE__)
-    if (fault != NULL && fault->fp != 0) walk_frames(st, pcs, fault);
+    if (fault == NULL) {
+        walk_here(pcs);
+        return;
+    }
+    if (fault->fp != 0) walk_frames(st, pcs, fault);
     else
 #else
     (void)fault;
