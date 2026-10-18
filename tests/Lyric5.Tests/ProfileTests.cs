@@ -64,6 +64,34 @@ public class ProfileTests
         Assert.Equal("-2147483648\n", BuildAndRun(dir, "app", "build", "-C", dir, "--gc", "immix", "--no-overflow-checks"));
     }
 
+    /// <summary>A build that goes back to a collector built before links again: its archive and the
+    /// program's objects are cached, older than the binary the other collector made, and that binary
+    /// was taken for up to date — the Boehm twins of bench/gc ran the own collector. The program
+    /// says which it runs: the own collector collects young, Boehm never.</summary>
+    [Fact]
+    public void A_build_under_the_other_collector_links_again()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", WhichCollector));
+        Assert.Equal("young\n", BuildAndRun(dir, "app", "build", "-C", dir, "--gc", "immix"));
+        Assert.Equal("full only\n", BuildAndRun(dir, "app", "build", "-C", dir, "--gc", "boehm"));
+        Assert.Equal("young\n", BuildAndRun(dir, "app", "build", "-C", dir, "--gc", "immix"));
+        Assert.Equal("full only\n", BuildAndRun(dir, "app", "build", "-C", dir, "--gc", "boehm"));
+    }
+
+    private const string WhichCollector = "import std.io { println };\n\n"
+        + "extern \"C\" fn lyr_gc_young_collections(): uint64;\n\n"
+        + "fn main(): void {\n"
+        + "    var kept = 0;\n"
+        + "    var i = 0;\n"
+        + "    while (i < 300000) {\n"
+        + "        let xs: List<int> = List.new();\n"
+        + "        xs.push(i);\n"
+        + "        kept = kept + xs.length();\n"
+        + "        i = i + 1;\n"
+        + "    }\n"
+        + "    println(if (lyr_gc_young_collections() > 0) \"young\" else \"full only\");\n"
+        + "}\n";
+
     [Fact]
     public void A_manifest_changes_a_built_in_profile()
     {
