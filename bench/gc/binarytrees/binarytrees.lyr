@@ -4,6 +4,10 @@
 // node count of every tree walked, the same in every language.
 import std.io { println };
 
+/// The collector's numbers (the runtime's, 13 M11 P12): 0 the collections, 4 the longest pause and
+/// 6 the 99th percentile, in nanoseconds — printed on a line of their own after the checksum.
+extern "C" fn lyr_gc_stat(which: int): int;
+
 class Node { left: ?Node, right: ?Node }
 
 fn bottomUp(depth: int): Node {
@@ -34,5 +38,6 @@ fn main(): int {
     }
     total += check(longLived);
     println(f"{total}");
+    println(f"gc {lyr_gc_stat(0)} {lyr_gc_stat(6)} {lyr_gc_stat(4)}");
     return 0;
 }

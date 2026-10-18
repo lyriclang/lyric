@@ -280,6 +280,28 @@ size_t lyr_gc_heap_size(void);
 /* Number of collections since start. */
 size_t lyr_gc_collections(void);
 
+/* The collector's numbers (13 M11 P12; design 11 H5) — internal until M14 gives hosts the header's
+ * promise: the collections, young and full; every pause's length, from the stop's request to the
+ * restart, as a total, a maximum, two percentiles and a log2 histogram; what the collector holds and
+ * what the last collections found alive. */
+typedef struct LyrGcStats {
+    uint64_t collections, young, full;       /* young: none under Boehm */
+    uint64_t pause_total_ns, pause_max_ns, pause_p50_ns, pause_p99_ns;
+    uint64_t pause_log2[48];                 /* the pauses of 2^i up to 2^(i+1) nanoseconds */
+    uint64_t heap_bytes, live_bytes;
+} LyrGcStats;
+void lyr_gc_stats(LyrGcStats *out);
+
+/* One of the numbers, for a program that reads them through extern "C" (bench/gc). RESET begins
+ * anew: the collections and pauses counted after it are those that come after it (a benchmark's
+ * steady phase, after it built what lives). */
+enum {
+    LYR_GC_STAT_COLLECTIONS, LYR_GC_STAT_YOUNG, LYR_GC_STAT_FULL, LYR_GC_STAT_PAUSE_TOTAL_NS,
+    LYR_GC_STAT_PAUSE_MAX_NS, LYR_GC_STAT_PAUSE_P50_NS, LYR_GC_STAT_PAUSE_P99_NS,
+    LYR_GC_STAT_HEAP_BYTES, LYR_GC_STAT_LIVE_BYTES, LYR_GC_STAT_RESET,
+};
+int64_t lyr_gc_stat(int64_t which);
+
 /* A young collection now (13 M11 P8: from the roots and the dirty cards — a coroutine's among them),
  * then the callbacks; a full one where the collector has no generations (Boehm). For the pace of
  * the coroutine stacks (coro.c), tests and measurement. And the young ones among

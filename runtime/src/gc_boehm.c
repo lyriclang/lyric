@@ -3,6 +3,7 @@
  * zeroes them, so they are zeroed here where the contract promises it. */
 #include "lyr/gc.h"
 #include "lyr/panic.h"
+#include "lyr/time.h"
 #include "internal.h"
 
 #include <gc.h>
@@ -181,6 +182,8 @@ void lyr_gc_safepoint_slow(void) {}
 
 void lyr_gc_collect_young(void) { lyr_gc_collect(); }
 size_t lyr_gc_young_collections(void) { return 0; }
+
+size_t lyr_gc_live_bytes(void) { return GC_get_heap_size() - GC_get_free_bytes(); }
 void lyr_gc_stack_slow(uintptr_t frame) {
     if (frame < lyr_mutator.stack_limit) lyr_stack_overflow();
 }
@@ -427,13 +430,18 @@ void lyr_gc_switch_begin(void *gc_handle, const LyrStackCtx *to) {
 
 void lyr_gc_switch_end(void) { atomic_fetch_sub(&switches_under_way, 1); }
 
+/* The world's stop to its start: the pause the stats keep (13 M11 P12). Under Boehm's lock. */
+static int64_t stopped_at;
+
 static void GC_CALLBACK on_collection_event(GC_EventType event) {
     if (event == GC_EVENT_PRE_STOP_WORLD) {
+        stopped_at = lyr_clock_monotonic_ns();
         atomic_store(&world_stopping, 1);
         unsigned spins = 0;
         while (atomic_load(&switches_under_way) != 0) relax(&spins);
     } else if (event == GC_EVENT_POST_START_WORLD) {
         atomic_store(&world_stopping, 0);
+        lyr_gc_record_pause((uint64_t)(lyr_clock_monotonic_ns() - stopped_at), 0);
     }
 #ifdef LYR_TSAN
     tsan_on_collection(event);
