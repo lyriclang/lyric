@@ -67,7 +67,9 @@ public class ProfileTests
     /// <summary>A build that goes back to a collector built before links again: its archive and the
     /// program's objects are cached, older than the binary the other collector made, and that binary
     /// was taken for up to date — the Boehm twins of bench/gc ran the own collector. The program
-    /// says which it runs: the own collector collects young, Boehm never.</summary>
+    /// says which it runs: the own collector collects young, Boehm never — asked through
+    /// <c>lyr_gc_stat</c>, whose <c>int64_t</c> is Lyric's <c>int</c> on every target (a <c>size_t</c>
+    /// counter declared <c>uint64</c> conflicts on macOS, where the two are different types).</summary>
     [Fact]
     public void A_build_under_the_other_collector_links_again()
     {
@@ -79,7 +81,7 @@ public class ProfileTests
     }
 
     private const string WhichCollector = "import std.io { println };\n\n"
-        + "extern \"C\" fn lyr_gc_young_collections(): uint64;\n\n"
+        + "extern \"C\" fn lyr_gc_stat(which: int): int;\n\n"
         + "fn main(): void {\n"
         + "    var kept = 0;\n"
         + "    var i = 0;\n"
@@ -89,7 +91,7 @@ public class ProfileTests
         + "        kept = kept + xs.length();\n"
         + "        i = i + 1;\n"
         + "    }\n"
-        + "    println(if (lyr_gc_young_collections() > 0) \"young\" else \"full only\");\n"
+        + "    println(if (lyr_gc_stat(1) > 0) \"young\" else \"full only\");\n"
         + "}\n";
 
     [Fact]
