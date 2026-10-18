@@ -200,7 +200,13 @@ public static class Pipeline
             var scripts = directives.Sources.Select(unit => unit with { ExtraFlags = [.. unit.ExtraFlags ?? [], .. paths] }).ToList();
             var objects = build.Compile([.. units, .. native, .. scripts]);
             var executable = project.Executable(request.Profile, request.Target);
-            if (!UpToDate(executable, [.. objects, archive])) build.LinkExecutable([.. objects, archive], executable, libraries);
+            string[] inputs = [.. objects, archive];
+            var record = Path.Combine(project.CacheDir, $"{project.BinaryName}-{Key(executable)}.link");
+            if (!UpToDate(executable, record, inputs, libraries))
+            {
+                build.LinkExecutable(inputs, executable, libraries);
+                File.WriteAllText(record, LinkLines(inputs, libraries));
+            }
             return (0, executable);
         }
         catch (CBuildException failure)
@@ -395,13 +401,21 @@ public static class Pipeline
         return true;
     }
 
-    /// <summary>A binary newer than every content-keyed input it was linked from is that link.</summary>
-    private static bool UpToDate(string executable, IEnumerable<string> inputs)
+    /// <summary>A binary is that link when it was linked from these very inputs — the record in the
+    /// cache names them — and is newer than each. Newer alone is not enough: the inputs are
+    /// content-keyed and cached, so a build that goes back to inputs built earlier — the other
+    /// collector's archive (13 M11 P11), a profile field and back — finds every one older than the
+    /// binary the other inputs made.</summary>
+    private static bool UpToDate(string executable, string record, IReadOnlyList<string> inputs, IReadOnlyList<string> libraries)
     {
         if (!File.Exists(executable)) return false;
+        if (!File.Exists(record) || File.ReadAllText(record) != LinkLines(inputs, libraries)) return false;
         var linked = File.GetLastWriteTimeUtc(executable);
         return inputs.All(input => File.GetLastWriteTimeUtc(input) <= linked);
     }
+
+    private static string LinkLines(IEnumerable<string> inputs, IEnumerable<string> libraries) =>
+        string.Join("\n", inputs.Concat(libraries.Select(library => "-l" + library))) + "\n";
 
     internal static string Key(params string[] parts)
     {
