@@ -3,8 +3,10 @@
  * coroutines — while another thread runs 300 collections back to back. So collections stop the
  * switching thread at every point of a switch, the moment between the move of what the collector
  * takes for the thread's stack and the move of the stack pointer included, unless the runtime
- * keeps the world from stopping there. Expected: no crash, every chain whole. Prints
- * "coro storm ok". */
+ * keeps the world from stopping there. Each coroutine yields at least YIELDS times, however fast
+ * the collections run — the switches are counted, not timed: on a slow runner the collecting thread
+ * once finished before the switching one had made a thousand. Expected: no crash, every chain
+ * whole, at least the switches the yields make. Prints "coro storm ok". */
 #if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
 #  define _POSIX_C_SOURCE 200809L  /* nanosleep under -std=c11 */
 #endif
@@ -21,7 +23,7 @@
 #  include <time.h>
 #endif
 
-enum { COROUTINES = 4, LINKS = 50, COLLECTIONS = 300 };
+enum { COROUTINES = 4, LINKS = 50, COLLECTIONS = 300, YIELDS = 300 };
 
 static const LyrDesc coroutine_desc = { .size = 0, .flags = LYR_DESC_CORO, .name = "test.Coroutine" };
 
@@ -45,7 +47,7 @@ static void chain_body(void *arg) {
         LYR_WRITE_BARRIER(node, &node->next, head);
         head = node;
     }
-    while (!atomic_load_explicit(&collecting_done, memory_order_relaxed)) {
+    for (int64_t yields = 0; yields < YIELDS || !atomic_load_explicit(&collecting_done, memory_order_relaxed); yields++) {
         LYR_SAFEPOINT();
         lyr_coro_yield();
     }
@@ -118,7 +120,7 @@ static int64_t program(void) {
     CHECK(pthread_join(thread, NULL) == 0);
 #endif
     LYR_GC_LEAVE_SAFE();
-    CHECK(switches > 1000);
+    CHECK(switches >= 2 * COROUTINES * YIELDS);
     CHECK(lyr_gc_collections() >= COLLECTIONS);
     lyr_println(lyr_str_from_cstr("coro storm ok"));
     return 0;

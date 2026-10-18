@@ -32,7 +32,8 @@ LyrErr *lyr_err_new_traced(LyrIface value) {
     if (count > 0) {
         LyrArr *kept = lyr_alloc_array(&trace_desc, count);
         memcpy(kept->data, pcs, (size_t)count * sizeof(uintptr_t));
-        err->trace = kept;
+        /* the allocation may have collected: err may be old by now */
+        LYR_WRITE_BARRIER(err, &err->trace, kept);
     }
     return err;
 }
@@ -48,7 +49,7 @@ void lyr_err_suppress(LyrErr *into, const LyrErr *err) {
     LyrArr *grown = lyr_alloc_array(&suppressed_desc, had + 1);
     if (had > 0) memcpy(grown->data, into->suppressed->data, (size_t)had * sizeof(LyrIface));
     LYR_ARR_DATA(grown, LyrIface)[had] = err->value;
-    into->suppressed = grown;
+    LYR_WRITE_BARRIER(into, &into->suppressed, grown);
 }
 
 LyrErr *lyr_err_unsuppress(const LyrErr *dropped) {
@@ -59,9 +60,9 @@ LyrErr *lyr_err_unsuppress(const LyrErr *dropped) {
     if (count > 1) {
         LyrArr *rest = lyr_alloc_array(&suppressed_desc, count - 1);
         memcpy(rest->data, all + 1, (size_t)(count - 1) * sizeof(LyrIface));
-        err->suppressed = rest;
+        LYR_WRITE_BARRIER(err, &err->suppressed, rest);
     }
-    err->trace = dropped->trace;
+    LYR_WRITE_BARRIER(err, &err->trace, dropped->trace);
     return err;
 }
 

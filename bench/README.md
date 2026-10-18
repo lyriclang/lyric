@@ -205,3 +205,34 @@ loops). The poll now counts down a local and reads the flag every 1024 passes of
 runs as before, and the prologue's check costs nothing measurable — what remains is the countdown's decrement
 and branch in a tight merge loop; strip-mining counted loops would take it (design 13, the S5 note: decided at P13's
 measurement). The bounds hold: `sorting` 1.28× Go, `maps` 1.44×; `strings` stays over 1.5× as before M11.
+
+## Measurement point 5 (M11): the collector — prepared in S6
+
+| Program | What it measures |
+|---|---|
+| `gc/binarytrees` | allocation throughput: complete binary trees built, walked and dropped at once, one long-lived tree beside them (the Benchmarks Game's program, on one thread) |
+| `gc/cache` | a heap alive: four million entries in a `Map`, each an object with an array of 24 ints, and over it short-lived arrays and replacements — an old slot made to point at a young entry each time |
+| `gc/lru` | stores into old objects: a least-recently-used list of 200 000 nodes over a `Map`, ten million lookups, most of them moving a node |
+
+    python3 bench/gc/run.py [--runs 3] [--lyric5 <exe>] [benches...]
+
+Each program in Lyric under its own collector, the same program under `gc = "boehm"`, and the Go twin;
+the wall time (the minimum of the runs) and the peak RSS (the largest, from `wait4`). The pauses come
+with `lyr_gc_stats()` (S9), and with them the plan's ratchet (13 M11 P12): better than Boehm in
+throughput, pauses and RSS, p99 of the pauses under 10 ms with a gibibyte alive.
+
+Measured 2026-10-16 with the generations of S6 (WSL2 x86-64, the release profile through `zig cc 0.16`,
+Go 1.27; the minimum of 3 runs; the machine busy, a load of 2.3):
+
+| bench | checksum | Lyric | Lyric (Boehm) | Go | Lyric / Boehm | Lyric / Go |
+|---|---|---|---|---|---|---|
+| binarytrees | 68332206 | 0.890 s, 122 MiB | 1.858 s, 54 MiB | 1.139 s, 36 MiB | 0.48 | 0.78 |
+| cache | 4000000 460271147 | 11.780 s, 3044 MiB | 16.693 s, 1571 MiB | 6.095 s, 1810 MiB | 0.71 | 1.93 |
+| lru | 200000 4938130 24392087650802 | 3.925 s, 150 MiB | 3.748 s, 41 MiB | 1.633 s, 36 MiB | 1.05 | 2.40 |
+
+Throughput beats Boehm in `binarytrees` and `cache` and trails it by 5 % in `lru`; RSS matches it in none. `cache`
+holds 1.4 GiB alive in 3.0 GiB: short-lived arrays share 256-byte lines with long-lived entries, and a
+line with one live byte stays taken — whatever the pacing (design 13, the S6 note). Its
+pauses reach 1.4 s for a full collection and 0.9 s for a young one, the young generation as large as the
+old (the same note). `lru` stores into old nodes nearly everywhere: its young collections read almost
+every line of the old heap through the cards and pause as long as a full one (about 40 ms at 64 MiB).

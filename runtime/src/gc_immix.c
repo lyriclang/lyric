@@ -20,7 +20,15 @@
  *
  * The world stops at safepoints (P5): compiled code polls at loop back-edges and function entries,
  * and the runtime's blocking calls are safe regions. A thread stopped either way has its registers
- * on its stack and its stack scanned from where it stopped. No signal is involved. */
+ * on its stack and its stack scanned from where it stopped. No signal is involved.
+ *
+ * Most collections are young (P8, sticky mark bits): they clear no mark — what is marked is old —,
+ * mark from the roots and from the old objects on the lines whose card a store dirtied (gc.h's
+ * barrier) — a coroutine's among them, whose card a switch into it or out of it marks: its stack
+ * has no barrier of its own —, and descend into no marked object.
+ * What survives is old from then on, where it lies. A full collection clears the marks and marks
+ * the whole heap; it comes when the old heap doubled since the last one, when the heap has no
+ * room, and when the program asks. */
 #if defined(__linux__) && !defined(_GNU_SOURCE)
 #  define _GNU_SOURCE  /* pthread_getattr_np */
 #endif
@@ -151,6 +159,7 @@ typedef struct Block {
 typedef struct Chunk {
     uint8_t kind;
     uint8_t committed;
+    uint8_t used;           /* taken once: its memory is no longer the zero the system committed */
     Block *blocks;          /* CHUNK_BLOCKS */
     uint16_t *pages;        /* CHUNK_LARGE: per page 0 when free, else 1 + the page its object starts on */
     uint32_t fresh_from;    /* CHUNK_LARGE: the pages from here on were never handed out */
@@ -167,6 +176,11 @@ static Chunk *chunks;
 static size_t chunk_count;    /* chunks in the reservation */
 static size_t chunks_taken;   /* the chunks below were taken once */
 
+/* The barrier's copy of the reservation, and the cards: a byte per line, set by every store of a
+ * reference into the line since the last collection (gc.h, P8). */
+uintptr_t lyr_gc_heap_base, lyr_gc_heap_span;
+uint8_t *lyr_gc_cards;
+
 /* The epoch a line mark is compared against: a line is live when its mark is the current one. A
  * collection begins a new one, so that no line has to be unmarked. */
 static uint8_t epoch = 1;
@@ -176,10 +190,13 @@ static size_t bytes_in_use;
 static size_t heap_limit;
 
 /* The pace (P7): bytes handed to allocators since the last collection, against the budget —
- * counted as runs are handed out, by every thread. */
+ * counted as runs are handed out, by every thread. The generations (P8): what the last full
+ * collection found alive, and what the young ones marked since — the old heap is their sum, the
+ * budget grows with it, and a full collection comes when it doubled. */
 static atomic_size_t since_collection;
 static size_t budget = MIN_BUDGET;
-static atomic_size_t collections;
+static atomic_size_t collections, full_collections, young_collections;
+static size_t live_full, promoted;
 
 static inline size_t granule_of(uintptr_t at) { return (at - heap_base) / GRANULE; }
 static inline size_t line_of(uintptr_t at) { return (at - heap_base) / LINE; }
@@ -235,6 +252,7 @@ static bool commit_chunk(size_t c) {
     if (chunk->committed) return true;
     if (!os_commit((void *)(heap_base + c * CHUNK), CHUNK)) return false;
     if (!os_commit(line_marks + c * LINE_BYTES_PER_CHUNK, LINE_BYTES_PER_CHUNK)) return false;
+    if (!os_commit(lyr_gc_cards + c * LINE_BYTES_PER_CHUNK, LINE_BYTES_PER_CHUNK)) return false;
     if (!os_commit(start_bits + c * BIT_BYTES_PER_CHUNK, BIT_BYTES_PER_CHUNK)) return false;
     if (!os_commit(mark_bits + c * BIT_BYTES_PER_CHUNK, BIT_BYTES_PER_CHUNK)) return false;
     chunk->committed = 1;
@@ -252,6 +270,9 @@ static ptrdiff_t take_chunk(ChunkKind kind) {
     }
     Chunk *chunk = &chunks[c];
     if (!commit_chunk(c)) return -1;
+    /* a chunk a huge object held and left is taken again: what it hands out is zeroed, not fresh */
+    uint8_t fresh = !chunk->used;
+    chunk->used = 1;
     if (kind == CHUNK_BLOCKS && chunk->blocks == NULL) {
         chunk->blocks = calloc(BLOCKS_PER_CHUNK, sizeof(Block));
         if (chunk->blocks == NULL) return -1;
@@ -262,10 +283,10 @@ static ptrdiff_t take_chunk(ChunkKind kind) {
     }
     chunk->kind = (uint8_t)kind;
     if (kind == CHUNK_BLOCKS) {
-        for (size_t b = 0; b < BLOCKS_PER_CHUNK; b++) chunk->blocks[b] = (Block){ BLOCK_FREE, 1 };
+        for (size_t b = 0; b < BLOCKS_PER_CHUNK; b++) chunk->blocks[b] = (Block){ BLOCK_FREE, fresh };
     } else if (kind == CHUNK_LARGE) {
         memset(chunk->pages, 0, PAGES_PER_CHUNK * sizeof(uint16_t));
-        chunk->fresh_from = 0;
+        chunk->fresh_from = fresh ? 0 : PAGES_PER_CHUNK;
         chunk->free_pages = PAGES_PER_CHUNK;
     }
     return (ptrdiff_t)c;
@@ -302,7 +323,9 @@ static ptrdiff_t start_at_or_below(size_t g, size_t first) {
 /* The start of the object `at` points into — its start or any byte inside it (views, 01 V9/V10) —
  * or 0 when `at` points into no object of the heap: outside it (a static object, a number), into
  * a free block, or past the end of the object before it. A conservative word and a reference of a
- * map are asked alike. */
+ * map are asked alike. A word on a start is that object, its header unread: most references are,
+ * and a young collection meets an old object, marked already, at every other one (P8) — the
+ * header is a cache miss the mark bit spares. */
 LYR_NO_SANITIZE static uintptr_t object_of(uintptr_t at) {
     if (!in_heap(at)) return 0;
     size_t c = (at - heap_base) / CHUNK;
@@ -313,6 +336,7 @@ LYR_NO_SANITIZE static uintptr_t object_of(uintptr_t at) {
     case CHUNK_BLOCKS: {
         uint32_t block = (uint32_t)((at - heap_base) / BLOCK);
         if (block_info(block)->state == BLOCK_FREE) return 0;
+        if (at % GRANULE == 0 && bit(start_bits, granule_of(at))) return at;
         ptrdiff_t found = start_at_or_below(granule_of(at), granule_of(block_address(block)));
         if (found < 0) return 0;
         start = heap_base + (uintptr_t)found * GRANULE;
@@ -332,6 +356,7 @@ LYR_NO_SANITIZE static uintptr_t object_of(uintptr_t at) {
     default:
         return 0;
     }
+    if (at == start) return start;
     return at - start < object_bytes((const LyrObj *)start) ? start : 0;
 }
 
@@ -389,21 +414,26 @@ static uint32_t sweep_one(void) {
     return NO_BLOCK;
 }
 
-static bool collect(void);
+/* What a collection is asked for: the budget is spent — a young one, unless the old heap doubled
+ * since the last full one (P8) —; the heap has no room — a full one before LYR-RT0005 (P7) —; or
+ * the program asks (lyr_gc_collect, lyr_gc_collect_young). */
+typedef enum Need { PACED, FULL, YOUNG } Need;
+
+static void collect(Need need);
 
 /* A block for a thread's buffer: a recyclable one (for small objects, which fit its runs), a free
- * one, a new chunk's — and when the budget is spent or the heap limit reached, a collection first.
- * NO_BLOCK when even that leaves none. */
+ * one, a new chunk's — and when the budget is spent a collection first, and when the heap limit is
+ * reached a full one. NO_BLOCK when even that leaves none. */
 static uint32_t take_block(bool small) {
-    bool collected = false;
+    bool paced = false, full = false;
     lock();
     for (;;) {
-        if (atomic_load_explicit(&since_collection, memory_order_relaxed) >= budget && !collected) {
+        if (atomic_load_explicit(&since_collection, memory_order_relaxed) >= budget && !paced && !full) {
             unlock();
-            collected = collect();
+            collect(PACED);
             lock();
-            if (collected) continue;
-            collected = true;  /* no collection now (S2: several threads); grow instead */
+            paced = true;
+            continue;
         }
         uint32_t block = NO_BLOCK;
         if (small && recyclable_blocks.count > 0) block = recyclable_blocks.items[--recyclable_blocks.count];
@@ -436,11 +466,11 @@ static uint32_t take_block(bool small) {
             unlock();
             return block;
         }
-        if (collected) break;
+        if (full) break;
         unlock();
-        collected = collect();
+        collect(FULL);
         lock();
-        if (!collected) break;
+        full = true;
     }
     unlock();
     return NO_BLOCK;
@@ -667,9 +697,11 @@ static uintptr_t take_huge(size_t count, size_t bytes, bool *fresh) {
         if (run < count) continue;
         size_t first = c + 1 - count;
         uintptr_t start = heap_base + first * CHUNK;
-        *fresh = first >= chunks_taken;
+        *fresh = true;
         for (size_t d = first; d <= c; d++) {
             if (!commit_chunk(d)) return 0;
+            if (chunks[d].used) *fresh = false;
+            chunks[d].used = 1;
             chunks[d].kind = CHUNK_HUGE;
             chunks[d].huge = start;
         }
@@ -683,15 +715,15 @@ static uintptr_t take_huge(size_t count, size_t bytes, bool *fresh) {
 static void *allocate_large(Thread *t, size_t rounded, size_t asked) {
     size_t pages = (rounded + PAGE - 1) / PAGE;
     size_t bytes = pages * PAGE;
-    bool fresh = true, collected = false;
+    bool fresh = true, paced = false, full = false;
     uintptr_t at = 0;
     lock();
     for (;;) {
-        if (atomic_load_explicit(&since_collection, memory_order_relaxed) >= budget && !collected) {
+        if (atomic_load_explicit(&since_collection, memory_order_relaxed) >= budget && !paced && !full) {
             unlock();
-            collect();
+            collect(PACED);
             lock();
-            collected = true;
+            paced = true;
         }
         if (within_limit(bytes)) {
             at = pages > PAGES_PER_CHUNK / 2 ? take_huge((bytes + CHUNK - 1) / CHUNK, bytes, &fresh) : take_pages(pages, &fresh);
@@ -702,11 +734,11 @@ static void *allocate_large(Thread *t, size_t rounded, size_t asked) {
                 break;
             }
         }
-        if (collected) break;
+        if (full) break;
         unlock();
-        collected = collect();
+        collect(FULL);
         lock();
-        if (!collected) break;
+        full = true;
     }
     unlock();
     if (at == 0) exhausted(asked);
@@ -1008,10 +1040,21 @@ void lyr_gc_remove_thread_stack(LyrStackCtx *own) {
     if (t != NULL && t->own == own) t->own = t->running = NULL;
 }
 
+/* A coroutine's stack changes only while it runs, and has no barrier: the switch is its barrier.
+ * The card of the line the coroutine object starts on, marked for the one a switch leaves and the
+ * one it enters — a young collection reads the coroutine whole from there, its stack too (P8). */
+static void ran(const Thread *t, const LyrStackCtx *ctx) {
+    if (ctx == NULL || ctx == t->own) return;
+    lyr_gc_card((const char *)ctx - offsetof(LyrCoro, ctx));
+}
+
 /* No collection stops a thread inside a switch — the world stops at safepoints (S3), and a switch
- * has none — so a switch only says where the thread runs now. */
+ * has none — so a switch only says where the thread runs now, and marks what it changes. */
 void lyr_gc_switch_begin(void *gc_handle, const LyrStackCtx *to) {
-    ((Thread *)gc_handle)->running = (LyrStackCtx *)to;
+    Thread *t = gc_handle;
+    ran(t, t->running);
+    ran(t, to);
+    t->running = (LyrStackCtx *)to;
 }
 
 void lyr_gc_switch_end(void) {}
@@ -1105,6 +1148,129 @@ LYR_NO_SANITIZE static void trace_coro(const LyrCoro *co) {
     }
 }
 
+/* The references of the marked object at `start` that lie in [low, high) — a dirty card's line: the
+ * words its map names there, every word of a conservative one there. A coroutine whole from the
+ * line it starts on, where a switch marks the card — its stack read once —, its fields from any. */
+LYR_NO_SANITIZE static void trace_within(uintptr_t start, uintptr_t low, uintptr_t high) {
+    const LyrObj *object = (const LyrObj *)start;
+    const LyrDesc *desc = object->desc;
+    if (desc->flags & LYR_DESC_CORO) {
+        const LyrCoro *co = (const LyrCoro *)object;
+        if (start >= low) {
+            trace_coro(co);
+        } else if (co->status != 0) {
+            mark_word((uintptr_t)co->arg);
+            mark_word((uintptr_t)co->resumer_coro);
+            mark_word((uintptr_t)co->error);
+            mark_word((uintptr_t)co->parked_top);
+            mark_word((uintptr_t)co->panic_code);
+            mark_word((uintptr_t)co->panic_message);
+            mark_word((uintptr_t)co->panic_trace);
+        }
+        return;
+    }
+    uintptr_t end = start + object_bytes(object);
+    if (low < start + sizeof(LyrObj)) low = start + sizeof(LyrObj);
+    if (high > end) high = end;
+    if (low >= high) return;
+    if (desc->flags & LYR_DESC_CONSERVATIVE) {
+        scan_range(low, high);
+        return;
+    }
+    if (!(desc->flags & LYR_DESC_HAS_REFS) || desc->refmap_words == 0) return;
+    if (desc->flags & LYR_DESC_ARRAY) {
+        const LyrArr *array = (const LyrArr *)start;
+        uintptr_t data = (uintptr_t)array->data;
+        size_t size = desc->elem_size, words = size / sizeof(uintptr_t);
+        if (words > desc->refmap_words * 64) words = desc->refmap_words * 64;
+        if (words == 0 || high <= data) return;
+        size_t first = low > data ? (low - data) / size : 0;
+        size_t last = (high - data + size - 1) / size;
+        if (last > (size_t)array->len) last = (size_t)array->len;
+        for (size_t i = first; i < last; i++) {
+            const uintptr_t *element = (const uintptr_t *)(data + i * size);
+            for (size_t w = 0; w < words; w++) {
+                uintptr_t at = (uintptr_t)&element[w];
+                if (at < low || at >= high) continue;
+                if ((desc->refmap[w / 64] >> (w % 64)) & 1) mark_word(element[w]);
+            }
+        }
+    } else {
+        const uintptr_t *words = (const uintptr_t *)start;
+        size_t count = desc->size / sizeof(uintptr_t);
+        if (count > desc->refmap_words * 64) count = desc->refmap_words * 64;
+        size_t first = (low - start) / sizeof(uintptr_t);
+        size_t last = (high - start + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
+        if (last > count) last = count;
+        for (size_t w = first; w < last; w++) {
+            if ((desc->refmap[w / 64] >> (w % 64)) & 1) mark_word(words[w]);
+        }
+    }
+}
+
+/* A dirty card: the old objects on its line read there — the one reaching into it from below,
+ * the ones starting on it. An unmarked one is young: the marking reaches it, or it died. */
+LYR_NO_SANITIZE static void scan_card(size_t line) {
+    uintptr_t low = heap_base + line * LINE, high = low + LINE;
+    size_t c = (low - heap_base) / CHUNK;
+    const Chunk *chunk = &chunks[c];
+    uintptr_t start;
+    switch (chunk->kind) {
+    case CHUNK_BLOCKS: {
+        uint32_t block = (uint32_t)((low - heap_base) / BLOCK);
+        if (block_info(block)->state == BLOCK_FREE) return;
+        size_t g = granule_of(low);
+        ptrdiff_t below = start_at_or_below(g, granule_of(block_address(block)));
+        if (below >= 0 && (size_t)below < g && bit(mark_bits, (size_t)below)) {
+            start = heap_base + (uintptr_t)below * GRANULE;
+            if (start + object_bytes((const LyrObj *)start) > low) trace_within(start, low, high);
+        }
+        for (size_t s = g; s < g + LINE / GRANULE; s++) {
+            if (bit(start_bits, s) && bit(mark_bits, s)) trace_within(heap_base + s * GRANULE, low, high);
+        }
+        return;
+    }
+    case CHUNK_LARGE: {
+        uint16_t owner = chunk->pages[((low - heap_base) % CHUNK) / PAGE];
+        if (owner == 0) return;
+        start = heap_base + c * CHUNK + (uintptr_t)(owner - 1) * PAGE;
+        break;
+    }
+    case CHUNK_HUGE:
+        start = chunk->huge;
+        break;
+    default:
+        return;
+    }
+    size_t g = granule_of(start);
+    if (bit(start_bits, g) && bit(mark_bits, g)) trace_within(start, low, high);
+}
+
+/* A young collection's roots in the heap: every dirty card, the table read eight cards at a time
+ * and cleared as it is read. */
+LYR_NO_SANITIZE static void scan_cards(void) {
+    for (size_t c = 0; c < chunks_taken; c++) {
+        if (!chunks[c].committed || chunks[c].kind == CHUNK_UNUSED) continue;
+        uint8_t *cards = lyr_gc_cards + c * LINE_BYTES_PER_CHUNK;
+        for (size_t w = 0; w < LINE_BYTES_PER_CHUNK; w += 8) {
+            uint64_t eight;
+            memcpy(&eight, cards + w, sizeof eight);
+            if (eight == 0) continue;
+            memset(cards + w, 0, sizeof eight);
+            for (size_t b = 0; b < 8; b++) {
+                if (((const uint8_t *)&eight)[b]) scan_card(c * LINE_BYTES_PER_CHUNK + w + b);
+            }
+        }
+    }
+}
+
+/* After a full collection, which needs no card: every card clean. */
+static void clear_cards(void) {
+    for (size_t c = 0; c < chunks_taken; c++) {
+        if (chunks[c].committed) memset(lyr_gc_cards + c * LINE_BYTES_PER_CHUNK, 0, LINE_BYTES_PER_CHUNK);
+    }
+}
+
 LYR_NO_SANITIZE static void drain(void) {
     while (mark_top > 0) {
         uintptr_t start = mark_stack[--mark_top];
@@ -1189,6 +1355,93 @@ LYR_NO_SANITIZE static void verify_object(uintptr_t start) {
         if (target == value && !bit(mark_bits, granule_of(target))) {
             lyr_panic(LYR_RT_SYSTEM, "the map of %s does not name its word at offset %zu, which points at an unmarked %s",
                       desc->name, at, ((const LyrObj *)target)->desc->name);
+        }
+    }
+}
+
+/* The other check the tests build in (P8): the heap as the last collection left it, copied, and
+ * at the next collection every reference of an object that collection left marked compared with
+ * its copy. One that changed, on a line whose card is clean, to a young object is a store without
+ * its barrier — the young object would die under it. (A reference that changed to an old object,
+ * or to null, needs no card; a dead object a stale stack word kept may hold anything, but it
+ * changes nothing.) */
+static uintptr_t *snapshot;
+static size_t snapshot_chunks;
+
+LYR_NO_SANITIZE static void take_snapshot(void) {
+    if (chunks_taken > snapshot_chunks) {
+        free(snapshot);
+        snapshot = malloc(chunks_taken * (size_t)CHUNK);
+        snapshot_chunks = snapshot != NULL ? chunks_taken : 0;
+    }
+    for (size_t c = 0; c < snapshot_chunks; c++) {
+        if (!chunks[c].committed || chunks[c].kind == CHUNK_UNUSED) continue;
+        const uintptr_t *from = (const uintptr_t *)(heap_base + c * CHUNK);
+        uintptr_t *into = snapshot + c * (CHUNK / sizeof(uintptr_t));
+        for (size_t w = 0; w < CHUNK / sizeof(uintptr_t); w++) into[w] = from[w];
+    }
+}
+
+LYR_NO_SANITIZE static void check_store(const char *name, uintptr_t start, size_t offset) {
+    uintptr_t at = start + offset;
+    size_t c = (at - heap_base) / CHUNK;
+    if (c >= snapshot_chunks) return;
+    uintptr_t now = *(const uintptr_t *)at, then = snapshot[(at - heap_base) / sizeof(uintptr_t)];
+    if (now == then || lyr_gc_cards[line_of(at)]) return;
+    uintptr_t target = object_of(now);
+    if (target == 0 || bit(mark_bits, granule_of(target))) return;
+    lyr_panic(LYR_RT_SYSTEM, "%s holds at offset %zu a young %s, stored without its barrier: its card is clean",
+              name, offset, ((const LyrObj *)target)->desc->name);
+}
+
+LYR_NO_SANITIZE static void check_stores(uintptr_t start) {
+    const LyrObj *object = (const LyrObj *)start;
+    const LyrDesc *desc = object->desc;
+    if (desc->flags & LYR_DESC_CORO) {
+        static const size_t fields[] = {
+            offsetof(LyrCoro, arg), offsetof(LyrCoro, resumer_coro), offsetof(LyrCoro, error),
+            offsetof(LyrCoro, parked_top), offsetof(LyrCoro, panic_code), offsetof(LyrCoro, panic_message),
+            offsetof(LyrCoro, panic_trace),
+        };
+        for (size_t i = 0; i < sizeof fields / sizeof fields[0]; i++) check_store(desc->name, start, fields[i]);
+        return;
+    }
+    if (!(desc->flags & LYR_DESC_HAS_REFS) || desc->refmap_words == 0) return;
+    if (desc->flags & LYR_DESC_ARRAY) {
+        const LyrArr *array = (const LyrArr *)start;
+        size_t size = desc->elem_size, words = size / sizeof(uintptr_t);
+        if (words > desc->refmap_words * 64) words = desc->refmap_words * 64;
+        for (int64_t i = 0; i < array->len; i++) {
+            for (size_t w = 0; w < words; w++) {
+                if ((desc->refmap[w / 64] >> (w % 64)) & 1) {
+                    check_store(desc->name, start, offsetof(LyrArr, data) + (size_t)i * size + w * sizeof(uintptr_t));
+                }
+            }
+        }
+    } else {
+        size_t count = desc->size / sizeof(uintptr_t);
+        if (count > desc->refmap_words * 64) count = desc->refmap_words * 64;
+        for (size_t w = 1; w < count; w++) {
+            if ((desc->refmap[w / 64] >> (w % 64)) & 1) check_store(desc->name, start, w * sizeof(uintptr_t));
+        }
+    }
+}
+
+/* Before a collection marks: every object the last one left marked, its stores checked. */
+static void verify_barriers(void) {
+    for (size_t c = 0; c < chunks_taken && c < snapshot_chunks; c++) {
+        Chunk *chunk = &chunks[c];
+        if (chunk->kind == CHUNK_UNUSED) continue;
+        uintptr_t base = heap_base + c * CHUNK;
+        if (chunk->kind == CHUNK_HUGE) {
+            if (chunk->huge == base && bit(mark_bits, granule_of(base))) check_stores(base);
+            continue;
+        }
+        for (size_t g = 0; g < CHUNK / GRANULE; g++) {
+            uintptr_t at = base + g * GRANULE;
+            size_t global = granule_of(at);
+            if (chunk->kind == CHUNK_BLOCKS && block_info((uint32_t)((at - heap_base) / BLOCK))->state == BLOCK_FREE) continue;
+            if (bit(start_bits, global) && bit(mark_bits, global)) check_stores(at);
         }
     }
 }
@@ -1333,52 +1586,75 @@ static void restart_the_world(Thread *t) {
     give(&stop_lock);
 }
 
-/* A collection of the whole heap, with the world stopped. A thread that finds one under way waits
- * for it in a safe region and does not collect again: true either way. */
-static bool collect(void) {
+/* A collection with the world stopped, young or full as `need` asks and the old heap's growth
+ * decides (P8). A thread that finds one under way waits for it in a safe region and does not
+ * collect again — unless it needs a full one and none ran meanwhile. */
+static void collect(Need need) {
     Thread *t = current();
-    size_t seen = atomic_load(&collections);
+    size_t seen = atomic_load(&collections), seen_full = atomic_load(&full_collections);
     LYR_GC_ENTER_SAFE();
     take(&collect_lock);
     resume_running(t, SAFE);  /* nobody stops the world while this thread holds the lock */
-    if (atomic_load(&collections) != seen) {
+    if (need == FULL ? atomic_load(&full_collections) != seen_full : atomic_load(&collections) != seen) {
         give(&collect_lock);
-        return true;
+        return;
     }
     take(&registry_lock);
     stop_the_world(t);
     collecting_here = true;
     lock();
     for (Thread *other = threads; other != NULL; other = other->next) give_up_buffers(other);
+#ifdef LYR_GC_VERIFY
+    verify_barriers();
+#endif
 
-    /* a new epoch: no line is live until this collection finds it so */
-    if (++epoch == 0) {
-        for (size_t c = 0; c < chunks_taken; c++) {
-            if (chunks[c].committed) memset(line_marks + c * LINE_BYTES_PER_CHUNK, 0, LINE_BYTES_PER_CHUNK);
-        }
-        epoch = 1;
-    }
-    for (size_t c = 0; c < chunks_taken; c++) {
-        if (chunks[c].committed) memset(mark_bits + c * BIT_BYTES_PER_CHUNK, 0, BIT_BYTES_PER_CHUNK);
-    }
+    size_t floor = live_full > MIN_BUDGET ? live_full : MIN_BUDGET;
+    bool full = need == FULL || (need == PACED && live_full + promoted >= 2 * floor);
     live_bytes = 0;
+    if (full) {
+        /* a new epoch: no line is live until this collection finds it so, no object old */
+        if (++epoch == 0) {
+            for (size_t c = 0; c < chunks_taken; c++) {
+                if (chunks[c].committed) memset(line_marks + c * LINE_BYTES_PER_CHUNK, 0, LINE_BYTES_PER_CHUNK);
+            }
+            epoch = 1;
+        }
+        for (size_t c = 0; c < chunks_taken; c++) {
+            if (chunks[c].committed) memset(mark_bits + c * BIT_BYTES_PER_CHUNK, 0, BIT_BYTES_PER_CHUNK);
+        }
+    } else {
+        /* young: the marks and the epoch stay — the old lines stay live —, and the roots grow by
+         * the stores into old objects and the coroutines that ran */
+        scan_cards();
+    }
     mark_roots(t);
 #ifdef LYR_GC_VERIFY
     verify();
 #endif
+    if (full) clear_cards();
     clear_dead_weaks();
     release_dead_coroutines();
     free_dead_large();
     unsweep_blocks();
+    if (full) {
+        live_full = live_bytes;
+        promoted = 0;
+        atomic_fetch_add(&full_collections, 1);
+    } else {
+        promoted += live_bytes;
+        atomic_fetch_add(&young_collections, 1);
+    }
     atomic_store_explicit(&since_collection, 0, memory_order_relaxed);
-    budget = live_bytes > MIN_BUDGET ? live_bytes : MIN_BUDGET;
+    budget = live_full + promoted > MIN_BUDGET ? live_full + promoted : MIN_BUDGET;
     atomic_fetch_add(&collections, 1);
+#ifdef LYR_GC_VERIFY
+    take_snapshot();
+#endif
     unlock();
     collecting_here = false;
     restart_the_world(t);
     give(&registry_lock);
     give(&collect_lock);
-    return true;
 }
 
 /* --- safepoints and safe regions ------------------------------------------------------------- */
@@ -1550,10 +1826,13 @@ void lyr_gc_init(void) {
         heap_base = base;
         heap_span = span;
         line_marks = tables;
+        lyr_gc_cards = tables + lines;
         start_bits = tables + 2 * lines;
         mark_bits = start_bits + bits;
     }
     if (heap_base == 0) lyr_panic(LYR_RT_OUT_OF_MEMORY, "the system grants no address space for the heap");
+    lyr_gc_heap_base = heap_base;
+    lyr_gc_heap_span = heap_span;
     chunk_count = heap_span / CHUNK;
     chunks = calloc(chunk_count, sizeof(Chunk));
     if (chunks == NULL || register_this_thread() == NULL) {
@@ -1606,9 +1885,16 @@ void lyr_thread_detach(void) {
 /* --- collection -------------------------------------------------------------------------------- */
 
 void lyr_gc_collect(void) {
-    collect();
+    collect(FULL);
     run_callbacks();
 }
+
+void lyr_gc_collect_young(void) {
+    collect(YOUNG);
+    run_callbacks();
+}
+
+size_t lyr_gc_young_collections(void) { return atomic_load(&young_collections); }
 
 size_t lyr_gc_heap_size(void) { return heap_in_use(); }
 

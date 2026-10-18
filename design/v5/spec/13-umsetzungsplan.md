@@ -738,3 +738,36 @@ Nach Aufwand: groß S2, S3, S6; mittel S1, S4, S5, S9; klein S7, S8, S10. Etwa a
   bleibt das Dekrement mit Sprung in einer engen Merge-Schleife. Strip-Mining gezählter Schleifen (die innere
   Grenze `min(last, i + 1024)`, der Poll in einem äußeren Kopf — HotSpots `LoopStripMiningIter`) nähme auch das;
   die Entscheidung fällt mit der Messung aus P13. Die Ratschen halten (`sorting` 1,28× Go, `maps` 1,44×).
+
+### Nachtrag 2026-10-16 — S6 gebaut und gemessen
+
+- **Der Wechsel ist die Barriere des Stacks.** P8 sah eine Liste der Koroutinen vor, die seit der letzten Sammlung
+  liefen. Gebaut ist sie als Karte: `lyr_gc_switch_begin` markiert die Karte der Zeile, auf der das Objekt der
+  verlassenen und der betretenen Koroutine beginnt, und die junge Sammlung liest eine Koroutine von ihrer
+  Anfangszeile aus ganz, ihren Stack mit. Ein Mechanismus statt zweier (CONTRIBUTING Regel 2): die Felder einer
+  Koroutine schreibt `coro.c` ohnehin über die Barriere. Die Kontrolle der Liste blieb grün, solange der Test nur gab
+  und fortsetzte — jedes Fortsetzen und jedes Geben schreibt `resumer_coro` und markiert die Karte; erst die innere
+  Koroutine einer geparkten Kette, die nichts Eigenes schreibt, braucht die Karte des Wechsels. Der Test hat sie jetzt.
+- **Die Stacks takten jung zuerst** (06 A5): was ein Programm an Koroutinen fallen lässt, ist meist jung; voll erst,
+  wenn die junge Sammlung die Stacks nicht unter die Schwelle brachte.
+- **Die Prüfung der Barriere** (`LYR_GC_VERIFY`): eine Abschrift des Heaps nach jeder Sammlung; vor der nächsten ist
+  jede Referenz eines markierten Objekts, die sich seither geändert hat, auf ein junges Objekt zeigt und deren Karte
+  sauber ist, ein Store ohne Barriere — das Programm endet. „Markiert zeigt auf Markiertes" taugt als Prüfung nicht:
+  ein totes Objekt, das ein veraltetes Stackwort am Leben hält, darf auf längst Freigegebenes zeigen.
+- **Das Verhältnis jung zu voll** bleibt P8: jung nach dem Budget aus P7 (so groß wie der alte Heap), voll, wenn der
+  alte Heap sich verdoppelt hat. Gemessen gegen eine junge Generation von einem Viertel und einem Achtel des alten
+  Heaps, voll schon beim Anderthalbfachen: `cache` 30–40 % langsamer, seine RSS unverändert; `lru` und
+  `binarytrees` 30–43 % weniger RSS bei bis zu 27 % mehr Zeit.
+- **Gemessen** (`bench/gc`, für Messpunkt 5 vorbereitet; WSL2, Release-Profil): die Generationen machen `cache`
+  26 % schneller als die vollen Sammlungen allein (12,3 s gegen 16,6 s) und kosten 12 % RSS (3,0 GiB gegen 2,7);
+  `binarytrees` braucht die Hälfte der Zeit Boehms und drei Viertel der Gos (`bench/README.md`).
+- **Zwei Befunde für S9**, gesammelt als offene Punkte:
+  1. *Pausen*: das Budget aus P7 macht die junge Generation so groß wie die alte — bei 1,4 GiB Lebendem pausiert eine
+     junge Sammlung 0,9 s, eine volle 1,4 s (Markieren mit etwa 0,8 GB/s, drei Seitentabellen je Objekt). Das p99 von
+     P12 (unter 10 ms bei 1 GB) braucht eine Obergrenze der jungen Generation und ein schnelleres Markieren
+     (Prefetch; Start- und Markierbit in einem Byte). S9 entscheidet mit den Pausen aus `lyr_gc_stats()`.
+  2. *RSS*: `cache` hält 1,4 GiB Lebendes in 3,0 GiB, Boehm in 1,6, Go in 1,8 — bei jeder Taktung. Es sind die
+     Zeilen: kurzlebige Scratch-Arrays liegen zwischen langlebigen Einträgen in denselben 256-Byte-Zeilen, und eine
+     Zeile mit einem lebenden Byte bleibt belegt; Boehm trennt nach Größenklassen. „Besser als Boehm in RSS" (P12)
+     braucht damit mehr als Taktung — Größenklassen für kleine Objekte (01 nannte sie, P2 nahm Immix' Bump),
+     kleinere Zeilen, oder die Ratsche neu gelesen. Die Entscheidung trifft der Maintainer.

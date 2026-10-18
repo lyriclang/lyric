@@ -1,0 +1,59 @@
+// Measurement point 5, 'lru' (design/v5/spec/13 M11 P12): a least-recently-used cache of 200 000
+// entries — a doubly linked list over a Map — under ten million lookups of keys from a stream
+// twice its size: a hit moves its node to the front, a miss puts a new one there and drops the
+// last. Nearly every step stores a reference into an old node, many of them to a young one.
+// Prints one checksum, the same in every language.
+import std.collections { Map };
+import std.io { println };
+
+class Node { key: int, var value: int, var prev: ?Node, var next: ?Node }
+
+class Lru { map: Map<int, Node>, var head: ?Node, var tail: ?Node }
+
+fn unlink(lru: Lru, node: Node) {
+    if (let prev = node.prev) { prev.next = node.next; } else { lru.head = node.next; }
+    if (let next = node.next) { next.prev = node.prev; } else { lru.tail = node.prev; }
+    node.prev = null;
+    node.next = null;
+}
+
+fn pushFront(lru: Lru, node: Node) {
+    node.next = lru.head;
+    if (let head = lru.head) { head.prev = node; }
+    lru.head = node;
+    if (lru.tail == null) { lru.tail = node; }
+}
+
+fn main(): int {
+    let capacity = 200000;
+    let lru = Lru { map = Map<int, Node>.new(), head = null, tail = null };
+    var x: uint = 88172645463325252;
+    var hits = 0;
+    var total = 0;
+    var i = 0;
+    while (i < 10000000) {
+        x = x ^ (x << 13);
+        x = x ^ (x >> 7);
+        x = x ^ (x << 17);
+        let key = (x % 400000) as int;
+        if (let node = lru.map.get(key)) {
+            hits += 1;
+            total += node.value;
+            unlink(lru, node);
+            pushFront(lru, node);
+            node.value = i;
+        } else {
+            let node = Node { key = key, value = i, prev = null, next = null };
+            lru.map.insert(key, node);
+            pushFront(lru, node);
+            if (lru.map.length() > capacity) {
+                let last = lru.tail!;
+                unlink(lru, last);
+                lru.map.remove(last.key);
+            }
+        }
+        i += 1;
+    }
+    println(f"{lru.map.length()} {hits} {total}");
+    return 0;
+}

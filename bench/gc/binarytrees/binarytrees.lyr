@@ -1,0 +1,38 @@
+// Measurement point 5, 'binarytrees' (design/v5/spec/13 M11 P12; the Benchmarks Game's program,
+// on one thread): allocation throughput — complete binary trees built, walked and dropped at once,
+// deeper and fewer by turns, while one long-lived tree stays throughout. Prints one checksum, the
+// node count of every tree walked, the same in every language.
+import std.io { println };
+
+class Node { left: ?Node, right: ?Node }
+
+fn bottomUp(depth: int): Node {
+    if (depth <= 0) { return Node { left = null, right = null }; }
+    return Node { left = bottomUp(depth - 1), right = bottomUp(depth - 1) };
+}
+
+fn check(node: Node): int {
+    var count = 1;
+    if (let left = node.left) { count += check(left); }
+    if (let right = node.right) { count += check(right); }
+    return count;
+}
+
+fn main(): int {
+    let maxDepth = 18;
+    var total = check(bottomUp(maxDepth + 1));
+    let longLived = bottomUp(maxDepth);
+    var depth = 4;
+    while (depth <= maxDepth) {
+        let iterations = 1 << (maxDepth - depth + 4);
+        var i = 0;
+        while (i < iterations) {
+            total += check(bottomUp(depth));
+            i += 1;
+        }
+        depth += 2;
+    }
+    total += check(longLived);
+    println(f"{total}");
+    return 0;
+}

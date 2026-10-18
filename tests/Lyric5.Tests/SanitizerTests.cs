@@ -54,6 +54,7 @@ public class SanitizerTests
         { "coro_basic", [], 0 },
         { "coro_basic", ["self"], 101 },
         { "coro_gc", [], 0 },
+        { "generations", [], 0 },
         { "coro_pace", [], 0 },
         { "coro_park", [], 0 },
         { "coro_threads", [], 0 },
@@ -81,6 +82,8 @@ public class SanitizerTests
         { "task_main", [], 7 },
         { "coro_panic", [], 0 },
         { "coro_gc", [], 0 },
+        // the cards: stored with relaxed atomics, read and cleared in the pause
+        { "generations", [], 0 },
     };
 
     [Theory]

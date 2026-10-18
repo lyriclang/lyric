@@ -357,7 +357,9 @@ static size_t mapping_bytes(size_t stack_size) { return stack_size + below_bytes
  * starts coroutines and drops them while it keeps a large heap would pile their stacks up between
  * two collections — some four thousand at 64 MiB alive, measured, and in proportion to the heap.
  * So the stacks pace a collection of their own, which takes the dropped ones with it (06 A5): when
- * those in use reach twice what the last one left, and at least STACKS_PACED. */
+ * those in use reach twice what the last one left, and at least STACKS_PACED. A young one first
+ * (13 M11 P8) — what a program drops is mostly what it made since —, a full one when that left
+ * them in use: the dropped ones were old. */
 enum { STACKS_PACED = 1024 };
 static atomic_size_t collect_at = STACKS_PACED;
 
@@ -365,7 +367,10 @@ static void pace_stacks(void) {
     if (atomic_load_explicit(&stacks_in_use, memory_order_relaxed) < atomic_load_explicit(&collect_at, memory_order_relaxed)) {
         return;
     }
-    lyr_gc_collect();
+    lyr_gc_collect_young();
+    if (atomic_load_explicit(&stacks_in_use, memory_order_relaxed) >= atomic_load_explicit(&collect_at, memory_order_relaxed)) {
+        lyr_gc_collect();
+    }
     size_t left = atomic_load_explicit(&stacks_in_use, memory_order_relaxed);
     atomic_store_explicit(&collect_at, left < STACKS_PACED / 2 ? (size_t)STACKS_PACED : left * 2, memory_order_relaxed);
 }
