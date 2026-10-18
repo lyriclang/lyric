@@ -447,8 +447,7 @@ public class CEmitterTests
         Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = result.Stdout.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(line, lines[0]);
-        Assert.StartsWith("collections ", lines[1]);
-        var collections = int.Parse(lines[1]["collections ".Length..]);
+        var (collections, _) = Collections(lines[1]);
         Assert.True(collections >= 5, $"only {collections} collections ran: the graph was not tested against the collector");
     }
 
@@ -458,7 +457,10 @@ public class CEmitterTests
     /// collected, and right only because what it keeps is marked through the maps. The runtime is
     /// built with its check of the maps (<c>LYR_GC_VERIFY</c>): a word of a marked object that the
     /// map does not name and that points at an unmarked object ends the program — so here the bits
-    /// of the bitmaps are tested, which the test above leaves to the layout asserts.
+    /// of the bitmaps are tested, which the test above leaves to the layout asserts. And its check
+    /// of the barrier (P8): a reference of an old object that changed since the last collection to
+    /// a young object, on a line whose card is clean, ends it too — so every store the emitter
+    /// writes is tested against the young collections, of which each graph needs one at least.
     /// </summary>
     [Theory]
     [InlineData("objects_gc", Profile.Debug, "kept 499500 held-999999 held-0 alice")]
@@ -484,9 +486,17 @@ public class CEmitterTests
         Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = result.Stdout.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(line, lines[0]);
-        Assert.StartsWith("collections ", lines[1]);
-        var collections = int.Parse(lines[1]["collections ".Length..]);
+        var (collections, young) = Collections(lines[1]);
         Assert.True(collections >= 5, $"only {collections} collections ran: the graph was not tested against the collector");
+        Assert.True(young >= 1, $"none of the {collections} collections was young: the barrier was not tested");
+    }
+
+    /// <summary>The harness's last line, "collections N young M".</summary>
+    private static (int Collections, int Young) Collections(string line)
+    {
+        var words = line.Split(' ');
+        Assert.True(words.Length == 4 && words[0] == "collections" && words[2] == "young", $"not the harness's line: {line}");
+        return (int.Parse(words[1]), int.Parse(words[3]));
     }
 
     /// <summary>

@@ -192,16 +192,42 @@ void lyr_gc_leave_safe(void);
 #define LYR_GC_LEAVE_SAFE() ((void)0)
 #endif
 
-/* Stores a reference into a slot. A plain store in stage 1; stage 3 records old-to-young stores.
- * Emitted code writes every reference field through it from day one. `object` is the place the
- * emitter holds for the slot and not always an object's start: a struct lies inline in its
- * object, so it may be an interior pointer, and a struct on the stack is no heap address at all.
- * A barrier that needs the object finds it from the slot (a card table does not need it). */
-#define LYR_WRITE_BARRIER(object, slot, value) ((void)(object), (*(slot) = (value)))
+/* The cards of stage 3 (13 M11 P8): a byte per 256-byte line of the heap, set where a reference was
+ * stored — a young collection reads the old objects on those lines for references to young ones.
+ * Unconditional within the heap, with no test of old or young: the emitter does not always hold
+ * the slot's object (below), and a card needs none. A store outside the heap (a struct on a stack,
+ * a static) marks nothing. Under Boehm there are no cards. */
+#ifdef LYR_GC_BOEHM
+static inline void lyr_gc_card(const void *slot) { (void)slot; }
+static inline void lyr_gc_card_span(const void *at, size_t bytes) { (void)at; (void)bytes; }
+#else
+extern uintptr_t lyr_gc_heap_base, lyr_gc_heap_span;
+extern uint8_t *lyr_gc_cards;
+
+static inline void lyr_gc_card(const void *slot) {
+    uintptr_t off = (uintptr_t)slot - lyr_gc_heap_base;
+    if (off < lyr_gc_heap_span) __atomic_store_n(&lyr_gc_cards[off >> 8], (uint8_t)1, __ATOMIC_RELAXED);
+}
+
+static inline void lyr_gc_card_span(const void *at, size_t bytes) {
+    uintptr_t off = (uintptr_t)at - lyr_gc_heap_base;
+    if (bytes == 0 || off >= lyr_gc_heap_span) return;
+    for (uintptr_t line = off >> 8, last = (off + bytes - 1) >> 8; line <= last; line++) {
+        __atomic_store_n(&lyr_gc_cards[line], (uint8_t)1, __ATOMIC_RELAXED);
+    }
+}
+#endif
+
+/* Stores a reference into a slot, and marks the slot's card (stage 3). Emitted code writes every
+ * reference field through it from day one. `object` is the place the emitter holds for the slot
+ * and not always an object's start: a struct lies inline in its object, so it may be an interior
+ * pointer, and a struct on the stack is no heap address at all. The card is the slot's line's. */
+#define LYR_WRITE_BARRIER(object, slot, value) ((void)(object), (*(slot) = (value)), lyr_gc_card(slot))
 
 /* The same for a struct value that holds references, stored whole: every reference word of the
- * value is a reference store. */
-#define LYR_WRITE_BARRIER_VALUE(object, slot, value) ((void)(object), (*(slot) = (value)))
+ * value is a reference store, and the cards of every line it covers are marked. */
+#define LYR_WRITE_BARRIER_VALUE(object, slot, value) \
+    ((void)(object), (*(slot) = (value)), lyr_gc_card_span((slot), sizeof(*(slot))))
 
 /* Strong roots for pointers the collector cannot see — held by C code or a host (11 X6 GcHandle).
  * A root keeps its object alive until it is freed. Drop the handle with it: while the collector is
@@ -253,6 +279,13 @@ size_t lyr_gc_heap_size(void);
 
 /* Number of collections since start. */
 size_t lyr_gc_collections(void);
+
+/* A young collection now (13 M11 P8: from the roots and the dirty cards — a coroutine's among them),
+ * then the callbacks; a full one where the collector has no generations (Boehm). For the pace of
+ * the coroutine stacks (coro.c), tests and measurement. And the young ones among
+ * lyr_gc_collections — none under Boehm. */
+void lyr_gc_collect_young(void);
+size_t lyr_gc_young_collections(void);
 
 /* The allocations the calling thread has made since it started, and their bytes (10 X4: what a
  * benchmark's run allocates). */

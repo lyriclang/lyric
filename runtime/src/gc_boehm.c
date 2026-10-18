@@ -178,6 +178,9 @@ void lyr_register_stack(void *low, void *high) { GC_add_roots(low, high); }
 /* Boehm stops threads with signals: a safe region and a safepoint ask nothing of it. The stack
  * check is the overflow's alone. */
 void lyr_gc_safepoint_slow(void) {}
+
+void lyr_gc_collect_young(void) { lyr_gc_collect(); }
+size_t lyr_gc_young_collections(void) { return 0; }
 void lyr_gc_stack_slow(uintptr_t frame) {
     if (frame < lyr_mutator.stack_limit) lyr_stack_overflow();
 }

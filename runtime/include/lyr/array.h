@@ -8,6 +8,7 @@
 #define LYR_ARRAY_H
 
 #include "lyr/types.h"
+#include "lyr/gc.h"
 
 #include <string.h>  /* memmove, for LYR_SLICE_MOVE */
 
@@ -23,9 +24,10 @@ LyrArr *lyr_arr_repeat(const LyrDesc *desc, const LyrArr *array, int64_t count);
  * view `into`, both `lyr_slice_<T>` of one element type (a pointer into an array and a length,
  * CEmitter) — memmove, so the two may overlap either way: a struct element is copied whole, a
  * reference element as the reference (02 M3). The counts are the library's to check
- * (std.core's `moveElements` callers; `Slice.copyInto` panics with LYR-RT0003). The one place a
- * write barrier for a span of references would go (M11): the collector of this stage needs none. */
-#define LYR_SLICE_MOVE(into, from, count) \
-    memmove((into).ptr, (from).ptr, (size_t)(count) * sizeof(*(into).ptr))
+ * (std.core's `moveElements` callers; `Slice.copyInto` panics with LYR-RT0003). The barrier for a
+ * span (13 M11 P8): the cards of the lines the moved elements now cover. */
+#define LYR_SLICE_MOVE(into, from, count)                                                 \
+    (memmove((into).ptr, (from).ptr, (size_t)(count) * sizeof(*(into).ptr)),             \
+     lyr_gc_card_span((into).ptr, (size_t)(count) * sizeof(*(into).ptr)))
 
 #endif

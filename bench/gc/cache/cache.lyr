@@ -1,0 +1,48 @@
+// Measurement point 5, 'cache' (design/v5/spec/13 M11 P12): a gibibyte alive — four million
+// entries in a Map, each an object with an array of twenty-four ints — and over it a steady stream
+// of short-lived arrays and of entries replaced, every replacement an old slot of the map made to
+// point at a young entry: what the generations cost and save — the pauses, the RSS, the barrier.
+// Prints one checksum, the same in every language.
+import std.collections { Map };
+import std.io { println };
+
+class Entry { id: int, data: int[] }
+
+fn entry(id: int, seed: int): Entry {
+    let data = [0] * 24;
+    var j = 0;
+    while (j < 24) {
+        data[j] = seed + j;
+        j += 1;
+    }
+    return Entry { id = id, data = data };
+}
+
+fn main(): int {
+    let entries = 4000000;
+    let cache = Map<int, Entry>.new();
+    var i = 0;
+    while (i < entries) {
+        cache.insert(i, entry(i, i));
+        i += 1;
+    }
+    var x: uint = 88172645463325252;
+    var check = 0;
+    var op = 0;
+    while (op < 8000000) {
+        x = x ^ (x << 13);
+        x = x ^ (x >> 7);
+        x = x ^ (x << 17);
+        let key = (x % 4000000) as int;
+        let scratch = [op] * 8;
+        check = (check + scratch[op % 8] + key) % 1000000007;
+        if (op % 2 == 0) {
+            cache.insert(key, entry(key, op));
+        } else if (let e = cache.get(key)) {
+            check = (check + e.id + e.data[op % 24]) % 1000000007;
+        }
+        op += 1;
+    }
+    println(f"{cache.length()} {check}");
+    return 0;
+}

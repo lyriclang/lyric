@@ -27,7 +27,7 @@ Bump-Allokation inline.
 | Wurzeln | **Stack konservativ** (Haupt- und jeder Koroutinen-Stack, wortweise, Innenzeiger zählen), **Heap präzise** über Typdeskriptoren | kein Shadow-Stack (5–10 % Prolog), kein Stack-Map-Problem; Präzedenz Ruby ≥2.7, JavaScriptCore |
 | Bewegen | **nie** — die eine Tür, die zugeht | konservative Wurzeln, C-Innenzeiger und FFI verlangen sonst Pinning überall; „Zeiger sind stabil" macht jede FFI-Regel trivial |
 | Heap-Organisation | **Immix-Mark-Region**: 32-KB-Blöcke, 256-B-Zeilen, Größenklassen, Large-Object-Space; Bump-Allokation in Zeilen; Sweep faul je Zeile | Bump-Geschwindigkeit ohne Bewegen; Fragmentierung über Zeilenrecycling |
-| Generational | **ja, Stufe 3, über Sticky-Mark-Bits** (kein Kopieren; Mark-Bits bleiben stehen, junger Zyklus markiert ab geänderten alten Objekten) | verträgt sich mit nicht-bewegend |
+| Generational | **ja, Stufe 3, über Sticky-Mark-Bits** (kein Kopieren; Mark-Bits bleiben stehen, junger Zyklus markiert ab geänderten alten Objekten) *(gebaut M11 S6: die Karte je Zeile, 13 M11 P8)* | verträgt sich mit nicht-bewegend |
 | Nebenläufig | **Stufe 4** (Go-Hybrid-Barrier, paralleles Sweeping), Ziel Pausen im ms-Bereich; **Minor nach 5.0** | dieselbe Barrier-Stelle wie Stufe 3, keine Backend-Änderung |
 | Finalizer | **nein** (klassisch: Wiederbelebung, Extra-Zyklus, undefinierte Reihenfolge) | Java deprecated, Go rät ab |
 | Weak References | **ja**, mit **Rückruf nach dem Tod** (Java-`Cleaner`-Form: die Aktion sieht nur den rohen Handle, nie das Objekt) | das Netz für vergessene FFI-Handles; gratis im Tracing-GC |
@@ -46,7 +46,7 @@ Perceus/ORC/ARC (siehe Refcount).
 | 0 | **Runtime-Vertrag**: `lyr_alloc(desc, size)`; Typdeskriptor (Größe, Referenzfeld-Bitmap, VTable-Anker); `LYR_WRITE_BARRIER(obj, field, val)`; `LYR_SAFEPOINT()`; Stack-Registrierung (Thread- und Koroutinen-Stacks); `lyr_pin`/`lyr_unpin` als No-Op-Platzhalter der FFI-Regel; Weak-Handles mit Rückruf | Barrier-Makro, Poll-Makro, Deskriptor je Allokation — **ab Tag eins emittiert** |
 | 1 | Boehm dahinter; Barrier und Poll leer | — |
 | 2 | eigener GC: Immix-Heap, präzises Marking, konservativer Scan aller registrierten Stacks, Stop-the-World *(gebaut M11 S1–S4, Vorgabe seit M11 S5; Boehm bleibt als Profilfeld `gc = "boehm"`)* | Bump-Fast-Path inline (~5 Instruktionen), Slow-Path-Aufruf |
-| 3 | Sticky-Mark-Bits generational; Barrier wird echt (Remembered-Set) | Barrier-Makro bekommt Körper |
+| 3 | Sticky-Mark-Bits generational; Barrier wird echt (Remembered-Set) *(gebaut M11 S6: die Barriere setzt das Kartenbyte der Zeile des Slots — Karten statt Remembered-Set —, ein Koroutinenwechsel die Karte der Koroutine)* | Barrier-Makro bekommt Körper |
 | 4 | nebenläufiges Marking, paralleles Sweeping | Barrier-Körper ändert sich, Polls tragen Phasenwechsel |
 
 **5.0 liefert Stufe 3.** Stufe 4 ist ein Minor.
