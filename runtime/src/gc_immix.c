@@ -128,6 +128,22 @@ static bool os_commit(void *at, size_t bytes) {
 #endif
 }
 
+/* Memory the heap holds and does not use, given back to the system (P7, S8): its pages leave the
+ * process's resident set, the address space stays. Windows decommits, and the memory is committed
+ * again before it is handed out (os_commit, which commits what is committed already at no cost);
+ * Linux drops the pages, macOS maps fresh ones over them. What it holds afterwards is zeroed when
+ * it is handed out again, as any reused memory is. */
+static void os_discard(void *at, size_t bytes) {
+#if defined(_WIN32)
+    VirtualFree(at, bytes, MEM_DECOMMIT);
+#elif defined(__APPLE__)
+    /* Darwin's advice frees lazily and the resident set keeps the pages: mapped over, they go now */
+    mmap(at, bytes, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
+#else
+    madvise(at, bytes, MADV_DONTNEED);
+#endif
+}
+
 /* A reservation aligned to `align` (a power of two): reserved larger, the rest given back where
  * the system lets it (POSIX), or kept (Windows, which releases a reservation only whole). */
 static uintptr_t reserve_aligned(size_t bytes, size_t align) {
@@ -153,13 +169,15 @@ typedef enum BlockState { BLOCK_FREE, BLOCK_IN_USE, BLOCK_FULL, BLOCK_RECYCLABLE
 
 typedef struct Block {
     uint8_t state;
-    uint8_t fresh;   /* never handed out since it was committed: its memory is zero already */
+    uint8_t fresh;      /* never handed out since it was committed: its memory is zero already */
+    uint8_t discarded;  /* free, its memory given back (S8): committed again when it is taken */
 } Block;
 
 typedef struct Chunk {
     uint8_t kind;
     uint8_t committed;
     uint8_t used;           /* taken once: its memory is no longer the zero the system committed */
+    uint8_t discarded;      /* unused or all free, its memory given back (S8): committed again when taken */
     Block *blocks;          /* CHUNK_BLOCKS */
     uint16_t *pages;        /* CHUNK_LARGE: per page 0 when free, else 1 + the page its object starts on */
     uint32_t fresh_from;    /* CHUNK_LARGE: the pages from here on were never handed out */
@@ -259,6 +277,14 @@ static bool commit_chunk(size_t c) {
     return true;
 }
 
+/* Under the lock: chunk `c`'s memory committed again where it was given back (S8). */
+static bool recommit(size_t c) {
+    if (!chunks[c].discarded) return true;
+    if (!os_commit((void *)(heap_base + c * CHUNK), CHUNK)) return false;
+    chunks[c].discarded = 0;
+    return true;
+}
+
 /* Under the lock: a chunk of `kind`, committed; -1 when the reservation is used up or the system
  * refuses the memory. */
 static ptrdiff_t take_chunk(ChunkKind kind) {
@@ -273,6 +299,7 @@ static ptrdiff_t take_chunk(ChunkKind kind) {
     /* a chunk a huge object held and left is taken again: what it hands out is zeroed, not fresh */
     uint8_t fresh = !chunk->used;
     chunk->used = 1;
+    if (!recommit(c)) return -1;
     if (kind == CHUNK_BLOCKS && chunk->blocks == NULL) {
         chunk->blocks = calloc(BLOCKS_PER_CHUNK, sizeof(Block));
         if (chunk->blocks == NULL) return -1;
@@ -450,6 +477,14 @@ static uint32_t take_block(bool small) {
         }
         if (block == NO_BLOCK && free_blocks.count > 0) {
             block = free_blocks.items[--free_blocks.count];
+            Block *info = block_info(block);
+            if (info->discarded) {
+                if (!os_commit((void *)block_address(block), BLOCK)) {
+                    free_blocks.count++;
+                    break;
+                }
+                info->discarded = 0;
+            }
             bytes_in_use += BLOCK;
         }
         if (block == NO_BLOCK && within_limit(BLOCK)) {
@@ -670,6 +705,7 @@ static uintptr_t take_pages(size_t pages, bool *fresh) {
         for (size_t c = 0; c < chunks_taken; c++) {
             Chunk *chunk = &chunks[c];
             if (chunk->kind != CHUNK_LARGE || chunk->free_pages < pages) continue;
+            if (!recommit(c)) return 0;
             size_t run = 0;
             for (size_t p = 0; p < PAGES_PER_CHUNK; p++) {
                 run = chunk->pages[p] == 0 ? run + 1 : 0;
@@ -699,7 +735,7 @@ static uintptr_t take_huge(size_t count, size_t bytes, bool *fresh) {
         uintptr_t start = heap_base + first * CHUNK;
         *fresh = true;
         for (size_t d = first; d <= c; d++) {
-            if (!commit_chunk(d)) return 0;
+            if (!commit_chunk(d) || !recommit(d)) return 0;
             if (chunks[d].used) *fresh = false;
             chunks[d].used = 1;
             chunks[d].kind = CHUNK_HUGE;
@@ -1375,10 +1411,14 @@ LYR_NO_SANITIZE static void take_snapshot(void) {
         snapshot_chunks = snapshot != NULL ? chunks_taken : 0;
     }
     for (size_t c = 0; c < snapshot_chunks; c++) {
-        if (!chunks[c].committed || chunks[c].kind == CHUNK_UNUSED) continue;
-        const uintptr_t *from = (const uintptr_t *)(heap_base + c * CHUNK);
-        uintptr_t *into = snapshot + c * (CHUNK / sizeof(uintptr_t));
-        for (size_t w = 0; w < CHUNK / sizeof(uintptr_t); w++) into[w] = from[w];
+        if (!chunks[c].committed || chunks[c].kind == CHUNK_UNUSED || chunks[c].discarded) continue;
+        for (size_t b = 0; b < BLOCKS_PER_CHUNK; b++) {
+            /* a block given back is no memory to read on Windows */
+            if (chunks[c].kind == CHUNK_BLOCKS && chunks[c].blocks[b].discarded) continue;
+            const uintptr_t *from = (const uintptr_t *)(heap_base + c * CHUNK + b * BLOCK);
+            uintptr_t *into = snapshot + (c * CHUNK + b * BLOCK) / sizeof(uintptr_t);
+            for (size_t w = 0; w < BLOCK / sizeof(uintptr_t); w++) into[w] = from[w];
+        }
     }
 }
 
@@ -1516,6 +1556,11 @@ LYR_NO_SANITIZE static void free_dead_large(void) {
                 }
                 p = end;
             }
+            /* a chunk of large objects left empty goes back whole: one call, however many died */
+            if (chunk->free_pages == PAGES_PER_CHUNK && !chunk->discarded && chunk->fresh_from > 0) {
+                os_discard((void *)base, CHUNK);
+                chunk->discarded = 1;
+            }
         } else if (chunk->kind == CHUNK_HUGE && chunk->huge == base && !bit(mark_bits, granule_of(base))) {
             clear_bit(start_bits, granule_of(base));
             POISON(base, chunk->huge_bytes);
@@ -1524,9 +1569,42 @@ LYR_NO_SANITIZE static void free_dead_large(void) {
             for (size_t d = c; d < c + count; d++) {
                 chunks[d].kind = CHUNK_UNUSED;
                 chunks[d].huge = 0;
+                chunks[d].discarded = 1;
             }
+            os_discard((void *)base, count * CHUNK);
             chunks[c].huge_bytes = 0;
         }
+    }
+}
+
+/* After a full collection, with the world running again (P7, S8): the blocks no allocator swept
+ * yet swept now, so that every free one is known; the free ones beyond what the next cycle
+ * allocates — the budget — given back to the system, the highest first, in runs; and the free
+ * stack rebuilt with the lowest on top, so that allocation stays low and what was given back is
+ * taken last. Under the heap's lock, outside the pause: a thread that needs a block meanwhile
+ * waits for it, the others run. */
+static void give_back_blocks(void) {
+    for (uint32_t block; (block = sweep_one()) != NO_BLOCK;) {
+        if (block_info(block)->state == BLOCK_RECYCLABLE && !push_block(&recyclable_blocks, block)) break;
+    }
+    size_t keep = budget / BLOCK, kept = 0;
+    size_t total = chunks_taken * (size_t)BLOCKS_PER_CHUNK, run_start = 0, run_length = 0;
+    for (size_t block = 0; block <= total; block++) {
+        Block *info = block < total && chunks[block / BLOCKS_PER_CHUNK].kind == CHUNK_BLOCKS ? block_info((uint32_t)block) : NULL;
+        bool give = info != NULL && info->state == BLOCK_FREE && !info->discarded && kept++ >= keep;
+        if (give && run_length > 0 && run_start + run_length == block) {
+            run_length++;
+        } else {
+            if (run_length > 0) os_discard((void *)block_address((uint32_t)run_start), run_length * BLOCK);
+            run_start = block;
+            run_length = give ? 1 : 0;
+        }
+        if (give) info->discarded = 1;
+    }
+    free_blocks.count = 0;
+    for (size_t block = total; block-- > 0;) {
+        if (chunks[block / BLOCKS_PER_CHUNK].kind != CHUNK_BLOCKS) continue;
+        if (block_info((uint32_t)block)->state == BLOCK_FREE && !push_block(&free_blocks, (uint32_t)block)) break;
     }
 }
 
@@ -1653,6 +1731,11 @@ static void collect(Need need) {
     unlock();
     collecting_here = false;
     restart_the_world(t);
+    if (full) {
+        lock();
+        give_back_blocks();
+        unlock();
+    }
     give(&registry_lock);
     give(&collect_lock);
 }
