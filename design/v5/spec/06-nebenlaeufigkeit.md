@@ -185,7 +185,7 @@ Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert 
 | M6-20 | `Thread.spawn` gibt den **Task-Handle** seines ersten Tasks; „join“ ist `await()`. Endet der erste Task, **bricht der Thread ab, was auf ihm noch lebt, und läuft, bis alle geendet haben** — `defer` laufen, Schlösser werden frei. `main` bleibt nach T6 | N1 G2, N7 P1 |
 | M6-21 | **Panik im Rumpf eines Schlosses**: das Schloss wird frei und ist vergiftet; jeder weitere `lock`/`read`/`write` paniert mit `LYR-RT0019` und nennt die erste Panik. Ein `Once` in dieser Lage ist ebenfalls vergiftet | N1 G4, N5 K6 |
 | M6-22 | Wirft der Rumpf eines `Once`, geht der Fehler an diesen Aufrufer, und der nächste `run` versucht es neu | N5 K6 |
-| M6-23 | `Atomic<T>` trägt `int` und `bool`. **Referenzen (`Atomic<Klasse>`) kommen mit M11** — ein atomarer Referenz-Store braucht die Schreibbarriere des eigenen GC | N1 G4, N5 K6 |
+| M6-23 | `Atomic<T>` trägt `int` und `bool`. **Referenzen (`Atomic<Klasse>`) kommen mit M11** — ein atomarer Referenz-Store braucht die Schreibbarriere des eigenen GC *(gebaut M11 S7: jede Klasse und jedes Optional einer, `compareAndSet` nach Identität, nach jedem Schreiben die Karte; Spec 10 §8)* | N1 G4, N5 K6 |
 | M6-24 | Der Rumpf von `lock` und `write` bekommt den **Ort** (`m.lock { &n => n += 1; }`, 03 T12); ein Guard-Typ entfällt. `read` gibt den Wert | N1 G4 |
 | M6-27 | `pool.spawn` und `scope.spawn` nach `close()` sind eine Panik | N1 G2 |
 | M6-28 | Der Signal-Kanal hat einen festen Puffer von 16; die Zustellung blockiert nie, ein voller Puffer verliert das Signal für diesen Kanal | N5 K5 |

@@ -8953,12 +8953,26 @@ public sealed class TypeChecker
     private bool Satisfies(LyrType arg, TypeSymbol iface, LyrType wanted)
     {
         StackGuard.Check("checking a constraint");
+        if (IsAtomicReference(arg, iface)) return true;
         // An associated type a constraint fixes is its answer in the instance asked for too (05 §8
         // rule 5): 'FromIterator<I.Item>' under 'I :: [Iterator<Item = T>]' is 'FromIterator<T>'.
         if (MentionsAssoc(wanted) && ReduceFixed(wanted) is var reduced && !LyrType.Equal(reduced, wanted))
             wanted = reduced;
         return SatisfiesOnce(arg, iface, wanted);
     }
+
+    /// <summary>
+    /// std.sync's <c>AtomicValue</c> (spec 10 §8 rule 1; design 13 M11 P10): besides <c>int</c> and
+    /// <c>bool</c>, which conform through their blocks, every class and every optional of one — a
+    /// reference is one word the machine reads and writes in one step, and no block names every
+    /// class. Any other optional is a flag beside a value: two words.
+    /// </summary>
+    private static bool IsAtomicReference(LyrType arg, TypeSymbol iface) =>
+        iface.Home is { FullName: "std.sync" } && iface.Name == "AtomicValue"
+        && IsClassReference(arg is Optional optional ? optional.Inner : arg);
+
+    private static bool IsClassReference(LyrType type) =>
+        type is NamedRef { Symbol.Kind: TypeSymbolKind.Class } or GenericInstance { Definition.Kind: TypeSymbolKind.Class };
 
     private bool SatisfiesOnce(LyrType arg, TypeSymbol iface, LyrType wanted) => arg switch
     {
