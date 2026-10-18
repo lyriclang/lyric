@@ -185,4 +185,9 @@ void lyr_gc_remove_thread_stack(LyrStackCtx *own);
 void lyr_gc_switch_begin(void *gc_handle, const LyrStackCtx *to); /* no world stop until the end; the bottom moves */
 void lyr_gc_switch_end(void);                    /* on the stack that runs now: the world may stop again */
 
+/* gc_stats.c — a pause the collector made (from the stop's request to the restart), and what its
+ * collector found alive (13 M11 P12). */
+void lyr_gc_record_pause(uint64_t ns, int young);
+size_t lyr_gc_live_bytes(void);
+
 #endif

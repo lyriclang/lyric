@@ -6,6 +6,10 @@
 import std.collections { Map };
 import std.io { println };
 
+/// The collector's numbers (the runtime's, 13 M11 P12): 0 the collections, 4 the longest pause and
+/// 6 the 99th percentile, in nanoseconds — printed on a line of their own after the checksum.
+extern "C" fn lyr_gc_stat(which: int): int;
+
 class Node { key: int, var value: int, var prev: ?Node, var next: ?Node }
 
 class Lru { map: Map<int, Node>, var head: ?Node, var tail: ?Node }
@@ -55,5 +59,6 @@ fn main(): int {
         i += 1;
     }
     println(f"{lru.map.length()} {hits} {total}");
+    println(f"gc {lyr_gc_stat(0)} {lyr_gc_stat(6)} {lyr_gc_stat(4)}");
     return 0;
 }

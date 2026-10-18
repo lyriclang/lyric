@@ -789,3 +789,44 @@ Nach Aufwand: groß S2, S3, S6; mittel S1, S4, S5, S9; klein S7, S8, S10. Etwa a
   belegt, nicht frei. Und ein Programm, dessen Altes stirbt und das danach wenig befördert, sammelt nie wieder
   voll: der alte Heap wächst nicht, P8 löst keine volle Sammlung aus, sein Toter bleibt resident. Ein Auslöser
   über die Zeit (Gos Scavenger arbeitet so) ist eine Tür; die Entscheidung mit S9s Messung.
+
+### Nachtrag 2026-10-16 — S9 gemessen: Messpunkt 5
+
+- **Die Zahlen** (`lyr_gc_stats()`, `runtime/src/gc_stats.c`, intern bis M14): jede Pause vom Stopp-Wunsch bis
+  zum Neustart, für beide Sammler — Boehm über `GC_EVENT_PRE_STOP_WORLD` und `POST_START_WORLD`; jede Pause wird
+  behalten (acht Byte), die Perzentile sind genau. Die Programme lesen sie über `extern "C" fn lyr_gc_stat`, der
+  Go-Zwilling aus `runtime/metrics`; `run.py` vergleicht nur die Zeile der Prüfsumme.
+- **Die Lesart von P12**: „p99 … bei 1 GB lebendem Heap" zählt den stetigen Teil — `cache` beginnt die Zählung nach
+  dem Aufbau neu (`lyr_gc_stat(9)`; Go: die Differenz der Histogramme). Über den ganzen Lauf bestimmt die Aufbauphase
+  das p99: der Heap verdoppelt sich von 4 MiB auf 1,4 GiB neunmal, jede Verdopplung eine volle Sammlung.
+- **Die junge Generation ist begrenzt** (8 MiB, `YOUNG_MAX`): das Budget aus P7 machte sie so groß wie die alte, und
+  eine junge Sammlung über 1,4 GiB pausierte 0,9 s. Für die vollen bleibt P8: voll, wenn der alte Heap sich verdoppelt
+  hat. 16 MiB gaben junge Pausen von 23–36 ms, 8 MiB vor den Schritten unten 14–19.
+- **Das Markieren**: (1) `mark_object` liest den Kopf nicht mehr — er wird beim Abarbeiten gelesen, durch einen Ring
+  von acht Objekten vorab geholt (Boehms Prefetch-Puffer); (2) ein Wort auf einen markierten Anfang beantwortet das
+  Markierbit; (3) eine junge Sammlung überspringt Wörter in Blöcke und Chunks, die seit der letzten Sammlung nichts
+  ausgegeben haben — eine kleine Tabelle statt des Markierbit-Felds, das bei 1,4 GiB 11 MiB groß ist; (4) der
+  Kartenscan überspringt Zeilen ohne altes Objekt (ihre Zeilenmarke ist nicht die Epoche). Junge Pausen in `cache`:
+  p50 7 ms, p90 9 ms. Start- und Markierbits nebeneinander (ein Cache-Zugriff statt zweier) machten das volle
+  Markieren 10 % schneller und die jungen Sammlungen langsamer — die Startbits eines Blocks lagen nicht mehr dicht —
+  und wurden zurückgenommen.
+- **Gemessen** (WSL2, Release-Profil, das Minimum von drei Läufen, die Maschine ruhig; die Pausen des schnellsten):
+
+  | bench | twin | time | RSS | collections | pause p99 | pause max |
+  |---|---|---|---|---|---|---|
+  | binarytrees | Lyric | 0.933 s | 60 MiB | 259 | 6.42 ms | 10.94 ms |
+  | binarytrees | Lyric (Boehm) | 1.849 s | 62 MiB | 121 | 9.89 ms | 11.79 ms |
+  | binarytrees | Go | 1.122 s | 38 MiB | 133 | 0.20 ms | 0.23 ms |
+  | cache | Lyric | 12.582 s | 2454 MiB | 240 | 11.01 ms | 881.17 ms |
+  | cache | Lyric (Boehm) | 15.839 s | 1571 MiB | 7 | 718.75 ms | 722.35 ms |
+  | cache | Go | 5.962 s | 1853 MiB | 1 | 12.58 ms | 12.58 ms |
+  | lru | Lyric | 3.592 s | 114 MiB | 32 | 14.30 ms | 15.24 ms |
+  | lru | Lyric (Boehm) | 3.454 s | 41 MiB | 21 | 19.39 ms | 24.34 ms |
+  | lru | Go | 1.501 s | 37 MiB | 15 | 1.31 ms | 1.31 ms |
+
+- **Die Ratsche** (`run.py --ratchet`) hält für `binarytrees` (Zeit, RSS, längste Pause besser als Boehm) und
+  verfehlt: `cache` in RSS (die Zeilen, S6-Nachtrag), längster Pause (881 gegen 722 ms) und p99 (11,0 gegen 10 ms);
+  `lru` in Zeit (+4 %) und RSS. **S9b ist damit verlangt**: P12 band das parallele Markieren an Boehms parallelen
+  Markierer — unser Boehm-Build markiert auf einem Faden (kein `PARALLEL_MARK`; bdwgc setzt es nur über configure
+  oder CMake), und die längste Pause verliert schon gegen ihn. S9b folgt als eigener Schritt; RSS und die Lesart der
+  Ratsche entscheidet der Maintainer (die offenen Punkte).

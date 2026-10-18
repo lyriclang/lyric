@@ -236,3 +236,24 @@ line with one live byte stays taken — whatever the pacing (design 13, the S6 n
 pauses reach 1.4 s for a full collection and 0.9 s for a young one, the young generation as large as the
 old (the same note). `lru` stores into old nodes nearly everywhere: its young collections read almost
 every line of the old heap through the cards and pause as long as a full one (about 40 ms at 64 MiB).
+
+Measured 2026-10-16 with S9 (the young generation bounded, the marking's changes — design 13, the S9 note):
+the numbers from `lyr_gc_stat` and Go's `runtime/metrics`, for `cache` its steady phase only; the machine
+quiet; the minimum of 3 runs, the pauses of the fastest:
+
+| bench | twin | time | RSS | collections | pause p99 | pause max |
+|---|---|---|---|---|---|---|
+| binarytrees | Lyric | 0.933 s | 60 MiB | 259 | 6.42 ms | 10.94 ms |
+| binarytrees | Lyric (Boehm) | 1.849 s | 62 MiB | 121 | 9.89 ms | 11.79 ms |
+| binarytrees | Go | 1.122 s | 38 MiB | 133 | 0.20 ms | 0.23 ms |
+| cache | Lyric | 12.582 s | 2454 MiB | 240 | 11.01 ms | 881.17 ms |
+| cache | Lyric (Boehm) | 15.839 s | 1571 MiB | 7 | 718.75 ms | 722.35 ms |
+| cache | Go | 5.962 s | 1853 MiB | 1 | 12.58 ms | 12.58 ms |
+| lru | Lyric | 3.592 s | 114 MiB | 32 | 14.30 ms | 15.24 ms |
+| lru | Lyric (Boehm) | 3.454 s | 41 MiB | 21 | 19.39 ms | 24.34 ms |
+| lru | Go | 1.501 s | 37 MiB | 15 | 1.31 ms | 1.31 ms |
+
+    python3 bench/gc/run.py --ratchet
+
+fails today on `cache` (RSS, the longest pause, the 99th percentile at 11 ms) and `lru` (time by 4 %, RSS):
+the parallel mark (S9b) follows; RSS waits on the maintainer's decision (design 13, the S6 note).
