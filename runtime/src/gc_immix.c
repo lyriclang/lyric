@@ -46,6 +46,7 @@
 #  define UNPOISON(at, bytes) ((void)(at), (void)(bytes))
 #endif
 
+#include <errno.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -1451,16 +1452,36 @@ static LYR_NOINLINE LYR_NO_SANITIZE void save_entry_frames(Thread *t, uintptr_t 
     (void)anchor;
 }
 
+/* Entering and leaving keep errno and Windows' last error as they were: the caller reads what its
+ * system call left after the region — a thread-local read clears the last error on Windows, and a
+ * wait for a restart takes locks. (A poller's wait that timed out read as failed with error 0
+ * there once the own collector was the default.) */
 LYR_NOINLINE void lyr_gc_enter_safe(void *marker) {
     __builtin_unwind_init();
+    int kept_errno = errno;
+#ifdef _WIN32
+    DWORD kept_error = GetLastError();
+#endif
     Thread *t = self;
     if (t != NULL && !collecting_here) save_entry_frames(t, (uintptr_t)marker);
+#ifdef _WIN32
+    SetLastError(kept_error);
+#endif
+    errno = kept_errno;
     __asm__ volatile("" ::: "memory");
 }
 
 void lyr_gc_leave_safe(void) {
+    int kept_errno = errno;
+#ifdef _WIN32
+    DWORD kept_error = GetLastError();
+#endif
     Thread *t = self;
     if (t != NULL && !collecting_here) resume_running(t, SAFE);
+#ifdef _WIN32
+    SetLastError(kept_error);
+#endif
+    errno = kept_errno;
 }
 
 /* --- start ------------------------------------------------------------------------------------- */

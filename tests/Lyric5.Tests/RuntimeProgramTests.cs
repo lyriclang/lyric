@@ -29,6 +29,7 @@ public class RuntimeProgramTests
             data.Add("coro_pace", profile, 0, "coro pace ok\n", []);
             data.Add("coro_park", profile, 0, "coro park ok\n", []);
             data.Add("poll_basic", profile, 0, "poll ok\n", []);
+            data.Add("safe_errors", profile, 0, "errors kept\n", []);
             data.Add("task_main", profile, 7, "task ok\n", []);
             data.Add("coro_panic", profile, 0, "coro panic ok\n", []);
             data.Add("coro_threads", profile, 0, "coro threads ok\n", []);
