@@ -28,6 +28,7 @@ public class RuntimeProgramTests
             data.Add("coro_gc", profile, 0, "coro gc ok\n", []);
             data.Add("generations", profile, 0, "generations ok\n", []);
             data.Add("reuse_zeroed", profile, 0, "reuse ok\n", []);
+            data.Add("memory_return", profile, 0, "memory ok\n", []);
             data.Add("coro_pace", profile, 0, "coro pace ok\n", []);
             data.Add("coro_park", profile, 0, "coro park ok\n", []);
             data.Add("poll_basic", profile, 0, "poll ok\n", []);

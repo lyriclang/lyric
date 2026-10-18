@@ -771,3 +771,21 @@ Nach Aufwand: groß S2, S3, S6; mittel S1, S4, S5, S9; klein S7, S8, S10. Etwa a
      Zeile mit einem lebenden Byte bleibt belegt; Boehm trennt nach Größenklassen. „Besser als Boehm in RSS" (P12)
      braucht damit mehr als Taktung — Größenklassen für kleine Objekte (01 nannte sie, P2 nahm Immix' Bump),
      kleinere Zeilen, oder die Ratsche neu gelesen. Die Entscheidung trifft der Maintainer.
+
+### Nachtrag 2026-10-16 — S8 gebaut: Speicher zurück
+
+- **Wann**: nach jeder vollen Sammlung, wenn die Welt wieder läuft, unter der Sperre des Heaps — keine Arbeit
+  in der Pause (P7). Der sammelnde Thread kehrt die Blöcke, die noch kein Allokator angesehen hat, damit jeder
+  freie bekannt ist; die freien über dem Budget des nächsten Zyklus gehen an das System, die höchsten zuerst,
+  in Läufen; der Stapel der freien Blöcke wird neu gebaut, die niedrigsten oben — der Heap bleibt unten, was
+  zurückging, wird zuletzt genommen. Große Objekte schon in der Pause: ein Chunk großer Objekte, der leer wurde,
+  und die Chunks eines riesigen Objekts mit einem Aufruf je Chunk-Lauf.
+- **Wie**: Linux `madvise(MADV_DONTNEED)`; Windows `MEM_DECOMMIT` und vor dem nächsten Ausgeben wieder
+  `MEM_COMMIT`; macOS frische Seiten mit `MAP_FIXED` darüber — Darwins Hinweise geben träge frei, und das
+  Resident-Set behielte die Seiten. Was zurückging, wird beim Ausgeben genullt wie jeder wiederverwendete Speicher.
+- **Gemessen**: ein Programm, das 512 MiB aufbaut (kleine Objekte, große, zwei riesige) und loslässt — 601 MiB
+  resident, nach zwei vollen Sammlungen 17 MiB (`runtime/tests/memory_return.c`). Ohne die Rückgabe: 601.
+- **Was es nicht löst**: die RSS von `cache` (Zeilenfragmentierung, der S6-Nachtrag) — dort ist der Speicher
+  belegt, nicht frei. Und ein Programm, dessen Altes stirbt und das danach wenig befördert, sammelt nie wieder
+  voll: der alte Heap wächst nicht, P8 löst keine volle Sammlung aus, sein Toter bleibt resident. Ein Auslöser
+  über die Zeit (Gos Scavenger arbeitet so) ist eine Tür; die Entscheidung mit S9s Messung.
