@@ -7,7 +7,7 @@ namespace Lyric5.Build;
 /// <c>null</c> where it sets none — and, for a profile of the manifest's own, the one it inherits
 /// from.</summary>
 public sealed record ProfileSpec(string Name, string? Inherits, int? Opt, bool? DebugInfo, bool? Lto,
-    bool? DenyWarnings, bool? OverflowChecks, bool? FastMath, int Line);
+    bool? DenyWarnings, bool? OverflowChecks, bool? FastMath, Collector? Gc, int Line);
 
 /// <summary>
 /// The profiles of a program (design/v5/spec/11 W2 P3): the four built in, changed by the root
@@ -17,7 +17,7 @@ public sealed record ProfileSpec(string Name, string? Inherits, int? Opt, bool? 
 public static partial class Profiles
 {
     /// <summary>The fields a profile table may set.</summary>
-    public static readonly string[] Fields = ["opt", "debugInfo", "lto", "denyWarnings", "overflowChecks", "fastMath"];
+    public static readonly string[] Fields = ["opt", "debugInfo", "lto", "denyWarnings", "overflowChecks", "fastMath", "gc"];
 
     /// <summary>The profile named <paramref name="name"/>: built in, or the manifest's.</summary>
     /// <exception cref="ArgumentException">No profile has that name.</exception>
@@ -39,6 +39,7 @@ public static partial class Profiles
             DenyWarnings = spec.DenyWarnings ?? over.DenyWarnings,
             OverflowChecks = spec.OverflowChecks ?? over.OverflowChecks,
             FastMath = spec.FastMath ?? over.FastMath,
+            Gc = spec.Gc ?? over.Gc,
         };
     }
 
@@ -80,6 +81,13 @@ public static partial class Profiles
                     ? b
                     : throw new ManifestException("LYR-PKG0002", file, table.Line, 1, $"'{key}' of [profile.{name}] is true or false");
             }
+            Collector? gc = null;
+            if (table.TryGet("gc", out var collector))
+            {
+                gc = collector is string named ? Collectors.Parse(named) : null;
+                if (gc is null)
+                    throw new ManifestException("LYR-PKG0002", file, table.Line, 1, $"'gc' of [profile.{name}] is \"immix\" or \"boehm\"");
+            }
             string? inherits = null;
             if (table.TryGet("inherits", out var parent))
                 inherits = parent as string
@@ -91,7 +99,7 @@ public static partial class Profiles
                 throw new ManifestException("LYR-PKG0002", file, table.Line, 1,
                     $"[profile.{name}] is the manifest's own and inherits from a profile: inherits = \"release\"");
             specs[name] = new ProfileSpec(name, inherits, opt, Flag("debugInfo"), Flag("lto"), Flag("denyWarnings"),
-                Flag("overflowChecks"), Flag("fastMath"), table.Line);
+                Flag("overflowChecks"), Flag("fastMath"), gc, table.Line);
         }
         // Every chain ends in a built-in profile.
         foreach (var spec in specs.Values.Where(s => s.Inherits is not null))

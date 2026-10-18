@@ -286,6 +286,7 @@ LyrStr * lyr_app_main_name(lyr_ty_app_main_Signal l0_s) {
     LyrStr *t7 = NULL;
     LyrStr *t8 = NULL;
     LyrStr *t9 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 47
     t0 = &l0_s;
@@ -311,7 +312,7 @@ bb2:;
     t6 = (uint8_t)(t1 == t5);
 #line 49
     if (t6) goto bb4; else goto bb5;
-bb3:; LYR_SAFEPOINT();
+bb3:; LYR_LOOP_POLL(lyr_poll);
 #line 47
     t9 = l1__match0;
 #line 47
@@ -350,6 +351,7 @@ lyr_ty_app_main_Signal lyr_app_main_next(lyr_ty_app_main_Signal l0_s) {
     lyr_ty_app_main_Signal *t8 = &t8_s;
     lyr_ty_app_main_Signal t9_s = {0};
     lyr_ty_app_main_Signal *t9 = &t9_s;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 55
     t0 = &l0_s;
@@ -375,7 +377,7 @@ bb2:;
     t6 = (uint8_t)(t1 == t5);
 #line 57
     if (t6) goto bb4; else goto bb5;
-bb3:; LYR_SAFEPOINT();
+bb3:; LYR_LOOP_POLL(lyr_poll);
 #line 55
     t9 = &l1__match0;
 #line 55
@@ -442,6 +444,7 @@ int64_t lyr_app_main_area(lyr_ty_app_main_Shape l0_s) {
     int64_t t30 = 0;
     int64_t t31 = 0;
     int64_t t32 = 0;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 63
     t0 = &l0_s;
@@ -467,7 +470,7 @@ bb2:;
     t6 = (uint8_t)(t1 == t5);
 #line 65
     if (t6) goto bb4; else goto bb5;
-bb3:; LYR_SAFEPOINT();
+bb3:; LYR_LOOP_POLL(lyr_poll);
 #line 63
     t32 = l1__match0;
 #line 63
@@ -626,6 +629,7 @@ LyrStr * lyr_app_main_describe(lyr_ty_app_main_Shape l0_s) {
     LyrStr *t58 = NULL;
     LyrStr *t59 = NULL;
     LyrStr *t60 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 72
     t0 = &l0_s;
@@ -666,7 +670,7 @@ bb3:;
     l1__match0 = t9;
 #line 73
     goto bb4;
-bb4:; LYR_SAFEPOINT();
+bb4:; LYR_LOOP_POLL(lyr_poll);
 #line 72
     t60 = l1__match0;
 #line 72
@@ -704,7 +708,7 @@ bb7:;
     l1__match0 = t18;
 #line 74
     goto bb4;
-bb8:; LYR_SAFEPOINT();
+bb8:; LYR_LOOP_POLL(lyr_poll);
 #line 75
     t24 = (LyrStr *)&lyr_lit5;
 #line 75
@@ -857,6 +861,7 @@ LyrStr * lyr_app_main_grade(int64_t l0_n) {
     LyrStr *t13 = NULL;
     LyrStr *t14 = NULL;
     LyrStr *t15 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 83
     t0 = l0_n;
@@ -880,7 +885,7 @@ bb2:;
     t5 = (uint8_t)(t0 >= t4);
 #line 85
     if (t5) goto bb4; else goto bb5;
-bb3:; LYR_SAFEPOINT();
+bb3:; LYR_LOOP_POLL(lyr_poll);
 #line 83
     t15 = l1__match0;
 #line 83
@@ -1915,6 +1920,7 @@ int64_t lyr_app_main_Signal_ordinal(lyr_ty_app_main_Signal *l0_this) {
     int64_t t7 = 0;
     int64_t t8 = 0;
     int64_t t9 = 0;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 20
     t0 = l0_this;
@@ -1940,7 +1946,7 @@ bb2:;
     t6 = (uint8_t)(t1 == t5);
 #line 20
     if (t6) goto bb4; else goto bb5;
-bb3:; LYR_SAFEPOINT();
+bb3:; LYR_LOOP_POLL(lyr_poll);
 #line 20
     t9 = l1__match0;
 #line 20
@@ -2353,6 +2359,7 @@ void lyr_std_core_StringBuilder_grow(lyr_ty_std_core_StringBuilder *l0_this, int
     int64_t t27 = 0;
     lyr_ty_std_core_StringBuilder *t28 = NULL;
     LyrArr *t29 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l0_this;
@@ -2395,7 +2402,7 @@ bb3:;
     l2_room = t11;
 #line _
     goto bb4;
-bb4:; LYR_SAFEPOINT();
+bb4:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t12 = l2_room;
 #line _
@@ -2477,6 +2484,7 @@ void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text) {
     int64_t t17 = 0;
     int64_t t18 = 0;
     lyr_slice_u8 t19 = {0};
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l1_text;
@@ -2486,7 +2494,7 @@ bb0:;
     l2_rest = t1;
 #line _
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t2 = l2_rest;
 #line _

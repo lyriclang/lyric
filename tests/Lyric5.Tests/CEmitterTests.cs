@@ -442,7 +442,8 @@ public class CEmitterTests
     [InlineData("maps_gc", Profile.Release, "kept 1500 2000 value-999999 1500")]
     public void A_class_graph_survives_collections(string name, Profile profile, string line)
     {
-        var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC(name), name, profile);
+        // Boehm, kept to compare against (13 M11 P11); the own collector runs the same graphs below
+        var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC(name), name, BuildProfile.Of(profile) with { Gc = Collector.Boehm });
         Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = result.Stdout.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(line, lines[0]);

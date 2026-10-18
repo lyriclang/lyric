@@ -29,6 +29,24 @@
 #include "lyr/panic.h"
 #include "internal.h"
 
+/* Under ASan (01 L12) every allocation takes the slow path (gc.h), memory the heap does not hand out
+ * is poisoned — free lines and blocks, the pages of a large object that died — and a run is made
+ * accessible as it is handed out: a stale pointer into freed memory is ASan's to report. The
+ * collector's own reads of the heap are not instrumented: a conservative word may point into what
+ * died. */
+#if defined(__has_feature)
+#  if __has_feature(address_sanitizer)
+#    include <sanitizer/asan_interface.h>
+#    define POISON(at, bytes) ASAN_POISON_MEMORY_REGION((const void *)(at), (bytes))
+#    define UNPOISON(at, bytes) ASAN_UNPOISON_MEMORY_REGION((const void *)(at), (bytes))
+#  endif
+#endif
+#ifndef POISON
+#  define POISON(at, bytes) ((void)(at), (void)(bytes))
+#  define UNPOISON(at, bytes) ((void)(at), (void)(bytes))
+#endif
+
+#include <errno.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -257,7 +275,7 @@ static ptrdiff_t take_chunk(ChunkKind kind) {
 
 /* The bytes of the object at `at`, rounded to granules: its descriptor's size, or for an array, a
  * string or a coroutine what the header and the length say. */
-static size_t object_bytes(const LyrObj *object) {
+LYR_NO_SANITIZE static size_t object_bytes(const LyrObj *object) {
     const LyrDesc *desc = object->desc;
     size_t bytes;
     if (desc->flags & LYR_DESC_ARRAY) bytes = offsetof(LyrArr, data) + (size_t)((const LyrArr *)object)->len * desc->elem_size;
@@ -285,7 +303,7 @@ static ptrdiff_t start_at_or_below(size_t g, size_t first) {
  * or 0 when `at` points into no object of the heap: outside it (a static object, a number), into
  * a free block, or past the end of the object before it. A conservative word and a reference of a
  * map are asked alike. */
-static uintptr_t object_of(uintptr_t at) {
+LYR_NO_SANITIZE static uintptr_t object_of(uintptr_t at) {
     if (!in_heap(at)) return 0;
     size_t c = (at - heap_base) / CHUNK;
     if (c >= chunks_taken) return 0;
@@ -359,8 +377,12 @@ static uint32_t sweep_one(void) {
         if (live == 0) {
             info->state = BLOCK_FREE;
             bytes_in_use -= BLOCK;
+            POISON(block_address(block), BLOCK);
         } else {
             info->state = live == LINES_PER_BLOCK ? BLOCK_FULL : BLOCK_RECYCLABLE;
+            for (size_t l = 0; l < LINES_PER_BLOCK; l++) {
+                if (marks[l] != epoch) POISON(block_address(block) + l * LINE, LINE);
+            }
         }
         return block;
     }
@@ -546,6 +568,7 @@ static void sync_out(Thread *t) {
  * bits cleared. */
 static void hand_out(Buffer *buffer, uintptr_t from, uintptr_t to) {
     Block *block = block_info(buffer->block);
+    UNPOISON(from, to - from);
     if (!block->fresh) {
         clear_starts(from, to);
         memset((void *)from, 0, to - from);
@@ -687,6 +710,7 @@ static void *allocate_large(Thread *t, size_t rounded, size_t asked) {
     }
     unlock();
     if (at == 0) exhausted(asked);
+    UNPOISON(at, bytes);
     if (!fresh) memset((void *)at, 0, rounded);
     t->allocations++;
     t->allocated_bytes += rounded;
@@ -1011,7 +1035,7 @@ static void push(uintptr_t object) {
 
 /* The object starting at `start` marked, its lines live in this epoch, and pushed when it holds
  * references; nothing when it was marked already. */
-static void mark_object(uintptr_t start) {
+LYR_NO_SANITIZE static void mark_object(uintptr_t start) {
     size_t g = granule_of(start);
     if (bit(mark_bits, g)) return;
     set_bit(mark_bits, g);
@@ -1027,7 +1051,7 @@ static void mark_object(uintptr_t start) {
 }
 
 /* A word that may be a reference: the object it points into marked. */
-static inline void mark_word(uintptr_t value) {
+static inline LYR_NO_SANITIZE void mark_word(uintptr_t value) {
     uintptr_t start = object_of(value);
     if (start != 0) mark_object(start);
 }
@@ -1042,7 +1066,7 @@ static LYR_NO_SANITIZE void scan_range(uintptr_t low, uintptr_t high) {
 }
 
 /* The words of `object` its map names: by element for an array, by word for the rest. */
-static void trace_map(uintptr_t start, const LyrDesc *desc) {
+LYR_NO_SANITIZE static void trace_map(uintptr_t start, const LyrDesc *desc) {
     if (desc->refmap_words == 0) return;
     if (desc->flags & LYR_DESC_ARRAY) {
         const LyrArr *array = (const LyrArr *)start;
@@ -1067,7 +1091,7 @@ static void trace_map(uintptr_t start, const LyrDesc *desc) {
 /* A coroutine: what it keeps alive by its fields, and, while its stack is mapped and stopped,
  * every word of that stack from the saved stack pointer up, conservatively — what a suspended
  * coroutine's frames hold lives as long as the coroutine (06 A5). */
-static void trace_coro(const LyrCoro *co) {
+LYR_NO_SANITIZE static void trace_coro(const LyrCoro *co) {
     if (co->status == 0) return;
     mark_word((uintptr_t)co->arg);
     mark_word((uintptr_t)co->resumer_coro);
@@ -1081,7 +1105,7 @@ static void trace_coro(const LyrCoro *co) {
     }
 }
 
-static void drain(void) {
+LYR_NO_SANITIZE static void drain(void) {
     while (mark_top > 0) {
         uintptr_t start = mark_stack[--mark_top];
         const LyrObj *object = (const LyrObj *)start;
@@ -1144,7 +1168,7 @@ static void mark_roots(Thread *t) {
 /* The check the tests build in (13 M11 S2): a word of a marked object that its map does not name
  * and that points at the start of an unmarked object is a reference the map left out — the
  * object would be freed under a live pointer. Reported with the type and the word. */
-static void verify_object(uintptr_t start) {
+LYR_NO_SANITIZE static void verify_object(uintptr_t start) {
     const LyrObj *object = (const LyrObj *)start;
     const LyrDesc *desc = object->desc;
     if (desc->flags & (LYR_DESC_CORO | LYR_DESC_CONSERVATIVE | LYR_DESC_STRING)) return;
@@ -1190,7 +1214,7 @@ static void verify(void) {
 #endif
 
 /* After marking: every weak reference whose object is unmarked cleared, its callback queued. */
-static void clear_dead_weaks(void) {
+LYR_NO_SANITIZE static void clear_dead_weaks(void) {
     for (LyrWeak *weak = weaks; weak != NULL; weak = weak->next) {
         uintptr_t start = object_of((uintptr_t)weak->object);
         if (start == 0 || bit(mark_bits, granule_of(start))) continue;
@@ -1207,7 +1231,7 @@ static void clear_dead_weaks(void) {
 
 /* After marking: every watched coroutine nobody references any more goes with its stack. Its
  * object is still intact — nothing has been reused — so the hook reads it; it allocates nothing. */
-static void release_dead_coroutines(void) {
+LYR_NO_SANITIZE static void release_dead_coroutines(void) {
     LyrCoro *co = watched;
     while (co != NULL) {
         LyrCoro *next = co->gc_next;
@@ -1220,7 +1244,7 @@ static void release_dead_coroutines(void) {
 }
 
 /* After marking: the large objects without a mark freed — their pages, or their chunks. */
-static void free_dead_large(void) {
+LYR_NO_SANITIZE static void free_dead_large(void) {
     for (size_t c = 0; c < chunks_taken; c++) {
         Chunk *chunk = &chunks[c];
         uintptr_t base = heap_base + c * CHUNK;
@@ -1232,6 +1256,7 @@ static void free_dead_large(void) {
                 while (end < PAGES_PER_CHUNK && chunk->pages[end] == p + 1) end++;
                 if (!bit(mark_bits, granule_of(start))) {
                     clear_bit(start_bits, granule_of(start));
+                    POISON(start, (end - p) * PAGE);
                     for (size_t q = p; q < end; q++) chunk->pages[q] = 0;
                     chunk->free_pages += (uint32_t)(end - p);
                     bytes_in_use -= (end - p) * PAGE;
@@ -1240,6 +1265,7 @@ static void free_dead_large(void) {
             }
         } else if (chunk->kind == CHUNK_HUGE && chunk->huge == base && !bit(mark_bits, granule_of(base))) {
             clear_bit(start_bits, granule_of(base));
+            POISON(base, chunk->huge_bytes);
             size_t count = (chunk->huge_bytes + CHUNK - 1) / CHUNK;
             bytes_in_use -= chunk->huge_bytes;
             for (size_t d = c; d < c + count; d++) {
@@ -1426,16 +1452,36 @@ static LYR_NOINLINE LYR_NO_SANITIZE void save_entry_frames(Thread *t, uintptr_t 
     (void)anchor;
 }
 
+/* Entering and leaving keep errno and Windows' last error as they were: the caller reads what its
+ * system call left after the region — a thread-local read clears the last error on Windows, and a
+ * wait for a restart takes locks. (A poller's wait that timed out read as failed with error 0
+ * there once the own collector was the default.) */
 LYR_NOINLINE void lyr_gc_enter_safe(void *marker) {
     __builtin_unwind_init();
+    int kept_errno = errno;
+#ifdef _WIN32
+    DWORD kept_error = GetLastError();
+#endif
     Thread *t = self;
     if (t != NULL && !collecting_here) save_entry_frames(t, (uintptr_t)marker);
+#ifdef _WIN32
+    SetLastError(kept_error);
+#endif
+    errno = kept_errno;
     __asm__ volatile("" ::: "memory");
 }
 
 void lyr_gc_leave_safe(void) {
+    int kept_errno = errno;
+#ifdef _WIN32
+    DWORD kept_error = GetLastError();
+#endif
     Thread *t = self;
     if (t != NULL && !collecting_here) resume_running(t, SAFE);
+#ifdef _WIN32
+    SetLastError(kept_error);
+#endif
+    errno = kept_errno;
 }
 
 /* --- start ------------------------------------------------------------------------------------- */

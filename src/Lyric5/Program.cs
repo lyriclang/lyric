@@ -87,7 +87,7 @@ public static class Program
         output.WriteLine("options of build and run:");
         output.WriteLine("  --profile <name>               the build profile: debug, release, asan, tsan, or one of the");
         output.WriteLine("                                 manifest's (default: LYRIC_PROFILE, else debug)");
-        output.WriteLine("  --opt <0-3>, --[no-]lto, --[no-]debug-info, --[no-]deny-warnings,");
+        output.WriteLine("  --opt <0-3>, --gc <immix|boehm>, --[no-]lto, --[no-]debug-info, --[no-]deny-warnings,");
         output.WriteLine("  --[no-]overflow-checks, --[no-]fast-math");
         output.WriteLine("                                 a field of the profile, for this build");
         output.WriteLine("  --target <triple>              a Tier 1 target (default: this machine)");
@@ -111,7 +111,7 @@ public static class Program
 
     // --- build and run -------------------------------------------------------------------------
 
-    private static readonly string[] ValueOptions = ["--emit", "--profile", "--target", "-C", "--opt", "--bin"];
+    private static readonly string[] ValueOptions = ["--emit", "--profile", "--target", "-C", "--opt", "--gc", "--bin"];
 
     /// <summary>The profile's fields a flag sets for one build, <c>--x</c> on and <c>--no-x</c> off:
     /// the field flag over the profile (11 C4, W2 P3).</summary>
@@ -317,6 +317,15 @@ public static class Program
             }
             profile = profile with { Opt = opt[0] - '0' };
         }
+        if (values.TryGetValue("--gc", out var gcName))
+        {
+            if (Collectors.Parse(gcName) is not { } gc)
+            {
+                Unknown($"'--gc' is immix or boehm, not '{gcName}'");
+                return null;
+            }
+            profile = profile with { Gc = gc };
+        }
         foreach (var (field, set) in FieldFlags)
         {
             bool on = flags.Contains("--" + field), off = flags.Contains("--no-" + field);
@@ -344,7 +353,7 @@ public static class Program
 
     // --- test ----------------------------------------------------------------------------------
 
-    private static readonly string[] TestValueOptions = ["--profile", "-C", "--opt", "-f", "--filter", "--target"];
+    private static readonly string[] TestValueOptions = ["--profile", "-C", "--opt", "--gc", "-f", "--filter", "--target"];
 
     /// <summary>
     /// <c>lyric test</c> (design/v5/spec/10 B12, 11 C2): the package's tests — every function it

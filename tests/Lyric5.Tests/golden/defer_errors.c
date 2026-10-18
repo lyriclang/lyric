@@ -163,6 +163,7 @@ void lyr_app_main_fail(int64_t l0_what, LyrErr **lyr_err) {
     uint8_t t7 = 0;
     lyr_ty_app_main_Second *t8 = NULL;
     LyrIface t9 = {0};
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 13
     t0 = l0_what;
@@ -188,7 +189,7 @@ bb2:;
     t7 = (uint8_t)(t5 == t6);
 #line 14
     if (t7) goto bb4; else goto bb5;
-bb3:; LYR_SAFEPOINT();
+bb3:; LYR_LOOP_POLL(lyr_poll);
 #line 13
     *lyr_err = lyr_e; return;
 bb4:;
@@ -562,6 +563,7 @@ LyrStr * lyr_app_main_loopBreak(LyrErr **lyr_err) {
     int64_t t20 = 0;
     lyr_ty_std_core_StringBuilder *t21 = NULL;
     LyrStr *t22 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 52
     t0 = (int64_t)INT64_C(0);
@@ -569,7 +571,7 @@ bb0:;
     l0_i = t0;
 #line 53
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line 53
     t1 = l0_i;
 #line 53
@@ -595,7 +597,7 @@ bb2:;
     t9 = (uint8_t)(t7 == t8);
 #line 56
     if (t9) goto bb4; else goto bb5;
-bb3:; LYR_SAFEPOINT();
+bb3:; LYR_LOOP_POLL(lyr_poll);
 #line 58
     t12 = (int64_t)INT64_C(25);
 #line 58
@@ -677,6 +679,7 @@ LyrStr * lyr_app_main_loopContinue(LyrErr **lyr_err) {
     int64_t t20 = 0;
     lyr_ty_std_core_StringBuilder *t21 = NULL;
     LyrStr *t22 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 62
     t0 = (int64_t)INT64_C(0);
@@ -684,7 +687,7 @@ bb0:;
     l0_i = t0;
 #line 63
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line 63
     t1 = l0_i;
 #line 63
@@ -2009,6 +2012,7 @@ void lyr_std_core_StringBuilder_grow(lyr_ty_std_core_StringBuilder *l0_this, int
     int64_t t27 = 0;
     lyr_ty_std_core_StringBuilder *t28 = NULL;
     LyrArr *t29 = NULL;
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l0_this;
@@ -2051,7 +2055,7 @@ bb3:;
     l2_room = t11;
 #line _
     goto bb4;
-bb4:; LYR_SAFEPOINT();
+bb4:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t12 = l2_room;
 #line _
@@ -2133,6 +2137,7 @@ void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text) {
     int64_t t17 = 0;
     int64_t t18 = 0;
     lyr_slice_u8 t19 = {0};
+    uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
     t0 = l1_text;
@@ -2142,7 +2147,7 @@ bb0:;
     l2_rest = t1;
 #line _
     goto bb1;
-bb1:; LYR_SAFEPOINT();
+bb1:; LYR_LOOP_POLL(lyr_poll);
 #line _
     t2 = l2_rest;
 #line _

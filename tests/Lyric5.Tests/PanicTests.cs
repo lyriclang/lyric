@@ -217,7 +217,7 @@ public partial class PanicTests
     [MemberData(nameof(Profiles))]
     public void Allocation_beyond_the_heap_limit_panics(Profile profile)
     {
-        var result = RuntimeBuildTests.RunTest("heap_limit", profile);
+        var result = RuntimeBuildTests.RunTest("heap_limit", BuildProfile.Of(profile) with { Gc = Collector.Boehm }, binary: "heap_limit-boehm");
         Assert.True(result.ExitCode == 101, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = Lines(result.Stderr);
         Assert.StartsWith("panic [LYR-RT0005]: out of memory allocating 1016 bytes (heap ", lines[0]);
