@@ -4,8 +4,9 @@
 import std.task { atomicLoad, atomicStore, atomicExchange, atomicCompareAndSet, atomicFetchAndAdd,
     Cancelled, here, LockState, park, Slot, SpinLock, Waiters };
 
-/// The types an `Atomic` holds: those the machine reads and writes in one step — `int` and `bool`.
-/// Sealed: no other type becomes one.
+/// The types an `Atomic` holds: those the machine reads and writes in one step — `int` and `bool`,
+/// and, by the compiler, every class and every optional of one (a reference is one word; 13 M11
+/// P10). Sealed: no other type becomes one.
 pub sealed interface AtomicValue { }
 
 extend int :: [AtomicValue] { }
@@ -45,7 +46,8 @@ pub class Atomic<T :: [AtomicValue]> {
     }
 
     /// Sets the value to `desired` where it is `expected`, in one step: true then — false, and
-    /// nothing changed, where it was another.
+    /// nothing changed, where it was another. A class is compared by identity: the same object,
+    /// whatever `==` says.
     pub mut fn compareAndSet(expected: T, desired: T): bool {
         return atomicCompareAndSet(&this.value, expected, desired);
     }

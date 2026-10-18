@@ -440,6 +440,8 @@ public class CEmitterTests
     [InlineData("generators_gc", Profile.Release, "kept item-7:0 item-7:1 item-7:2 true 7 item-199999:1 200000")]
     [InlineData("maps_gc", Profile.Debug, "kept 1500 2000 value-999999 1500")]
     [InlineData("maps_gc", Profile.Release, "kept 1500 2000 value-999999 1500")]
+    [InlineData("atomics_gc", Profile.Debug, "stack 1000 499500 node-999")]
+    [InlineData("atomics_gc", Profile.Release, "stack 1000 499500 node-999")]
     public void A_class_graph_survives_collections(string name, Profile profile, string line)
     {
         // Boehm, kept to compare against (13 M11 P11); the own collector runs the same graphs below
@@ -479,6 +481,8 @@ public class CEmitterTests
     [InlineData("generators_gc", Profile.Release, "kept item-7:0 item-7:1 item-7:2 true 7 item-199999:1 200000")]
     [InlineData("maps_gc", Profile.Debug, "kept 1500 2000 value-999999 1500")]
     [InlineData("maps_gc", Profile.Release, "kept 1500 2000 value-999999 1500")]
+    [InlineData("atomics_gc", Profile.Debug, "stack 1000 499500 node-999")]
+    [InlineData("atomics_gc", Profile.Release, "stack 1000 499500 node-999")]
     public void A_class_graph_survives_the_own_collector(string name, Profile profile, string line)
     {
         var build = BuildProfile.Of(profile) with { Gc = Collector.Immix, GcVerify = true };

@@ -1,0 +1,39 @@
+// An Atomic of a class keeps what it holds (spec 10 §8; 13 M11 P10): a stack after Treiber over an
+// Atomic<?Node>, the atomic made before a million short-lived nodes, each push storing a young
+// node into it — the atomic's store marks its card, or a young collection would not see the node.
+// Run under the test's heap limit, as objects_gc, and under the collector's check of the barrier.
+// Expected stdout: "stack 1000 499500 node-999" (every thousandth of the million kept: 1000 nodes,
+// 0 + 1 + … + 999 = 499500, the top the last pushed). Exit 0.
+import std.io { println };
+import std.sync { Atomic };
+
+class Node { id: int, label: string, next: ?Node }
+
+fn push(top: Atomic<?Node>, id: int): void {
+    while (true) {
+        let seen = top.load();
+        if (top.compareAndSet(seen, Node { id = id, label = f"node-{id}", next = seen })) { return; }
+    }
+}
+
+fn main(): int {
+    let top = Atomic<?Node>.new(null);
+    var i = 0;
+    while (i < 1000000) {
+        let junk = Node { id = i, label = f"junk-{i}", next = null };
+        if (junk.id % 1000 == 999) { push(top, junk.id / 1000); }
+        i += 1;
+    }
+    var count = 0;
+    var sum = 0;
+    var at = top.load();
+    while (at != null) {
+        count += 1;
+        sum += at.id;
+        at = at.next;
+    }
+    let head = top.load();
+    let label = if (head != null) head.label else "none";
+    println(f"stack {count} {sum} {label}");
+    return if (count == 1000) 0 else 1;
+}
