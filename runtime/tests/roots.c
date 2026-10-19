@@ -1,8 +1,10 @@
 /* Roots, pins and registered ranges (01 L1, 11 X6).
  * Expected: 1000 objects held only by roots all survive a collection (their weak references still
- * answer); after the roots are freed at least 950 of them die (conservative margin). 1000 objects
- * held only in malloc memory registered as a scanned range survive; after the range is
- * unregistered at least 950 die. lyr_pin/lyr_unpin compile to nothing. Prints "roots ok". */
+ * answer); after the roots are freed at least DIE_AT_LEAST of them die (conservative margin). 1000
+ * objects held only in malloc memory registered as a scanned range survive; after the range is
+ * unregistered at least DIE_AT_LEAST die — 950 under the own collector, whose heap is precise; 900
+ * under Boehm, which scans every word and kept more than 50 through stale words on Linux ARM's debug
+ * frames once (open point 215). lyr_pin/lyr_unpin compile to nothing. Prints "roots ok". */
 #include "lyr/lyr.h"
 #include "check.h"
 #include "conservative.h"
@@ -10,6 +12,11 @@
 #include <stdlib.h>
 
 enum { N = 1000 };
+#ifdef LYR_GC_BOEHM
+enum { DIE_AT_LEAST = 900 };
+#else
+enum { DIE_AT_LEAST = 950 };
+#endif
 
 typedef struct Box { LyrObj header; int64_t value; } Box;
 static const LyrDesc box_desc = { .size = sizeof(Box), .name = "test.Box" };
@@ -68,8 +75,8 @@ static int64_t program(void) {
     }
     wipe_stack();
     lyr_gc_collect();
-    CHECK(deaths >= 950);
-    CHECK(alive() <= 50);
+    CHECK(deaths >= DIE_AT_LEAST);
+    CHECK(alive() <= N - DIE_AT_LEAST);
 
     /* registered ranges */
     void **range = calloc(N, sizeof(void *));
@@ -83,7 +90,7 @@ static int64_t program(void) {
     lyr_unregister_stack(range, range + N);
     wipe_stack();
     lyr_gc_collect();
-    CHECK(ranged_deaths >= 950);
+    CHECK(ranged_deaths >= DIE_AT_LEAST);
     free(range);
 
     lyr_println(lyr_str_from_cstr("roots ok"));

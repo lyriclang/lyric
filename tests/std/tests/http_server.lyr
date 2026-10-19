@@ -5,9 +5,9 @@
 // client would not misbehave.
 import std.io { IoError, IoErrorKind, ByteBuffer };
 import std.net { IpAddr, SocketAddr, TcpStream };
-import std.task { spawn, sleep, Cancelled };
+import std.task { spawn, sleep };
 import std.time { Duration };
-import std.http { Client, ClientOptions, Request, Response, Server, ServerOptions, Method, Headers, Status, HttpError };
+import std.http { Client, ClientOptions, Request, Response, Server, ServerOptions, Method, Status };
 import std.uri { Uri };
 import std.codec { Codable };
 import std.compress { Gzip };
@@ -117,17 +117,17 @@ fn aServerAnswersAndKeepsTheConnection(): void throws Error {
     assertEq(r.headers.get("Server"), "lyric5");
     assertEq(try r.text(), "hello, world");
     // JSON
-    let items = try (try client.get(uri(base, "/items"))).json<Item[]>();
+    let items = try (client.get(uri(base, "/items"))).json<Item[]>();
     assertEq(items, [Item { id = 1, name = "one" }, Item { id = 2, name = "zwei" }]);
     // the request's parts and body reach the handler
-    let e = try (try client.send(Request.post(uri(base, "/echo?x=1"), "payload".toBytes()[..], "text/plain"))).json<Echo>();
+    let e = try (client.send(Request.post(uri(base, "/echo?x=1"), "payload".toBytes()[..], "text/plain"))).json<Echo>();
     assertEq(e, Echo { method = "POST", path = "/echo", query = "x=1", length = 7, text = "payload" });
     // a chunked request body
     var put = Request { method = Method.Put, uri = uri(base, "/echo") };
     let src = ByteBuffer.new();
     try src.write("chunked in".toBytes()[..]);
     put.body = src;
-    assertEq((try (try client.send(put)).json<Echo>()).text, "chunked in");
+    assertEq((try (client.send(put)).json<Echo>()).text, "chunked in");
     // a streamed response in chunks, and one with its length
     let s = try client.get(uri(base, "/stream"));
     assertEq(s.headers.get("Transfer-Encoding"), "chunked");
@@ -158,20 +158,20 @@ fn aServerAnswersAndKeepsTheConnection(): void throws Error {
     // starts clean (its method is seen whole, not glued to the body's bytes)
     let u = try client.send(Request.post(uri(base, "/unread"), "ignored".toBytes()[..]));
     assertEq(try u.text(), "left it");
-    let after = try (try client.get(uri(base, "/echo"))).json<Echo>();
+    let after = try (client.get(uri(base, "/echo"))).json<Echo>();
     assertEq(after, Echo { method = "GET", path = "/echo", query = null, length = 0, text = "" });
     // a gzipped body is decoded as it is read (S9); the headers lose the encoding; the connection stays
     let gz = try client.get(uri(base, "/gzipped"));
     assertNull(gz.headers.get("Content-Encoding"));
     assertNull(gz.headers.get("Content-Length"));
     assertEq(try gz.text(), "the body was gzipped, and the client saw none of it");
-    assertEq(try (try client.get(uri(base, "/accepts"))).text(), "gzip, deflate");
+    assertEq(try (client.get(uri(base, "/accepts"))).text(), "gzip, deflate");
     var plain = Client.new(ClientOptions { decompress = false });
     let raw = try plain.get(uri(base, "/gzipped"));
     assertEq(raw.headers.get("Content-Encoding"), "gzip");
     let rawBytes = try raw.bytes();
     assertEq(rawBytes[0], 0x1Fu8);
-    assertEq(try (try plain.get(uri(base, "/accepts"))).text(), "-");
+    assertEq(try (plain.get(uri(base, "/accepts"))).text(), "-");
     plain.close();
     client.close();
     server.shutdown();
@@ -217,15 +217,15 @@ fn aServerTalksHttp11OnTheWire(): void throws Error {
 fn aServerShutsDown(): void throws Error {
     let (server, base) = try start();
     var client = Client.new();
-    assertEq(try (try client.get(uri(base, "/hello"))).text(), "hello, world");
+    assertEq(try (client.get(uri(base, "/hello"))).text(), "hello, world");
     // a request under way is answered; the idle connection is closed; nothing new is accepted
-    let slow = spawn(() => try (try client.get(uri(base, "/slow"))).text());
+    let slow = spawn(() => try (client.get(uri(base, "/slow"))).text());
     try sleep(Duration.ofMillis(50));
     server.shutdown();
     assertEq(try slow.await(), "slow");
     var fresh = Client.new();
     try {
-        let _ = try fresh.get(uri(base, "/hello"));
+        let _ = fresh.get(uri(base, "/hello"));
         fail("accepted after shutdown");
     } catch (e: IoError) {
         assertTrue(e.kind == IoErrorKind.ConnectionRefused);

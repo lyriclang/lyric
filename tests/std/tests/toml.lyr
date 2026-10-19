@@ -2,9 +2,9 @@
 // value of a document, TomlValue the tree with its tables in order, the rules against redefinition,
 // the four date-times.
 import std.toml;
-import std.toml { TomlValue, TomlDatetime, TomlError };
+import std.toml { TomlError };
 import std.codec { Codable, Codec, Bytes, DecodeError, DecodeErrorKind, EncodeError };
-import std.collections { List, Map };
+import std.collections { Map };
 import std.string { StringBuilder };
 import std.test { assertEq, assertTrue, assertNull, fail };
 import std.time { Instant };
@@ -84,7 +84,7 @@ fn aValueWritesAsADocumentAndReadsBack(): void throws Error {
     // a null stands in a table's key alone, left out
     let h = Holder { shapes = [Shape.Dot, Shape.Circle(3), Shape.Rect(2, 5)], one = Shape.Circle(1) };
     assertEq(try toml.encode(h), "shapes = [\"Dot\", { Circle = 3 }, { Rect = [2, 5] }]\n\n[one]\nCircle = 1\n");
-    assertEq(try toml.decode<Holder>(try toml.encode(h)), h);
+    assertEq(try toml.decode<Holder>(toml.encode(h)), h);
 }
 
 @Test
@@ -171,7 +171,7 @@ fn theTreeAndTheErrorsHaveTheirPlaces(): void throws Error {
         // at the struct, not at the key read before
         assertEq(e.message(), "missing: field 'debug_mode' (at Config)");
     }
-    assertTrue(kindOf(() => { let _ = try (try toml.parse("x = 1")).path("x")!.read<Bytes>(); }) == DecodeErrorKind.TypeMismatch);
+    assertTrue(kindOf(() => { let _ = try toml.parse("x = 1").path("x")!.read<Bytes>(); }) == DecodeErrorKind.TypeMismatch);
     // an Instant writes as a string and reads from a date-time or a string
     let when = try Instant.parse("1979-05-27T07:32:00Z");
     assertEq(try (toml.parse("t = 1979-05-27T07:32:00Z")).path("t")!.read<Instant>(), when);
