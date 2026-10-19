@@ -107,6 +107,16 @@ enum {
  * about 100 MiB alive, its longest pause 14.5 ms alone and 17–20 ms side by side; cache's full
  * collections from 438 MiB on are where sharing pays). */
 #define SHARE_MIN ((size_t)128 << 20)
+/* A full collection also after this many times as much allocation since the last full one as lived
+ * through it, and FULL_MIN at least (open point 208): a program whose old objects die while it
+ * promotes little never doubles its old heap, and P8 alone never collected it fully again — its
+ * dead stayed resident and nothing went back to the system. The marking stays a fraction of the
+ * allocation, as in Go's GOGC; no clock, so the same program collects the same way every run.
+ * FULL_MIN keeps a small heap from collecting fully every few young collections: at 64 MiB
+ * binarytrees (a few MiB alive) lost 5–15 % and 2 ms of its longest pause; at 256 MiB it keeps
+ * both and holds 50 MiB where it held 60. */
+#define FULL_AFTER 4
+#define FULL_MIN ((size_t)256 << 20)
 
 #define NO_BLOCK UINT32_MAX
 
@@ -227,6 +237,7 @@ static atomic_size_t since_collection;
 static size_t budget = MIN_BUDGET;
 static atomic_size_t collections, full_collections, young_collections;
 static size_t live_full, promoted;
+static size_t since_full;  /* bytes handed out since the last full collection (208) */
 
 static inline size_t granule_of(uintptr_t at) { return (at - heap_base) / GRANULE; }
 static inline size_t line_of(uintptr_t at) { return (at - heap_base) / LINE; }
@@ -1952,7 +1963,10 @@ static void collect(Need need) {
 #endif
 
     size_t floor = live_full > MIN_BUDGET ? live_full : MIN_BUDGET;
-    bool full = need == FULL || (need == PACED && live_full + promoted >= 2 * floor);
+    since_full += atomic_load_explicit(&since_collection, memory_order_relaxed);
+    size_t full_after = FULL_AFTER * live_full > FULL_MIN ? FULL_AFTER * live_full : FULL_MIN;
+    bool full = need == FULL ||
+                (need == PACED && (live_full + promoted >= 2 * floor || since_full >= full_after));
     marker = &collector_marker;
     collector_marker.live = 0;
     if (full) {
@@ -1986,6 +2000,7 @@ static void collect(Need need) {
     if (full) {
         live_full = live_bytes;
         promoted = 0;
+        since_full = 0;
         atomic_fetch_add(&full_collections, 1);
     } else {
         promoted += live_bytes;

@@ -30,6 +30,7 @@ public class RuntimeProgramTests
             data.Add("mark_shared", profile, 0, "shared marking ok\n", []);
             data.Add("reuse_zeroed", profile, 0, "reuse ok\n", []);
             data.Add("memory_return", profile, 0, "memory ok\n", []);
+            data.Add("old_dies", profile, 0, "old dies ok\n", []);
             data.Add("gc_numbers", profile, 0, "numbers ok\n", []);
             data.Add("coro_pace", profile, 0, "coro pace ok\n", []);
             data.Add("coro_park", profile, 0, "coro park ok\n", []);
