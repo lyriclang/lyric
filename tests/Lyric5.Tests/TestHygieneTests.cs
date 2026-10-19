@@ -35,6 +35,40 @@ public class TestHygieneTests
         Assert.True(File.Exists(fresh));
     }
 
+    /// <summary>The user cache's runtime archives, one directory per toolchain version (open point
+    /// 206): what went unused for the age goes, by its stamp or by the directory's time; the version
+    /// building keeps its own.</summary>
+    [Fact]
+    public void A_version_s_archives_go_when_unused_and_the_current_one_stays()
+    {
+        var runtime = TestDirectories.Fresh("lyric5-versions-");
+        var long_ago = DateTime.UtcNow - TimeSpan.FromDays(30);
+        string Version(string name, DateTime? stamped, DateTime written)
+        {
+            var dir = Directory.CreateDirectory(Path.Combine(runtime, name)).FullName;
+            File.WriteAllText(Path.Combine(dir, "liblyr-x.a"), "x");
+            if (stamped is { } at)
+            {
+                File.WriteAllText(Path.Combine(dir, ".used"), "");
+                File.SetLastWriteTimeUtc(Path.Combine(dir, ".used"), at);
+            }
+            Directory.SetLastWriteTimeUtc(dir, written);
+            return dir;
+        }
+        var stale = Version("5.0.0+aaaaaaa", long_ago, long_ago);
+        var used = Version("5.0.0+bbbbbbb", DateTime.UtcNow - TimeSpan.FromDays(1), long_ago);
+        var unstamped = Version("5.0.0+ccccccc", null, long_ago);
+        var current = Version("5.0.0+ddddddd", long_ago, long_ago);
+
+        var removed = Lyric5.Build.RuntimeArchive.PruneVersions(runtime, "5.0.0+ddddddd", DateTime.UtcNow - TimeSpan.FromDays(14));
+
+        Assert.Equal(2, removed);
+        Assert.False(Directory.Exists(stale));
+        Assert.False(Directory.Exists(unstamped));
+        Assert.True(Directory.Exists(used), "used yesterday");
+        Assert.True(Directory.Exists(current), "the version building");
+    }
+
     [Fact]
     public void A_dead_process_s_directories_go_and_a_living_one_s_stay()
     {

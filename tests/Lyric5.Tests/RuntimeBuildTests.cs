@@ -16,6 +16,15 @@ public class RuntimeBuildTests
     /// <summary>Stable across runs, so the collector is compiled once per machine, not per test run.</summary>
     private static readonly string Cache = Path.Combine(Path.GetTempPath(), "lyric5-test-cache");
 
+    /// <summary>
+    /// What a checkout builds by name — the programs under <c>bin/</c>, the emitted units under
+    /// <c>emitted/</c> — in a directory of its own: two test runs in two worktrees at once ran each
+    /// other's binary, linked between one's link and its run (open point 203). The archives under
+    /// <c>lib/</c> are named by their content and stay shared.
+    /// </summary>
+    private static readonly string Own = Path.Combine(Cache,
+        "checkout-" + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Root)))[..8]);
+
     /// <summary>How long a file of the cache may go unused before a test run removes it.</summary>
     private static readonly TimeSpan CacheAge = TimeSpan.FromDays(7);
 
@@ -89,7 +98,7 @@ public class RuntimeBuildTests
                 [RuntimeLayout.IncludeDir(Root), Path.Combine(Root, "runtime", "third_party", "bdwgc", "include")]);
             var objects = build.Compile([test]);
             var exe = build.LinkExecutable([.. objects, archive],
-                Path.Combine(Cache, "bin", target.Triple, $"gc_smoke-{gc}" + target.ExecutableSuffix));
+                Path.Combine(Own, "bin", target.Triple, $"gc_smoke-{gc}" + target.ExecutableSuffix));
             Assert.True(File.Exists(exe), $"no executable for {target}");
         }
     }
@@ -147,13 +156,13 @@ public class RuntimeBuildTests
     /// program built under Boehm and the same one under the own collector (13 M11 P11) never
     /// overwrite each other.</summary>
     private static string BinDir(BuildProfile profile) =>
-        Path.Combine(Cache, "bin", Target.Host.Triple,
+        Path.Combine(Own, "bin", Target.Host.Triple,
             profile.Name + (profile.Gc == Collector.Boehm ? "" : "-immix") + (profile.GcVerify ? "-verify" : ""));
 
     /// <summary>One file per unit under <c>emitted/&lt;name&gt;/</c>, the module's first.</summary>
     private static string[] WriteUnits(IReadOnlyList<CEmitter.Unit> units, string name)
     {
-        var dir = Path.Combine(Cache, "emitted", name);
+        var dir = Path.Combine(Own, "emitted", name);
         Directory.CreateDirectory(dir);
         var paths = new string[units.Count];
         for (var i = 0; i < units.Count; i++)
