@@ -210,6 +210,11 @@ After M11 (2026-10-18/19; four measurements, the machine noisy — C's own `loop
 1.54–1.68× Go, over the bound every time; `maps` 1.09–1.56×, around it; `sorting` 0.99–1.43×. The loop poll costs
 `sorting` 4–7 % (design 13, the S5 note). A profiling sweep before M12 takes `strings` on (design 13, the S10 note).
 
+After the sweep (Y1, 2026-10-19; the machine quiet, two rounds of 7): `strings` 1.27–1.38× Go, `maps` 1.39–1.40×,
+`sorting` 1.28–1.29× — all three within the bound. A third of `strings`' instructions had been the search (a
+string pattern compared at every byte; now memchr to the first byte's places), the rest the numbers written and
+read; 797 million instructions to 434.
+
 ## Measurement point 5 (M11): the collector — prepared in S6
 
 | Program | What it measures |

@@ -187,6 +187,23 @@ public sealed class Natives(Interpreter interpreter)
             var at = I(a[2]);
             return Value.Bool(at >= 0 && at <= s.Length - p.Length && s.AsSpan((int)at, p.Length).SequenceEqual(p));
         },
+        ["std.core.viewFind"] = (a, _, _) =>
+        {
+            var s = Bytes.Of(a[0]);
+            var p = Bytes.Of(a[1]);
+            var from = Math.Max(I(a[2]), 0);
+            if (from > s.Length) return Value.Int(-1);
+            if (p.Length == 0) return Value.Int(from);
+            var at = s.AsSpan((int)from).IndexOf(p);
+            return Value.Int(at < 0 ? -1 : from + at);
+        },
+        ["std.core.viewWordAt"] = (a, _, _) =>
+        {
+            var bytes = Bytes.Of(a[0]);
+            var i = Interpreter.Index(a[1], bytes.Length);
+            Interpreter.Index(Value.Int(i + 7), bytes.Length);
+            return Value.Uint(System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(i, 8)));
+        },
         ["std.core.viewsHoldTheSameBytes"] = (a, _, _) => Value.Bool(Bytes.Of(a[0]).AsSpan().SequenceEqual(Bytes.Of(a[1]))),
         ["std.core.compareViewBytes"] = (a, _, _) => Value.Int(Order(Bytes.Of(a[0]), Bytes.Of(a[1]))),
         ["std.core.viewToString"] = (a, _, _) => Str(Bytes.Of(a[0])),

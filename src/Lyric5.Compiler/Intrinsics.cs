@@ -173,6 +173,8 @@ public static class Intrinsics
         ["std.core.byteCount"] = "LYR_VIEW_LEN",
         ["std.core.byteAt"] = "LYR_VIEW_BYTE",
         ["std.core.viewMatchesAt"] = "LYR_VIEW_MATCHES_AT",
+        ["std.core.viewFind"] = "LYR_VIEW_FIND",
+        ["std.core.viewWordAt"] = "LYR_VIEW_WORD",
         ["std.core.compareBytes"] = "lyr_str_cmp",
         ["std.core.byteSlice"] = "lyr_str_slice",
         ["std.core.stringOfBytes"] = "lyr_str_from_byte_array",

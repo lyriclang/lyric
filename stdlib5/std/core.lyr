@@ -1457,14 +1457,26 @@ extend char {
 /// write differently (10 C8).
 extend string :: [Hashable] {
     fn hash<H :: [Hasher]>(&h: H): void {
-        let n = byteCount(this);
-        var i = 0;
-        while (i < n) {
-            h.writeByte(byteAt(this, i) as uint8);
-            i = i + 1;
-        }
-        h.writeByte(255);
+        hashText(this, &h);
     }
+}
+
+/// A text into a hasher (10 K2): its bytes, then 255, which no UTF-8 byte is — "ab" + "c" and "a" +
+/// "bc" differ. Eight bytes at a time as a word, the lowest first, the rest one at a time: the same
+/// bytes in the same order as one at a time, so every hasher answers as it did byte by byte
+/// (sweep 214: the byte loop was most of a string key's hashing).
+fn hashText<H :: [Hasher]>(s: StringView, &h: H): void {
+    let n = byteCount(s);
+    var i = 0;
+    while (i + 8 <= n) {
+        h.writeUint(viewWordAt(s, i));
+        i = i + 8;
+    }
+    while (i < n) {
+        h.writeByte(byteAt(s, i) as uint8);
+        i = i + 1;
+    }
+    h.writeByte(255);
 }
 
 extend string :: [Debug, Clone, Default] {
@@ -2130,6 +2142,28 @@ fn parseInteger<T :: [Integer]>(s: StringView, radix: int): T throws ParseError 
     if (i == n || (negative && !T.isSigned)) {
         throw ParseError { kind = ParseErrorKind.Invalid };
     }
+    // The common case first: decimal, at most 18 digits, no '_' — summed in `int`, where 18 digits
+    // cannot overflow, and fitted to `T` once. Any other byte goes to the general path below, which
+    // reads the text again and reports what is wrong; the answer is the same either way.
+    if (radix == 10 && n - i <= 18) {
+        var acc = 0;
+        var j = i;
+        while (j < n) {
+            let b = byteAt(s, j);
+            if (b < 48 || b > 57) {
+                break;
+            }
+            acc = acc * 10 + (b - 48);
+            j = j + 1;
+        }
+        if (j == n) {
+            let fitted: ?T = exactly(if (negative) -acc else acc);
+            if (let v = fitted) {
+                return v;
+            }
+            throw ParseError { kind = ParseErrorKind.Overflow };
+        }
+    }
     let base = asTypeOf(radix, T.zero);
     var value = T.zero;
     var overflowed = false;
@@ -2279,6 +2313,11 @@ fn byteCount(s: StringView): int;
 fn byteAt(s: StringView, i: int): int;
 /// Whether `p`'s bytes stand in `s` from byte `at` on — memcmp; false where they would run past it.
 fn viewMatchesAt(s: StringView, p: StringView, at: int): bool;
+/// Where `p`'s bytes first stand in `s` at or after byte `from` (a negative one counts as 0), -1
+/// where nowhere — memchr to the first byte's places, memcmp there.
+fn viewFind(s: StringView, p: StringView, from: int): int;
+/// The eight bytes from byte `i` as a word, the lowest first — as `writeUint` writes them.
+fn viewWordAt(s: StringView, i: int): uint64;
 /// Byte by byte, as `memcmp` and then the length: -1, 0 or 1.
 fn compareBytes(a: string, b: string): int;
 /// The bytes from..to as a string; out of bounds or off a character's boundary, a panic.
@@ -2365,15 +2404,11 @@ extend StringView :: [Pattern] {
     }
 
     fn nextIn(text: StringView, from: int): ?int {
-        let last = byteCount(text) - byteCount(this);
-        var at = from;
-        while (at <= last) {
-            if (viewMatchesAt(text, this, at)) {
-                return at;
-            }
-            at = at + 1;
+        let at = viewFind(text, this, from);
+        if (at < 0) {
+            return null;
         }
-        return null;
+        return at;
     }
 }
 
@@ -2395,15 +2430,11 @@ extend string :: [Pattern] {
     }
 
     fn nextIn(text: StringView, from: int): ?int {
-        let last = byteCount(text) - byteCount(this);
-        var at = from;
-        while (at <= last) {
-            if (viewMatchesAt(text, this, at)) {
-                return at;
-            }
-            at = at + 1;
+        let at = viewFind(text, this, from);
+        if (at < 0) {
+            return null;
         }
-        return null;
+        return at;
     }
 }
 
@@ -2854,10 +2885,8 @@ pub struct LinesIter :: [Iterator] {
         if (this.at >= n) {
             return null;
         }
-        var i = this.at;
-        while (i < n && byteAt(this.s, i) != 10) {
-            i = i + 1;
-        }
+        let found = viewFind(this.s, "\n", this.at);
+        let i = if (found < 0) n else found;
         var end = i;
         if (end > this.at && byteAt(this.s, end - 1) == 13) {
             end = end - 1;
@@ -3038,8 +3067,7 @@ extend StringView :: [Equatable, Hashable, Ordered, TotalOrder, Display, Debug, 
     }
 
     fn hash<H :: [Hasher]>(&h: H): void {
-        h.write(viewBytes(this));
-        h.writeByte(255);
+        hashText(this, &h);
     }
 
     fn compare(o: StringView): ?Ordering {
