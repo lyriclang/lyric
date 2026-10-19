@@ -257,3 +257,21 @@ quiet; the minimum of 3 runs, the pauses of the fastest:
 
 fails today on `cache` (RSS, the longest pause, the 99th percentile at 11 ms) and `lru` (time by 4 %, RSS):
 the parallel mark (S9b) follows; RSS waits on the maintainer's decision (design 13, the S6 note).
+
+With S9b (2026-10-19: full collections over 128 MiB alive mark on several threads — design 13, the S9b note), the
+machine quiet, the minimum of 3 runs:
+
+| bench | twin | time | RSS | collections | pause p99 | pause max |
+|---|---|---|---|---|---|---|
+| binarytrees | Lyric | 0.896 s | 60 MiB | 259 | 6.33 ms | 8.06 ms |
+| binarytrees | Lyric (Boehm) | 1.781 s | 62 MiB | 118 | 9.33 ms | 9.50 ms |
+| binarytrees | Go | 1.047 s | 38 MiB | 131 | 0.16 ms | 0.23 ms |
+| cache | Lyric | 11.182 s | 2469 MiB | 240 | 9.20 ms | 462.38 ms |
+| cache | Lyric (Boehm) | 14.179 s | 1571 MiB | 7 | 649.39 ms | 661.41 ms |
+| cache | Go | 5.225 s | 1852 MiB | 1 | 0.26 ms | 0.26 ms |
+| lru | Lyric | 3.341 s | 114 MiB | 32 | 14.16 ms | 14.21 ms |
+| lru | Lyric (Boehm) | 3.021 s | 41 MiB | 21 | 15.18 ms | 17.07 ms |
+| lru | Go | 1.423 s | 37 MiB | 15 | 0.79 ms | 0.79 ms |
+
+The pauses keep the ratchet now — `cache`'s 99th percentile under 10 ms, every longest pause under Boehm's —; it
+fails on RSS (`cache`, `lru`) and `lru`'s time, which wait on the maintainer's decision.

@@ -55,6 +55,7 @@ public class SanitizerTests
         { "coro_basic", ["self"], 101 },
         { "coro_gc", [], 0 },
         { "generations", [], 0 },
+        { "mark_shared", [], 0 },
         { "coro_pace", [], 0 },
         { "coro_park", [], 0 },
         { "coro_threads", [], 0 },
@@ -84,6 +85,8 @@ public class SanitizerTests
         { "coro_gc", [], 0 },
         // the cards: stored with relaxed atomics, read and cleared in the pause
         { "generations", [], 0 },
+        // the markers side by side: packets handed over under a lock, the mark bits set atomically
+        { "mark_shared", [], 0 },
     };
 
     [Theory]
