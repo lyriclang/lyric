@@ -36,10 +36,62 @@ public static class RuntimeArchive
         var cache = CacheDir(toolchainVersion);
         // The flags, not the name alone: '--lto' on 'release' is another archive than 'release'.
         var key = $"{toolchainVersion}|{compiler.Identity}|{target.Triple}|{profile.Name}|{string.Join(' ', profile.Codegen)}|{SourceStamp(root)}";
-        string Build() => RuntimeLayout.BuildArchive(new CBuild(compiler, target, profile, cache), root, Path.Combine(cache, "lib"));
+        string Build()
+        {
+            var built = RuntimeLayout.BuildArchive(new CBuild(compiler, target, profile, cache), root, Path.Combine(cache, "lib"));
+            // A new archive is rare — a new version, target or profile —: then the versions nobody
+            // used for a while go (open point 206: a development build's version carries its commit,
+            // and the directories had grown to 14 GB).
+            PruneVersions(Path.Combine(UserCache.Root, "runtime"), toolchainVersion, DateTime.UtcNow - VersionAge);
+            return built;
+        }
         var archive = UserCache.Memo("runtime-archive", key, Build);
+        MarkUsed(cache);
         // The memo may outlive the archive (a cleaned cache): then build again.
         return File.Exists(archive) ? archive : Build();
+    }
+
+    /// <summary>How long a version's archives may go unused before a new archive's build removes them.</summary>
+    public static readonly TimeSpan VersionAge = TimeSpan.FromDays(14);
+
+    /// <summary>Every use of a version's archives stamps <c>.used</c> in its directory.</summary>
+    private static void MarkUsed(string versionDir)
+    {
+        try
+        {
+            var stamp = Path.Combine(versionDir, ".used");
+            if (File.Exists(stamp)) File.SetLastWriteTimeUtc(stamp, DateTime.UtcNow);
+            else if (Directory.Exists(versionDir)) File.WriteAllText(stamp, "");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>Removes the version directories under <paramref name="runtimeRoot"/> last used —
+    /// their <c>.used</c> stamp, or the directory's own time where it has none — before
+    /// <paramref name="limit"/>, all but <paramref name="keep"/>; how many went. A directory in use
+    /// elsewhere is passed over; a toolchain that finds its archive gone builds it again.</summary>
+    public static int PruneVersions(string runtimeRoot, string keep, DateTime limit)
+    {
+        if (!Directory.Exists(runtimeRoot)) return 0;
+        var removed = 0;
+        try
+        {
+            foreach (var dir in Directory.EnumerateDirectories(runtimeRoot))
+            {
+                if (Path.GetFileName(dir) == keep) continue;
+                try
+                {
+                    var stamp = Path.Combine(dir, ".used");
+                    var used = File.Exists(stamp) ? File.GetLastWriteTimeUtc(stamp) : Directory.GetLastWriteTimeUtc(dir);
+                    if (used >= limit) continue;
+                    Directory.Delete(dir, recursive: true);
+                    removed++;
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        return removed;
     }
 
     private static string SourceStamp(string root)

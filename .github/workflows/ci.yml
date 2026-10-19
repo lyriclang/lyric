@@ -113,8 +113,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     # macOS took about 17 minutes of this when the cap was 30; on main it took 22 to 30 minutes
     # in October 2026 (the runtime tests the most), and the run after #448 lost the job to the
-    # cap with no red test. The cap is for a hang; 45 leaves a hang red and a slow runner green.
-    timeout-minutes: 45
+    # cap with no red test. The cap is for a hang; 45 left a hang red and a slow runner green until
+    # M11's sweep, when the job took 41 minutes on main and twice lost a green suite (1668 passed in
+    # 39 minutes) to the cap: 60.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:

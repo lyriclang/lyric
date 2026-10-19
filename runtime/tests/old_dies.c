@@ -1,13 +1,14 @@
-/* Old objects that die while the program promotes nothing (open point 208): 128 MiB built and made
- * old by a full collection, let go, then 640 MiB of short-lived garbage. The old heap never doubles,
- * so the growth of the old heap alone (13 M11 P8) never collects fully again and the dead stay in
- * use. Expected: a full collection comes after the allocation passes four times what lived through
- * the last one, and the heap in use falls below half of what it held. Prints "old dies ok". */
+/* Old objects that die while the program promotes nothing (open point 208): 64 MiB built and made
+ * old by a full collection, let go, then 320 MiB of short-lived garbage — past FULL_MIN (256 MiB),
+ * which four times 64 does not exceed. The old heap never doubles, so the growth of the old heap
+ * alone (13 M11 P8) never collects fully again and the dead stay in use. Expected: a full
+ * collection comes after the allocation passes four times what lived through the last one, and the
+ * heap in use falls below half of what it held. Prints "old dies ok". */
 #include "lyr/lyr.h"
 #include "check.h"
 #include "conservative.h"
 
-enum { OLD = 128 * 1024, PIECE = 1024, GARBAGE = 640 * 1024 };
+enum { OLD = 64 * 1024, PIECE = 1024, GARBAGE = 320 * 1024 };
 
 static const LyrDesc bytes_desc = { .size = (uint32_t)offsetof(LyrArr, data), .flags = LYR_DESC_ARRAY,
                                     .elem_size = 1, .name = "test.Bytes" };
