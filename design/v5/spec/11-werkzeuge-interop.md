@@ -301,6 +301,18 @@ Entscheidung des Maintainers („alle Empfehlungen“) zu einem offenen Punkt, d
 |---|---|---|
 | CI | **Das Konformanz-Gate läuft je Profil als eigener Job** (`debug`, `release` als Matrix): 1166 Fälle in beiden Profilen brauchten im PR-Lauf 27 Minuten, im Dispatch-Lauf über 40 (die Grenze wurde in M8b S14 auf 60 angehoben); geteilt halbiert sich die Wandzeit. Die Checks heißen dann je Profil. Eine Einstellung, die einen Check beim Namen verlangt, gibt es nicht — `main` hat keine Branch-Regel (geprüft 2026-10-09); nachgezogen werden nur die eigenen Skripte, die das Ergebnis des Gates lesen (Präfix statt Namen). Verworfen: ein Job mit höherer Grenze — die Wandzeit bleibt, und jeder neue Fall verlängert sie. Gebaut in M8c S19, vor S15–S18 ausgeliefert | M5-8 |
 
+## Review 2026-10-19 — vor dem Plan für M12a
+
+Entscheidungen des Maintainers zu Lücken und Widersprüchen, die der Plan für M12a fand (13, Nachtrag 2026-10-19). Wo
+eine ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| W7 | **`module-shadowing` ist `allow`** — 07 K4 („ein Lint, standardmäßig aus“) ist die genauere Zeile; die Lint-Liste von W7 nannte ihn ohne Markierung | W7, 07 K4 |
+| W7 | **Namen für die entschiedenen Warnungen ohne Namen**: `shadowed-it` (08 F4), `irrefutable-pattern` (08 Y6), `void-binding` (03 M6-5), `exit-code-range` (C5), `useless-allow` (09 A10), `foreign-conformance` (03 M4-5), `missing-module-docs` (08, `allow`); die Hülle um einen Handle ohne eigenen Namen (10 S3) gehört zu `closeable-never-closed` | W7 |
+| C2 | **`lyric new` und `lyric init`** in Cargos Form: `new <name>` legt das Verzeichnis an, `init` nutzt das aktuelle (nicht, wo schon ein `lyric.toml` liegt); `lyric.toml`, `src/main.lyr` oder mit `--lib` `src/lib.lyr`, `.gitignore`; kein `build.lyr` (BS1). **git** über das Flag `--git`/`--no-git`; ohne Flag entscheidet die Umgebungsvariable `LYRIC_GIT_ON_NEW` (C4: Kommandozeile vor `LYRIC_*`), ohne beides kein git | C2, C4, BS1 |
+| M12 | **M12 geschnitten**: M12a die Diagnostik (W6, W7, die Verben), M12b die Sprach-Uhren der Reviews (03, 04) | 13 |
+
 ---
 
 **Bereich 11 ist damit vollständig entschieden** (W1–W9, 2026-09-29). Es bleibt 12 (Migration).

@@ -47,7 +47,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M9b | Macros | L | **done** 2026-10-13 |
 | M10 | std after rule D | XL | **done** 2026-10-14 |
 | M11 | Own GC | XL | **done** 2026-10-19 |
-| M12 | Diagnostics and lints | L | — |
+| M12a | Diagnostics and lints | L | — (plan 2026-10-19) |
+| M12b | Inference and abstraction (the review clocks) | M | — |
 | M13a | fmt, doc, api | M | — |
 | M13b | LSP, DAP, clients | XL | — |
 | M14 | FFI and embedding | L | — |
