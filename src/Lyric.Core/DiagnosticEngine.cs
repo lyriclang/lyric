@@ -85,9 +85,7 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
         _diagnostics.Add(diagnostic);
     }
 
-    private static bool Same(Diagnostic a, Diagnostic b) =>
-        a.Code == b.Code && a.Severity == b.Severity && a.Span == b.Span && a.Message == b.Message
-        && (a.Notes ?? []).SequenceEqual(b.Notes ?? []);
+    private static bool Same(Diagnostic a, Diagnostic b) => a.Equals(b);
 
     private readonly List<(DiagnosticNote Note, Span? Primary, Func<Diagnostic, Diagnostic>? Recode)> _within = [];
 

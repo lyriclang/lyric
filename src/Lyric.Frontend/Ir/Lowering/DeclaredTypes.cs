@@ -46,7 +46,7 @@ internal static class DeclaredTypes
             && TypeFacts.FromBuiltinName(element.Path[0]) is { } elementPrimitive)
             return new IrArrayType(TypeLowering.Lower(elementPrimitive));
 
-        throw new UnsupportedConstructException(
+        throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
             "a declared signature takes primitive types only, and this one is not",
             node.Span);
     }

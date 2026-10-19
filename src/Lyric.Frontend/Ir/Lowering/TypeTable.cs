@@ -434,7 +434,7 @@ internal sealed class TypeTable
 
         return Conformance.InterfaceOf(node, _binding) is { } plain
             ? InterfaceOf(plain)
-            : throw new UnsupportedConstructException(
+            : throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                 "a constraint that is not an interface reached the lowering", span);
     }
 
@@ -457,7 +457,7 @@ internal sealed class TypeTable
         var index = Array.IndexOf(def.MethodSlots, method);
         if (index >= 0) return index;
 
-        throw new UnsupportedConstructException(
+        throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
             $"interface '{interfaceSymbol.Name}' has no method '{method}'", span);
     }
 
@@ -496,7 +496,7 @@ internal sealed class TypeTable
         var index = Array.IndexOf(_variantNames[enumId.Value], variantName);
         if (index >= 0) return _defs[enumId.Value].Variants[index];
 
-        throw new UnsupportedConstructException(
+        throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
             $"'{_defs[enumId.Value].Name}' has no variant '{variantName}'", span);
     }
 
@@ -507,7 +507,7 @@ internal sealed class TypeTable
         var index = Array.IndexOf(_variantNames[enumId.Value], variantName);
         if (index >= 0) return index;
 
-        throw new UnsupportedConstructException(
+        throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
             $"'{_defs[enumId.Value].Name}' has no variant '{variantName}'", span);
     }
 
@@ -526,7 +526,7 @@ internal sealed class TypeTable
         if (symbol.Generics.Length > 0)
         {
             if (typeArguments.Count != symbol.Generics.Length)
-                throw new UnsupportedConstructException(
+                throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                     $"generic type '{symbol.Name}' needs {symbol.Generics.Length} type "
                     + $"argument(s), got {typeArguments.Count}", SpanOf(symbol));
 
@@ -575,7 +575,7 @@ internal sealed class TypeTable
         // placeholder from the first attempt would remain, and the second caller would read a layout with
         // FieldNames == null: a NullReferenceException in the compiler instead of a diagnostic.
         if (_failed.TryGetValue(symbol, out var failure))
-            throw new UnsupportedConstructException(failure.Message, failure.Span);
+            throw new UnsupportedConstructException(failure.Code, failure.Message, failure.Span, failure.Note);
 
         if (_assigned.TryGetValue(symbol, out var existing)) return existing;
 
@@ -583,7 +583,7 @@ internal sealed class TypeTable
         if (symbol.Kind == TypeSymbolKind.Interface) return InternInterface(symbol);
 
         if (symbol.Kind is not (TypeSymbolKind.Class or TypeSymbolKind.Struct))
-            throw new UnsupportedConstructException(
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                 $"type '{symbol.Name}' is a {Describe(symbol.Kind)}",
                 SpanOf(symbol));
 
@@ -598,7 +598,7 @@ internal sealed class TypeTable
         };
 
         if (members is null)
-            throw new UnsupportedConstructException(
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                 $"type '{symbol.Name}' has no declaration to read a layout from",
                 SpanOf(symbol));
 
@@ -634,7 +634,7 @@ internal sealed class TypeTable
         };
 
         if (members is null)
-            throw new UnsupportedConstructException(
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                 $"type '{symbol.Name}' has no declaration to read a layout from", SpanOf(symbol));
 
         // Reserve the place AND record the id before the field types are lowered — see the class
@@ -708,7 +708,7 @@ internal sealed class TypeTable
         LyrType[]? instanceArguments, string? key = null)
     {
         if (symbol.Declaration is not EnumDecl decl)
-            throw new UnsupportedConstructException(
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                 $"enum '{symbol.Name}' has no declaration to read its variants from", SpanOf(symbol));
 
         // Record the id BEFORE the variants are interned — an enum may name itself through a variant
@@ -775,7 +775,7 @@ internal sealed class TypeTable
         if (_fixedInterfaceIds.TryGetValue(key, out var known)) return known;
         var symbol = fixedType.Definition;
         if (symbol.Declaration is not InterfaceDecl decl)
-            throw new UnsupportedConstructException($"interface '{symbol.Name}' has no declaration to read its methods from", span);
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable, $"interface '{symbol.Name}' has no declaration to read its methods from", span);
         var mapping = new Dictionary<string, LyrType>(StringComparer.Ordinal);
         for (var i = 0; i < symbol.Generics.Length && i < fixedType.Arguments.Length; i++)
             mapping[symbol.Generics[i].Name] = fixedType.Arguments[i];
@@ -806,7 +806,7 @@ internal sealed class TypeTable
     private TypeId InternInterface(TypeSymbol symbol, string name)
     {
         if (symbol.Declaration is not InterfaceDecl decl)
-            throw new UnsupportedConstructException(
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                 $"interface '{symbol.Name}' has no declaration to read its methods from",
                 SpanOf(symbol));
 
@@ -954,7 +954,7 @@ internal sealed class TypeTable
         var index = Array.IndexOf(def.FieldNames, name);
         if (index >= 0) return new FieldId(index);
 
-        throw new UnsupportedConstructException(
+        throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
             $"member '{name}' of '{symbol.Name}' is not a field; only field access is lowered",
             span);
     }
@@ -1076,13 +1076,13 @@ internal sealed class TypeTable
         // A type parameter reaches this place only when the caller did not substitute it. That is a
         // lowering error rather than a language boundary, hence a message of its own instead of the
         // generic "not lowerable".
-        TypeParamType p => throw new UnsupportedConstructException(
+        TypeParamType p => throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
             $"type parameter '{p.Param.Name}' reached lowering unsubstituted", span),
 
         // 'T.Item' with T known is the conformer's answer (03 T6); with T open it is the
         // same gap as the parameter itself.
         AssocOf { Base: not (TypeParamType or AssocOf) } a => LowerAnswer(a, span),
-        AssocOf a => throw new UnsupportedConstructException(
+        AssocOf a => throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
             $"associated type '{TypeFacts.Display(a)}' reached lowering unsubstituted", span),
 
         _ => TypeLowering.Lower(type)
@@ -1104,7 +1104,7 @@ internal sealed class TypeTable
         if (answer is AssocOf { Base: not (TypeParamType or AssocOf) })
         {
             var asked = open.Member.Owner is { } owner ? $"{owner.Name}.{open.Member.Name}" : open.Member.Name;
-            throw new UnsupportedConstructException(
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                 $"'{TypeFacts.Display(open.Base)}' answers no '{asked}'", span,
                 "the type checker lets no type through that leaves an associated type open (LYR-SEM0128), and this one came through: a bug in the compiler, please report it");
         }
@@ -1250,7 +1250,7 @@ internal sealed class TypeTable
         // A bare name arriving here is all but certainly a type parameter no substitution bound:
         // everything else was answered further up, and the sema would have refused an unknown name
         // long before the lowering ran.
-        throw new UnsupportedConstructException(
+        throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
             node is NamedType { TypeArguments.Length: 0 } bare
                 ? $"'{string.Join(".", bare.Path)}' names no type with a layout here — for a bare "
                   + "name that means a type parameter no substitution bound"
@@ -1513,7 +1513,7 @@ internal sealed class TypeTable
                     : Compilation.FindModule(["std", "core"])?.Members.LookupLocal("Error") is TypeSymbol root ? [new NamedRef(root)] : [],
             };
 
-        throw new UnsupportedConstructException(
+        throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
             "this type argument", span);
     }
 

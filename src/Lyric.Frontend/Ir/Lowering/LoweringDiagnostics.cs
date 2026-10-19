@@ -3,71 +3,75 @@ using Lyric.Core;
 namespace Lyric.Ir.Lowering;
 
 /// <summary>
-/// The diagnostic codes of the lowering (`LYR-IR####`).
-///
-/// <para>DELIBERATELY EXACTLY ONE CODE. The temptation would be to assign one per missing construct
-/// ("LYR-IR0002: lambdas"), but codes are stable identifiers and the gaps are temporary. A code that
-/// disappears once lambdas are lowered was never one. What is stable is the CATEGORY: "this compiler
-/// build cannot do that yet". Which construct is meant stands in the message.</para>
-///
-/// <para><c>LYR-IR0002..0010</c> stay free for real, permanent lowering errors. Most of what the
-/// lowering could reject has already been caught by the sema.</para>
+/// The codes of the lowering's refusals (design/v5/spec/11 G4: no catch-all — every refusal names its
+/// reason in a code of its own). Until M12a every refusal was <c>LYR-IR0001</c>, "this compiler version
+/// cannot lower it yet"; the code is retired. A refusal is the language's where the checker does not
+/// check its rule itself and a program meets it in the lowering — three reasons, <c>LYR-SEM0195..0197</c>.
+/// Everything else is something the checker accepted and the lowering cannot translate, the checker's
+/// own refusals among them (the never-null family, a generic function as a value, a type that does not
+/// cross into C: <c>LYR-SEM0005/0029/0059</c>, <c>SEM0052</c>, <c>SEM0099</c> — the lowering meeting
+/// one means the checker let it through): a compiler bug, <c>LYR-ICE0002</c>, to be reported.
 /// </summary>
 internal static class LoweringDiagnostics
 {
-    /// <summary>A construct or type this compiler build cannot lower yet.</summary>
-    public const string NotSupported = "LYR-IR0001";
+    /// <summary>A part of the standard library a construct is lowered through is not on the module path.</summary>
+    public const string StdMissing = "LYR-SEM0195";
+
+    /// <summary>A delegation the lowering cannot express yet: a generic member forwarded to a field, a
+    /// field of another interface (design 13, M12b).</summary>
+    public const string DelegationNotExpressible = "LYR-SEM0196";
+
+    /// <summary>The monomorphization does not terminate (design 03 T19).</summary>
+    public const string Unending = "LYR-SEM0197";
+
+    /// <summary>What the checker accepted and the lowering cannot translate.</summary>
+    public const string Untranslatable = "LYR-ICE0002";
+
+    /// <summary>The note of an <see cref="Untranslatable"/>: it is the compiler's fault, not the program's.</summary>
+    private const string BugNote = "the checker accepted this and the lowering cannot translate it — a compiler bug; please report it";
 
     /// <summary>
-    /// The category, carried as a note rather than as a clause. A message names the construct and
-    /// often says what to do about it; appending "is not supported by this compiler version yet"
-    /// to such a sentence splices two together — "initializer omits field 'wood', which has no
-    /// default is not supported by this compiler version yet" — and a reader has to take it apart
-    /// again. On its own line it reads as the aside it is.
-    /// </summary>
-    private const string Category = "this compiler version cannot lower it yet";
-
-    /// <summary>
-    /// The note for a refusal that is NOT a gap: an optional-shaped operation on a value that,
-    /// after monomorphization, has no optional in it. No compiler version will lower that, because
-    /// there is nothing to lower — telling the reader to wait for a newer one sends them looking
-    /// for a release that will never help.
+    /// The note for a refusal over an optional-shaped operation on a value that, after
+    /// monomorphization, has no optional in it. No compiler version will lower that, because there is
+    /// nothing to lower.
     /// </summary>
     public const string NeverNull = "a value of this type is never null";
 
-    /// <summary>Reports the one lowering code. Every site goes through here, so the note hangs in
-    /// a single place and no message has to carry the category in its own text.
-    ///
-    /// <para><paramref name="note"/> overrides the default category for a site where it does not
-    /// apply. The CODE stays one — codes are stable identifiers — and only the aside changes.
-    /// </para></summary>
-    public static void ReportUnsupported(DiagnosticEngine de, Span span, string message,
-        string? note = null) =>
-        de.Report(NotSupported, Severity.Error, span, message,
-            new DiagnosticNote(note ?? Category));
+    /// <summary>Reports a refusal under its code; an <see cref="Untranslatable"/> carries the note that
+    /// says whose fault it is, the others the note their site gave, if any.</summary>
+    public static void ReportUnsupported(DiagnosticEngine de, string code, Span span, string message,
+        string? note = null)
+    {
+        note ??= code == Untranslatable ? BugNote : null;
+        if (note is null) de.Report(code, Severity.Error, span, message);
+        else de.Report(code, Severity.Error, span, message, new DiagnosticNote(note));
+    }
+
+    /// <summary>The refusal a lowering step threw.</summary>
+    public static void ReportUnsupported(DiagnosticEngine de, UnsupportedConstructException refusal) =>
+        ReportUnsupported(de, refusal.Code, refusal.Span, refusal.Message, refusal.Note);
 }
 
 /// <summary>
-/// Signals a scope boundary of the lowering — NOT a compiler bug but valid Lyric for which the backend
-/// part is still missing. Carries its span along, so <see cref="ModuleLowerer"/> can turn it into a
-/// real diagnostic with file, line and column.
+/// A refusal of the lowering, with its code (see <see cref="LoweringDiagnostics"/>) and its span, so
+/// <see cref="ModuleLowerer"/> can turn it into a diagnostic with file, line and column.
 ///
-/// <para>The separation is the point: <see cref="InternalCompilationException"/> still means "the
-/// compiler is broken" and keeps its stack trace and throw semantics. This one means "you wrote
-/// something I cannot translate yet" and becomes an ordinary error message.</para>
+/// <para>The separation from <see cref="InternalCompilationException"/> stays: that one keeps its stack
+/// trace and ends the compilation; this one becomes an ordinary error message.</para>
 /// </summary>
 internal sealed class UnsupportedConstructException : Exception
 {
+    public string Code { get; }
+
     public Span Span { get; }
 
-    /// <summary>The note this refusal wants instead of the default category, or <c>null</c> for
-    /// the default. See <see cref="LoweringDiagnostics.NeverNull"/> for why a site needs one.
-    /// </summary>
+    /// <summary>The note this refusal carries, or <c>null</c> for its code's own.</summary>
     public string? Note { get; }
 
-    public UnsupportedConstructException(string message, Span span, string? note = null)
+    public UnsupportedConstructException(string code, string message, Span span, string? note = null)
         : base(message)
     {
+        Code = code;
         Span = span;
         Note = note;
     }

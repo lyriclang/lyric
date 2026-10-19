@@ -664,16 +664,17 @@ public class LoweringTests
         Assert.Contains(ir!.Functions, f => f.Name.Contains("firstMapped", StringComparison.Ordinal));
     }
 
-    /// <summary>What the lowering does not handle is valid Lyric, so it is a DIAGNOSTIC with file, line
-    /// and column rather than a crash. The code <c>LYR-IR0001</c> is the stable category — "this compiler
-    /// build cannot do that yet" — and the construct stands in the message.</summary>
+    /// <summary>What the lowering refuses is a DIAGNOSTIC with file, line and column rather than a
+    /// crash, under the code of its reason (design/v5/spec/11 G4; <c>LYR-IR0001</c>, one code for every
+    /// refusal, is retired) — here <c>LYR-SEM0195</c>, a part of the standard library the construct is
+    /// lowered through is not on the module path — and the construct stands in the message.</summary>
     private static void AssertNotSupported(string source, string expected)
     {
         var (ir, de) = TryLower(source);
 
         Assert.Null(ir); // no partial result: the FunctionIds would be shifted
         var diagnostic = Assert.Single(de.Diagnostics);
-        Assert.Equal("LYR-IR0001", diagnostic.Code);
+        Assert.Equal("LYR-SEM0195", diagnostic.Code);
         Assert.Equal(Severity.Error, diagnostic.Severity);
         Assert.Contains(expected, diagnostic.Message, StringComparison.Ordinal);
 
@@ -684,7 +685,7 @@ public class LoweringTests
 
     // An optional-shaped operation on an instantiated type parameter stood here through 4.6:
     // the checker let 'x == null', 'x ?? y' and 'x ??= y' pass on a 'T', and the lowering
-    // refused them with LYR-IR0001 and the note "a value of this type is never null". Lyric 5
+    // refused them with LYR-IR0001 (LYR-ICE0002 since M12a: the checker refuses it first) and the note "a value of this type is never null". Lyric 5
     // makes a bare 'T' opaque (design/v5/spec/03 T4 O2) and the checker refuses the three at the
     // declaration — OptionalOperatorsOnPlainValuesTests in the sema suite pins that. The
     // backstop in the lowering stays and has nothing left to catch.
@@ -807,21 +808,20 @@ public class LoweringTests
     /// generic method value, which the language will one day lower and today does not.</para>
     /// </summary>
     [Fact]
-    public void The_lowering_limit_says_the_construct_and_notes_the_category()
+    public void The_lowering_limit_says_the_construct_and_its_code_the_reason()
     {
-        // Iterating a string: valid Lyric the lowering has no form for yet. (The construct here
-        // was a null test on an instantiated type parameter until Lyric 5 gave that question to
-        // the checker.)
+        // Iterating a string without std.iter on the module path: the reason is the code's
+        // (LYR-SEM0195, design/v5/spec/11 G4), the construct the message's, and no note repeats
+        // the category the code already is.
         var (ir, de) = TryLower("""
             fn main(): int { var s = 0; for (c in "aaa") { if (c == 'a') { s += 1; } } return s; }
             """);
 
         Assert.Null(ir);
-        var diagnostic = Assert.Single(de.Diagnostics.Where(d => d.Code == "LYR-IR0001"));
+        var diagnostic = Assert.Single(de.Diagnostics.Where(d => d.Code == "LYR-SEM0195"));
+        Assert.Contains("iterating a string", diagnostic.Message);
         Assert.DoesNotContain("cannot lower it yet", diagnostic.Message);
-
-        Assert.NotNull(diagnostic.Notes);
-        Assert.Contains(diagnostic.Notes!, n => n.Message.Contains("cannot lower it yet"));
+        Assert.True(diagnostic.Notes is null or { Count: 0 });
     }
 
     [Fact]
@@ -838,7 +838,7 @@ public class LoweringTests
 
         Assert.Null(ir);
         Assert.Equal(3, de.Diagnostics.Count);
-        Assert.All(de.Diagnostics, d => Assert.Equal("LYR-IR0001", d.Code));
+        Assert.All(de.Diagnostics, d => Assert.Equal("LYR-SEM0195", d.Code));
     }
 
     [Fact]

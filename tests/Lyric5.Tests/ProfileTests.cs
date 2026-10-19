@@ -196,7 +196,7 @@ public class ProfileTests
         var (exit, _, error) = Run("build", "-C", dir);
         Assert.Equal(1, exit);
         Assert.Contains("warning[", error);
-        Assert.Contains("error[LYR-CLI0006]: 1 warning, and the profile 'debug' denies warnings (denyWarnings)", error);
+        Assert.Contains("error[LYR-CLI0016]: 1 warning, and the profile 'debug' denies warnings (denyWarnings)", error);
         Assert.Equal(0, Run("build", "-C", dir, "--no-deny-warnings").Exit);
     }
 

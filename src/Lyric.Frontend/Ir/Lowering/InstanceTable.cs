@@ -230,7 +230,7 @@ internal sealed class InstanceTable
         Core.Span span, GenericInstance? owner = null, LyrType? receiverType = null)
     {
         if (symbol.Generics.Length != typeArguments.Count)
-            throw new UnsupportedConstructException(
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                 $"call to '{baseName}' supplies {typeArguments.Count} type argument(s), "
                 + $"but it declares {symbol.Generics.Length}", span);
 
@@ -249,7 +249,7 @@ internal sealed class InstanceTable
         // there is no instance that could be built.
         for (var i = 0; i < typeArguments.Count; i++)
             if (typeArguments[i] is TypeParamType or Sema.ErrorType)
-                throw new UnsupportedConstructException(
+                throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                     $"call to '{baseName}': type argument {i} is not concrete "
                     + $"('{TypeFacts.Display(typeArguments[i])}')", span);
 
@@ -288,7 +288,7 @@ internal sealed class InstanceTable
     {
         if (_pending.Count < MaxInstances) return;
 
-        throw new UnsupportedConstructException(
+        throw new UnsupportedConstructException(LoweringDiagnostics.Unending,
             $"the monomorphization does not terminate: {_pending.Count} instances and still "
             + $"asking for '{name}'. A method whose result type is built from its own element "
             + "type demands an instance for the next one, and so on without end — write it as a "
@@ -340,7 +340,7 @@ internal sealed class InstanceTable
     {
         var own = typeArguments ?? [];
         if (method.Generics.Length != own.Count)
-            throw new UnsupportedConstructException(
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                 $"call to '{iface.Name}.{method.Name}' supplies {own.Count} type argument(s), "
                 + $"but it declares {method.Generics.Length}", span);
         var written = own.Count > 0 ? $"<{string.Join(", ", own.Select(NameOf))}>" : "";
@@ -348,7 +348,7 @@ internal sealed class InstanceTable
         if (Known(name, decl, out var existing)) return existing;
         for (var i = 0; i < own.Count; i++)
             if (own[i] is TypeParamType or Sema.ErrorType)
-                throw new UnsupportedConstructException(
+                throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                     $"call to '{iface.Name}.{method.Name}': type argument {i} is not concrete "
                     + $"('{TypeFacts.Display(own[i])}')", span);
         Guard(name, span);

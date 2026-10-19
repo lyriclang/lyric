@@ -77,14 +77,17 @@ public static class DiagnosticMapper
     };
 
     /// <summary>
-    /// The notes as the protocol's related information. A note without a place of its own is
-    /// anchored at the diagnostic — the protocol requires a location, and the diagnostic's own is
-    /// the honest one.
+    /// The secondary labels and the notes as the protocol's related information, the labels first.
+    /// A note without a place of its own is anchored at the diagnostic — the protocol requires a
+    /// location, and the diagnostic's own is the honest one.
     /// </summary>
     private static IReadOnlyList<LspDiagnosticRelatedInformation>? MapNotes(
         SourceManager sources, Diagnostic diagnostic)
     {
-        if (diagnostic.Notes is not { Count: > 0 } notes) return null;
+        var notes = new List<DiagnosticNote>();
+        foreach (var label in diagnostic.Labels ?? []) notes.Add(new DiagnosticNote(label.Span, label.Label));
+        notes.AddRange(diagnostic.Notes ?? []);
+        if (notes.Count == 0) return null;
 
         var mapped = new List<LspDiagnosticRelatedInformation>(notes.Count);
         foreach (var note in notes)
@@ -107,7 +110,6 @@ public static class DiagnosticMapper
     {
         Severity.Error => LspSeverity.Error,
         Severity.Warning => LspSeverity.Warning,
-        Severity.Info => LspSeverity.Information,
         Severity.Hint => LspSeverity.Hint,
 
         // Total over today's severities. A new one is a decision about how an editor should draw

@@ -263,19 +263,17 @@ public class DiagnosticEngineTests
     }
 
     [Fact]
-    public void RenderText_renders_all_four_severities()
+    public void RenderText_renders_all_three_severities()
     {
         var de = new DiagnosticEngine(new SourceManager());
         de.Report("E", Severity.Error,   default, "err");
         de.Report("W", Severity.Warning, default, "warn");
-        de.Report("I", Severity.Info,    default, "info");
         de.Report("H", Severity.Hint,    default, "hint");
         var sw = NewWriter();
         de.RenderText(sw);
         var s = sw.ToString();
         Assert.Contains("error[E]: err",     s);
         Assert.Contains("warning[W]: warn",  s);
-        Assert.Contains("info[I]: info",     s);
         Assert.Contains("hint[H]: hint",     s);
     }
 
@@ -287,7 +285,6 @@ public class DiagnosticEngineTests
         de.Report("W", Severity.Warning, default, "");
         // the same thing at one place is said once (M9b S5): a second warning says something else
         de.Report("W", Severity.Warning, default, "again");
-        de.Report("I", Severity.Info,    default, "");
         de.Report("H", Severity.Hint,    default, "");
         Assert.Equal(2, de.WarningCount);
     }
@@ -536,19 +533,17 @@ public class DiagnosticEngineTests
     }
 
     [Fact]
-    public void RenderJson_all_four_severities_as_strings()
+    public void RenderJson_all_three_severities_as_strings()
     {
         var de = new DiagnosticEngine(new SourceManager());
         de.Report("E", Severity.Error,   default, "");
         de.Report("W", Severity.Warning, default, "");
-        de.Report("I", Severity.Info,    default, "");
         de.Report("H", Severity.Hint,    default, "");
         var sw = NewWriter();
         de.RenderJson(sw);
         var s = sw.ToString();
         Assert.Contains("\"severity\":\"error\"",   s);
         Assert.Contains("\"severity\":\"warning\"", s);
-        Assert.Contains("\"severity\":\"info\"",    s);
         Assert.Contains("\"severity\":\"hint\"",    s);
     }
 
