@@ -2,9 +2,9 @@
 // VM - the matches and their groups, the syntax, leftmost-first alternation with greedy and lazy
 // repetition, replace and split, what is refused with its offset, and the time over a pattern a
 // backtracker would not survive.
-import std.regex { Regex, RegexError, Match };
+import std.regex { Regex, RegexError };
 import std.time { Instant };
-import std.test { assertEq, assertTrue, assertNull, fail };
+import std.test { assertEq, assertTrue, assertNull };
 
 fn re(p: string): Regex throws Error {
     return try Regex.new(p);

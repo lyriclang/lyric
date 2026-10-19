@@ -4,7 +4,7 @@
 // loopback port: it answers by path and marks each connection with X-Conn.
 import std.io { IoError, IoErrorKind, ByteBuffer };
 import std.net { IpAddr, SocketAddr, TcpListener, TcpStream };
-import std.task { spawn, sleep, Cancelled, TimedOut };
+import std.task { spawn, sleep, TimedOut };
 import std.time { Duration };
 import std.http { Client, ClientOptions, Request, Response, Method, Headers, Status, HttpError, HttpErrorKind };
 import std.uri { Uri };
@@ -224,7 +224,7 @@ fn aClientGetsAndKeepsTheConnection(): void throws Error {
     let none = try client.get(uri(base, "/nocontent"));
     assertEq(none.status.code, 204);
     assertEq(try none.text(), "");
-    assertEq(try (try client.get(uri(base, "/continue"))).text(), "went on");
+    assertEq(try (client.get(uri(base, "/continue"))).text(), "went on");
     // a body up to the close (HTTP/1.0, no length): the next request takes a new connection
     let old = try client.get(uri(base, "/old"));
     assertEq(try old.text(), "old style");
@@ -243,7 +243,7 @@ fn aClientGetsAndKeepsTheConnection(): void throws Error {
     assertEq(hs.headers.get("X-Ua"), "true");
     assertEq(hs.headers.get("X-Host"), "true");
     // JSON into a struct
-    assertEq(try (try client.get(uri(base, "/json"))).json<Info>(), Info { name = "lyric", n = 5 });
+    assertEq(try (client.get(uri(base, "/json"))).json<Info>(), Info { name = "lyric", n = 5 });
     client.close();
     try stop(listener);
 }
@@ -260,12 +260,12 @@ fn aClientPostsAndFollowsRedirects(): void throws Error {
     let src = ByteBuffer.new();
     try src.write("streamed body".toBytes()[..]);
     streamed.body = src;
-    assertEq(try (try client.send(streamed)).text(), "PUT got 13 bytes: streamed body");
+    assertEq(try (client.send(streamed)).text(), "PUT got 13 bytes: streamed body");
     // text as the body
     var t = Request.get(uri(base, "/echo"));
     t.method = Method.Post;
     t.setText("ein Text");
-    assertEq(try (try client.send(t)).text(), "POST got 8 bytes: ein Text");
+    assertEq(try (client.send(t)).text(), "POST got 8 bytes: ein Text");
     // redirects: not followed unless asked
     let r = try client.get(uri(base, "/redirect"));
     assertEq(r.status.code, 302);
@@ -281,7 +281,7 @@ fn aClientPostsAndFollowsRedirects(): void throws Error {
     // too many
     var few = Client.new(ClientOptions { followRedirects = true, maxRedirects = 3 });
     try {
-        let _ = try few.get(uri(base, "/loop"));
+        let _ = few.get(uri(base, "/loop"));
         fail("the loop ended");
     } catch (e: HttpError) {
         assertEq(e.kind, HttpErrorKind.Redirects);
@@ -303,17 +303,17 @@ fn whatIsNotHttpIsRefused(): void throws Error {
     try sleep(Duration.ofMillis(200));
     let before = ended.n;
     try {
-        let _ = try hasty.get(uri(base, "/slow"));
+        let _ = hasty.get(uri(base, "/slow"));
         fail("no timeout");
     } catch (_: TimedOut) { }
     // the connection the timeout cut short is closed: the server's task for it ends once its
     // slow answer is written (open point 191)
     try sleep(Duration.ofMillis(900));
     assertEq(ended.n, before + 1);
-    assertEq(try (try client.get(uri(base, "/slow"))).text(), "slow");
+    assertEq(try (client.get(uri(base, "/slow"))).text(), "slow");
     // nothing listens
     try {
-        let _ = try client.get(try Uri.parse("http://127.0.0.1:1/"));
+        let _ = client.get(Uri.parse("http://127.0.0.1:1/"));
         fail("connected to nothing");
     } catch (e: IoError) {
         assertTrue(e.kind == IoErrorKind.ConnectionRefused);
@@ -322,7 +322,7 @@ fn whatIsNotHttpIsRefused(): void throws Error {
     for ((u, said) in [("ftp://x/", "unsupported: the scheme 'ftp'"), ("https://x/", "unsupported: https needs a transport"),
                        ("/relative", "unsupported: the scheme ''"), ("http:///p", "unsupported: the URI names no host")]) {
         try {
-            let _ = try client.get(try Uri.parse(u));
+            let _ = client.get(Uri.parse(u));
             fail(f"sent {u}");
         } catch (e: HttpError) {
             assertEq(e.kind, HttpErrorKind.Unsupported);
@@ -331,32 +331,32 @@ fn whatIsNotHttpIsRefused(): void throws Error {
     }
     // a peer that does not speak HTTP
     try {
-        let _ = try client.get(uri(base, "/garbage"));
+        let _ = client.get(uri(base, "/garbage"));
         fail("read garbage");
     } catch (e: HttpError) {
         assertEq(e.message(), "not HTTP: the status line is 'HTTP/9 x'");
     }
     try {
-        let _ = try client.get(uri(base, "/badlength"));
+        let _ = client.get(uri(base, "/badlength"));
         fail("read a bad length");
     } catch (e: HttpError) {
         assertEq(e.message(), "not HTTP: 'many' is no Content-Length");
     }
     // a body that ends early, a chunk that is none
     try {
-        let _ = try (try client.get(uri(base, "/short"))).text();
+        let _ = (client.get(uri(base, "/short"))).text();
         fail("read a short body");
     } catch (e: IoError) {
         assertTrue(e.kind == IoErrorKind.UnexpectedEof);
     }
     try {
-        let _ = try (try client.get(uri(base, "/badchunk"))).text();
+        let _ = (client.get(uri(base, "/badchunk"))).text();
         fail("read a bad chunk");
     } catch (e: IoError) {
         assertTrue(e.kind == IoErrorKind.InvalidData);
     }
     // the client goes on after each
-    assertEq(try (try client.get(uri(base, "/hello"))).text(), "hello, world");
+    assertEq(try (client.get(uri(base, "/hello"))).text(), "hello, world");
     client.close();
     try stop(listener);
 }
