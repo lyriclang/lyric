@@ -178,23 +178,35 @@ int lyr_str_cmp(const LyrStr *a, const LyrStr *b) {
 
 /* An integer's decimal digits into `digits`, the last first: how many. In the negative range, so
  * INT64_MIN needs no case of its own. The converters and the builder's writers share them. */
-static int int_digits_reversed(char digits[24], int64_t value) {
-    int n = 0;
-    int64_t v = value < 0 ? value : -value;
-    do {
-        digits[n++] = (char)('0' - (v % 10));
-        v /= 10;
-    } while (v != 0);
-    if (value < 0) digits[n++] = '-';
-    return n;
-}
+/* The digits of 0..99 in pairs: a number's digits two at a time, one division per pair — the
+ * per-digit loop was a ninth of `strings`' instructions. */
+static const char digit_pairs[201] =
+    "00010203040506070809101112131415161718192021222324252627282930313233343536373839"
+    "40414243444546474849505152535455565758596061626364656667686970717273747576777879"
+    "8081828384858687888990919293949596979899";
 
 static int uint_digits_reversed(char digits[24], uint64_t value) {
     int n = 0;
-    do {
-        digits[n++] = (char)('0' + value % 10);
-        value /= 10;
-    } while (value != 0);
+    while (value >= 100) {
+        unsigned pair = (unsigned)(value % 100);
+        value /= 100;
+        digits[n++] = digit_pairs[2 * pair + 1];
+        digits[n++] = digit_pairs[2 * pair];
+    }
+    if (value >= 10) {
+        digits[n++] = digit_pairs[2 * value + 1];
+        digits[n++] = digit_pairs[2 * value];
+    } else {
+        digits[n++] = (char)('0' + value);
+    }
+    return n;
+}
+
+static int int_digits_reversed(char digits[24], int64_t value) {
+    /* the magnitude as unsigned: INT64_MIN's has no signed form */
+    uint64_t magnitude = value < 0 ? (uint64_t)0 - (uint64_t)value : (uint64_t)value;
+    int n = uint_digits_reversed(digits, magnitude);
+    if (value < 0) digits[n++] = '-';
     return n;
 }
 

@@ -124,4 +124,39 @@ static inline bool lyr_bytes_match_at(const uint8_t *s, int64_t slen, const uint
 }
 #define LYR_VIEW_MATCHES_AT(s, p, at) lyr_bytes_match_at((s).ptr, (s).len, (p).ptr, (p).len, (int64_t)(at))
 
+/* Where `p`'s bytes first stand in `s` at or after byte `from` (a negative `from` counts as 0), or -1:
+ * memchr to each place the first byte stands, memcmp for the rest there — not memcmp at every place,
+ * which cost `strings` a third of its time. The empty pattern stands at `from` while it is in `s`. */
+static inline int64_t lyr_bytes_find(const uint8_t *s, int64_t slen, const uint8_t *p, int64_t plen, int64_t from) {
+    if (from < 0) from = 0;
+    if (plen == 0) return from <= slen ? from : -1;
+    const int64_t last = slen - plen;
+    while (from <= last) {
+        const uint8_t *hit = memchr(s + from, p[0], (size_t)(last - from + 1));
+        if (hit == NULL) return -1;
+        const int64_t at = hit - s;
+        if (plen == 1 || memcmp(hit + 1, p + 1, (size_t)(plen - 1)) == 0) return at;
+        from = at + 1;
+    }
+    return -1;
+}
+#define LYR_VIEW_FIND(s, p, from) lyr_bytes_find((s).ptr, (s).len, (p).ptr, (p).len, (int64_t)(from))
+
+/* The eight bytes of a view from byte `i` as a word, the lowest first — what a hasher's `writeUint`
+ * writes byte by byte, so a text hashed a word at a time hashes as it did a byte at a time. */
+#define LYR_VIEW_WORD(v, i)                                                                         \
+    __extension__({                                                                                 \
+        const int64_t lyr_w_ = (i);                                                                 \
+        LYR_CHECK_INDEX(lyr_w_, (v).len);                                                           \
+        LYR_CHECK_INDEX(lyr_w_ + 7, (v).len);                                                       \
+        uint64_t lyr_word_;                                                                         \
+        memcpy(&lyr_word_, (v).ptr + lyr_w_, 8);                                                    \
+        LYR_LITTLE_ENDIAN_WORD(lyr_word_);                                                          \
+    })
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#  define LYR_LITTLE_ENDIAN_WORD(w) __builtin_bswap64(w)
+#else
+#  define LYR_LITTLE_ENDIAN_WORD(w) (w)
+#endif
+
 #endif

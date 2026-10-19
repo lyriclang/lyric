@@ -189,3 +189,28 @@ fn fnv1a64(): void {
     }
     assertEq(foobar.finish(), 9625390261332436968);
 }
+
+// A text a word at a time (sweep 214): the same bytes in the same order as one at a time, so the hash
+// is the same — over every length around a word's, at run time and at compile time, a view's too.
+fn bytewise(s: string): uint64 {
+    var h = FixedHasher.new();
+    for (b in s.toBytes()) {
+        h.writeByte(b);
+    }
+    h.writeByte(255);
+    return h.finish();
+}
+
+@Test
+fn aTextHashesAsItsBytesOneAtATime(): void {
+    let text = "abcdefghijklmnopqrstuvwxyz0123";
+    var n = 0;
+    while (n <= 30) {
+        let s = text[..n].toString();
+        assertEq(fixedOf(s), bytewise(s), s);
+        assertEq(fixedOf(text[..n]), bytewise(s), s);
+        n = n + 1;
+    }
+    let atCompileTime = comptime fixedOf("content-type");
+    assertEq(atCompileTime, bytewise("content-type"));
+}
