@@ -210,6 +210,12 @@ den anderen Bereichen; wo eine ältere Zeile dieses Dokuments dem widerspricht, 
 | S10 | **`Default` bleibt beim Compiler** (Nachtrag beim Bauen): `default()` baut `Self` aus den Defaults der Feldtypen und den geschriebenen Feld-Defaults, und keine Form nennt den Typ eines Feldes oder dessen Default (`f.type` in Typposition ist M9b). *In S10 hieß der Grund „ein statisches Member deklariert nur“; S11 hob das auf (03 Review 2026-10-12), die Form fehlt weiter.* A5s Liste der fünf ist damit `Equatable`, `Hashable`, `Ordered`, `TotalOrder`, `Clone`; fest im Compiler: `Default`, `Display`, `Debug`, `Identity` | A5; Spec 05 §14 Regel 1 |
 | S10 | **`std.meta`s Fragen und Structs stehen in `std.core`** (Nachtrag beim Bauen): die Familie fragt `fields<Self>()`, und `std.core` importiert nichts (ein Zyklus ist `RES0005`); `std.meta` re-exportiert sie (`pub import std.core { … }`), die Schreibweise `import std.meta { fields }` bleibt | A7 R1; 10 B2 |
 
+## Review 2026-10-19 — vor dem Plan für M12a
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| A11 | **`@Warn(name)` und `@Deny(name)` neben `@Allow(name)`**: die drei Ebenen eines Lints an Deklaration oder Modul, ein Mechanismus mit `[lints]` und `-A`/`-W`/`-D` (11 W7 L1, das sie schon nannte); jedes nimmt Name, Gruppe oder Nummer | A10, A11 |
+
 ---
 
 **Bereich 9 ist damit vollständig entschieden** (A1–A12, 2026-09-29).

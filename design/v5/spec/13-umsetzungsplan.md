@@ -60,7 +60,8 @@ Zeilen**, Meilensteine M0–M18.
 
 | M | Inhalt | Artefakt | Größe |
 |---|---|---|---|
-| **M12 Diagnostik und Lints** | W6/W7: Record mit beschrifteten Spans und Notizen, rustc-Ausgabe, Folgefehler-Vergiftung, NDJSON, `lyric explain`, **die Verben `check`, `new`, `init`, `env`, `completions`** (11 C2–C4, BS1; Durchsicht 2026-10-14), `diagnostics.toml` → Appendix, Wächter (G10), **alle Lints** mit rot/grün, `--deny-warnings`, Fixes mit `applicability`, `lyric fix` (5-intern); die Noten zu verborgenen Kandidaten und verdeckten Prelude-Namen (07), der Lint für fremde Konformanzen (03 X3) | Katalog vollständig, jede Warnung getestet; `lyric fix` wendet `safe`-Fixes an | L |
+| **M12a Diagnostik und Lints** | W6/W7: Record mit beschrifteten Spans und Notizen, rustc-Ausgabe, Folgefehler-Vergiftung, NDJSON, `lyric explain`, **die Verben `check`, `new`, `init`, `env`, `completions`, `fix`** (11 C2–C4, BS1; Durchsicht 2026-10-14), `diagnostics.toml` → Appendix, Wächter (G10), **alle Lints** mit rot/grün, `--deny-warnings`, Fixes mit `applicability`, `lyric fix` (5-intern); die Noten zu verborgenen Kandidaten und verdeckten Prelude-Namen (07), der Lint für fremde Konformanzen (03 X3) — Plan im Nachtrag 2026-10-19 | Katalog vollständig, jede Warnung getestet; `lyric fix` wendet `safe`-Fixes an | L |
+| **M12b Inferenz und Abstraktion** | Die Sprach-Uhren der Reviews (geschnitten 2026-10-19): 03 S15a (Typargumente am Methodenaufruf, Fixierung in Funktionen), N2b (Schranken geschriebener Typen), S5, S16, T8 (Unifikation mit Literal), T19 (Kettenmeldung); 04 R4a3 (Arität über Blöcke), R4b (generischer Weiterleiter), S7 (mehrere `From`: entscheiden); SEM0047, SEM0082, Delegation an ein Kind-Interface-Feld | je Punkt ein Konformanzfall rot davor, grün danach; S7 entschieden | M |
 | **M13a fmt, doc, api** | E5/E7: Formatter mit Trivia (Kommentare, Klammern), Semantik-Erhalt-Test, `lyric doc` (Site aus `///`), `///`-Doc-Tests, `lyric api` + `--diff` | Repo hält `lyric fmt --check`; Doc-Site der std | M |
 | **M13b LSP, DAP, Clients** | E1–E4, E8: `lyric lsp` mit modulgranularer Wiederverwendung, Code Actions, Tests im Editor; `lyric dap` über lldb-dap + `lyric.lldbinit` (Summaries, Panik-Breakpoint, Tasks-Scope); `tree-sitter-lyric`; VS Code/JetBrains-Clients auf 5 | Editor: Hover/Completion/Rename/Fix, Test-CodeLens; Debugger hält an Panik mit Lyric-Werten; Windows-lldb-Risiko gemessen | XL |
 | **M14 FFI und Einbettung** | W4/W5 nutzerseitig: `extern "C"` vollständig, `@Layout`, `Ptr`/`CStr`/`unsafe`, `ffi.Callback`/`GcHandle`, fremde Threads (X7), `@Export` + Header, `lyric build --lib`, `LyrConfig`/`LyrStatus`/`lyr_step` (H1–H6), `ffi.Library` | `examples/ffi` (C-Bibliothek gebunden), `embedded-host` in C gegen `lib<app>.a`; Spec `13-abi` | L |
@@ -83,7 +84,7 @@ M0 → M1 → M2 → M3 → M4 → M5 → M6
                  │      └→ M8a → M9a → M9b
                  └→ M7 ─┴→ M13a/M13b (nach M12)
 M2 → M11 (parallele Spur, jederzeit; vor M10 für Messpunkt 5)
-M2 → M12 (wächst mit jedem Meilenstein; Abschluss nach M9b)
+M2 → M12a (wächst mit jedem Meilenstein; Abschluss nach M9b) → M12b
 M7 → M15
 M8b → M16 (fix braucht die Zielbibliothek)
 M8b → M8c (std-Rest; vor M10, dessen `regex` die Unicode-Tabellen braucht)
@@ -91,7 +92,7 @@ alle → M17 → M18
 ```
 
 **Kritischer Pfad**: M1 → M2 → M3 → M4 → M5 → M6 → M8b (erste Alltagstauglichkeit) → M9a →
-M10 → M17 → M18. Parallel dazu: M11 (GC) und M12 (Diagnostik) als eigene Spuren; M13 und M14
+M10 → M17 → M18. Parallel dazu: M11 (GC) und M12a/M12b (Diagnostik, Inferenz) als eigene Spuren; M13 und M14
 nach M8b.
 
 ## Messpunkte (Z2) und ihre Ratchets
@@ -881,3 +882,93 @@ Nach Aufwand: groß S2, S3, S6; mittel S1, S4, S5, S9; klein S7, S8, S10. Etwa a
   | P13 Hasher | **SipHash-1-3 bleibt** (R9c bestätigt); `string.hash` wortweise (offener Punkt 214) im Sweep, danach `maps` und die Header-Map nachmessen. |
   | Sweep vor M12 | 208 (eine volle Sammlung über die Zeit: ein Programm, dessen Altes stirbt und das wenig befördert, sammelt sonst nie wieder voll), 203 und 206 (der Testprogramm-Cache je Checkout, der Laufzeit-Cache ausgedünnt), 200, 209, 215 (Hygiene), 214 und `strings`. |
   | 207 | Strip-Mining der Polls: Tür (die Ratsche hält). |
+
+## Nachtrag 2026-10-19 — der Plan für M12a
+
+M12 nach seiner Zeile oben, geschnitten mit dem Maintainer (2026-10-19): **M12a** ist die Diagnostik — W6 (G1–G13), W7
+(L1–L5 und die Lint-Liste), die Verben `check`, `new`, `init`, `env`, `completions`, `explain`, `fix` (11 C2–C4, BS1, BS4;
+Durchsicht 2026-10-14), die Noten aus 07 (M7-3, M7-11, K4, K7), die Warnungen aus 08 F4 und 10 S3, der Lint für fremde
+Konformanzen (03 M4-5) und die Exit-Bereichswarnung aus 11 C5. **M12b** sind die Sprach-Uhren, die die Reviews an M12
+hängten — 03 S15a (Typargumente am Methodenaufruf; Fixierung in Funktionen), N2b (geschriebene Typen prüfen ihre
+Schranken), S5 (`?U` aus einem Lambda, das `T` liefert), S16 (ein Literal nimmt `T[N]`), T8 (Unifikation mit Literal), T19
+(die Kettenmeldung), 04 R4a3 (Arität über Rumpf und Blöcke), R4b (der generische Weiterleiter), S7 (mehrere `From`), die
+Zeile „SEM0047, SEM0082, Delegation an ein Kind-Interface-Feld“ —, mit eigenem Plan direkt nach M12a. Die Diagnostik
+allein ist die Zeile; mit den Sprachpunkten wäre sie mehr als das Doppelte (CONTRIBUTING, Scope-Check).
+
+Grundlage ist eine Prüfung jedes Punkts gegen den Code (2026-10-19). Von M12a steht:
+
+- der **Record** `Diagnostic(Code, Severity, Span, Message, Notes?)` — ein Span, Noten `(Location, Message)` ohne Art,
+  kein Fix; Severities `Error`, `Warning`, `Info`, `Hint`; die Engine dedupliziert, verschiebt Fehler aus synthetisiertem
+  Code an den Aufrufer mit Notenkette, unterdrückt Nicht-Fehler über `Suppress`, sortiert deterministisch, maskiert
+  Steuerzeichen;
+- die **Ausgabe** `pfad:zeile:spalte: severity[CODE]: message`, die Quellzeile, Carets — keine Rinne, kein `-->`, keine
+  Farbe, keine beschrifteten Nebenspans; JSON als ein Dokument (`{"diagnostics":[…]}`), nur im 4.x-Pfad; kein
+  `--max-errors`;
+- **Folgefehler**: der Checker vergiftet über `ErrorType` (ein Test hält die Invariante „wer ihn sieht, schweigt“);
+- **Warnungen** ad hoc, ohne Namen (WarningAnalyzer: „Deliberately no lint framework“): SEM0071–0073, 0076, 0077, 0103,
+  0104, 0112, 0139, 0144, 0152, 0153, 0162, 0168, 0171, 0172, 0173, 0178, 0180; SEM0075 als `Hint`;
+- **`@Allow(code)`** und `[lints] allow = [codes]` (AllowFilter, Manifest — „Namen kommen mit M12“), `denyWarnings` als
+  Profilfeld und `--[no-]deny-warnings` (Pipeline.Denied; meldet heute `LYR-CLI0006`, den Code von `VmLaunchFailed`, statt
+  `CLI0016`, und schreibt die Zeile an der Engine vorbei);
+- **Codes**: 323 verschiedene im Code, kein Katalog, kein `explain`; `LYR-IR0001` an 15 Stellen als Sammelcode (G4);
+- **Fixes**: keine; `NameSuggestion` (Editierdistanz) als schlichte Note; `@Deprecated.replacement` nur als Note;
+- **Verben** von `lyric5`: `build`, `run`, `expand`, `test`, `bench`, `update`, `clean`, `metadata`, `add`, `remove`,
+  `version`, `help` — `check`, `new`, `init`, `env`, `completions`, `explain`, `fix` fehlen; die Optionen je Verb liegen als
+  Code in `Program.cs`, nicht als Tabelle;
+- **Spec**: Kapitel 16 und Anhang A sind Skelette („written with M12“).
+
+Die Slices heißen **M12a S1–S11**; jeder ist ein PR, sein Regel-PR in der Spec geht voran, wo sich eine Regel ändert (16
+für Record, Ausgabe, JSON, Lints, Fixes; 14 für die Verben; Anhang A wird erzeugt). Größe: **L**.
+
+### Architektur
+
+| # | Entscheidung | Warum — und warum nicht die Alternativen |
+|---|---|---|
+| P1 | **Der Record nach G1** in `Lyric.Core`: `Diagnostic { Code, Severity, Labels: LabeledSpan[] (genau ein primärer, sekundäre mit Text), Message, Notes: Note[] }`, `Note { Kind: Place \| Help \| Suggestion \| Category, Span?, Text, Replacement?, Applicability? }`, `Applicability { Safe, NeedsReview }`; Severities `Error`, `Warning`, `Hint` — `Info` fällt (keine Stelle meldet es heute). Die bisherigen `Report`-Überladungen bleiben als dünne Formen über dem neuen Record (ein Span = ein primäres Label, eine Note = `Place` oder ohne Span `Help`), damit S1 kein Tausend-Zeilen-Umbau der Melder wird; neue und berührte Melder nehmen die volle Form. | rustc `Diagnostic` (Labels, Sugg. mit `Applicability`), Clang. Verworfen: Nebenspans als Noten mit Ort (heute) — der Editor kann sie nicht als zweiten Unterstrich zeigen, die Ausgabe nicht als Label. |
+| P2 | **Die Ausgabe nach G5** als eigener Renderer (`Lyric.Core/Rendering`): `error[LYR-SEM0042]: message`, `--> pfad:zeile:spalte`, Rinne mit Zeilennummern, die Zeilen aller Labels einer Datei zusammen, primär `^^^`, sekundär `---` mit Text, `= note:`/`= help:`; lange Zeilen gekürzt (um den Span, mit `…`); Farbe nach C7 (`--color auto\|always\|never`, `NO_COLOR`, `TERM=dumb`); Pfade projektrelativ, `--absolute-paths`; `--max-errors N` (Vorgabe 50, 0 = alle), danach eine Zeile „N weitere Fehler“. Die Golden-Tests der Ausgabe sind Textvergleiche ohne Farbe. | rustc, Clang. Verworfen: die heutige GCC-Form beibehalten — sie zeigt keine Nebenspans und keine Notenorte im Quelltext. |
+| P3 | **Folgefehler (G6)**: die Vergiftung bleibt im Checker (`ErrorType`), die Engine bekommt die Regel dazu, die der Checker nicht sehen kann — eine Deklaration, deren Parse scheiterte, meldet nichts Abgeleitetes (Y4 machte das für die Synthese; S2 macht es für Resolver und Checker allgemein: ein Fehler im Ausdruck einer Deklaration mit Parserfehler wird unterdrückt, die Parserfehler bleiben). | rustc (`ErrorGuaranteed`), Clang. Verworfen: eine Fehlerobergrenze je Deklaration — verbirgt echte zweite Fehler. |
+| P4 | **Der Katalog** `diagnostics.toml` im Compiler-Repo (`src/Lyric.Core/`, eingebettet): je Code `title`, `severity`, `area`, `summary` (ein Absatz), `example` (ein minimales Programm, das ihn auslöst), für Fehler und Lints zusätzlich `explanation` mit `wrong`/`right` — mit dem Maintainer (2026-10-19): kurz für alle, lang für Fehler und Lints; für Lints `name`, `group`, `level`. Zurückgezogene Codes bleiben mit `retired = "…"`. **`lyric explain CODE\|lint-name`** druckt den Eintrag (Markdown als Text). Der Spec-Anhang A wird aus dem Katalog **erzeugt** (`tooling/diagnostics/appendix.py`), als Teil des Spec-PRs jedes Slices, der Codes ändert. | rustc `--explain`, GHC Error Index, G9. Verworfen: der Katalog in der Spec (Regeln sind spec-first, der Katalog nicht — D16 E); Texte aus den Doc-Kommentaren der C#-Konstanten — sie decken nur CLI ab. |
+| P5 | **Die Wächter (G10)** als Tests in `Lyric5.Tests`: (a) jeder Code, den der Compiler meldet, steht im Katalog — ein Quelltext-Scan der Literale `"LYR-…"` plus die dynamisch gebildeten (Interfaces der Laufzeit `LYR-RT…` aus `panic.h`); (b) jeder Katalogcode wird gemeldet oder ist `retired`; (c) die Severity im Katalog ist die gemeldete; (d) **jede Warnung und jeder Lint hat einen roten und einen grünen Konformanzfall** in der Spec-Suite (der Wächter liest die Fälle des gepinnten Spec-Commits); (e) Meldungsinvarianten: klein beginnend, ohne Punkt am Ende, Code im Katalog, kein `IR0001`. | rustc `tidy`, 4.x appendix-a-Wächter. |
+| P6 | **`LYR-IR0001` fällt (G4)**: jede der 15 Stellen bekommt ihren eigenen Code und Satz (`LYR-SEM…`, wo es eine Sprachgrenze ist; `LYR-ICE…`, wo es ein Compilerfehler wäre). | G4, rustc ICE. |
+| P7 | **NDJSON (G8, C6)**: `--json` als globale Option auf `build`, `run`, `test`, `check`, `fix`: eine Zeile je Ereignis — `{"type":"diagnostic","version":1,…}` mit dem Record (Labels, Noten, Fixes, Ort mit Zeile/Spalte/Offset), `{"type":"artifact",…}`, `{"type":"test",…}`, `{"type":"summary","errors":N,"warnings":M}`; Panik und ICE als `{"type":"ice"/"panic",…}`. Das Schema steht in Spec 16 (und 14 für die Ereignisse der Verben). Fortschritt nie auf stdout, wenn `--json`. | Cargo `--message-format=json`, rustc `--error-format=json`. Verworfen: SARIF (Tür nach G8); das heutige eine Dokument (nicht streamfähig). |
+| P8 | **Lints (W7)**: ein Lint ist ein Katalogeintrag mit `name`, `group`, `level`; die bestehenden Warnungscodes werden Lints mit Namen (`unused-variable` = SEM0071, `unused-import` = SEM0072, `unreachable-code` = SEM0073, `deprecated` = SEM0076, `prelude-shadowing` = SEM0153, `unused-label` = SEM0103, `unreachable-pattern` = SEM0112, `closeable-never-closed` = SEM0144, `unused-result` = SEM0178 …); eine Warnung, die kein Lint ist, gibt es nicht mehr (die Severity eines Lints ist sein Level). **Ebenen** `allow \| warn \| deny` je Lint und je Gruppe (`unused`, `correctness`, `resources`, `concurrency`, `deprecation`, `style`, `perf`, `docs`, `warnings` = alle); **drei Orte, ein Mechanismus**: `[lints]` (`deny = […]`, `allow = […]`, `warn = […]`, Gruppen und Namen und Nummern), `@Allow`/`@Warn`/`@Deny(name)` an Deklaration oder Modul (09 A11 nimmt `@Warn`/`@Deny` auf, mit dem Maintainer), CLI `-A`/`-W`/`-D name` und `--deny-warnings`; Präzedenz C4 (Kommandozeile > `LYRIC_*` > `lyric.toml` > Vorgabe), innerhalb einer Ebene das Engste (Deklaration > Modul > Paket). `deny` = Fehler mit Exit 1 (C5), die Meldung nennt, wer es verlangte. **G11**: Warnungen aus Abhängigkeiten und `std` werden nicht gezeigt (`--warn-deps`), Fehler immer. | Rust (`#[allow]`, `[lints]`, `-D`), Clippy-Gruppen. Verworfen: `lyric lint` als eigenes Verb (L4); Warnungen ohne Namen neben Lints (zwei Mechanismen). |
+| P9 | **Die Lint-Liste** aus W7, je mit rotem und grünem Fall; die Pegel nach W7, dazu mit dem Maintainer (2026-10-19): `module-shadowing` = `allow` (07 K4: „standardmäßig aus“). Namen für die entschiedenen Warnungen ohne Namen: `shadowed-it` (08 F4, `correctness`, warn), `irrefutable-pattern` (SEM0104, `correctness`, warn), `void-binding` (03 M6-5, SEM0173, `correctness`, warn), `exit-code-range` (11 C5, `correctness`, warn), `useless-allow` (09 A10, SEM0180, `unused`, warn), `foreign-conformance` (03 M4-5, `correctness`, warn), `missing-module-docs` (08, `docs`, allow), `wrapped-handle-never-closed` geht in `closeable-never-closed` auf (10 S3: eine Hülle um einen Handle ohne eigenen Namen). Die übrigen heutigen Warnungen bekommen Namen nach ihrer Natur (`useless-try` SEM0139, `visibility-leak` SEM0152, `blanket-shadowing` SEM0168, `iterator-reused` SEM0162, `unreachable-catch` SEM0171, `generator-copies-this` SEM0172, `builtin-type-shadowing` SEM0077, `unused-var` als Lint über SEM0075). | W7; Clippy. |
+| P10 | **Fixes (G7)**: `Note.Kind = Suggestion` mit `Replacement` (Span + Text) und `Applicability`; Quellen: die Lints, die eine mechanische Korrektur haben (`unused-import` entfernt, `unused-var` → `let`, `useless-try`, `needless-return`, `self-assignment`, `naming`), `@Deprecated.replacement`, `NameSuggestion` (`needsReview`). **`lyric fix`** wendet die `safe`-Fixes eines Pakets an — alle Dateien, nicht überlappende Ersetzungen, dann ein erneuter Check; `--dry-run` zeigt den Diff, `--json` nach P7; was übrig bleibt, wird gemeldet. `fix --from-4` gehört M16, `fix --edition` einer späteren Edition. | rustc `MachineApplicable`, `cargo fix`. |
+| P11 | **Die Optionstabelle (C3)**: jedes Verb deklariert seine Optionen als Daten (Name, Kurzform, Wert, Feldflag, Hilfe); `--help`, die Completions und die Spec-Tabelle in 14 entstehen daraus; unbekannte Optionen = Exit 2 (heute schon). `Program.cs` wird dabei in eine Datei je Verb geteilt. | Cargo (clap), Go `flag`. Verworfen: Hilfe und Completions von Hand — sie driften. |
+| P12 | **`lyric check`** (C2, M7-9, BS4, P13 aus M9a): der Bau bis vor die C-Emission — Front-End, Lints, `comptime`-Auswertung (P13: „jeder Bau, der senkt, wertet aus“; `check` senkt nicht nach C, wertet aber `comptime` aus, damit seine Fehler dieselben sind), `build.lyr` einmal, damit `gen/` existiert; `--locked`, `--profile`, `--json`, die Lint-Optionen; Exit 0/1 wie `build`. Keine Ausgabedatei. | `cargo check`, `go vet` nein (L4). |
+| P13 | **`lyric new`/`init`** (C2, BS1) — Form mit dem Maintainer (2026-10-19): Cargos. `new <name>` legt das Verzeichnis an, `init` nutzt das aktuelle (und weigert sich, wo schon ein `lyric.toml` liegt): `lyric.toml` (`[package] name`, `version = "0.1.0"`), `src/main.lyr` (Hallo) oder mit `--lib` `src/lib.lyr`, `.gitignore` (`out/`); kein `build.lyr` (BS1). **git**: das Flag `--git`/`--no-git`; ohne Flag entscheidet die Umgebungsvariable **`LYRIC_GIT_ON_NEW`** (`1`/`true` → `git init`, wo kein Repository darüber liegt und `git` gefunden wird), ohne beides kein git. Der Paketname folgt den Namensregeln (15); ein ungültiger ist Exit 2 mit Vorschlag. | `cargo new`/`init`. |
+| P14 | **`lyric env`** (C4): jede Einstellung, die ein Bau liest — Toolchain, Ziel, Profil und seine Felder, Cache-Wurzel, `zig`, `LYRIC_*` — mit Wert und **Herkunft** (`command line`, `LYRIC_X`, `lyric.toml`, `config.toml`, `default`); `--json`. **`lyric completions bash\|zsh\|fish\|pwsh`** druckt das Skript aus der Optionstabelle (P11), führt nie etwas aus (BS4). | `go env`, `cargo config get`; clap_complete. |
+| P15 | **Die Noten (07, 08, 10)**: M7-3 — scheitert eine Auflösung und hätte ein verborgener Kandidat gepasst, nennt eine `Place`-Note Name, Sichtbarkeit und Modul (Überladungen, Extensions, Member gleich); M7-11 und K4 — scheitert etwas, weil ein Local einen Prelude- oder Modulnamen verdeckt, erklärt eine Note die Verdeckung mit Ort; K7 — ein Modulpfad-Tippfehler bekommt einen Vorschlag (`NameSuggestion` über die Modultabelle, als `Suggestion`, `needsReview`). | rustc „private item … not accessible“, „did you mean“. |
+| P16 | **Spec**: 16 bekommt die Regeln zu Record, Codes und Bereichen, Severities, Lints und Ebenen, Präzedenz, Fixes, Text- und JSON-Ausgabe; 14 die Verben `check`, `new`, `init`, `env`, `completions`, `explain`, `fix` mit ihren Optionen (aus P11) und Ereignissen; Anhang A wird erzeugt; die Konformanzfälle der Lints in einem neuen Kapitelverzeichnis `16-diagnostics`. Der Harness der Spec braucht dafür die Direktive `warning: <lint>` (gibt es) und `lint: <name> = <level>` (neu, S5). | wie M11 P14. |
+
+### Slices
+
+| Slice | Inhalt | Artefakt, Prüfung |
+|---|---|---|
+| **S1** Der Record | P1: `LabeledSpan`, `Note` mit Art, `Applicability`; `Info` fällt; die alten Überladungen als Formen über dem neuen Record; die LSP-Abbildung nimmt Labels als `relatedInformation`; P6: die 15 `IR0001` mit eigenen Codes; der CLI0006-Fehler von `denyWarnings` | alle Suiten grün ohne geänderte Ausgabe außer den IR0001-Stellen; Tests je neuem Code |
+| **S2** Die Ausgabe | P2 (Renderer, Farbe, Kürzung, `--absolute-paths`, `--max-errors`), P3 (keine Folgefehler aus einer Deklaration mit Parserfehler) | Golden-Tests der Ausgabe (ein Span, Nebenspans, Noten, mehrzeilig, lange Zeile, Tab, Unicode-Breite); die Goldens der Treiber-Tests neu |
+| **S3** Katalog und `explain` | P4 (`diagnostics.toml` mit allen 323 Codes, kurz für alle, lang für Fehler und Lints), `lyric explain`, der Generator des Anhangs; P5 (a)–(c), (e) | `lyric explain LYR-SEM0042` und `explain unused-import`; der Wächter rot, wenn ein Code fehlt (Kontrolle); Spec-PR mit dem erzeugten Anhang A |
+| **S4** NDJSON | P7 auf `build`, `run`, `test`; Schema in 16/14 | ein Lauf mit Fehler, Warnung, Panik als Zeilen, die das Schema lesen; Konformanzfall für die Form |
+| **S5** Lints: der Mechanismus | P8 — Namen, Gruppen, Ebenen, `[lints]` voll, `@Allow`/`@Warn`/`@Deny` (09 A11 nachgetragen), `-A`/`-W`/`-D`, `--deny-warnings`, Präzedenz, G11 `--warn-deps`; die heutigen Warnungen als Lints; der Spec-Harness `lint:` | je Ort und Ebene ein Test; `deny` → Exit 1 mit Herkunft; `std`-Warnungen still, `--warn-deps` zeigt sie |
+| **S6** Lints I: `unused`, `correctness` | P9 — `unused-parameter`, `unused-assignment`, `unused-var`, `unused-generic`, `dead-code`, `assignment-in-condition`, `self-assignment`, `comparison-always`, `float-equality`, `shadowed-local`, `module-shadowing`, `int-literal-adapts`, `shadowed-it`, `exit-code-range`, `foreign-conformance`; je rot/grün | P5 (d) für diese Gruppen grün; Kontrolle: ein Lint ohne Fall → Wächter rot |
+| **S7** Lints II: der Rest | `resources` (`unused-task`, die Hülle aus 10 S3), `concurrency` (`global-var-without-sync`), `deprecation` (`until` abgelaufen = Fehler, `deprecated-edition` als Name ohne Auslöser bis zur ersten Edition), `style` (`naming`, `reserved-device-name` deny, `redundant-clone`, `needless-return`, `loop-instead-of-while-true`), `perf` (`string-concat-in-loop` warn, `large-value-copy`, `boxed-interface-in-hot-loop`), `docs` (`missing-docs`, `broken-doc-link`, `missing-module-docs`) | P5 (d) vollständig: jeder Lint rot und grün |
+| **S8** Fixes und `lyric fix` | P10 — Suggestions an den Lints mit mechanischer Korrektur, `@Deprecated.replacement`, `NameSuggestion`; `lyric fix` (`--dry-run`, `--json`) | ein Paket mit fünf Fix-Arten wird von `fix` sauber; zweiter Lauf ändert nichts; `needsReview` bleibt stehen |
+| **S9** `check`, `env`, Optionstabelle | P11 (eine Datei je Verb, die Tabelle), P12 `check`, P14 `env`; Spec 14 | `check` meldet, was `build` meldet, ohne C; `env` mit Herkunft je Stufe der Leiter |
+| **S10** `new`, `init`, `completions`, die Noten | P13, P14 `completions`; P15 (M7-3, M7-11, K4, K7) | `new`/`init` mit und ohne `--git` und `LYRIC_GIT_ON_NEW`; die Completions laden in bash/zsh/fish ohne Fehler; je Note ein Fall |
+| **S11** Abschluss | P5 (d) über alles; der Guide (`docs/guide`: Diagnostik, Lints, die Verben); STATUS, CHANGELOG, Bericht mit offenen Punkten; der M12b-Plan als nächster Schritt | die Zeile oben: „Katalog vollständig, jede Warnung getestet; `lyric fix` wendet `safe`-Fixes an“ |
+
+**Nicht in M12a:**
+
+- die Sprachpunkte — M12b (oben);
+- SARIF (Tür nach G8); `lyric fix --from-4` — M16; `--edition` — mit der ersten Edition;
+- Code Actions und `codeDescription.href` im LSP — M13b nimmt die Fixes und Katalog-Links aus dem Record;
+- `lyric doc`, `fmt`, `api` — M13a; `toolchain`, `lsp`, `dap` — M13b/M15.
+
+### Tests
+
+- **Golden** für die Textausgabe (S2) und die NDJSON-Zeilen (S4), farblos, plattformunabhängig (Pfadtrenner normalisiert).
+- **Wächter** (P5) als Tests in `Lyric5.Tests`, gegen den gepinnten Spec-Commit für (d).
+- **Konformanz**: je Lint ein roter und ein grüner Fall in `conformance/cases/16-diagnostics/`, `since: 5.0.0`; die Fälle
+  für Ebenen und Präzedenz; die Verben in `14-cli`.
+- **Kontrollen** je Slice rot gegen den Stand davor (der Lint aus → sein roter Fall schweigt; ein Code aus dem Katalog
+  gestrichen → der Wächter rot).
