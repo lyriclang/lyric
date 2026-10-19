@@ -20,13 +20,12 @@ public sealed class DiagnosticMappingTests
         var de = new DiagnosticEngine(sm);
         de.Report("E", Severity.Error,   new Span(id, 0, 1), "");
         de.Report("W", Severity.Warning, new Span(id, 1, 2), "");
-        de.Report("I", Severity.Info,    new Span(id, 2, 3), "");
         de.Report("H", Severity.Hint,    new Span(id, 3, 4), "");
 
         var mapped = DiagnosticMapper.ForFile(sm, de.SortedSnapshot(), id);
 
         Assert.Equal(
-            [LspSeverity.Error, LspSeverity.Warning, LspSeverity.Information, LspSeverity.Hint],
+            [LspSeverity.Error, LspSeverity.Warning, LspSeverity.Hint],
             mapped.Select(d => d.Severity));
     }
 
@@ -46,6 +45,26 @@ public sealed class DiagnosticMappingTests
         Assert.Equal(DocumentUri.FromFilePath("map.lyr"), related.Location.Uri);
         Assert.Equal(0, related.Location.Range.Start.Line);
         Assert.Equal(4, related.Location.Range.Start.Character);
+    }
+
+    /// <summary>A labelled secondary place (11 G1, M12a S1) is related information too, before the
+    /// notes: the label is what the editor shows there.</summary>
+    [Fact]
+    public void A_label_becomes_related_information_before_the_notes()
+    {
+        var sm = new SourceManager();
+        var id = sm.AddVirtual("map.lyr", "let x = 1;\nlet x = 2;");
+        var de = new DiagnosticEngine(sm);
+        de.Report(new Diagnostic("D", Severity.Error, new Span(id, 15, 16), "'x' is already defined",
+            [new DiagnosticNote("rename one of them")])
+        {
+            Labels = [new LabeledSpan(new Span(id, 4, 5), "first defined here")],
+        });
+
+        var mapped = Assert.Single(DiagnosticMapper.ForFile(sm, de.SortedSnapshot(), id));
+
+        Assert.Equal(["first defined here", "rename one of them"], mapped.RelatedInformation!.Select(r => r.Message));
+        Assert.Equal(4, mapped.RelatedInformation![0].Location.Range.Start.Character);
     }
 
     [Fact]

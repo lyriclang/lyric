@@ -272,7 +272,7 @@ internal sealed class GlobalTable
         // only, and a 'let' without a value cannot sensibly be filled in later: there is no later point
         // at which an assignment could stand.
         if (binding.Initializer is null)
-            throw new UnsupportedConstructException(
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                 $"the constant '{name}' has no initializer; a module-level 'let' needs one",
                 binding.Span);
 
@@ -302,7 +302,7 @@ internal sealed class GlobalTable
     {
         if (_assigned.TryGetValue(symbol, out var id)) return (id, _defs[id.Value].Type);
 
-        throw new UnsupportedConstructException(
+        throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
             $"the constant '{symbol.Name}' was not collected (is it declared outside this compilation?)",
             span);
     }

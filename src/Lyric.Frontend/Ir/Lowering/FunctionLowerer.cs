@@ -2283,7 +2283,7 @@ internal sealed class FunctionLowerer
                 ? SubstituteType(bound.Type)
                 : throw Bug($"for-in at {stmt.Span} has no bound loop variable");
 
-            var iteratorDefinition = _types.IteratorInterface ?? throw NotSupported(
+            var iteratorDefinition = _types.IteratorInterface ?? throw Refused(LoweringDiagnostics.StdMissing, 
                 "iterating (std.iter is not on the module path)", stmt.Span);
 
             var cursorType = new IrInterfaceType(
@@ -2297,7 +2297,7 @@ internal sealed class FunctionLowerer
         if (source is ArrayOf array)
         {
             var owner = new GenericInstance(
-                _types.ArrayIterator ?? throw NotSupported(
+                _types.ArrayIterator ?? throw Refused(LoweringDiagnostics.StdMissing, 
                     "iterating an array (std.iter is not on the module path)", stmt.Span),
                 [array.Element]);
 
@@ -2315,7 +2315,7 @@ internal sealed class FunctionLowerer
         // 'for (c in s)'.
         if (source is PrimitiveType { Kind: PrimitiveKind.String })
         {
-            var symbol = _types.StringIterator ?? throw NotSupported(
+            var symbol = _types.StringIterator ?? throw Refused(LoweringDiagnostics.StdMissing, 
                 "iterating a string (std.iter is not on the module path)", stmt.Span);
 
             var type = _typeTable.Intern(symbol);
@@ -2347,7 +2347,7 @@ internal sealed class FunctionLowerer
                 (true, false) => _types.InclusiveRangeIterator,
                 (false, true) => _types.UnsignedRangeIterator,
                 (true, true) => _types.InclusiveUnsignedRangeIterator,
-            } ?? throw NotSupported("iterating a range (std.iter is not on the module path)", stmt.Span);
+            } ?? throw Refused(LoweringDiagnostics.StdMissing, "iterating a range (std.iter is not on the module path)", stmt.Span);
 
             var type = _typeTable.Intern(symbol);
             var carrierType = new IrScalarType(unsigned ? IrScalar.U64 : IrScalar.I64);
@@ -5872,7 +5872,7 @@ internal sealed class FunctionLowerer
         // function per instantiation, and is not built. Asked here, an instance of nothing was
         // requested and the compiler failed on it ("function has no body").
         if (declaration.Body is null)
-            throw NotSupported($"the generic member '{member.Member}' of '{iface.Name}' where its type forwards it "
+            throw Refused(LoweringDiagnostics.DelegationNotExpressible, $"the generic member '{member.Member}' of '{iface.Name}' where its type forwards it "
                                + "to a field — write it on the type, calling the field's", expr.Span);
 
         var typeArguments = SubstitutedTypeArguments(expr);
@@ -8435,7 +8435,7 @@ internal sealed class FunctionLowerer
     private TempId CallHelper(string name, Span span, params TempId[] args)
     {
         if (!_imports.TryFind(name, out var import))
-            throw NotSupported(
+            throw Refused(LoweringDiagnostics.StdMissing, 
                 $"the runtime helper '{name}' (is the standard library on the module path?)", span);
 
         var target = _imports.Intern(import);
@@ -8869,12 +8869,15 @@ internal sealed class FunctionLowerer
         return mapping;
     }
 
-    /// <summary>A scope boundary: valid Lyric for which the backend part is still missing. Turned by
-    /// <see cref="ModuleLowerer"/> into a <c>LYR-IR0001</c> diagnostic with file, line and column, so no
-    /// position is written into the text here; the DiagnosticEngine renders it. The text names the
-    /// construct and nothing else — the category is a note the report attaches.</summary>
+    /// <summary>What the checker accepted and this lowering cannot translate — a compiler bug
+    /// (<see cref="LoweringDiagnostics.Untranslatable"/>). Turned by <see cref="ModuleLowerer"/> into a
+    /// diagnostic with file, line and column; the text names the construct and nothing else.</summary>
     private static UnsupportedConstructException NotSupported(string what, Span span,
-        string? note = null) => new(what, span, note);
+        string? note = null) => new(LoweringDiagnostics.Untranslatable, what, span, note);
+
+    /// <summary>A refusal the language makes, under its own code (<see cref="LoweringDiagnostics"/>).</summary>
+    private static UnsupportedConstructException Refused(string code, string what, Span span,
+        string? note = null) => new(code, what, span, note);
 
     /// <summary>An internal inconsistency: the compiler is broken, not the source.</summary>
     private InternalCompilationException Bug(string message) =>

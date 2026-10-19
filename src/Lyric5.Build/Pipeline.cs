@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Lyric.Compiler;
+using Lyric.Core;
 using Lyric.Ir;
 using Lyric5.Compiler;
 using Lyric5.Toolchain;
@@ -129,7 +130,7 @@ public static class Pipeline
     {
         if (profile is not { DenyWarnings: true } || result.Diagnostics.WarningCount == 0) return false;
         var count = result.Diagnostics.WarningCount;
-        error.WriteLine($"error[LYR-CLI0006]: {count} warning{(count == 1 ? "" : "s")}, and the profile '{profile.Name}' denies warnings (denyWarnings)");
+        error.WriteLine($"error[{CliDiagnostics.WarningsDenied}]: {count} warning{(count == 1 ? "" : "s")}, and the profile '{profile.Name}' denies warnings (denyWarnings)");
         return true;
     }
 

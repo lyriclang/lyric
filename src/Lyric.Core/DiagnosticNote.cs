@@ -1,8 +1,35 @@
 namespace Lyric.Core;
 
+/// <summary>What a note is (design/v5/spec/11 G1).</summary>
+public enum NoteKind
+{
+    /// <summary>Another place that belongs to the finding ("previous definition here").</summary>
+    Place,
+
+    /// <summary>Advice in words: what to do about it.</summary>
+    Help,
+
+    /// <summary>A change to the source that would resolve it, with its <see cref="Replacement"/>.</summary>
+    Suggestion,
+
+    /// <summary>What kind of finding this is, said once beside the message ("a compiler bug").</summary>
+    Category,
+}
+
+/// <summary>Whether a suggested change may be applied without a reader (11 G7): <c>lyric fix</c>
+/// applies the safe ones, an editor offers both.</summary>
+public enum Applicability
+{
+    Safe,
+    NeedsReview,
+}
+
+/// <summary>Text to put in place of a span.</summary>
+public readonly record struct Replacement(Span Span, string Text, Applicability Applicability);
+
 /// <summary>
 /// A secondary remark under a diagnostic: another PLACE that belongs to the same finding
-/// ("previous definition here"), or a remark with no place at all.
+/// ("previous definition here"), advice, a suggested change, or the finding's category.
 ///
 /// <para>Notes point at locations, never at literature — a message that cites a document ages in
 /// two directions at once, and both have happened here before.</para>
@@ -13,4 +40,21 @@ public readonly record struct DiagnosticNote(Span Location, string Message)
 {
     /// <summary>A note that is text alone.</summary>
     public DiagnosticNote(string message) : this(default, message) { }
+
+    private readonly NoteKind? _kind;
+
+    /// <summary>What the note is. Unless set, a note with a place is a <see cref="NoteKind.Place"/>
+    /// and one without is <see cref="NoteKind.Help"/> — what every note said before kinds existed.</summary>
+    public NoteKind Kind
+    {
+        get => _kind ?? (Location == default ? NoteKind.Help : NoteKind.Place);
+        init => _kind = value;
+    }
+
+    /// <summary>The change a <see cref="NoteKind.Suggestion"/> proposes; <c>null</c> otherwise.</summary>
+    public Replacement? Fix { get; init; }
+
+    /// <summary>A suggestion: <paramref name="message"/> says it, <paramref name="fix"/> is the change.</summary>
+    public static DiagnosticNote Suggest(string message, Replacement fix) =>
+        new(fix.Span, message) { Kind = NoteKind.Suggestion, Fix = fix };
 }

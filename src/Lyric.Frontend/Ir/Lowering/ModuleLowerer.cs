@@ -201,7 +201,7 @@ public static class ModuleLowerer
                     }
                     catch (UnsupportedConstructException ex)
                     {
-                        LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
+                        LoweringDiagnostics.ReportUnsupported(de, ex);
                         failed = true;
                     }
                     continue;
@@ -242,7 +242,7 @@ public static class ModuleLowerer
                     continue;
                 }
 
-                LoweringDiagnostics.ReportUnsupported(de, function.Span,
+                LoweringDiagnostics.ReportUnsupported(de, LoweringDiagnostics.Untranslatable, function.Span,
                     "'main' takes either no parameters or exactly one 'string[]'");
                 failed = true;
             }
@@ -300,7 +300,7 @@ public static class ModuleLowerer
                         }
                         catch (UnsupportedConstructException ex)
                         {
-                            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
+                            LoweringDiagnostics.ReportUnsupported(de, ex);
                             failed = true;
                         }
 
@@ -327,7 +327,7 @@ public static class ModuleLowerer
         }
         catch (UnsupportedConstructException ex)
         {
-            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
+            LoweringDiagnostics.ReportUnsupported(de, ex);
             return null;
         }
 
@@ -419,7 +419,7 @@ public static class ModuleLowerer
                 // reported once: the user should see all the MISSING CONSTRUCTS of their program, not
                 // every place the same one is missing.
                 if (reported.Add((ex.Span, ex.Message)))
-                    LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
+                    LoweringDiagnostics.ReportUnsupported(de, ex);
                 failed = true;
             }
         }
@@ -454,7 +454,7 @@ public static class ModuleLowerer
             }
             catch (UnsupportedConstructException ex)
             {
-                LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
+                LoweringDiagnostics.ReportUnsupported(de, ex);
                 return null;
             }
         }
@@ -478,7 +478,7 @@ public static class ModuleLowerer
         }
         catch (UnsupportedConstructException ex)
         {
-            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
+            LoweringDiagnostics.ReportUnsupported(de, ex);
             return null;
         }
 
@@ -531,7 +531,7 @@ public static class ModuleLowerer
             // missing vtable row, which is true and useless: it names a type nobody wrote.
             if (!settled)
             {
-                LoweringDiagnostics.ReportUnsupported(de, default,
+                LoweringDiagnostics.ReportUnsupported(de, LoweringDiagnostics.Unending, default,
                     "the monomorphization does not terminate: every round asks for further type "
                     + "instances. A method whose result type is built from its own element type "
                     + "demands an instance for the next one, and so on without end — write it as a "
@@ -548,7 +548,7 @@ public static class ModuleLowerer
         }
         catch (UnsupportedConstructException ex)
         {
-            LoweringDiagnostics.ReportUnsupported(de, ex.Span, ex.Message, ex.Note);
+            LoweringDiagnostics.ReportUnsupported(de, ex);
             return null;
         }
 
@@ -935,7 +935,7 @@ public static class ModuleLowerer
 
         foreach (var field in layout.FieldTypes)
             if (field is not IrScalarType)
-                throw new UnsupportedConstructException(
+                throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
                     $"a struct in a native signature is flattened to scalars, and a field of "
                     + $"'{symbol.Name}' is none — scalar and string fields only", node.Span);
 
@@ -1281,7 +1281,7 @@ public static class ModuleLowerer
 
                     // The sema already checked conformance. If something is missing here all the same, it
                     // is a lowering gap — a generic or bodyless implementation pass 1 skipped.
-                    LoweringDiagnostics.ReportUnsupported(de,
+                    LoweringDiagnostics.ReportUnsupported(de, LoweringDiagnostics.Untranslatable,
                         type.Declaration?.Span ?? default,
                         $"'{type.Name}' implements '{iface.Name}', but its '{slots[i]}' is not "
                         + "lowerable (generic or bodiless)");
@@ -1319,7 +1319,7 @@ public static class ModuleLowerer
                                      .FirstOrDefault(f => f is not null)
                                  ?? ResolveInInstance(typeTable, ifaceId, slots[i], instances);
                     if (target is { } id) { methods[i] = id; continue; }
-                    LoweringDiagnostics.ReportUnsupported(de, default,
+                    LoweringDiagnostics.ReportUnsupported(de, LoweringDiagnostics.Untranslatable, default,
                         $"'{builtin.Name}' implements '{iface.Name}', but its '{slots[i]}' is not lowerable");
                     complete = false;
                     break;
@@ -1358,7 +1358,7 @@ public static class ModuleLowerer
                                  ?? ResolveInExtensions(viaExtension, slots[i], extensions, typeTable, typeId, instances)
                                  ?? DefaultFor(iface, slots[i], concrete, instances, binding);
                     if (target is { } id) { methods[i] = id; continue; }
-                    LoweringDiagnostics.ReportUnsupported(de, type.Declaration?.Span ?? default,
+                    LoweringDiagnostics.ReportUnsupported(de, LoweringDiagnostics.Untranslatable, type.Declaration?.Span ?? default,
                         $"'{type.Name}' is an '{TypeFacts.Display(fixedType)}', but its '{slots[i]}' is not lowerable");
                     complete = false;
                     break;
@@ -1480,10 +1480,10 @@ public static class ModuleLowerer
         var def = typeTable.Defs[typeId.Value];
         var fieldIndex = Array.IndexOf(def.FieldNames, field);
         if (fieldIndex < 0)
-            throw new UnsupportedConstructException($"'{type.Name}' delegates to '{field}', which its layout does not hold", type.Declaration?.Span ?? default);
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable, $"'{type.Name}' delegates to '{field}', which its layout does not hold", type.Declaration?.Span ?? default);
         var fieldType = def.FieldTypes[fieldIndex];
         if (iface.Members.LookupLocal(typeTable.MethodSlotsOf(ifaceId)[slot]) is not FunctionSymbol { Declaration: FunctionDecl promised })
-            throw new UnsupportedConstructException($"'{iface.Name}' has no declaration for slot {slot}", type.Declaration?.Span ?? default);
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable, $"'{iface.Name}' has no declaration for slot {slot}", type.Declaration?.Span ?? default);
         var parameters = promised.Parameters.Select(p => typeTable.Lower(p.Type)).ToArray();
         var returnType = promised.ReturnType is null ? new IrScalarType(IrScalar.Void) : typeTable.Lower(promised.ReturnType);
         var isClass = type.Kind == TypeSymbolKind.Class;
@@ -1511,7 +1511,7 @@ public static class ModuleLowerer
         if (fieldType is IrInterfaceType already)
         {
             if (already.Type != ifaceId)
-                throw new UnsupportedConstructException($"'{type.Name}' delegates '{iface.Name}' to '{field}', a value of another interface — not yet", type.Declaration?.Span ?? default);
+                throw new UnsupportedConstructException(LoweringDiagnostics.DelegationNotExpressible, $"'{type.Name}' delegates '{iface.Name}' to '{field}', a value of another interface — not yet", type.Declaration?.Span ?? default);
             callee = held;
         }
         else
@@ -1521,7 +1521,7 @@ public static class ModuleLowerer
                 IrRefType r => r.Type,
                 IrStructType s => s.Type,
                 IrEnumType e => e.Type,
-                _ => throw new UnsupportedConstructException($"'{type.Name}' delegates '{iface.Name}' to '{field}', whose type cannot carry an interface value", type.Declaration?.Span ?? default),
+                _ => throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable, $"'{type.Name}' delegates '{iface.Name}' to '{field}', whose type cannot carry an interface value", type.Declaration?.Span ?? default),
             };
             foreach (var row in rows)
                 if (row.Type == concrete && row.Interface == ifaceId && slot < row.Methods.Length)
