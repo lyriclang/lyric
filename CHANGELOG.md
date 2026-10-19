@@ -192,6 +192,25 @@ promise. This entry fills with the milestones.
   functions are musl's on every platform, bit for bit, and `comptime exp(1.0)` answers. A child's
   pipes on Windows park on the poller. `examples/jsonserver` and `examples/logfilter`.
 
+- **The runtime's own collector (M11** — `design/v5/spec/01` L1 stages 2 and 3, 13 M11; spec chapters 13 §1.4,
+  10 §8, 14, 15 §4**):** the default, replacing Boehm, which stays as the profile field `gc = "boehm"` (and
+  `--gc boehm`) to compare against. Non-moving Immix — one reservation of address space, 32 KiB blocks of
+  256-byte lines, a bump allocation inline in the program, large objects in pages and chunks of their own —,
+  the heap marked precisely by the descriptors' maps and every stack conservatively. Generational over sticky
+  mark bits: a young collection marks from the roots and the cards a store dirtied — every reference store
+  marks its line's card, a coroutine switch the coroutine's — and leaves what is old; full when the old heap
+  doubled, when the heap has no room, and on `lyr_gc_collect`. The world stops at safepoints: every loop polls
+  every 1024 passes, every function that calls checks its stack at its entry, and the runtime's blocking calls
+  are safe regions — no signals. A stack overflow is found at a function's entry and is a panic like any
+  other: it leaves its coroutine, a task that overflows ends alone, and what the output holds comes out before
+  the report. Weak references call back for every object that dies; dropped coroutines go with their stacks;
+  memory beyond the next cycle's needs goes back to the system after a full collection. A full collection
+  over 128 MiB alive marks on several threads. `Atomic<T>` holds a class or an optional of one, compared by
+  identity. Measured (bench/gc, against the same programs under Boehm): binarytrees in half the time; cache —
+  1.4 GiB alive — with its longest pause at 462 ms (Boehm 661) and 99 % of its pauses under 10 ms; RSS above
+  Boehm's where short-lived objects share lines with long-lived ones. A build that switches the collector, or
+  goes back to any variant built before, links again.
+
 ---
 
 ## v4.6.0 — never released

@@ -206,6 +206,10 @@ runs as before, and the prologue's check costs nothing measurable — what remai
 and branch in a tight merge loop; strip-mining counted loops would take it (design 13, the S5 note: decided at P13's
 measurement). The bounds hold: `sorting` 1.28× Go, `maps` 1.44×; `strings` stays over 1.5× as before M11.
 
+After M11 (2026-10-18/19; four measurements, the machine noisy — C's own `loops` moved by a quarter): `strings`
+1.54–1.68× Go, over the bound every time; `maps` 1.09–1.56×, around it; `sorting` 0.99–1.43×. The loop poll costs
+`sorting` 4–7 % (design 13, the S5 note). A profiling sweep before M12 takes `strings` on (design 13, the S10 note).
+
 ## Measurement point 5 (M11): the collector — prepared in S6
 
 | Program | What it measures |

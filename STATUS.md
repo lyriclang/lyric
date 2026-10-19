@@ -46,7 +46,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M9a | `comptime` (the IR interpreter), attributes, `std.meta`, the synthesis | XL | **done** 2026-10-13 |
 | M9b | Macros | L | **done** 2026-10-13 |
 | M10 | std after rule D | XL | **done** 2026-10-14 |
-| M11 | Own GC | XL | — |
+| M11 | Own GC | XL | **done** 2026-10-19 |
 | M12 | Diagnostics and lints | L | — |
 | M13a | fmt, doc, api | M | — |
 | M13b | LSP, DAP, clients | XL | — |
@@ -1372,6 +1372,69 @@ released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "
   job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
   step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
 
+### M11 — done (2026-10-19)
+
+The runtime's own collector after 01 L1 stages 2 and 3: the plan is design 13's addendum "der Plan für M11"
+(P1–P14, S1–S10, S9b), #494. Boehm stays as the profile field `gc = "boehm"` to compare against. The mode of
+M10: no halt until the close, merged on green CI — from S5 on with the whole platform matrix dispatched on the
+branch first (S4 broke Windows in its PR and macOS only on main) —, open points collected for the report.
+
+- **S1** the heap (P1–P3, P11; #495): one reservation of address space taken in 4 MiB chunks, Immix blocks of
+  32 KiB with 256-byte lines, large objects page by page and huge ones in chunks of their own, the side tables
+  (line marks, start bits, mark bits); a buffer per thread, `lyr_alloc`/`lyr_alloc_array`/`lyr_alloc_string`
+  inline in `gc.h`, the start bits and the counters from parsing a buffer its thread leaves. The build compiles
+  one collector or the other (`RuntimeLayout`, `LYR_GC_BOEHM`); coroutine descriptors say `LYR_DESC_CORO`.
+- **S2** marking and reuse (P4, P7, P9; #496): a mark stack over the descriptors' maps, interior pointers through
+  the start bits, an enum with references read conservatively; roots — the stacks, a suspended coroutine's
+  through its object, the module globals through a table the emitter writes, `LyrRoot`, registered ranges; line
+  marks by epoch, blocks sorted when an allocator takes one, large objects freed in the pause; the budget grows
+  with what lived; weak callbacks again for every death (`weak` asks for all 1000, the review's D1); a dropped
+  coroutine goes with its stack. `LYR_GC_VERIFY` checks the maps: the emitted class graphs run under it.
+- **S3** safepoints (P5; #497): a poll at every loop's head, the stack check at every calling function's entry
+  — one compare is poll and overflow check —; the world stops without signals, every blocking call of the
+  runtime is a safe region that copies the spilled frames; TSan runs the threaded programs in CI.
+- **S4** the prologue check (P6; #498 + spec#322): an overflow is found at a function's entry and is a panic
+  like any other (spec 13 §1.6 rule 10) — it leaves its coroutine, a task that overflows ends alone, the output
+  comes out before the report; 05 E8's deviation M6-25 and open point 192 fell. Found by the platforms: DbgHelp
+  names a trace with far more than the reserve (the resumer names it now), and Apple's unwinder overflowed the
+  reserve while it gathered (#500: the frame-pointer chain, 64 KiB below a thread's own stack).
+- **S5** the default (P11, P14; #499 + spec#323): `gc = "immix" | "boehm"` (spec 15 §4, 14 `--gc`), the
+  development switch gone; ASan and TSan under the own collector. The loop poll counts down (every 1024 passes):
+  measurement points 2 and 3 kept their bounds, `sorting` paid 4–7 %. Found by Windows: leaving a safe region cleared the last
+  error, so a poller's timed-out wait read as a failure (`safe_errors`).
+- **S6** generations (P8; #501): sticky mark bits, the card barrier — a byte per line, set unconditionally
+  within the heap; the value, span and `error.c` barriers; a coroutine switch marks the card of the coroutine it
+  leaves and enters, its stack having no barrier; young after the budget, full when the old heap doubled.
+  `LYR_GC_VERIFY` catches a store without its barrier. Found: a reused huge chunk handed out a dead object's
+  bytes (`reuse_zeroed`).
+- **S7** `Atomic<class>` (P10; #502 + spec#324): `AtomicValue` admits classes and their optionals,
+  `compareAndSet` by identity, the card marked on every write (spec 10 §8).
+- **S8** memory back (P7; #503): after a full collection, outside the pause, free blocks beyond the next
+  cycle's budget go to the system (Linux `MADV_DONTNEED`, Windows decommit, macOS fresh pages); 601 → 17 MiB
+  resident after half a gibibyte let go.
+- **S9** measurement point 5 (P12; #505): `lyr_gc_stats()` (every pause, both collectors), `bench/gc` with Go
+  twins and the Boehm profile, `run.py --ratchet`; the young generation bounded (8 MiB) and the marking faster
+  (the header read ahead through a ring of eight; words into blocks without young objects passed over).
+- **S9b** parallel marking (P12; #506): a full collection over 128 MiB alive marks on up to eight threads;
+  alone, plain bit stores. Found by the measurement: a young collection after a shared one handed work to
+  nobody (open point 212; `mark_shared`).
+- **S10** the close (P13): measurement point 3 again, the hasher put to the maintainer, this status, the
+  changelog, the report.
+
+**Measurement point 5** (bench/gc, the machine quiet): `cache`'s longest pause 462 ms (Boehm 661), its 99th
+percentile 9.2 ms — P12's pause targets kept; `binarytrees` in half Boehm's time. Missed: RSS (`cache` 2.4 GiB
+against Boehm's 1.6 — short-lived arrays share lines with long-lived entries) and `lru`'s time (+10 %); both
+are the maintainer's (open points 204, 205). **Measurement point 3** again (P13): `strings` 1.54–1.68× Go in four measurements (2026-10-18/19, the machine noisy — C's own `loops` moved by a quarter), over the bound of 1.5 every time; `maps` 1.09–1.56×, around it; `sorting` 0.99–1.43×. The maintainer decided a profiling sweep before M12, the bound kept..
+
+Found outside the collector: a build that went back to cached inputs — the other collector's archive — kept
+the binary the others made (#504); its test then failed on macOS, where `size_t` and `uint64_t` differ (fixed
+in #505). Local full runs used the spec's serial runner (3 h); they use the tree's parallel wrapper now (216).
+
+Reviewed on 2026-10-19, every point as recommended (design 13, the S10 note): RSS is reported, not gated
+(size classes or smaller lines a door after 5.0); SipHash-1-3 stays the default hasher (R9c confirmed); a sweep
+before M12 — `strings`' profile, a word-wise `string.hash`, a full collection over time (208), the caches (203,
+206), the hygiene points (200, 209, 215).
+
 ## Design decisions
 
 All of them are in [`design/v5/spec/`](design/v5/spec/) — one document per area, each with the
@@ -1385,7 +1448,7 @@ Claude plans **and** implements; the maintainer reviews (in force since the scop
 merged once its CI is green; the milestones follow each other without a pause until 5.0 stands,
 and the last push toward 5.0 waits for the maintainer's review of the points collected on the
 way (those of M4 to M8a were reviewed on 2026-10-05, those of the run that closed M8a on
-2026-10-07, M8b's on 2026-10-08, M8c's on 2026-10-09). Claude also merges, tags and releases. Anything that acts outside the repository — creating
+2026-10-07, M8b's on 2026-10-08, M8c's on 2026-10-09, M10's on 2026-10-15, M11's on 2026-10-19). Claude also merges, tags and releases. Anything that acts outside the repository — creating
 repositories, publishing releases, deleting published things — is laid out first and done on the
 maintainer's word.
 

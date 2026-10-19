@@ -859,3 +859,25 @@ Nach Aufwand: groß S2, S3, S6; mittel S1, S4, S5, S9; klein S7, S8, S10. Etwa a
 - **Die Ratsche** hält damit jedes Pausenziel aus P12 (`cache`: p99 unter 10 ms, die längste Pause unter Boehms); es
   bleiben RSS (`cache`, `lru` — die Zeilen, S6-Nachtrag) und die Zeit von `lru` (+10 % gegen Boehm), die Entscheidungen
   des Maintainers (offene Punkte 204, 205).
+
+### Nachtrag 2026-10-19 — S10: Abschluss, Durchsicht
+
+- **Messpunkt 3 neu** (P13): `strings` 1,54–1,68× Go in vier Messungen (18./19.10., die Maschine verrauscht —
+  Cs eigenes `loops` schwankte um ein Viertel), jedes Mal über der Schranke 1,5; `maps` 1,09–1,56×, um sie herum;
+  `sorting` 0,99–1,43×. Der Poll kostet `sorting` 4–7 % (S5); `strings` lag schon vor M11 über der Schranke.
+- **Der Vorgabe-Hasher** (P13, 10 R9c): ein gefaltetes Produkt unter Prozessschlüssel gegen SipHash-1-3 auf
+  `maps`, einer Map aus 40 Header-Namen und einer neuen Map je Anfrage — 6–15 % schneller in drei Sitzungen.
+  Der größere Posten ist `string.hash`, das Byte für Byte über `writeByte` schreibt: FNV ohne jede Mischung liegt
+  bei Strings bei 40–55 % von SipHash. `std.http` legt Header in einer Liste ab, nicht in einer Map.
+- **Die Türen geprüft**: Stufe 4 (nebenläufiges Markieren, paralleles Sweeping) nicht gebaut; Enums mit Referenzen
+  weiter konservativ gelesen (präzise Karten je Variante: Tür, kein Befund falscher Rückhaltung in `bench/gc`);
+  keine Stellschraube (kein `getenv` im Sammler, `heap_limit` die einzige); nichts bewegt sich — Bewegen bleibt nie.
+- **Durchsicht 2026-10-19, alle Punkte nach Empfehlung**:
+
+  | # | Entscheidung |
+  |---|---|
+  | 204 | **Die Ratsche neu gelesen**: RSS wird berichtet, nicht gegated. Größenklassen für kleine Objekte oder kleinere Zeilen sind eine Tür (Uhr: nach 5.0, oder wenn ein Nutzer es misst). |
+  | P13 `strings` | **Ein Profil-Sweep vor M12**, die Schranke bleibt 1,5. |
+  | P13 Hasher | **SipHash-1-3 bleibt** (R9c bestätigt); `string.hash` wortweise (offener Punkt 214) im Sweep, danach `maps` und die Header-Map nachmessen. |
+  | Sweep vor M12 | 208 (eine volle Sammlung über die Zeit: ein Programm, dessen Altes stirbt und das wenig befördert, sammelt sonst nie wieder voll), 203 und 206 (der Testprogramm-Cache je Checkout, der Laufzeit-Cache ausgedünnt), 200, 209, 215 (Hygiene), 214 und `strings`. |
+  | 207 | Strip-Mining der Polls: Tür (die Ratsche hält). |
