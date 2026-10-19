@@ -830,3 +830,32 @@ Nach Aufwand: groß S2, S3, S6; mittel S1, S4, S5, S9; klein S7, S8, S10. Etwa a
   Markierer — unser Boehm-Build markiert auf einem Faden (kein `PARALLEL_MARK`; bdwgc setzt es nur über configure
   oder CMake), und die längste Pause verliert schon gegen ihn. S9b folgt als eigener Schritt; RSS und die Lesart der
   Ratsche entscheidet der Maintainer (die offenen Punkte).
+
+### Nachtrag 2026-10-19 — S9b gebaut und gemessen: paralleles Markieren
+
+- **Wie**: eine volle Sammlung, die mindestens 128 MiB Lebendes erwartet (`SHARE_MIN`), markiert mit Helfern — einer
+  weniger als die Prozessoren, höchstens sieben —, die beim ersten Sammeln starten, zwischen den Sammlungen schlafen,
+  kein Signal des Programms nehmen und keinen Programmcode laufen. Das Markierbit wird dann in einem atomaren Schritt
+  gesetzt, nur wer es setzte, legt das Objekt auf seinen Stapel; die Zeilenmarke ist ein relaxter Store der Epoche.
+  Ein Markierer, dessen Stapel über zwei Pakete wächst, während ein anderer wartet, gibt ein Paket zu 256 Objekten in
+  einen gemeinsamen Pool; das Markieren endet, wenn alle warten und der Pool leer ist. Allein — jede junge Sammlung,
+  jede volle unter `SHARE_MIN` — markiert der sammelnde Faden ohne den atomaren Schritt und gibt nichts ab.
+- **Ein Fehler, gefunden von der Messung** (offener Punkt 212): der Wartezähler blieb nach einer geteilten Markierung
+  stehen, und die nächste junge Sammlung gab allein Pakete in einen Pool, den niemand las — ihre Objekte wurden nie
+  gescannt, ihre Zeilen galten als frei, und die nächste volle Sammlung scannte, was dort inzwischen lag (`cache`:
+  SIGSEGV). `runtime/tests/mark_shared.c` (160 MiB Ballast über `SHARE_MIN`) ist davor rot, danach grün; auch unter
+  ASan und TSan.
+- **Die Schwelle**: jede volle Sammlung geteilt kostete die kleinen Heaps — `lru` (rund 100 MiB) 17–20 ms längste
+  Pause gegen 14,5 allein, `binarytrees` 11 gegen 8–9 ms. Junge Sammlungen geteilt maßen nicht besser (`cache`, 90.
+  Perzentil 10,0 gegen 10,9 ms, im Rauschen) und weckten die Helfer 369-mal.
+- **Gemessen** (die Maschine ruhig, zwei abwechselnde Runden gegen main mit S9, je das Minimum aus 3 Läufen):
+
+  | bench | S9: Pause max | S9b: Pause max | Boehm | S9b: p99 |
+  |---|---|---|---|---|
+  | binarytrees | 8,4 / 9,3 ms | 8,1 / 9,0 ms | 9,5 / 8,4 ms | 6,3 ms |
+  | cache | 786 / 823 ms | **462 / 482 ms** | 661 / 654 ms | 9,2 ms |
+  | lru | 14,3 / 14,6 ms | 14,2 / 16,4 ms | 17,1 / 15,0 ms | 14,2 ms |
+
+- **Die Ratsche** hält damit jedes Pausenziel aus P12 (`cache`: p99 unter 10 ms, die längste Pause unter Boehms); es
+  bleiben RSS (`cache`, `lru` — die Zeilen, S6-Nachtrag) und die Zeit von `lru` (+10 % gegen Boehm), die Entscheidungen
+  des Maintainers (offene Punkte 204, 205).

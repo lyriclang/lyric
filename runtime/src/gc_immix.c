@@ -67,6 +67,7 @@
 #else
 #  include <pthread.h>
 #  include <sched.h>
+#  include <signal.h>
 #  include <sys/mman.h>
 #  include <unistd.h>
 #endif
@@ -101,6 +102,11 @@ enum {
  * percentile under 10 ms). The old heap's growth paces the full collections as before (P8). */
 #define MIN_BUDGET ((size_t)4 << 20)
 #define YOUNG_MAX ((size_t)8 << 20)
+/* A full collection marks side by side (S9b) when it expects at least this much alive: below it the
+ * marking takes some milliseconds, and waking the helpers costs more than they share (measured: lru,
+ * about 100 MiB alive, its longest pause 14.5 ms alone and 17–20 ms side by side; cache's full
+ * collections from 438 MiB on are where sharing pays). */
+#define SHARE_MIN ((size_t)128 << 20)
 
 #define NO_BLOCK UINT32_MAX
 
@@ -567,6 +573,12 @@ static void take(SRWLOCK *l) { AcquireSRWLockExclusive(l); }
 static void give(SRWLOCK *l) { ReleaseSRWLockExclusive(l); }
 static void wait_restart(void) { SleepConditionVariableSRW(&restarted, &stop_lock, INFINITE, 0); }
 static void signal_restart(void) { WakeAllConditionVariable(&restarted); }
+typedef SRWLOCK Lock;
+typedef CONDITION_VARIABLE Cond;
+#define LOCK_INIT SRWLOCK_INIT
+#define COND_INIT CONDITION_VARIABLE_INIT
+static void wait_on(Cond *c, Lock *l) { SleepConditionVariableSRW(c, l, INFINITE, 0); }
+static void wake_all(Cond *c) { WakeAllConditionVariable(c); }
 #else
 static pthread_mutex_t collect_lock = PTHREAD_MUTEX_INITIALIZER, registry_lock = PTHREAD_MUTEX_INITIALIZER,
                        stop_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -575,6 +587,12 @@ static void take(pthread_mutex_t *l) { pthread_mutex_lock(l); }
 static void give(pthread_mutex_t *l) { pthread_mutex_unlock(l); }
 static void wait_restart(void) { pthread_cond_wait(&restarted, &stop_lock); }
 static void signal_restart(void) { pthread_cond_broadcast(&restarted); }
+typedef pthread_mutex_t Lock;
+typedef pthread_cond_t Cond;
+#define LOCK_INIT PTHREAD_MUTEX_INITIALIZER
+#define COND_INIT PTHREAD_COND_INITIALIZER
+static void wait_on(Cond *c, Lock *l) { pthread_cond_wait(c, l); }
+static void wake_all(Cond *c) { pthread_cond_broadcast(c); }
 #endif
 
 int lyr_gc_stop_requested;
@@ -1105,28 +1123,48 @@ void lyr_gc_switch_end(void) {}
 
 /* --- marking --------------------------------------------------------------------------------- */
 
-static uintptr_t *mark_stack;
-static size_t mark_top, mark_capacity;
+/* A marker (S9b): the stack it works off and the bytes it found alive. The collecting thread marks
+ * with its own, each helper with one of its own; `marker` is the calling thread's. */
+typedef struct Marker {
+    uintptr_t *stack;
+    size_t top, capacity;
+    size_t live;
+} Marker;
+
+static Marker collector_marker;
+static _Thread_local Marker *marker;
 static size_t live_bytes;
 
 static void push(uintptr_t object) {
-    if (mark_top == mark_capacity) {
-        size_t capacity = mark_capacity ? mark_capacity * 2 : 4096;
-        uintptr_t *grown = realloc(mark_stack, capacity * sizeof *grown);
+    Marker *m = marker;
+    if (m->top == m->capacity) {
+        size_t capacity = m->capacity ? m->capacity * 2 : 4096;
+        uintptr_t *grown = realloc(m->stack, capacity * sizeof *grown);
         if (grown == NULL) lyr_panic(LYR_RT_OUT_OF_MEMORY, "out of memory marking the heap");
-        mark_stack = grown;
-        mark_capacity = capacity;
+        m->stack = grown;
+        m->capacity = capacity;
     }
-    mark_stack[mark_top++] = object;
+    m->stack[m->top++] = object;
 }
 
 /* The object starting at `start` marked and pushed; nothing when it was marked already. Its header
  * is not read here — where it is found, it is a cache miss —, but when the stack gives it back
- * (drain), fetched ahead by then (S9). */
+ * (drain), fetched ahead by then (S9). Markers mark side by side (S9b): the bit is set in one
+ * atomic step, and only the marker that set it pushes the object; a marker alone sets it plainly. (With
+ * the locked step everywhere and sharing from 32 MiB, binarytrees' longest pause was 11 ms against 8–9
+ * before S9b; plainly alone and sharing from SHARE_MIN, 8–9 again — which of the two did it, the
+ * measurement does not separate.) */
+static int markers_running;  /* defined with the marking side by side, below */
+
 LYR_NO_SANITIZE static void mark_object(uintptr_t start) {
     size_t g = granule_of(start);
-    if (bit(mark_bits, g)) return;
-    set_bit(mark_bits, g);
+    uint8_t *byte = &mark_bits[g >> 3], mask = (uint8_t)(1u << (g & 7));
+    if (__atomic_load_n(byte, __ATOMIC_RELAXED) & mask) return;
+    if (markers_running > 1) {
+        if (__atomic_fetch_or(byte, mask, __ATOMIC_RELAXED) & mask) return;
+    } else {
+        *byte |= mask;
+    }
     push(start);
 }
 
@@ -1333,10 +1371,10 @@ LYR_NO_SANITIZE static void scan_object(uintptr_t start) {
     const LyrObj *object = (const LyrObj *)start;
     const LyrDesc *desc = object->desc;
     size_t bytes = object_bytes(object);
-    live_bytes += bytes;
+    marker->live += bytes;
     if (chunks[(start - heap_base) / CHUNK].kind == CHUNK_BLOCKS) {
         size_t first = line_of(start), last = line_of(start + bytes - 1);
-        for (size_t l = first; l <= last; l++) line_marks[l] = epoch;
+        for (size_t l = first; l <= last; l++) __atomic_store_n(&line_marks[l], epoch, __ATOMIC_RELAXED);
     }
     if (desc->flags & LYR_DESC_CORO) {
         trace_coro((const LyrCoro *)object);
@@ -1347,24 +1385,201 @@ LYR_NO_SANITIZE static void scan_object(uintptr_t start) {
     }
 }
 
+/* --- marking side by side (S9b) ---------------------------------------------------------------- */
+
+/* The collecting thread and helper threads — one fewer than the machine's processors, at most
+ * MARKERS - 1 — work off the marking together once the roots are pushed. A marker whose stack grows
+ * while another waits gives a packet of PACKET objects to a shared pool; a marker whose stack runs
+ * empty takes one; the marking ends when every marker waits and the pool is empty. The helpers sleep
+ * between collections and run no program code. */
+enum { PACKET = 256, MARKERS = 8 };
+
+typedef struct Packet {
+    struct Packet *next;
+    uintptr_t items[PACKET];
+} Packet;
+
+static Lock pool_lock = LOCK_INIT;
+static Cond pool_changed = COND_INIT, phase_begun = COND_INIT, helper_done = COND_INIT;
+static Packet *full_packets, *spare_packets;
+/* markers_waiting is written under pool_lock and read without it by a busy marker (drain): its
+ * writes are atomic, the reads under the lock plain. */
+static int markers_running = 1, markers_waiting, helpers, helpers_done;
+static bool marking_over;
+static unsigned phase;
+static size_t helpers_live;
+
+static void give_packet(Marker *m) {
+    take(&pool_lock);
+    Packet *p = spare_packets;
+    if (p != NULL) spare_packets = p->next;
+    give(&pool_lock);
+    if (p == NULL && (p = malloc(sizeof *p)) == NULL) return;
+    m->top -= PACKET;
+    memcpy(p->items, &m->stack[m->top], sizeof p->items);
+    take(&pool_lock);
+    p->next = full_packets;
+    full_packets = p;
+    wake_all(&pool_changed);
+    give(&pool_lock);
+}
+
+/* A packet for an empty marker; false when the marking is over. */
+static bool take_packet(Marker *m) {
+    take(&pool_lock);
+    __atomic_store_n(&markers_waiting, markers_waiting + 1, __ATOMIC_RELAXED);
+    for (;;) {
+        Packet *p = full_packets;
+        if (p != NULL) {
+            full_packets = p->next;
+            __atomic_store_n(&markers_waiting, markers_waiting - 1, __ATOMIC_RELAXED);
+            give(&pool_lock);
+            for (size_t i = 0; i < PACKET; i++) push(p->items[i]);
+            take(&pool_lock);
+            p->next = spare_packets;
+            spare_packets = p;
+            give(&pool_lock);
+            return true;
+        }
+        if (!marking_over && markers_waiting == markers_running) {
+            marking_over = true;
+            wake_all(&pool_changed);
+        }
+        if (marking_over) {
+            give(&pool_lock);
+            return false;
+        }
+        wait_on(&pool_changed, &pool_lock);
+    }
+    (void)m;
+}
+
 /* The stack worked off through a ring of AHEAD objects (S9, Boehm's prefetch buffer): each is
- * fetched as it leaves the stack and scanned AHEAD objects later, its header in the cache by then. */
+ * fetched as it leaves the stack and scanned AHEAD objects later, its header in the cache by then.
+ * While markers mark side by side, a stack grown past two packets while one of them waits gives one
+ * away; a marker alone keeps its work — a packet given in a young collection would wait in the pool
+ * unscanned, its objects' lines read free, and the next full collection would scan what lay there
+ * by then. */
 enum { AHEAD = 8 };
 
 LYR_NO_SANITIZE static void drain(void) {
-    uintptr_t ring[AHEAD];
-    size_t head = 0, held = 0;
+    Marker *m = marker;
     for (;;) {
-        while (held < AHEAD && mark_top > 0) {
-            uintptr_t next = mark_stack[--mark_top];
-            __builtin_prefetch((const void *)next);
-            ring[(head + held++) % AHEAD] = next;
+        uintptr_t ring[AHEAD];
+        size_t head = 0, held = 0;
+        for (;;) {
+            while (held < AHEAD && m->top > 0) {
+                uintptr_t next = m->stack[--m->top];
+                __builtin_prefetch((const void *)next);
+                ring[(head + held++) % AHEAD] = next;
+            }
+            if (held == 0) break;
+            uintptr_t start = ring[head];
+            head = (head + 1) % AHEAD;
+            held--;
+            scan_object(start);
+            if (markers_running > 1 && m->top > 2 * PACKET && __atomic_load_n(&markers_waiting, __ATOMIC_RELAXED) > 0) {
+                give_packet(m);
+            }
         }
-        if (held == 0) return;
-        uintptr_t start = ring[head];
-        head = (head + 1) % AHEAD;
-        held--;
-        scan_object(start);
+        if (markers_running == 1 || !take_packet(m)) return;
+    }
+}
+
+static void helper_loop(void) {
+    Marker own = { 0 };
+    marker = &own;
+    unsigned seen = 0;
+    for (;;) {
+        take(&pool_lock);
+        while (phase == seen) wait_on(&phase_begun, &pool_lock);
+        seen = phase;
+        give(&pool_lock);
+        own.live = 0;
+        drain();
+        take(&pool_lock);
+        helpers_live += own.live;
+        helpers_done++;
+        wake_all(&helper_done);
+        give(&pool_lock);
+    }
+}
+
+#ifdef _WIN32
+static DWORD WINAPI helper_main(LPVOID unused) {
+    (void)unused;
+    helper_loop();
+    return 0;
+}
+#else
+static void *helper_main(void *unused) {
+    (void)unused;
+    /* no signal of the program's is a helper's to take */
+    sigset_t all;
+    sigfillset(&all);
+    pthread_sigmask(SIG_BLOCK, &all, NULL);
+    helper_loop();
+    return NULL;
+}
+#endif
+
+/* Once, at the first collection: the helpers, one fewer than the processors, at most MARKERS - 1. */
+static void start_helpers(void) {
+    static bool started;
+    if (started) return;
+    started = true;
+#ifdef _WIN32
+    SYSTEM_INFO info;
+    GetSystemInfo(&info);
+    long processors = (long)info.dwNumberOfProcessors;
+#else
+    long processors = sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+    int wanted = processors > MARKERS ? MARKERS - 1 : (int)processors - 1;
+    for (int i = 0; i < wanted; i++) {
+#ifdef _WIN32
+        HANDLE thread = CreateThread(NULL, 0, helper_main, NULL, 0, NULL);
+        if (thread == NULL) break;
+        CloseHandle(thread);
+#else
+        pthread_t thread;
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+        int failed = pthread_create(&thread, &attr, helper_main, NULL);
+        pthread_attr_destroy(&attr);
+        if (failed) break;
+#endif
+        helpers++;
+    }
+}
+
+/* The marking from the pushed roots on — by every marker in a full collection over SHARE_MIN, by the
+ * collecting thread alone otherwise. A young collection's work is bounded (YOUNG_MAX): sharing it
+ * measured no better (cache's young pauses at the 90th percentile 10.0 ms side by side, 10.9 alone,
+ * within the runs' noise) and woke the helpers 369 times. The bytes found alive summed. */
+static void mark_side_by_side(void) {
+    start_helpers();
+    bool shared = helpers > 0 && !young_only && live_full + promoted >= SHARE_MIN;
+    if (shared) {
+        take(&pool_lock);
+        markers_running = helpers + 1;
+        __atomic_store_n(&markers_waiting, 0, __ATOMIC_RELAXED);
+        helpers_done = 0;
+        helpers_live = 0;
+        marking_over = false;
+        phase++;
+        wake_all(&phase_begun);
+        give(&pool_lock);
+    }
+    drain();
+    if (shared) {
+        take(&pool_lock);
+        while (helpers_done < helpers) wait_on(&helper_done, &pool_lock);
+        markers_running = 1;
+        __atomic_store_n(&markers_waiting, 0, __ATOMIC_RELAXED);
+        collector_marker.live += helpers_live;
+        give(&pool_lock);
     }
 }
 
@@ -1409,7 +1624,7 @@ static void mark_roots(Thread *t) {
     }
     for (LyrRoot *root = roots; root != NULL; root = root->next) mark_word((uintptr_t)root->object);
     for (size_t i = 0; i < range_count; i++) scan_range(ranges[i].low, ranges[i].high);
-    drain();
+    mark_side_by_side();
 }
 
 #ifdef LYR_GC_VERIFY
@@ -1738,7 +1953,8 @@ static void collect(Need need) {
 
     size_t floor = live_full > MIN_BUDGET ? live_full : MIN_BUDGET;
     bool full = need == FULL || (need == PACED && live_full + promoted >= 2 * floor);
-    live_bytes = 0;
+    marker = &collector_marker;
+    collector_marker.live = 0;
     if (full) {
         /* a new epoch: no line is live until this collection finds it so, no object old */
         if (++epoch == 0) {
@@ -1758,6 +1974,7 @@ static void collect(Need need) {
     }
     mark_roots(t);
     young_only = false;
+    live_bytes = collector_marker.live;
 #ifdef LYR_GC_VERIFY
     verify();
 #endif
