@@ -261,7 +261,7 @@ schweren Fragen des Dossiers schon beantwortet.
 | T5 | **Zwei Kanäle, Zig-Modell** (Maintainer, 2026-09-29): **`stable`** = getaggte Releases (SemVer, GitHub Release + Website-Mirror, `SHA256SUMS`, **minisign-Signatur**); **`dev`** = fortlaufende Builds vom `dev`-Branch **ohne jedes Versprechen** (Version `5.2.0-dev.<datum>+<sha>`), dort wird ausprobiert und entwickelt, von dort wandert es in die stabile Release. **Kein `nightly`** (die 4.x-Nightlies wurden binnen Stunden von Stable ersetzt — ein Kanal ohne Inhalt). `lyric toolchain install dev` / `update` installieren daneben, nie in-place | Zig (Master-Builds + Tags); verworfen: Rust-Nightly-Kanal |
 | T6 | **Versionskohärenz**: ein Binary — kein Werkzeug-Versatz (CLI-31 entfällt); Clients prüfen `lyric lsp --version` + Protokollversion (E18); `std` in der Toolchain, `LYRIC_STDLIB` nur für Entwicklung | — |
 | T7 | **Toolchain-Pin im Manifest ist die Wahrheit** (P12); `~/.lyric/config.toml` hält `default`; Präzedenz C4 | Go |
-| T8 | **Vormerk Website** (Maintainer): Neudesign als eigener Bereich; die Seite **spiegelt die Toolchain-Downloads** (T1/T5) und ist Download-Quelle für `lyric toolchain` neben GitHub — dieselben Hashes und Signaturen; trägt Guide, Spec, Katalogseite (G9), Paket-Doku (`lyric doc`) | — |
+| T8 | **Vormerk Website** (Maintainer): Neudesign als eigener Bereich; die Seite **spiegelt die Toolchain-Downloads** (T1/T5) und ist Download-Quelle für `lyric toolchain` neben GitHub — dieselben Hashes und Signaturen; trägt Guide, Spec, Katalogseite (G9), Paket-Doku (`lyric doc`). **Ausgeführt in 14** (der Guide wird dort das Book) | — |
 
 ## Review 2026-10-05 — Nachträge beim Bauen (M4–M8a)
 

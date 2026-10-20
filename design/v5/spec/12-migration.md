@@ -127,7 +127,7 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | # | Korpus | Weg | Warum |
 |---|---|---|---|
 | Q1 | **`std`** | **neu schreiben**, nicht migrieren — 35 Module nach B1, neue Grenze, neue Verträge; die 4.x-Quelle ist Steinbruch für getestete Algorithmen (Map, Merge-Sort, JSON, Base64, RFC 3339) | Regel D und die neuen Interfaces machen jede Datei zu 70 % anders |
-| Q2 | **Guide** | neu aus den Spec-Dokumenten; Kapitel folgen den Bereichen; jedes Snippet in der Suite | der 4.x-Guide erklärt eine andere Bibliothek |
+| Q2 | **Book** (geändert 2026-10-20, 14 W6: statt eines Guides nach Bereichen) | neu aus den Spec-Dokumenten; Kapitel folgen dem Lernweg, mit Projektkapiteln; jedes Snippet in der Suite | der 4.x-Guide erklärt eine andere Bibliothek |
 | Q3 | **`examples/`** | **mit `fix --from-4` migrieren** — der Abnahmetest: was danach nicht kompiliert, ist eine fehlende Regel (R2 ergänzen) oder ein `needsReview`-Fall im Bericht | misst das Werkzeug ehrlich |
 | Q4 | **Konformanzsuite** | neu (R4); 4.x-Fälle wandern mit Lyric-Script | — |
 | Q5 | **Golden-Tests** des Compilers | fallen; Ersatz: Konformanzfälle + C-Emission-Goldens | Compiler-Umbau |
