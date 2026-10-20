@@ -780,7 +780,7 @@ public sealed partial class Parser
         var boundTypes = new List<AssociatedTypeDecl>();
         var statics = new List<StaticBindingDecl>();
         if (_buffer.Match(TokenKind.Semicolon) || membersBegin)
-            ParseMethodSequence(methods, allowStatic: true, types: boundTypes, statics: statics);
+            ParseMethodSequence(methods, types: boundTypes, statics: statics);
 
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close enum body");
         return new EnumDecl(isPublic, name.Name, generics, interfaces, variants.ToArray(), methods.ToArray(),
@@ -904,7 +904,7 @@ public sealed partial class Parser
         var members = new List<FunctionDecl>();
         var types = new List<AssociatedTypeDecl>();
         var statics = new List<StaticBindingDecl>();
-        ParseMethodSequence(members, allowStatic: true, types: types, statics: statics); // a static member declares, through a constraint (03 T5)
+        ParseMethodSequence(members, types: types, statics: statics); // a static member declares, through a constraint (03 T5)
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close interface body");
         return new InterfaceDecl(isPublic, name.Name, generics, interfaces, members.ToArray(), Span.Union(start, close.Span))
             { NameSpan = name.Span, Types = types.ToArray(), IsSealed = isSealed, Statics = statics.ToArray() };
@@ -923,7 +923,7 @@ public sealed partial class Parser
         var methods = new List<FunctionDecl>();
         var boundTypes = new List<AssociatedTypeDecl>();
         var statics = new List<StaticBindingDecl>();
-        ParseMethodSequence(methods, allowStatic: true, types: boundTypes, statics: statics);
+        ParseMethodSequence(methods, types: boundTypes, statics: statics);
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close extend body");
         return new ExtendDecl(isPublic, target, interfaces, methods.ToArray(), Span.Union(start, close.Span))
             { Types = boundTypes.ToArray(), Generics = generics, Statics = statics.ToArray() };
@@ -935,8 +935,6 @@ public sealed partial class Parser
     /// <para>The modifier order is the one of FunctionDecl: the visibility word and 'static' are
     /// read here, 'mut' and 'fn' by ParseFunctionDecl.</para>
     /// </summary>
-    /// <param name="allowStatic">False in an interface body, where a member is dispatched on a
-    /// receiver and a static one has none.</param>
     /// <param name="allowAttributes">True everywhere since 2.15, the sema admitting only
     /// '@Deprecated' (the Member target). It was false in an interface body until then, because
     /// deprecating an abstract member raised a conformance question nobody had answered: do
@@ -953,7 +951,7 @@ public sealed partial class Parser
     /// <param name="statics">The list a <c>static let</c> goes to: an interface's declaration
     /// <c>static let zero: Self;</c> (03 T5), a block's constant (05 §6), an enum's (03 §4.1).
     /// Every member sequence takes one — LYR-PAR0040, which refused it in an enum, is retired.</param>
-    private void ParseMethodSequence(List<FunctionDecl> methods, List<StaticBindingDecl> statics, bool allowStatic,
+    private void ParseMethodSequence(List<FunctionDecl> methods, List<StaticBindingDecl> statics,
         bool allowAttributes = true, List<AssociatedTypeDecl>? types = null)
     {
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
@@ -979,7 +977,7 @@ public sealed partial class Parser
             var isStatic = false;
             if (_buffer.Check(TokenKind.Static))
             {
-                var kw = _buffer.Advance();
+                _buffer.Advance();
 
                 // 'static let' is a StaticBinding, as in a struct's or a class's body: an
                 // interface's declaration (03 T5), a block's constant (05 §6), an enum's.
@@ -990,14 +988,9 @@ public sealed partial class Parser
                     continue;
                 }
 
-                if (!allowStatic)
-                    _de.Report("LYR-PAR0041", Severity.Error, kw.Span,
-                        "an interface member cannot be 'static' — it is dispatched on a receiver, "
-                        + "and a static member has none. Declare it on the implementing type");
-
-                // Read on either way: the rest of the member is well formed, and stopping here
-                // would report every following one as well.
-                isStatic = allowStatic;
+                // every member sequence takes a static member since 03 T5 (an interface's declares
+                // through a constraint): LYR-PAR0041, which refused one in an interface, is retired
+                isStatic = true;
             }
 
             methods.Add(ParseFunctionDecl(isPublic, start, isStatic) with { Attributes = attributes });
