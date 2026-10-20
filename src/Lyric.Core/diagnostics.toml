@@ -64,11 +64,14 @@ fn main(): void {
 [LYR-BLD0003]
 title = "a warning a build script reported"
 severity = "warning"
+lint = "build-script-warning"
+group = "correctness"
+level = "warn"
 area = "15-project"
 summary = "Reported when a package's `build.lyr` calls `std.build.warn`: the build shows the script's message as a warning, prefixed with the package's name."
 explanation = '''
 A build script talks to the build through directives, not through its own output, which the toolchain keeps to itself. `build.warn(message)` is the directive for something the person building should see: a generated file that is out of date, a native library that was not found and a fallback that was taken.
-
+The warning is the script's; what to do is what its message says. It is the lint `build-script-warning`: `-D build-script-warning`, or a profile's `denyWarnings`, makes it an error that stops the build; a dependency's script warns with `--warn-deps` alone.
 The warning is the script's; what to do is what its message says. It does not count toward a profile's `denyWarnings`, which counts the compilation's warnings.
 '''
 wrong = '''
@@ -335,38 +338,8 @@ retired = "Lyric 5: binaries are native and there is no stub; the constant has n
 title = "warnings under a profile that denies them"
 severity = "error"
 area = "15-project"
-summary = "Reported after a compilation that warned when the profile has `denyWarnings` — set in the manifest's `[profile.<name>]` or with `--deny-warnings`. The warnings stay warnings; this error makes the build fail with exit 1."
-explanation = '''
-A profile with `denyWarnings = true` treats any warning as a reason to fail: the warnings are shown with their own codes and severity, and this one error, which counts them, carries the policy into the exit code. It is meant for CI, where a warning nobody reads should not reach `main`.
-
-Fix the warnings, allow a code where it is deliberate (`@Allow`, or `[lints] allow` in the manifest), or build without the policy: `--no-deny-warnings` for one build.
-'''
-wrong = '''
-//- lyric.toml
-[package]
-name = "app"
-version = "0.1.0"
-
-[profile.debug]
-denyWarnings = true
-//- src/main.lyr
-fn main(): void {
-    let x = 1;
-}
-'''
-right = '''
-//- lyric.toml
-[package]
-name = "app"
-version = "0.1.0"
-
-[profile.debug]
-denyWarnings = true
-//- src/main.lyr
-fn main(): void {
-    let _ = 1;
-}
-'''
+summary = "Reported after a compilation that warned when the profile had `denyWarnings`: one error that counted the warnings, which stayed warnings."
+retired = "M12a S5: a profile that denies warnings is `-D warnings` — each warning is the error, with a note naming the profile."
 
 [LYR-CLI0017]
 title = "a `lyric.json` holds something suspect"
@@ -5741,6 +5714,9 @@ fn main(): void {
 [LYR-SEM0071]
 title = "a local that is never used"
 severity = "warning"
+lint = "unused-variable"
+group = "unused"
+level = "warn"
 area = "07-statements"
 summary = "A local binding, loop variable, catch binding or pattern binding is never read after it is declared."
 explanation = '''
@@ -5765,6 +5741,9 @@ fn main(): void {
 [LYR-SEM0072]
 title = "an import that is never used"
 severity = "warning"
+lint = "unused-import"
+group = "unused"
+level = "warn"
 area = "04-modules"
 summary = "A name an import binds is never referred to in the file."
 explanation = '''
@@ -5786,6 +5765,9 @@ fn main(): void {
 [LYR-SEM0073]
 title = "an unreachable statement"
 severity = "warning"
+lint = "unreachable-code"
+group = "unused"
+level = "warn"
 area = "07-statements"
 summary = "A statement follows one that always leaves the block (`return`, `throw`, `break`, `continue`, a panic) and can never run; reported once per block."
 explanation = '''
@@ -5864,6 +5846,9 @@ fn main(): void {
 [LYR-SEM0076]
 title = "a use of a deprecated declaration"
 severity = "warning"
+lint = "deprecated"
+group = "deprecation"
+level = "warn"
 area = "11-metaprogramming"
 summary = "A declaration or module marked `@Deprecated` is used or imported outside another deprecated declaration."
 explanation = '''
@@ -5899,6 +5884,9 @@ fn main(): void {
 [LYR-SEM0077]
 title = "an import that shadows a builtin type"
 severity = "warning"
+lint = "builtin-type-shadowing"
+group = "correctness"
+level = "warn"
 area = "04-modules"
 summary = "An import binds a name that is also a builtin type, such as `import std.string;` binding `string`."
 explanation = '''
@@ -6637,6 +6625,9 @@ fn main(): void {
 [LYR-SEM0103]
 title = "a loop label nothing jumps to"
 severity = "warning"
+lint = "unused-label"
+group = "unused"
+level = "warn"
 area = "07-statements"
 summary = "A loop carries a label, and no 'break' or 'continue' in its body names it."
 explanation = '''
@@ -6664,6 +6655,9 @@ fn main(): void {
 [LYR-SEM0104]
 title = "a pattern that cannot fail where a test is promised"
 severity = "warning"
+lint = "irrefutable-pattern"
+group = "correctness"
+level = "warn"
 area = "09-patterns"
 summary = "The pattern of an 'if (let …)', 'while (let …)' or the 'let … else' form matches every value of the type it is given, so the test never fails ('if let', 'while let') or the 'else' never runs."
 explanation = '''
@@ -6785,6 +6779,9 @@ fn main(): void {
 [LYR-SEM0112]
 title = "a match arm no value can reach"
 severity = "warning"
+lint = "unreachable-pattern"
+group = "unused"
+level = "warn"
 area = "09-patterns"
 summary = "An arm of a 'match' stands after an arm that already matches every value, or tests the same variant or literal as an unguarded arm above it."
 explanation = '''
@@ -7614,6 +7611,9 @@ fn main(): void {
 [LYR-SEM0139]
 title = "a 'try' mark over nothing that can throw"
 severity = "warning"
+lint = "useless-try"
+group = "style"
+level = "warn"
 area = "06-errors"
 summary = "A 'try' mark, a 'try?' or 'try!', a 'try' block or a marked loop covers no call that can throw, or marks what an enclosing or earlier mark covers already."
 explanation = '''
@@ -7800,6 +7800,9 @@ fn main(): void {
 [LYR-SEM0144]
 title = "a Closeable value nothing closes"
 severity = "warning"
+lint = "closeable-never-closed"
+group = "resources"
+level = "warn"
 area = "06-errors"
 summary = "A value of a 'Closeable' type is made and dropped by an expression statement, or bound with a plain 'let', used, and neither closed nor handed on."
 explanation = '''
@@ -8056,6 +8059,9 @@ fn main(): void {
 [LYR-SEM0152]
 title = "a member is written wider than its type"
 severity = "warning"
+lint = "visibility-leak"
+group = "correctness"
+level = "warn"
 area = "04-modules"
 summary = "A field, method or constant of a struct, class or enum, or a member of an inherent `extend` block (or the block itself), is written with a visibility wider than the type it belongs to."
 explanation = '''
@@ -8087,6 +8093,9 @@ fn main(): void {
 [LYR-SEM0153]
 title = "a name hides one of the prelude's"
 severity = "warning"
+lint = "prelude-shadowing"
+group = "correctness"
+level = "warn"
 area = "04-modules"
 summary = "A module declares or imports a name the prelude already gives every module (`assert`, `panic`, `Result`, `Test` …); the module's own wins in that module. The standard library itself is not warned."
 explanation = '''
@@ -8383,6 +8392,9 @@ fn main(): void {
 [LYR-SEM0162]
 title = "a second loop over the same iterator"
 severity = "warning"
+lint = "iterator-reused"
+group = "correctness"
+level = "warn"
 area = "07-statements"
 summary = "A `for` loop walks a local or parameter that an earlier loop in the same or an enclosing block already walked, with no assignment to it between, and the binding's iterator may be shared (a class, or a type parameter a class may answer)."
 explanation = '''
@@ -8656,6 +8668,9 @@ fn main(): void {
 [LYR-SEM0168]
 title = "a type's member hides a blanket member"
 severity = "warning"
+lint = "blanket-shadowing"
+group = "correctness"
+level = "warn"
 area = "05-interfaces"
 summary = "A type has a member of its own (written, inherited as an interface default, or delegated to a field) with the same name as a member a blanket `extend<T :: […]> T` block gives it."
 explanation = '''
@@ -8794,6 +8809,9 @@ fn main(): void {
 [LYR-SEM0171]
 title = "a catch-all clause that nothing reaches"
 severity = "warning"
+lint = "unreachable-catch"
+group = "unused"
+level = "warn"
 area = "06-errors"
 summary = "A `catch` clause without a type (`catch (_)`) follows clauses that already take every error type the `try` block throws."
 explanation = '''
@@ -8859,6 +8877,9 @@ fn main(): void {
 [LYR-SEM0172]
 title = "a 'mut fn' generator on a value type changes a copy"
 severity = "warning"
+lint = "generator-copies-this"
+group = "correctness"
+level = "warn"
 area = "10-concurrency"
 summary = "A non-static `mut fn` method of a struct or enum is a generator: it returns `Coroutine<…>` and yields."
 explanation = '''
@@ -8900,6 +8921,9 @@ fn main(): void {
 [LYR-SEM0173]
 title = "a binding or parameter holds a 'void'"
 severity = "warning"
+lint = "void-binding"
+group = "correctness"
+level = "warn"
 area = "03-types"
 summary = "A local binding is initialized with a `void` value, or a parameter is declared with type `void`. Not reported for `_`, nor in generic code where a type parameter happens to be `void`."
 explanation = '''
@@ -9057,6 +9081,9 @@ fn main(): void {
 [LYR-SEM0178]
 title = "the value of a '@MustUse' call is dropped"
 severity = "warning"
+lint = "unused-result"
+group = "unused"
+level = "warn"
 area = "11-metaprogramming"
 summary = "An expression statement drops the non-void value of a call to a function marked `@MustUse`, or a value whose type is marked `@MustUse` (such as a `Result` or a task handle from `std.task.spawn`)."
 explanation = '''
@@ -9086,17 +9113,17 @@ fn main(): void {
 '''
 
 [LYR-SEM0179]
-title = "'@Allow' names no diagnostic code"
+title = "a lint attribute names no lint"
 severity = "error"
-area = "11-metaprogramming"
-summary = "The argument of `@Allow` is not a diagnostic code such as `LYR-SEM0071`; for example, it is a lint name such as `unused`."
+area = "16-diagnostics"
+summary = "The argument of `@Allow`, `@Warn` or `@Deny` is no lint's name or code, no group, and not `warnings`."
 explanation = '''
-`@Allow` takes back a warning in what it sits on, and names that warning by its code, as `lyric explain` and the compiler's output show it. Lint names do not exist.
+`@Allow`, `@Warn` and `@Deny` set a lint's level in what they sit on, and name the lint by its name (`unused-variable`), by its code (`LYR-SEM0071`), by its group (`unused`), or all of them (`warnings`). A name that names nothing would set nothing, silently.
 
-Write the code of the warning, as `@Allow("LYR-SEM0071")`.
+Write a lint's name — `lyric explain LYR-SEM0071` names a warning's lint — or a group.
 '''
 wrong = '''
-@Allow("unused")
+@Allow("unused-varable")
 fn f(): void {
     let x = 1;
 }
@@ -9106,7 +9133,7 @@ fn main(): void {
 }
 '''
 right = '''
-@Allow("LYR-SEM0071")
+@Allow("unused-variable")
 fn f(): void {
     let x = 1;
 }
@@ -9117,17 +9144,20 @@ fn main(): void {
 '''
 
 [LYR-SEM0180]
-title = "an '@Allow' that suppresses nothing"
+title = "an '@Allow' that takes back nothing"
 severity = "warning"
-area = "11-metaprogramming"
-summary = "An `@Allow` names a code that no diagnostic inside the declaration it sits on reports."
+lint = "useless-allow"
+group = "unused"
+level = "warn"
+area = "16-diagnostics"
+summary = "An `@Allow` names a lint that nothing inside the declaration or module it sits on reports."
 explanation = '''
 An `@Allow` that takes back nothing is stale: the code it was written for has changed, or it never applied. Warning about it lets it leave with the code it was written for.
 
-Remove the attribute, or name the code that is actually reported there.
+Remove the attribute, or name the lint that is reported there.
 '''
 wrong = '''
-@Allow("LYR-SEM0071")
+@Allow("unused-variable")
 fn tidy(): int {
     let used = 1;
     return used;

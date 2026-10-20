@@ -1,3 +1,4 @@
+using Lyric.Core;
 using System.Text.RegularExpressions;
 using Lyric5.Build;
 using Lyric5.Toolchain;
@@ -108,7 +109,7 @@ public partial class CatalogTests
     public void The_catalog_is_in_code_order_and_its_titles_read_as_titles()
     {
         var codes = DiagnosticCatalog.Entries.Keys.ToList();
-        var text = File.ReadAllText(Path.Combine(Root, "src", "Lyric5.Build", "diagnostics.toml"));
+        var text = File.ReadAllText(Path.Combine(Root, "src", "Lyric.Core", "diagnostics.toml"));
         var order = DiagnosticCatalog.Read(text).Select(e => e.Code).ToList();
         Assert.Equal(order.Order(StringComparer.Ordinal), order);
         Assert.Equal(codes.Count, order.Count);
@@ -220,6 +221,6 @@ public partial class CatalogTests
         Assert.Contains("\nRight:\n\n", output);
         var (refused, _, error) = RunRaw("explain", "LYR-XYZ9999");
         Assert.Equal(2, refused);
-        Assert.Contains("error[LYR-CLI0003]: no code 'LYR-XYZ9999' in the catalog", error);
+        Assert.Contains("error[LYR-CLI0003]: no code or lint 'LYR-XYZ9999' in the catalog", error);
     }
 }

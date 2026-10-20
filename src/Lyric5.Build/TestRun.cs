@@ -133,7 +133,7 @@ public static class TestRun
             PackageGenRoots = Pipeline.GenRoots(project),
             PlaceNames = Pipeline.Places(project),
             ToolchainVersion = Pipeline.ClaimedVersion,
-            AllowedCodes = project.AllowedCodes,
+            LintLevels = project.LintLevels, RootPackage = project.Name, WarnDeps = project.LintArgs.WarnDeps,
         };
         var result = SourceCompiler.CheckProject(roots, options);
         // The warnings are the build's to report, which compiles the program again: once is enough.

@@ -51,7 +51,7 @@ internal sealed class WarningAnalyzer
     public void Run()
     {
         foreach (var module in _comp.Modules)
-            if (_comp.IsNative(module))
+            if (_comp.Unwatched(module))
                 _nativeFiles.Add(_comp.AstOf(module).Span.File);
 
         // Both tables: the checker's references carry expression uses, the resolver's carry the
@@ -68,7 +68,7 @@ internal sealed class WarningAnalyzer
         // never-reassigned hint reads.
         foreach (var module in _comp.Modules)
         {
-            if (_comp.IsNative(module)) continue;
+            if (_comp.Unwatched(module)) continue;
             foreach (var decl in _comp.AstOf(module).Declarations)
                 WalkDecl(decl);
         }
@@ -99,7 +99,7 @@ internal sealed class WarningAnalyzer
     public void RunDeprecated(Func<AttributeNode, IReadOnlyDictionary<string, string>?> fieldsOf, string toolchain)
     {
         foreach (var module in _comp.Modules)
-            if (_comp.IsNative(module))
+            if (_comp.Unwatched(module))
                 _nativeFiles.Add(_comp.AstOf(module).Span.File);
         _fieldsOf = fieldsOf;
         _toolchain = toolchain;
@@ -119,7 +119,7 @@ internal sealed class WarningAnalyzer
     {
         foreach (var module in _comp.Modules)
         {
-            if (_comp.IsNative(module)) continue;
+            if (_comp.Unwatched(module)) continue;
             foreach (var decl in _comp.AstOf(module).Declarations)
             {
                 (string? name, Decl[]? members) = decl switch
@@ -155,7 +155,7 @@ internal sealed class WarningAnalyzer
         // block writes no word (LYR-SEM0150), and a shape has no type to compare with.
         foreach (var block in _comp.Extensions.Blocks)
         {
-            if (block.IsImplicit || block.Decl.Interfaces.Length > 0 || _comp.IsNative(block.Module)
+            if (block.IsImplicit || block.Decl.Interfaces.Length > 0 || _comp.Unwatched(block.Module)
                 || block.Target is not { } target) continue;
             if (Written(block.Decl.Visibility) is { } blockWord && blockWord > target.Visibility)
             {
@@ -209,7 +209,7 @@ internal sealed class WarningAnalyzer
         var names = new HashSet<string>(prelude.Members.Symbols.Select(s => s.Name), StringComparer.Ordinal) { "panic", "same" };
         foreach (var module in _comp.Modules)
         {
-            if (_comp.IsNative(module) || module.Path is ["std", ..]) continue;
+            if (_comp.Unwatched(module) || module.Path is ["std", ..]) continue;
             foreach (var decl in _comp.AstOf(module).Declarations)
             {
                 switch (decl)
@@ -250,7 +250,7 @@ internal sealed class WarningAnalyzer
     {
         foreach (var module in _comp.Modules)
         {
-            if (_comp.IsNative(module)) continue;
+            if (_comp.Unwatched(module)) continue;
             foreach (var decl in _comp.AstOf(module).Declarations)
             {
                 if (decl is not ImportDecl import) continue;
@@ -417,7 +417,7 @@ internal sealed class WarningAnalyzer
         if (_deprecatedModules.Count == 0) return;
         foreach (var module in _comp.Modules)
         {
-            if (_comp.IsNative(module)) continue;
+            if (_comp.Unwatched(module)) continue;
             foreach (var decl in _comp.AstOf(module).Declarations)
             {
                 if (decl is not ImportDecl import) continue;
@@ -545,7 +545,7 @@ internal sealed class WarningAnalyzer
 
         foreach (var module in _comp.Modules)
         {
-            if (_comp.IsNative(module)) continue;
+            if (_comp.Unwatched(module)) continue;
             foreach (var decl in _comp.AstOf(module).Declarations) Visit(decl);
         }
         foreach (var (local, binding) in bound)
@@ -594,7 +594,7 @@ internal sealed class WarningAnalyzer
 
         foreach (var module in _comp.Modules)
         {
-            if (_comp.IsNative(module)) continue;
+            if (_comp.Unwatched(module)) continue;
             foreach (var decl in _comp.AstOf(module).Declarations) Visit(decl);
         }
     }
@@ -649,7 +649,7 @@ internal sealed class WarningAnalyzer
     {
         foreach (var module in _comp.Modules)
         {
-            if (_comp.IsNative(module)) continue;
+            if (_comp.Unwatched(module)) continue;
 
             var ast = _comp.AstOf(module);
             var inFile = _usedByFile.GetValueOrDefault(ast.Span.File);

@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace Lyric5.Build;
+namespace Lyric.Core;
 
 /// <summary>
 /// The TOML a manifest is written in (design/v5/spec/11 W2: <c>lyric.toml</c>), the subset it uses:
@@ -374,7 +374,7 @@ public sealed class TomlTable
 
     public bool TryGet(string key, out object value) => _values.TryGetValue(key, out value!);
 
-    internal bool Contains(string key) => _values.ContainsKey(key);
+    public bool Contains(string key) => _values.ContainsKey(key);
 
     internal void Add(string key, object value)
     {
@@ -386,7 +386,7 @@ public sealed class TomlTable
 /// <summary>A TOML array; <see cref="OfTables"/> when <c>[[…]]</c> headers made it.</summary>
 public sealed class TomlArray : List<object>
 {
-    internal bool OfTables { get; init; }
+    public bool OfTables { get; init; }
 }
 
 /// <summary>Text that is not TOML — or not the subset a manifest uses — at a line and column.</summary>

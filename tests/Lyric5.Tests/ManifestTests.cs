@@ -1,3 +1,4 @@
+using Lyric.Core;
 using Lyric5.Build;
 
 namespace Lyric5.Tests;
@@ -110,24 +111,30 @@ public class ManifestTests
         Assert.Contains(why, e.Message);
     }
 
-    /// <summary><c>[lints] allow</c> (09 A10; M9a S6): warning codes, each once; a lint's name, and
-    /// the levels beside <c>allow</c>, come with M12.</summary>
+    /// <summary><c>[lints]</c> (spec 16 §5; M12a S5): <c>allow</c>, <c>warn</c>, <c>deny</c> — each an
+    /// array of lints by name or code, groups, or <c>warnings</c>; a selector in two levels, one that
+    /// names nothing, a level the manifest does not know, a list that is no array are refused.</summary>
     [Fact]
-    public void A_manifest_allows_warnings_by_their_codes()
+    public void A_manifest_sets_the_lints_levels()
     {
-        var m = Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[lints]\nallow = [\"LYR-SEM0071\", \"LYR-SEM0178\", \"LYR-SEM0071\"]\n"));
-        Assert.Equal(["LYR-SEM0071", "LYR-SEM0178"], m.LintAllow);
-        var named = Assert.Throws<ManifestException>(() =>
-            Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[lints]\nallow = [\"dead-code\"]\n")));
-        Assert.Equal("LYR-PKG0002", named.Code);
-        Assert.Contains("'dead-code' is no warning code", named.Message);
-        var single = Assert.Throws<ManifestException>(() =>
-            Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[lints]\nallow = \"LYR-SEM0071\"\n")));
-        Assert.Contains("allow is an array of warning codes", single.Message);
+        var m = Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[lints]\n"
+                                    + "allow = [\"LYR-SEM0071\", \"unused\"]\ndeny = [\"unused-import\", \"warnings\"]\n"));
+        Assert.Equal([("LYR-SEM0071", LintLevel.Allow), ("unused", LintLevel.Allow), ("unused-import", LintLevel.Deny), ("warnings", LintLevel.Deny)],
+            m.Lints.Select(r => (r.Selector, r.Level)));
+        Assert.Equal("[lints] deny in lyric.toml", m.Lints[2].Origin);
+        void Refused(string lints, string why)
+        {
+            var e = Assert.Throws<ManifestException>(() => Manifest.Read(Write("[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[lints]\n" + lints + "\n")));
+            Assert.Equal("LYR-PKG0002", e.Code);
+            Assert.Contains(why, e.Message);
+        }
+        Refused("allow = [\"dead-cod\"]", "no lint, group or warning code 'dead-cod'");
+        Refused("allow = [\"unused\"]\ndeny = [\"unused\"]", "'unused' stands in two of allow, warn and deny");
+        Refused("allow = \"LYR-SEM0071\"", "allow is an array of lints");
     }
 
     [Theory]
-    [InlineData("[lints]\ndeny = []", "comes with M12")]
+    [InlineData("[lints]\nforbid = []", "[lints] holds 'allow', 'warn' and 'deny', not 'forbid'")]
     [InlineData("[workspace]\nmembers = []", "no part of a manifest")]
     public void A_section_the_toolchain_does_not_read_is_refused(string section, string why)
     {

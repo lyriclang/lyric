@@ -200,6 +200,14 @@ public sealed class Compilation
     /// </summary>
     public bool IsNative(ModuleSymbol module) => _native.Contains(module);
 
+    /// <summary>Whether the warning passes look at <c>std</c>'s modules too — a build that says the
+    /// other packages' warnings (<c>--warn-deps</c>). Off, what <c>std</c> says of itself is not looked for.</summary>
+    public bool WarnNative { get; init; }
+
+    /// <summary>Whether the warning passes skip <paramref name="module"/>: one of <c>std</c>'s, unless
+    /// they look there too.</summary>
+    public bool Unwatched(ModuleSymbol module) => IsNative(module) && !WarnNative;
+
     private HashSet<ModuleSymbol>? _preludeSources;
 
     /// <summary>The modules the prelude passes names on from, once.</summary>

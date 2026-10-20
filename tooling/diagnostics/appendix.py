@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The specification's Appendix A from the toolchain's diagnostic catalog (design/v5/spec/13, M12a P4).
 
-    python3 tooling/diagnostics/appendix.py [--catalog src/Lyric5.Build/diagnostics.toml] > appendix-a-diagnostics.md
+    python3 tooling/diagnostics/appendix.py [--catalog src/Lyric.Core/diagnostics.toml] > appendix-a-diagnostics.md
 
 The appendix is generated, never edited by hand: a code's title, severity, chapter and summary come from
 diagnostics.toml, grouped by the part of the toolchain that reports it. `lyric explain CODE` prints the
@@ -39,7 +39,7 @@ def cell(text):
 def main():
     ap = argparse.ArgumentParser()
     root = pathlib.Path(__file__).resolve().parents[2]
-    ap.add_argument("--catalog", default=root / "src" / "Lyric5.Build" / "diagnostics.toml")
+    ap.add_argument("--catalog", default=root / "src" / "Lyric.Core" / "diagnostics.toml")
     args = ap.parse_args()
     catalog = tomllib.loads(pathlib.Path(args.catalog).read_text(encoding="utf-8"))
 
@@ -72,6 +72,16 @@ def main():
     if unknown:
         print(f"codes of no group: {', '.join(unknown)}", file=sys.stderr)
         return 1
+    # the lints (16 §5): every warning, by its name
+    lints = sorted((e["lint"], code, e) for code, e in catalog.items() if "lint" in e)
+    out.append(f"## A.{len(GROUPS) + 1} Lints\n")
+    out.append("Every warning is a lint (16 §5): its name, its code, its group and its level unless said. "
+               "`warnings` names them all.\n")
+    out.append("| Lint | Code | Group | Level | Title |")
+    out.append("|---|---|---|---|---|")
+    for name, code, e in lints:
+        out.append(f"| `{name}` | {code} | {e['group']} | {e.get('level', 'warn')} | {cell(e['title'])} |")
+    out.append("")
     sys.stdout.write("\n".join(out))
     return 0
 

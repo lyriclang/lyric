@@ -43,6 +43,10 @@ public static class BuildScripts
         var sources = new List<CUnit>();
         var libraries = new List<string>();
         var order = graph.Packages.Values.Where(m => m.Name != root.Name).OrderBy(m => m.Name, StringComparer.Ordinal).Append(root);
+        // a script's 'warn' is the lint 'build-script-warning', at its package's level (spec 16 §5);
+        // a dependency's script warns with --warn-deps alone, and never as an error
+        var levels = Pipeline.LintLevelsOf(project.LintLevels, root.Name, profile);
+        var scriptWarning = Lyric.Core.DiagnosticCatalog.Entries["LYR-BLD0003"];
         foreach (var manifest in order)
         {
             if (manifest.BuildScript is null) continue;
@@ -70,7 +74,19 @@ public static class BuildScripts
                         if (!libraries.Contains(text)) libraries.Add(text);
                         break;
                     case "warn":
-                        Say.Warning(error, "LYR-BLD0003", $"{manifest.Name}'s build.lyr: {text}");
+                        var foreign = manifest.Name != root.Name;
+                        if (foreign && !project.LintArgs.WarnDeps) break;
+                        var (level, origin) = (levels.GetValueOrDefault(manifest.Name) ?? Lyric.Core.LintSettings.Default).LevelOf(scriptWarning);
+                        // another package's levels never fail this build
+                        if (foreign && level == Lyric.Core.LintLevel.Deny) level = Lyric.Core.LintLevel.Warn;
+                        var said = $"{manifest.Name}'s build.lyr: {text}";
+                        if (level == Lyric.Core.LintLevel.Warn) Say.Warning(error, "LYR-BLD0003", said);
+                        else if (level == Lyric.Core.LintLevel.Deny)
+                        {
+                            Say.ErrorWithNotes(error, "LYR-BLD0003", said,
+                                [new Lyric.Core.DiagnosticNote($"'build-script-warning' is denied by {origin ?? "its own level"}")]);
+                            return (1, null);
+                        }
                         break;
                 }
             }

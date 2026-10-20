@@ -13,4 +13,10 @@
     breaks the split.
   -->
 
+  <!-- the diagnostic catalog (M12a S3, S5): lyric explain reads it, the checker its lints, CatalogTests
+       hold it against the compiler -->
+  <ItemGroup>
+    <EmbeddedResource Include="diagnostics.toml" LogicalName="diagnostics.toml" />
+  </ItemGroup>
+
 </Project>

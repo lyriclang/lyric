@@ -50,7 +50,6 @@ public static class Pipeline
     {
         var result = SourceCompiler.Lower(SourceOf(project), OptionsFor(project, profile, target));
         if (!result.Render(error) || result.Ir is null) return null;
-        if (Denied(result, profile, error)) return null;
         if (SubsetGate.Check(result.Ir, result.Diagnostics)) return result;
         result.Diagnostics.RenderText(error);
         return null;
@@ -98,7 +97,8 @@ public static class Pipeline
             // '@callerFile' names a source as the binary's backtrace does (09 A11, P6)
             PlaceNames = Places(project),
             ToolchainVersion = ClaimedVersion,
-            AllowedCodes = project.AllowedCodes,
+            LintLevels = LintLevelsOf(project.LintLevels, project.Name, profile), RootPackage = project.Name,
+            WarnDeps = project.LintArgs.WarnDeps,
             // what 'target' and 'profile' hold: the build's, a cross-build's target (09 B4)
             Build = FactsOf(target ?? Target.Host, profile),
         };
@@ -124,14 +124,22 @@ public static class Pipeline
         return 0;
     }
 
-    /// <summary>A compilation that warned, under a profile that denies warnings: the warnings stay
-    /// warnings, and one error says why the build failed (11 W2 P3).</summary>
-    private static bool Denied(CompileResult result, BuildProfile? profile, TextWriter error)
+    /// <summary>
+    /// The packages' lint levels for a build under <paramref name="profile"/>: a profile that denies
+    /// warnings — <c>denyWarnings</c>, <c>--deny-warnings</c> — is <c>-D warnings</c> for the root
+    /// package, in front of the command line's own (spec 16 §5): each warning is an error, and its
+    /// note names the profile.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, LintSettings> LintLevelsOf(IReadOnlyDictionary<string, LintSettings> levels,
+        string root, BuildProfile? profile)
     {
-        if (profile is not { DenyWarnings: true } || result.Diagnostics.WarningCount == 0) return false;
-        var count = result.Diagnostics.WarningCount;
-        Say.Error(error, CliDiagnostics.WarningsDenied, $"{count} warning{(count == 1 ? "" : "s")}, and the profile '{profile.Name}' denies warnings (denyWarnings)");
-        return true;
+        if (profile is not { DenyWarnings: true }) return levels;
+        var denied = new Dictionary<string, LintSettings>(levels, StringComparer.Ordinal);
+        var own = levels.GetValueOrDefault(root) ?? LintSettings.Default;
+        denied[root] = new LintSettings(
+            [new LintSettings.Rule(DiagnosticCatalog.AllLints, LintLevel.Deny, $"denyWarnings of the profile '{profile.Name}'"), .. own.CommandLine],
+            own.Manifest);
+        return denied;
     }
 
     /// <summary>The binary's path, or the exit code of the failure.</summary>
@@ -156,8 +164,12 @@ public static class Pipeline
         // complete.
         // The C is the profile's too where the profile changes it: without overflow checks the
         // arithmetic wraps (03 T2).
+        // And what decides the findings is part of it: a build that is up to date runs no
+        // front end and says nothing, so '-D warnings' after a plain build would pass on the plain
+        // build's C — the command line's lint levels, '--warn-deps' and the profile's denyWarnings.
         var key = Key(SourcesKey(project), request.ToolchainVersion, CEmitter.Version, CompilerIdentity,
-            request.Profile.OverflowChecks ? "checked" : "wrapping");
+            request.Profile.OverflowChecks ? "checked" : "wrapping",
+            project.LintArgs.Fingerprint, request.Profile.DenyWarnings ? "deny-warnings" : "");
         var manifest = Path.Combine(project.CacheDir, $"{project.BinaryName}-{key}.units");
         // What 'embed' read (design/v5/spec/09 Q4) is an input the key cannot name before the front
         // end runs: the list beside the units says which, and a file that changed sends the
@@ -342,7 +354,7 @@ public static class Pipeline
     /// the front end and the lowering, one compilation — a check; there is no program to build. Exit
     /// 0 when it holds, 1 after reporting.
     /// </summary>
-    public static int CheckLibrary(LibraryException library, TextWriter error, BuildProfile? profile = null)
+    public static int CheckLibrary(LibraryException library, TextWriter error, BuildProfile? profile = null, LintArgs? lints = null)
     {
         var manifest = library.Manifest;
         var roots = Directory.Exists(manifest.SourceRoot)
@@ -351,13 +363,18 @@ public static class Pipeline
                 .Select(file => ScriptSource.FromDisk(file, Project.ModulePathOf(manifest, file)!))
                 .ToList()
             : [];
+        // the library's packages at their own levels, the command line's in front of the library's
+        var levels = library.Graph.Packages.ToDictionary(p => p.Key,
+            p => new LintSettings(p.Key == manifest.Name ? (lints ?? LintArgs.None).Rules : [], p.Value.Lints), StringComparer.Ordinal);
         var options = new CompilerOptions
         {
             StdlibRoot = StdlibRoot, PackageRoots = library.Graph.SourceRoots,
             PackageDependencies = library.Graph.Declared,
+            LintLevels = LintLevelsOf(levels, manifest.Name, profile), RootPackage = manifest.Name,
+            WarnDeps = (lints ?? LintArgs.None).WarnDeps,
         };
         var result = SourceCompiler.CheckProject(roots, options);
-        return result.Render(error) && !Denied(result, profile, error) ? 0 : 1;
+        return result.Render(error) ? 0 : 1;
     }
 
     internal static void AddTree(List<string> parts, string root)

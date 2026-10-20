@@ -1,3 +1,4 @@
+using Lyric.Core;
 using System.Text.RegularExpressions;
 
 namespace Lyric5.Build;
@@ -110,9 +111,9 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     /// the root manifest's counts; <c>null</c> for the toolchain's default.</summary>
     public long? ComptimeBudget { get; init; }
 
-    /// <summary><c>[lints] allow</c> (09 A10; M9a S6): the warning codes the package's files do not
-    /// report — each package's own.</summary>
-    public IReadOnlyList<string> LintAllow { get; init; } = [];
+    /// <summary><c>[lints]</c> (spec 16 §5; M12a S5): the levels the package gives its lints —
+    /// each package's own, for its own files.</summary>
+    public IReadOnlyList<LintSettings.Rule> Lints { get; init; } = [];
 
     /// <summary><c>[trust] build-scripts</c> (11 W3 BS5): the packages of the graph whose
     /// <c>build.lyr</c> may run — the root manifest's alone count; the root's own script always runs.</summary>
@@ -241,34 +242,48 @@ public sealed partial record Manifest(string File, string Name, string Version, 
             Toolchain = ReadToolchain(package, file),
             TrustedScripts = ReadTrust(document, file),
             ComptimeBudget = ReadComptimeBudget(package, file),
-            LintAllow = ReadLints(document, file),
+            Lints = ReadLints(document, file),
         };
     }
 
-    /// <summary><c>[lints] allow = ["LYR-SEM0071"]</c> (09 A10; 13 M9a P8): the warning codes the
-    /// package's files do not report — <c>@Allow</c> on the package. The levels beside it
-    /// (<c>warn</c>, <c>deny</c>) and the lint names come with M12 (11 L1, G2).</summary>
-    private static List<string> ReadLints(TomlTable document, string file)
+    /// <summary><c>[lints]</c> (spec 16 §5; 13 M12a P8): <c>allow</c>, <c>warn</c> and <c>deny</c>, each
+    /// an array of what it sets — a lint by its name or code, a group, or <c>warnings</c> for all. One
+    /// selector stands in one of them: <c>deny = ["unused"]</c> beside <c>allow = ["unused"]</c> says
+    /// two things of one thing.</summary>
+    private static List<LintSettings.Rule> ReadLints(TomlTable document, string file)
     {
-        var codes = new List<string>();
-        if (!document.TryGet("lints", out var found)) return codes;
+        var rules = new List<LintSettings.Rule>();
+        if (!document.TryGet("lints", out var found)) return rules;
         if (found is not TomlTable lints)
-            throw new ManifestException("LYR-PKG0002", file, 1, 1, "[lints] is a table: [lints] allow = [\"LYR-SEM0071\"]");
+            throw new ManifestException("LYR-PKG0002", file, 1, 1, "[lints] is a table: [lints] deny = [\"unused-import\"]");
         foreach (var key in lints.Keys)
-            if (key != "allow")
-                throw new ManifestException("LYR-PKG0003", file, lints.Line, 1,
-                    $"[lints] {key} comes with M12: this toolchain reads 'allow' alone");
-        if (!lints.TryGet("allow", out var given)) return codes;
-        if (given is not TomlArray list || list.Any(c => c is not string))
-            throw new ManifestException("LYR-PKG0002", file, lints.Line, 1, "allow is an array of warning codes, as \"LYR-SEM0071\"");
-        foreach (string code in list)
         {
-            if (!Lyric.Sema.AllowFilter.IsCode(code))
+            var level = key switch
+            {
+                "allow" => LintLevel.Allow,
+                "warn" => LintLevel.Warn,
+                "deny" => LintLevel.Deny,
+                _ => throw new ManifestException("LYR-PKG0003", file, lints.Line, 1,
+                    $"[lints] holds 'allow', 'warn' and 'deny', not '{key}'"),
+            };
+            lints.TryGet(key, out var given);
+            if (given is not TomlArray list || list.Any(c => c is not string))
                 throw new ManifestException("LYR-PKG0002", file, lints.Line, 1,
-                    $"'{code}' is no warning code — a code is written as \"LYR-SEM0071\"; lint names come with M12");
-            if (!codes.Contains(code)) codes.Add(code);
+                    $"{key} is an array of lints — a name, a group or a code: {key} = [\"unused-import\"]");
+            foreach (string selector in list)
+            {
+                if (DiagnosticCatalog.Select(selector) is null)
+                    throw new ManifestException("LYR-PKG0002", file, lints.Line, 1,
+                        DiagnosticCatalog.Nearest(selector) is { } near
+                            ? $"no lint, group or warning code '{selector}'; did you mean '{near}'?"
+                            : $"no lint, group or warning code '{selector}' — 'lyric explain <name>' says what a lint is");
+                if (rules.Any(r => r.Selector == selector && r.Level != level))
+                    throw new ManifestException("LYR-PKG0002", file, lints.Line, 1,
+                        $"'{selector}' stands in two of allow, warn and deny: one level each");
+                rules.Add(new LintSettings.Rule(selector, level, $"[lints] {key} in {Path.GetFileName(file)}"));
+            }
         }
-        return codes;
+        return rules;
     }
 
     /// <summary><c>comptimeBudget</c> (design/v5/spec/09 Q5): the steps one <c>comptime</c> site may

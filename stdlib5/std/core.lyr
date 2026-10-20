@@ -421,11 +421,23 @@ pub struct MustUse :: [OnCallable, OnType] { }
 /// needs a `_` arm, so a new variant or conformer breaks nobody there.
 pub struct NonExhaustive :: [OnType, OnInterface] { }
 
-/// A warning not reported (09 A10): `@Allow("LYR-SEM0071")` on a declaration, or the module's
-/// head, silences that code inside it; an `@Allow` that silences nothing warns itself. The
-/// manifest's `[lints] allow` silences codes for the whole package.
+/// A lint not said where this stands (spec 16 §5): `@Allow("unused-variable")` on a
+/// declaration, or on the module's head, takes the lint back inside it — a lint by its name or its
+/// code, a group (`"unused"`), or `"warnings"` for all; an `@Allow` that takes back nothing warns
+/// itself (`useless-allow`). The manifest's `[lints] allow` does it for the package.
 pub struct Allow :: [OnAny] {
-    pub code: string,
+    pub lint: string,
+}
+
+/// A lint said as a warning where this stands, whatever the package says (spec 16 §5).
+pub struct Warn :: [OnAny] {
+    pub lint: string,
+}
+
+/// A lint said as an error where this stands (spec 16 §5): the build fails, and the error
+/// names the `@Deny` that made it one.
+pub struct Deny :: [OnAny] {
+    pub lint: string,
 }
 
 /// What a `using let` binding closes when its scope is left (design/v5/spec/05 E7 R1, 10 K1).

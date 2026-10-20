@@ -138,6 +138,19 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
     public void Suppress(Func<Diagnostic, bool> allowed) =>
         _diagnostics.RemoveAll(d => d.Severity != Severity.Error && allowed(d));
 
+    /// <summary>Puts each warning, note and hint through <paramref name="revise"/> (spec 16 §5: a
+    /// lint's level): <c>null</c> takes it back, another diagnostic stands in its place — a denied
+    /// lint becomes an error. An error stays as it is.</summary>
+    public void Revise(Func<Diagnostic, Diagnostic?> revise)
+    {
+        for (var i = _diagnostics.Count - 1; i >= 0; i--)
+        {
+            if (_diagnostics[i].Severity == Severity.Error) continue;
+            if (revise(_diagnostics[i]) is { } kept) _diagnostics[i] = kept;
+            else _diagnostics.RemoveAt(i);
+        }
+    }
+
     private int _muted;
 
     /// <summary>
