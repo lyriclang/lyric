@@ -18,9 +18,9 @@ public static class Program
     {
         try
         {
-            if (TakeRenderOptions(ref args) is { } refused) return refused;
+            if (TakeRenderOptions(ref args, out var lints) is { } refused) return refused;
             if (args.Length == 0) return Usage(Console.Out, 0);
-            var exit = Dispatch(args);
+            var exit = Dispatch(args, lints);
             // the JSON form closes with the count (16 §4); 'run' said it before its program ran
             Lyric.Core.Rendering.RenderStyle.Current.Events?.Summary();
             return exit;
@@ -31,16 +31,16 @@ public static class Program
         }
     }
 
-    private static int Dispatch(string[] args) =>
+    private static int Dispatch(string[] args, LintArgs lints) =>
             args[0] switch
             {
                 "--version" or "-V" or "version" => Version(),
                 "--help" or "-h" or "help" => Usage(Console.Out, 0),
-                "build" => Build(args[1..], run: false),
-                "run" => Build(args[1..], run: true),
-                "expand" => Build(args[1..], run: false, expand: true),
-                "test" => Test(args[1..]),
-                "bench" => Bench(args[1..]),
+                "build" => Build(args[1..], lints, run: false),
+                "run" => Build(args[1..], lints, run: true),
+                "expand" => Build(args[1..], lints, run: false, expand: true),
+                "test" => Test(args[1..], lints),
+                "bench" => Bench(args[1..], lints),
                 "update" => Update(args[1..]),
                 "clean" => Clean(args[1..]),
                 "metadata" => Metadata(args[1..]),
@@ -80,14 +80,17 @@ public static class Program
     /// set afresh by each command, so none leaks into the next. Paths are said relative to the
     /// package's root: the one <c>-C</c> names, or the one around the working directory.
     /// </summary>
-    private static int? TakeRenderOptions(ref string[] args)
+    private static int? TakeRenderOptions(ref string[] args, out LintArgs lintArgs)
     {
+        lintArgs = LintArgs.None;
         var kept = new List<string>();
         var color = "auto";
         var absolute = false;
         var json = false;
         var maxErrors = Lyric.Core.Rendering.RenderStyle.DefaultMaxErrors;
         string? from = null;
+        var lints = new List<Lyric.Core.LintSettings.Rule>();
+        var warnDeps = false;
         for (var i = 0; i < args.Length; i++)
         {
             var arg = args[i];
@@ -95,6 +98,21 @@ public static class Program
             if (arg == "--absolute-paths") { absolute = true; continue; }
             // the JSON form (16 §4) for the verbs that report findings; metadata's --json is its own
             if (arg == "--json" && kept.Count > 0 && kept[0] is "build" or "run" or "test") { json = true; continue; }
+            // the lints' levels (16 §5) for the verbs that compile: in their order, the later deciding among equals
+            var compiles = kept.Count > 0 && kept[0] is "build" or "run" or "expand" or "test" or "bench";
+            if (compiles && arg == "--warn-deps") { warnDeps = true; continue; }
+            if (compiles && arg is "-A" or "-W" or "-D")
+            {
+                if (i + 1 >= args.Length) return Unknown($"'{arg}' takes a lint, a group or 'warnings'");
+                var selector = args[++i];
+                if (Lyric.Core.DiagnosticCatalog.Select(selector) is null)
+                    return Unknown(Lyric.Core.DiagnosticCatalog.Nearest(selector) is { } near
+                        ? $"no lint, group or warning code '{selector}'; did you mean '{near}'?"
+                        : $"no lint, group or warning code '{selector}' — 'lyric5 explain <name>' says what a lint is");
+                var level = arg switch { "-A" => Lyric.Core.LintLevel.Allow, "-W" => Lyric.Core.LintLevel.Warn, _ => Lyric.Core.LintLevel.Deny };
+                lints.Add(new Lyric.Core.LintSettings.Rule(selector, level, $"'{arg} {selector}' on the command line"));
+                continue;
+            }
             if (arg is "--color" or "--max-errors")
             {
                 if (i + 1 >= args.Length) return Unknown($"'{arg}' takes a value");
@@ -123,6 +141,7 @@ public static class Program
             BaseDirectory = manifest is not null ? Path.GetDirectoryName(manifest) : Directory.GetCurrentDirectory(),
             Events = json ? new Lyric.Core.Rendering.EventWriter(Console.Out) : null,
         };
+        lintArgs = new LintArgs(lints, warnDeps);
         return null;
     }
 
@@ -182,6 +201,9 @@ public static class Program
         output.WriteLine("  --color auto|always|never      colour the diagnostics (default auto: a terminal, unless");
         output.WriteLine("                                 NO_COLOR is set or TERM is dumb)");
         output.WriteLine("  --absolute-paths               paths as they are, not relative to the package");
+        output.WriteLine("  -A, -W, -D <lint>              build, run, expand, test, bench: allow, warn of or deny a lint — a name,");
+        output.WriteLine("                                 a group, a code, or warnings for all; the later decides among equals");
+        output.WriteLine("  --warn-deps                    say the warnings of the dependencies too");
         output.WriteLine("  --json                         build, run, test: the findings, artifacts, tests and the count as");
         output.WriteLine("                                 a line of JSON each on the standard output");
         output.WriteLine("  --max-errors <n>               draw the first n errors and count the rest (default 50,");
@@ -219,7 +241,7 @@ public static class Program
     /// <summary><c>build</c>, <c>run</c>, and <c>expand</c> (13 M9b P8), which chooses a program
     /// as <c>run</c> does and prints its entry module after the macros' expansion instead of
     /// building it.</summary>
-    private static int Build(string[] args, bool run, bool expand = false)
+    private static int Build(string[] args, LintArgs lints, bool run, bool expand = false)
     {
         var verb = expand ? "expand" : run ? "run" : "build";
         string? file = null;
@@ -346,7 +368,8 @@ public static class Program
 
         if (ProfileOf(values, flags, library?.Manifest ?? programs[0].Manifest) is not { } profile) return 2;
 
-        if (library is not null) return Pipeline.CheckLibrary(library, Console.Error, profile);
+        if (library is not null) return Pipeline.CheckLibrary(library, Console.Error, profile, lints);
+        programs = [.. programs.Select(p => p with { LintArgs = lints })];
 
         Target target;
         try { target = values.TryGetValue("--target", out var triple) ? Target.Parse(triple) : Target.Host; }
@@ -452,8 +475,8 @@ public static class Program
     /// this machine and run, one after another, each in a task of its own; the program's exit is
     /// the command's (C5): 0 when every test held, 1 when one failed or the program was refused.
     /// </summary>
-    private static int Test(string[] args) =>
-        Package(args, "test", "tests", TestValueOptions, null, (project, profile, target, compiler, values) =>
+    private static int Test(string[] args, LintArgs lints) =>
+        Package(args, "test", "tests", TestValueOptions, null, lints, (project, profile, target, compiler, values) =>
             TestRun.Run(project, profile, target, compiler, DisplayVersion(), values.GetValueOrDefault("-f"), Console.Out, Console.Error));
 
     private static readonly string[] BenchValueOptions = [.. TestValueOptions, "--save", "--compare"];
@@ -465,8 +488,8 @@ public static class Program
     /// run one after another. <c>--save</c> names a file the run writes its times to,
     /// <c>--compare</c> one it reads to say how they changed. The program's exit is the command's.
     /// </summary>
-    private static int Bench(string[] args) =>
-        Package(args, "bench", "benchmarks", BenchValueOptions, "release", (project, profile, target, compiler, values) =>
+    private static int Bench(string[] args, LintArgs lints) =>
+        Package(args, "bench", "benchmarks", BenchValueOptions, "release", lints, (project, profile, target, compiler, values) =>
             BenchRun.Run(project, profile, target, compiler, DisplayVersion(), values.GetValueOrDefault("-f"),
                 values.TryGetValue("--save", out var save) ? Path.GetFullPath(save) : "",
                 values.TryGetValue("--compare", out var compare) ? Path.GetFullPath(compare) : "",
@@ -478,7 +501,7 @@ public static class Program
     /// unless <c>--target</c> names another, as <c>build</c> and <c>run</c> take it —, and the
     /// compiler found; then <paramref name="run"/>.</summary>
     private static int Package(string[] args, string verb, string what, string[] valueOptions, string? profileDefault,
-        Func<Project, BuildProfile, Target, CCompiler, Dictionary<string, string>, int> run)
+        LintArgs lints, Func<Project, BuildProfile, Target, CCompiler, Dictionary<string, string>, int> run)
     {
         var values = new Dictionary<string, string>();
         var flags = new HashSet<string>(StringComparer.Ordinal);
@@ -512,7 +535,7 @@ public static class Program
                 Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above", $"lyric5 {verb} runs a package's {what}");
                 return 2;
             }
-            project = found;
+            project = found with { LintArgs = lints };
             ToolchainCheck.Check(project.Graph, DisplayVersion());
         }
         catch (ManifestException refused)
@@ -815,14 +838,15 @@ public static class Program
 
     /// <summary><c>lyric explain &lt;code&gt;</c> (11 G9; 13 M12a P4): the catalog's entry — what the
     /// code means, why, what to do, a wrong and a right program. A code is read as a reader may write
-    /// it (<c>sem0001</c>, <c>LYR-SEM0001</c>); one the catalog does not hold is exit 2.</summary>
+    /// it (<c>sem0001</c>, <c>LYR-SEM0001</c>), a lint by its name (<c>unused-import</c>); one the
+    /// catalog does not hold is exit 2.</summary>
     private static int Explain(string[] args)
     {
-        if (args.Length != 1 || args[0].StartsWith('-')) return Unknown("explain takes one code: lyric5 explain LYR-SEM0001");
-        var code = DiagnosticCatalog.Normalize(args[0]);
-        if (!DiagnosticCatalog.Entries.TryGetValue(code, out var entry))
-            return Unknown($"no code '{args[0]}' in the catalog");
-        Console.Out.Write(DiagnosticCatalog.Explain(entry));
+        if (args.Length != 1 || args[0].StartsWith('-')) return Unknown("explain takes one code or lint: lyric5 explain LYR-SEM0001");
+        if (!Lyric.Core.DiagnosticCatalog.Lints.TryGetValue(args[0], out var entry)
+            && !Lyric.Core.DiagnosticCatalog.Entries.TryGetValue(Lyric.Core.DiagnosticCatalog.Normalize(args[0]), out entry))
+            return Unknown($"no code or lint '{args[0]}' in the catalog");
+        Console.Out.Write(Lyric.Core.DiagnosticCatalog.Explain(entry));
         return 0;
     }
 

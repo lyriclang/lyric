@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Lyric5.Build;
+namespace Lyric.Core;
 
 /// <summary>One code of the catalog (design/v5/spec/11 G9; 13 M12a P4).</summary>
 public sealed record CatalogEntry(string Code, string Title, string Severity, string Area, string Summary)
@@ -20,6 +20,20 @@ public sealed record CatalogEntry(string Code, string Title, string Severity, st
 
     /// <summary>Why the code is no longer reported; its number stays taken.</summary>
     public string? Retired { get; init; }
+
+    /// <summary>A warning's lint (16 §5; 13 M12a P8): its name, its group, its level unless said.
+    /// Every warning has one; nothing else has.</summary>
+    public string? Lint { get; init; }
+    public string? Group { get; init; }
+    public LintLevel Level { get; init; }
+}
+
+/// <summary>What a lint does where it is met (16 §5): nothing, a warning, or an error.</summary>
+public enum LintLevel
+{
+    Allow,
+    Warn,
+    Deny,
 }
 
 /// <summary>
@@ -41,8 +55,18 @@ public static class DiagnosticCatalog
         "15-project", "16-diagnostics",
     ];
 
+    /// <summary>The groups a lint belongs to (13 M12a P8); <c>warnings</c> names every lint.</summary>
+    public static readonly string[] Groups =
+        ["unused", "correctness", "resources", "concurrency", "deprecation", "style", "perf", "docs"];
+
+    /// <summary>The group of every lint.</summary>
+    public const string AllLints = "warnings";
+
     private static readonly string[] Keys =
-        ["title", "severity", "area", "summary", "explanation", "wrong", "right", "program", "example", "retired"];
+    [
+        "title", "severity", "lint", "group", "level", "area", "summary", "explanation", "wrong", "right", "program",
+        "example", "retired",
+    ];
 
     private static readonly Lazy<IReadOnlyDictionary<string, CatalogEntry>> Embedded = new(() =>
     {
@@ -54,6 +78,56 @@ public static class DiagnosticCatalog
 
     /// <summary>The toolchain's own catalog, by code.</summary>
     public static IReadOnlyDictionary<string, CatalogEntry> Entries => Embedded.Value;
+
+    private static readonly Lazy<IReadOnlyDictionary<string, CatalogEntry>> ByLint = new(() =>
+        Entries.Values.Where(e => e.Lint is not null).ToDictionary(e => e.Lint!, StringComparer.Ordinal));
+
+    /// <summary>The lints, by name.</summary>
+    public static IReadOnlyDictionary<string, CatalogEntry> Lints => ByLint.Value;
+
+    /// <summary>The selector closest to <paramref name="selector"/> in spelling — a lint's name, a
+    /// group, <c>warnings</c> — at most two edits away, for a "did you mean"; <c>null</c> for none.</summary>
+    public static string? Nearest(string selector)
+    {
+        string? found = null;
+        var best = 3;
+        foreach (var candidate in Lints.Keys.Concat(Groups).Append(AllLints))
+        {
+            var d = Distance(selector, candidate);
+            if (d < best) (best, found) = (d, candidate);
+        }
+        return found;
+    }
+
+    private static int Distance(string a, string b)
+    {
+        var row = new int[b.Length + 1];
+        for (var j = 0; j <= b.Length; j++) row[j] = j;
+        for (var i = 1; i <= a.Length; i++)
+        {
+            var diagonal = row[0];
+            row[0] = i;
+            for (var j = 1; j <= b.Length; j++)
+            {
+                var above = row[j];
+                row[j] = Math.Min(Math.Min(row[j] + 1, row[j - 1] + 1), diagonal + (a[i - 1] == b[j - 1] ? 0 : 1));
+                diagonal = above;
+            }
+        }
+        return row[b.Length];
+    }
+
+    /// <summary>The lints a selector names (16 §5 rule 2) — a lint's name or code, a group, or
+    /// <c>warnings</c> —, and how specific it is (2 a lint, 1 a group, 0 all); none for a selector
+    /// that names nothing.</summary>
+    public static (IReadOnlyList<CatalogEntry> Lints, int Specificity)? Select(string selector)
+    {
+        if (Lints.TryGetValue(selector, out var byName)) return ([byName], 2);
+        if (Entries.TryGetValue(selector, out var byCode) && byCode.Lint is not null) return ([byCode], 2);
+        if (selector == AllLints) return ([.. Lints.Values], 0);
+        if (Groups.Contains(selector)) return ([.. Lints.Values.Where(l => l.Group == selector)], 1);
+        return null;
+    }
 
     /// <summary>
     /// The entries of a catalog text, in its order. What an entry must hold is checked here, so a
@@ -82,8 +156,28 @@ public static class DiagnosticCatalog
             {
                 Explanation = Get("explanation"), Wrong = Get("wrong"), Right = Get("right"),
                 Program = Get("program"), Example = Get("example"), Retired = Get("retired"),
+                Lint = Get("lint"), Group = Get("group"),
+                Level = Get("level") switch
+                {
+                    null or "warn" => LintLevel.Warn,
+                    "allow" => LintLevel.Allow,
+                    "deny" => LintLevel.Deny,
+                    var other => throw new InvalidDataException($"{code}: level '{other}' — allow, warn or deny"),
+                },
             };
             if (!Severities.Contains(entry.Severity)) throw new InvalidDataException($"{code}: severity '{entry.Severity}'");
+            // a warning is a lint, and nothing else is (13 M12a P8)
+            var live = entry.Retired is null && entry.Severity == "warning";
+            if (live != (entry.Lint is not null) || (entry.Lint is null) != (entry.Group is null) || (entry.Lint is null && Get("level") is not null))
+                throw new InvalidDataException($"{code}: a warning has its lint, group and level, and nothing else has");
+            if (entry.Lint is { } lint)
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(lint, "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"))
+                    throw new InvalidDataException($"{code}: lint name '{lint}' — lowercase words joined by '-'");
+                if (!Groups.Contains(entry.Group)) throw new InvalidDataException($"{code}: group '{entry.Group}'");
+                if (Groups.Contains(lint) || lint == AllLints) throw new InvalidDataException($"{code}: '{lint}' names a group");
+                if (entries.Any(e => e.Lint == lint)) throw new InvalidDataException($"{code}: lint '{lint}' twice");
+            }
             if (!Areas.Contains(entry.Area)) throw new InvalidDataException($"{code}: area '{entry.Area}'");
             if (entry.Retired is not null)
             {
@@ -115,7 +209,9 @@ public static class DiagnosticCatalog
     {
         var sb = new StringBuilder();
         sb.Append($"{entry.Code}: {entry.Title}\n");
-        sb.Append($"{entry.Severity} · {entry.Area}\n\n");
+        sb.Append($"{entry.Severity} · {entry.Area}");
+        if (entry.Lint is { } lint) sb.Append($" · lint '{lint}', group '{entry.Group}', {entry.Level.ToString().ToLowerInvariant()} unless said");
+        sb.Append("\n\n");
         if (entry.Retired is { } retired) sb.Append($"Retired: {retired}\n\n");
         sb.Append(entry.Summary).Append("\n\n");
         if (entry.Explanation is { } explanation) sb.Append(explanation).Append("\n\n");

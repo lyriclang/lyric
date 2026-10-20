@@ -139,7 +139,7 @@ public class CompilerInstructionTests
     [InlineData("@AlwaysInline\n@NoInline\nfn f(): void { }", "LYR-SEM0177", "'@NoInline' contradicts the '@AlwaysInline' beside it")]
     [InlineData("@Cold\nstruct S { }", "LYR-SEM0065", "'@Cold' cannot sit on a struct")]
     [InlineData("fn f(@Deprecated x: int): int { return x; }", "LYR-SEM0065", "'@Deprecated' cannot sit on a parameter")]
-    [InlineData("@Allow(\"dead-code\")\nfn f(): void { }", "LYR-SEM0179", "not \"dead-code\"; lint names come with M12")]
+    [InlineData("@Allow(\"dead-code\")\nfn f(): void { }", "LYR-SEM0179", "there is no lint 'dead-code'")]
     [InlineData("@Deprecated { until = \"soon\" }\nfn f(): void { }", "LYR-SEM0081", "'soon' is not a version")]
     [InlineData("@Deprecated { until = \"5.0\" }\nfn f(): void { }", "LYR-SEM0081", "this was kept until 5.0 and the toolchain is 5.")]
     public void An_instruction_refuses_what_it_cannot_say(string declarations, string code, string why)
@@ -400,7 +400,7 @@ public class CompilerInstructionTests
         var (exit, _, error) = Run("build", "-C", dir);
         Assert.True(exit == 0, error);
         Assert.Contains(":12:9:", Assert.Single(Lines(error, "LYR-SEM0071")));
-        Assert.Contains("this '@Allow' suppresses nothing: no 'LYR-SEM0144'", Assert.Single(Lines(error, "LYR-SEM0180")));
+        Assert.Contains("this '@Allow' takes back nothing: no 'LYR-SEM0144'", Assert.Single(Lines(error, "LYR-SEM0180")));
         Assert.Empty(Lines(error, "LYR-SEM0178"));
         Assert.Equal(2, error.Split('\n').Count(l => l.Contains("warning[")));
     }

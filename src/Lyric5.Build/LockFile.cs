@@ -1,3 +1,4 @@
+using Lyric.Core;
 using System.Text;
 using System.Text.RegularExpressions;
 

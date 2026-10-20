@@ -186,8 +186,8 @@ public class ProfileTests
         Assert.Contains(code, ran.Stderr);
     }
 
-    /// <summary>A profile that denies warnings fails a build that warns: the warnings stay
-    /// warnings, one error says why.</summary>
+    /// <summary>A profile that denies warnings fails a build that warns: it is <c>-D warnings</c>, so
+    /// each warning is the error, and its note names the profile; <c>--deny-warnings</c> is the same.</summary>
     [Fact]
     public void A_profile_that_denies_warnings_fails_a_build_that_warns()
     {
@@ -195,9 +195,13 @@ public class ProfileTests
         var dir = Package(("lyric.toml", AppManifest + "\n[profile.debug]\ndenyWarnings = true\n"), ("src/main.lyr", main));
         var (exit, _, error) = Run("build", "-C", dir);
         Assert.Equal(1, exit);
-        Assert.Contains("warning[", error);
-        Assert.Contains("error[LYR-CLI0016]: 1 warning, and the profile 'debug' denies warnings (denyWarnings)", error);
+        Assert.Contains("src/main.lyr", error.Replace('\\', '/'));
+        Assert.Contains("error[LYR-SEM0072]: ", error);
+        Assert.DoesNotContain("warning[", error);
+        Assert.Contains("note: 'unused-import' is denied by denyWarnings of the profile 'debug'", error);
         Assert.Equal(0, Run("build", "-C", dir, "--no-deny-warnings").Exit);
+        var plain = Package(("lyric.toml", AppManifest), ("src/main.lyr", main));
+        Assert.Equal(1, Run("build", "-C", plain, "--deny-warnings").Exit);
     }
 
     [Fact]

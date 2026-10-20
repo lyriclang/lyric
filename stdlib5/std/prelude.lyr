@@ -53,6 +53,8 @@ pub import std.core {
     MustUse,
     NonExhaustive,
     Allow,
+    Warn,
+    Deny,
     When,
     Shared,
     SeesConformer,

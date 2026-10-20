@@ -14676,7 +14676,7 @@ public sealed class TypeChecker
     /// <summary>The compiler instructions of <c>std.core</c> beside <c>@Test</c>, <c>@Bench</c> and
     /// <c>@callerExpr</c> (09 A11, the closed list of T2): what changes what the compiler does.</summary>
     private static readonly string[] CompilerInstructions =
-        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "When", "Shared", "SeesConformer"];
+        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "Warn", "Deny", "When", "Shared", "SeesConformer"];
 
     /// <summary>Whether this is one of <see cref="CompilerInstructions"/>, by identity (09 T6).</summary>
     private bool IsCompilerInstruction(TypeSymbol ts) =>

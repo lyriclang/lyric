@@ -89,6 +89,7 @@ public static class SourceCompiler
             var built = new Compilation(sources, diagnostics)
             {
                 Lyric5Modules = options.PackageRoots is not null,
+                WarnNative = options.WarnDeps,
                 PackageDependencies = options.PackageDependencies,
                 ModuleOnDisk = ModuleProbe(options),
                 // The standard library is ordinary Lyric source and is loaded on demand.
@@ -196,9 +197,9 @@ public static class SourceCompiler
             report?.ReportPhase(Phase.Verify,
                 timings.Runs > 1 ? $"{FunctionCount(ir)}, {timings.Runs} runs" : FunctionCount(ir),
                 timings.Verification);
-        // '@Allow' and '[lints] allow' (09 A10), once every warning is in
+        // the lints' levels (16 §5), once every warning is in
         if (compilation.Lyric5Modules)
-            AllowFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.AllowedCodes);
+            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps);
         return new CompileResult(sources, diagnostics, ir, model)
             { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive };
     }
@@ -492,6 +493,7 @@ public static class SourceCompiler
         {
             ModuleLoader = loader,
             Lyric5Modules = options.PackageRoots is not null,
+            WarnNative = options.WarnDeps,
             PackageDependencies = options.PackageDependencies,
             ModuleOnDisk = ModuleProbe(options),
         };
@@ -540,7 +542,7 @@ public static class SourceCompiler
             optimize: options.Optimize, libraryRoots: true, passes: options.Passes, comptime: comptime);
         if (ir is null) return new CompileResult(sources, diagnostics, null, model);
         if (compilation.Lyric5Modules)
-            AllowFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.AllowedCodes);
+            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps);
 
         return new CompileResult(sources, diagnostics, ir, model)
             { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive };
@@ -727,9 +729,16 @@ public sealed record CompilerOptions
     /// (<see cref="Lyric.Core.ToolchainVersion.Value"/>).</summary>
     public string? ToolchainVersion { get; init; }
 
-    /// <summary>Each package's <c>[lints] allow</c> (09 A10), by name: the warning codes its files
-    /// do not report.</summary>
-    public IReadOnlyDictionary<string, IReadOnlyList<string>>? AllowedCodes { get; init; }
+    /// <summary>Each package's lint levels (spec 16 §5), by name: its <c>[lints]</c>, the root's with the
+    /// command line's in front.</summary>
+    public IReadOnlyDictionary<string, LintSettings>? LintLevels { get; init; }
+
+    /// <summary>The package the build is for: the warnings of the others are not said (11 G11) unless
+    /// <see cref="WarnDeps"/>.</summary>
+    public string? RootPackage { get; init; }
+
+    /// <summary><c>--warn-deps</c>: the dependencies' warnings are said too.</summary>
+    public bool WarnDeps { get; init; }
 
     /// <summary>
     /// A package's <c>tests/</c> (design/v5/spec/07 V4), by the package's name: its files are

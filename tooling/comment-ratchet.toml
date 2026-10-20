@@ -1,13 +1,13 @@
 # Comment lines that cite the design, per file: what CommentRatchetTests allows.
 # A count may only fall. LYRIC_UPDATE_SNAPSHOTS=1 lowers the counts to what the tree holds.
 
-# stdlib5-doc: 547
+# stdlib5-doc: 546
 ["stdlib5-doc"]
 "stdlib5/std/build.lyr" = 4
 "stdlib5/std/codec.lyr" = 25
 "stdlib5/std/collections.lyr" = 29
 "stdlib5/std/compress.lyr" = 1
-"stdlib5/std/core.lyr" = 172
+"stdlib5/std/core.lyr" = 171
 "stdlib5/std/crypto.lyr" = 5
 "stdlib5/std/encoding.lyr" = 5
 "stdlib5/std/fmt.lyr" = 1
@@ -103,28 +103,26 @@
 "runtime/src/task.c" = 2
 "runtime/src/trace.c" = 6
 
-# compiler: 392
+# compiler: 386
 ["compiler"]
 "src/Lyric5.Build/BenchRun.cs" = 2
 "src/Lyric5.Build/BuildScripts.cs" = 9
-"src/Lyric5.Build/DiagnosticCatalog.cs" = 1
 "src/Lyric5.Build/Git.cs" = 1
 "src/Lyric5.Build/GitCache.cs" = 5
 "src/Lyric5.Build/LockFile.cs" = 4
-"src/Lyric5.Build/Manifest.cs" = 43
+"src/Lyric5.Build/Manifest.cs" = 42
 "src/Lyric5.Build/ManifestEdit.cs" = 3
 "src/Lyric5.Build/Metadata.cs" = 2
 "src/Lyric5.Build/NativePart.cs" = 2
 "src/Lyric5.Build/OutLock.cs" = 1
 "src/Lyric5.Build/PackageContent.cs" = 2
 "src/Lyric5.Build/PackageGraph.cs" = 16
-"src/Lyric5.Build/Pipeline.cs" = 28
+"src/Lyric5.Build/Pipeline.cs" = 27
 "src/Lyric5.Build/Profiles.cs" = 2
-"src/Lyric5.Build/Project.cs" = 29
+"src/Lyric5.Build/Project.cs" = 28
 "src/Lyric5.Build/RuntimeArchive.cs" = 3
 "src/Lyric5.Build/SemVer.cs" = 4
 "src/Lyric5.Build/TestRun.cs" = 7
-"src/Lyric5.Build/Toml.cs" = 2
 "src/Lyric5.Build/ToolchainCheck.cs" = 1
 "src/Lyric5.Compiler/CEmitter.cs" = 114
 "src/Lyric5.Compiler/Intrinsics.cs" = 32
@@ -139,7 +137,7 @@
 "src/Lyric5.Toolchain/UserCache.cs" = 1
 "src/Lyric5/Program.cs" = 32
 
-# frontend: 1632
+# frontend: 1626
 ["frontend"]
 "src/Lyric.Frontend/AST/AstRewriter.cs" = 1
 "src/Lyric.Frontend/AST/CoroutineShape.cs" = 1
@@ -151,7 +149,7 @@
 "src/Lyric.Frontend/AST/Types.cs" = 8
 "src/Lyric.Frontend/Compiler/InactiveUses.cs" = 2
 "src/Lyric.Frontend/Compiler/MacroExpander.cs" = 10
-"src/Lyric.Frontend/Compiler/SourceCompiler.cs" = 45
+"src/Lyric.Frontend/Compiler/SourceCompiler.cs" = 44
 "src/Lyric.Frontend/Formatting/AstFormatter.cs" = 16
 "src/Lyric.Frontend/Ir/GlobalPruning.cs" = 2
 "src/Lyric.Frontend/Ir/Inliner.cs" = 3
@@ -209,7 +207,6 @@
 "src/Lyric.Frontend/Resolver/Symbol.cs" = 10
 "src/Lyric.Frontend/Resolver/SymbolTable.cs" = 2
 "src/Lyric.Frontend/Resolver/Synthesis.cs" = 18
-"src/Lyric.Frontend/Sema/AllowFilter.cs" = 5
 "src/Lyric.Frontend/Sema/ExceptionAnalyzer.cs" = 25
 "src/Lyric.Frontend/Sema/Flow.cs" = 1
 "src/Lyric.Frontend/Sema/FlowAnalyzer.cs" = 6
@@ -223,7 +220,7 @@
 "src/Lyric.Frontend/Sema/TypeResult.cs" = 45
 "src/Lyric.Frontend/Sema/WarningAnalyzer.cs" = 13
 
-# tests: 391
+# tests: 390
 ["tests"]
 "tests/Lyric5.Tests/AssertAndBindingSiteTests.cs" = 3
 "tests/Lyric5.Tests/AttributeMacroTests.cs" = 3
@@ -280,7 +277,7 @@
 "tests/Lyric5.Tests/LtoTests.cs" = 1
 "tests/Lyric5.Tests/MacroTests.cs" = 7
 "tests/Lyric5.Tests/ManifestEditTests.cs" = 1
-"tests/Lyric5.Tests/ManifestTests.cs" = 6
+"tests/Lyric5.Tests/ManifestTests.cs" = 5
 "tests/Lyric5.Tests/MeasurementTests.cs" = 3
 "tests/Lyric5.Tests/MemberForAnInterfaceTests.cs" = 2
 "tests/Lyric5.Tests/MetaTests.cs" = 7

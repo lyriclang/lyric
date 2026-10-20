@@ -69,12 +69,24 @@ public sealed record Project(string Source, string Name, string Module, string R
         : ModuleRoots is null ? Graph.SourceRoots
         : Graph.SourceRoots.Where(r => !ModuleRoots.ContainsKey(r.Key)).Concat(ModuleRoots).ToDictionary(r => r.Key, r => r.Value, StringComparer.Ordinal);
 
-    /// <summary>Each package's <c>[lints] allow</c> by name (09 A10): what its files do not report.</summary>
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> AllowedCodes =>
-        Graph?.Packages.ToDictionary(p => p.Key, p => p.Value.LintAllow, StringComparer.Ordinal)
-        ?? (Manifest is { } own
-            ? new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal) { [Name] = own.LintAllow }
-            : new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal));
+    /// <summary>Each package's lint levels by name (spec 16 §5): its <c>[lints]</c>, and for the root
+    /// package — or the file built alone — the command line's in front (<c>-A</c>, <c>-W</c>,
+    /// <c>-D</c>).</summary>
+    /// <summary>What the command line says of the lints for this build.</summary>
+    public LintArgs LintArgs { get; init; } = LintArgs.None;
+
+    public IReadOnlyDictionary<string, Lyric.Core.LintSettings> LintLevels
+    {
+        get
+        {
+            var commandLine = LintArgs.Rules;
+            var levels = new Dictionary<string, Lyric.Core.LintSettings>(StringComparer.Ordinal);
+            foreach (var (name, manifest) in Graph?.Packages ?? new Dictionary<string, Manifest>())
+                levels[name] = new Lyric.Core.LintSettings(name == Name ? commandLine : [], manifest.Lints);
+            if (!levels.ContainsKey(Name)) levels[Name] = new Lyric.Core.LintSettings(commandLine, Manifest?.Lints ?? []);
+            return levels;
+        }
+    }
 
     /// <summary>What each package declares it imports from (07 P6) — a module space of a
     /// build script's own imports from none.</summary>
