@@ -94,7 +94,7 @@ lyric/
 ├── stdlib/               the 4.x standard library in Lyric (the front-end tests import it; M8a)
 ├── tests/                xUnit test projects
 ├── examples/             22 example programs (4.x; the input of M16)
-├── design/v5/            the Lyric 5 design round: corpus and decisions (spec/00–13)
+├── design/v5/            the Lyric 5 design round: corpus and decisions (spec/00–14)
 ├── tooling/              zig-version and c-smoke/ — the C toolchain; valgrind/ — memcheck locally;
 │                         textmate/ — the editor grammar, pinned against the lexer by the tests
 ├── tools/                DocGen, the documentation site generator

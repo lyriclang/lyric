@@ -6,7 +6,7 @@ project ("Oil"), where scope creep and parallel-mechanism creep killed
 forward progress.
 
 The rules below bind the Lyric 5 line on `main`. The decisions they refer to
-live in [`design/v5/spec/`](design/v5/spec/) (areas 00–12, plan in 13); the
+live in [`design/v5/spec/`](design/v5/spec/) (areas 00–12 and 14, plan in 13); the
 Lyric 4.x line continues as [lyriclang/lyric-script](https://github.com/lyriclang/lyric-script)
 under its own rules.
 

@@ -2,7 +2,7 @@
 
 The one file that changes often. It says where the Lyric 5 line stands, which milestone is open,
 and how the work is done. The decisions themselves live in [`design/v5/spec/`](design/v5/spec/)
-(areas 00–12); the plan with sizes, artefacts and dependencies is
+(areas 00–12, website and docs in 14); the plan with sizes, artefacts and dependencies is
 [`13-umsetzungsplan.md`](design/v5/spec/13-umsetzungsplan.md). The Lyric 4 status up to the
 4.6 cut is archived at [`docs/archive/4.x/STATUS.md`](docs/archive/4.x/STATUS.md).
 
@@ -49,6 +49,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M11 | Own GC | XL | **done** 2026-10-19 |
 | M12a | Diagnostics and lints | L | — (plan 2026-10-19) |
 | M12b | Inference and abstraction (the review clocks) | M | — |
+| M12c | Docs foundation and website (comments in the W8 form, `Lyric5.Doc`, Book scaffold, `/dev/` live) | L | — (plan 2026-10-20, design/v5/spec/14) |
 | M13a | fmt, doc, api | M | — |
 | M13b | LSP, DAP, clients | XL | — |
 | M14 | FFI and embedding | L | — |
