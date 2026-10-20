@@ -513,7 +513,4 @@ public sealed class ManifestException(string code, string file, int line, int co
     public string File { get; } = file;
     public int Line { get; } = line;
     public int Column { get; } = column;
-
-    /// <summary>As the driver writes a diagnostic.</summary>
-    public string Render() => $"error[{Code}]: {Message}\n  --> {File}:{Line}:{Column}";
 }

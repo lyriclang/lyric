@@ -258,6 +258,13 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
     public void RenderText(TextWriter output, RenderStyle style)
     {
         ArgumentNullException.ThrowIfNull(output);
+        if (style.Events is { } events)
+        {
+            // the JSON form says every finding, each once; the limit is the drawing's
+            foreach (var diagnostic in SortedSnapshot())
+                if (_rendered.Add(diagnostic)) events.Diagnostic(_sourceManager, diagnostic, style);
+            return;
+        }
         var renderer = new TextRenderer(_sourceManager, style);
         int hiddenErrors = 0, hiddenOthers = 0;
         foreach (var diagnostic in SortedSnapshot())

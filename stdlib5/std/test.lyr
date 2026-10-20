@@ -10,7 +10,7 @@
 import std.core { Contains, StringBuilder, filled };
 import std.fs { readText, writeText };
 import std.io { flush, println };
-import std.os { cpuCount };
+import std.os { cpuCount, env };
 import std.task { spawn, sleep, PanicInfo, TaskStatus, Cancelled, monotonicNanos };
 import std.thread { Pool, Thread };
 import std.sync { Atomic };
@@ -53,6 +53,87 @@ class Subtests {
 let watch = Watch { };
 let subtests = Subtests { };
 
+/// Whether `lyric test --json` asked for the JSON form (spec 16 §4): a line for each test,
+/// `{"type":"test",…}`, and one for the count, `{"type":"tests",…}`, in place of the text.
+let asJson = (env("LYRIC_TEST_FORMAT") ?? "") == "json";
+
+/// A test that held.
+fn sayPassed(name: string): void {
+    if (asJson) {
+        event(name, "passed", "", "");
+    } else {
+        println(f"ok    {name}");
+    }
+}
+
+/// A test skipped, and why.
+fn saySkipped(name: string, why: string): void {
+    if (asJson) {
+        event(name, "skipped", why, "");
+    } else {
+        println(f"skip  {name}: {why}");
+    }
+}
+
+/// A test that did not hold: what ended it — a message's further lines under its first —, the panic's
+/// code where a panic did, and its backtrace below.
+fn sayFailed(name: string, detail: string, panic: string = "", trace: string = ""): void {
+    if (asJson) {
+        event(name, "failed", if (trace != "") detail + "\n" + trace else detail, panic);
+    } else {
+        println(f"FAIL  {name}");
+        println(f"      {indented(detail)}");
+        if (trace != "") { println(trace); }
+    }
+}
+
+/// One test's line of the JSON form.
+fn event(name: string, outcome: string, message: string, panic: string): void {
+    let line = StringBuilder.new();
+    line.appendStr("{\"type\":\"test\",\"version\":1,\"name\":");
+    quoted(line, name);
+    line.appendStr(",\"outcome\":\"");
+    line.appendStr(outcome);
+    line.appendChar('"');
+    if (message != "") {
+        line.appendStr(",\"message\":");
+        quoted(line, message);
+    }
+    if (panic != "") {
+        line.appendStr(",\"panic\":");
+        quoted(line, panic);
+    }
+    line.appendChar('}');
+    println(line.toString());
+}
+
+/// `s` as a JSON string — std.json's rule, written here because importing std.json would bring its
+/// codec into every test program the toolchain builds.
+fn quoted(out: StringBuilder, s: string): void {
+    out.appendChar('"');
+    for (c in s.chars()) {
+        if (c == '"') {
+            out.appendStr("\\\"");
+        } else if (c == '\\') {
+            out.appendStr("\\\\");
+        } else if (c == '\n') {
+            out.appendStr("\\n");
+        } else if (c == '\r') {
+            out.appendStr("\\r");
+        } else if (c == '\t') {
+            out.appendStr("\\t");
+        } else if ((c as uint32) < 0x20) {
+            let code = (c as uint32) as int;
+            let digit = code % 16;
+            out.appendStr(if (code < 16) "\\u000" else "\\u001");
+            out.appendChar(if (digit < 10) ((('0' as uint32) + (digit as uint32)) as char) else ((('a' as uint32) + ((digit - 10) as uint32)) as char));
+        } else {
+            out.appendChar(c);
+        }
+    }
+    out.appendChar('"');
+}
+
 /// Runs the tests one after another, each in a task of its own (X3): a panic or an error that
 /// leaves a test fails it, and the run goes on. Those marked `parallel` run after the others, at
 /// once. A line for each test once it has ended — what it printed comes before —, then the count.
@@ -67,7 +148,7 @@ pub fn run(cases: TestCase[]): int {
     for (i in 0..cases.length()) {
         let c = cases[i];
         if (c.skip != "") {
-            println(f"skip  {c.name}: {c.skip}");
+            saySkipped(c.name, c.skip);
             skipped += 1;
             continue;
         }
@@ -83,13 +164,12 @@ pub fn run(cases: TestCase[]): int {
         let held = outcome(c.name, c.body);
         watch.deadline.store(0);
         if (held && subtests.failed == 0) {
-            println(f"ok    {c.name}");
+            sayPassed(c.name);
             passed += 1;
         } else {
             if (held) {
                 let noun = if (subtests.failed == 1) "subtest" else "subtests";
-                println(f"FAIL  {c.name}");
-                println(f"      {subtests.failed} {noun} failed");
+                sayFailed(c.name, f"{subtests.failed} {noun} failed");
             }
             failed += 1;
         }
@@ -101,7 +181,12 @@ pub fn run(cases: TestCase[]): int {
     }
     let count = passed + failed + skipped;
     let noun = if (count == 1) "test" else "tests";
-    println(f"\n{count} {noun}: {passed} passed, {failed} failed, {skipped} skipped");
+    if (asJson) {
+        println("{\"type\":\"tests\",\"version\":1,\"passed\":" + f"{passed}" + ",\"failed\":" + f"{failed}"
+            + ",\"skipped\":" + f"{skipped}" + "}");
+    } else {
+        println(f"\n{count} {noun}: {passed} passed, {failed} failed, {skipped} skipped");
+    }
     return if (failed > 0) 1 else 0;
 }
 
@@ -137,7 +222,7 @@ fn runApart(cases: TestCase[], chosen: List<int>): int {
         var task = tasks[k];
         task.join();
         if (reported(name, task.status())) {
-            println(f"ok    {name}");
+            sayPassed(name);
         } else {
             failed += 1;
         }
@@ -170,17 +255,13 @@ fn reported(name: string, status: TaskStatus<void>): bool {
             held = true;
         }
         TaskStatus.Failed(e) => {
-            println(f"FAIL  {name}");
-            println(f"      error: {indented(e.message())}");
+            sayFailed(name, f"error: {e.message()}");
         }
         TaskStatus.Panicked(p) => {
-            println(f"FAIL  {name}");
-            println(f"      panic [{p.code}]: {indented(p.message)}");
-            if (p.trace != "") { println(p.trace); }
+            sayFailed(name, f"panic [{p.code}]: {p.message}", p.code, p.trace);
         }
         TaskStatus.Cancelled => {
-            println(f"FAIL  {name}");
-            println("      cancelled");
+            sayFailed(name, "cancelled");
         }
         TaskStatus.Running => unreachable("a joined task has ended"),
     }
@@ -202,8 +283,7 @@ fn guard(cases: TestCase[]): void throws Cancelled {
         if (deadline > 0 && monotonicNanos() > deadline) {
             let at = watch.current.load();
             let name = if (at >= 0) cases[at].name else "the parallel tests";
-            println(f"FAIL  {name}");
-            println(f"      timed out after {watch.seconds.load()} s — the run ends here");
+            sayFailed(name, f"timed out after {watch.seconds.load()} s — the run ends here");
             flush();
             _exit(1);
         }
@@ -220,7 +300,7 @@ pub fn subtest(name: string, body: fn() -> void throws Error): void {
     }
     let full = subtests.parent + "/" + name;
     if (outcome(full, body)) {
-        println(f"ok    {full}");
+        sayPassed(full);
     } else {
         subtests.failed += 1;
     }

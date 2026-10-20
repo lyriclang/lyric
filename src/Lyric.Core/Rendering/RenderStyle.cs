@@ -30,6 +30,10 @@ public sealed record RenderStyle
     /// <summary>See <see cref="DefaultWidth"/>.</summary>
     public int Width { get; init; } = DefaultWidth;
 
+    /// <summary><c>--json</c> (16 §4): the findings go out as events here, on the standard output,
+    /// and no text is drawn; <c>null</c> draws text.</summary>
+    public EventWriter? Events { get; init; }
+
     /// <summary>No colour, paths as read, the default limit.</summary>
     public static RenderStyle Plain { get; } = new();
 

@@ -20,7 +20,19 @@ public static class Program
         {
             if (TakeRenderOptions(ref args) is { } refused) return refused;
             if (args.Length == 0) return Usage(Console.Out, 0);
-            return args[0] switch
+            var exit = Dispatch(args);
+            // the JSON form closes with the count (16 §4); 'run' said it before its program ran
+            Lyric.Core.Rendering.RenderStyle.Current.Events?.Summary();
+            return exit;
+        }
+        catch (Exception crash)
+        {
+            return Crashed(crash);
+        }
+    }
+
+    private static int Dispatch(string[] args) =>
+            args[0] switch
             {
                 "--version" or "-V" or "version" => Version(),
                 "--help" or "-h" or "help" => Usage(Console.Out, 0),
@@ -37,14 +49,25 @@ public static class Program
                 "explain" => Explain(args[1..]),
                 _ => Unknown($"unknown verb '{args[0]}'"),
             };
-        }
-        catch (Exception crash)
+
+    /// <summary>The toolchain's own failure (11 G4): not the program's fault, and worth a report.</summary>
+    private static int Crashed(Exception crash)
+    {
         {
-            // The toolchain's own failure (11 G4): not the program's fault, and worth a report.
-            Console.Error.WriteLine($"error[LYR-ICE0001]: the toolchain failed: {crash.GetType().Name}: {crash.Message}");
-            if (Lyric.Core.CompilerPosition.Describe() is { } place) Console.Error.WriteLine($"  while {place}");
+            var message = $"the toolchain failed: {crash.GetType().Name}: {crash.Message}";
+            var place = Lyric.Core.CompilerPosition.Describe();
+            var trace = crash is Lyric.Core.CompilerDepthException ? Head(crash.StackTrace, 24) : crash.StackTrace;
+            if (Lyric.Core.Rendering.RenderStyle.Current.Events is { } events)
+            {
+                // the JSON form (16 §4) says it as an event of its own, and closes the stream
+                events.Ice("LYR-ICE0001", message, place, trace);
+                events.Summary();
+                return 101;
+            }
+            Console.Error.WriteLine($"error[LYR-ICE0001]: {message}");
+            if (place is not null) Console.Error.WriteLine($"  while {place}");
             Console.Error.WriteLine("  = help: this is a bug in lyric5 — please report it with the program that triggered it");
-            Console.Error.WriteLine(crash is Lyric.Core.CompilerDepthException ? Head(crash.StackTrace, 24) : crash.StackTrace);
+            Console.Error.WriteLine(trace);
             return 101;
         }
     }
@@ -62,6 +85,7 @@ public static class Program
         var kept = new List<string>();
         var color = "auto";
         var absolute = false;
+        var json = false;
         var maxErrors = Lyric.Core.Rendering.RenderStyle.DefaultMaxErrors;
         string? from = null;
         for (var i = 0; i < args.Length; i++)
@@ -69,6 +93,8 @@ public static class Program
             var arg = args[i];
             if (arg == "--") { kept.AddRange(args[i..]); break; }
             if (arg == "--absolute-paths") { absolute = true; continue; }
+            // the JSON form (16 §4) for the verbs that report findings; metadata's --json is its own
+            if (arg == "--json" && kept.Count > 0 && kept[0] is "build" or "run" or "test") { json = true; continue; }
             if (arg is "--color" or "--max-errors")
             {
                 if (i + 1 >= args.Length) return Unknown($"'{arg}' takes a value");
@@ -95,11 +121,12 @@ public static class Program
             AbsolutePaths = absolute,
             MaxErrors = maxErrors,
             BaseDirectory = manifest is not null ? Path.GetDirectoryName(manifest) : Directory.GetCurrentDirectory(),
+            Events = json ? new Lyric.Core.Rendering.EventWriter(Console.Out) : null,
         };
         return null;
     }
 
-    /// <summary>The first lines of a stack trace:a recursion that reached the end of the stack
+    /// <summary>The first lines of a stack trace: a recursion that reached the end of the stack
     /// has a few thousand frames, and they repeat after the first dozen.</summary>
     internal static string Head(string? trace, int lines)
     {
@@ -155,6 +182,8 @@ public static class Program
         output.WriteLine("  --color auto|always|never      colour the diagnostics (default auto: a terminal, unless");
         output.WriteLine("                                 NO_COLOR is set or TERM is dumb)");
         output.WriteLine("  --absolute-paths               paths as they are, not relative to the package");
+        output.WriteLine("  --json                         build, run, test: the findings, artifacts, tests and the count as");
+        output.WriteLine("                                 a line of JSON each on the standard output");
         output.WriteLine("  --max-errors <n>               draw the first n errors and count the rest (default 50,");
         output.WriteLine("                                 0 for all)");
         output.WriteLine();
@@ -164,8 +193,7 @@ public static class Program
 
     private static int Unknown(string what)
     {
-        Console.Error.WriteLine($"error[LYR-CLI0003]: {what}");
-        Console.Error.WriteLine("  = help: lyric5 help lists what exists");
+        Say.Error(Console.Error, "LYR-CLI0003", $"{what}", "lyric5 help lists what exists");
         return 2;
     }
 
@@ -230,7 +258,7 @@ public static class Program
         var baseDirectory = Path.GetFullPath(values.GetValueOrDefault("-C", Directory.GetCurrentDirectory()));
         if (!Directory.Exists(baseDirectory))
         {
-            Console.Error.WriteLine($"error[LYR-CLI0001]: no such directory '{baseDirectory}'");
+            Say.Error(Console.Error, "LYR-CLI0001", $"no such directory '{baseDirectory}'");
             return 2;
         }
         if (file is not null) file = Path.GetFullPath(file, baseDirectory);
@@ -248,8 +276,7 @@ public static class Program
             {
                 if (Project.ProgramsOf(baseDirectory, offline, locked) is not { } package)
                 {
-                    Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
-                    Console.Error.WriteLine($"  = help: lyric5 {verb} <file.lyr> builds one file alone");
+                    Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above", $"lyric5 {verb} <file.lyr> builds one file alone");
                     return 2;
                 }
                 programs = [.. package];
@@ -259,7 +286,7 @@ public static class Program
                 if (values.ContainsKey("--bin")) return Unknown("'--bin' names a program of the package; a file is a program by itself");
                 if (!File.Exists(file))
                 {
-                    Console.Error.WriteLine($"error[LYR-CLI0001]: no such file '{file}'");
+                    Say.Error(Console.Error, "LYR-CLI0001", $"no such file '{file}'");
                     return 2;
                 }
                 programs = [Project.ForFile(file, offline, locked)];
@@ -267,7 +294,7 @@ public static class Program
         }
         catch (ManifestException refused)
         {
-            Console.Error.WriteLine(refused.Render());
+            Say.Manifest(Console.Error, refused);
             return refused.Exit;
         }
         catch (LibraryException refused)
@@ -276,7 +303,7 @@ public static class Program
             // run, and nothing to print.
             if (run || expand || values.ContainsKey("--emit"))
             {
-                Console.Error.WriteLine($"error[LYR-CLI0005]: {refused.Message}");
+                Say.Error(Console.Error, "LYR-CLI0005", $"{refused.Message}");
                 return 2;
             }
             library = refused;
@@ -287,7 +314,7 @@ public static class Program
         try { ToolchainCheck.Check(library?.Graph ?? programs[0].Graph, DisplayVersion()); }
         catch (ManifestException refused)
         {
-            Console.Error.WriteLine(refused.Render());
+            Say.Manifest(Console.Error, refused);
             return refused.Exit;
         }
 
@@ -307,9 +334,10 @@ public static class Program
                 var main = programs.FirstOrDefault(p => p.Binary is null) ?? (programs.Count == 1 ? programs[0] : null);
                 if (main is null)
                 {
-                    Console.Error.WriteLine($"error[LYR-CLI0007]: package '{programs[0].Name}' has several programs and no src/main.lyr: "
-                                            + string.Join(", ", programs.Select(p => p.BinaryName)));
-                    Console.Error.WriteLine($"  = help: --bin <name> names the one to {(run ? "run" : expand ? "expand" : "print")}");
+                    Say.Error(Console.Error, "LYR-CLI0007",
+                        $"package '{programs[0].Name}' has several programs and no src/main.lyr: "
+                        + string.Join(", ", programs.Select(p => p.BinaryName)),
+                        $"--bin <name> names the one to {(run ? "run" : expand ? "expand" : "print")}");
                     return 2;
                 }
                 programs = [main];
@@ -344,13 +372,16 @@ public static class Program
             var (exit, built) = Pipeline.Build(new BuildRequest(program, profile, target, compiler, DisplayVersion()), Console.Error);
             if (exit != 0 || built is null) return exit;
             executable = built;
+            Lyric.Core.Rendering.RenderStyle.Current.Events?.Artifact("binary", program.BinaryName, built);
         }
         if (!run) return 0;
         if (!target.IsHost)
         {
-            Console.Error.WriteLine($"error[LYR-CLI0003]: '{target.Triple}' is not this machine; the binary is at {executable}");
+            Say.Error(Console.Error, "LYR-CLI0003", $"'{target.Triple}' is not this machine; the binary is at {executable}");
             return 2;
         }
+        // the build's count before the program, whose output follows on the same stream (16 §4)
+        Lyric.Core.Rendering.RenderStyle.Current.Events?.Summary();
         return ProcessRunner.RunInherited(executable!, programArgs);
     }
 
@@ -469,7 +500,7 @@ public static class Program
         var baseDirectory = Path.GetFullPath(values.GetValueOrDefault("-C", Directory.GetCurrentDirectory()));
         if (!Directory.Exists(baseDirectory))
         {
-            Console.Error.WriteLine($"error[LYR-CLI0001]: no such directory '{baseDirectory}'");
+            Say.Error(Console.Error, "LYR-CLI0001", $"no such directory '{baseDirectory}'");
             return 2;
         }
 
@@ -478,8 +509,7 @@ public static class Program
         {
             if (Project.TestsOf(baseDirectory, flags.Contains("--offline"), flags.Contains("--locked")) is not { } found)
             {
-                Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
-                Console.Error.WriteLine($"  = help: lyric5 {verb} runs a package's {what}");
+                Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above", $"lyric5 {verb} runs a package's {what}");
                 return 2;
             }
             project = found;
@@ -487,7 +517,7 @@ public static class Program
         }
         catch (ManifestException refused)
         {
-            Console.Error.WriteLine(refused.Render());
+            Say.Manifest(Console.Error, refused);
             return refused.Exit;
         }
 
@@ -532,12 +562,12 @@ public static class Program
         var start = Path.GetFullPath(directory ?? Directory.GetCurrentDirectory());
         if (!Directory.Exists(start))
         {
-            Console.Error.WriteLine($"error[LYR-CLI0001]: no such directory '{start}'");
+            Say.Error(Console.Error, "LYR-CLI0001", $"no such directory '{start}'");
             return 2;
         }
         if (Project.FindManifest(start) is not { } file)
         {
-            Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
+            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above");
             return 2;
         }
         try
@@ -566,7 +596,7 @@ public static class Program
         }
         catch (ManifestException refused)
         {
-            Console.Error.WriteLine(refused.Render());
+            Say.Manifest(Console.Error, refused);
             return refused.Exit;
         }
     }
@@ -588,7 +618,7 @@ public static class Program
             try { edited = ManifestEdit.SetTag(text, dependency.Name, newest); }
             catch (InvalidOperationException other)
             {
-                Console.Error.WriteLine($"error[LYR-CLI0008]: {other.Message}");
+                Say.Error(Console.Error, "LYR-CLI0008", $"{other.Message}");
                 return null;
             }
             if (edited is null) continue;
@@ -646,7 +676,7 @@ public static class Program
         var start = Path.GetFullPath(directory ?? Directory.GetCurrentDirectory());
         if (!Directory.Exists(start))
         {
-            Console.Error.WriteLine($"error[LYR-CLI0001]: no such directory '{start}'");
+            Say.Error(Console.Error, "LYR-CLI0001", $"no such directory '{start}'");
             exit = 2;
             return null;
         }
@@ -660,7 +690,7 @@ public static class Program
         if (PackageOptions("clean", args, [], out var refused) is not { } options) return refused;
         if (Project.FindManifest(options.Start) is not { } file)
         {
-            Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
+            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above");
             return 2;
         }
         var outDir = Path.Combine(Path.GetDirectoryName(file)!, "out");
@@ -698,7 +728,7 @@ public static class Program
         if (PackageOptions("metadata", args, ["--offline", "--json"], out var refused) is not { } options) return refused;
         if (Project.FindManifest(options.Start) is null)
         {
-            Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
+            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above");
             return 2;
         }
         try
@@ -720,7 +750,7 @@ public static class Program
         }
         catch (ManifestException manifest)
         {
-            Console.Error.WriteLine(manifest.Render());
+            Say.Manifest(Console.Error, manifest);
             return manifest.Exit;
         }
     }
@@ -764,7 +794,7 @@ public static class Program
         var start = Path.GetFullPath(values.GetValueOrDefault("-C") ?? Directory.GetCurrentDirectory());
         if (Project.FindManifest(start) is not { } file)
         {
-            Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
+            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above");
             return 2;
         }
         var root = Path.GetDirectoryName(file)!;
@@ -814,7 +844,7 @@ public static class Program
         if (PackageOptions("remove", [.. rest], ["--offline"], out var refused) is not { } options) return refused;
         if (Project.FindManifest(options.Start) is not { } file)
         {
-            Console.Error.WriteLine("error[LYR-CLI0004]: no lyric.toml here or above");
+            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above");
             return 2;
         }
         return EditDependencies(file, options.Flags.Contains("--offline"),
@@ -833,7 +863,7 @@ public static class Program
         catch (ArgumentException unknown) { return Unknown(unknown.Message); }
         catch (InvalidOperationException other)
         {
-            Console.Error.WriteLine($"error[LYR-CLI0008]: {other.Message}");
+            Say.Error(Console.Error, "LYR-CLI0008", $"{other.Message}");
             return 2;
         }
         File.WriteAllText(file, after);
@@ -845,7 +875,7 @@ public static class Program
         catch (ManifestException refused)
         {
             File.WriteAllText(file, before);
-            Console.Error.WriteLine(refused.Render());
+            Say.Manifest(Console.Error, refused);
             return refused.Exit;
         }
         Console.Out.WriteLine(done);

@@ -43,7 +43,10 @@ public static class TestRun
         var chosen = filter is null ? tests : tests.Where(t => t.Name.Contains(filter, StringComparison.Ordinal)).ToList();
         if (chosen.Count == 0)
         {
-            output.WriteLine(tests.Count == 0 ? "no tests" : $"no test's name holds '{filter}'");
+            // the JSON form's count says it, with nothing run
+            if (Lyric.Core.Rendering.RenderStyle.Current.Events is { } none)
+                none.Raw("{\"type\":\"tests\",\"version\":1,\"passed\":0,\"failed\":0,\"skipped\":0}");
+            else output.WriteLine(tests.Count == 0 ? "no tests" : $"no test's name holds '{filter}'");
             return 0;
         }
         var program = project with { EntryText = Driver(chosen) };
@@ -61,10 +64,22 @@ public static class TestRun
         if (exit != 0 || built is null) return exit;
         if (!target.IsHost)
         {
-            error.WriteLine($"error[LYR-CLI0003]: '{target.Triple}' is not this machine; the binary is at {built}");
+            Say.Error(error, "LYR-CLI0003", $"'{target.Triple}' is not this machine; the binary is at {built}");
             return 2;
         }
-        return ProcessRunner.Stream(built, [], output, error, program.Manifest?.Root ?? program.Root);
+        var at = program.Manifest?.Root ?? program.Root;
+        if (Lyric.Core.Rendering.RenderStyle.Current.Events is not { } events)
+            return ProcessRunner.Stream(built, [], output, error, at);
+        // --json (16 §4): the runner writes a line of the form for each test (std.test, asked by the
+        // variable), passed on as it is; what else the program writes becomes an 'output' event
+        return ProcessRunner.Stream(built, [],
+            line =>
+            {
+                if (line.StartsWith("{\"type\":\"test", StringComparison.Ordinal)) events.Raw(line);
+                else events.Output("stdout", line);
+            },
+            line => events.Output("stderr", line),
+            at, new Dictionary<string, string> { ["LYRIC_TEST_FORMAT"] = "json" });
     }
 
     /// <summary>
@@ -104,8 +119,7 @@ public static class TestRun
             // 'app.tests.x' is one module: src/tests/x.lyr or tests/x.lyr, not both.
             if (File.Exists(Path.Combine(manifest.SourceRoot, "tests", relative)))
             {
-                error.WriteLine($"error[LYR-RES0015]: the module '{module}' lies under src/tests/ and under tests/");
-                error.WriteLine("  = help: rename one of the two files");
+                Say.Error(error, "LYR-RES0015", $"the module '{module}' lies under src/tests/ and under tests/", "rename one of the two files");
                 return null;
             }
             roots.Add(ScriptSource.FromDisk(file, module));
