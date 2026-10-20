@@ -149,7 +149,7 @@ public static class ProcessRunner
         Stream(file, arguments, output.WriteLine, error.WriteLine, workingDirectory);
 
     /// <summary>As the other, each line to a callback of its own — one at a time, never two at once —
-    /// and with variables added to the program's environment (<c>lyric test --json</c>, M12a S4).</summary>
+    /// and with variables added to the program's environment (what <c>lyric test --json</c> passes).</summary>
     public static int Stream(string file, IEnumerable<string> arguments, Action<string> output, Action<string> error,
         string? workingDirectory = null, IReadOnlyDictionary<string, string>? environment = null)
     {

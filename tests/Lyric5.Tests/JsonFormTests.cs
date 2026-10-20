@@ -4,7 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The JSON form (spec 16 §4; M12a S4): under <c>--json</c>, <c>build</c>, <c>run</c> and <c>test</c>
+/// The JSON form (spec 16 §4): under <c>--json</c>, <c>build</c>, <c>run</c> and <c>test</c>
 /// write one object a line on the standard output — every line parses by itself, each has its type and
 /// version — and nothing on the standard error; the findings the driver says itself (a usage error,
 /// a manifest's refusal) come the same way, a manifest's at its line.

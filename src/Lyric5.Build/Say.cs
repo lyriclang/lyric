@@ -5,10 +5,9 @@ namespace Lyric5.Build;
 
 /// <summary>
 /// The findings of the driver and the build that no compilation's engine holds — a usage error, a
-/// manifest's refusal, a build script that failed (M12a S4): drawn as text the way the renderer
-/// draws a compiler's (16 §1), or, under <c>--json</c>, written as the same events (16 §4). One way
-/// out: until S4 they were written line by line beside the engine, in a form of their own, with
-/// absolute paths and no colour, and the JSON form would have lost them.
+/// manifest's refusal, a build script that failed: drawn as text the way the renderer draws a
+/// compiler's (16 §1), or, under <c>--json</c>, written as the same events (16 §4). They share the
+/// compiler's form, its relative paths and its colour, and they reach the JSON stream too.
 /// </summary>
 public static class Say
 {
