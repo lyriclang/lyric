@@ -6,15 +6,21 @@ Module main
   External Dict (from std.collections.HashMap)
 
 === diagnostics ===
-imports.lyr:1:1: error[LYR-RES0003]: cannot find module 'std.io'
-import std.io;
-^^^^^^^^^^^^^^
+error[LYR-RES0003]: cannot find module 'std.io'
+ --> imports.lyr:1:1
+  |
+1 | import std.io;
+  | ^^^^^^^^^^^^^^
 
-imports.lyr:2:1: error[LYR-RES0003]: cannot find module 'std.io'
-import std.io { println, eprintln };
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+error[LYR-RES0003]: cannot find module 'std.io'
+ --> imports.lyr:2:1
+  |
+2 | import std.io { println, eprintln };
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-imports.lyr:3:1: error[LYR-RES0003]: cannot find module 'std.collections.HashMap'
-import std.collections.HashMap as Dict;
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+error[LYR-RES0003]: cannot find module 'std.collections.HashMap'
+ --> imports.lyr:3:1
+  |
+3 | import std.collections.HashMap as Dict;
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

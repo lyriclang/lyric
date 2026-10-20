@@ -3,11 +3,15 @@ Cast [0..6)
   ErrorType [5..6)
 
 === diagnostics ===
-type_error.lyr:1:6: error[LYR-PAR0001]: unexpected token after expression: IntLiteral
-x as 5
-     ^
+error[LYR-PAR0001]: unexpected token after expression: IntLiteral
+ --> type_error.lyr:1:6
+  |
+1 | x as 5
+  |      ^
 
-type_error.lyr:1:6: error[LYR-PAR0011]: expected a type, got IntLiteral
-x as 5
-     ^
+error[LYR-PAR0011]: expected a type, got IntLiteral
+ --> type_error.lyr:1:6
+  |
+1 | x as 5
+  |      ^
 

@@ -1,4 +1,5 @@
-﻿using System.Text;
+using System.Text;
+using Lyric.Core.Rendering;
 
 namespace Lyric.Core;
 
@@ -40,6 +41,10 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
             if (diagnostic.Severity == Severity.Error && _probe is { } probe && _muted == probe.Level) probe.Errors++;
             return;
         }
+        // What follows from a declaration the parser could not read is not said (11 G6; M12a S2 P3):
+        // its parts are what the recovery left, and an error about them is an error about the
+        // recovery. The parser's own errors stay.
+        if (InUnparsed(diagnostic)) return;
         if (_within.Count > 0)
         {
             if (diagnostic.Severity is not Severity.Error) return;
@@ -86,6 +91,22 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
     }
 
     private static bool Same(Diagnostic a, Diagnostic b) => a.Equals(b);
+
+    private readonly List<Span> _unparsed = [];
+
+    /// <summary>Marks <paramref name="declaration"/> as one the parser could not read whole: from
+    /// now on only lexer and parser findings are said inside it.</summary>
+    public void MarkUnparsed(Span declaration) => _unparsed.Add(declaration);
+
+    /// <summary>Whether <paramref name="span"/> lies in a declaration the parser could not read.</summary>
+    public bool IsUnparsed(Span span) =>
+        _unparsed.Any(u => u.File == span.File && span.Start >= u.Start && span.Start < Math.Max(u.End, u.Start + 1));
+
+    private bool InUnparsed(Diagnostic diagnostic) =>
+        _unparsed.Count > 0
+        && !diagnostic.Code.StartsWith("LYR-PAR", StringComparison.Ordinal)
+        && !diagnostic.Code.StartsWith("LYR-LEX", StringComparison.Ordinal)
+        && IsUnparsed(diagnostic.Span);
 
     private readonly List<(DiagnosticNote Note, Span? Primary, Func<Diagnostic, Diagnostic>? Recode)> _within = [];
 
@@ -222,67 +243,38 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
         static bool IsControl(char c) => c != '\t' && (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F));
     }
 
-    public void RenderText(TextWriter output)
-    {
-        if (output == null) throw new ArgumentNullException(nameof(output));
+    private readonly HashSet<Diagnostic> _rendered = [];
+    private int _shownErrors;
 
-        foreach (var diagnostic in SortedSnapshot())
-        {
-            if (!diagnostic.Span.File.IsValid)
-            {
-                output.Write($"{diagnostic.Severity.ToDisplayString()}[{diagnostic.Code}]: {Printable(diagnostic.Message)}");
-                output.Write("\n");
-                RenderNotes(output, diagnostic);
-                output.Write("\n");
-                continue;
-            }
-
-            LinePosition diagPos = _sourceManager.LocateStart(diagnostic.Span);
-            output.WriteLine
-            (
-                $"{Printable(_sourceManager.GetPath(diagnostic.Span.File))}:" +
-                $"{diagPos.Line}:{diagPos.Column}: " +
-                $"{diagnostic.Severity.ToDisplayString()}[{diagnostic.Code}]: {Printable(diagnostic.Message)}"
-            );
-            output.WriteLine(Printable(_sourceManager.GetLineText(diagnostic.Span.File, diagPos.Line)));
-            for (int i = 0; i < diagPos.Column - 1; i++)
-            {
-                output.Write(" ");
-            }
-
-            var endPos = _sourceManager.LocateEnd(diagnostic.Span);
-            for (int i = 0;
-                 i < (diagPos.Line == endPos.Line ? Math.Max(diagnostic.Span.Length, 1) : 1); // Single-line with Length 0 gets one Caret
-                 i++)
-            {
-                output.Write("^");
-            }
-            output.Write("\n");
-            RenderNotes(output, diagnostic);
-            output.Write("\n");
-        }
-    }
+    /// <summary>Renders, in <see cref="RenderStyle.Current"/>, what has not been rendered yet.</summary>
+    public void RenderText(TextWriter output) => RenderText(output, RenderStyle.Current);
 
     /// <summary>
-    /// The notes, indented under their diagnostic. Indented lines deliberately do not match the
-    /// <c>path:line:col:</c> head format, so an editor's problem matcher sees one problem, not
-    /// one per note.
+    /// The findings as text (11 G5; M12a S2), each once: a second call says only what was reported
+    /// since the first — the build renders after the front end and again after the gate, and the
+    /// warnings were said twice. After <see cref="RenderStyle.MaxErrors"/> errors the rest is
+    /// counted, not drawn (G6), and one line says how much.
     /// </summary>
-    private void RenderNotes(TextWriter output, Diagnostic diagnostic)
+    public void RenderText(TextWriter output, RenderStyle style)
     {
-        foreach (var note in diagnostic.Notes ?? [])
+        ArgumentNullException.ThrowIfNull(output);
+        var renderer = new TextRenderer(_sourceManager, style);
+        int hiddenErrors = 0, hiddenOthers = 0;
+        foreach (var diagnostic in SortedSnapshot())
         {
-            if (note.Location.File.IsValid)
+            if (!_rendered.Add(diagnostic)) continue;
+            if (style.MaxErrors > 0 && _shownErrors >= style.MaxErrors)
             {
-                var position = _sourceManager.LocateStart(note.Location);
-                output.WriteLine($"  note: {Printable(note.Message)} — " +
-                    $"{Printable(_sourceManager.GetPath(note.Location.File))}:{position.Line}:{position.Column}");
+                if (diagnostic.Severity == Severity.Error) hiddenErrors++; else hiddenOthers++;
+                continue;
             }
-            else
-            {
-                output.WriteLine($"  note: {Printable(note.Message)}");
-            }
+            renderer.Render(output, diagnostic);
+            if (diagnostic.Severity == Severity.Error) _shownErrors++;
         }
+        if (hiddenErrors + hiddenOthers == 0) return;
+        var what = hiddenErrors == 1 ? "1 more error" : $"{hiddenErrors} more errors";
+        if (hiddenOthers > 0) what += hiddenOthers == 1 ? " and 1 more warning or hint" : $" and {hiddenOthers} more warnings or hints";
+        output.Write($"note: {what} not shown; '--max-errors 0' shows all\n\n");
     }
 
     public void RenderJson(TextWriter output)

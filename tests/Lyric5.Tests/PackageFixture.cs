@@ -80,8 +80,16 @@ internal static class PackageFixture
         return dir;
     }
 
-    /// <summary>The driver with <paramref name="args"/>: its exit code and what it wrote.</summary>
+    /// <summary>The driver with <paramref name="args"/>: its exit code and what it wrote, the
+    /// diagnostics folded to one line per finding (<see cref="DiagnosticHeads"/>).</summary>
     public static (int Exit, string Out, string Err) Run(params string[] args)
+    {
+        var (exit, output, error) = RunRaw(args);
+        return (exit, output, DiagnosticHeads.Fold(error));
+    }
+
+    /// <summary>The driver with <paramref name="args"/>, its standard error as it was written.</summary>
+    public static (int Exit, string Out, string Err) RunRaw(params string[] args)
     {
         var savedOut = Console.Out;
         var savedErr = Console.Error;

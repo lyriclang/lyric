@@ -2,8 +2,20 @@ Module main
   Function foo
 
 === diagnostics ===
-duplicate_decl.lyr:5:1: error[LYR-RES0001]: 'foo' is already declared in this module — only two FUNCTIONS may share a name, told apart by how many arguments they take
-struct foo {
-^
-  note: previous declaration — duplicate_decl.lyr:1:1
+error[LYR-RES0001]: 'foo' is already declared in this module — only two FUNCTIONS may share a name, told apart by how many arguments they take
+ --> duplicate_decl.lyr:5:1
+  |
+5 | struct foo {
+  | ^^^^^^^^^^^^
+6 |     x: int,
+7 | }
+  | ^
+note: previous declaration
+ --> duplicate_decl.lyr:1:1
+  |
+1 | fn foo(): int {
+  | ^^^^^^^^^^^^^^^
+2 |     return 0;
+3 | }
+  | ^
 

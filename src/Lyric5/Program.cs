@@ -18,6 +18,7 @@ public static class Program
     {
         try
         {
+            if (TakeRenderOptions(ref args) is { } refused) return refused;
             if (args.Length == 0) return Usage(Console.Out, 0);
             return args[0] switch
             {
@@ -47,7 +48,57 @@ public static class Program
         }
     }
 
-    /// <summary>The first lines of a stack trace: a recursion that reached the end of the stack
+    /// <summary>
+    /// The options of every verb that say how its diagnostics read (design/v5/spec/11 G5, G6, C7;
+    /// M12a S2): <c>--color auto|always|never</c>, <c>--absolute-paths</c>, <c>--max-errors N</c>
+    /// (0 for all), anywhere before a <c>--</c>. They are taken out of <paramref name="args"/> and
+    /// set as <see cref="Lyric.Core.Rendering.RenderStyle.Current"/> — every verb, the same style, and
+    /// set afresh by each command, so none leaks into the next. Paths are said relative to the
+    /// package's root: the one <c>-C</c> names, or the one around the working directory.
+    /// </summary>
+    private static int? TakeRenderOptions(ref string[] args)
+    {
+        var kept = new List<string>();
+        var color = "auto";
+        var absolute = false;
+        var maxErrors = Lyric.Core.Rendering.RenderStyle.DefaultMaxErrors;
+        string? from = null;
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (arg == "--") { kept.AddRange(args[i..]); break; }
+            if (arg == "--absolute-paths") { absolute = true; continue; }
+            if (arg is "--color" or "--max-errors")
+            {
+                if (i + 1 >= args.Length) return Unknown($"'{arg}' takes a value");
+                var value = args[++i];
+                if (arg == "--color")
+                {
+                    if (value is not ("auto" or "always" or "never")) return Unknown($"'--color' takes auto, always or never, not '{value}'");
+                    color = value;
+                }
+                else if (!int.TryParse(value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out maxErrors))
+                    return Unknown($"'--max-errors' takes a count, 0 for all, not '{value}'");
+                continue;
+            }
+            if (arg == "-C" && i + 1 < args.Length) from = args[i + 1];
+            kept.Add(arg);
+        }
+        args = [.. kept];
+
+        var start = Path.GetFullPath(from ?? Directory.GetCurrentDirectory());
+        var manifest = Directory.Exists(start) ? Project.FindManifest(start) : null;
+        Lyric.Core.Rendering.RenderStyle.Current = new Lyric.Core.Rendering.RenderStyle
+        {
+            Color = Lyric.Core.Rendering.RenderStyle.ColorFor(color, !Console.IsErrorRedirected, Environment.GetEnvironmentVariable)!.Value,
+            AbsolutePaths = absolute,
+            MaxErrors = maxErrors,
+            BaseDirectory = manifest is not null ? Path.GetDirectoryName(manifest) : Directory.GetCurrentDirectory(),
+        };
+        return null;
+    }
+
+    /// <summary>The first lines of a stack trace:a recursion that reached the end of the stack
     /// has a few thousand frames, and they repeat after the first dozen.</summary>
     internal static string Head(string? trace, int lines)
     {
@@ -97,6 +148,13 @@ public static class Program
         output.WriteLine("  --offline                      fetch nothing: packages from git come from the cache");
         output.WriteLine("  --locked                       take lyric.lock as it is: build, run and test fail where");
         output.WriteLine("                                 the manifests read otherwise, and write no lock");
+        output.WriteLine();
+        output.WriteLine("options of every verb:");
+        output.WriteLine("  --color auto|always|never      colour the diagnostics (default auto: a terminal, unless");
+        output.WriteLine("                                 NO_COLOR is set or TERM is dumb)");
+        output.WriteLine("  --absolute-paths               paths as they are, not relative to the package");
+        output.WriteLine("  --max-errors <n>               draw the first n errors and count the rest (default 50,");
+        output.WriteLine("                                 0 for all)");
         output.WriteLine();
         output.WriteLine("The Lyric 5 command line, in development (design/v5/spec/13).");
         return exit;

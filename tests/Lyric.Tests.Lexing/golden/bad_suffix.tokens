@@ -7,19 +7,27 @@
 [23..23) Eof
 
 === diagnostics ===
-bad_suffix.lyr:1:1: error[LYR-LEX0003]: invalid suffix 'i7' on decimal literal
-100i7
-^^^^^
+error[LYR-LEX0003]: invalid suffix 'i7' on decimal literal
+ --> bad_suffix.lyr:1:1
+  |
+1 | 100i7
+  | ^^^^^
 
-bad_suffix.lyr:2:1: error[LYR-LEX0003]: integer suffix 'i32' is not allowed on float literal
-1.5i32
-^^^^^^
+error[LYR-LEX0003]: integer suffix 'i32' is not allowed on float literal
+ --> bad_suffix.lyr:2:1
+  |
+2 | 1.5i32
+  | ^^^^^^
 
-bad_suffix.lyr:3:1: error[LYR-LEX0004]: empty integer literal after prefix
-0xGG
-^^
+error[LYR-LEX0004]: empty integer literal after prefix
+ --> bad_suffix.lyr:3:1
+  |
+3 | 0xGG
+  | ^^
 
-bad_suffix.lyr:4:4: error[LYR-LEX0001]: unexpected character '§'
-99 §
-   ^
+error[LYR-LEX0001]: unexpected character '§'
+ --> bad_suffix.lyr:4:4
+  |
+4 | 99 §
+  |    ^
 
