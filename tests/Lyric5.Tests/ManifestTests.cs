@@ -236,7 +236,7 @@ public class ManifestTests
         Assert.Equal(3, e.Line);
         var said = new StringWriter { NewLine = "\n" };
         Say.Manifest(said, e);
-        // drawn as a compiler's finding (M12a S4): the arrow at the place, the line it is about
+        // drawn as a compiler's finding: the arrow at the place, the line it is about
         Assert.Contains("lyric.toml:3:", said.ToString());
         Assert.Contains("3 | version = 0.1", said.ToString());
     }

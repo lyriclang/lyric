@@ -35,12 +35,13 @@ den 11 T5 abgeschafft hat.
 | Verboten | Entscheidungs-IDs (`(10 C3)`), Meilensteine und Slices, Reviews, Spec-Pfade, „verworfen“, Geschichte, Begründungen, Vergleiche mit anderen Sprachen |
 
 Das gilt für `///`; für alle übrigen Kommentare gilt es schon (`CONTRIBUTING.md` §Code style:
-„no milestone or decision references“). Gemessen auf `origin/main` am 2026-10-20 (eine Suche
-nach Entscheidungsnummern, Meilensteinen, „Review“, `design/`): `stdlib5` `///` 396 von 3091
-Zeilen in 33 Modulen, `stdlib5` `//` 98, `runtime/` 199, `src/Lyric5*` 261.
+„no milestone or decision references“). Gezählt vom Wächter
+(`CommentRatchetTests`, K1) am 2026-10-20, Kommentarzeilen mit Bezug: `stdlib5` `///` 547,
+`stdlib5` `//` 114, `runtime/` 277, `src/Lyric5*` 392, `src/Lyric.Frontend` 1632,
+`tests/Lyric5.Tests` 391 — der Stand je Datei in `tooling/comment-ratchet.toml`.
 
 **Uhren**: ein **Wächter als Ratchet** (die Zahl je Bereich darf nur sinken) sofort, als eigener PR während M12a; ein
-**Aufräumblock** zwischen M12b und M13a — `stdlib5` in die Form oben, `runtime/` und C# ohne
+**Aufräumblock** zwischen M12b und M13a — `stdlib5` in die Form oben, `runtime/`, der C#-Code und die Tests ohne
 Entscheidungsbezüge, am Ende steht der Ratchet auf 0 und wird ein harter Wächter; die
 `# Examples` der std mit dem Doc-Test-Läufer in M13a.
 
@@ -121,7 +122,8 @@ Archive aus M15, der Inhalt des Books aus M17, die Version `5.0` aus M18.
 | **K1** Ratchet | Ein Test in `Lyric5.Tests` zählt die Kommentare mit Entscheidungsbezug je Bereich (`stdlib5` `///`, `stdlib5` `//`, `runtime/`, `src/Lyric5*`) gegen `tooling/comment-ratchet.toml`; rot, wenn eine Zahl steigt, mit den neuen Fundstellen; die Zahlen sinken mit jedem Aufräum-PR | ein neuer Kommentar mit `(10 C3)` macht den Test rot (Kontrolle) | S |
 | **K2a** std I | die `///` von `core`, `iter`, `collections`, `string`, `fmt`, `math`, `hash` in W8-Form: erster Satz, Beschreibung, `# Panics`, `# Errors`; Querverweise als `[Typ.member]` | **die emittierte C der std bleibt bis auf die `#line`-Angaben gleich** (Beweis: nur Kommentare geändert — die Zeilennummern verschieben sich mit); `broken-doc-link` grün | M |
 | **K2b** std II | dasselbe für die übrigen Module (io, fs, net, process, http, json, task, sync, time …) und die `//` in `stdlib5` | wie K2a | M |
-| **K2c** Laufzeit und Compiler | `runtime/` und `src/Lyric5*` ohne Entscheidungsbezüge; der Ratchet steht auf 0 und wird ein harter Wächter | Bau und Suiten unverändert grün; der Wächter rot bei einem neuen Fund | S |
+| **K2c** Laufzeit, Compiler, Tests | `runtime/`, `src/Lyric5*` und `tests/Lyric5.Tests` ohne Entscheidungsbezüge (etwa 1060 Zeilen; geteilt 2026-10-20, als der Wächter Frontend und Tests mitzählte) | Bau und Suiten unverändert grün; der Wächter dieser Bereiche auf 0 | M |
+| **K2d** Frontend | `src/Lyric.Frontend` ohne Entscheidungsbezüge (etwa 1630 Zeilen); danach steht der Ratchet überall auf 0 und wird ein harter Wächter | wie K2c; der Wächter rot bei einem neuen Fund | M |
 | **S1** Renderer und Thema | P1–P4, P7: `Lyric5.Doc` mit Layout, CSS aus B1–B10, Schriften, JS; Startseite (B8) und Releases (aus `CHANGELOG.md`) über `tools/Site`; Ausgabe in ein Verzeichnis je Version; der AOT-Test aus P3 | Goldens je Seitenform; Linkprüfung; **keine externe Anfrage** (kein `http(s)` in `<link>`, `<script>`, `@font-face`); Kontrast jedes Farbpaars aus B3 ≥ 4,5:1 als Test | M |
 | **S2** Book-Gerüst | P5: `SUMMARY.md`, die zweispaltige Seite (B10), Weiter/Zurück, die Snippet-Prüfung in der Suite; zwei echte Kapitel (Getting started, A first program) | jedes Snippet läuft; ein falsches `output` wird rot (Kontrolle) | M |
 | **S3** Spec und Katalog | die Spec aus `lyric-spec` am `spec.pin`, der Katalog aus `diagnostics.toml` (eine Seite je Code, P6) | jeder Code des Katalogs hat eine Seite; `lyric explain` nennt die URL | S |
@@ -132,7 +134,7 @@ Archive aus M15, der Inhalt des Books aus M17, die Version `5.0` aus M18.
 | **in M15** | der Mirror (C9): VPS härten, `dl.lyric.oil1i.de`, Upload im Release-Job, die Kanalliste für `lyric toolchain` | `lyric toolchain install dev` lädt vom Mirror, fällt auf GitHub zurück | — |
 | **in M17/M18** | M17: der Inhalt des Books. M18: `/5.0/` eingefroren, `/` zeigt auf das Stable | — | — |
 
-**Reihenfolge**: K1 sofort (während M12a) → M12a, M12b → K2a, K2b, K2c → S1 → S2, S3, S4 (in
+**Reihenfolge**: K1 sofort (während M12a) → M12a, M12b → K2a, K2b, K2c, K2d → S1 → S2, S3, S4 (in
 beliebiger Folge) → S5 → S6 → M13a. S5 vor S6: die erste Veröffentlichung der neuen Seite darf die
 alte nicht überschreiben.
 
@@ -148,8 +150,8 @@ Nicht automatisch: das Verhalten bei schmalem Fenster — S1 und S2 prüfen es v
 ### Umfang
 
 `Lyric5.Doc` etwa 2000 Zeilen C# und 600 CSS/JS, `tools/Site` etwa 800, die Book-Prüfung etwa
-500, K1 etwa 150; K2 schreibt rund 3500 Kommentarzeilen um, ohne Code. Dazu fallen DocGen und
-seine Tests (etwa 1700 Zeilen). Zusammen etwa **L**: K1, K2c, S3–S6 klein, K2a, K2b, S1, S2 mittel.
+500, K1 etwa 150; K2 schreibt rund 3350 Kommentarzeilen um, ohne Code. Dazu fallen DocGen und
+seine Tests (etwa 1700 Zeilen). Zusammen **L an der oberen Kante**: K1, S3–S6 klein, K2a–K2d, S1, S2 mittel.
 
 ### Reflexion
 
@@ -168,7 +170,7 @@ seine Tests (etwa 1700 Zeilen). Zusammen etwa **L**: K1, K2c, S3–S6 klein, K2a
 
 | # | Entscheidung | Verworfen |
 |---|---|---|
-| E1 | **M12c „Doku-Grundlage und Website“**, Größe L, zwischen M12b und M13a: K2a–K2c und S1–S6. Artefakt: `/dev/` live, der Kommentar-Wächter auf 0 | alles in M13a — es wüchse von M auf XL, mehr als 100 % über seiner Größe (CONTRIBUTING) |
+| E1 | **M12c „Doku-Grundlage und Website“**, Größe L, zwischen M12b und M13a: K2a–K2d und S1–S6. Artefakt: `/dev/` live, der Kommentar-Wächter auf 0 | alles in M13a — es wüchse von M auf XL, mehr als 100 % über seiner Größe (CONTRIBUTING) |
 | E2 | **K1 sofort**, als eigener PR während M12a | K1 erst mit M12c — bis dahin wüchsen die Funde mit M12a und M12b weiter |
 | E3 | **M12a S11** schreibt sein Kapitel als Markdown-Entwurf eines Book-Kapitels unter `docs/book/`; S2 rendert es | in den 4.x-Guide schreiben, den es nach W6 nicht mehr gibt |
 | E4 | Die übrigen Stücke bleiben in ihren Meilensteinen: `lyric doc` und die Doc-Tests in M13a, der Mirror in M15, der Inhalt des Books in M17, `/5.0/` in M18 | — |
