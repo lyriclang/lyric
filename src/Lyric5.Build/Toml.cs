@@ -15,9 +15,14 @@ public static class Toml
 {
     /// <summary>The document as its root table.</summary>
     /// <exception cref="TomlException">The text is not TOML, or not the subset.</exception>
-    public static TomlTable Parse(string text) => new Reader(text).Document();
+    public static TomlTable Parse(string text) => new Reader(text, false).Document();
 
-    private sealed class Reader(string text)
+    /// <summary>The subset with literal multi-line strings (<c>'''…'''</c>, no escapes inside, a line
+    /// break right after the opening dropped) — the diagnostic catalog's (M12a S3), whose explanations
+    /// and programs run over lines. A manifest still refuses them.</summary>
+    public static TomlTable ParseCatalog(string text) => new Reader(text, true).Document();
+
+    private sealed class Reader(string text, bool multiline)
     {
         private int _pos;
         private int _line = 1;
@@ -147,7 +152,8 @@ public static class Toml
                     if (text.AsSpan(_pos).StartsWith("\"\"\"")) throw Error("multi-line strings are not part of a manifest");
                     return BasicString();
                 case '\'':
-                    if (text.AsSpan(_pos).StartsWith("'''")) throw Error("multi-line strings are not part of a manifest");
+                    if (text.AsSpan(_pos).StartsWith("'''"))
+                        return multiline ? MultilineLiteral() : throw Error("multi-line strings are not part of a manifest");
                     return LiteralString();
                 case '[': return Array();
                 case '{': return InlineTable();
@@ -155,6 +161,21 @@ public static class Toml
             if (text.AsSpan(_pos).StartsWith("true") && !IsBareChar(4)) { _pos += 4; return true; }
             if (text.AsSpan(_pos).StartsWith("false") && !IsBareChar(5)) { _pos += 5; return false; }
             return Integer();
+        }
+
+        /// <summary><c>'''…'''</c>: the text as written, its line breaks counted.</summary>
+        private string MultilineLiteral()
+        {
+            _pos += 3;
+            if (Current == '\r' && _pos + 1 < text.Length && text[_pos + 1] == '\n') _pos++;
+            if (Current == '\n') { _pos++; _line++; _lineStart = _pos; }
+            var start = _pos;
+            var end = text.IndexOf("'''", _pos, StringComparison.Ordinal);
+            if (end < 0) throw Error("a multi-line string is not closed");
+            for (var i = _pos; i < end; i++)
+                if (text[i] == '\n') { _line++; _lineStart = i + 1; }
+            _pos = end + 3;
+            return text[start..end].Replace("\r\n", "\n");
         }
 
         private bool IsBareChar(int offset) =>

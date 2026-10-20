@@ -18,4 +18,9 @@
     <ProjectReference Include="..\Lyric5.Toolchain\Lyric5.Toolchain.csproj" />
   </ItemGroup>
 
+  <!-- the diagnostic catalog (M12a S3): lyric explain reads it, CatalogTests hold it against the compiler -->
+  <ItemGroup>
+    <EmbeddedResource Include="diagnostics.toml" LogicalName="diagnostics.toml" />
+  </ItemGroup>
+
 </Project>

@@ -34,6 +34,7 @@ public static class Program
                 "metadata" => Metadata(args[1..]),
                 "add" => Add(args[1..]),
                 "remove" => Remove(args[1..]),
+                "explain" => Explain(args[1..]),
                 _ => Unknown($"unknown verb '{args[0]}'"),
             };
         }
@@ -132,6 +133,7 @@ public static class Program
         output.WriteLine("  clean [-C <dir>]               remove the package's out/");
         output.WriteLine("  metadata [options]             the package as JSON: its graph, programs, profiles, targets");
         output.WriteLine("                                 (options: -C <dir>, --offline, --json)");
+        output.WriteLine("  explain <code>                 what a diagnostic code means, with a wrong and a right program");
         output.WriteLine("  version                        the toolchain and the C compiler it found");
         output.WriteLine("  help                           this");
         output.WriteLine();
@@ -779,6 +781,19 @@ public static class Program
             value = $"{{ git = {ManifestEdit.Quote(values["--git"])}{revision} }}";
         }
         return EditDependencies(file, offline, text => ManifestEdit.Add(text, name, value), $"added {name} = {value}");
+    }
+
+    /// <summary><c>lyric explain &lt;code&gt;</c> (11 G9; 13 M12a P4): the catalog's entry — what the
+    /// code means, why, what to do, a wrong and a right program. A code is read as a reader may write
+    /// it (<c>sem0001</c>, <c>LYR-SEM0001</c>); one the catalog does not hold is exit 2.</summary>
+    private static int Explain(string[] args)
+    {
+        if (args.Length != 1 || args[0].StartsWith('-')) return Unknown("explain takes one code: lyric5 explain LYR-SEM0001");
+        var code = DiagnosticCatalog.Normalize(args[0]);
+        if (!DiagnosticCatalog.Entries.TryGetValue(code, out var entry))
+            return Unknown($"no code '{args[0]}' in the catalog");
+        Console.Out.Write(DiagnosticCatalog.Explain(entry));
+        return 0;
     }
 
     /// <summary><c>lyric remove &lt;name&gt;</c> (11 C2): the dependency's line taken out of
