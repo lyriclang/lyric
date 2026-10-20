@@ -234,7 +234,11 @@ public class ManifestTests
         var e = Assert.Throws<ManifestException>(() => Manifest.Read(Write("[package]\nname = \"app\"\nversion = 0.1\n")));
         Assert.Equal("LYR-PKG0001", e.Code);
         Assert.Equal(3, e.Line);
-        Assert.Contains("lyric.toml:3:", e.Render());
+        var said = new StringWriter { NewLine = "\n" };
+        Say.Manifest(said, e);
+        // drawn as a compiler's finding (M12a S4): the arrow at the place, the line it is about
+        Assert.Contains("lyric.toml:3:", said.ToString());
+        Assert.Contains("3 | version = 0.1", said.ToString());
     }
 
     private static object Get(TomlTable table, string key)

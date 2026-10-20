@@ -145,7 +145,13 @@ public static class ProcessRunner
     /// to writers rather than to the console, so a caller that redirects the console gets it —;
     /// answers its exit code. <c>lyric test</c>'s program (10 B12).</summary>
     public static int Stream(string file, IEnumerable<string> arguments, TextWriter output, TextWriter error,
-        string? workingDirectory = null)
+        string? workingDirectory = null) =>
+        Stream(file, arguments, output.WriteLine, error.WriteLine, workingDirectory);
+
+    /// <summary>As the other, each line to a callback of its own — one at a time, never two at once —
+    /// and with variables added to the program's environment (<c>lyric test --json</c>, M12a S4).</summary>
+    public static int Stream(string file, IEnumerable<string> arguments, Action<string> output, Action<string> error,
+        string? workingDirectory = null, IReadOnlyDictionary<string, string>? environment = null)
     {
         var info = new ProcessStartInfo(file)
         {
@@ -157,10 +163,11 @@ public static class ProcessRunner
         };
         if (workingDirectory is not null) info.WorkingDirectory = workingDirectory;
         foreach (var argument in arguments) info.ArgumentList.Add(argument);
+        foreach (var (name, value) in environment ?? new Dictionary<string, string>()) info.Environment[name] = value;
         using var process = new Process { StartInfo = info };
         var gate = new object();
-        process.OutputDataReceived += (_, e) => { if (e.Data is not null) lock (gate) output.WriteLine(e.Data); };
-        process.ErrorDataReceived += (_, e) => { if (e.Data is not null) lock (gate) error.WriteLine(e.Data); };
+        process.OutputDataReceived += (_, e) => { if (e.Data is not null) lock (gate) output(e.Data); };
+        process.ErrorDataReceived += (_, e) => { if (e.Data is not null) lock (gate) error(e.Data); };
         if (!process.Start()) throw new InvalidOperationException($"could not start {file}");
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();

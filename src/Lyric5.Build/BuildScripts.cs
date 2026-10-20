@@ -49,9 +49,9 @@ public static class BuildScripts
             if (manifest.Name != root.Name && !root.TrustedScripts.Contains(manifest.Name))
             {
                 var (file, line) = DeclaredAt(graph, manifest.Name) ?? (root.File, 1);
-                error.WriteLine(new ManifestException("LYR-PKG0012", file, line, 1,
+                Say.Manifest(error, new ManifestException("LYR-PKG0012", file, line, 1,
                     $"package '{manifest.Name}' has a build script, and a dependency's script runs only where the root trusts it: " +
-                    $"[trust] build-scripts = [\"{manifest.Name}\"] in {Path.GetFileName(root.File)} (11 W3 BS5)").Render());
+                    $"[trust] build-scripts = [\"{manifest.Name}\"] in {Path.GetFileName(root.File)} (11 W3 BS5)"));
                 return (1, null);
             }
             var (exit, directives) = RunOne(manifest, graph.Scripts.GetValueOrDefault(manifest.Name), target, profile, compiler, version, error);
@@ -70,7 +70,7 @@ public static class BuildScripts
                         if (!libraries.Contains(text)) libraries.Add(text);
                         break;
                     case "warn":
-                        error.WriteLine($"warning[LYR-BLD0003]: {manifest.Name}'s build.lyr: {text}");
+                        Say.Warning(error, "LYR-BLD0003", $"{manifest.Name}'s build.lyr: {text}");
                         break;
                 }
             }
@@ -110,7 +110,7 @@ public static class BuildScripts
             compiler, version), error);
         if (built != 0 || executable is null)
         {
-            error.WriteLine($"error[LYR-BLD0002]: {manifest.Name}'s build.lyr does not build, so the package does not (11 W3 BS1)");
+            Say.Error(error, "LYR-BLD0002", $"{manifest.Name}'s build.lyr does not build, so the package does not (11 W3 BS1)");
             return (built == 0 ? 1 : built, null);
         }
 
@@ -131,15 +131,22 @@ public static class BuildScripts
         }
         catch (TimeoutException)
         {
-            error.WriteLine($"error[LYR-BLD0002]: {manifest.Name}'s build.lyr did not end within 10 minutes");
+            Say.Error(error, "LYR-BLD0002", $"{manifest.Name}'s build.lyr did not end within 10 minutes");
             return (2, null);
         }
         File.WriteAllText(Path.Combine(dir, "output.txt"), ran.Stdout + ran.Stderr);
         if (ran.ExitCode != 0)
         {
-            error.WriteLine($"error[LYR-BLD0002]: {manifest.Name}'s build.lyr ended with exit {ran.ExitCode}, and the package is not built; what it wrote:");
-            error.Write(ran.Stdout);
-            error.Write(ran.Stderr);
+            // what the script wrote comes after the finding as it was written, or, in the JSON form, as its note
+            var wrote = ran.Stdout + ran.Stderr;
+            var message = $"{manifest.Name}'s build.lyr ended with exit {ran.ExitCode}, and the package is not built";
+            if (Lyric.Core.Rendering.RenderStyle.Current.Events is not null)
+                Say.ErrorWithNotes(error, "LYR-BLD0002", message, wrote.Length > 0 ? [new Lyric.Core.DiagnosticNote($"what it wrote:\n{wrote}")] : []);
+            else
+            {
+                Say.Error(error, "LYR-BLD0002", wrote.Length > 0 ? message + "; what it wrote:" : message);
+                error.Write(wrote);
+            }
             return (2, null);
         }
         var directives = new List<(string, string)>();

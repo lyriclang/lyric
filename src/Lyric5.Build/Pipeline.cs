@@ -130,7 +130,7 @@ public static class Pipeline
     {
         if (profile is not { DenyWarnings: true } || result.Diagnostics.WarningCount == 0) return false;
         var count = result.Diagnostics.WarningCount;
-        error.WriteLine($"error[{CliDiagnostics.WarningsDenied}]: {count} warning{(count == 1 ? "" : "s")}, and the profile '{profile.Name}' denies warnings (denyWarnings)");
+        Say.Error(error, CliDiagnostics.WarningsDenied, $"{count} warning{(count == 1 ? "" : "s")}, and the profile '{profile.Name}' denies warnings (denyWarnings)");
         return true;
     }
 
@@ -212,7 +212,7 @@ public static class Pipeline
         }
         catch (CBuildException failure)
         {
-            error.WriteLine($"error[LYR-BLD0001]: {failure.Message}");
+            Say.Error(error, "LYR-BLD0001", failure.Message);
             return (2, null);
         }
     }
