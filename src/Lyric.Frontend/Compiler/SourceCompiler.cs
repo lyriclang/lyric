@@ -19,8 +19,8 @@ namespace Lyric.Compiler;
 ///
 /// <para>This class NEVER RENDERS ITSELF. It collects into
 /// <see cref="CompileResult.Diagnostics"/> and leaves the output to the caller;
-/// <see cref="DiagnosticEngine.RenderText"/> renders the whole collection each time, so two calls
-/// would be duplicate messages.</para>
+/// <see cref="DiagnosticEngine.RenderText"/> says each finding once, so a second call after more
+/// reports adds those alone (M12a S2; before, it rendered the whole collection again).</para>
 /// </summary>
 public static class SourceCompiler
 {

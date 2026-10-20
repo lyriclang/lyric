@@ -65,8 +65,36 @@ public sealed partial class Parser
             _de.Report("LYR-PAR0042", Severity.Error, pending[0].Span,
                 "an attribute must be followed by the declaration it applies to");
 
+        MarkUnparsed(decls);
+
         var end = decls.Count > 0 ? decls[^1].Span : (header?.Span ?? start);
         return new Module(header, decls.ToArray(), Span.Union(start, end)) { Attributes = moduleAttributes };
+    }
+
+    /// <summary>
+    /// Tells the engine which declarations hold a lexer or parser error (11 G6; M12a S2 P3): what
+    /// the resolver and the checker would say about them is said about the recovery's leftovers,
+    /// and the engine keeps it back. The parser's errors are found by their place, not counted as
+    /// they come — the lexer reported its own before the first declaration was read.
+    /// </summary>
+    private void MarkUnparsed(List<Decl> decls)
+    {
+        if (decls.Count == 0) return;
+        var file = decls[0].Span.File;
+        var broken = _de.Diagnostics
+            .Where(d => d.Severity == Severity.Error && d.Span.File == file
+                        && (d.Code.StartsWith("LYR-PAR", StringComparison.Ordinal) || d.Code.StartsWith("LYR-LEX", StringComparison.Ordinal)))
+            .Select(d => d.Span.Start)
+            .Order()
+            .ToList();
+        if (broken.Count == 0) return;
+        foreach (var decl in decls)
+        {
+            // the first error at or after the declaration's start, and whether it lies inside
+            var at = broken.BinarySearch(decl.Span.Start);
+            if (at < 0) at = ~at;
+            if (at < broken.Count && broken[at] < Math.Max(decl.Span.End, decl.Span.Start + 1)) _de.MarkUnparsed(decl.Span);
+        }
     }
 
     private bool AtAttributeStart =>

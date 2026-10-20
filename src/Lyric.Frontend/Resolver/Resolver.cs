@@ -320,11 +320,6 @@ public sealed class Resolver
     /// leaves the type's own list (one conformance per type and interface, 03 T7 X3). The
     /// declaration comes back without those nodes; the AST holds the result.
     /// </summary>
-    /// <summary>Whether the parser reported an error inside <paramref name="span"/>.</summary>
-    private bool ParsedBroken(Span span) =>
-        _de.Diagnostics.Any(d => d.Severity == Severity.Error && d.Code.StartsWith("LYR-PAR", StringComparison.Ordinal)
-                                 && d.Span.File == span.File && d.Span.Start >= span.Start && d.Span.Start < span.End);
-
     private Decl Synthesize(ModuleSymbol module, Decl decl, bool coreHasDebug, bool streamsHash, bool coreHasIdentity)
     {
         string name; GenericParam[] generics; TypeNode[] interfaces; FieldDecl[] fields; EnumVariant[]? variants; IEnumerable<FunctionDecl> methods;
@@ -339,8 +334,9 @@ public sealed class Resolver
         if (requests.Count == 0) return decl;
         // A declaration the parser could not read whole gets nothing synthesized: its fields are what
         // the recovery left — a ':' or a keyword taken as a name —, and a block written over them failed
-        // to parse five times over, ahead of the parser's own errors (open point 200).
-        if (ParsedBroken(decl.Span)) return decl;
+        // to parse five times over, ahead of the parser's own errors (open point 200). The engine's
+        // own rule (M12a S2) would not catch it: a synthesized member's errors stand in its own file.
+        if (_de.IsUnparsed(decl.Span)) return decl;
 
         var taken = new HashSet<TypeNode>(ReferenceEqualityComparer.Instance);
         foreach (var request in requests)

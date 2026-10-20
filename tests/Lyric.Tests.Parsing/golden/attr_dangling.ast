@@ -7,7 +7,9 @@ Module [0..41)
   ErrorDecl [30..41)
 
 === diagnostics ===
-attr_dangling.lyr:3:1: error[LYR-PAR0042]: an attribute must be followed by the declaration it applies to
-@Component
-^^^^^^^^^^
+error[LYR-PAR0042]: an attribute must be followed by the declaration it applies to
+ --> attr_dangling.lyr:3:1
+  |
+3 | @Component
+  | ^^^^^^^^^^
 

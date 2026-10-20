@@ -12,10 +12,11 @@ public class DiagnosticRecordTests
     private static readonly FileId File = new SourceManager().AddVirtual("r.lyr", "let x = 1;\nlet x = 2;");
 
     [Fact]
-    public void A_note_says_its_kind_by_its_place_unless_told()
+    public void A_note_is_a_note_unless_told()
     {
         Assert.Equal(NoteKind.Place, new DiagnosticNote(new Span(File, 4, 5), "first here").Kind);
-        Assert.Equal(NoteKind.Help, new DiagnosticNote("write it out").Kind);
+        Assert.Equal(NoteKind.Place, new DiagnosticNote("synthesized as: x").Kind);
+        Assert.Equal(NoteKind.Help, new DiagnosticNote("write it out") { Kind = NoteKind.Help }.Kind);
         Assert.Equal(NoteKind.Category, new DiagnosticNote("a compiler bug") { Kind = NoteKind.Category }.Kind);
     }
 

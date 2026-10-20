@@ -7,15 +7,21 @@
 [36..36) Eof
 
 === diagnostics ===
-unterminated.lyr:1:9: error[LYR-LEX0009]: unterminated string literal
-let x = "oops
-        ^^^^^
+error[LYR-LEX0009]: unterminated string literal
+ --> unterminated.lyr:1:9
+  |
+1 | let x = "oops
+  |         ^^^^^
 
-unterminated.lyr:2:1: error[LYR-LEX0012]: expected identifier after '@'
-@ 123
-^
+error[LYR-LEX0012]: expected identifier after '@'
+ --> unterminated.lyr:2:1
+  |
+2 | @ 123
+  | ^
 
-unterminated.lyr:3:1: error[LYR-LEX0002]: unterminated block comment
-/* never closed
-^
+error[LYR-LEX0002]: unterminated block comment
+ --> unterminated.lyr:3:1
+  |
+3 | /* never closed
+  | ^^^^^^^^^^^^^^^
 

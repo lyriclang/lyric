@@ -3,7 +3,9 @@ namespace Lyric.Core;
 /// <summary>What a note is (design/v5/spec/11 G1).</summary>
 public enum NoteKind
 {
-    /// <summary>Another place that belongs to the finding ("previous definition here").</summary>
+    /// <summary>A note: another place that belongs to the finding ("previous definition here"), or,
+    /// without a location, the context said in words ("synthesized as: …"). The renderer draws the
+    /// first in the source and says the second as <c>= note:</c>.</summary>
     Place,
 
     /// <summary>Advice in words: what to do about it.</summary>
@@ -43,11 +45,13 @@ public readonly record struct DiagnosticNote(Span Location, string Message)
 
     private readonly NoteKind? _kind;
 
-    /// <summary>What the note is. Unless set, a note with a place is a <see cref="NoteKind.Place"/>
-    /// and one without is <see cref="NoteKind.Help"/> — what every note said before kinds existed.</summary>
+    /// <summary>What the note is. Unless set, a <see cref="NoteKind.Place"/> — what every note said
+    /// before kinds existed, "note:"; advice is <see cref="NoteKind.Help"/> where its reporter says so
+    /// (M12a S2: the default was Help for a note without a place, and the renderer would have turned
+    /// every "synthesized as" and every explanation into advice).</summary>
     public NoteKind Kind
     {
-        get => _kind ?? (Location == default ? NoteKind.Help : NoteKind.Place);
+        get => _kind ?? NoteKind.Place;
         init => _kind = value;
     }
 
