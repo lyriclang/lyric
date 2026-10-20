@@ -27,6 +27,10 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
   pull requests checked together, the specification merges first, and main is green in between.
   **A pull request runs what its diff reaches** (`tooling/affected.toml`, 2026-10-11) and a fixed regression group;
   main after a merge, and a dispatched run, run everything — a break the selection misses shows on main.
+- **Comments describe, they do not cite** (design/v5/spec/14 W8): `CommentRatchetTests` counts, per
+  file, the comment lines that still name a decision, milestone, slice or design round — 3353 on
+  2026-10-20 (#518), in `tooling/comment-ratchet.toml` — and fails a pull request that adds one.
+  The counts only fall; M12c (K2a–K2d) takes them to zero, and the guard turns hard.
 
 ## Milestones
 
@@ -47,7 +51,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M9b | Macros | L | **done** 2026-10-13 |
 | M10 | std after rule D | XL | **done** 2026-10-14 |
 | M11 | Own GC | XL | **done** 2026-10-19 |
-| M12a | Diagnostics and lints | L | — (plan 2026-10-19) |
+| M12a | Diagnostics and lints | L | open — S1–S4 merged (#513–#516); plan 2026-10-19 |
 | M12b | Inference and abstraction (the review clocks) | M | — |
 | M12c | Docs foundation and website (comments in the W8 form, `Lyric5.Doc`, Book scaffold, `/dev/` live) | L | — (plan 2026-10-20, design/v5/spec/14) |
 | M13a | fmt, doc, api | M | — |
@@ -1373,6 +1377,19 @@ released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "
   conformance defaults (188, a compiler bug for the sweep; S11 worked around it); main's macOS
   job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
   step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
+
+### M12a — open
+
+The plan is design 13's addendum "der Plan für M12a" (P1–P16, S1–S11), #512. The mode of M11: no halt
+until the close, merged on green CI, open points collected for the report.
+
+- **S1** the record (#513), **S2** the output (#514), **S3** the catalog and `lyric explain` (#515),
+  **S4** NDJSON (#516).
+- Between S4 and S5 (2026-10-20): the website round decided design area 14 (#517) — M12c is new
+  between M12b and M13a, and S11 writes its chapter as a Book draft under `docs/book/` —, and the
+  comment ratchet came in (#518); the five lines S4 had added with milestone references describe
+  the code now. Every comment from here on describes what the code does (14 W8): a slice that adds
+  a citation fails its own pull request.
 
 ### M11 — done (2026-10-19)
 
