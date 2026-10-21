@@ -252,8 +252,9 @@ public class CompilerInstructionTests
     }
 
     /// <summary><c>@MustUse</c> (A11): a dropped value warns where the function carries it or the
-    /// value's type does — <c>Result</c>, and <c>std.task.spawn</c>, whose handle is the only way to
-    /// the task's error. <c>let _ = …</c> drops one on purpose; a <c>void</c> call gives nothing.</summary>
+    /// value's type does — <c>Result</c>. <c>std.task.spawn</c>'s handle, the only way to the task's
+    /// error, has a lint of its own, <c>unused-task</c>. <c>let _ = …</c> drops one on purpose; a
+    /// <c>void</c> call gives nothing.</summary>
     [Fact]
     public void A_dropped_value_warns_where_must_use_asks_for_it()
     {
@@ -294,11 +295,11 @@ public class CompilerInstructionTests
         var (exit, _, error) = Run("build", "-C", dir);
         Assert.True(exit == 0, error);
         var warnings = Lines(error, "LYR-SEM0178");
-        Assert.Equal(4, warnings.Length);
+        Assert.Equal(3, warnings.Length);
         Assert.Contains(warnings, w => w.Contains(":23:5:") && w.Contains("the value of 'token' is dropped"));
         Assert.Contains(warnings, w => w.Contains(":24:5:") && w.Contains("a 'Ticket' is dropped here"));
         Assert.Contains(warnings, w => w.Contains(":25:5:") && w.Contains("a 'Result<int, Fail>' is dropped here"));
-        Assert.Contains(warnings, w => w.Contains(":29:5:") && w.Contains("the value of 'spawn' is dropped"));
+        Assert.Contains(Lines(error, "LYR-SEM0212"), w => w.Contains(":29:5:") && w.Contains("this task's handle is dropped"));
     }
 
     /// <summary><c>@NonExhaustive</c> (A11): outside the package that declares it a match covers

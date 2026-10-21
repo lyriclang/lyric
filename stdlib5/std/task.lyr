@@ -1923,6 +1923,7 @@ fn enlist(s: Scheduler): void {
 }
 
 /// The ids of the channels, in the order they were made: the order of their locks. Atomic.
+@Allow("global-var-without-sync")
 var channelIds: int = 0;
 
 /// The running thread's scheduler: there is one wherever a task runs.

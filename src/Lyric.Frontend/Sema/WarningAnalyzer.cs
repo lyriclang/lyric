@@ -83,6 +83,7 @@ internal sealed partial class WarningAnalyzer
         if (_comp.Lyric5Modules) WarnMembersMoreVisibleThanTheirType();
         if (_comp.Lyric5Modules) WarnPreludeShadowing();
         if (_comp.Lyric5Modules) RunLints();
+        if (_comp.Lyric5Modules) RunGroupLints();
 
         // Lyric 5 reads '@Deprecated' from its value, which the compiler computes after this
         // (RunDeprecated); the 4.x tools from the literals the attribute writes
@@ -532,6 +533,16 @@ internal sealed partial class WarningAnalyzer
                     _de.Report("LYR-SEM0144", Severity.Warning, made.Span,
                         $"this makes a '{TypeFacts.Display(_types.TypeOf(made))}' nothing closes — bind it with 'using let'");
                     break;
+                // 'BufWriter.new(File.create(p))': the handle inside has no name, and the wrapper's
+                // close() leaves it open
+                case CallExpr wrapper when _comp.Lyric5Modules && IsCloseable(_types.TypeOf(wrapper)) && !ClosesItsFields(_types.TypeOf(wrapper)):
+                    foreach (var argument in wrapper.Arguments)
+                        if (TypeChecker.Unmarked(argument) is CallExpr inner && IsCloseable(_types.TypeOf(inner)))
+                            _de.Report("LYR-SEM0144", Severity.Warning, inner.Span,
+                                $"this '{TypeFacts.Display(_types.TypeOf(inner))}' has no name, and closing the "
+                                + $"'{TypeFacts.Display(_types.TypeOf(wrapper))}' around it does not close it",
+                                new DiagnosticNote("bind it with 'using let' and pass the name"));
+                    break;
                 // 'f.read()': a use that neither closes nor lets the value go.
                 case CallExpr { Callee: MemberExpr { Target: IdentifierExpr receiver, Member: not "close" } } call
                     when _types.RefOf(receiver) is LocalSymbol target:
@@ -566,6 +577,7 @@ internal sealed partial class WarningAnalyzer
     private void WarnMustUse()
     {
         if (_comp.FindModule(["std", "core"])?.Members.LookupLocal("MustUse") is not TypeSymbol mustUse) return;
+        var task = _comp.FindModule(["std", "task"])?.Members.LookupLocal("Task") as TypeSymbol;
         bool Marked(Node? declaration) => (declaration switch
         {
             FunctionDecl f => f.Attributes,
@@ -582,7 +594,13 @@ internal sealed partial class WarningAnalyzer
                 && _types.TypeOf(call) is var type && !TypeFacts.IsVoid(type) && type is not ErrorType)
             {
                 var callee = _types.RefOf(call.Callee) is ImportBindingSymbol shell ? shell.Target : _types.RefOf(call.Callee);
-                if (callee is FunctionSymbol { Declaration: var declared } function && Marked(declared))
+                // a scope's spawn is awaited by the scope's close(): its handle may go
+                if (task is not null && type is GenericInstance { Definition: var made } && ReferenceEquals(made, task)
+                    && !(call.Callee is MemberExpr { Target: var owner } && TypeFacts.SymbolOf(_types.TypeOf(owner)) is { Name: "TaskScope" }))
+                    _de.Report("LYR-SEM0212", Severity.Warning, call.Span,
+                        "this task's handle is dropped: nobody awaits it, and its error is lost",
+                        new DiagnosticNote("await it, or start it with 'spawnDetached' to say nobody will"));
+                else if (callee is FunctionSymbol { Declaration: var declared } function && Marked(declared))
                     _de.Report("LYR-SEM0178", Severity.Warning, call.Span,
                         $"the value of '{function.Name}' is dropped, and '{function.Name}' is '@MustUse' — "
                         + "use it, or drop it on purpose with 'let _ = …'");

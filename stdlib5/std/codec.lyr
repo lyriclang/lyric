@@ -17,7 +17,7 @@
 /// decoder is passed by reference, `&e`, as a hasher is (10 K2): a conformance is generic over the
 /// format's type, and the format keeps its state.
 import std.collections { List, Map, Set, Deque };
-import std.core { Hasher, ParseError, OnField, OnType, fields, variants, attribute, typeAttribute, typeName, isEnum, FieldInfo };
+import std.core { Hasher, ParseError, StringBuilder, OnField, OnType, fields, variants, attribute, typeAttribute, typeName, isEnum, FieldInfo };
 import std.hash { DefaultHasher };
 import std.time { Instant, Duration, Date, Time, DateTime };
 
@@ -61,32 +61,33 @@ pub fn wireName(f: FieldInfo, own: ?Codec, type: ?Codec): string {
 
 /// `userId` as `user_id`.
 pub fn snakeCase(name: string): string {
-    var out = "";
+    let out = StringBuilder.new();
     for (c in name.chars()) {
         if (c.isUpper()) {
-            out = out + "_" + f"{c.toLower()}";
+            out.appendChar('_');
+            out.appendChar(c.toLower());
         } else {
-            out = out + f"{c}";
+            out.appendChar(c);
         }
     }
-    return out;
+    return out.toString();
 }
 
 /// `user_id` as `userId`.
 pub fn camelCase(name: string): string {
-    var out = "";
+    let out = StringBuilder.new();
     var up = false;
     for (c in name.chars()) {
         if (c == '_') {
             up = true;
         } else if (up) {
-            out = out + f"{c.toUpper()}";
+            out.appendChar(c.toUpper());
             up = false;
         } else {
-            out = out + f"{c}";
+            out.appendChar(c);
         }
     }
-    return out;
+    return out.toString();
 }
 
 /// The names of `E`'s variants, in order.

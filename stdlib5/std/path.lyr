@@ -18,6 +18,7 @@ pub let separator: string = if (onWindows) "\\" else "/";
 /// `parts` joined by the separator, the empty ones left out, the result normalized; nothing for no
 /// part that is not empty. On Windows a drive alone, `C:`, joins without a separator — `C:a`, the
 /// directory current on that drive.
+@Allow("string-concat-in-loop")
 pub fn join(parts: string...): string {
     var joined = "";
     var any = false;
