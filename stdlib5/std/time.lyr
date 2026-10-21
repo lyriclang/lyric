@@ -1289,10 +1289,10 @@ pub struct DateTime :: [Display, Parse] {
             if (p && hour < 12) { hour = hour + 12; }
             if (!p && hour >= 12) { hour = hour - 12; }
         }
-        let date = try Date.of(year, month, day) catch (e: TimeError) throw ParseError { kind = .Invalid };
-        let time = try Time.of(hour, minute, second, nano) catch (e: TimeError) throw ParseError { kind = .Invalid };
+        let date = try Date.of(year, month, day) catch (_: TimeError) throw ParseError { kind = .Invalid };
+        let time = try Time.of(hour, minute, second, nano) catch (_: TimeError) throw ParseError { kind = .Invalid };
         if (let o = off) {
-            let fixed = try Zone.fixed(Duration.ofSecs(o)) catch (e: TimeError) throw ParseError { kind = .Invalid };
+            let fixed = try Zone.fixed(Duration.ofSecs(o)) catch (_: TimeError) throw ParseError { kind = .Invalid };
             return DateTime { d = date, t = time, off = o * 1000000000, z = fixed };
         }
         return DateTime.of(date, time, zone);
@@ -1384,7 +1384,7 @@ fn readDate(b: Slice<uint8>): Date throws ParseError {
     let year = (try twoDigitsAt(b, 0)) * 100 + (try twoDigitsAt(b, 2));
     let month = try twoDigitsAt(b, 5);
     let day = try twoDigitsAt(b, 8);
-    return try Date.of(year, month, day) catch (e: TimeError) throw ParseError { kind = .Invalid };
+    return try Date.of(year, month, day) catch (_: TimeError) throw ParseError { kind = .Invalid };
 }
 
 fn twoDigitsAt(b: Slice<uint8>, at: int): int throws ParseError {

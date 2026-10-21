@@ -4607,7 +4607,7 @@ fn main(): void {
 right = '''
 interface Show { fn show(): string; }
 
-fn label<T :: [Show]>(x: T): string { return x.show(); }
+fn _label<T :: [Show]>(x: T): string { return x.show(); }
 
 fn main(): void {
 }
@@ -5831,14 +5831,30 @@ fn main(): void {
 
 [LYR-SEM0075]
 title = "a 'var' that is never reassigned"
-severity = "hint"
+severity = "warning"
+lint = "unused-var"
+group = "unused"
+level = "warn"
 area = "07-statements"
 summary = "A `var` with an initializer is read but never reassigned, written through, or used for a `mut fn` call; `let` would do."
-program = '''
+explanation = '''
+A `var` says the binding changes. One that never does reads as a promise the code does not keep, and a reader looks for the change that is not there.
+
+Write `let`. A `var` that documents a change through it — a field write, a `mut fn` call — is not reported.
+'''
+wrong = '''
 import std.io { println };
 
 fn main(): void {
     var count = 3;
+    println(count);
+}
+'''
+right = '''
+import std.io { println };
+
+fn main(): void {
+    let count = 3;
     println(count);
 }
 '''
@@ -7254,7 +7270,7 @@ struct Byte :: [Sized] {
     static fn size(): int { return 1; }
 }
 
-fn sizeOf<T :: [Sized]>(x: T): int { return T.size(); }
+fn sizeOf<T :: [Sized]>(_x: T): int { return T.size(); }
 
 fn main(): void {
     let _ = sizeOf(Byte { v = 0 });
@@ -8112,7 +8128,7 @@ fn main(): void {
 }
 '''
 right = '''
-fn check(x: bool): void {
+fn check(_x: bool): void {
 }
 
 fn main(): void {
@@ -8579,7 +8595,7 @@ fn risky(fail: bool): int throws Oops {
     return 7;
 }
 
-fn launch(): (Task<int> throws Oops) {
+fn _launch(): (Task<int> throws Oops) {
     return spawn(() => try risky(false));
 }
 
@@ -9722,4 +9738,474 @@ Write such a function as a free generic function, which is instantiated per use 
 example = '''
 $ lyric build
 error[LYR-SEM0197]: the monomorphization does not terminate: 20000 instances and still asking for 'Wrap<Wrap<Wrap<…>>>.deeper'. A method whose result type is built from its own element type demands an instance for the next one, and so on without end — write it as a free function, which is instantiated per use rather than per instance
+'''
+
+[LYR-SEM0198]
+title = "a parameter that is never used"
+severity = "warning"
+lint = "unused-parameter"
+group = "unused"
+level = "warn"
+area = "07-statements"
+summary = "A function's parameter is never named in its body. A method of a type with a conformance list, and a parameter whose name begins with `_`, are not reported."
+explanation = '''
+A parameter the body does not read asks every caller for a value nothing uses. It is often left over from a change, or a sign the body forgets something.
+
+Take it out, use it, or name it `_name` where the signature is fixed and the value is deliberately ignored.
+'''
+wrong = '''
+fn twice(x: int, unused: int): int {
+    return x * 2;
+}
+
+fn main(): void {
+    let _ = twice(1, 2);
+}
+'''
+right = '''
+fn twice(x: int, _unused: int): int {
+    return x * 2;
+}
+
+fn main(): void {
+    let _ = twice(1, 2);
+}
+'''
+
+[LYR-SEM0199]
+title = "a 'var' that is written and never read"
+severity = "warning"
+lint = "unused-assignment"
+group = "unused"
+level = "warn"
+area = "07-statements"
+summary = "Every use of a `var` is the target of an assignment: what it stores is never read."
+explanation = '''
+A value stored and never read is work for nothing — often a forgotten use, or an assignment to the wrong name.
+
+Read what the assignments store, or take them out with the binding. A store that a later one overwrites before a read is not looked for.
+'''
+wrong = '''
+fn main(): void {
+    var last = 0;
+    last = 2;
+}
+'''
+right = '''
+import std.io { println };
+
+fn main(): void {
+    var last = 0;
+    last = 2;
+    println(last);
+}
+'''
+
+[LYR-SEM0200]
+title = "a type parameter that is never used"
+severity = "warning"
+lint = "unused-generic"
+group = "unused"
+level = "warn"
+area = "03-types"
+summary = "A function's or a type's type parameter is named nowhere in it — not in a parameter, the result, a field or the body."
+explanation = '''
+A type parameter nothing names cannot be inferred from a call: every caller must write it, and it changes nothing.
+
+Take it out, or name it where the declaration needs it. A name that begins with `_` is not reported.
+'''
+wrong = '''
+fn first<T, U>(xs: T[]): T {
+    return xs[0];
+}
+
+fn main(): void {
+    let _ = first<int, string>([1, 2]);
+}
+'''
+right = '''
+fn first<T>(xs: T[]): T {
+    return xs[0];
+}
+
+fn main(): void {
+    let _ = first([1, 2]);
+}
+'''
+
+[LYR-SEM0201]
+title = "a declaration nothing uses"
+severity = "warning"
+lint = "dead-code"
+group = "unused"
+level = "warn"
+area = "04-modules"
+summary = "A declaration of a module that is not `pub` and carries no attribute is named nowhere in the compilation. `main` is not reported."
+explanation = '''
+A function, type or alias nothing uses is code to read and keep that does nothing. Another package cannot reach it: it is not `pub`.
+
+Take it out, or make it `pub` where another package is meant to use it. A declaration with an attribute (`@Test`, `@Bench`, …) is used by what reads the attribute, and is not reported.
+'''
+wrong = '''
+fn helper(): int {
+    return 1;
+}
+
+fn main(): void {
+}
+'''
+right = '''
+fn helper(): int {
+    return 1;
+}
+
+fn main(): void {
+    let _ = helper();
+}
+'''
+
+[LYR-SEM0202]
+title = "an assignment written as a condition"
+severity = "warning"
+lint = "assignment-in-condition"
+group = "correctness"
+level = "warn"
+area = "08-expressions"
+summary = "The condition of an `if`, a `while` or a `do … while` is an assignment, where a comparison with `==` is usually meant."
+explanation = '''
+An assignment is an expression whose value is the new value of its target, so `if (ready = true)` compiles — and is true every time. It is almost always `==` mistyped.
+
+Write `==` to compare. To assign on purpose and test the value, write the condition in a second pair of parentheses: `if ((ready = next()))`.
+'''
+wrong = '''
+fn main(): void {
+    var ready = false;
+    if (ready = true) {
+        ready = false;
+    }
+    let _ = ready;
+}
+'''
+right = '''
+fn main(): void {
+    var ready = false;
+    if (ready == true) {
+        ready = false;
+    }
+    let _ = ready;
+}
+'''
+
+[LYR-SEM0203]
+title = "an assignment of a value to itself"
+severity = "warning"
+lint = "self-assignment"
+group = "correctness"
+level = "warn"
+area = "08-expressions"
+summary = "An `=` whose value is its own target — `x = x`, `a.b = a.b` — or `x = x++`, which keeps the old value."
+explanation = '''
+Assigning a place to itself changes nothing. It is usually a typo for another name, and `x = x++` reads as an increment while it is none: the value assigned is the old one.
+
+Assign what was meant, or take the statement out; write `x++` alone to increment.
+'''
+wrong = '''
+fn main(): void {
+    var x = 1;
+    x = x;
+    let _ = x;
+}
+'''
+right = '''
+fn main(): void {
+    var x = 1;
+    x = x + 1;
+    let _ = x;
+}
+'''
+
+[LYR-SEM0204]
+title = "a comparison of an unsigned value with 0 that cannot fail"
+severity = "warning"
+lint = "comparison-always"
+group = "correctness"
+level = "warn"
+area = "08-expressions"
+summary = "An unsigned value compared with the literal 0 in a way that is always true (`n >= 0`) or always false (`n < 0`)."
+explanation = '''
+An unsigned value is never below 0, so the comparison decides nothing — the code that depends on it either always or never runs, which is rarely what the test was written for. Often the value was meant to be signed.
+
+Take the comparison out, or compare what was meant: `n > 0`, or a signed type.
+'''
+wrong = '''
+fn main(): void {
+    let n: uint = 3;
+    if (n >= 0) {
+        let _ = n;
+    }
+}
+'''
+right = '''
+fn main(): void {
+    let n: uint = 3;
+    if (n > 0) {
+        let _ = n;
+    }
+}
+'''
+
+[LYR-SEM0205]
+title = "an equality test on floats"
+severity = "warning"
+lint = "float-equality"
+group = "correctness"
+level = "allow"
+area = "08-expressions"
+summary = "`==` or `!=` with a `float` or `float32` on both sides. Not said unless the lint is set to `warn`."
+explanation = '''
+Floating-point arithmetic rounds, so two computations of the same value can differ in the last bit: `0.1 + 0.2 == 0.3` is false. An exact test is right for values that were never computed, and wrong for most others.
+
+Compare the difference with a tolerance. The lint is `allow` by default; `-W float-equality` or `[lints] warn = ["float-equality"]` turns it on.
+'''
+wrong = '''
+@Warn("float-equality")
+fn main(): void {
+    let a = 0.1 + 0.2;
+    let _ = a == 0.3;
+}
+'''
+right = '''
+@Warn("float-equality")
+fn main(): void {
+    let a = 0.1 + 0.2;
+    let d = a - 0.3;
+    let _ = d < 0.000001 && d > -0.000001;
+}
+'''
+
+[LYR-SEM0206]
+title = "a local that hides one of the same name"
+severity = "warning"
+lint = "shadowed-local"
+group = "correctness"
+level = "allow"
+area = "07-statements"
+summary = "A local binding in an inner block takes the name of a local or a parameter around it. Not said unless the lint is set to `warn`."
+explanation = '''
+Inside the block the outer local cannot be reached by its name, and a reader may take one for the other. The language allows it — in one scope a name is bound once (`LYR-SEM0176`), across scopes it may be bound again.
+
+Give the inner binding another name. The lint is `allow` by default.
+'''
+wrong = '''
+@Warn("shadowed-local")
+fn main(): void {
+    let x = 1;
+    if (x > 0) {
+        let x = 2;
+        let _ = x;
+    }
+}
+'''
+right = '''
+@Warn("shadowed-local")
+fn main(): void {
+    let x = 1;
+    if (x > 0) {
+        let y = 2;
+        let _ = y;
+    }
+}
+'''
+
+[LYR-SEM0207]
+title = "a local that hides a module the file imports"
+severity = "warning"
+lint = "module-shadowing"
+group = "correctness"
+level = "allow"
+area = "04-modules"
+summary = "A local or a parameter takes the name a whole-module import binds — `import std.io;` binds `io`. Not said unless the lint is set to `warn`."
+explanation = '''
+Inside the local's scope the module cannot be named; a member access then means the local's member, and an error says so where it bites. The lint names the hiding itself.
+
+Give the local another name, or import the module under another (`import std.io as stdio;`). The lint is `allow` by default.
+'''
+wrong = '''
+import std.io;
+
+@Warn("module-shadowing")
+fn main(): void {
+    let io = 1;
+    let _ = io;
+}
+'''
+right = '''
+import std.io;
+
+@Warn("module-shadowing")
+fn main(): void {
+    let count = 1;
+    let _ = count;
+    io.println("x");
+}
+'''
+
+[LYR-SEM0208]
+title = "an integer literal that takes another type than int"
+severity = "warning"
+lint = "int-literal-adapts"
+group = "correctness"
+level = "allow"
+area = "03-types"
+summary = "An integer literal without a suffix takes a type other than `int` from its context. Not said unless the lint is set to `warn`."
+explanation = '''
+A literal adapts to the type its context names, and a reader may not see which type that is. Turning the lint on asks for the type to be written where a literal takes one.
+
+Write the suffix (`3u8`) or keep the literal in a context that names the type plainly. The lint is `allow` by default.
+'''
+wrong = '''
+@Warn("int-literal-adapts")
+fn main(): void {
+    let small: uint8 = 3;
+    let _ = small;
+}
+'''
+right = '''
+@Warn("int-literal-adapts")
+fn main(): void {
+    let small = 3u8;
+    let _ = small;
+}
+'''
+
+[LYR-SEM0209]
+title = "a block's implicit 'it' that hides the 'it' around it"
+severity = "warning"
+lint = "shadowed-it"
+group = "correctness"
+level = "warn"
+area = "08-expressions"
+summary = "A trailing block that uses its implicit `it` stands inside another trailing block with an implicit `it`."
+explanation = '''
+Inside the inner block `it` is the inner block's parameter; the outer one cannot be named, and a reader may take one for the other.
+
+Name the parameter of one of them: `apply { x => apply { it + 1 } + x }`.
+'''
+wrong = '''
+fn apply(f: fn(int) -> int): int {
+    return f(1);
+}
+
+fn main(): void {
+    let _ = apply { apply { it + 1 } + it };
+}
+'''
+right = '''
+fn apply(f: fn(int) -> int): int {
+    return f(1);
+}
+
+fn main(): void {
+    let _ = apply { x => apply { it + 1 } + x };
+}
+'''
+
+[LYR-SEM0210]
+title = "an exit code outside 0 to 255"
+severity = "warning"
+lint = "exit-code-range"
+group = "correctness"
+level = "warn"
+area = "14-cli"
+summary = "`fn main(): int` returns an integer literal below 0 or above 255; the process leaves with it modulo 256."
+explanation = '''
+An exit code is a byte: the system keeps the value modulo 256, so `return 256` leaves as 0 — success — and `return -1` as 255.
+
+Return a code from 0 to 255; 0 says success, 1 an ordinary failure.
+'''
+wrong = '''
+fn main(): int {
+    return 300;
+}
+'''
+right = '''
+fn main(): int {
+    return 1;
+}
+'''
+
+[LYR-SEM0211]
+title = "a conformance of another package's type to another package's interface"
+severity = "warning"
+lint = "foreign-conformance"
+group = "correctness"
+level = "warn"
+area = "05-interfaces"
+summary = "A conformance block is written for a type of another package to an interface of another package (`std` among them)."
+explanation = '''
+A conformance holds for the whole program, and there is no rule that gives it to one package: two packages that both write the block for the same type and interface would both claim it.
+
+Conform in the package of the type or of the interface — a wrapper type of your own conforms where it is declared.
+'''
+wrong = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[dependencies]
+geo = { path = "deps/geo" }
+//- deps/geo/lyric.toml
+[package]
+name = "geo"
+version = "0.1.0"
+//- deps/geo/src/lib.lyr
+pub struct Point {
+    pub x: int,
+}
+//- src/main.lyr
+import geo { Point };
+import std.io { println };
+
+extend Point :: [Display] {
+    fn show(): string {
+        return f"({this.x})";
+    }
+}
+
+fn main(): void {
+    println(Point { x = 1 });
+}
+'''
+right = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[dependencies]
+geo = { path = "deps/geo" }
+//- deps/geo/lyric.toml
+[package]
+name = "geo"
+version = "0.1.0"
+//- deps/geo/src/lib.lyr
+pub struct Point {
+    pub x: int,
+}
+//- src/main.lyr
+import geo { Point };
+import std.io { println };
+
+struct Shown :: [Display] {
+    point: Point,
+
+    fn show(): string {
+        return f"({this.point.x})";
+    }
+}
+
+fn main(): void {
+    println(Shown { point = Point { x = 1 } });
+}
 '''

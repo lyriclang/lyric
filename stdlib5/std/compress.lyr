@@ -7,7 +7,7 @@
 /// and CRC-32 (members in a row read as one). `Gzip.compress(bytes, level)`, `Gzip.decompress`,
 /// `Zlib.*` and `Deflate.*` for what fits in memory.
 import std.collections { List };
-import std.core { viewBytes, Closeable };
+import std.core { Closeable };
 import std.hash { adler32, crc32 };
 import std.io { Reader, Writer, IoError, ByteBuffer };
 import std.task { Cancelled };
@@ -54,7 +54,6 @@ fn codeLengthOrder(): int[] {
 /// The length symbol (257 + index) and the extra bits of a match length 3..258.
 fn lengthCode(len: int): (int, int) {
     let base = lengthBase();
-    let extra = lengthExtra();
     var i = 28;
     while (i > 0 && base[i] > len) {
         i = i - 1;
@@ -1332,7 +1331,7 @@ pub class ZlibReader<R :: [Reader]> :: [Reader] {
     }
 
     mut fn readHeader(): void throws [IoError, Cancelled] {
-        var head: uint8[] = [0u8, 0u8];
+        let head: uint8[] = [0u8, 0u8];
         try this.inflate.readTrailerExact(head[..], "zlib header");
         let cmf = head[0] as int;
         let flg = head[1] as int;
@@ -1363,7 +1362,7 @@ pub class ZlibReader<R :: [Reader]> :: [Reader] {
             this.adler = adler32(into[0..n], this.adler);
             return n;
         }
-        var trailer: uint8[] = [0u8] * 4;
+        let trailer: uint8[] = [0u8] * 4;
         try this.inflate.readTrailerExact(trailer[..], "zlib trailer");
         let said = ((trailer[0] as uint32) << 24) | ((trailer[1] as uint32) << 16) | ((trailer[2] as uint32) << 8) | (trailer[3] as uint32);
         if (said != this.adler) {
@@ -1452,7 +1451,7 @@ pub class GzipReader<R :: [Reader]> :: [Reader] {
 
     /// The header; `false` where the stream has ended cleanly before one (a member boundary).
     mut fn readHeader(first: bool): bool throws [IoError, Cancelled] {
-        var head: uint8[] = [0u8] * 10;
+        let head: uint8[] = [0u8] * 10;
         var at = 0;
         while (at < 10) {
             let n = try this.inflate.readTrailer(head[at..10]);
@@ -1478,10 +1477,10 @@ pub class GzipReader<R :: [Reader]> :: [Reader] {
         }
         let flags = head[3] as int;
         if ((flags & 0x04) != 0) {
-            var lenBytes: uint8[] = [0u8, 0u8];
+            let lenBytes: uint8[] = [0u8, 0u8];
             try this.inflate.readTrailerExact(lenBytes[..], "gzip header");
             var len = (lenBytes[0] as int) | ((lenBytes[1] as int) << 8);
-            var skip: uint8[] = [0u8] * 256;
+            let skip: uint8[] = [0u8] * 256;
             while (len > 0) {
                 let take = if (len > 256) 256 else len;
                 try this.inflate.readTrailerExact(skip[0..take], "gzip header");
@@ -1495,7 +1494,7 @@ pub class GzipReader<R :: [Reader]> :: [Reader] {
             try this.skipZeroEnded();
         }
         if ((flags & 0x02) != 0) {
-            var crc16: uint8[] = [0u8, 0u8];
+            let crc16: uint8[] = [0u8, 0u8];
             try this.inflate.readTrailerExact(crc16[..], "gzip header");
         }
         this.headerRead = true;
@@ -1503,7 +1502,7 @@ pub class GzipReader<R :: [Reader]> :: [Reader] {
     }
 
     mut fn skipZeroEnded(): void throws [IoError, Cancelled] {
-        var one: uint8[] = [0u8];
+        let one: uint8[] = [0u8];
         while (true) {
             try this.inflate.readTrailerExact(one[..], "gzip header");
             if (one[0] == 0u8) {
@@ -1526,7 +1525,7 @@ pub class GzipReader<R :: [Reader]> :: [Reader] {
                 this.size = this.size + n;
                 return n;
             }
-            var trailer: uint8[] = [0u8] * 8;
+            let trailer: uint8[] = [0u8] * 8;
             try this.inflate.readTrailerExact(trailer[..], "gzip trailer");
             let said = (trailer[0] as uint32) | ((trailer[1] as uint32) << 8) | ((trailer[2] as uint32) << 16) | ((trailer[3] as uint32) << 24);
             if (said != this.crc) {
@@ -1539,7 +1538,7 @@ pub class GzipReader<R :: [Reader]> :: [Reader] {
             // another member?
             let fresh = DeflateReader<R>.new(this.inflate.inner);
             // what the old reader buffered beyond the trailer belongs to the next member
-            var carried: uint8[] = [0u8] * 4096;
+            let carried: uint8[] = [0u8] * 4096;
             let c = try this.inflate.readTrailer(carried[..]);
             if (c == 0) {
                 this.ended = true;

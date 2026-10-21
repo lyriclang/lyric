@@ -14,7 +14,8 @@ public class CoroutineCloseTests
     private static string[] Codes(string source)
     {
         var result = TestCompiler.Lower("close.lyr", source);
-        return result.Diagnostics.Diagnostics.Select(d => d.Code).ToArray();
+        // the programs share their helpers: which one a test leaves unused is no finding of it
+        return result.Diagnostics.Diagnostics.Select(d => d.Code).Where(c => c != "LYR-SEM0201").ToArray();
     }
 
     private const string Gen = """
