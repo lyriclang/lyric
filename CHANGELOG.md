@@ -210,6 +210,32 @@ promise. This entry fills with the milestones.
   1.4 GiB alive — with its longest pause at 462 ms (Boehm 661) and 99 % of its pauses under 10 ms; RSS above
   Boehm's where short-lived objects share lines with long-lived ones. A build that switches the collector, or
   goes back to any variant built before, links again.
+- **Diagnostics and lints (M12a** — `design/v5/spec/11` W6, W7, C2–C4, 13 M12a; spec chapters 16, 14 §1, §5–§7, 04
+  §4, Appendix A**):** every finding is one record — a code, its severity, a primary place with an optional label,
+  labelled secondary places, notes that are a place, advice, a suggested change or a category — drawn as rustc
+  draws it, with `--color`, `--absolute-paths` and `--max-errors N`, and as one JSON object a line with `--json`
+  (`build`, `run`, `test`, `check`, `fix`). A mistake is said once: what follows from an error, or from a
+  declaration the parser could not read, is not said again. Every code is in one catalogue, printed by
+  **`lyric explain <code|lint>`** with its explanation and a wrong and a right program, and as the spec's
+  Appendix A; a code holds one rule, and no message cites a design document or a plan. **Every warning is a
+  lint** with a name, a group (`unused`, `correctness`, `resources`, `concurrency`, `deprecation`, `style`,
+  `perf`, `docs`; `warnings` for all) and a level (`allow`, `warn`, `deny`), set by `@Allow`/`@Warn`/`@Deny` on a
+  declaration, by `[lints]` in `lyric.toml`, and by `-A`/`-W`/`-D` on the command line — the narrowest attribute
+  first, then the command line over the manifest over the lint's own level; `--deny-warnings` and a profile's
+  `denyWarnings` deny them all; a dependency's and std's warnings are said with `--warn-deps` alone, never as
+  errors; an `@Allow` that decides nothing warns. Forty-nine lints, each held by a red and a green case of the
+  suite: among the new ones `unused-parameter`, `unused-assignment`, `dead-code`, `self-assignment`,
+  `assignment-in-condition`, `comparison-always`, `shadowed-it`, `exit-code-range`, `foreign-conformance`,
+  `unused-task`, `global-var-without-sync`, `naming`, `reserved-device-name` (deny), `redundant-clone`,
+  `string-concat-in-loop`, `broken-doc-link`, and, allowed until asked for, `float-equality`, `shadowed-local`,
+  `needless-return`, `large-value-copy`, `missing-docs`. A failed lookup says what it could not see: a module path
+  a typo away, a local hiding a module or a prelude name where it bites, a method of a module not imported.
+  The verbs: **`lyric fix`** makes the safe suggested changes in the package's own files (`--dry-run` prints them
+  as a diff); **`lyric check`** does what a build does before the C; **`lyric env`** says every setting with where
+  it comes from; **`lyric new`** and **`lyric init`** start a package (`--lib`, `--git`, `LYRIC_GIT_ON_NEW`);
+  **`lyric completions bash|zsh|fish|pwsh`**; one table of verbs and options behind `lyric help`, `<verb> --help`,
+  the completions and the spec's table. A build that finds its C up to date says the warnings again. A build
+  script that fails is exit 1.
 
 ---
 

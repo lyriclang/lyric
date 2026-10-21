@@ -47,7 +47,7 @@ public sealed class LoweringTimings
 /// <para>WHAT IS SKIPPED: bodyless declarations, which have nothing to lower, and generic functions.
 /// The latter need the worklist monomorphization — one instance per concrete type argument tuple,
 /// starting from the roots. A call to a skipped function finds no id and reports that as
-/// <c>LYR-IR0001</c> rather than silently producing wrong code.</para>
+/// <c>LYR-ICE0002</c> rather than silently producing wrong code.</para>
 /// </summary>
 public static class ModuleLowerer
 {
@@ -97,7 +97,7 @@ public static class ModuleLowerer
     public static bool VerifyByDefault => Pipeline.VerifiesIr;
 
     /// <summary>Lowers the compilation. Returns <c>null</c> when scope boundaries were reported as
-    /// <c>LYR-IR0001</c>; the cause then stands in <paramref name="de"/>.</summary>
+    /// <c>LYR-ICE0002</c>; the cause then stands in <paramref name="de"/>.</summary>
     /// <param name="verify"><c>null</c> means <see cref="VerifyByDefault"/>. Tests set the value
     /// explicitly, so their result does not depend on the build configuration.</param>
     /// <param name="optimize">Whether the optimizations run at all. Off in the debug profile and in

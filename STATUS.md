@@ -51,8 +51,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M9b | Macros | L | **done** 2026-10-13 |
 | M10 | std after rule D | XL | **done** 2026-10-14 |
 | M11 | Own GC | XL | **done** 2026-10-19 |
-| M12a | Diagnostics and lints | L | open — S1–S4 merged (#513–#516); plan 2026-10-19 |
-| M12b | Inference and abstraction (the review clocks) | M | — |
+| M12a | Diagnostics and lints | L | **done** 2026-10-21 |
+| M12b | Inference and abstraction (the review clocks) | M | next — plan 2026-10-21 |
 | M12c | Docs foundation and website (comments in the W8 form, `Lyric5.Doc`, Book scaffold, `/dev/` live) | L | — (plan 2026-10-20, design/v5/spec/14) |
 | M13a | fmt, doc, api | M | — |
 | M13b | LSP, DAP, clients | XL | — |
@@ -1378,18 +1378,38 @@ released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "
   job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
   step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
 
-### M12a — open
+### M12a — done (2026-10-21)
 
 The plan is design 13's addendum "der Plan für M12a" (P1–P16, S1–S11), #512. The mode of M11: no halt
-until the close, merged on green CI, open points collected for the report.
+until the close, merged on green CI with the platform matrix dispatched, open points collected for the report.
 
 - **S1** the record (#513), **S2** the output (#514), **S3** the catalog and `lyric explain` (#515),
   **S4** NDJSON (#516).
 - Between S4 and S5 (2026-10-20): the website round decided design area 14 (#517) — M12c is new
   between M12b and M13a, and S11 writes its chapter as a Book draft under `docs/book/` —, and the
-  comment ratchet came in (#518); the five lines S4 had added with milestone references describe
-  the code now. Every comment from here on describes what the code does (14 W8): a slice that adds
-  a citation fails its own pull request.
+  comment ratchet came in (#518); every comment from here on describes what the code does (14 W8).
+- **S5** the levels (#519 + spec#329): every warning a lint with a name, a group and a level; `@Allow`/`@Warn`/
+  `@Deny`, `[lints]` (the array form of P8), `-A/-W/-D`; the narrowest attribute, then the command line over the
+  manifest over the lint's own level; `--deny-warnings` and `denyWarnings` are `-D warnings`; `--warn-deps`;
+  `useless-allow`. A second draft of S5 from another session was compared and its five better points taken.
+- **S6** the lints of `unused` and `correctness` (#521 + spec#330), **S7** the other six groups (#522 + spec#331):
+  forty-nine lints, each held by a red and a green case (16 §5 rule 9, `tools/check_lints.py`); std put right
+  under them and kept silent under `--warn-deps` by a test.
+- **S8** fixes and `lyric fix` (#523 + spec#332), **S9** `check`, `env`, the verb table, and an up-to-date build
+  that says its warnings again (#524 + spec#333), **S10** `new`, `init`, `completions` and the lookup notes
+  (#525 + spec#334).
+- **S11** in three: **S11a** messages without the design and a code per rule (#526 + spec#335; a guard in the core
+  tests), **S11b** a mistake said once (#527 + spec#336), **S11c** the close (#528 + spec#337): the Book
+  chapter `docs/book/diagnostics.md` (a draft until M12c renders it), CHANGELOG, the message style guide in
+  CONTRIBUTING, a CI guard that holds the catalogue to the pinned specification (Appendix A, the lint cases), the
+  M12b plan in design 13.
+- The exit criterion — the catalogue complete, every warning tested, `lyric fix` applies the safe fixes — holds:
+  372 codes, 49 lints with their cases, CatalogTests over every entry's programs, FixTests.
+- Open points from the milestone and its close audit are 220–250 (226–235, 241 done in M12a); the decision 233 (a
+  module's lint level — Lyric 5 has no module header) waits for the maintainer. Deliberate deviations kept on record:
+  the array form of `[lints]` against 11 L2/L3 (246), no lint `LYRIC_*` rung, refusals of the lowering under one
+  ICE code (243), no `panic` JSON event (244), `reserved-device-name` without a red case and `deprecated-edition`
+  without a trigger (237).
 
 ### M11 — done (2026-10-19)
 

@@ -4586,7 +4586,7 @@ public sealed class TypeChecker
     ///
     /// <para>It used to be accepted without a word: a field was typed as the error type, which
     /// silences everything after it, a method as its function type without the receiver — and
-    /// the lowering met a reference it had no word for (<c>LYR-IR0001</c>), an error type
+    /// the lowering met a reference it had no word for (<c>LYR-ICE0002</c>), an error type
     /// (<c>LYR-ICE0001</c>) or a call one argument short (malformed IR). In a method of a
     /// generic type that no instance asked for, nothing was said at all.</para>
     ///
@@ -5582,7 +5582,7 @@ public sealed class TypeChecker
     /// <summary>
     /// <c>x == null</c> where <c>x</c> can never be null (<c>LYR-SEM0059</c>, §6.2).
     ///
-    /// <para>The lowering refused it as <c>LYR-IR0001</c>, which says "this compiler version
+    /// <para>The lowering refused it as <c>LYR-ICE0002</c>, which says "this compiler version
     /// cannot lower it yet" about a program no version will ever run — §12.1 keeps that code for
     /// VALID Lyric. The pattern twin has been a sema error all along (<c>LYR-SEM0029</c>, a
     /// <c>null</c> pattern against a non-optional scrutinee); this is the expression side of the
@@ -5817,7 +5817,7 @@ public sealed class TypeChecker
         if (UnifyNumeric(b.Left, l, b.Right, r) is { } n) return n;
         // "x" * 3 (10 C7) is std.core's repetition of a text in Lyric 5, in the one order:
         // '3 * "x"' is refused, as 'n * [x]' is. Until N1a the checker took both and the lowering
-        // called a helper only the 4.x library has (LYR-IR0001). The 4.x path keeps its helper.
+        // called a helper only the 4.x library has (LYR-ICE0002). The 4.x path keeps its helper.
         if (TypeFacts.IsString(l) && TypeFacts.IsInteger(r))
             return _coreRepeatText ? DesugarToFreeCall(b, "repeatText", scope, b.Left, b.Right) : LyrType.String;
         if (TypeFacts.IsString(r) && TypeFacts.IsInteger(l) && !_coreRepeatText) return LyrType.String;
@@ -6103,7 +6103,7 @@ public sealed class TypeChecker
         if (l is NullType) return r; // null ?? b yields the type of b
 
         // AN OPTIONAL-ONLY OPERATOR ON SOMETHING THAT IS NEVER NULL. This used to read "no effect,
-        // but no type error" and leave the refusal to the lowering, as LYR-IR0001 — a code §12.1
+        // but no type error" and leave the refusal to the lowering, as LYR-ICE0002 — a code §12.1
         // keeps for VALID Lyric, carrying the note "this compiler version cannot lower it yet"
         // about a program no version will ever run. The force-unwrap beside it has been
         // LYR-SEM0005 all along; this is the same rule and now the same code, in the phase that
@@ -7800,7 +7800,7 @@ public sealed class TypeChecker
     /// <summary>
     /// <c>T</c> becomes <c>?T</c>, while <c>?T</c> stays <c>?T</c>.
     ///
-    /// <para>Optionals do not nest; the lowering reports <c>??T</c> as <c>LYR-IR0001</c>. Without the
+    /// <para>Optionals do not nest; the lowering reports <c>??T</c> as <c>LYR-ICE0002</c>. Without the
     /// collapse, <c>b?.v</c> on a field of type <c>?int</c> would be a <c>??int</c>, and the error
     /// would arrive as "cannot assign '?int' to 'int'" one level too late.</para>
     /// </summary>
@@ -10623,7 +10623,7 @@ public sealed class TypeChecker
     /// An initializer that leaves a field without a default unset (<c>LYR-SEM0106</c>).
     ///
     /// <para>IT WAS THE LOWERING'S JOB, and the lowering has no business refusing a program: the
-    /// same omission answered <c>LYR-IR0001</c> with the note "this compiler version cannot lower
+    /// same omission answered <c>LYR-ICE0002</c> with the note "this compiler version cannot lower
     /// it yet", which is a promise about a future release for a program that will never be valid.
     /// §12.1 reserves that code for VALID Lyric, so the check belongs here — where it also reaches
     /// <c>lyrc check</c>, which never lowers and therefore used to answer "ok".</para>

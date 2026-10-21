@@ -988,3 +988,42 @@ Technik der Seite und den Plan dafür. Für diesen Plan folgt daraus:
 | **M15** | der Mirror auf dem VPS (14 C9) |
 | **M17** | der Inhalt des Books statt Guide 5 (12 Q2 geändert) |
 | **M18** | `/5.0/` eingefroren, `/` auf das Stable |
+
+## Nachtrag 2026-10-21 — der Plan für M12b
+
+M12b nach seiner Zeile oben und dem Schnitt vom 2026-10-19: die Sprach-Uhren der Reviews, die an M12 hängen, und
+was M12a dazu fand. Das Artefakt: **je Punkt ein Konformanzfall, rot gegen den Compiler davor, grün danach**;
+die eine Sprachfrage, 04 S7, entschieden. Grundlage ist der Stand nach M12a (#528) und seine offenen Punkte
+218, 221–225, 240, 242 (die Liste im Bericht von M12a).
+
+| # | Entscheidung | Vergleich / Verworfen |
+|---|---|---|
+| P1 | **Typargumente am Methodenaufruf** (03 S15a): `it.collect<List<int>>()` wie an einer Funktion; der Parser liest `name<…>(` nach einem `.` als Typargumente, wo die schließende `>` direkt vor `(` steht und dazwischen nur Typen stehen — dieselbe Prüfung wie heute am Funktionsaufruf (`empty<int>()`). | C#, Kotlin. Verworfen: Rusts `::<>` (eine zweite Schreibweise derselben Sache). |
+| P2 | **Fixierung in Funktionen** (03 S15a): `fn f<I :: [Iterator<Item = T>], T>(it: I)` leitet `T` aus der Fixierung von `I` ab, wie ein Block (Spec 05 §13 Regel 2) — die Unifikation nimmt die Fixierungen der Schranken als Gleichungen auf; SEM0060 nur, wo danach etwas offen bleibt. | Rusts Projektion `I::Item`. Verworfen: die Regel 03 §9.2.1 zu belassen (Funktion und Block ungleich). |
+| P3 | **Geschriebene Typen prüfen ihre Schranken** (03 N2b): ein Durchgang über Signaturen, Felder, Annotationen und Aliase prüft jede geschriebene Instanz gegen die Schranken ihrer Deklaration (`fn f(s: Set<NoHash>)` → SEM0028 an der Signatur), einmal je Stelle; die Prüfung am Gebrauch bleibt für Inferiertes. | Rusts WF-Prüfung. |
+| P4 | **Inferenz an den Rändern** (03 S5, S16, T8): ein Lambda, das `T` liefert, bindet `?U` mit `U = T` (`mapNotNull`); ein Literal an einem Parameter, den ein früheres Argument auf `T[N]` band, nimmt `T[N]` als Ziel (`assertEq(x.toBytesBE(), [2u8, 1u8])`); ein Literal unifiziert mit dem Typparameter, an dem es steht, nachdem die übrigen Argumente ihn gebunden haben (T8: erst die Nicht-Literale, dann die Literale als Ziel). | Kotlin, C#. Verworfen: Whole-Function-Inferenz (T8). |
+| P5 | **Die Kettenmeldung und das Tiefenlimit** (03 T19; Punkt 218): die Monomorphisierung zählt die Tiefe je Instanziierungskette (128, wie Rust) und meldet bei Überschreitung die Kette (`grow<W<W<…>>>` mit den ersten und letzten Gliedern) statt zu laufen — heute läuft `lyric5 build` bei `fn grow<T>(x: T) { grow(W<T> { … }) }` ohne Ende. Ein Instanzlimit je Programm mit eigener Meldung. | Rust `recursion_limit`. |
+| P6 | **Arität über Rumpf und Blöcke** (04 R4a3): zwei Funktionen eines Namens mit verschiedener Anzahl dürfen im Rumpf, in inhärenten Blöcken und über Rumpf und Block stehen (08 §1.2 Regel 1); Spec 05 §3 Regel 1 heißt „eine Funktion je Name und Anzahl“; SEM0121 nur noch für gleiche Anzahl. | — |
+| P7 | **Der generische Weiterleiter** (04 R4b): ein an ein Feld delegiertes generisches Member bekommt einen synthetisierten generischen Weiterleiter, eine Instanz je Gebrauch; dazu die Delegation an ein Feld vom Typ eines Kind-Interfaces (der Weiterleiter geht über die Elternmethode) und der Interface-Wert aus einer Shape- oder Blanket-Konformanz (SEM0230; die Methodentabelle der Konformanz je Instanz). | — |
+| P8 | **Generische Interfaces mehrfach** (A8, SEM0082) **und mehrere `From`** (04 S7): **zu entscheiden mit dem Maintainer vor S8**. Empfehlung: Konformanzen einer generischen Schnittstelle mit verschiedenen Argumenten unterscheiden ihre Member an der Instanz (`Label :: [From<int>, From<string>]`, `Label.from(3)` wählt über den Argumenttyp wie eine Überladung, `From<int>.from(3)` qualifiziert) — wie Rusts mehrere `From` für einen Fehlertyp; D4 („ein Name, eine Bedeutung je Anzahl“) gilt dann je Konformanz. Die Alternative: D4 bleibt, ein Fehlertyp mit mehreren Quellen nimmt ein Enum (der Stand). | Rust. Die Entscheidung bestimmt S8. |
+| P9 | **Die Lücken, die M12a fand**: die ICEs 221–225 werden Fehler mit Code (die Einfuhr einer Einfuhr ist RES0009; eine generische statische Methode als Wert; der qualifizierte Aufruf eines statischen Interface-Members; `comptime if` als Wert; `==` auf `void` im Checker abgelehnt); ein Typfehler an einer Bindung zeigt auf den Initialisierer, mit Label (242); die Note zu verborgenen Kandidaten auch für Überladungen (240). | — |
+
+| Slice | Inhalt | Artefakt |
+|---|---|---|
+| **S1** Typargumente am Methodenaufruf | P1 | `collect<List<int>>()` und `parse<int>()` an Methoden; ein Vergleich `a.b < c > (d)` bleibt einer (Fall) |
+| **S2** Fixierung in Funktionen | P2 | `fn f<I :: [Iterator<Item = T>], T>` ohne SEM0060 am Aufruf |
+| **S3** Schranken geschriebener Typen | P3 | `fn f(s: Set<NoHash>)` rot an der Signatur, einmal |
+| **S4** Inferenz an den Rändern | P4 | `mapNotNull`, `assertEq` mit `T[N]`, das Literal als Ziel — je ein Fall |
+| **S5** Kettenmeldung | P5 | `grow` endet mit einer Meldung, die Kette darin; 218 zu |
+| **S6** Arität über Blöcke | P6 | die drei Stellungen grün, gleiche Anzahl bleibt SEM0121 |
+| **S7** Weiterleiter und Interface-Werte | P7 | delegiertes generisches Member, Kind-Interface-Feld, Interface-Wert aus Shape und Blanket — SEM0230 fällt |
+| **S8** mehrere Konformanzen | P8 nach der Entscheidung | je nach ihr: `From<int>` und `From<string>` an einem Typ, oder ein Fall, der D4 hält |
+| **S9** Lücken aus M12a | P9 | fünf ICEs als Fehler mit Code, die Bindung mit Label, die Überladungsnote |
+| **S10** Abschluss | STATUS, CHANGELOG, Bericht, der Plan für M12c als nächster Schritt (14 S1–S6, K2a–K2d) | die Zeile oben |
+
+Nach Aufwand: groß S5, S7, S8; mittel S1, S2, S3, S4, S9; klein S6, S10. Zusammen **M an der oberen Kante**.
+**Reflexion**: Die Punkte teilen einen Kern — die Unifikation (P2, P4) und die Monomorphisierung (P5, P7) —, und
+die Reihenfolge baut auf ihm auf: erst was der Parser liest (S1), dann was die Unifikation bindet (S2, S4), dann
+was die Instanzen erzeugen (S5, S7). P8 steht spät, weil seine Entscheidung die Überladung über Konformanzen
+berührt, die S6 erst ordnet. Verworfen: die Inferenzpunkte einzeln über Sonderfälle zu lösen (S5 und S16 sind
+derselbe Mangel — der erwartete Typ fließt nicht in ein schon gebundenes Argument zurück).
