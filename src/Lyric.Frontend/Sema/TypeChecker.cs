@@ -4388,7 +4388,15 @@ public sealed class TypeChecker
 
             case CallExpr { Callee: FieldByInfoExpr byInfoCallee } call when _comp.Lyric5Modules: return CheckVariantCallByInfo(call, byInfoCallee, scope, expected);
             case CallExpr call: return CheckCall(call, scope, expected);
-            case MemberExpr mem: return CheckMember(mem, scope, expected);
+            case MemberExpr mem:
+            {
+                var before = _de.Count;
+                var type = CheckMember(mem, scope, expected);
+                // a local that hides a module or a prelude name, where the member is the hidden one's
+                if (type is ErrorType && _de.Count > before && ShadowNote(mem) is { } shadow)
+                    _de.AddNote(before, d => d.Severity == Severity.Error && d.Span.Start >= mem.Span.Start && d.Span.End <= mem.Span.End, shadow);
+                return type;
+            }
             case StructInitExpr si: return si.Rounds.Length > 0 || si.Fields.Any(f => f.Info is not null)
                 ? CheckInitWithRounds(si, scope, expected) : CheckStructInit(si, scope, expected);
             case TypePathExpr tp: return CheckTypePath(tp, scope, expected);
@@ -7755,7 +7763,8 @@ public sealed class TypeChecker
         if (baseType is CoroutineOf && BlanketMember(baseType, mem.Member, mem.Span) is { } blanket)
             return BindMember(mem, blanket);
         if (targetType.IsError) return LyrType.Error;
-        return Report(mem.Span, "LYR-SEM0012", $"'{TypeFacts.Display(targetType)}' has no member '{mem.Member}'");
+        return Report(mem.Span, "LYR-SEM0012", $"'{TypeFacts.Display(targetType)}' has no member '{mem.Member}'",
+            _comp.Lyric5Modules && TypeFacts.SymbolOf(targetType) is { } owner ? HiddenCandidate(owner, mem.Member) : null);
     }
 
     /// <summary>The clause binding this member is asked of, in its clause and not in a lambda there
@@ -9409,6 +9418,48 @@ public sealed class TypeChecker
     /// call chooses from, where what may not be named is not there.</summary>
     private bool MayName(Symbol symbol) => _currentModule is null || _comp.Visible(symbol, _currentModule);
 
+    /// <summary>A candidate the lookup of <paramref name="member"/> passed over because this module
+    /// cannot see it: a method a block adds to the type in a module not imported here, or one its
+    /// module keeps to itself.</summary>
+    private DiagnosticNote? HiddenCandidate(TypeSymbol ts, string member)
+    {
+        foreach (var ext in _comp.Extensions.MethodsFor(ts))
+        {
+            if (ext.Symbol.Name != member) continue;
+            var at = ext.Symbol.Declaration is FunctionDecl f ? f.NameSpan : default;
+            if (!_comp.Reaches(_currentModule, ext))
+                return new DiagnosticNote(at, $"'{member}' is added to '{ts.Name}' in module '{ext.Module.FullName}', which this module does not import");
+            if (!MayName(ext.Symbol))
+                return new DiagnosticNote(at, $"'{member}' is added to '{ts.Name}' in module '{ext.Module.FullName}' and kept there: {_comp.Hidden(ext.Symbol)}");
+        }
+        return null;
+    }
+
+    /// <summary>Where <c>x.m</c> fails on a local <c>x</c> and the module or the prelude name it hides
+    /// has an <c>m</c>: the note says that the name is the local here, and what it hides.</summary>
+    private DiagnosticNote? ShadowNote(MemberExpr mem)
+    {
+        if (!_comp.Lyric5Modules || mem.Target is not IdentifierExpr id || _currentModule is null) return null;
+        var (declared, type) = _result.RefOf(id) switch
+        {
+            LocalSymbol l => (l.Declaration, l.Type),
+            ParameterSymbol p => (p.Declaration, p.Type),
+            _ => (null, null),
+        };
+        if (declared is null || type is null) return null;
+        var at = declared is INamedDecl named && named.NameSpan.File.IsValid ? named.NameSpan : declared.Span;
+        foreach (var import in _comp.AstOf(_currentModule).Declarations.OfType<ImportDecl>())
+        {
+            var bound = import.Clause switch { null => import.Path[^1], ImportAlias alias => alias.Alias, _ => null };
+            if (bound != id.Name || _comp.FindModule(import.Path) is not { } hidden) continue;
+            if (hidden.Members.LookupLocal(mem.Member) is null) return null;
+            return new DiagnosticNote(at, $"'{id.Name}' is here the local of type '{TypeFacts.Display(type)}', which hides the module '{hidden.FullName}'");
+        }
+        if (_comp.PreludeMember(id.Name) is TypeSymbol prelude && prelude.Members.LookupLocal(mem.Member) is not null)
+            return new DiagnosticNote(at, $"'{id.Name}' is here the local of type '{TypeFacts.Display(type)}', which hides the prelude's type '{prelude.Name}'");
+        return null;
+    }
+
     /// <summary>The member a lookup answers from here: of an overload set the first function this
     /// module may name, so a hidden overload beside a visible one is not there; a name with
     /// nothing visible is reported (07 V2 S1) and answered all the same.</summary>
@@ -9486,10 +9537,13 @@ public sealed class TypeChecker
         // A blanket block's member (04 D15), asked last: the receiver binds its parameter.
         var receiver = _memberReceiver is GenericInstance own && ReferenceEquals(own.Definition, ts) ? own : SelfType(ts);
         if (BlanketMember(receiver, member, span) is { } blanket) return blanket;
-        return (Report(span, "LYR-SEM0012", $"'{ts.Name}' has no member '{member}'" + RecordNote(member, ts),
-            NameSuggestion.Note(member, MemberFacts
-                .OfInstance(_comp, _binding, ts, _currentModule)
-                .Select(candidate => candidate.Symbol.Name))), null);
+        var hidden = _comp.Lyric5Modules ? HiddenCandidate(ts, member) : null;
+        var near = NameSuggestion.Note(member, MemberFacts
+            .OfInstance(_comp, _binding, ts, _currentModule)
+            .Select(candidate => candidate.Symbol.Name));
+        DiagnosticNote[] notes = [.. new[] { hidden, near }.Where(n => n is not null).Select(n => n!.Value)];
+        _de.Report("LYR-SEM0012", Severity.Error, span, $"'{ts.Name}' has no member '{member}'" + RecordNote(member, ts), notes);
+        return (LyrType.Error, null);
     }
 
     /// <summary>A visible extension method of this name, meaning the declaring module is the

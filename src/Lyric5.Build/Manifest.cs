@@ -495,6 +495,9 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     [GeneratedRegex("^[a-z][a-z0-9_]*$")]
     private static partial Regex NamePattern();
 
+    /// <summary>Whether <paramref name="name"/> may name a package: the pattern, and not <c>std</c>.</summary>
+    public static bool IsPackageName(string name) => NamePattern().IsMatch(name) && name != "std";
+
     [GeneratedRegex(@"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$")]
     private static partial Regex SemVerPattern();
 

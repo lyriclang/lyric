@@ -135,6 +135,20 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
 
     /// <summary>Takes back the warnings, notes and hints <paramref name="allowed"/> says yes to
     /// (design/v5/spec/09 A10: <c>@Allow</c>, <c>[lints] allow</c>); an error stays.</summary>
+    /// <summary>Adds <paramref name="note"/> to the first diagnostic reported since the count was
+    /// <paramref name="from"/> that <paramref name="which"/> takes: what the reporter could not see —
+    /// the expression around a failed lookup — said by the caller that can.</summary>
+    public void AddNote(int from, Func<Diagnostic, bool> which, DiagnosticNote note)
+    {
+        for (var i = from; i < _diagnostics.Count; i++)
+            if (which(_diagnostics[i]))
+            {
+                var d = _diagnostics[i];
+                _diagnostics[i] = d with { Notes = [.. d.Notes ?? [], note] };
+                return;
+            }
+    }
+
     public void Suppress(Func<Diagnostic, bool> allowed) =>
         _diagnostics.RemoveAll(d => d.Severity != Severity.Error && allowed(d));
 

@@ -16,7 +16,7 @@ public class VerbTableTests
     public static TheoryData<string> Verbs() => [.. new[]
     {
         "build", "run", "check", "expand", "test", "bench", "fix", "env", "update", "add", "remove", "clean",
-        "metadata", "explain", "version", "help",
+        "metadata", "explain", "new", "init", "completions", "version", "help",
     }];
 
     [Theory]

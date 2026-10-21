@@ -581,8 +581,19 @@ public sealed class Resolver
                     new DiagnosticNote($"a package's 'src/{Compilation.RootModuleFile}.lyr' is the module "
                         + $"'{package}' itself — import '{package}'"));
             else
-                _de.Report("LYR-RES0003", Severity.Error, imp.Span,
-                    $"cannot find module '{string.Join('.', imp.Path)}'");
+            {
+                // a module path a typo away from one there is: the path changed, for a reader to take
+                var written = string.Join('.', imp.Path);
+                var text = _sm.GetText(imp.Span.File);
+                var at = text.IndexOf(written, imp.Span.Start, imp.Span.End - imp.Span.Start, StringComparison.Ordinal);
+                var near = Lyric.Sema.NameSuggestion.For(written, _comp.Modules.Where(m => m.Path.Length > 0).Select(m => m.FullName));
+                if (_comp.Lyric5Modules && near is not null && at >= 0)
+                    _de.Report("LYR-RES0003", Severity.Error, imp.Span, $"cannot find module '{written}'",
+                        DiagnosticNote.Suggest($"did you mean '{near}'?",
+                            new Replacement(new Span(imp.Span.File, at, at + written.Length), near, Applicability.NeedsReview)));
+                else
+                    _de.Report("LYR-RES0003", Severity.Error, imp.Span, $"cannot find module '{written}'");
+            }
         }
         // A package imports what its manifest declares (07 P6) — not what those depend on.
         else if (_comp.Lyric5Modules && _comp.PackageDependencies is { } declared)

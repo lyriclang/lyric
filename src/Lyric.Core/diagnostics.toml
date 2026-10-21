@@ -369,6 +369,24 @@ area = "14-cli"
 summary = "Reported by the 4.x drivers when the compiler reached a state it believed impossible."
 retired = "Lyric 5: lyric5 reports its own failures as LYR-ICE0001 (exit 101); nothing in lyric5 calls CliDiagnostics.FailInternal"
 
+[LYR-CLI0021]
+title = "no package can be made here"
+severity = "error"
+area = "14-cli"
+summary = "`lyric new` names a directory that exists already, `lyric init` runs where a `lyric.toml` is, or the `git init` the command asked for failed. The exit code is 2."
+explanation = '''
+`new <name>` makes the directory `<name>` and the package in it; it does not write into a directory that is there. `init` makes the package in the directory it runs in, and not where one is already. With `--git`, a repository is made beside the package; when git refuses, so does the command, after the files are written.
+
+Choose another name, run `init` in the directory instead, or leave the package that is there as it is.
+'''
+example = '''
+$ lyric5 new app
+created program package 'app' in /home/ada/app
+$ lyric5 new app
+error[LYR-CLI0021]: '/home/ada/app' exists already
+  = help: lyric5 init makes a package in a directory that is there
+'''
+
 [LYR-CT0001]
 title = "a panic while evaluating at compile time"
 severity = "error"
