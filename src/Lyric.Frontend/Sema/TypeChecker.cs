@@ -7260,6 +7260,7 @@ public sealed class TypeChecker
                 for (var i = variadicAt; i < args.Length; i++)
                     if (args[i] is { } element && element is not LambdaExpr)
                         UnifyInfer(Spreads(call, element) ? tail : tail.Element, argTypes[i]!, map, element.Span);
+            if (fsym is { Generics.Length: > 0 }) BindThroughFixations(fsym.Generics, map);
             substituted = (FnType)Substitute(fn, map);
         }
 
@@ -8910,6 +8911,37 @@ public sealed class TypeChecker
         CoroutineOf c => ContainsError(c.Yield) || ContainsError(c.Result),
         _ => false,
     };
+
+    /// <summary>
+    /// A function's type parameter bound through the fixation of another's constraint, as a block's
+    /// is: in <c>fn f&lt;I :: [Iterator&lt;Item = T&gt;], T&gt;(it: I)</c> the argument binds <c>I</c>,
+    /// and <c>T</c> is the answer <c>I</c>'s conformance gives — matched against the fixed type
+    /// where that is a structure, <c>Item = (K, V)</c>. Only what the arguments left open is bound.
+    /// </summary>
+    private void BindThroughFixations(GenericParamSymbol[] generics, Dictionary<GenericParamSymbol, LyrType> map)
+    {
+        foreach (var from in generics)
+        {
+            if (!map.TryGetValue(from, out var source) || Unfixed(source) is not null) continue;
+            foreach (var c in from.Constraints)
+            {
+                if (ResolveType(c, _currentModule?.Members ?? _comp.Builtins) is not GenericInstance { Fixations: { } fixations }) continue;
+                foreach (var (member, fixedTo) in fixations)
+                {
+                    if (!generics.Any(g => !ReferenceEquals(g, from) && !map.ContainsKey(g) && MentionsParam(fixedTo, g))) continue;
+                    var answer = ResolveAssociated(source, member);
+                    if (answer.IsError) continue;
+                    if (fixedTo is TypeParamType { Param: var p }) map.TryAdd(p, answer);
+                    else
+                    {
+                        var bound = new Dictionary<GenericParamSymbol, LyrType>(map, ReferenceEqualityComparer.Instance);
+                        if (TypeFacts.Match(fixedTo, answer, bound))
+                            foreach (var (g, t) in bound) map.TryAdd(g, t);
+                    }
+                }
+            }
+        }
+    }
 
     private void CheckConstraints(GenericParamSymbol[] generics, LyrType[] args, Span span,
         Dictionary<GenericParamSymbol, LyrType>? around = null)
