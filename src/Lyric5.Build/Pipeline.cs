@@ -377,6 +377,31 @@ public static class Pipeline
         return result.Render(error) ? 0 : 1;
     }
 
+    /// <summary>The front end on a program's source, nothing rendered: what <c>lyric fix</c> reads.</summary>
+    public static CompileResult Check(Project project) =>
+        SourceCompiler.Check(SourceOf(project), OptionsFor(project, null, null));
+
+    /// <summary>The front end on a library's modules, nothing rendered: what <c>lyric fix</c> reads.</summary>
+    public static CompileResult Check(LibraryException library, LintArgs? lints)
+    {
+        var manifest = library.Manifest;
+        var roots = Directory.Exists(manifest.SourceRoot)
+            ? Directory.EnumerateFiles(manifest.SourceRoot, "*.lyr", SearchOption.AllDirectories)
+                .Order(StringComparer.Ordinal)
+                .Select(file => ScriptSource.FromDisk(file, Project.ModulePathOf(manifest, file)!))
+                .ToList()
+            : [];
+        var levels = library.Graph.Packages.ToDictionary(p => p.Key,
+            p => new LintSettings(p.Key == manifest.Name ? (lints ?? LintArgs.None).Rules : [], p.Value.Lints), StringComparer.Ordinal);
+        return SourceCompiler.CheckProject(roots, new CompilerOptions
+        {
+            StdlibRoot = StdlibRoot, PackageRoots = library.Graph.SourceRoots,
+            PackageDependencies = library.Graph.Declared,
+            LintLevels = LintLevelsOf(levels, manifest.Name, null), RootPackage = manifest.Name,
+            WarnDeps = (lints ?? LintArgs.None).WarnDeps,
+        });
+    }
+
     internal static void AddTree(List<string> parts, string root)
     {
         if (!Directory.Exists(root)) return;

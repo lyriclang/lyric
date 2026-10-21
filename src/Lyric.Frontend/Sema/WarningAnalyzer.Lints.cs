@@ -210,9 +210,11 @@ internal sealed partial class WarningAnalyzer
                 if (a.Operator is null && (Same(a.Target, a.Value)
                         || a.Value is PostfixExpr { Operator: PostfixOp.Inc or PostfixOp.Dec } post && Same(a.Target, post.Operand)))
                     _de.Report("LYR-SEM0203", Severity.Warning, a.Span, "this assigns a value to itself — nothing changes",
-                        new DiagnosticNote(a.Value is PostfixExpr
-                            ? "'x = x++' keeps the old value: write 'x++' alone"
-                            : "assign what was meant, or take the statement out"));
+                        a.Value is PostfixExpr bumped
+                            ? DiagnosticNote.Suggest("'x = x++' keeps the old value: write 'x++' alone",
+                                new Replacement(a.Span, _comp.Sources.GetText(a.Span.File)[bumped.Span.Start..bumped.Span.End], Applicability.Safe))
+                            : DiagnosticNote.Suggest("assign what was meant, or take the statement out",
+                                SourceEdits.DeleteStatement(_comp.Sources, a.Span, Applicability.NeedsReview)));
                 // the target is written, not read: the walk goes on in the value alone
                 if (a.Operator is null && a.Target is IdentifierExpr)
                 {

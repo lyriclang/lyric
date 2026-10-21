@@ -15,6 +15,13 @@ internal static class NameSuggestion
     public static DiagnosticNote? Note(string written, IEnumerable<string> candidates) =>
         For(written, candidates) is { } best ? new DiagnosticNote($"did you mean '{best}'?") : null;
 
+    /// <summary>The suggestion as a change of the name at <paramref name="at"/> — one a reader
+    /// decides on: a close name is a guess.</summary>
+    public static DiagnosticNote? Note(string written, IEnumerable<string> candidates, Span at) =>
+        For(written, candidates) is { } best
+            ? DiagnosticNote.Suggest($"did you mean '{best}'?", new Replacement(at, best, Applicability.NeedsReview))
+            : null;
+
     public static string? For(string written, IEnumerable<string> candidates)
     {
         var budget = written.Length <= 4 ? 1 : 2;

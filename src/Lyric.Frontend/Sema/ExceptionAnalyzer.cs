@@ -193,7 +193,8 @@ internal sealed class ExceptionAnalyzer
             foreach (var (mark, frame) in context.Rightward)
                 if (!frame.Reached)
                     _de.Report("LYR-SEM0139", Severity.Warning, mark.KeywordSpan,
-                        "nothing to the right of this 'try' throws — the mark says a call may fail where none can");
+                        "nothing to the right of this 'try' throws — the mark says a call may fail where none can",
+                        MarkOut(mark));
         }
         finally { _context = saved; }
     }
@@ -369,7 +370,8 @@ internal sealed class ExceptionAnalyzer
                 if (!frame.Reached && !ReferenceEquals(tried, _closing))
                     _de.Report("LYR-SEM0139", Severity.Warning, tried.KeywordSpan, tried.Catches.Length > 0
                         ? "nothing under this 'try' throws — its 'catch' clauses never run"
-                        : $"nothing under this '{Spelled(tried.Kind)}' throws — the mark says a call may fail where none can");
+                        : $"nothing under this '{Spelled(tried.Kind)}' throws — the mark says a call may fail where none can",
+                        MarkOut(tried));
                 foreach (var c in tried.Catches) AnalyzeStmt(c.Body);
                 break;
             }
@@ -569,7 +571,15 @@ internal sealed class ExceptionAnalyzer
 
     private void MarksAgain(TryExpr again) =>
         _de.Report("LYR-SEM0139", Severity.Warning, again.KeywordSpan,
-            "this 'try' marks what a 'try' around it or to its left marks already — one mark covers the expression");
+            "this 'try' marks what a 'try' around it or to its left marks already — one mark covers the expression",
+            MarkOut(again));
+
+    /// <summary>The mark taken out, where it is a plain <c>try</c> without clauses: <c>try?</c> and
+    /// <c>try!</c> change the value's type, and a clause is code.</summary>
+    private DiagnosticNote[] MarkOut(TryExpr mark) =>
+        mark is { Kind: TryKind.Propagate, Catches.Length: 0 }
+            ? [DiagnosticNote.Suggest("take the 'try' out", SourceEdits.DeleteWord(_comp.Sources, mark.KeywordSpan))]
+            : [];
 
     /// <summary>The mark to the right of an operator that stands BEHIND <paramref name="position"/>
     /// in the same expression — what an unmarked site left of it is told about. Not one in a
