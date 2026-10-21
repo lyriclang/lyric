@@ -26,7 +26,9 @@ struct User :: [Codable, Equatable] {
 
 @Codec { rename = .CamelCase }
 struct Snaky :: [Codable, Equatable] {
+    @Allow("naming")
     first_name: string,
+    @Allow("naming")
     last_name: string,
 }
 

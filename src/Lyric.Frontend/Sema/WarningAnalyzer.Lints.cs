@@ -70,6 +70,8 @@ internal sealed partial class WarningAnalyzer
         void Collect(Node node)
         {
             if (node is NamedType { Path: [var single] }) named.Add(single);
+            // as a value it is used too: 'D.new()' names the type parameter 'D'
+            if (node is IdentifierExpr { Name: var value }) named.Add(value);
             foreach (var child in AstChildren.Of(node))
                 if (child is not GenericParam) Collect(child);
         }

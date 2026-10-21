@@ -49,7 +49,7 @@ fn refused(bytes: Slice<uint8>): string {
 @Test
 fn everyLevelRoundTrips(): void throws Error {
     let text = sampleText();
-    var run: uint8[] = [97u8] * 70000;
+    let run: uint8[] = [97u8] * 70000;
     var noise: uint8[] = [0u8] * 5000;
     var x = 7;
     var i = 0;
@@ -60,7 +60,6 @@ fn everyLevelRoundTrips(): void throws Error {
     }
     let empty: uint8[] = [];
     for (data in [empty, "a".toBytes(), "hello hello hello hello, world".toBytes(), text, run, noise]) {
-        var last = -1;
         for (level in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
             let packed = try Gzip.compress(data[..], level);
             assertTrue(sameBytes(try Gzip.decompress(packed[..]), data[..]), f"level {level} over {data.length()} bytes");
@@ -68,7 +67,6 @@ fn everyLevelRoundTrips(): void throws Error {
                 // stored: the data plus the headers and a block per 65535 bytes
                 assertEq(packed.length(), data.length() + 18 + 5 * (1 + (data.length() + 65534) / 65535));
             }
-            last = packed.length();
         }
         assertTrue(sameBytes(try Zlib.decompress((Zlib.compress(data[..], 6))[..]), data[..]));
         assertTrue(sameBytes(try Deflate.decompress((Deflate.compress(data[..], 6))[..]), data[..]));
@@ -146,7 +144,7 @@ fn theAdaptersStream(): void throws Error {
     var r = GzipReader<ByteBuffer>.new(packed);
     let out = ByteBuffer.new();
     let chunk: uint8[] = [0u8] * 1000;
-    var sizes = [1, 7, 100, 999, 1000, 3];
+    let sizes = [1, 7, 100, 999, 1000, 3];
     var k = 0;
     while (true) {
         let want = sizes[k % sizes.length()];

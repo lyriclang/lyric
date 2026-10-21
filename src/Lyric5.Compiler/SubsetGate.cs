@@ -53,9 +53,14 @@ public static class SubsetGate
                 : $"not yet in Lyric 5: {what}");
         }
 
+        private string _function = "";
+        private Diagnostic? _inStd;
+        private bool _ownSaid;
+
         public void Module()
         {
             foreach (var function in module.Functions) Function(function);
+            if (!_ownSaid && _inStd is { } inStd) diagnostics.Report(inStd);
             foreach (var global in module.Globals) Type(global.Type, default, $"the type of '{global.Name}'");
             // A module-level finding has no instruction to point at: the entry's first line stands in.
         }
@@ -65,6 +70,7 @@ public static class SubsetGate
 
         private void Function(IrFunction function)
         {
+            _function = function.Name;
             var at = FirstSpan(function);
             Type(function.ReturnType, at, "the return type");
             foreach (var local in function.Locals) Type(local.Type, at, $"the type of '{local.Name}'");
@@ -159,8 +165,16 @@ public static class SubsetGate
                         // the syntax tree is read, built and written at compile time (10 B13 M2, M9b S1):
                         // the natives have no runtime call, and never will
                         Refused = true;
-                        diagnostics.Report(ComptimeOnly, Severity.Error, op.Span,
+                        var said = new Diagnostic(ComptimeOnly, Severity.Error, op.Span,
                             $"'{name["std.".Length..]}' runs at compile time only: a syntax tree is read, built and written inside 'comptime'");
+                        // the standard library's own call is said only where the program's is not: the
+                        // program called into it, and its call is the one to change
+                        if (_function.StartsWith("std.", StringComparison.Ordinal)) _inStd ??= said;
+                        else
+                        {
+                            diagnostics.Report(said);
+                            _ownSaid = true;
+                        }
                     }
                     else if (!Intrinsics.Contains(name) && !Compiler.Intrinsics.IsForeign(name))
                         // nothing brings a program's own natives: a program declares 'extern "C"'

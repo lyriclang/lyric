@@ -1060,7 +1060,10 @@ public sealed partial class Parser
                 || _buffer.Peek(at).TokenKind == TokenKind.Identifier
                     && _buffer.Peek(at + 1).TokenKind is TokenKind.RBrace or TokenKind.Equal;
         }
-        if (_buffer.Peek(open + 2).TokenKind != TokenKind.Equal) return false;
+        // 'S { x: 1 }' is an initializer written with a type's ':' — not a label, which a loop follows
+        var colon = _sm.Lyric5 && _buffer.Peek(open + 2).TokenKind == TokenKind.Colon
+                    && _buffer.Peek(open + 3).TokenKind is not (TokenKind.While or TokenKind.Do or TokenKind.For) && !IsLoopAhead(open + 3);
+        if (_buffer.Peek(open + 2).TokenKind != TokenKind.Equal && !colon) return false;
         var depth = 0;
         for (var i = open + 3; ; i++)
         {
@@ -1241,7 +1244,13 @@ public sealed partial class Parser
                 if (!_buffer.Match(TokenKind.Comma)) break;
                 continue;
             }
-            _buffer.Expect(TokenKind.Equal, "LYR-PAR0037", "expected '=' in struct initializer (':' is only for types)");
+            if (_sm.Lyric5 && _buffer.Check(TokenKind.Colon))
+            {
+                var colon = _buffer.Advance();
+                _de.Report(new Diagnostic("LYR-PAR0037", Severity.Error, colon.Span, "expected '=' in struct initializer (':' is only for types)",
+                    [DiagnosticNote.Suggest("write '='", new Replacement(colon.Span, " =", Applicability.Safe))]));
+            }
+            else _buffer.Expect(TokenKind.Equal, "LYR-PAR0037", "expected '=' in struct initializer (':' is only for types)");
             var value = ParseSubExpr();
             fields.Add(new StructInitField(fieldName, value,
                 Span.Union(nameTok.Span, Whole(value))) { NameSpan = nameTok.Span });
@@ -1298,8 +1307,15 @@ public sealed partial class Parser
                 string? formatSpec = null;
                 if (_buffer.Check(TokenKind.FStringFormatSpec))
                     formatSpec = _sm.Slice(_buffer.Advance().Span).ToString();
-                var interpEnd = _buffer.Expect(TokenKind.FStringInterpEnd, "LYR-PAR0014",
-                    "expected '}' to close interpolation");
+                if (_sm.Lyric5 && !_buffer.Check(TokenKind.FStringInterpEnd))
+                {
+                    // what is left of the hole is the one mistake: skipped to its end, not parsed on
+                    _de.Report("LYR-PAR0014", Severity.Error, _buffer.Current.Span, "expected '}' to close interpolation");
+                    while (!_buffer.Check(TokenKind.FStringInterpEnd) && !_buffer.Check(TokenKind.FStringEnd) && !_buffer.Check(TokenKind.Eof))
+                        _buffer.Advance();
+                }
+                var interpEnd = _sm.Lyric5 && !_buffer.Check(TokenKind.FStringInterpEnd) ? _buffer.Current
+                    : _buffer.Expect(TokenKind.FStringInterpEnd, "LYR-PAR0014", "expected '}' to close interpolation");
                 segments.Add(new InterpHole(expr, formatSpec, Span.Union(t.Span, interpEnd.Span)));
                 continue;
             }

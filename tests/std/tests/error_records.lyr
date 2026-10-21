@@ -110,7 +110,7 @@ fn aBacktraceNamesTheThrowerWhereOneIsKept(): void {
     }
 }
 
-fn shownTrace(i: int): bool {
+fn shownTrace(_i: int): bool {
     try { explode(); } catch (e) {
         let where = e.backtrace();
         if (where != null) {
