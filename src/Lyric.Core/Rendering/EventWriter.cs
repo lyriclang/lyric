@@ -88,6 +88,17 @@ public sealed class EventWriter(TextWriter output)
         w.WriteString("path", path);
     });
 
+    /// <summary>A change <c>lyric fix</c> made (16 §6): the file, where the change begins, the code of
+    /// the finding it answers, and the text put in.</summary>
+    public void Fixed(string path, int line, int column, string code, string text) => Line("fix", w =>
+    {
+        w.WriteString("path", path);
+        w.WriteNumber("line", line);
+        w.WriteNumber("column", column);
+        w.WriteString("code", code);
+        w.WriteString("text", text);
+    });
+
     /// <summary>A line the test program wrote in the form, passed on as it is: <c>lyric test</c>'s
     /// own events come from the program that runs the tests (std.test).</summary>
     public void Raw(string line)

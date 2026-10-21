@@ -4530,7 +4530,7 @@ public sealed class TypeChecker
         var sym = NameOf(id, scope); // 'Ordering.Less' through the prelude; 'debugArray(xs)', the compiler's, through std.core
         if (sym is null)
             return Report(id.Span, "LYR-SEM0002", $"unknown identifier '{id.Name}'",
-                NameSuggestion.Note(id.Name, NamesIn(scope, typesOnly: false)));
+                NameSuggestion.Note(id.Name, NamesIn(scope, typesOnly: false), id.Span));
         _result.BindRef(id, sym);
         if (_narrowed.TryGetValue(sym, out var narrowed)) return narrowed; // ?T is T inside the narrowed region
         // A selective import (import std.io.console { println }) binds to a shell; the target is what
@@ -9985,7 +9985,7 @@ public sealed class TypeChecker
         {
             Report(attribute.PathSpan, "LYR-SEM0011", $"unknown type '{written}'",
                 attribute.Path is [var single]
-                    ? NameSuggestion.Note(single, NamesIn(scope, typesOnly: true))
+                    ? NameSuggestion.Note(single, NamesIn(scope, typesOnly: true), attribute.PathSpan)
                     : null);
             foreach (var f in attribute.Fields) CheckExpr(f.Value, scope);
             return null;
@@ -10136,7 +10136,7 @@ public sealed class TypeChecker
         if (sym is null)
         {
             Report(attribute.PathSpan, "LYR-SEM0011", $"unknown type '{written}'",
-                attribute.Path is [var single] ? NameSuggestion.Note(single, NamesIn(scope, typesOnly: true)) : null);
+                attribute.Path is [var single] ? NameSuggestion.Note(single, NamesIn(scope, typesOnly: true), attribute.PathSpan) : null);
             foreach (var f in attribute.Fields) CheckExpr(f.Value, scope);
             return null;
         }

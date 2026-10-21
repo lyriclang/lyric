@@ -258,7 +258,8 @@ public sealed class TextRenderer(SourceManager sources, RenderStyle style)
         if (start.Line != end.Line || fix.Text.Contains('\n'))
         {
             output.Write(Paint(new string(' ', gutter + 1) + "=", Blue) + " " + Paint("help:", Bold) + " "
-                         + DiagnosticEngine.Printable(note.Message) + ": `" + DiagnosticEngine.Printable(fix.Text) + "`\n");
+                         + DiagnosticEngine.Printable(note.Message)
+                         + (fix.Text.Length == 0 ? "" : ": `" + DiagnosticEngine.Printable(fix.Text) + "`") + "\n");
             return;
         }
         output.Write(Paint("help", Cyan) + Paint(": " + DiagnosticEngine.Printable(note.Message), Bold) + "\n");

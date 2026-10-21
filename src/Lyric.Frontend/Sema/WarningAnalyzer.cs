@@ -412,7 +412,7 @@ internal sealed partial class WarningAnalyzer
                     if (!reported.Add(node)) continue;
 
                     _de.Report("LYR-SEM0076", Severity.Warning, node.Span,
-                        DeprecationMessage($"'{target.Name}'", info.Message), Notes(info));
+                        DeprecationMessage($"'{target.Name}'", info.Message), Notes(info, node));
                 }
         }
 
@@ -434,10 +434,22 @@ internal sealed partial class WarningAnalyzer
     }
 
     /// <summary>Where the attribute stands, and what to write instead where it says (09 A11).</summary>
-    private static DiagnosticNote[] Notes(Deprecation info) => info.Replacement.Length == 0
-        ? [new DiagnosticNote(info.AttributeSpan, "declared deprecated here")]
-        : [new DiagnosticNote(info.AttributeSpan, "declared deprecated here"),
-           new DiagnosticNote($"write '{info.Replacement}' instead")];
+    private static DiagnosticNote[] Notes(Deprecation info, Node? use = null)
+    {
+        if (info.Replacement.Length == 0) return [new DiagnosticNote(info.AttributeSpan, "declared deprecated here")];
+        // the name in the use's place: safe where the replacement is a name, to be read where it is more
+        Span? at = use switch
+        {
+            IdentifierExpr id => id.Span,
+            MemberExpr member => member.MemberSpan,
+            _ => null,
+        };
+        var instead = at is { } place
+            ? DiagnosticNote.Suggest($"write '{info.Replacement}' instead", new Replacement(place, info.Replacement,
+                info.Replacement.All(c => char.IsLetterOrDigit(c) || c == '_') ? Applicability.Safe : Applicability.NeedsReview))
+            : new DiagnosticNote($"write '{info.Replacement}' instead");
+        return [new DiagnosticNote(info.AttributeSpan, "declared deprecated here"), instead];
+    }
 
     private static string DeprecationMessage(string what, string message) =>
         message.Length == 0 ? $"{what} is deprecated" : $"{what} is deprecated: {message}";
@@ -653,8 +665,13 @@ internal sealed partial class WarningAnalyzer
             if (!_used.Contains(symbol)) continue; // the unused warning already spoke
             if (_mutated.Contains(symbol)) continue;
 
+            var source = _comp.Sources.GetText(binding.Span.File);
+            var keyword = new Span(binding.Span.File, binding.Span.Start, binding.Span.Start + 3);
+            DiagnosticNote[] fix = binding.Span.Start + 3 <= source.Length && source.AsSpan(binding.Span.Start, 3) is "var"
+                ? [DiagnosticNote.Suggest("write 'let'", new Replacement(keyword, "let", Applicability.Safe))]
+                : [];
             _de.Report("LYR-SEM0075", _comp.Lyric5Modules ? Severity.Warning : Severity.Hint, binding.NameSpan,
-                $"'{local.Name}' is never reassigned — 'let' would do");
+                $"'{local.Name}' is never reassigned — 'let' would do", fix);
         }
     }
 
@@ -680,32 +697,58 @@ internal sealed partial class WarningAnalyzer
                 switch (import.Clause)
                 {
                     case ImportSelective selective:
+                    {
+                        var unused = Enumerable.Range(0, selective.Names.Length)
+                            .Where(i => IsUnusedImport(module, selective.BoundName(i), inFile)).ToHashSet();
                         for (var i = 0; i < selective.Names.Length; i++)
-                            WarnIfUnusedImport(module, selective.BoundName(i),
-                                selective.NameSpans[i], inFile);
+                            WarnIfUnusedImport(module, selective.BoundName(i), selective.NameSpans[i], inFile,
+                                unused.Count == selective.Names.Length ? WholeImport(import) : NameOutOf(selective, i));
                         break;
+                    }
                     case ImportAlias alias:
-                        WarnIfUnusedImport(module, alias.Alias, alias.Span, inFile);
+                        WarnIfUnusedImport(module, alias.Alias, alias.Span, inFile, WholeImport(import));
                         break;
                     case null when _comp.Lyric5Modules && import.Path.Length > 0:
-                        WarnIfUnusedImport(module, import.Path[^1], import.Span, inFile);
+                        WarnIfUnusedImport(module, import.Path[^1], import.Span, inFile, WholeImport(import));
                         break;
                 }
             }
         }
     }
 
+    private Replacement? WholeImport(ImportDecl import) =>
+        _comp.Lyric5Modules ? SourceEdits.DeleteStatement(_comp.Sources, import.Span) : null;
+
+    /// <summary>One name out of <c>{ a, b }</c>, with the comma that joins it to its neighbour; a
+    /// renamed one (<c>f as g</c>) is left to the hand.</summary>
+    private Replacement? NameOutOf(ImportSelective selective, int i)
+    {
+        if (!_comp.Lyric5Modules || selective.Renames is { } renames && renames.Any(r => r is not null)) return null;
+        var spans = selective.NameSpans;
+        var file = spans[i].File;
+        return selective.Names.Length == 1 ? null
+            : i + 1 < spans.Length ? new Replacement(new Span(file, spans[i].Start, spans[i + 1].Start), "", Applicability.Safe)
+            : new Replacement(new Span(file, spans[i - 1].End, spans[i].End), "", Applicability.Safe);
+    }
+
     private void WarnIfUnusedImport(ModuleSymbol module, string name, Span span,
-        HashSet<Symbol>? usedInFile)
+        HashSet<Symbol>? usedInFile, Replacement? fix)
+    {
+        if (IsUnusedImport(module, name, usedInFile))
+            _de.Report("LYR-SEM0072", Severity.Warning, span, $"import '{name}' is never used",
+                fix is { } change ? [DiagnosticNote.Suggest("take it out", change)] : []);
+    }
+
+    private bool IsUnusedImport(ModuleSymbol module, string name, HashSet<Symbol>? usedInFile)
     {
         // An unresolvable import already has the resolver's error; nothing to add.
-        if (module.Members.LookupLocal(name) is not { } binding) return;
+        if (module.Members.LookupLocal(name) is not { } binding) return false;
 
         // A use may be bound to the import shell or to what it targets — the checker does both,
         // depending on the path the resolution took. Either one makes the import used.
         var target = binding is ImportBindingSymbol shell ? shell.Target : binding;
         if (usedInFile is not null
-            && (usedInFile.Contains(binding) || usedInFile.Contains(target))) return;
+            && (usedInFile.Contains(binding) || usedInFile.Contains(target))) return false;
 
         // Importing a name brings the whole overload SET, and a call may have chosen any member
         // of it — the lookup above answers with the first. Without this the accounting warned
@@ -714,7 +757,7 @@ internal sealed partial class WarningAnalyzer
         // second member).
         if (usedInFile is not null)
             foreach (var overload in module.Members.OverloadsLocal(name))
-                if (usedInFile.Contains(overload)) return;
+                if (usedInFile.Contains(overload)) return false;
 
         // A MODULE import is used when one of its extension methods resolved in this file:
         // 'import std.string as strings;' exists exactly for 's.trim()' (v1.15), and no name of
@@ -723,15 +766,15 @@ internal sealed partial class WarningAnalyzer
             foreach (var used in usedInFile)
                 if (ExtensionOwners.TryGetValue(used, out var owner)
                     && ReferenceEquals(owner, targetModule))
-                    return;
+                    return false;
 
         // And when it brings conformances: 'import std.iter;' brings the blocks that make every
         // iterator one, for the whole program, and no name of the module appears for that.
         if (target is ModuleSymbol brings && _comp.Lyric5Modules
             && _comp.AstOf(brings).Declarations.Any(d => d is ExtendDecl { Interfaces.Length: > 0 }))
-            return;
+            return false;
 
-        _de.Report("LYR-SEM0072", Severity.Warning, span, $"import '{name}' is never used");
+        return true;
     }
 
     /// <summary>Which module each extension METHOD belongs to — the lookup behind the rule that

@@ -74,9 +74,10 @@ internal sealed partial class WarningAnalyzer
 
         void Type(string name, Span at) { if (!Pascal(name)) Say(name, at, "a type", ToPascal(name), "PascalCase"); }
         void Value(string name, Span at, string what) { if (!Camel(name)) Say(name, at, what, ToCamel(name), "camelCase"); }
+        // the name where it is declared; its uses are the editor's rename, so a reader decides
         void Say(string name, Span at, string what, string better, string form) =>
             _de.Report("LYR-SEM0215", Severity.Warning, at, $"'{name}' is {what}, and {what[2..]}s are named in {form}",
-                new DiagnosticNote($"'{better}'"));
+                DiagnosticNote.Suggest($"'{better}'", new Replacement(at, better, Applicability.NeedsReview)));
         void Generics(GenericParam[] generics) { foreach (var g in generics) Type(g.Name, g.NameSpan); }
         void Function(FunctionDecl f)
         {
@@ -171,7 +172,7 @@ internal sealed partial class WarningAnalyzer
     {
         if (body.Statements is [.., ReturnStmt { Value: null } last])
             _de.Report("LYR-SEM0218", Severity.Warning, last.Span, "this 'return' ends a body that ends here anyway",
-                new DiagnosticNote("take it out"));
+                DiagnosticNote.Suggest("take it out", SourceEdits.DeleteStatement(_comp.Sources, last.Span)));
     }
 
     /// <summary>The walk for the lints that read loops and calls: loop-instead-of-while-true,
