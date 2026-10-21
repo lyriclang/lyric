@@ -7240,8 +7240,13 @@ public sealed class TypeChecker
                 CheckNeverArguments(fsym.Generics, explicitArgs, written);
 
                 // Constraints apply to written arguments too, or the explicit form would be a way
-                // around them.
-                if (!placeholders) CheckConstraints(fsym.Generics, explicitArgs, call.Span);
+                // around them — with the parameters of the block the method stands in bound by its
+                // receiver: 'xs.iter().collect<List<int>>()' asks 'FromIterator<I.Item>' with 'I'
+                // the receiver's iterator.
+                var receiverBound = owningBlock is not null && call.Callee is MemberExpr { Target: var receiverExpr }
+                    ? BlockSubstitution(owningBlock, _result.TypeOf(receiverExpr), open: true)
+                    : null;
+                if (!placeholders) CheckConstraints(fsym.Generics, explicitArgs, call.Span, receiverBound);
             }
 
             var variadicAt = decl is { Parameters: { Length: > 0 } declared } && declared[^1].IsParams ? declared.Length - 1 : -1;
@@ -8906,14 +8911,18 @@ public sealed class TypeChecker
         _ => false,
     };
 
-    private void CheckConstraints(GenericParamSymbol[] generics, LyrType[] args, Span span)
+    private void CheckConstraints(GenericParamSymbol[] generics, LyrType[] args, Span span,
+        Dictionary<GenericParamSymbol, LyrType>? around = null)
     {
         var n = Math.Min(generics.Length, args.Length);
 
         // The FULL mapping rather than one parameter at a time: a constraint may name the other type
         // parameters (`<K, V :: [Map<K, V>]>`), and without the other bindings `Map<K, V>` could not
-        // resolve to `Map<string, int>`.
-        var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        // resolve to `Map<string, int>` — and those of the block around the member, which its
+        // receiver bound.
+        var map = around is null
+            ? new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance)
+            : new Dictionary<GenericParamSymbol, LyrType>(around, ReferenceEqualityComparer.Instance);
         for (var i = 0; i < n; i++) map[generics[i]] = args[i];
 
         for (var i = 0; i < n; i++) CheckSatisfies(generics[i], args[i], map, span);
