@@ -92,6 +92,7 @@ public class ExpandCommandTests
         var dir = Build("fn main(): void { }\n");
         var (exit, _, error) = Run("expand", "-C", dir, "--emit", "ir");
         Assert.Equal(2, exit);
-        Assert.Contains("'--emit' prints instead of building", error);
+        // expand has no '--emit' in its table: the option is not one of its own
+        Assert.Contains("unknown option '--emit' for 'expand'", error);
     }
 }

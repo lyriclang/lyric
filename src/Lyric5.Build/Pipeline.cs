@@ -176,7 +176,16 @@ public static class Pipeline
         // program through the front end again — into a unit named by what it read.
         var embeds = manifest + ".embeds";
         if (File.Exists(manifest) && !EmbedsHold(embeds)) File.Delete(manifest);
-        if (!File.Exists(manifest))
+        // What the front end said is kept beside the units and said again by a build that finds
+        // them: an up-to-date build says the warnings the one that made it said.
+        var said = manifest + ".said";
+        List<string> sources;
+        if (File.Exists(manifest))
+        {
+            DiagnosticStore.Replay(said, error);
+            sources = File.ReadAllLines(manifest).Where(line => line.Length > 0).ToList();
+        }
+        else
         {
             var result = Compile(project, error, request.Profile, request.Target);
             if (result is null) return (1, null);
@@ -193,9 +202,12 @@ public static class Pipeline
             }
             if (read.Count > 0) File.WriteAllLines(embeds, read);
             else File.Delete(embeds);
-            WriteOnce(manifest, string.Join("\n", paths) + "\n");
+            // findings that cannot be read back — in a synthesized file — leave the units unlisted:
+            // the next build runs the front end again and says them itself
+            if (DiagnosticStore.Save(said, result.Sources, result.Diagnostics.Diagnostics))
+                WriteOnce(manifest, string.Join("\n", paths) + "\n");
+            sources = paths;
         }
-        var sources = File.ReadAllLines(manifest).Where(line => line.Length > 0).ToList();
 
         try
         {
@@ -375,6 +387,23 @@ public static class Pipeline
         };
         var result = SourceCompiler.CheckProject(roots, options);
         return result.Render(error) ? 0 : 1;
+    }
+
+    /// <summary>
+    /// <c>lyric check</c> (spec 14 §1.1): a program through everything its build does before the C —
+    /// the build scripts, for what they write into <c>gen/</c>, the front end and its lints,
+    /// <c>comptime</c>, the lowering and its gate —, its findings said as <c>build</c> says them; no
+    /// C and no binary. Exit 0, or 1 after reporting.
+    /// </summary>
+    public static int CheckProgram(Project project, BuildProfile profile, Target target, string version, TextWriter error)
+    {
+        using var held = OutLock.Take(project.OutDir, error);
+        if (CCompiler.Locate() is { } compiler)
+        {
+            var (ran, directives) = BuildScripts.Run(project, target, profile, compiler, version, error);
+            if (directives is null) return ran;
+        }
+        return Compile(project, error, profile, target) is null ? 1 : 0;
     }
 
     /// <summary>The front end on a program's source, nothing rendered: what <c>lyric fix</c> reads.</summary>

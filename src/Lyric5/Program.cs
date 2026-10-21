@@ -5,14 +5,12 @@ using Lyric5.Toolchain;
 namespace Lyric5;
 
 /// <summary>
-/// The Lyric 5 driver: one binary with verbs (design/v5/spec/11 C1–C3), strict about what it
-/// does not know (exit 2), reporting what the program did wrong with exit 1, passing a program's
-/// own exit through (C5). The verbs grow milestone by milestone; today: <c>build</c> (a binary,
-/// or <c>--emit ir|c</c>), <c>run</c>, <c>version</c>, <c>help</c> (M2), <c>update</c>,
-/// <c>clean</c>, <c>metadata</c>, <c>add</c>, <c>remove</c> (M7), <c>test</c> (M8a),
-/// <c>expand</c> (M9b).
+/// The Lyric 5 driver: one binary with verbs, strict about what it does not know (exit 2),
+/// reporting what the program did wrong with exit 1, passing a program's own exit through. The
+/// verbs and their options are the table in <see cref="Verbs"/>; each verb is read against it in a
+/// file of its own.
 /// </summary>
-public static class Program
+public static partial class Program
 {
     public static int Main(string[] args)
     {
@@ -31,25 +29,57 @@ public static class Program
         }
     }
 
-    private static int Dispatch(string[] args, LintArgs lints) =>
-            args[0] switch
-            {
-                "--version" or "-V" or "version" => Version(),
-                "--help" or "-h" or "help" => Usage(Console.Out, 0),
-                "build" => Build(args[1..], lints, run: false),
-                "run" => Build(args[1..], lints, run: true),
-                "expand" => Build(args[1..], lints, run: false, expand: true),
-                "test" => Test(args[1..], lints),
-                "bench" => Bench(args[1..], lints),
-                "update" => Update(args[1..]),
-                "clean" => Clean(args[1..]),
-                "metadata" => Metadata(args[1..]),
-                "add" => Add(args[1..]),
-                "remove" => Remove(args[1..]),
-                "explain" => Explain(args[1..]),
-                "fix" => Fix(args[1..], lints),
-                _ => Unknown($"unknown verb '{args[0]}'"),
-            };
+    private static int Dispatch(string[] args, LintArgs lints)
+    {
+        if (args[0] is "--version" or "-V") return Version();
+        if (args[0] is "--help" or "-h") return Usage(Console.Out, 0);
+        if (Verbs.Find(args[0]) is not { } verb) return Unknown($"unknown verb '{args[0]}'");
+        var rest = args[1..];
+        // '--help' among the verb's own options, before a '--', asks for them
+        var dash = Array.IndexOf(rest, "--");
+        if (verb.Name != "help" && (dash < 0 ? rest : rest[..dash]).Any(a => a is "--help" or "-h"))
+        {
+            Verbs.Help(Console.Out, verb);
+            return 0;
+        }
+        return verb.Name switch
+        {
+            "build" => Build(rest, lints, BuildVerb.Build),
+            "run" => Build(rest, lints, BuildVerb.Run),
+            "check" => Build(rest, lints, BuildVerb.Check),
+            "expand" => Build(rest, lints, BuildVerb.Expand),
+            "test" => Test(rest, lints),
+            "bench" => Bench(rest, lints),
+            "fix" => Fix(rest, lints),
+            "env" => Env(rest),
+            "update" => Update(rest),
+            "add" => Add(rest),
+            "remove" => Remove(rest),
+            "clean" => Clean(rest),
+            "metadata" => Metadata(rest),
+            "explain" => Explain(rest),
+            "version" => Verbs.Read(verb, rest, Unknown, out var unread) is { Words.Count: 0, Rest: null } ? Version()
+                : unread != 0 ? unread : Unknown("'version' takes no words"),
+            _ => Help(rest),
+        };
+    }
+
+    /// <summary><c>help [&lt;verb&gt;]</c>: the verbs, or the verb's options; <c>--markdown</c>, the
+    /// table of spec 14 §5.</summary>
+    private static int Help(string[] args)
+    {
+        if (Verbs.Read(Verbs.Find("help")!, args, Unknown, out var exit) is not { } parsed) return exit;
+        if (parsed.Flags.Contains("--markdown"))
+        {
+            Verbs.Markdown(Console.Out);
+            return 0;
+        }
+        if (parsed.Words.Count == 0) return Usage(Console.Out, 0);
+        if (parsed.Words.Count > 1 || Verbs.Find(parsed.Words[0]) is not { } verb)
+            return Unknown($"no verb '{string.Join(' ', parsed.Words)}'");
+        Verbs.Help(Console.Out, verb);
+        return 0;
+    }
 
     /// <summary>The toolchain's own failure (11 G4): not the program's fault, and worth a report.</summary>
     private static int Crashed(Exception crash)
@@ -98,9 +128,9 @@ public static class Program
             if (arg == "--") { kept.AddRange(args[i..]); break; }
             if (arg == "--absolute-paths") { absolute = true; continue; }
             // the JSON form (16 §4) for the verbs that report findings; metadata's --json is its own
-            if (arg == "--json" && kept.Count > 0 && kept[0] is "build" or "run" or "test" or "fix") { json = true; continue; }
+            if (arg == "--json" && kept.Count > 0 && Verbs.Find(kept[0]) is { Json: true }) { json = true; continue; }
             // the lints' levels (16 §5) for the verbs that compile: in their order, the later deciding among equals
-            var compiles = kept.Count > 0 && kept[0] is "build" or "run" or "expand" or "test" or "bench" or "fix";
+            var compiles = kept.Count > 0 && Verbs.Find(kept[0]) is { Lints: true };
             if (compiles && arg == "--warn-deps") { warnDeps = true; continue; }
             if (compiles && arg is "-A" or "-W" or "-D")
             {
@@ -159,61 +189,7 @@ public static class Program
 
     private static int Usage(TextWriter output, int exit)
     {
-        output.WriteLine("usage: lyric5 <verb> [options]");
-        output.WriteLine();
-        output.WriteLine("  build [<file.lyr>] [options]   compile the package here — its src/main.lyr and its [[bin]]");
-        output.WriteLine("                                 programs —, or the file, to binaries under out/");
-        output.WriteLine("  run [<file.lyr>] [options] [-- args]");
-        output.WriteLine("                                 build, then run the binary with the arguments");
-        output.WriteLine("  expand [<file.lyr>] [options]  print the program's entry module with its macros expanded");
-        output.WriteLine("  update [<package>…] [options]  read the packages from git anew — all, or those named —,");
-        output.WriteLine("                                 raise a tag to the newest of its line in lyric.toml, and write");
-        output.WriteLine("                                 lyric.lock (options: -C <dir>, --offline)");
-        output.WriteLine("  add <name> --path <dir> | --git <url> [--tag|--branch|--rev <r>]");
-        output.WriteLine("                                 write the dependency into lyric.toml (-C <dir>, --offline)");
-        output.WriteLine("  remove <name>                  take the dependency out of lyric.toml (-C <dir>, --offline)");
-        output.WriteLine("  test [options] [-f <text>]     build the package's tests and run them, each in a task of");
-        output.WriteLine("                                 its own — those whose name holds <text>, with -f");
-        output.WriteLine("  bench [options] [-f <text>] [--save <file>] [--compare <file>]");
-        output.WriteLine("                                 build the package's benchmarks in the release profile and");
-        output.WriteLine("                                 run them; --save writes the times, --compare reads them back");
-        output.WriteLine("  clean [-C <dir>]               remove the package's out/");
-        output.WriteLine("  metadata [options]             the package as JSON: its graph, programs, profiles, targets");
-        output.WriteLine("                                 (options: -C <dir>, --offline, --json)");
-        output.WriteLine("  fix [<file.lyr>] [--dry-run]   make the safe changes the findings suggest in the package's");
-        output.WriteLine("                                 own files, then say what is left (-C <dir>, --offline, --json,");
-        output.WriteLine("                                 and the lint options); --dry-run prints them as a diff instead");
-        output.WriteLine("  explain <code>                 what a diagnostic code means, with a wrong and a right program");
-        output.WriteLine("  version                        the toolchain and the C compiler it found");
-        output.WriteLine("  help                           this");
-        output.WriteLine();
-        output.WriteLine("options of build and run:");
-        output.WriteLine("  --profile <name>               the build profile: debug, release, asan, tsan, or one of the");
-        output.WriteLine("                                 manifest's (default: LYRIC_PROFILE, else debug)");
-        output.WriteLine("  --opt <0-3>, --gc <immix|boehm>, --[no-]lto, --[no-]debug-info, --[no-]deny-warnings,");
-        output.WriteLine("  --[no-]overflow-checks, --[no-]fast-math");
-        output.WriteLine("                                 a field of the profile, for this build");
-        output.WriteLine("  --target <triple>              a Tier 1 target (default: this machine)");
-        output.WriteLine("  --emit ir|c                    print the IR or the C instead of building");
-        output.WriteLine("  -C <dir>                       look for the package from <dir> instead of here");
-        output.WriteLine("  --bin <name>                   the package's program to build, run or print");
-        output.WriteLine("  --offline                      fetch nothing: packages from git come from the cache");
-        output.WriteLine("  --locked                       take lyric.lock as it is: build, run and test fail where");
-        output.WriteLine("                                 the manifests read otherwise, and write no lock");
-        output.WriteLine();
-        output.WriteLine("options of every verb:");
-        output.WriteLine("  --color auto|always|never      colour the diagnostics (default auto: a terminal, unless");
-        output.WriteLine("                                 NO_COLOR is set or TERM is dumb)");
-        output.WriteLine("  --absolute-paths               paths as they are, not relative to the package");
-        output.WriteLine("  -A, -W, -D <lint>              build, run, expand, test, bench: allow, warn of or deny a lint — a name,");
-        output.WriteLine("                                 a group, a code, or warnings for all; the later decides among equals");
-        output.WriteLine("  --warn-deps                    say the warnings of the dependencies too");
-        output.WriteLine("  --json                         build, run, test: the findings, artifacts, tests and the count as");
-        output.WriteLine("                                 a line of JSON each on the standard output");
-        output.WriteLine("  --max-errors <n>               draw the first n errors and count the rest (default 50,");
-        output.WriteLine("                                 0 for all)");
-        output.WriteLine();
-        output.WriteLine("The Lyric 5 command line, in development (design/v5/spec/13).");
+        Verbs.Usage(output);
         return exit;
     }
 
@@ -221,772 +197,6 @@ public static class Program
     {
         Say.Error(Console.Error, "LYR-CLI0003", $"{what}", "lyric5 help lists what exists");
         return 2;
-    }
-
-    // --- build and run -------------------------------------------------------------------------
-
-    private static readonly string[] ValueOptions = ["--emit", "--profile", "--target", "-C", "--opt", "--gc", "--bin"];
-
-    /// <summary>The profile's fields a flag sets for one build, <c>--x</c> on and <c>--no-x</c> off:
-    /// the field flag over the profile (11 C4, W2 P3).</summary>
-    private static readonly (string Flag, Func<BuildProfile, bool, BuildProfile> Set)[] FieldFlags =
-    [
-        ("lto", (p, on) => p with { Lto = on }),
-        ("debug-info", (p, on) => p with { DebugInfo = on }),
-        ("deny-warnings", (p, on) => p with { DenyWarnings = on }),
-        ("overflow-checks", (p, on) => p with { OverflowChecks = on }),
-        ("fast-math", (p, on) => p with { FastMath = on }),
-    ];
-
-    /// <summary>The options without a value.</summary>
-    private static readonly string[] Flags =
-        ["--offline", "--locked", .. FieldFlags.SelectMany(f => new[] { "--" + f.Flag, "--no-" + f.Flag })];
-
-    /// <summary><c>build</c>, <c>run</c>, and <c>expand</c> (13 M9b P8), which chooses a program
-    /// as <c>run</c> does and prints its entry module after the macros' expansion instead of
-    /// building it.</summary>
-    private static int Build(string[] args, LintArgs lints, bool run, bool expand = false)
-    {
-        var verb = expand ? "expand" : run ? "run" : "build";
-        string? file = null;
-        var values = new Dictionary<string, string>();
-        var flags = new HashSet<string>(StringComparer.Ordinal);
-        var programArgs = new List<string>();
-        for (var i = 0; i < args.Length; i++)
-        {
-            var arg = args[i];
-            if (arg == "--")
-            {
-                if (!run) return Unknown("'--' separates the program's arguments, which only 'run' passes on");
-                programArgs.AddRange(args[(i + 1)..]);
-                break;
-            }
-            if (Flags.Contains(arg))
-            {
-                flags.Add(arg);
-                continue;
-            }
-            var option = ValueOptions.FirstOrDefault(o => arg == o || arg.StartsWith(o + "=", StringComparison.Ordinal));
-            if (option is not null)
-            {
-                string? value = arg == option ? (i + 1 < args.Length ? args[++i] : null) : arg[(option.Length + 1)..];
-                if (value is null) return Unknown($"'{option}' needs a value");
-                values[option] = value;
-            }
-            else if (arg.StartsWith('-')) return Unknown($"unknown option '{arg}' for '{verb}'");
-            else if (file is null) file = arg;
-            else return Unknown($"'{verb}' takes one file, got '{file}' and '{arg}'");
-        }
-        // The package here or above, or the file named — a module of its package, or a package of
-        // its own (07 M7a; 11 C8).
-        // '-C <dir>' (11 C3): where the search for the package starts, and what a relative file is
-        // relative to — the process's own directory stays as it is.
-        var baseDirectory = Path.GetFullPath(values.GetValueOrDefault("-C", Directory.GetCurrentDirectory()));
-        if (!Directory.Exists(baseDirectory))
-        {
-            Say.Error(Console.Error, "LYR-CLI0001", $"no such directory '{baseDirectory}'");
-            return 2;
-        }
-        if (file is not null) file = Path.GetFullPath(file, baseDirectory);
-        // '--offline' (11 W2 P9): what is read from git comes from the user's cache, nothing is fetched.
-        var offline = flags.Contains("--offline");
-        // '--locked' (07 M7-9): the lock as it is — what it does not hold, or holds besides, refused.
-        var locked = flags.Contains("--locked");
-
-        // The programs this command is about: a package's every one (P2), or the file's.
-        List<Project> programs;
-        LibraryException? library = null;
-        try
-        {
-            if (file is null)
-            {
-                if (Project.ProgramsOf(baseDirectory, offline, locked) is not { } package)
-                {
-                    Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above", $"lyric5 {verb} <file.lyr> builds one file alone");
-                    return 2;
-                }
-                programs = [.. package];
-            }
-            else
-            {
-                if (values.ContainsKey("--bin")) return Unknown("'--bin' names a program of the package; a file is a program by itself");
-                if (!File.Exists(file))
-                {
-                    Say.Error(Console.Error, "LYR-CLI0001", $"no such file '{file}'");
-                    return 2;
-                }
-                programs = [Project.ForFile(file, offline, locked)];
-            }
-        }
-        catch (ManifestException refused)
-        {
-            Say.Manifest(Console.Error, refused);
-            return refused.Exit;
-        }
-        catch (LibraryException refused)
-        {
-            // 'build' checks a library (07 B6) — under its profile, below —; there is nothing to
-            // run, and nothing to print.
-            if (run || expand || values.ContainsKey("--emit"))
-            {
-                Say.Error(Console.Error, "LYR-CLI0005", $"{refused.Message}");
-                return 2;
-            }
-            library = refused;
-            programs = [];
-        }
-
-        // The toolchain the packages ask for (11 W2 P12): one below it refuses them.
-        try { ToolchainCheck.Check(library?.Graph ?? programs[0].Graph, DisplayVersion()); }
-        catch (ManifestException refused)
-        {
-            Say.Manifest(Console.Error, refused);
-            return refused.Exit;
-        }
-
-        // Which program (P2; 11 C8): '--bin' names one; 'run' and '--emit' take the package's
-        // src/main.lyr — or its only program —; 'build' builds every one.
-        if (library is null && file is null)
-        {
-            if (values.TryGetValue("--bin", out var bin))
-            {
-                var named = programs.FirstOrDefault(p => p.BinaryName == bin);
-                if (named is null)
-                    return Unknown($"no program '{bin}' in package '{programs[0].Name}': {string.Join(", ", programs.Select(p => p.BinaryName))}");
-                programs = [named];
-            }
-            else if (run || expand || values.ContainsKey("--emit"))
-            {
-                var main = programs.FirstOrDefault(p => p.Binary is null) ?? (programs.Count == 1 ? programs[0] : null);
-                if (main is null)
-                {
-                    Say.Error(Console.Error, "LYR-CLI0007",
-                        $"package '{programs[0].Name}' has several programs and no src/main.lyr: "
-                        + string.Join(", ", programs.Select(p => p.BinaryName)),
-                        $"--bin <name> names the one to {(run ? "run" : expand ? "expand" : "print")}");
-                    return 2;
-                }
-                programs = [main];
-            }
-        }
-
-        if (ProfileOf(values, flags, library?.Manifest ?? programs[0].Manifest) is not { } profile) return 2;
-
-        if (library is not null) return Pipeline.CheckLibrary(library, Console.Error, profile, lints);
-        programs = [.. programs.Select(p => p with { LintArgs = lints })];
-
-        Target target;
-        try { target = values.TryGetValue("--target", out var triple) ? Target.Parse(triple) : Target.Host; }
-        catch (ArgumentException)
-        {
-            return Unknown($"unknown target '{values["--target"]}': {string.Join(", ", Target.Tier1.Select(t => t.Triple))}");
-        }
-
-        // the emission is the target's too: 'comptime if (target.os == …)' chose for it (09 A6)
-        if (values.TryGetValue("--emit", out var emit))
-        {
-            if (emit is not ("ir" or "c")) return Unknown($"unknown emission '{emit}': ir, c");
-            if (run || expand) return Unknown("'--emit' prints instead of building; use 'build'");
-            return Pipeline.Emit(programs[0], emit, Console.Out, Console.Error, profile, target);
-        }
-        if (expand) return Pipeline.Expand(programs[0], Console.Out, Console.Error, profile, target);
-
-        if (CompilerFor(profile) is not { } compiler) return 2;
-
-        string? executable = null;
-        foreach (var program in programs)
-        {
-            var (exit, built) = Pipeline.Build(new BuildRequest(program, profile, target, compiler, DisplayVersion()), Console.Error);
-            if (exit != 0 || built is null) return exit;
-            executable = built;
-            Lyric.Core.Rendering.RenderStyle.Current.Events?.Artifact("binary", program.BinaryName, built);
-        }
-        if (!run) return 0;
-        if (!target.IsHost)
-        {
-            Say.Error(Console.Error, "LYR-CLI0003", $"'{target.Triple}' is not this machine; the binary is at {executable}");
-            return 2;
-        }
-        // the build's count before the program, whose output follows on the same stream (16 §4)
-        Lyric.Core.Rendering.RenderStyle.Current.Events?.Summary();
-        return ProcessRunner.RunInherited(executable!, programArgs);
-    }
-
-    /// <summary><c>fix</c> (spec 16 §6): the safe changes the findings suggest, made in the package's
-    /// own files — the file's, for a file alone —; <c>--dry-run</c> prints them as a diff and writes
-    /// nothing.</summary>
-    private static int Fix(string[] args, LintArgs lints)
-    {
-        string? file = null;
-        string? from = null;
-        var dryRun = false;
-        var offline = false;
-        for (var i = 0; i < args.Length; i++)
-        {
-            var arg = args[i];
-            if (arg == "--dry-run") dryRun = true;
-            else if (arg == "--offline") offline = true;
-            else if (arg == "-C")
-            {
-                if (i + 1 >= args.Length) return Unknown("'-C' needs a value");
-                from = args[++i];
-            }
-            else if (arg.StartsWith('-')) return Unknown($"unknown option '{arg}' for 'fix'");
-            else if (file is null) file = arg;
-            else return Unknown($"'fix' takes one file, got '{file}' and '{arg}'");
-        }
-        var baseDirectory = Path.GetFullPath(from ?? Directory.GetCurrentDirectory());
-        if (!Directory.Exists(baseDirectory))
-        {
-            Say.Error(Console.Error, "LYR-CLI0001", $"no such directory '{baseDirectory}'");
-            return 2;
-        }
-        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        static bool Under(string dir, string path, StringComparison comparison) =>
-            path.StartsWith(Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, comparison);
-        List<Func<Lyric.Compiler.CompileResult>> checks;
-        Func<string, bool> ours;
-        string root;
-        try
-        {
-            if (file is not null)
-            {
-                file = Path.GetFullPath(file, baseDirectory);
-                if (!File.Exists(file))
-                {
-                    Say.Error(Console.Error, "LYR-CLI0001", $"no such file '{file}'");
-                    return 2;
-                }
-                var project = Project.ForFile(file, offline, locked: false) with { LintArgs = lints };
-                checks = [() => Pipeline.Check(project)];
-                var manifest = project.Manifest;
-                ours = path => string.Equals(path, file, comparison) || manifest is not null && Under(manifest.SourceRoot, path, comparison);
-                root = manifest?.Root ?? Path.GetDirectoryName(file)!;
-            }
-            else
-            {
-                if (Project.ProgramsOf(baseDirectory, offline, locked: false) is not { } package)
-                {
-                    Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above", "lyric5 fix <file.lyr> fixes one file alone");
-                    return 2;
-                }
-                var programs = package.Select(p => p with { LintArgs = lints }).ToList();
-                checks = [.. programs.Select(p => (Func<Lyric.Compiler.CompileResult>)(() => Pipeline.Check(p)))];
-                var manifest = programs[0].Manifest!;
-                ours = path => Under(manifest.SourceRoot, path, comparison);
-                root = manifest.Root;
-            }
-        }
-        catch (ManifestException refused)
-        {
-            Say.Manifest(Console.Error, refused);
-            return refused.Exit;
-        }
-        catch (LibraryException library)
-        {
-            checks = [() => Pipeline.Check(library, lints)];
-            ours = path => Under(library.Manifest.SourceRoot, path, comparison);
-            root = library.Manifest.Root;
-        }
-        return FixRun.Run(checks, ours, root, dryRun, Console.Out, Console.Error);
-    }
-
-    /// <summary>The profile (11 W2 P3): '--profile', else LYRIC_PROFILE, else debug — built in, or
-    /// the root manifest's; a field flag changes a field for this build alone. <c>null</c> after
-    /// reporting a command line that asks for none.</summary>
-    private static BuildProfile? ProfileOf(Dictionary<string, string> values, HashSet<string> flags, Manifest? manifest)
-    {
-        var profileName = values.GetValueOrDefault("--profile")
-                          ?? (Environment.GetEnvironmentVariable("LYRIC_PROFILE") is { Length: > 0 } fromEnvironment ? fromEnvironment : "debug");
-        BuildProfile profile;
-        try { profile = Profiles.Resolve(manifest, profileName); }
-        catch (ArgumentException unknown)
-        {
-            Unknown(unknown.Message);
-            return null;
-        }
-        if (values.TryGetValue("--opt", out var opt))
-        {
-            if (opt is not ("0" or "1" or "2" or "3"))
-            {
-                Unknown($"'--opt' is a level from 0 to 3, not '{opt}'");
-                return null;
-            }
-            profile = profile with { Opt = opt[0] - '0' };
-        }
-        if (values.TryGetValue("--gc", out var gcName))
-        {
-            if (Collectors.Parse(gcName) is not { } gc)
-            {
-                Unknown($"'--gc' is immix or boehm, not '{gcName}'");
-                return null;
-            }
-            profile = profile with { Gc = gc };
-        }
-        foreach (var (field, set) in FieldFlags)
-        {
-            bool on = flags.Contains("--" + field), off = flags.Contains("--no-" + field);
-            if (on && off)
-            {
-                Unknown($"'--{field}' and '--no-{field}' ask for opposite things");
-                return null;
-            }
-            if (on || off) profile = set(profile, on);
-        }
-        return profile;
-    }
-
-    /// <summary>The C compiler a profile builds with (01 C7, C8); <c>null</c> after reporting that
-    /// there is none.</summary>
-    private static CCompiler? CompilerFor(BuildProfile profile)
-    {
-        var compiler = profile.RequiresClang ? CCompiler.Locate(CCompilerKind.Clang) : CCompiler.Locate();
-        if (compiler is null)
-            Console.Error.WriteLine(profile.RequiresClang
-                ? $"error[LYR-CLI0002]: the {profile.Name} profile needs clang (01 C7), and none was found"
-                : "error[LYR-CLI0002]: no C compiler found — install zig (recommended), clang or gcc, or set LYRIC_CC");
-        return compiler;
-    }
-
-    // --- test ----------------------------------------------------------------------------------
-
-    private static readonly string[] TestValueOptions = ["--profile", "-C", "--opt", "--gc", "-f", "--filter", "--target"];
-
-    /// <summary>
-    /// <c>lyric test</c> (design/v5/spec/10 B12, 11 C2): the package's tests — every function it
-    /// marks <c>@Test</c>, under <c>src/</c> and under <c>tests/</c> — built into one program for
-    /// this machine and run, one after another, each in a task of its own; the program's exit is
-    /// the command's (C5): 0 when every test held, 1 when one failed or the program was refused.
-    /// </summary>
-    private static int Test(string[] args, LintArgs lints) =>
-        Package(args, "test", "tests", TestValueOptions, null, lints, (project, profile, target, compiler, values) =>
-            TestRun.Run(project, profile, target, compiler, DisplayVersion(), values.GetValueOrDefault("-f"), Console.Out, Console.Error));
-
-    private static readonly string[] BenchValueOptions = [.. TestValueOptions, "--save", "--compare"];
-
-    /// <summary>
-    /// <c>lyric bench</c> (design/v5/spec/10 B12 X4, 11 C2): the package's benchmarks — every
-    /// function it marks <c>@Bench</c>, under <c>src/</c> and under <c>tests/</c> — built into one
-    /// program for this machine, in the release profile unless <c>--profile</c> names another, and
-    /// run one after another. <c>--save</c> names a file the run writes its times to,
-    /// <c>--compare</c> one it reads to say how they changed. The program's exit is the command's.
-    /// </summary>
-    private static int Bench(string[] args, LintArgs lints) =>
-        Package(args, "bench", "benchmarks", BenchValueOptions, "release", lints, (project, profile, target, compiler, values) =>
-            BenchRun.Run(project, profile, target, compiler, DisplayVersion(), values.GetValueOrDefault("-f"),
-                values.TryGetValue("--save", out var save) ? Path.GetFullPath(save) : "",
-                values.TryGetValue("--compare", out var compare) ? Path.GetFullPath(compare) : "",
-                Console.Out, Console.Error));
-
-    /// <summary>A verb over the package of the nearest <c>lyric.toml</c> — <c>test</c>, <c>bench</c>:
-    /// its options read, the package and its graph loaded, the profile chosen — <paramref name="profileDefault"/>
-    /// where the command line names none, else as <c>build</c> chooses —, the target — this machine
-    /// unless <c>--target</c> names another, as <c>build</c> and <c>run</c> take it —, and the
-    /// compiler found; then <paramref name="run"/>.</summary>
-    private static int Package(string[] args, string verb, string what, string[] valueOptions, string? profileDefault,
-        LintArgs lints, Func<Project, BuildProfile, Target, CCompiler, Dictionary<string, string>, int> run)
-    {
-        var values = new Dictionary<string, string>();
-        var flags = new HashSet<string>(StringComparer.Ordinal);
-        for (var i = 0; i < args.Length; i++)
-        {
-            var arg = args[i];
-            if (Flags.Contains(arg))
-            {
-                flags.Add(arg);
-                continue;
-            }
-            var option = valueOptions.FirstOrDefault(o => arg == o || arg.StartsWith(o + "=", StringComparison.Ordinal));
-            if (option is null)
-                return Unknown(arg.StartsWith('-') ? $"unknown option '{arg}' for '{verb}'" : $"'{verb}' runs a package's {what} and takes no file, got '{arg}'");
-            string? value = arg == option ? (i + 1 < args.Length ? args[++i] : null) : arg[(option.Length + 1)..];
-            if (value is null) return Unknown($"'{option}' needs a value");
-            values[option == "--filter" ? "-f" : option] = value;
-        }
-        var baseDirectory = Path.GetFullPath(values.GetValueOrDefault("-C", Directory.GetCurrentDirectory()));
-        if (!Directory.Exists(baseDirectory))
-        {
-            Say.Error(Console.Error, "LYR-CLI0001", $"no such directory '{baseDirectory}'");
-            return 2;
-        }
-
-        Project project;
-        try
-        {
-            if (Project.TestsOf(baseDirectory, flags.Contains("--offline"), flags.Contains("--locked")) is not { } found)
-            {
-                Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above", $"lyric5 {verb} runs a package's {what}");
-                return 2;
-            }
-            project = found with { LintArgs = lints };
-            ToolchainCheck.Check(project.Graph, DisplayVersion());
-        }
-        catch (ManifestException refused)
-        {
-            Say.Manifest(Console.Error, refused);
-            return refused.Exit;
-        }
-
-        if (profileDefault is not null) values.TryAdd("--profile", profileDefault);
-        if (ProfileOf(values, flags, project.Manifest) is not { } profile) return 2;
-        Target target;
-        try { target = values.TryGetValue("--target", out var triple) ? Target.Parse(triple) : Target.Host; }
-        catch (ArgumentException)
-        {
-            return Unknown($"unknown target '{values["--target"]}': {string.Join(", ", Target.Tier1.Select(t => t.Triple))}");
-        }
-        if (CompilerFor(profile) is not { } compiler) return 2;
-        return run(project, profile, target, compiler, values);
-    }
-
-    // --- update --------------------------------------------------------------------------------
-
-    /// <summary>
-    /// <c>lyric update [&lt;package&gt;…]</c> (design/v5/spec/07 P4, P5): the packages from git
-    /// read anew — every one, or those named; the others stay at their locked commits — and
-    /// <c>lyric.lock</c> written. A branch moves to its head, a moved tag to its commit; a tag of
-    /// the root manifest that is a version is raised to the newest of its line first, in the
-    /// manifest (the review's M7-8) — a dependency's own manifest is its own.
-    /// </summary>
-    private static int Update(string[] args)
-    {
-        var names = new List<string>();
-        string? directory = null;
-        var offline = false;
-        for (var i = 0; i < args.Length; i++)
-        {
-            var arg = args[i];
-            if (arg == "--offline") offline = true;
-            else if (arg == "-C" || arg.StartsWith("-C=", StringComparison.Ordinal))
-            {
-                directory = arg == "-C" ? (i + 1 < args.Length ? args[++i] : null) : arg[3..];
-                if (directory is null) return Unknown("'-C' needs a value");
-            }
-            else if (arg.StartsWith('-')) return Unknown($"unknown option '{arg}' for 'update'");
-            else names.Add(arg);
-        }
-        var start = Path.GetFullPath(directory ?? Directory.GetCurrentDirectory());
-        if (!Directory.Exists(start))
-        {
-            Say.Error(Console.Error, "LYR-CLI0001", $"no such directory '{start}'");
-            return 2;
-        }
-        if (Project.FindManifest(start) is not { } file)
-        {
-            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above");
-            return 2;
-        }
-        try
-        {
-            var manifest = Manifest.Read(file);
-            var before = LockFile.Read(LockFile.For(manifest));
-            bool Named(string name) => names.Count == 0 || names.Contains(name);
-            // the manifest as it was, written back where the raised one is refused — as 'add' does
-            var original = File.ReadAllText(file);
-            if (Raise(file, manifest, Named, offline) is not { } raised) return 2;
-            manifest = raised;
-            PackageGraph graph;
-            try { graph = Project.Resolve(manifest, offline, refresh: Named, keep: entry => !Named(entry.Name)); }
-            catch (ManifestException)
-            {
-                File.WriteAllText(file, original);
-                throw;
-            }
-            ToolchainCheck.Check(graph, DisplayVersion());
-            var unknown = names.Where(n => graph.Locked.All(entry => entry.Name != n)).ToList();
-            if (unknown.Count > 0)
-                return Unknown($"no package '{unknown[0]}' is read from git here"
-                               + (graph.Locked.Count > 0 ? $": {string.Join(", ", graph.Locked.Select(e => e.Name).Distinct())}" : ""));
-            Report(before, graph.Locked);
-            return 0;
-        }
-        catch (ManifestException refused)
-        {
-            Say.Manifest(Console.Error, refused);
-            return refused.Exit;
-        }
-    }
-
-    /// <summary>The root manifest's tags that are versions, each raised to the newest tag of its
-    /// line the repository has (M7-8), the line rewritten in place; the manifest as read again.
-    /// <c>null</c> after refusing a dependency written as a table, which is the person's to edit.</summary>
-    private static Manifest? Raise(string file, Manifest manifest, Func<string, bool> named, bool offline)
-    {
-        var git = GitCache.ForUser(offline);
-        var text = File.ReadAllText(file);
-        var changed = false;
-        foreach (var dependency in manifest.Dependencies)
-        {
-            if (!named(dependency.Name) || dependency.Git is not { Kind: GitRefKind.Tag, Ref: { } tag }
-                || SemVer.OfTag(tag) is not { } current) continue;
-            if (SemVer.Newest(current, git.Tags(dependency, manifest.File)) is not { } newest) continue;
-            string? edited;
-            try { edited = ManifestEdit.SetTag(text, dependency.Name, newest); }
-            catch (InvalidOperationException other)
-            {
-                Say.Error(Console.Error, "LYR-CLI0008", $"{other.Message}");
-                return null;
-            }
-            if (edited is null) continue;
-            text = edited;
-            changed = true;
-            Console.Out.WriteLine($"  raised   {dependency.Name} {tag} -> {newest} (lyric.toml)");
-        }
-        if (!changed) return manifest;
-        File.WriteAllText(file, text);
-        return Manifest.Read(file);
-    }
-
-    /// <summary>What the update changed in the lock, a line per revision of a repository.</summary>
-    private static void Report(IReadOnlyList<Locked> before, IReadOnlyList<Locked> after)
-    {
-        var old = before.ToDictionary(e => (e.Name, e.Git));
-        var changed = false;
-        foreach (var entry in after)
-        {
-            if (!old.Remove((entry.Name, entry.Git), out var was))
-                Console.Out.WriteLine($"  added    {entry.Name} {entry.Version} ({entry.Git}) {entry.Commit[..12]}");
-            else if (was.Commit != entry.Commit)
-                Console.Out.WriteLine($"  updated  {entry.Name} {entry.Version} ({entry.Git}) {was.Commit[..12]} -> {entry.Commit[..12]}");
-            else continue;
-            changed = true;
-        }
-        foreach (var gone in LockFile.Sorted(old.Values))
-        {
-            Console.Out.WriteLine($"  removed  {gone.Name} {gone.Version} ({gone.Git})");
-            changed = true;
-        }
-        if (!changed) Console.Out.WriteLine(after.Count == 0 ? "no package is read from git" : "lyric.lock is up to date");
-    }
-
-    // --- clean and metadata ------------------------------------------------------------------
-
-    /// <summary>The options of a verb about the package of a directory: <c>-C</c> and the flags it
-    /// takes. <c>null</c> after refusing a word, with the exit code in <paramref name="exit"/>.</summary>
-    private static (string Start, HashSet<string> Flags)? PackageOptions(string verb, string[] args, string[] flags, out int exit)
-    {
-        exit = 0;
-        string? directory = null;
-        var given = new HashSet<string>(StringComparer.Ordinal);
-        for (var i = 0; i < args.Length; i++)
-        {
-            var arg = args[i];
-            if (flags.Contains(arg)) given.Add(arg);
-            else if (arg == "-C" || arg.StartsWith("-C=", StringComparison.Ordinal))
-            {
-                directory = arg == "-C" ? (i + 1 < args.Length ? args[++i] : null) : arg[3..];
-                if (directory is null) { exit = Unknown("'-C' needs a value"); return null; }
-            }
-            else { exit = Unknown($"unknown option '{arg}' for '{verb}'"); return null; }
-        }
-        var start = Path.GetFullPath(directory ?? Directory.GetCurrentDirectory());
-        if (!Directory.Exists(start))
-        {
-            Say.Error(Console.Error, "LYR-CLI0001", $"no such directory '{start}'");
-            exit = 2;
-            return null;
-        }
-        return (start, given);
-    }
-
-    /// <summary><c>lyric clean</c> (11 W2 P5): the package's <c>out/</c> removed — after the build
-    /// that writes into it, if one does, is done.</summary>
-    private static int Clean(string[] args)
-    {
-        if (PackageOptions("clean", args, [], out var refused) is not { } options) return refused;
-        if (Project.FindManifest(options.Start) is not { } file)
-        {
-            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above");
-            return 2;
-        }
-        var outDir = Path.Combine(Path.GetDirectoryName(file)!, "out");
-        if (!Directory.Exists(outDir))
-        {
-            Console.Out.WriteLine("nothing to clean");
-            return 0;
-        }
-        using (OutLock.Take(outDir, Console.Error))
-        {
-            foreach (var entry in Directory.EnumerateFileSystemEntries(outDir))
-            {
-                if (Path.GetFileName(entry) == ".lock") continue;
-                if (Directory.Exists(entry)) DeleteTree(entry);
-                else File.Delete(entry);
-            }
-        }
-        DeleteTree(outDir);
-        Console.Out.WriteLine($"removed {outDir}");
-        return 0;
-    }
-
-    /// <summary>Read-only files too: a cache can hold them.</summary>
-    private static void DeleteTree(string directory)
-    {
-        foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
-            File.SetAttributes(file, FileAttributes.Normal);
-        Directory.Delete(directory, recursive: true);
-    }
-
-    /// <summary><c>lyric metadata</c> (11 W2 P10): the package as one JSON object on standard
-    /// output — <c>--json</c> names the one form there is.</summary>
-    private static int Metadata(string[] args)
-    {
-        if (PackageOptions("metadata", args, ["--offline", "--json"], out var refused) is not { } options) return refused;
-        if (Project.FindManifest(options.Start) is null)
-        {
-            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above");
-            return 2;
-        }
-        try
-        {
-            IReadOnlyList<Project> programs;
-            PackageGraph graph;
-            try
-            {
-                programs = Project.ProgramsOf(options.Start, options.Flags.Contains("--offline"))!;
-                graph = programs[0].Graph!;
-            }
-            catch (LibraryException library)
-            {
-                programs = [];
-                graph = library.Graph;
-            }
-            Console.Out.WriteLine(global::Lyric5.Build.Metadata.Json(graph, programs, DisplayVersion()));
-            return 0;
-        }
-        catch (ManifestException manifest)
-        {
-            Say.Manifest(Console.Error, manifest);
-            return manifest.Exit;
-        }
-    }
-
-    // --- add and remove ------------------------------------------------------------------------
-
-    /// <summary>
-    /// <c>lyric add &lt;name&gt; --path &lt;dir&gt; | --git &lt;url&gt; [--tag|--branch|--rev &lt;r&gt;]</c>
-    /// (11 C2): the dependency written into <c>[dependencies]</c> as one line, every other line as it
-    /// was, and the graph read with it — a graph that refuses the dependency leaves the manifest as
-    /// it was. The path is written relative to the manifest.
-    /// </summary>
-    private static int Add(string[] args)
-    {
-        var values = new Dictionary<string, string>(StringComparer.Ordinal);
-        string? name = null;
-        var offline = false;
-        string[] valued = ["--path", "--git", "--tag", "--branch", "--rev", "-C"];
-        for (var i = 0; i < args.Length; i++)
-        {
-            var arg = args[i];
-            var option = valued.FirstOrDefault(o => arg == o || arg.StartsWith(o + "=", StringComparison.Ordinal));
-            if (arg == "--offline") offline = true;
-            else if (option is not null)
-            {
-                var given = arg == option ? (i + 1 < args.Length ? args[++i] : null) : arg[(option.Length + 1)..];
-                if (given is null) return Unknown($"'{option}' needs a value");
-                values[option] = given;
-            }
-            else if (arg.StartsWith('-')) return Unknown($"unknown option '{arg}' for 'add'");
-            else if (name is null) name = arg;
-            else return Unknown($"'add' takes one name, got '{name}' and '{arg}'");
-        }
-        if (name is null) return Unknown("'add' needs the dependency's name: lyric5 add geo --path ../geo");
-        var revisions = new[] { "--tag", "--branch", "--rev" }.Where(values.ContainsKey).ToList();
-        if (values.ContainsKey("--path") == values.ContainsKey("--git"))
-            return Unknown("'add' reads a dependency from a directory or from a repository: --path or --git, one of them");
-        if (revisions.Count > 0 && !values.ContainsKey("--git")) return Unknown($"'{revisions[0]}' names a revision of a repository: it goes with --git");
-        if (revisions.Count > 1) return Unknown($"'{revisions[0]}' and '{revisions[1]}': a dependency reads one revision");
-
-        var start = Path.GetFullPath(values.GetValueOrDefault("-C") ?? Directory.GetCurrentDirectory());
-        if (Project.FindManifest(start) is not { } file)
-        {
-            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above");
-            return 2;
-        }
-        var root = Path.GetDirectoryName(file)!;
-        string value;
-        if (values.TryGetValue("--path", out var path))
-        {
-            // Relative to where the command looks from (-C), as a file 'build' is given is.
-            var relative = Path.GetRelativePath(root, Path.GetFullPath(path, start)).Replace('\\', '/');
-            value = $"{{ path = {ManifestEdit.Quote(relative)} }}";
-        }
-        else
-        {
-            var revision = revisions.Count == 0 ? "" : $", {revisions[0][2..]} = {ManifestEdit.Quote(values[revisions[0]])}";
-            value = $"{{ git = {ManifestEdit.Quote(values["--git"])}{revision} }}";
-        }
-        return EditDependencies(file, offline, text => ManifestEdit.Add(text, name, value), $"added {name} = {value}");
-    }
-
-    /// <summary><c>lyric explain &lt;code&gt;</c> (11 G9; 13 M12a P4): the catalog's entry — what the
-    /// code means, why, what to do, a wrong and a right program. A code is read as a reader may write
-    /// it (<c>sem0001</c>, <c>LYR-SEM0001</c>), a lint by its name (<c>unused-import</c>); one the
-    /// catalog does not hold is exit 2.</summary>
-    private static int Explain(string[] args)
-    {
-        if (args.Length != 1 || args[0].StartsWith('-')) return Unknown("explain takes one code or lint: lyric5 explain LYR-SEM0001");
-        if (!Lyric.Core.DiagnosticCatalog.Lints.TryGetValue(args[0], out var entry)
-            && !Lyric.Core.DiagnosticCatalog.Entries.TryGetValue(Lyric.Core.DiagnosticCatalog.Normalize(args[0]), out entry))
-            return Unknown($"no code or lint '{args[0]}' in the catalog");
-        Console.Out.Write(Lyric.Core.DiagnosticCatalog.Explain(entry));
-        return 0;
-    }
-
-    /// <summary><c>lyric remove &lt;name&gt;</c> (11 C2): the dependency's line taken out of
-    /// <c>[dependencies]</c>, and the graph — the lock with it — read again.</summary>
-    private static int Remove(string[] args)
-    {
-        // The name, wherever it stands among the options.
-        var names = new List<string>();
-        var rest = new List<string>();
-        for (var i = 0; i < args.Length; i++)
-        {
-            if (args[i] == "-C" && i + 1 < args.Length) { rest.Add(args[i]); rest.Add(args[++i]); }
-            else if (args[i].StartsWith('-')) rest.Add(args[i]);
-            else names.Add(args[i]);
-        }
-        if (names.Count != 1) return Unknown("'remove' takes the dependency's name, one: lyric5 remove geo");
-        var name = names[0];
-        if (PackageOptions("remove", [.. rest], ["--offline"], out var refused) is not { } options) return refused;
-        if (Project.FindManifest(options.Start) is not { } file)
-        {
-            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above");
-            return 2;
-        }
-        return EditDependencies(file, options.Flags.Contains("--offline"),
-            text => ManifestEdit.Remove(text, name)
-                    ?? throw new ArgumentException($"no dependency '{name}' in {file}"),
-            $"removed {name}");
-    }
-
-    /// <summary>The manifest edited, then read with its graph; what refuses the edit puts the
-    /// manifest back as it was.</summary>
-    private static int EditDependencies(string file, bool offline, Func<string, string> edit, string done)
-    {
-        var before = File.ReadAllText(file);
-        string after;
-        try { after = edit(before); }
-        catch (ArgumentException unknown) { return Unknown(unknown.Message); }
-        catch (InvalidOperationException other)
-        {
-            Say.Error(Console.Error, "LYR-CLI0008", $"{other.Message}");
-            return 2;
-        }
-        File.WriteAllText(file, after);
-        try
-        {
-            var graph = Project.Resolve(Manifest.Read(file), offline);
-            ToolchainCheck.Check(graph, DisplayVersion());
-        }
-        catch (ManifestException refused)
-        {
-            File.WriteAllText(file, before);
-            Say.Manifest(Console.Error, refused);
-            return refused.Exit;
-        }
-        Console.Out.WriteLine(done);
-        return 0;
     }
 
     // --- version -------------------------------------------------------------------------------

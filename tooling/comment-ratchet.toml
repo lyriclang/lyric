@@ -103,7 +103,7 @@
 "runtime/src/task.c" = 2
 "runtime/src/trace.c" = 6
 
-# compiler: 386
+# compiler: 357
 ["compiler"]
 "src/Lyric5.Build/BenchRun.cs" = 2
 "src/Lyric5.Build/BuildScripts.cs" = 9
@@ -135,7 +135,7 @@
 "src/Lyric5.Toolchain/RuntimeLayout.cs" = 7
 "src/Lyric5.Toolchain/Target.cs" = 3
 "src/Lyric5.Toolchain/UserCache.cs" = 1
-"src/Lyric5/Program.cs" = 32
+"src/Lyric5/Program.cs" = 3
 
 # frontend: 1626
 ["frontend"]
