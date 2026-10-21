@@ -28,7 +28,7 @@ public static class SourceCompiler
     /// Everything a build does except writing the bytes. The basis of <c>lyrc check</c>.
     ///
     /// <para>Lowering is part of it: a limit the backend cannot express is reported as
-    /// <c>LYR-IR0001</c>, and stopping after the sema would let <c>check</c> answer 'ok' for a
+    /// <c>LYR-ICE0002</c>, and stopping after the sema would let <c>check</c> answer 'ok' for a
     /// program that <c>build</c> rejects.</para>
     /// </summary>
     public static CompileResult Check(string path, CompilerOptions? options = null) =>
@@ -175,7 +175,7 @@ public static class SourceCompiler
         WarnDeprecated(compilation, binding, types, diagnostics, options, comptime);
         if (diagnostics.HasErrors) return new CompileResult(sources, diagnostics, null, model); // an 'until' come due
 
-        // Lowering limits arrive as LYR-IR0001 in the same engine and are rendered with file, line and
+        // Lowering limits arrive as LYR-ICE0002 in the same engine and are rendered with file, line and
         // column like any other error.
         //
         // The verifier runs INSIDE the lowering now, and twice — once on what the lowering produced,

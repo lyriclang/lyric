@@ -125,6 +125,27 @@ For C# code, follow these rules manually. For Lyric code (`.lyr`) the formatter 
 templates) is kept formatted, and a test in `Lyric.Tests.Formatting` fails when it stops
 being it.
 
+### Diagnostics
+
+A diagnostic is read by someone who wrote the program, not the compiler. Its message:
+
+- says what is wrong in one sentence, lowercase at its start and without a closing period, the
+  names in single quotes (`'count'`, `'Option<int>'`), a dash written `—`;
+- names the program's own words — the token as written (`got ';'`), the type as the program
+  writes it —, never the compiler's (`got Semicolon`, a node's class);
+- cites no design document, decision, milestone or plan, and no chapter of the specification:
+  what a rule is, `lyric explain` says;
+- is said once: what follows from it — a second report of the same mistake, the recovery's
+  wreckage — is not reported (spec 16 §2).
+
+Advice goes into a note (`help:`), a change the compiler can make into a suggestion with its
+applicability — `safe` only where the change is the whole remedy and keeps the meaning. A code
+holds one rule; a new rule gets a new code and a catalogue entry in `src/Lyric.Core/diagnostics.toml`
+with its explanation and a wrong and a right program, and a lint its red and green case in the
+suite. The house style the tests hold: `CatalogTests` (an entry for every code, its programs), the
+core tests' `DiagnosticTextTests` (no citation in a string), the CI's catalogue guard (Appendix A and
+the lint cases of the pinned specification).
+
 ---
 
 ## Testing

@@ -23,7 +23,7 @@ namespace Lyric.Ir.Lowering;
 /// local slots, and a phi would have to become store/load again at emission.</para>
 ///
 /// <para>A construct the IR cannot express is valid Lyric and therefore a DIAGNOSTIC
-/// (<c>LYR-IR0001</c>) with file, line and column rather than a crash — see
+/// (<c>LYR-ICE0002</c>) with file, line and column rather than a crash — see
 /// <see cref="UnsupportedConstructException"/>. Internal inconsistencies stay separate and keep
 /// throwing <see cref="InternalCompilationException"/>.</para>
 /// </summary>
