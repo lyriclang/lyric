@@ -380,15 +380,18 @@ pub fn blackBox<T>(x: T): T {
 /// `@callerExpr(p)` on a `string` parameter with a default (09 A11): where a call leaves the
 /// parameter out, it gets the text the call wrote for `p` — `assertEq(xs.length(), 3)` hands
 /// `std.test` the words `xs.length()`. Named like the compiler instruction it is, not like a type.
+@Allow("naming")
 pub struct callerExpr :: [OnParameter] { }
 
 /// `@callerLine` on an `int` parameter with a default (09 A11): where a call leaves the parameter
 /// out, it gets the line the call begins on.
+@Allow("naming")
 pub struct callerLine :: [OnParameter] { }
 
 /// `@callerFile` on a `string` parameter with a default (09 A11): where a call leaves the
 /// parameter out, it gets the file the call stands in, as the binary's backtrace names it — the
 /// package's name, then the path within the package (`app/src/main.lyr`), with forward slashes.
+@Allow("naming")
 pub struct callerFile :: [OnParameter] { }
 
 /// A declaration on its way out (09 A11): every use outside a deprecated declaration warns
@@ -4131,16 +4134,16 @@ extend<T :: [TotalOrder]> Slice<T> {
 extend<T :: [Display]> Slice<T> {
     /// The elements' texts, `sep` between each two.
     pub fn join(sep: string): string {
-        var out = "";
+        let out = StringBuilder.new();
         var i = 0;
         while (i < this.length()) {
             if (i > 0) {
-                out = out + sep;
+                out.append(sep);
             }
-            out = out + f"{this[i]}";
+            out.append(this[i]);
             i = i + 1;
         }
-        return out;
+        return out.toString();
     }
 }
 

@@ -358,7 +358,7 @@ class Reaper {
         this.started = true;
         this.guard.release();
         if (start) {
-            Thread.spawn(() => {
+            let _ = Thread.spawn(() => {
                 reaper.watch();
             });
         } else {

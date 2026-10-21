@@ -232,4 +232,90 @@ public class LintTests
         Assert.StartsWith("LYR-SEM0072: ", output);
         Assert.Contains("lint 'unused-import', group 'unused', warn unless said", output);
     }
+    /// <summary>reserved-device-name has no red case in the suite: its program is a file Windows cannot
+    /// hold, in a checkout of the suite as anywhere. It is read here, where such a file can be made.</summary>
+    [Fact]
+    public void A_module_named_as_a_device_is_refused()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var root = Package(("lyric.toml", AppManifest), ("src/con.lyr", "pub fn hello(): int {\n    return 1;\n}\n"),
+            ("src/main.lyr", "import app.con;\n\nfn main(): void {\n    let _ = con.hello();\n}\n"));
+        var (exit, error) = Build(root);
+        Assert.Equal(1, exit);
+        Assert.Contains("error[LYR-SEM0216]: the module 'app.con' is named 'con', a name Windows keeps for a device", error);
+    }
+
+    /// <summary>A handle made in the argument of a wrapper whose <c>close()</c> leaves it open has no
+    /// name to close it by; a handle bound and passed has one.</summary>
+    [Fact]
+    public void A_handle_without_a_name_inside_a_wrapper_warns()
+    {
+        const string Unnamed = """
+            import std.fs { File };
+            import std.io { BufWriter };
+
+            fn main(): void throws Error {
+                using let w = BufWriter.new(try File.create("out.txt"));
+                try w.writeString("x");
+            }
+            """;
+        const string Named = """
+            import std.fs { File };
+            import std.io { BufWriter };
+
+            fn main(): void throws Error {
+                using let file = try File.create("out.txt");
+                using let w = BufWriter.new(file);
+                try w.writeString("x");
+            }
+            """;
+        var (_, error) = Build(App(program: Unnamed));
+        Assert.Contains("warning[LYR-SEM0144]: this 'File' has no name, and closing the", error);
+        Assert.Equal("", Build(App(program: Named)).Err);
+    }
+
+    /// <summary>unused-task: a scope awaits what it spawns, so its handle may go; a thread's task
+    /// dropped is a task nobody awaits.</summary>
+    [Fact]
+    public void A_scopes_task_may_go_and_a_threads_may_not()
+    {
+        const string Scoped = """
+            import std.task { TaskScope };
+
+            fn main(): void throws Error {
+                using let scope = TaskScope.new();
+                scope.spawn(() => 1);
+            }
+            """;
+        const string Threaded = """
+            import std.thread { Thread };
+
+            fn main(): void {
+                Thread.spawn(() => 1);
+            }
+            """;
+        Assert.Equal("", Build(App(program: Scoped)).Err);
+        Assert.Contains("warning[LYR-SEM0212]: this task's handle is dropped", Build(App(program: Threaded)).Err);
+    }
+
+    /// <summary>naming leaves a <c>_</c> between two digits alone, and an <c>extern</c> function's
+    /// name is its library's.</summary>
+    [Fact]
+    public void Naming_leaves_numbers_and_foreign_names_alone()
+    {
+        const string Names = """
+            enum Arch {
+                X86_64,
+                Aarch64,
+            }
+
+            extern "C" fn abs(n: int32): int32;
+
+            fn main(): void {
+                let _ = Arch.X86_64;
+                let _ = abs(-1);
+            }
+            """;
+        Assert.Equal("", Build(App(program: Names)).Err);
+    }
 }

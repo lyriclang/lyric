@@ -5,7 +5,7 @@
 /// without an import; the structs are named here — `iter.MapIter<I, U>` — where a type is written.
 /// The protocol itself (`Iterator`, `Iterable`, `DoubleEnded`, `Step`, `FromIterator`), the ranges
 /// and the iterators of std.core's own types stay in std.core.
-import std.core { DoubleEnded, Join };
+import std.core { DoubleEnded, Join, StringBuilder };
 
 /// `it.map(f)` (10 B6 I3, I4): the values of `it`, each through `f` — lazily, a pull at a time.
 /// Named for what it gives: `Map` is the collection's (C4). What `f` throws, a pull throws beside
@@ -915,18 +915,18 @@ extend<I :: [Iterator<Item = T>], T :: [Display]> I {
     /// The values' texts, `sep` between each two.
     pub fn join(sep: string): string throws I.Error {
         var it = this;
-        var out = "";
+        let out = StringBuilder.new();
         var x = try it.next();
         var first = true;
         while (x != null) {
             if (!first) {
-                out = out + sep;
+                out.append(sep);
             }
             first = false;
-            out = out + f"{x}";
+            out.append(x);
             x = try it.next();
         }
-        return out;
+        return out.toString();
     }
 }
 

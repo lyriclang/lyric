@@ -217,6 +217,7 @@ pub fn parallelMap<T, U, E :: [Error]>(xs: Slice<T>, f: fn(T) -> U throws E): U[
 }
 
 /// The program's pool for `parallelMap`, made at its first call: a thread for each processor.
+@Allow("global-var-without-sync")
 var sharedPool: ?Pool = null;
 let sharedPoolGuard = SpinLock { };
 

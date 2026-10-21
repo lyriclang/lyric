@@ -207,40 +207,40 @@ extend TomlValue {
     /// The value at a path, `"servers.alpha.ports[0]"`.
     pub fn path(p: string): ?TomlValue {
         var current: ?TomlValue = this;
-        var name = "";
-        var index = "";
+        let name = StringBuilder.new();
+        let index = StringBuilder.new();
         var inIndex = false;
         for (c in p.chars()) {
             if (inIndex) {
                 if (c == ']') {
                     var i = -1;
                     try {
-                        i = int.parse(index);
+                        i = int.parse(index.toString());
                     } catch (_: ParseError) {
                     }
                     if (let v = current) {
                         current = v.at(i);
                     }
-                    index = "";
+                    index.clear();
                     inIndex = false;
                 } else {
-                    index = index + f"{c}";
+                    index.appendChar(c);
                 }
             } else if (c == '.' || c == '[') {
-                if (name != "") {
+                if (name.length() > 0) {
                     if (let v = current) {
-                        current = v[name];
+                        current = v[name.toString()];
                     }
-                    name = "";
+                    name.clear();
                 }
                 inIndex = c == '[';
             } else {
-                name = name + f"{c}";
+                name.appendChar(c);
             }
         }
-        if (name != "") {
+        if (name.length() > 0) {
             if (let v = current) {
-                current = v[name];
+                current = v[name.toString()];
             }
         }
         return current;
@@ -1827,21 +1827,21 @@ pub class TomlReader :: [Decoder] {
     /// `Config.servers[0].Server.port`: a struct's name and the key being read with `.` between,
     /// an array's index without, `{}` for a map, a variant's name.
     pub fn path(): string {
-        var out = "";
+        let out = StringBuilder.new();
         for (frame in this.stack) {
             match (frame) {
-                .Array(_, _, current) => { out = out + f"[{current}]"; },
-                .Map(_, _, _) => { out = out + (if (out.isEmpty()) "" else ".") + "{}"; },
+                .Array(_, _, current) => { out.append(f"[{current}]"); },
+                .Map(_, _, _) => { out.append(if (out.length() == 0) "{}" else ".{}"); },
                 .Struct(_, name, current, _) => {
-                    out = out + (if (out.isEmpty()) "" else ".") + name;
+                    out.append(if (out.length() == 0) name else f".{name}");
                     if (let key = current) {
-                        out = out + "." + key;
+                        out.append(f".{key}");
                     }
                 },
-                .Variant(name, _, _) => { out = out + (if (out.isEmpty()) "" else ".") + name; },
+                .Variant(name, _, _) => { out.append(if (out.length() == 0) name else f".{name}"); },
             }
         }
-        return out;
+        return out.toString();
     }
 }
 

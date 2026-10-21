@@ -86,6 +86,7 @@ fn flushed(stream: int): int {
 
 fn consoleRead(into: Slice<uint8>): int;
 
+@Allow("global-var-without-sync")
 var theStdin: ?Stdin = null;
 let stdinGuard = SpinLock { };
 
@@ -222,6 +223,7 @@ fn failure(answer: int, path: ?string, doing: string): IoError {
 // console's flushes run on it.
 // ---------------------------------------------------------------------------------------------
 
+@Allow("global-var-without-sync")
 var ioPool: ?Pool = null;
 let ioPoolGuard = SpinLock { };
 

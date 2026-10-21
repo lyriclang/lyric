@@ -68,7 +68,7 @@ public partial class CatalogTests
     public void Every_code_of_the_catalog_is_reported_unless_retired()
     {
         var sources = CodesInSources();
-        var silent = DiagnosticCatalog.Entries.Values.Where(e => e.Retired is null && !sources.ContainsKey(e.Code))
+        var silent = DiagnosticCatalog.Entries.Values.Where(e => e.Retired is null && !sources.ContainsKey(e.Code) && !NoTriggerYet.ContainsKey(e.Code))
             .Select(e => e.Code).ToList();
         Assert.True(silent.Count == 0, "listed, reported nowhere — retire them:\n" + string.Join("\n", silent));
         var reported = DiagnosticCatalog.Entries.Values
@@ -82,6 +82,13 @@ public partial class CatalogTests
             Assert.True(sources.ContainsKey(code), $"{code}'s site is gone: take it off the list");
         }
     }
+
+    /// <summary>Lints named before anything can set them off: listed, so that a level can name them,
+    /// and reported nowhere yet.</summary>
+    private static readonly Dictionary<string, string> NoTriggerYet = new(StringComparer.Ordinal)
+    {
+        ["LYR-SEM0214"] = "deprecated-edition: there is no edition yet to retire a construct",
+    };
 
     /// <summary>
     /// Codes retired for Lyric 5 whose sites stay in source: the front end still serves the 4.x

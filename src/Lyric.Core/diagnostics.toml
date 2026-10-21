@@ -5486,28 +5486,28 @@ severity = "error"
 area = "03-types"
 summary = "A static member, constant or variant of a generic type is reached through the bare type name, where nothing supplies the type arguments."
 explanation = '''
-`Grid.SIZE` names a member of `Grid<T>` without saying which `T`. Where a call's arguments or the expected type can determine the arguments, they are inferred; a constant, a function value or a variant read on its own has nothing to infer them from.
+`Grid.size` names a member of `Grid<T>` without saying which `T`. Where a call's arguments or the expected type can determine the arguments, they are inferred; a constant, a function value or a variant read on its own has nothing to infer them from.
 
-Write the type arguments: `Grid<int>.SIZE`.
+Write the type arguments: `Grid<int>.size`.
 '''
 wrong = '''
 struct Grid<T> {
     cells: T[],
-    static let SIZE: int = 4;
+    static let size: int = 4;
 }
 
 fn main(): void {
-    let _ = Grid.SIZE;
+    let _ = Grid.size;
 }
 '''
 right = '''
 struct Grid<T> {
     cells: T[],
-    static let SIZE: int = 4;
+    static let size: int = 4;
 }
 
 fn main(): void {
-    let _ = Grid<int>.SIZE;
+    let _ = Grid<int>.size;
 }
 '''
 
@@ -10207,5 +10207,497 @@ struct Shown :: [Display] {
 
 fn main(): void {
     println(Shown { point = Point { x = 1 } });
+}
+'''
+
+[LYR-SEM0212]
+title = "a task's handle dropped"
+severity = "warning"
+lint = "unused-task"
+group = "resources"
+level = "warn"
+area = "10-concurrency"
+summary = "An expression statement starts a task with `spawn` or `Thread.spawn` and drops the `Task` it gives; a scope's `spawn` is left alone, the scope awaits it."
+explanation = '''
+A task's handle is the only way to its value and to its error: dropped, nobody awaits the task, and what it throws is lost without a word.
+
+Await the handle, or start the task with `spawnDetached`, which says that nobody will. `let _ = spawn(…)` drops it on purpose.
+'''
+wrong = '''
+import std.task { spawn };
+
+fn main(): void {
+    spawn(() => 1);
+}
+'''
+right = '''
+import std.task { spawn };
+
+fn main(): void throws Error {
+    let task = spawn(() => 1);
+    let _ = try task.await();
+}
+'''
+
+[LYR-SEM0213]
+title = "a module 'var' in a program that starts threads"
+severity = "warning"
+lint = "global-var-without-sync"
+group = "concurrency"
+level = "warn"
+area = "10-concurrency"
+summary = "A module of a program that imports `std.thread` declares a module-level `var`."
+explanation = '''
+Tasks of one thread take turns, but threads run at once: two of them may read and write a module's `var` at the same time, and a value half written is read.
+
+Hold the value in an `Atomic`, or behind a `Mutex` (`std.sync`), or keep it local to one thread. A `var` that a lock of its own guards says so with `@Allow("global-var-without-sync")`.
+'''
+wrong = '''
+import std.thread { Thread };
+
+var hits = 0;
+
+fn main(): void {
+    hits = hits + 1;
+    let _ = Thread.spawn(() => 1);
+}
+'''
+right = '''
+import std.thread { Thread };
+
+fn main(): void {
+    var hits = 0;
+    hits = hits + 1;
+    let _ = hits;
+    let _ = Thread.spawn(() => 1);
+}
+'''
+
+[LYR-SEM0214]
+title = "a construct an edition retires"
+severity = "warning"
+lint = "deprecated-edition"
+group = "deprecation"
+level = "warn"
+area = "16-diagnostics"
+summary = "The name for the warning on a construct a newer edition retires. There is no edition yet, so nothing says it."
+explanation = '''
+An edition may retire a construct while the compiler still reads it; the code that uses it then warns under this lint, until it is written the newer way. Until the first edition there is nothing to retire, and the lint is a name without a trigger.
+'''
+example = '''
+$ cat lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[lints]
+deny = ["deprecated-edition"]
+$ lyric5 build
+'''
+
+[LYR-SEM0215]
+title = "a name against the naming convention"
+severity = "warning"
+lint = "naming"
+group = "style"
+level = "warn"
+area = "16-diagnostics"
+summary = "A type, a type parameter or a variant not in PascalCase; a function, a field, a parameter, a local or a constant not in camelCase; a module with capitals in its name."
+explanation = '''
+Types, their parameters and an enum's variants are written in PascalCase (`HttpClient`, `T`, `NotFound`); functions, methods, fields, parameters, locals and constants in camelCase (`readLine`, `int.max`); modules in lower case. A leading `_` is left out of the reading, and so is a `_` between two digits (`X86_64`). An `extern` function keeps the name its library gives it.
+
+Rename it as the note says; `@Allow("naming")` keeps a name another convention asks for.
+'''
+wrong = '''
+struct point_2d {
+    x: int,
+}
+
+fn main(): void {
+    let p = point_2d { x = 1 };
+    let _ = p.x;
+}
+'''
+right = '''
+struct Point2d {
+    x: int,
+}
+
+fn main(): void {
+    let p = Point2d { x = 1 };
+    let _ = p.x;
+}
+'''
+
+[LYR-SEM0216]
+title = "a module named as a Windows device"
+severity = "warning"
+lint = "reserved-device-name"
+group = "style"
+level = "deny"
+area = "04-modules"
+summary = "A module is named `con`, `prn`, `aux`, `nul`, `com0` to `com9` or `lpt0` to `lpt9`, in any case."
+explanation = '''
+Windows keeps these names for devices: a file of that name cannot be made there, whatever its extension, so a package with such a module cannot be checked out or built on Windows. The lint is `deny` by default.
+
+Name the module otherwise — `console` for `con`.
+'''
+example = '''
+$ ls src
+con.lyr  main.lyr
+$ lyric5 build
+error[LYR-SEM0216]: the module 'app.con' is named 'con', a name Windows keeps for a device
+ --> src/con.lyr:1:1
+'''
+
+[LYR-SEM0217]
+title = "'clone()' of a value a copy makes whole"
+severity = "warning"
+lint = "redundant-clone"
+group = "style"
+level = "warn"
+area = "08-expressions"
+summary = "`clone()` is called on a number, a `bool`, a `char`, a `string`, or a struct or an enum made of only such."
+explanation = '''
+An assignment copies such a value whole, and a `string` never changes: the copy is a value of its own, and `clone()` makes nothing a copy does not.
+
+Use the value itself.
+'''
+wrong = '''
+fn main(): void {
+    let name = "lyric";
+    let copy = name.clone();
+    let _ = copy;
+}
+'''
+right = '''
+fn main(): void {
+    let name = "lyric";
+    let copy = name;
+    let _ = copy;
+}
+'''
+
+[LYR-SEM0218]
+title = "a 'return;' that ends a body"
+severity = "warning"
+lint = "needless-return"
+group = "style"
+level = "allow"
+area = "07-statements"
+summary = "The last statement of a function's or a lambda's body is `return;`. Not said unless the lint is set to `warn`."
+explanation = '''
+A body ends after its last statement; a `return;` there says nothing more. The lint is `allow` by default.
+
+Take it out.
+'''
+wrong = '''
+@Warn("needless-return")
+fn main(): void {
+    let _ = 1;
+    return;
+}
+'''
+right = '''
+@Warn("needless-return")
+fn main(): void {
+    let _ = 1;
+}
+'''
+
+[LYR-SEM0219]
+title = "'while (true)' where 'loop' is meant"
+severity = "warning"
+lint = "loop-instead-of-while-true"
+group = "style"
+level = "allow"
+area = "07-statements"
+summary = "A `while` loop's condition is the literal `true`. Not said unless the lint is set to `warn`."
+explanation = '''
+`loop { … }` is the loop that ends only by `break`, `return` or `throw`; it says so at its first word, and a `break` out of it can give a value. The lint is `allow` by default.
+
+Write `loop { … }`.
+'''
+wrong = '''
+@Warn("loop-instead-of-while-true")
+fn main(): void {
+    var n = 0;
+    while (true) {
+        n = n + 1;
+        if (n > 2) {
+            break;
+        }
+    }
+}
+'''
+right = '''
+@Warn("loop-instead-of-while-true")
+fn main(): void {
+    var n = 0;
+    loop {
+        n = n + 1;
+        if (n > 2) {
+            break;
+        }
+    }
+}
+'''
+
+[LYR-SEM0220]
+title = "a string grown with '+' in a loop"
+severity = "warning"
+lint = "string-concat-in-loop"
+group = "perf"
+level = "warn"
+area = "08-expressions"
+summary = "In a loop, a string kept across its rounds is assigned itself with something added: `s = s + x` or `s += x`."
+explanation = '''
+A string never changes, so each `+` makes a new one and copies all that came before: n rounds copy on the order of n² bytes.
+
+Append to a `StringBuilder` in the loop and take its `toString()` after it.
+'''
+wrong = '''
+fn main(): void {
+    var line = "";
+    for (i in 0..3) {
+        line = line + f"{i}";
+    }
+    let _ = line;
+}
+'''
+right = '''
+import std.string { StringBuilder };
+
+fn main(): void {
+    let line = StringBuilder.new();
+    for (i in 0..3) {
+        line.append(i);
+    }
+    let _ = line.toString();
+}
+'''
+
+[LYR-SEM0221]
+title = "a large struct passed by value"
+severity = "warning"
+lint = "large-value-copy"
+group = "perf"
+level = "allow"
+area = "03-types"
+summary = "A parameter's type is a struct of more than 64 bytes, counted without padding. Not said unless the lint is set to `warn`."
+explanation = '''
+A struct is a value: each call copies it whole into the parameter. Past 64 bytes the copy costs more than a reference would. The size the lint counts is a floor — no padding, a reference as one word — so a struct it names is at least as large as it says. The lint is `allow` by default.
+
+Make the type a class, or pass the part of it the function needs.
+'''
+wrong = '''
+struct Frame {
+    a: int,
+    b: int,
+    c: int,
+    d: int,
+    e: int,
+    f: int,
+    g: int,
+    h: int,
+    i: int,
+}
+
+@Warn("large-value-copy")
+fn total(frame: Frame): int {
+    return frame.a + frame.i;
+}
+
+fn main(): void {
+    let _ = total(Frame { a = 1, b = 2, c = 3, d = 4, e = 5, f = 6, g = 7, h = 8, i = 9 });
+}
+'''
+right = '''
+struct Frame {
+    a: int,
+    b: int,
+    c: int,
+    d: int,
+    e: int,
+    f: int,
+    g: int,
+    h: int,
+}
+
+@Warn("large-value-copy")
+fn total(frame: Frame): int {
+    return frame.a + frame.h;
+}
+
+fn main(): void {
+    let _ = total(Frame { a = 1, b = 2, c = 3, d = 4, e = 5, f = 6, g = 7, h = 8 });
+}
+'''
+
+[LYR-SEM0222]
+title = "a value boxed as an interface in a loop"
+severity = "warning"
+lint = "boxed-interface-in-hot-loop"
+group = "perf"
+level = "allow"
+area = "05-interfaces"
+summary = "In a loop, a number or a struct or enum value is passed where the parameter's type is an interface. Not said unless the lint is set to `warn`."
+explanation = '''
+An interface value holds a reference: a value becomes one by being copied into a box on the heap, each time it is passed — in a loop, each round. The lint is `allow` by default.
+
+Take a type parameter constrained by the interface (`fn show<T :: [Display]>(d: T)`), which takes the value as it is, or box it once before the loop.
+'''
+wrong = '''
+fn show(d: Display): string {
+    return d.show();
+}
+
+@Warn("boxed-interface-in-hot-loop")
+fn main(): void {
+    for (i in 0..3) {
+        let _ = show(i);
+    }
+}
+'''
+right = '''
+fn show<T :: [Display]>(d: T): string {
+    return d.show();
+}
+
+@Warn("boxed-interface-in-hot-loop")
+fn main(): void {
+    for (i in 0..3) {
+        let _ = show(i);
+    }
+}
+'''
+
+[LYR-SEM0223]
+title = "a pub declaration without documentation"
+severity = "warning"
+lint = "missing-docs"
+group = "docs"
+level = "allow"
+area = "01-lexical"
+summary = "A `pub` function, type, field, method or module binding has no `///` above it; a method a conformance answers is documented by its interface. Not said unless the lint is set to `warn`."
+explanation = '''
+What a package makes `pub` is what its users read about in `lyric doc` and in their editor; without a `///` they read only the signature. The lint is `allow` by default; a library sets it to `deny` in its `[lints]`.
+
+Say what it is in a `///` above it.
+'''
+wrong = '''
+@Warn("missing-docs")
+pub fn area(w: int, h: int): int {
+    return w * h;
+}
+
+fn main(): void {
+    let _ = area(2, 3);
+}
+'''
+right = '''
+/// The area of a rectangle `w` wide and `h` high.
+@Warn("missing-docs")
+pub fn area(w: int, h: int): int {
+    return w * h;
+}
+
+fn main(): void {
+    let _ = area(2, 3);
+}
+'''
+
+[LYR-SEM0224]
+title = "a doc link that names nothing"
+severity = "warning"
+lint = "broken-doc-link"
+group = "docs"
+level = "warn"
+area = "01-lexical"
+summary = "A `///` links `[Name]` or `[Type.member]`, and nothing of that name is visible where the documented declaration stands."
+explanation = '''
+In a `///`, `[Name]` and `[Type.member]` link to the declaration they name; `lyric doc` makes them links, the editor follows them. One that names nothing — a typo, a declaration renamed or removed — leads nowhere. Text in backticks or in a code fence is not read, nor is a Markdown link `[text](url)`.
+
+Name a type, a function or a member the module sees, or write the text in backticks.
+'''
+wrong = '''
+/// Twice `x`; [halve] goes the other way.
+fn twice(x: int): int {
+    return x * 2;
+}
+
+fn main(): void {
+    let _ = twice(1);
+}
+'''
+right = '''
+/// Half of `x`.
+fn halve(x: int): int {
+    return x / 2;
+}
+
+/// Twice `x`; [halve] goes the other way.
+fn twice(x: int): int {
+    return x * 2;
+}
+
+fn main(): void {
+    let _ = twice(halve(4));
+}
+'''
+
+[LYR-SEM0225]
+title = "a module without module documentation"
+severity = "warning"
+lint = "missing-module-docs"
+group = "docs"
+level = "allow"
+area = "01-lexical"
+summary = "A module that declares something `pub` does not begin with `//!` lines. Not said unless the lint is set to `warn`."
+explanation = '''
+`//!` lines at the top of a file document the module: the editor shows them over the module's path, `lyric doc` makes the module's page of them. The lint is `allow` by default.
+
+Say what the module is for in `//!` lines at the top of the file.
+'''
+wrong = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[lints]
+warn = ["missing-module-docs"]
+//- src/shapes.lyr
+/// The area of a rectangle `w` wide and `h` high.
+pub fn area(w: int, h: int): int {
+    return w * h;
+}
+//- src/main.lyr
+import app.shapes;
+
+fn main(): void {
+    let _ = shapes.area(2, 3);
+}
+'''
+right = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[lints]
+warn = ["missing-module-docs"]
+//- src/shapes.lyr
+//! Areas of shapes.
+
+/// The area of a rectangle `w` wide and `h` high.
+pub fn area(w: int, h: int): int {
+    return w * h;
+}
+//- src/main.lyr
+import app.shapes;
+
+fn main(): void {
+    let _ = shapes.area(2, 3);
 }
 '''
