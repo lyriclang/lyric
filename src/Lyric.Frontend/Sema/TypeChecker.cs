@@ -9599,6 +9599,11 @@ public sealed class TypeChecker
         // holding the name at two counts is an overload set the call's count settles (08 §1.2).
         // Every other duplicate was refused at its declaration (LYR-SEM0121).
         var blocks = visible.Select(v => v.Block).Distinct().ToList();
+        // two blocks for one interface are the conformance said twice, refused at the second block
+        // (LYR-SEM0133): the call takes the first and says nothing more
+        if (blocks.Count > 1 && visible.All(v => v.InConformanceBlock)
+            && blocks.Select(b => Conformance.InterfaceOf(b.Decl.Interfaces[0], _binding)).Distinct().Count() == 1)
+            return visible[0].Symbol;
         if (blocks.Count > 1 && visible.All(v => v.InConformanceBlock))
         {
             var interfaces = blocks.Select(b => Conformance.InterfaceOf(b.Decl.Interfaces[0], _binding)?.Name ?? "?").ToList();
@@ -9848,6 +9853,8 @@ public sealed class TypeChecker
             // and in value position CheckExpr reports LYR-SEM0052. An Error here instead poisoned
             // the whole chain silently — no diagnostic, and the lowering threw on the <error> type.
             TypeSymbol tsym => (new NonValueType(tsym, "type"), tsym),
+            // a module the parser could not read holds nothing: its users are not told so again
+            _ when _de.IsUnparsed(new Span(_comp.AstOf(mod).Span.File, 0, 0)) => (LyrType.Error, null),
             _ => (Report(span, "LYR-SEM0012", $"module '{mod.FullName}' has no member '{member}'"), null)
         };
     }
@@ -10486,6 +10493,10 @@ public sealed class TypeChecker
             else
                 args = FillPlaceholders(si, ts, expected, scope, out prechecked);
 
+            // arguments the context gave were refused where the context names them: the
+            // annotation's error is the one, and the initializer that takes them says nothing more
+            if (args.Length != ts.Generics.Length && si.TypeArguments.Length == 0 && InstanceFromExpected(expected, ts) is not null)
+                return LyrType.Error;
             if (args.Length != ts.Generics.Length)
             {
                 _de.Report("LYR-SEM0026", Severity.Error, si.Span,
@@ -11940,13 +11951,19 @@ public sealed class TypeChecker
         for (var i = 1; i < tables.Count; i++)
         {
             var alt = tables[i].Symbols.OfType<LocalSymbol>().ToList();
+            // the names one side binds and the other does not, said once for the alternative
+            var unbound = reference.Select(s => s.Name).Union(alt.Select(s => s.Name))
+                .Where(name => reference.All(s => s.Name != name) || alt.All(s => s.Name != name)).ToList();
+            if (unbound.Count > 0)
+                _de.Report("LYR-SEM0032", Severity.Error, o.Alternatives[i].Span,
+                    $"or-pattern alternatives bind different variables: {string.Join(" and ", unbound.Select(n => $"'{n}'"))} "
+                    + (unbound.Count == 1 ? "is" : "are") + " not bound in every alternative");
             foreach (var name in reference.Select(s => s.Name).Union(alt.Select(s => s.Name)))
             {
                 var a = reference.Find(s => s.Name == name);
                 var b = alt.Find(s => s.Name == name);
                 if (a is null || b is null)
-                    _de.Report("LYR-SEM0032", Severity.Error, o.Alternatives[i].Span,
-                        $"or-pattern alternatives bind different variables: '{name}' is not bound in every alternative");
+                    continue;
                 else if (!a.Type.IsError && !b.Type.IsError && !LyrType.Equal(a.Type, b.Type))
                     _de.Report("LYR-SEM0032", Severity.Error, o.Alternatives[i].Span,
                         $"'{name}' is bound as '{TypeFacts.Display(a.Type)}' and as '{TypeFacts.Display(b.Type)}' in different or-pattern alternatives");

@@ -23,7 +23,7 @@ fn summed(words: string[]): int throws ParseError {
     return sum;
 }
 
-fn boomOf(v: int): int throws Boom {
+fn boomOf(_v: int): int throws Boom {
     throw Boom {};
 }
 

@@ -32,6 +32,9 @@ public sealed partial class Parser
                 $"nesting is deeper than this parser carries ({MaxNesting} levels) — the language "
                 + "sets no limit, this implementation does, and the alternative was taking the "
                 + "process down");
+            // the file is read as holding nothing: what follows from that — a 'main' missing, a name
+            // an import does not find — is the wreckage, not another mistake
+            if (_sm.Lyric5) _de.MarkUnparsed(new Span(deep.At.File, 0, _sm.GetText(deep.At.File).Length + 1));
             return new Module(null, [], deep.At);
         }
     }

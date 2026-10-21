@@ -15,7 +15,7 @@ fn magnitude<T :: [Signed]>(x: T): T {
     return abs(x);
 }
 
-fn span<T :: [Integer]>(sample: T): string {
+fn span<T :: [Integer]>(_sample: T): string {
     return f"{T.min}..{T.max} in {T.bitWidth} bits, signed {T.isSigned}";
 }
 

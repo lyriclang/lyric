@@ -77,7 +77,8 @@ namespace Lyric.Parsing
             {
                 var sufText = lexme[suffixStart..lexme.Length].ToString();
                 _intSuffixes.TryGetValue(sufText, out suffix);
-                if (suffix == null) de.Report("LYR-PAR0006", Severity.Error, span, $"invalid integer suffix: '{sufText}'");
+                // the lexer refused the suffix already: one report of one mistake
+                if (suffix == null && !LexerSaid(de, span)) de.Report("LYR-PAR0006", Severity.Error, span, $"invalid integer suffix: '{sufText}'");
             }
 
             foreach (char c in lexme[start..suffixStart])
@@ -102,7 +103,7 @@ namespace Lyric.Parsing
             if (fidx > 0)
             {
                 _floatSuffixes.TryGetValue(ls[fidx..], out suffix);
-                if (suffix == null) de.Report("LYR-PAR0006", Severity.Error, span, $"invalid float suffix: '{ls[fidx..]}'");
+                if (suffix == null && !LexerSaid(de, span)) de.Report("LYR-PAR0006", Severity.Error, span, $"invalid float suffix: '{ls[fidx..]}'");
                 ls = ls[0..fidx];
             }
             double.TryParse(ls, CultureInfo.InvariantCulture, out var value);
@@ -224,5 +225,10 @@ namespace Lyric.Parsing
             var s = ResolveEscapes(StripQuotes(lexme.ToString()));
             return string.IsNullOrEmpty(s) ? 0 : Char.ConvertToUtf32(s, 0);
         }
+
+        /// <summary>Whether the lexer refused the literal at <paramref name="span"/> already.</summary>
+        private static bool LexerSaid(DiagnosticEngine de, Span span) =>
+            de.Diagnostics.Any(d => d.Code.StartsWith("LYR-LEX", StringComparison.Ordinal) && d.Span.File == span.File
+                                    && d.Span.Start < span.End && span.Start < d.Span.End);
     }
 }

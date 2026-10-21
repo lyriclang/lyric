@@ -642,7 +642,9 @@ public sealed class Resolver
         var found = target.Members.LookupLocal(name);
         if (found is null)
         {
-            _de.Report("LYR-RES0004", Severity.Error, imp.Span, $"module '{target.FullName}' has no exported '{name}'");
+            // a module whose file the parser could not read holds nothing, and its importers are not told so again
+            if (!_de.IsUnparsed(new Span(_comp.AstOf(target).Span.File, 0, 0)))
+                _de.Report("LYR-RES0004", Severity.Error, imp.Span, $"module '{target.FullName}' has no exported '{name}'");
             return [new ErrorSymbol(name)];
         }
 
