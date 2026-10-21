@@ -26,6 +26,7 @@
 #define LYR_RT_FLOOR            "LYR-RT0017"  /* control reached code the compiler holds unreachable: a bug in the compiler (05 E8) */
 #define LYR_RT_DEADLOCK         "LYR-RT0018"  /* every task of a thread waits, and nothing can wake one (06, M6-12) */
 #define LYR_RT_POISONED         "LYR-RT0019"  /* a lock a task panicked while holding, acquired again (06 G4, M6-21) */
+#define LYR_RT_INVARIANT        "LYR-RT0020"  /* the runtime found its own invariant broken: a bug in the runtime or the compiler */
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define LYR_NORETURN __attribute__((noreturn, cold, noinline))

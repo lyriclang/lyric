@@ -5,7 +5,7 @@ namespace Lyric5.Build;
 /// <summary>A package without <c>src/main.lyr</c> (11 P2): a library, which <c>build</c> checks
 /// (07 B6) and nothing runs.</summary>
 public sealed class LibraryException(Manifest manifest, PackageGraph graph)
-    : InvalidOperationException($"package '{manifest.Name}' is a library — it has no src/main.lyr and no [[bin]], so there is no program (11 P2)")
+    : InvalidOperationException($"package '{manifest.Name}' is a library — it has no src/main.lyr and no [[bin]], so there is no program")
 {
     public Manifest Manifest { get; } = manifest;
     public PackageGraph Graph { get; } = graph;

@@ -147,7 +147,7 @@ internal sealed partial class WarningAnalyzer
                     if (memberName is null || visibility <= type.Visibility) continue;
                     _de.Report("LYR-SEM0152", Severity.Warning, nameSpan,
                         $"'{memberName}' is {Word(visibility)}, but its type '{name}' is {Word(type.Visibility)} — "
-                        + "the member is exported only once the type is (07 V2 S3)");
+                        + "the member is exported only once the type is");
                 }
             }
         }
@@ -165,7 +165,7 @@ internal sealed partial class WarningAnalyzer
                 _de.Report("LYR-SEM0152", Severity.Warning,
                     new Span(block.Decl.Span.File, start, start + Word(blockWord).Length),
                     $"this block is {Word(blockWord)}, but its type '{target.Name}' is {Word(target.Visibility)} — "
-                    + "its members are exported only once the type is (07 V2 S3)");
+                    + "its members are exported only once the type is");
             }
             foreach (var fn in block.Decl.Methods)
                 if (Written(fn.Visibility) is { } word && word > target.Visibility)
@@ -178,7 +178,7 @@ internal sealed partial class WarningAnalyzer
         void WiderThan(TypeSymbol type, string member, Span at, Visibility word) =>
             _de.Report("LYR-SEM0152", Severity.Warning, at,
                 $"'{member}' is {Word(word)}, but its type '{type.Name}' is {Word(type.Visibility)} — "
-                + "the member is exported only once the type is (07 V2 S3)");
+                + "the member is exported only once the type is");
     }
 
     /// <summary>The visibility a written word says; <c>null</c> where none is written.</summary>
@@ -209,6 +209,8 @@ internal sealed partial class WarningAnalyzer
     {
         if (_comp.Prelude is not { } prelude) return;
         var names = new HashSet<string>(prelude.Members.Symbols.Select(s => s.Name), StringComparer.Ordinal) { "panic", "same" };
+        // 'same' is the compiler's and 'panic' std.core's: everywhere as the prelude's names are, and no names of it
+        string Whose(string name) => prelude.Members.LookupLocal(name) is null ? $"the built-in '{name}'" : $"the prelude's '{name}'";
         foreach (var module in _comp.Modules)
         {
             if (_comp.Unwatched(module) || module.Path is ["std", ..]) continue;
@@ -218,17 +220,17 @@ internal sealed partial class WarningAnalyzer
                 {
                     case INamedDecl named when decl is not ImportDecl && names.Contains(named.Name):
                         _de.Report("LYR-SEM0153", Severity.Warning, named.NameSpan,
-                            $"'{named.Name}' hides the prelude's '{named.Name}' in this module (07 I8)");
+                            $"'{named.Name}' hides {Whose(named.Name)} in this module");
                         break;
                     case ImportDecl { Clause: ImportSelective selective } import:
                         for (var i = 0; i < selective.Names.Length; i++)
                             if (names.Contains(selective.BoundName(i)) && !SameAsPrelude(import, selective, i))
                                 _de.Report("LYR-SEM0153", Severity.Warning, selective.NameSpans[i],
-                                    $"'{selective.BoundName(i)}' hides the prelude's '{selective.BoundName(i)}' in this module (07 I8)");
+                                    $"'{selective.BoundName(i)}' hides {Whose(selective.BoundName(i))} in this module");
                         break;
                     case ImportDecl { Clause: ImportAlias alias } when names.Contains(alias.Alias):
                         _de.Report("LYR-SEM0153", Severity.Warning, alias.Span,
-                            $"'{alias.Alias}' hides the prelude's '{alias.Alias}' in this module (07 I8)");
+                            $"'{alias.Alias}' hides {Whose(alias.Alias)} in this module");
                         break;
                 }
             }
@@ -1053,7 +1055,7 @@ internal sealed partial class WarningAnalyzer
         if (lit.Suffix is not null) return;
         if (_types.TypeOf(lit) is not PrimitiveType { Kind: PrimitiveKind.Int }) return;
         if (TypeFacts.IntLiteralFits(negative, lit.Value, PrimitiveKind.Int)) return;
-        _de.Report("LYR-SEM0001", Severity.Error, lit.Span,
+        _de.Report(_comp.Lyric5Modules ? "LYR-SEM0227" : "LYR-SEM0001", Severity.Error, lit.Span,
             "integer literal does not fit 'int' — annotate the uint type that holds it");
     }
 }

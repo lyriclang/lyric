@@ -135,7 +135,7 @@ public sealed partial class Parser
                 if (!_buffer.Check(TokenKind.Identifier))
                 {
                     _de.Report("LYR-PAR0026", Severity.Error, _buffer.Current.Span,
-                        $"expected attribute name, got {_buffer.Current.TokenKind}");
+                        $"expected attribute name, got {Shown(_buffer.Current)}");
                     break;
                 }
                 var first = _buffer.Advance();
@@ -158,7 +158,7 @@ public sealed partial class Parser
         while (_buffer.Match(TokenKind.Dot))
         {
             var segment = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-                $"expected attribute name, got {_buffer.Current.TokenKind}");
+                $"expected attribute name, got {Shown(_buffer.Current)}");
             path.Add(_sm.Slice(segment.Span).ToString());
             nameSpan = segment.Span;
             pathEnd = segment.Span;
@@ -173,7 +173,7 @@ public sealed partial class Parser
             while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
             {
                 var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-                    $"expected field name, got {_buffer.Current.TokenKind}");
+                    $"expected field name, got {Shown(_buffer.Current)}");
                 _buffer.Expect(TokenKind.Equal, "LYR-PAR0037",
                     "expected '=' in attribute arguments (':' is only for types)");
                 var value = ParseSubExpr();
@@ -313,7 +313,7 @@ public sealed partial class Parser
                     return new ErrorDecl(Span.Union(start, stop));
                 }
                 _de.Report("LYR-PAR0025", Severity.Error, _buffer.Current.Span,
-                    $"expected a declaration, got {_buffer.Current.TokenKind}");
+                    $"expected a declaration, got {Shown(_buffer.Current)}");
                 var end = SynchronizeTopLevel(); // skip to the next declaration start, so only ONE error
                 return new ErrorDecl(Span.Union(start, end));
         }
@@ -455,7 +455,7 @@ public sealed partial class Parser
     {
         var asKw = _buffer.Advance(); // 'as'
         var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-            $"expected alias name after 'as', got {_buffer.Current.TokenKind}");
+            $"expected alias name after 'as', got {Shown(_buffer.Current)}");
         return new ImportAlias(_sm.Slice(nameTok.Span).ToString(), Span.Union(asKw.Span, nameTok.Span));
     }
 
@@ -493,7 +493,7 @@ public sealed partial class Parser
         // 'macro name(...)' (08 Y12 Q1): a function over syntax, written with its own word in the
         // place of 'fn' and nothing else about it different
         var isMacro = _buffer.Match(TokenKind.Macro);
-        if (!isMacro) _buffer.Expect(TokenKind.Fn, "LYR-PAR0032", $"expected 'fn', got {_buffer.Current.TokenKind}");
+        if (!isMacro) _buffer.Expect(TokenKind.Fn, "LYR-PAR0032", $"expected 'fn', got {Shown(_buffer.Current)}");
         var name = ExpectNamed("LYR-PAR0026", "function name");
         var generics = _buffer.Check(TokenKind.Less) ? ParseGenericParams() : [];
 
@@ -527,7 +527,7 @@ public sealed partial class Parser
             if (_buffer.Match(TokenKind.Equal))
             {
                 var symbolTok = _buffer.Expect(TokenKind.StringLiteral, "LYR-PAR0044",
-                    $"expected the symbol as a string after '=', got {_buffer.Current.TokenKind}");
+                    $"expected the symbol as a string after '=', got {Shown(_buffer.Current)}");
                 if (symbolTok.TokenKind == TokenKind.StringLiteral)
                     spec = spec with
                     {
@@ -765,7 +765,7 @@ public sealed partial class Parser
             if (!_buffer.Check(TokenKind.Identifier) && WordOf(_buffer.Current.TokenKind) == VisibilityWord.None)
             {
                 _de.Report("LYR-PAR0026", Severity.Error, _buffer.Current.Span,
-                    $"expected enum variant name, got {_buffer.Current.TokenKind}");
+                    $"expected enum variant name, got {Shown(_buffer.Current)}");
                 _buffer.Advance();
                 if (!_buffer.Match(TokenKind.Comma)) break;
                 continue;
@@ -853,7 +853,7 @@ public sealed partial class Parser
                 "a variant is as visible as its enum — the word stands before 'enum'");
 
         var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-            $"expected enum variant name, got {_buffer.Current.TokenKind}");
+            $"expected enum variant name, got {Shown(_buffer.Current)}");
         var name = _sm.Slice(nameTok.Span).ToString();
 
         if (_buffer.Check(TokenKind.LParen)) // tuple variant
@@ -1069,7 +1069,7 @@ public sealed partial class Parser
         do
         {
             var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-                $"expected type parameter, got {_buffer.Current.TokenKind}");
+                $"expected type parameter, got {Shown(_buffer.Current)}");
             TypeNode[] constraints = [];
             var end = nameTok.Span;
             if (_buffer.Match(TokenKind.ColonColon)) // T :: [I1, I2]
@@ -1165,7 +1165,7 @@ public sealed partial class Parser
             var splice = ParseSplice();
             return ("#" + splice.Index, splice.Span);
         }
-        var tok = _buffer.Expect(TokenKind.Identifier, code, $"expected {what}, got {_buffer.Current.TokenKind}");
+        var tok = _buffer.Expect(TokenKind.Identifier, code, $"expected {what}, got {Shown(_buffer.Current)}");
         return (_sm.Slice(tok.Span).ToString(), tok.Span);
     }
 

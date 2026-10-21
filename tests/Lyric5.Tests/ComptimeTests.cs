@@ -144,7 +144,7 @@ public class ComptimeTests
     {
         var errors = Errors("import std.fs { readText };\n\nfn read(): string {\n    return try! readText(\"x.txt\");\n}\n\n"
                             + "fn main(): void {\n    let _ = comptime read();\n}\n");
-        Assert.Contains(errors, l => l.Contains("error[LYR-CT0003]: ") && l.Contains("a file") && l.Contains("(09 Q3)"));
+        Assert.Contains(errors, l => l.Contains("error[LYR-CT0003]: ") && l.Contains("a file") && l.Contains("code run at compile time does not"));
         Assert.Contains(errors, l => l.Contains("note: in 'app.main.read'"));
     }
 

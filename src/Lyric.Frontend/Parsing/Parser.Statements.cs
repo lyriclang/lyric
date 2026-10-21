@@ -41,7 +41,7 @@ public sealed partial class Parser
         var stmt = ParseStmt();
         if (!_buffer.AtEnd)
             _de.Report("LYR-PAR0001", Severity.Error, _buffer.Current.Span,
-                $"unexpected token after statement: {_buffer.Current.TokenKind}");
+                $"unexpected token after statement: {Shown(_buffer.Current)}");
         return stmt;
     }
 
@@ -139,13 +139,13 @@ public sealed partial class Parser
         if (fn.Generics.Length > 0)
         {
             _de.Report("LYR-PAR0060", Severity.Error, fn.NameSpan,
-                $"a local function takes no type parameters — '{fn.Name}' is one closure, not one per type (08 F9)");
+                $"a local function takes no type parameters — '{fn.Name}' is one closure, not one per type");
             return new Block([], fn.Span);
         }
         foreach (var p in fn.Parameters)
             if (p.Default is not null || p.IsParams)
                 _de.Report("LYR-PAR0060", Severity.Error, p.Span,
-                    $"a local function's parameter has no default and is no variadic one: '{p.Name}' (08 F9)");
+                    $"a local function's parameter has no default and is no variadic one: '{p.Name}'");
         if (fn.Body is null)
             _de.Report("LYR-PAR0060", Severity.Error, fn.Span, $"a local function has a body: '{fn.Name}'");
         var body = fn.Body ?? new Block([], fn.Span);
@@ -318,7 +318,7 @@ public sealed partial class Parser
             return ParseLetPattern(kw, isMutable);
 
         var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0020",
-            $"expected binding name, got {_buffer.Current.TokenKind}");
+            $"expected binding name, got {Shown(_buffer.Current)}");
         TypeNode? type = _buffer.Match(TokenKind.Colon) ? ParseType() : null;
         Expr? init = _buffer.Match(TokenKind.Equal) ? ParseExpr(0) : null;
 
@@ -556,7 +556,7 @@ public sealed partial class Parser
         }
 
         var varTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0020",
-            $"expected loop variable, got {_buffer.Current.TokenKind}");
+            $"expected loop variable, got {Shown(_buffer.Current)}");
         _buffer.Expect(TokenKind.In, "LYR-PAR0021", "expected 'in' in for-loop");
         var iter = ParseExpr(0);
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after for-loop header");
@@ -672,7 +672,7 @@ public sealed partial class Parser
         // CatchBinding: '_' | IDENTIFIER ':' TypeExpr | IDENTIFIER 'in' TypeList | IDENTIFIER
         // ('_' is an identifier)
         var idTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0020",
-            $"expected catch binding, got {_buffer.Current.TokenKind}");
+            $"expected catch binding, got {Shown(_buffer.Current)}");
         var text = _sm.Slice(idTok.Span).ToString();
         string? name = text == "_" ? null : text; // '_' binds nothing
         TypeNode? type = null;

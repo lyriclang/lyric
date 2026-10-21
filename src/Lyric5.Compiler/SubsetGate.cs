@@ -43,10 +43,14 @@ public static class SubsetGate
 
         private readonly HashSet<int> _walkedEnums = [];
 
-        private void Refuse(Span span, string what, string milestone)
+        /// <summary>What the lowering does not translate: not yet there, or — <paramref name="bug"/> — a
+        /// case it should have and a defect of its own.</summary>
+        private void Refuse(Span span, string what, bool bug = false)
         {
             Refused = true;
-            diagnostics.Report(NotYet, Severity.Error, span, $"not yet in Lyric 5: {what} ({milestone})");
+            diagnostics.Report(NotYet, Severity.Error, span, bug
+                ? $"not yet in Lyric 5: {what} — a compiler bug, worth a report"
+                : $"not yet in Lyric 5: {what}");
         }
 
         public void Module()
@@ -84,7 +88,7 @@ public static class SubsetGate
                 case IrRefType r when module.Types.Any(t => t.Variants.Contains(r.Type)):
                     break;
                 case IrRefType r:
-                    Refuse(span, $"the reference type '{module.Types[r.Type.Value].Name}', {where}", "a later milestone");
+                    Refuse(span, $"the reference type '{module.Types[r.Type.Value].Name}', {where}");
                     break;
                 case IrArrayType array:
                     Type(array.Element, span, where);
@@ -121,10 +125,10 @@ public static class SubsetGate
                     Type(p.Value, span, where);
                     break;
                 case IrHostType:
-                    Refuse(span, $"host types, {where}", "M14");
+                    Refuse(span, $"host types, {where}");
                     break;
                 default:
-                    Refuse(span, $"the type {type}, {where}", "no milestone: a compiler bug");
+                    Refuse(span, $"the type {type}, {where}", bug: true);
                     break;
             }
         }
@@ -156,13 +160,11 @@ public static class SubsetGate
                         // the natives have no runtime call, and never will
                         Refused = true;
                         diagnostics.Report(ComptimeOnly, Severity.Error, op.Span,
-                            $"'{name["std.".Length..]}' runs at compile time only: a syntax tree is read, built and written inside 'comptime' (09 Q3)");
+                            $"'{name["std.".Length..]}' runs at compile time only: a syntax tree is read, built and written inside 'comptime'");
                     }
                     else if (!Intrinsics.Contains(name) && !Compiler.Intrinsics.IsForeign(name))
-                        // M8a was named here, as if it would bring a program's own natives; nothing
-                        // does — a program declares 'extern "C"' (N1b)
-                        Refuse(op.Span, $"the native function '{name}'",
-                            "no milestone: a function without a body is the standard library's — a program reaches C through 'extern \"C\"'");
+                        // nothing brings a program's own natives: a program declares 'extern "C"'
+                        Refuse(op.Span, $"the native function '{name}' — a function without a body is the standard library's; a program reaches C through 'extern \"C\"'");
                     break;
                 }
                 case NewObject n:
@@ -184,7 +186,7 @@ public static class SubsetGate
                 // std.core's 'repeatArray' under 'Clone' (M4 S9); an instruction over objects
                 // here is one it missed — unless it shares on purpose, std.core's 'filled' (S16).
                 case ArrayRepeat r when HoldsObject(r.Element) && !r.Shares:
-                    Refuse(op.Span, "'[x] * n' with an element that is or holds an object as an instruction — the sema desugars it through 'Clone'", "no milestone: a compiler bug");
+                    Refuse(op.Span, "'[x] * n' with an element that is or holds an object as an instruction — the sema desugars it through 'Clone'", bug: true);
                     break;
                 case ArrayRepeat:
                     break;
@@ -215,7 +217,7 @@ public static class SubsetGate
                     or CoroutineClosing or CoroutineClose:
                     break;
                 default:
-                    Refuse(op.Span, $"the instruction {op.GetType().Name}", "a later milestone");
+                    Refuse(op.Span, $"the instruction {op.GetType().Name}");
                     break;
             }
         }
@@ -242,7 +244,7 @@ public static class SubsetGate
                 case Return or Branch or CondBranch or Unreachable or Throw or ErrorBranch or Propagate or PanicError:
                     break;
                 default:
-                    Refuse(at, $"the terminator {terminator.GetType().Name}", "a later milestone");
+                    Refuse(at, $"the terminator {terminator.GetType().Name}");
                     break;
             }
         }

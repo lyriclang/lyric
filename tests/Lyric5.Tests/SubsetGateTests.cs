@@ -64,12 +64,12 @@ public class SubsetGateTests
     // element without 'Clone' (LYR-SEM0136) and desugars the rest, so no such instruction
     // reaches the gate — OptionalEqualityAndRepeatTests pins it.
     [Theory]
-    [InlineData("import std.notyet { tick };\nfn main(): int { return tick(); }", "the native function 'std.notyet.tick'", "no milestone: a function without a body is the standard library's — a program reaches C through 'extern \"C\"'")]
-    public void A_construct_outside_the_core_names_its_milestone(string source, string what, string milestone)
+    [InlineData("import std.notyet { tick };\nfn main(): int { return tick(); }", "the native function 'std.notyet.tick'", "a function without a body is the standard library's; a program reaches C through 'extern \"C\"'")]
+    public void A_construct_outside_the_core_says_why(string source, string what, string why)
     {
         var refusals = Refusals(source);
         Assert.NotEmpty(refusals);
-        Assert.Contains(refusals, r => r.Contains(what) && r.EndsWith($"({milestone})"));
+        Assert.Contains(refusals, r => r.Contains(what) && r.EndsWith(why));
     }
 
     [Fact]

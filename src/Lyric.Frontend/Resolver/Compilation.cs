@@ -280,7 +280,7 @@ public sealed class Compilation
         // a header that names nothing is Lyric 5's: where the module's attributes stand (09 T7)
         if (Lyric5Modules && ast.Header is { Segments.Length: > 0 } header)
             _de.Report("LYR-RES0008", Severity.Error, header.Span,
-                "a module is named by its path: the 'module' header is gone (07 M2)");
+                "a module is named by its path: the 'module' header is gone");
 
         var path = name is not null ? name.Split('.')
                  : ast.Header is not null && !Lyric5Modules ? ast.Header.Segments

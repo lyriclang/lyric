@@ -198,7 +198,7 @@ public class ManifestTests
         var e = Assert.Throws<ManifestException>(() => Manifest.Read(Write(
             "[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[override]\ngeo = { git = \"https://example.org/geo\" }\n")));
         Assert.Equal("LYR-PKG0003", e.Code);
-        Assert.Contains("an override reads a directory (07 P7)", e.Message);
+        Assert.Contains("an override reads a directory: ", e.Message);
     }
 
     [Fact]
