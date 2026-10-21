@@ -26,8 +26,11 @@ public sealed class DiagnosticTextTests
     /// matched, and no diagnostic message is written as one.</summary>
     private static readonly Regex StringLiteral = new("\"(?:[^\"\\\\\\n]|\\\\.)*\"", RegexOptions.Compiled);
 
-    /// <summary>What must not stand inside one: a section sign, or the name of a document.</summary>
-    private static readonly Regex Citation = new("§|\\.md\\b", RegexOptions.Compiled);
+    /// <summary>What must not stand inside one: a section sign, the name of a document, a decision's
+    /// label — <c>(07 K5)</c>, <c>11 W3</c> — or a milestone: a reader of a message has none of them.</summary>
+    private static readonly Regex Citation = new(
+        @"§|\.md\b|design/v5|\((?:\d{2}\s+)?[A-Z]{1,2}\d{1,2}[a-z]?\b|\b(?:0\d|1[0-4]) [A-Z]{1,2}\d{1,2}[a-z]?\b|\bM\d{1,2}[a-c]?\b(?!\.\d)",
+        RegexOptions.Compiled);
 
     public static TheoryData<string> ProductionSources()
     {

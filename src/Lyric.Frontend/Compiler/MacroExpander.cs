@@ -148,7 +148,7 @@ public static class MacroExpander
                         break;
                     case FunctionSymbol { IsMacro: true } own:
                         diagnostics.Report("LYR-SEM0189", Severity.Error, site.Span,
-                            $"'{site.Written}' is written in the module that declares the macro '{own.Name}': a macro expands in the modules that import it, and its own module checks it first (13 M9b P6) - move the site, or the macro");
+                            $"'{site.Written}' is written in the module that declares the macro '{own.Name}': a macro expands in the modules that import it, and its own module checks it first — move the site, or the macro");
                         failed = true;
                         break;
                     case null:
@@ -284,7 +284,7 @@ public static class MacroExpander
             {
                 diagnostics.Report("LYR-SEM0191", Severity.Error, site.Span,
                     $"'{macro.Name}!' takes {function.ParamCount} argument{(function.ParamCount == 1 ? "" : "s")}, {written.Length} {(written.Length == 1 ? "is" : "are")} written"
-                    + (kind is "Block" or "Stmt[]" ? $" - the last, '{kind}', may stand as a trailing block" : ""));
+                    + (kind is "Block" or "Stmt[]" ? $" — the last, '{kind}', may stand as a trailing block" : ""));
                 return null;
             }
             var argument = written[next++];
@@ -292,7 +292,7 @@ public static class MacroExpander
             if (value is null)
             {
                 diagnostics.Report("LYR-SEM0191", Severity.Error, argument.Span,
-                    $"'{macro.Name}!' takes {Describe(kind)} here, and this argument is no {Describe(kind)}");
+                    $"'{macro.Name}!' takes {Describe(kind)} here, and this argument is not {Describe(kind)}");
                 return null;
             }
             values[i] = value.Value;
@@ -301,7 +301,7 @@ public static class MacroExpander
         {
             diagnostics.Report("LYR-SEM0191", Severity.Error, site.Span,
                 $"'{macro.Name}!' takes {function.ParamCount} argument{(function.ParamCount == 1 ? "" : "s")}, more are written"
-                + (call.Trailing is not null && !trailingUsed ? " - the trailing block needs a last parameter of type 'Block' or 'Stmt[]'" : ""));
+                + (call.Trailing is not null && !trailingUsed ? " — the trailing block needs a last parameter of type 'Block' or 'Stmt[]'" : ""));
             return null;
         }
         return values;
@@ -542,7 +542,7 @@ public static class MacroExpander
                 if (site.Statement is null)
                 {
                     diagnostics.Report("LYR-SEM0188", Severity.Error, site.Span,
-                        $"'{macro.Name}!' gives statements back, and stands where an expression is needed - write it as a statement of its own");
+                        $"'{macro.Name}!' gives statements back, and stands where an expression is needed — write it as a statement of its own");
                     return false;
                 }
                 // statements stand where no value is taken: a tail among them is the statement it is
@@ -559,7 +559,7 @@ public static class MacroExpander
             }
             default:
                 diagnostics.Report("LYR-SEM0188", Severity.Error, site.Span,
-                    $"'{macro.Name}!' gives '{kind}' back, which no site of this form takes: an expression or statements stand here - a macro that gives declarations is an attribute, '@{macro.Name}' on the declaration it rewrites (13 M9b S4)");
+                    $"'{macro.Name}!' gives '{kind}' back, which no site of this form takes: an expression or statements stand here — a macro that gives declarations is an attribute, '@{macro.Name}' on the declaration it rewrites");
                 return false;
         }
     }

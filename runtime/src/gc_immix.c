@@ -629,7 +629,7 @@ static void resume_running(Thread *t, int stopped) {
 
 static Thread *current(void) {
     Thread *t = self;
-    if (LYR_UNLIKELY(t == NULL)) lyr_panic(LYR_RT_SYSTEM, "a thread allocates without being attached to the collector");
+    if (LYR_UNLIKELY(t == NULL)) lyr_panic(LYR_RT_INVARIANT, "a thread allocates without being attached to the collector");
     return t;
 }
 
@@ -641,7 +641,7 @@ static void parse(Thread *t, Buffer *buffer) {
     while (at < buffer->cursor) {
         size_t bytes = object_bytes((const LyrObj *)at);
         if (LYR_UNLIKELY(bytes == 0)) {
-            lyr_panic(LYR_RT_SYSTEM, "an object of %s has no size: its descriptor does not say what it is",
+            lyr_panic(LYR_RT_INVARIANT, "an object of %s has no size: its descriptor does not say what it is",
                       ((const LyrObj *)at)->desc->name);
         }
         set_start(at);
@@ -1661,7 +1661,7 @@ LYR_NO_SANITIZE static void verify_object(uintptr_t start) {
         if (!in_heap(value) || value % GRANULE != 0) continue;
         uintptr_t target = object_of(value);
         if (target == value && !bit(mark_bits, granule_of(target))) {
-            lyr_panic(LYR_RT_SYSTEM, "the map of %s does not name its word at offset %zu, which points at an unmarked %s",
+            lyr_panic(LYR_RT_INVARIANT, "the map of %s does not name its word at offset %zu, which points at an unmarked %s",
                       desc->name, at, ((const LyrObj *)target)->desc->name);
         }
     }
@@ -1702,7 +1702,7 @@ LYR_NO_SANITIZE static void check_store(const char *name, uintptr_t start, size_
     if (now == then || lyr_gc_cards[line_of(at)]) return;
     uintptr_t target = object_of(now);
     if (target == 0 || bit(mark_bits, granule_of(target))) return;
-    lyr_panic(LYR_RT_SYSTEM, "%s holds at offset %zu a young %s, stored without its barrier: its card is clean",
+    lyr_panic(LYR_RT_INVARIANT, "%s holds at offset %zu a young %s, stored without its barrier: its card is clean",
               name, offset, ((const LyrObj *)target)->desc->name);
 }
 

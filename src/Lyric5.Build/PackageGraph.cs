@@ -139,7 +139,7 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
             && SemVer.Parse(manifest.Version) is { } carried && tagged.CompareTo(carried) != 0)
             throw new ManifestException("LYR-PKG0006", declaring, at.Line, 1,
                 $"tag '{tag}' of {at.Git.Url} holds '{name}' at version {manifest.Version} — a tag that is a version "
-                + "names the version the package's manifest gives, by which the build chooses among versions (07 P4)");
+                + "names the version the package's manifest gives, by which the build chooses among versions");
         return new Node(at, manifest, revision is null ? null : revision with { Version = manifest.Version });
     }
 
@@ -186,9 +186,9 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
                        && SemVer.OfTag(x.Ref!) is not null && SemVer.OfTag(y.Ref!) is not null;
         return versions
             ? $"'{name}' is asked for at tag '{first.Git!.Ref}' and at tag '{second.Git!.Ref}' of {first.Git.Url}: two incompatible "
-              + $"versions — a program holds one package of each name (07 P3); [override] in '{root}' picks the one"
+              + $"versions — a program holds one package of each name; [override] in '{root}' picks the one"
             : $"'{name}' is read from {first.Describe()} and from {second.Describe()} — a program holds one "
-              + $"package of each name (07 P3); [override] in '{root}' picks the one";
+              + $"package of each name; [override] in '{root}' picks the one";
     }
 
     private static bool SameDirectory(string a, string b) =>

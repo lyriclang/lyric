@@ -519,7 +519,7 @@ public sealed class Resolver
         if (_comp.Lyric5Modules && _comp.Builtins.LookupLocal(sym.Name) is TypeSymbol)
         {
             _de.Report("LYR-RES0011", Severity.Error, decl.Span,
-                $"'{sym.Name}' is a builtin type — no declaration takes its name (07 K5)");
+                $"'{sym.Name}' is a builtin type — no declaration takes its name");
             return;
         }
         if (!module.Members.TryDeclare(sym))
@@ -602,7 +602,7 @@ public sealed class Resolver
             var to = Compilation.PackageOf(target);
             if (from != to && to != "std" && !(declared.TryGetValue(from, out var own) && own.Contains(to)))
                 _de.Report("LYR-RES0014", Severity.Error, imp.Span,
-                    $"package '{to}' is no dependency of '{from}' — a package imports what its lyric.toml declares (07 P6)");
+                    $"package '{to}' is no dependency of '{from}' — a package imports what its lyric.toml declares");
         }
 
         switch (imp.Clause)
@@ -716,7 +716,7 @@ public sealed class Resolver
                 if (symbol is ImportBindingSymbol { Target: ModuleSymbol itself } && itself.Path.SequenceEqual(path)) continue;
                 _de.Report("LYR-RES0012", Severity.Error, declaration.Span,
                     $"'{symbol.Name}' in module '{module.FullName}' is also the module '{string.Join('.', path)}' — "
-                    + "one name has one meaning in a module (07 K1)");
+                    + "one name has one meaning in a module");
             }
     }
 

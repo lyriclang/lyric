@@ -88,7 +88,7 @@ public sealed partial class Parser
         var expr = ParseExpr(0);
         if (!_buffer.AtEnd)
             _de.Report("LYR-PAR0001", Severity.Error, _buffer.Current.Span,
-                $"unexpected token after expression: {_buffer.Current.TokenKind}");
+                $"unexpected token after expression: {Shown(_buffer.Current)}");
         return expr;
     }
 
@@ -101,7 +101,7 @@ public sealed partial class Parser
         var block = ParseValueBlock();
         if (!_buffer.AtEnd)
             _de.Report("LYR-PAR0001", Severity.Error, _buffer.Current.Span,
-                $"unexpected token after expression: {_buffer.Current.TokenKind}");
+                $"unexpected token after expression: {Shown(_buffer.Current)}");
         return block;
     }
 
@@ -205,6 +205,16 @@ public sealed partial class Parser
     /// <summary>The marks to the right of an operator in each expression being read, innermost
     /// last (<see cref="TryReach"/>); <c>null</c> for an expression that has met none — nearly
     /// every one.</summary>
+    /// <summary>A token as a message says it: as it is written — <c>';'</c>, <c>'while'</c> —, or the
+    /// end of the file. The 4.x tools, whose goldens hold them, keep the kind's name.</summary>
+    private string Shown(Token token)
+    {
+        if (!_sm.Lyric5) return token.TokenKind.ToString();
+        if (token.TokenKind == TokenKind.Eof || token.Span.End <= token.Span.Start) return "the end of the file";
+        var text = _sm.GetText(token.Span.File)[token.Span.Start..token.Span.End];
+        return text.Length > 24 ? $"'{text[..21]}…'" : $"'{text}'";
+    }
+
     private readonly List<List<TryReach>?> _marks = new();
 
     private Expr ParseExprInner(int minBp)
@@ -549,7 +559,7 @@ public sealed partial class Parser
                         break;
                     }
                     var name = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0003",
-                        $"expected member name after '.', got {_buffer.Current.TokenKind}");
+                        $"expected member name after '.', got {Shown(_buffer.Current)}");
                     operand = new MemberExpr(operand, _sm.Slice(name.Span).ToString(), false,
                         Span.Union(Whole(operand), name.Span)) { MemberSpan = name.Span };
                     break;
@@ -558,7 +568,7 @@ public sealed partial class Parser
                 {
                     _buffer.Advance();
                     var name = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0003",
-                        $"expected member name after '?.', got {_buffer.Current.TokenKind}");
+                        $"expected member name after '?.', got {Shown(_buffer.Current)}");
                     operand = new MemberExpr(operand, _sm.Slice(name.Span).ToString(), true,
                         Span.Union(Whole(operand), name.Span)) { MemberSpan = name.Span };
                     break;
@@ -815,7 +825,7 @@ public sealed partial class Parser
                 return ParseParenOrTupleOrLambda();
             default:
             {
-                _de.Report("LYR-PAR0002", Severity.Error, cur.Span, $"expected an expression, got {cur.TokenKind}");
+                _de.Report("LYR-PAR0002", Severity.Error, cur.Span, $"expected an expression, got {Shown(cur)}");
                 // Closing tokens are not consumed: they end the surrounding construct and serve
                 // its recovery.
                 if (cur.TokenKind is not (TokenKind.Eof or TokenKind.RParen or TokenKind.RBracket
@@ -1112,7 +1122,7 @@ public sealed partial class Parser
         while (_buffer.Match(TokenKind.Dot))
         {
             var segment = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-                $"expected type name, got {_buffer.Current.TokenKind}");
+                $"expected type name, got {Shown(_buffer.Current)}");
             path.Add(_sm.Slice(segment.Span).ToString());
             nameSpan = segment.Span;
         }
@@ -1154,7 +1164,7 @@ public sealed partial class Parser
         while (_buffer.Match(TokenKind.Dot))
         {
             var segment = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-                $"expected type name, got {_buffer.Current.TokenKind}");
+                $"expected type name, got {Shown(_buffer.Current)}");
             path.Add(_sm.Slice(segment.Span).ToString());
             nameSpan = segment.Span;
         }
@@ -1168,7 +1178,7 @@ public sealed partial class Parser
             while (_buffer.Match(TokenKind.Dot))
             {
                 var variant = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-                    $"expected variant name, got {_buffer.Current.TokenKind}");
+                    $"expected variant name, got {Shown(_buffer.Current)}");
                 path.Add(_sm.Slice(variant.Span).ToString());
                 nameSpan = variant.Span;
             }
@@ -1221,7 +1231,7 @@ public sealed partial class Parser
                 continue;
             }
             var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-                $"expected field name, got {_buffer.Current.TokenKind}");
+                $"expected field name, got {Shown(_buffer.Current)}");
             var fieldName = _sm.Slice(nameTok.Span).ToString();
             // 'S { v, w }' (02 I3): a name alone is 'v = v', the field from the binding of its name.
             if (nameTok.TokenKind == TokenKind.Identifier && _buffer.Current.TokenKind is TokenKind.Comma or TokenKind.RBrace)
@@ -1376,7 +1386,7 @@ public sealed partial class Parser
                 else
                 {
                     var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0013",
-                        $"expected lambda parameter name, got {_buffer.Current.TokenKind}");
+                        $"expected lambda parameter name, got {Shown(_buffer.Current)}");
                     TypeNode? type = null;
                     if (_buffer.Match(TokenKind.Colon)) type = ParseType();
                     var pstart = mark ?? nameTok.Span;
@@ -1404,7 +1414,7 @@ public sealed partial class Parser
         }
 
         _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0012",
-            $"expected '=>' in lambda, got {_buffer.Current.TokenKind}");
+            $"expected '=>' in lambda, got {Shown(_buffer.Current)}");
 
         // Body: an expression or a block, '=> expr' or '=> { ... }'. The block is a value block:
         // its tail is the lambda's result, like 'return tail;' at its end.
@@ -1579,14 +1589,14 @@ public sealed partial class Parser
                 else
                 {
                     var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0013",
-                        $"expected lambda parameter name, got {_buffer.Current.TokenKind}");
+                        $"expected lambda parameter name, got {Shown(_buffer.Current)}");
                     parameters.Add(new LambdaParam(_sm.Slice(nameTok.Span).ToString(), null,
                         mark is { } from ? Span.Union(from, nameTok.Span) : nameTok.Span)
                         { NameSpan = nameTok.Span, IsPlace = mark is not null });
                 }
                 if (!_buffer.Match(TokenKind.Comma)) break;
             }
-            _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0012", $"expected '=>' after the parameters, got {_buffer.Current.TokenKind}");
+            _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0012", $"expected '=>' after the parameters, got {Shown(_buffer.Current)}");
             var rest = OutsideLoops(() => ParseBlockRest(open, valueBlock: true));
             return new LambdaExpr(parameters.ToArray(), null, rest, Span.Union(open.Span, rest.Span)) { Form = LambdaForm.Trailing };
         }
@@ -1846,7 +1856,7 @@ public sealed partial class Parser
                        && _buffer.Match(TokenKind.Dot))
                 {
                     var seg = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0011",
-                        $"expected identifier in type path, got {_buffer.Current.TokenKind}");
+                        $"expected identifier in type path, got {Shown(_buffer.Current)}");
                     path.Add(_sm.Slice(seg.Span).ToString());
                     end = seg.Span;
                     nameSpan = seg.Span;
@@ -1862,7 +1872,7 @@ public sealed partial class Parser
                     { NameSpan = nameSpan, ArgumentNames = names };
             }
             default:
-                _de.Report("LYR-PAR0011", Severity.Error, cur.Span, $"expected a type, got {cur.TokenKind}");
+                _de.Report("LYR-PAR0011", Severity.Error, cur.Span, $"expected a type, got {Shown(cur)}");
                 return new ErrorType(cur.Span);
         }
     }
@@ -1882,7 +1892,7 @@ public sealed partial class Parser
             } while (_buffer.Match(TokenKind.Comma));
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' in function type");
         _buffer.Expect(TokenKind.Arrow, "LYR-PAR0015",
-            $"expected '->' in function type, got {_buffer.Current.TokenKind}");
+            $"expected '->' in function type, got {Shown(_buffer.Current)}");
         // A 'throws' after the return type is the function TYPE's set (03 T17): the return type is
         // read without the coroutine suffix.
         _groupedType = null;
@@ -2005,7 +2015,7 @@ public sealed partial class Parser
             _buffer.SplitCurrentGreater();
 
         closeSpan = _buffer.Expect(TokenKind.Greater, "LYR-PAR0009",
-            $"expected '>' to close type arguments, got {_buffer.Current.TokenKind}").Span;
+            $"expected '>' to close type arguments, got {Shown(_buffer.Current)}").Span;
         return args.ToArray();
     }
 }

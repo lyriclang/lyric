@@ -654,8 +654,8 @@ public sealed class TypeChecker
                     // The one word an interface member takes: 'private' on a helper with a body.
                     if (member.Visibility == VisibilityWord.None || member.IsPrivateHelper) continue;
                     _de.Report("LYR-SEM0118", Severity.Error, member.NameSpan, member.Visibility == VisibilityWord.Private
-                        ? $"'private' on '{member.Name}' — a private member of an interface is a helper and has a body; a requirement takes no word (07 V2 S4)"
-                        : $"'{Word(member.Visibility)}' on '{member.Name}' — an interface's members are as visible as the interface (07 V2 S4); drop it");
+                        ? $"'private' on '{member.Name}' — a private member of an interface is a helper and has a body; a requirement takes no word"
+                        : $"'{Word(member.Visibility)}' on '{member.Name}' — an interface's members are as visible as the interface; drop it");
                 }
                 if (module.Members.LookupLocal(i.Name) is TypeSymbol iface)
                     CheckOverloadSets(iface.Members, $"interface '{i.Name}'", inInterface: true);
@@ -2713,7 +2713,7 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0186", Severity.Error, fn.ReturnType?.Span ?? fn.NameSpan,
                 $"a macro gives syntax back: '{fn.Name}' needs a return type of std.syntax (Expr, Stmt[], Block, Decl ...), which is what stands at the site");
         if (fn.Generics.Length > 0)
-            _de.Report("LYR-SEM0186", Severity.Error, fn.Generics[0].Span, $"a macro has no type parameters: '{fn.Name}' sees syntax, which carries no types (13 M9b P9)");
+            _de.Report("LYR-SEM0186", Severity.Error, fn.Generics[0].Span, $"a macro has no type parameters: '{fn.Name}' sees syntax, which carries no types");
         // an attribute macro (13 M9b S4): its first parameter a declaration, its result one or several
         if (fn.Parameters.Length > 0 && IsDeclarationKind(fn.Parameters[0].Type) && fn.ReturnType is { } ret && Syntactic(ret)
             && !(ret is NamedType { Path: ["Decl"] } or ArrayType { Element: NamedType { Path: ["Decl"] } }))
@@ -2736,7 +2736,7 @@ public sealed class TypeChecker
     {
         var syntax = _comp.FindModule(["std", "syntax"]);
         if (syntax is null)
-            return Report(q.Span, "LYR-SEM0194", "'quote' builds a tree of std.syntax, which this program does not reach - 'import std.syntax;' first");
+            return Report(q.Span, "LYR-SEM0194", "'quote' builds a tree of std.syntax, which this program does not reach — 'import std.syntax;' first");
         LyrType Of(string name) => syntax.Members.LookupLocal(name) is TypeSymbol t ? new NamedRef(t) : LyrType.Error;
         string? KindOf(LyrType? t) => t switch
         {
@@ -3017,7 +3017,7 @@ public sealed class TypeChecker
                     else if (r.Value is not null)
                         CheckAssignable(r.Value, CheckExpr(r.Value, scope, ending.Result), ending.Result, r.Span);
                     else if (!TypeFacts.IsVoid(ending.Result) && !ending.Result.IsError)
-                        _de.Report("LYR-SEM0001", Severity.Error, r.Span,
+                        _de.Report(Lyric5Code("LYR-SEM0226"), Severity.Error, r.Span,
                             $"'return' without a value in a coroutine whose result is '{TypeFacts.Display(ending.Result)}'");
                 }
                 // A block lambda inferring its return type: the returns are COLLECTED here and
@@ -3034,7 +3034,7 @@ public sealed class TypeChecker
                 }
                 else if (r.Value is not null) CheckAssignable(r.Value, CheckExpr(r.Value, scope, _currentReturn), _currentReturn, r.Span);
                 else if (!TypeFacts.IsVoid(_currentReturn) && !_currentReturn.IsError)
-                    _de.Report("LYR-SEM0001", Severity.Error, r.Span, "return without a value in a non-void function");
+                    _de.Report(Lyric5Code("LYR-SEM0226"), Severity.Error, r.Span, "return without a value in a non-void function");
                 break;
             case ExprStmt es:
             {
@@ -4365,7 +4365,7 @@ public sealed class TypeChecker
                 _result.SetType(one, inline);
                 _result.SetType(count, LyrType.Int);
                 if (count.Value != (ulong)inline.Length)
-                    return Report(repeat.Span, "LYR-SEM0001",
+                    return Report(repeat.Span, Lyric5Code("LYR-SEM0228"),
                         $"'{TypeFacts.Display(inline)}' holds {inline.Length} elements; the repetition makes {count.Value}");
                 return inline;
             }
@@ -6384,7 +6384,7 @@ public sealed class TypeChecker
         {
             case TypeParamType tp:
                 _de.Report("LYR-SEM0131", Severity.Error, span,
-                    $"no type test on the type parameter '{tp.Param.Name}' (03 T11): a value of 'Any' is what a dynamic test takes");
+                    $"no type test on the type parameter '{tp.Param.Name}': a value of 'Any' is what a dynamic test takes");
                 return false;
             case NamedRef { Symbol.Kind: TypeSymbolKind.Interface } or GenericInstance { Definition.Kind: TypeSymbolKind.Interface }:
                 if (!ValueUsable(TypeFacts.SymbolOf(target)!, out var reason, target))
@@ -6947,7 +6947,7 @@ public sealed class TypeChecker
             foreach (var element in arr.Elements)
                 CheckAssignable(element, CheckExpr(element, scope, inline.Element), inline.Element, element.Span);
             if (arr.Elements.Length != inline.Length)
-                return Report(arr.Span, "LYR-SEM0001",
+                return Report(arr.Span, Lyric5Code("LYR-SEM0228"),
                     $"'{TypeFacts.Display(inline)}' holds {inline.Length} elements; the literal has {arr.Elements.Length}");
             return inline;
         }
@@ -7007,7 +7007,7 @@ public sealed class TypeChecker
         {
             foreach (var leftover in call.Arguments) CheckOrphanArgument(leftover, scope);
             return Report(call.Callee.Span, "LYR-SEM0187",
-                $"'{macro.Name}' is a macro: its expansion is written '{macro.Name}!(...)' (08 Y12), and a macro is never called as a function nor used as a value");
+                $"'{macro.Name}' is a macro: its expansion is written '{macro.Name}!(...)', and a macro is never called as a function nor used as a value");
         }
         if (call.Callee is IdentifierExpr bare && PastAField(bare, scope) is { } past)
         {
@@ -7475,7 +7475,7 @@ public sealed class TypeChecker
             // Nothing widens and nothing is wrapped: the callee writes the parameter's type into
             // the caller's place.
             if (!argTypes[i]!.IsError && !fn.Parameters[i].IsError && !LyrType.Equal(argTypes[i]!, fn.Parameters[i]))
-                _de.Report("LYR-SEM0001", Severity.Error, a.Span,
+                _de.Report(Lyric5Code("LYR-SEM0229"), Severity.Error, a.Span,
                     $"a place of '{TypeFacts.Display(argTypes[i]!)}' is no place of '{TypeFacts.Display(fn.Parameters[i])}' — "
                     + "a place parameter takes its type exactly, nothing widens into it");
         }
@@ -8548,8 +8548,8 @@ public sealed class TypeChecker
 
     private void RefuseNever(AssociatedTypeSymbol member, Span at) =>
         _de.Report("LYR-SEM0145", Severity.Error, at,
-            $"'never' answers '{member.Owner?.Name}.{member.Name}' only where its bound is 'Error' — an empty thrown set "
-            + "(05 E2 K4); anywhere else it would type a value that cannot exist");
+            $"'never' answers '{member.Owner?.Name}.{member.Name}' only where its bound is 'Error' — an empty thrown set; "
+            + "anywhere else it would type a value that cannot exist");
 
     /// <summary>A written <c>never</c> as a type argument (05, "Review 2026-10-09" S5; M8c S17):
     /// the empty thrown set where the parameter's bound is <c>Error</c> — <c>DedupIter&lt;I, never&gt;</c>,
@@ -8564,7 +8564,7 @@ public sealed class TypeChecker
                 && Conformance.WithParents(bound, _binding).Any(p => ReferenceEquals(p, root))))
             return;
         _de.Report("LYR-SEM0145", Severity.Error, at,
-            $"'never' stands for '{param.Name}' only where its bound is 'Error' — an empty thrown set (05 E2 K4); "
+            $"'never' stands for '{param.Name}' only where its bound is 'Error' — an empty thrown set; "
             + "anywhere else it would type a value that cannot exist");
     }
 
@@ -9416,6 +9416,11 @@ public sealed class TypeChecker
 
     /// <summary>Whether the module being checked may name this member (07 V2) — for the sets a
     /// call chooses from, where what may not be named is not there.</summary>
+    /// <summary>A code of Lyric 5's own: where one rule of the shared front end was split off a code
+    /// the 4.x tools still report it under, their suites keep the old one.</summary>
+    private string Lyric5Code(string code, string before = "LYR-SEM0001") =>
+        _comp.Lyric5Modules ? code : code == "LYR-SEM0230" ? "LYR-SEM0047" : before;
+
     private bool MayName(Symbol symbol) => _currentModule is null || _comp.Visible(symbol, _currentModule);
 
     /// <summary>A candidate the lookup of <paramref name="member"/> passed over because this module
@@ -9525,7 +9530,7 @@ public sealed class TypeChecker
             if (ext.IsStatic)
                 _de.Report("LYR-SEM0074", Severity.Error, span,
                     $"'{member}' is a static extension and belongs to the type — "
-                    + $"call '{ts.Name}.{member}(…)'; the instance form is an error since 2.0");
+                    + $"call '{ts.Name}.{member}(…)'; the instance form is an error");
             return (ExtensionSignature(ext, span), ext);
         }
         if (DefaultMember(ts, member, span) is { } def)
@@ -12745,7 +12750,7 @@ public sealed class TypeChecker
     private static string? FamilyShapeRefusal(string family, TypeResult.MetaField field) => family switch
     {
         "Hashable" when field.Type is ArrayOf or SliceOf or InlineArrayOf { Element: ArrayOf or SliceOf } =>
-            $"the field '{field.Name}' is an array or a view, which is no Hashable (10 C8)",
+            $"the field '{field.Name}' is an array or a view, which is no Hashable",
         "Clone" when field.Type is SliceOf or FnType => $"a field of type '{TypeFacts.Display(field.Type)}' has no synthesized clone",
         _ => null,
     };
@@ -13803,7 +13808,7 @@ public sealed class TypeChecker
         if (TypeFacts.KindOf(liftedTo) == TypeSymbolKind.Interface && !LyrType.Equal(from, liftedTo) && !from.IsError
             && TypeFacts.SymbolOf(liftedTo) is { } through && OnlyThroughABlock(from, through, liftedTo))
         {
-            _de.Report("LYR-SEM0047", Severity.Error, span,
+            _de.Report(Lyric5Code("LYR-SEM0230"), Severity.Error, span,
                 $"'{TypeFacts.Display(from)}' is a '{through.Name}' through "
                 + (IsShape(from) ? "the block on its shape" : "a blanket block")
                 + $", and a value of '{through.Name}' made that way is not written yet — reach it through a constraint, "

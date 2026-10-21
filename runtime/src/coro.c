@@ -615,7 +615,7 @@ LyrCoro *lyr_coro_new(const LyrDesc *desc, LyrCoroBody body, void *arg, size_t s
     size_t page = page_bytes();
     size_t size = stack_size == 0 ? LYR_CORO_STACK_DEFAULT : (stack_size + page - 1) / page * page;
     if (LYR_UNLIKELY(!(desc->flags & LYR_DESC_CORO))) {
-        lyr_panic(LYR_RT_SYSTEM, "the descriptor of coroutine %s does not say LYR_DESC_CORO", desc->name);
+        lyr_panic(LYR_RT_INVARIANT, "the descriptor of coroutine %s does not say LYR_DESC_CORO", desc->name);
     }
     LyrCoro *co = lyr_gc_alloc_coro();
     co->header.desc = desc;

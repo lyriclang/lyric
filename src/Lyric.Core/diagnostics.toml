@@ -98,7 +98,7 @@ fn main(): void {
 title = "a construct the C backend does not translate"
 severity = "error"
 area = "16-diagnostics"
-summary = "The backend's subset gate meets something in the IR it has no translation for: a native function of the standard library without a runtime call, a host type, an IR instruction or type the emitter does not know. The message names the construct and the milestone that brings it, or says that it is a compiler bug."
+summary = "The backend's subset gate meets something in the IR it has no translation for: a native function of the standard library without a runtime call, a host type, an IR instruction or type the emitter does not know. The message names the construct, and says where it is a compiler bug."
 explanation = '''
 Every function a program reaches is translated to C; the gate before the emitter refuses what has no translation, so that nothing is compiled wrong in silence. A program of the shipped toolchain does not reach it: every native function of `stdlib5` has its runtime call, and a program reaches C only through `extern "C"`. Meeting the code means a standard library without its runtime counterpart, or a bug in the compiler.
 
@@ -106,7 +106,7 @@ Report the program that triggered it, with the message.
 '''
 example = '''
 $ lyric5 build
-error[LYR-CG0001]: not yet in Lyric 5: the native function 'std.notyet.tick' (no milestone: a function without a body is the standard library's — a program reaches C through 'extern "C"')
+error[LYR-CG0001]: not yet in Lyric 5: the native function 'std.notyet.tick' — a function without a body is the standard library's; a program reaches C through 'extern "C"'
  --> src/main.lyr:6:12
 '''
 
@@ -3966,11 +3966,26 @@ fn main(): void throws Error {
 }
 '''
 
+[LYR-RT0020]
+title = "the runtime found its own invariant broken"
+severity = "panic"
+area = "16-diagnostics"
+summary = "The runtime met a state its own rules exclude — a thread allocating that the collector does not know, an object whose descriptor gives no size, a pointer the collector's map of a type does not name, a young object stored without its barrier, a coroutine whose descriptor is no coroutine's. That is a bug in the runtime or in the compiler, never in the program."
+explanation = '''
+The collector and the coroutines check a few of their own invariants as they go, where breaking one would corrupt memory in silence. The panic names what was found; the program cannot cause it, whatever it does.
+
+Report the program with the message and the trace.
+'''
+example = '''
+$ ./out/debug/x86_64-linux-gnu/app
+panic[LYR-RT0020]: the map of app.Node does not name its word at offset 16, which points at an unmarked app.Leaf
+'''
+
 [LYR-SEM0001]
 title = "a value of another type than the place takes"
 severity = "error"
 area = "03-types"
-summary = "An expression's type does not fit where it stands: an initializer, an argument, a return value, an assignment. A bare `return;` in a function that returns a value, an integer literal too large for `int`, and an inline-array literal of the wrong length are reported under this code too."
+summary = "An expression's type does not fit where it stands: an initializer, an argument, a return value, an assignment."
 explanation = '''
 A place with a declared type takes values of that type and of the types that convert to it implicitly. Lyric widens little on its own: an `int` is no `float`, a `uint` is no `int`, an optional is no value of its inner type, and nothing becomes an interface it does not conform to.
 
@@ -5108,7 +5123,7 @@ fn main(): void {
 title = "an extend target or conversion not supported"
 severity = "error"
 area = "05-interfaces"
-summary = "An `extend` block targets an inline array `T[N]`, or a value is made into an interface it conforms to only through a block on a shape or a blanket conformance, which is not built yet."
+summary = "An `extend` block targets an inline array `T[N]`, or something that is no named type and no built-in constructor."
 explanation = '''
 An inline array has `length()`, `isEmpty()` and `toArray()`, and where it lies in the heap the members of a view; a block on it would add nothing reachable, so the block is written on `Slice<T>`. A value of an interface needs a method table for its type; for a conformance that comes only from a block on a shape or from a blanket block that table does not exist yet.
 
@@ -10717,5 +10732,185 @@ import app.shapes;
 
 fn main(): void {
     let _ = shapes.area(2, 3);
+}
+'''
+
+[LYR-SEM0226]
+title = "a 'return' without the value the function returns"
+severity = "error"
+area = "07-statements"
+summary = "A bare `return;` stands in a function, a lambda or a coroutine whose result is not `void`."
+explanation = '''
+A function that returns a value returns one on every path: `return;` leaves without it. Only a `void` function, and a coroutine whose result is `void`, ends with a bare `return;`.
+
+Write the value — `return 0;` — or change the result to `void`.
+'''
+wrong = '''
+fn twice(x: int): int {
+    if (x < 0) {
+        return;
+    }
+    return x * 2;
+}
+
+fn main(): void {
+    let _ = twice(1);
+}
+'''
+right = '''
+fn twice(x: int): int {
+    if (x < 0) {
+        return 0;
+    }
+    return x * 2;
+}
+
+fn main(): void {
+    let _ = twice(1);
+}
+'''
+
+[LYR-SEM0227]
+title = "an integer literal too large for 'int'"
+severity = "error"
+area = "01-lexical"
+summary = "An integer literal without a suffix whose type is `int` is greater than `int.max`."
+explanation = '''
+A literal takes its type from where it stands, `int` where nothing else is asked; one beyond `int.max` (9223372036854775807) does not fit, and a literal never wraps.
+
+Give it a type that holds it — an annotation `uint`, or the suffix `u` — or write a smaller number.
+'''
+wrong = '''
+fn main(): void {
+    let big = 9223372036854775808;
+    let _ = big;
+}
+'''
+right = '''
+fn main(): void {
+    let big: uint = 9223372036854775808;
+    let _ = big;
+}
+'''
+
+[LYR-SEM0228]
+title = "an inline array of another length"
+severity = "error"
+area = "03-types"
+summary = "An array literal or a repetition `[x] * n` that is to be an inline array `T[N]` makes another number of elements than `N`."
+explanation = '''
+An inline array holds exactly its length: `int[3]` is three `int`s, inline. A literal for it writes each of them, a repetition makes as many as it says; another count is no value of the type.
+
+Write `N` elements, or the length the elements have.
+'''
+wrong = '''
+fn main(): void {
+    let cells: int[3] = [1, 2];
+    let _ = cells;
+}
+'''
+right = '''
+fn main(): void {
+    let cells: int[3] = [1, 2, 3];
+    let _ = cells;
+}
+'''
+
+[LYR-SEM0229]
+title = "a place of another type than the place parameter"
+severity = "error"
+area = "03-types"
+summary = "A place argument `&x` is of another type than the place parameter `&p: T` it is passed to; nothing widens into a place."
+explanation = '''
+A place parameter is the caller's place itself: the callee writes a value of its type into it. A place of another type — an `int8` for an `int` — could not hold what is written, so a place takes its parameter's type exactly.
+
+Declare the place with the parameter's type, or pass a value instead of a place.
+'''
+wrong = '''
+fn increment(&n: int): void {
+    n += 1;
+}
+
+fn main(): void {
+    var small: int8 = 1;
+    increment(&small);
+    let _ = small;
+}
+'''
+right = '''
+fn increment(&n: int): void {
+    n += 1;
+}
+
+fn main(): void {
+    var small = 1;
+    increment(&small);
+    let _ = small;
+}
+'''
+
+[LYR-SEM0230]
+title = "an interface value made through a shape's or a blanket block"
+severity = "error"
+area = "05-interfaces"
+summary = "A value is made into an interface it conforms to only through a block on a shape or a blanket conformance: such a value is not built in this release."
+explanation = '''
+A value of an interface carries the method table of its type. For a conformance a block on a shape or a blanket block gives, that table is not made in this release, so a value of the interface cannot be made from it; calling the interface's methods on the value itself, or through a type parameter constrained by the interface, works.
+
+Reach the members through a constraint (`fn greet<T :: [Greeter]>(g: T)`), or conform the type to the interface in a block of its own.
+'''
+wrong = '''
+interface Named {
+    fn name(): string;
+}
+
+interface Greeter {
+    fn greeting(): string;
+}
+
+struct Cat :: [Named] {
+    fn name(): string {
+        return "cat";
+    }
+}
+
+extend<T :: [Named]> T :: [Greeter] {
+    fn greeting(): string {
+        return "hello " + this.name();
+    }
+}
+
+fn main(): void {
+    let g: Greeter = Cat { };
+    let _ = g;
+}
+'''
+right = '''
+interface Named {
+    fn name(): string;
+}
+
+interface Greeter {
+    fn greeting(): string;
+}
+
+struct Cat :: [Named] {
+    fn name(): string {
+        return "cat";
+    }
+}
+
+extend<T :: [Named]> T :: [Greeter] {
+    fn greeting(): string {
+        return "hello " + this.name();
+    }
+}
+
+fn greet<T :: [Greeter]>(g: T): string {
+    return g.greeting();
+}
+
+fn main(): void {
+    let _ = greet(Cat { });
 }
 '''

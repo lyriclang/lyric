@@ -232,7 +232,7 @@ public static partial class Program
         var compiler = profile.RequiresClang ? CCompiler.Locate(CCompilerKind.Clang) : CCompiler.Locate();
         if (compiler is null)
             Console.Error.WriteLine(profile.RequiresClang
-                ? $"error[LYR-CLI0002]: the {profile.Name} profile needs clang (01 C7), and none was found"
+                ? $"error[LYR-CLI0002]: the {profile.Name} profile needs clang, and none was found"
                 : "error[LYR-CLI0002]: no C compiler found — install zig (recommended), clang or gcc, or set LYRIC_CC");
         return compiler;
     }

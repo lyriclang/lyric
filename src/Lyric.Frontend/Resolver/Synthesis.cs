@@ -159,7 +159,7 @@ internal static class Synthesis
                 {
                     if (HashInto($"this.{f.Name}", f.Type) is not { } written)
                     {
-                        refusal = $"the field '{f.Name}' is an array or a view, which is no Hashable (10 C8)";
+                        refusal = $"the field '{f.Name}' is an array or a view, which is no Hashable";
                         return null;
                     }
                     sb.Append($"        {written}\n");
@@ -376,7 +376,7 @@ internal static class Synthesis
                     {
                         if (HashInto(names[k], types[k]) is not { } written)
                         {
-                            refusal = $"a payload of '{variants[i].Name}' is an array or a view, which is no Hashable (10 C8)";
+                            refusal = $"a payload of '{variants[i].Name}' is an array or a view, which is no Hashable";
                             return null;
                         }
                         parts.Add(written);

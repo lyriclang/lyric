@@ -17,7 +17,7 @@ public sealed partial class Parser
         var pattern = ParseOrPattern();
         if (!_buffer.AtEnd)
             _de.Report("LYR-PAR0001", Severity.Error, _buffer.Current.Span,
-                $"unexpected token after pattern: {_buffer.Current.TokenKind}");
+                $"unexpected token after pattern: {Shown(_buffer.Current)}");
         return pattern;
     }
 
@@ -82,7 +82,7 @@ public sealed partial class Parser
             case TokenKind.LBracket:
                 return ParseArrayPattern();
             default:
-                _de.Report("LYR-PAR0033", Severity.Error, cur.Span, $"expected a pattern, got {cur.TokenKind}");
+                _de.Report("LYR-PAR0033", Severity.Error, cur.Span, $"expected a pattern, got {Shown(cur)}");
                 if (cur.TokenKind is not (TokenKind.Eof or TokenKind.RParen or TokenKind.RBrace
                     or TokenKind.RBracket or TokenKind.Comma or TokenKind.FatArrow or TokenKind.Pipe))
                     _buffer.Advance();
@@ -103,7 +103,7 @@ public sealed partial class Parser
             if (_buffer.Current.TokenKind is not (TokenKind.IntLiteral or TokenKind.FloatLiteral))
             {
                 _de.Report("LYR-PAR0033", Severity.Error, _buffer.Current.Span,
-                    $"expected a numeric literal after '-' in a pattern, got {_buffer.Current.TokenKind}");
+                    $"expected a numeric literal after '-' in a pattern, got {Shown(_buffer.Current)}");
                 return new ErrorExpr(Span.Union(minus.Span, _buffer.Current.Span));
             }
 
@@ -118,7 +118,7 @@ public sealed partial class Parser
             or TokenKind.False or TokenKind.Null))
         {
             _de.Report("LYR-PAR0033", Severity.Error, _buffer.Current.Span,
-                $"expected a literal in a pattern, got {_buffer.Current.TokenKind}");
+                $"expected a literal in a pattern, got {Shown(_buffer.Current)}");
             var span = _buffer.Current.Span;
             return new ErrorExpr(span);
         }
@@ -134,7 +134,7 @@ public sealed partial class Parser
         while (_buffer.Match(TokenKind.Dot))
         {
             last = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-                $"expected identifier in pattern path, got {_buffer.Current.TokenKind}");
+                $"expected identifier in pattern path, got {Shown(_buffer.Current)}");
             path.Add(_sm.Slice(last.Span).ToString());
         }
 
@@ -215,7 +215,7 @@ public sealed partial class Parser
     private FieldPattern ParseFieldPattern()
     {
         var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
-            $"expected field name in pattern, got {_buffer.Current.TokenKind}");
+            $"expected field name in pattern, got {Shown(_buffer.Current)}");
         Pattern? sub = null;
         var end = nameTok.Span;
         if (_buffer.Match(TokenKind.Equal)) // x = Pattern
@@ -340,7 +340,7 @@ public sealed partial class Parser
             _guardHead = false;
             _inGuard = false;
         }
-        _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0034", $"expected '=>' in match arm, got {_buffer.Current.TokenKind}");
+        _buffer.Expect(TokenKind.FatArrow, "LYR-PAR0034", $"expected '=>' in match arm, got {Shown(_buffer.Current)}");
         // A block arm is a value block: in a match expression its tail is the arm's value.
         Node body = _buffer.Check(TokenKind.LBrace) ? ParseBlock(valueBlock: true) : ParseExpr(0);
         return new MatchArm(pattern, guard, body, Span.Union(pattern.Span, End(body)));

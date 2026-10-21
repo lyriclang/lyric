@@ -230,7 +230,7 @@ public sealed class SemaRules
     private void Refuse(Span at, string what, Visibility level, TypeSymbol type) =>
         _de.Report("LYR-SEM0151", Severity.Error, at,
             $"{what} is {Word(level)}, but it names '{type.Name}', which is {Word(type.Visibility)} — "
-            + "a declaration is no more visible than the types it names (07 V2 S2)");
+            + "a declaration is no more visible than the types it names");
 
     private static Visibility Narrow(Visibility own, Visibility owner) => own < owner ? own : owner;
 
@@ -454,7 +454,7 @@ public sealed class SemaRules
         if (mains.Count == 0)
         {
             _de.Report("LYR-SEM0021", Severity.Error, new Span(ast.Span.File, 0, 0),
-                $"module '{entry.FullName}' has no 'main' to start the program from (07 M7a)");
+                $"module '{entry.FullName}' has no 'main' to start the program from");
             return;
         }
 
@@ -462,7 +462,7 @@ public sealed class SemaRules
             if (main.Parameters.Length > 0 || !ValidMain(main))
                 _de.Report("LYR-SEM0021", Severity.Error, main.Span,
                     "'main' is 'fn main(): void' or 'fn main(): int', and may declare 'throws'; it takes no "
-                    + "parameters — the arguments come from the standard library (07 M7b)");
+                    + "parameters — the arguments come from the standard library");
 
         for (var i = 1; i < mains.Count; i++)
             _de.Report("LYR-SEM0021", Severity.Error, mains[i].Span, "duplicate 'main' function");

@@ -55,7 +55,7 @@ public static class BuildScripts
                 var (file, line) = DeclaredAt(graph, manifest.Name) ?? (root.File, 1);
                 Say.Manifest(error, new ManifestException("LYR-PKG0012", file, line, 1,
                     $"package '{manifest.Name}' has a build script, and a dependency's script runs only where the root trusts it: " +
-                    $"[trust] build-scripts = [\"{manifest.Name}\"] in {Path.GetFileName(root.File)} (11 W3 BS5)"));
+                    $"[trust] build-scripts = [\"{manifest.Name}\"] in {Path.GetFileName(root.File)}"));
                 return (1, null);
             }
             var (exit, directives) = RunOne(manifest, graph.Scripts.GetValueOrDefault(manifest.Name), target, profile, compiler, version, error);
@@ -126,7 +126,7 @@ public static class BuildScripts
             compiler, version), error);
         if (built != 0 || executable is null)
         {
-            Say.Error(error, "LYR-BLD0002", $"{manifest.Name}'s build.lyr does not build, so the package does not (11 W3 BS1)");
+            Say.Error(error, "LYR-BLD0002", $"{manifest.Name}'s build.lyr does not build, so the package does not");
             return (built == 0 ? 1 : built, null);
         }
 
@@ -148,7 +148,8 @@ public static class BuildScripts
         catch (TimeoutException)
         {
             Say.Error(error, "LYR-BLD0002", $"{manifest.Name}'s build.lyr did not end within 10 minutes");
-            return (2, null);
+            // the package's own code failed, as one that does not compile: exit 1, not the environment's 2
+            return (1, null);
         }
         File.WriteAllText(Path.Combine(dir, "output.txt"), ran.Stdout + ran.Stderr);
         if (ran.ExitCode != 0)
@@ -163,7 +164,7 @@ public static class BuildScripts
                 Say.Error(error, "LYR-BLD0002", wrote.Length > 0 ? message + "; what it wrote:" : message);
                 error.Write(wrote);
             }
-            return (2, null);
+            return (1, null);
         }
         var directives = new List<(string, string)>();
         foreach (var line in File.ReadAllLines(file))

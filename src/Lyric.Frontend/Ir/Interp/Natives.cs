@@ -49,7 +49,7 @@ public sealed class Natives(Interpreter interpreter)
             return Syntax.Quote(interpreter.Module.Quotes[int.Parse(name["std.syntax.quote#".Length..])], args, types, import.ReturnType);
         if (Table.TryGetValue(name, out var native)) return native(args, types, import.ReturnType);
         if (WorldNatives.Contains(name) || WorldModules.Any(m => name.StartsWith(m, StringComparison.Ordinal)) || name.StartsWith("C:", StringComparison.Ordinal))
-            throw ComptimeFailure.World($"'{Short(name)}' reaches outside the program — {What(name)} — and code run at compile time does not (09 Q3)");
+            throw ComptimeFailure.World($"'{Short(name)}' reaches outside the program — {What(name)} — and code run at compile time does not");
         throw ComptimeFailure.NotYet($"'{Short(name)}' does not run at compile time yet");
     }
 

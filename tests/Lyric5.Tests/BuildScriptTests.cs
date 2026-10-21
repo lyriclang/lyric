@@ -151,7 +151,7 @@ public class BuildScriptTests
             """;
         var dir = Package(("lyric.toml", AppManifest), ("build.lyr", script), ("src/main.lyr", "fn main(): void {\n}\n"));
         var (exit, _, error) = Run("build", "-C", dir);
-        Assert.Equal(2, exit);
+        Assert.Equal(1, exit);
         Assert.Contains("error[LYR-BLD0002]: app's build.lyr ended with exit 101", error);
         Assert.Contains("about to give up", error);
         Assert.Contains("no schema found", error);

@@ -103,7 +103,7 @@
 "runtime/src/task.c" = 2
 "runtime/src/trace.c" = 6
 
-# compiler: 357
+# compiler: 355
 ["compiler"]
 "src/Lyric5.Build/BenchRun.cs" = 2
 "src/Lyric5.Build/BuildScripts.cs" = 9
@@ -126,7 +126,7 @@
 "src/Lyric5.Build/ToolchainCheck.cs" = 1
 "src/Lyric5.Compiler/CEmitter.cs" = 114
 "src/Lyric5.Compiler/Intrinsics.cs" = 32
-"src/Lyric5.Compiler/SubsetGate.cs" = 11
+"src/Lyric5.Compiler/SubsetGate.cs" = 9
 "src/Lyric5.Toolchain/BuildProfile.cs" = 8
 "src/Lyric5.Toolchain/CBuild.cs" = 9
 "src/Lyric5.Toolchain/CCompiler.cs" = 6

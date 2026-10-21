@@ -210,9 +210,9 @@ public sealed partial record Manifest(string File, string Name, string Version, 
         var name = RequiredString(package, "name", file);
         if (!NamePattern().IsMatch(name))
             throw new ManifestException("LYR-PKG0002", file, package.Line, 1,
-                $"'{name}' is no package name: a lowercase letter, then letters, digits and '_' — the first segment of its module paths (07 M1)");
+                $"'{name}' is no package name: a lowercase letter, then letters, digits and '_' — the first segment of its module paths");
         if (name == "std")
-            throw new ManifestException("LYR-PKG0002", file, package.Line, 1, "'std' is the standard library's name (07 M3, D1)");
+            throw new ManifestException("LYR-PKG0002", file, package.Line, 1, "'std' is the standard library's name");
 
         var version = RequiredString(package, "version", file);
         if (!SemVerPattern().IsMatch(version))
@@ -304,7 +304,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
         var dependencies = ReadDependencies(document, "build-dependencies", file);
         if (dependencies.FirstOrDefault(d => d.Name == "build") is { } clash)
             throw new ManifestException("LYR-PKG0002", file, clash.Line, 1,
-                "'build' is the build script's own module (11 W3 BS3), and no package its script can import from");
+                "'build' is the build script's own module, and no package its script can import from");
         return dependencies;
     }
 
@@ -416,7 +416,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
                 throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{name}' is no package name");
             if (value is string)
                 throw new ManifestException("LYR-PKG0003", file, line, 1,
-                    $"'{name}' asks a registry for a version, and there is none in 5.0 (07 P8) — give its directory or its repository: {name} = {{ path = \"…\" }}");
+                    $"'{name}' asks a registry for a version, and there is none in 5.0 — give its directory or its repository: {name} = {{ path = \"…\" }}");
             if (value is not TomlTable spec)
                 throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{name}' is written {name} = {{ path = \"…\" }} or {name} = {{ git = \"…\" }}");
             foreach (var key in spec.Keys)
@@ -442,7 +442,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
             if (!hasGit)
                 throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{name}' needs a path or a git repository: {name} = {{ path = \"…\" }}");
             if (section == "override")
-                throw new ManifestException("LYR-PKG0003", file, line, 1, $"an override reads a directory (07 P7): {name} = {{ path = \"…\" }}");
+                throw new ManifestException("LYR-PKG0003", file, line, 1, $"an override reads a directory: {name} = {{ path = \"…\" }}");
             dependencies.Add(new Dependency(name, null, GitForm(name, (string)url, spec, revisions, file, line), line));
         }
         return dependencies;

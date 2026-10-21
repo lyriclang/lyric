@@ -70,7 +70,7 @@ public static partial class LockFile
     public static string Text(IEnumerable<Locked> entries)
     {
         var text = new StringBuilder();
-        text.Append("# Written by lyric (07 P5): each revision of a git repository the build reads,\n");
+        text.Append("# Written by lyric: each revision of a git repository the build reads,\n");
         text.Append("# the commit it is and the hash of its package content. Check it in with lyric.toml.\n");
         text.Append("version = 1\n");
         foreach (var entry in Sorted(entries))
