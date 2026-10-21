@@ -195,14 +195,22 @@ public class LintTests
         Assert.Contains("warning[LYR-SEM0071]: 'unusedInDep' is never used", error);
     }
 
-    /// <summary><c>--warn-deps</c> says what <c>std</c> warns of itself too; without it, nothing of std's.</summary>
+    /// <summary><c>--warn-deps</c> looks at <c>std</c> too, and std says nothing of itself: a program
+    /// that imports every module of it, each under a name of its own, hears not a word. A lint std
+    /// trips over turns this red — std is ordinary Lyric, and kept to the lints it ships.</summary>
     [Fact]
-    public void Std_warns_with_warn_deps_alone()
+    public void Std_says_nothing_of_itself_under_warn_deps()
     {
-        static bool FromStd(string error) =>
-            error.Split('\n').Any(l => l.Contains("stdlib5") && (l.Contains("warning[") || l.Contains("-->")));
-        Assert.False(FromStd(Build(App(program: "fn main(): void { }\n")).Err));
-        Assert.True(FromStd(Build(App(program: "fn main(): void { }\n"), "--warn-deps").Err));
+        var std = Path.Combine(TestCompiler.Stdlib, "std");
+        var modules = Directory.EnumerateFiles(std, "*.lyr", SearchOption.AllDirectories)
+            .Select(f => "std." + Path.GetRelativePath(std, f)[..^4].Replace(Path.DirectorySeparatorChar, '.'))
+            .Where(m => m != "std.prelude")
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        var program = string.Concat(modules.Select((m, i) => $"import {m} as m{i};\n")) + "\nfn main(): void { }\n";
+        var (exit, error) = Build(App(program: program), "--warn-deps", "-A", "unused-import");
+        Assert.True(exit == 0, error);
+        Assert.Equal("", error);
     }
 
     /// <summary>An up-to-date build runs no front end: what decides the findings is in its key,

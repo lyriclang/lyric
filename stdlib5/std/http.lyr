@@ -13,7 +13,7 @@
 /// No TLS of its own, no HTTP/2, no cookies (Q6: doors).
 import std.collections { List, Map };
 import std.core { StringBuilder, viewBytes, Closeable, ParseError };
-import std.io { Reader, Writer, IoError, IoErrorKind, ByteBuffer };
+import std.io { Reader, Writer, IoError, ByteBuffer };
 import std.net { TcpStream, TcpListener, SocketAddr, IpAddr, resolve };
 import std.task { Cancelled, TimedOut, withTimeout, spawn };
 import std.time { Duration };
@@ -452,7 +452,7 @@ class Conn {
                 break;
             }
         }
-        var bytes = out.toArray();
+        let bytes = out.toArray();
         var n = bytes.length();
         if (n > 0 && bytes[n - 1] == 13u8) {
             n = n - 1;

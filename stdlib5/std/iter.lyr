@@ -5,7 +5,7 @@
 /// without an import; the structs are named here — `iter.MapIter<I, U>` — where a type is written.
 /// The protocol itself (`Iterator`, `Iterable`, `DoubleEnded`, `Step`, `FromIterator`), the ranges
 /// and the iterators of std.core's own types stay in std.core.
-import std.core { DoubleEnded, Join, Step, StringBuilder };
+import std.core { DoubleEnded, Join };
 
 /// `it.map(f)` (10 B6 I3, I4): the values of `it`, each through `f` — lazily, a pull at a time.
 /// Named for what it gives: `Map` is the collection's (C4). What `f` throws, a pull throws beside

@@ -17,7 +17,7 @@ namespace Lyric.Sema;
 /// cannot fix is noise with a good conscience. The standard library is NOT skipped — it is
 /// ordinary Lyric, this repository owns it, and a corpus test holds it warning-free.</para>
 /// </summary>
-internal sealed class WarningAnalyzer
+internal sealed partial class WarningAnalyzer
 {
     private readonly Compilation _comp;
     private readonly BindingResult _binding;
@@ -82,6 +82,7 @@ internal sealed class WarningAnalyzer
         WarnBuiltinShadowingImports();
         if (_comp.Lyric5Modules) WarnMembersMoreVisibleThanTheirType();
         if (_comp.Lyric5Modules) WarnPreludeShadowing();
+        if (_comp.Lyric5Modules) RunLints();
 
         // Lyric 5 reads '@Deprecated' from its value, which the compiler computes after this
         // (RunDeprecated); the 4.x tools from the literals the attribute writes
@@ -523,7 +524,8 @@ internal sealed class WarningAnalyzer
         {
             switch (node)
             {
-                case BindingStmt { Cleanup: null } b when _types.RefOf(b) is LocalSymbol l && IsCloseable(l.Type):
+                // "let me = this" in a close() names the value being closed, not one to close
+                case BindingStmt { Cleanup: null, Initializer: not ThisExpr } b when _types.RefOf(b) is LocalSymbol l && IsCloseable(l.Type):
                     bound[l] = b;
                     break;
                 case ExprStmt es when TypeChecker.Unmarked(es.Expr) is CallExpr made && IsCloseable(_types.TypeOf(made)):
@@ -633,7 +635,7 @@ internal sealed class WarningAnalyzer
             if (!_used.Contains(symbol)) continue; // the unused warning already spoke
             if (_mutated.Contains(symbol)) continue;
 
-            _de.Report("LYR-SEM0075", Severity.Hint, binding.NameSpan,
+            _de.Report("LYR-SEM0075", _comp.Lyric5Modules ? Severity.Warning : Severity.Hint, binding.NameSpan,
                 $"'{local.Name}' is never reassigned — 'let' would do");
         }
     }
@@ -704,6 +706,12 @@ internal sealed class WarningAnalyzer
                 if (ExtensionOwners.TryGetValue(used, out var owner)
                     && ReferenceEquals(owner, targetModule))
                     return;
+
+        // And when it brings conformances: 'import std.iter;' brings the blocks that make every
+        // iterator one, for the whole program, and no name of the module appears for that.
+        if (target is ModuleSymbol brings && _comp.Lyric5Modules
+            && _comp.AstOf(brings).Declarations.Any(d => d is ExtendDecl { Interfaces.Length: > 0 }))
+            return;
 
         _de.Report("LYR-SEM0072", Severity.Warning, span, $"import '{name}' is never used");
     }

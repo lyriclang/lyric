@@ -256,7 +256,7 @@ fn onPool(call: fn() -> int): int {
 fn uncancelled<T>(call: fn() -> T throws [IoError, Cancelled]): T throws IoError {
     try {
         return call();
-    } catch (e: Cancelled) {
+    } catch (_: Cancelled) {
         unreachable("a file's or the console's call is no point of cancellation");
     }
 }
