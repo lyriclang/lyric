@@ -823,6 +823,8 @@ public sealed partial class Parser
                 return ParseMatchExpr();
             case TokenKind.LParen:
                 return ParseParenOrTupleOrLambda();
+            case TokenKind.Continue or TokenKind.Break or TokenKind.Return when _sm.Lyric5:
+                return ParseJumpAsBlock();
             default:
             {
                 _de.Report("LYR-PAR0002", Severity.Error, cur.Span, $"expected an expression, got {Shown(cur)}");
@@ -1258,6 +1260,65 @@ public sealed partial class Parser
         }
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close struct initializer");
         return (fields.ToArray(), rounds.ToArray(), close.Span);
+    }
+
+    /// <summary>
+    /// 'continue', 'break' or 'return' where an expression stands — a match arm, a branch of an
+    /// 'if' expression: a statement, said with the block it belongs in, and read as that block,
+    /// '{ continue; }', so what follows is checked as usual.
+    /// </summary>
+    private Expr ParseJumpAsBlock()
+    {
+        var kw = _buffer.Advance();
+        Stmt jump;
+        var end = kw.Span;
+        // what ends the arm or the branch ends the jump too: it takes a label or a value only
+        // where one follows
+        bool AtEnd() => _buffer.Current.TokenKind is TokenKind.Comma or TokenKind.RBrace or TokenKind.RParen
+            or TokenKind.RBracket or TokenKind.Semicolon or TokenKind.Else or TokenKind.Eof;
+        switch (kw.TokenKind)
+        {
+            case TokenKind.Continue:
+            {
+                string? label = null;
+                Span labelSpan = default;
+                if (_buffer.Check(TokenKind.Identifier))
+                {
+                    var tok = _buffer.Advance();
+                    (label, labelSpan, end) = (_sm.Slice(tok.Span).ToString(), tok.Span, tok.Span);
+                }
+                jump = new ContinueStmt(Span.Union(kw.Span, end)) { Label = label, LabelSpan = labelSpan };
+                break;
+            }
+            case TokenKind.Break:
+            {
+                string? label = null;
+                Span labelSpan = default;
+                if (_buffer.Check(TokenKind.Identifier) && _loopLabels.Contains(_sm.Slice(_buffer.Current.Span).ToString()))
+                {
+                    var tok = _buffer.Advance();
+                    (label, labelSpan, end) = (_sm.Slice(tok.Span).ToString(), tok.Span, tok.Span);
+                }
+                Expr? value = AtEnd() ? null : ParseExpr(0);
+                if (value is not null) end = Whole(value);
+                jump = new BreakStmt(Span.Union(kw.Span, end)) { Label = label, LabelSpan = labelSpan, Value = value };
+                break;
+            }
+            default:
+            {
+                Expr? value = AtEnd() ? null : ParseExpr(0);
+                if (value is not null) end = Whole(value);
+                jump = new ReturnStmt(value, Span.Union(kw.Span, end));
+                break;
+            }
+        }
+        var span = Span.Union(kw.Span, end);
+        var written = _sm.Slice(span).ToString();
+        var word = _sm.Slice(kw.Span).ToString();
+        _de.Report(new Diagnostic("LYR-PAR0065", Severity.Error, span,
+            $"'{word}' is a statement — where a value stands it goes in a block, '{{ {written}; }}'",
+            [DiagnosticNote.Suggest("write it as a block", new Replacement(span, $"{{ {written}; }}", Applicability.Safe))]));
+        return new BlockExpr(new Block([jump], span), span);
     }
 
     /// <summary>'[f] = e': the field the info names, and its value.</summary>
