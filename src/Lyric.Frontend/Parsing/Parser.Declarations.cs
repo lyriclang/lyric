@@ -680,6 +680,15 @@ public sealed partial class Parser
             // in '}', a bodiless method, a 'static let' and a 'type Item = …' end in ';'.
             if (member is FunctionDecl or StaticBindingDecl or AssociatedTypeDecl)
                 _buffer.Match(TokenKind.Comma);
+            // A field that ends with ';': the separator a statement takes, said where it stands and
+            // read as the ',' it stands for, so the next member is read as it is.
+            else if (_sm.Lyric5 && _buffer.Check(TokenKind.Semicolon))
+            {
+                var semi = _buffer.Advance();
+                _de.Report(new Diagnostic("LYR-PAR0064", Severity.Error, semi.Span,
+                    "a field ends with ',' — ';' ends a statement",
+                    [DiagnosticNote.Suggest("write ','", new Replacement(semi.Span, ",", Applicability.Safe))]));
+            }
             else
                 _buffer.Expect(TokenKind.Comma, "LYR-PAR0029", "expected ',' between members");
         }

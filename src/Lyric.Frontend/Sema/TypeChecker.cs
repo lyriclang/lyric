@@ -3295,6 +3295,18 @@ public sealed class TypeChecker
             CheckMetaLoop(fo, metaCall, metaArray.Element, scope);
             return;
         }
+        // A string is no sequence of one kind: its characters and its lines are each a walk of
+        // their own. Refused here, where the loop is written, with the walk most loops mean.
+        // A 'comptime for' walks an array alone, and said so above.
+        if (_comp.Lyric5Modules && !fo.Comptime && iterType is PrimitiveType { Kind: PrimitiveKind.String })
+        {
+            var at = fo.Iterable.Span;
+            var simple = fo.Iterable is IdentifierExpr or MemberExpr or CallExpr or StringLiteralExpr;
+            _de.Report(new Diagnostic("LYR-SEM0232", Severity.Error, at,
+                "a 'string' is not iterable — '.chars()' gives its characters, '.lines()' its lines",
+                simple ? [DiagnosticNote.Suggest("walk its characters", new Replacement(new Span(at.File, at.End, at.End), ".chars()", Applicability.Safe))] : []));
+            iterType = LyrType.Error;
+        }
         // Lyric 5 (10 B6 I2): anything but a range literal — the counted loop — and the shapes the
         // compiler walks itself goes through the protocol.
         var protocol = _coreIterable is not null
@@ -5137,6 +5149,15 @@ public sealed class TypeChecker
     /// </summary>
     private StructInitExpr? ShorthandInitOf(CallExpr call, SymbolTable scope, LyrType? expected)
     {
+        // 'T { a = 1; b = 2; }': an initializer whose fields end with ';' reads as a block after a
+        // call. Where the name is a type and the block holds nothing but such assignments, it is
+        // the initializer — each ';' said, and the fields checked as written.
+        if (_comp.Lyric5Modules && call.TypeArguments is null
+            && call.Arguments is [LambdaExpr { Form: LambdaForm.Trailing, Body: Block { Statements.Length: > 0 } body } assigned]
+            && assigned.Parameters.All(p => p.Implicit)
+            && body.Statements.All(s => s is ExprStmt { Expr: AssignExpr { Operator: null, Target: IdentifierExpr } }
+                                     or TailExprStmt { Expr: AssignExpr { Operator: null, Target: IdentifierExpr } }))
+            return SemicolonInitOf(call, body, scope);
         if (call.TypeArguments is not null
             || call.Arguments is not [LambdaExpr { Form: LambdaForm.Trailing, Body: IdentifierExpr field } block]
             || block.Parameters.Any(p => !p.Implicit))
@@ -5182,6 +5203,47 @@ public sealed class TypeChecker
         return new StructInitExpr(path, [],
             [new StructInitField(field.Name, field, field.Span) { NameSpan = field.Span, IsShorthand = true }], call.Span)
             { NameSpan = nameSpan, IsImplicit = implicitly };
+    }
+
+    /// <summary>The initializer a block of assignments after a type's name stands for, each ';' that
+    /// ends a field said with the ',' it means; <c>null</c> where the name is no type with fields.</summary>
+    private StructInitExpr? SemicolonInitOf(CallExpr call, Block body, SymbolTable scope)
+    {
+        if (NamePath(call.Callee) is not { } names) return null;
+        var cur = scope.Lookup(names[0]) ?? ImplicitType(call.Span.File, names[0]);
+        for (var i = 1; i < names.Length && cur is not null; i++)
+            cur = (cur is ImportBindingSymbol through ? through.Target : cur) switch
+            {
+                ModuleSymbol mod => mod.Members.LookupLocal(names[i]),
+                TypeSymbol t => t.Members.LookupLocal(names[i]),
+                _ => null,
+            };
+        if (cur is ImportBindingSymbol reached) cur = reached.Target;
+        if (cur is not (TypeSymbol { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class }
+                or EnumVariantSymbol { Declaration: EnumVariant { StructFields: not null } }))
+            return null;
+
+        var text = _comp.Sources.GetText(call.Span.File);
+        var fields = new List<StructInitField>();
+        for (var k = 0; k < body.Statements.Length; k++)
+        {
+            var statement = body.Statements[k];
+            var assignment = (AssignExpr)(statement is ExprStmt e ? e.Expr : ((TailExprStmt)statement).Expr);
+            var name = (IdentifierExpr)assignment.Target;
+            fields.Add(new StructInitField(name.Name, assignment.Value, assignment.Span) { NameSpan = name.Span });
+            if (statement is not ExprStmt) continue;
+            // the ';' that ends the statement: a ',' between fields, nothing after the last
+            var at = statement.Span.End - 1;
+            while (at > assignment.Span.End && char.IsWhiteSpace(text[at])) at--;
+            if (text[at] != ';') continue;
+            var semi = new Span(call.Span.File, at, at + 1);
+            var last = k == body.Statements.Length - 1;
+            _de.Report(new Diagnostic("LYR-PAR0064", Severity.Error, semi,
+                "an initializer separates its fields with ',' — ';' ends a statement",
+                [DiagnosticNote.Suggest(last ? "take it out" : "write ','", new Replacement(semi, last ? "" : ",", Applicability.Safe))]));
+        }
+        return new StructInitExpr(names, [], fields.ToArray(), call.Span)
+            { NameSpan = call.Callee is MemberExpr m ? m.MemberSpan : call.Callee.Span };
     }
 
     /// <summary>The names of a callee written as a path, <c>geo.Shape.Rect</c>; <c>null</c> for anything else.</summary>

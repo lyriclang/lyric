@@ -2664,6 +2664,69 @@ pub macro one(): Expr {
 }
 '''
 
+
+[LYR-PAR0064]
+title = "a field that ends with ';'"
+severity = "error"
+area = "16-diagnostics"
+summary = "A field of a struct or class, or a field of an initializer, ends with `;` where its list separates with `,`; read as the `,` it stands for."
+explanation = '''
+The fields of a type and the fields of an initializer are lists, and a list separates its items with `,`. A `;` ends a statement. The compiler reads the `;` as the `,` it stands for, says it once where it stands, and goes on: the next field is read as it is written. After the name of a type, braces that hold `name = value;` are an initializer, not a call with a trailing block.
+
+`lyric fix` writes `,` — after the last field of an initializer it takes the `;` out.
+'''
+wrong = '''
+struct Pair {
+    a: int;
+    b: int,
+}
+
+fn main(): void {
+}
+'''
+right = '''
+struct Pair {
+    a: int,
+    b: int,
+}
+
+fn main(): void {
+}
+'''
+
+[LYR-PAR0065]
+title = "a 'continue', 'break' or 'return' where a value stands"
+severity = "error"
+area = "16-diagnostics"
+summary = "A jump stands where an expression is wanted — a match arm, a branch of an `if` expression —; it is a statement and goes in a block, `=> { continue; }`."
+explanation = '''
+`continue`, `break` and `return` are statements: they leave, and give no value. Where an arm of a `match` or a branch of an `if` expression wants a value, a block holds the statement, and a block that leaves is worth `never`, which fits any arm. The compiler reads the jump as that block and checks the other arms as usual.
+
+`lyric fix` writes the block: `' ' => continue,` becomes `' ' => { continue; },`.
+'''
+wrong = '''
+fn main(): void {
+    for (c in "a b".chars()) {
+        let n = match (c) {
+            ' ' => continue,
+            _ => 1,
+        };
+        let _ = n;
+    }
+}
+'''
+right = '''
+fn main(): void {
+    for (c in "a b".chars()) {
+        let n = match (c) {
+            ' ' => { continue; },
+            _ => 1,
+        };
+        let _ = n;
+    }
+}
+'''
+
 [LYR-PKG0001]
 title = "`lyric.toml` or `lyric.lock` is not valid TOML"
 severity = "error"
@@ -10853,5 +10916,32 @@ fn build<T :: [Make]>(s: string): T {
 fn main(): void {
     let _ = Item.make("x");
     let _: Item = build("y");
+}
+'''
+
+[LYR-SEM0232]
+title = "a loop over a string"
+severity = "error"
+area = "07-statements"
+summary = "A `for` loop walks a `string`, which is no `Iterable`: `s.chars()` gives its characters, `s.lines()` its lines."
+explanation = '''
+A string holds text, and text is walked in more than one way: by its characters, `s.chars()`, or by its lines, `s.lines()`. Neither is the string's own, so a `string` is no `Iterable` and `for (c in s)` is refused.
+
+`lyric fix` writes `.chars()`, the walk most loops mean.
+'''
+wrong = '''
+fn main(): void {
+    let line = "ab";
+    for (c in line) {
+        let _ = c;
+    }
+}
+'''
+right = '''
+fn main(): void {
+    let line = "ab";
+    for (c in line.chars()) {
+        let _ = c;
+    }
 }
 '''
