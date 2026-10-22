@@ -395,6 +395,7 @@ public sealed class TypeChecker
         if (_comp.Lyric5Modules) ExpandMetaDefaults(); // 09 A5, A7
         foreach (var asked in _metaAttributeCalls) CheckFieldAttributeQuery(asked); // R4
         if (_comp.Lyric5Modules) CheckInlineFunctions(); // 08 F6
+        if (_comp.Lyric5Modules) RecordAskedConformances();
         JudgeContextless(errorsAtStart); // the '[]' outside every function body
         _currentModule = null;
         new FlowAnalyzer(_comp, _result, _de).Run(); // definite assignment
@@ -6491,10 +6492,47 @@ public sealed class TypeChecker
         return LyrType.Bool;
     }
 
+    /// <summary>The interfaces a type test or a type pattern asks about (05 §9 rules 2, 5).</summary>
+    private readonly List<LyrType> _askedInterfaces = new();
+
+    /// <summary>
+    /// For each interface a type test asks about, the conformances a blanket's or a shape's block
+    /// gives it, recorded for every type an expression of the program has (05 §9 rule 2): a value
+    /// that reaches an interface value has such a type, and the lowering builds the rows the test
+    /// reads. Asked here because nothing else asks — a test on an <c>Any</c> knows no type.
+    /// </summary>
+    private void RecordAskedConformances()
+    {
+        if (_askedInterfaces.Count == 0) return;
+        var byName = new Dictionary<string, List<LyrType>>(StringComparer.Ordinal);
+        var held = new List<LyrType>();
+        foreach (var type in _result.ExpressionTypes)
+        {
+            if (!(TypeFacts.SymbolOf(type) is { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }
+                  || BoxesAsBuiltin(type))
+                || MentionsTypeParam(type) || ContainsError(type)) continue;
+            var shown = TypeFacts.Display(type);
+            if (!byName.TryGetValue(shown, out var same)) byName[shown] = same = new List<LyrType>();
+            if (same.Any(known => LyrType.Equal(known, type))) continue;
+            same.Add(type);
+            held.Add(type);
+        }
+        using (_de.Mute())
+            foreach (var asked in _askedInterfaces)
+                if (TypeFacts.SymbolOf(asked) is { } iface)
+                    foreach (var type in held)
+                        Satisfies(type, iface, asked);
+    }
+
     /// <summary>What a value behind an interface can be: a struct, a class, an enum, a built-in
     /// type in Lyric 5, or an interface that is a value type itself (04 D9).</summary>
     private bool CheckTestTarget(LyrType target, Span span)
     {
+        // an interface asked about: the conformances blocks give it are recorded for every type a
+        // value of the program has (RecordAskedConformances)
+        if (_comp.Lyric5Modules && TypeFacts.KindOf(target) == TypeSymbolKind.Interface
+            && !_askedInterfaces.Any(known => LyrType.Equal(known, target)))
+            _askedInterfaces.Add(target);
         switch (target)
         {
             case TypeParamType tp:

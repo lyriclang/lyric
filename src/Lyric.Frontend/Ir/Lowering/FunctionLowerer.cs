@@ -2867,7 +2867,8 @@ internal sealed class FunctionLowerer
         IrRefType r => r.Type,
         IrStructType s => s.Type,
         IrEnumType e => e.Type,
-        IrInterfaceType i => i.Type,
+        // asked about: the conformances blocks give reach this interface's table (05 §9 rule 2)
+        IrInterfaceType i => _typeTable.MarkAsked(i.Type),
         _ when _typeTable.BuiltinOfIr(type) is { } builtin => _typeTable.BoxOfBuiltin(type, builtin),
         _ => throw NotSupported($"a type test against '{type}'", span),
     };

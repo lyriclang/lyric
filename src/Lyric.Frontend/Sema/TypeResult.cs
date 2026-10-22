@@ -68,6 +68,9 @@ public sealed class TypeResult
     public IEnumerable<KeyValuePair<Expr, LyrType>> AllTypes => _types;
     public LyrType TypeOf(Expr expr) => _types.TryGetValue(expr, out var t) ? t : LyrType.Error;
 
+    /// <summary>Every type an expression of the program has: what a value of an interface can hold.</summary>
+    public IEnumerable<LyrType> ExpressionTypes => _types.Values;
+
     public void BindRef(Node node, Symbol symbol) => _refs[node] = symbol;
 
     /// <summary>The parameters <c>@callerExpr</c> sits on (design/v5/spec/09 A11), each with the
@@ -171,6 +174,13 @@ public sealed class TypeResult
         _blockConformances.Where(e => (e.Block.IsConstructorTarget || e.Block.IsBlanketTarget)
             && e.Instance is ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType
             && !TypeChecker.MentionsTypeParam(e.Instance));
+
+    /// <summary>The blanket block that gives a built-in type the interface, and the type as the sema
+    /// recorded it — what a box of the built-in's value is a value of.</summary>
+    public (ExtensionBlock Block, LyrType Instance)? BlanketConformanceOfBuiltin(TypeSymbol builtin, TypeSymbol iface) =>
+        _blockConformances.Where(e => e.Block.IsBlanketTarget && ReferenceEquals(e.Iface, iface)
+                && e.Instance is PrimitiveType or StringViewType && TypeFacts.Display(e.Instance) == builtin.Name)
+            .Select(e => ((ExtensionBlock, LyrType)?)(e.Block, e.Instance)).FirstOrDefault();
 
     /// <summary>The blanket block that gives <paramref name="instance"/> the interface, as the sema
     /// proved it (05 §13 rule 8): a value of the interface is made through it.</summary>

@@ -108,6 +108,23 @@ internal sealed class TypeTable
 
     public void MarkLifted(TypeId concrete, TypeId iface) => _lifted.Add((concrete, iface));
 
+    private readonly HashSet<TypeId> _asked = new();
+
+    /// <summary>The interfaces a type test or a type pattern asks a value about (05 §9 rules 2, 5): a
+    /// conformance a block gives reaches their tables for every type a value of an interface holds.</summary>
+    public IReadOnlyCollection<TypeId> Asked => _asked;
+
+    public TypeId MarkAsked(TypeId iface)
+    {
+        _asked.Add(iface);
+        return iface;
+    }
+
+    /// <summary>Is a row of the type for the interface wanted: a value of it made into the interface or
+    /// a child of it, or one made into any interface where a type test asks about this one?</summary>
+    public bool RowWanted(TypeId concrete, TypeId iface, Func<TypeId, bool> liftedIntoIt) =>
+        liftedIntoIt(concrete) || _asked.Contains(iface) && _lifted.Any(l => l.Concrete == concrete);
+
     /// <summary>The boxes a shape's value went into an interface value through (05 §13 rule 6):
     /// their rows are built from the blocks that gave the shape the interface.</summary>
     public IReadOnlyList<(IrType Payload, TypeId Id)> ShapeBoxes => _shapeBoxes;
