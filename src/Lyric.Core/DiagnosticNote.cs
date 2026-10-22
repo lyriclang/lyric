@@ -1,6 +1,6 @@
 namespace Lyric.Core;
 
-/// <summary>What a note is (design/v5/spec/11 G1).</summary>
+/// <summary>What a note is.</summary>
 public enum NoteKind
 {
     /// <summary>A note: another place that belongs to the finding ("previous definition here"), or,
@@ -18,7 +18,7 @@ public enum NoteKind
     Category,
 }
 
-/// <summary>Whether a suggested change may be applied without a reader (11 G7): <c>lyric fix</c>
+/// <summary>Whether a suggested change may be applied without a reader: <c>lyric fix</c>
 /// applies the safe ones, an editor offers both.</summary>
 public enum Applicability
 {
@@ -47,8 +47,8 @@ public readonly record struct DiagnosticNote(Span Location, string Message)
 
     /// <summary>What the note is. Unless set, a <see cref="NoteKind.Place"/> — what every note said
     /// before kinds existed, "note:"; advice is <see cref="NoteKind.Help"/> where its reporter says so
-    /// (M12a S2: the default was Help for a note without a place, and the renderer would have turned
-    /// every "synthesized as" and every explanation into advice).</summary>
+    /// (a default of Help for a note without a place would turn every "synthesized as" and every
+    /// explanation into advice).</summary>
     public NoteKind Kind
     {
         get => _kind ?? NoteKind.Place;

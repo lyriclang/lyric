@@ -1,7 +1,7 @@
 namespace Lyric.AST;
 
 /// <summary>
-/// What makes a function a coroutine (design/v5/spec/08 D11, F5; 06 M6-3): its declared result is
+/// What makes a function a coroutine: its declared result is
 /// <c>Coroutine&lt;…&gt;</c> AND it yields itself — not in a lambda nested in it, which makes that
 /// lambda a generator instead — OR it returns no value. So a body that yields through helpers
 /// only is a generator, and an empty body the empty one; they were "ordinary functions" that

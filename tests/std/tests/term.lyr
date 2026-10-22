@@ -1,4 +1,4 @@
-// std.term (design/v5/spec/10 Q7; 13 M10 S10): the styles as ECMA-48's SGR sequences, when they go
+// std.term: the styles as ECMA-48's SGR sequences, when they go
 // out (NO_COLOR, FORCE_COLOR, TERM, the terminal), the cursor and the screen sequences, the
 // terminal questions.
 import std.term { StdStream, Color, Style, isTerminal, size, colorsEnabled, reset, cursorUp, cursorDown, cursorForward, cursorBack, cursorTo, cursorNextLine, cursorHide, cursorShow, cursorSave, cursorRestore, clearScreen, clearToEnd, eraseLine, eraseToEndOfLine };

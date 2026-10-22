@@ -1,4 +1,4 @@
-// std.uri (design/v5/spec/10 O11; 13 M10 S5): RFC 3986 strictly - the five parts and their text,
+// std.uri: RFC 3986 strictly - the five parts and their text,
 // the reference resolution of §5.4, the normalization of §6.2, the percent-encoding per component,
 // the query as pairs, what the grammar refuses.
 import std.uri { Uri, Query, percentEncode, percentDecode, removeDotSegments };
@@ -169,7 +169,7 @@ fn whatTheGrammarRefusesIsRefused(): void {
     assertTrue(refused("http://[v6.fe80::a]/"));
 }
 
-/// A refusal says where and why (the review of M10, M14): `detail` and `offset` beside the kind,
+/// A refusal says where and why: `detail` and `offset` beside the kind,
 /// and `message()` carries them.
 @Test
 fn aRefusalSaysWhereAndWhy(): void {

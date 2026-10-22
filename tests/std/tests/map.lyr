@@ -1,4 +1,4 @@
-// std.collections' Map (design/v5/spec/10 C4): a Swiss table — what goes in comes out, through
+// std.collections' Map: a Swiss table — what goes in comes out, through
 // growth, deletions and colliding hashes.
 import std.collections { Map };
 import std.hash { FixedHasher, Hasher };

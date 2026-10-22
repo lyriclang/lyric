@@ -1,4 +1,4 @@
-// std.io's core (design/v5/spec/10 O1–O3; M8b S2): the readers' and the writers' defaults, copy,
+// std.io's core: the readers' and the writers' defaults, copy,
 // and the two streams over memory — the end only at 0, an empty slice at once, a partial write.
 import std.io { ByteBuffer, ByteReader, IoError, IoErrorKind, Reader, Writer, copy };
 import std.task { Cancelled };

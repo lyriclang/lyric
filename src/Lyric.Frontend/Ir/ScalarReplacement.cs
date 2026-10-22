@@ -97,7 +97,7 @@ internal static class ScalarReplacement
     /// reasoning is a loud test failure rather than a wrong value.</para>
     ///
     /// <para>Parameters are excluded — their store is the calling convention, invisible
-    /// here — and so is a local whose place is taken (03 T12): the call it was handed to writes
+    /// here — and so is a local whose place is taken: the call it was handed to writes
     /// it, invisible here as well.</para>
     /// </summary>
     private static bool ForwardLocals(IrFunction function)
@@ -184,7 +184,7 @@ internal static class ScalarReplacement
         public bool Viable = true;
     }
 
-    /// <summary>The locals whose place an <c>addr</c> takes (03 T12): no longer frame-private,
+    /// <summary>The locals whose place an <c>addr</c> takes: no longer frame-private,
     /// since whoever holds the place reads and writes them.</summary>
     /// <summary>A type whose temps are places, not values: a struct, an enum, an inline array, an
     /// optional — the emitter names where the value lies, and a store copies it (CEmitter's
@@ -197,7 +197,7 @@ internal static class ScalarReplacement
     /// storage — an allocation, a variant, a copy —, used by nothing but the writes that fill it
     /// before the store, and the store. Anything else is a place another name reaches — another
     /// local, a field, an element —, and the local is a copy of it, which forwarding would make
-    /// an alias (the review's B10: 'let q = p;' read p through q).</summary>
+    /// an alias ('let q = p;' would read p through q).</summary>
     private static bool Fresh(IrFunction function, TempId stored)
     {
         foreach (var block in function.Blocks)

@@ -1,4 +1,4 @@
-// std.compress (design/v5/spec/10 Q8; 13 M10 S9): DEFLATE, zlib and gzip whole in Lyric - the
+// std.compress: DEFLATE, zlib and gzip whole in Lyric - the
 // round trip at every level, the formats' headers and trailers, streams through the adapters,
 // what is refused, and the bytes of RFC 1951's own examples and of zlib's output read back.
 import std.io { IoError, IoErrorKind, ByteBuffer };

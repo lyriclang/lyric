@@ -3,7 +3,7 @@ using Lyric.Core;
 namespace Lyric.Ir.Interp;
 
 /// <summary>
-/// What <c>embed</c> reads (design/v5/spec/09 Q4; 13 M9a S4): a file named relative to the module
+/// What <c>embed</c> reads: a file named relative to the module
 /// that calls, within its package's directory — the one thing code run at compile time reads from
 /// outside the program. Every file read is noted, absolute, for the build, which depends on it as
 /// on a source.

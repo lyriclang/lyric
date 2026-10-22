@@ -1,4 +1,4 @@
-// std.core's Pattern (design/v5/spec/10 S2; M8a S12): one signature per operation takes a view or
+// std.core's Pattern: one signature per operation takes a view or
 // a string, or a character — over characters of more than one byte too —; splitN, replaceN and
 // matches at their edges.
 import std.test { assertEq, assertFalse, assertNull, assertTrue };

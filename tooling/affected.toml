@@ -21,7 +21,7 @@ ignore = ["docs/", "design/", "bench/", "STATUS.md", "CHANGELOG.md", "README.md"
 [regression]
 # Always: the goldens and the native runs of every program, the examples, and the cases that
 # once went red after a merge, with one run case per chapter (tooling/conformance/regression.txt).
-tests = ["CEmitterTests", "ExampleTests", "RuntimeProgramTests", "ProgramTests", "CommentRatchetTests"]
+tests = ["CEmitterTests", "ExampleTests", "RuntimeProgramTests", "ProgramTests", "CommentCitationTests"]
 cases = "tooling/conformance/regression.txt"
 
 [[rule]]

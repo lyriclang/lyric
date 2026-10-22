@@ -1,4 +1,4 @@
-// std.core's numbers (design/v5/spec/10 B5): the tower, its static members, the defaults on it.
+// std.core's numbers: the tower, its static members, the defaults on it.
 import std.math { abs, signum };
 import std.test { assertEq, assertTrue, assertFalse, assertNull, assertNotNull };
 import std.core { Signed };

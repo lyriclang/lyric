@@ -29,10 +29,10 @@ public sealed class Compilation
     private readonly Dictionary<ModuleSymbol, Module> _asts = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>Each module's tree as it was loaded, before the resolver's synthesis took the
-    /// synthesized interfaces off its type declarations (04 D7): what a rebuild after a macro
-    /// round starts from, so that the round's resolver synthesizes them again (sweep after M10,
-    /// open point 188 — the first resolver wrote the stripped declarations into the shared parse,
-    /// and the second found nothing to synthesize).</summary>
+    /// synthesized interfaces off its type declarations: what a rebuild after a macro
+    /// round starts from, so that the round's resolver synthesizes them again; written into the
+    /// shared parse, the stripped declarations would leave the second resolver nothing to
+    /// synthesize.</summary>
     private readonly Dictionary<ModuleSymbol, Module> _loaded = new(ReferenceEqualityComparer.Instance);
 
     public Compilation(SourceManager sm, DiagnosticEngine de)
@@ -49,13 +49,13 @@ public sealed class Compilation
     /// <summary>The source text a span covers: what <c>@callerExpr</c> hands a call's callee.</summary>
     public string TextOf(Span span) => _sm.Slice(span).ToString();
 
-    /// <summary>The sources, for a part of a file parsed again (M9a S9).</summary>
+    /// <summary>The sources, for a part of a file parsed again.</summary>
     public SourceManager Sources => _sm;
     public ExtensionRegistry Extensions { get; } = new();
 
     /// <summary>The blocks the resolver synthesized for inline arrays, <c>T[N] :: [Equatable]</c> and
-    /// <c>[Hashable]</c> per length (10 C8, S4b; M8c S3b): the only blocks on an inline array, which
-    /// one written is refused (<c>LYR-SEM0047</c>, 03 M4-2).</summary>
+    /// <c>[Hashable]</c> per length: the only blocks on an inline array, which
+    /// one written is refused (<c>LYR-SEM0047</c>).</summary>
     public HashSet<ExtendDecl> InlineArrayBlocks { get; } = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
@@ -68,8 +68,8 @@ public sealed class Compilation
     public Func<string[], LoadedModule?>? ModuleLoader { get; set; }
 
     /// <summary>
-    /// The file of a package's ROOT MODULE, without its ending (design/v5/spec/07 V1 M1, the
-    /// review's M7-1): <c>src/lib.lyr</c> is the module of the package's own name —
+    /// The file of a package's ROOT MODULE, without its ending:
+    /// <c>src/lib.lyr</c> is the module of the package's own name —
     /// <c>import geo { Circle }</c> —, the one exception to "a module is named by its path".
     /// There is no module <c>geo.lib</c> beside it; a directory <c>src/lib/</c> is a namespace
     /// like any other.
@@ -80,7 +80,7 @@ public sealed class Compilation
     /// Whether a package of the program holds a module of this path — as a FILE, loaded or not.
     /// <c>null</c> where modules are not files of packages (the 4.x tools, a host's modules).
     ///
-    /// <para>For the one-namespace check (07 V6 K1): asked only of what a program loaded, the
+    /// <para>For the one-namespace check: asked only of what a program loaded, the
     /// answer depended on the importer — a library declaring <c>shapes</c> beside its module
     /// <c>geo.shapes</c> was refused in the program that imported both, and accepted in the
     /// next.</para>
@@ -88,24 +88,24 @@ public sealed class Compilation
     public Func<string[], bool>? ModuleOnDisk { get; set; }
 
     /// <summary>
-    /// Lyric 5's module rules (design/v5/spec/07): a module is named by its path alone and a
-    /// <c>module</c> header is refused (LYR-RES0008, M1, M2) — it said again what the path says,
-    /// or something else; the entry module's <c>main</c> starts the program (M7a); a name is
+    /// Lyric 5's module rules: a module is named by its path alone and a
+    /// <c>module</c> header is refused (LYR-RES0008) — it said again what the path says,
+    /// or something else; the entry module's <c>main</c> starts the program; a name is
     /// visible by its word — <c>private</c>, <c>internal</c>, the default, or <c>pub</c> — at every
-    /// route that reaches it (V2). Off for the 4.x tools that still read headers, the language
-    /// server first (until M13b).
+    /// route that reaches it. Off for the 4.x tools that still read headers, the language
+    /// server first.
     /// </summary>
     public bool Lyric5Modules { get; init; }
 
-    /// <summary>What each package of the program declares it imports from (07 P6): a module imports
+    /// <summary>What each package of the program declares it imports from: a module imports
     /// from its own package, from <c>std</c>, and from these alone. <c>null</c> where no package
     /// rules apply.</summary>
     public IReadOnlyDictionary<string, IReadOnlySet<string>>? PackageDependencies { get; init; }
 
     /// <summary>
-    /// Whether <paramref name="symbol"/> may be named from <paramref name="from"/> (07 V2): a
+    /// Whether <paramref name="symbol"/> may be named from <paramref name="from"/>: a
     /// <c>pub</c> declaration everywhere, an <c>internal</c> one in its own package, a
-    /// <c>private</c> one in its own module, and an import only in the module that wrote it (I4).
+    /// <c>private</c> one in its own module, and an import only in the module that wrote it.
     /// THE check of every route a name takes out of its module — import, qualified path, type,
     /// initializer, pattern — so a route cannot forget it. Always true for the 4.x tools, whose
     /// one check was the selective import's.
@@ -113,7 +113,7 @@ public sealed class Compilation
     public bool Visible(Symbol symbol, ModuleSymbol from)
     {
         if (!Lyric5Modules || symbol.Home is not { } home || ReferenceEquals(home, from)) return true;
-        if (symbol is ImportBindingSymbol { Reexported: true }) return true; // passed on (I4)
+        if (symbol is ImportBindingSymbol { Reexported: true }) return true; // passed on
         if (symbol is ImportBindingSymbol or ExternalSymbol) return false;
         return VisibilityOf(symbol) switch
         {
@@ -123,7 +123,7 @@ public sealed class Compilation
         };
     }
 
-    /// <summary>Whether <paramref name="symbol"/> may be passed on by a <c>pub import</c> (07 V3 I4):
+    /// <summary>Whether <paramref name="symbol"/> may be passed on by a <c>pub import</c>:
     /// a module, a <c>pub</c> declaration, or what another <c>pub import</c> passed on.</summary>
     public bool Exported(Symbol symbol) => symbol switch
     {
@@ -134,10 +134,10 @@ public sealed class Compilation
     };
 
     /// <summary>Whether <paramref name="file"/> is text the compiler wrote — a synthesized
-    /// conformance (04 D7) — rather than a program's own.</summary>
+    /// conformance — rather than a program's own.</summary>
     public bool IsSynthesized(FileId file) => _sm.OriginOf(file) is not null;
 
-    /// <summary>The prelude (design/v5/spec/07 V3 I8, 10 B2): <c>std.prelude</c>, whose names every
+    /// <summary>The prelude: <c>std.prelude</c>, whose names every
     /// module of a program names without an import; <c>null</c> without a standard library.</summary>
     public ModuleSymbol? Prelude => FindModule(["std", "prelude"]);
 
@@ -162,7 +162,7 @@ public sealed class Compilation
                 ? $"'{symbol.Name}' is internal to package '{(symbol.Home is { } home ? PackageOf(home) : "?")}'"
                 : $"'{symbol.Name}' is private to module '{symbol.Home?.FullName}'";
 
-    /// <summary>A package is named by the first segment of its modules' paths (07 M1); a single
+    /// <summary>A package is named by the first segment of its modules' paths; a single
     /// file is a package of its own, <c>std</c> is one.</summary>
     public static string PackageOf(ModuleSymbol module) => module.Path.Length > 0 ? module.Path[0] : "";
 
@@ -176,8 +176,8 @@ public sealed class Compilation
     };
 
     /// <summary>
-    /// The module the program starts in: its <c>main</c> is the program's root (design/v5/spec/07
-    /// M7a), and a <c>main</c> anywhere else is an ordinary function. <c>null</c> for a workspace,
+    /// The module the program starts in: its <c>main</c> is the program's root,
+    /// and a <c>main</c> anywhere else is an ordinary function. <c>null</c> for a workspace,
     /// which holds several programs side by side.
     /// </summary>
     public ModuleSymbol? Entry { get; set; }
@@ -225,8 +225,8 @@ public sealed class Compilation
     /// <summary>Does module <paramref name="from"/> see declarations from <paramref name="to"/>?
     /// The same module, or an import of <paramref name="to"/>.</summary>
     /// <summary>
-    /// Whether a block reaches the code of <paramref name="from"/> (design/v5/spec/04; spec 04 rule
-    /// 10; the sweep after M10, W7): a conformance block — <c>extend T :: [I] { … }</c>, the
+    /// Whether a block reaches the code of <paramref name="from"/> (spec 04 rule
+    /// 10): a conformance block — <c>extend T :: [I] { … }</c>, the
     /// synthesized ones among them — wherever its type is, its module imported or not, since the
     /// conformance is the program's (05 §13 rule 4: one per type and interface in the whole
     /// program); a block of methods alone where its module is seen (04 rule 9). Before W7 every
@@ -277,7 +277,7 @@ public sealed class Compilation
     public ModuleSymbol AddModule(Module ast, string? name = null, bool isNative = false,
         DocumentationTable? documentation = null)
     {
-        // a header that names nothing is Lyric 5's: where the module's attributes stand (09 T7)
+        // a header that names nothing is Lyric 5's: where the module's attributes stand
         if (Lyric5Modules && ast.Header is { Segments.Length: > 0 } header)
             _de.Report("LYR-RES0008", Severity.Error, header.Span,
                 "a module is named by its path: the 'module' header is gone");
@@ -328,8 +328,8 @@ public sealed class Compilation
             ["std", "collections"], ["std", "prelude"]];
 
     /// <summary>
-    /// The home of <c>Cancelled</c> (design/v5/spec/10 Q10), what a coroutine's yield throws when
-    /// <c>close()</c> unwinds it (06 A5): a program with a coroutine needs it whether or not it
+    /// The home of <c>Cancelled</c>, what a coroutine's yield throws when
+    /// <c>close()</c> unwinds it: a program with a coroutine needs it whether or not it
     /// imports the module. Loaded only then — it is the scheduler's home and grows with it.
     /// </summary>
     private static readonly string[] CancelledHome = ["std", "task"];
@@ -358,9 +358,9 @@ public sealed class Compilation
     }
 
     /// <summary>Whether a module holds a coroutine: a yield, or a generator that yields nowhere —
-    /// a body that returns no value, or only throws (06 M6-3; N1a: such a generator found no
-    /// std.task, so its <c>using</c> and its <c>close()</c> were refused). A function that only
-    /// returns one, as <c>std.core</c>'s <c>sequence</c> does, makes none.</summary>
+    /// a body that returns no value, or only throws. Without the check, such a generator would
+    /// find no std.task, and its <c>using</c> and its <c>close()</c> would be refused. A function
+    /// that only returns one, as <c>std.core</c>'s <c>sequence</c> does, makes none.</summary>
     private static bool UsesCoroutines(Module ast)
     {
         var pending = new Stack<Node>();

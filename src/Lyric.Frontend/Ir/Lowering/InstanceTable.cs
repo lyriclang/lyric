@@ -94,7 +94,7 @@ internal sealed partial class InstanceTable
 
     /// <summary>
     /// What tells one of several functions of a name apart in an instance's name: its count,
-    /// <c>of/1&lt;int&gt;</c> beside <c>of/2&lt;int&gt;</c> (04 D4) — the suffix a function that
+    /// <c>of/1&lt;int&gt;</c> beside <c>of/2&lt;int&gt;</c> — the suffix a function that
     /// is no instance carries (<see cref="NameMangling.OverloadSuffix"/>). Empty for a name
     /// declared once, which is nearly every name.
     /// </summary>
@@ -198,7 +198,7 @@ internal sealed partial class InstanceTable
                 foreach (var member in members) index[member] = module.FullName;
             }
 
-        // The synthesized blocks (04 D7) stand in no module's AST: parsed apart and declared in the
+        // The synthesized blocks stand in no module's AST: parsed apart and declared in the
         // type's module. Without them, 'Point.hash<FixedHasher>' of two modules was one name.
         foreach (var block in compilation.Extensions.Blocks)
         {
@@ -279,7 +279,7 @@ internal sealed partial class InstanceTable
         {
             for (var i = 0; i < instance.Definition.Generics.Length && i < instance.Arguments.Length; i++)
                 substitution[instance.Definition.Generics[i]] = instance.Arguments[i];
-            // An interface's member for a value of the interface: 'Self' is the interface (04 D9).
+            // An interface's member for a value of the interface: 'Self' is the interface.
             if (instance.Definition.SelfParam is { } self) substitution[self] = instance;
         }
         // The same for a non-generic interface, which has no owner instance: a helper or a generic
@@ -352,7 +352,7 @@ internal sealed partial class InstanceTable
     /// the same one as for generic functions.</para>
     /// </summary>
     /// <summary>
-    /// A member of a generic <c>extend</c> block for one receiver (03 T7 X1): the block's
+    /// A member of a generic <c>extend</c> block for one receiver: the block's
     /// parameters as the receiver bound them, 'this' the receiver's instance. Keyed by the
     /// receiver, as a method of a generic type is.
     /// </summary>
@@ -369,8 +369,8 @@ internal sealed partial class InstanceTable
         var id = _ids.Next();
         _byKey[name] = (id, decl);
         // 'this' is the receiver: the instance for a named target, the shape itself for a
-        // built-in constructor (03 T7 X2), where no symbol stands — and whatever a blanket block
-        // (04 D15) is reached on, an instance included, which no target symbol names.
+        // built-in constructor, where no symbol stands — and whatever a blanket block
+        // is reached on, an instance included, which no target symbol names.
         Add(new Pending(decl, name, id, method.IsStatic ? null : block.Target,
             substitution, receiver as GenericInstance,
             method.IsStatic || (receiver is GenericInstance && block.Target is not null) ? null : receiver));
@@ -378,10 +378,10 @@ internal sealed partial class InstanceTable
     }
 
     /// <summary>
-    /// An interface's default for one conformer (04 D9): 'Self' the conformer, 'this' its value,
+    /// An interface's default for one conformer: 'Self' the conformer, 'this' its value,
     /// the call direct — one instance per default and conformer, as for a block's member. The
     /// interface has no parameters of its own here; a generic one's defaults go through its value.
-    /// A generic default's own arguments stand beside 'Self' (D9 whole): one instance per
+    /// A generic default's own arguments stand beside 'Self': one instance per
     /// conformer and argument list.
     /// </summary>
     public FunctionId RequestDefault(FunctionSymbol method, FunctionDecl decl, TypeSymbol iface,
@@ -422,7 +422,7 @@ internal sealed partial class InstanceTable
             ReferenceEqualityComparer.Instance);
         for (var i = 0; i < owner.Definition.Generics.Length && i < owner.Arguments.Length; i++)
             substitution[owner.Definition.Generics[i]] = owner.Arguments[i];
-        // An interface's member for a value of the interface: 'Self' is the interface (04 D9).
+        // An interface's member for a value of the interface: 'Self' is the interface.
         if (owner.Definition.SelfParam is { } self) substitution[self] = owner;
 
         Guard(name, span);
@@ -451,7 +451,7 @@ internal sealed partial class InstanceTable
         {
             _current = _lowered;
             var p = _pending[_lowered];
-            // A default set in place for its conformer (09 A5, A7; M9a S9): that body, checked as
+            // A default set in place for its conformer: that body, checked as
             // the conformer's — a generic conformer's parameters bound by the instance.
             if (p.ReceiverType is { } conformer && TypeFacts.SymbolOf(conformer) is { } holder
                 && types.ExpansionOf(p.Decl, holder) is { } expansion)
@@ -461,7 +461,7 @@ internal sealed partial class InstanceTable
                 if (conformer is GenericInstance instance)
                     for (var i = 0; i < instance.Definition.Generics.Length && i < instance.Arguments.Length; i++)
                         bound[instance.Definition.Generics[i]] = instance.Arguments[i];
-                // The family's block is 'extend<T :: [I]> P<T>' (05 §14 rule 4; M9a S10): the expansion
+                // The family's block is 'extend<T :: [I]> P<T>': the expansion
                 // was checked over the BLOCK's parameters, which the instance's arguments bind too.
                 if (conformer is GenericInstance bound2 && types.ExpansionSelfOf(p.Decl, holder) is GenericInstance { Arguments: var over })
                     for (var i = 0; i < over.Length && i < bound2.Arguments.Length; i++)
@@ -469,7 +469,7 @@ internal sealed partial class InstanceTable
                             bound[blockParam] = bound2.Arguments[i];
                 p = p with { Decl = expansion, Substitution = bound };
             }
-            // A generic coroutine is two functions per instance, as a written one is (06 N2): the
+            // A generic coroutine is two functions per instance, as a written one is: the
             // factory under the instance's name, the body behind it in the instance's terms.
             if (ModuleLowerer.CoroutineReturn(p.Decl) is not null)
             {

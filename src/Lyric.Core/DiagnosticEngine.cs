@@ -41,7 +41,7 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
             if (diagnostic.Severity == Severity.Error && _probe is { } probe && _muted == probe.Level) probe.Errors++;
             return;
         }
-        // What follows from a declaration the parser could not read is not said (11 G6; M12a S2 P3):
+        // What follows from a declaration the parser could not read is not said:
         // its parts are what the recovery left, and an error about them is an error about the
         // recovery. The parser's own errors stay.
         if (InUnparsed(diagnostic)) return;
@@ -51,7 +51,7 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
             var rounds = new List<DiagnosticNote>();
             if (diagnostic.Notes is { } own) rounds.AddRange(own);
             for (var i = _within.Count - 1; i >= 0; i--) rounds.Add(_within[i].Note);
-            // A scope with a place of its own (05 §14 rule 6; M9a S10): the error is said there —
+            // A scope with a place of its own (spec 05 §14 rule 6): the error is said there —
             // the conformer's entry — and where it arose becomes a note.
             var primary = _within.LastOrDefault(w => w.Primary is not null).Primary;
             if (primary is { } at && at.File != diagnostic.Span.File)
@@ -68,7 +68,7 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
             // to act on, and an error in it is the WRITTEN declaration's: a field whose type
             // carries no Equatable, say. The error moves to the node that asked for the
             // synthesis, named, and the line it stood on comes along so the field can be found,
-            // then the origin's own notes (the quote a macro's expansion came from, M9b S5). A
+            // then the origin's own notes (the quote a macro's expansion came from). A
             // node that asked for a synthesis may itself stand in a synthesized file - a site a
             // macro's result holds -, so the move repeats until the error stands where someone
             // wrote, the chain innermost first; the diagnostic's own notes close.
@@ -85,7 +85,7 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
             diagnostic = diagnostic with { Notes = chain };
         }
         // The same thing said twice at one place is said once: a macro that splices an argument
-        // twice (M9b S5) checks the written node twice, and its one mistake is one.
+        // twice checks the written node twice, and its one mistake is one.
         if (_diagnostics.Any(d => Same(d, diagnostic))) return;
         _diagnostics.Add(diagnostic);
     }
@@ -112,7 +112,7 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
 
     /// <summary>
     /// While the scope lasts, an error is said with where it was set in place: a body checked
-    /// once per round or per conformer (M9a S9) reports at the line written once, and the note
+    /// once per round or per conformer reports at the line written once, and the note
     /// names the round. A warning or a hint the written body has had already is not said again.
     /// </summary>
     public IDisposable Within(DiagnosticNote where, Span? primary = null, Func<Diagnostic, Diagnostic>? recode = null)
@@ -134,7 +134,7 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
     }
 
     /// <summary>Takes back the warnings, notes and hints <paramref name="allowed"/> says yes to
-    /// (design/v5/spec/09 A10: <c>@Allow</c>, <c>[lints] allow</c>); an error stays.</summary>
+    /// (<c>@Allow</c>, <c>[lints] allow</c>); an error stays.</summary>
     /// <summary>Adds <paramref name="note"/> to the first diagnostic reported since the count was
     /// <paramref name="from"/> that <paramref name="which"/> takes: what the reporter could not see —
     /// the expression around a failed lookup — said by the caller that can.</summary>
@@ -189,7 +189,7 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
 
     /// <summary>
     /// Mutes, and COUNTS the errors that would have been reported, for a check whose question is
-    /// "does this hold at all": an implicit synthesis (04 D7) is kept where its body checks and
+    /// "does this hold at all": an implicit synthesis is kept where its body checks and
     /// withdrawn where it does not, and nobody is told either way. One probe at a time.
     /// </summary>
     public ProbeScope Probe()
@@ -277,10 +277,10 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
     public void RenderText(TextWriter output) => RenderText(output, RenderStyle.Current);
 
     /// <summary>
-    /// The findings as text (11 G5; M12a S2), each once: a second call says only what was reported
+    /// The findings as text, each once: a second call says only what was reported
     /// since the first — the build renders after the front end and again after the gate, and the
     /// warnings were said twice. After <see cref="RenderStyle.MaxErrors"/> errors the rest is
-    /// counted, not drawn (G6), and one line says how much.
+    /// counted, not drawn, and one line says how much.
     /// </summary>
     public void RenderText(TextWriter output, RenderStyle style)
     {

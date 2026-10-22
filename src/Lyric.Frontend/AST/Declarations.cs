@@ -40,7 +40,7 @@ public sealed record AttributeNode(string[] Path, StructInitField[] Fields, Span
 public abstract record Decl(Span Span) : Node(Span);
 
 /// <summary>
-/// The visibility word written before a declaration (design/v5/spec/07 V2, 08 D3): <c>pub</c> —
+/// The visibility word written before a declaration: <c>pub</c> —
 /// exported —, <c>internal</c> — the package's —, <c>private</c> — the module's —, or none. What
 /// none means is the reader's: Lyric 5 reads it as <c>internal</c>, the 4.x tools as the module's.
 /// </summary>
@@ -55,7 +55,7 @@ public enum VisibilityWord
 // --- imports ---
 public sealed record ImportDecl(string[] Path, ImportClause? Clause, Span Span) : Decl(Span)
 {
-    /// <summary><c>pub import</c> (design/v5/spec/07 V3 I4): what it binds the module passes on —
+    /// <summary><c>pub import</c>: what it binds the module passes on —
     /// a re-export. Without the word an import is its module's own.</summary>
     public bool IsPublic { get; init; }
 }
@@ -67,7 +67,7 @@ public sealed record ImportSelective(string[] Names, Span Span) : ImportClause(S
 {
     public required Span[] NameSpans { get; init; }
 
-    /// <summary><c>{ f as g }</c> (design/v5/spec/07 V3 I2): the name each item is bound under,
+    /// <summary><c>{ f as g }</c>: the name each item is bound under,
     /// by index — <c>null</c> where it keeps its own, and <c>null</c> as a whole when none is
     /// renamed.</summary>
     public string?[]? Renames { get; init; }
@@ -82,7 +82,7 @@ public sealed record GenericParam(string Name, TypeNode[] Constraints, Span Span
 {
     public required Span NameSpan { get; init; }
 
-    /// <summary><c>Rhs = Self</c> (design/v5/spec/03 T18): the argument the parameter takes when a
+    /// <summary><c>Rhs = Self</c>: the argument the parameter takes when a
     /// use writes none; <c>null</c> when it must be written.</summary>
     public TypeNode? Default { get; init; }
 }
@@ -92,21 +92,21 @@ public sealed record Param(bool IsParams, string Name, TypeNode Type, Expr? Defa
 {
     public required Span NameSpan { get; init; }
 
-    /// <summary>What sits on the parameter: <c>@callerExpr(actual)</c> (design/v5/spec/09 A11) —
+    /// <summary>What sits on the parameter: <c>@callerExpr(actual)</c> —
     /// the one attribute a parameter takes.</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 
-    /// <summary><c>&amp;x: T</c> (design/v5/spec/03 T12): the parameter takes a place of the
+    /// <summary><c>&amp;x: T</c>: the parameter takes a place of the
     /// caller, which the function reads and writes, not a value.</summary>
     public bool IsPlace { get; init; }
 
-    /// <summary><c>nums: int...</c> (design/v5/spec/08): Lyric 5's variadic parameter, written with
+    /// <summary><c>nums: int...</c>: Lyric 5's variadic parameter, written with
     /// the element type — <see cref="Param.Type"/> is the array, as for 4.x's <c>params nums:
     /// int[]</c>, and <see cref="Param.IsParams"/> holds for both.</summary>
     public bool IsEllipsis { get; init; }
 }
-/// <summary><c>throws E</c>, <c>throws [A, B]</c>, or bare <c>throws</c> (design/v5/spec/05 E2 K1,
-/// K2; 08 D9): a SET of thrown types, written in brackets from two on (the list rule, 08 D5/D6).
+/// <summary><c>throws E</c>, <c>throws [A, B]</c>, or bare <c>throws</c>:
+/// a SET of thrown types, written in brackets from two on (the list rule).
 /// <see cref="Types"/> empty is the bare form, which means <c>throws Error</c>.</summary>
 public sealed record ThrowsClause(TypeNode[] Types, Span Span) : Node(Span);
 
@@ -118,16 +118,16 @@ public sealed record FunctionDecl(
 {
     public bool IsPublic => Visibility == VisibilityWord.Pub;
 
-    /// <summary>On an interface member: <c>private fn</c> with a body (design/v5/spec/07 V2 S4) —
+    /// <summary>On an interface member: <c>private fn</c> with a body —
     /// a helper the interface's defaults call. No requirement, no slot, and no conformer answers
     /// or overrides it.</summary>
     public bool IsPrivateHelper => Visibility == VisibilityWord.Private && Body is not null;
 
-    /// <summary><c>inline fn</c> (design/v5/spec/08 F6): set in place at every call, its lambda
+    /// <summary><c>inline fn</c>: set in place at every call, its lambda
     /// arguments with it — no closure, a <c>return</c> in one leaves the function that wrote it.</summary>
     public bool IsInline { get; init; }
 
-    /// <summary><c>macro name(params): Ret { ... }</c> (design/v5/spec/08 Y12 Q1; 13 M9b P3): a
+    /// <summary><c>macro name(params): Ret { ... }</c>: a
     /// function over syntax, run by the interpreter at a site's expansion and never by the
     /// program. Its parameters and its result are types of <c>std.syntax</c>.</summary>
     public bool IsMacro { get; init; }
@@ -136,8 +136,7 @@ public sealed record FunctionDecl(
 
     /// <summary>Whether the return type is written in parentheses, <c>fn f(): (Task&lt;int&gt;) throws E</c>.
     /// A grouping leaves no node in a type, and here it carries meaning: behind a return type
-    /// that may itself carry a set, the parentheses say that the <c>throws</c> is the function's
-    /// (the review's M6-6).</summary>
+    /// that may itself carry a set, the parentheses say that the <c>throws</c> is the function's.</summary>
     public bool ReturnGrouped { get; init; }
 
     /// <summary>Set on a top-level function, and (since 2.1) on a method of a struct, class,
@@ -189,12 +188,12 @@ public sealed record FieldDecl(string Name, TypeNode Type, Expr? Default, Span S
     /// <summary>Since 2.1; the sema admits only <c>@Deprecated</c> on a member.</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 
-    /// <summary>Declared <c>var name: T</c> (design/v5/spec/02 M2): the field may be written,
+    /// <summary>Declared <c>var name: T</c>: the field may be written,
     /// through a root that may be written. Without the word a field is fixed once its value is
-    /// built — for a struct and for a class alike (M9).</summary>
+    /// built — for a struct and for a class alike.</summary>
     public bool IsVar { get; init; }
 
-    /// <summary><c>pub x: int</c>, <c>private var y: int</c> (design/v5/spec/07 V2 S0): a field
+    /// <summary><c>pub x: int</c>, <c>private var y: int</c>: a field
     /// follows the rule of every member. A variant's fields have none of their own.</summary>
     public VisibilityWord Visibility { get; init; }
 }
@@ -204,7 +203,7 @@ public sealed record StructDecl(VisibilityWord Visibility, string Name, GenericP
 {
     public bool IsPublic => Visibility == VisibilityWord.Pub;
 
-    /// <summary><c>:: [Walker by legs]</c> (design/v5/spec/04 D1): the field each entry of
+    /// <summary><c>:: [Walker by legs]</c>: the field each entry of
     /// <c>Interfaces</c> delegates to, by index, <c>null</c> where the entry is conformed in the
     /// ordinary way — and <c>null</c> as a whole when no entry delegates.</summary>
     public string?[]? Delegates { get; init; }
@@ -218,7 +217,7 @@ public sealed record ClassDecl(VisibilityWord Visibility, string Name, GenericPa
 {
     public bool IsPublic => Visibility == VisibilityWord.Pub;
 
-    /// <summary><c>:: [Walker by legs]</c> (design/v5/spec/04 D1): the field each entry of
+    /// <summary><c>:: [Walker by legs]</c>: the field each entry of
     /// <c>Interfaces</c> delegates to, by index, <c>null</c> where the entry is conformed in the
     /// ordinary way — and <c>null</c> as a whole when no entry delegates.</summary>
     public string?[]? Delegates { get; init; }
@@ -234,11 +233,11 @@ public sealed record EnumDecl(VisibilityWord Visibility, string Name, GenericPar
 
     public required Span NameSpan { get; init; }
 
-    /// <summary>The associated types the enum binds for its conformances (03 T6).</summary>
+    /// <summary>The associated types the enum binds for its conformances.</summary>
     public AssociatedTypeDecl[] Types { get; init; } = [];
 
-    /// <summary>The enum's constants, <c>static let all: Level[] = [Level.Low, Level.High];</c>
-    /// (design/v5/spec/08; the review's M8a-10) — behind the ';' that ends the variants, among
+    /// <summary>The enum's constants, <c>static let all: Level[] = [Level.Low, Level.High];</c>:
+    /// behind the ';' that ends the variants, among
     /// the methods.</summary>
     public StaticBindingDecl[] Statics { get; init; } = [];
 
@@ -249,7 +248,7 @@ public sealed record EnumVariant(string Name, TypeNode[]? TupleFields, FieldDecl
 {
     public required Span NameSpan { get; init; }
 
-    /// <summary>Its attributes (design/v5/spec/09 T7: every declaration carries them in Lyric 5;
+    /// <summary>Its attributes (every declaration carries them in Lyric 5;
     /// the 4.x parser refuses them here).</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 }
@@ -260,18 +259,18 @@ public sealed record InterfaceDecl(VisibilityWord Visibility, string Name, Gener
 
     public required Span NameSpan { get; init; }
 
-    /// <summary>The associated types the interface declares, <c>type Item;</c> (design/v5/spec/03 T6).</summary>
+    /// <summary>The associated types the interface declares, <c>type Item;</c>.</summary>
     public AssociatedTypeDecl[] Types { get; init; } = [];
 
-    /// <summary><c>sealed interface Shape</c> (04 D8): every conformer stands in the declaring
+    /// <summary><c>sealed interface Shape</c>: every conformer stands in the declaring
     /// module, and a match of type patterns over it is exhaustive without <c>_</c>.</summary>
     public bool IsSealed { get; init; }
 
-    /// <summary>The constants it declares, <c>static let zero: Self;</c> (design/v5/spec/03 T5):
+    /// <summary>The constants it declares, <c>static let zero: Self;</c>:
     /// every conformer answers them with a <c>static let</c> of its own.</summary>
     public StaticBindingDecl[] Statics { get; init; } = [];
 
-    /// <summary>Its attributes (design/v5/spec/09 T7: every declaration carries them in Lyric 5;
+    /// <summary>Its attributes (every declaration carries them in Lyric 5;
     /// the 4.x parser refuses them here).</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 }
@@ -280,10 +279,10 @@ public sealed record ExtendDecl(VisibilityWord Visibility, TypeNode Target, Type
 {
     public bool IsPublic => Visibility == VisibilityWord.Pub;
 
-    /// <summary>The associated types a conformance block binds, <c>type Item = int;</c> (03 T6).</summary>
+    /// <summary>The associated types a conformance block binds, <c>type Item = int;</c>.</summary>
     public AssociatedTypeDecl[] Types { get; init; } = [];
 
-    /// <summary><c>extend&lt;T :: [Display]&gt; List&lt;T&gt; { … }</c> (03 T7 X1): the block's own type
+    /// <summary><c>extend&lt;T :: [Display]&gt; List&lt;T&gt; { … }</c>: the block's own type
     /// parameters, bound by the receiver at every use.</summary>
     public GenericParam[] Generics { get; init; } = [];
 
@@ -291,13 +290,13 @@ public sealed record ExtendDecl(VisibilityWord Visibility, TypeNode Target, Type
     /// answers for its interfaces (05 §6, §7).</summary>
     public StaticBindingDecl[] Statics { get; init; } = [];
 
-    /// <summary>Its attributes (design/v5/spec/09 T7: every declaration carries them in Lyric 5;
+    /// <summary>Its attributes (every declaration carries them in Lyric 5;
     /// the 4.x parser refuses them here).</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 }
 
 /// <summary>
-/// An associated type (design/v5/spec/03 T6): in an interface <c>type Item;</c> declares one,
+/// An associated type: in an interface <c>type Item;</c> declares one,
 /// <c>type Item = Self;</c> with a default; in a struct, class, enum or conformance block
 /// <c>type Item = int;</c> binds it for that conformer. <see cref="Type"/> is the default or
 /// the binding, <c>null</c> for a bare declaration.
@@ -307,17 +306,17 @@ public sealed record AssociatedTypeDecl(string Name, TypeNode? Type, Span Span) 
     public required Span NameSpan { get; init; }
 
     /// <summary>What every answer conforms to, in an interface's declaration —
-    /// <c>type Iter :: [Iterator];</c> (10 B6) —, as a type parameter's constraints are written.</summary>
+    /// <c>type Iter :: [Iterator];</c> —, as a type parameter's constraints are written.</summary>
     public TypeNode[] Bounds { get; init; } = [];
 
-    /// <summary>Its attributes (design/v5/spec/09 T7: every declaration carries them in Lyric 5;
+    /// <summary>Its attributes (every declaration carries them in Lyric 5;
     /// the 4.x parser refuses them here).</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 }
 
 // --- global bindings and type aliases ---
 /// <inheritdoc cref="StaticBindingDecl"/>
-public sealed record GlobalBindingDecl(VisibilityWord Visibility, BindingStmt Binding, Span Span) : Decl(Span), INamedDecl // 'let' or 'var' (07 V5 G5)
+public sealed record GlobalBindingDecl(VisibilityWord Visibility, BindingStmt Binding, Span Span) : Decl(Span), INamedDecl // 'let' or 'var'
 {
     public bool IsPublic => Visibility == VisibilityWord.Pub;
 
@@ -325,7 +324,7 @@ public sealed record GlobalBindingDecl(VisibilityWord Visibility, BindingStmt Bi
 
     public Span NameSpan => Binding.NameSpan;
 
-    /// <summary>Its attributes (design/v5/spec/09 T7: every declaration carries them in Lyric 5;
+    /// <summary>Its attributes (every declaration carries them in Lyric 5;
     /// the 4.x parser refuses them here).</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 }
@@ -336,10 +335,10 @@ public sealed record TypeAliasDecl(VisibilityWord Visibility, bool IsOpaque, str
 
     public required Span NameSpan { get; init; }
 
-    /// <summary>The parameters of a generic alias, <c>type Pair&lt;T&gt; = (T, T)</c> (03 T15).</summary>
+    /// <summary>The parameters of a generic alias, <c>type Pair&lt;T&gt; = (T, T)</c>.</summary>
     public GenericParam[] Generics { get; init; } = [];
 
-    /// <summary>Its attributes (design/v5/spec/09 T7: every declaration carries them in Lyric 5;
+    /// <summary>Its attributes (every declaration carries them in Lyric 5;
     /// the 4.x parser refuses them here).</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 }

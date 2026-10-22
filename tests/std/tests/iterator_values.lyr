@@ -1,4 +1,4 @@
-// An interface value with its associated types fixed (03 M4-1, T6; M8c S9a): 'Iterator<Item = int>'
+// An interface value with its associated types fixed: 'Iterator<Item = int>'
 // taken and given, walked by 'for' and by 'next()', two iterators behind one type, a throwing one
 // with its Error fixed, a generic body lifting what its constraint fixes.
 import std.test { assertEq, assertTrue };

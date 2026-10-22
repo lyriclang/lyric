@@ -51,7 +51,7 @@ public sealed partial class Parser
 
     /// <summary>
     /// The function declared at <paramref name="span"/>, parsed again into nodes of its own — the
-    /// same text, the same spans, nothing shared with the first parse (M9a S9: a body set in place
+    /// same text, the same spans, nothing shared with the first parse (a body set in place
     /// once per field, or per conformer, is checked once per round). Its attributes are the first
     /// parse's and are skipped; what the parse reports, the first one did.
     /// </summary>
@@ -92,9 +92,9 @@ public sealed partial class Parser
         return expr;
     }
 
-    /// <summary>Exactly one expression, or a value block (08 Y4) where the text opens with
+    /// <summary>Exactly one expression, or a value block where the text opens with
     /// <c>{</c>: what a macro's expansion writes for an <c>Expr</c> that is a spliced block
-    /// (M9b S5), which no written expression starts with.</summary>
+    /// which no written expression starts with.</summary>
     public Expr ParseExpressionOrBlock()
     {
         if (!_buffer.Check(TokenKind.LBrace)) return ParseExpression();
@@ -185,7 +185,7 @@ public sealed partial class Parser
         }
 
         // A whole expression — a statement's, an argument, what stands in parentheses, a branch:
-        // the marks to the right of its operators cover up to its end (M5-9), which is known now.
+        // the marks to the right of its operators cover up to its end, which is known now.
         var from = _buffer.Current.Span.Start;
         _marks.Add(null);
         try
@@ -238,7 +238,7 @@ public sealed partial class Parser
                 continue;
             }
 
-            // 'is' (03 T11): the right-hand side is a type as well.
+            // 'is': the right-hand side is a type as well.
             if (op == TokenKind.Is)
             {
                 _buffer.Advance();
@@ -247,7 +247,7 @@ public sealed partial class Parser
                 continue;
             }
 
-            // Range: not chainable. 'a..' before ']' is the view to the end (03 T13 A2), which
+            // Range: not chainable. 'a..' before ']' is the view to the end, which
             // only an index can close that way.
             if (op is TokenKind.DotDot or TokenKind.DotDotEqual)
             {
@@ -278,13 +278,13 @@ public sealed partial class Parser
                 continue;
             }
 
-            // The remaining binary operators. The right of '??' may be a value block (08 Y4):
+            // The remaining binary operators. The right of '??' may be a value block:
             // 'x ?? { return 0; }' — nothing else an operand begins with is a brace.
             _buffer.Advance();
             var right = op == TokenKind.QuestionQuestion && _buffer.Check(TokenKind.LBrace) ? ParseValueBlock() : ParseExpr(rightBp);
             left = new BinaryExpr(left, Operators.MapBinary(op), right, Span.Union(Whole(left), Whole(right)));
 
-            // A comparison and an equality do not chain (08 Y4): 'a < b < c' compared a bool with
+            // A comparison and an equality do not chain: 'a < b < c' compared a bool with
             // 'c' and was a type error far from the point, 'a == b == c' was taken in silence. Said
             // once, at the second operator; the rest of the chain is read and set aside, so nothing
             // else is said about it.
@@ -305,7 +305,7 @@ public sealed partial class Parser
         return left;
     }
 
-    /// <summary>The non-associative levels of 08 Y4: 1 the comparisons and the membership tests,
+    /// <summary>The non-associative levels of the precedence table: 1 the comparisons and the membership tests,
     /// 2 the equalities; <c>null</c> for an operator that chains.</summary>
     private static int? ChainLevel(TokenKind op) => op switch
     {
@@ -322,15 +322,15 @@ public sealed partial class Parser
     private Expr ParsePrefix(bool atStart = false)
     {
         var op = _buffer.Current.TokenKind;
-        // 'try e' (design/v5/spec/05 E4, 08 Y4): the mark covers EVERYTHING to its right — 'try a +
-        // b' is 'try (a + b)'. It may also stand to the right of an operator (the review's M5-9;
+        // 'try e': the mark covers EVERYTHING to its right — 'try a +
+        // b' is 'try (a + b)'. It may also stand to the right of an operator (
         // Swift refuses that): there it covers from where it stands to the end of the expression,
         // and what stands left of it is not covered. 'try {' is the block form, which only a
         // statement starts.
         if (op is TokenKind.Try && _buffer.Peek(1).TokenKind is not TokenKind.LBrace)
         {
             var kw = _buffer.Advance();
-            // 'try?' and 'try!' (05 E4): the sign written against the keyword. With a space between,
+            // 'try?' and 'try!': the sign written against the keyword. With a space between,
             // '!' is the negation of what follows — 'try !done()' marks 'not done()'.
             var kind = TryKind.Propagate;
             var keyword = kw.Span;
@@ -357,7 +357,7 @@ public sealed partial class Parser
             }
             var marked = atStart ? ParseExpr(0) : ParsePrefix();
 
-            // 'try e catch (x: A) v' (08 Y4): the clauses belong to the nearest 'try' on their left,
+            // 'try e catch (x: A) v': the clauses belong to the nearest 'try' on their left,
             // so a clause body that is a 'try' of its own takes the clauses after it.
             var catches = new List<CatchClause>();
             while (_buffer.Check(TokenKind.Catch))
@@ -373,7 +373,7 @@ public sealed partial class Parser
             return new TryExpr(marked, Span.Union(kw.Span, end))
                 { KeywordSpan = keyword, Kind = kind, Catches = catches.ToArray(), Reach = reach };
         }
-        // '&x' marks the argument of a place parameter (03 T12, 08 Y4) and stands nowhere else:
+        // '&x' marks the argument of a place parameter and stands nowhere else:
         // there is no address as a value. ParseArguments takes the mark before it gets here; one
         // that arrives is read past, so it gives one message and the rest still parses.
         if (op is TokenKind.Amp)
@@ -383,7 +383,7 @@ public sealed partial class Parser
                 "'&' marks the argument of a place parameter and stands nowhere else — there is no address as a value");
             return ParsePrefix(atStart);
         }
-        // '^' at the start of an operand is the from-end index (03 T14 N6); between operands it
+        // '^' at the start of an operand is the from-end index; between operands it
         // is still the exclusive or, which the binary loop takes before this is asked.
         if (op is TokenKind.Exclamation or TokenKind.Minus or TokenKind.Tilde or TokenKind.Inc or TokenKind.Dec or TokenKind.Caret)
         {
@@ -397,7 +397,7 @@ public sealed partial class Parser
             var value = ParsePrefix();
             return new ThrowExpr(value, Span.Union(kw.Span, Whole(value)));
         }
-        // 'comptime if (c) a else b' in expression position (09 Q2; M9a S10): the arms are
+        // 'comptime if (c) a else b' in expression position: the arms are
         // expressions, the condition a site; in a round that decides it, the chosen arm alone is
         // checked — a '@Shared' field's clone is the field itself, and the other arm names a
         // 'clone' the field's type need not have.
@@ -413,7 +413,7 @@ public sealed partial class Parser
             var other = ParseSubExpr();
             return new ComptimeIfExpr(new ComptimeExpr(condition, condition.Span), then, other, Span.Union(kw.Span, Whole(other)));
         }
-        // 'comptime e' and 'comptime { … }' (design/v5/spec/09 Q2): a word in Lyric 5, whose
+        // 'comptime e' and 'comptime { … }': a word in Lyric 5, whose
         // block is a value block — its last expression the value.
         if (_buffer.Check(TokenKind.Comptime))
         {
@@ -467,7 +467,7 @@ public sealed partial class Parser
                     if (depth == 0) return _buffer.Peek(offset + 1).TokenKind == TokenKind.LParen;
                     break;
 
-                // '>>' closes two: 'read<List<int>>()' (sweep after M10, open point 148 — the
+                // '>>' closes two: 'read<List<int>>()' (the
                 // lexer's one token read as an operator here, and the '<' became a comparison)
                 case TokenKind.Shr:
                     depth -= 2;
@@ -508,8 +508,8 @@ public sealed partial class Parser
             {
                 case TokenKind.Dot when _sm.Lyric5 && _buffer.Peek(1).TokenKind == TokenKind.LBracket:
                 {
-                    // 'e.[f]' (09 A7 R2): the field a 'comptime for' over 'std.meta.fields' names;
-                    // 'e.[v, p]' (M9a S10) the payload field 'p' of the variant 'v'; 'E.[v]' the
+                    // 'e.[f]': the field a 'comptime for' over 'std.meta.fields' names;
+                    // 'e.[v, p]' the payload field 'p' of the variant 'v'; 'E.[v]' the
                     // variant 'v' of the enum 'E', and 'E.[v] { … }' one built field by field
                     _buffer.Advance();
                     _buffer.Advance();
@@ -534,7 +534,7 @@ public sealed partial class Parser
                 case TokenKind.Dot:
                 {
                     _buffer.Advance();
-                    // 't.0': the element of a tuple by position (03 T16). The lexer hands the
+                    // 't.0': the element of a tuple by position. The lexer hands the
                     // number over as a literal; 't.0.1' arrives as the float '0.1' and is two
                     // members, as Rust reads it.
                     if (_buffer.Current.TokenKind is TokenKind.IntLiteral or TokenKind.FloatLiteral)
@@ -616,7 +616,7 @@ public sealed partial class Parser
                     break;
                 }
 
-                // 'p with { x = 1, pos.y = 2 }' (02 M6): a postfix, 'with' contextual, the
+                // 'p with { x = 1, pos.y = 2 }': a postfix, 'with' contextual, the
                 // fields as in an initializer with a path allowed on the left.
                 case TokenKind.Identifier when AtContextual("with") && _buffer.Peek(1).TokenKind == TokenKind.LBrace:
                 {
@@ -649,7 +649,7 @@ public sealed partial class Parser
                 {
                     var lambda = ParseTrailingLambda();
                     // The block joins the call as it was written. Built anew here, the call had
-                    // lost the names of its arguments (04 D5) — 'apply(b: 1, a: 10) { … }' went
+                    // lost the names of its arguments — 'apply(b: 1, a: 10) { … }' went
                     // by position, in silence — and the parentheses '@callerExpr' quotes.
                     operand = operand is CallExpr call && call.Arguments is not [.., LambdaExpr { Form: LambdaForm.Trailing }]
                         ? call with { Arguments = [.. call.Arguments, lambda], Span = Span.Union(call.Span, lambda.Span) }
@@ -752,8 +752,8 @@ public sealed partial class Parser
                 var (value, suffix) = LiteralDecoder.DecodeFloat(written, span, _de);
                 return new FloatLiteralExpr(value, suffix, span);
             }
-            // '.Red', '.Num(3)', '.Rect { w = 1 }': a member of the type the position expects
-            // (08 Y9). The call and the initializer take the same shapes as after a name.
+            // '.Red', '.Num(3)', '.Rect { w = 1 }': a member of the type the position expects.
+            // The call and the initializer take the same shapes as after a name.
             case TokenKind.Dot when _buffer.Peek(1).TokenKind == TokenKind.Identifier:
             {
                 _buffer.Advance();
@@ -765,7 +765,7 @@ public sealed partial class Parser
                 return new ImplicitMemberExpr(text, span);
             }
             case TokenKind.Identifier:
-                // 'loop { … }' and 'outer: loop { … }' as an expression (05 E11, 08 S4):
+                // 'loop { … }' and 'outer: loop { … }' as an expression:
                 // 'let found = loop { …; break x; };'. A call reads 'name:' as a named argument
                 // before it gets here, so the labeled form is free.
                 if (IsLoopAhead(0)) return ParseLoop(null, default);
@@ -784,7 +784,7 @@ public sealed partial class Parser
                 // was a parse error everywhere but in a match arm, whose pattern is not parsed
                 // here, and in a guard, which the flag excludes.
                 if (!_inGuard && _buffer.Peek(1).TokenKind == TokenKind.FatArrow) return ParseBareLambda();
-                // 'twice!(x)', 'retry!(3) { ... }', 'run! { ... }' (08 Y12 Q5; 13 M9b P4): the '!'
+                // 'twice!(x)', 'retry!(3) { ... }', 'run! { ... }': the '!'
                 // directly behind the name, before '(' or '{', is a macro's expansion site. With a
                 // space, or before anything else, it is the unwrap postfix as ever: 'x! in xs',
                 // 'x!.f()'. A call on an unwrapped value, 'x!(y)', was never written.
@@ -892,7 +892,7 @@ public sealed partial class Parser
     private Span End(Node body) => body is Expr expression ? Whole(expression) : body.Span;
 
     /// <summary>The arguments of a call that are written in parentheses of their own, each with
-    /// the span that holds them — what '@callerExpr' quotes (09 A11) — or null where none is.</summary>
+    /// the span that holds them — what '@callerExpr' quotes — or null where none is.</summary>
     private (Expr Argument, Span Written)[]? Parenthesized(Expr[] arguments)
     {
         List<(Expr, Span)>? found = null;
@@ -920,8 +920,8 @@ public sealed partial class Parser
 
     /// <param name="names">The name each argument was written with, or <c>null</c> for every
     /// positional one — and <c>null</c> as a whole when none was named.</param>
-    /// <param name="spreads">The arguments with <c>...</c> behind them, <c>f(xs...)</c> (the
-    /// review's A2), each with where its dots stand — noted wherever they stand: that a call
+    /// <param name="spreads">The arguments with <c>...</c> behind them, <c>f(xs...)</c>,
+    /// each with where its dots stand — noted wherever they stand: that a call
     /// spreads one argument, the rest, is the checker's to say, once, where it knows the
     /// parameters.</param>
     /// <param name="call">Whether these are a call's arguments: an attribute's are no call,
@@ -936,7 +936,7 @@ public sealed partial class Parser
         if (_buffer.Check(TokenKind.RParen)) return args.ToArray();
         while (true)
         {
-            // 'host: "h"' — an argument by its parameter's name (04 D5, 08 Y9): ':' after an
+            // 'host: "h"' — an argument by its parameter's name: ':' after an
             // identifier opens nothing else inside a call's parentheses.
             string? name = null;
             if (_buffer.Check(TokenKind.Identifier) && _buffer.Peek(1).TokenKind == TokenKind.Colon)
@@ -944,7 +944,7 @@ public sealed partial class Parser
                 name = _sm.Slice(_buffer.Advance().Span).ToString();
                 _buffer.Advance();
             }
-            // '&x' (03 T12, 08 Y4): the place x for a place parameter. The mark covers the whole
+            // '&x': the place x for a place parameter. The mark covers the whole
             // argument, as 'try' covers everything to its right; whether what it covers is a place
             // is the checker's question.
             var marked = _buffer.Check(TokenKind.Amp);
@@ -971,7 +971,7 @@ public sealed partial class Parser
     /// </summary>
     /// <summary>
     /// What stands between <c>[</c> and <c>]</c>: an index, or a range that takes a view of the
-    /// indexed value (03 T13 A2) — <c>a..b</c>, <c>a..=b</c>, <c>..b</c>, <c>a..</c>, <c>..</c>,
+    /// indexed value — <c>a..b</c>, <c>a..=b</c>, <c>..b</c>, <c>a..</c>, <c>..</c>,
     /// with either bound left open. A closed range arrives as the ordinary range node and is
     /// re-read here as the view it is in this position.
     /// </summary>
@@ -1039,7 +1039,7 @@ public sealed partial class Parser
     /// else is a trailing lambda ('run { 7 }', 'xs.map { it * 2 }').
     ///
     /// <para>'name = value' alone does not tell them apart: a block may begin with an assignment,
-    /// 'run { total = 5; … }'. What ENDS the value does (08 Y4, the review's M6-2): a ';' makes
+    /// 'run { total = 5; … }'. What ENDS the value does: a ';' makes
     /// it a statement and the brace a block's; a ',' or the closing brace makes it a field. A
     /// token scan over the first value, as the other lookaheads are.</para>
     /// </summary>
@@ -1049,9 +1049,9 @@ public sealed partial class Parser
         if (after == TokenKind.RBrace) return true;
         if (after != TokenKind.Identifier) return false;
 
-        // 'S { v, w }', 'S { v, w = 2 }' (02 I3): names before a ',' are an initializer's
+        // 'S { v, w }', 'S { v, w = 2 }': names before a ',' are an initializer's
         // shorthand — unless a '=>' follows them, the parameters of a trailing block
-        // ('{ acc, x => … }', 08 Y11 F2). One name alone, 'S { v }', stays a trailing block's
+        // ('{ acc, x => … }'). One name alone, 'S { v }', stays a trailing block's
         // here: whether 'S' is a type that makes it the shorthand is the sema's to say.
         if (_buffer.Peek(open + 2).TokenKind == TokenKind.Comma)
         {
@@ -1091,7 +1091,7 @@ public sealed partial class Parser
     /// Lookahead from an identifier: is this a type path WITH arguments in value position, that is
     /// segments joined by <c>.</c>, then <c>&lt;…&gt;</c>, then a <c>.</c> directly after — or the
     /// end of the expression, which makes it an instantiated generic function as a value,
-    /// <c>map(xs, ident&lt;int&gt;)</c> (design/v5/spec/03 T17)?
+    /// <c>map(xs, ident&lt;int&gt;)</c>?
     ///
     /// <para>Without arguments the <c>&lt;</c> is no type path: <c>P.neu()</c> is an ordinary
     /// identifier whose symbol happens to be a type and does not need this route. Hence there is NO
@@ -1201,7 +1201,7 @@ public sealed partial class Parser
     }
 
     /// <summary>The body of an initializer, from its '{' to its '}': named fields, and in Lyric 5
-    /// the items over infos (M9a S10) — '[f] = e' the field the round's variable names, and
+    /// the items over infos — '[f] = e' the field the round's variable names, and
     /// 'comptime for (f in fields&lt;T&gt;()) [f] = e' one such item per round.</summary>
     private (StructInitField[] Fields, StructInitRound[] Rounds, Span End) ParseInitItems()
     {
@@ -1238,7 +1238,7 @@ public sealed partial class Parser
             var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
                 $"expected field name, got {Shown(_buffer.Current)}");
             var fieldName = _sm.Slice(nameTok.Span).ToString();
-            // 'S { v, w }' (02 I3): a name alone is 'v = v', the field from the binding of its name.
+            // 'S { v, w }': a name alone is 'v = v', the field from the binding of its name.
             if (nameTok.TokenKind == TokenKind.Identifier && _buffer.Current.TokenKind is TokenKind.Comma or TokenKind.RBrace)
             {
                 fields.Add(new StructInitField(fieldName, new IdentifierExpr(fieldName, nameTok.Span), nameTok.Span)
@@ -1395,9 +1395,9 @@ public sealed partial class Parser
     }
 
     /// <summary>
-    /// The value of every text of an f-string, from its start token's form (08 Y7 L8): <c>fr"</c>
+    /// The value of every text of an f-string, from its start token's form: <c>fr"</c>
     /// resolves no escape, <c>f"""</c> takes the lines' indentation off as a multi-line string does
-    /// (L6) — over the texts as one, a hole standing for what it holds, so a line that begins with
+    /// — over the texts as one, a hole standing for what it holds, so a line that begins with
     /// a hole is indented like any other.
     /// </summary>
     private InterpSegment[] DecodeTexts(List<InterpSegment> segments, string opening, Span whole)
@@ -1445,7 +1445,7 @@ public sealed partial class Parser
                 // '((k, v)) => …': a parenthesis where a name stands opens an irrefutable
                 // pattern over the parameter. The outer pair is still the parameter list, so
                 // '(k, v) => …' keeps its two parameters.
-                // '&n' (03 T12; the review's M6-24): the parameter takes a place, the mark at
+                // '&n': the parameter takes a place, the mark at
                 // its start as on a declaration's. Read before a pattern is looked for: before
                 // one it is refused there, and the pattern is read on as the parameter it is.
                 var mark = LambdaPlaceMark();
@@ -1477,7 +1477,7 @@ public sealed partial class Parser
         }
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after lambda parameters");
 
-        // A return type, and after it the lambda's own set (08 Y11 F7) — read as a declaration's
+        // A return type, and after it the lambda's own set — read as a declaration's
         // clause is, so the return type does not take it.
         TypeNode? returnType = null;
         ThrowsClause? throws = null;
@@ -1529,7 +1529,7 @@ public sealed partial class Parser
         {
             // At the START OF A STATEMENT an initializer is what §6.8 keeps out: 'Point { x = 1 };'
             // must stay the error it is rather than turning into a call with a trailing lambda.
-            // What the braces hold tells the two apart there as everywhere (M6-2): a block of
+            // What the braces hold tells the two apart there as everywhere: a block of
             // statements after a bare name is the call it looks like, 'run { total = 5; }'.
             // After a member or a call the brace is the lambda anywhere.
             IdentifierExpr => _allowStructInit || !InitializerBodyAhead(0),
@@ -1543,7 +1543,7 @@ public sealed partial class Parser
     /// they hold statements, exactly as '=> { … }' does — a value block, whose tail is the
     /// lambda's result: <c>{ let d = it * 2; d + 1 }</c>.
     /// </summary>
-    /// <summary>A macro's expansion site (08 Y12 Q5): the name, its '!', then '(args)', a block, or
+    /// <summary>A macro's expansion site: the name, its '!', then '(args)', a block, or
     /// both. The arguments are expressions as written; the block is a value block, so its last
     /// expression may stand without ';' ('retry!(3) { try fetch(url) }').</summary>
     private MacroCallExpr ParseMacroCall()
@@ -1574,7 +1574,7 @@ public sealed partial class Parser
     private int _quoteDepth;
     private List<Expr>? _splices;
 
-    /// <summary><c>quote { ... }</c> (08 Y12 Q2; M9b S3): declarations when the block opens with
+    /// <summary><c>quote { ... }</c>: declarations when the block opens with
     /// one, statements otherwise - a value block, so a last expression without ';' is the tail,
     /// and the quote an expression. Inside, '#{' is a splice.</summary>
     private Expr ParseQuote()
@@ -1630,7 +1630,7 @@ public sealed partial class Parser
             || PeekContextual(1, "type") || PeekContextual(1, "extern");
     }
 
-    /// <summary><c>#{e}</c> (08 Y12 Q3): the expression is the function's code, kept in the
+    /// <summary><c>#{e}</c>: the expression is the function's code, kept in the
     /// quote's list; the content holds the splice by its index.</summary>
     private SpliceExpr ParseSplice()
     {
@@ -1647,7 +1647,7 @@ public sealed partial class Parser
     {
         var open = _buffer.Current; // '{'
 
-        // '{ acc, x => … }', '{ (k, v) => … }' (08 Y11 F2): a parameter list before '=>' names
+        // '{ acc, x => … }', '{ (k, v) => … }': a parameter list before '=>' names
         // the parameters instead of the implicit 'it'; the body is the rest of the block, a
         // value block whose tail is the result.
         if (TrailingParametersAhead())
@@ -1742,7 +1742,7 @@ public sealed partial class Parser
     // Does the block at the cursor contain a ';' at its own level, or begin with a statement
     // keyword? Then it is a statement block rather than a single expression. An empty one is
     // a block of no statements — 'subtest("row") { }' a lambda that does nothing, as '() => { }'
-    // is (08 Y11; M8c S18) — not an expression missing.
+    // is — not an expression missing.
     private bool HoldsStatements()
     {
         if (_buffer.Peek(1).TokenKind == TokenKind.RBrace) return true;
@@ -1839,7 +1839,7 @@ public sealed partial class Parser
 
     private TypeNode ParseTypeInner(bool allowThrows)
     {
-        // '?T', and since Lyric 5 '??T' (design/v5/spec/03 T4 O1): an optional of an optional is
+        // '?T', and since Lyric 5 '??T': an optional of an optional is
         // a type. The lexer hands '??' over as one token, the coalesce operator; in type
         // position it is two levels.
         var qTok = _buffer.Current;
@@ -1853,7 +1853,7 @@ public sealed partial class Parser
 
         var type = ParseTypeAtom(returned: !allowThrows);
 
-        // 'Self.[f]' (Lyric 5; the sweep after M10, X5): the type of the field a round's variable names
+        // 'Self.[f]' (Lyric 5): the type of the field a round's variable names
         if (_sm.Lyric5 && type is NamedType && _buffer.Check(TokenKind.Dot) && _buffer.Peek(1).TokenKind == TokenKind.LBracket)
         {
             _buffer.Advance();
@@ -1867,8 +1867,8 @@ public sealed partial class Parser
         {
             _buffer.Advance();
 
-            // 'T[3]' is the inline array (design/v5/spec/03 T13 A4): a value of that many
-            // elements. The length is a literal in 5.0; a constant or a parameter is a door (T18).
+            // 'T[3]' is the inline array: a value of that many
+            // elements. The length is a literal in 5.0; a constant or a parameter is a door.
             int? length = null;
             if (_buffer.Check(TokenKind.IntLiteral))
             {
@@ -1912,7 +1912,7 @@ public sealed partial class Parser
         var cur = _buffer.Current;
         switch (cur.TokenKind)
         {
-            // 'v: #{t}' inside a quote (08 Y12 Q3; M9b S4): a Type spliced in, "#i" in the content
+            // 'v: #{t}' inside a quote: a Type spliced in, "#i" in the content
             case TokenKind.Hash when _quoteDepth > 0 && _buffer.Peek(1).TokenKind == TokenKind.LBrace:
             {
                 var splice = ParseSplice();
@@ -1928,7 +1928,7 @@ public sealed partial class Parser
                 var path = new List<string> { _sm.Slice(cur.Span).ToString() };
                 var end = cur.Span;
                 var nameSpan = cur.Span;
-                // a '.[' ends the path: 'Self.[f]' is the type of a round's field (X5)
+                // a '.[' ends the path: 'Self.[f]' is the type of a round's field
                 while (!(_sm.Lyric5 && _buffer.Check(TokenKind.Dot) && _buffer.Peek(1).TokenKind == TokenKind.LBracket)
                        && _buffer.Match(TokenKind.Dot))
                 {
@@ -1959,7 +1959,7 @@ public sealed partial class Parser
         var start = _buffer.Advance(); // 'fn'
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0008", "expected '(' after 'fn' in function type");
         var parameters = new List<TypeNode>();
-        // 'fn(&int) -> void' (03 T12, T17): the mark at the parameter's start, the type unmarked.
+        // 'fn(&int) -> void': the mark at the parameter's start, the type unmarked.
         var places = new List<bool>();
         if (!_buffer.Check(TokenKind.RParen))
             do
@@ -1970,7 +1970,7 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' in function type");
         _buffer.Expect(TokenKind.Arrow, "LYR-PAR0015",
             $"expected '->' in function type, got {Shown(_buffer.Current)}");
-        // A 'throws' after the return type is the function TYPE's set (03 T17): the return type is
+        // A 'throws' after the return type is the function TYPE's set: the return type is
         // read without the coroutine suffix.
         _groupedType = null;
         var returnType = ParseType(allowThrows: false);
@@ -1980,7 +1980,7 @@ public sealed partial class Parser
         {
             // … unless this function type is itself a return type: 'fn make(): fn() -> int throws E'
             // — the returned function's set, or make's? The nearest took it, and a reader could
-            // not know (the review's M5-7). Parentheses say whose it is; it is still read as the
+            // not know. Parentheses say whose it is; it is still read as the
             // nearest's, so that one mistake gives one message.
             if (returned)
             {
@@ -1998,7 +1998,7 @@ public sealed partial class Parser
     }
 
     /// <summary>
-    /// What follows a function type's <c>throws</c> (design/v5/spec/03 T17, 05 E2): a bracketed list,
+    /// What follows a function type's <c>throws</c>: a bracketed list,
     /// one type, or nothing — the bare form, <c>Error</c> — where no type starts. Unlike a
     /// declaration's clause, a comma ends the type: in <c>fn(f: fn() -&gt; void throws A, b: B)</c> it
     /// separates two parameters, so several types without the brackets are no list here.
@@ -2030,7 +2030,7 @@ public sealed partial class Parser
         var sawComma = false;
         do
         {
-            // '(x: int, y: int)': a label before an element (03 T16), 'name' then ':'.
+            // '(x: int, y: int)': a label before an element, 'name' then ':'.
             if (_buffer.Check(TokenKind.Identifier) && _buffer.Peek(1).TokenKind == TokenKind.Colon)
             {
                 labels.Add(_sm.Slice(_buffer.Advance().Span).ToString());
@@ -2059,14 +2059,14 @@ public sealed partial class Parser
     }
 
     /// <summary>The type the last grouping held, '(T)': a grouping leaves no node, and behind a
-    /// return type its parentheses say whose a 'throws' is (M5-7, M6-6). A return type that IS
+    /// return type its parentheses say whose a 'throws' is. A return type that IS
     /// this node was written in parentheses — one with something around them, '(T)[]' or '?(T)',
     /// is another node.</summary>
     private TypeNode? _groupedType;
 
     private TypeNode[] ParseTypeArguments(out Span closeSpan) => ParseTypeArguments(out closeSpan, out _);
 
-    /// <param name="names">'Item = int' (03 T6): the associated type an argument fixes, by
+    /// <param name="names">'Item = int': the associated type an argument fixes, by
     /// index, <c>null</c> for a positional one; <c>null</c> as a whole when none is named.</param>
     private TypeNode[] ParseTypeArguments(out Span closeSpan, out string?[]? names)
     {

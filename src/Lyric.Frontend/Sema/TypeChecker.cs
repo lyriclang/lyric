@@ -48,7 +48,7 @@ public sealed class TypeChecker
     /// <summary>
     /// The synthesized member expressions whose receiver is an IMPLICIT FORM the operator has
     /// typed already: <c>.Red == c</c> desugars to <c>.Red.equals(c)</c>, and in receiver
-    /// position <c>.Red</c> has no context of its own (08 Y9) — its type is the one the operand
+    /// position <c>.Red</c> has no context of its own — its type is the one the operand
     /// check gave it. Written source never puts an implicit form there and gets LYR-SEM0113.
     /// </summary>
     private readonly HashSet<MemberExpr> _typedReceiver = new(ReferenceEqualityComparer.Instance);
@@ -67,37 +67,37 @@ public sealed class TypeChecker
     /// <c>Error</c> means "already reported", so something has to be reported here.</para>
     /// </summary>
     private bool _inGlobalInitializer;
-    /// <summary>The root of everything thrown, caught and declared: <c>std.core</c>'s <c>Error</c>
-    /// (design/v5/spec/05 E6 O1). Null without a standard library, and throwability is then not
+    /// <summary>The root of everything thrown, caught and declared: <c>std.core</c>'s <c>Error</c>.
+    /// Null without a standard library, and throwability is then not
     /// asked — a missing root must not cascade into every throw.</summary>
     private readonly TypeSymbol? _error;
 
-    /// <summary>What a clause's <c>e.backtrace()</c> answers: <c>std.core</c>'s <c>Backtrace</c>
-    /// (design/v5/spec/05 E6 O3, the review's M5-3). Null without it — then a binding answers
+    /// <summary>What a clause's <c>e.backtrace()</c> answers: <c>std.core</c>'s <c>Backtrace</c>.
+    /// Null without it — then a binding answers
     /// nothing of its record.</summary>
     private readonly TypeSymbol? _backtrace;
 
-    /// <summary>The clause bindings that tell of their record here (06 §4, M5-3): those of the
+    /// <summary>The clause bindings that tell of their record here (06 §4): those of the
     /// clauses being checked, in the function being checked — a lambda's body starts without
     /// them, since what it captures is a value.</summary>
     private HashSet<LocalSymbol> _askable = new(ReferenceEqualityComparer.Instance);
 
-    /// <summary>What a <c>using let</c> binding closes: <c>std.core</c>'s <c>Closeable</c>
-    /// (design/v5/spec/05 E7 R1, 10 K1). Null without a standard library.</summary>
+    /// <summary>What a <c>using let</c> binding closes: <c>std.core</c>'s <c>Closeable</c>.
+    /// Null without a standard library.</summary>
     private readonly TypeSymbol? _closeable;
     private readonly TypeSymbol? _identity;
 
     /// <summary>What a coroutine's suspended <c>yield</c> throws when <c>close()</c> unwinds it:
-    /// <c>std.task</c>'s <c>Cancelled</c> (design/v5/spec/06 A5, 10 Q10), which the compilation
+    /// <c>std.task</c>'s <c>Cancelled</c>, which the compilation
     /// loads for a program with coroutines. Null without it — then a yield throws nothing and a
     /// coroutine has no <c>close()</c>.</summary>
     private readonly TypeSymbol? _cancelled;
     private readonly TypeSymbol? _task;  // std.task's Task: besides a coroutine, the type that carries an error (10 §2)
-    private readonly FunctionSymbol? _same;  // the builtin identity test (02 M10)
+    private readonly FunctionSymbol? _same;  // the builtin identity test
     private readonly TypeSymbol? _coroutine; // the builtin Coroutine<T>, mapped to CoroutineOf
     private readonly TypeSymbol? _slice;     // the builtin Slice<T>, mapped to SliceOf
     private readonly TypeSymbol? _stringView; // the builtin StringView, mapped to StringViewType
-    private readonly TypeSymbol? _range, _rangeInclusive; // std.core's Range<T> and RangeInclusive<T> (03 A3)
+    private readonly TypeSymbol? _range, _rangeInclusive; // std.core's Range<T> and RangeInclusive<T>
 
     /// <summary>The <c>Iterator&lt;T&gt;</c> interface from <c>std.iter</c>, what <c>for-in</c> checks
     /// against. <c>null</c> when the stdlib is not loaded; the loop head then reports the ordinary
@@ -111,33 +111,33 @@ public sealed class TypeChecker
     private readonly TypeSymbol? _stringIterator;
     private readonly TypeSymbol? _iterable;
     private readonly TypeSymbol? _indexable;
-    private readonly TypeSymbol? _coreIndex;     // std.core's Index<K>: 'x[k]' (04 D6)
+    private readonly TypeSymbol? _coreIndex;     // std.core's Index<K>: 'x[k]'
     private readonly TypeSymbol? _coreIndexSet;
-    private readonly TypeSymbol? _coreAsSlice;   // std.core's AsSlice<T>: 'x[a..b]' through the view (M8c S18)
-    // 'Format' (10 S7): std.core declaring it is Lyric 5's format language — a spec checked here,
+    private readonly TypeSymbol? _coreAsSlice;   // std.core's AsSlice<T>: 'x[a..b]' through the view
+    // 'Format': std.core declaring it is Lyric 5's format language — a spec checked here,
     // the hole a call of std.core's (12 §2); the 4.x tools keep their std.fmt converters.
     private readonly TypeSymbol? _coreFormat;
     private readonly TypeSymbol? _debug;  // and IndexSet<K>: 'x[k] = v'
-    // 'fstringStart' (10 S6): std.core declaring it is Lyric 5's f-string — one builder, each hole a
+    // 'fstringStart': std.core declaring it is Lyric 5's f-string — one builder, each hole a
     // piece of it (12 §2 rule 4); the 4.x tools keep their converters and concat chain.
     private readonly bool _fstringBuilder;
-    /// <summary>Lyric 5's std.core, whose <c>repeatText</c> is what <c>"x" * n</c> means (10 C7).</summary>
+    /// <summary>Lyric 5's std.core, whose <c>repeatText</c> is what <c>"x" * n</c> means.</summary>
     private readonly bool _coreRepeatText;
-    /// <summary>Lyric 5's std.core, which fills its own tables through <c>filled</c> (M8a S16):
+    /// <summary>Lyric 5's std.core, which fills its own tables through <c>filled</c>:
     /// there a type parameter counts as maybe an object where <c>[x] * n</c> asks (03 §5.1). The
     /// 4.x library the shared front end still checks repeats type parameters natively, as 4.x
     /// did.</summary>
     private readonly bool _repeatAsksTypeParameters;
-    // 'Contains<T>' (04 D6): what 'x in xs' asks of the right operand's type.
+    // 'Contains<T>': what 'x in xs' asks of the right operand's type.
     private readonly TypeSymbol? _coreContains;
-    // 'FromArrayLiteral<T>' (10 K4; M8c S6b): what an array literal becomes where a type is expected.
+    // 'FromArrayLiteral<T>': what an array literal becomes where a type is expected.
     private readonly TypeSymbol? _fromArrayLiteral;
 
     private LyrType _currentReturn = LyrType.Void;
     private LyrType? _currentYield; // the yield type when the current function is a coroutine
 
     /// <summary>Non-null while a generator lambda without a coroutine context infers its yield type:
-    /// every yield of that lambda lands here instead of being checked (08 Y11 F5).</summary>
+    /// every yield of that lambda lands here instead of being checked.</summary>
     private List<LyrType>? _yieldInference;
 
     /// <summary>Non-null while a block lambda infers its return type: every <c>return</c> of that
@@ -185,7 +185,7 @@ public sealed class TypeChecker
         _inclusiveUnsignedRangeIterator = iter?.LookupLocal("InclusiveUnsignedRangeIterator") as TypeSymbol;
         _stringIterator = iter?.LookupLocal("StringIterator") as TypeSymbol;
         _iterable = iter?.LookupLocal("Iterable") as TypeSymbol;
-        // Lyric 5's protocol (10 B6) is std.core's: what 'for' walks is an Iterable there.
+        // Lyric 5's protocol is std.core's: what 'for' walks is an Iterable there.
         _coreIterable = comp.Lyric5Modules
             && comp.FindModule(["std", "core"])?.Members.LookupLocal("Iterable") is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIterable
             ? coreIterable : null;
@@ -271,7 +271,7 @@ public sealed class TypeChecker
     /// <summary>What a non-numeric <c>as</c> converts through, under the same rules.</summary>
     private readonly TypeSymbol? _into;
 
-    /// <summary>The rest of the operator interfaces (design/v5/spec/04 D6), on the same footing
+    /// <summary>The rest of the operator interfaces, on the same footing
     /// as <see cref="_add"/>: present where <c>std.core</c> declares them.</summary>
     private readonly TypeSymbol? _rem, _neg, _bitAnd, _bitOr, _bitXor, _bitNot, _shl, _shr;
 
@@ -293,15 +293,15 @@ public sealed class TypeChecker
     /// <summary>What <c>&lt;</c> and its three siblings resolve through, under the same rules.</summary>
     private readonly TypeSymbol? _ordered;
 
-    /// <summary>std.core's <c>Box</c> (02 M13): the one class whose value a <c>comptime</c> site
+    /// <summary>std.core's <c>Box</c>: the one class whose value a <c>comptime</c> site
     /// may leave behind — its value is fixed, so a fresh box is as good as the evaluated one.</summary>
     private readonly TypeSymbol? _box;
 
-    /// <summary>std.core's members: the attribute markers by name (09 F1).</summary>
+    /// <summary>std.core's members: the attribute markers by name.</summary>
     private readonly SymbolTable? _coreMembers;
 
-    /// <summary>What <c>[x] * n</c> asks of an element that is or holds an object (03 §5.1,
-    /// 10 C7), under the same rules.</summary>
+    /// <summary>What <c>[x] * n</c> asks of an element that is or holds an object (03 §5.1),
+    /// under the same rules.</summary>
     private readonly TypeSymbol? _clone;
 
     /// <summary>The context type a value block's tail checks against (§3.1, §6.9): the match
@@ -314,7 +314,7 @@ public sealed class TypeChecker
     /// only drops the error.</summary>
     private Expr? _statementValue;
 
-    /// <summary>A loop around the statement being checked (05 E11): what a <c>break</c> or
+    /// <summary>A loop around the statement being checked: what a <c>break</c> or
     /// <c>continue</c> finds — and for a <c>loop</c>, the values its breaks give and its plain
     /// breaks.</summary>
     private sealed class LoopContext(bool givesValue, string? label, LyrType? expected)
@@ -327,7 +327,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>The loops around the statement being checked, innermost last. A lambda starts with
-    /// none: its body is a function of its own (08 Y11 F5).</summary>
+    /// none: its body is a function of its own.</summary>
     private List<LoopContext> _loops = new();
 
     public TypeResult Check()
@@ -367,7 +367,7 @@ public sealed class TypeChecker
         // everything it imports, so an initializer may read across an import it declared itself.
         foreach (var module in _comp.InitializationOrder()) ComputeGlobals(module);
 
-        // The associated types (03 T6) first: every conformance's answers are read before any
+        // The associated types first: every conformance's answers are read before any
         // signature that names 'T.Item' is substituted — a body may be checked before the type
         // it instantiates is declared.
         BindAssociatedTypes();
@@ -390,11 +390,11 @@ public sealed class TypeChecker
                 CheckDecl(decl, module);
         }
         CheckExtensionBlocks(); // extend bodies, conformance
-        CheckMethodSets();      // one name, one function per type (04 D2, D3)
+        CheckMethodSets();      // one name, one function per type
         CheckStaticSets();      // one constant of a name per type (05 §6)
-        if (_comp.Lyric5Modules) ExpandMetaDefaults(); // 09 A5, A7
+        if (_comp.Lyric5Modules) ExpandMetaDefaults();
         foreach (var asked in _metaAttributeCalls) CheckFieldAttributeQuery(asked); // R4
-        if (_comp.Lyric5Modules) CheckInlineFunctions(); // 08 F6
+        if (_comp.Lyric5Modules) CheckInlineFunctions();
         if (_comp.Lyric5Modules) RecordAskedConformances();
         JudgeContextless(errorsAtStart); // the '[]' outside every function body
         _currentModule = null;
@@ -412,8 +412,7 @@ public sealed class TypeChecker
         // global of a real module.
         _currentModule = module;
 
-        // A constant that is one per instance is folded where it is read (07 G2; the review's
-        // M8a-3b): there is no order among such constants, and the rule of slots — an initializer
+        // A constant that is one per instance is folded where it is read: there is no order among such constants, and the rule of slots — an initializer
         // reads what stands before it (LYR-SEM0057) — is not theirs. Their written types are
         // settled first, so one may name another that stands later; what an initializer may not
         // do is name its own constant (CheckConstantInitializer). Muted: each type is resolved
@@ -492,7 +491,7 @@ public sealed class TypeChecker
     /// The two rules a set of same-named functions has to keep.
     ///
     /// <para>ONE: they are told apart by HOW MANY arguments they take and by nothing else
-    /// (design/v5/spec/04 D4): a call counts its arguments and finds one candidate — no ranking,
+    /// — a call counts its arguments and finds one candidate — no ranking,
     /// no conversion rank, no ambiguity at the call, no interaction with inference. Two whose
     /// argument counts overlap for any number — defaults widen a count to a range — are a
     /// redeclaration (LYR-SEM0085), at the declaration and never at a call.</para>
@@ -636,8 +635,8 @@ public sealed class TypeChecker
                     foreach (var payloadField in variant.StructFields ?? [])
                         CheckAttributes(payloadField.Attributes, AttributeSite.Field, e.Generics.Length > 0,
                             module.Members, "a field");
-                    // and its default is checked as a struct field's (03 §4 rule 2 under §2.4; the sweep
-                    // after M10, X2): against the field's type, the enum's parameters in scope
+                    // and its default is checked as a struct field's (03 §4 rule 2 under §2.4):
+                    // against the field's type, the enum's parameters in scope
                     foreach (var payloadField in variant.StructFields ?? [])
                     {
                         if (payloadField.Default is null) continue;
@@ -666,7 +665,7 @@ public sealed class TypeChecker
                         module.Members, "an associated type");
                 CheckInterfaceParents(i, module);
                 RequireSealedInModule(i.Interfaces, module, i.Name);
-                // An interface's members are public always (design/v5/spec/04 D14): a conformance
+                // An interface's members are public always: a conformance
                 // is visible wherever the type and the interface are, and a member nobody could
                 // call through the interface would be no member of it. 'pub' says nothing here,
                 // and a word that says nothing is refused rather than ignored.
@@ -690,7 +689,7 @@ public sealed class TypeChecker
                 CheckMethods(i.Name, i.Members, module);
                 break;
             // ExtendDecl goes to CheckExtensionBlocks after all types; GlobalBindingDecl to ComputeGlobals.
-            // Their attributes, and an alias's, are checked here (Lyric 5, 09 T7).
+            // In Lyric 5 their attributes, and an alias's, are checked here.
             case ExtendDecl x:
                 CheckAttributes(x.Attributes, AttributeSite.Extend, x.Generics.Length > 0,
                     module.Members, "an extend block");
@@ -742,7 +741,7 @@ public sealed class TypeChecker
     /// </summary>
     private void CheckExtern(FunctionDecl fn, ExternSpec spec, ModuleSymbol module)
     {
-        // Lyric 5's one foreign boundary is C (design/v5/spec/11 W4); "dotnet" is the 4.x VM's.
+        // Lyric 5's one foreign boundary is C; "dotnet" is the 4.x VM's.
         var abi = _comp.Lyric5Modules ? "C" : "dotnet";
         if (spec.Abi != abi)
         {
@@ -793,11 +792,10 @@ public sealed class TypeChecker
         type is PrimitiveType { Kind: var kind } && (kind != PrimitiveKind.Void || asReturn);
 
     /// <summary>
-    /// <c>extern "C" fn add(a: int, b: int): int;</c> — stage 1 of the C ABI (design/v5/spec/11 W4,
-    /// M7): a C function the program calls by its symbol, the function's name unless
+    /// <c>extern "C" fn add(a: int, b: int): int;</c> — the C ABI's first stage: a C function the program calls by its symbol, the function's name unless
     /// <c>= "symbol"</c> names another, with the scalars C has as they are — integers, floats,
     /// <c>bool</c> — and <c>void</c> as a return. Strings, pointers, structs and callbacks are the
-    /// type table's of M14; until then the checker refuses what no stage-1 binding carries.
+    /// type table's; the checker refuses what no first-stage binding carries.
     /// </summary>
     private void CheckCExtern(FunctionDecl fn, ExternSpec spec, ModuleSymbol module)
     {
@@ -810,8 +808,8 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0099", Severity.Error, fn.Throws.Span, $"'{fn.Name}' is a C function, and a C function throws nothing");
         foreach (var p in fn.Parameters)
         {
-            // A place (03 §2.3a) is an address, and what a pointer is to C is the type table's
-            // (M14): until then no place crosses. It was taken here, and the lowering — which
+            // A place (03 §2.3a) is an address, and what a pointer is to C is the type table's:
+            // no place crosses. It was taken here, and the lowering — which
             // has no wire for it — stopped the toolchain.
             if (p.IsPlace)
                 _de.Report("LYR-SEM0099", Severity.Error, p.Span,
@@ -846,11 +844,11 @@ public sealed class TypeChecker
     {
         if (module.Members.LookupLocal(typeName) is not TypeSymbol ts) return;
         var isInterface = ts.Kind == TypeSymbolKind.Interface;
-        // 'this' in an interface's body is the conformer, 'Self' (03 T5): a default is generic over
-        // it and monomorphized per conformer (04 D9) — through a value of the interface, the
+        // 'this' in an interface's body is the conformer, 'Self': a default is generic over
+        // it and monomorphized per conformer — through a value of the interface, the
         // interface is the conformer.
         var thisType = isInterface && ts.SelfParam is { } selfParam ? new TypeParamType(selfParam) : SelfType(ts);
-        // 'never' as a parameter's default (05 A7, "Review 2026-10-09" S5; M8c S20) stands where
+        // 'never' as a parameter's default stands where
         // the bound is 'Error': 'MapIter<I, U>' is 'MapIter<I, U, never>'.
         foreach (var generic in ts.Generics)
             if (generic.Declaration is GenericParam { Default: { } fallback }
@@ -887,11 +885,11 @@ public sealed class TypeChecker
             // default, 'K { }' does.
             //
             // The field's type is the context: a literal adapts to it and '.Red' reads the enum
-            // from it (08 Y9), as at every other coercion site.
+            // from it, as at every other coercion site.
             //
-            // With the type's PARAMETERS in scope (03 T8; the review's R4a): 'items: List<T> =
+            // With the type's PARAMETERS in scope: 'items: List<T> =
             // List<T>.new()'. The parameters alone — the type's members are no part of a
-            // default's scope: it has no 'this' (02 I2) and names a static through the type.
+            // default's scope: it has no 'this' and names a static through the type.
             if (m is FieldDecl field && (field.Default is not null || _comp.Lyric5Modules))
             {
                 var defaults = module.Members;
@@ -901,8 +899,7 @@ public sealed class TypeChecker
                     foreach (var parameter in ts.Generics) defaults.TryDeclare(parameter);
                 }
                 var fieldType = ResolveType(field.Type, defaults);
-                // A constraint written for a field's value is said here, once (design 04 "Review
-                // 2026-10-09" S13; M8c S18); its reads take it as no type (FieldType).
+                // A constraint written for a field's value is said here, once; its reads take it as no type (FieldType).
                 if (ValueTypeAt(fieldType, field.Type.Span).IsError) fieldType = LyrType.Error;
                 if (field.Default is not null)
                     CheckAssignable(field.Default, CheckExpr(field.Default, defaults, fieldType),
@@ -912,10 +909,9 @@ public sealed class TypeChecker
 
             if (m is not FunctionDecl fn) continue;
             if (!isInterface) RequireBody(fn, module);
-            // A static interface member with a body is a default in Lyric 5 (03 T5, "Review
-            // 2026-10-12"; M9a S11): set in place per conformer as an instance default is, 'E.m(…)'
-            // and 'T.m(…)' the conformer's instance of it. (Until S11 it declared only: a body
-            // "would run for no type" — S9's expansion gave it one per conformer.) The 4.x
+            // A static interface member with a body is a default in Lyric 5: set in place per
+            // conformer as an instance default is, 'E.m(…)' and 'T.m(…)' the conformer's instance
+            // of it. The 4.x
             // frontend keeps the rule: nothing sets a default in place there.
             if (isInterface && fn.IsStatic && fn.Body is not null && !_comp.Lyric5Modules)
                 _de.Report("LYR-SEM0127", Severity.Error, fn.NameSpan,
@@ -923,7 +919,7 @@ public sealed class TypeChecker
 
             // A GENERIC interface member gets no table slot — a slot holds one function and this is
             // one per instantiation. Abstract, every conformer writes it and a constraint reaches it
-            // by monomorphization (04 D9), the interface no value type; as a default it is complete
+            // by monomorphization, the interface no value type; as a default it is complete
             // in itself and may not be overridden (below).
 
             CheckMemberModifiers(fn);
@@ -955,7 +951,7 @@ public sealed class TypeChecker
     /// <summary>A <c>static let</c> constant. Its initializer is checked in the scope it stands in —
     /// the type's, a block's — but without <c>this</c>: there is no instance it could refer to.</summary>
     /// <param name="perInstance">The constant of a generic type or of a generic block: one per
-    /// instance, folded where it is read (07 G2; the review's M8a-3, M8a-3b) — so its
+    /// instance, folded where it is read — so its
     /// initializer is a constant, <see cref="CheckConstantInitializer"/>.</param>
     private void CheckStaticBinding(StaticBindingDecl sb, SymbolTable scope, bool perInstance = false)
     {
@@ -1000,7 +996,7 @@ public sealed class TypeChecker
     private readonly Dictionary<GlobalSymbol, Expr> _foldedConstants = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
-    /// The initializer of a constant that is one per instance (07 G2; the review's M8a-3b). It is
+    /// The initializer of a constant that is one per instance. It is
     /// folded where the constant is read — nothing runs for it before the entry, and no order
     /// among the instances of a program is asked, which only a compilation that has found them
     /// all could give. So it is a CONSTANT: a literal, <c>null</c>, an empty literal, another
@@ -1108,7 +1104,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>A block's constant (05 §6 rule 2): the type's, checked as one in its body is. A
-    /// generic block's is one per instance of the block's parameters (the review's M8a-3) — it
+    /// generic block's is one per instance of the block's parameters — it
     /// was refused, undecided (<c>LYR-SEM0159</c>).</summary>
     private void CheckBlockStatic(StaticBindingDecl sb, ExtensionBlock block) =>
         CheckStaticBinding(sb, block.MethodScope, perInstance: block.Decl.Generics.Length > 0);
@@ -1146,7 +1142,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// One constant of a name per type (05 §6 rule 2, as 04 D2 has it for functions): a block's
+    /// One constant of a name per type (05 §6 rule 2, as for functions): a block's
     /// may not repeat one the type's body or another block declares, nor a member of another
     /// kind — <c>T.name</c> would have two answers (<c>LYR-SEM0121</c>).
     /// </summary>
@@ -1193,7 +1189,7 @@ public sealed class TypeChecker
     // `this` inside a method: for a generic type the self-instance Stack<T>, with the type parameters
     // as arguments; otherwise plainly the reference.
     /// <summary>The type a built-in symbol stands for: a scalar by its name, or the view of a
-    /// string's bytes (10 S1) — the one built-in without parameters that is no scalar.</summary>
+    /// string's bytes — the one built-in without parameters that is no scalar.</summary>
     private static LyrType? BuiltinType(TypeSymbol builtin) =>
         builtin.Name == "StringView" ? LyrType.StringView : TypeFacts.FromBuiltinName(builtin.Name);
 
@@ -1206,8 +1202,8 @@ public sealed class TypeChecker
             : new GenericInstance(ts, Array.ConvertAll(ts.Generics, g => (LyrType)new TypeParamType(g)));
 
     /// <summary>
-    /// The implicit synthesis — the <c>Debug</c> every type gets where it can (04 D7 "bei
-    /// Bedarf") — is checked MUTED before any body can bind to it, and a block whose body does
+    /// The implicit synthesis — the <c>Debug</c> every type gets where it can —
+    /// is checked MUTED before any body can bind to it, and a block whose body does
     /// not check is withdrawn: the type then has no <c>debug()</c>, as a type with an interface
     /// or a function among its fields has none to give, and nobody is told, because nobody
     /// asked. To a fixpoint, since one type's rendering reads another's.
@@ -1215,7 +1211,7 @@ public sealed class TypeChecker
     private void ProbeImplicitBlocks()
     {
         // A type that writes its Debug in a block has written one (05 §14 rule 7): the implicit
-        // one stands back — std's containers write theirs under a constraint (10 C9; M8a S14).
+        // one stands back — std's containers write theirs under a constraint.
         if (_debug is { } debug)
             foreach (var block in _comp.Extensions.Blocks.Where(b => b.IsImplicit && b.Target is not null).ToArray())
                 if (_comp.Extensions.Blocks.Any(other => !other.IsImplicit && ReferenceEquals(other.Target, block.Target)
@@ -1246,7 +1242,7 @@ public sealed class TypeChecker
     /// <summary>The body check of a block's methods: the outer scope is the block's method scope,
     /// which carries cross-calls and the method generics; <c>this</c> is the target type — the
     /// primitive for builtins, the reference otherwise, the instance with the block's own
-    /// parameters for <c>List&lt;T&gt;</c> and <c>Slice&lt;T&gt;</c> (03 T7 X1, X2).</summary>
+    /// parameters for <c>List&lt;T&gt;</c> and <c>Slice&lt;T&gt;</c>.</summary>
     private void CheckBlockBodies(ExtensionBlock block)
     {
         var thisType = block.Decl.Target is NamedType { TypeArguments.Length: > 0 }
@@ -1274,11 +1270,11 @@ public sealed class TypeChecker
 
             if (block.IsConstructorTarget)
             {
-                // An inline array is no target (03 T13 A4; the review's M4-2). Its members are
+                // An inline array is no target. Its members are
                 // the three it has built in and, where it lies in the heap, a view's — so a
                 // block on 'Slice<T>' is the block that reaches it. One on 'T[4]' was taken and
                 // added nothing: its member was "no member" at every call. The one exception is
-                // the compiler's own: 'Equatable' and 'Hashable' per written length (M8c S3b).
+                // the compiler's own: 'Equatable' and 'Hashable' per written length.
                 if (block.Decl.Target is ArrayType { Length: not null } && !_comp.InlineArrayBlocks.Contains(block.Decl))
                 {
                     _de.Report("LYR-SEM0047", Severity.Error, block.Decl.Target.Span,
@@ -1288,7 +1284,7 @@ public sealed class TypeChecker
                     continue;
                 }
 
-                // A built-in constructor as the target (03 T7 X2): 'this' is the shape at the
+                // A built-in constructor as the target: 'this' is the shape at the
                 // block's parameters, and a conformance it names is checked there (05 §13 rule 6).
                 CheckBlockConformance(block);
                 foreach (var fn in block.Decl.Methods)
@@ -1301,7 +1297,7 @@ public sealed class TypeChecker
 
             if (block.IsBlanketTarget)
             {
-                // A blanket block (04 D15): its members reach every type its constraints admit,
+                // A blanket block: its members reach every type its constraints admit,
                 // 'this' the parameter; a conformance it names, every such type (05 §13 rule 8).
                 CheckBlockConformance(block);
                 foreach (var fn in block.Decl.Methods)
@@ -1322,7 +1318,7 @@ public sealed class TypeChecker
                 continue; // without a target there is no useful body check
             }
 
-            // An interface is extended through the generic form only (04 D15): 'extend Walker
+            // An interface is extended through the generic form only: 'extend Walker
             // { … }' would be a second spelling of 'extend<T :: [Walker]> T { … }', and a
             // conformance of an interface to an interface has no meaning either.
             if (block.Target.Kind == TypeSymbolKind.Interface)
@@ -1336,7 +1332,7 @@ public sealed class TypeChecker
             // Body check — an implicit block's was probed already, and what survived checks.
             if (!block.IsImplicit) CheckBlockBodies(block);
 
-            // No orphan rule (03 T7 X3): coherence is checked whole-program, and an extend may
+            // No orphan rule: coherence is checked whole-program, and an extend may
             // stand in any module.
             CheckTypeConformance(block.Target, block.Decl.Interfaces, block.Module, block.Target.Name,
                 self: block.Decl.Target is NamedType { TypeArguments.Length: > 0 } ? BlockTargetType(block) : null,
@@ -1346,7 +1342,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// A conformance is global (design/v5/spec/07 V2 S5): visible wherever its type and its
+    /// A conformance is global: visible wherever its type and its
     /// interface are, its methods with it — no word narrows it, on the block or on a method in it
     /// (<c>LYR-SEM0150</c>). Two package-private <c>Hashable</c> conformances would be two hash
     /// functions for one <c>Set&lt;Foo&gt;</c>. An inherent block's word is its methods' default and
@@ -1377,7 +1373,7 @@ public sealed class TypeChecker
     };
 
     /// <summary>
-    /// Coherence (03 T7 X3, X4): one conformance per type instance and interface instance in the
+    /// Coherence: one conformance per type instance and interface instance in the
     /// whole program. A block that could meet another conformance on one instance — the type's
     /// own declaration, another block, a generic block beside a concrete one — is refused where
     /// it stands (<c>LYR-SEM0133</c>); no specialization.
@@ -1430,7 +1426,7 @@ public sealed class TypeChecker
         // their chains with methods of their own, so two of them meeting on one type are two
         // implementations, and the lowering asks for one by the interface alone: compared over
         // the chains, by interface rather than instance. A blanket block excludes a type's own
-        // conformance and a shape's block where it reaches the type or the shape (X4), another
+        // conformance and a shape's block where it reaches the type or the shape, another
         // blanket block anywhere, even where no type could meet both; a shape's block, another
         // block on an overlapping shape.
         var blockSites = new List<(ExtensionBlock Block, LyrType Target, List<TypeSymbol> Chain)>();
@@ -1536,7 +1532,7 @@ public sealed class TypeChecker
                 if (seen.Any(t => LyrType.Equal(t, instance))) continue;
                 seen.Add(instance);
                 if (iface.Declaration is not InterfaceDecl idecl) continue;
-                // a parent another block on the shape gives is that block's to answer (N2a)
+                // a parent another block on the shape gives is that block's to answer
                 if (ParentsGivenBeside(block).Contains(iface)) continue;
                 var subst = instance is GenericInstance gi ? SubstMap(gi) : EmptySubst;
                 var implied = ReferenceEquals(iface, direct) ? "" : $" (implied by '{direct.Name}')";
@@ -1571,7 +1567,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>The target of a block as a type, <c>List&lt;T&gt;</c> with the block's own
-    /// parameters (03 T7); resolved once.</summary>
+    /// parameters; resolved once.</summary>
     private LyrType BlockTargetType(ExtensionBlock block) =>
         block.TargetType ??= ResolveType(block.Decl.Target, block.MethodScope);
 
@@ -1615,7 +1611,7 @@ public sealed class TypeChecker
     /// <summary>The fixations of the block's constraints that name its parameters, once per block:
     /// <c>T</c> from <c>I :: [Iterator&lt;Item = T&gt;]</c> (05 §13 rule 2), and <c>K</c>, <c>V</c>
     /// from <c>I :: [Iterator&lt;Item = (K, V)&gt;]</c> — the fixed type a pattern the receiver's
-    /// answer is matched against (M8c S5, the pairs <c>toMap</c> takes).</summary>
+    /// answer is matched against (the pairs <c>toMap</c> takes).</summary>
     private (LyrType, GenericParamSymbol, AssociatedTypeSymbol, GenericParamSymbol[])[] FixationBindingsOf(ExtensionBlock block)
     {
         if (block.FixationBindings is { } known) return known;
@@ -1688,10 +1684,10 @@ public sealed class TypeChecker
 
     /// <summary>
     /// The block's parameters only its conformance names (05 §13 rule 9): <c>U</c> in
-    /// <c>extend&lt;T, U :: [From&lt;T&gt;]&gt; T :: [Into&lt;U&gt;]</c> (10 B4). No receiver binds them;
+    /// <c>extend&lt;T, U :: [From&lt;T&gt;]&gt; T :: [Into&lt;U&gt;]</c>. No receiver binds them;
     /// the instance a constraint asks for does — <c>Into&lt;Centimeters&gt;</c> binds <c>U</c> —,
     /// and at a call of the block's member the call does, as it binds the member's own parameters
-    /// (03 T8: the arguments, then the type the position expects). Once per block.
+    /// (the arguments, then the type the position expects). Once per block.
     /// </summary>
     private GenericParamSymbol[] OpenParametersOf(ExtensionBlock block)
     {
@@ -1768,13 +1764,13 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// One method set per type (design/v5/spec/04 D2): own members, inherent extension members,
+    /// One method set per type: own members, inherent extension members,
     /// the implementations of its conformances — own, in a conformance block, a default, or
     /// delegated — hold every name ONCE, and a collision is an error where the second comer is
     /// declared (<c>LYR-SEM0121</c>), never a silent preference. The exceptions are the rules
     /// themselves: an own member IS the implementation of every conformance's member of that
     /// name; a default is overridden by an own member or a conformance block; two conformance
-    /// blocks may each implement one name for their interface, scoped to it (D3), and the
+    /// blocks may each implement one name for their interface, scoped to it, and the
     /// unqualified call is then refused where it stands. Two defaults nobody overrides are the
     /// type's to settle (<c>LYR-SEM0043</c>).
     /// </summary>
@@ -1816,9 +1812,9 @@ public sealed class TypeChecker
                 ext.InConformanceBlock ? $"the conformance block of '{ts.Name}'" : $"an extension of '{ts.Name}'"));
             blockOf[ext.Symbol] = ext.Block;
         }
-        // A blanket block's members reach the type where its constraints admit it (04 D15) —
+        // A blanket block's members reach the type where its constraints admit it —
         // BEHIND the type's own, as the lookup asks them: a kind of their own here, because one
-        // the type has a member for is hidden, not a collision (the review's A5).
+        // the type has a member for is hidden, not a collision.
         foreach (var block in _comp.Extensions.Blocks)
             if (block.IsBlanketTarget && BlockSubstitution(block, SelfType(ts)) is not null
                 // A conformance it gives that the type declares itself is the coherence check's
@@ -1827,7 +1823,7 @@ public sealed class TypeChecker
                     && DeclaredInterfaceNodes(ts).Any(own => ReferenceEquals(Conformance.InterfaceOf(own, _binding), given))))
                 foreach (var m in block.Methods)
                     entries.Add((m.Name, Provenance.Blanket, m, m.Declaration?.Span ?? default, "a blanket extension"));
-        // A delegated interface's DEFAULTS run on the outer type and are not forwarded (D1):
+        // A delegated interface's DEFAULTS run on the outer type and are not forwarded:
         // they are the ordinary defaults, and only the abstract members go to the field.
         foreach (var (iface, _) in InterfacesOf(ts))
             foreach (var m in iface.Members.Symbols)
@@ -1850,7 +1846,7 @@ public sealed class TypeChecker
             var blankets = list.Where(e => e.Kind == Provenance.Blanket).ToList();
             var name = group.Key;
 
-            // A blanket member (04 D15, the review's A5). A name the type has — its own, an
+            // A blanket member. A name the type has — its own, an
             // extension's, a conformance block's, a default it inherits, a member it leaves to
             // a field — comes first on the type, and the blanket member is HIDDEN for it: a call
             // on the type reaches the type's, generic code that reaches the name through the
@@ -1875,7 +1871,7 @@ public sealed class TypeChecker
 
             // An own member settles the name for every conformance; what else declares it collides
             // — except a block implementing ANOTHER INSTANCE of an interface the own member
-            // implements too ('Mul<float>' beside the own 'mul' of 'Mul<int>', 04 D6): the
+            // implements too ('Mul<float>' beside the own 'mul' of 'Mul<int>'): the
             // operand picks between them, and the block's stays reachable qualified.
             if (owns.Count > 0)
             {
@@ -1943,21 +1939,21 @@ public sealed class TypeChecker
                 continue;
             }
 
-            // Two defaults, nobody's implementation: the type decides (D3).
+            // Two defaults, nobody's implementation: the type decides.
             if (blocks.Count == 0 && defaults.Count > 1)
                 _de.Report("LYR-SEM0043", Severity.Error, ts.Declaration?.Span ?? default,
                     $"'{ts.Name}' conforms to interfaces that both default '{name}' — implement '{name}' on "
                     + $"'{ts.Name}', one function for both",
                     defaults.Select(d => new DiagnosticNote(d.Declaration?.Span ?? default, "a default is here")).ToArray());
             // Conformance blocks each implementing the name for their interface are the one case
-            // of two functions, scoped (D3): the unqualified call is refused where it stands.
+            // of two functions, scoped: the unqualified call is refused where it stands.
         }
     }
 
 
     /// <summary>
-    /// The warning for a blanket member a type's own hides (<c>LYR-SEM0168</c>, the review's
-    /// A5): where the type's member stands — the function the author wrote, in the body or in a
+    /// The warning for a blanket member a type's own hides (<c>LYR-SEM0168</c>):
+    /// where the type's member stands — the function the author wrote, in the body or in a
     /// block of the type; for a default the type inherits, or a member it leaves to a field, at
     /// the type, which is what its author wrote.
     /// </summary>
@@ -1984,7 +1980,7 @@ public sealed class TypeChecker
             .FirstOrDefault(t => t.Kind == TypeSymbolKind.Interface && t.Members.Symbols.Contains(member))?.Name
         ?? "an interface";
 
-    /// <summary>The field a type leaves a member to (04 D1).</summary>
+    /// <summary>The field a type leaves a member to.</summary>
     private string DelegatedTo(TypeSymbol ts, string name)
     {
         foreach (var (iface, field) in _result.DelegationsOf(ts))
@@ -2008,7 +2004,7 @@ public sealed class TypeChecker
     private static bool IsSealed(TypeSymbol iface) => iface.Declaration is InterfaceDecl { IsSealed: true };
 
     /// <summary>
-    /// A sealed interface's conformers stand in the module that declares it (04 D8) — a type, a
+    /// A sealed interface's conformers stand in the module that declares it — a type, a
     /// conformance block, a child interface alike; the set is closed there, and a match of type
     /// patterns over it may rely on that.
     /// </summary>
@@ -2057,14 +2053,14 @@ public sealed class TypeChecker
     // --- interface conformance with a signature match ---
 
     /// <summary>
-    /// <c>Identity</c> is an object's (02 M10): the equality it gives is the object itself, its
+    /// <c>Identity</c> is an object's: the equality it gives is the object itself, its
     /// hash the address. A struct or an enum is a value and has neither — refused where the
     /// synthesis meets it, and here for a block that writes the conformance by hand. The list comes
     /// back without what was refused: the members of a conformance that cannot be are not asked.
     /// </summary>
     private TypeNode[] RequireIdentityOfAnObject(TypeSymbol implementer, TypeNode[] interfaces, string name)
     {
-        // A coroutine is an object too (06 A7): std.core's block gives it Identity.
+        // A coroutine is an object too: std.core's block gives it Identity.
         if (_identity is null || implementer.Kind is TypeSymbolKind.Class or TypeSymbolKind.Interface
             || ReferenceEquals(implementer, _coroutine)) return interfaces;
         bool Refused(TypeNode node) => Conformance.InterfaceOf(node, _binding) is { } iface
@@ -2082,11 +2078,11 @@ public sealed class TypeChecker
 
     // One matching implementation per abstract interface method, either an own member or a visible
     // extension; default methods may be missing. The signature has to match exactly.
-    /// <param name="delegates">The field an entry delegates to (<c>Walker by legs</c>, 04 D1), by
+    /// <param name="delegates">The field an entry delegates to (<c>Walker by legs</c>), by
     /// index: its members the type does not write itself are forwarded, and conformance is
     /// satisfied by that.</param>
     /// <param name="self">What <c>Self</c> is for the conformer: the block's target instance for a
-    /// generic block (<c>List&lt;T&gt;</c> with the block's own T, 03 T7), else the type itself.</param>
+    /// generic block (<c>List&lt;T&gt;</c> with the block's own T), else the type itself.</param>
     /// <param name="from">The block whose list this is, for a conformance an <c>extend</c> block
     /// declares; <c>null</c> for the type's own list.</param>
     private void CheckTypeConformance(TypeSymbol implementer, TypeNode[] interfaces, ModuleSymbol module, string name,
@@ -2096,15 +2092,15 @@ public sealed class TypeChecker
         RequireSealedInModule(interfaces, module, name);
         interfaces = RequireIdentityOfAnObject(implementer, interfaces, name);
         var candidates = CandidateMethods(implementer, module);
-        // A string reaches the members written once on its view (10 S1) — at a call, and as the
-        // witness of a conformance alike (M8c S9b): 'extend string :: [Contains<char>] { }' is
+        // A string reaches the members written once on its view — at a call, and as the
+        // witness of a conformance alike: 'extend string :: [Contains<char>] { }' is
         // answered by the view's 'contains', a name the string's own blocks leave free.
         if (implementer is { Kind: TypeSymbolKind.Builtin, Name: "string" } && _stringView is { } ofText)
             foreach (var (viewName, viewMembers) in CandidateMethods(ofText, module))
                 candidates.TryAdd(viewName, viewMembers);
 
         // Of several candidates of one name, those written where THIS conformance is declared
-        // come first (04 D3): two blocks of one type may each give a 'greet', one for 'Greeter'
+        // come first: two blocks of one type may each give a 'greet', one for 'Greeter'
         // and one for 'Waver', and a block's member is its own interfaces'. The first that fit
         // was the answer recorded for both conformances — and the record is what the lowering
         // reads: a static through a constraint, 'T.label()', called the other block's.
@@ -2150,7 +2146,7 @@ public sealed class TypeChecker
         // once, while two instances of one interface are still two conformances to check.
         var seen = new List<LyrType>();
         // A parent another block on the same shape gives, under constraints this block entails, is
-        // that block's to answer, not this one's (N2a; ParentsGivenBeside).
+        // that block's to answer, not this one's (ParentsGivenBeside).
         if (from is not null)
             foreach (var parent in ParentsGivenBeside(from)) seen.Add(WithoutFixations(new NamedRef(parent)));
 
@@ -2160,7 +2156,7 @@ public sealed class TypeChecker
         // where the caller happens to stand. That is the failure SEM0079 refuses inside a chain,
         // and it is the same one here.
         //
-        // That is the 4.x rule. In Lyric 5 (04 D9 whole, the review's A8) an interface with a
+        // That is the 4.x rule. In Lyric 5 an interface with a
         // generic member has no value, so nothing is chosen by one: a conformer's own takes the
         // default's place, and is checked against it below. A GENERIC interface keeps the refusal
         // for now — its defaults are still lowered for its value, and one of them calling the
@@ -2267,11 +2263,11 @@ public sealed class TypeChecker
                 foreach (var im in idecl.Members)
                 {
                     // A generic DEFAULT that cannot be replaced (LYR-SEM0082 above) is no part of
-                    // the contract. One that can (04 D9 whole) is: a conformer's own of the name
+                    // the contract. One that can is: a conformer's own of the name
                     // answers it and has its signature — compared below, as an abstract generic
                     // member's is, with the conformer's parameters read as the interface's.
                     if (im.Generics.Length > 0 && im.Body is not null && !ReplacesGenericDefaults(iface)) continue;
-                    // Nor is a PRIVATE helper (07 V2 S4): the interface's defaults call it, no
+                    // Nor is a PRIVATE helper: the interface's defaults call it, no
                     // conformer answers it, and a method of its name in a conformer is the
                     // conformer's own.
                     if (im.IsPrivateHelper) continue;
@@ -2352,7 +2348,7 @@ public sealed class TypeChecker
                         // to repeat.
                         _result.RecordConformanceImpl(implementer, iface, im.Name,
                             InstanceOfConformance(iface, subst), satisfying);
-                        // A generic member as the witness (M8c S9b): the instance the lowering
+                        // A generic member as the witness: the instance the lowering
                         // calls, its own parameters as the conformance bound them.
                         if (satisfying.Generics.Length > 0 && im.Generics.Length == 0
                             && WitnessArguments(want, satisfying, WitnessSignature(satisfying, at)) is { } witness)
@@ -2409,9 +2405,8 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// The word of a member that answers an interface (design/v5/spec/07 V2 S4, S5; the review's
-    /// M7-2). A conformance is as visible as its type and its interface, whichever is narrower,
-    /// and it cannot be narrowed (S5) — so a member that answers it and is written narrower, in
+    /// The word of a member that answers an interface. A conformance is as visible as its type and its interface, whichever is narrower,
+    /// and it cannot be narrowed — so a member that answers it and is written narrower, in
     /// the type's body or in an inherent block, would be called through the interface by callers
     /// its own name refuses. It says the conformance's word itself (<c>LYR-SEM0167</c>), as Swift
     /// asks of a witness.
@@ -2458,12 +2453,12 @@ public sealed class TypeChecker
     private readonly HashSet<Symbol> _witnessWordsSaid = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>Whether a conformer's own member takes the place of a generic default of this
-    /// interface (04 D9 whole, the review's A8): in Lyric 5, for an interface that is generic in
+    /// interface: in Lyric 5, for an interface that is generic in
     /// nothing — the one whose defaults are instantiated per conformer.</summary>
     private bool ReplacesGenericDefaults(TypeSymbol iface) => _comp.Lyric5Modules && iface.Generics.Length == 0;
 
     /// <summary>Why a conformer's generic member does not answer an abstract generic one of the
-    /// interface (04 D9), or <c>null</c>: as many type parameters, the same constraints on each, and
+    /// interface, or <c>null</c>: as many type parameters, the same constraints on each, and
     /// the signature equal once the conformer's parameters are read as the interface's.</summary>
     private string? GenericSignatureMismatch(FnType want, FunctionSymbol promised, FunctionSymbol candidate)
     {
@@ -2582,7 +2577,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>A type that is an <c>Iterator</c> and <c>Closeable</c> throws in <c>close()</c> only
-    /// what its <c>Error</c> allows (the review's M8a-4): a loop over a generic iterator closes the
+    /// what its <c>Error</c> allows: a loop over a generic iterator closes the
     /// instance's iterator where it is Closeable, and the one clause that covers the loop's
     /// <c>next()</c> covers that close too. Asked where a conformance to <c>Closeable</c> was
     /// verified — in the type's own list or in a block —, of the type that conforms.</summary>
@@ -2633,7 +2628,7 @@ public sealed class TypeChecker
 
     // Signature comparison, invariant: arity, parameter types, return type, mut, and throws ⊆.
     /// <summary>The binding of a generic member's own parameters that makes it the plain interface
-    /// member <paramref name="want"/> (13 S9): its parameters and return unified with the
+    /// member <paramref name="want"/>: its parameters and return unified with the
     /// member's, every own parameter bound, every constraint holding for what it bound. <c>null</c>
     /// where none does.</summary>
     private Dictionary<GenericParamSymbol, LyrType>? WitnessArguments(FnType want, FunctionSymbol impl, FnType have)
@@ -2660,7 +2655,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>A candidate's signature at the site's target: from a GENERIC block it speaks in that
-    /// block's own parameters, which the target binds (03 T7 X1).</summary>
+    /// block's own parameters, which the target binds.</summary>
     private FnType WitnessSignature(FunctionSymbol impl, LyrType? at) =>
         at is not null && _comp.Extensions.BlockOf(impl) is { Generics.Length: > 0 } block
         && BlockSubstitution(block, at) is { } map
@@ -2673,12 +2668,12 @@ public sealed class TypeChecker
         // A candidate from a GENERIC block speaks in that block's own parameters: 'Pair<T>' of
         // 'extend<T :: [Equatable]> Pair<T>' is not the 'Pair<T>' of the site checking an
         // implied parent from another block. Read at this site's target, where the block's
-        // parameters bind to ours (03 T7 X1).
+        // parameters bind to ours.
         var have = WitnessSignature(impl, at);
         if (ifaceMethod.IsStatic != decl.IsStatic)
             return ifaceMethod.IsStatic ? "expected a static member" : "expected an instance member, found a static one";
-        // A GENERIC member answers a plain one where its parameters bind to the member's (13 S9;
-        // M8c S9b): 'contains<P :: [Pattern]>(p: P)' is 'Contains<char>.contains(x: char)' at
+        // A GENERIC member answers a plain one where its parameters bind to the member's:
+        // 'contains<P :: [Pattern]>(p: P)' is 'Contains<char>.contains(x: char)' at
         // 'P = char', 'char' being a Pattern — read at that binding, and compared as written.
         if (impl.Generics.Length > 0 && ifaceMethod.Generics.Length == 0)
         {
@@ -2700,7 +2695,7 @@ public sealed class TypeChecker
             return $"returns '{TypeFacts.Display(have.Return)}', expected '{TypeFacts.Display(want.Return)}'";
         if (ifaceMethod.IsMut != decl.IsMut)
             return decl.IsMut ? "must not be 'mut'" : "must be declared 'mut'";
-        // An implementation throws at most what the member allows (05 E2 K6): every type of its
+        // An implementation throws at most what the member allows: every type of its
         // set covered by the member's, both read at the conformance instance.
         if (have.Throws.FirstOrDefault(t => !want.Throws.Any(w => ThrownCoveredBy(t, w, _currentModule))) is { } extra)
             return want.Throws.Length == 0
@@ -2739,7 +2734,7 @@ public sealed class TypeChecker
                 : new DiagnosticNote("previous declaration"));
     }
 
-    /// <summary>A macro takes syntax and gives syntax (design/v5/spec/08 Y12 Q1; 13 M9b P3): every
+    /// <summary>A macro takes syntax and gives syntax: every
     /// parameter and the result are types of <c>std.syntax</c>, or arrays of them; no type
     /// parameters, since a site hands over trees, not values with types.</summary>
     private void CheckMacroSignature(FunctionDecl fn)
@@ -2761,7 +2756,7 @@ public sealed class TypeChecker
                 $"a macro gives syntax back: '{fn.Name}' needs a return type of std.syntax (Expr, Stmt[], Block, Decl ...), which is what stands at the site");
         if (fn.Generics.Length > 0)
             _de.Report("LYR-SEM0186", Severity.Error, fn.Generics[0].Span, $"a macro has no type parameters: '{fn.Name}' sees syntax, which carries no types");
-        // an attribute macro (13 M9b S4): its first parameter a declaration, its result one or several
+        // an attribute macro: its first parameter a declaration, its result one or several
         if (fn.Parameters.Length > 0 && IsDeclarationKind(fn.Parameters[0].Type) && fn.ReturnType is { } ret && Syntactic(ret)
             && !(ret is NamedType { Path: ["Decl"] } or ArrayType { Element: NamedType { Path: ["Decl"] } }))
             _de.Report("LYR-SEM0186", Severity.Error, ret.Span,
@@ -2769,11 +2764,11 @@ public sealed class TypeChecker
     }
 
     /// <summary>Whether a parameter type names a declaration of std.syntax: the marker of an
-    /// attribute macro (13 M9b S4).</summary>
+    /// attribute macro.</summary>
     private static bool IsDeclarationKind(TypeNode type) =>
         type is NamedType { Path: ["Decl" or "StructDecl" or "ClassDecl" or "FnDecl" or "EnumDecl" or "InterfaceDecl" or "ExtendDecl" or "LetDecl"] };
 
-    /// <summary><c>quote { ... }</c> (08 Y12 Q2; 13 M9b P5): a value of std.syntax - an Expr for a
+    /// <summary><c>quote { ... }</c>: a value of std.syntax - an Expr for a
     /// lone tail, Stmt[] or Block for statements, Decl or Decl[] for declarations, the expected type
     /// deciding where the content allows two. The splices are checked as the function's code,
     /// each against its position in the content: a name takes an Ident, a statement of its own
@@ -2817,7 +2812,7 @@ public sealed class TypeChecker
         }
         _result.NoteQuote(q, _currentModule?.FullName ?? "");
         // A free name of the content is this module's wherever the tree ends up (rule 8): an
-        // import it names is used here, though the content is checked nowhere (M9b S5).
+        // import it names is used here, though the content is checked nowhere.
         if (_currentModule is { } home)
         {
             void Mark(string name)
@@ -2875,7 +2870,7 @@ public sealed class TypeChecker
         return positions;
     }
 
-    /// <summary>The scope of the module a quote wrote a name in (13 M9b P5), or <c>null</c>.</summary>
+    /// <summary>The scope of the module a quote wrote a name in, or <c>null</c>.</summary>
     private SymbolTable? HomeScope(string module) => _comp.FindModule(module.Split('.'))?.Members;
 
     /// <summary>The macro a bare name means here, or <c>null</c>.</summary>
@@ -2924,7 +2919,7 @@ public sealed class TypeChecker
             if (p.Default is not null)
             {
                 CheckAssignable(p.Default, CheckExpr(p.Default, scope, pt), pt, p.Span);
-                // A default runs at the call, before the receiver is anyone's (04 D5 F2): it may
+                // A default runs at the call, before the receiver is anyone's: it may
                 // read the parameters before it and nothing of 'this'. The sema sees the method's
                 // scope here, so without this walk the lowering met 'this' outside a method.
                 if (Descendants(p.Default).OfType<ThisExpr>().FirstOrDefault() is { } receiver)
@@ -2934,9 +2929,9 @@ public sealed class TypeChecker
             }
         }
         _currentReturn = fn.ReturnType is not null ? ValueTypeAt(ResolveType(fn.ReturnType, scope), fn.ReturnType.Span) : LyrType.Void;
-        // Coroutine — 'Coroutine<…>' and a yield of its own (08 D11): the body never produces the
+        // Coroutine — 'Coroutine<…>' and a yield of its own: the body never produces the
         // coroutine value, which the runtime builds at the call. Its 'return' gives the coroutine's
-        // result (06 A1), so coverage asks for one where the result is not void; the yield context
+        // result, so coverage asks for one where the result is not void; the yield context
         // comes besides. A function that returns a coroutine without yielding is an ordinary one.
         var coroutine = _currentReturn is CoroutineOf co && CoroutineShape.IsCoroutine(fn) ? co : null;
         // Its body runs after the call has returned, when the caller's place may be gone (03 §2.3a).
@@ -3050,7 +3045,7 @@ public sealed class TypeChecker
                 break;
             case ForInStmt fo: InLoop(new LoopContext(false, fo.Label, null), () => CheckForIn(fo, scope)); break;
             case ReturnStmt r:
-                // In a coroutine 'return' ends the body with the coroutine's result (06 A1): a value
+                // In a coroutine 'return' ends the body with the coroutine's result: a value
                 // where the type names one, 'Coroutine<Y, R>'; a bare 'return;' where it does not.
                 if (_currentYield is not null && _currentReturn is CoroutineOf ending)
                 {
@@ -3071,7 +3066,7 @@ public sealed class TypeChecker
                 // unified afterwards — there is nothing to check assignability against yet.
                 else if (_returnInference is { } inferred)
                     inferred.Add(r.Value is not null ? CheckExpr(r.Value, scope) : LyrType.Void);
-                // A function returning 'never' does not return (05 E12): a 'return' would — unless
+                // A function returning 'never' does not return: a 'return' would — unless
                 // what it returns does not return either.
                 else if (_currentReturn is NeverType)
                 {
@@ -3108,7 +3103,7 @@ public sealed class TypeChecker
                 if (_currentYield is null)
                     break;
                 // A yield of the body: where 'close()' finds the coroutine suspended, it throws
-                // 'Cancelled' (06 A5) — a site the exception analysis covers by the body itself.
+                // 'Cancelled' — a site the exception analysis covers by the body itself.
                 _result.MarkBodyYield(y);
                 // A generator lambda without a coroutine context collects its yields: they give its 'Y'.
                 if (_yieldInference is { } yieldsSoFar)
@@ -3142,7 +3137,7 @@ public sealed class TypeChecker
 
     private void CheckBinding(BindingStmt bnd, SymbolTable scope)
     {
-        // a local 'fn' (08 F8): bound before its lambda is checked, which calls it
+        // a local 'fn': bound before its lambda is checked, which calls it
         if (bnd.LocalFunction && bnd.Type is not null && bnd.Initializer is not null)
         {
             var fnType = ValueTypeAt(ResolveType(bnd.Type, scope), bnd.Type.Span);
@@ -3174,11 +3169,11 @@ public sealed class TypeChecker
         var local = new LocalSymbol(bnd.Name, type, bnd.IsMutable, bnd);
         DeclareLocal(local, bnd, scope);
 
-        // 'using let' (05 E7 R1–R6): what it binds is Closeable (R6), and the close it owes its
+        // 'using let': what it binds is Closeable, and the close it owes its
         // scope is checked as the defer it is — a site of this scope, the keyword its mark.
         if (bnd.Cleanup is { } cleanup && !type.IsError)
         {
-            // A coroutine is Closeable (10 I7) — by its built-in 'close()', not through a table.
+            // A coroutine is Closeable — by its built-in 'close()', not through a table.
             if (type is CoroutineOf && _cancelled is not null
                 || _closeable is not null && ThrownCoveredBy(type, new NamedRef(_closeable), _currentModule))
                 CheckStmt(cleanup, scope);
@@ -3188,7 +3183,7 @@ public sealed class TypeChecker
         }
     }
 
-    /// <summary>A binding's name into its scope, once (N1a), and its symbol on its node.</summary>
+    /// <summary>A binding's name into its scope, once, and its symbol on its node.</summary>
     private void DeclareLocal(LocalSymbol local, BindingStmt bnd, SymbolTable scope)
     {
         // A name is bound once in a scope (Lyric 5; decided 2026-10-07, N1a). The table kept the first
@@ -3198,7 +3193,7 @@ public sealed class TypeChecker
         // as C#, Java and Go have it): a 'let' of its name there hid it in silence.
         var fresh = scope.TryDeclare(local);
         // '_' binds nothing (09 §1 rule 1): 'let _ = f();' twice in a block keeps two values
-        // nobody reads, and is no name bound twice (M9a S2, found by its probes)
+        // nobody reads, and is no name bound twice
         if (_comp.Lyric5Modules && bnd.Name != "_")
         {
             if (!fresh)
@@ -3241,10 +3236,10 @@ public sealed class TypeChecker
     /// <c>for-in</c> currently being checked. See <see cref="CheckRange"/>.</summary>
     private Expr? _rangeInPosition;
 
-    /// <summary>std.core's <c>Iterable</c> (10 B6), what a Lyric 5 <c>for</c> walks.</summary>
+    /// <summary>std.core's <c>Iterable</c>, what a Lyric 5 <c>for</c> walks.</summary>
     private readonly TypeSymbol? _coreIterable;
 
-    /// <summary>std.core's <c>Iterator</c>, which a coroutine is built in (10 B6 I7).</summary>
+    /// <summary>std.core's <c>Iterator</c>, which a coroutine is built in.</summary>
     private readonly TypeSymbol? _coreIterator;
 
     private void CheckForIn(ForInStmt fo, SymbolTable scope)
@@ -3263,8 +3258,8 @@ public sealed class TypeChecker
                 + "to catch what they throw, put the loop in a 'try { … }' block");
             iterType = LyrType.Error;
         }
-        // 'comptime for' (09 Q2): over an array a site computes, its body unrolled per element —
-        // a name for the element, which each round binds to a value of its own (M9a S3)
+        // 'comptime for': over an array a site computes, its body unrolled per element —
+        // a name for the element, which each round binds to a value of its own
         if (fo.Comptime && !iterType.IsError)
         {
             if (fo.Pattern is not null)
@@ -3274,21 +3269,21 @@ public sealed class TypeChecker
                 _de.Report("LYR-SEM0100", Severity.Error, fo.Iterable.Span,
                     $"a 'comptime for' walks an array its site computes — this one is '{TypeFacts.Display(iterType)}'");
         }
-        // 'comptime for (p in m.parameters)' (X4): the body once per parameter of the member's function
+        // 'comptime for (p in m.parameters)': the body once per parameter of the member's function
         if (fo.Comptime && fo.Pattern is null && fo.Iterable is ComptimeExpr { Inner: MemberExpr { Member: "parameters", Target: IdentifierExpr overParams } }
             && RoundVariable(overParams, scope) is { } overMember && iterType is ArrayOf paramArray)
         {
             CheckParameterLoop(fo, overMember, paramArray.Element, scope);
             return;
         }
-        // 'comptime for (p in v.payload)' (M9a S10): the body once per field of the variant's payload
+        // 'comptime for (p in v.payload)': the body once per field of the variant's payload
         if (fo.Comptime && fo.Pattern is null && fo.Iterable is ComptimeExpr { Inner: MemberExpr { Member: "payload", Target: IdentifierExpr over } }
             && RoundVariable(over, scope) is { } overVariant && iterType is ArrayOf payloadArray)
         {
             CheckPayloadLoop(fo, overVariant, payloadArray.Element, scope);
             return;
         }
-        // 'comptime for (f in fields<T>())' (09 A7; M9a S9): the body once per field
+        // 'comptime for (f in fields<T>())': the body once per field
         if (fo.Comptime && fo.Pattern is null && fo.Iterable is ComptimeExpr walkedMeta && _result.IsMetaSite(walkedMeta)
             && walkedMeta.Inner is CallExpr metaCall && iterType is ArrayOf metaArray)
         {
@@ -3307,13 +3302,13 @@ public sealed class TypeChecker
                 simple ? [DiagnosticNote.Suggest("walk its characters", new Replacement(new Span(at.File, at.End, at.End), ".chars()", Applicability.Safe))] : []));
             iterType = LyrType.Error;
         }
-        // Lyric 5 (10 B6 I2): anything but a range literal — the counted loop — and the shapes the
+        // Lyric 5: anything but a range literal — the counted loop — and the shapes the
         // compiler walks itself goes through the protocol.
         var protocol = _coreIterable is not null
                        && !(fo.Iterable is RangeExpr && iterType is RangeOf)
                        && iterType is not (ArrayOf or SliceOf or InlineArrayOf or ErrorType)
                        && iterType is not PrimitiveType { Kind: PrimitiveKind.String };
-        // An array, a view, an inline array: the index loop (10 B6 I10, COL-09 B), no iterator.
+        // An array, a view, an inline array: the index loop, no iterator.
         var indexed = _coreIterable is not null && iterType is ArrayOf or SliceOf or InlineArrayOf;
         if (indexed) _result.MarkIndexed(fo);
         var elem = protocol ? CheckForInProtocol(fo, iterType, scope) : iterType switch
@@ -3377,7 +3372,7 @@ public sealed class TypeChecker
         fo.Iterable is TryExpr head && (head.Kind != TryKind.Propagate || head.Catches.Length > 0) ? head : null;
 
     /// <summary>
-    /// A second loop over one iterator binding (07 §2 rule 4; design 10 B6 I2, COL-11 C). Where the
+    /// A second loop over one iterator binding (07 §2 rule 4). Where the
     /// binding's <c>iter()</c> gives the iterator itself and that may be an object several bindings
     /// reach — a class, or an open type a class may answer —, a loop after an earlier one over the
     /// same binding goes on where that one stopped, often at the end, and runs no pass without a
@@ -3410,7 +3405,7 @@ public sealed class TypeChecker
         || TypeFacts.KindOf(type) is TypeSymbolKind.Class or TypeSymbolKind.Interface;
 
     /// <summary>
-    /// <c>for (x in e)</c> over Lyric 5's protocol (10 B6 I2): the two calls the loop makes, written
+    /// <c>for (x in e)</c> over Lyric 5's protocol: the two calls the loop makes, written
     /// and checked as a program's — <c>e.iter()</c> once, then <c>next()</c> on a hidden variable
     /// that holds the iterator, until it answers <c>null</c>. The element is what <c>next</c>
     /// answers. Recorded for the lowering, which lowers them as the calls they are: an own member,
@@ -3434,7 +3429,7 @@ public sealed class TypeChecker
         var nextCall = new CallExpr(nextMember, [], span);
         var produced = CheckExpr(nextCall, cursorScope);
         if (produced.IsError) return LyrType.Error;
-        // A Closeable iterator is closed on every way out but a panic (10 B6 I6, 05 E7 R7), as a
+        // A Closeable iterator is closed on every way out but a panic, as a
         // 'using' binding closes what it binds — asked of the type the checked code knows.
         DeferStmt? close = null;
         var closeIfCloseable = false;
@@ -3446,8 +3441,8 @@ public sealed class TypeChecker
             close = new DeferStmt(new ExprStmt(closeCall, span), span);
         }
         // The iterator's type names a type parameter: whether it is Closeable is known only where
-        // the loop is lowered for a concrete type, and there the INSTANCE closes (the review's
-        // M8a-4). The call is built here, bound to Closeable's member — the lowering resolves it
+        // the loop is lowered for a concrete type, and there the INSTANCE closes.
+        // The call is built here, bound to Closeable's member — the lowering resolves it
         // on the concrete type, or drops it where that type is no Closeable. It throws what the
         // loop's next() throws, the iterator's Error: the rule at the declaration (LYR-SEM0174)
         // holds every Closeable iterator's close() to that, so one clause covers both calls.
@@ -3570,9 +3565,9 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// A <c>throws</c> clause (design/v5/spec/05 E2): a SET of types that conform to <c>Error</c>
-    /// (E3, <c>LYR-SEM0030</c>), each named once (K1, <c>LYR-SEM0137</c>); the bare form is
-    /// <c>Error</c> (K2). The resolved set is recorded for the exception analysis — not for a
+    /// A <c>throws</c> clause: a SET of types that conform to <c>Error</c>
+    /// (<c>LYR-SEM0030</c>), each named once (<c>LYR-SEM0137</c>); the bare form is
+    /// <c>Error</c>. The resolved set is recorded for the exception analysis — not for a
     /// coroutine function, whose clause describes the pulls of the coroutine it returns.
     /// </summary>
     private void CheckThrowsClause(FunctionDecl fn, SymbolTable scope)
@@ -3599,7 +3594,7 @@ public sealed class TypeChecker
 
     /// <summary>
     /// A <c>throws</c> behind a return type that may carry a set of its own — a task, a coroutine,
-    /// under any <c>?</c> — says whose it is (the review's M6-6): <c>(Task&lt;int&gt; throws E)</c>
+    /// under any <c>?</c> — says whose it is: <c>(Task&lt;int&gt; throws E)</c>
     /// returns a task that may end in the error, <c>(Task&lt;int&gt;) throws E</c> throws itself.
     /// Without the parentheses the clause was the function's, and who meant the task's learned it
     /// from a mismatch between the body's value and the return type, with no word about the
@@ -3631,9 +3626,9 @@ public sealed class TypeChecker
     private readonly HashSet<ThrowsClause> _whoseAsked = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
-    /// The set a function type or a lambda writes (03 T17, 08 Y11 F7), under a declaration's rules:
+    /// The set a function type or a lambda writes, under a declaration's rules:
     /// every type throwable (<c>LYR-SEM0030</c>), each named once (<c>LYR-SEM0137</c>), the bare form
-    /// <c>Error</c> (K2). Reported once per clause — a parameter's type is resolved again through its
+    /// <c>Error</c>. Reported once per clause — a parameter's type is resolved again through its
     /// function's type at every call.
     /// </summary>
     private LyrType[] ResolveThrownSet(ThrowsClause clause, SymbolTable scope)
@@ -3666,7 +3661,7 @@ public sealed class TypeChecker
     private readonly HashSet<ThrowsClause> _checkedSets = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>A set after a substitution: <c>never</c> names nothing — <c>throws E</c> at
-    /// <c>E = never</c> is no clause (05 E2 K4) — and two entries bound to one type are one.</summary>
+    /// <c>E = never</c> is no clause — and two entries bound to one type are one.</summary>
     internal static LyrType[] ThrownAfter(IEnumerable<LyrType> substituted)
     {
         var set = new List<LyrType>();
@@ -3675,7 +3670,7 @@ public sealed class TypeChecker
         return set.ToArray();
     }
 
-    /// <summary>What a function's clause names, resolved — the bare form as <c>Error</c> (K2),
+    /// <summary>What a function's clause names, resolved — the bare form as <c>Error</c>,
     /// nothing without a clause. What its BODY may throw, a coroutine's included.</summary>
     private LyrType[] ClauseSetOf(FunctionDecl fn)
     {
@@ -3690,7 +3685,7 @@ public sealed class TypeChecker
     private LyrType[] DeclaredThrowsOf(FunctionDecl fn) =>
         CoroutineShape.IsCoroutine(fn) && ResolveType(fn.ReturnType!, _comp.Builtins) is CoroutineOf ? [] : ClauseSetOf(fn);
 
-    /// <summary>What a <c>throw</c> throws conforms to <c>Error</c> (design/v5/spec/05 E3): a
+    /// <summary>What a <c>throw</c> throws conforms to <c>Error</c>: a
     /// struct, a class or an enum that conforms, an interface value of it or of a child of it, a
     /// type parameter constrained to it.</summary>
     private void CheckThrown(LyrType thrown, Span span)
@@ -3703,7 +3698,7 @@ public sealed class TypeChecker
     /// <summary>The root as a type, for the exception analysis.</summary>
     internal LyrType? ErrorRoot => _error is null ? null : new NamedRef(_error);
 
-    /// <summary><c>std.task</c>'s <c>Cancelled</c>, what a yield of a body throws at close (06 A5).</summary>
+    /// <summary><c>std.task</c>'s <c>Cancelled</c>, what a yield of a body throws at close.</summary>
     internal LyrType? CancelledType => _cancelled is null ? null : new NamedRef(_cancelled);
 
     private bool IsThrowable(LyrType t) =>
@@ -3719,7 +3714,7 @@ public sealed class TypeChecker
 
     /// <summary>
     /// Whether an element of a thrown set — a <c>throws</c> entry, a <c>catch</c> type — covers a
-    /// thrown type (design/v5/spec/05 E2 K5, K8): it IS that type, on the instance —
+    /// thrown type: it IS that type, on the instance —
     /// <c>Box&lt;int&gt;</c> is not <c>Box&lt;string&gt;</c> — or an interface the type conforms
     /// to, <c>Error</c> covering everything thrown. Asked at <paramref name="at"/>, the module the
     /// site stands in: a conformance from an extend block counts where it is seen. A shape — an
@@ -3729,13 +3724,13 @@ public sealed class TypeChecker
     {
         if (thrown.IsError || element.IsError || thrown is NeverType) return true;
         if (LyrType.Equal(thrown, element)) return true;
-        // An open join covers each of its parts, and is covered where both of them are (05 E2 K7).
+        // An open join covers each of its parts, and is covered where both of them are.
         if (IsOpenJoin(element) && element is GenericInstance covering
             && (ThrownCoveredBy(thrown, covering.Arguments[0], at) || ThrownCoveredBy(thrown, covering.Arguments[1], at)))
             return true;
         if (IsOpenJoin(thrown) && thrown is GenericInstance joined)
             return ThrownCoveredBy(joined.Arguments[0], element, at) && ThrownCoveredBy(joined.Arguments[1], element, at);
-        // An associated type is thrown through its bound, 'type Error :: [Error]' (10 B6 I5).
+        // An associated type is thrown through its bound, 'type Error :: [Error]'.
         if (thrown is not (NamedRef or GenericInstance or TypeParamType or PrimitiveType or AssocOf)) return false;
         if (TypeFacts.SymbolOf(element) is not { Kind: TypeSymbolKind.Interface } iface) return false;
         var saved = _currentModule;
@@ -3745,9 +3740,9 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// The clauses of a try, in order (05 E9): each bound in a scope of its own and held against the
-    /// clauses above it (C1, C2) before <paramref name="body"/> checks it. A clause without a type
-    /// gets the set that reaches it first (K7) — what <paramref name="tried"/> throws past every try
+    /// The clauses of a try, in order: each bound in a scope of its own and held against the
+    /// clauses above it before <paramref name="body"/> checks it. A clause without a type
+    /// gets the set that reaches it first — what <paramref name="tried"/> throws past every try
     /// inside it, less what the clauses above take whole — so a match in its body can be exhaustive
     /// over it.
     /// </summary>
@@ -3761,8 +3756,8 @@ public sealed class TypeChecker
                 var escaping = Escaping(tried);
                 var reaching = escaping.Where(t => !above.Any(c => TakesWhole(c, t))).ToArray();
                 _result.RecordCatchSet(clauses[i], reaching);
-                // The clauses above take every type the block throws: this one is dead (the
-                // review's M5-16, a warning). A block that throws nothing at all has its own
+                // The clauses above take every type the block throws: this one is dead (a
+                // warning). A block that throws nothing at all has its own
                 // sentence, for all its clauses (LYR-SEM0139).
                 if (reaching.Length == 0 && escaping.Length > 0)
                     _de.Report("LYR-SEM0171", Severity.Warning, KeywordSpan(clauses[i]),
@@ -3771,7 +3766,7 @@ public sealed class TypeChecker
             }
             var catchScope = BindCatch(clauses[i], scope);
             CheckAgainstAbove(clauses[i], above);
-            // Its binding tells of the record while its own body runs (06 §4, M5-3).
+            // Its binding tells of the record while its own body runs (06 §4).
             var binding = clauses[i].BindingName is not null ? _result.RefOf(clauses[i]) as LocalSymbol : null;
             if (binding is not null) _askable.Add(binding);
             body(clauses[i], catchScope);
@@ -3779,7 +3774,7 @@ public sealed class TypeChecker
         }
     }
 
-    /// <summary>What reaches a clause without a type (05 E2 K7): what the sites under the try throw
+    /// <summary>What reaches a clause without a type: what the sites under the try throw
     /// past every try inside it — the exception analysis's own walk, run muted, so there is one
     /// notion of a site — less what the clauses above take whole.</summary>
     private LyrType[] Escaping(Node tried)
@@ -3793,13 +3788,13 @@ public sealed class TypeChecker
         new(clause.Span.File, clause.Span.Start, Math.Min(clause.Span.End, clause.Span.Start + "catch".Length));
 
     /// <summary>
-    /// The type of a binding that carries a set (the review's M5-6): where only ONE type can
+    /// The type of a binding that carries a set: where only ONE type can
     /// arrive, the binding is that type — its fields and its variants are there, as in a typed
     /// clause —; with several, or none, it is the root, and the set is what a rethrow and a match
-    /// ask (K7).
+    /// ask.
     /// </summary>
     private LyrType BindingOf(LyrType[] set) =>
-        // An open join is several types under one name (K7): no type for a value.
+        // An open join is several types under one name: no type for a value.
         set is [var one] && !one.IsError && !IsOpenJoin(one) ? one : _error is not null ? new NamedRef(_error) : LyrType.Error;
 
     /// <summary>The types a clause names: its type, or its set's; none for the clause without a type.</summary>
@@ -3813,10 +3808,10 @@ public sealed class TypeChecker
         clause.TakesAll || CaughtTypes(clause).Any(c => ThrownCoveredBy(thrown, c, _currentModule));
 
     /// <summary>
-    /// A clause against the clauses above it (05 E9): a type caught a second time is refused (C1,
-    /// <c>LYR-SEM0141</c>), and so is one a type caught before it takes whole — an interface it
-    /// conforms to, <c>Error</c> — since no value of it can reach the clause (C2,
-    /// <c>LYR-SEM0142</c>). Within a set the same holds from left to right. A clause below the one
+    /// A clause against the clauses above it: a type caught a second time is refused
+    /// (<c>LYR-SEM0141</c>), and so is one a type caught before it takes whole — an interface it
+    /// conforms to, <c>Error</c> — since no value of it can reach the clause
+    /// (<c>LYR-SEM0142</c>). Within a set the same holds from left to right. A clause below the one
     /// without a type is SEM0035's, and not asked again.
     /// </summary>
     private void CheckAgainstAbove(CatchClause clause, CatchClause[] above)
@@ -3842,7 +3837,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// The <c>try</c> family as an expression (design/v5/spec/05 E4). A mark is worth its operand,
+    /// The <c>try</c> family as an expression. A mark is worth its operand,
     /// and so is <c>try!</c> — an error panics. <c>try?</c> is worth <c>?T</c>, never flattened: "the
     /// call failed" stays apart from "the call gave null". The expression form is worth its operand
     /// or the value of the clause that took the error, unified like the arms of a <c>match</c>.
@@ -3881,7 +3876,7 @@ public sealed class TypeChecker
         var value = CheckExpr(tried.Value, scope, expected is Optional wanted ? wanted.Inner : null);
         if (value.IsError) return value;
         // Over an operand that never gives a value the form would be worth '?never' — always null,
-        // and 'never' stands only as a return type (05 E12).
+        // and 'never' stands only as a return type.
         if (value is NeverType)
             return Report(tried.KeywordSpan, "LYR-SEM0145",
                 "'try?' over an expression that never gives a value would be worth '?never' — and 'never' stands only as a return type");
@@ -3916,15 +3911,15 @@ public sealed class TypeChecker
     }
 
     /// <summary>A clause's binding in a scope of its own: the type it names, checked to be an error;
-    /// the root for a set, which the binding carries besides (K7), and for a clause without a type.</summary>
+    /// the root for a set, which the binding carries besides, and for a clause without a type.</summary>
     private SymbolTable BindCatch(CatchClause clause, SymbolTable scope)
     {
         var catchScope = new SymbolTable(scope);
         LyrType bt;
         if (clause.BindingTypes.Length > 0)
         {
-            // The set form (05 E9 C5): every type an error; the binding an 'Error' that carries the
-            // set (K7) — what it may hold, asked by a rethrow and a match, not a second type.
+            // The set form: every type an error; the binding an 'Error' that carries the
+            // set — what it may hold, asked by a rethrow and a match, not a second type.
             var set = new List<LyrType>();
             foreach (var node in clause.BindingTypes)
             {
@@ -3936,7 +3931,7 @@ public sealed class TypeChecker
                 set.Add(caught);
             }
             _result.RecordCatchSet(clause, set.ToArray());
-            bt = BindingOf(set.ToArray()); // 'catch (e in A)' is 'catch (e: A)' (M5-6)
+            bt = BindingOf(set.ToArray()); // 'catch (e in A)' is 'catch (e: A)'
         }
         else if (clause.BindingType is not null)
         {
@@ -3975,14 +3970,14 @@ public sealed class TypeChecker
     // 'if (x == null) { return; }' narrows x afterwards through the early exit.
     private void CheckIf(IfStmt f, SymbolTable scope)
     {
-        // 'comptime if' (09 Q2) chooses by a bool computed while compiling
+        // 'comptime if' chooses by a bool computed while compiling
         if (f.Comptime && f.Condition is LetCondExpr refused)
             _de.Report("LYR-SEM0100", Severity.Error, refused.Span,
                 "a 'comptime if' chooses by a bool computed while compiling — a 'let' condition binds a value of the run");
         if (f.Condition is LetCondExpr letCond) { CheckIfLet(f, letCond, scope); return; }
 
         CheckCondition(f.Condition, scope);
-        // a 'comptime if' the round decides (M9a S10): the chosen branch alone — the other may name
+        // a 'comptime if' the round decides: the chosen branch alone — the other may name
         // what this field's type has not ('clone' of a '@Shared' field)
         if (f.Comptime && f.Condition is ComptimeExpr decidedSite && RoundConstant(decidedSite.Inner, scope) is bool chosenBranch)
         {
@@ -4074,7 +4069,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// <c>loop { … }</c> (05 E11): its type is what its breaks give — their values unified, or the
+    /// <c>loop { … }</c>: its type is what its breaks give — their values unified, or the
     /// type its position expects, each checked against it; <c>void</c> when they give none;
     /// <c>never</c> when no break leaves it. Some giving a value and some none is
     /// <c>LYR-SEM0149</c>.
@@ -4092,8 +4087,8 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// <c>break</c> (05 E11, 08 S4): it leaves the loop its label names, or the innermost — of its
-    /// own function, a lambda's body being one (08 Y11 F5, <c>LYR-SEM0147</c>). A value leaves only a
+    /// <c>break</c>: it leaves the loop its label names, or the innermost — of its
+    /// own function, a lambda's body being one (<c>LYR-SEM0147</c>). A value leaves only a
     /// <c>loop</c> (<c>LYR-SEM0148</c>), checked against what the loop's position expects.
     /// </summary>
     private void CheckBreak(BreakStmt br, SymbolTable scope)
@@ -4213,7 +4208,7 @@ public sealed class TypeChecker
     /// </summary>
     private (Dictionary<Symbol, LyrType> then, Dictionary<Symbol, LyrType> els) NarrowingFacts(Expr cond)
     {
-        // '!c' proves what 'c' refutes and refutes what it proves (03 T4 O3, T11): the two sets
+        // '!c' proves what 'c' refutes and refutes what it proves: the two sets
         // change places. So 'if (!(s is Circle)) { return; }' guards — a type test had no guard
         // form but an empty branch — and De Morgan needs no line of its own: a negated '&&'
         // refutes both sides where it is false, by the rule for '&&' below.
@@ -4245,8 +4240,8 @@ public sealed class TypeChecker
             return (then, els);
         }
 
-        // A test narrows by ONE level, from the type the name has where the test stands
-        // (design/v5/spec/03 T4 O3): a '??int' proven present is a '?int', and a second test on
+        // A test narrows by ONE level, from the type the name has where the test stands:
+        // a '??int' proven present is a '?int', and a second test on
         // it reaches the 'int'. Reading the declared type instead narrowed every test to the same
         // level, which was the whole story while optionals did not nest.
         if (cond is BinaryExpr { Operator: BinaryOp.Ne or BinaryOp.Eq } b
@@ -4257,7 +4252,7 @@ public sealed class TypeChecker
             (b.Operator == BinaryOp.Ne ? then : els)[sym2] = opt.Inner;
         }
 
-        // 'x is Circle' (03 T11): in the branch the test guards, 'x' is a 'Circle' — the smart
+        // 'x is Circle': in the branch the test guards, 'x' is a 'Circle' — the smart
         // cast, the same mechanism as the null test. Nothing is known in the other branch.
         if (cond is TypeTestExpr { Operand: IdentifierExpr tid } test
             && _result.RefOf(tid) is { } tsym && Narrowable(tsym) && _typeTests.TryGetValue(test, out var tested2))
@@ -4414,7 +4409,7 @@ public sealed class TypeChecker
                 return Report(t.Span, "LYR-SEM0008", "'this' is only valid inside a method");
             case UnaryExpr u: return CheckUnary(u, scope);
             case PostfixExpr p: return CheckPostfix(p, scope);
-            // '[x] * 64' where a 'T[64]' is expected builds the inline array at compile time (10 C7):
+            // '[x] * 64' where a 'T[64]' is expected builds the inline array at compile time:
             // the count is a literal equal to the type's length.
             case BinaryExpr { Operator: BinaryOp.Mul, Left: ArrayLitExpr { Elements.Length: 1 } one, Right: IntLiteralExpr count } repeat
                 when expected is InlineArrayOf inline:
@@ -4481,7 +4476,7 @@ public sealed class TypeChecker
             }
             case LambdaExpr lam: return CheckLambda(lam, scope, expected);
             case ComptimeExpr ct: return CheckComptime(ct, scope, expected);
-            // an unexpanded site (13 M9b P6): the expander replaces it before the module is
+            // an unexpanded site: the expander replaces it before the module is
             // checked for real; this is the pre-expansion pass, whose findings are buffered
             case MacroCallExpr: return LyrType.Error;
             case QuoteExpr q: return CheckQuote(q, scope, expected);
@@ -4494,7 +4489,7 @@ public sealed class TypeChecker
                 CheckThrown(CheckExpr(te.Value, scope), te.Span);
                 return LyrType.Never;
             }
-            // The 'try' family (design/v5/spec/05 E4): the types here; what each form covers —
+            // The 'try' family: the types here; what each form covers —
             // which sites, where they propagate — is the exception analysis's question.
             case TryExpr tried: return CheckTry(tried, scope, expected);
             // An attribute is not an expression: it describes the declaration it precedes and has
@@ -4532,7 +4527,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// A tuple literal (design/v5/spec/03 §1.3, T8). Where the position expects a tuple of its
+    /// A tuple literal (03 §1.3). Where the position expects a tuple of its
     /// length, each element stands where its element type is expected — the place a binding's
     /// value or an argument stands at: <c>return (0, null);</c> against <c>(int, ?int)</c>,
     /// <c>(1, [])</c> against <c>(int, int[])</c>, <c>(.Red, 1)</c>. The literal then HAS the
@@ -4562,7 +4557,7 @@ public sealed class TypeChecker
 
     private LyrType CheckIdentifier(IdentifierExpr id, SymbolTable scope, LyrType? expected = null)
     {
-        // a name a 'quote' wrote (13 M9b P5) is the macro's module's, not the site's
+        // a name a 'quote' wrote is the macro's module's, not the site's
         if (id.QuotedFrom is { } from && HomeScope(from) is { } home) scope = home;
         // A name that means SEVERAL functions, standing where a value is wanted rather than in
         // callee position. Nothing about the expression chooses, so the expected type has to: a
@@ -4636,8 +4631,8 @@ public sealed class TypeChecker
     // --- a member's bare name ---
 
     /// <summary>
-    /// A member named bare where nothing gives it a receiver (design/v5/spec/07, the review's
-    /// M6-30). Between a type's braces the names of its members are in scope, and a static one
+    /// A member named bare where nothing gives it a receiver.
+    /// Between a type's braces the names of its members are in scope, and a static one
     /// is reached by its name alone. A field or a method that is not static belongs to an
     /// instance and is written through it — <c>this.label</c>, <c>this.size()</c> —, a variant
     /// through its type, as in a pattern (<c>LYR-SEM0111</c>). The bare name is refused here,
@@ -4735,7 +4730,7 @@ public sealed class TypeChecker
 
     /// <summary>
     /// Where a call's bare callee is looked up, when that is not the call's own scope: in a call
-    /// a field counts only if it can be called (the review's M6-30). <c>label()</c> beside a
+    /// a field counts only if it can be called. <c>label()</c> beside a
     /// field <c>label: string</c> means the function outside, so a field <c>size</c> or
     /// <c>name</c> closes no function of that name to its type's methods. A local and a
     /// parameter hide whole, as everywhere; a field that holds a function is what the call
@@ -4768,7 +4763,7 @@ public sealed class TypeChecker
 
     private FnType FnTypeOf(FunctionSymbol f)
     {
-        // In a default set in place for a conformer (M9a S9, S10) 'Self' is the conformer — in the
+        // In a default set in place for a conformer 'Self' is the conformer — in the
         // default's body. A member's signature resolved here names ITS interface's Self, which the
         // caller substitutes with the receiver: an 'equals(o: Self)' asked of a field's type 'T'
         // takes a 'T', not the conformer.
@@ -4783,13 +4778,13 @@ public sealed class TypeChecker
         var fn = (FunctionDecl)f.Declaration!;
         // a constraint only goes on as the error type, said where the declaration is checked
         var ps = fn.Parameters.Select(p => ValueTypeAt(ResolveType(p.Type, _comp.Builtins), null)).ToArray();
-        // 'never' is a return type like any other (05 E12): 'panic', 'unreachable' and 'todo' say it
+        // 'never' is a return type like any other: 'panic', 'unreachable' and 'todo' say it
         // in their declarations, and so may any function.
         var ret = fn.ReturnType is not null ? ValueTypeAt(ResolveType(fn.ReturnType, _comp.Builtins), null) : LyrType.Void;
         return new FnType(ps, CoroutineThrowsOf(fn, ret, _comp.Builtins)) { Throws = DeclaredThrowsOf(fn), Places = PlacesOf(fn) };
     }
 
-    /// <summary>Which of a declaration's parameters take a place (03 T12); empty when none does.</summary>
+    /// <summary>Which of a declaration's parameters take a place; empty when none does.</summary>
     private static bool[] PlacesOf(FunctionDecl fn) =>
         fn.Parameters.Any(p => p.IsPlace) ? fn.Parameters.Select(p => p.IsPlace).ToArray() : [];
 
@@ -4807,13 +4802,13 @@ public sealed class TypeChecker
     /// </summary>
     private LyrType CoroutineThrowsOf(FunctionDecl fn, LyrType declared, SymbolTable scope) =>
         fn.Throws is { } clause && declared is CoroutineOf co && co.Throws is null && CoroutineShape.IsCoroutine(fn)
-            // A coroutine's type carries one thrown type, its pulls' (06 A1): one named stays
-            // itself, several join to the root, as composed sets do (05 K7 Nachtrag).
+            // A coroutine's type carries one thrown type, its pulls': one named stays
+            // itself, several join to the root, as composed sets do.
             ? co with { Throws = ThrownTypeOf(clause.Types is [var one] ? one : null, scope) }
             : declared;
 
     /// <summary>What a <c>throws</c> names: the written type, or <c>std.core</c>'s <c>Error</c>
-    /// when it names none — the "anything" the typeless clause means (05 E2 K2).</summary>
+    /// when it names none — the "anything" the typeless clause means.</summary>
     private LyrType? ThrownTypeOf(TypeNode? written, SymbolTable scope) =>
         written is null
             ? _error is { } any ? new NamedRef(any) : null
@@ -4870,7 +4865,7 @@ public sealed class TypeChecker
 
     /// <summary>A type's members of one name, its own first, then its visible blocks' — the one
     /// scope 08 §1.2 counts in. Members of several CONFORMANCE blocks are scoped to their
-    /// interfaces (04 D3), not a set to choose from: the lookup refused the unqualified call
+    /// interfaces, not a set to choose from: the lookup refused the unqualified call
     /// already.</summary>
     private List<OverloadCandidate> MemberOverloads(TypeSymbol ts, string member, bool withBlocks)
     {
@@ -4905,7 +4900,7 @@ public sealed class TypeChecker
 
     /// <summary>How many conformance BLOCKS implement a name — blocks, not members: one block that
     /// holds the name at two counts is an overload set (08 §1.2), two blocks that hold it are the
-    /// scoped exception of 04 D3 (05 §3.4).</summary>
+    /// scoped exception (05 §3.4).</summary>
     private int ConformanceBlocksNaming(TypeSymbol ts, string member) =>
         _comp.Extensions.MethodsFor(ts)
             .Where(ext => ext.Symbol.Name == member && ext.InConformanceBlock)
@@ -4989,8 +4984,8 @@ public sealed class TypeChecker
         // named twice.
         if (candidates.Count > 1) candidates = candidates.Distinct().ToArray();
 
-        // The count decides (04 D4), and the declaration rule made the count decisive: two
-        // candidates of one scope never take the same number. Names decide nothing (D5 F7).
+        // The count decides, and the declaration rule made the count decisive: two
+        // candidates of one scope never take the same number. Names decide nothing.
         var count = call.Arguments.Length;
         var fitting = candidates.Where(c => Takes(c.Fn, count)).ToList();
 
@@ -5004,7 +4999,7 @@ public sealed class TypeChecker
             return null;
         }
 
-        // An own member and an extension of one name: 04 D2 makes the pair a declaration error
+        // An own member and an extension of one name: the pair is a declaration error
         // (LYR-SEM0121, where the block is checked), and the call takes the member, saying
         // nothing twice.
         if (fitting.Count > 1 && fitting.Any(f => !f.FromExtension))
@@ -5070,7 +5065,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// <c>same(a, b)</c>: whether two references are one object (design/v5/spec/02 M10).
+    /// <c>same(a, b)</c>: whether two references are one object.
     /// Identity belongs to references — a class, an array, a coroutine — and both sides have
     /// one type. On a value it is an ERROR, not <c>false</c>: a struct has no identity to ask
     /// about, not even a stable address, and an answer would invent one.
@@ -5139,7 +5134,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// <c>Point { v }</c> (02 I3): a trailing block holding one name, after a struct, a class or a
+    /// <c>Point { v }</c>: a trailing block holding one name, after a struct, a class or a
     /// struct variant, is the shorthand initializer it reads as, <c>Point { v = v }</c>. The parser
     /// cannot tell it from <c>run { v }</c> and reads a trailing block; what the callee names
     /// decides here. A type with a trailing block was an error before — its factory, if any, is
@@ -5255,7 +5250,7 @@ public sealed class TypeChecker
     };
 
     /// <summary>
-    /// <c>Point(1, 2)</c> is <c>Point.new(1, 2)</c> (design/v5/spec/08 Y9, 04 D11): a type name
+    /// <c>Point(1, 2)</c> is <c>Point.new(1, 2)</c>: a type name
     /// in call position means the type's factory, and <c>new</c> is an ordinary static
     /// function — there are no constructors, so there is no half-built <c>this</c>, and a
     /// factory may validate, answer an optional, throw, or hand out an object that exists. The
@@ -5342,8 +5337,8 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// <c>.Red</c>: a member of the type this position expects, the type unnamed (design/v5/spec/03
-    /// T9, 08 Y9) — a variant as it stands, the callee of <c>.Num(3)</c>, a static member. The
+    /// <c>.Red</c>: a member of the type this position expects, the type unnamed —
+    /// a variant as it stands, the callee of <c>.Num(3)</c>, a static member. The
     /// expectation comes from the position: an initializer with a written type, an argument, a
     /// return, an assignment, the other side of <c>==</c>. Where none is, the member has no type
     /// to belong to, and the diagnostic says to name it.
@@ -5363,8 +5358,8 @@ public sealed class TypeChecker
         return type;
     }
 
-    /// <summary>The forms that read the type they belong to from their position (Y9).</summary>
-    /// <summary>A side of <c>==</c> that is typed by the other: an implicit member (08 Y9), an
+    /// <summary>The forms that read the type they belong to from their position.</summary>
+    /// <summary>A side of <c>==</c> that is typed by the other: an implicit member, an
     /// array literal — <c>[]</c> fixes no type of its own.</summary>
     private static bool TakesTheOtherSidesType(Expr e) => IsImplicitForm(e) || e is ArrayLitExpr;
 
@@ -5375,7 +5370,7 @@ public sealed class TypeChecker
     {
         var t = CheckExpr(u.Operand, scope);
         if (t.IsError) return LyrType.Error;
-        // An operand that gives no value leaves none to operate on (05 E12): neither does the expression.
+        // An operand that gives no value leaves none to operate on: neither does the expression.
         if (t is NeverType) return LyrType.Never;
         switch (u.Operator)
         {
@@ -5392,7 +5387,7 @@ public sealed class TypeChecker
                 return Report(u.Span, "LYR-SEM0114",
                     "'^n' counts from the end inside '[…]' only — as the index, or as a bound of its range");
             case UnaryOp.Place: // at a place parameter it never reaches here: CheckPlaceArgument takes it
-                if (_metaPending.Count > 0) return t; // a body checked once (M9a S9), its call's receiver no one's yet: the rounds say it
+                if (_metaPending.Count > 0) return t; // a body checked once, its call's receiver no one's yet: the rounds say it
                 return Report(u.Span, "LYR-SEM0157",
                     "'&' hands a place to a place parameter, and this argument's parameter takes a value");
             default: // PreInc and PreDec
@@ -5402,7 +5397,7 @@ public sealed class TypeChecker
         }
     }
 
-    /// <summary><c>-x</c> as <c>x.neg()</c>, <c>~x</c> as <c>x.bitNot()</c> (04 D6): the one
+    /// <summary><c>-x</c> as <c>x.neg()</c>, <c>~x</c> as <c>x.bitNot()</c>: the one
     /// conformance, the call checked through the ordinary member path and recorded as what the
     /// operator means. <c>null</c> where no interface takes part; the caller reports.</summary>
     private LyrType? DesugarUnary(UnaryExpr u, LyrType t, SymbolTable scope, TypeSymbol? iface, string method, string opText)
@@ -5448,8 +5443,8 @@ public sealed class TypeChecker
 
     private LyrType CheckBinary(BinaryExpr b, SymbolTable scope)
     {
-        // 'x == .Red': the implicit member takes the other side's type (08 Y9), and so does an
-        // array literal, 'xs == []' (M8a S14: arrays compare). When the side that needs the type
+        // 'x == .Red': the implicit member takes the other side's type, and so does an
+        // array literal, 'xs == []' (arrays compare). When the side that needs the type
         // is the left one, the right side goes first and lends its type.
         if (b.Operator is BinaryOp.Eq or BinaryOp.Ne && TakesTheOtherSidesType(b.Left) && !TakesTheOtherSidesType(b.Right))
         {
@@ -5479,7 +5474,7 @@ public sealed class TypeChecker
         }
 
         if (l.IsError || r.IsError) return LyrType.Error;
-        // An operand that gives no value fits every type (05 E12): it takes the other one's, so
+        // An operand that gives no value fits every type: it takes the other one's, so
         // 'ok || fail("…")' is a 'bool' and '1 + unreachable()' an 'int'. '??' has its own rule for
         // a right side that gives none.
         if (b.Operator is not BinaryOp.Coalesce)
@@ -5492,8 +5487,8 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// <c>a &lt;&lt; n</c> and <c>a &gt;&gt; n</c> on two integers (03 §1.6 rule 2; the review's
-    /// A9f — Rust and Go have it so): the count is an integer of ANY type, and the result has
+    /// <c>a &lt;&lt; n</c> and <c>a &gt;&gt; n</c> on two integers (03 §1.6 rule 2,
+    /// as in Rust and Go): the count is an integer of ANY type, and the result has
     /// the left operand's. The two sides are not unified as an operator's are. So the left is
     /// what it would be without the shift: a literal is an <c>int</c> here — unified,
     /// <c>1 &lt;&lt; n</c> took the COUNT's type, a <c>uint8</c> that panics at eight — and the
@@ -5528,14 +5523,14 @@ public sealed class TypeChecker
                 return UnifyNumeric(b.Left, l, b.Right, r)
                        ?? DesugarArithmetic(b, l, r, scope, _rem, "rem", "%")
                        ?? BadBinary(b, l, r);
-            // The wrap operators are for integers only (08 Y4): a float knows no wrap (IEEE has
-            // its infinities) and a 'char' is not a number (03 T1e).
+            // The wrap operators are for integers only: a float knows no wrap (IEEE has
+            // its infinities) and a 'char' is not a number.
             case BinaryOp.AddWrap or BinaryOp.SubWrap or BinaryOp.MulWrap:
                 if (TypeFacts.IsInteger(l) && TypeFacts.IsInteger(r))
                     return UnifyNumeric(b.Left, l, b.Right, r) ?? BadBinary(b, l, r);
                 return BadBinary(b, l, r);
             // The bit operators and the shifts: integers natively, a conforming type through its
-            // interface (04 D6) — 'BitAnd<Rhs = Self>', 'Shl<Rhs = int>'.
+            // interface — 'BitAnd<Rhs = Self>', 'Shl<Rhs = int>'.
             case BinaryOp.BitAnd or BinaryOp.BitXor or BinaryOp.BitOr or BinaryOp.Shl or BinaryOp.Shr:
             {
                 if (TypeFacts.IsInteger(l) && TypeFacts.IsInteger(r))
@@ -5561,7 +5556,7 @@ public sealed class TypeChecker
                     return LyrType.Bool;
                 if (TypeFacts.IsChar(l) && TypeFacts.IsChar(r))
                     return LyrType.Bool;
-                // A view and a string, or two views (10 S1): their bytes, in order — std.core's
+                // A view and a string, or two views: their bytes, in order — std.core's
                 // 'compareViews', a string giving a view of itself at the argument.
                 if (ComparesAsViews(l, r))
                 {
@@ -5578,13 +5573,13 @@ public sealed class TypeChecker
                         $"operator '{(b.Operator is BinaryOp.Eq ? "==" : "!=")}' is not applicable to 'void' — a 'void' value holds nothing to compare");
                     return LyrType.Bool;
                 }
-                // '?T == ?T', and 'x == 5' with 'x: ?int' through the coercion (03 O6).
+                // '?T == ?T', and 'x == 5' with 'x: ?int' through the coercion.
                 if (OptionalEquality(l, r) is { } inner)
                 {
                     CheckOptionalEquality(b, inner, scope);
                     return LyrType.Bool;
                 }
-                // A view and a string, or two views (10 S1): equal where they hold the same bytes.
+                // A view and a string, or two views: equal where they hold the same bytes.
                 if (ComparesAsViews(l, r))
                 {
                     DesugarToFreeCall(b, "equalViews", scope, b.Left, b.Right);
@@ -5604,7 +5599,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// Membership (05 §12 rule 10; 04 D6, 10 C12): <c>x in xs</c> is <c>xs.contains(x)</c> through
+    /// Membership (05 §12 rule 10): <c>x in xs</c> is <c>xs.contains(x)</c> through
     /// <c>Contains&lt;T&gt;</c> — a range, an array, a view, a list, a set, a map's keys — and on a
     /// text any <c>Pattern</c>, through the text's own <c>contains</c>; <c>!in</c> is the negation.
     /// The call is checked as written and recorded for the lowering, which evaluates <c>x</c> before
@@ -5658,7 +5653,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>The element an array literal takes where <paramref name="target"/> is expected: the
-    /// <c>T</c> of the <c>FromArrayLiteral&lt;T&gt;</c> it conforms to (10 K4), or <c>null</c> where it
+    /// <c>T</c> of the <c>FromArrayLiteral&lt;T&gt;</c> it conforms to, or <c>null</c> where it
     /// conforms to none — a named type, its instance; an array, a view and an inline array take
     /// their literals themselves.</summary>
     private LyrType? LiteralElement(LyrType target, TypeSymbol fromLiteral)
@@ -5690,7 +5685,7 @@ public sealed class TypeChecker
     /// rather than a diagnostic.</para>
     /// </remarks>
     /// <summary>The instance a conformance question about <paramref name="self"/> asks for: the
-    /// bare interface where <c>Self</c> names the conformer (<c>Equatable</c>, 04 D6), the
+    /// bare interface where <c>Self</c> names the conformer (<c>Equatable</c>), the
     /// instance at the type where the library parametrizes it (<c>Equatable&lt;T&gt;</c> of 4.x).</summary>
     private static LyrType SelfInstance(TypeSymbol iface, LyrType self) =>
         iface.Generics.Length == 0 ? new NamedRef(iface) : new GenericInstance(iface, [self]);
@@ -5699,7 +5694,7 @@ public sealed class TypeChecker
     {
         if (l is NullType || r is NullType) { CheckNullTest(b, l, r); return; }
 
-        // '[] == []': each side takes the other's type, and neither has one (M8a S14).
+        // '[] == []': each side takes the other's type, and neither has one.
         if (b.Left is ArrayLitExpr { Elements.Length: 0 } && b.Right is ArrayLitExpr { Elements.Length: 0 })
         {
             _de.Report("LYR-SEM0060", Severity.Error, b.Span,
@@ -5730,7 +5725,7 @@ public sealed class TypeChecker
         }
 
         // A shape compares through the Equatable its block gives (05 §13 rule 6) — an array or a
-        // view through std.core's, element by element (10 C9; M8a S14); else it has no '=='.
+        // view through std.core's, element by element; else it has no '=='.
         if ((IsShape(l) || l is CoroutineOf) && _equatable is { } shapeEquatable && Satisfies(l, shapeEquatable, SelfInstance(shapeEquatable, l)))
         {
             DesugarToMethodCall(b, "equals", scope);
@@ -5766,11 +5761,11 @@ public sealed class TypeChecker
     /// <c>null</c> pattern against a non-optional scrutinee); this is the expression side of the
     /// same sentence, and it now reaches <c>lyrc check</c> too.</para>
     ///
-    /// <para>A BARE TYPE PARAMETER IS OPAQUE (design/v5/spec/03 T4 O2): no null operation on an
+    /// <para>A BARE TYPE PARAMETER IS OPAQUE: no null operation on an
     /// expression of type <c>T</c> — not <c>== null</c>, not <c>??</c>, not <c>!</c>, not a
     /// <c>null</c> pattern — only on <c>?…</c>. A generic body is checked at its declaration, and
     /// there <c>T</c> is not an optional; that an instantiation may bind it to one changes
-    /// nothing, because a generic <c>?T</c> at <c>T = ?int</c> is <c>??int</c> (O1), and the body
+    /// nothing, because a generic <c>?T</c> at <c>T = ?int</c> is <c>??int</c>, and the body
     /// asks about ITS level. Lyric 4 exempted the type parameter here and in <c>??</c> while
     /// <c>!</c> and the pattern refused it — four ways of asking with two answers.</para>
     /// </summary>
@@ -5852,14 +5847,14 @@ public sealed class TypeChecker
         return type;
     }
 
-    /// <summary>Whether <c>==</c> or an ordering compares the two as views of bytes (10 S1): a
+    /// <summary>Whether <c>==</c> or an ordering compares the two as views of bytes: a
     /// view on one side, a view or a string on the other — two strings keep their own.</summary>
     private static bool ComparesAsViews(LyrType l, LyrType r) =>
         (l is StringViewType || r is StringViewType)
         && l is StringViewType or PrimitiveType { Kind: PrimitiveKind.String }
         && r is StringViewType or PrimitiveType { Kind: PrimitiveKind.String };
 
-    /// <summary>The value type of an equality between optionals (design/v5/spec/03 O6): two
+    /// <summary>The value type of an equality between optionals: two
     /// optionals of one type, or an optional and a value of its type, which coerces up at the
     /// argument. <c>null</c> where this is no such equality.</summary>
     private static LyrType? OptionalEquality(LyrType l, LyrType r) =>
@@ -5869,7 +5864,7 @@ public sealed class TypeChecker
 
     /// <summary>
     /// <c>?T == ?T</c>: both absent, or both present and equal through the value's own equality
-    /// (03 O6) — <c>std.core</c>'s <c>equalOptionals</c> under <c>T :: [Equatable]</c>, which the
+    /// — <c>std.core</c>'s <c>equalOptionals</c> under <c>T :: [Equatable]</c>, which the
     /// scalars satisfy through their conformances in <c>std.core</c>. No ordering on an optional.
     /// </summary>
     private void CheckOptionalEquality(BinaryExpr b, LyrType inner, SymbolTable scope)
@@ -5891,9 +5886,8 @@ public sealed class TypeChecker
     /// an interface value — directly or inside a struct, an enum payload, a tuple, an optional
     /// or an inline array? A string does not count: shared, nobody can tell. What <c>[x] * n</c>
     /// asks before it clones. A type parameter and an associated type count (03 §5.1): an
-    /// instance may make them an object, and a generic body is checked once — counted as none, a
-    /// body repeated natively and the instance over an object refused it as a compiler bug (M8a
-    /// S16: every map over objects, since R9d filled its slots so).</summary>
+    /// instance may make them an object, and a generic body is checked once — counted as none, the
+    /// instance over an object would be refused as a compiler bug.</summary>
     private bool HoldsReference(LyrType type) => type switch
     {
         ArrayOf or SliceOf or FnType or CoroutineOf => true,
@@ -5982,7 +5976,7 @@ public sealed class TypeChecker
         if (TypeFacts.IsString(l) && TypeFacts.IsString(r)) return LyrType.String;      // "a" + "b"
         if (l is ArrayOf la && r is ArrayOf ra && LyrType.Equal(la.Element, ra.Element)) // [..] + [..]
             return new ArrayOf(la.Element);
-        // A view and a view (10 C7; M8c S6): a new array, through the block std.core gives
+        // A view and a view: a new array, through the block std.core gives
         // 'Slice<T>' — a shape's operator, as its '==' is (05 §13 rule 6).
         if (l is SliceOf ls && r is SliceOf rs && LyrType.Equal(ls.Element, rs.Element)
             && _add is { } add && Satisfies(l, add, new GenericInstance(add, [l])))
@@ -5993,13 +5987,13 @@ public sealed class TypeChecker
     private LyrType CheckMul(BinaryExpr b, LyrType l, LyrType r, SymbolTable scope)
     {
         if (UnifyNumeric(b.Left, l, b.Right, r) is { } n) return n;
-        // "x" * 3 (10 C7) is std.core's repetition of a text in Lyric 5, in the one order:
+        // "x" * 3 is std.core's repetition of a text in Lyric 5, in the one order:
         // '3 * "x"' is refused, as 'n * [x]' is. Until N1a the checker took both and the lowering
         // called a helper only the 4.x library has (LYR-ICE0002). The 4.x path keeps its helper.
         if (TypeFacts.IsString(l) && TypeFacts.IsInteger(r))
             return _coreRepeatText ? DesugarToFreeCall(b, "repeatText", scope, b.Left, b.Right) : LyrType.String;
         if (TypeFacts.IsString(r) && TypeFacts.IsInteger(l) && !_coreRepeatText) return LyrType.String;
-        // '[x] * n' repeats (10 C7); 'n * [x]' does not — one order, as for a string.
+        // '[x] * n' repeats; 'n * [x]' does not — one order, as for a string.
         if (l is ArrayOf la && TypeFacts.IsInteger(r))
         {
             // An element that is or holds an object is CLONED into every slot (03 §5.1), never
@@ -6129,7 +6123,7 @@ public sealed class TypeChecker
                     if (!ReferenceEquals(it, iface) || it.Generics.Length is not (1 or 2)) continue;
                     if (!subst.TryGetValue(it.Generics[0], out var operand)) continue;
                     if (it.Members.LookupLocal(method) is not FunctionSymbol member) continue;
-                    // 'Self' in the constraint is the parameter (03 T5); the 5 shape's 'Out'
+                    // 'Self' in the constraint is the parameter; the 5 shape's 'Out'
                     // stays 'T.Out' until the constraint fixes it ('Add<Out = T>').
                     var withSelf = WithSelf(subst, it, receiver);
                     var signature = Substitute(FnTypeOf(member), withSelf);
@@ -6147,7 +6141,7 @@ public sealed class TypeChecker
         foreach (var (instance, site) in ConformancesTo(ts, iface, ofInstance))
         {
             // Two shapes: 'Add<T, R>' of the 4.x library, and 'Add<Rhs = Self>' with its 'Out'
-            // answer (04 D6) — the one argument is the operand either way. Another shape is a
+            // answer — the one argument is the operand either way. Another shape is a
             // stdlib mismatch, not a program error; it matches nothing.
             if (instance is not GenericInstance { Arguments.Length: 1 or 2 } inst) continue;
             var operandType = Substitute(inst.Arguments[0], SelfMap(iface, receiver));
@@ -6287,7 +6281,7 @@ public sealed class TypeChecker
         // LYR-SEM0005 all along; this is the same rule and now the same code, in the phase that
         // knows the types. 'lyrc check' sees it too, which it did not before.
         //
-        // A bare type parameter is opaque, as CheckNullTest says (03 T4 O2): '??' is asked of a
+        // A bare type parameter is opaque, as CheckNullTest says: '??' is asked of a
         // '?T', never of a 'T' that an instantiation might happen to make optional.
         if (l is not ErrorType)
             _de.Report("LYR-SEM0005", Severity.Error, b.Span,
@@ -6302,16 +6296,15 @@ public sealed class TypeChecker
     private LyrType CheckAssign(AssignExpr a, SymbolTable scope)
     {
         CheckExpr(a.Target, scope); // binds RefOf
-        // A string's characters are read and not written (10 S1): the string is immutable, and a
+        // A string's characters are read and not written: the string is immutable, and a
         // view of it reads.
         if (a.Target is IndexExpr { Index: not SliceRangeExpr } ofText
             && _result.TypeOf(ofText.Target) is StringViewType or PrimitiveType { Kind: PrimitiveKind.String })
             return Report(a.Span, "LYR-SEM0019",
                 $"'{TypeFacts.Display(_result.TypeOf(ofText.Target)!)}' is read by index and not written — "
                 + "a string is immutable, and a view of it reads");
-        // 'x[k] = v' on a type's own index writes 'x.setIndex(k, v)' (04 D6), and a compound
-        // 'x[k] op= v' reads and writes it with 'x' and 'k' evaluated ONCE (02 M8a-1, the
-        // review's decision), as on an array's element: the lowering holds the two, and what is
+        // 'x[k] = v' on a type's own index writes 'x.setIndex(k, v)', and a compound
+        // 'x[k] op= v' reads and writes it with 'x' and 'k' evaluated ONCE, as on an array's element: the lowering holds the two, and what is
         // stored here is the write — its value argument the operation, a node of its own.
         if (a.Target is IndexExpr { Index: not SliceRangeExpr } written && _coreIndex is { } readIndex
             && _result.TypeOf(written.Target) is var holder && IndexesThrough(holder, readIndex))
@@ -6485,14 +6478,14 @@ public sealed class TypeChecker
     {
         var lo = CheckExpr(r.Low, scope);
         var hi = CheckExpr(r.High, scope);
-        // Two characters bound a range of characters (03 S15b, M8c S3): 'c in 'a'..='z'', and
+        // Two characters bound a range of characters: 'c in 'a'..='z'', and
         // walked it gives the scalar values between, the surrogates passed over (std.core).
         var chars = TypeFacts.IsChar(lo) && TypeFacts.IsChar(hi);
         var elem = chars ? lo : UnifyNumeric(r.Low, lo, r.High, hi);
         if (elem is null && !lo.IsError && !hi.IsError)
             _de.Report("LYR-SEM0003", Severity.Error, r.Span, $"range bounds must be matching numerics or two characters, got '{TypeFacts.Display(lo)}' and '{TypeFacts.Display(hi)}'");
 
-        // In a 'for' head the range is the counted loop and no value (03 T13 A3); everywhere
+        // In a 'for' head the range is the counted loop and no value; everywhere
         // else 'a..b' is a 'Range<T>' and 'a..=b' a 'RangeInclusive<T>' of std.core, holding its
         // bounds. Lyric 4 refused the value. A range of characters is the value in a head too: its
         // walk passes over the surrogates, which a counted loop would count.
@@ -6522,14 +6515,14 @@ public sealed class TypeChecker
     private readonly Dictionary<TypeTestExpr, LyrType> _typeTests = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
-    /// <c>x is T</c> (03 T11): the operand is an interface value — on anything else the static
+    /// <c>x is T</c>: the operand is an interface value — on anything else the static
     /// type answers already (<c>LYR-SEM0131</c>) — and <c>T</c> a struct, class, enum, built-in
-    /// type (Lyric 5) or an interface a value can have. A type parameter is no test (O2): dynamic
+    /// type (Lyric 5) or an interface a value can have. A type parameter is no test: dynamic
     /// typing takes <c>Any</c>.
     /// </summary>
     private LyrType CheckTypeTest(TypeTestExpr t, SymbolTable scope)
     {
-        // 'e is v' (M9a S10): is 'e' the variant the round names? In the body checked once, nothing yet.
+        // 'e is v': is 'e' the variant the round names? In the body checked once, nothing yet.
         if (t.Type is NamedType { Path: [var variantName], TypeArguments.Length: 0 } && scope.Lookup(variantName) is LocalSymbol roundVariable
             && (_result.KnownVariantOf(roundVariable) is not null || _metaPendingEver.Contains(roundVariable)))
         {
@@ -6587,7 +6580,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>What a value behind an interface can be: a struct, a class, an enum, a built-in
-    /// type in Lyric 5, or an interface that is a value type itself (04 D9).</summary>
+    /// type in Lyric 5, or an interface that is a value type itself.</summary>
     private bool CheckTestTarget(LyrType target, Span span)
     {
         // an interface asked about: the conformances blocks give it are recorded for every type a
@@ -6612,7 +6605,7 @@ public sealed class TypeChecker
             case NamedRef { Symbol.Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }
                 or GenericInstance { Definition.Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }:
                 return true;
-            // A built-in's value lies behind an interface in a box of its own (M8c S8b), whose
+            // A built-in's value lies behind an interface in a box of its own, whose
             // descriptor names the type: the test is exact — an 'int8' is no 'int', nothing widens
             // (05 §9 rule 3), and an alias is the type it names.
             case var builtin when _comp.Lyric5Modules && BoxesAsBuiltin(builtin):
@@ -6631,10 +6624,10 @@ public sealed class TypeChecker
         var target = ResolveType(c.Type, scope);
         if (op.IsError || target.IsError) return target;
 
-        // 'as' between numbers always succeeds and is bit-near (03 T1d): a narrowing wraps, a
+        // 'as' between numbers always succeeds and is bit-near: a narrowing wraps, a
         // float to an integer saturates and NaN gives 0, an integer to a float rounds. A 'char'
         // meets only 'uint32' — outward freely, inward with a check of the scalar value at
-        // runtime — and 'bool' meets no number at all: neither is a number (T1e), and a cast
+        // runtime — and 'bool' meets no number at all: neither is a number, and a cast
         // that made one would be the arithmetic the type exists to refuse.
         if (TypeFacts.IsNumeric(op) && TypeFacts.IsNumeric(target)) return target;
         if (TypeFacts.IsChar(op) != TypeFacts.IsChar(target)
@@ -6680,8 +6673,8 @@ public sealed class TypeChecker
             return target;
         }
 
-        // 'as' through 'Into' is 4.x's. Lyric 5's 'as' converts numbers only (04 D6, 03 §1.4); its
-        // std.core has an 'Into' too since M8c S7, and the desugar found it.
+        // 'as' through 'Into' is 4.x's. Lyric 5's 'as' converts numbers only (03 §1.4); its
+        // std.core has an 'Into' too, and the desugar would find it.
         if (_coreFormat is not null)
             return Report(c.Span, "LYR-SEM0006",
                 $"cannot cast '{TypeFacts.Display(op)}' to '{TypeFacts.Display(target)}' — 'as' converts numbers only; "
@@ -6717,7 +6710,7 @@ public sealed class TypeChecker
     /// not conform stays the error it was, with the conformance named instead of the converter.</para>
     /// </summary>
     private CallExpr? DisplayPiece(InterpHole hole, LyrType type, Func<Expr> output) =>
-        // Through 'showTo' into the builder (10 S6): no string of its own.
+        // Through 'showTo' into the builder: no string of its own.
         RendersInAHole(hole, type) ? Piece("fstringShown", hole.Span, output(), hole.Expr) : null;
 
     /// <summary>Whether a value that is no scalar renders in a hole — through <c>Display</c>, and
@@ -6749,7 +6742,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// A hole with a format (08 Y7, 10 S7; spec 12 §2): the spec read and checked against what the
+    /// A hole with a format (spec 12 §2): the spec read and checked against what the
     /// value is (<c>LYR-SEM0164</c>), then the hole IS a call of std.core's, written by the compiler
     /// as an operator's helper is — <c>formatted</c> for a <c>Format</c> type (the scalars, checked
     /// here; another type reads its own specs), <c>padded</c> for another <c>Display</c> type,
@@ -6774,7 +6767,7 @@ public sealed class TypeChecker
             misfit = spec.MisfitForPadding("'?'");
         }
         else if (type is not PrimitiveType && RendersThrough(type, format))
-            helper = "fstringFormatted"; // formats of its own: the type reads the spec as written (10 S7)
+            helper = "fstringFormatted"; // formats of its own: the type reads the spec as written
         else if (spec is null)
         {
             _de.Report("LYR-SEM0164", Severity.Error, hole.Span, $"':{text}' is no format: {malformed}");
@@ -6812,7 +6805,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// An f-string (08 Y7; 10 S6, M8a S13): one builder for the whole text, sized for it, each piece
+    /// An f-string: one builder for the whole text, sized for it, each piece
     /// appended in order, the text taken — no string per piece and no chain of concatenations. The
     /// pieces are calls of std.core's <c>fstring…</c> helpers, written by the compiler and checked
     /// as written — a scalar through its own writer (its <c>show()</c> is an f-string itself, so
@@ -6845,7 +6838,7 @@ public sealed class TypeChecker
         var builder = new LocalSymbol("$fstring", builderType, true, fs);
         var inner = new SymbolTable(scope);
         inner.TryDeclare(builder);
-        // The builder by its reference (10 S13): a class, written through it; no '&'.
+        // The builder by its reference: a class, written through it; no '&'.
         Expr Output() => new IdentifierExpr("$fstring", span);
 
         var pieces = new List<CallExpr>();
@@ -6958,12 +6951,11 @@ public sealed class TypeChecker
     {
         var target = CheckExpr(ix.Target, scope);
 
-        // 'xs[a..b]' takes a view (03 T13 A2): a Slice<T> of an array or of a view, sharing the
+        // 'xs[a..b]' takes a view: a Slice<T> of an array or of a view, sharing the
         // elements. The bounds are indices, '^n' among them, either left open.
         if (ix.Index is SliceRangeExpr range)
         {
-            // A type that gives a view of itself (std.core's AsSlice<T>; design 03 "Review
-            // 2026-10-09" S6, M8c S18): the range of its view — 'list[a..b]' is
+            // A type that gives a view of itself (std.core's AsSlice<T>): the range of its view — 'list[a..b]' is
             // 'list.asSlice()[a..b]', its bounds checked against the view, which has the length.
             if (_coreAsSlice is { } asSlice && IndexesThrough(target, asSlice))
             {
@@ -6982,7 +6974,7 @@ public sealed class TypeChecker
                 ArrayOf a => new SliceOf(a.Element),
                 SliceOf s => s,
                 InlineArrayOf ia => ViewOfInline(ix.Target, ia, ix.Span),
-                // A string's bytes and a view's (10 S1): a view, no copy, on character boundaries.
+                // A string's bytes and a view's: a view, no copy, on character boundaries.
                 StringViewType or PrimitiveType { Kind: PrimitiveKind.String } => LyrType.StringView,
                 ErrorType => LyrType.Error,
                 _ => Report(ix.Span, "LYR-SEM0007",
@@ -6991,7 +6983,7 @@ public sealed class TypeChecker
             };
         }
 
-        // A string's index is the character that begins at the byte (10 S1): built in as an
+        // A string's index is the character that begins at the byte: built in as an
         // array's is — std.core's 'charAtByte' on a view, the index checked there, in range and
         // on a character's first byte.
         if (target is StringViewType or PrimitiveType { Kind: PrimitiveKind.String })
@@ -7004,7 +6996,7 @@ public sealed class TypeChecker
             return DesugarToFreeCall(ix, "charAtByte", scope, ix.Target, ix.Index);
         }
 
-        // A type's own index (04 D6): 'x[k]' reads 'x.index(k)' through Index<K>.
+        // A type's own index: 'x[k]' reads 'x.index(k)' through Index<K>.
         if (_coreIndex is { } index && IndexesThrough(target, index))
             return DesugarIndex(ix, ix, "index", [ix.Index], scope);
 
@@ -7027,8 +7019,8 @@ public sealed class TypeChecker
         };
     }
 
-    /// <summary>Whether a value of the type is indexed through <paramref name="iface"/> of std.core
-    /// (04 D6): its own list or a block conforms, or a constraint of a type parameter does. An
+    /// <summary>Whether a value of the type is indexed through <paramref name="iface"/> of std.core:
+    /// its own list or a block conforms, or a constraint of a type parameter does. An
     /// array's, a view's and an inline array's index is built in.</summary>
     private bool IndexesThrough(LyrType target, TypeSymbol iface) => target switch
     {
@@ -7052,14 +7044,14 @@ public sealed class TypeChecker
     }
 
     /// <summary>Why a value of the type is not written through its index, or <c>null</c> where
-    /// it is: it conforms to <c>Index</c> and not to <c>IndexSet</c> (04 D6).</summary>
+    /// it is: it conforms to <c>Index</c> and not to <c>IndexSet</c>.</summary>
     private string? NotWrittenByIndex(LyrType holder) =>
         _coreIndexSet is { } writeIndex && IndexesThrough(holder, writeIndex)
             ? null
             : $"'{TypeFacts.Display(holder)}' is read by index and not written — it conforms to 'Index', not to 'IndexSet'";
 
     /// <summary>
-    /// <c>x[k]++</c> and <c>x[k]--</c> on a type's own index (02 M8a-1): the read is the
+    /// <c>x[k]++</c> and <c>x[k]--</c> on a type's own index: the read is the
     /// <c>x.index(k)</c> the operand already is, the write <c>x.setIndex(k, …)</c> — stored on
     /// the operator's node, the operand standing where the new value goes; the lowering
     /// evaluates <c>x</c> and <c>k</c> once for the two. False where the type is not written
@@ -7081,9 +7073,9 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// The index is an <c>int</c> (03 T14 N4): a narrower integer widens to it as at any
+    /// The index is an <c>int</c>: a narrower integer widens to it as at any
     /// coercion site, a <c>uint</c> or a <c>uint64</c> is converted with <c>as</c>, nothing else
-    /// stands there. <c>^n</c> counts from the end (N6): sugar for <c>length() - n</c> of the
+    /// stands there. <c>^n</c> counts from the end: sugar for <c>length() - n</c> of the
     /// indexed value, so it stands inside <c>[…]</c> only and on a value that has a length.
     /// </summary>
     private void CheckIndexValue(Expr index, LyrType target, SymbolTable scope)
@@ -7110,7 +7102,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// A view of an inline array is taken where the array is HEAP-RESIDENT (03 T13 A4): a field
+    /// A view of an inline array is taken where the array is HEAP-RESIDENT: a field
     /// of an object, an element of an array or of a view, or inside a struct that is — reached
     /// through a reference somewhere on the way. A view of a local, a parameter or a field of a
     /// struct local would point into a frame that may end before the view does; that array is
@@ -7141,10 +7133,10 @@ public sealed class TypeChecker
 
     private LyrType CheckArrayLit(ArrayLitExpr arr, SymbolTable scope, LyrType? expected)
     {
-        // A literal where a 'FromArrayLiteral<T>' is expected (10 K4; M8c S6b): the elements check
+        // A literal where a 'FromArrayLiteral<T>' is expected: the elements check
         // against T, and the literal is that type's 'fromLiteral' of them — 'let s: Set<int> = [1, 2]',
         // 'let m: Map<string, int> = [("a", 1)]'. The empty one too: the type gives its element.
-        // Through '?' as every coercion (03 T3): with '?Set<int>' expected the literal is the set,
+        // Through '?' as every coercion: with '?Set<int>' expected the literal is the set,
         // and the place wraps it.
         var literalTarget = expected is Optional { Inner: var inner } ? inner : expected;
         if (literalTarget is not null && _fromArrayLiteral is { } fromLiteral && LiteralElement(literalTarget, fromLiteral) is { } into)
@@ -7155,7 +7147,7 @@ public sealed class TypeChecker
             return literalTarget;
         }
 
-        // '[a, b, c]' where a 'T[3]' is expected builds the inline array (03 T13 A4; 10 C7): the
+        // '[a, b, c]' where a 'T[3]' is expected builds the inline array: the
         // literal has exactly the length the type says, or it is refused.
         if (expected is InlineArrayOf inline)
         {
@@ -7167,7 +7159,7 @@ public sealed class TypeChecker
             return inline;
         }
 
-        // A view's element type too (03 S3, M8c S3): 'take([1, 2])' with 'take(s: Slice<uint8>)'
+        // A view's element type too: 'take([1, 2])' with 'take(s: Slice<uint8>)'
         // checks the elements against 'uint8' as 'let a: uint8[] = [1, 2]' does; the array the
         // literal builds then stands for the view at the site (§5.2 rule 4).
         var elemExpected = expected switch { ArrayOf ea => ea.Element, SliceOf sv => sv.Element, _ => null };
@@ -7212,12 +7204,12 @@ public sealed class TypeChecker
     {
         // The two calls that are not calls of what their callee names: identity, which the
         // compiler answers itself, and a type name, which means its factory.
-        // A bare callee is looked up past a field that cannot be called (the review's M6-30):
+        // A bare callee is looked up past a field that cannot be called:
         // 'label()' beside a field 'label: string' means the function outside. The arguments
         // stay in the call's own scope.
-        // a callee a 'quote' wrote (13 M9b P5) is found in the macro's module; the arguments stay here
+        // a callee a 'quote' wrote is found in the macro's module; the arguments stay here
         var calleeScope = call.Callee is IdentifierExpr { QuotedFrom: { } from } && HomeScope(from) is { } home ? home : scope;
-        // a macro is never called as a function (13 M9b P3): its site is written with the '!'
+        // a macro is never called as a function: its site is written with the '!'
         if (call.Callee is IdentifierExpr macroName && MacroNamed(macroName.Name, scope) is { } macro)
         {
             foreach (var leftover in call.Arguments) CheckOrphanArgument(leftover, scope);
@@ -7266,9 +7258,9 @@ public sealed class TypeChecker
                 + $"parameter the interface bounds, 'T.{staticQualified.Member}(…)'");
         }
 
-        // 'Walker.describe(x)' (04 D2 R5): the interface's member, called with its receiver as
+        // 'Walker.describe(x)': the interface's member, called with its receiver as
         // the first argument — the qualified form that reaches an implementation the unqualified
-        // call cannot name (D3). Checked as the method call it stands for, on a receiver that
+        // call cannot name. Checked as the method call it stands for, on a receiver that
         // conforms, with the member settled here rather than looked up on the receiver's type.
         if (call.Callee is MemberExpr { IsOptional: false } qualified
             && InterfaceNamed(qualified.Target, scope) is { } named
@@ -7366,23 +7358,23 @@ public sealed class TypeChecker
 
         var fsym = TargetSymbol(call.Callee) as FunctionSymbol;
         var decl = fsym?.Declaration as FunctionDecl;
-        // In parameter order, a named argument where its name says (04 D5); a hole is a parameter
+        // In parameter order, a named argument where its name says; a hole is a parameter
         // the call leaves to its default.
         var args = ArrangeArguments(call, decl);
         _callees.Add(call.Callee);
         if (_currentModule is { } asker && IsMetaQuery(fsym)) _result.SetMetaFrom(call, asker);
         if (IsMetaQuery(fsym) && fsym!.Name is "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute") _metaAttributeCalls.Add(call);
-        // 'typeAttribute<Alias, A>()' (R4; the sweep after M10, W6): the alias's own attributes, not
+        // 'typeAttribute<Alias, A>()': the alias's own attributes, not
         // its target's — the written name is kept, since the type argument resolves through the alias
         if (IsMetaQuery(fsym) && fsym!.Name == "typeAttribute" && call.TypeArguments is [NamedType aliasName, ..]
             && (_binding.Resolve(aliasName) ?? ResolveTypePath(aliasName.Path, scope, aliasName.Span))
                 is TypeSymbol { Kind: TypeSymbolKind.Alias, Declaration: TypeAliasDecl aliasDecl })
             _result.SetAliasAsked(call, aliasDecl);
-        // a question about Self in a default of an interface marked @SeesConformer (W10), checked
+        // a question about Self in a default of an interface marked @SeesConformer, checked
         // once for every conformer: the lowering asks with the conformer's module
         if (IsMetaQuery(fsym) && _metaIface is { } owner && call.TypeArguments is [NamedType { Path: ["Self"] }, ..] && SeesConformer(owner))
             _result.MarkMetaFromConformer(call);
-        // An 'inline fn' (08 F6) sets the lambda literals at its function parameters in place:
+        // An 'inline fn' sets the lambda literals at its function parameters in place:
         // marked before phase C checks them, so their 'return' is the enclosing function's
         if (decl is { IsInline: true })
             for (var i = 0; i < args.Length && i < fn.Parameters.Length; i++)
@@ -7397,7 +7389,7 @@ public sealed class TypeChecker
         // Only when the parameter is CONCRETE. In 'fn f<T>(o: Opt<T>)' the parameter still holds the
         // type parameter, and offering 'Opt<T>' as the expected type would fix the instance to
         // something the inference is supposed to determine from this very argument.
-        // An OPEN RECEIVER (03 T8, the review's M8a-2): 'Cell.of(3)', 'Opt.Some(7)', 'Map.new()' —
+        // An OPEN RECEIVER: 'Cell.of(3)', 'Opt.Some(7)', 'Map.new()' —
         // a generic type named without its arguments. Its parameters are bound here with the
         // call's own, and FIRST by the type the position expects, as an initializer's are: in
         // 'let a: Atomic<?int> = Atomic.new(1);' the '1' is checked as a '?int'. The receiver's
@@ -7466,7 +7458,7 @@ public sealed class TypeChecker
                         $"generic function '{fsym.Name}' expects {fsym.Generics.Length} type "
                         + $"argument(s), got {written.Length}");
 
-                // A placeholder ('collect<_, int>(xs)', 03 T8) is not bound here: it is the one
+                // A placeholder ('collect<_, int>(xs)') is not bound here: it is the one
                 // position the inference below is asked to fill, the way it fills every argument
                 // of a call written without any. The constraints of a list with a placeholder are
                 // checked once the list is complete, with the inferred ones.
@@ -7495,7 +7487,7 @@ public sealed class TypeChecker
             for (var i = 0; i < n; i++)
                 if (i != variadicAt && args[i] is { } given && given is not LambdaExpr && !asTarget[i]) UnifyInfer(fn.Parameters[i], argTypes[i]!, map, given.Span);
             // The variadic tail (08 §1.1 rule 1) binds through its element, one argument at a time —
-            // an array too, which is one element (the review's A2) — or through the array itself
+            // an array too, which is one element — or through the array itself
             // where the call spreads one over it, 'count(xs...)'.
             if (variadicAt >= 0 && variadicAt < fn.Parameters.Length && fn.Parameters[variadicAt] is ArrayOf tail)
                 for (var i = variadicAt; i < args.Length; i++)
@@ -7522,7 +7514,7 @@ public sealed class TypeChecker
         }
         if (map is not null)
         {
-            // The position's expected type binds what the arguments left open (03 T8: an
+            // The position's expected type binds what the arguments left open (an
             // assignment, an argument, a return, a field): 'let xs: int[] = empty();'. After the
             // arguments, never over them — 'UnifyInfer' adds and does not overwrite — so a
             // mismatch stays what it is, the assignment's, and is reported there.
@@ -7546,7 +7538,7 @@ public sealed class TypeChecker
             // Not reported when an argument was already faulty: the cause is reported then, and a
             // second line about a type argument would be follow-up noise. Nor where the type the
             // position expects is the one already said ('let xs: List<Equatable> = List.new()',
-            // LYR-SEM0126 at the type; M8c S18): it would have determined the argument.
+            // LYR-SEM0126 at the type): it would have determined the argument.
             var faulty = argTypes.Any(t => t is not null && ContainsError(t)) || expected is { IsError: true };
             if (!faulty && fsym is not null && _pendingRounds == 0)
                 foreach (var generic in fsym.Generics)
@@ -7597,14 +7589,14 @@ public sealed class TypeChecker
 
         CheckCallArgs(call, substituted, args, argTypes, decl);
 
-        // What this call may throw, in its instance's terms (05 E2 K5): the exception analysis
+        // What this call may throw, in its instance's terms: the exception analysis
         // asks whether it is marked and covered. 'task.await()' throws what the task's type says
         // and, as every wait, 'Cancelled' (10 §2) — the handle's error is a thing of its type.
         var thrownHere = AwaitedTask(call) is { } awaited && CancelledType is { } stopped
             ? ThrownAfter(awaited.Throws is { } failure ? [failure, stopped] : [stopped])
             : substituted.Throws;
-        // 'close()' of an Iterator that is Closeable throws what its Error allows (the review's
-        // M8a-4): the rule at the declaration (LYR-SEM0174) holds every such type to it, so a
+        // 'close()' of an Iterator that is Closeable throws what its Error allows:
+        // the rule at the declaration (LYR-SEM0174) holds every such type to it, so a
         // generic body that closes the iterator it holds needs no clause for 'Error'.
         if (fsym is not null && _closeable is not null && _coreIterator is not null && fsym.Name == "close"
             && ReferenceEquals(_closeable.Members.LookupLocal("close"), fsym)
@@ -7665,7 +7657,7 @@ public sealed class TypeChecker
         if (i < fixedCount && i < fn.Parameters.Length) return fn.Parameters[i];
         // The variadic position expects the ELEMENT — that is what names an enum variant's
         // instance in 'f(Opt.Some(1))', and what makes an array literal there one element, an
-        // array (the review's A2: the call says which, not the argument's shape). A spread
+        // array (the call says which, not the argument's shape). A spread
         // argument is the parameter's array.
         if (variadic && fn.Parameters[^1] is ArrayOf elem) return spread ? elem : elem.Element;
         return null;
@@ -7701,7 +7693,7 @@ public sealed class TypeChecker
                 hidden is { } note ? [note] : []);
         }
 
-        // 'f(xs...)' (08 §1.1 rule 1; the review's A2): the argument is the REST — one, at a
+        // 'f(xs...)' (08 §1.1 rule 1): the argument is the REST — one, at a
         // variadic parameter, alone there, and that parameter's array. Said once where it is
         // not, on the dots; a spread argument that does not fit is then checked as nothing.
         var spreads = call.Spreads ?? [];
@@ -7752,7 +7744,7 @@ public sealed class TypeChecker
                     continue;
                 }
                 // One argument is one element. An array of the parameter's own type was handed
-                // on as the rest until the review (A2) — who writes that now is told what does it.
+                // on as the rest — who writes that is told what does it.
                 if (argTypes[i] is { IsError: false } handed && LyrType.Equal(handed, fn.Parameters[^1])
                     && !IsAssignable(a, handed, elem.Element))
                 {
@@ -7772,9 +7764,9 @@ public sealed class TypeChecker
         : call.Callee is IdentifierExpr { Name: var name } ? $"'{name}', a function value," : "a function value";
 
     /// <summary>
-    /// The arguments of a call in PARAMETER order (design/v5/spec/04 D5): the positional ones
+    /// The arguments of a call in PARAMETER order: the positional ones
     /// first, in their order, then each named one where its name says. A name decides nothing
-    /// about WHICH function is called — the count does (D4) — and names every parameter but a
+    /// about WHICH function is called — the count does — and names every parameter but a
     /// <c>params</c> tail; a positional argument after a named one, a name given twice or for a
     /// parameter already set, and a name no parameter has are refused (<c>LYR-SEM0119</c>). The
     /// arrangement is recorded for the lowering, which materializes a hole from its default.
@@ -7902,7 +7894,7 @@ public sealed class TypeChecker
         //
         // An unresolvable import gives an error type and falls through: InstanceMemberOf has no case
         // for it and the IsError check below returns without a second diagnostic.
-        // 'Self.A' in a default set in place for a conformer (M9a S10): the conformer's static,
+        // 'Self.A' in a default set in place for a conformer: the conformer's static,
         // not the type parameter's constraint
         if (targetType is NonValueType { Symbol: GenericParamSymbol selfParam } && _selfAs is { } boundSelf && ReferenceEquals(boundSelf.Param, selfParam))
             targetType = boundSelf.Type switch
@@ -7916,8 +7908,7 @@ public sealed class TypeChecker
             case NonValueType { Symbol: TypeSymbol ts } named:
             {
                 var namedInstance = named.Instance ?? ExpectedInstance(expected, ts);
-                // A generic type named without its arguments and CALLED through (03 T8, the
-                // review's M8a-2): the call binds them, so the member is typed in the parameters
+                // A generic type named without its arguments and CALLED through: the call binds them, so the member is typed in the parameters
                 // still open and the receiver is remembered for it.
                 if (namedInstance is null && ts.Generics.Length > 0 && _calleePosition.Contains(mem)
                     && OpenMember(ts, mem.Member, mem.Span) is { } openMember)
@@ -7941,25 +7932,25 @@ public sealed class TypeChecker
                         qualifiedGeneric);
                 return BindMember(mem, moduleMember);
 
-            // 'T.parse(s)': a static member through the constraint (03 T5).
+            // 'T.parse(s)': a static member through the constraint.
             case NonValueType { Symbol: GenericParamSymbol gp }:
                 return BindMember(mem, StaticMemberOfTypeParam(gp, mem.Member, mem.Span));
         }
 
         var baseType = mem.IsOptional && targetType is Optional opt ? opt.Inner : targetType;
 
-        // 'length()' on T[] is built in rather than a library method (03 T13 A1: the length and
-        // the index are the primitives), and it is a CALL, with parentheses like every length
-        // (10 N8). Without them the name is refused rather than read as a field: the two forms
+        // 'length()' on T[] is built in rather than a library method (the length and
+        // the index are the primitives), and it is a CALL, with parentheses like every length.
+        // Without them the name is refused rather than read as a field: the two forms
         // would otherwise mean one thing, and 'xs.length' read like a field of the array.
-        // An element of a tuple, by position or by the label its type gives it (03 T16).
+        // An element of a tuple, by position or by the label its type gives it.
         if (baseType is TupleOf tuple)
         {
             var at = tuple.Labels is { } labels ? Array.IndexOf(labels, mem.Member) : -1;
             if (at < 0 && int.TryParse(mem.Member, out var position) && mem.Member.All(char.IsAsciiDigit)) at = position;
             if (at < 0 || at >= tuple.Elements.Length)
             {
-                // A member a block on the tuple shape adds (03 T7 X2) comes before the refusal.
+                // A member a block on the tuple shape adds comes before the refusal.
                 if (at < 0 && ConstructorMember(baseType, mem, mem.Span) is { } added)
                     return mem.IsOptional ? Optionalized(added) : added;
                 return Report(mem.MemberSpan, "LYR-SEM0012",
@@ -7975,9 +7966,9 @@ public sealed class TypeChecker
             return Report(mem.MemberSpan, "LYR-SEM0012", "'length' is called: write 'length()'");
         }
 
-        // A coroutine's members are built in (06 N2): 'next()' pulls — '?Y', the value it yielded
+        // A coroutine's members are built in: 'next()' pulls — '?Y', the value it yielded
         // or null once the body ended; 'bool' for a coroutine that yields nothing — and a yielded
-        // null of a 'Coroutine<?T>' is told apart from the end, '??T' (03 T4 O1); 'result()' is
+        // null of a 'Coroutine<?T>' is told apart from the end, '??T'; 'result()' is
         // what the body returned, '?R', null until it ended; 'isDone()' asks without pulling.
         if (baseType is CoroutineOf co && mem.Member == "next")
         {
@@ -7998,16 +7989,16 @@ public sealed class TypeChecker
         }
         if (baseType is CoroutineOf && mem.Member == "isDone")
             return new FnType([], LyrType.Bool);
-        // 'close()' unwinds a suspended coroutine (06 A5): its yield throws 'Cancelled', its
+        // 'close()' unwinds a suspended coroutine: its yield throws 'Cancelled', its
         // defers run. What escapes the body besides that comes out here — the coroutine's own set,
-        // so 'close()' throws what a pull throws, smaller than Closeable's 'Error' (05 K6).
+        // so 'close()' throws what a pull throws, smaller than Closeable's 'Error'.
         if (baseType is CoroutineOf closing && mem.Member == "close" && _cancelled is not null)
         {
             if (closing.Throws is { } thrown) _result.MarkThrowingPull(mem, thrown);
             return new FnType([], LyrType.Void);
         }
 
-        // What a clause's binding tells of its record (06 §4, 05 E6 O3; the review's M5-3), where
+        // What a clause's binding tells of its record (06 §4), where
         // its type has no member of the name — asked muted first: built in, as a coroutine's
         // 'next()' is.
         if (mem.Member is "suppressed" or "backtrace" && AskedBinding(mem) is { } held)
@@ -8019,7 +8010,7 @@ public sealed class TypeChecker
         if (InstanceMemberOf(baseType, mem, mem.Span) is { } mt)
             return mem.IsOptional ? Optionalized(mt) : mt;
         // A coroutine's members beside its built-in ones come from the blanket blocks its
-        // conformances admit — 'iter()' of every iterator (10 B6 I7).
+        // conformances admit — 'iter()' of every iterator.
         if (baseType is CoroutineOf && BlanketMember(baseType, mem.Member, mem.Span) is { } blanket)
             return BindMember(mem, blanket);
         if (targetType.IsError) return LyrType.Error;
@@ -8028,7 +8019,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>The clause binding this member is asked of, in its clause and not in a lambda there
-    /// (06 §4, M5-3) — null for any other receiver, and without std.core's two types.</summary>
+    /// (06 §4) — null for any other receiver, and without std.core's two types.</summary>
     private LocalSymbol? AskedBinding(MemberExpr mem) =>
         mem.Target is IdentifierExpr && _result.RefOf(mem.Target) is LocalSymbol held && _askable.Contains(held)
         && _error is not null && _backtrace is not null
@@ -8036,7 +8027,7 @@ public sealed class TypeChecker
             : null;
 
     /// <summary>
-    /// <c>e.suppressed()</c> and <c>e.backtrace()</c> on a clause's binding (06 §4, M5-3): the record
+    /// <c>e.suppressed()</c> and <c>e.backtrace()</c> on a clause's binding (06 §4): the record
     /// lives as long as the clause, so the binding itself answers, and a value stored elsewhere
     /// does not. <c>Error[]</c>, in the order the errors were suppressed; <c>?Backtrace</c>, null
     /// where the profile kept no trace.
@@ -8050,7 +8041,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>The sentence a refusal of <c>suppressed</c> or <c>backtrace</c> on an error adds: the
-    /// two are the binding's, not the value's (M5-3).</summary>
+    /// two are the binding's, not the value's.</summary>
     private string RecordNote(string member, TypeSymbol ts) =>
         member is "suppressed" or "backtrace" && _backtrace is not null && IsThrowable(new NamedRef(ts))
             ? " — what was suppressed into an error and where it was thrown are told by a clause's binding, "
@@ -8079,7 +8070,7 @@ public sealed class TypeChecker
             case GenericInstance gi:
                 var (t, s) = InstanceMember(gi.Definition, mem.Member, span);
                 if (s is not null) _result.BindRef(mem, s);
-                // A value of an interface with its associated types fixed (03 M4-1): 'Self' is the
+                // A value of an interface with its associated types fixed: 'Self' is the
                 // value — its own interface's and a parent's — so 'Self.Item' reads the fixation.
                 if (gi.Definition.Kind == TypeSymbolKind.Interface && gi.Fixations is { Length: > 0 })
                 {
@@ -8093,7 +8084,7 @@ public sealed class TypeChecker
                 return BindMember(mem, MemberOfTypeParam(tp.Param, mem.Member, span, mem));
             case AssocOf assoc:
                 return BindMember(mem, MemberOfAssoc(assoc, mem.Member, span));
-            // A string reaches the members written once on its view (10 S1): where its own
+            // A string reaches the members written once on its view: where its own
             // blocks give no member of the name, 's.m()' is the view's, on a view of all of it.
             case PrimitiveType { Kind: PrimitiveKind.String } text
                 when BuiltinSymbol(text) is { } textSymbol && _stringView is { } ofText
@@ -8101,7 +8092,7 @@ public sealed class TypeChecker
                 return BindMember(mem, InstanceMember(ofText, mem.Member, span));
             case PrimitiveType p when BuiltinSymbol(p) is { } bs: // extensions on builtins, such as string.shout()
                 return BindMember(mem, InstanceMember(bs, mem.Member, span));
-            case StringViewType when _stringView is { } view: // std.core's blocks on the view (10 S1)
+            case StringViewType when _stringView is { } view: // std.core's blocks on the view
                 return BindMember(mem, InstanceMember(view, mem.Member, span));
             case ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType or CoroutineOf:
                 return ConstructorMember(baseType, mem, span);
@@ -8110,14 +8101,14 @@ public sealed class TypeChecker
         }
     }
 
-    /// <summary>A member a block on a built-in constructor adds (03 T7 X2): the block whose
+    /// <summary>A member a block on a built-in constructor adds: the block whose
     /// target matches the receiver's shape and whose constraints hold — 'extend&lt;T&gt; T[]',
     /// 'extend&lt;T :: [Display]&gt; ?T', 'extend&lt;T&gt; Slice&lt;T&gt;'.</summary>
     private LyrType? ConstructorMember(LyrType receiver, MemberExpr mem, Span span)
     {
         ExtensionBlock? shapeOnly = null; // the shape matched, the constraints did not
 
-        // An inline array (03 T13 A4; the review's M4-2). 'isEmpty()' and 'toArray()' it has
+        // An inline array. 'isEmpty()' and 'toArray()' it has
         // wherever it lies, beside 'length()' — built in, no block gives them. A view's members
         // it has where a view of it can be taken: in the heap (§5.3 rule 4), called on a view of
         // all of it, as an array has them. In a frame no view of it exists; the member is
@@ -8130,7 +8121,7 @@ public sealed class TypeChecker
                     return Report(mem.MemberSpan, "LYR-SEM0012", $"'{mem.Member}' is called: write '{mem.Member}()'");
                 return mem.Member == "isEmpty" ? new FnType([], LyrType.Bool) : new FnType([], new ArrayOf(inline.Element));
             }
-            // Its own blocks before a view's: 'equals' and 'hash' of the length (M8c S3b) are the
+            // Its own blocks before a view's: 'equals' and 'hash' of the length are the
             // array's wherever it lies, and a view's 'equals' would ask for a view it may not have.
             if (ShapeBlockMember(receiver, mem, span, ref shapeOnly) is { } own) return own;
             if (ShapeBlockMember(new SliceOf(inline.Element), mem, span, ref shapeOnly) is { } ofView)
@@ -8144,7 +8135,7 @@ public sealed class TypeChecker
         }
 
         if (ShapeBlockMember(receiver, mem, span, ref shapeOnly) is { } direct) return direct;
-        // An array gives a view of itself (design 03 A2, 03 §5.2 rule 4): the members written
+        // An array gives a view of itself (03 §5.2 rule 4): the members written
         // once on 'Slice<T>' reach it after its own blocks' — the lowering passes the whole view.
         if (receiver is ArrayOf whole && ShapeBlockMember(new SliceOf(whole.Element), mem, span, ref shapeOnly) is { } viewed)
             return viewed;
@@ -8183,7 +8174,7 @@ public sealed class TypeChecker
             if (found.IsStatic)
                 return Report(span, "LYR-SEM0074", $"'{mem.Member}' is a static extension and belongs to the type — the instance form is an error");
             var member = Substitute(FnTypeOf(found), map);
-            // A block on 'Coroutine<Y, R>' reaches a coroutine whatever its pulls throw (06 A7): where
+            // A block on 'Coroutine<Y, R>' reaches a coroutine whatever its pulls throw: where
             // its member names the target, 'equals(o: Coroutine<Y, R>)', it names the receiver, or
             // two throwing coroutines would not compare.
             if (receiver is CoroutineOf { Throws: not null } && Substitute(BlockTargetType(block), map) is CoroutineOf { Throws: null } written
@@ -8198,7 +8189,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// A member a blanket block adds (04 D15, R4): <c>extend&lt;T :: [I]&gt; T { … }</c> reaches every
+    /// A member a blanket block adds: <c>extend&lt;T :: [I]&gt; T { … }</c> reaches every
     /// type that satisfies its constraints, a type parameter whose constraints imply them included —
     /// the receiver binds <c>T</c>. Asked after every other source of members. A shape conforms to
     /// nothing yet (05 §13 rule 6), so none receives one.
@@ -8227,7 +8218,7 @@ public sealed class TypeChecker
         _comp.Builtins.LookupLocal(TypeFacts.Display(p)) as TypeSymbol;
 
     /// <summary>Whether a built-in's own blocks, seen from here, give a member of the name — what
-    /// a string asks before it reaches its view's (10 S1).</summary>
+    /// a string asks before it reaches its view's.</summary>
     private bool BlocksGive(TypeSymbol builtin, string member) =>
         builtin.Members.LookupLocal(member) is not null
         || _comp.Extensions.Blocks.Any(block => ReferenceEquals(block.Target, builtin)
@@ -8255,7 +8246,7 @@ public sealed class TypeChecker
                 if (fn.IsStatic)
                     return (Report(span, "LYR-SEM0055",
                         $"'{member}' is a static member of '{it.Name}' — call it on the type parameter: '{gp.Name}.{member}(…)'"), fn);
-                // A private helper is its interface's defaults' alone (07 V2 S4) — through a
+                // A private helper is its interface's defaults' alone — through a
                 // constraint from elsewhere it is not there; the interface's own 'this.helper()'
                 // comes this way, 'this' being 'Self'.
                 if (fn.Declaration is FunctionDecl { IsPrivateHelper: true } && !Inside(it))
@@ -8264,8 +8255,8 @@ public sealed class TypeChecker
 
                 // Substitute the type arguments OF THE CONSTRAINT. 'T :: [Eq<T>]' means the 'T' in
                 // 'Eq<T>.eq(other: T)' is the 'T' of the calling function — two different symbols
-                // with the same name. 'Self' is the type parameter itself (03 T5), and an
-                // associated type the constraint fixes is that type (T6).
+                // with the same name. 'Self' is the type parameter itself, and an
+                // associated type the constraint fixes is that type.
                 //
                 // Without the substitution the raw interface type comes back and 'a.eq(b)' fails
                 // with "cannot assign 'T' to 'T'".
@@ -8275,13 +8266,13 @@ public sealed class TypeChecker
                 return (signature, fn);
             }
         }
-        // A blanket block whose constraints the parameter's imply (04 R4).
+        // A blanket block whose constraints the parameter's imply.
         if (BlanketMember(new TypeParamType(gp), member, span) is { } blanket) return blanket;
         return (Report(span, "LYR-SEM0027",
             $"type parameter '{gp.Name}' has no member '{member}' (no constraint provides it)"), null);
     }
 
-    /// <summary>Members of an associated type through a constraint, <c>A.Iter</c> (10 B6): what its
+    /// <summary>Members of an associated type through a constraint, <c>A.Iter</c>: what its
     /// bound provides, <c>Self</c> read as the associated type itself.</summary>
     private (LyrType, Symbol?) MemberOfAssoc(AssocOf assoc, string member, Span span)
     {
@@ -8291,7 +8282,7 @@ public sealed class TypeChecker
             if (fn.Declaration is FunctionDecl { IsPrivateHelper: true } && !Inside(it)) continue;
             return (Substitute(FnTypeOf(fn), WithSelf(subst, it, assoc)), fn);
         }
-        // A blanket block whose constraints the bound reaches (04 R4), as on a type parameter.
+        // A blanket block whose constraints the bound reaches, as on a type parameter.
         if (BlanketMember(assoc, member, span) is { } blanket) return blanket;
         return (Report(span, "LYR-SEM0027",
             $"'{TypeFacts.Display(assoc)}' has no member '{member}' — "
@@ -8313,7 +8304,7 @@ public sealed class TypeChecker
         }
     }
 
-    /// <summary>Whether an associated type's bound reaches a constraint's interface (10 B6) — the
+    /// <summary>Whether an associated type's bound reaches a constraint's interface — the
     /// one way it satisfies one.</summary>
     private bool AssocReaches(AssocOf assoc, TypeSymbol iface, LyrType wanted)
     {
@@ -8355,7 +8346,7 @@ public sealed class TypeChecker
         return Fix(type);
     }
 
-    /// <summary><c>T.parse(s)</c> (03 T5): a STATIC member of an interface the type parameter is
+    /// <summary><c>T.parse(s)</c>: a STATIC member of an interface the type parameter is
     /// constrained by, reachable through the parameter alone — monomorphization makes it the
     /// concrete type's static, a direct call.</summary>
     private (LyrType, Symbol?) StaticMemberOfTypeParam(GenericParamSymbol gp, string member, Span span)
@@ -8379,13 +8370,13 @@ public sealed class TypeChecker
             $"type parameter '{gp.Name}' has no static member '{member}' (no constraint provides it)"), null);
     }
 
-    /// <summary>The substitution with the interface's <c>Self</c> bound (03 T5): to the conforming
+    /// <summary>The substitution with the interface's <c>Self</c> bound: to the conforming
     /// type at a conformance, to the type parameter at a constraint, to the type at a lookup.</summary>
     private static Dictionary<GenericParamSymbol, LyrType> WithSelf(
         Dictionary<GenericParamSymbol, LyrType> subst, TypeSymbol iface, LyrType self)
     {
         if (iface.SelfParam is not { } param) return subst;
-        // The instance's own arguments may name 'Self' too — 'Add' is 'Add<Self>' (T18) — and the
+        // The instance's own arguments may name 'Self' too — 'Add' is 'Add<Self>' — and the
         // substitution is one pass, so they are resolved here as well.
         var selfOnly = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance) { [param] = self };
         var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance) { [param] = self };
@@ -8420,11 +8411,11 @@ public sealed class TypeChecker
             TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()) { Labels = t.Labels },
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map))
                 { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map))), Places = f.Places },
-            // A join reduces once both its parts are known (05 E2 K7).
+            // A join reduces once both its parts are known.
             GenericInstance gi => ReduceJoin(new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray())
             {
                 Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map))).ToArray(),
-                // 'Task<T> throws E' at 'E = never' throws nothing (05 E2 K4).
+                // 'Task<T> throws E' at 'E = never' throws nothing.
                 Throws = gi.Throws is { } thrown && Substitute(thrown, map) is not NeverType and var bound ? bound : null,
             }),
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
@@ -8435,7 +8426,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// <c>T.Item</c> once <c>T</c> is known (03 T6): the conformer's binding of the associated
+    /// <c>T.Item</c> once <c>T</c> is known: the conformer's binding of the associated
     /// type, read off the interface's declaration symbol, through the conformer's own type
     /// arguments; still a type parameter, the question stays open as it is.
     /// </summary>
@@ -8445,7 +8436,7 @@ public sealed class TypeChecker
         switch (@base)
         {
             case TypeParamType or AssocOf: return new AssocOf(@base, member);
-            // A value of an interface (03 M4-1): what its type fixes, 'Iterator<Item = int>', else the
+            // A value of an interface: what its type fixes, 'Iterator<Item = int>', else the
             // interface's default — its 'Error' is 'never'.
             case GenericInstance { Definition.Kind: TypeSymbolKind.Interface } face
                 when (face.Fixations?.FirstOrDefault(f => ReferenceEquals(f.Member, member)) is { Member: not null } written
@@ -8477,7 +8468,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// What a constraint fixes for its parameter (03 T6): the constraint's own fixations,
+    /// What a constraint fixes for its parameter: the constraint's own fixations,
     /// <c>T :: [Iterator&lt;Item = int&gt;]</c>, and those its interface's parents carry in their
     /// lists, <c>interface Num :: [Add&lt;Out = Self&gt;]</c> (05 §8 rule 7) — every interface's
     /// <c>Self</c> read as the parameter, so <c>x + x</c> under <c>T :: [Num]</c> is a <c>T</c>.
@@ -8608,7 +8599,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// Every conformance's answers to the associated types of its interfaces (03 T6): a
+    /// Every conformance's answers to the associated types of its interfaces: a
     /// binding in the type's body or in the conformance block, else the interface's default
     /// with <c>Self</c> as the conformer, else refused (<c>LYR-SEM0128</c>). A binding no
     /// interface of the type asks for is refused too (<c>LYR-SEM0129</c>).
@@ -8654,7 +8645,7 @@ public sealed class TypeChecker
     /// <summary>The answers to check against their bounds once every answer is read.</summary>
     private readonly List<(AssociatedTypeSymbol Member, LyrType Answer, LyrType Conformer, Span At, string Who)> _boundChecks = new();
 
-    /// <summary>What every answer conforms to (10 B6): the bounds of <c>type Iter :: [Iterator];</c>,
+    /// <summary>What every answer conforms to: the bounds of <c>type Iter :: [Iterator];</c>,
     /// resolved in the interface. A bound names an interface (<c>LYR-SEM0078</c> otherwise).</summary>
     private void BindAssociatedBounds()
     {
@@ -8666,7 +8657,7 @@ public sealed class TypeChecker
                 if (symbol is not TypeSymbol { Kind: TypeSymbolKind.Interface } iface || !DeclaredInModule(iface, module)) continue;
                 foreach (var member in iface.Members.Symbols.OfType<AssociatedTypeSymbol>())
                 {
-                    // The default a value of the interface answers with (03 M4-1), where it is one
+                    // The default a value of the interface answers with, where it is one
                     // type for every value — no 'Self' in it.
                     if (member.Declaration is AssociatedTypeDecl { Type: { } byDefault }
                         && ResolveType(byDefault, DeclarationScope(iface)) is var defaultAnswer
@@ -8740,7 +8731,7 @@ public sealed class TypeChecker
         }
     }
 
-    /// <summary>A bound belongs to the declaring interface (10 B6): an answer carries none
+    /// <summary>A bound belongs to the declaring interface: an answer carries none
     /// (<c>LYR-SEM0161</c>) — what it must conform to is the interface's to say.</summary>
     private void RefuseAnswerBound(AssociatedTypeSymbol answer)
     {
@@ -8776,7 +8767,7 @@ public sealed class TypeChecker
     private (AssociatedTypeSymbol Member, LyrType Type)[] BlockAnswersOf(ExtensionBlock block) =>
         _blockAnswers.Where(a => ReferenceEquals(a.Block, block)).Select(a => (a.Member, a.Answer)).ToArray();
 
-    /// <summary>An answer that does not conform to its bound (10 B6): <c>LYR-SEM0160</c>.</summary>
+    /// <summary>An answer that does not conform to its bound: <c>LYR-SEM0160</c>.</summary>
     private void CheckAnswerBounds(AssociatedTypeSymbol member, LyrType answer, LyrType conformer, Span at, string who)
     {
         if (answer.IsError || member.Owner is not { } owner) return;
@@ -8796,7 +8787,7 @@ public sealed class TypeChecker
         }
     }
 
-    /// <summary>Whether <c>never</c> may answer an associated type (05 E2 K4): an empty thrown
+    /// <summary>Whether <c>never</c> may answer an associated type: an empty thrown
     /// set, where the member's bound is <c>Error</c> — elsewhere it would type a value that cannot
     /// exist. Before the bounds are bound, the written bound is read.</summary>
     private bool NeverMayAnswer(AssociatedTypeSymbol member) =>
@@ -8811,9 +8802,9 @@ public sealed class TypeChecker
             $"'never' answers '{member.Owner?.Name}.{member.Name}' only where its bound is 'Error' — an empty thrown set; "
             + "anywhere else it would type a value that cannot exist");
 
-    /// <summary>A written <c>never</c> as a type argument (05, "Review 2026-10-09" S5; M8c S17):
+    /// <summary>A written <c>never</c> as a type argument (05):
     /// the empty thrown set where the parameter's bound is <c>Error</c> — <c>DedupIter&lt;I, never&gt;</c>,
-    /// <c>f&lt;never&gt;()</c> — as <c>E = never</c> is what a set of nothing binds (E2 K4); for any other
+    /// <c>f&lt;never&gt;()</c> — as <c>E = never</c> is what a set of nothing binds; for any other
     /// parameter it would type a value that cannot exist. The rule of an associated type's answer
     /// (<see cref="NeverMayAnswer"/>), for a parameter.</summary>
     private void CheckNeverArgument(GenericParamSymbol param, Span at)
@@ -8835,7 +8826,7 @@ public sealed class TypeChecker
             if (args[i] is NeverType) CheckNeverArgument(generics[i], written[i].Span);
     }
 
-    /// <summary>A generic block's parameters read as its target's own (03 T7 X1): <c>extend&lt;U&gt;
+    /// <summary>A generic block's parameters read as its target's own: <c>extend&lt;U&gt;
     /// Box&lt;U&gt;</c> answers in its <c>U</c>, and the type's answer is asked in Box's own <c>T</c>.
     /// <c>null</c> for a block with no parameters.</summary>
     private Dictionary<GenericParamSymbol, LyrType>? BlockToTarget(ExtensionBlock block, TypeSymbol target)
@@ -8857,7 +8848,7 @@ public sealed class TypeChecker
         {
             foreach (var (iface, subst) in ClosureOfNode(node))
             {
-                // The answer belongs to the conformance INSTANCE (04 D6): 'Mul<int>' and
+                // The answer belongs to the conformance INSTANCE: 'Mul<int>' and
                 // 'Mul<float>' of one type answer 'Out' each for themselves.
                 var instance = Substitute(InstanceOfConformance(iface, subst), SelfMap(iface, SelfType(ts)));
                 foreach (var member in iface.Members.Symbols.OfType<AssociatedTypeSymbol>())
@@ -8866,7 +8857,7 @@ public sealed class TypeChecker
                     var answer = answers.LookupLocal(member.Name) is AssociatedTypeSymbol own
                         && own.Declaration is AssociatedTypeDecl { Type: { } bound } ? (own, bound) : default;
                     // Answered already: this is a second block of the same conformance, which
-                    // coherence refuses as a whole (03 T7 X3, LYR-SEM0133) — its answers are not
+                    // coherence refuses as a whole (LYR-SEM0133) — its answers are not
                     // asked again, so the one mistake gets one error.
                     if (member.Answer(ts, instance, exact: true) is not null) continue;
                     if (answer.bound is { } written)
@@ -8907,7 +8898,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// <c>T.Item</c>, <c>Self.Item</c>, <c>P.Item</c> (03 T6): the associated type named off a
+    /// <c>T.Item</c>, <c>Self.Item</c>, <c>P.Item</c>: the associated type named off a
     /// type parameter (through its constraints, or the interface it is the <c>Self</c> of), or
     /// off a concrete type (its answer).
     /// </summary>
@@ -9013,9 +9004,9 @@ public sealed class TypeChecker
             case FnType pf when arg is FnType af && pf.Parameters.Length == af.Parameters.Length:
                 for (var i = 0; i < pf.Parameters.Length; i++) UnifyInfer(pf.Parameters[i], af.Parameters[i], map, argSpan);
                 UnifyInfer(pf.Return, af.Return, map, argSpan);
-                // A set written as one type parameter, 'throws E', takes the argument's (05 E2 K4):
+                // A set written as one type parameter, 'throws E', takes the argument's:
                 // nothing thrown binds 'never', one type binds it, several their join — 'Error', as
-                // composed sets join (K7). The first binding wins, as for every parameter.
+                // composed sets join. The first binding wins, as for every parameter.
                 if (pf.Throws is [TypeParamType thrownBy] && !map.ContainsKey(thrownBy.Param) && !af.Throws.Any(t => t.IsError))
                     map[thrownBy.Param] = af.Throws switch
                     {
@@ -9269,7 +9260,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// std.sync's <c>AtomicValue</c> (spec 10 §8 rule 1; design 13 M11 P10): besides <c>int</c> and
+    /// std.sync's <c>AtomicValue</c> (spec 10 §8 rule 1): besides <c>int</c> and
     /// <c>bool</c>, which conform through their blocks, every class and every optional of one — a
     /// reference is one word the machine reads and writes in one step, and no block names every
     /// class. Any other optional is a flag beside a value: two words.
@@ -9298,19 +9289,19 @@ public sealed class TypeChecker
         PrimitiveType prim when BuiltinSymbol(prim) is { } builtin =>
             ImplementsWithExtensions(builtin, iface, wanted, EmptySubst),
 
-        // A view conforms through std.core's blocks on it, as a string does (10 S1).
+        // A view conforms through std.core's blocks on it, as a string does.
         StringViewType when _stringView is { } view => ImplementsWithExtensions(view, iface, wanted, EmptySubst),
 
         // 'never' has no value and so every conformance vacuously: 'E = never', what a set of
-        // nothing binds (05 E2 K4), satisfies 'E :: [Error]'.
+        // nothing binds, satisfies 'E :: [Error]'.
         NeverType => true,
 
-        // An associated type through a constraint conforms to what its bound reaches (10 B6) —
-        // through a blanket block too, as a type parameter does (04 R4) — and to nothing else:
+        // An associated type through a constraint conforms to what its bound reaches —
+        // through a blanket block too, as a type parameter does — and to nothing else:
         // its answer is anybody's until the type is known.
         AssocOf assoc => AssocReaches(assoc, iface, wanted) || BlockConforms(assoc, iface, wanted, shapes: false),
 
-        // A coroutine is an iterator of what it yields and Closeable (10 B6 I7), built in — the
+        // A coroutine is an iterator of what it yields and Closeable, built in — the
         // blanket block makes it Iterable — and conforms to nothing else: it passed every
         // constraint here before.
         CoroutineOf co => CoroutineConforms(co, iface, wanted) || BlockConforms(co, iface, wanted, shapes: true),
@@ -9325,7 +9316,7 @@ public sealed class TypeChecker
         OpaqueRef => false,
 
         // 'null' alone is no type a constraint could hold for: bound as a type argument it passed
-        // every one and failed in the lowering (M8a S14). A name that is no value is reported
+        // every one and failed in the lowering. A name that is no value is reported
         // where it stands.
         NullType or NonValueType => false,
 
@@ -9341,7 +9332,7 @@ public sealed class TypeChecker
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TypeSymbol, TypeSymbol> JoinRoots = new();
 
     /// <summary>
-    /// The join of two thrown types (design/v5/spec/05 E2 K7), std.core's <c>Join&lt;A, B&gt;</c>,
+    /// The join of two thrown types, std.core's <c>Join&lt;A, B&gt;</c>,
     /// once both are known: one type where they are one, the other where one is <c>never</c>, the
     /// root <c>Error</c> where they differ. Open, it stays as it is.
     /// </summary>
@@ -9358,11 +9349,11 @@ public sealed class TypeChecker
             || t is GenericInstance g && g.Arguments.Any(Open) || t is Optional { Inner: var inner } && Open(inner);
     }
 
-    /// <summary>Whether the type is an unreduced join, whose parts it covers (05 E2 K7).</summary>
+    /// <summary>Whether the type is an unreduced join, whose parts it covers.</summary>
     internal static bool IsOpenJoin(LyrType t) =>
         t is GenericInstance { Arguments.Length: 2 } gi && JoinRoots.TryGetValue(gi.Definition, out _);
 
-    /// <summary>A coroutine's built-in conformances (10 B6 I7): <c>Iterator</c> with its answers —
+    /// <summary>A coroutine's built-in conformances: <c>Iterator</c> with its answers —
     /// a fixation must name them — and <c>Closeable</c> where std.task gives its close.</summary>
     private bool CoroutineConforms(CoroutineOf co, TypeSymbol iface, LyrType wanted)
     {
@@ -9372,7 +9363,7 @@ public sealed class TypeChecker
         return fixations.All(f => CoroutineAnswer(co, f.Member) is { } answer && LyrType.Equal(answer, f.Type));
     }
 
-    /// <summary>A coroutine's answers as an iterator (10 B6 I7): its <c>Item</c> what it yields, its
+    /// <summary>A coroutine's answers as an iterator: its <c>Item</c> what it yields, its
     /// <c>Error</c> what it throws, <c>never</c> where nothing.</summary>
     internal static LyrType? CoroutineAnswer(CoroutineOf co, AssociatedTypeSymbol member) =>
         member.Owner is { Name: "Iterator", Kind: TypeSymbolKind.Interface }
@@ -9398,7 +9389,7 @@ public sealed class TypeChecker
     /// </summary>
     private static bool IsTheConstraint(LyrType arg, TypeSymbol ts, TypeSymbol iface, LyrType wanted) =>
         ReferenceEquals(ts, iface) && (Matches(arg, EmptySubst, wanted)
-            // A value with its associated types fixed is a value of its interface (03 M4-1): what a
+            // A value with its associated types fixed is a value of its interface: what a
             // constraint fixes as well, it answers alike — 'Iterator<Item = int>' is an 'Iterator',
             // and an 'Iterator<Item = int>', and no 'Iterator<Item = string>'.
             || arg is GenericInstance { Fixations.Length: > 0 } fixedArg
@@ -9427,7 +9418,7 @@ public sealed class TypeChecker
                         return true;
                 continue;
             }
-            // A block on an INSTANCE (03 T7 X1) — 'List<int>', or 'List<T>' with the block's own
+            // A block on an INSTANCE — 'List<int>', or 'List<T>' with the block's own
             // parameters — reaches where its target matches the instance and its constraints hold
             // for what the match bound; the lowering builds a row for exactly the instances
             // proved here.
@@ -9498,8 +9489,8 @@ public sealed class TypeChecker
         return false;
     }
 
-    /// <summary>A block on a shape: a built-in constructor (03 T7 X2), or the builtin
-    /// <c>Slice</c> a view maps to, or <c>Coroutine</c> (06 A7, N2d) — types with a symbol and no
+    /// <summary>A block on a shape: a built-in constructor, or the builtin
+    /// <c>Slice</c> a view maps to, or <c>Coroutine</c> — types with a symbol and no
     /// declaration, whose instances the sema writes as shapes.</summary>
     private bool IsShapeBlock(ExtensionBlock block) =>
         block.IsConstructorTarget || (block.Target is { } t && (ReferenceEquals(t, _slice) || ReferenceEquals(t, _coroutine)));
@@ -9507,9 +9498,9 @@ public sealed class TypeChecker
     private readonly Dictionary<ExtensionBlock, HashSet<TypeSymbol>> _givenBeside = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
-    /// The parents a shape's block leaves to another block on the same shape (N2a): a block giving
+    /// The parents a shape's block leaves to another block on the same shape: a block giving
     /// <c>Hashable</c> to a tuple, whose parent <c>Equatable</c> another block gives the tuple under
-    /// constraints this block's entail — 04 D7 synthesizes each interface under its own condition,
+    /// constraints this block's entail — each interface is synthesized under its own condition,
     /// so a tuple of floats compares and a tuple of strings hashes as well. Such a parent is no part
     /// of this block's chain: its members are not asked of it, coherence does not count it twice,
     /// and a call through it is answered by the other block. A non-generic parent only.
@@ -9596,8 +9587,8 @@ public sealed class TypeChecker
     /// <see cref="Satisfies"/> asks first as well. Asked again rather than read from a record:
     /// a generic body records its parameters, not what an instance made of them.
     /// </summary>
-    /// <summary>The conformance question at an instance the lowering reached (the review's
-    /// M8a-4): asked outside every module, as <see cref="ConformanceBlockFor"/> is.</summary>
+    /// <summary>The conformance question at an instance the lowering reached:
+    /// asked outside every module, as <see cref="ConformanceBlockFor"/> is.</summary>
     private bool SatisfiesAt(LyrType concrete, TypeSymbol iface)
     {
         var saved = _currentModule;
@@ -9652,7 +9643,7 @@ public sealed class TypeChecker
         foreach (var (p, inst) in InterfaceClosure(direct, ResolveType(node, scope)))
         {
             if (!ReferenceEquals(p, iface)) continue;
-            // 'Self' on both sides is the conforming type (03 T5): 'Vec2 :: [Add]' is 'Add<Vec2>'
+            // 'Self' on both sides is the conforming type: 'Vec2 :: [Add]' is 'Add<Vec2>'
             // written short, and so is the constraint 'T :: [Add]' at 'T = Vec2'.
             var selfMap = self is null ? EmptySubst : SelfMap(p, self);
             // The fixations are asked below, the arguments here: 'Iterator<Item = int>' names the
@@ -9660,7 +9651,7 @@ public sealed class TypeChecker
             // as 'Neg' (05 §8 rule 7).
             var declared = WithoutFixations(inst);
             if (!Matches(Substitute(declared, selfMap), ofInstance, Substitute(WithoutFixations(wanted), selfMap))) continue;
-            // A fixation at the constraint, 'T :: [Iterator<Item = int>]' (03 T6), asks the
+            // A fixation at the constraint, 'T :: [Iterator<Item = int>]', asks the
             // conformer's answer to be that type.
             if (wanted is GenericInstance { Fixations: { Length: > 0 } fixations } && self is not null && self is not TypeParamType)
             {
@@ -9712,7 +9703,7 @@ public sealed class TypeChecker
         return sym is ImportBindingSymbol ib ? ib.Target : sym;
     }
 
-    /// <summary>Whether the module being checked may name this member (07 V2) — for the sets a
+    /// <summary>Whether the module being checked may name this member — for the sets a
     /// call chooses from, where what may not be named is not there.</summary>
     /// <summary>A code of Lyric 5's own: where one rule of the shared front end was split off a code
     /// the 4.x tools still report it under, their suites keep the old one.</summary>
@@ -9800,7 +9791,7 @@ public sealed class TypeChecker
 
     /// <summary>The member a lookup answers from here: of an overload set the first function this
     /// module may name, so a hidden overload beside a visible one is not there; a name with
-    /// nothing visible is reported (07 V2 S1) and answered all the same.</summary>
+    /// nothing visible is reported and answered all the same.</summary>
     private Symbol Reachable(SymbolTable members, string name, Symbol found, Span span)
     {
         if (MayName(found)) return found;
@@ -9813,7 +9804,7 @@ public sealed class TypeChecker
     // Member resolution: own members, then visible extensions, then interface default methods.
     private (LyrType, Symbol?) InstanceMember(TypeSymbol ts, string member, Span span)
     {
-        // A private helper of an interface (07 V2 S4) is its defaults' to call — on any value of
+        // A private helper of an interface is its defaults' to call — on any value of
         // the interface — and nobody else's, its own module's other code included.
         if (ts.Kind == TypeSymbolKind.Interface
             && ts.Members.LookupLocal(member) is FunctionSymbol { Declaration: FunctionDecl { IsPrivateHelper: true } } helper
@@ -9872,7 +9863,7 @@ public sealed class TypeChecker
             return def;
         }
         if (DelegatedMember(ts, member) is { } forwarded) return forwarded;
-        // A blanket block's member (04 D15), asked last: the receiver binds its parameter.
+        // A blanket block's member, asked last: the receiver binds its parameter.
         var receiver = _memberReceiver is GenericInstance own && ReferenceEquals(own.Definition, ts) ? own : SelfType(ts);
         if (BlanketMember(receiver, member, span) is { } blanket) return blanket;
         var hidden = _comp.Lyric5Modules ? HiddenCandidate(ts, member) : null;
@@ -9895,7 +9886,7 @@ public sealed class TypeChecker
     private LyrType? _memberReceiver;
 
     /// <summary>A block member's signature for the receiver at hand: a generic block's parameters
-    /// bound by the receiver (03 T7 X1), its constraints checked — the member is not there where
+    /// bound by the receiver, its constraints checked — the member is not there where
     /// they fail (<c>LYR-SEM0134</c>).</summary>
     private LyrType ExtensionSignature(FunctionSymbol ext, Span span, LyrType? receiver = null)
     {
@@ -9922,12 +9913,12 @@ public sealed class TypeChecker
         {
             if (ext.Symbol.Name != member) continue;
             if (!_comp.Reaches(_currentModule, ext)) continue;
-            // A method its module keeps to itself is not there for this one (07 V2 S5).
+            // A method its module keeps to itself is not there for this one.
             if (!MayName(ext.Symbol)) continue;
             if (!visible.Any(f => ReferenceEquals(f.Symbol, ext.Symbol))) visible.Add(ext);
         }
 
-        // Two conformance blocks each implementing the name for their interface (04 D3): the
+        // Two conformance blocks each implementing the name for their interface: the
         // name belongs to the block, and the unqualified call says nothing about which. One block
         // holding the name at two counts is an overload set the call's count settles (08 §1.2).
         // Every other duplicate was refused at its declaration (LYR-SEM0121).
@@ -9951,7 +9942,7 @@ public sealed class TypeChecker
         return visible.Count > 0 ? visible[0].Symbol : null;
     }
 
-    /// <summary>A member a type forwards to a field (<c>:: [Walker by legs]</c>, 04 D1): the
+    /// <summary>A member a type forwards to a field (<c>:: [Walker by legs]</c>): the
     /// interface's member, typed as the interface declares it.</summary>
     private (LyrType, Symbol?)? DelegatedMember(TypeSymbol ts, string member)
     {
@@ -9975,7 +9966,7 @@ public sealed class TypeChecker
         {
             if (iface.Members.LookupLocal(member) is not FunctionSymbol fn) continue;
             if (fn.Declaration is not FunctionDecl { Body: not null }) continue; // defaults only, not abstract ones
-            if (fn.Declaration is FunctionDecl { IsPrivateHelper: true }) continue; // the interface's own (07 V2 S4)
+            if (fn.Declaration is FunctionDecl { IsPrivateHelper: true }) continue; // the interface's own
             var t = Substitute(FnTypeOf(fn), WithSelf(subst, iface, SelfType(ts)));
             if (found is null) found = (t, fn);
             else if (!ReferenceEquals(found.Value.sym, fn)) ambiguous = true;
@@ -10009,7 +10000,7 @@ public sealed class TypeChecker
         StructDecl s => s.Interfaces,
         ClassDecl c => c.Interfaces,
         EnumDecl e => e.Interfaces,
-        InterfaceDecl i => i.Interfaces, // the parents, for the child-to-parent transition (04 D10)
+        InterfaceDecl i => i.Interfaces, // the parents, for the child-to-parent transition
         _ => []
     };
 
@@ -10104,7 +10095,7 @@ public sealed class TypeChecker
             // A block's constant (05 §6 rule 2), under the type's name.
             _ when StaticOf(ts, member, seen: true) is { } added => (Of(TypeOfGlobalReference(added, span)), added),
 
-            // A generic block's constant (one per instance; the review's M8a-3): the named
+            // A generic block's constant (one per instance): the named
             // instance binds the BLOCK's parameters, as it does for a generic block's static
             // function — the constant's type is written in them.
             _ when GenericBlockStatic(ts, member) is { } inBlock => instance is null
@@ -10123,7 +10114,7 @@ public sealed class TypeChecker
             // and the lowering already emits one without a receiver.
             _ => ExtensionMember(ts, member, span) switch
             {
-                // A generic block's own parameters are bound by the named instance (03 T7 X1):
+                // A generic block's own parameters are bound by the named instance:
                 // 'Box<int>.default()' from 'extend<T :: [Default]> Box<T>' answers 'Box<int>'.
                 //
                 // Without an instance nothing binds them. The signature was then read at the
@@ -10141,7 +10132,7 @@ public sealed class TypeChecker
                     $"'{ext.Name}' is an instance method and needs a receiver — " +
                     $"call it on a value, or declare it 'static fn {member}(…)'"), ext),
 
-                // A static default of an interface the type conforms to (03 T5, M9a S11): the
+                // A static default of an interface the type conforms to: the
                 // conformer's instance of it, 'Self' the conformer.
                 null when StaticDefaultOf(ts, member, instance ?? SelfType(ts)) is var (defaultType, defaultFn) => (defaultType, defaultFn),
                 null => (Report(span, "LYR-SEM0012",
@@ -10154,7 +10145,7 @@ public sealed class TypeChecker
     private (LyrType, Symbol?) MemberOfModule(ModuleSymbol mod, string member, Span span)
     {
         var found = mod.Members.LookupLocal(member);
-        // What another module passes on with 'pub import' (07 V3 I4) stands for what it imported.
+        // What another module passes on with 'pub import' stands for what it imported.
         while (found is ImportBindingSymbol { Reexported: true } passedOn)
         {
             if (passedOn.Target is ModuleSymbol inner) return (new NonValueType(inner, "module"), inner);
@@ -10163,7 +10154,7 @@ public sealed class TypeChecker
         if (_comp.Lyric5Modules && _currentModule is { } from && found is not null && !_comp.Visible(found, from))
         {
             // Of an overload set the first VISIBLE function answers, so the call's selection
-            // starts from what this module may name (07 V2 S1); none visible is the one error.
+            // starts from what this module may name; none visible is the one error.
             if (found is FunctionSymbol
                 && mod.Members.OverloadsLocal(member).FirstOrDefault(f => _comp.Visible(f, from)) is { } visible)
                 found = visible;
@@ -10207,8 +10198,8 @@ public sealed class TypeChecker
         _currentModule is null ? null : ts.Members.Symbols.OfType<FieldSymbol>().FirstOrDefault(f => !MayName(f));
 
     /// <summary>
-    /// Whether a name another module declares may be named from the module being checked (design/
-    /// v5/spec/07 V2 S1) — the question every route through a module path asks, answered by
+    /// Whether a name another module declares may be named from the module being checked —
+    /// the question every route through a module path asks, answered by
     /// <see cref="Compilation.Visible"/>; reported at <paramref name="span"/> where it may not. The
     /// caller binds the symbol all the same, so a hidden name fails with one message, not a cascade.
     /// </summary>
@@ -10222,7 +10213,7 @@ public sealed class TypeChecker
     /// the construction, which the substitution cannot supply, because what stands here is the bare
     /// enum symbol rather than a type parameter.</param>
     /// <summary>
-    /// The receivers a call leaves OPEN (design/v5/spec/03 T8, the review's M8a-2): a generic
+    /// The receivers a call leaves OPEN: a generic
     /// type named without its arguments in callee position — <c>Cell.of(3)</c>,
     /// <c>Opt.Some(7)</c>, <c>Map.new()</c>. <see cref="CheckCall"/> binds the parameters as it
     /// binds the function's own — the type the position expects first, as for an initializer,
@@ -10277,10 +10268,10 @@ public sealed class TypeChecker
 
     private enum AttributeTarget { Module, Type, Function, Member }
 
-    /// <summary>Where an attribute stands in Lyric 5 (design/v5/spec/09 T7): on every declaration.</summary>
+    /// <summary>Where an attribute stands in Lyric 5: on every declaration.</summary>
     private enum AttributeSite { Module, Function, Method, Field, StaticLet, Variant, Parameter, Type, Interface, Alias, Extend, Binding, AssociatedType }
 
-    /// <summary>The markers that admit an attribute at a site (09 F1): its own kind first, then
+    /// <summary>The markers that admit an attribute at a site: its own kind first, then
     /// the wider sets that hold it — the first is what a refusal names. The markers inherit
     /// nothing; this table is the hierarchy.</summary>
     private static string[] Admitting(AttributeSite site) => site switch
@@ -10346,7 +10337,7 @@ public sealed class TypeChecker
             else
                 seen.Add(ts);
         }
-        // two hints that say opposite things (09 A11), which the C compiler would refuse
+        // two hints that say opposite things, which the C compiler would refuse
         if (_comp.Lyric5Modules && _coreMembers is { } core
             && seen.Any(t => ReferenceEquals(t, core.LookupLocal("AlwaysInline")))
             && attributes.FirstOrDefault(a => ReferenceEquals(_result.RefOf(a), core.LookupLocal("NoInline"))) is { } noInline)
@@ -10356,7 +10347,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// A function marked <c>@Test</c> (design/v5/spec/10 B12 X2, 09 A11): <c>lyric test</c> calls
+    /// A function marked <c>@Test</c>: <c>lyric test</c> calls
     /// it from a module of its own and with nothing, so it takes no parameters, returns nothing
     /// and is not private. It may throw — an error that leaves it fails the test. A generic one is
     /// refused already, as every attribute on a generic declaration is (SEM0067).
@@ -10511,7 +10502,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// A Lyric 5 attribute (design/v5/spec/09 A1–A3, F1, F4; 13 M9a P7): a struct that declares a
+    /// A Lyric 5 attribute: a struct that declares a
     /// marker admitting the site (<see cref="Admitting"/>), whose value is the struct it writes —
     /// made a <c>comptime</c> site and checked as its initializer is: field names, types,
     /// defaults. One value, which the build evaluates and the runner and the warnings read. The
@@ -10529,7 +10520,7 @@ public sealed class TypeChecker
             _ => targetDescription,
         };
         var (sym, _) = ResolveInitPath(attribute.Path, scope, attribute.PathSpan);
-        // an attribute macro's site (13 M9b S4): the expander replaces the declaration before the
+        // an attribute macro's site: the expander replaces the declaration before the
         // module is checked for real; this is the pass with the sites still in
         if (sym is FunctionSymbol { IsMacro: true } or ImportBindingSymbol { Target: FunctionSymbol { IsMacro: true } }) return null;
         var written = string.Join('.', attribute.Path);
@@ -10563,7 +10554,7 @@ public sealed class TypeChecker
                 + $"or a marker whose set holds it ({string.Join(", ", admitting.Skip(1))}), to allow it here");
             return ts;
         }
-        // A compiler instruction says the same of every instance (13 M9a P8); data, and a test
+        // A compiler instruction says the same of every instance; data, and a test
         // or benchmark — a root the runner cannot instantiate —, still may not
         if (targetIsGeneric && !IsCompilerInstruction(ts))
             _de.Report("LYR-SEM0067", Severity.Error, attribute.PathSpan,
@@ -10583,7 +10574,7 @@ public sealed class TypeChecker
             }
             fields.Add(new StructInitField(open[0].Name, positional, positional.Span) { NameSpan = positional.Span });
         }
-        // The value (09 F4): the struct the attribute writes, computed while the program compiles.
+        // The value: the struct the attribute writes, computed while the program compiles.
         var value = new ComptimeExpr(
             new StructInitExpr(attribute.Path, [], [.. fields], attribute.Span) { NameSpan = attribute.NameSpan },
             attribute.Span);
@@ -10658,11 +10649,11 @@ public sealed class TypeChecker
                 : [member.Member];
 
     /// <summary>
-    /// <c>p with { x = 3, pos.y = 4 }</c> (design/v5/spec/02 M6): a copy of <c>p</c> with the
-    /// named fields replaced, of <c>p</c>'s type — on a struct only (W2): a class would be a
+    /// <c>p with { x = 3, pos.y = 4 }</c>: a copy of <c>p</c> with the
+    /// named fields replaced, of <c>p</c>'s type — on a struct only: a class would be a
     /// clone with a new identity, a tuple has no field names. A path reaches into a struct the
-    /// value holds by value (W6); a field named twice is refused, a field the type does not
-    /// have too (W4); no field needs <c>var</c>, since nothing is written in place. The values
+    /// value holds by value; a field named twice is refused, a field the type does not
+    /// have too; no field needs <c>var</c>, since nothing is written in place. The values
     /// see the old <c>p</c>: they are expressions over it, and the copy is what changes.
     /// </summary>
     private LyrType CheckWith(WithExpr w, SymbolTable scope)
@@ -10678,7 +10669,7 @@ public sealed class TypeChecker
                     : target is TupleOf ? "a tuple, which has no fields to name" : "no struct"));
         }
 
-        // A copy with fields replaced is a construction (02 W3): where the initializer may not
+        // A copy with fields replaced is a construction: where the initializer may not
         // stand, neither may 'with' — the copy would hand out what the factory keeps.
         if (TypeFacts.SymbolOf(target) is { } copied && HiddenField(copied) is { } hidden)
             _de.Report("LYR-RES0009", Severity.Error, w.Span,
@@ -10724,7 +10715,7 @@ public sealed class TypeChecker
 
     private LyrType CheckStructInit(StructInitExpr si, SymbolTable scope, LyrType? expected)
     {
-        // '.Rect { w = 1 }': the variant of the enum this position expects (08 Y9).
+        // '.Rect { w = 1 }': the variant of the enum this position expects.
         if (si.IsImplicit)
         {
             if (EnumFromExpected(expected) is { } target
@@ -10766,7 +10757,7 @@ public sealed class TypeChecker
             }
             // A name that is no type, before braces that read as an initializer's: 'run { x = 5 }'.
             // It said nothing — the error type went on to the lowering, which stopped on it. The
-            // likeliest meaning is a trailing block whose assignment lacks its ';' (M6-2).
+            // likeliest meaning is a trailing block whose assignment lacks its ';'.
             else
                 _de.Report("LYR-SEM0011", Severity.Error, si.Span,
                     $"'{string.Join('.', si.Path)}' is no type, and '{{ {si.Fields.FirstOrDefault()?.Name ?? "…"} = … }}' "
@@ -10784,7 +10775,7 @@ public sealed class TypeChecker
         _result.BindRef(si, ts);
 
         // A type with a field this module may not name is built where it may: by its factory, in
-        // a module that names all of it (design/v5/spec/04 D11, 07 V2 S0) — what a reader cannot
+        // a module that names all of it — what a reader cannot
         // see is an invariant it cannot keep. Rust and Swift draw the same line. One error; the
         // fields check on as usual.
         if (HiddenField(ts) is { } hidden)
@@ -10805,8 +10796,8 @@ public sealed class TypeChecker
         }
 
         // A generic type takes its type arguments from what is WRITTEN, else from the context,
-        // else from the FIELD VALUES, as a call takes them from its arguments (the review's
-        // M8a-2): 'P { v = 1 }' with no context anywhere is a 'P<int>'.
+        // else from the FIELD VALUES, as a call takes them from its arguments:
+        // 'P { v = 1 }' with no context anywhere is a 'P<int>'.
         LyrType result;
         Dictionary<GenericParamSymbol, LyrType> subst;
         Dictionary<StructInitField, LyrType>? prechecked = null;
@@ -10886,12 +10877,12 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// The type arguments of <c>Pair&lt;_, string&gt; { first = 3, second = "x" }</c> (design/v5/spec/03
-    /// T8): what is written stands, a placeholder comes from the context when the position names
+    /// The type arguments of <c>Pair&lt;_, string&gt; { first = 3, second = "x" }</c>:
+    /// what is written stands, a placeholder comes from the context when the position names
     /// an instance, else from the field values — each checked with as much of its field type as
     /// is known, its type binding what is open, the way a call's arguments bind its parameters.
-    /// An initializer without a list is one whose every argument is a placeholder (the review's
-    /// M8a-2): what the context does not answer, the values do.
+    /// An initializer without a list is one whose every argument is a placeholder:
+    /// what the context does not answer, the values do.
     /// </summary>
     /// <param name="prechecked">The values checked on the way, so the caller checks none twice;
     /// <c>null</c> when the context answered.</param>
@@ -10970,7 +10961,7 @@ public sealed class TypeChecker
     private void ReportOmittedFields(Span span, string owner, IReadOnlyList<FieldDecl> declared,
         HashSet<string> given)
     {
-        // A '?T' field has the default 'null' without saying so (design/v5/spec/02 M14 I1).
+        // A '?T' field has the default 'null' without saying so.
         var missing = declared.Where(f => f.Default is null && f.Type is not NullableType && !given.Contains(f.Name))
             .Select(f => f.Name).ToArray();
         if (missing.Length == 0) return;
@@ -11021,7 +11012,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// <c>ident&lt;int&gt;</c> as a value (design/v5/spec/03 T17): the INSTANCE of a generic function
+    /// <c>ident&lt;int&gt;</c> as a value: the INSTANCE of a generic function
     /// is a function value like any monomorphic function, where the bare generic name is none
     /// (<c>LYR-SEM0052</c>, §8.1). The arguments are written; a placeholder among them is filled
     /// from the function type this position expects (<c>let f: fn(int) -&gt; int = ident&lt;_&gt;</c>,
@@ -11097,14 +11088,14 @@ public sealed class TypeChecker
         return cur as TypeSymbol;
     }
 
-    /// <summary>The <c>_</c> of a type argument list (design/v5/spec/03 T8): a position the
+    /// <summary>The <c>_</c> of a type argument list: a position the
     /// inference fills. Only that — anywhere else <see cref="ResolveType"/> refuses it.</summary>
     private static bool IsPlaceholder(TypeNode node) =>
         node is NamedType { Path: ["_"], TypeArguments.Length: 0 };
 
     private (Symbol? sym, TypeSymbol? owner) ResolveInitPath(string[] path, SymbolTable scope, Span span)
     {
-        // A public type of std.core is visible without an import (design/v5/spec/10 U-series), in
+        // A public type of std.core is visible without an import, in
         // an initializer as in a type position: 'Exception { text = "…" }'. The scope wins.
         var cur = scope.Lookup(path[0]) ?? ImplicitType(span.File, path[0]);
         if (cur is ImportBindingSymbol ib0)
@@ -11271,7 +11262,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// A value block where an expression is wanted (08 Y4) — a branch of an 'if' expression, the
+    /// A value block where an expression is wanted — a branch of an 'if' expression, the
     /// right of '??'. It is worth its tail. Without one it gives no value: 'never' when every
     /// path through it leaves — 'return', 'throw', 'break', 'continue' — and nothing otherwise,
     /// which a position that wants a value refuses.
@@ -11429,7 +11420,7 @@ public sealed class TypeChecker
     // --- …) need a '_' or binding arm. Guards do not count. ---
 
     /// <summary>
-    /// An arm no value reaches is a warning (08 Y6; Rust's <c>unreachable_patterns</c>): every
+    /// An arm no value reaches is a warning (Rust's <c>unreachable_patterns</c>): every
     /// arm after an unguarded arm that matches everything, and an unguarded arm that repeats a
     /// unit variant, a literal or <c>null</c> an unguarded arm above already tests. A warning
     /// and not an error, as the specification says; a typo in a bare name gets this beside the
@@ -11509,19 +11500,19 @@ public sealed class TypeChecker
                 $"match on '{TypeFacts.Display(scrutinee)}' is not exhaustive — {what}");
     }
 
-    /// <summary>The set a catch binding carries (05 E2 K7), when the scrutinee is one: the binding
+    /// <summary>The set a catch binding carries, when the scrutinee is one: the binding
     /// of a set clause or of a clause without a type — a 'let', so it holds what the clause took.</summary>
     private LyrType[]? CatchSetOf(Expr scrutinee) =>
         scrutinee is IdentifierExpr id && _result.RefOf(id) is LocalSymbol { Declaration: CatchClause clause } binding
-        // A binding of ONE type is that type (M5-6), and is matched as a value of it.
+        // A binding of ONE type is that type, and is matched as a value of it.
         && (_error is null || binding.Type is NamedRef { Symbol: var root } && ReferenceEquals(root, _error))
             ? _result.CatchSet(clause)
-            // A type-set pattern's 'let' binding carries its set as a clause's does (08 Y6).
+            // A type-set pattern's 'let' binding carries its set as a clause's does.
             : scrutinee is IdentifierExpr held
               && _result.RefOf(held) is LocalSymbol { Declaration: TypeSetPattern { Types.Length: > 1 } pattern, IsMutable: false }
                 ? _result.TypeSet(pattern) : null;
 
-    /// <summary>What the arms leave of a catch binding's set (K7): every type of the set no
+    /// <summary>What the arms leave of a catch binding's set: every type of the set no
     /// unguarded type pattern covers — the type itself, or an interface it conforms to — as the
     /// pattern to add. A default covers all of it.</summary>
     private List<string> MissingFromSet(LyrType[] set, List<Pattern> pats, LyrType scrutinee)
@@ -11581,11 +11572,11 @@ public sealed class TypeChecker
             case TupleOf tuple:
                 return MissingTupleCases(tuple, pats);
             default:
-                // '@NonExhaustive' (09 A11): outside the package that declares it, a later version
+                // '@NonExhaustive': outside the package that declares it, a later version
                 // may add one more — which only a default covers, as it covers an open type
                 if (EnumDefOf(type) is { Declaration: EnumDecl ed } enumTs)
                     return [.. MissingVariants(type, ed, enumTs, pats), .. ForeignNonExhaustive(enumTs, ed.Attributes)];
-                // A sealed interface's conformers are a closed set (04 D8): type patterns
+                // A sealed interface's conformers are a closed set: type patterns
                 // cover it; an open interface needs the default.
                 if (TypeFacts.SymbolOf(type) is { Kind: TypeSymbolKind.Interface } sealedIface && IsSealed(sealedIface))
                     return [.. MissingConformers(sealedIface, pats),
@@ -11651,7 +11642,7 @@ public sealed class TypeChecker
 
     /// <summary>
     /// <c>["_"]</c> where <paramref name="ts"/> — an enum, a sealed interface — carries
-    /// <c>@NonExhaustive</c> of <c>std.core</c> (09 A11) and the match stands outside the package
+    /// <c>@NonExhaustive</c> of <c>std.core</c> and the match stands outside the package
     /// that declares it; the type is named in <see cref="_nonExhaustive"/> for the diagnostic.
     /// The attribute is read from the declaring module's scope: that module may be checked after
     /// this match, and its attributes bound only then.
@@ -11714,7 +11705,7 @@ public sealed class TypeChecker
     };
 
     /// <summary>A variant written as a pattern, with its payload left open — in the dotted form,
-    /// since a bare name would be a binding (08 Y6).</summary>
+    /// since a bare name would be a binding.</summary>
     private static string WitnessOf(EnumVariant variant) => variant switch
     {
         { TupleFields: { } tuple } => $".{variant.Name}({string.Join(", ", tuple.Select(_ => "_"))})",
@@ -11745,7 +11736,7 @@ public sealed class TypeChecker
             else exact.Add(positions.Length);
         }
 
-        // An inline array has one length (A4): only that class needs covering.
+        // An inline array has one length: only that class needs covering.
         if (fixedLength is { } only)
             return exact.Contains(only) || only >= open ? []
                 : [only == 0 ? "[]" : "[" + string.Join(", ", Enumerable.Repeat("_", only)) + "]"];
@@ -11810,7 +11801,7 @@ public sealed class TypeChecker
                 // At the top a name binds the present half of a '?T' and leaves null uncovered;
                 // nested it binds the whole optional (BindPattern) and covers it.
                 if (type is Optional opt) return nested && BindsWholeOptional(b, opt);
-                return true; // a bare name binds, always (08 Y6)
+                return true; // a bare name binds, always
             // An array pattern only covers everything when it tests no length: '[..]' and
             // '[..rest]' match every array, anything else asks how many elements there are.
             case ArrayPattern ap:
@@ -11934,7 +11925,7 @@ public sealed class TypeChecker
 
             case TypePattern tp:
             {
-                // 'c: Circle' (03 T11): the scrutinee is an interface value, the type one it
+                // 'c: Circle': the scrutinee is an interface value, the type one it
                 // may hold; the name is bound as that type.
                 var tested = ResolveType(tp.Type, scope);
                 _result.RecordTypeTested(tp, tested);
@@ -11956,9 +11947,9 @@ public sealed class TypeChecker
 
             case TypeSetPattern ts:
             {
-                // 's in [Circle, Rect]' (08 Y6): one of the types, the form of 'catch (e in [A, B])'.
+                // 's in [Circle, Rect]': one of the types, the form of 'catch (e in [A, B])'.
                 // A set of one binds as its type; a larger one as what the scrutinee holds, an
-                // interface value carrying the set (K7) — a match over it covers the set, a rethrow
+                // interface value carrying the set — a match over it covers the set, a rethrow
                 // throws it.
                 var interfaceValue = TypeFacts.SymbolOf(scrutinee) is { Kind: TypeSymbolKind.Interface };
                 var set = new List<LyrType>();
@@ -11983,7 +11974,7 @@ public sealed class TypeChecker
             }
 
             case BindingPattern b:
-                // A bare name is a binding, always (08 Y6). One that spells a variant of the
+                // A bare name is a binding, always. One that spells a variant of the
                 // scrutinee's enum would match everything under the variant's name: refused,
                 // with the spelling that tests the variant. Lyric 4 read it as the variant.
                 if (EnumDefOf(scrutinee) is { } be && VariantOf(be, b.Name) is not null)
@@ -12057,7 +12048,7 @@ public sealed class TypeChecker
 
         foreach (var element in ap.Elements)
         {
-            // '..rest' binds a view of the elements it covers (03 T13 A2), never a copy.
+            // '..rest' binds a view of the elements it covers, never a copy.
             if (element is RestPattern { Name: { } restName } rest)
             {
                 var local = new LocalSymbol(restName, new SliceOf(array.Element), mutable, rest);
@@ -12163,7 +12154,7 @@ public sealed class TypeChecker
         {
             if (def.Members.LookupLocal(fp.Name) is FieldSymbol fs)
             {
-                Reach(fs, fp.Span); // a field named in a pattern is named (07 V2 S0)
+                Reach(fs, fp.Span); // a field named in a pattern is named
                 BindFieldPattern(fp, Substitute(FieldType(fs), subst), scope, mutable);
             }
             else
@@ -12362,7 +12353,7 @@ public sealed class TypeChecker
     };
 
     // Resolves the first count segments of a pattern path through the scope: modules and imports;
-    // what a module step names is visible from here, or reported (07 V2 S1).
+    // what a module step names is visible from here, or reported.
     private Symbol? ResolveNamePath(string[] path, int count, SymbolTable scope, Span span)
     {
         var cur = scope.Lookup(path[0]);
@@ -12428,7 +12419,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// <c>comptime e</c> (design/v5/spec/09 A4, Q1): <c>e</c> is checked exactly as it would be
+    /// <c>comptime e</c>: <c>e</c> is checked exactly as it would be
     /// without the prefix — the value is the same — and then held to what the evaluation can
     /// honour. The IR interpreter runs it as a function of its own, without the enclosing
     /// function's frame, so a local, a parameter or <c>this</c> has nothing to stand on there;
@@ -12440,7 +12431,7 @@ public sealed class TypeChecker
         var type = CheckExpr(ct.Inner, scope, expected);
         if (type.IsError) return type;
 
-        // A question to std.meta (09 A7; M9a S9) is a constant of the type it asks about, which in
+        // A question to std.meta is a constant of the type it asks about, which in
         // a generic body is known per instance: the lowering answers it there. No site — a site is
         // evaluated once.
         if (ct.Inner is CallExpr asked && IsMetaQuery(TargetSymbol(asked.Callee)))
@@ -12456,7 +12447,7 @@ public sealed class TypeChecker
                 + $"and this one is '{TypeFacts.Display(type)}': {why}");
 
         // What the site binds itself — the locals of its block, a lambda's parameters, a loop's
-        // variable — it may use and assign (09 Q2, M9a S3); what the enclosing function binds has
+        // variable — it may use and assign; what the enclosing function binds has
         // no frame at compile time, and a module's 'var' is the run's, not the build's.
         bool Own(Symbol symbol) =>
             symbol.Declaration is { } d && d.Span.File == ct.Inner.Span.File && ct.Inner.Span.Contains(d.Span.Start);
@@ -12471,7 +12462,7 @@ public sealed class TypeChecker
                     Report(t.Span, "LYR-SEM0100", "'this' cannot be used in a 'comptime' expression — "
                         + "it is evaluated before any receiver exists");
                     return;
-                // A round's variable (M9a S9) is its field's info, a constant. One whose rounds come
+                // A round's variable is its field's info, a constant. One whose rounds come
                 // later stands in a body checked once and never built — its site is the rounds'.
                 case IdentifierExpr known when _result.RefOf(known) is LocalSymbol round
                                               && (_result.KnownFieldOf(round) is not null || _result.KnownVariantOf(round) is not null
@@ -12504,7 +12495,7 @@ public sealed class TypeChecker
         Walk(ct.Inner);
 
         // once: a hole of an f-string is checked twice — a site listed twice ran twice and
-        // reported its error twice (M9a S1)
+        // reported its error twice
         if (pure && !_result.ComptimeSites.Contains(ct)) _result.ComptimeSites.Add(ct);
         return type;
     }
@@ -12520,7 +12511,7 @@ public sealed class TypeChecker
 
     /// <summary>
     /// Why a value of <paramref name="type"/> is no literal a <c>comptime</c> site can leave
-    /// behind (09 Q1; 13 M9a P3) — <c>null</c> where it is one: a scalar, a string, and an array,
+    /// behind — <c>null</c> where it is one: a scalar, a string, and an array,
     /// an inline array, a tuple, an optional, a struct, an enum or a <c>Box</c> of such. A class
     /// is an object with an identity; a view shows an array it does not own; a function value
     /// holds its captures, a coroutine its stack, an interface value an object of any type.
@@ -12590,7 +12581,7 @@ public sealed class TypeChecker
 
         var expFn = expected is FnType ef && ef.Parameters.Length == parameters.Length ? ef : null;
 
-        // What the lambda throws (05 E2 K3, 08 Y11 F7): the set it writes; else the one its position
+        // What the lambda throws: the set it writes; else the one its position
         // expects, which the body is then held to; else — no position, or an expected set still
         // waiting for this lambda to bind its type parameter — what the body lets escape, read once
         // the body is checked.
@@ -12602,12 +12593,12 @@ public sealed class TypeChecker
         var savedInference = _returnInference;
         var savedLoops = _loops;
         var savedAskable = _askable;
-        // A lambda an 'inline fn' sets in place (08 F6) is no function of its own: its 'return',
+        // A lambda an 'inline fn' sets in place is no function of its own: its 'return',
         // 'break', 'continue' and 'yield' are the enclosing function's, and it captures nothing.
         var inline = _result.IsInlineLambda(lam);
         if (!inline)
         {
-            _loops = new(); // its loops are its own (08 Y11 F5)
+            _loops = new(); // its loops are its own
             _askable = new(ReferenceEqualityComparer.Instance); // a clause's binding is a captured value here (06 §4)
             _currentYield = null; // a lambda is no coroutine: a yield inside it is the DYNAMIC kind
                                   // (§10a) even when the lambda stands inside a coroutine body —
@@ -12626,7 +12617,7 @@ public sealed class TypeChecker
             else if (expFn is not null) pt = expFn.Parameters[i];
             else pt = Report(p.Span, "LYR-SEM0045",
                 $"lambda parameter '{p.Name}' needs a type annotation (no context type available)");
-            // '&n' (03 T12; the review's M6-24): the parameter takes a place. The mark is the
+            // '&n': the parameter takes a place. The mark is the
             // lambda's to write, as '&x' is the call's: where the position hands a place over
             // the parameter says so, and the body shows what it may write. Said here, once —
             // the lambda is then typed as its position wants it, so no mismatch follows.
@@ -12657,13 +12648,13 @@ public sealed class TypeChecker
 
         var contextRet = lam.ReturnType is not null ? ResolveType(lam.ReturnType, scope) : expFn?.Return;
 
-        // As on a declaration (M6-6): a set behind a written return type that may carry one says
+        // As on a declaration: a set behind a written return type that may carry one says
         // whose it is — but in a generator lambda, whose set is its coroutine's.
         if (lam.Throws is { } whose && lam.ReturnType is not null && !(lam.Body is Block yielding && CoroutineShape.YieldsIn(yielding))
             && LeavesOpenWhoseThrows(contextRet!, lam.ReturnGrouped, whose))
             contextRet = LyrType.Error;
 
-        // A yield of its own makes the lambda a GENERATOR (08 Y11 F5): 'fn(…) -> Coroutine<Y, R>'.
+        // A yield of its own makes the lambda a GENERATOR: 'fn(…) -> Coroutine<Y, R>'.
         // Calling it builds the coroutine and throws nothing; what the body throws is the pulls'.
         if (!inline && lam.Body is Block generator && CoroutineShape.YieldsIn(generator))
         {
@@ -12702,7 +12693,7 @@ public sealed class TypeChecker
                 break;
             case Block b when inline:
             {
-                // set in place (08 F6): a 'return' leaves the enclosing function, so the lambda's
+                // set in place: a 'return' leaves the enclosing function, so the lambda's
                 // value is its tail — or nothing, for a void position
                 var savedTail = _tailExpected;
                 var wanted = openGeneric ? null : contextRet;
@@ -12792,7 +12783,7 @@ public sealed class TypeChecker
         return new FnType(pTypes, ret) { Throws = thrown ?? EscapingOf(lam.Body), Places = places.Contains(true) ? places : [] };
     }
 
-    // ------------------------------------------------------------------ std.meta (09 A7; M9a S9)
+    // ------------------------------------------------------------------ std.meta
 
     /// <summary>'Self' read as a conformer while a default is set in place for it.</summary>
     private (GenericParamSymbol Param, LyrType Type)? _selfAs;
@@ -12826,14 +12817,14 @@ public sealed class TypeChecker
     /// <summary>A file's tokens, lexed once for every part of it parsed again.</summary>
     private readonly Dictionary<FileId, List<Token>> _tokens = new();
 
-    /// <summary>A question of std.meta (09 A7): a function of its without a body, which the
+    /// <summary>A question of std.meta: a function of its without a body, which the
     /// compiler answers.</summary>
     private static bool IsMetaQuery(Symbol? symbol) =>
         symbol is FunctionSymbol { Declaration: FunctionDecl { Body: null }, Name: "fields" or "members" or "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute" or "typeAttribute" or "variants" or "conformances" or "hasConformance" or "typeName" or "isStruct" or "isClass" or "isEnum" or "isInterface" }
         && symbol.Home is { FullName: "std.meta" or "std.core" };
 
     /// <summary>
-    /// <c>comptime for (f in fields&lt;T&gt;())</c> (design/v5/spec/09 A7 R1, R2; 13 M9a P5, S9).
+    /// <c>comptime for (f in fields&lt;T&gt;())</c>.
     /// The body is checked once, <c>f</c> a <c>FieldInfo</c>: what it names is bound, and what is
     /// wrong in it is said once. Where <c>T</c> is a type whose fields the checker reads here and
     /// the body reads a field through <c>e.[f]</c> or asks a <c>comptime</c> site about <c>f</c>,
@@ -12859,7 +12850,7 @@ public sealed class TypeChecker
         var known = walks && about is not (TypeParamType or AssocOf or ErrorType);
         var perConformer = walks && about is TypeParamType { Param: var param }
                            && _metaIface?.SelfParam is { } self && ReferenceEquals(param, self);
-        // a question about 'T.[f]' in the body checked once (X5): the rounds come with f's
+        // a question about 'T.[f]' in the body checked once: the rounds come with f's
         var nestedPending = asked.TypeArguments is [FieldTypeByInfo { Info: var fieldVariable }, ..]
                             && scope.Lookup(fieldVariable) is LocalSymbol outer && _metaPending.Contains(outer);
         var rounds = reads && known && _outerFunction is not null;
@@ -12883,10 +12874,10 @@ public sealed class TypeChecker
         var built = new List<TypeResult.MetaRound>();
         if (overVariants)
         {
-            // a round per variant (M9a S10): 'v' that variant's info, 'e is v' and 'e.[v, p]' its forms
+            // a round per variant: 'v' that variant's info, 'e is v' and 'e.[v, p]' its forms
             foreach (var variant in MetaVariantsOf(about))
             {
-                // 'Variants' (09 A7 R5; M9a S11) is for an enum whose variants all are units: a
+                // 'Variants' is for an enum whose variants all are units: a
                 // variant with a payload has no value without it, said as such at the entry
                 if (_familyExpanding == "Variants" && variant.Payload.Length > 0)
                 {
@@ -12911,7 +12902,7 @@ public sealed class TypeChecker
         }
         if (overMembers)
         {
-            // a round per member (the sweep after M10, W6): 'm' that member's info, 'memberAttribute<A>(m)' what it carries
+            // a round per member: 'm' that member's info, 'memberAttribute<A>(m)' what it carries
             foreach (var member in MetaMembersOf(about, _currentModule))
             {
                 if (ReparsedLoop(fo) is not { } fresh) return;
@@ -12956,7 +12947,7 @@ public sealed class TypeChecker
     }
 
     /// <summary><c>std.meta.attribute&lt;A&gt;(f)</c>, <c>variantAttribute&lt;A&gt;(v)</c>,
-    /// <c>memberAttribute&lt;A&gt;(m)</c> (R4; W6): the argument is the variable of a loop over
+    /// <c>memberAttribute&lt;A&gt;(m)</c>: the argument is the variable of a loop over
     /// fields, variants or members, whose round knows what it holds — or whose rounds come later.</summary>
     private void CheckFieldAttributeQuery(CallExpr call)
     {
@@ -12988,14 +12979,14 @@ public sealed class TypeChecker
         _result.KnownFieldOf(round)?.Attributes ?? _result.KnownVariantOf(round)?.Attributes ?? _result.KnownMemberOf(round)?.Attributes
         ?? _result.KnownParamOf(round)?.Attributes;
 
-    /// <summary><c>e.[f]</c> (09 A7 R2; M9a S9): in a round, the field whose info <c>f</c> holds —
+    /// <summary><c>e.[f]</c>: in a round, the field whose info <c>f</c> holds —
     /// the member access it is, checked as one; in a body checked once whose rounds come later,
     /// no one's yet.</summary>
     private LyrType CheckFieldByInfo(FieldByInfoExpr access, SymbolTable scope, LyrType? expected)
     {
         CheckExpr(access.Info, scope);
         var round = access.Info is IdentifierExpr ? _result.RefOf(access.Info) as LocalSymbol : null;
-        // 'E.[v]' (M9a S10): the value of the unit variant the round names; in the body checked once,
+        // 'E.[v]': the value of the unit variant the round names; in the body checked once,
         // 'Self' is no value yet and the rounds come later
         if (round is not null && _metaPending.Contains(round) && access.Target is IdentifierExpr { Name: "Self" }) return LyrType.Error;
         if (round is not null && _result.KnownVariantOf(round) is { } variant)
@@ -13039,7 +13030,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// The defaults that walk <c>Self</c>'s fields (09 A5, A7; M9a S9), set in place for each
+    /// The defaults that walk <c>Self</c>'s fields, set in place for each
     /// conformer that takes them: the default parsed again and checked as the conformer's —
     /// <c>Self</c> and <c>this</c> the conformer, the scope the interface's, so it names what the
     /// interface's module names. Its rounds come with the check; the lowering builds the
@@ -13052,7 +13043,7 @@ public sealed class TypeChecker
             if (!_metaDefaults.Contains(member) || _result.ExpansionOf(member, conformer) is not null) continue;
             if (iface.SelfParam is not { } selfParam || Reparsed(member) is not { } fresh) continue;
             var saved = (_currentModule, _selfAs, _metaIface);
-            // The family's defaults (D2; M9a S10) ask with the conformer's module: a conformer's
+            // The family's defaults ask with the conformer's module: a conformer's
             // internal and private fields compare, hash and clone as its pub ones do. What is
             // wrong in them is said at the conformer's entry (05 §14 rule 6).
             var family = IsFamily(iface);
@@ -13087,7 +13078,7 @@ public sealed class TypeChecker
         return Parser.FunctionAt(_comp.Sources, tokens, original.Span);
     }
 
-    // ------------------------------------------------------------------ M9a S10: variants, payloads, initializers over infos
+    // ------------------------------------------------------------------ variants, payloads, initializers over infos
 
     /// <summary>The variable of a round — of a loop over <c>fields</c>, <c>variants</c> or a
     /// variant's <c>payload</c> —, named alone: known in its round, pending in the body checked
@@ -13098,8 +13089,8 @@ public sealed class TypeChecker
             || _result.KnownParamOf(local) is not null || _metaPendingEver.Contains(local))
             ? local : null;
 
-    /// <summary>The five of 05 §14 and <c>TotalOrder</c> (09 A5; M9a S10): their defaults in
-    /// std.core ask with the conformer's module (D2), and what is wrong in them is said at the
+    /// <summary>The five of 05 §14 and <c>TotalOrder</c>: their defaults in
+    /// std.core ask with the conformer's module, and what is wrong in them is said at the
     /// conformer's entry (05 §14 rule 6).</summary>
     /// <summary>The family's member being set in place, while it is (05 §14 rule 6): a shape its
     /// synthesis has no form for is refused as such.</summary>
@@ -13116,11 +13107,11 @@ public sealed class TypeChecker
     private static bool IsFamily(TypeSymbol iface) =>
         (iface.Home is { FullName: "std.core" }
          && iface.Name is "Equatable" or "Hashable" or "Ordered" or "TotalOrder" or "Clone" or "VariantName" or "Variants")
-        // the serialization pair (10 E3; M10 S2): a type's private fields are written and read as its pub ones are
+        // the serialization pair: a type's private fields are written and read as its pub ones are
         || (iface.Home is { FullName: "std.codec" } && iface.Name is "Encode" or "Decode");
 
-    /// <summary>Whether the interface's defaults ask with the conformer's module (11 §4 rule 10;
-    /// the sweep after M10, W10): one marked <c>@SeesConformer</c> — std.core's family and
+    /// <summary>Whether the interface's defaults ask with the conformer's module (11 §4 rule 10):
+    /// one marked <c>@SeesConformer</c> — std.core's family and
     /// std.codec's pair carry the marker, and a program's interface may —, and the family by
     /// name, for the std of a build without the marker.</summary>
     private bool SeesConformer(TypeSymbol iface)
@@ -13147,8 +13138,8 @@ public sealed class TypeChecker
         return false;
     }
 
-    /// <summary>A static default of an interface <paramref name="ts"/> conforms to (03 T5; M9a
-    /// S11), reached as <c>E.m(…)</c>: its type with <c>Self</c> the conformer, or nothing.</summary>
+    /// <summary>A static default of an interface <paramref name="ts"/> conforms to,
+    /// reached as <c>E.m(…)</c>: its type with <c>Self</c> the conformer, or nothing.</summary>
     private (LyrType, FunctionSymbol)? StaticDefaultOf(TypeSymbol ts, string member, LyrType self)
     {
         foreach (var (iface, subst) in InterfacesOf(ts))
@@ -13160,7 +13151,7 @@ public sealed class TypeChecker
     private const string RoundsMessage =
         "in a round of its own — here there is none: the type is known only per instance, or this is no such loop's variable";
 
-    /// <summary><c>comptime for (p in m.parameters)</c> (the sweep after M10, X4): the body once per
+    /// <summary><c>comptime for (p in m.parameters)</c>: the body once per
     /// parameter of the function the member round names, <c>p</c> that parameter's info —
     /// <c>parameterAttribute&lt;A&gt;(p)</c> what it carries. Where <c>m</c> is pending, the body is
     /// checked once and the rounds come with <c>m</c>'s.</summary>
@@ -13197,7 +13188,7 @@ public sealed class TypeChecker
         _result.SetMetaRounds(fo, [.. built]);
     }
 
-    /// <summary><c>comptime for (p in v.payload)</c> (M9a S10): the body once per field of the
+    /// <summary><c>comptime for (p in v.payload)</c>: the body once per field of the
     /// variant's payload, <c>p</c> that field's info — <c>e.[v, p]</c> the field, <c>[p] = …</c>
     /// its initializer. Where <c>v</c> is pending, the body is checked once and the rounds come
     /// with <c>v</c>'s.</summary>
@@ -13288,7 +13279,7 @@ public sealed class TypeChecker
     private static readonly object NullMark = new();
     private static readonly object Present = new();
 
-    /// <summary>What a round decides of an expression (M9a S10): a field's <c>isVar</c>, <c>index</c>,
+    /// <summary>What a round decides of an expression: a field's <c>isVar</c>, <c>index</c>,
     /// <c>name</c>, a variant's <c>index</c> and <c>name</c>, whether <c>attribute&lt;A&gt;(f)</c> is
     /// there, literals, and <c>==</c>, <c>!=</c>, the orderings, <c>!</c>, <c>&amp;&amp;</c>, <c>||</c> over
     /// them — or <c>null</c> where it is no such thing, and the site decides while lowering.</summary>
@@ -13318,7 +13309,7 @@ public sealed class TypeChecker
                 if (_result.KnownParamOf(rv) is { } kp)
                     return m.Member switch { "name" => kp.Name, "index" => (long)kp.Index, "hasDefault" => kp.HasDefault, _ => null };
                 return null;
-            // 'f.type.kind' (W9): the kind of the field's type, decided against a 'TypeKind'
+            // 'f.type.kind': the kind of the field's type, decided against a 'TypeKind'
             case MemberExpr { Target: MemberExpr { Target: IdentifierExpr kid, Member: "type", IsOptional: false }, Member: "kind", IsOptional: false }
                 when RoundVariable(kid, scope) is { } krv && _result.KnownFieldOf(krv) is { } kf:
                 touched = true;
@@ -13332,12 +13323,12 @@ public sealed class TypeChecker
             case MemberExpr { Target: IdentifierExpr { Name: "MemberKind" }, Member: var memberKind, IsOptional: false }
                 when Array.IndexOf(TypeFacts.MemberKindNames, memberKind) >= 0:
                 return new KindMark(memberKind);
-            // 'f.type.name' (M10 S2): the field's type as 'typeName' writes it
+            // 'f.type.name': the field's type as 'typeName' writes it
             case MemberExpr { Target: MemberExpr { Target: IdentifierExpr tid, Member: "type", IsOptional: false }, Member: "name", IsOptional: false }
                 when RoundVariable(tid, scope) is { } trv && _result.KnownFieldOf(trv) is { } tf:
                 touched = true;
                 return TypeFacts.Display(tf.Type);
-            // 'v.payload.length()' (M10 S2): how many fields a variant's payload has
+            // 'v.payload.length()': how many fields a variant's payload has
             case CallExpr { Callee: MemberExpr { Target: MemberExpr { Target: IdentifierExpr pid, Member: "payload", IsOptional: false }, Member: "length" }, Arguments.Length: 0 }
                 when RoundVariable(pid, scope) is { } prv && _result.KnownVariantOf(prv) is { } pv:
                 touched = true;
@@ -13406,7 +13397,7 @@ public sealed class TypeChecker
             _ => ReferenceEquals(l, r),
         };
 
-    /// <summary>An initializer with items over infos (M9a S10): <c>[f] = e</c> and
+    /// <summary>An initializer with items over infos: <c>[f] = e</c> and
     /// <c>comptime for (f in fields&lt;T&gt;()) [f] = e</c> — one named field per round, <c>e</c>
     /// checked with <c>f</c> that field's info, of that field's type. The type is the written one,
     /// or <c>Self</c> in a default: the conformer's at the expansion.</summary>
@@ -13544,7 +13535,7 @@ public sealed class TypeChecker
         _metaPending.Add(loopVar);
         _metaPendingEver.Add(loopVar);
         if (round.Item.Info is not null) CheckExpr(round.Item.Info, loopScope);
-        // The field's type is the instance's (M10 S2): a type argument the value's call leaves
+        // The field's type is the instance's: a type argument the value's call leaves
         // open here is bound in the round of each instance, where the field is known.
         _pendingRounds++;
         CheckExpr(round.Item.Value, loopScope);
@@ -13556,7 +13547,7 @@ public sealed class TypeChecker
     /// checked once, over <c>Self</c>): an inference the field's type would settle is no error.</summary>
     private int _pendingRounds;
 
-    /// <summary><c>E.[v] { … }</c> (M9a S10): the variant <c>v</c> of <c>E</c> built from its
+    /// <summary><c>E.[v] { … }</c>: the variant <c>v</c> of <c>E</c> built from its
     /// payload's infos — <c>[p] = e</c> per field, or <c>comptime for (p in v.payload) [p] = e</c>.
     /// A unit variant takes no items and is its value.</summary>
     private LyrType CheckVariantInitByInfo(VariantInitExpr vi, SymbolTable scope, LyrType? expected)
@@ -13636,7 +13627,7 @@ public sealed class TypeChecker
                     Set(field, fresh.Item.Value, fresh.Item.Span, CheckExpr(fresh.Item.Value, roundScope, field.Type));
             }
         }
-        // an omitted field as for a written initializer (11 §4 rule 8; the sweep after M10, X2): its
+        // an omitted field as for a written initializer (11 §4 rule 8): its
         // default, 'null' for a '?T', or LYR-SEM0106
         var omitted = variant.Payload.Where((field, i) => values[i] is null
             && field.Declaration?.Default is null && field.Type is not Optional).Select(field => field.Name).ToArray();
@@ -13660,7 +13651,7 @@ public sealed class TypeChecker
 
     /// <summary><c>E.[v](…)</c>: the variant's constructor, called — checked as the call it stands
     /// for, <c>E.Name(…)</c>, which the lowering takes. <c>e.[m](…)</c> and <c>T.[m](…)</c> (11 §4
-    /// rule 4; the sweep after M10, X3): the member the round's <c>m</c> names, called — checked as
+    /// rule 4): the member the round's <c>m</c> names, called — checked as
     /// <c>e.name(…)</c> and <c>T.name(…)</c>, among overloads the arguments choose.</summary>
     private LyrType CheckVariantCallByInfo(CallExpr call, FieldByInfoExpr callee, SymbolTable scope, LyrType? expected)
     {
@@ -13709,8 +13700,8 @@ public sealed class TypeChecker
         return type;
     }
 
-    /// <summary>The fields of a struct or a class that <paramref name="from"/> may name (09 A7
-    /// R1, R7), in declaration order, of the instance's types; none of any other type.</summary>
+    /// <summary>The fields of a struct or a class that <paramref name="from"/> may name,
+    /// in declaration order, of the instance's types; none of any other type.</summary>
     private TypeResult.MetaField[] MetaFieldsOf(LyrType type, ModuleSymbol? from)
     {
         if (TypeFacts.SymbolOf(type) is not { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class } ts) return [];
@@ -13739,7 +13730,7 @@ public sealed class TypeChecker
     {
         if (TypeFacts.SymbolOf(type) is not { } ts) return [];
         // the functions, the constants and the associated types of its own body, in the order
-        // written (X4)
+        // written
         IEnumerable<Decl> own = ts.Declaration switch
         {
             StructDecl s => s.Members.Where(m => m is FunctionDecl or StaticBindingDecl or AssociatedTypeDecl),
@@ -13809,11 +13800,11 @@ public sealed class TypeChecker
         return [.. found];
     }
 
-    /// <summary>Every callee a call names: an 'inline fn' (08 F6) is called, never a value.</summary>
+    /// <summary>Every callee a call names: an 'inline fn' is called, never a value.</summary>
     private readonly HashSet<Expr> _callees = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
-    /// What an <c>inline fn</c> (design/v5/spec/08 F6; 13 M9a P10) asks, once every body is checked:
+    /// What an <c>inline fn</c> asks, once every body is checked:
     /// <list type="bullet">
     /// <item>its function parameters are called — or passed on to another <c>inline fn</c>'s —, never
     /// kept, returned or captured: they are set in place (<c>LYR-SEM0181</c>);</item>
@@ -13843,7 +13834,7 @@ public sealed class TypeChecker
                     InterfaceDecl i => i.Members,
                     _ => [],
                 };
-                // what an expansion does not take (13 M9a S8): no body, a member called through a
+                // what an expansion does not take: no body, a member called through a
                 // table, a receiver or parameter that is the caller's place, a body that yields
                 foreach (var fn in fns.Where(fn => fn.IsInline))
                 {
@@ -13901,7 +13892,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// The body of a generator lambda (08 Y11 F5). Its yields give the coroutine's <c>Y</c> and its
+    /// The body of a generator lambda. Its yields give the coroutine's <c>Y</c> and its
     /// returns <c>R</c>: checked against a context that says <c>Coroutine&lt;Y, R&gt;</c>; inferred
     /// from the body where none does, or where the context's coroutine still names a type parameter
     /// — <c>sequence&lt;T&gt;</c>'s argument — which the body then binds. What the body throws belongs
@@ -13956,7 +13947,7 @@ public sealed class TypeChecker
         return new CoroutineOf(yielded, thrown) { Result = result };
     }
 
-    /// <summary>What a lambda's body lets escape (05 E2 K3): the exception analysis's own walk, run
+    /// <summary>What a lambda's body lets escape: the exception analysis's own walk, run
     /// muted, as for a clause without a type (<see cref="Reaching"/>) — one notion of a site.</summary>
     private LyrType[] EscapingOf(Node body)
     {
@@ -14102,7 +14093,7 @@ public sealed class TypeChecker
 
         // Captured 'var' bindings are shared rather than copied, so they need a cell. Conservatively:
         // what counts is not WHETHER the closure writes, but that it could.
-        // A local 'fn' its own body captures (08 F8) too: the closure stands before the binding
+        // A local 'fn' its own body captures too: the closure stands before the binding
         // holds it, so the binding holds a cell the closure reads.
         foreach (var symbol in captured)
             if (symbol is LocalSymbol { IsMutable: true } or LocalSymbol { Declaration: BindingStmt { LocalFunction: true } })
@@ -14162,7 +14153,7 @@ public sealed class TypeChecker
         var liftedTo = to;
         while (liftedTo is Optional { Inner: var inner } && from is not (NullType or Optional))
             liftedTo = inner;
-        // A value of an interface arises here (04 D9): an interface a table cannot serve — a
+        // A value of an interface arises here: an interface a table cannot serve — a
         // member naming 'Self' beyond the receiver, a static, a generic one — is a constraint
         // and no type for a value; said where the value would come to be.
         if (TypeFacts.KindOf(liftedTo) == TypeSymbolKind.Interface && !LyrType.Equal(from, liftedTo) && !from.IsError
@@ -14248,9 +14239,9 @@ public sealed class TypeChecker
 
 
     /// <summary>
-    /// A value type must not contain itself, not even indirectly (design/v5/spec/02 M13).
+    /// A value type must not contain itself, not even indirectly.
     ///
-    /// <para>A struct holds its fields BY SIZE and an enum its payloads (01 V2, V6), so a value
+    /// <para>A struct holds its fields BY SIZE and an enum its payloads, so a value
     /// type that contains itself would be infinitely large. Rust reports "recursive type has
     /// infinite size", C# reports CS0523. For a reference, <c>class Node { next: Node }</c> is
     /// fine: a field holds one machine word.</para>
@@ -14316,7 +14307,7 @@ public sealed class TypeChecker
             NamedType named => [named],
             NullableType optional => Inside(optional.Inner),
             TupleType tuple => tuple.Elements.SelectMany(Inside),
-            ArrayType { Length: not null } inline => Inside(inline.Element), // T[N] holds by value (A4)
+            ArrayType { Length: not null } inline => Inside(inline.Element), // T[N] holds by value
             _ => [],
         };
 
@@ -14326,10 +14317,10 @@ public sealed class TypeChecker
     /// <param name="coercionSite">Whether the position is a coercion site — an assignment, an
     /// argument, a return, an initializer — where an unsuffixed literal takes the target's type
     /// (§3.1; the caller records the adaptation afterwards) and an integer widens losslessly
-    /// (design/v5/spec/03 T1c; the lowering converts). False where the answer only decides a type
+    /// (the lowering converts). False where the answer only decides a type
     /// and nothing writes it back — an arm unification — because a yes on either ground alone
     /// leaves the value at its own type while the result claims the target's; coercion happens
-    /// after the unification, never inside it (T8).</param>
+    /// after the unification, never inside it.</param>
     private bool IsAssignable(Expr expr, LyrType from, LyrType to, bool coercionSite = true)
     {
         if (from.IsError || to.IsError) return true;      // poison: no follow-up errors
@@ -14357,8 +14348,8 @@ public sealed class TypeChecker
         if (to is GenericInstance { Throws: not null } wantedTask && from is GenericInstance { Throws: null } givenTask)
             return LyrType.Equal(givenTask, wantedTask with { Throws = null });
 
-        // A function value that throws less fits where one may throw more (05 E2 K6): the same
-        // parameters and return — no variance (03 T17) — and its set covered by the target's. Free
+        // A function value that throws less fits where one may throw more: the same
+        // parameters and return — no variance — and its set covered by the target's. Free
         // at run time, since every function value takes the error slot; never the way back, which
         // is how the demand to mark a call would vanish.
         if (to is FnType wantedFn && from is FnType givenFn && FitsFunctionType(givenFn, wantedFn)) return true;
@@ -14366,11 +14357,11 @@ public sealed class TypeChecker
         if (coercionSite && to is SliceOf view && from is ArrayOf whole && LyrType.Equal(whole.Element, view.Element))
             return true;                                                                    // T[] to Slice<T>, A2
         if (coercionSite && to is StringViewType && from is PrimitiveType { Kind: PrimitiveKind.String })
-            return true;                                                                    // string to StringView, 10 S1
+            return true;                                                                    // string to StringView
         if (coercionSite && to is SliceOf viewOfInline && from is InlineArrayOf inlineArray
             && LyrType.Equal(inlineArray.Element, viewOfInline.Element))
         {
-            // T[N] to Slice<T> (A4): where the array lies in the heap; otherwise the refusal is
+            // T[N] to Slice<T>: where the array lies in the heap; otherwise the refusal is
             // reported here, with its reason, and no second message follows.
             ViewOfInline(expr, inlineArray, expr.Span);
             return true;
@@ -14378,13 +14369,13 @@ public sealed class TypeChecker
         if (coercionSite && to is PrimitiveType pt && LiteralAdaptsTo(expr, pt)) return true; // literal fit
         if (coercionSite && TypeFacts.Widens(from, to)) return true;                           // int8 to int, T1c
         if (ImplementsInterface(from, to)) return true;   // T to I when T :: [I]
-        // Every struct, class and enum value is an 'Any' at the transition (03 T10): the empty
+        // Every struct, class and enum value is an 'Any' at the transition: the empty
         // interface asks nothing, so nothing has to be declared. In Lyric 5 a built-in's value
         // too, in its box ('let a: Any = 5', 05 §9 rule 1); the 4.x lowering has none.
         if (IsAny(to) && (TypeFacts.SymbolOf(from) is { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }
                           || _comp.Lyric5Modules && BoxesAsBuiltin(from)))
             return true;
-        // A child interface value where a parent is expected (04 D10): a coercion, the parent's
+        // A child interface value where a parent is expected: a coercion, the parent's
         // table found at the transition through the concrete type's conformance list.
         if (TypeFacts.KindOf(from) == TypeSymbolKind.Interface && TypeFacts.KindOf(to) == TypeSymbolKind.Interface
             && TypeFacts.SymbolOf(from) is { } child && TypeFacts.SymbolOf(to) is { } parent && !ReferenceEquals(child, parent)
@@ -14394,7 +14385,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>Whether a function value of type <paramref name="given"/> may stand where
-    /// <paramref name="wanted"/> is expected (05 E2 K6): one signature, its set covered by the
+    /// <paramref name="wanted"/> is expected: one signature, its set covered by the
     /// wanted one's — equal sets included.</summary>
     private bool FitsFunctionType(FnType given, FnType wanted) =>
         given.Parameters.Length == wanted.Parameters.Length
@@ -14414,23 +14405,23 @@ public sealed class TypeChecker
     /// conformance check and the IR lowering ask.</para>
     /// </summary>
     /// <summary>
-    /// Whether an interface can be the type of a VALUE (design/v5/spec/04 D9): not when a member
+    /// Whether an interface can be the type of a VALUE: not when a member
     /// names <c>Self</c> outside the receiver, is static, or is generic — a table slot holds one
     /// function for every conformer, and such a member has no one function. Such an interface is
     /// a constraint, and the diagnostic says so where a value of it would arise.
     /// <para>An interface with associated types is a value's type where <paramref name="instance"/>
     /// answers every one of them — fixed, <c>Iterator&lt;Item = int&gt;</c>, or by the interface's
-    /// default, its <c>Error</c> (03 M4-1, T6) —; a member typed by <c>Self.Item</c> then has one
+    /// default, its <c>Error</c> —; a member typed by <c>Self.Item</c> then has one
     /// signature for every value.</para>
     /// </summary>
     /// <summary>
     /// A type written for a value — a binding's, a parameter's, a return — that is an interface no
-    /// value of arises, or an optional of one (05 §7 rule 3, 04 D9): said once where it is written
+    /// value of arises, or an optional of one (05 §7 rule 3): said once where it is written
     /// (<c>LYR-SEM0126</c>), and the error type from there on, so its uses and its calls say nothing
-    /// more (the review of 2026-10-08; M8c S13). Silent where <paramref name="at"/> is null — a
+    /// more. Silent where <paramref name="at"/> is null — a
     /// signature read again. Within the type too, where a value of it holds values of another —
     /// an element of an array, a view or a tuple, a type argument (<c>List&lt;Equatable&gt;</c>), and
-    /// a field's type (design 04 "Review 2026-10-09" S13; M8c S18). Lyric 5's: the 4.x line keeps
+    /// a field's type. Lyric 5's: the 4.x line keeps
     /// saying it at the transition alone.
     /// </summary>
     private LyrType ValueTypeAt(LyrType type, Span? at)
@@ -14489,7 +14480,7 @@ public sealed class TypeChecker
         foreach (var part in Conformance.WithParents(iface, _binding))
             foreach (var symbol in part.Members.Symbols)
             {
-                // A value fixes its associated types, 'Iterator<Item = int>' (03 M4-1, T6, 04 D9),
+                // A value fixes its associated types, 'Iterator<Item = int>',
                 // or leaves one to the interface's default. Asked before 'Self', which 'Self.Item'
                 // mentions as well.
                 if (symbol is AssociatedTypeSymbol assoc
@@ -14504,10 +14495,10 @@ public sealed class TypeChecker
                 { reason = $"it declares the static member '{constant.Name}'"; return false; }
                 if (symbol is not FunctionSymbol fn) continue;
                 if (fn.IsStatic) { reason = $"it declares the static member '{fn.Name}'"; return false; }
-                // A generic member, with a body too (D9 whole, the review's A8): one function per
+                // A generic member, with a body too: one function per
                 // instantiation, and no slot holds that. Not a private helper, which is no member
-                // of the contract (07 V2 S4). The 4.x path keeps a generic default beside a value
-                // until it leaves main (M16).
+                // of the contract. The 4.x path keeps a generic default beside a value
+                // until it leaves main.
                 if (fn.Generics.Length > 0
                     && (fn.Declaration is FunctionDecl { Body: null }
                         || (_comp.Lyric5Modules && fn.Declaration is FunctionDecl { IsPrivateHelper: false })))
@@ -14517,7 +14508,7 @@ public sealed class TypeChecker
             foreach (var symbol in part.Members.Symbols)
             {
                 if (symbol is not FunctionSymbol fn) continue;
-                // (D9's generic members are the first loop's. The 4.x library reaches
+                // (A generic interface's members are the first loop's. The 4.x library reaches
                 // 'Iterator<T>' values with a generic 'map' — 05 §5.2a of the 4.x text,
                 // monomorphized and not overridable — and keeps them in its own path.)
                 // 'Self.Item' is an answer the value's type fixes; 'Self' itself — 'equals(o: Self)' —
@@ -14565,7 +14556,7 @@ public sealed class TypeChecker
         _ => false,
     };
 
-    /// <summary>Why a type that conforms is no value of a fixed interface (03 M4-1): the first
+    /// <summary>Why a type that conforms is no value of a fixed interface: the first
     /// associated type it answers otherwise than the value — <c>'Countdown' answers 'Error' with
     /// 'Oops', the value with 'never'</c>. <c>null</c> where that is not the reason.</summary>
     private string? FixationMismatch(LyrType from, LyrType to)
@@ -14591,7 +14582,7 @@ public sealed class TypeChecker
         if (TypeFacts.KindOf(to) != TypeSymbolKind.Interface) return false;
         var target = TypeFacts.SymbolOf(to)!;
 
-        // A value of an interface with its associated types fixed (03 M4-1) holds a type that
+        // A value of an interface with its associated types fixed holds a type that
         // answers EVERY one of them as the value does — the fixed ones as written, the others as
         // the interface's default: a throwing iterator is no 'Iterator<Item = int>', whose 'Error'
         // is 'never', or a call through the value would throw what its type says it cannot. The
@@ -14615,7 +14606,7 @@ public sealed class TypeChecker
                 from is GenericInstance instance ? SubstMap(instance) : EmptySubst);
 
         // A built-in's value conforms through std.core's blocks on it, and goes into its interface
-        // in a box (01 V7, 03 T3; M8c S8b): 'let d: Display = 5;', 'f(1, "two")' for 'f(xs: Display...)'.
+        // in a box: 'let d: Display = 5;', 'f(1, "two")' for 'f(xs: Display...)'.
         // Lyric 5's: the 4.x lowering has no box for it.
         if (_comp.Lyric5Modules && BoxesAsBuiltin(from))
             return Satisfies(from, target, to);
@@ -14627,7 +14618,7 @@ public sealed class TypeChecker
         // A type parameter satisfies what its constraints demand. It has no symbol of its own, so it
         // stands here beside rather than inside SymbolOf.
         // Through the constraint's chain: 'this' in a default is 'Self', and passes as its
-        // interface and as a parent of it, as an interface value does (04 D10).
+        // interface and as a parent of it, as an interface value does.
         return from is TypeParamType parameter
                && parameter.Param.Constraints.Any(c =>
                    NodeReaches(c, _currentModule?.Members ?? _comp.Builtins, target, to, EmptySubst, parameter));
@@ -14734,7 +14725,7 @@ public sealed class TypeChecker
             case NamedType n:
                 // The placeholder stands only where an inference fills it — the type arguments of
                 // a call, an initializer, an instantiated function — and those sites take it
-                // before resolving. 'let x: List<_> = …' is not among them (T8: a binding's
+                // before resolving. 'let x: List<_> = …' is not among them (a binding's
                 // type is written or omitted).
                 if (IsPlaceholder(n))
                     return Report(n.Span, "LYR-SEM0117",
@@ -14748,7 +14739,7 @@ public sealed class TypeChecker
                 // ("what does this type name refer to") answered by one table, whoever asked it.
                 if (sym is not null && _binding.Resolve(n) is null) _binding.Bind(n, sym);
 
-                // 'T.Item' (03 T6): a path whose head is a type or a type parameter, not a module,
+                // 'T.Item': a path whose head is a type or a type parameter, not a module,
                 // names an associated type, and every further segment one of what the path has
                 // reached ('A.Iter.Item', 05 §8 rule 4). The resolver bound such a node to its
                 // HEAD (a module path is bound to the type it reaches), and a signature is
@@ -14766,10 +14757,10 @@ public sealed class TypeChecker
                 if (sym is ImportBindingSymbol ibt) sym = ibt.Target;
                 if (sym is null)
                     return Report(n.Span, "LYR-SEM0011", $"unresolved type '{string.Join('.', n.Path)}'");
-                // 'Self' in the body of a generic type is the type at its own parameters (03 T5).
+                // 'Self' in the body of a generic type is the type at its own parameters.
                 if (n.Path is ["Self"] && n.TypeArguments.Length == 0 && sym is TypeSymbol { Generics.Length: > 0 } selfType)
                     return new GenericInstance(selfType, selfType.Generics.Select(g => (LyrType)new TypeParamType(g)).ToArray());
-                // 'Self' of a default set in place for a conformer (M9a S9) is the conformer
+                // 'Self' of a default set in place for a conformer is the conformer
                 if (sym is GenericParamSymbol gp)
                     return _selfAs is { } selfAs && ReferenceEquals(selfAs.Param, gp) ? selfAs.Type : new TypeParamType(gp);
                 if (ReferenceEquals(sym, _slice)) // Slice<T> becomes the internal SliceOf
@@ -14794,18 +14785,18 @@ public sealed class TypeChecker
                     return new CoroutineOf(ResolveType(n.TypeArguments[0], scope))
                         { Result = n.TypeArguments.Length == 2 ? ResolveType(n.TypeArguments[1], scope) : LyrType.Void };
                 }
-                // 'Pair<int>' of 'type Pair<T> = (T, T)' (03 T15) is '(int, int)'.
+                // 'Pair<int>' of 'type Pair<T> = (T, T)' is '(int, int)'.
                 if (sym is TypeSymbol { Kind: TypeSymbolKind.Alias } aliasSymbol)
                     return ExpandAlias(aliasSymbol, scope, n, n.Span);
                 if (sym is TypeSymbol { Kind: not (TypeSymbolKind.Builtin or TypeSymbolKind.Alias) } gts
                     && (gts.Generics.Length > 0 || n.TypeArguments.Length > 0))
                 {
                     // A non-generic interface fixed only, 'Iterator<Item = int>', is an instance
-                    // too: the fixation is part of the type (03 T6).
+                    // too: the fixation is part of the type.
                     return MakeGenericInstance(gts, n, scope);
                 }
                 return SymbolToType(sym, scope, n.Span);
-            // 'T.[f]' (11 §4 rule 3; the sweep after M10, X5): the type of the field the round's
+            // 'T.[f]' (11 §4 rule 3): the type of the field the round's
             // variable names — of the type the round walks; in the body checked once, before the
             // rounds, no type yet
             case FieldTypeByInfo byInfo:
@@ -14830,7 +14821,7 @@ public sealed class TypeChecker
                 var carried = ResolveType(tt.Inner, scope);
                 if (carried.IsError) return carried;
 
-                // A task carries the error its body may end with (05 E10, 10 §2), as a coroutine
+                // A task carries the error its body may end with (10 §2), as a coroutine
                 // carries what its pulls throw.
                 if (carried is GenericInstance { Definition: var held } handle && _task is not null && ReferenceEquals(held, _task))
                     return handle with { Throws = ThrownTypeOf(tt.Thrown, scope) };
@@ -14857,7 +14848,7 @@ public sealed class TypeChecker
             {
                 var parameters = f.Parameters.Select(p => ResolveType(p, scope)).ToArray();
                 var result = ResolveType(f.ReturnType, scope);
-                // 'fn() -> Task<int> throws E': the call's set, or the task's? As on a declaration (M6-6).
+                // 'fn() -> Task<int> throws E': the call's set, or the task's? As on a declaration.
                 if (f.Throws is { } whose && LeavesOpenWhoseThrows(result, f.ReturnGrouped, whose)) return LyrType.Error;
                 return new FnType(parameters, result)
                     { Throws = f.Throws is { } thrown ? ResolveThrownSet(thrown, scope) : [], Places = f.Places };
@@ -14875,7 +14866,7 @@ public sealed class TypeChecker
     /// died instead of the compilation failing. Reported once per alias: the cycle is a property of
     /// the declaration, and one message per use site would be the same fault repeated.</para>
     ///
-    /// <para>A generic alias (03 T15) names its type with the arguments of the use in place of
+    /// <para>A generic alias names its type with the arguments of the use in place of
     /// its parameters. They are resolved before the guard is taken: <c>Pair&lt;Pair&lt;int&gt;&gt;</c>
     /// expands the alias inside its own argument, and that is no cycle.</para>
     /// </summary>
@@ -14975,7 +14966,7 @@ public sealed class TypeChecker
     // through the conformance model.
     private LyrType MakeGenericInstance(TypeSymbol ts, NamedType n, SymbolTable scope)
     {
-        // 'Iterator<Item = int>' (03 T6): a named argument fixes an associated type of an
+        // 'Iterator<Item = int>': a named argument fixes an associated type of an
         // interface; the positional ones are the type arguments.
         var positional = new List<LyrType>();
         List<(AssociatedTypeSymbol, LyrType)>? fixations = null;
@@ -15015,7 +15006,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// A trailing parameter left unwritten takes its default (03 T18), resolved in the
+    /// A trailing parameter left unwritten takes its default, resolved in the
     /// declaration's scope — where <c>Self</c> and the earlier parameters stand — the earlier
     /// ones then meaning what was written: <c>Add</c> is <c>Add&lt;Self&gt;</c>, <c>Map&lt;K, V&gt;</c>
     /// is <c>Map&lt;K, V, DefaultHasher&gt;</c>. A list the defaults cannot complete is returned
@@ -15068,14 +15059,14 @@ public sealed class TypeChecker
         new PrimitiveType(s == FloatSuffix.F32 ? PrimitiveKind.Float32 : PrimitiveKind.Float);
 
     /// <summary>
-    /// The calls the compiler writes itself — a desugared operator's helper (03 O6) —, by node:
+    /// The calls the compiler writes itself — a desugared operator's helper —, by node:
     /// they name std.core's helper first, whatever the program's scope holds, and std.core rather
     /// than the prelude.
     /// </summary>
     private readonly HashSet<Node> _compilerWritten = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>Whether <paramref name="at"/> is code the compiler wrote: a desugared call, or a
-    /// synthesized conformance (04 D7).</summary>
+    /// synthesized conformance.</summary>
     private bool WrittenByCompiler(Node at) => _compilerWritten.Contains(at) || _comp.IsSynthesized(at.Span.File);
 
     /// <summary>What a bare name means: for a call the compiler wrote, std.core's helper first;
@@ -15085,8 +15076,8 @@ public sealed class TypeChecker
             ? CoreMember(id.Name) ?? scope.Lookup(id.Name)
             : scope.Lookup(id.Name) ?? ImplicitMember(id, id.Name);
 
-    /// <summary>A name not in scope (design/v5/spec/07 V3 I8): the prelude's in a program's own
-    /// code — a type, a function, a binding (<c>target</c>, <c>profile</c>: 09 B4) —, std.core's in
+    /// <summary>A name not in scope: the prelude's in a program's own
+    /// code — a type, a function, a binding (<c>target</c>, <c>profile</c>) —, std.core's in
     /// what the compiler wrote — and for the 4.x tools, as before.</summary>
     private Symbol? ImplicitMember(Node at, string name) =>
         _comp.Lyric5Modules && !WrittenByCompiler(at)
@@ -15103,7 +15094,7 @@ public sealed class TypeChecker
     private TypeSymbol? CoreType(string name) =>
         _comp.FindModule(["std", "core"])?.Members.LookupLocal(name) is TypeSymbol { Visibility: Visibility.Public } core ? core : null;
 
-    /// <summary>A public type or function of <c>std.core</c>, visible without an import (10 U5: the
+    /// <summary>A public type or function of <c>std.core</c>, visible without an import (the
     /// prelude carries what the language itself reaches for — the synthesized conformances do).</summary>
     private Symbol? CoreMember(string name) =>
         _comp.FindModule(["std", "core"])?.Members.LookupLocal(name) switch
@@ -15117,18 +15108,18 @@ public sealed class TypeChecker
     private IReadOnlyList<FunctionSymbol> CoreOverloads(string name) =>
         _comp.FindModule(["std", "core"])?.Members.OverloadsLocal(name).Where(f => f.Visibility == Visibility.Public).ToList() ?? [];
 
-    /// <summary>THE <c>Any</c> of <c>std.core</c> (03 T10), by identity.</summary>
+    /// <summary>THE <c>Any</c> of <c>std.core</c>, by identity.</summary>
     private bool IsAny(LyrType type) =>
         TypeFacts.SymbolOf(type) is { } ts && ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("Any"));
 
-    /// <summary>A built-in whose value goes into an interface value in a box of its own (01 V7;
-    /// M8c S8b): <c>bool</c>, <c>char</c>, the ten number types, <c>string</c> and the view a
+    /// <summary>A built-in whose value goes into an interface value in a box of its own:
+    /// <c>bool</c>, <c>char</c>, the ten number types, <c>string</c> and the view a
     /// string gives — the ones the lowering boxes (<c>TypeTable.BuiltinOfIr</c>).</summary>
     private static bool BoxesAsBuiltin(LyrType type) =>
         type is PrimitiveType { Kind: not PrimitiveKind.Void } or StringViewType;
 
     /// <summary>
-    /// What sits on a parameter (design/v5/spec/09 A11): <c>@callerExpr(p)</c> alone, by its
+    /// What sits on a parameter: <c>@callerExpr(p)</c> alone, by its
     /// identity — where a call leaves this parameter out, it gets the text the call wrote for
     /// <c>p</c>, another parameter of the function. So this one is a <c>string</c>, and has a default
     /// for the call that writes it itself.
@@ -15141,7 +15132,7 @@ public sealed class TypeChecker
             var written = string.Join('.', attribute.Path);
             if (sym is not TypeSymbol ts || !ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("callerExpr")))
             {
-                // Lyric 5: a parameter carries what declares a marker for it (09 T7)
+                // Lyric 5: a parameter carries what declares a marker for it
                 if (_comp.Lyric5Modules && sym is TypeSymbol marked)
                 {
                     CheckAttribute5(attribute, AttributeSite.Parameter, fn.Generics.Length > 0, scope, "a parameter");
@@ -15172,15 +15163,15 @@ public sealed class TypeChecker
     }
 
     /// <summary>The compiler instructions of <c>std.core</c> beside <c>@Test</c>, <c>@Bench</c> and
-    /// <c>@callerExpr</c> (09 A11, the closed list of T2): what changes what the compiler does.</summary>
+    /// <c>@callerExpr</c> (the closed list of T2): what changes what the compiler does.</summary>
     private static readonly string[] CompilerInstructions =
         ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "Warn", "Deny", "When", "Shared", "SeesConformer"];
 
-    /// <summary>Whether this is one of <see cref="CompilerInstructions"/>, by identity (09 T6).</summary>
+    /// <summary>Whether this is one of <see cref="CompilerInstructions"/>, by identity.</summary>
     private bool IsCompilerInstruction(TypeSymbol ts) =>
         _coreMembers is { } core && CompilerInstructions.Any(name => ReferenceEquals(ts, core.LookupLocal(name)));
 
-    /// <summary><c>@callerLine</c> or <c>@callerFile</c> of <c>std.core</c>, by identity (09 A11).</summary>
+    /// <summary><c>@callerLine</c> or <c>@callerFile</c> of <c>std.core</c>, by identity.</summary>
     private CallerPlace? CallerPlaceOf(TypeSymbol ts)
     {
         var core = _comp.FindModule(["std", "core"])?.Members;
@@ -15191,7 +15182,7 @@ public sealed class TypeChecker
 
     /// <summary>
     /// <c>@callerLine</c> on an <c>int</c> parameter, <c>@callerFile</c> on a <c>string</c> one
-    /// (09 A11): where a call leaves the parameter out, it gets that of the call's place. Each with
+    /// — where a call leaves the parameter out, it gets that of the call's place. Each with
     /// a default, which a call that writes the argument keeps — the same rule as <c>@callerExpr</c>,
     /// and the same code.
     /// </summary>
@@ -15210,7 +15201,7 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0155", Severity.Error, attribute.Span, $"'@{written}' {fault}");
     }
 
-    /// <summary>Whether this is THE <c>Test</c> attribute of <c>std.core</c> (09 A3): by identity —
+    /// <summary>Whether this is THE <c>Test</c> attribute of <c>std.core</c>: by identity —
     /// a <c>Test</c> struct of a program's own is data, not a test.</summary>
     private bool IsCanonicalTest(TypeSymbol ts) =>
         ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("Test"));
@@ -15265,7 +15256,7 @@ public sealed class TypeChecker
         var hint = b.Operator switch
         {
             // The two places a reader most likely expected a conversion the language does not
-            // make (03 T1c, T1e): the hint names the explicit way.
+            // make: the hint names the explicit way.
             BinaryOp.AddWrap or BinaryOp.SubWrap or BinaryOp.MulWrap when !TypeFacts.IsInteger(l) || !TypeFacts.IsInteger(r)
                 => " — the wrap operators are for integer types only",
             _ when TypeFacts.IsChar(l) != TypeFacts.IsChar(r) && (TypeFacts.IsNumeric(l) || TypeFacts.IsNumeric(r))

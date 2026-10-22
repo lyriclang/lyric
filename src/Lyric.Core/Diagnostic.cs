@@ -1,7 +1,7 @@
 namespace Lyric.Core;
 
 /// <summary>
-/// One finding (design/v5/spec/11 G1): a code, its severity, the primary place, the message, and
+/// One finding: a code, its severity, the primary place, the message, and
 /// what helps to read it — labelled secondary places and notes of a kind. The primary place may
 /// carry a short label of its own ("expected 'int' here"); a secondary one always does ("first
 /// declared here"). The renderer draws all of them in the source; the editor shows the secondary

@@ -14,7 +14,7 @@ public abstract record Pattern(Span Span) : Node(Span);
 public sealed record WildcardPattern(Span Span) : Pattern(Span);                        // _
 public sealed record LiteralPattern(Expr Literal, Span Span) : Pattern(Span);           // 42, "x", true, null, 'c', -1
 public sealed record BindingPattern(string Name, Span Span) : Pattern(Span);            // x: a binding OR a unit variant, decided by the sema
-/// <summary><c>c: Circle</c>, <c>_: Circle</c> (03 T11): the scrutinee, an interface value, holds a
+/// <summary><c>c: Circle</c>, <c>_: Circle</c>: the scrutinee, an interface value, holds a
 /// value of that type; <see cref="Name"/> binds it as that type, <c>null</c> for <c>_</c>.</summary>
 public sealed record TypePattern(string? Name, TypeNode Type, Span Span) : Pattern(Span), INamedDecl
 {
@@ -22,10 +22,10 @@ public sealed record TypePattern(string? Name, TypeNode Type, Span Span) : Patte
 
     string INamedDecl.Name => Name ?? "_";
 }
-/// <summary><c>s in [Circle, Rect]</c>, <c>_ in [A, B]</c>, <c>s in Circle</c> (08 Y6): the scrutinee,
+/// <summary><c>s in [Circle, Rect]</c>, <c>_ in [A, B]</c>, <c>s in Circle</c>: the scrutinee,
 /// an interface value, holds a value of one of the types — the form of <c>catch (e in [A, B])</c>.
 /// <see cref="Name"/> binds it as the one type of a set of one, as the scrutinee's type otherwise,
-/// carrying the set (K7); <c>null</c> for <c>_</c>.</summary>
+/// carrying the set; <c>null</c> for <c>_</c>.</summary>
 public sealed record TypeSetPattern(string? Name, TypeNode[] Types, Span Span) : Pattern(Span), INamedDecl
 {
     public required Span NameSpan { get; init; }
@@ -35,7 +35,7 @@ public sealed record TypeSetPattern(string? Name, TypeNode[] Types, Span Span) :
 public sealed record VariantPattern(string[] Path, Pattern[]? TupleElements, FieldPattern[]? StructFields, Span Span) : Pattern(Span)
 {
     /// <summary><c>.Red</c>, <c>.Num(v)</c>, <c>.Rect { w = 0 }</c>: the variant of the
-    /// scrutinee's enum, the enum unnamed (08 Y6). The path is the one variant name.</summary>
+    /// scrutinee's enum, the enum unnamed. The path is the one variant name.</summary>
     public bool IsImplicit { get; init; }
 }
 public sealed record TuplePattern(Pattern[] Elements, Span Span) : Pattern(Span);       // (a, b)

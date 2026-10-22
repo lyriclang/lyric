@@ -32,7 +32,7 @@ internal static class GlobalInitializer
         IReadOnlyDictionary<FunctionSymbol, FunctionId> functions, ImportTable imports,
         TypeTable typeTable, LambdaTable lambdas, InstanceTable instances)
     {
-        // A binding whose site the program does not reach (09 D8; M9a S12b) gets no initializer: its
+        // A binding whose site the program does not reach gets no initializer: its
         // site was not evaluated, and the slot - an empty range for the pruning, which drops it
         // with the others nobody touches - stays what nobody reads.
         bool Skipped((GlobalSymbol Symbol, BindingStmt Binding, ModuleSymbol Module) entry)
@@ -72,7 +72,7 @@ internal static class GlobalInitializer
     public static string EachName(int global) => $"<global:{global}>";
 
     /// <summary>
-    /// The hoisting pass's initializers (13 M9a S5): one function per global, which the interpreter
+    /// The hoisting pass's initializers: one function per global, which the interpreter
     /// runs at the global's first access — so code run at compile time runs no initializer it does
     /// not read, a module's that reaches the world among them (std.path's asks the platform).
     /// </summary>
@@ -84,7 +84,7 @@ internal static class GlobalInitializer
         var unexpanded = typeTable.Comptime?.Unexpanded;
         foreach (var entry in globals.Pending.ToList())
         {
-            // a module with sites still to expand (13 M9b P6): its initializers hold holes, and
+            // a module with sites still to expand: its initializers hold holes, and
             // the round reads none of its globals
             if (unexpanded?.Contains(entry.Module) == true) continue;
             var global = globals.IdOf(entry.Symbol);

@@ -126,7 +126,7 @@ internal static class Flow
     /// warned about as unreachable, and without that 'return' the function passed as one that
     /// returns on every path, and ran off its end.</para>
     ///
-    /// <para>A lambda's body is a function of its own (08 Y11 F5): its jumps are its loops'.</para>
+    /// <para>A lambda's body is a function of its own: its jumps are its loops'.</para>
     /// </summary>
     private static bool Jumps(Node node, string? label, bool nested, bool breaks, bool continues) => node switch
     {

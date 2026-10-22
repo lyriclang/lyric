@@ -1,4 +1,4 @@
-// char over the Unicode Character Database (10 B9 S4, S5; M8c S1): the category, the predicates,
+// char over the Unicode Character Database: the category, the predicates,
 // the simple case mappings, the digits. Every code point against the database is Lyric5.Tests'
 // UnicodeTests; here what a reader of the decisions would ask.
 import std.core { UnicodeCategory };

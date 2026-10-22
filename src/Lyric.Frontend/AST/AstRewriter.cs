@@ -4,7 +4,7 @@ using Lyric.Core;
 namespace Lyric.AST;
 
 /// <summary>
-/// A tree with some of its nodes replaced (13 M9b P6): what a macro's expansion writes back into
+/// A tree with some of its nodes replaced: what a macro's expansion writes back into
 /// the module. Generic over the record types of the AST through their properties: a node whose
 /// children changed is cloned (the record's own copy) and the changed properties set, so a node
 /// kind added to the AST takes part without a line here. A replaced node is not walked into: what

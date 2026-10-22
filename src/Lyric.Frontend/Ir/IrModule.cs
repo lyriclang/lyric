@@ -52,8 +52,8 @@ public class IrFunction(string Name, IrType ReturnType, int ParamCount, List<IrL
     public List<IrTemp> Temps { get; init; } = Temps;
 
     /// <summary>
-    /// Whether the function may throw (design/v5/spec/05 E2): it declares a non-empty set, so a
-    /// back end gives it the caller's error slot (01 L5 E1) and <see cref="Propagate"/> may end a
+    /// Whether the function may throw: it declares a non-empty set, so a
+    /// back end gives it the caller's error slot and <see cref="Propagate"/> may end a
     /// block. Where a throw or a failed call goes INSIDE the function is no table's business: the
     /// edges are in the blocks (<see cref="Throw"/>, <see cref="ErrorBranch"/>).
     /// </summary>
@@ -62,7 +62,7 @@ public class IrFunction(string Name, IrType ReturnType, int ParamCount, List<IrL
     /// <summary>
     /// Whether parameter 0 is the receiver of a method of a VALUE, a struct or an enum:
     /// <c>this</c> is then a reference
-    /// to the caller's place, not a copy (design/v5/spec/02 M5; C# <c>ref this</c>) — a write
+    /// to the caller's place, not a copy (C# <c>ref this</c>) — a write
     /// through it is a write into the caller's value, and a partial write before a panic stays.
     /// The local keeps its struct type; a back end passes the place. A class method needs no
     /// flag: its receiver is a reference by type.
@@ -71,18 +71,18 @@ public class IrFunction(string Name, IrType ReturnType, int ParamCount, List<IrL
 
     /// <summary>Whether a <c>defer</c> or a <c>using</c> registers in the function — for a
     /// coroutine's body, the cleanup that only running it to its end or <c>close()</c> runs, which
-    /// the debug profile reports when the coroutine is dropped without either (06 A5).</summary>
+    /// the debug profile reports when the coroutine is dropped without either.</summary>
     public bool Cleanup { get; init; }
 
-    /// <summary>What the source asks of the C compiler for this function (design/v5/spec/09
-    /// A11): hints, no promises. <see cref="IrHints.NoInline"/> keeps the IR inliner away as well.</summary>
+    /// <summary>What the source asks of the C compiler for this function: hints, no
+    /// promises. <see cref="IrHints.NoInline"/> keeps the IR inliner away as well.</summary>
     public IrHints Hints { get; init; }
 
     public List<IrBlock> Blocks { get; init; } = Blocks;
     public BlockId Entry { get; set; }
 }
 
-/// <summary><c>@AlwaysInline</c>, <c>@NoInline</c>, <c>@Cold</c> (09 A11) on a function.</summary>
+/// <summary><c>@AlwaysInline</c>, <c>@NoInline</c>, <c>@Cold</c> on a function.</summary>
 [Flags]
 public enum IrHints
 {
@@ -124,9 +124,9 @@ public record struct IrTypeDef(string Name, IrType[] FieldTypes, string[] FieldN
     /// </summary>
     public string[] MethodSlots { get; init; } = [];
 
-    /// <summary>Per slot of an INTERFACE, whether its member declares <c>throws</c> (05 E2): the
+    /// <summary>Per slot of an INTERFACE, whether its member declares <c>throws</c>: the
     /// slot's function then takes the caller's error slot, and so does every entry of every table
-    /// row for it — an implementation that throws nothing ignores it (K6).</summary>
+    /// row for it — an implementation that throws nothing ignores it.</summary>
     public bool[] SlotThrows { get; init; } = [];
 
     /// <summary>
@@ -149,8 +149,8 @@ public record struct IrTypeDef(string Name, IrType[] FieldTypes, string[] FieldN
     /// the layout itself changes.</summary>
     public bool IsStruct { get; init; }
 
-    /// <summary>The box a built-in type's value lives in behind an interface value (01 V7, 03 T3;
-    /// M8c S8b): a struct entry whose one field, <c>value</c>, IS the boxed value — an <c>int</c>, a
+    /// <summary>The box a built-in type's value lives in behind an interface value: a struct
+    /// entry whose one field, <c>value</c>, IS the boxed value — an <c>int</c>, a
     /// <c>string</c>, a view —, not a struct of it. Its table rows come from the built-in's blocks,
     /// <c>extend int :: [Display]</c>.</summary>
     public bool IsBuiltinBox { get; init; }
@@ -169,8 +169,8 @@ public record struct IrTypeDef(string Name, IrType[] FieldTypes, string[] FieldN
     public bool IsEnum => Variants.Length > 0;
 
     /// <summary>Declared with <c>interface</c>. A flag rather than "has slots": an interface
-    /// whose members are all generic, static or typed by an associated type (03 T6) has no
-    /// slot, and the empty <c>Any</c> (T10) has none either — both are interfaces still.</summary>
+    /// whose members are all generic, static or typed by an associated type has no
+    /// slot, and the empty <c>Any</c> has none either — both are interfaces still.</summary>
     public bool IsInterface { get; init; }
 }
 
@@ -217,7 +217,7 @@ public record struct IrAttributeValue(IrType Type, ulong Bits, string? Text);
 public record struct IrAttribute(IrAttributeTarget TargetKind, int Target, TypeId Type,
     IrAttributeValue[] Values);
 
-/// <summary>A quote of the program (13 M9b P5): the tree the interpreter builds at the call of
+/// <summary>A quote of the program: the tree the interpreter builds at the call of
 /// <c>std.syntax.quote#i</c>, and the module whose names its free names are.</summary>
 public sealed record IrQuote(Lyric.AST.QuoteExpr Node, string Module);
 
@@ -258,7 +258,7 @@ public class IrModule(List<IrFunction> Functions)
     public FunctionId? GlobalInit { get; set; }
 
     /// <summary>
-    /// std.task's scheduler loop where <c>main</c> is a task (design/v5/spec/06 T6), or <c>null</c>.
+    /// std.task's scheduler loop where <c>main</c> is a task, or <c>null</c>.
     ///
     /// <para>Set when what the program reaches asks for its thread's scheduler — it waits somewhere:
     /// then the runtime hands main's context to this function, which runs until that context is

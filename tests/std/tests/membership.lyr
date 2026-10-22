@@ -1,4 +1,4 @@
-// Membership (design/v5/spec/04 D6, 10 C12; spec 05 §12 rule 10): 'x in xs' is 'xs.contains(x)'
+// Membership (spec 05 §12 rule 10): 'x in xs' is 'xs.contains(x)'
 // through Contains<T>, '!in' its negation.
 import std.collections { List, Map, Set };
 import std.test { assertFalse, assertTrue };

@@ -5,7 +5,7 @@ using Lyric.Parsing;
 namespace Lyric.Ir.Interp;
 
 /// <summary>
-/// The syntax bridge (design/v5/spec/10 B13 M2; 13 M9b S1, P2): the compiler's tree as values of
+/// The syntax bridge: the compiler's tree as values of
 /// <c>std.syntax</c> in the interpreter, and such values as a tree again. Type-directed in both
 /// directions: a target <see cref="IrType"/> says which enum, variant or struct to build and how its
 /// fields lie, so the bridge knows the NAMES of <c>std.syntax</c>'s nodes and fields and nothing of
@@ -19,7 +19,7 @@ namespace Lyric.Ir.Interp;
 public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
 {
     /// <summary>Where the bridge parses into and locates in: the program's sources when it has
-    /// them (an expansion, M9b S2), its own for a bridge of its own.</summary>
+    /// them (an expansion), its own for a bridge of its own.</summary>
     private readonly SourceManager _sources = sources ?? new() { Lyric5 = true };
     private int _fresh;
     private readonly Dictionary<string, FileId> _fileIds = new(StringComparer.Ordinal);
@@ -244,8 +244,8 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         }
     }
 
-    /// <summary>Reads a node with its own span as the span the nodes built within it get (M9b
-    /// S5): what the caller wrote keeps the place it was written at, through the macro and back;
+    /// <summary>Reads a node with its own span as the span the nodes built within it get: what the
+    /// caller wrote keeps the place it was written at, through the macro and back;
     /// a node the macro built with <c>Span.none()</c> stands where the node around it stands, and
     /// the outermost such at the site.</summary>
     private T Within<T>(Value v, IrType t, Func<Value, IrType, T> read)
@@ -256,7 +256,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         finally { _current = saved; }
     }
 
-    /// <summary>The failure <c>error(at, msg)</c> raises (13 M9b P7).</summary>
+    /// <summary>The failure <c>error(at, msg)</c> raises.</summary>
     public ComptimeFailure MacroError(string file, int line, int column, string message) => ComptimeFailure.Macro(SpanAt(file, line, column), message);
 
     /// <summary>The name <paramref name="name"/> as an <c>Ident</c> value, for a macro's parameter.</summary>
@@ -272,7 +272,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
     public Decl[] DeclsOf(Value v, IrType t) => Many(v, t, DeclOf);
 
     /// <summary>An <c>Ident</c>: the name, renamed where the quote being built binds it (hygiene,
-    /// 13 M9b P5), the splice's own where the content names it as "#i"; <paramref name="from"/>
+    /// hygiene), the splice's own where the content names it as "#i"; <paramref name="from"/>
     /// the module a free name of a quote belongs to.</summary>
     private Value Ident(string name, Span span, IrType t, string? from = null)
     {
@@ -542,7 +542,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         switch (n)
         {
             case NamedType { Path: [var only] } when _splices is not null && only.Length > 1 && only[0] == '#' && int.TryParse(only.AsSpan(1), out var spliced):
-                return _splices[spliced]; // a Type spliced in (M9b S4), its kind checked at the quote
+                return _splices[spliced]; // a Type spliced in, its kind checked at the quote
             case NamedType nt:
                 return Variant(t, "Named", Strings(nt.Path), Types(nt.TypeArguments),
                     Strings(nt.ArgumentNames is { } names ? names.Select(x => x ?? "") : []), OptS(nt.QuotedFrom ?? _quoteModule), sp);
@@ -593,8 +593,8 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         ("interfaces", Types(interfaces)), ("delegates", Strings(delegates is { } d ? d.Select(x => x ?? "") : [])),
         ("members", Arr(members, Decl)), ("attributes", Attributes(attributes)), ("span", Sp(span)));
 
-    /// <summary>A declaration as the struct of its kind, for an attribute macro's first parameter
-    /// (13 M9b S4): <paramref name="t"/> is that struct's type, and <c>null</c> where the kind is
+    /// <summary>A declaration as the struct of its kind, for an attribute macro's first
+    /// parameter: <paramref name="t"/> is that struct's type, and <c>null</c> where the kind is
     /// not the declaration's.</summary>
     public Value? DeclPayload(Decl d, IrType t)
     {
@@ -669,7 +669,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         }
     }
 
-    // ------------------------------------------------------------------ quotes (M9b S3)
+    // ------------------------------------------------------------------ quotes
 
     private Value[]? _splices;
     private IrType[]? _spliceTypes;
@@ -684,7 +684,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
         _ => "?",
     };
 
-    /// <summary>The tree a quote builds (13 M9b P5): its content as values of the kind the type
+    /// <summary>The tree a quote builds: its content as values of the kind the type
     /// says, the splices set in, every name the content binds renamed fresh (hygiene), every
     /// free name marked as the quote's module's.</summary>
     public Value Quote(IrQuote quote, Value[] splices, IrType[] spliceTypes, IrType resultType)
@@ -810,11 +810,11 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
     private Expr? MaybeBoxedExpr(Value v, IrType t) => OptionOf(v) is { } inner ? BoxedExpr(inner, Inner(t)) : null;
 
     /// <summary>The span a node built from values gets where the values name none: the site it is
-    /// built for (M9b S2), so a diagnostic on expanded code points at the site; none for a bridge
+    /// built for, so a diagnostic on expanded code points at the site; none for a bridge
     /// of its own.</summary>
     public Span At { get; set; }
 
-    /// <summary>The span of the node being read, where its value names one (M9b S5).</summary>
+    /// <summary>The span of the node being read, where its value names one.</summary>
     private Span? _current;
 
     private Span NoSpan => _current ?? At;

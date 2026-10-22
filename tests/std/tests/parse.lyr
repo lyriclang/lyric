@@ -1,4 +1,4 @@
-// std.core's parsing (design/v5/spec/10 B3, B5 Z6): a value read from a text, the reason thrown.
+// std.core's parsing: a value read from a text, the reason thrown.
 import std.test { assertEq, assertTrue, assertThrows, assertPanics };
 import std.core { Parse, ParseError, ParseErrorKind };
 

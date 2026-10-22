@@ -1,4 +1,4 @@
-// std.time's spans and clocks (design/v5/spec/10 Q1; M8b S5a): Duration's arithmetic, order, Go's
+// std.time's spans and clocks: Duration's arithmetic, order, Go's
 // text and its parsing; Instant on the wall clock; Monotonic, which only moves forward.
 import std.core { ParseError, ParseErrorKind };
 import std.task { sleep };
@@ -105,7 +105,7 @@ fn theMonotonicClockMovesForward(): void throws Error {
     assertTrue(start.elapsed() >= first);
 }
 
-/// A time of day reads from its text (the review of M10, M15): what `show()` writes, and the
+/// A time of day reads from its text: what `show()` writes, and the
 /// refusals with their reasons.
 @Test
 fn aTimeOfDayReadsFromItsText(): void throws Error {

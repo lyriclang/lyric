@@ -5,18 +5,18 @@ using Lyric.Resolver;
 namespace Lyric.Sema;
 
 /// <summary>
-/// Marked propagation (design/v5/spec/05 E1, E2), a read-only pass after the checker:
+/// Marked propagation, a read-only pass after the checker:
 ///
 /// <list type="bullet">
 /// <item>every call of a throwing function stands under a <c>try</c> — a <c>try</c> expression,
 /// or the body of a <c>try</c> block — of its own function context (<c>LYR-SEM0138</c>): the
 /// propagation is seen where it happens;</item>
 /// <item>every type a site may throw is covered by a <c>catch</c> of an enclosing block or by the
-/// context's <c>throws</c> set (K8, <c>LYR-SEM0034</c>) — a <c>throw</c> needs no mark, but the
+/// context's <c>throws</c> set (<c>LYR-SEM0034</c>) — a <c>throw</c> needs no mark, but the
 /// same cover;</item>
 /// <item>a <c>try</c> no error reaches is warned about (<c>LYR-SEM0139</c>): nothing under it
 /// throws, or a <c>try</c> inside takes all of it — and so is a mark over what another
-/// <c>try</c> marks already (the review's M5-5, M5-9).</item>
+/// <c>try</c> marks already.</item>
 /// </list>
 ///
 /// <para>A mark to the right of an operator, <c>a() + try b() + c()</c>, covers by POSITION: from
@@ -25,7 +25,7 @@ namespace Lyric.Sema;
 /// frames, with what they cover, and a site asks them by where it stands.</para>
 ///
 /// <para>A lambda is a context of its own — its body runs later, outside every <c>try</c> around
-/// it — that throws what its type says (K3): the set it writes or its position expects, or the one
+/// it — that throws what its type says: the set it writes or its position expects, or the one
 /// read off its body. A global's initializer and a default have no handler at all. Coverage is the checker's question: an
 /// element covers a thrown type when it IS the type, on the instance, or an interface the type
 /// conforms to (<see cref="TypeChecker.ThrownCoveredBy"/>), asked in the module the site stands in.</para>
@@ -61,7 +61,7 @@ internal sealed class ExceptionAnalyzer
         /// behind it in its expression.</summary>
         public Node? Body { get; init; }
 
-        /// <summary>The program's <c>main</c>, where the context is its body (06 M6-4): it covers
+        /// <summary>The program's <c>main</c>, where the context is its body: it covers
         /// <c>Cancelled</c> itself, as a generator's body does.</summary>
         public FunctionDecl? Entry { get; init; }
     }
@@ -94,8 +94,8 @@ internal sealed class ExceptionAnalyzer
     }
 
     /// <summary>
-    /// What the sites under a try throw past every try inside it — what reaches the try's clauses
-    /// (05 E2 K7). The analysis's own walk, under a frame that takes everything and keeps what
+    /// What the sites under a try throw past every try inside it — what reaches the try's clauses.
+    /// The analysis's own walk, under a frame that takes everything and keeps what
     /// reached it; the checker asks it while it checks the clauses, with the diagnostics muted —
     /// the analysis proper runs after the checker and reports.
     /// </summary>
@@ -173,7 +173,7 @@ internal sealed class ExceptionAnalyzer
     }
 
     /// <summary>The program's <c>main</c>: the function of that name at the top of the entry
-    /// module (07 M7).</summary>
+    /// module.</summary>
     private bool IsEntry(FunctionDecl fn) =>
         fn.Name == "main" && _comp.Lyric5Modules && _comp.Entry is { } entry && ReferenceEquals(entry, _module)
         && _comp.AstOf(entry).Declarations.Contains(fn);
@@ -209,7 +209,7 @@ internal sealed class ExceptionAnalyzer
             case TailExprStmt tail: AnalyzeExpr(tail.Expr); break;
             case BindingStmt bd:
                 if (bd.Initializer is not null) AnalyzeExpr(bd.Initializer);
-                // 'using let': the close it owes the scope, a site of the scope (05 E7 R4) — where
+                // 'using let': the close it owes the scope, a site of the scope — where
                 // the checker took it up: a binding that is no Closeable (SEM0143) owes nothing.
                 if (bd.Cleanup is { Body: ExprStmt { Expr: TryExpr { Value: { } close } closing } } && !_types.TypeOf(close).IsError)
                 {
@@ -235,13 +235,13 @@ internal sealed class ExceptionAnalyzer
             case DoWhileStmt d: AnalyzeStmt(d.Body); AnalyzeExpr(d.Condition); break;
             case ForInStmt fo:
             {
-                // A loop over the protocol makes two calls of its own (design/v5/spec/10 B6 I5),
+                // A loop over the protocol makes two calls of its own,
                 // 'iter()' once and 'next()' at every pass: throw sites at its head, which a 'try'
                 // there marks — it covers the source and every pull.
                 var walk = _types.ForInOf(fo);
                 if (walk is not null && fo.Iterable is TryExpr { Kind: TryKind.Propagate, Catches.Length: 0 } head)
                 {
-                    // In a 'try' block the loop's calls are marked already (M5-5): the head's mark
+                    // In a 'try' block the loop's calls are marked already: the head's mark
                     // says nothing new, and that is the one thing said about it.
                     var again = Marked(head.KeywordSpan.Start);
                     if (again) MarksAgain(head);
@@ -269,7 +269,7 @@ internal sealed class ExceptionAnalyzer
             case BreakStmt { Value: { } broken }: AnalyzeExpr(broken); break;
             case YieldStmt y:
                 if (y.Value is not null) AnalyzeExpr(y.Value);
-                // A yield throws 'Cancelled' where close() finds its coroutine suspended (06 A5).
+                // A yield throws 'Cancelled' where close() finds its coroutine suspended.
                 // One of a coroutine's body reaches the trys around it — a clause may catch it — and
                 // the body covers what none takes. One outside a body (§10a) is a site like a
                 // throw: covered by a clause around it or by its function's set.
@@ -286,8 +286,8 @@ internal sealed class ExceptionAnalyzer
                 break;
             case TryStmt tr:
             {
-                // The block form marks its whole body (05 E4: the block form of the same thing);
-                // a clause is not covered by its own try (E9 C6), only by those around it.
+                // The block form marks its whole body (the block form of the same thing);
+                // a clause is not covered by its own try, only by those around it.
                 var frame = Open(tr.Catches, takesAll: false);
                 try { AnalyzeStmt(tr.Body); }
                 finally { Close(); }
@@ -327,7 +327,7 @@ internal sealed class ExceptionAnalyzer
                     Site([pulled], call.Span, "'next()'");
                 else
                 {
-                    // 'Walker.walk(d)' stands for the member call it was checked as (04 D2 R5).
+                    // 'Walker.walk(d)' stands for the member call it was checked as.
                     var thrown = _types.CallThrows(call);
                     if (thrown.Length == 0 && _types.OperatorCallOf(call) is { } meant) thrown = _types.CallThrows(meant);
                     Site(thrown, call.Span, $"the call to '{CalleeName(call.Callee)}'");
@@ -338,8 +338,8 @@ internal sealed class ExceptionAnalyzer
                 break;
             case LambdaExpr lam:
                 // Its own context: the body runs later, outside every try around it, and throws what
-                // the lambda's type says (05 E2 K3) — a generator lambda's, what its coroutine's
-                // pulls throw (08 Y11 F5).
+                // the lambda's type says — a generator lambda's, what its coroutine's
+                // pulls throw.
                 InContext(new Context(LambdaThrows(lam), "the lambda", canDeclare: false) { Body = lam.Body }, () =>
                 {
                     if (lam.Body is Block b) AnalyzeStmt(b);
@@ -348,13 +348,13 @@ internal sealed class ExceptionAnalyzer
                 break;
             // A plain mark over what is marked already — under a 'try' block, under another
             // mark, behind one that stands to its left in the same expression: it says nothing
-            // the other does not (M5-5, M5-9). Not the close a 'using let' writes for itself.
+            // the other does not. Not the close a 'using let' writes for itself.
             case TryExpr { Kind: TryKind.Propagate, Catches.Length: 0 } again
                 when Marked(again.KeywordSpan.Start) && !ReferenceEquals(again, _closing):
                 MarksAgain(again);
                 AnalyzeExpr(again.Value);
                 break;
-            // A mark to the right of an operator (M5-9): it covers from where it stands to the end
+            // A mark to the right of an operator: it covers from where it stands to the end
             // of the expression it stands in — its operand, and what the walk meets behind it.
             case TryExpr { Reach: not null } rightward:
                 _context.Rightward.Add((rightward, new Frame([], takesAll: false)));
@@ -363,7 +363,7 @@ internal sealed class ExceptionAnalyzer
             case TryExpr tried:
             {
                 // 'try?' and 'try!' take every error themselves; the expression form's clauses take
-                // what they cover and are not inside their own try (E9 C6), as the block's are not.
+                // what they cover and are not inside their own try, as the block's are not.
                 var frame = Open(tried.Catches, takesAll: tried.Kind != TryKind.Propagate);
                 try { AnalyzeExpr(tried.Value); }
                 finally { Close(); }
@@ -429,7 +429,7 @@ internal sealed class ExceptionAnalyzer
     };
 
     /// <summary>What a function's body covers: its set — and in a coroutine's body the
-    /// <c>Cancelled</c> close() throws at its yields (06 A5), which the runner takes, so a call of a
+    /// <c>Cancelled</c> close() throws at its yields, which the runner takes, so a call of a
     /// helper that yields and passes it on (§10a) is covered as the body's own yields are.</summary>
     private LyrType[] BodyCovers(LyrType[] declared, bool coroutine) =>
         coroutine && _cancelled is { } cancelled ? [.. declared, cancelled] : declared;
@@ -442,7 +442,7 @@ internal sealed class ExceptionAnalyzer
     }
 
     /// <summary>An operator that IS a call — <c>a + b</c> through <c>Add</c>, <c>x[k]</c> through
-    /// an index interface (04 D6) — throws what its method throws, and is marked like one.</summary>
+    /// an index interface — throws what its method throws, and is marked like one.</summary>
     /// <remarks>No operator's method throws in 5.0: the interfaces of <c>std.core</c> declare no
     /// set, and a method may not throw more than its interface's (LYR-SEM0042). Should one ever,
     /// its site is asked here where its NODE begins — and a mark that covers by position
@@ -458,7 +458,7 @@ internal sealed class ExceptionAnalyzer
 
     private void Throw(Expr value, Span span)
     {
-        // A binding that carries a set throws exactly the set (K7, precise rethrow): what reached
+        // A binding that carries a set throws exactly the set (a precise rethrow): what reached
         // its clause, not the 'Error' it is typed as.
         if (value is IdentifierExpr id && _types.RefOf(id) is LocalSymbol { Declaration: CatchClause clause }
             && _types.CatchSet(clause) is { } set)
@@ -466,7 +466,7 @@ internal sealed class ExceptionAnalyzer
             Site(set, span, "'throw'", needsMark: false);
             return;
         }
-        // So does a type-set pattern's binding of several types (08 Y6): what it may hold is the set.
+        // So does a type-set pattern's binding of several types: what it may hold is the set.
         if (value is IdentifierExpr held && _types.RefOf(held) is LocalSymbol { Declaration: TypeSetPattern { Types.Length: > 1 } pattern, IsMutable: false }
             && _types.TypeSet(pattern) is { } tested)
         {
@@ -515,9 +515,9 @@ internal sealed class ExceptionAnalyzer
         foreach (var t in thrown)
         {
             if (Taken(t) || _context.Declared.Any(d => _covers(t, d, _module))) continue;
-            // 'main' covers 'Cancelled' itself (06 M6-4): nobody above it can answer a
+            // 'main' covers 'Cancelled' itself: nobody above it can answer a
             // cancellation, so the clause said nothing. It is noted — 'main' throws it from here
-            // on as though it were written, and an error that leaves 'main' is reported (05 E6 O4).
+            // on as though it were written, and an error that leaves 'main' is reported.
             if (_context.Entry is { } main && _cancelled is { } cancelled && LyrType.Equal(t, cancelled))
             {
                 _types.RecordEntryThrows(main, cancelled);

@@ -6,12 +6,12 @@ namespace Lyric.AST
     public enum BinaryOp
     {
         Add, Sub, Mul, Div, Rem,
-        // The wrap operators '+%' '-%' '*%' (design/v5/spec/08 Y4, 03 T2): the arithmetic that
+        // The wrap operators '+%' '-%' '*%': the arithmetic that
         // wraps instead of panicking on overflow, on integer types only.
         AddWrap, SubWrap, MulWrap,
         Shl, Shr, BitAnd, BitXor, BitOr,
         Lt, Le, Gt, Ge, Eq, Ne,
-        // 'x in xs', 'x !in xs' (04 D6): 'xs.contains(x)' through 'Contains<T>', and its negation.
+        // 'x in xs', 'x !in xs': 'xs.contains(x)' through 'Contains<T>', and its negation.
         In, NotIn,
         LogicalAnd, LogicalOr,
         Coalesce
@@ -21,10 +21,10 @@ namespace Lyric.AST
     {
         Not, Neg, BitNot, PreInc, PreDec,
         /// <summary><c>^n</c>: the index <c>n</c> from the end, inside <c>[…]</c> only
-        /// (design/v5/spec/03 T14 N6) — sugar for <c>length() - n</c> of the indexed value.</summary>
+        /// — sugar for <c>length() - n</c> of the indexed value.</summary>
         FromEnd,
-        /// <summary><c>&amp;x</c>: the place <c>x</c>, handed to a place parameter (design/v5/spec/03
-        /// T12, 08 Y4). The parser builds it at the start of an argument and nowhere else.</summary>
+        /// <summary><c>&amp;x</c>: the place <c>x</c>, handed to a place parameter.
+        /// The parser builds it at the start of an argument and nowhere else.</summary>
         Place,
     }
 

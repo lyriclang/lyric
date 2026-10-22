@@ -1,4 +1,4 @@
-// std.core's StringView (design/v5/spec/10 S1; M8a S12): a view hashes as the string of its bytes,
+// std.core's StringView: a view hashes as the string of its bytes,
 // orders by them, and a view of a view is a view of the same string.
 import std.hash { FixedHasher };
 import std.test { assertEq, assertFalse, assertTrue };

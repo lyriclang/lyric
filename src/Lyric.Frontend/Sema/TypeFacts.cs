@@ -7,9 +7,9 @@ namespace Lyric.Sema;
 public static class TypeFacts
 {
     /// <summary>
-    /// An integer in the sense of the arithmetic rules. <c>char</c> is NOT one (design/v5/spec/03
-    /// T1e): it is a Unicode scalar value, with no arithmetic and no comparison against a number;
-    /// the number behind it is reached through <c>as uint32</c> (T1d). Lyric 4 counted it as an
+    /// An integer in the sense of the arithmetic rules. <c>char</c> is NOT one:
+    /// it is a Unicode scalar value, with no arithmetic and no comparison against a number;
+    /// the number behind it is reached through <c>as uint32</c>. Lyric 4 counted it as an
     /// integer so that <c>std.string</c> could ask "is this a digit?" without the host, and paid
     /// for it with a range check on every operation that produced a <c>char</c>.
     ///
@@ -42,7 +42,7 @@ public static class TypeFacts
 
     /// <summary>
     /// Whether a value of one scalar type stands implicitly where the other is expected
-    /// (design/v5/spec/03 T1c; Zig and Java do the same): an integer widens into every integer
+    /// (as in Zig and Java): an integer widens into every integer
     /// type whose RANGE contains its own — <c>int8→int16→int32→int</c>, <c>uint8→…→uint</c>,
     /// and the unsigned into the next wider signed, <c>uint8→int16</c>, <c>uint32→int</c> — and
     /// <c>float32</c> widens into <c>float</c>. Never a narrowing, never an integer into a float
@@ -73,7 +73,7 @@ public static class TypeFacts
     private static readonly Dictionary<string, PrimitiveKind> Builtins = new()
     {
         ["int"] = PrimitiveKind.Int, ["uint"] = PrimitiveKind.Uint, ["float"] = PrimitiveKind.Float,
-        // The 64-bit names are aliases (03 T1a): 'int64' IS 'int', and displays as 'int'.
+        // The 64-bit names are aliases: 'int64' IS 'int', and displays as 'int'.
         ["int64"] = PrimitiveKind.Int, ["uint64"] = PrimitiveKind.Uint, ["float64"] = PrimitiveKind.Float,
         ["int8"] = PrimitiveKind.Int8, ["int16"] = PrimitiveKind.Int16, ["int32"] = PrimitiveKind.Int32,
         ["uint8"] = PrimitiveKind.Uint8, ["uint16"] = PrimitiveKind.Uint16, ["uint32"] = PrimitiveKind.Uint32,
@@ -97,7 +97,7 @@ public static class TypeFacts
         PrimitiveKind.Uint32 => !negative && magnitude <= 4294967295,
         PrimitiveKind.Uint => !negative,
 
-        // No integer literal is a 'char' (03 T1e): 'let c: char = 65' names a number where a
+        // No integer literal is a 'char': 'let c: char = 65' names a number where a
         // scalar value belongs; the way is '\u{41}', or '65 as char' through uint32.
         _ => false
     };
@@ -139,12 +139,12 @@ public static class TypeFacts
     public static TypeSymbolKind? KindOf(LyrType type) => SymbolOf(type)?.Kind;
 
     /// <summary>std.core's <c>TypeKind</c>, in its declaration order: what a <c>Type</c> says a
-    /// type is (11 §4 rule 1; the sweep after M10, W9). The lowering writes the variant by this
+    /// type is. The lowering writes the variant by this
     /// index.</summary>
     public static readonly string[] TypeKindNames =
         ["Primitive", "Struct", "Class", "Enum", "Interface", "Opaque", "Optional", "Array", "InlineArray", "Slice", "Tuple", "Function", "Parameter", "Other"];
 
-    /// <summary>std.core's <c>MemberKind</c>, in its declaration order (X4).</summary>
+    /// <summary>std.core's <c>MemberKind</c>, in its declaration order.</summary>
     public static readonly string[] MemberKindNames = ["Function", "Constant", "AssociatedType"];
 
     /// <summary>The <c>TypeKind</c> of a type, by name.</summary>
@@ -181,7 +181,7 @@ public static class TypeFacts
 
     /// <summary>
     /// Does <paramref name="actual"/> fit <paramref name="pattern"/>, a type with parameters in it
-    /// (a block's <c>List&lt;T&gt;</c>, 03 T7)? The parameters bind in <paramref name="map"/>, a
+    /// (a block's <c>List&lt;T&gt;</c>)? The parameters bind in <paramref name="map"/>, a
     /// parameter met twice has to agree; everything else matches by equality.
     /// </summary>
     public static bool Match(LyrType pattern, LyrType actual, Dictionary<GenericParamSymbol, LyrType> map)
@@ -199,7 +199,7 @@ public static class TypeFacts
                 return true;
             case ArrayOf pa when actual is ArrayOf aa: return Match(pa.Element, aa.Element, map);
             case SliceOf ps when actual is SliceOf sa: return Match(ps.Element, sa.Element, map);
-            // An inline array of the same length (the blocks synthesized per length, M8c S3b).
+            // An inline array of the same length (the blocks synthesized per length).
             case InlineArrayOf pi when actual is InlineArrayOf ai && pi.Length == ai.Length:
                 return Match(pi.Element, ai.Element, map);
             case Optional po when actual is Optional ao: return Match(po.Inner, ao.Inner, map);
@@ -207,7 +207,7 @@ public static class TypeFacts
                 for (var i = 0; i < pt.Elements.Length; i++)
                     if (!Match(pt.Elements[i], at.Elements[i], map)) return false;
                 return true;
-            // A coroutine (06 A7, N2d): what it yields and returns. What a pull throws binds only
+            // A coroutine: what it yields and returns. What a pull throws binds only
             // where the pattern names it — a block on 'Coroutine<Y, R>' reaches every coroutine of
             // those, as identity asks nothing of the pulls.
             case CoroutineOf pc when actual is CoroutineOf ac:
@@ -227,7 +227,7 @@ public static class TypeFacts
     }
 
     /// <summary>Could the two meet on one type — a parameter on either side stands for anything
-    /// (03 T7 X3, X4)?</summary>
+    ///?</summary>
     public static bool Overlaps(LyrType a, LyrType b)
     {
         if (a is TypeParamType || b is TypeParamType) return true;
@@ -261,7 +261,7 @@ public static class TypeFacts
         _ => false,
     };
 
-    /// <summary>Could a 'throws' written behind this type be the type's own (03 T17, 10 §2): a
+    /// <summary>Could a 'throws' written behind this type be the type's own: a
     /// function type, a coroutine, std.task's task — under any '?'.</summary>
     private static bool CouldTakeASet(LyrType type) => type switch
     {
@@ -276,7 +276,7 @@ public static class TypeFacts
         IsVoid(co.Result) ? "" : ", " + Render(co.Result, name);
 
     /// <summary>A function type's set as written after its return type, in one order whatever the
-    /// declaration's (05 E2 K1): the display names an instance, and two orders are one type.</summary>
+    /// declaration's: the display names an instance, and two orders are one type.</summary>
     private static string ThrownText(LyrType[] thrown, Func<TypeSymbol, string> name) => thrown.Length switch
     {
         0 => "",
@@ -333,8 +333,8 @@ public static class TypeFacts
             case TupleOf tu:
                 return "(" + string.Join(", ", tu.Elements.Select((e, i) => tu.Labels?[i] is { } l ? l + ": " + Render(e, name) : Render(e, name))) + ")";
             case FnType f:
-                // The return type in the parentheses that say whose a set is (03 T17; the review's
-                // M5-7, M6-6), as the source writes them: around one that ends in a set of its
+                // The return type in the parentheses that say whose a set is,
+                // as the source writes them: around one that ends in a set of its
                 // own, 'fn() -> (Task<int> throws E)', and around one that could have taken the
                 // set behind it, 'fn() -> (Task<int>) throws E'. Without them the two were one text.
                 return "fn(" + string.Join(", ", f.Parameters.Select((p, i) => (f.PlaceAt(i) ? "&" : "") + Render(p, name))) + ") -> "

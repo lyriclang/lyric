@@ -28,23 +28,23 @@ public sealed class ComptimeTable
 
     public bool Hoist { get; init; }
 
-    /// <summary>The sites of module bindings no program reaches (09 D8; M9a S12b): the hoisting
+    /// <summary>The sites of module bindings no program reaches: the hoisting
     /// pass fills it, the evaluator leaves them out, and the real pass lowers each as the
     /// expression it holds - into an initializer the pruning drops with its global.</summary>
     public HashSet<int>? Skipped { get; set; }
 
-    /// <summary>The macros an expansion round runs (13 M9b P6): roots of the hoisting pass, and the
+    /// <summary>The macros an expansion round runs: roots of the hoisting pass, and the
     /// only macros it lowers. The real pass lowers none.</summary>
     public IReadOnlySet<Lyric.Resolver.FunctionSymbol>? MacroRoots { get; init; }
 
-    /// <summary>The modules whose sites are not expanded yet (13 M9b P6): their bodies and their
+    /// <summary>The modules whose sites are not expanded yet: their bodies and their
     /// globals' initializers hold holes the lowering cannot type, and the round runs none of
     /// them, so the hoisting pass lowers each as a stub.</summary>
     public IReadOnlySet<Lyric.Resolver.ModuleSymbol>? Unexpanded { get; init; }
 
     public IReadOnlyDictionary<int, IrConstValue>? Values { get; init; }
 
-    /// <summary>What the build leaves out (09 B2): the real lowering builds none of it.</summary>
+    /// <summary>What the build leaves out: the real lowering builds none of it.</summary>
     public Inactivity? Inactive { get; init; }
 
     /// <summary>A runner's boxed value as the constant the site's type expects. The runner

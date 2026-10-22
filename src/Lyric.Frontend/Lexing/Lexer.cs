@@ -39,10 +39,10 @@ public sealed class Lexer
         /// interpolation, and does a ':' really separate the format specifier?</summary>
         public bool AtTopLevel => BraceDepth == 0 && ParenDepth == 0 && BracketDepth == 0;
 
-        /// <summary>For FStringText: <c>fr"…"</c> takes a backslash as itself (08 Y7 L5, L8).</summary>
+        /// <summary>For FStringText: <c>fr"…"</c> takes a backslash as itself.</summary>
         public bool Raw { get; init; }
 
-        /// <summary>For FStringText: <c>f"""…"""</c> runs over lines and ends at <c>"""</c> (L6, L8).</summary>
+        /// <summary>For FStringText: <c>f"""…"""</c> runs over lines and ends at <c>"""</c>.</summary>
         public bool Triple { get; init; }
     }
 
@@ -139,7 +139,7 @@ public sealed class Lexer
         { "macro", TokenKind.Macro },
     };
 
-    /// <summary>The words Lyric 5 reserves for its compile-time forms (08 Y1): names in 4.x.</summary>
+    /// <summary>The words Lyric 5 reserves for its compile-time forms: names in 4.x.</summary>
     private static bool IsCompileTimeWord(TokenKind kind) =>
         kind is TokenKind.Comptime or TokenKind.Inline or TokenKind.Quote or TokenKind.Macro;
 
@@ -242,14 +242,14 @@ public sealed class Lexer
             }
         }
 
-        // 'f"…"', 'fr"…"', 'f"""…"""', 'fr"""…"""' (08 Y7 L8). Each of the prefixed forms was an
+        // 'f"…"', 'fr"…"', 'f"""…"""', 'fr"""…"""'. Each of the prefixed forms was an
         // identifier before a string before — a syntax error, so no program changes meaning.
         if (Current == 'f' && (PeekAt(1) == '"' || PeekAt(1) == 'r' && PeekAt(2) == '"'))
         {
             return ScanFStringStart();
         }
 
-        // 'r"…"', 'r#"…"#', 'r"""…"""' (L5, L6) and 'b"…"' (L7).
+        // 'r"…"', 'r#"…"#', 'r"""…"""' and 'b"…"'.
         if (Current == 'r' && (PeekAt(1) == '"' || PeekAt(1) == '#' && HashesThenQuote(1)))
         {
             return ScanRawString(_pos);
@@ -405,7 +405,7 @@ public sealed class Lexer
                 + string.Join(", ", beyond.Select(c => $"'{c}'"))));
             return new Token(TokenKind.Identifier, new Span(_file, identifierStart, _pos));
         }
-        // Lyric 5 drops 'module' and 'params' as words (08 Y1): names, which the parser still reads
+        // Lyric 5 drops 'module' and 'params' as words: names, which the parser still reads
         // at the two places the words stood, to say what replaced them. It takes the compile-time
         // words, which stay names in 4.x.
         if (Keywords.TryGetValue(lexme, out var kind)
@@ -642,9 +642,9 @@ public sealed class Lexer
     }
 
     /// <summary>
-    /// <c>r"…"</c>, <c>r#"…"#</c> (08 Y7 L5): no escape — the backslash is itself — and the text ends
+    /// <c>r"…"</c>, <c>r#"…"#</c>: no escape — the backslash is itself — and the text ends
     /// at the first <c>"</c> followed by as many <c>#</c> as opened it, so <c>r#"say "hi""#</c> holds
-    /// quotes. One line, as a plain string is; <c>r"""…"""</c> is the multi-line raw form (L6).
+    /// quotes. One line, as a plain string is; <c>r"""…"""</c> is the multi-line raw form.
     /// </summary>
     private Token ScanRawString(int start)
     {
@@ -676,7 +676,7 @@ public sealed class Lexer
     }
 
     /// <summary>
-    /// <c>"""…"""</c> and <c>r"""…"""</c> (08 Y7 L6): over lines, to the next <c>"""</c>; a <c>\"</c>
+    /// <c>"""…"""</c> and <c>r"""…"""</c>: over lines, to the next <c>"""</c>; a <c>\"</c>
     /// does not end it in the escaped form. Its lines and their indentation are the decoder's to
     /// read (<see cref="Lyric.Parsing.LiteralDecoder"/>), which reports what is wrong with them.
     /// </summary>
@@ -703,7 +703,7 @@ public sealed class Lexer
     }
 
     /// <summary>
-    /// <c>b"…"</c> (08 Y7 L7): bytes, a <c>uint8[]</c> — ASCII text and the escapes, <c>\xNN</c> any
+    /// <c>b"…"</c>: bytes, a <c>uint8[]</c> — ASCII text and the escapes, <c>\xNN</c> any
     /// byte. A character beyond ASCII has no one byte, and <c>\u{…}</c> names a character, not a
     /// byte: both are refused here (<c>LYR-LEX0012</c>).
     /// </summary>
@@ -785,7 +785,7 @@ public sealed class Lexer
     {
         _pos++; //Consume '\'
         if (Current is '\0' or '\n') return;
-        // '\xNN' is a byte (08 Y7 L4): a byte string's alone in Lyric 5. In a string or a character
+        // '\xNN' is a byte: a byte string's alone in Lyric 5. In a string or a character
         // it named a Latin-1 character by its byte, which reads like UTF-8 and is not.
         if (Current == 'x' && !inBytes && _sources.Lyric5)
             _diagnostics.Report(new Diagnostic("LYR-LEX0013", Severity.Error, new Span(_file, _pos - 1, _pos + 1),
@@ -891,7 +891,7 @@ public sealed class Lexer
 
     #region FStrings
 
-    /// <summary><c>f"</c>, <c>fr"</c>, <c>f"""</c> or <c>fr"""</c> (08 Y7 L8): the start token covers the
+    /// <summary><c>f"</c>, <c>fr"</c>, <c>f"""</c> or <c>fr"""</c>: the start token covers the
     /// prefix and the quotes, so the parser reads the form off its text.</summary>
     private Token ScanFStringStart()
     {
@@ -1065,7 +1065,7 @@ public sealed class Lexer
                     return new Token(TokenKind.Dec, new Span(_file, operatorStart, _pos));
                 }
 
-                // The wrap operators (08 Y4, Zig's spelling): '-%' and '-%='.
+                // The wrap operators (Zig's spelling): '-%' and '-%='.
                 if (PeekAt(1) == '%')
                 {
                     if (PeekAt(2) == '=')
@@ -1161,11 +1161,11 @@ public sealed class Lexer
                 _pos++;
                 return new Token(TokenKind.Caret, new Span(_file, operatorStart, _pos));
             case '#':
-                // '#{' inside a 'quote' is a splice (08 Y12 Q3; M9b S3): the parser reads the pair
+                // '#{' inside a 'quote' is a splice: the parser reads the pair
                 _pos++;
                 return new Token(TokenKind.Hash, new Span(_file, operatorStart, _pos));
             case '!':
-                // '!in' (08 Y-table, 04 D6): one token where 'in' follows as a word of its own —
+                // '!in': one token where 'in' follows as a word of its own —
                 // '!inside' stays '!' and a name, 'x! in xs' an unwrap before 'in'.
                 if (PeekAt(1) == 'i' && PeekAt(2) == 'n' && !IsIdentifierCont(PeekAt(3)))
                 {

@@ -1,4 +1,4 @@
-// std.sync and std.thread (M8b S1): a semaphore woken from another thread, parallelMap's results
+// std.sync and std.thread: a semaphore woken from another thread, parallelMap's results
 // each an object of its own, its first failure in order.
 import std.sync { Semaphore };
 import std.thread { parallelMap, Thread };

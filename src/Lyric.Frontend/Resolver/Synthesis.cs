@@ -5,8 +5,8 @@ using Lyric.Core;
 namespace Lyric.Resolver;
 
 /// <summary>
-/// Conformance synthesis (design/v5/spec/04 D7), provisional in the compiler until area 09
-/// decides where it lives: a conformance written without a body — <c>struct P :: [Equatable]</c>
+/// Conformance synthesis in the compiler:
+/// a conformance written without a body — <c>struct P :: [Equatable]</c>
 /// with no <c>equals</c> — is implemented from the fields, in an <c>extend</c> block of the type's
 /// own module; a generic type conditionally, with the derive-bound on every parameter
 /// (<c>extend&lt;T :: [Equatable]&gt; Pair&lt;T&gt; :: [Equatable]</c>). <c>Debug</c> is given to every type that
@@ -15,8 +15,7 @@ namespace Lyric.Resolver;
 ///
 /// <para>The text is laid out one field per line on purpose: a diagnostic from inside the block
 /// is re-pointed at the declaration (<see cref="DiagnosticEngine"/>) with the line it stood on,
-/// and that line then names the field the rule asks to be named (D7: "fehlende Feldkonformanz
-/// nennt das Feld").</para>
+/// and that line then names the field the rule asks to be named.</para>
 /// </summary>
 internal static class Synthesis
 {
@@ -51,7 +50,7 @@ internal static class Synthesis
     /// <summary>What a type asks to have synthesized: the listed interfaces of the family without
     /// the member written, the parents those imply when neither listed nor written, and
     /// <c>Debug</c> unasked where <c>std.core</c> declares it. A class listing <c>Identity</c>
-    /// (02 M10) has its <c>Equatable</c> and <c>Hashable</c> by identity, listed beside it or not.</summary>
+    /// has its <c>Equatable</c> and <c>Hashable</c> by identity, listed beside it or not.</summary>
     public static List<Request> RequestsOf(TypeNode[] interfaces, IEnumerable<FunctionDecl> methods, bool coreHasDebug,
         bool coreHasIdentity = false, bool isClass = false)
     {
@@ -77,7 +76,7 @@ internal static class Synthesis
 
     /// <summary>The members of the family the compiler writes — <c>Default</c>, <c>Display</c> —
     /// that an interface of the program implies for a type listing it: <c>struct Start :: [Args]</c>
-    /// under <c>interface Args :: [Default]</c> (05 §14 rule 5; the sweep after M10, W7b), as
+    /// under <c>interface Args :: [Default]</c> (spec 05 §14 rule 5), as
     /// requests where the type neither lists the interface nor writes the member. The std.core
     /// defaults a parent brings need none: a parent's defaults are inherited (05 §1 rule 3).</summary>
     public static List<Request> ImpliedRequests(IEnumerable<(string Interface, TypeNode Via)> implied,
@@ -113,7 +112,7 @@ internal static class Synthesis
             : identity
                 ? $"extend<{string.Join(", ", generics.Select(g => g.Name))}> {typeText} :: [{iface}] {{\n"
                 : $"extend<{string.Join(", ", generics.Select(g => $"{g.Name} :: [{BoundOf(iface)}]"))}> {typeText} :: [{iface}] {{\n";
-        // Lyric 5 (09 A5; M9a S10): the family's members are std.core's defaults over Self's fields
+        // Lyric 5: the family's members are std.core's defaults over Self's fields
         // and variants, set in place per conformer — the block carries the conformance and its
         // condition (05 §14 rule 4), nothing else. 'Default' stays written here: a static member of
         // an interface declares only (SEM0127), so no default can build 'Self' for it.
@@ -153,7 +152,7 @@ internal static class Synthesis
                 sb.Append(";\n    }\n");
                 break;
             case "Hashable" when streamsHash:
-                // Every field into the hasher, in order, one line each (10 K2).
+                // Every field into the hasher, in order, one line each.
                 sb.Append("    fn hash<H :: [Hasher]>(&h: H): void {\n");
                 foreach (var f in fields)
                 {
@@ -191,7 +190,7 @@ internal static class Synthesis
                 var parts = new List<string>();
                 foreach (var f in fields)
                 {
-                    // '@Shared' (04 Clone; 13 M9a S8): the reference copied, not cloned — a parent,
+                    // '@Shared': the reference copied, not cloned — a parent,
                     // a service, a cycle. Read by its name here; the checker holds it to std.core's.
                     var cloned = f.Attributes.Any(a => a.Path is [.., "Shared"])
                         ? $"this.{f.Name}"
@@ -236,14 +235,14 @@ internal static class Synthesis
 
     /// <summary><c>a == b</c> for a field of this type: the value's own equality, a helper for a
     /// shape, element by element for a tuple. An inline array is whole where Lyric 5's std.core
-    /// gives each written length its blocks (<paramref name="whole"/>; M8c S3b, S16): its own
-    /// <c>==</c> walks it, so a <c>uint8[4096]</c> field is one comparison, not 4096 (04, "Review
-    /// 2026-10-09" S3b; M8c S17). The 4.x library has no such block: there it is unrolled.</summary>
+    /// gives each written length its blocks (<paramref name="whole"/>): its own
+    /// <c>==</c> walks it, so a <c>uint8[4096]</c> field is one comparison, not 4096.
+    /// The 4.x library has no such block: there it is unrolled.</summary>
     private static string EqOf(string a, string b, TypeNode type, Func<TypeNode, string> text, bool whole) => type switch
     {
         ArrayType { Length: null } => $"equalArrays({a}, {b})",
         ArrayType { Length: not null } when whole => $"{a} == {b}",
-        // Element by element, unrolled: a view of it is taken only on the heap (03 T13), and
+        // Element by element, unrolled: a view of it is taken only on the heap, and
         // 'this' of a struct lies in a frame.
         ArrayType { Length: { } n, Element: var e } => n == 0 ? "true"
             : "(" + string.Join(" && ", Enumerable.Range(0, n).Select(i => EqOf($"{a}[{i}]", $"{b}[{i}]", e, text, whole))) + ")",
@@ -263,10 +262,10 @@ internal static class Synthesis
         _ => $"{expr}.hash()",
     };
 
-    /// <summary>A field written into the hasher <c>h</c> (10 K2): an optional through its mark, a tuple
+    /// <summary>A field written into the hasher <c>h</c>: an optional through its mark, a tuple
     /// element by element, an inline array through its own <c>hash</c> — the length's block writes its
-    /// elements in order (M8c S3b, S17), so the bytes are the ones the unrolled form wrote; <c>null</c>
-    /// for an array or a view, which is no <c>Hashable</c> (C8), and an inline array of them. Lyric 5's
+    /// elements in order, so the bytes are the ones the unrolled form wrote; <c>null</c>
+    /// for an array or a view, which is no <c>Hashable</c>, and an inline array of them. Lyric 5's
     /// alone: the 4.x library's <c>hash(): int</c> takes <see cref="HashOf"/>.</summary>
     private static string? HashInto(string expr, TypeNode type) => type switch
     {
@@ -300,7 +299,7 @@ internal static class Synthesis
     private static string? DefaultOf(TypeNode type, Func<TypeNode, string> text) => type switch
     {
         ArrayType { Length: null } => "[]",
-        // 'T[N] :: [Default]' conditionally (10 C7): every slot the element's default.
+        // 'T[N] :: [Default]' conditionally: every slot the element's default.
         ArrayType { Length: { } n, Element: var e } => DefaultOf(e, text) is { } one
             ? "[" + string.Join(", ", Enumerable.Repeat(one, n)) + "]" : null,
         NullableType => "null",
@@ -312,7 +311,7 @@ internal static class Synthesis
 
     /// <summary>The text rendering a value of this type in a synthesized <c>debug()</c>: the
     /// value's own, or a helper of <c>std.core</c> for a shape that has none. An inline array is
-    /// whole as in <see cref="EqOf"/>: its own text is the unrolled one, <c>[1, 2]</c> (M8c S16).</summary>
+    /// whole as in <see cref="EqOf"/>: its own text is the unrolled one, <c>[1, 2]</c>.</summary>
     private static string DebugOf(string expr, TypeNode type, Func<TypeNode, string> text, bool whole) => type switch
     {
         ArrayType { Length: null } => $"debugArray({expr})",
@@ -366,7 +365,7 @@ internal static class Synthesis
                 sb.Append("        };\n    }\n");
                 break;
             case "Hashable" when streamsHash:
-                // The variant's position, then its payload (10 K2).
+                // The variant's position, then its payload.
                 sb.Append("    fn hash<H :: [Hasher]>(&h: H): void {\n        match (this) {\n");
                 for (var i = 0; i < variants.Length; i++)
                 {
@@ -399,8 +398,8 @@ internal static class Synthesis
                 break;
             case "Ordered" or "TotalOrder":
             {
-                // Lexicographic as for a struct, the variant's position first (D7 "Enums: wie
-                // Structs"): a variant before another is Less whatever the payloads; the same
+                // Lexicographic as for a struct, the variant's position first:
+                // a variant before another is Less whatever the payloads; the same
                 // variant compares its payload field by field.
                 var ret = iface == "Ordered" ? "?Ordering" : "Ordering";
                 var method = iface == "Ordered" ? "compare" : "totalCompare";

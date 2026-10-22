@@ -20,7 +20,7 @@ namespace Lyric.Compiler;
 /// <para>This class NEVER RENDERS ITSELF. It collects into
 /// <see cref="CompileResult.Diagnostics"/> and leaves the output to the caller;
 /// <see cref="DiagnosticEngine.RenderText"/> says each finding once, so a second call after more
-/// reports adds those alone (M12a S2; before, it rendered the whole collection again).</para>
+/// reports adds those alone.</para>
 /// </summary>
 public static class SourceCompiler
 {
@@ -46,7 +46,7 @@ public static class SourceCompiler
     public static CompileResult Lower(ScriptSource source, CompilerOptions? options = null) =>
         Run(source, Stage.Lower, options ?? new CompilerOptions());
 
-    /// <summary>The program's entry module with its macros expanded (13 M9b P8, <c>lyric expand</c>):
+    /// <summary>The program's entry module with its macros expanded (<c>lyric expand</c>):
     /// resolved and expanded, not checked; <see cref="CompileResult.Expanded"/> holds the tree, the
     /// parsed one where the program has no site.</summary>
     public static CompileResult Expand(ScriptSource source, CompilerOptions? options = null) =>
@@ -81,7 +81,7 @@ public static class SourceCompiler
 
         var stdlib = BuildModuleLoader(sources, diagnostics, options, source.BaseDirectory);
 
-        // what the loader gave, by module name: a rebuild after a macro's expansion (13 M9b P6)
+        // what the loader gave, by module name: a rebuild after a macro's expansion
         // serves it again, with the expanded tree where there is one, and parses nothing twice
         var parsedModules = new Dictionary<string, LoadedModule>(StringComparer.Ordinal);
         Compilation Build(IReadOnlyDictionary<string, Module>? trees)
@@ -119,7 +119,7 @@ public static class SourceCompiler
         }
         var compilation = Build(null);
 
-        // 'std' is the standard library's name (design/v5/spec/07 D1): a single file named std.lyr
+        // 'std' is the standard library's name: a single file named std.lyr
         // would claim it — a package cannot, its manifest refuses the name.
         if (options.PackageRoots is not null && source.ModuleName is "std")
             diagnostics.Report("LYR-RES0013", Severity.Error, new Span(id, 0, 0),
@@ -135,7 +135,7 @@ public static class SourceCompiler
 
         var embed = EmbedReaderFor(sources, options);
 
-        // macros (13 M9b P6): every site is expanded before its module is checked; a program
+        // macros: every site is expanded before its module is checked; a program
         // without a site pays nothing
         if (compilation.Lyric5Modules && !diagnostics.HasErrors && MacroExpander.Sites(compilation).Count > 0)
         {
@@ -165,10 +165,10 @@ public static class SourceCompiler
         if (diagnostics.HasErrors)
             return new CompileResult(sources, diagnostics, null, model);
 
-        // 'comptime' sites (09 A4; M9a S1): a lowering that hoists each into a function of its own
+        // 'comptime' sites: a lowering that hoists each into a function of its own
         // — the module's only roots, so it holds what the sites reach —, the IR interpreter over
         // it, and the real lowering writes each site's value as a constant. Lyric 5's: the 4.x
-        // tools lower a site as its inner expression, as they did since their VM went (01 L7).
+        // tools lower a site as its inner expression, as they did since their VM went.
         types.SourcePlace = SourcePlaceFor(sources, options);
         if (!EvaluateSites(compilation, binding, types, diagnostics, options, embed, report, out var comptime))
             return new CompileResult(sources, diagnostics, null, model);
@@ -185,7 +185,7 @@ public static class SourceCompiler
         report?.BeginPhase(Phase.Lower);
         var timings = new LoweringTimings();
         var lowering = Stopwatch.StartNew();
-        // A Lyric 5 program roots in its entry's 'main' (design/v5/spec/07 B6, 01 L11): a 'pub'
+        // A Lyric 5 program roots in its entry's 'main': a 'pub'
         // function nothing reaches is no part of the binary. The 4.x tools keep a library's roots.
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
             optimize: options.Optimize, libraryRoots: !compilation.Lyric5Modules, passes: options.Passes,
@@ -205,7 +205,7 @@ public static class SourceCompiler
     }
 
     /// <summary>
-    /// <c>@Deprecated</c> in Lyric 5 (09 A11; 13 M9a P8): its uses warn with what its value says —
+    /// <c>@Deprecated</c> in Lyric 5: its uses warn with what its value says —
     /// computed now, so <c>message</c> may be any string a <c>comptime</c> site makes —, and its
     /// <c>until</c> comes due against the version the toolchain claims. The 4.x tools read the
     /// literals in the warning pass itself.
@@ -218,7 +218,7 @@ public static class SourceCompiler
             .RunDeprecated(StringFieldsOf(types, comptime), options.ToolchainVersion ?? ToolchainVersion.Value);
     }
 
-    /// <summary>An attribute's string fields by name, as the compiler computed its value (09 F4).</summary>
+    /// <summary>An attribute's string fields by name, as the compiler computed its value.</summary>
     private static Func<AttributeNode, IReadOnlyDictionary<string, string>?> StringFieldsOf(TypeResult types, ComptimeTable? comptime) =>
         attribute =>
         {
@@ -234,13 +234,13 @@ public static class SourceCompiler
             return fields;
         };
 
-    /// <summary>'embed' (09 Q4) reads relative to the module that calls, within its package's
+    /// <summary>'embed' reads relative to the module that calls, within its package's
     /// directory: the one a package's source root lies in.</summary>
     private static EmbedReader EmbedReaderFor(SourceManager sources, CompilerOptions options) =>
         new(sources.GetPath,
             options.PackageRoots?.Values.Select(root => Path.GetDirectoryName(Path.GetFullPath(root))!).ToList() ?? []);
 
-    /// <summary>Where a span begins as the binary names it (09 A11): a standard-library source
+    /// <summary>Where a span begins as the binary names it: a standard-library source
     /// relative to the library's parent directory, as its <c>#line</c> has it; a package's under
     /// the name the build writes for the package's directory (<see cref="CompilerOptions.PlaceNames"/>);
     /// anything else as the source manager has it. Forward slashes on every system, so a program
@@ -273,11 +273,11 @@ public static class SourceCompiler
     }
 
     /// <summary>
-    /// The 'comptime' sites of a Lyric 5 compilation evaluated (09 A4; 13 M9a P1, P11, P13): a
+    /// The 'comptime' sites of a Lyric 5 compilation evaluated: a
     /// lowering that hoists each into a function of its own — the module's only roots, so it holds
     /// what the sites reach —, the IR interpreter over it. <paramref name="comptime"/> holds the
     /// values the real lowering writes as constants; <c>null</c> where there is no site, or for
-    /// the 4.x tools, which lower a site as its inner expression (01 L7). False after reporting.
+    /// the 4.x tools, which lower a site as its inner expression. False after reporting.
     /// </summary>
     private static bool EvaluateSites(Compilation compilation, BindingResult binding, TypeResult types,
         DiagnosticEngine diagnostics, CompilerOptions options, EmbedReader embed, TerminalOutput? report,
@@ -292,10 +292,10 @@ public static class SourceCompiler
         report?.EndPhase();
         if (hoisted is null || diagnostics.HasErrors) return false;
 
-        // '@When' first (09 B2, B3): what it leaves out is checked, but its sites are not evaluated
+        // '@When' first: what it leaves out is checked, but its sites are not evaluated
         // — a site of another target's code may read what this one does not have
         var when = WhenSites(compilation, types);
-        // the standard library's sites run under the default budget, not the program's (M9a S12)
+        // the standard library's sites run under the default budget, not the program's
         var stdFiles = compilation.Modules.Where(compilation.IsNative).Select(m => compilation.AstOf(m).Span.File).ToHashSet();
         bool Standard(int site) => stdFiles.Contains(types.ComptimeSites[site].Span.File);
         var chosen = when.Count == 0 ? new Dictionary<int, IrConstValue>()
@@ -318,7 +318,7 @@ public static class SourceCompiler
         return true;
     }
 
-    /// <summary>The sites of the <c>@When</c>s of <c>std.core</c> (09 B2): each with the declaration
+    /// <summary>The sites of the <c>@When</c>s of <c>std.core</c>: each with the declaration
     /// it sits on, or <c>null</c> and the module's file for one on the module header.</summary>
     private static Dictionary<int, (Decl? Decl, FileId File)> WhenSites(Compilation compilation, TypeResult types)
     {
@@ -384,20 +384,20 @@ public static class SourceCompiler
             entry => StdlibLoader.ForProject(entry.Value, sources, diagnostics, options.SourceOverlay),
             StringComparer.Ordinal);
 
-        // Packages (07 M1): the name in front, the file under the source root without it, its name
-        // exactly as the module path writes it on every platform (M6).
+        // Packages: the name in front, the file under the source root without it, its name
+        // exactly as the module path writes it on every platform.
         var packages = options.PackageRoots?.ToDictionary(
             entry => entry.Key,
             entry => (Root: entry.Value,
                 Load: StdlibLoader.ForProject(entry.Value, sources, diagnostics, options.SourceOverlay)),
             StringComparer.Ordinal);
-        // A package's tests/ (07 V4): 'app.tests.x' is tests/x.lyr — under 'lyric test' alone.
+        // A package's tests/: 'app.tests.x' is tests/x.lyr — under 'lyric test' alone.
         var tests = options.PackageTestRoots?.ToDictionary(
             entry => entry.Key,
             entry => (Root: entry.Value,
                 Load: StdlibLoader.ForProject(entry.Value, sources, diagnostics, options.SourceOverlay)),
             StringComparer.Ordinal);
-        // A package's gen/ (design/v5/spec/11 W3 BS6): 'app.gen.x' is gen/x.lyr, what its build
+        // A package's gen/: 'app.gen.x' is gen/x.lyr, what its build
         // script wrote — a module of the package as any other.
         var generated = options.PackageGenRoots?.ToDictionary(
             entry => entry.Key,
@@ -421,7 +421,7 @@ public static class SourceCompiler
                     && File.Exists(Path.Combine([genRoot.Root, .. modulePath[2..^1], modulePath[^1] + ".lyr"])))
                     return genRoot.Load(modulePath[2..]);
                 if (modulePath.Length == 0 || !packages.TryGetValue(modulePath[0], out var package)) return null;
-                // The root module (07 M1, the review's M7-1): 'src/lib.lyr' is the module of the
+                // The root module: 'src/lib.lyr' is the module of the
                 // package's own name, and there is no module '<package>.lib' beside it.
                 if (modulePath is [_, Compilation.RootModuleFile]) return null;
                 string[] file = modulePath.Length == 1 ? [Compilation.RootModuleFile] : modulePath[1..];
@@ -509,7 +509,7 @@ public static class SourceCompiler
             // path registers under the name it claims; an import of the path-derived name then
             // reloads the file and reports the mismatch (LYR-RES0006), the same way it would were
             // the file not a root.
-            // Lyric 5's names its module by the path alone (07 M2), a header or none
+            // Lyric 5's names its module by the path alone, a header or none
             var name = parsed.Ast.Header is not null && !compilation.Lyric5Modules ? null : root.ModuleName;
 
             compilation.AddModule(parsed.Ast, name, documentation: parsed.Documentation);
@@ -529,8 +529,8 @@ public static class SourceCompiler
         if (diagnostics.HasErrors)
             return new CompileResult(sources, diagnostics, null, model);
 
-        // Every build that lowers evaluates (13 M9a P13) — a library by itself too; an
-        // attribute's value is read from here (09 F4: 'lyric test' its '@Test').
+        // Every build that lowers evaluates — a library by itself too; an
+        // attribute's value is read from here ('lyric test' its '@Test').
         var embed = EmbedReaderFor(sources, options);
         types.SourcePlace = SourcePlaceFor(sources, options);
         if (!EvaluateSites(compilation, binding, types, diagnostics, options, embed, report: null, out var comptime))
@@ -549,7 +549,7 @@ public static class SourceCompiler
     }
 
     /// <summary>
-    /// Whether the file of a module path is named exactly as the path writes it (07 M6): on a file
+    /// Whether the file of a module path is named exactly as the path writes it: on a file
     /// system that ignores case, <c>import app.Util</c> would otherwise read <c>util.lyr</c> on one
     /// machine and nothing on the next. Segment by segment, by the names the directories list.
     /// </summary>
@@ -702,7 +702,7 @@ public sealed record CompilerOptions
     public IReadOnlyDictionary<string, string>? DependencyRoots { get; init; }
 
     /// <summary>
-    /// Lyric 5's packages (design/v5/spec/07 M1, M2; 11 C8), by name, each naming its source root:
+    /// Lyric 5's packages, by name, each naming its source root:
     /// <c>["app"] = "…/app/src"</c> makes <c>import app.net.http</c> read
     /// <c>…/app/src/net/http.lyr</c> — the package's name is the first segment of every module
     /// path, its files lie under the root without it.
@@ -710,22 +710,22 @@ public sealed record CompilerOptions
     /// <para>Set, it is the whole of what a program reaches besides <c>std</c>: there is no lookup
     /// beside the entry file, and a single file — given none — imports only <c>std</c>. Every module
     /// is named by its path then, and a <c>module</c> header is refused (LYR-RES0008). The 4.x
-    /// tools, the language server first, still read headers and leave this unset (until M13b).</para>
+    /// tools, the language server first, still read headers and leave this unset.</para>
     /// </summary>
     public IReadOnlyDictionary<string, string>? PackageRoots { get; init; }
 
-    /// <summary>What each package declares it imports from (design/v5/spec/07 P6), by name;
+    /// <summary>What each package declares it imports from, by name;
     /// <c>null</c> where no package rules apply.</summary>
     public IReadOnlyDictionary<string, IReadOnlySet<string>>? PackageDependencies { get; init; }
 
-    /// <summary>The name the binary writes for each directory its sources lie in (11 W2 P6), as
+    /// <summary>The name the binary writes for each directory its sources lie in, as
     /// the build hands the C compiler its <c>-ffile-prefix-map</c>: what <c>@callerFile</c> gives
-    /// (09 A11) is then what a backtrace shows, and no machine's path. Without, a source's path as
+    /// is then what a backtrace shows, and no machine's path. Without, a source's path as
     /// the source manager has it.</summary>
     public IReadOnlyList<(string From, string To)>? PlaceNames { get; init; }
 
     /// <summary>The version the toolchain claims, which a <c>@Deprecated</c>'s <c>until</c> comes
-    /// due against (09 A11): <c>lyric5</c>'s own. Without, the 4.x tree's
+    /// due against: <c>lyric5</c>'s own. Without, the 4.x tree's
     /// (<see cref="Lyric.Core.ToolchainVersion.Value"/>).</summary>
     public string? ToolchainVersion { get; init; }
 
@@ -733,7 +733,7 @@ public sealed record CompilerOptions
     /// command line's in front.</summary>
     public IReadOnlyDictionary<string, LintSettings>? LintLevels { get; init; }
 
-    /// <summary>The package the build is for: the warnings of the others are not said (11 G11) unless
+    /// <summary>The package the build is for: the warnings of the others are not said unless
     /// <see cref="WarnDeps"/>.</summary>
     public string? RootPackage { get; init; }
 
@@ -741,14 +741,14 @@ public sealed record CompilerOptions
     public bool WarnDeps { get; init; }
 
     /// <summary>
-    /// A package's <c>tests/</c> (design/v5/spec/07 V4), by the package's name: its files are
+    /// A package's <c>tests/</c>, by the package's name: its files are
     /// modules of the package, <c>tests/math.lyr</c> in <c>app</c> is <c>app.tests.math</c>. Only
     /// <c>lyric test</c> names them; a build of a program reaches no test.
     /// </summary>
     public IReadOnlyDictionary<string, string>? PackageTestRoots { get; init; }
 
     /// <summary>
-    /// A package's <c>gen/</c> (design/v5/spec/11 W3 BS6), by the package's name: what its build
+    /// A package's <c>gen/</c>, by the package's name: what its build
     /// script wrote, modules of the package — <c>gen/schema.lyr</c> in <c>app</c> is
     /// <c>app.gen.schema</c>.
     /// </summary>
@@ -792,14 +792,14 @@ public sealed record CompilerOptions
     /// finding.</summary>
     public IrPasses Passes { get; init; } = IrPasses.All;
 
-    /// <summary>Whether integer overflow panics (03 T2), the profile's <c>overflowChecks</c>: at
-    /// compile time as in the binary, so <c>comptime f()</c> is <c>f()</c> (09 Q7).</summary>
+    /// <summary>Whether integer overflow panics, the profile's <c>overflowChecks</c>: at
+    /// compile time as in the binary, so <c>comptime f()</c> is <c>f()</c>.</summary>
     public bool OverflowChecks { get; init; } = true;
 
-    /// <summary>The steps one <c>comptime</c> site may take (09 Q5).</summary>
+    /// <summary>The steps one <c>comptime</c> site may take.</summary>
     public long ComptimeBudget { get; init; } = ComptimeEvaluator.DefaultBudget;
 
-    /// <summary>What the build is for and as (09 A6 B4): <c>std.core</c>'s <c>target</c> and
+    /// <summary>What the build is for and as: <c>std.core</c>'s <c>target</c> and
     /// <c>profile</c> — a cross-build's target, not the host's. The host in the debug profile
     /// without.</summary>
     public BuildFacts Build { get; init; } = BuildFacts.Host;
@@ -828,18 +828,18 @@ public sealed record CompileResult(
     /// <summary>No error was reported. Warnings do not count.</summary>
     public bool Ok => !Diagnostics.HasErrors;
 
-    /// <summary>The files <c>embed</c> read while the program compiled (design/v5/spec/09 Q4),
+    /// <summary>The files <c>embed</c> read while the program compiled,
     /// absolute: inputs of the build beside its sources.</summary>
     public IReadOnlyList<string> Embedded { get; init; } = [];
 
-    /// <summary>Each 'comptime' site's value by its index in the model's sites (09 A4), where the
-    /// compilation evaluated any — an attribute's among them (09 F4).</summary>
+    /// <summary>Each 'comptime' site's value by its index in the model's sites, where the
+    /// compilation evaluated any — an attribute's among them.</summary>
     public IReadOnlyDictionary<int, IrConstValue>? ComptimeValues { get; init; }
 
-    /// <summary>What the build leaves out (09 B2): a <c>@Test</c> there is no test of this target.</summary>
+    /// <summary>What the build leaves out: a <c>@Test</c> there is no test of this target.</summary>
     public Lyric.Ir.Lowering.Inactivity? Inactive { get; init; }
 
-    /// <summary>The entry module after the macros' expansion (13 M9b P8), from
+    /// <summary>The entry module after the macros' expansion, from
     /// <see cref="SourceCompiler.Expand"/> alone; <c>null</c> after an error.</summary>
     public Module? Expanded { get; init; }
 

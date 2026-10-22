@@ -25,7 +25,7 @@ public static class Semantics
         if (types.NestingExceeded) return types;
 
         new SemaRules(compilation, binding, types, de, singleProgram).Run();
-        // Marked propagation and coverage (05 E1, E2); whether an element covers a thrown type is
+        // Marked propagation and coverage; whether an element covers a thrown type is
         // the checker's conformance question, asked where the site stands.
         new ExceptionAnalyzer(compilation, types, de, checker.ThrownCoveredBy, checker.ErrorRoot, checker.CancelledType).Run();
 

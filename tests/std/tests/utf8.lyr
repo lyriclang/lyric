@@ -1,4 +1,4 @@
-// std.core's bytes to text (design/v5/spec/10 S3; M8a S12): the ranges of well-formed UTF-8 the
+// std.core's bytes to text: the ranges of well-formed UTF-8 the
 // lossy decoder keeps to, and a part of an array as the bytes.
 import std.core { Utf8Error };
 import std.test { assertEq };

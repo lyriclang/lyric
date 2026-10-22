@@ -1,4 +1,4 @@
-// The prelude (design/v5/spec/10 B2): the collections are named without an import.
+// The prelude: the collections are named without an import.
 import std.test { assertEq };
 
 @Test

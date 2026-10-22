@@ -1,6 +1,6 @@
-// Ranges after M8c S3a (03 S15b, 12 §Iteration): a range of characters walks the scalar values,
+// Ranges (spec 12 §Iteration): a range of characters walks the scalar values,
 // the surrogates passed over, to the ends of the type from either side; an integer range walks
-// through the same `Step` as before. And a literal at a view's site (03 S3).
+// through the same `Step` as before. And a literal at a view's site.
 import std.test { assertEq, assertFalse, assertNull, assertTrue };
 
 fn sum(s: Slice<uint8>): int {

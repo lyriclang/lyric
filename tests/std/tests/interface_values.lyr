@@ -1,4 +1,4 @@
-// A built-in's value as an interface value (01 V7, 05 §2; M8c S8b): a number, a bool, a char, a
+// A built-in's value as an interface value (spec 05 §2): a number, a bool, a char, a
 // string and a view go into the interface they conform to through std.core's blocks, in a box of
 // their own — from a binding, an argument, a variadic tail, a list, a generic body.
 import std.collections { List };

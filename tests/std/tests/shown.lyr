@@ -1,4 +1,4 @@
-// Equality and display of arrays, views and the containers (design/v5/spec/10 C9; spec 12):
+// Equality and display of arrays, views and the containers (spec 12):
 // element by element in order, a set's and a map's in any order; the debug text, the same shown.
 import std.collections { Deque, Heap, List, Map, Set };
 import std.test { assertEq, assertFalse, assertTrue };

@@ -5,7 +5,7 @@ using System.Text;
 namespace Lyric.Ir.Interp;
 
 /// <summary>
-/// The standard library's natives at compile time (design/v5/spec/09 Q3, Q7; 13 M9a P2): each
+/// The standard library's natives at compile time: each
 /// pure one as the runtime computes it — the C beside each case is <c>runtime/src</c>'s —, each
 /// one that touches the world (the console, files, the network, processes, the clock, threads and
 /// tasks, the system) refused where it is called (<c>LYR-CT0003</c>).
@@ -30,10 +30,10 @@ public sealed class Natives(Interpreter interpreter)
     private readonly ConditionalWeakTable<object, StrongBox<long>> _identities = new();
     private long _nextIdentity = 1;
 
-    /// <summary>What <c>embed</c> reads through (09 Q4); <c>null</c>, it reads nothing.</summary>
+    /// <summary>What <c>embed</c> reads through; <c>null</c>, it reads nothing.</summary>
     public EmbedReader? Embed { get; init; }
 
-    /// <summary>What the build is for and as (09 B4), which <c>std.core</c>'s <c>target</c> and
+    /// <summary>What the build is for and as, which <c>std.core</c>'s <c>target</c> and
     /// <c>profile</c> read.</summary>
     public BuildFacts Facts { get; init; } = BuildFacts.Host;
 
@@ -44,7 +44,7 @@ public sealed class Natives(Interpreter interpreter)
     {
         _at = at;
         var name = import.Name;
-        // a quote (13 M9b P5): the tree of the module's quote by the import's index, the splices' values set in
+        // a quote: the tree of the module's quote by the import's index, the splices' values set in
         if (name.StartsWith("std.syntax.quote#", StringComparison.Ordinal))
             return Syntax.Quote(interpreter.Module.Quotes[int.Parse(name["std.syntax.quote#".Length..])], args, types, import.ReturnType);
         if (Table.TryGetValue(name, out var native)) return native(args, types, import.ReturnType);
@@ -115,11 +115,11 @@ public sealed class Natives(Interpreter interpreter)
 
     private SyntaxBridge? _syntax;
 
-    /// <summary>The bridge to <c>std.syntax</c> (M9b S1), built on the first use: the program's
+    /// <summary>The bridge to <c>std.syntax</c>, built on the first use: the program's
     /// tree as values, and values as a tree.</summary>
     private SyntaxBridge Syntax => _syntax ??= new SyntaxBridge(interpreter.Module, Sources);
 
-    /// <summary>The program's sources (M9b S2): the bridge parses into them and locates in them,
+    /// <summary>The program's sources: the bridge parses into them and locates in them,
     /// so a span a macro reads is the program's and the file ids collide with nobody's.</summary>
     public Core.SourceManager? Sources { get; init; }
 
@@ -131,7 +131,7 @@ public sealed class Natives(Interpreter interpreter)
 
     private Dictionary<string, Native> Build() => new(StringComparer.Ordinal)
     {
-        // --- std.syntax (10 B13 M2; M9b S1): the tree in both directions; type-directed, so the
+        // --- std.syntax: the tree in both directions; type-directed, so the
         // return type of the import and the types of the arguments say which nodes are meant
         ["std.syntax.parseExpr"] = (a, _, r) => Syntax.Expr(Syntax.ParseExpr(S(a[0]).ToString()), r),
         ["std.syntax.parseStmts"] = (a, _, r) => Syntax.Array(Syntax.ParseStmts(S(a[0]).ToString()), r, Syntax.Stmt),
@@ -312,17 +312,17 @@ public sealed class Natives(Interpreter interpreter)
             return Value.Uint((key & sign) != 0 ? ~key & all : key | sign);
         },
         // An object's address at run time; at compile time a number per object, in the order asked —
-        // the same each run (Q7), which an address is not.
+        // the same each run, which an address is not.
         ["std.core.identityOf"] = (a, _, _) => Value.Int(_identities.GetValue(a[0].Ref!, _ => new StrongBox<long>(_nextIdentity++)).Value!),
 
-        // --- a file of the package, the one thing compile time reads (09 Q4)
+        // --- a file of the package, the one thing compile time reads
         ["std.core.embed"] = (a, _, _) =>
         {
             var bytes = (Embed ?? throw ComptimeFailure.Embed("'embed' reads no file in this compilation")).Bytes(_at, S(a[0]).ToString());
             return Value.Of(new ArrayObj([.. bytes.Select(b => Value.Uint(b))]));
         },
 
-        // --- the build's target and profile (09 A6 B4): compile time's alone, nothing at run time asks
+        // --- the build's target and profile: compile time's alone, nothing at run time asks
         ["std.core.buildOs"] = (_, _, _) => Value.Int(Facts.Os),
         ["std.core.buildArch"] = (_, _, _) => Value.Int(Facts.Arch),
         ["std.core.buildPointerWidth"] = (_, _, _) => Value.Int(Facts.PointerWidth),
@@ -341,7 +341,7 @@ public sealed class Natives(Interpreter interpreter)
         ["C:trunc"] = (a, _, _) => Value.Double(Math.Truncate(a[0].AsDouble)),
         ["C:sqrt"] = (a, _, _) => Value.Double(Math.Sqrt(a[0].AsDouble)),
         // The rest of std.math's functions are musl's, in the runtime under its prefix and here as
-        // the same code (09 D7, 13 M10 S12): the answer at compile time is the program's bits.
+        // the same code: the answer at compile time is the program's bits.
         ["C:lyr_exp"] = (a, _, _) => Value.Double(Libm.Exp(a[0].AsDouble)),
         ["C:lyr_log"] = (a, _, _) => Value.Double(Libm.Log(a[0].AsDouble)),
         ["C:lyr_log2"] = (a, _, _) => Value.Double(Libm.Log2(a[0].AsDouble)),
@@ -368,8 +368,8 @@ public sealed class Natives(Interpreter interpreter)
             return Value.Double(Math.Abs(x - whole) >= 0.5 ? whole + Math.CopySign(1.0, x) : whole);
         },
 
-        // --- std.hash's key (10 K2): drawn from the system per process at run time, fixed at compile
-        // time (13 M9a P2) — a Map walked in a 'comptime' site walks the same way in every build.
+        // --- std.hash's key: drawn from the system per process at run time, fixed at compile
+        // time — a Map walked in a 'comptime' site walks the same way in every build.
         ["C:lyr_hash_key"] = (_, _, _) => Value.Uint(0),
 
         // --- the scheduler and the atomics on one thread (task.h, atomic.h): no scheduler runs at

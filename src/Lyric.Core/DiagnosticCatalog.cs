@@ -2,7 +2,7 @@ using System.Text;
 
 namespace Lyric.Core;
 
-/// <summary>One code of the catalog (design/v5/spec/11 G9; 13 M12a P4).</summary>
+/// <summary>One code of the catalog.</summary>
 public sealed record CatalogEntry(string Code, string Title, string Severity, string Area, string Summary)
 {
     /// <summary>The rule, why, and what to do — errors and warnings.</summary>
@@ -21,7 +21,7 @@ public sealed record CatalogEntry(string Code, string Title, string Severity, st
     /// <summary>Why the code is no longer reported; its number stays taken.</summary>
     public string? Retired { get; init; }
 
-    /// <summary>A warning's lint (16 §5; 13 M12a P8): its name, its group, its level unless said.
+    /// <summary>A warning's lint (spec 16 §5): its name, its group, its level unless said.
     /// Every warning has one; nothing else has.</summary>
     public string? Lint { get; init; }
     public string? Group { get; init; }
@@ -55,7 +55,7 @@ public static class DiagnosticCatalog
         "15-project", "16-diagnostics",
     ];
 
-    /// <summary>The groups a lint belongs to (13 M12a P8); <c>warnings</c> names every lint.</summary>
+    /// <summary>The groups a lint belongs to; <c>warnings</c> names every lint.</summary>
     public static readonly string[] Groups =
         ["unused", "correctness", "resources", "concurrency", "deprecation", "style", "perf", "docs"];
 
@@ -166,7 +166,7 @@ public static class DiagnosticCatalog
                 },
             };
             if (!Severities.Contains(entry.Severity)) throw new InvalidDataException($"{code}: severity '{entry.Severity}'");
-            // a warning is a lint, and nothing else is (13 M12a P8)
+            // a warning is a lint, and nothing else is
             var live = entry.Retired is null && entry.Severity == "warning";
             if (live != (entry.Lint is not null) || (entry.Lint is null) != (entry.Group is null) || (entry.Lint is null && Get("level") is not null))
                 throw new InvalidDataException($"{code}: a warning has its lint, group and level, and nothing else has");

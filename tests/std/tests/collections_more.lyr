@@ -1,4 +1,4 @@
-// The collections after M8c S6a (10 C3, C4, C5, C7, N3): a set's operations, a map's index — a
+// More of the collections: a set's operations, a map's index — a
 // null takes the key out —, Map.from and entries, Set.of, List.from and shrinkToFit, a view plus a view.
 import std.collections { List, Map, Set };
 import std.test { assertEq, assertFalse, assertNull, assertTrue };

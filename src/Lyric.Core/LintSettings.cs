@@ -1,7 +1,7 @@
 namespace Lyric.Core;
 
 /// <summary>
-/// A package's levels for the lints (spec 16 §5; 13 M12a P8): what the command line says
+/// A package's levels for the lints (spec 16 §5): what the command line says
 /// (<c>-A</c>, <c>-W</c>, <c>-D</c>) over what the manifest says (<c>[lints]</c>) over each lint's own
 /// level. Within one of them the most specific selector decides — a lint's name or code over its
 /// group over <c>warnings</c> —, among equals the last. A declaration's or a module's

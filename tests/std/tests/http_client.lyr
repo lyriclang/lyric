@@ -1,4 +1,4 @@
-// std.http, the client (design/v5/spec/10 Q6; 13 M10 S7): a request written, the head and the
+// std.http, the client: a request written, the head and the
 // body read in each framing, the connection kept for the next request, redirects, a body sent
 // with its length or in chunks, a timeout, what is refused. Against a server of this file on a
 // loopback port: it answers by path and marks each connection with X-Conn.
@@ -84,8 +84,8 @@ fn decodeChunks(raw: Slice<uint8>): string {
 }
 
 /// How many connection tasks of the server have ended: a client that gives a connection up — a
-/// timeout cuts the exchange short — closes it, so the task sees the end and ends (sweep after
-/// M10, open point 191: it used to stay open, and the task waited for the next request for ever).
+/// timeout cuts the exchange short — closes it, so the task sees the end and ends,
+/// rather than wait for the next request for ever.
 class Counter {
     var n: int = 0,
 }
@@ -307,7 +307,7 @@ fn whatIsNotHttpIsRefused(): void throws Error {
         fail("no timeout");
     } catch (_: TimedOut) { }
     // the connection the timeout cut short is closed: the server's task for it ends once its
-    // slow answer is written (open point 191)
+    // slow answer is written
     try sleep(Duration.ofMillis(900));
     assertEq(ended.n, before + 1);
     assertEq(try (client.get(uri(base, "/slow"))).text(), "slow");

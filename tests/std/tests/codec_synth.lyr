@@ -1,4 +1,4 @@
-// The Codable synthesis and `@Codec` (design/v5/spec/10 B10 E3, E4, E6; 13 M10 S2): a struct and an
+// The Codable synthesis and `@Codec`: a struct and an
 // enum conform without a line, written over std.meta's infos by the defaults of std.codec's
 // `Encode` and `Decode`; `@Codec` steers names, skipping, renaming, the tag and unknown fields; an
 // own `encode`/`decode` replaces the synthesis.

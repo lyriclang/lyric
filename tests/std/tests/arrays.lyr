@@ -1,4 +1,4 @@
-// std.core's members of arrays and views (design/v5/spec/10 C2): written on the view, reached on
+// std.core's members of arrays and views: written on the view, reached on
 // the array; the writes reach the array.
 import std.core { arrayOf };
 import std.test { assertEq, assertFalse, assertNull, assertPanics, assertTrue };
@@ -112,7 +112,7 @@ fn arrayOfCallsInOrderOncePerIndex(): void {
     assertEq(arrayOf(1000, (i) => i)[999], 999);
 }
 
-// --- copyInto (the review's B16b): fits, longer keeps its rest, shorter panics, overlaps ------------
+// --- copyInto: fits, longer keeps its rest, shorter panics, overlaps ------------
 
 @Test
 fn copyIntoFillsAViewAsLong(): void {
@@ -170,7 +170,7 @@ fn copyIntoOfNothingDoesNothing(): void {
 
 @Test
 fn aRepeatFillsEveryElement(): void {
-    // one byte is a fill, a wider element a copy doubled — the last copy shorter (M8a S13)
+    // one byte is a fill, a wider element a copy doubled — the last copy shorter
     let seven: uint8 = 7;
     let bytes = [seven] * 5;
     assertEq(bytes.length(), 5);

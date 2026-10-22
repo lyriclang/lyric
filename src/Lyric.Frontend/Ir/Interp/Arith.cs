@@ -5,7 +5,7 @@ namespace Lyric.Ir.Interp;
 /// <summary>
 /// The number tower's operations as the C back end performs them (lyr/panic.h, lyr/numeric.h;
 /// <c>CEmitter.Binary</c>, <c>Unary</c>, <c>Conversion</c>): the same result bit for bit, and the
-/// same panic where C panics (design/v5/spec/09 Q7, 13 M9a P2).
+/// same panic where C panics.
 /// </summary>
 public static class Arith
 {
@@ -222,7 +222,7 @@ public static class Arith
         return Value.Uint(Norm(v.Bits, to));
     }
 
-    /// <summary>A float to an integer (T1d, Rust's rule; numeric.h's <c>LYR_SATURATE_</c>).</summary>
+    /// <summary>A float to an integer, saturating (Rust's rule; numeric.h's <c>LYR_SATURATE_</c>).</summary>
     private static ulong Saturate(double x, IrScalar to)
     {
         if (double.IsNaN(x)) return 0;

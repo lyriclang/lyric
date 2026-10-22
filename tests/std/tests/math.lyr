@@ -1,4 +1,4 @@
-// std.math (design/v5/spec/10 B5 Z2), Ordered's clamp, char's code point (Z8).
+// std.math, Ordered's clamp, char's code point.
 import std.test { assertEq, assertTrue, assertPanics, assertNull, assertNotNull, assertClose };
 import std.math;
 

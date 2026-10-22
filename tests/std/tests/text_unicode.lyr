@@ -1,4 +1,4 @@
-// Text over Unicode (10 S1, S3, S4, S12c, S12d, S14; M8c S2): trimming by White_Space and by a
+// Text over Unicode: trimming by White_Space and by a
 // pattern, blankness, case, bytes, characters from both ends and with their indices, `parse`
 // by the expected type, `Debug` as the text would be written.
 import std.test { assertEq, assertFalse, assertNull, assertTrue };

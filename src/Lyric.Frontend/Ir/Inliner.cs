@@ -31,8 +31,8 @@ namespace Lyric.Ir;
 /// local of the caller. Its <c>this</c> is the caller's place, not a copy: spliced, the callee's
 /// receiver IS the caller's local — every load, address and store of it goes there. A receiver
 /// that lies in a field or behind an optional has no local to stand for it, and the call stays.
-/// (Copied into a local of its own, as the other parameters are, it lost every write — the
-/// review's B10.)</item>
+/// (Copied into a local of its own, as the other parameters are, it would lose every
+/// write.)</item>
 /// </list>
 ///
 /// <para>The spliced instructions KEEP THE CALLEE'S SPANS: a panic then names the right line in
@@ -115,10 +115,10 @@ internal static class Inliner
 
     private static bool Inlinable(IrFunction callee)
     {
-        // '@NoInline' (09 A11) is the C compiler's hint, and this inliner's
+        // '@NoInline' is the C compiler's hint, and this inliner's
         if (callee.Hints.HasFlag(IrHints.NoInline)) return false;
 
-        // A callee with an error path keeps its own frame (05, 01 L5): its landings end in ITS
+        // A callee with an error path keeps its own frame: its landings end in ITS
         // bottom — propagate into its caller's slot, or a dispatch — which spliced into another
         // function would mean that function's error, or nothing.
         if (callee.Throws) return false;

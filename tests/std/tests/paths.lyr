@@ -1,4 +1,4 @@
-// std.path (design/v5/spec/10 O6; M8b S6a): Go's path/filepath, lexically — on POSIX its documented
+// std.path: Go's path/filepath, lexically — on POSIX its documented
 // examples and the cases Go itself answers (checked against `go run` when written); on Windows the
 // volumes, both separators, and names alike without regard to case.
 import std.path;

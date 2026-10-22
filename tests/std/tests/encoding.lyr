@@ -1,6 +1,6 @@
-// std.encoding (design/v5/spec/10 Q5; M8b S4a): RFC 4648's test vectors for Base64 and Base16,
+// std.encoding: RFC 4648's test vectors for Base64 and Base16,
 // the URL-safe alphabet, the strict decoders' offsets, UTF-16 with a surrogate pair, the integers
-// of a byte slice and the bytes of an integer (M8c S11).
+// of a byte slice and the bytes of an integer.
 import std.encoding { Base64, Base64Url, EncodingError, Hex, Utf16 };
 import std.io { ByteBuffer };
 import std.test { assertEq, assertPanics, assertTrue, fail };
@@ -160,7 +160,7 @@ fn aNumberTakesExactlyItsWidth(): void {
 
 @Test
 fn anIntegerGivesItsBytesInEitherOrder(): void {
-    // an inline array is Equatable, not Debug (10 S4b): an assertion compares it as an array
+    // an inline array is Equatable, not Debug: an assertion compares it as an array
     let n: uint16 = 0x0102;
     let be: uint8[2] = [1u8, 2u8];
     assertTrue(n.toBytesBE() == be);

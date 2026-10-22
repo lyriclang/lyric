@@ -40,7 +40,7 @@ internal sealed class GlobalTable
     /// Collects all globals of a compilation. Runs BEFORE the function lowering: a function body may
     /// read a global that stands later in the source.
     /// </summary>
-    /// <param name="built">Whether the build makes a declaration (09 B2): a binding it leaves out has
+    /// <param name="built">Whether the build makes a declaration: a binding it leaves out has
     /// no slot and no initializer.</param>
     public void Collect(Compilation compilation, TypeResult types, TypeTable typeTable, Func<Decl, bool>? built = null)
     {
@@ -108,7 +108,7 @@ internal sealed class GlobalTable
     }
 
     /// <summary>
-    /// A constant of a generic type or of a generic block (07 G2; the review's M8a-3): ONE PER
+    /// A constant of a generic type or of a generic block: ONE PER
     /// INSTANCE, and no slot — it could have none, its type names the type's parameter
     /// (<c>static let none: ?T = null;</c>), and which instances a program has is known only
     /// when the lowering has found them. Its initializer is a constant by the sema's rule
@@ -130,8 +130,8 @@ internal sealed class GlobalTable
     /// <summary>
     /// A <c>static let</c> whose initializer is a literal — <c>static let max: int8 = 127;</c> — is
     /// that literal wherever it is read, and has no slot: no line in the init function, nothing a
-    /// program that never reads it carries (10 B5's number constants stood in every program as
-    /// globals). Any other initializer, and every module <c>let</c>, keeps its slot and runs in order.
+    /// program that never reads it carries. Any other initializer, and every module <c>let</c>,
+    /// keeps its slot and runs in order.
     /// </summary>
     private void AddStatic(GlobalSymbol symbol, BindingStmt binding, ModuleSymbol module, string name,
         TypeResult types, TypeTable typeTable)
@@ -198,8 +198,8 @@ internal sealed class GlobalTable
     private readonly HashSet<GlobalSymbol> _effectFree = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<int, (int Block, int Start, int End)> _initRanges = new();
 
-    /// <summary>Whether a global's initializer does nothing a program could see but give its value
-    /// (01 B13): such a global goes where nothing reads it (<see cref="GlobalPruning"/>).</summary>
+    /// <summary>Whether a global's initializer does nothing a program could see but give its
+    /// value: such a global goes where nothing reads it (<see cref="GlobalPruning"/>).</summary>
     public bool IsEffectFree(GlobalSymbol symbol) => _effectFree.Contains(symbol);
 
     /// <summary>Where the init function computes and stores an effect-free global: its block and the
@@ -211,7 +211,7 @@ internal sealed class GlobalTable
     public IReadOnlyDictionary<int, (int Block, int Start, int End)> InitRanges => _initRanges;
 
     /// <summary>
-    /// An initializer that only gives its value (01 B13): a literal, <c>null</c>, another global
+    /// An initializer that only gives its value: a literal, <c>null</c>, another global
     /// read, a <c>comptime</c> site, or an array, a tuple, a struct or a class built of such — the type's field defaults
     /// included. Nothing that calls or computes: an operator may panic, a call may do anything.
     /// </summary>
@@ -225,7 +225,7 @@ internal sealed class GlobalTable
                 return true;
             case UnaryExpr { Operator: UnaryOp.Neg, Operand: IntLiteralExpr or FloatLiteralExpr }:
                 return true;
-            // a constant the compiler computed (09 A4): what runs is its construction — in Lyric 5;
+            // a constant the compiler computed: what runs is its construction — in Lyric 5;
             // the 4.x tools lower a site as its inner expression, effects and all
             case ComptimeExpr when types.Lyric5Modules:
                 return true;

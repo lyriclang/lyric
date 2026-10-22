@@ -1,4 +1,4 @@
-// std.crypto (design/v5/spec/10 Q4; M8b S4b): FIPS 180-4's and RFC 1321's examples, the padding at
+// std.crypto: FIPS 180-4's and RFC 1321's examples, the padding at
 // every block edge, RFC 2202's and RFC 4231's HMAC cases. The expected values come from Python's
 // hashlib and hmac, an implementation of its own.
 import std.crypto { Digest, Hmac, Md5, Sha1, Sha256, Sha512, constantTimeEq, randomBytes, randomUint64, sha256 };

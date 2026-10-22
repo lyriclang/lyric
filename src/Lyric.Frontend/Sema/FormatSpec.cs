@@ -1,7 +1,7 @@
 namespace Lyric.Sema;
 
 /// <summary>
-/// A format spec as design/v5/spec/08 Y7 writes it, read (spec 12 §2 rule 1):
+/// A format spec as an f-string's hole writes it, read (spec 12 §2 rule 1):
 /// <c>[[fill]align][sign][#][0][width][grouping][.precision][type]</c>. Which parts a value takes is
 /// asked here, by kind of value; std.core reads the same text at run time.
 /// </summary>

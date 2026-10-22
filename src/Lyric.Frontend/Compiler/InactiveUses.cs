@@ -8,11 +8,11 @@ using Lyric.Sema;
 namespace Lyric.Compiler;
 
 /// <summary>
-/// An active use of what the build leaves out (design/v5/spec/09 A6 B2; 13 M9a P9): the name is
+/// An active use of what the build leaves out: the name is
 /// known — the inactive declaration is checked as every other —, but nothing of it is built, so a
 /// use the program would run is <c>LYR-CT0006</c>. A use within something left out is none, and
 /// neither is one in the branch a <c>comptime if</c> does not take: that is how a program chooses
-/// between what each target builds (B1). An import names, it does not use.
+/// between what each target builds. An import names, it does not use.
 /// </summary>
 internal static class InactiveUses
 {

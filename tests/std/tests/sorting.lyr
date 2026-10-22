@@ -1,4 +1,4 @@
-// std.core's sort family (design/v5/spec/10 C10): stable sorts keep equal elements in order, the
+// std.core's sort family: stable sorts keep equal elements in order, the
 // unstable one sorts in place; on arrays and on views.
 import std.core { arrayOf };
 import std.test { assertEq, assertTrue };

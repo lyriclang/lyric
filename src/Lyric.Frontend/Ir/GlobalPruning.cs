@@ -1,17 +1,14 @@
 namespace Lyric.Ir;
 
 /// <summary>
-/// Design 01 B13: a module binding nothing reads, whose initializer only gives its value, goes —
-/// its slot, and its lines in the init function. Every other binding of a reached module stays,
-/// and runs in order (07 G2): an initializer that calls may do anything.
+/// A module binding nothing reads, whose initializer only gives its value, goes — its slot, and
+/// its lines in the init function. Every other binding of a reached module stays, and runs in
+/// order: an initializer that calls may do anything.
 ///
 /// <para>Read means touched by a function the program reaches — a load, a store, an address — or
 /// by the initializer of a global that stays: the fixpoint over the init function, since one
 /// constant may be built of another. Which initializer only gives its value the lowering knows
 /// (<see cref="Lowering.GlobalTable"/>); where it stands in the init function it noted then.</para>
-///
-/// <para>Until N1b only a <c>static let</c> of a literal had no slot, and every program carried
-/// std.collections' <c>emptyGroup</c>, <c>lowBits</c> and <c>highBits</c>.</para>
 /// </summary>
 internal static class GlobalPruning
 {

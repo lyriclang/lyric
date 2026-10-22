@@ -90,7 +90,7 @@ public static class DocumentSymbolProvider
         // right about what it does — it puts a name on a type — and the alternatives say less.
         TypeAliasDecl => (SymbolKind.Class, null),
 
-        // An associated type (03 T6) is a type-level parameter of the conformance; the enum has
+        // An associated type is a type-level parameter of the conformance; the enum has
         // exactly that word.
         AssociatedTypeDecl => (SymbolKind.TypeParameter, null),
 

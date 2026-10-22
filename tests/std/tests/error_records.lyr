@@ -1,4 +1,4 @@
-// What a clause's binding tells of the error it took (06 §4, 05 E6 O3; M8c S10): the errors
+// What a clause's binding tells of the error it took (spec 06 §4): the errors
 // suppressed into it — from a `using` close and a `defer` that failed on the way out — and where it
 // was thrown. A backtrace is kept in the debug profile only, so a test asks for one only where
 // there is one; CEmitterTests holds each profile to its answer.

@@ -3,13 +3,13 @@ using Lyric.Core;
 namespace Lyric.Ir.Interp;
 
 /// <summary>
-/// The compile-time interpreter (design/v5/spec/09 A4, 01 L7 — the door built; 13 M9a P1): runs
+/// The compile-time interpreter: runs
 /// a function of a lowered <see cref="IrModule"/> and returns its value. Its rules are the C back
 /// end's, taken from <c>CEmitter</c> instruction by instruction, so <c>comptime f()</c> is what
-/// <c>f()</c> is at run time (Q7).
+/// <c>f()</c> is at run time.
 /// <para>The frames are its own (no C# recursion per call), each with its locals, temps, the
-/// error in flight (01 L5) and the stashes of its defers. A step costs one unit of the budget
-/// (Q5); a panic, the budget, a call into the world and a form not run yet stop the run with a
+/// error in flight and the stashes of its defers. A step costs one unit of the budget; a panic,
+/// the budget, a call into the world and a form not run yet stop the run with a
 /// <see cref="ComptimeFailure"/> carrying the stack.</para>
 /// </summary>
 public sealed class Interpreter
@@ -27,9 +27,9 @@ public sealed class Interpreter
     private readonly Natives _natives;
 
     /// <param name="budget">The steps a run may take; <see cref="Refill"/> gives each run its own.</param>
-    /// <param name="overflowChecks">The profile's setting (07 P3): a checked operation panics
+    /// <param name="overflowChecks">The profile's setting: a checked operation panics
     /// where the binary would, and wraps where it would.</param>
-    /// <param name="embed">What <c>embed</c> reads files through (09 Q4); without one it reads none.</param>
+    /// <param name="embed">What <c>embed</c> reads files through; without one it reads none.</param>
     public Interpreter(IrModule module, long budget, bool overflowChecks, EmbedReader? embed = null, BuildFacts? build = null, SourceManager? sources = null)
     {
         _module = module;
@@ -53,8 +53,8 @@ public sealed class Interpreter
     /// <summary>Steps taken since the last <see cref="Refill"/>.</summary>
     public long Spent => _budgetLimit - _budget;
 
-    /// <summary>The budget whole again: each evaluation has its own (09 Q5 "je Auswertung") — the
-    /// one given, for a site the manifest's budget does not hold (std's, M9a S12).</summary>
+    /// <summary>The budget whole again: each evaluation has its own — the one given, for a site
+    /// the manifest's budget does not hold (std's).</summary>
     public void Refill(long? budget = null) => _budget = budget ?? _budgetLimit;
 
     /// <summary>Per global: 0 not filled yet, 1 being filled, 2 filled.</summary>
@@ -63,12 +63,12 @@ public sealed class Interpreter
     private readonly Dictionary<int, FunctionId> _globalInits = new();
 
     /// <summary>
-    /// A global filled at its first access (13 M9a S5), by the initializer the hoisting lowering
+    /// A global filled at its first access, by the initializer the hoisting lowering
     /// gave it alone — so code run at compile time runs no initializer it does not read, and a
     /// module's that cannot run there (<c>std.path</c> asks the system whether it runs on Windows)
     /// stops only what reads it. One that could not be filled stops every access to it, rather
     /// than reading a zero. A global read while it is being filled reads its zero, as a program
-    /// reads a later one before its turn (07 G2).
+    /// reads a later one before its turn.
     /// </summary>
     private void FillGlobal(int global)
     {
@@ -97,7 +97,7 @@ public sealed class Interpreter
     public Value Run(FunctionId function) => Run(function, []);
 
     /// <summary>Runs <paramref name="function"/> with <paramref name="args"/>, one per parameter:
-    /// a macro at its expansion (13 M9b P6), the trees of the site as values.</summary>
+    /// a macro at its expansion, the trees of the site as values.</summary>
     public Value Run(FunctionId function, Value[] args)
     {
         var stack = new List<Frame> { NewFrame(_module.Functions[function.Value], args, null) };
@@ -577,7 +577,7 @@ public sealed class Interpreter
     private static IEnumerable<Value> Elements(Window w) =>
         w.Str is { } s ? s.Bytes.Skip(w.Offset).Take(w.Length).Select(b => Value.Uint(b)) : w.Items!.Skip(w.Offset).Take(w.Length);
 
-    /// <summary>An index checked against a length (03 T14 N5, <c>LYR_CHECK_INDEX</c>).</summary>
+    /// <summary>An index checked against a length (<c>LYR_CHECK_INDEX</c>).</summary>
     internal static int Index(Value index, int length)
     {
         if (index.Bits >= (ulong)length)

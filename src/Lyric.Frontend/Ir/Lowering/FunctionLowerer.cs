@@ -130,7 +130,7 @@ internal sealed class FunctionLowerer
     private readonly Dictionary<LocalId, (TypeId Cell, IrType Value)> _cells = new();
 
     /// <summary>
-    /// Slots holding the caller's PLACE rather than a value — a place parameter's (03 T12) — with
+    /// Slots holding the caller's PLACE rather than a value — a place parameter's — with
     /// the type of the value at the place. Like a cell, known only to <see cref="LoadValue"/> and
     /// <see cref="StoreValue"/>: the rest of the lowering reads and writes the name as any other.
     /// </summary>
@@ -186,7 +186,7 @@ internal sealed class FunctionLowerer
 
         // A coroutine BODY is an ordinary function containing 'yield' ops: the yielded values
         // travel through the suspension, never through 'ret', and what it returns is the
-        // coroutine's result (06 A1) — void for 'Coroutine<Y>'. Everything else about it —
+        // coroutine's result — void for 'Coroutine<Y>'. Everything else about it —
         // parameters, locals, defers, lambdas — is the ordinary machinery, which is the point:
         // the frame lives on the coroutine's own stack like any other. Its coroutine is the
         // written return type, in this instance's terms.
@@ -196,9 +196,9 @@ internal sealed class FunctionLowerer
                 ?? throw Bug($"'{name}' is lowered as a coroutine body but returns no coroutine");
             _coroutineYield = CoroutineType.Yield;
         }
-        // The caller's error slot (01 L5 E1): a function whose CALL may throw — and a coroutine's
-        // body, whose error the runtime keeps for the pull that ran into it (05 E10, M6).
-        // A body has it also for the 'Cancelled' its yields throw when close() unwinds it (06 A5).
+        // The caller's error slot: a function whose CALL may throw — and a coroutine's
+        // body, whose error the runtime keeps for the pull that ran into it.
+        // A body has it also for the 'Cancelled' its yields throw when close() unwinds it.
         _irThrows = coroutineBody
             ? ThrownHere(types.DeclaredThrows(decl)).Length > 0 || CancelledClass() is not null
             : types.ThrowsAtCall(decl) && ThrownHere(types.DeclaredThrows(decl)).Length > 0;
@@ -209,7 +209,7 @@ internal sealed class FunctionLowerer
         // The receiver is parameter 0 and is allocated BEFORE the declared parameters: the IR's parameter
         // convention is positional, and a later slot would be a wrong-slot read in the VM. CIL takes the
         // same route with 'this'.
-        // A static default set in place for a conformer (M9a S11) brings the conformer as its receiver
+        // A static default set in place for a conformer brings the conformer as its receiver
         // type for 'Self', and has no 'this'.
         if ((receiver is not null || receiverType is not null) && !decl.IsStatic)
         {
@@ -222,7 +222,7 @@ internal sealed class FunctionLowerer
             // that: 'extend int' and 'extend string' target builtins that have no layout entry, and every
             // case there would invent an object for them. A scalar as parameter 0 is nothing new — every
             // free function has that. This is why an inherent extension needs no boxing.
-            // A block on a built-in constructor (03 T7 X2) brings its receiver as a TYPE — 'T[]'
+            // A block on a built-in constructor brings its receiver as a TYPE — 'T[]'
             // at the block's parameters, substituted for this instance — where no symbol stands.
             _thisType = receiverType is { } shape
                 ? _typeTable.Lower(SubstituteType(shape), SpanOfDecl(decl))
@@ -258,7 +258,7 @@ internal sealed class FunctionLowerer
             if (_types.RefOf(p) is not ParameterSymbol ps)
                 throw Bug($"parameter '{p.Name}' was not bound by the type checker");
             var valueType = LowerValueType(ps.Type, p.Span);
-            // '&n: int' (03 T12): the slot holds the caller's place, and the name is read and
+            // '&n: int': the slot holds the caller's place, and the name is read and
             // written through it.
             if (ps.IsPlace) _places[_slots.DeclareFor(ps, new IrPlaceType(valueType))] = valueType;
             else _slots.DeclareFor(ps, valueType);
@@ -312,9 +312,9 @@ internal sealed class FunctionLowerer
 
         if (_types.IsGeneratorLambda(lambda) && _types.TypeOf(lambda) is FnType { Return: CoroutineOf made })
         {
-            // A generator lambda (08 Y11 F5) is lowered as a coroutine's body: its yields suspend,
+            // A generator lambda is lowered as a coroutine's body: its yields suspend,
             // its returns give the result, and it has the error slot — for what the coroutine's
-            // pulls throw, and for the Cancelled its yields throw at close (06 A5).
+            // pulls throw, and for the Cancelled its yields throw at close.
             CoroutineType = (IrCoroutineType)LowerType(made, lambda.Span);
             _coroutineYield = CoroutineType.Yield;
             _returnType = CoroutineType.Result;
@@ -322,8 +322,8 @@ internal sealed class FunctionLowerer
         }
         else
         {
-            // A lambda throws what its type says (05 E2 K3), in the enclosing instance's terms: a set
-            // naming the enclosing function's 'E' is empty where 'E = never' (K4).
+            // A lambda throws what its type says, in the enclosing instance's terms: a set
+            // naming the enclosing function's 'E' is empty where 'E = never'.
             _irThrows = _types.TypeOf(lambda) is FnType thrower && ThrownHere(thrower.Throws).Length > 0;
 
             _returnType = _types.TypeOf(lambda) is FnType fn
@@ -344,7 +344,7 @@ internal sealed class FunctionLowerer
             // declaration, so it needs a place of its own rather than an entry in the same map.
             if (capturesThis)
             {
-                // The type the environment holds it as (02 M8 C2): a class as its reference,
+                // The type the environment holds it as: a class as its reference,
                 // a struct as a copy of the value — read off the environment's layout, not
                 // rebuilt from the receiver, which would make a struct's 'this' a reference.
                 _thisType = _typeTable.Defs[env.Type.Value].FieldTypes[captures.Count];
@@ -360,7 +360,7 @@ internal sealed class FunctionLowerer
             if (_types.RefOf(p) is not ParameterSymbol ps)
                 throw Bug($"lambda parameter '{p.Name}' was not bound by the type checker");
             var valueType = LowerValueType(ps.Type, p.Span);
-            // '&n' (03 T12): the slot holds the caller's place, as a declaration's does.
+            // '&n': the slot holds the caller's place, as a declaration's does.
             if (ps.IsPlace) _places[_slots.DeclareFor(ps, new IrPlaceType(valueType))] = valueType;
             else _slots.DeclareFor(ps, valueType);
             _lambdaParameterCount++;
@@ -424,7 +424,7 @@ internal sealed class FunctionLowerer
     /// <para>The same sequence as for a struct initializer, except that the fields go by position rather
     /// than by name. An opcode of its own would be a second way to build an object.</para>
     /// </summary>
-    /// <summary><c>a..b</c> as a value (03 T13 A3): the std.core struct holding its bounds, a
+    /// <summary><c>a..b</c> as a value: the std.core struct holding its bounds, a
     /// fresh value like a tuple. In a <c>for</c> head the literal never gets here.</summary>
     private TempId LowerRangeValue(RangeExpr expr)
     {
@@ -440,9 +440,9 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// <c>p with { x = 3, pos.y = 4 }</c> (02 M6): a copy of <c>p</c>, then one store per field
+    /// <c>p with { x = 3, pos.y = 4 }</c>: a copy of <c>p</c>, then one store per field
     /// into the copy — through the structs a path names, aliased where they lie in the copy.
-    /// The values are expressions over <c>p</c> and see the old values (W4).
+    /// The values are expressions over <c>p</c> and see the old values.
     /// </summary>
     private TempId LowerWith(WithExpr expr)
     {
@@ -492,7 +492,7 @@ internal sealed class FunctionLowerer
 
     private TempId LowerLambda(LambdaExpr lambda)
     {
-        // a lambda an inline call sets in place (08 F6) is no closure: its 'return' is not its own
+        // a lambda an inline call sets in place is no closure: its 'return' is not its own
         if (_types.IsInlineLambda(lambda))
             throw NotSupported("a lambda an inline function sets in place, on a call path that does not set it in place", lambda.Span);
         if (LowerType(_types.TypeOf(lambda), lambda.Span) is not IrFunctionType signature)
@@ -646,7 +646,7 @@ internal sealed class FunctionLowerer
         _places.TryGetValue(slot, out var held) ? held
         : _cells.TryGetValue(slot, out var cell) ? cell.Value : _slots.TypeOfLocal(slot);
 
-    /// <summary>The place a place parameter's slot holds (03 T12).</summary>
+    /// <summary>The place a place parameter's slot holds.</summary>
     private TempId PlaceIn(LocalId slot, Core.Span span)
     {
         var type = _slots.TypeOfLocal(slot);
@@ -695,7 +695,7 @@ internal sealed class FunctionLowerer
                 var type = _slots.TypeOfLocal(slot);
                 return Address(type, dest => new AddrLocal(dest, slot, type, span));
             }
-            // 'normalize(&this)' in a 'mut fn' (03 T12): the receiver's place, which is the caller's.
+            // 'normalize(&this)' in a 'mut fn': the receiver's place, which is the caller's.
             case ThisExpr when ThisSlot is { } self && ThisType is { } selfType:
                 return Address(selfType, dest => new AddrLocal(dest, self, selfType, span));
             case ThisExpr:
@@ -749,7 +749,7 @@ internal sealed class FunctionLowerer
                     return loaded;
                 }, value => _b.Emit(new StoreElem(array, index, value, span)));
             }
-            // An index of a type's own (02 M8a-1): 'index' reads, the stored 'setIndex' writes,
+            // An index of a type's own: 'index' reads, the stored 'setIndex' writes,
             // the receiver and the key evaluated once for the two.
             case IndexExpr own when write is not null:
                 return OwnIndexAccess(own, write);
@@ -817,7 +817,7 @@ internal sealed class FunctionLowerer
         };
     }
 
-    /// <summary>The C compiler's hints a function carries (09 A11): <c>@AlwaysInline</c>,
+    /// <summary>The C compiler's hints a function carries: <c>@AlwaysInline</c>,
     /// <c>@NoInline</c>, <c>@Cold</c> of <c>std.core</c>, by identity.</summary>
     private IrHints HintsOf(FunctionDecl declaration)
     {
@@ -943,14 +943,14 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>true means control flow falls through, false means the block is sealed. An expression
-    /// in the statement that gives no value (05 E12) ends the statement where it stands.</summary>
+    /// in the statement that gives no value ends the statement where it stands.</summary>
     private bool LowerStmt(Stmt stmt)
     {
         try { return LowerStmtCore(stmt); }
         catch (Diverged) { return false; }
     }
 
-    /// <summary>A value position met an expression that gives no value (05 E12) — a throw, a panic, a
+    /// <summary>A value position met an expression that gives no value — a throw, a panic, a
     /// call of a function that returns 'never' — which sealed its block: the rest of the enclosing
     /// expression never runs, so its lowering stops, and the statement around it reports that control
     /// flow ended (<see cref="LowerStmt"/>). A construct that branches before such an operand handles
@@ -1014,17 +1014,17 @@ internal sealed class FunctionLowerer
     private readonly Stack<List<DeferStmt>> _defers = new();
 
     /// <summary>Whether a defer — a <c>using</c>'s close among them — registers anywhere in the
-    /// function: for a coroutine's body, what dropping it without <c>close()</c> skips (06 A5).</summary>
+    /// function: for a coroutine's body, what dropping it without <c>close()</c> skips.</summary>
     private bool _cleanup;
 
-    // --- the error path (design/v5/spec/05 E1-E4, E9; 01 L5) ----------------------------------
+    // --- the error path ----------------------------------------------------------------------------
     //
     // A throw site — a 'throw', a call of a throwing function — has a LANDING: the defers of every
     // scope it leaves, innermost and latest first, then the catch dispatch of the innermost try
     // around it, or the function's bottom. Each step is a block of the CFG; nothing unwinds. The
     // chains are shared: a step is keyed by the scope and how many of its defers are registered,
     // which fixes everything below it, so two sites with the same pending defers share one chain
-    // (L5 E3, the cleanup labels of Zig's emission).
+    // (the cleanup labels of Zig's emission).
 
     /// <summary>Whether this function takes the caller's error slot (<see cref="IrFunction.Throws"/>).</summary>
     private readonly bool _irThrows;
@@ -1042,7 +1042,7 @@ internal sealed class FunctionLowerer
     private BlockId? _bottom;
 
     /// <summary>How many of a scope's defers a landing runs, where not all of them: while the scope's
-    /// defers run on a normal exit, those registered before the one running (05 E7: they run all
+    /// defers run on a normal exit, those registered before the one running (they run all
     /// the same); none, once they all ran. Keyed by the scope's list itself.</summary>
     private readonly Dictionary<List<DeferStmt>, int> _deferLimits = new(ReferenceEqualityComparer.Instance);
 
@@ -1060,7 +1060,7 @@ internal sealed class FunctionLowerer
     private int _stashes;
 
     /// <summary>The bindings of the clauses being lowered whose bodies throw them again, and the
-    /// stash each one's record waits in for that throw (05 E6 O3).</summary>
+    /// stash each one's record waits in for that throw.</summary>
     private readonly Dictionary<LocalSymbol, int> _kept = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>The error edges and throws lowered so far: a defer body on the error path that adds
@@ -1071,7 +1071,7 @@ internal sealed class FunctionLowerer
     /// its unwrapped self — gets one edge.</summary>
     private readonly HashSet<CallExpr> _errorEdged = new(ReferenceEqualityComparer.Instance);
 
-    /// <summary>The root of what is thrown as an interface type (05 E6 O1).</summary>
+    /// <summary>The root of what is thrown as an interface type.</summary>
     private IrInterfaceType ErrorType(Span span) =>
         LowerType(ErrorRoot(span), span) as IrInterfaceType
             ?? throw Bug("std.core's Error did not lower to an interface");
@@ -1085,7 +1085,7 @@ internal sealed class FunctionLowerer
     /// Where an error at this point goes: the pending defers above the innermost try (or all of
     /// them), then that try's dispatch (or the bottom). Inside a defer body that runs with an error
     /// in flight — and not inside a try of its own — the body's own scopes, then the merge into the
-    /// stashed error (05 E7). Built on demand, shared by key.
+    /// stashed error. Built on demand, shared by key.
     /// </summary>
     private BlockId ErrorLanding(Span span)
     {
@@ -1127,7 +1127,7 @@ internal sealed class FunctionLowerer
         _chains[(scope, count, end)] = step;
         var resume = _b.CurrentId;
         _b.SwitchTo(step);
-        // The body runs where it was registered, with an error in flight (05 E7). Where it can fail,
+        // The body runs where it was registered, with an error in flight. Where it can fail,
         // that error is stashed while it runs — the body's own calls report through the same slot,
         // and a call that went well leaves it as it was — and an error of the body's own is
         // appended to the stashed one as suppressed, the first winning, before the chain goes on
@@ -1160,7 +1160,7 @@ internal sealed class FunctionLowerer
 
     /// <summary>The end of every chain no try catches: the error leaves through the caller's slot —
     /// or, in a function that throws nothing, cannot arrive at all: the sema proved every site
-    /// covered (05 K8), and a dispatch whose clauses do not end in a catch-all keeps an edge here.</summary>
+    /// covered, and a dispatch whose clauses do not end in a catch-all keeps an edge here.</summary>
     private BlockId Bottom(Span span)
     {
         if (_bottom is { } known) return known;
@@ -1173,12 +1173,12 @@ internal sealed class FunctionLowerer
         return bottom;
     }
 
-    /// <summary>A recorded set in this instance's terms (05 E2 K4): substituted, <c>never</c> dropped
+    /// <summary>A recorded set in this instance's terms: substituted, <c>never</c> dropped
     /// — a call through a <c>fn() throws E</c> throws nothing where <c>E = never</c>, and the sema,
     /// which checks a generic body once, recorded the <c>E</c>.</summary>
     private LyrType[] ThrownHere(LyrType[] set) => TypeChecker.ThrownAfter(set.Select(SubstituteType));
 
-    /// <summary>The edge after a call that may fail (01 L5 E3): the error to the landing, the value
+    /// <summary>The edge after a call that may fail: the error to the landing, the value
     /// on in a fresh block.</summary>
     private void ErrorEdge(Span span)
     {
@@ -1189,9 +1189,9 @@ internal sealed class FunctionLowerer
         _b.SwitchTo(next);
     }
 
-    /// <summary>'throw e' (05 E1, E3): the value as an Error interface value — a class as it is, a
+    /// <summary>'throw e': the value as an Error interface value — a class as it is, a
     /// struct or an enum boxed, an interface value re-tabled — into flight, then to the landing. A
-    /// clause's own binding thrown again is the same error going on (E6 O3): its record — where it
+    /// clause's own binding thrown again is the same error going on: its record — where it
     /// was first thrown, what was suppressed into it — goes back into flight from its stash.</summary>
     private void Raise(Expr thrown, Span span)
     {
@@ -1217,11 +1217,11 @@ internal sealed class FunctionLowerer
         return null;
     }
 
-    /// <summary>An unexpanded site (13 M9b P6), met only in the hoisting pass of an expansion
+    /// <summary>An unexpanded site, met only in the hoisting pass of an expansion
     /// round: a global's initializer of the calling module holds one, and that pass runs no
     /// initializer. A trap, so the function stays well-formed; the expander replaces the site
     /// before the module is lowered for real.</summary>
-    /// <summary><c>quote { ... }</c> (13 M9b P5): a call of the native <c>std.syntax.quote#i</c>
+    /// <summary><c>quote { ... }</c>: a call of the native <c>std.syntax.quote#i</c>
     /// with the splices' values, which builds the tree from the quote's content; the content is
     /// in the module's table, by the import's index.</summary>
     private TempId? LowerQuote(QuoteExpr quote)
@@ -1251,7 +1251,7 @@ internal sealed class FunctionLowerer
     /// function declared 'never', an 'if' or 'match' whose every arm diverges? Such an expression
     /// seals the block when lowered, and the position holding it must not store or branch after it.
     /// Read at the instance: a generic body's `body()` of type `T` diverges where `T` is `never` —
-    /// `spawn` of a task that never returns (M8b S10c's echo server found it).</summary>
+    /// `spawn` of a task that never returns.</summary>
     private bool Diverges(Expr expr) => _types.TypeOf(expr) is { } type && SubstituteType(type) is NeverType;
 
     /// <summary>Lowers a diverging expression for its effect. After it the block is sealed; a
@@ -1287,18 +1287,18 @@ internal sealed class FunctionLowerer
 
     private bool LowerThrow(ThrowStmt stmt)
     {
-        // The defers of the scopes the throw leaves are the landing's (05 E7, L5 E3) — not inlined
+        // The defers of the scopes the throw leaves are the landing's — not inlined
         // here, as a 'return' inlines them.
         Raise(stmt.Value, stmt.Span);
         return false;
     }
 
     /// <summary>
-    /// <c>try { … } catch (e: T) { … }</c> (05 E4, E9): the body's sites land — after the defers
+    /// <c>try { … } catch (e: T) { … }</c>: the body's sites land — after the defers
     /// they leave inside it — on ONE dispatch block, which tests the in-flight error against the
     /// clauses in order: the first that covers it takes it off and runs; a catch-all ends the chain;
     /// when no clause matches, the error goes on to the landing outside this try. The clauses are
-    /// lowered outside the try, so a throw in one is not caught by its sisters (E9 C6).
+    /// lowered outside the try, so a throw in one is not caught by its sisters.
     /// </summary>
     private bool LowerTry(TryStmt stmt)
     {
@@ -1323,7 +1323,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// A try's dispatch (05 E9): the in-flight error tested against the clauses in order — the first
+    /// A try's dispatch: the in-flight error tested against the clauses in order — the first
     /// that covers it takes it off, binds it under its own type and runs <paramref name="lowerBody"/>;
     /// a catch-all ends the chain. No clause took it: the error goes on to the landing outside — the
     /// defers there, then the next try or the bottom. Answers the blocks the bodies fall out of.
@@ -1343,7 +1343,7 @@ internal sealed class FunctionLowerer
             var symbol = clause.BindingName is null ? null
                 : _types.RefOf(clause) as LocalSymbol
                   ?? throw Bug($"catch binding at {clause.Span} was not bound by the type checker");
-            // What the clause tests: its type, or each type of its set (C5); nothing — it takes
+            // What the clause tests: its type, or each type of its set; nothing — it takes
             // everything — without a type, or where the root is among them.
             LyrType[] tested = clause.BindingTypes.Length > 0
                 ? _types.CatchSet(clause) ?? throw Bug($"the set at {clause.Span} was not resolved by the type checker")
@@ -1379,7 +1379,7 @@ internal sealed class FunctionLowerer
             if (lowerBody(clause)) open.Add(_b.CurrentId);
             if (symbol is not null) _kept.Remove(symbol);
 
-            if (next is null) { caughtAll = true; break; } // a catch-all ends the chain (E9 C3)
+            if (next is null) { caughtAll = true; break; } // a catch-all ends the chain
             _b.SwitchTo(next.Value);
         }
 
@@ -1391,10 +1391,10 @@ internal sealed class FunctionLowerer
 
     /// <summary>
     /// A clause's binding. Under its OWN type where the sema gave it one — a typed clause, a set
-    /// of one, a clause without a type that one type reaches (the review's M5-6): a class's
+    /// of one, a clause without a type that one type reaches: a class's
     /// object, a struct's or an enum's value out of the box, an interface value re-tabled.
-    /// Otherwise the Error value itself; what it may hold is the sema's (K7). The question was
-    /// "does the clause write a type", which a clause without one never does.
+    /// Otherwise the Error value itself; what it may hold is the sema's. What decides is the type
+    /// the sema gave, not whether the clause writes one.
     /// </summary>
     private void BindCaught(LocalSymbol symbol, TempId error, IrType errorType, LyrType root, Span span)
     {
@@ -1410,7 +1410,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>A clause takes the error off the slot: the record dropped — or, where the body throws
-    /// the binding again or asks it of its record, kept aside for the clause (05 E6 O3), which is
+    /// the binding again or asks it of its record, kept aside for the clause, which is
     /// one store more.</summary>
     private void Take(CatchClause clause, LocalSymbol? symbol)
     {
@@ -1440,7 +1440,7 @@ internal sealed class FunctionLowerer
         || AstChildren.Of(node).Any(child => AsksTheRecord(child, binding));
 
     /// <summary>
-    /// What a clause's binding tells of the record its clause kept (06 §4, 05 E6 O3):
+    /// What a clause's binding tells of the record its clause kept:
     /// <c>e.suppressed()</c> the errors suppressed into it, a new <c>Error[]</c>; <c>e.backtrace()</c>
     /// its program counters, which std.core's <c>backtraceOf</c> makes a <c>?Backtrace</c> of —
     /// null where there are none, as in the release profile.
@@ -1483,7 +1483,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// The <c>try</c> family as an expression (05 E4). A mark is its operand: the sites in it got
+    /// The <c>try</c> family as an expression. A mark is its operand: the sites in it got
     /// their edges where they were lowered. The other forms open a frame, as the block does, so the
     /// operand's errors land on ONE dispatch: <c>try!</c> panics there, <c>try?</c> clears the error
     /// and gives <c>null</c>, and the expression form asks its clauses, each delivering the value
@@ -1505,7 +1505,7 @@ internal sealed class FunctionLowerer
         finally { _tryFrames.Pop(); }
     }
 
-    /// <summary><c>try! e</c> (05 E4, E8): the value is the operand's; an error ends the program as a
+    /// <summary><c>try! e</c>: the value is the operand's; an error ends the program as a
     /// panic with its message. The dispatch has no way back, so the value needs no slot.</summary>
     private TempId? LowerTryForce(TryExpr expr)
     {
@@ -1521,7 +1521,7 @@ internal sealed class FunctionLowerer
         return value;
     }
 
-    /// <summary><c>try? e</c> (05 E4): the operand's value wrapped, or <c>null</c> when it fails — the
+    /// <summary><c>try? e</c>: the operand's value wrapped, or <c>null</c> when it fails — the
     /// error cleared and dropped. Never flattened: a <c>?T</c> operand is wrapped once more. Over an
     /// expression without a value it stands as a statement (the sema saw to it) and only drops the
     /// error.</summary>
@@ -1586,7 +1586,7 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
-    /// <summary><c>try e catch (x: A) v</c> (05 E4): the operand under a frame; its dispatch asks the
+    /// <summary><c>try e catch (x: A) v</c>: the operand under a frame; its dispatch asks the
     /// clauses in order as the block form's does, and the clause that takes the error delivers the
     /// value from its value block. No clause takes it: the error goes on to the landing outside.
     /// A form whose every part leaves has the type 'never' and no slot.</summary>
@@ -1672,7 +1672,7 @@ internal sealed class FunctionLowerer
     /// innermost first, each scope's latest first (LIFO): a scope's end, a <c>return</c> (all of
     /// them), a <c>break</c> or <c>continue</c> (those above the loop). Each body runs where its
     /// defer was registered — under the trys around its scope, not those inside it — and should
-    /// one throw (05 E7), the error leaves like any other: the defers registered before it run all
+    /// one throw, the error leaves like any other: the defers registered before it run all
     /// the same, then those of the scopes below, never again one that ran, then the try around or
     /// the bottom. Answers whether the exit is still open: a body that always throws ends it.
     /// </summary>
@@ -1740,7 +1740,7 @@ internal sealed class FunctionLowerer
         if (binding.Initializer is not null)
             _b.Emit(new StoreLocal(slot, LowerExprAs(binding.Initializer, type), binding.Span));
 
-        // 'using let' (05 E7 R2): its close joins the scope's one LIFO list, registered once the
+        // 'using let': its close joins the scope's one LIFO list, registered once the
         // value stands — a failure in the initializer has nothing to close yet.
         if (binding.Cleanup is { } cleanup) _defers.Peek().Add(cleanup);
         return true;
@@ -1769,7 +1769,7 @@ internal sealed class FunctionLowerer
 
     private bool LowerReturn(ReturnStmt stmt)
     {
-        // in the body of an inline function (08 F6), or a lambda its call wrote: the expansion's
+        // in the body of an inline function, or a lambda its call wrote: the expansion's
         if (_inline is { } frame) return LowerInlineReturn(stmt, frame);
         // A bare 'return;' in a coroutine body is the ordinary void return below (§10): the
         // body is a void function since format 4.0, and the chain's end is the frame ending —
@@ -1800,7 +1800,7 @@ internal sealed class FunctionLowerer
     {
         var loop = TargetLoop(stmt.Label, "break", stmt.Span);
         // A value goes into the loop's slot first, as a 'return' takes its value before the defers
-        // run (05 E11).
+        // run.
         if (stmt.Value is { } value && loop.ValueSlot is { } slot)
             _b.Emit(new StoreLocal(slot, LowerExprAs(value, loop.ValueType!), value.Span));
         // A break leaves every scope between it and the loop it names — their defers run first,
@@ -1835,11 +1835,11 @@ internal sealed class FunctionLowerer
     /// </summary>
     private bool LowerIf(IfStmt stmt)
     {
-        // 'comptime if' (09 Q2): with the evaluator's values in hand, the branch its condition
+        // 'comptime if': with the evaluator's values in hand, the branch its condition
         // chose and nothing of the other; in the hoisting pass, the 'if' it is
         if (stmt.Comptime && stmt.Condition is ComptimeExpr site && ComptimeValue(site) is BoolConst chosen)
             return chosen.Value ? LowerScope(stmt.Then) : stmt.Else is not { } other || LowerStmt(other);
-        // decided by the round while checking (M9a S10): the branch the checker checked, alone
+        // decided by the round while checking: the branch the checker checked, alone
         if (stmt.Comptime && _types.DecidedIf(stmt) is bool decided)
             return decided ? LowerScope(stmt.Then) : stmt.Else is not { } rest || LowerStmt(rest);
 
@@ -1903,8 +1903,8 @@ internal sealed class FunctionLowerer
         if (_types.RefOf(stmt) is not LocalSymbol loopVar)
             throw Bug($"loop variable '{stmt.Variable}' was not bound by the type checker");
 
-        // a loop over a known type's fields (M9a S9): a body per round, its variable that field's info.
-        // The info takes no slot (M9a S10): a read of the variable materializes the constant where it
+        // a loop over a known type's fields: a body per round, its variable that field's info.
+        // The info takes no slot: a read of the variable materializes the constant where it
         // stands (LowerIdentifier; a lambda reads it there too), so a round that decides with it alone — the family's
         // defaults, 'attribute<Shared>(f)' — leaves no FieldInfo in the function.
         if (stmt.Comptime && _types.MetaRoundsOf(stmt) is { } metaRounds)
@@ -1989,7 +1989,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// <c>comptime for (x in w)</c> (design/v5/spec/09 Q2): the body once per element of the
+    /// <c>comptime for (x in w)</c>: the body once per element of the
     /// array its site computed, <c>x</c> that element's value, built where the round begins. A
     /// round's <c>continue</c> goes on with the next round, a <c>break</c> past the last; each
     /// round has a loop scope of its own whose targets arise only where a jump asks for them, and
@@ -2005,7 +2005,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>The rounds of a <c>comptime for</c>, each its body after what enters it: the
-    /// element stored, one body for all — or, over a known type's fields (M9a S9), a body of its
+    /// element stored, one body for all — or, over a known type's fields, a body of its
     /// own per field, checked with that field.</summary>
     private bool LowerRounds(ForInStmt stmt, IReadOnlyList<(Block Body, Action? Enter)> rounds)
     {
@@ -2037,8 +2037,8 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// <c>for (x in xs)</c> over an array, a view or an inline array in Lyric 5 (design/v5/spec/10
-    /// B6 I10, COL-09 B): the index loop. The sequence is evaluated once into a hidden slot — an
+    /// <c>for (x in xs)</c> over an array, a view or an inline array in Lyric 5: the index loop.
+    /// The sequence is evaluated once into a hidden slot — an
     /// inline array copied there, as a binding copies it —, its length read once, and the element
     /// at the index read at every pass: a write to a later element of an array is seen. No
     /// iterator and no optional per element, so an element that is itself optional walks.
@@ -2103,7 +2103,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// <c>for (x in e)</c> over Lyric 5's protocol (design/v5/spec/10 B6 I2): the iterator from
+    /// <c>for (x in e)</c> over Lyric 5's protocol: the iterator from
     /// <c>e.iter()</c> into the loop's hidden variable, then <c>next()</c> on it before every pass,
     /// the body while it answers a value — the two calls lowered as the calls the checker recorded.
     /// </summary>
@@ -2114,10 +2114,10 @@ internal sealed class FunctionLowerer
         var cursor = _slots.DeclareFor(protocol.Cursor, cursorType);
         _b.Emit(new StoreLocal(cursor, iterator, stmt.Span));
 
-        // A Closeable iterator's close (10 B6 I6): a defer in a scope of the loop's own, below
+        // A Closeable iterator's close: a defer in a scope of the loop's own, below
         // the loop's depth, so break and continue stay inside it — the exit runs it once, a return
         // or an error leaving the loop unwinds it. Where the iterator's type named a type
-        // parameter, the INSTANCE decides (the review's M8a-4): the close stays where the
+        // parameter, the INSTANCE decides: the close stays where the
         // concrete iterator is Closeable, and goes where it is not.
         if (protocol.CloseIfCloseable && !InstanceIsCloseable(SubstituteType(protocol.Cursor.Type)))
             protocol = protocol with { Close = null };
@@ -2126,8 +2126,8 @@ internal sealed class FunctionLowerer
         finally { if (protocol.Close is not null) _defers.Pop(); }
     }
 
-    /// <summary>Whether the concrete iterator of a generic loop is Closeable (the review's
-    /// M8a-4): a coroutine always is; everything else the sema answers at the instance.</summary>
+    /// <summary>Whether the concrete iterator of a generic loop is Closeable: a coroutine
+    /// always is; everything else the sema answers at the instance.</summary>
     private bool InstanceIsCloseable(LyrType concrete)
     {
         if (concrete is CoroutineOf) return true;
@@ -2172,10 +2172,10 @@ internal sealed class FunctionLowerer
 
     /// <summary>
     /// <c>for (i in a..b)</c> and <c>a..=b</c> over a range LITERAL: a counted loop on the element
-    /// type, no iterator object (design/v5/spec/13, M2 — the Lyric 5 backend has no runtime
-    /// object to hand a range to, and 03 A3 makes a range a value the compiler knows). The bounds
-    /// are read once, before the loop. An inclusive range ends on equality with its last value
-    /// BEFORE the step, so <c>..= MAX</c> never computes <c>MAX + 1</c> (the 2.0.1 bug, §7.2);
+    /// type, no iterator object (the Lyric 5 backend has no runtime object to hand a range to,
+    /// and a range is a value the compiler knows). The bounds are read once, before the loop.
+    /// An inclusive range ends on equality with its last value BEFORE the step, so
+    /// <c>..= MAX</c> never computes <c>MAX + 1</c>;
     /// an exclusive one steps only while <c>i &lt; last</c>, where <c>i + 1</c> fits. <c>continue</c>
     /// lands on the step, <c>break</c> after the loop.
     /// </summary>
@@ -2505,7 +2505,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// <c>loop { … }</c> (05 E11): the body, and back to its start. Only a <c>break</c> leaves — with
+    /// <c>loop { … }</c>: the body, and back to its start. Only a <c>break</c> leaves — with
     /// a value through a synthetic local the exit reads. The exit exists once a break was lowered
     /// (<see cref="LoopScope"/>): a loop nothing leaves has none, and nothing after it runs — its
     /// type is 'never', or its breaks stood only where no path goes.
@@ -2661,7 +2661,7 @@ internal sealed class FunctionLowerer
     /// sealed its block. Otherwise a temp.</summary>
     private TempId? LowerExprOrVoid(Expr expr) =>
         _chainReceivers.TryGetValue(expr, out var alreadyUnwrapped) ? alreadyUnwrapped
-        : _types.RewriteOf(expr) is { } rewritten ? LowerExprOrVoid(rewritten) // what the checker set in its place (M9a S10)
+        : _types.RewriteOf(expr) is { } rewritten ? LowerExprOrVoid(rewritten) // what the checker set in its place
         : expr switch
     {
         IntLiteralExpr e => LowerIntLiteral(e),
@@ -2742,7 +2742,7 @@ internal sealed class FunctionLowerer
     {
         var symbol = _types.RefOf(expr) ?? throw Bug($"identifier '{expr.Name}' is unbound");
 
-        // A round's variable (M9a S9) where no round stored it — in a 'comptime' site, lifted
+        // A round's variable where no round stored it — in a 'comptime' site, lifted
         // out of the function: its field's info, a constant.
         if (symbol is LocalSymbol round && _types.KnownFieldOf(round) is { } known && !_slots.TryLookup(round, out _))
             return EmitComptimeValue(FieldInfoConst(known), LowerType(round.Type, expr.Span), expr.Span);
@@ -2753,8 +2753,8 @@ internal sealed class FunctionLowerer
         if (symbol is LocalSymbol paramRound && _types.KnownParamOf(paramRound) is { } knownParam && !_slots.TryLookup(paramRound, out _))
             return EmitComptimeValue(ParameterInfoConst(knownParam), LowerType(paramRound.Type, expr.Span), expr.Span);
 
-        // A parameter of the CALLEE, named in a default that is being lowered at this call site
-        // (04 D5 F2): the argument materialized for it.
+        // A parameter of the CALLEE, named in a default that is being lowered at this call
+        // site: the argument materialized for it.
         if (symbol is ParameterSymbol && _argumentOverrides.TryGetValue(symbol, out var passed)) return passed;
 
         // A module 'let' has no frame slot but a global one.
@@ -2794,7 +2794,7 @@ internal sealed class FunctionLowerer
             // way does not fall victim to the reachability analysis.
             //
             // A selective import binds its name to a shell — under the function's own name or
-            // another, from the module that declares it or one that passes it on (07 V3 I2, I4) —
+            // another, from the module that declares it or one that passes it on —
             // and the function beneath is what the name means, here as at a call.
             var meant = symbol;
             while (meant is ImportBindingSymbol shell) meant = shell.Target;
@@ -2839,7 +2839,7 @@ internal sealed class FunctionLowerer
     private TempId Narrow(Expr expr, TempId value, IrType type)
     {
         // One 'optget' per level the sema narrowed away: a '??T' proven present once is a '?T',
-        // twice a 'T' (03 T4 O3). The slot keeps its declared depth; the expression has its own.
+        // twice a 'T'. The slot keeps its declared depth; the expression has its own.
         var wanted = OptionalDepth(TypeOfExpr(expr));
         while (type is IrOptionalType option && OptionalDepth(type) > wanted)
         {
@@ -2848,13 +2848,13 @@ internal sealed class FunctionLowerer
             (value, type) = (narrowed, option.Inner);
         }
 
-        // 'if (x is Circle)' (03 T11): the sema says 'Circle' where the slot holds the interface
+        // 'if (x is Circle)': the sema says 'Circle' where the slot holds the interface
         // value — the downcast is the materialization of the test that guards the branch.
         if (type is IrInterfaceType && TypeOfExpr(expr) is { } proven && proven is not IrOptionalType && !proven.Equals(type))
         {
             var cast = _slots.NewTemp(proven);
             _b.Emit(new Downcast(cast, value, TargetIdOf(proven, expr.Span), proven, expr.Span));
-            if (proven is IrStructType or IrInlineArrayType) _fresh.Add(cast); // a copy out of the box (04 D12)
+            if (proven is IrStructType or IrInlineArrayType) _fresh.Add(cast); // a copy out of the box
             return cast;
         }
         return value;
@@ -2873,11 +2873,11 @@ internal sealed class FunctionLowerer
         _ => throw NotSupported($"a type test against '{type}'", span),
     };
 
-    /// <summary><c>x is T</c> (03 T11): a bool off the interface value's table.</summary>
+    /// <summary><c>x is T</c>: a bool off the interface value's table.</summary>
     private TempId LowerTypeTest(TypeTestExpr test)
     {
         var value = LowerExpr(test.Operand);
-        // 'e is v' (M9a S10): the tag against the variant's
+        // 'e is v': the tag against the variant's
         if (_types.VariantTestOf(test) is { } variant)
         {
             var enumType = RequireEnum(test.Operand);
@@ -2944,13 +2944,13 @@ internal sealed class FunctionLowerer
     {
         if (expr.Operator is UnaryOp.Place) return LowerPlace(expr.Operand);
 
-        // '++x[k]' on a type's own index carries its write, 'x.setIndex(k, …)' (02 M8a-1): a call
+        // '++x[k]' on a type's own index carries its write, 'x.setIndex(k, …)': a call
         // stored on the node as an operator's is, and not the operator — so before the next test.
         if (expr.Operator is UnaryOp.PreInc or UnaryOp.PreDec)
             return LowerIncDec(expr.Operand, expr.Operator is UnaryOp.PreInc,
                 yieldOldValue: false, expr.Span, _types.OperatorCallOf(expr));
 
-        // '-v' and '~v' on a conforming type ARE their calls (04 D6).
+        // '-v' and '~v' on a conforming type ARE their calls.
         if (_types.OperatorCallOf(expr) is { } desugaredUnary)
             return LowerCall(desugaredUnary) ?? throw Bug($"operator method for '{expr.Operator}' returned no value");
 
@@ -3022,7 +3022,7 @@ internal sealed class FunctionLowerer
         // What to make of the result follows from the operator on this node: '==' is the call
         // itself, '!=' negates it, and the four orderings read the SIGN of what 'compare' answered —
         // against zero, with the same comparison instruction an 'int < int' emits.
-        // '[x] * 64' as a 'T[64]' (10 C7): the inline array, its one element repeated.
+        // '[x] * 64' as a 'T[64]': the inline array, its one element repeated.
         if (TypeOfExpr(expr) is IrInlineArrayType repeated
             && expr is { Operator: BinaryOp.Mul, Left: ArrayLitExpr { Elements: [var one] } })
         {
@@ -3053,7 +3053,7 @@ internal sealed class FunctionLowerer
             var value = LowerCall(desugared)
                         ?? throw Bug($"operator method for '{expr.Operator}' returned no value");
 
-            // 'compare' answers a '?Ordering' (04 D6): '<' is '.Less', '<=' is not '.Greater', and
+            // 'compare' answers a '?Ordering': '<' is '.Less', '<=' is not '.Greater', and
             // so on; 'null' — the two are not ordered — makes every one of the four false.
             if (expr.Operator is BinaryOp.Lt or BinaryOp.Le or BinaryOp.Gt or BinaryOp.Ge
                 && TypeOfExpr(desugared) is IrOptionalType { Inner: IrEnumType ordering } answered)
@@ -3165,7 +3165,7 @@ internal sealed class FunctionLowerer
     /// that comes out has stored its value and reaches the merge; one that gives no value — as a
     /// whole ('else throw e'), or because an operand in it does — ends where it stands, and the
     /// merge has the other as its only predecessor. An 'if' nobody takes a value from — both
-    /// branches give none (05 E12), or are worth nothing, as two calls of void functions are —
+    /// branches give none, or are worth nothing, as two calls of void functions are —
     /// has no slot.</summary>
     private TempId? LowerIfExpr(IfExpr expr)
     {
@@ -3216,7 +3216,7 @@ internal sealed class FunctionLowerer
 
 
     /// <summary>
-    /// A value block as an expression (08 Y4): its statements in a scope of their own — its
+    /// A value block as an expression: its statements in a scope of their own — its
     /// defers run at its end — and its tail into a slot, which is the block's value. A block
     /// nobody takes a value from has no slot: it is worth nothing, or it leaves. One that does
     /// not come out — it leaves, or an operand in it gives no value — ends where it stands.
@@ -3302,8 +3302,8 @@ internal sealed class FunctionLowerer
 
     private TempId LowerAssign(AssignExpr expr)
     {
-        // 'this = value' in a 'mut fn' of a struct replaces the caller's value as a whole
-        // (02 M4): 'this' is the caller's place (M5), and the store reaches it.
+        // 'this = value' in a 'mut fn' of a struct replaces the caller's value as a whole:
+        // 'this' is the caller's place, and the store reaches it.
         if (expr.Target is ThisExpr && expr.Operator is null && ThisSlot is { } self && ThisType is { } selfType)
         {
             var replacement = LowerExprAs(expr.Value, selfType);
@@ -3313,7 +3313,7 @@ internal sealed class FunctionLowerer
 
         if (expr.Target is FieldByInfoExpr byInfo) return LowerFieldAssign(MemberOfInfo(byInfo), expr);
         if (expr.Target is MemberExpr member) return LowerFieldAssign(member, expr);
-        // 'x[k] = v' and 'x[k] op= v' through IndexSet (04 D6; 02 M8a-1): the write the sema
+        // 'x[k] = v' and 'x[k] op= v' through IndexSet: the write the sema
         // stored, 'x.setIndex(k, …)'.
         if (expr.Target is IndexExpr own && _types.OperatorCallOf(expr) is { } setCall)
             return LowerOwnIndexAssign(own, setCall, expr);
@@ -3322,7 +3322,7 @@ internal sealed class FunctionLowerer
         if (TryCapturedCell(expr.Target, out var cell, out var cellType, out var cellValueType))
             return LowerCapturedAssign(expr, cell, cellType, cellValueType);
 
-        // A module-level 'var' (07 V5 G5): the global slot, read and written as a local is.
+        // A module-level 'var': the global slot, read and written as a local is.
         if (expr.Target is IdentifierExpr globalName && GlobalOf(globalName) is { } global)
             return LowerGlobalAssign(expr, global);
 
@@ -3377,12 +3377,12 @@ internal sealed class FunctionLowerer
     /// where the site is the expression it holds.</summary>
     private IrConstValue? ComptimeValue(ComptimeExpr site)
     {
-        // a question to std.meta (M9a S9): answered at this instance — it is no site
+        // a question to std.meta: answered at this instance — it is no site
         if (_types.IsMetaSite(site) && site.Inner is CallExpr asked && MetaQueryOf(asked) is { } query)
             return MetaAnswer(asked, query);
         if (_typeTable.Comptime is not { Values: { } values } table) return null;
         var index = _types.ComptimeSites.IndexOf(site);
-        // a module binding's site the program does not reach (09 D8; M9a S12b) was not evaluated,
+        // a module binding's site the program does not reach was not evaluated,
         // and its binding gets no initializer (GlobalInitializer.Build): nothing lowers it
         if (index >= 0 && table.Skipped is { } skipped && skipped.Contains(index))
             throw Bug($"comptime site at {site.Span} was skipped as unreached, and is lowered");
@@ -3392,7 +3392,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// A site's value (13 M9a P3), built where the site stands as a literal of it is built —
+    /// A site's value, built where the site stands as a literal of it is built —
     /// each evaluation a fresh value, an array one to write. An array of scalars or strings is
     /// one constant, the C's static data; everything else the instructions of its literal.
     /// </summary>
@@ -3457,9 +3457,9 @@ internal sealed class FunctionLowerer
         (array is IrArrayType a ? a.Element : ((IrInlineArrayType)array).Element) is IrScalarType;
 
     /// <summary>
-    /// <c>co.next()</c> (06 N2 A2): one instruction — <c>?Y</c>, or for a coroutine that yields
+    /// <c>co.next()</c>: one instruction — <c>?Y</c>, or for a coroutine that yields
     /// nothing whether it stopped at a yield. A coroutine whose type throws throws through its
-    /// pulls (05 E10): the error its body ended with comes out here, on the error path like a
+    /// pulls: the error its body ended with comes out here, on the error path like a
     /// call's.
     /// </summary>
     private TempId LowerCoroutineNext(MemberExpr member, CoroutineOf type, Core.Span span)
@@ -3476,7 +3476,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// <c>co.close()</c> (06 A5): the runtime resumes a suspended coroutine to be unwound, and the
+    /// <c>co.close()</c>: the runtime resumes a suspended coroutine to be unwound, and the
     /// <c>Cancelled</c> its body ends with is dropped; what else escapes the body comes out here, on
     /// the error path like a pull's.
     /// </summary>
@@ -3485,14 +3485,14 @@ internal sealed class FunctionLowerer
         var coroutine = LowerExpr(member.Target);
         var cancelled = CancelledClass() ?? throw Bug("'close()' of a coroutine checked without std.task's Cancelled");
         // What the close may throw: the coroutine's set, as the checker noted at the pull — or,
-        // for the close of a generic loop's iterator that an instance made a coroutine (M8a-4),
+        // for the close of a generic loop's iterator that an instance made a coroutine,
         // what it recorded for the call itself.
         var throws = (_types.ThrownByPull(member) is { } thrown ? ThrownHere([thrown]) : ThrownHere(_types.CallThrows(call))).Length > 0;
         _b.Emit(new CoroutineClose(coroutine, ((IrRefType)_typeTable.RefTo(cancelled)).Type, span) { Throws = throws });
         if (throws && !_b.IsSealed) ErrorEdge(span);
     }
 
-    /// <summary>std.task's <c>Cancelled</c>, when the compilation has it (06 A5).</summary>
+    /// <summary>std.task's <c>Cancelled</c>, when the compilation has it.</summary>
     private TypeSymbol? CancelledClass() =>
         _typeTable.Compilation.FindModule(["std", "task"])?.Members.LookupLocal("Cancelled") is TypeSymbol { Kind: TypeSymbolKind.Class } cancelled
             ? cancelled : null;
@@ -3509,7 +3509,7 @@ internal sealed class FunctionLowerer
         _b.Seal(new Throw(value, ErrorLanding(span), span));
     }
 
-    /// <summary><c>co.result()</c> and <c>co.isDone()</c> (06 A2, A4): what the body returned —
+    /// <summary><c>co.result()</c> and <c>co.isDone()</c>: what the body returned —
     /// <c>?R</c> — and whether it has ended, without pulling.</summary>
     private TempId LowerCoroutineQuery(MemberExpr member, CoroutineOf type, Core.Span span)
     {
@@ -3528,12 +3528,12 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// <c>yield</c> (06 N2): one op, and control CONTINUES at the next instruction when the
+    /// <c>yield</c>: one op, and control CONTINUES at the next instruction when the
     /// coroutine is pulled again — the suspension is the runtime's business, not the CFG's.
     /// Inside a coroutine body the value is checked against the yield type here, statically;
     /// outside it (§10a) the value is typed as what it is, and the running coroutine meets it at
-    /// run time. A yield of the body is where <c>close()</c> finds the coroutine suspended
-    /// (06 A5): resumed to be unwound, it throws <c>Cancelled</c> there, and the error path runs
+    /// run time. A yield of the body is where <c>close()</c> finds the coroutine suspended:
+    /// resumed to be unwound, it throws <c>Cancelled</c> there, and the error path runs
     /// the defers on the way out of the body.
     /// </summary>
     private bool LowerYield(YieldStmt stmt)
@@ -3555,7 +3555,7 @@ internal sealed class FunctionLowerer
         return true;
     }
 
-    /// <summary>After a yield: where close() resumed the coroutine to be unwound (06 A5), the yield
+    /// <summary>After a yield: where close() resumed the coroutine to be unwound, the yield
     /// throws <c>Cancelled</c>, and the error path runs the defers on the way out.</summary>
     private void UnwindAtClose(Core.Span span)
     {
@@ -3647,7 +3647,7 @@ internal sealed class FunctionLowerer
     /// static method), so a missing slot is a bug here.</summary>
     private TempId LowerThis(ThisExpr expr)
     {
-        // Inside a lambda 'this' is a captured value (02 M8 C2): read from the environment, at
+        // Inside a lambda 'this' is a captured value: read from the environment, at
         // the field behind the named captures. A class's 'this' is the shared reference, a
         // struct's the copy taken when the closure was made.
         if (ThisSlot is null && _capturedThisField is { } field && _envSlot is { } envSlot && _envType is { } envType
@@ -3676,7 +3676,7 @@ internal sealed class FunctionLowerer
     /// <c>next()</c> twice.</para>
     /// </summary>
     /// <summary>
-    /// The place an index of a type's own names (04 D6; 02 M8a-1): <c>x.index(k)</c> reads it —
+    /// The place an index of a type's own names: <c>x.index(k)</c> reads it —
     /// the call the sema stored on the index expression — and <c>x.setIndex(k, …)</c> writes it,
     /// the call stored on the node that writes. The receiver and the key are evaluated HERE,
     /// once and in that order; the two calls are lowered with them in hand
@@ -3722,11 +3722,10 @@ internal sealed class FunctionLowerer
 
     /// <summary>
     /// <c>x[k] = v</c> and <c>x[k] op= v</c> on a type's own index. THE TARGET BEFORE THE VALUE
-    /// (04 D6, as C# has it): receiver, key, then the value — the value came first, so
-    /// <c>xs[next()] = next()</c> stored the first count at the second, where an array stores the
-    /// second at the first. The value is lowered AT THE ELEMENT'S TYPE: bare, a <c>null</c> had
-    /// none to take, and the assignment as a value was the right side unconverted — a class
-    /// where the index holds an interface.
+    /// (as C# has it): receiver, key, then the value, so <c>xs[next()] = next()</c> stores the
+    /// second count at the first, as an array does. The value is lowered AT THE ELEMENT'S TYPE:
+    /// a <c>null</c> takes that type, and the assignment as a value is the converted value — an
+    /// interface value where the index holds an interface.
     /// </summary>
     private TempId LowerOwnIndexAssign(IndexExpr own, CallExpr setCall, AssignExpr expr)
     {
@@ -4107,7 +4106,7 @@ internal sealed class FunctionLowerer
             case BindingPattern other:
                 throw Bug($"pattern binding '{other.Name}' was not bound by the type checker");
 
-            // 'c: Circle' (03 T11): the test, then the value out of the interface value as the
+            // 'c: Circle': the test, then the value out of the interface value as the
             // name's type. The last arm of an exhaustive match is not tested; a type pattern is
             // never the one that makes a match exhaustive, so the test always stands here.
             case TypePattern tp:
@@ -4137,7 +4136,7 @@ internal sealed class FunctionLowerer
                 return;
             }
 
-            // 's in [Circle, Rect]' (08 Y6): a test per type, the first that holds matching. A set of
+            // 's in [Circle, Rect]': a test per type, the first that holds matching. A set of
             // one binds as its type, as 'c: Circle' does; a larger one binds the interface value itself.
             case TypeSetPattern ts:
             {
@@ -4658,15 +4657,15 @@ internal sealed class FunctionLowerer
     private TempId Coerce(TempId value, IrType from, IrType to, Span span)
     {
         // The optional levels the target has beyond the value: each becomes one 'optsome', from
-        // the inside out — a 'T' where '??T' is expected is wrapped twice, a '?T' once (03 T4
-        // O1). 'target' is the target with those levels taken off, the type the value itself
+        // the inside out — a 'T' where '??T' is expected is wrapped twice, a '?T' once.
+        // 'target' is the target with those levels taken off, the type the value itself
         // has to reach first.
         var missing = Math.Max(0, OptionalDepth(to) - OptionalDepth(from));
         var target = to;
         for (var i = 0; i < missing; i++) target = ((IrOptionalType)target).Inner;
         var source = from;
 
-        // The third implicit transition, a lossless integer widening (design/v5/spec/03 T1c):
+        // The third implicit transition, a lossless integer widening:
         // the sema admitted 'int8' where 'int' is expected, and the value changes representation
         // here, as a convert — the same instruction 'as' emits, on a pair the rule allows. Only
         // where the scalar kinds differ; the sema vouches that they differ by a widening.
@@ -4679,15 +4678,15 @@ internal sealed class FunctionLowerer
             from = target;
         }
 
-        // An array where a view is expected gives a view of itself, whole (03 T13 A2); an inline
-        // array too, where the sema found it in the heap (A4).
+        // An array where a view is expected gives a view of itself, whole; an inline
+        // array too, where the sema found it in the heap.
         if (target is IrSliceType view && source is IrArrayType or IrInlineArrayType && from is not IrOptionalType)
         {
             value = ViewOf(value, view.Element, span);
             from = target;
         }
 
-        // A string where a 'StringView' is expected gives a view of its bytes, whole (10 S1). The
+        // A string where a 'StringView' is expected gives a view of its bytes, whole. The
         // sema lets a string stand for no other slice.
         if (target is IrSliceType { Element: IrScalarType { Kind: IrScalar.U8 } } && source is IrScalarType { Kind: IrScalar.String }
             && from is not IrOptionalType)
@@ -4696,7 +4695,7 @@ internal sealed class FunctionLowerer
             from = target;
         }
 
-        // An inline array is a value like a struct (A4): copied at its binding point.
+        // An inline array is a value like a struct: copied at its binding point.
         if (target is IrInlineArrayType inlineValue && from is not IrOptionalType && !_fresh.Contains(value))
         {
             var copy = _slots.NewTemp(inlineValue);
@@ -4711,7 +4710,7 @@ internal sealed class FunctionLowerer
         if (target is IrStructType value_ && from is not IrOptionalType && !_fresh.Contains(value))
             value = CopyStructValue(value, value_, span);
 
-        // A child interface value where a parent is expected (04 D10): the parent's table, found
+        // A child interface value where a parent is expected: the parent's table, found
         // through the concrete type's conformance list — the same op as the downcast to an
         // interface, since both read that list.
         if (target is IrInterfaceType parentIface && source is IrInterfaceType childIface
@@ -4789,7 +4788,7 @@ internal sealed class FunctionLowerer
             IrRefType r => r.Type,
             IrStructType v => v.Type,
             IrEnumType e => e.Type,
-            // A built-in's value in a box of its own (01 V7; M8c S8b): 'let d: Display = 5;'.
+            // A built-in's value in a box of its own: 'let d: Display = 5;'.
             _ when _typeTable.BuiltinOfIr(concrete) is { } builtin => _typeTable.BoxOfBuiltin(concrete, builtin),
             // A shape's value, through the block that gave the shape the interface (05 §13 rule 6).
             IrArrayType or IrOptionalType or IrFunctionType or IrInlineArrayType or IrSliceType
@@ -4812,7 +4811,7 @@ internal sealed class FunctionLowerer
         if (TypeOfExpr(operand) is not IrOptionalType option)
             throw NotSupported("'!' on a non-optional", span, LoweringDiagnostics.NeverNull);
 
-        // The one unwrap that can be wrong: the program says the value is there (03 T4 O4).
+        // The one unwrap that can be wrong: the program says the value is there.
         var dest = _slots.NewTemp(option.Inner);
         _b.Emit(new OptGet(dest, value, option.Inner, span) { Checked = true });
         return dest;
@@ -5072,7 +5071,7 @@ internal sealed class FunctionLowerer
 
     /// <summary><c>[a, b, c]</c> — one instruction rather than three stores. The values lie on the stack
     /// in source order at the <c>newarr</c>.</summary>
-    /// <summary><c>b"…"</c> (08 Y7 L7): a new <c>uint8[]</c> of its bytes, as an array literal of them is.</summary>
+    /// <summary><c>b"…"</c>: a new <c>uint8[]</c> of its bytes, as an array literal of them is.</summary>
     private TempId LowerByteString(ByteStringExpr expr)
     {
         var u8 = new IrScalarType(IrScalar.U8);
@@ -5082,7 +5081,7 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
-    /// <summary>A literal into a <c>FromArrayLiteral&lt;T&gt;</c> (10 K4): the elements as <c>T</c> into
+    /// <summary>A literal into a <c>FromArrayLiteral&lt;T&gt;</c>: the elements as <c>T</c> into
     /// a fresh array, and the expected type's static <c>fromLiteral</c> called with it — the type's
     /// own or its block's, found as <see cref="LowerStaticConstraintCall"/> finds a static the
     /// constraint promised.</summary>
@@ -5118,7 +5117,7 @@ internal sealed class FunctionLowerer
 
     private TempId LowerArrayLiteral(ArrayLitExpr expr)
     {
-        // '[a, b, c]' as a 'T[3]' (03 T13 A4): the inline array, a fresh value.
+        // '[a, b, c]' as a 'T[3]': the inline array, a fresh value.
         if (TypeOfExpr(expr) is IrInlineArrayType inline)
         {
             var parts = new TempId[expr.Elements.Length];
@@ -5130,7 +5129,7 @@ internal sealed class FunctionLowerer
             return built;
         }
 
-        // A literal that stands for a 'FromArrayLiteral<T>' (10 K4; M8c S6b): the array of its
+        // A literal that stands for a 'FromArrayLiteral<T>': the array of its
         // elements, then the expected type's 'fromLiteral' of it — the block's static, as a written
         // 'Set<int>.fromLiteral([…])' calls it.
         if (_types.LiteralElementOf(expr) is { } into)
@@ -5163,7 +5162,7 @@ internal sealed class FunctionLowerer
 
     /// <summary>
     /// <c>filled(n, x)</c>: <c>n</c> slots of the one value <c>x</c>, in one allocation — the
-    /// instruction of <c>[x] * n</c>, but SHARED where the element is an object (M8a S16). The
+    /// instruction of <c>[x] * n</c>, but SHARED where the element is an object. The
     /// standard library's tables start so: <c>null</c> in every slot of a map, a deque, and
     /// <c>arrayOf</c>, which writes every slot after. <c>internal</c> to std; a program's
     /// repetition clones (03 §5.1).
@@ -5183,10 +5182,10 @@ internal sealed class FunctionLowerer
 
     private TempId LowerIndexRead(IndexExpr expr)
     {
-        // A type's own index (04 D6): the call the sema desugared, 'x.index(k)'.
+        // A type's own index: the call the sema desugared, 'x.index(k)'.
         if (_types.OperatorCallOf(expr) is { } indexCall)
             return LowerCall(indexCall) ?? throw Bug("'index' returned no value");
-        // A range on a type that gives a view (M8c S18): the range of 'x.asSlice()', as checked.
+        // A range on a type that gives a view: the range of 'x.asSlice()', as checked.
         if (_types.RangeThroughViewOf(expr) is { Index: SliceRangeExpr viewRange } throughView)
             return LowerSlice(throughView, viewRange);
         // A container from std.collections goes through 'Indexable<T>.get(i)' — the same division of
@@ -5268,14 +5267,14 @@ internal sealed class FunctionLowerer
     };
 
     /// <summary>
-    /// <c>xs[a..b]</c>: a view of the elements from <c>a</c> to <c>b</c> (03 T13 A2), of an
+    /// <c>xs[a..b]</c>: a view of the elements from <c>a</c> to <c>b</c>, of an
     /// array or of a view — checked against the source's length, no copy. An open bound is the
     /// start or the length; an inclusive end is one past its bound. The source is evaluated once,
     /// before the bounds, so <c>^n</c> reads its length.
     /// </summary>
     private TempId LowerSlice(IndexExpr expr, SliceRangeExpr range)
     {
-        // A string's bytes or a view's (10 S1): the bounds checked on character boundaries too.
+        // A string's bytes or a view's: the bounds checked on character boundaries too.
         var chars = SubstituteType(_types.TypeOf(expr.Target)) is StringViewType or PrimitiveType { Kind: PrimitiveKind.String };
         if ((chars ? new IrScalarType(IrScalar.U8) : ElementOf(TypeOfExpr(expr.Target))) is not { } element)
             throw NotSupported($"a view of a '{TypeFacts.Display(_types.TypeOf(expr.Target))}'", expr.Span);
@@ -5299,7 +5298,7 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
-    /// <summary>An array where a view of it is expected gives a view of itself, whole (A2).</summary>
+    /// <summary>An array where a view of it is expected gives a view of itself, whole.</summary>
     private TempId ViewOf(TempId array, IrType element, Span span)
     {
         var i64 = new IrScalarType(IrScalar.I64);
@@ -5311,7 +5310,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>The index as an <c>int</c>: a narrower one widened, <c>^n</c> as the length of
-    /// the indexed value less <c>n</c> (03 T14 N6) — the value is evaluated once, before.</summary>
+    /// the indexed value less <c>n</c> — the value is evaluated once, before.</summary>
     private TempId LowerIndexValue(Expr index, TempId target)
     {
         if (index is not UnaryExpr { Operator: UnaryOp.FromEnd } fromEnd)
@@ -5440,7 +5439,7 @@ internal sealed class FunctionLowerer
 
             var index = Array.IndexOf(layout.FieldNames, field.Name);
 
-            // A '?T' field without a written default is 'null' (02 M14 I1).
+            // A '?T' field without a written default is 'null'.
             if (field.Default is null && index >= 0 && layout.FieldTypes[index] is IrOptionalType absent)
             {
                 var none = _slots.NewTemp(absent);
@@ -5489,7 +5488,7 @@ internal sealed class FunctionLowerer
         var value = LowerExprAs(stmt.Binding.Initializer!, type);
         _b.Emit(new StoreGlobal(id, value, stmt.Span));
         // An initializer that only gives its value is straight code: its range in this block is what
-        // GlobalPruning removes where nothing reads the global (01 B13).
+        // GlobalPruning removes where nothing reads the global.
         if (_globals.IsEffectFree(stmt.Symbol) && _b.CurrentId == block)
             _globals.NoteInit(id, block, start, _b.CurrentCount);
     }
@@ -5550,7 +5549,7 @@ internal sealed class FunctionLowerer
     /// this function's substitution holds the parameters already.</param>
     private TempId LowerGlobalRead(GlobalSymbol symbol, Span span, LyrType? through = null)
     {
-        // A constant of a generic type is one per instance (07 G2): its initializer, lowered
+        // A constant of a generic type is one per instance: its initializer, lowered
         // here under the instance the read names.
         if (_globals.FoldedOf(symbol) is { } folded) return LowerFoldedConstant(symbol, folded, through, span);
         // A constant, a 'static let' of a literal, is the literal where it is read (GlobalTable).
@@ -5569,7 +5568,7 @@ internal sealed class FunctionLowerer
     private int _foldingDepth;
 
     /// <summary>
-    /// A read of a constant that is one per instance (07 G2; the review's M8a-3): its
+    /// A read of a constant that is one per instance: its
     /// initializer — a constant by the sema's rule — lowered in place, with the parameters of
     /// its type bound by the instance the read names; for a generic block's, the block's
     /// parameters bound by matching its target against that instance.
@@ -5613,8 +5612,8 @@ internal sealed class FunctionLowerer
 
     /// <summary>
     /// A method as a value. A static one is a function value without an environment, like a
-    /// free function. An instance method is a BOUND closure (08 Y11 F10): its environment holds
-    /// the receiver — the object shared, a struct copied (02 M8 C2) — and its code is a function
+    /// free function. An instance method is a BOUND closure: its environment holds
+    /// the receiver — the object shared, a struct copied — and its code is a function
     /// built here that takes the receiver out of the environment and calls the method with it.
     /// </summary>
     private TempId LowerMethodValue(MemberExpr expr, FunctionSymbol method)
@@ -5666,7 +5665,7 @@ internal sealed class FunctionLowerer
 
     /// <summary>The code of a bound method value: environment first, then the parameters; the
     /// receiver is read from the environment and the method called with it. A method that throws
-    /// passes its error on through the closure's slot (05 E2, 03 T17).</summary>
+    /// passes its error on through the closure's slot.</summary>
     private static IrFunction BuildBoundMethod(string name, IrRefType envType, IrType receiver,
         IrFunctionType signature, FunctionId target, bool throws)
     {
@@ -5717,7 +5716,7 @@ internal sealed class FunctionLowerer
         ["Type"] = ["name", "kind"],
     };
 
-    /// <summary>A round's info, or a member of it, as the constant it is (M9a S10): <c>v</c>,
+    /// <summary>A round's info, or a member of it, as the constant it is: <c>v</c>,
     /// <c>v.index</c>, <c>f.type.name</c> — so that <c>h.writeInt(v.index)</c> writes a number and
     /// builds no <c>VariantInfo</c> with its payload array at every call. <c>null</c> for anything
     /// else.</summary>
@@ -5743,7 +5742,7 @@ internal sealed class FunctionLowerer
 
     private TempId LowerFieldRead(MemberExpr expr)
     {
-        // a member of a round's info (M9a S10): the constant's field, folded
+        // a member of a round's info: the constant's field, folded
         if (RoundInfoConst(expr) is { } folded) return EmitComptimeValue(folded, TypeOfExpr(expr), expr.Span);
 
         // 'T.zero' (05 §7 rule 2): the interface's constant through a constraint. Under this
@@ -5771,7 +5770,7 @@ internal sealed class FunctionLowerer
         if (_types.RefOf(expr) is EnumVariantSymbol)
             return LowerVariantCall(expr.Member, [], expr, expr.Span);
 
-        // 'obj.method' and 'Type.staticFn' as VALUES (08 Y11 F10, 03 T17).
+        // 'obj.method' and 'Type.staticFn' as VALUES.
         if (_types.RefOf(expr) is FunctionSymbol method && !expr.IsOptional)
             return LowerMethodValue(expr, method);
 
@@ -5793,7 +5792,7 @@ internal sealed class FunctionLowerer
         // same position.
         var target = SubstituteType(_types.TypeOf(expr.Target));
 
-        // A tuple's element, by position or by the label the sema resolved (03 T16): the
+        // A tuple's element, by position or by the label the sema resolved: the
         // layout's fields are the positions.
         if (target is Sema.TupleOf tuple)
         {
@@ -5980,7 +5979,7 @@ internal sealed class FunctionLowerer
         _types.TypeArgumentsOf(expr).Select(SubstituteType).ToArray();
 
     /// <summary>
-    /// <c>ident&lt;int&gt;</c> as a value (design/v5/spec/03 T17): the instance the sema settled,
+    /// <c>ident&lt;int&gt;</c> as a value: the instance the sema settled,
     /// requested as a call would request it, then a closure without an environment around it —
     /// the same value a monomorphic function gives, and at the C level one more thunk.
     /// </summary>
@@ -6027,8 +6026,8 @@ internal sealed class FunctionLowerer
         if (TypeTable.InterfaceOwning(method) is { Generics.Length: 0 })
             return LowerConstraintCall(member, owner, expr);
 
-        // An interface's default on the instance: the default's instance for it (04 D9). As a
-        // method of the type it was lowered with the interface's 'this' and failed the verifier.
+        // An interface's default on the instance: the default's instance for it. As a method
+        // of the type it would take the interface's 'this', which the verifier refuses.
         if (DirectDefault(member) is { } onInstance)
             return LowerDefaultCall(member, onInstance, owner, expr);
 
@@ -6039,7 +6038,7 @@ internal sealed class FunctionLowerer
         var methodArguments = method.Generics.Length > 0
             ? SubstitutedTypeArguments(expr) : [];
 
-        // an inline method (08 F6): set in place, the type's parameters bound by the instance
+        // an inline method: set in place, the type's parameters bound by the instance
         if (declaration is { IsInline: true, Body: not null })
         {
             var symbols = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
@@ -6107,7 +6106,7 @@ internal sealed class FunctionLowerer
         if (method.Declaration is not FunctionDecl declaration)
             throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
 
-        // A static of a generic 'extend' block (03 T7 X1): 'Box<int>.default()' from
+        // A static of a generic 'extend' block: 'Box<int>.default()' from
         // 'extend<T :: [Default]> Box<T>'. The block's parameters are bound by the named instance
         // and the method is an instance of its own, as the instance form is — the sema already
         // answered the call's type in the instance's terms.
@@ -6116,14 +6115,13 @@ internal sealed class FunctionLowerer
             var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
             if (block.TargetType is not { } pattern || !TypeFacts.Match(pattern, owner, map))
                 throw NotSupported($"'{TypeFacts.Display(owner)}' does not match the block's target", expr.Span);
-            // the method's own arguments beside the block's — 'Pack<int>.rd<StringBuilder>(&sb)'
-            // (sweep after M10, open point 147: a generic static of a generic block went the
-            // type's way below, where only the type's parameters are bound, and its body kept
-            // the block's 'T')
+            // the method's own arguments beside the block's — 'Pack<int>.rd<StringBuilder>(&sb)':
+            // a generic static of a generic block binds both, where the type's way below binds
+            // only the type's parameters
             var ownArguments = method.Generics.Length > 0 ? SubstitutedTypeArguments(expr) : [];
             for (var i = 0; i < method.Generics.Length && i < ownArguments.Length; i++)
                 map[method.Generics[i]] = ownArguments[i];
-            // an inline static of the block (08 F6): set in place under the instance's binding
+            // an inline static of the block: set in place under the instance's binding
             if (declaration is { IsInline: true, Body: not null })
                 return LowerInline(expr, declaration, null, null, map,
                     map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal));
@@ -6147,7 +6145,7 @@ internal sealed class FunctionLowerer
         var methodArguments = method.Generics.Length > 0
             ? SubstitutedTypeArguments(expr) : [];
 
-        // an inline method (08 F6): set in place, the type's parameters bound by the instance
+        // an inline method: set in place, the type's parameters bound by the instance
         if (declaration is { IsInline: true, Body: not null })
         {
             var symbols = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
@@ -6278,12 +6276,12 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// The member a type's blocks give FOR the interface a call's member belongs to (04 D3): the
+    /// The member a type's blocks give FOR the interface a call's member belongs to: the
     /// one the conformance check settled, where that stands in a block. A name does not say it —
     /// two blocks of one type may each give a <c>greet</c>, one for <c>Greeter</c> and one for
-    /// <c>Waver</c>, and the first block that has the name answered every call through a
-    /// constraint, <c>T :: [Waver]</c> included. Where nothing single was settled — several
-    /// conformances to one interface, a member of no interface — the name decides, as before.
+    /// <c>Waver</c>, and a call through <c>T :: [Waver]</c> wants the second. Where nothing single
+    /// was settled — several conformances to one interface, a member of no interface — the name
+    /// decides.
     /// </summary>
     private FunctionSymbol? BlockMemberFor(TypeSymbol owner, MemberExpr member) =>
         _types.RefOf(member) is FunctionSymbol promised
@@ -6432,7 +6430,7 @@ internal sealed class FunctionLowerer
         return false;
     }
 
-    /// <summary>A block member on an instance receiver (03 T7): a generic block's method is
+    /// <summary>A block member on an instance receiver: a generic block's method is
     /// requested for the receiver, a plain block's lowered as every extension is; the call is
     /// direct either way.</summary>
     private TempId? LowerBlockMethodCall(MemberExpr member, FunctionSymbol symbol, ExtensionBlock block,
@@ -6456,7 +6454,7 @@ internal sealed class FunctionLowerer
             // A parameter only a fixation names is the receiver's answer (05 §13 rule 2).
             if (!TypeChecker.ApplyFixations(block, map))
                 throw NotSupported($"'{TypeFacts.Display(receiver)}' does not fit a fixation of the block", expr.Span);
-            // A generic method's own parameters (03 T7 X1), bound by the call beside the block's
+            // A generic method's own parameters, bound by the call beside the block's
             // bound by the receiver: 'mapped<U>' in 'extend<I :: [Iterator]> I'.
             var own = symbol.Generics.Length > 0 ? SubstitutedTypeArguments(expr) : [];
             for (var i = 0; i < symbol.Generics.Length && i < own.Length; i++) map[symbol.Generics[i]] = own[i];
@@ -6471,8 +6469,8 @@ internal sealed class FunctionLowerer
             blockMap = map;
             byName = map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal);
         }
-        // The receiver before the arguments: left to right everywhere (04 D6), as a type's own
-        // member's call has it (M8a S15: the arguments came first here).
+        // The receiver before the arguments: left to right everywhere, as a type's own
+        // member's call has it.
         var self = viewed
             ? ViewOf(LowerExpr(member.Target), TypeOfExpr(member.Target) switch
             {
@@ -6481,7 +6479,7 @@ internal sealed class FunctionLowerer
                 var other => throw Bug($"a view of all of a '{other}' at {member.Span}"),
             }, member.Span)
             : LowerExpr(member.Target);
-        // an inline method of the block (08 F6): set in place, its parameters bound by the receiver
+        // an inline method of the block: set in place, its parameters bound by the receiver
         if (decl.IsInline)
             return LowerInline(expr, decl, self, null, blockMap ?? new Dictionary<GenericParamSymbol, LyrType>(), byName);
         var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span, byName);
@@ -6562,12 +6560,12 @@ internal sealed class FunctionLowerer
         var function = chosen
                        ?? owner?.Members.LookupLocal(member.Member) as FunctionSymbol
                        ?? (owner is null ? null : _typeTable.ExtensionMethod(owner, member.Member));
-        // A static a generic block or a shape's block gives (05 §13 rules 3, 6; M8a S15:
-        // 'C.fromIter(it)' with 'C = List<int>' or 'int[]'): the block matched against the type.
+        // A static a generic block or a shape's block gives ('C.fromIter(it)' with
+        // 'C = List<int>' or 'int[]'): the block matched against the type.
         if ((function is null || _typeTable.BlockOf(function) is { } found && (found.Generics.Length > 0 || found.IsConstructorTarget))
             && BlockStatic(concrete, member.Member) is { } fromBlock)
             return LowerBlockStaticCall(member, fromBlock.Method, fromBlock.Block, fromBlock.Map, concrete, expr);
-        // The interface's static default (03 T5, M9a S11), where the conformer wrote no static of
+        // The interface's static default, where the conformer wrote no static of
         // the name: the conformer's instance of it.
         if (function is null && StaticDefault(member) is { } staticDefault)
             return LowerStaticDefaultCall(member, staticDefault, concrete, expr);
@@ -6589,7 +6587,7 @@ internal sealed class FunctionLowerer
         }
         else if (function.Generics.Length > 0 && declaration.Body is not null && concrete is not GenericInstance)
         {
-            // A generic static (04 D9 whole; 'U.exact(v)', the review's M8a-7): its instance at the
+            // A generic static ('U.exact(v)'): its instance at the
             // call's type arguments, under the name a call through the type gives it — with
             // 'U = int8' it is the function 'int8.exact(v)' calls.
             target = _instances.Request(function, declaration, StaticBaseName(function, function.Name), null,
@@ -6617,8 +6615,8 @@ internal sealed class FunctionLowerer
     /// else: an own member, an abstract one, a default of a generic interface — and, in the 4.x
     /// path, a generic default, which is lowered for the interface's value there
     /// (<see cref="LowerGenericInterfaceMethod"/>). In Lyric 5 a generic default is one instance
-    /// per conformer and argument list (04 D9 whole): its interface has no value.</summary>
-    /// <summary>A static default of an interface the member is bound to (03 T5; M9a S11), or
+    /// per conformer and argument list: its interface has no value.</summary>
+    /// <summary>A static default of an interface the member is bound to, or
     /// nothing: the static twin of <see cref="DirectDefault"/>.</summary>
     private (FunctionSymbol Default, FunctionDecl Decl, TypeSymbol Iface)? StaticDefault(MemberExpr member) =>
         _types.RefOf(member) is FunctionSymbol { IsStatic: true } promised
@@ -6627,7 +6625,7 @@ internal sealed class FunctionLowerer
             ? (promised, decl, iface)
             : null;
 
-    /// <summary>A static default called through a conformer's name or a constraint (M9a S11):
+    /// <summary>A static default called through a conformer's name or a constraint:
     /// its instance for the conformer, 'Self' that type, no receiver.</summary>
     private TempId? LowerStaticDefaultCall(MemberExpr member, (FunctionSymbol Default, FunctionDecl Decl, TypeSymbol Iface) found,
         LyrType conformer, CallExpr expr)
@@ -6659,7 +6657,7 @@ internal sealed class FunctionLowerer
             : null;
 
     /// <summary>
-    /// A call of a member its type leaves to a field (04 D1), where the type is known: the
+    /// A call of a member its type leaves to a field, where the type is known: the
     /// forwarder of the slot, called directly. <c>false</c> where the member is not delegated —
     /// or is one this does not build a direct call for: a generic interface's, whose rows are
     /// per instance.
@@ -6702,8 +6700,8 @@ internal sealed class FunctionLowerer
         return true;
     }
 
-    /// <summary>Whether a conformer's own member stands in place of this generic default (04 D9
-    /// whole): in Lyric 5, a member of the contract of a non-generic interface. The checker lets
+    /// <summary>Whether a conformer's own member stands in place of this generic default: in
+    /// Lyric 5, a member of the contract of a non-generic interface. The checker lets
     /// one be written exactly there (<c>LYR-SEM0082</c> elsewhere).</summary>
     private bool Replaceable(FunctionSymbol promised) =>
         _types.Lyric5Modules
@@ -6711,7 +6709,7 @@ internal sealed class FunctionLowerer
         && TypeTable.InterfaceOwning(promised) is { Generics.Length: 0 };
 
     /// <summary>
-    /// An interface's default called on a conformer (04 D9): the default's instance for the
+    /// An interface's default called on a conformer: the default's instance for the
     /// conformer's type, 'Self' that type, the receiver passed as it is — a struct, an instance, a
     /// builtin, a shape alike, no value of the interface made, which a scalar or a constraint-only
     /// interface has none of.
@@ -6719,7 +6717,7 @@ internal sealed class FunctionLowerer
     private TempId? LowerDefaultCall(MemberExpr member, (FunctionSymbol Default, FunctionDecl Decl, TypeSymbol Iface) found,
         LyrType conformer, CallExpr expr)
     {
-        // A generic default's own arguments beside 'Self' (D9 whole): the call's, through this
+        // A generic default's own arguments beside 'Self': the call's, through this
         // instance's substitution.
         var own = found.Default.Generics.Length > 0 ? SubstitutedTypeArguments(expr) : [];
         var target = _instances.RequestDefault(found.Default, found.Decl, found.Iface, conformer, expr.Span, own);
@@ -6742,9 +6740,9 @@ internal sealed class FunctionLowerer
         return result;
     }
 
-    /// <summary>The witness's instance for the concrete type, called on the receiver (M8c S9b): a
+    /// <summary>The witness's instance for the concrete type, called on the receiver: a
     /// block's member on a built-in has no holder, the block's target in its name; a string's call
-    /// of its view's member passes the view (10 S1).</summary>
+    /// of its view's member passes the view.</summary>
     private TempId? LowerWitnessCall(MemberExpr member, FunctionSymbol witness, FunctionDecl decl,
         LyrType[] arguments, LyrType concrete, CallExpr expr)
     {
@@ -6776,7 +6774,7 @@ internal sealed class FunctionLowerer
 
     private TempId? LowerConstraintCall(MemberExpr member, LyrType concrete, CallExpr expr)
     {
-        // An interface's private helper (07 V2 S4) is never overridden: a conformer's method of its
+        // An interface's private helper is never overridden: a conformer's method of its
         // name is the conformer's own, which the defaults do not call — the helper's instance for
         // the type, as a default's is.
         if (DirectDefault(member) is { } helper && helper.Decl.IsPrivateHelper)
@@ -6799,17 +6797,17 @@ internal sealed class FunctionLowerer
                 : throw NotSupported($"'{member.Member}' on '{TypeFacts.Display(concrete)}' as the default of a generic interface, through the block that gives the conformance", expr.Span);
         }
 
-        // A generic member (04 D9): no slot — the concrete type's own, its instance at the call's
+        // A generic member: no slot — the concrete type's own, its instance at the call's
         // type arguments, named as a direct call on the type names it, so both reach one instance.
         // An abstract one has nothing else. A default's place is the conformer's own where it
-        // wrote one (D9 whole); where it did not, the default's instance for the type follows
+        // wrote one; where it did not, the default's instance for the type follows
         // below.
         if (_types.RefOf(member) is FunctionSymbol { Generics.Length: > 0, Declaration: FunctionDecl promisedDecl } promisedGeneric
             && (promisedDecl.Body is null || Replaceable(promisedGeneric))
             && GenericImplementationOf(concrete, member) is { Declaration: FunctionDecl genericDecl } genericImplementation)
             return LowerGenericImplementationCall(member, genericImplementation, genericDecl, concrete, expr);
 
-        // A generic member as the witness of a plain one (13 S9; M8c S9b): its instance at the
+        // A generic member as the witness of a plain one: its instance at the
         // binding the conformance made — 'contains<char>' for 'Contains<char>' —, a string's call
         // on its view's.
         if (_types.RefOf(member) is FunctionSymbol { Generics.Length: 0 } plainPromised
@@ -6850,7 +6848,7 @@ internal sealed class FunctionLowerer
             }
 
             // The interface's default, 'render(42)' reaching a member 'extend int :: [Display]'
-            // leaves to it: the default's instance for the builtin (04 D9) — no boxing either.
+            // leaves to it: the default's instance for the builtin — no boxing either.
             if (DirectDefault(member) is { } onBuiltin)
                 return LowerDefaultCall(member, onBuiltin, concrete, expr);
 
@@ -6872,8 +6870,8 @@ internal sealed class FunctionLowerer
             || method.Declaration is not FunctionDecl declaration
             || ConstraintNeedsTheInstance(member, owner))
         {
-            // A generic owner's block, 'extend<T :: [Integer]> Range<T> :: [Iterator]' (03 T7
-            // X1): the block's method for the receiver's instance, a direct call.
+            // A generic owner's block, 'extend<T :: [Integer]> Range<T> :: [Iterator]': the
+            // block's method for the receiver's instance, a direct call.
             if (concrete is GenericInstance && !ConstraintNeedsTheInstance(member, owner)
                 && BlockMemberFor(owner, member) is { } genericBlockMethod
                 && _typeTable.BlockOf(genericBlockMethod) is { } genericBlock)
@@ -6881,7 +6879,7 @@ internal sealed class FunctionLowerer
 
             // The implementation stands in a conformance block, 'extend StrBox :: [Container]'
             // (05 §6): the same direct call as on a builtin above. A member typed by an
-            // associated type (03 T6) has no slot to be lifted into, so the direct call is the
+            // associated type has no slot to be lifted into, so the direct call is the
             // only route.
             if (concrete is NamedRef && !ConstraintNeedsTheInstance(member, owner)
                 && BlockMemberFor(owner, member) is { } blockMethod
@@ -6904,12 +6902,12 @@ internal sealed class FunctionLowerer
                 return blockResult;
             }
 
-            // The interface's default, for the type (04 D9): its instance, direct. Several
+            // The interface's default, for the type: its instance, direct. Several
             // conformances to one interface go by the instance, through the table below.
             if (!ConstraintNeedsTheInstance(member, owner) && DirectDefault(member) is { } ofType)
                 return LowerDefaultCall(member, ofType, concrete, expr);
 
-            // Left to a field (04 D1): the forwarder, direct, the receiver as it stands.
+            // Left to a field: the forwarder, direct, the receiver as it stands.
             if (!ConstraintNeedsTheInstance(member, owner)
                 && _types.RefOf(member) is FunctionSymbol leftToAField
                 && TypeTable.InterfaceOwning(leftToAField) is { } forwarding
@@ -6976,10 +6974,10 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
-    // ------------------------------------------------------------------ std.meta (09 A7; M9a S9)
+    // ------------------------------------------------------------------ std.meta
 
     /// <summary><c>e.[f]</c>, in its round, is the member access the checker made of it.</summary>
-    /// <summary><c>e.[v, p]</c> (M9a S10): the tag tested against the variant's — a panic where it
+    /// <summary><c>e.[v, p]</c>: the tag tested against the variant's — a panic where it
     /// is another —, the value narrowed, the payload field read by its place in the layout.</summary>
     private TempId LowerPayloadByInfo(PayloadByInfoExpr access)
     {
@@ -7043,7 +7041,7 @@ internal sealed class FunctionLowerer
         return value;
     }
 
-    /// <summary><c>E.[v] { … }</c> (M9a S10): the variant built from the values the checker
+    /// <summary><c>E.[v] { … }</c>: the variant built from the values the checker
     /// settled, in the payload's order.</summary>
     private TempId LowerVariantInitByInfo(VariantInitExpr init)
     {
@@ -7062,7 +7060,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// A payload field the initializer leaves out (03 §4 rule 2 under §2.4; the sweep after M10, X2):
+    /// A payload field the initializer leaves out:
     /// its default, evaluated here at the construction site as a struct's field's is — under the
     /// enum's instance, since a default may name its parameters —, or <c>null</c> for a <c>?T</c>
     /// without one. The checker has refused an omission with neither (<c>LYR-SEM0106</c>).
@@ -7095,8 +7093,8 @@ internal sealed class FunctionLowerer
             : null;
 
     /// <summary>
-    /// What std.meta answers (09 A7 R1, R6; 10 B13 M1), of the type the call asks about at this
-    /// instance: the fields the asking module may name (R7), an enum's variants, the interfaces it
+    /// What std.meta answers, of the type the call asks about at this
+    /// instance: the fields the asking module may name, an enum's variants, the interfaces it
     /// conforms to, its name, its kind. The checker reads the fields and the conformances; the
     /// constants are std.meta's structs, in their layout order.
     /// </summary>
@@ -7104,7 +7102,7 @@ internal sealed class FunctionLowerer
     {
         var asked = SubstitutedTypeArguments(call);
         var about = asked.Length > 0 ? asked[0] : LyrType.Error;
-        // asked with the conformer's module where the interface says so (W10), else the asker's
+        // asked with the conformer's module where the interface says so, else the asker's
         var from = _types.MetaFromConformer(call) && TypeFacts.SymbolOf(about)?.Home is { } home ? home : _types.MetaFromOf(call);
         return query.Name switch
         {
@@ -7115,7 +7113,7 @@ internal sealed class FunctionLowerer
                                               && _types.Satisfies?.Invoke(about, iface) == true),
             // 'members<Self>()' where 'Self' is the interface itself — its default's own body,
             // lowered beside the conformers' expansions: none, as its fields and variants are none;
-            // an interface is no conformer of itself (the sweep after M10, X3)
+        // an interface is no conformer of itself
             "members" => new ArrayConst([.. (call.TypeArguments is [NamedType { Path: ["Self"] }, ..] && TypeFacts.KindOf(about) == TypeSymbolKind.Interface
                 ? [] : _types.MetaMembers?.Invoke(about, from) ?? []).Select(MemberInfoConst)]),
             "typeName" => new StringConst(TypeFacts.Display(about)),
@@ -7127,7 +7125,7 @@ internal sealed class FunctionLowerer
         };
     }
 
-    /// <summary>std.meta's <c>Type</c>: its name and its kind (W9).</summary>
+    /// <summary>std.meta's <c>Type</c>: its name and its kind.</summary>
     private static IrConstValue TypeConst(LyrType type) => new StructConst(
         [new StringConst(TypeFacts.Display(type)), new VariantConst(Array.IndexOf(TypeFacts.TypeKindNames, TypeFacts.TypeKindNameOf(type)), [])]);
 
@@ -7150,7 +7148,7 @@ internal sealed class FunctionLowerer
          new VariantConst(Array.IndexOf(TypeFacts.MemberKindNames, member.Kind), []),
          new ArrayConst([.. member.Parameters.Select(ParameterInfoConst)])]);
 
-    /// <summary>std.meta's <c>ParameterInfo</c> — name, type, index, hasDefault — of a parameter (X4).</summary>
+    /// <summary>std.meta's <c>ParameterInfo</c> — name, type, index, hasDefault — of a parameter.</summary>
     private static IrConstValue ParameterInfoConst(TypeResult.MetaParam parameter) => new StructConst(
         [new StringConst(parameter.Name), TypeConst(parameter.Type), new IntConst((ulong)parameter.Index), new BoolConst(parameter.HasDefault)]);
 
@@ -7160,7 +7158,7 @@ internal sealed class FunctionLowerer
 
     /// <summary>
     /// <c>attribute&lt;A&gt;(f)</c>, <c>variantAttribute&lt;A&gt;(v)</c>, <c>memberAttribute&lt;A&gt;(m)</c>
-    /// and <c>typeAttribute&lt;T, A&gt;()</c> (09 A7 R4; W6): the attribute of type <c>A</c> the
+    /// and <c>typeAttribute&lt;T, A&gt;()</c>: the attribute of type <c>A</c> the
     /// field, variant or member — the one a round's variable holds — or the type's declaration
     /// carries, its value as its site computed it; none where it carries none. A <c>T</c> written
     /// as an alias answers with the alias's own. Where the value is not computed yet — in a site
@@ -7204,7 +7202,7 @@ internal sealed class FunctionLowerer
         _ => [],
     };
 
-    // ------------------------------------------------------------------ inline functions (08 F6)
+    // ------------------------------------------------------------------ inline functions
 
     /// <summary>The expansion of an inline function whose code is being lowered — <c>null</c> for
     /// the function's own code. A <c>return</c> there goes to the expansion's exit.</summary>
@@ -7238,7 +7236,7 @@ internal sealed class FunctionLowerer
     private sealed record InlineLambda(LambdaExpr Lambda, InlineContext Context);
 
     /// <summary>The expansions open at this point, innermost last: each maps the spans of its
-    /// function's declaration to its call's (M9a S12b) — a panic in an `assert` set in place
+    /// function's declaration to its call's — a panic in an `assert` set in place
     /// names the call's line, as the native check did; a lambda set in place lies outside the
     /// declaration and keeps its own. Nested, the inner call lies in the outer body and maps on.</summary>
     private readonly List<(Span Body, Span Call)> _inlineSpans = [];
@@ -7259,7 +7257,7 @@ internal sealed class FunctionLowerer
     private static readonly IReadOnlyDictionary<string, LyrType> NoNames = new Dictionary<string, LyrType>(StringComparer.Ordinal);
 
     /// <summary>
-    /// A call of an inline function (design/v5/spec/08 F6; 13 M9a P10): its body set in place. The
+    /// A call of an inline function: its body set in place. The
     /// arguments are evaluated first, left to right, each once — but a lambda literal at a function
     /// parameter, which is set in place where the body calls it, in the context it was written in.
     /// The body's parameters get slots of their own and its receiver one, under the call's type
@@ -7287,7 +7285,7 @@ internal sealed class FunctionLowerer
                 lambdas[bound] = new InlineLambda(literal, context);
                 continue;
             }
-            // passed on from the inline function this call stands in (F6): the same lambda
+            // passed on from the inline function this call stands in: the same lambda
             if (given is IdentifierExpr forwarded && _types.RefOf(forwarded) is ParameterSymbol held
                 && _inline?.Lambdas.TryGetValue(held, out var passed) == true)
             {
@@ -7360,7 +7358,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// The call of a function parameter an inline call set a lambda literal at (08 F6): the
+    /// The call of a function parameter an inline call set a lambda literal at: the
     /// lambda's body, in place. Its arguments are evaluated here, in the body's context; the body
     /// is lowered in the context the lambda was written in — its <c>return</c> that code's, the loops
     /// around it its loops, the inline body's loops out of reach. A block body gives its value as
@@ -7441,7 +7439,7 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
-    /// <summary>A <c>return</c> in an expansion's code (08 F6): the value into its slot, the scopes
+    /// <summary>A <c>return</c> in an expansion's code: the value into its slot, the scopes
     /// it leaves closed, and on to its exit.</summary>
     private bool LowerInlineReturn(ReturnStmt stmt, InlineFrame frame)
     {
@@ -7469,7 +7467,7 @@ internal sealed class FunctionLowerer
                 ? LowerExprAs(expr.Arguments[i], signature.Parameters[i])
                 : LowerExpr(expr.Arguments[i]); // an arity error was already reported by the sema
 
-        // A value whose type throws hands the call the caller's slot (03 T17); the edge follows in
+        // A value whose type throws hands the call the caller's slot; the edge follows in
         // LowerCall, from the same recorded set.
         var throws = ThrownHere(_types.CallThrows(expr)).Length > 0;
         if (IsVoid(signature.Return))
@@ -7487,7 +7485,7 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
-    /// <summary>A call, and — when its function throws (05 E1, 01 L5 E3) — the error edge after
+    /// <summary>A call, and — when its function throws — the error edge after
     /// it. Once per call node.</summary>
     private TempId? LowerCall(CallExpr expr)
     {
@@ -7498,16 +7496,16 @@ internal sealed class FunctionLowerer
 
     private TempId? LowerCallSite(CallExpr expr)
     {
-        // 'Point(1, 2)' IS the factory call the sema stored for it (08 Y9) — the seam of the
+        // 'Point(1, 2)' IS the factory call the sema stored for it — the seam of the
         // operators, for a callee that names a type.
         if (_types.OperatorCallOf(expr) is { } factory)
             return LowerCall(factory);
 
-        // 'Point { v }' is the shorthand initializer the sema found it to be (02 I3), not a call.
+        // 'Point { v }' is the shorthand initializer the sema found it to be, not a call.
         if (_types.ShorthandOf(expr) is { } shorthand)
             return LowerExpr(shorthand);
 
-        // 'same(a, b)': identity is the comparison of two references (02 M10). The symbol is
+        // 'same(a, b)': identity is the comparison of two references. The symbol is
         // the builtin exactly when no module declares it; a user function of the name shadows.
         if (expr.Callee is IdentifierExpr { Name: "same" } identity
             && _types.RefOf(identity) is FunctionSymbol { Declaration: FunctionDecl { Body: null, Span: var where } } builtin
@@ -7530,7 +7528,7 @@ internal sealed class FunctionLowerer
         // 'co.next()' — the safe pull on a coroutine, built in like '.length' on an array. Before
         // the indirect-call check: the sema types the member as a function type with no symbol
         // behind it, which is exactly what the value-call test matches.
-        // 'xs.length()' on an array or a view is built in: neither a field nor a method (03 T13 A1).
+        // 'xs.length()' on an array or a view is built in: neither a field nor a method.
         if (expr.Callee is MemberExpr { Member: "length", IsOptional: false } length
             && TypeOfExpr(length.Target) is IrArrayType or IrSliceType or IrInlineArrayType)
             return LowerArrayLength(length.Target, expr.Span);
@@ -7587,7 +7585,7 @@ internal sealed class FunctionLowerer
         // module's binding, and 'handler(4)' calls the function it holds.
         var called = _types.RefOf(expr.Callee);
         while (called is ImportBindingSymbol calledThrough) called = calledThrough.Target;
-        // a function parameter of an inline function (08 F6) whose argument is a lambda literal:
+        // a function parameter of an inline function whose argument is a lambda literal:
         // its body, set in place
         if (called is ParameterSymbol inlineParameter && _inline is { } frame
             && frame.Lambdas.TryGetValue(inlineParameter, out var setInPlace))
@@ -7598,7 +7596,7 @@ internal sealed class FunctionLowerer
 
         switch (expr.Callee)
         {
-            // A member of a blanket block (04 D15): 'extend<T :: [I]> T' — the receiver binds the
+            // A member of a blanket block: 'extend<T :: [I]> T' — the receiver binds the
             // block's parameter, and the method is an instance of its own, as on any generic block.
             case MemberExpr member
                 when _types.RefOf(member) is FunctionSymbol blanketMember
@@ -7611,7 +7609,7 @@ internal sealed class FunctionLowerer
             case MemberExpr member when _types.RefOf(member) is EnumVariantSymbol:
                 return LowerVariantCall(member.Member, expr.Arguments, expr, expr.Span);
 
-            // '.Num(3)': the variant of the enum the position expected (08 Y9).
+            // '.Num(3)': the variant of the enum the position expected.
             case ImplicitMemberExpr implied when _types.RefOf(implied) is EnumVariantSymbol:
                 return LowerVariantCall(implied.Name, expr.Arguments, expr, expr.Span);
 
@@ -7627,7 +7625,7 @@ internal sealed class FunctionLowerer
             // has none.
             //
             // The instance is the one the receiver names — written, 'Pair<int>', or settled by the
-            // call for a bare 'Pair' (03 T8): the sema wrote it onto the receiver either way.
+            // call for a bare 'Pair': the sema wrote it onto the receiver either way.
             case MemberExpr member
                 when _types.TypeOf(member.Target) is Sema.NonValueType { Instance: { } owner }:
                 // Through the OWN substitution, as the instance-method dispatch below does: in
@@ -7668,13 +7666,13 @@ internal sealed class FunctionLowerer
                 return LowerConstraintCall(member, SubstituteType(ReceiverType(member.Target)),
                     expr);
 
-            // The receiver's type is an associated type through a constraint, 'A.Iter' (10 B6):
+            // The receiver's type is an associated type through a constraint, 'A.Iter':
             // under this instance's substitution it is the answer, and the call is that type's.
             case MemberExpr member
                 when ReceiverType(member.Target) is AssocOf && _substitution.Count > 0:
                 return LowerConstraintCall(member, SubstituteType(ReceiverType(member.Target)), expr);
 
-            // A STATIC interface member through a constraint, 'T.parse(s)' (03 T5): under this
+            // A STATIC interface member through a constraint, 'T.parse(s)': under this
             // instance's substitution T is a type, and the call is that type's own static — direct.
             case MemberExpr member
                 when (_types.RefOf(member.Target) as GenericParamSymbol
@@ -7683,7 +7681,7 @@ internal sealed class FunctionLowerer
                 return LowerStaticConstraintCall(member, boundTo, expr);
 
             // An INTERFACE'S member bound on a concrete receiver — the qualified form 'Walker.walk(d)'
-            // (04 D2 R5) and a member delegated to a field (D1): the sema settled the member on
+            // and a member delegated to a field: the sema settled the member on
             // the interface, and the call goes through that interface's table, where the type's
             // implementation — own, in a block, a default, a forwarder — stands.
             case MemberExpr member
@@ -7710,10 +7708,10 @@ internal sealed class FunctionLowerer
                 }
 
                 // A default, reached plainly or written 'Walker.walk(d)': its instance for the
-                // type (04 D9), direct — a constraint-only interface has no value to go through.
+                // type, direct — a constraint-only interface has no value to go through.
                 if (DirectDefault(member) is { } declared)
                     return LowerDefaultCall(member, declared, SubstituteType(ReceiverType(member.Target)), expr);
-                // A member the type leaves to a field (04 D1): its forwarder, called with the
+                // A member the type leaves to a field: its forwarder, called with the
                 // receiver as it stands — a struct is the caller's place there, and a 'mut fn'
                 // writes the field of THAT. Through the table, the struct went into a box first.
                 if (TryLowerForwardedCall(member, concrete, ReceiverType(member.Target), declaring, expr, out var forwarded))
@@ -7741,7 +7739,7 @@ internal sealed class FunctionLowerer
                      && !BoundToExtension(member)
                      && _typeTable.InterfaceProviding(concrete, member.Member) is { } provider:
             {
-                // The default's instance for the type (04 D9), direct; a generic interface's goes
+                // The default's instance for the type, direct; a generic interface's goes
                 // through its value below.
                 if (DirectDefault(member) is { } onConcrete)
                     return LowerDefaultCall(member, onConcrete, SubstituteType(ReceiverType(member.Target)), expr);
@@ -7763,7 +7761,7 @@ internal sealed class FunctionLowerer
                 receiverOwner = named.Symbol;
                 break;
 
-            // A member of an 'extend' block on an instance of a generic type (03 T7 X1): the
+            // A member of an 'extend' block on an instance of a generic type: the
             // block's parameters bound by the receiver, the method an instance of its own.
             case MemberExpr member
                 when _types.RefOf(member) is FunctionSymbol blockMember
@@ -7771,7 +7769,7 @@ internal sealed class FunctionLowerer
                      && SubstituteType(ReceiverType(member.Target)) is GenericInstance onInstance:
                 return LowerBlockMethodCall(member, blockMember, ownerBlock, onInstance, expr);
 
-            // A member of a block on a built-in constructor (03 T7 X2): 'xs.sum()' on a 'T[]',
+            // A member of a block on a built-in constructor: 'xs.sum()' on a 'T[]',
             // 'o.orElse(v)' on a '?T' — the shape binds the block's parameters.
             case MemberExpr member
                 when _types.RefOf(member) is FunctionSymbol shapeMember
@@ -7808,7 +7806,7 @@ internal sealed class FunctionLowerer
                      && _typeTable.InterfaceProviding(instanced.Definition, member.Member)
                          is { } providing:
             {
-                // A plain interface's generic default (D9 whole): its instance for this receiver.
+                // A plain interface's generic default: its instance for this receiver.
                 if (DirectDefault(member) is { } forInstance)
                     return LowerDefaultCall(member, forInstance, instanced, expr);
                 var into = InterfaceAsDeclaredBy(instanced, providing, expr.Span);
@@ -7831,7 +7829,7 @@ internal sealed class FunctionLowerer
             // function runs is statically settled — that is the whole difference between an inherent
             // extension and one through an interface.
             // An interface's default on a builtin, '3.greet()' with 'extend int :: [Named]': its
-            // instance for the builtin (04 D9), direct — a scalar has no value of the interface.
+            // instance for the builtin, direct — a scalar has no value of the interface.
             case MemberExpr member
                 when ReceiverType(member.Target) is PrimitiveType onBuiltin && DirectDefault(member) is { } builtinDefault:
                 return LowerDefaultCall(member, builtinDefault, onBuiltin, expr);
@@ -7842,15 +7840,15 @@ internal sealed class FunctionLowerer
                 calleeName = member.Member;
                 bound = _types.RefOf(member);
                 receiver = LowerExpr(member.Target);
-                // A string reaching a member written on its view (10 S1): a view of all of it.
+                // A string reaching a member written on its view: a view of all of it.
                 if (ReceiverType(member.Target) is PrimitiveType { Kind: PrimitiveKind.String }
                     && bound is FunctionSymbol onView
                     && _typeTable.BlockOf(onView) is { Target: { Kind: TypeSymbolKind.Builtin, Name: "StringView" } })
                     receiver = ViewOf(receiver.Value, new IrScalarType(IrScalar.U8), member.Span);
                 break;
 
-            // A static default of an interface reached through the conformer's name, 'E.fromName(s)'
-            // (03 T5, M9a S11): the conformer's instance of the default, no receiver.
+            // A static default of an interface reached through the conformer's name,
+            // 'E.fromName(s)': the conformer's instance of the default, no receiver.
             case MemberExpr member
                 when _types.TypeOf(member.Target) is Sema.NonValueType { Symbol: TypeSymbol concrete, Instance: null }
                      && StaticDefault(member) is { } staticDefault
@@ -7879,13 +7877,13 @@ internal sealed class FunctionLowerer
         if (bound is not FunctionSymbol symbol)
             throw NotSupported($"call to '{calleeName}' (not a function or method)", expr.Span);
 
-        // a question to std.meta (09 A7; M9a S9): a constant of the type asked about, here
+        // a question to std.meta: a constant of the type asked about, here
         if (MetaQueryOf(expr) is { } metaQuery)
             return metaQuery.Name is "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute" or "typeAttribute"
                 ? LowerAttributeQuery(expr, metaQuery)
                 : EmitComptimeValue(MetaAnswer(expr, metaQuery), TypeOfExpr(expr), expr.Span);
 
-        // an inline function (08 F6): its body set in place, under the call's type arguments
+        // an inline function: its body set in place, under the call's type arguments
         if (symbol.Declaration is FunctionDecl { IsInline: true, Body: not null } inlined)
         {
             var symbols = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
@@ -7896,9 +7894,9 @@ internal sealed class FunctionLowerer
                 symbol.Generics.Length > 0 ? NamedSubstitutionFor(symbol, _types.TypeArgumentsOf(expr)) : null);
         }
 
-        // std.core's 'filled(n, x)' (M8a S16): the repetition's instruction, sharing.
+        // std.core's 'filled(n, x)': the repetition's instruction, sharing.
         if (IsCoreFilled(symbol)) return LowerFilled(expr);
-        // std.core's 'blackBox(x)' (10 X4): the value through an instruction the C compiler cannot
+        // std.core's 'blackBox(x)': the value through an instruction the C compiler cannot
         // see through.
         if (IsCoreNamed(symbol, "blackBox") && expr.Arguments.Length == 1)
         {
@@ -7984,7 +7982,7 @@ internal sealed class FunctionLowerer
             var builtinReceiver = receiverOwner is null && receiver is not null && expr.Callee is MemberExpr { Target: var on }
                 ? SubstituteType(ReceiverType(on))
                 : null;
-            // A string reaching a generic member of its view (10 S1): the view is the 'this' —
+            // A string reaching a generic member of its view: the view is the 'this' —
             // the receiver passed is a view of the string already.
             if (builtinReceiver is PrimitiveType { Kind: PrimitiveKind.String }
                 && _typeTable.BlockOf(symbol) is { Target: { Kind: TypeSymbolKind.Builtin, Name: "StringView" } })
@@ -8041,7 +8039,7 @@ internal sealed class FunctionLowerer
     /// arguments are not visible.</para>
     /// </summary>
     /// <summary>The arguments of a call in parameter order: as the sema arranged them when the call
-    /// names some (04 D5), as written otherwise.</summary>
+    /// names some, as written otherwise.</summary>
     private Expr?[] ArgumentsOf(CallExpr expr)
     {
         if (expr.Parenthesized is { } grouped)
@@ -8054,7 +8052,7 @@ internal sealed class FunctionLowerer
     private readonly Dictionary<Expr, Span> _writtenWith = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>The argument materialized for an earlier parameter of the call whose default is
-    /// being lowered (04 D5 F2): a default runs per call, in the callee's scope, and may read the
+    /// being lowered: a default runs per call, in the callee's scope, and may read the
     /// parameters before it — their symbols are the callee's, and here they mean the temps.</summary>
     private readonly Dictionary<Symbol, TempId> _argumentOverrides = new(ReferenceEqualityComparer.Instance);
 
@@ -8102,7 +8100,7 @@ internal sealed class FunctionLowerer
     ///
     /// <para>A SPREAD ARGUMENT IS THE ARRAY: <c>sum(xs...)</c> hands on <c>xs</c> itself, no copy
     /// — that is how one variadic function hands its arguments to another. The call says so
-    /// (the review's A2); an array without the dots is one element, like any other argument.</para>
+    /// with the dots; an array without them is one element, like any other argument.</para>
     /// </summary>
     private TempId CollectVariadic(Param parameter, Expr?[] provided, int from, Span span,
         IReadOnlyDictionary<string, LyrType>? calleeSubstitution = null)
@@ -8137,7 +8135,7 @@ internal sealed class FunctionLowerer
     /// mismatch deep in the callee rather than as what it is: a missing coercion at the call site.</para>
     /// </summary>
     /// <summary>
-    /// The argument for parameter <paramref name="i"/> where the call leaves it out (04 D5; 09 A11):
+    /// The argument for parameter <paramref name="i"/> where the call leaves it out:
     /// the text the call wrote for the parameter <c>@callerExpr</c> names, the call's place for
     /// <c>@callerLine</c> and <c>@callerFile</c>, else the parameter's default — lowered per call,
     /// in the callee's scope, as <paramref name="expected"/> where the call knows the type better
@@ -8149,7 +8147,7 @@ internal sealed class FunctionLowerer
     {
         var parameter = parameters[i];
 
-        // '@callerExpr(p)' (09 A11): the text the call wrote for 'p' — what an assertion names (10 X1)
+        // '@callerExpr(p)': the text the call wrote for 'p' — what an assertion names
         if (_types.CallerExprOf(parameter) is { } target && _types.SourceText is { } text
             && Array.FindIndex(parameters, q => q.Name == target) is var written and >= 0
             && written < provided.Length && provided[written] is { } argument)
@@ -8158,7 +8156,7 @@ internal sealed class FunctionLowerer
             return EmitConst(new StringConst(text(quoted)), new IrScalarType(IrScalar.String), span);
         }
 
-        // '@callerLine', '@callerFile' (09 A11): the call's place
+        // '@callerLine', '@callerFile': the call's place
         if (_types.CallerPlaceOf(parameter) is { } place && _types.SourcePlace is { } where)
         {
             var (file, line) = where(span);
@@ -8223,7 +8221,7 @@ internal sealed class FunctionLowerer
     private TempId? LowerVirtualCall(MemberExpr member, GenericInstance instance, CallExpr expr) =>
         LowerVirtualCall(member, instance.Definition, expr,
             // through the instance's type: a value with its associated types fixed has an entry of
-            // its own (03 M4-1)
+            // its own
             ((IrInterfaceType)_typeTable.InstanceType(instance, member.Span)).Type);
 
     private TempId? LowerVirtualCall(MemberExpr member, TypeSymbol iface, CallExpr expr,
@@ -8242,9 +8240,9 @@ internal sealed class FunctionLowerer
         //
         // In Lyric 5 that is a GENERIC interface's member alone. A plain interface's generic
         // default never comes here: it is instantiated per conformer (DirectDefault), where the
-        // conformer's own may stand in its place (04 D9 whole).
+        // conformer's own may stand in its place.
         //
-        // A PRIVATE helper (07 V2 S4) takes the same route for the same reason: it has no slot,
+        // A PRIVATE helper takes the same route for the same reason: it has no slot,
         // because no conformer may stand in for it.
         if (iface.Members.LookupLocal(member.Member) is FunctionSymbol generic
             && (generic.Generics.Length > 0 || generic.Declaration is FunctionDecl { IsPrivateHelper: true }))
@@ -8264,8 +8262,8 @@ internal sealed class FunctionLowerer
             ? method.Declaration as FunctionDecl
             : null;
 
-        // In parameter order, a parameter the call leaves out a null (04 D5): its default, or what
-        // '@callerExpr', '@callerLine' or '@callerFile' gives (09 A11), comes from the contract too.
+        // In parameter order, a parameter the call leaves out a null: its default, or what
+        // '@callerExpr', '@callerLine' or '@callerFile' gives, comes from the contract too.
         var provided = ArgumentsOf(expr);
         var parameters = declaration?.Parameters ?? [];
         var variadic = parameters is [.., { IsParams: true }];
@@ -8280,14 +8278,14 @@ internal sealed class FunctionLowerer
         // 'Iterator<int>' is 'fn(int) -> bool'. Without it the lowering meets a bare T, which is
         // no type at all — the wall every default of a generic interface ran into.
         var owning = _typeTable.InstanceOf(interfaceId);
-        // A value with its associated types fixed (03 M4-1): the declaration writes 'Self.Item',
+        // A value with its associated types fixed: the declaration writes 'Self.Item',
         // which the checker read at the value's fixations — its signature is the one to lower.
         var asFixed = _typeTable.FixedInterfaceOf(interfaceId) is not null && _types.TypeOf(member) is FnType read
             ? read : null;
 
         for (var i = 0; i < args.Length - 1; i++)
         {
-            // 'xs: T...' collects the rest (04 D5), as in a direct call
+            // 'xs: T...' collects the rest, as in a direct call
             if (variadic && i == parameters.Length - 1)
             {
                 args[i + 1] = CollectVariadic(parameters[i], provided, i, expr.Span, owning is { } of ? OwnerMapping(of) : null);
@@ -8336,8 +8334,7 @@ internal sealed class FunctionLowerer
     /// one of them. That the native is generic is what makes this work at any element type.</para>
     /// </summary>
     /// <summary><c>..rest</c> binds a view of the elements between the fixed ones — from
-    /// <c>before</c> to <c>length - after</c> — sharing them, no copy (03 T13 A2). Lyric 4 copied
-    /// them into a new array.</summary>
+    /// <c>before</c> to <c>length - after</c> — sharing them, no copy.</summary>
     private void BindNamedRest(RestPattern rest, TempId value, IrType elementType, TempId length,
         int beforeCount, int afterCount)
     {
@@ -8431,8 +8428,8 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>A native's arguments with the defaults its declaration gives for those a call leaves
-    /// out (04 D5) — its own expressions, lowered at the call as every argument is: <c>assert(ok)</c>
-    /// passes the default message. A parameter <c>@callerExpr</c> sits on (09 A11) gets the text
+    /// out — its own expressions, lowered at the call as every argument is: <c>assert(ok)</c>
+    /// passes the default message. A parameter <c>@callerExpr</c> sits on gets the text
     /// the call wrote instead, as in a call of a Lyric function (<see cref="MaterializeArguments"/>):
     /// <c>assert</c> names its condition; one <c>@callerLine</c> or <c>@callerFile</c> sits on
     /// gets the call's place. That text is a literal the sema never saw; its type
@@ -8498,7 +8495,7 @@ internal sealed class FunctionLowerer
             if (shape?.Params[i + offset] is not { Struct: { } structType } flat)
             {
                 // A scalar argument is coerced to the wire type it lands in, as an argument to
-                // a Lyric function is (03 T1c): 'fromInt(x)' with 'x: int8' widens here, or the
+                // a Lyric function is: 'fromInt(x)' with 'x: int8' widens here, or the
                 // call would hand an i8 to a parameter declared i64 — the verifier refused that,
                 // and a native callee would have read it as whatever C made of it.
                 args.Add(LowerExprAs(arguments[i], import.ParamTypes[args.Count]));
@@ -8574,7 +8571,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// An f-string runs the checker's plan where there is one (10 S6; M8a S13): the builder's local
+    /// An f-string runs the checker's plan where there is one: the builder's local
     /// made, the pieces appended in order, the text taken — the calls the checker wrote and
     /// checked. Without one — the 4.x tools, whose stdlib has no builder, or a text without a hole —
     /// it becomes a chain of <c>concat</c> and the <c>fromXxx</c> converters. No arrays and no
@@ -8687,7 +8684,7 @@ internal sealed class FunctionLowerer
             IrScalar.String => value,
             IrScalar.Bool => CallHelper("std.string.fromBool", expr.Span, value),
             IrScalar.Char => CallHelper("std.string.fromChar", expr.Span, value),
-            // A float32 has a converter of its own (the review's M8a-9): its shortest text is not
+            // A float32 has a converter of its own: its shortest text is not
             // the double's — '0.1', where the widened value reads '0.10000000149011612'.
             IrScalar.F32 => CallHelper("std.string.fromFloat32", expr.Span, value),
             IrScalar.F64 => CallHelper("std.string.fromFloat", expr.Span, value),
@@ -8709,7 +8706,7 @@ internal sealed class FunctionLowerer
     /// <c>fromFloat</c>, singular, because Lyric has no overloading. There is therefore exactly ONE
     /// signature per kind, and it takes the widest type. Whoever passes an <c>int8</c> has to widen it
     /// first. The exception is <c>float32</c> in a hole: <c>fromFloat32</c> is its own, since its
-    /// shortest text is not the double's (the review's M8a-9).</para>
+    /// shortest text is not the double's.</para>
     ///
     /// <para>Without this step <c>f"{x}"</c> with <c>x: int8</c> crashes the compiler in the IR verifier
     /// ("arg 0 is i8, expected i64") — with a stack trace instead of a diagnostic, and for every type

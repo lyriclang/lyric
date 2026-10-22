@@ -1,4 +1,4 @@
-// std.time's zones and patterns (design/v5/spec/10 Q1; 13 M10 S11): a POSIX rule zone across the
+// std.time's zones and patterns: a POSIX rule zone across the
 // changes of the clocks, the gap and the overlap resolved, a day across a change, a TZif file
 // from its bytes, the system's database where there is one, UTS #35 format and parse.
 import std.time { Zone, ZoneInfo, Instant, DateTime, Date, Time, Duration, TimeError, TimeErrorKind };

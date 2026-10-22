@@ -10,7 +10,7 @@ using Lyric.Sema;
 namespace Lyric.Compiler;
 
 /// <summary>
-/// The expansion of macros (design/v5/spec/13 M9b P3, P4, P6, P7; 08 Y12): every site
+/// The expansion of macros: every site
 /// (<see cref="MacroCallExpr"/>) of every module is replaced by what its macro gives back, before
 /// the module is checked. A round: the compilation is analyzed once more with the sites as holes
 /// (its findings buffered; those in a macro's module are the round's, the rest the final check's),
@@ -21,14 +21,14 @@ namespace Lyric.Compiler;
 /// another's argument comes back inside the result and is expanded in the round after (outer
 /// before inner). A program without a site never comes here.
 ///
-/// <para>What a macro gives back stands in a file of its own (S5, P7): the result is written as
+/// <para>What a macro gives back stands in a file of its own: the result is written as
 /// source and read again, so its nodes have places in a synthesized file whose origin is the
 /// site - an error in expanded code is said at the site, with the line of the expansion it stood
 /// on and the quote it came from. What the caller wrote keeps the places it was written at.</para>
 /// </summary>
 public static class MacroExpander
 {
-    /// <summary>Rounds before a result holding sites again is called a loop (P6, the depth
+    /// <summary>Rounds before a result holding sites again is called a loop (the depth
     /// limit): every round is a full analysis, so the bound is small.</summary>
     public const int MaxRounds = 32;
 
@@ -46,7 +46,7 @@ public static class MacroExpander
 
     /// <summary>The sites of the compiled modules (not the standard library's, which writes
     /// none), outermost only: an inner one travels with its argument. An attribute naming a
-    /// macro on a top-level declaration is a site as well (13 M9b S4).</summary>
+    /// macro on a top-level declaration is a site as well.</summary>
     public static List<Site> Sites(Compilation compilation)
     {
         var found = new List<Site>();
@@ -77,7 +77,7 @@ public static class MacroExpander
         _ => [],
     };
 
-    /// <summary>The declaration without the attribute that is its site (T5: the macro sees the
+    /// <summary>The declaration without the attribute that is its site (the macro sees the
     /// rest, and the rest stays).</summary>
     private static Decl WithoutAttribute(Decl decl, AttributeNode attribute)
     {
@@ -165,7 +165,7 @@ public static class MacroExpander
             }
             if (failed) return null;
 
-            // a macro whose module holds sites of its own runs when those are gone (P6)
+            // a macro whose module holds sites of its own runs when those are gone
             var busy = sites.Select(s => s.Module).ToHashSet();
             var ready = planned.Where(p => !busy.Contains(p.Home)).ToList();
             if (ready.Count == 0)
@@ -231,7 +231,7 @@ public static class MacroExpander
             foreach (var module in ready.Select(p => p.Site.Module).Distinct())
             {
                 // from the tree as loaded, not the resolver's: the rebuild synthesizes the
-                // conformances again from the declarations' own lists (open point 188)
+                // conformances again from the declarations' own lists
                 trees[module.FullName] = AstRewriter.Rewrite(compilation.LoadedAstOf(module),
                     n => replacements.GetValueOrDefault(n), s => splices.GetValueOrDefault(s), d => declSplices.GetValueOrDefault(d));
             }
@@ -259,7 +259,7 @@ public static class MacroExpander
         _ => "?",
     };
 
-    /// <summary>The site's arguments as the macro's parameters take them (P4): each written
+    /// <summary>The site's arguments as the macro's parameters take them: each written
     /// argument to the next parameter by its kind, the trailing block to a last <c>Block</c> or
     /// <c>Stmt[]</c> parameter; or <c>null</c>, reported.</summary>
     private static Value[]? Arguments(Site site, FunctionSymbol macro, IrFunction function, IrModule module, SyntaxBridge bridge, DiagnosticEngine diagnostics)
@@ -307,7 +307,7 @@ public static class MacroExpander
         return values;
     }
 
-    /// <summary>An attribute macro's arguments (13 M9b S4): the declaration it sits on, without
+    /// <summary>An attribute macro's arguments: the declaration it sits on, without
     /// this attribute, as the first parameter's kind; then the attribute's positional argument
     /// for the parameters after it. Fields are a data attribute's.</summary>
     private static Value[]? AttributeArguments(Site site, FunctionSymbol macro, IrFunction function, IrModule module, SyntaxBridge bridge, DiagnosticEngine diagnostics)
@@ -401,7 +401,7 @@ public static class MacroExpander
         }
     }
 
-    /// <summary>The result in a file of its own (13 M9b S5, P7): the nodes a macro gave back,
+    /// <summary>The result in a file of its own: the nodes a macro gave back,
     /// written as source and read again, so each stands in a synthesized file whose origin is the
     /// site. An error in it is said at the site, with the line it stood on and - where the result
     /// is a quote's - the quote it came from; a warning in it is nobody's. What the caller wrote
