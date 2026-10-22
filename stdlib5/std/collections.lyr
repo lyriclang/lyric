@@ -1,5 +1,18 @@
-/// The containers (design/v5/spec/10 B7). Not safe across threads (C11): a `Mutex` holds one
-/// that is shared.
+/// Provides the growable containers of the standard library.
+///
+/// - [List]: a growing array, indexed from 0.
+/// - [Map]: keys to values by hash, each key once, in no order of its own.
+/// - [Set]: values by hash, each once, in no order of its own.
+/// - [Deque]: a double-ended queue, pushed and popped at either end.
+/// - [Heap]: a binary min-heap.
+///
+/// Each can be built from an array literal and through `collect()`, and is `Clone` where its
+/// elements are. All but the heap are `Iterable`, and `Equatable`, `Debug` and `Display` where their
+/// elements are; the heap is `Debug`. The iterator methods that build containers — `toList`,
+/// `toSet`, `toMap`, `chunks`, `windows`, `sorted`, `sortedBy`, `partition`, `groupBy` — live here
+/// too.
+///
+/// The containers are not safe across threads: share one through a `Mutex`.
 import std.core { arrayOf, AsSlice, Contains, filled, FromArrayLiteral, FromIterator, Hasher, Join, StringBuilder };
 import std.hash { DefaultHasher };
 
@@ -8,9 +21,15 @@ import std.hash { DefaultHasher };
 // copies of a value already there — never read, overwritten on the way back — so the buffer is a
 // `T[]` and `asSlice()` a view of it (C3: growth leaves an older view on the older buffer).
 
-/// A growing array (10 C3): its elements in order; `[i]` and `[i] = v` as an array's, panicking
-/// outside `0 ≤ i < length()`; `[a..b]` a view of the elements, as `asSlice()[a..b]`. Not safe
-/// across threads (C11).
+/// A growing array: its elements in order, indexed from 0.
+///
+/// `list[i]` and `list[i] = v` work as on an array; `list[a..b]` is a view of the elements, as
+/// `asSlice()[a..b]`. When full, the buffer doubles, so `push` is amortized constant time. Not safe
+/// across threads.
+///
+/// # Panics
+///
+/// `list[i]` and `list[i] = v` panic outside `0 ≤ i < length()`.
 pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
     type Output = T;
     type Iter = ListIter<T>;
@@ -19,13 +38,18 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
     var changes: int,
     reserved: int,
 
-    /// An empty list.
+    /// Creates an empty list.
     pub static fn new(): List<T> {
         return List<T> { buffer = [], count = 0, changes = 0, reserved = 0 };
     }
 
-    /// An empty list with room for `n` elements before it grows (10 N3); a negative `n` panics. The
-    /// room is taken at the first push — a list holds no value it has not been given.
+    /// Creates an empty list with room for `n` elements before it grows.
+    ///
+    /// The room is allocated at the first push.
+    ///
+    /// # Panics
+    ///
+    /// When `n` is negative.
     pub static fn withCapacity(n: int): List<T> {
         if (n < 0) {
             panic(f"List.withCapacity: a negative capacity {n}");
@@ -33,32 +57,40 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
         return List<T> { buffer = [], count = 0, changes = 0, reserved = n };
     }
 
-    /// A list of the array's elements, copied.
+    /// Creates a list of the array's elements, copied.
     pub static fn of(xs: T[]): List<T> {
         return List<T> { buffer = arrayOf(xs.length(), (i: int) => xs[i]), count = xs.length(), changes = 0, reserved = 0 };
     }
 
-    /// How many elements it holds.
+    /// Returns how many elements it holds.
     pub fn length(): int {
         return this.count;
     }
 
-    /// Whether it holds none.
+    /// Returns whether it holds no elements.
     pub fn isEmpty(): bool {
         return this.count == 0;
     }
 
-    /// The element at `i`; outside `0 ≤ i < length()` a panic (`LYR-RT0003`).
+    /// Returns the element at `i`; this is `list[i]`.
+    ///
+    /// # Panics
+    ///
+    /// Outside `0 ≤ i < length()`, with `LYR-RT0003`.
     pub fn index(i: int): T {
         return this.buffer[..this.count][i];
     }
 
-    /// `v` at `i`, in place of the element there.
+    /// Replaces the element at `i` with `v`; this is `list[i] = v`.
+    ///
+    /// # Panics
+    ///
+    /// Outside `0 ≤ i < length()`, with `LYR-RT0003`.
     pub mut fn setIndex(i: int, v: T): void {
         this.buffer[..this.count][i] = v;
     }
 
-    /// The element at `i`, or `null` outside `0 ≤ i < length()`.
+    /// Returns the element at `i`, or `null` outside `0 ≤ i < length()`.
     pub fn get(i: int): ?T {
         if (i < 0 || i >= this.count) {
             return null;
@@ -66,13 +98,15 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
         return this.buffer[i];
     }
 
-    /// The elements as a view of the buffer: the members of arrays and views (C2) reach them — a
-    /// sort writes the list. A push past the room moves the list to a new buffer, the view not.
+    /// Returns a view of the elements in the list's buffer.
+    ///
+    /// The members of views reach the elements in place: sorting the view sorts the list. A push
+    /// past the room moves the list to a new buffer; a view taken before stays on the old one.
     pub fn asSlice(): Slice<T> {
         return this.buffer[..this.count];
     }
 
-    /// The elements, copied into an array of their own — one copy (B16).
+    /// Returns the elements copied into a new array, in order.
     pub fn toArray(): T[] {
         let n = this.count;
         if (n == 0) {
@@ -83,7 +117,9 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
         return out;
     }
 
-    /// `v` at the end.
+    /// Appends `v` at the end.
+    ///
+    /// Amortized constant time: a full buffer is replaced by one twice its size.
     pub mut fn push(v: T): void {
         if (this.count == this.buffer.length()) {
             this.grow(v);
@@ -93,14 +129,14 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
         this.changes = this.changes + 1;
     }
 
-    /// Every value `xs` gives, at the end, in order.
+    /// Appends every element of `xs` at the end, in order.
     pub mut fn pushAll(xs: T[]): void {
         for (x in xs) {
             this.push(x);
         }
     }
 
-    /// The last element taken off, or `null` where there is none.
+    /// Removes and returns the last element, or `null` where there is none.
     pub mut fn pop(): ?T {
         if (this.count == 0) {
             return null;
@@ -110,7 +146,13 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
         return this.buffer[this.count];
     }
 
-    /// `v` at `i`, the elements from `i` on one place further; `i` outside `0 ≤ i ≤ length()` panics.
+    /// Inserts `v` at `i`, moving the elements from `i` on one place towards the end.
+    ///
+    /// Takes time linear in the number of elements moved.
+    ///
+    /// # Panics
+    ///
+    /// When `i` is outside `0 ≤ i ≤ length()`.
     pub mut fn insert(i: int, v: T): void {
         if (i < 0 || i > this.count) {
             panic(f"List.insert: index {i} outside 0..={this.count}");
@@ -121,8 +163,13 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
         this.buffer[i] = v;
     }
 
-    /// The element at `i` taken out, those after it one place nearer; outside `0 ≤ i < length()`
-    /// a panic.
+    /// Removes and returns the element at `i`, moving those after it one place towards the front.
+    ///
+    /// Takes time linear in the number of elements moved.
+    ///
+    /// # Panics
+    ///
+    /// When `i` is outside `0 ≤ i < length()`, with `LYR-RT0003`.
     pub mut fn removeAt(i: int): T {
         let taken = this.index(i);
         this.buffer[i + 1..this.count].copyInto(this.buffer[i..this.count - 1]);
@@ -131,9 +178,15 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
         return taken;
     }
 
-    /// The elements for which `p` holds taken out, the others kept in order; how many went. A `p`
-    /// that throws ends it there: what it decided is done, the rest is kept as it was (Rust's
-    /// `retain` where its predicate panics).
+    /// Removes the elements for which `p` holds, keeping the others in order, and returns how many
+    /// were removed.
+    ///
+    /// One pass, linear time.
+    ///
+    /// # Errors
+    ///
+    /// Throws what `p` throws. The removal stops there: the elements already decided are removed or
+    /// kept, and the rest stay in the list in their order.
     pub mut fn removeWhere<E :: [Error]>(p: fn(T) -> bool throws E): int throws E {
         var kept = 0;
         var i = 0;
@@ -168,13 +221,19 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
         return gone;
     }
 
-    /// Every element taken out; the room stays.
+    /// Removes every element; the allocated room stays.
     pub mut fn clear(): void {
         this.count = 0;
         this.changes = this.changes + 1;
     }
 
-    /// The first `n` elements kept, the rest taken out; `n` at or past the length keeps all.
+    /// Keeps the first `n` elements and removes the rest.
+    ///
+    /// An `n` at or past the length keeps all.
+    ///
+    /// # Panics
+    ///
+    /// When `n` is negative.
     pub mut fn truncate(n: int): void {
         if (n < 0) {
             panic(f"List.truncate: a negative length {n}");
@@ -185,19 +244,27 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
         }
     }
 
-    /// The elements at `i` and `j` exchanged.
+    /// Exchanges the elements at `i` and `j`.
+    ///
+    /// # Panics
+    ///
+    /// When `i` or `j` is outside `0 ≤ i < length()`.
     pub mut fn swap(i: int, j: int): void {
         this.asSlice().swap(i, j);
     }
 
-    /// The iterator over the elements, front to back (10 I9): a push, a pop or another change of the
-    /// length while it walks is the program's error, and the next pull panics.
+    /// Returns an iterator over the elements, front to back.
+    ///
+    /// # Panics
+    ///
+    /// The next pull panics (`LYR-RT0016`) after a push, a pop or another change of the length while
+    /// the iterator walks.
     pub fn iter(): ListIter<T> {
         return ListIter<T> { list = this, at = 0, changes = this.changes };
     }
 
-    /// Room for twice the elements, the slots past the length holding `filler`: the new buffer
-    /// made of the filler, the elements over in one copy (B16).
+    /// Replaces the buffer by one twice its size (at least 8, at least the reserved room), the slots
+    /// past the length holding `filler`.
     mut fn grow(filler: T): void {
         var room = if (this.buffer.length() == 0) 8 else this.buffer.length() * 2;
         if (room < this.reserved) {
@@ -210,13 +277,18 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
 }
 
 extend<T> List<T> {
-    /// The values of an iterator, in a list (10 C3, N3): `List.from(words.iter())`.
+    /// Creates a list of the values of an iterator, in order: `List.from(words.iter())`.
+    ///
+    /// # Errors
+    ///
+    /// Throws what a pull of `items` throws.
     pub static fn from<I :: [Iterator<Item = T>]>(items: I): List<T> throws I.Error {
         return try items.toList();
     }
 
-    /// The room cut down to the elements (10 C3): a buffer of `length()` slots. A view taken before
-    /// keeps the buffer it was taken of.
+    /// Shrinks the allocated room to the elements: a buffer of `length()` slots.
+    ///
+    /// A view taken before keeps the buffer it was taken of.
     pub mut fn shrinkToFit(): void {
         if (this.buffer.length() == this.count) {
             return;
@@ -232,7 +304,7 @@ extend<T> List<T> {
 }
 
 extend<T :: [Equatable]> List<T> {
-    /// The first element equal to `x` taken out; whether there was one.
+    /// Removes the first element equal to `x` and returns whether there was one.
     pub mut fn remove(x: T): bool {
         let at = this.asSlice().indexOf(x);
         if (at == null) {
@@ -242,7 +314,7 @@ extend<T :: [Equatable]> List<T> {
         return true;
     }
 
-    /// Runs of equal elements kept once each.
+    /// Removes consecutive repeated elements, keeping the first of each run of equal ones.
     pub mut fn dedup(): void {
         if (this.count < 2) {
             return;
@@ -263,8 +335,13 @@ extend<T :: [Equatable]> List<T> {
     }
 }
 
-/// The iterator of a list (10 I9): it walks the list where it stands, and a change of the list's
-/// length since it began panics at the next pull.
+/// Iterates over a list's elements, front to back; made by [List.iter].
+///
+/// It walks the list itself, not a copy.
+///
+/// # Panics
+///
+/// A pull panics (`LYR-RT0016`) when the list's length changed since the iterator was made.
 pub struct ListIter<T> :: [Iterator] {
     type Item = T;
     list: List<T>,
@@ -290,21 +367,26 @@ pub struct ListIter<T> :: [Iterator] {
 // they match; a group with an empty slot ends the probe. At most seven of every eight slots are
 // filled; the deleted ones are swept when the table is built anew.
 
-/// Eight empty slots.
+/// A control word with all eight slots empty.
 let emptyGroup: uint64 = 0x8080808080808080;
 let lowBits: uint64 = 0x0101010101010101;
 let highBits: uint64 = 0x8080808080808080;
 
-/// The slots of a control word that are empty: 0x80, the high bit set and bit 1 clear.
+/// Returns the high bits of the slots of a control word that are empty (0x80: the high bit set,
+/// bit 1 clear).
 fn emptiesOf(word: uint64): uint64 {
     return word & ~(word << 6) & highBits;
 }
 
-/// A map from keys to values, by the keys' hashes (10 C4): what it holds in no order of its own,
-/// the same key once. `H` hashes the keys — `DefaultHasher` under the process's key unless the map
-/// is given another; a hasher is a value, copied fresh for every key. The control words lie in an
-/// array of their own, small enough to stay in a cache where the slots do not: a lookup that misses
-/// reads no slot. A slot holds its key and its value side by side: a hit reads one (01 B14).
+/// A hash map from keys to values: each key once, in no order of its own.
+///
+/// `H` hashes the keys: [DefaultHasher] under the process's key unless the map is given another
+/// with [Map.withHasher]; the hasher is a value, copied fresh for every key. `map[k]` gives the
+/// value under `k` or `null`; `map[k] = v` puts `v` there and `map[k] = null` removes `k`.
+///
+/// The table is a Swiss table: lookup, insertion and removal take expected constant time. The
+/// control words lie in an array of their own, so a lookup that misses reads no slot; a slot holds
+/// its key and value side by side, so a hit reads one. Not safe across threads.
 pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
     type Iter = MapEntriesIter<K, V, H>;
     var controls: uint64[],
@@ -314,23 +396,25 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
     var changes: int,
     seed: H,
 
-    /// An empty map hashing with `seed`: `Map<string, int, FixedHasher>.withHasher(FixedHasher.new())`
-    /// is the same in every run.
+    /// Creates an empty map whose keys are hashed with `seed`.
+    ///
+    /// With a fixed hasher the order is the same in every run:
+    /// `Map<string, int, FixedHasher>.withHasher(FixedHasher.new())`.
     pub static fn withHasher(seed: H): Map<K, V, H> {
         return Map<K, V, H> { controls = [], slots = [], count = 0, free = 0, changes = 0, seed = seed };
     }
 
-    /// How many keys it holds.
+    /// Returns how many keys it holds.
     pub fn length(): int {
         return this.count;
     }
 
-    /// Whether it holds none.
+    /// Returns whether it holds no keys.
     pub fn isEmpty(): bool {
         return this.count == 0;
     }
 
-    /// The value under `k`, or `null`.
+    /// Returns the value under `k`, or `null` where `k` is not there.
     pub fn get(k: K): ?V {
         let at = this.find(k, this.hashOf(k));
         if (at < 0) {
@@ -339,12 +423,12 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         return this.slots[at]!.value;
     }
 
-    /// Whether it holds `k`.
+    /// Returns whether it holds `k`.
     pub fn containsKey(k: K): bool {
         return this.find(k, this.hashOf(k)) >= 0;
     }
 
-    /// `v` under `k`; the value it replaces, or `null` where `k` was not there.
+    /// Puts `v` under `k` and returns the value it replaces, or `null` where `k` was not there.
     pub mut fn insert(k: K, v: V): ?V {
         let hash = this.hashOf(k);
         let at = this.find(k, hash);
@@ -362,7 +446,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         return null;
     }
 
-    /// `k` and its value taken out; the value, or `null` where `k` was not there.
+    /// Removes `k` and returns its value, or `null` where `k` was not there.
     pub mut fn remove(k: K): ?V {
         let at = this.find(k, this.hashOf(k));
         if (at < 0) {
@@ -386,7 +470,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         return old;
     }
 
-    /// The value under `k`, or `otherwise` where there is none.
+    /// Returns the value under `k`, or `otherwise` where `k` is not there.
     pub fn getOr(k: K, otherwise: V): V {
         let at = this.find(k, this.hashOf(k));
         if (at < 0) {
@@ -395,7 +479,13 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         return this.slots[at]!.value;
     }
 
-    /// The value under `k`; where there is none, `make()`'s, inserted first.
+    /// Returns the value under `k`; where `k` is not there, inserts and returns what `make()` gives.
+    ///
+    /// `make` is called only when `k` is missing.
+    ///
+    /// # Errors
+    ///
+    /// Throws what `make` throws; the map is then unchanged.
     pub mut fn getOrInsert<E :: [Error]>(k: K, make: fn() -> V throws E): V throws E {
         let hash = this.hashOf(k);
         let at = this.find(k, hash);
@@ -412,7 +502,11 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         return made;
     }
 
-    /// The value under `k` replaced by `f` of it; whether there was one.
+    /// Replaces the value under `k` with `f` of it and returns whether `k` was there.
+    ///
+    /// # Errors
+    ///
+    /// Throws what `f` throws; the value is then unchanged.
     pub mut fn update<E :: [Error]>(k: K, f: fn(V) -> V throws E): bool throws E {
         let at = this.find(k, this.hashOf(k));
         if (at < 0) {
@@ -423,7 +517,11 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         return true;
     }
 
-    /// The entries for which `p` fails taken out; how many went.
+    /// Removes the entries for which `p` does not hold and returns how many were removed.
+    ///
+    /// # Errors
+    ///
+    /// Throws what `p` throws; the entries already removed stay removed.
     pub mut fn retain<E :: [Error]>(p: fn(K, V) -> bool throws E): int throws E {
         var gone = 0;
         var at = 0;
@@ -439,23 +537,27 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         return gone;
     }
 
-    /// The entries, in no order of the map's own (10 I8): a change of the map while they are walked
-    /// panics at the next pull (I9).
+    /// Returns an iterator over the entries, `(K, V)`, in no order of the map's own.
+    ///
+    /// # Panics
+    ///
+    /// The next pull panics (`LYR-RT0016`) after a key is inserted or removed, or the map cleared,
+    /// while the iterator walks.
     pub fn iter(): MapEntriesIter<K, V, H> {
         return MapEntriesIter<K, V, H> { map = this, at = 0, changes = this.changes };
     }
 
-    /// The keys, in the entries' order.
+    /// Returns an iterator over the keys, in the order of [Map.iter].
     pub fn keys(): MapKeysIter<K, V, H> {
         return MapKeysIter<K, V, H> { entries = this.iter() };
     }
 
-    /// The values, in the entries' order.
+    /// Returns an iterator over the values, in the order of [Map.iter].
     pub fn values(): MapValuesIter<K, V, H> {
         return MapValuesIter<K, V, H> { entries = this.iter() };
     }
 
-    /// Every key taken out.
+    /// Removes every key and frees the table.
     pub mut fn clear(): void {
         this.controls = [];
         this.slots = [];
@@ -470,8 +572,10 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         return h.finish();
     }
 
-    /// The slot holding `k`, or -1: the groups along the hash's probe, triangular — every group once
-    /// where their number is a power of two.
+    /// Returns the slot holding `k`, or -1 where `k` is not there.
+    ///
+    /// Probes the groups triangularly from the hash's group, which visits every group once when
+    /// their number is a power of two.
     fn find(k: K, hash: uint64): int {
         if (this.count == 0) {
             return -1;
@@ -503,7 +607,11 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         return -1;
     }
 
-    /// `k` and `v` into the first slot along the probe that is not full; `k` is not there.
+    /// Puts `k` and `v` into the first slot along the probe that is not full; `k` must not be there.
+    ///
+    /// # Panics
+    ///
+    /// When no slot along the probe is free.
     mut fn place(k: K, v: V, hash: uint64): void {
         let mask = this.controls.length() - 1;
         let tag = hash & 127;
@@ -528,8 +636,12 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         panic("Map: a full table");
     }
 
-    /// Room for `n` keys in an empty table: the fewest groups, a power of two, whose seven slots in
-    /// eight hold them.
+    /// Allocates an empty table with room for `n` keys: the fewest groups, a power of two, whose
+    /// seven usable slots in eight hold them.
+    ///
+    /// # Panics
+    ///
+    /// When `n` is negative.
     mut fn makeRoom(n: int): void {
         if (n < 0) {
             panic(f"Map.withCapacity: a negative capacity {n}");
@@ -547,8 +659,10 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         this.free = groups * 7;
     }
 
-    /// The table built anew, every key placed again: twice the groups — one where there was none —
-    /// or as many where fewer than half the slots the load allows hold keys, the rest deletions.
+    /// Rebuilds the table, placing every key again and dropping the deletion marks.
+    ///
+    /// The new table has twice the groups (one where there were none), or as many where the keys
+    /// fill less than half of the usable slots.
     mut fn rebuild(): void {
         let groups = this.controls.length();
         var next = 1;
@@ -573,19 +687,23 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
     }
 }
 
-/// A full slot of a map's table: a key and its value side by side.
+/// Holds a key and its value side by side in a full slot of a map's table.
 struct MapSlot<K, V> {
     key: K,
     value: V,
 }
 
-/// A map's entries, `(K, V)`, slot by slot.
+/// Iterates over a map's entries, `(K, V)`, slot by slot; made by [Map.iter].
+///
+/// # Panics
+///
+/// A pull panics (`LYR-RT0016`) when the map changed since the iterator was made.
 pub struct MapEntriesIter<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
     type Item = (K, V);
     map: Map<K, V, H>,
     var at: int,
     changes: int,
-    /// What the walk is called where it panics: a `Set` walks its table's entries.
+    /// The collection name the panic message shows: `"Set"` when a set walks its table.
     label: string = "Map",
 
     pub mut fn next(): ?(K, V) {
@@ -604,7 +722,7 @@ pub struct MapEntriesIter<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
     }
 }
 
-/// A map's keys.
+/// Iterates over a map's keys or a set's values; made by [Map.keys] and [Set.iter].
 pub struct MapKeysIter<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
     type Item = K;
     var entries: MapEntriesIter<K, V, H>,
@@ -619,7 +737,7 @@ pub struct MapKeysIter<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
     }
 }
 
-/// A map's values.
+/// Iterates over a map's values; made by [Map.values].
 pub struct MapValuesIter<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
     type Item = V;
     var entries: MapEntriesIter<K, V, H>,
@@ -634,53 +752,65 @@ pub struct MapValuesIter<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
     }
 }
 
-/// A collection changed while it was walked (10 I9): a panic of its own code, `LYR-RT0016`,
-/// "List: changed while it was walked". Native: the runtime's.
+/// Panics because the collection `what` changed while it was walked.
+///
+/// The panic has the code `LYR-RT0016` and a message such as "List: changed while it was walked".
+/// Implemented by the runtime.
 fn changedWhileWalked(what: string): never;
 
 // --- Set (10 C5): a Map's keys -----------------------------------------------------------------
 
-/// The values it holds, each once, in no order of its own — a map's keys, by the same table.
+/// A hash set: values, each once, in no order of its own.
+///
+/// It is a [Map]'s keys over the same table, so membership, insertion and removal take expected
+/// constant time. `x in set` is `set.contains(x)`. The set operations — [Set.union],
+/// [Set.intersect], [Set.difference], [Set.symmetricDifference] — are methods that return a new
+/// set. Not safe across threads.
 pub class Set<T :: [Hashable], H :: [Hasher] = DefaultHasher> :: [Iterable, Contains<T>] {
     type Iter = MapKeysIter<T, bool, H>;
     var table: Map<T, bool, H>,
 
-    /// An empty set hashing with `seed`.
+    /// Creates an empty set whose values are hashed with `seed`.
     pub static fn withHasher(seed: H): Set<T, H> {
         return Set<T, H> { table = Map<T, bool, H>.withHasher(seed) };
     }
 
-    /// How many values it holds.
+    /// Returns how many values it holds.
     pub fn length(): int {
         return this.table.length();
     }
 
-    /// Whether it holds none.
+    /// Returns whether it holds no values.
     pub fn isEmpty(): bool {
         return this.table.isEmpty();
     }
 
-    /// Whether it holds `v`.
+    /// Returns whether it holds `v`.
     pub fn contains(v: T): bool {
         return this.table.containsKey(v);
     }
 
-    /// `v` added; whether it was not there.
+    /// Adds `v` and returns whether it was not there before.
     pub mut fn insert(v: T): bool {
         return this.table.insert(v, true) == null;
     }
 
-    /// `v` taken out; whether it was there.
+    /// Removes `v` and returns whether it was there.
     pub mut fn remove(v: T): bool {
         return this.table.remove(v) != null;
     }
 
-    /// Every value taken out.
+    /// Removes every value.
     pub mut fn clear(): void {
         this.table.clear();
     }
 
-    /// The values, in no order of the set's own.
+    /// Returns an iterator over the values, in no order of the set's own.
+    ///
+    /// # Panics
+    ///
+    /// The next pull panics (`LYR-RT0016`) after a value is inserted or removed, or the set
+    /// cleared, while the iterator walks.
     pub fn iter(): MapKeysIter<T, bool, H> {
         return MapKeysIter<T, bool, H> {
             entries = MapEntriesIter<T, bool, H> { map = this.table, at = 0, changes = this.table.changes, label = "Set" },
@@ -689,12 +819,12 @@ pub class Set<T :: [Hashable], H :: [Hasher] = DefaultHasher> :: [Iterable, Cont
 }
 
 extend<T :: [Hashable]> Set<T, DefaultHasher> {
-    /// An empty set hashing with the process's key.
+    /// Creates an empty set hashing with the process's key; its order differs from run to run.
     pub static fn new(): Set<T, DefaultHasher> {
         return Set<T, DefaultHasher>.withHasher(DefaultHasher.new());
     }
 
-    /// A set of the array's elements, each once (10 N3, as `List.of`).
+    /// Creates a set of the array's elements, each once.
     pub static fn of(xs: T[]): Set<T, DefaultHasher> {
         let out = Set<T, DefaultHasher>.new();
         for (x in xs) {
@@ -703,7 +833,11 @@ extend<T :: [Hashable]> Set<T, DefaultHasher> {
         return out;
     }
 
-    /// An empty set with room for `n` values before it grows (10 N3); a negative `n` panics.
+    /// Creates an empty set with room for `n` values before it grows.
+    ///
+    /// # Panics
+    ///
+    /// When `n` is negative.
     pub static fn withCapacity(n: int): Set<T, DefaultHasher> {
         return Set<T, DefaultHasher> { table = Map<T, bool, DefaultHasher>.withCapacity(n) };
     }
@@ -730,7 +864,8 @@ extend<K :: [Hashable], V, H :: [Hasher]> Map<K, V, H> :: [IndexSet<K>] {
 }
 
 extend<K :: [Hashable], V, H :: [Hasher]> Map<K, V, H> {
-    /// The entries, `(K, V)`, in no order of the map's own — `iter()` by its name in C4.
+    /// Returns an iterator over the entries, `(K, V)`, in no order of the map's own; the same as
+    /// [Map.iter].
     pub fn entries(): MapEntriesIter<K, V, H> {
         return this.iter();
     }
@@ -739,7 +874,7 @@ extend<K :: [Hashable], V, H :: [Hasher]> Map<K, V, H> {
 // A set's operations are methods (10 C5): each makes a new set hashing as this one does, or answers
 // a question; no operators.
 extend<T :: [Hashable], H :: [Hasher]> Set<T, H> {
-    /// The elements of either.
+    /// Returns a new set of the values in either set, hashing as this one does.
     pub fn union(other: Set<T, H>): Set<T, H> {
         let out = Set<T, H>.withHasher(this.table.seed);
         for (x in this) {
@@ -751,7 +886,7 @@ extend<T :: [Hashable], H :: [Hasher]> Set<T, H> {
         return out;
     }
 
-    /// The elements of both.
+    /// Returns a new set of the values in both sets, hashing as this one does.
     pub fn intersect(other: Set<T, H>): Set<T, H> {
         let out = Set<T, H>.withHasher(this.table.seed);
         for (x in this) {
@@ -762,7 +897,7 @@ extend<T :: [Hashable], H :: [Hasher]> Set<T, H> {
         return out;
     }
 
-    /// The elements of this one the other lacks.
+    /// Returns a new set of the values in this set but not in `other`, hashing as this one does.
     pub fn difference(other: Set<T, H>): Set<T, H> {
         let out = Set<T, H>.withHasher(this.table.seed);
         for (x in this) {
@@ -773,7 +908,7 @@ extend<T :: [Hashable], H :: [Hasher]> Set<T, H> {
         return out;
     }
 
-    /// The elements of exactly one of the two.
+    /// Returns a new set of the values in exactly one of the two sets, hashing as this one does.
     pub fn symmetricDifference(other: Set<T, H>): Set<T, H> {
         let out = this.difference(other);
         for (x in other) {
@@ -784,7 +919,9 @@ extend<T :: [Hashable], H :: [Hasher]> Set<T, H> {
         return out;
     }
 
-    /// Whether every element is the other's too — the empty set is a subset of every set.
+    /// Returns whether every value of this set is in `other`.
+    ///
+    /// The empty set is a subset of every set.
     pub fn isSubset(other: Set<T, H>): bool {
         for (x in this) {
             if (!other.contains(x)) {
@@ -794,12 +931,12 @@ extend<T :: [Hashable], H :: [Hasher]> Set<T, H> {
         return true;
     }
 
-    /// Whether every element of the other is this one's too.
+    /// Returns whether every value of `other` is in this set.
     pub fn isSuperset(other: Set<T, H>): bool {
         return other.isSubset(this);
     }
 
-    /// Whether no element is the other's too.
+    /// Returns whether the two sets have no value in common.
     pub fn isDisjoint(other: Set<T, H>): bool {
         for (x in this) {
             if (other.contains(x)) {
@@ -849,8 +986,13 @@ extend<T :: [TotalOrder]> Heap<T> :: [FromArrayLiteral<T>] {
 // --- from iterators (10 I4) ----------------------------------------------------------------------
 
 extend<I :: [Iterator]> I {
-    /// The values, in a list of their own — its room the iterator's guess of its length
-    /// (`sizeHint`, 10 I4).
+    /// Collects the values into a new list, in order.
+    ///
+    /// The list starts with room for the iterator's lower `sizeHint`.
+    ///
+    /// # Errors
+    ///
+    /// Throws what a pull of the iterator throws.
     pub fn toList(): List<I.Item> throws I.Error {
         var it = this;
         let out = List<I.Item>.withCapacity(it.sizeHint().0);
@@ -864,7 +1006,9 @@ extend<I :: [Iterator]> I {
 }
 
 
-/// `it.chunks(n)`: the values of `it` in lists of `n`, the last one shorter where they do not divide.
+/// Yields the values of an iterator in lists of `n`; made by `it.chunks(n)`.
+///
+/// The last list is shorter where the values do not divide evenly.
 pub struct ChunksIter<I :: [Iterator]> :: [Iterator] {
     type Item = List<I.Item>;
     type Error = I.Error;
@@ -887,8 +1031,10 @@ pub struct ChunksIter<I :: [Iterator]> :: [Iterator] {
     }
 }
 
-/// `it.windows(n)`: every run of `n` values of `it` in turn, each a list of its own — none where
-/// there are fewer.
+/// Yields every run of `n` consecutive values of an iterator in turn, each in a new list; made by
+/// `it.windows(n)`.
+///
+/// Yields nothing where there are fewer than `n` values.
 pub struct WindowsIter<I :: [Iterator]> :: [Iterator] {
     type Item = List<I.Item>;
     type Error = I.Error;
@@ -930,7 +1076,11 @@ extend<I :: [Iterator, Closeable]> WindowsIter<I> :: [Closeable] {
 }
 
 extend<I :: [Iterator]> I {
-    /// The values in lists of `n`; `n` below 1 panics.
+    /// Returns an iterator over the values in lists of `n`, the last one possibly shorter.
+    ///
+    /// # Panics
+    ///
+    /// When `n` is less than 1.
     pub fn chunks(n: int): ChunksIter<I> {
         if (n < 1) {
             panic(f"chunks: {n} values a chunk");
@@ -938,7 +1088,11 @@ extend<I :: [Iterator]> I {
         return ChunksIter<I> { inner = this, n = n };
     }
 
-    /// Every run of `n` values; `n` below 1 panics.
+    /// Returns an iterator over every run of `n` consecutive values, each in a new list.
+    ///
+    /// # Panics
+    ///
+    /// When `n` is less than 1.
     pub fn windows(n: int): WindowsIter<I> {
         if (n < 1) {
             panic(f"windows: {n} values a window");
@@ -946,14 +1100,24 @@ extend<I :: [Iterator]> I {
         return WindowsIter<I> { inner = this, n = n, window = List<I.Item>.withCapacity(n) };
     }
 
-    /// The values in a list, in the order `cmp` gives — stable; a `cmp` that throws, as `sortBy`.
+    /// Returns the values in a new list, sorted by `cmp`.
+    ///
+    /// The sort is stable: equal values keep their order.
+    ///
+    /// # Errors
+    ///
+    /// Throws what a pull of the iterator or `cmp` throws, as the view's `sortBy` does.
     pub fn sortedBy<E :: [Error]>(cmp: fn(I.Item, I.Item) -> Ordering throws E): List<I.Item> throws Join<I.Error, E> {
         let out = try this.toList();
         try out.asSlice().sortBy(cmp);
         return out;
     }
 
-    /// The values `p` holds for and the others, each in a list, in order.
+    /// Splits the values into two new lists: those for which `p` holds and the others, each in order.
+    ///
+    /// # Errors
+    ///
+    /// Throws what a pull of the iterator or `p` throws.
     pub fn partition<E :: [Error]>(p: fn(I.Item) -> bool throws E): (List<I.Item>, List<I.Item>) throws Join<I.Error, E> {
         var it = this;
         let yes = List<I.Item>.new();
@@ -971,7 +1135,13 @@ extend<I :: [Iterator]> I {
         return both;
     }
 
-    /// The values in lists under their `key`, each list in order — eagerly, a map.
+    /// Groups the values into a new map from each `key` to the list of values with that key.
+    ///
+    /// Eager: walks the whole iterator. Each list keeps the values' order.
+    ///
+    /// # Errors
+    ///
+    /// Throws what a pull of the iterator or `key` throws.
     pub fn groupBy<K :: [Hashable], E :: [Error]>(key: fn(I.Item) -> K throws E): Map<K, List<I.Item>, DefaultHasher> throws Join<I.Error, E> {
         var it = this;
         let out = Map<K, List<I.Item>, DefaultHasher>.new();
@@ -987,7 +1157,13 @@ extend<I :: [Iterator]> I {
 }
 
 extend<I :: [Iterator<Item = T>], T :: [TotalOrder]> I {
-    /// The values in a list, in ascending order — stable.
+    /// Returns the values in a new list, in ascending order.
+    ///
+    /// The sort is stable: equal values keep their order.
+    ///
+    /// # Errors
+    ///
+    /// Throws what a pull of the iterator throws.
     pub fn sorted(): List<T> throws I.Error {
         let out: List<T> = try this.toList();
         out.asSlice().sort();
@@ -996,20 +1172,25 @@ extend<I :: [Iterator<Item = T>], T :: [TotalOrder]> I {
 }
 
 extend<I :: [Iterator<Item = (K, V)>], K :: [Hashable], V> I {
-    /// The pairs in a map — a later value of a key replacing the earlier one, as `collect()`.
+    /// Collects the pairs into a new map; a later value of a key replaces the earlier one.
+    ///
+    /// # Errors
+    ///
+    /// Throws what a pull of the iterator throws.
     pub fn toMap(): Map<K, V, DefaultHasher> throws I.Error {
         let out: Map<K, V, DefaultHasher> = try this.collect();
         return out;
     }
 }
 extend<K :: [Hashable], V> Map<K, V, DefaultHasher> {
-    /// An empty map hashing with the process's key (10 K2): its order differs from run to run.
+    /// Creates an empty map hashing with the process's key; its order differs from run to run.
     pub static fn new(): Map<K, V, DefaultHasher> {
         return Map<K, V, DefaultHasher>.withHasher(DefaultHasher.new());
     }
 
-    /// The pairs in a map (10 C4, N3), a later value of a key replacing the earlier one:
-    /// `Map.from([("a", 1), ("b", 2)])`.
+    /// Creates a map of the pairs: `Map.from([("a", 1), ("b", 2)])`.
+    ///
+    /// A later value of a key replaces the earlier one.
     pub static fn from(pairs: Slice<(K, V)>): Map<K, V, DefaultHasher> {
         let out = Map<K, V, DefaultHasher>.withCapacity(pairs.length());
         for (p in pairs) {
@@ -1018,7 +1199,11 @@ extend<K :: [Hashable], V> Map<K, V, DefaultHasher> {
         return out;
     }
 
-    /// An empty map with room for `n` keys before it grows (10 N3); a negative `n` panics.
+    /// Creates an empty map with room for `n` keys before it grows.
+    ///
+    /// # Panics
+    ///
+    /// When `n` is negative.
     pub static fn withCapacity(n: int): Map<K, V, DefaultHasher> {
         let map = Map<K, V, DefaultHasher>.withHasher(DefaultHasher.new());
         map.makeRoom(n);
@@ -1031,8 +1216,14 @@ extend<K :: [Hashable], V> Map<K, V, DefaultHasher> {
 // ring is copied, in order, into one twice its size. A slot no value holds is `null`, so the buffer
 // keeps nothing alive.
 
-/// A double-ended queue (10 C6): values pushed and popped at either end; `[i]` counts from the
-/// front, panicking outside `0 ≤ i < length()`; walked front to back. Not safe across threads (C11).
+/// A double-ended queue: values pushed and popped at either end in amortized constant time.
+///
+/// The values lie in a ring buffer that doubles when full. `deque[i]` counts from the front; an
+/// iterator walks front to back. Not safe across threads.
+///
+/// # Panics
+///
+/// `deque[i]` panics outside `0 ≤ i < length()`.
 pub class Deque<T> :: [Index<int>, Iterable] {
     type Output = T;
     type Iter = DequeIter<T>;
@@ -1041,12 +1232,16 @@ pub class Deque<T> :: [Index<int>, Iterable] {
     var count: int,
     var changes: int,
 
-    /// An empty deque.
+    /// Creates an empty deque.
     pub static fn new(): Deque<T> {
         return Deque<T> { slots = [], head = 0, count = 0, changes = 0 };
     }
 
-    /// An empty deque with room for `n` values before it grows (10 N3); a negative `n` panics.
+    /// Creates an empty deque with room for `n` values before it grows.
+    ///
+    /// # Panics
+    ///
+    /// When `n` is negative.
     pub static fn withCapacity(n: int): Deque<T> {
         if (n < 0) {
             panic(f"Deque.withCapacity: a negative capacity {n}");
@@ -1055,17 +1250,17 @@ pub class Deque<T> :: [Index<int>, Iterable] {
         return Deque<T> { slots = filled(n, none), head = 0, count = 0, changes = 0 };
     }
 
-    /// How many values it holds.
+    /// Returns how many values it holds.
     pub fn length(): int {
         return this.count;
     }
 
-    /// Whether it holds none.
+    /// Returns whether it holds no values.
     pub fn isEmpty(): bool {
         return this.count == 0;
     }
 
-    /// `v` at the back.
+    /// Appends `v` at the back.
     pub mut fn pushBack(v: T): void {
         this.grow();
         this.slots[this.slotOf(this.count)] = v;
@@ -1073,7 +1268,7 @@ pub class Deque<T> :: [Index<int>, Iterable] {
         this.changes = this.changes + 1;
     }
 
-    /// `v` at the front.
+    /// Prepends `v` at the front.
     pub mut fn pushFront(v: T): void {
         this.grow();
         this.head = this.slotOf(this.slots.length() - 1);
@@ -1082,7 +1277,7 @@ pub class Deque<T> :: [Index<int>, Iterable] {
         this.changes = this.changes + 1;
     }
 
-    /// The front value taken off, or `null` where there is none.
+    /// Removes and returns the front value, or `null` where there is none.
     pub mut fn popFront(): ?T {
         if (this.count == 0) {
             return null;
@@ -1095,7 +1290,7 @@ pub class Deque<T> :: [Index<int>, Iterable] {
         return v;
     }
 
-    /// The back value taken off, or `null` where there is none.
+    /// Removes and returns the back value, or `null` where there is none.
     pub mut fn popBack(): ?T {
         if (this.count == 0) {
             return null;
@@ -1108,7 +1303,7 @@ pub class Deque<T> :: [Index<int>, Iterable] {
         return v;
     }
 
-    /// The front value, or `null` where there is none.
+    /// Returns the front value without removing it, or `null` where there is none.
     pub fn peekFront(): ?T {
         if (this.count == 0) {
             return null;
@@ -1116,7 +1311,7 @@ pub class Deque<T> :: [Index<int>, Iterable] {
         return this.slots[this.head];
     }
 
-    /// The back value, or `null` where there is none.
+    /// Returns the back value without removing it, or `null` where there is none.
     pub fn peekBack(): ?T {
         if (this.count == 0) {
             return null;
@@ -1124,7 +1319,11 @@ pub class Deque<T> :: [Index<int>, Iterable] {
         return this.slots[this.slotOf(this.count - 1)];
     }
 
-    /// The value `i` from the front; outside `0 ≤ i < length()` a panic (`LYR-RT0003`).
+    /// Returns the value `i` places from the front; this is `deque[i]`.
+    ///
+    /// # Panics
+    ///
+    /// Outside `0 ≤ i < length()`, with `LYR-RT0003`.
     pub fn index(i: int): T {
         if (i < 0 || i >= this.count) {
             // the bounds checked as an array's are, on a view of `count` slots: it panics
@@ -1133,18 +1332,22 @@ pub class Deque<T> :: [Index<int>, Iterable] {
         return this.slots[this.slotOf(i)] ?? unreachable();
     }
 
-    /// The iterator over the values, front to back (10 C6, I9): a change while it walks is the
-    /// program's error, and the next pull panics.
+    /// Returns an iterator over the values, front to back.
+    ///
+    /// # Panics
+    ///
+    /// The next pull panics (`LYR-RT0016`) after a push or a pop while the iterator walks.
     pub fn iter(): DequeIter<T> {
         return DequeIter<T> { deque = this, at = 0, changes = this.changes };
     }
 
-    /// The slot `offset` past the head, around the ring.
+    /// Returns the slot `offset` places past the head, around the ring.
     fn slotOf(offset: int): int {
         return (this.head + offset) % this.slots.length();
     }
 
-    /// Room for one more: a full ring copied, from its head on, into one twice its size.
+    /// Makes room for one more value: a full ring is copied, from its head on, into one twice its
+    /// size (at least 8).
     mut fn grow(): void {
         if (this.count < this.slots.length()) {
             return;
@@ -1164,7 +1367,11 @@ pub class Deque<T> :: [Index<int>, Iterable] {
     }
 }
 
-/// A deque's values, front to back.
+/// Iterates over a deque's values, front to back; made by [Deque.iter].
+///
+/// # Panics
+///
+/// A pull panics (`LYR-RT0016`) when the deque changed since the iterator was made.
 pub struct DequeIter<T> :: [Iterator] {
     type Item = T;
     deque: Deque<T>,
@@ -1187,24 +1394,31 @@ pub struct DequeIter<T> :: [Iterator] {
 // A binary tree laid out in a list: the children of `i` at `2i + 1` and `2i + 2`, no value less
 // than its parent.
 
-/// A binary heap (10 C1): the least value first (the review's A1) — `push`, `pop` and `peek` —
-/// each in `log n` steps, over a list. Not safe across threads (C11). The greatest first: a heap
-/// of a type whose order is reversed.
+/// A binary min-heap: [Heap.peek] and [Heap.pop] give the least value.
+///
+/// `push` and `pop` take `log n` steps, `peek` constant time; the values lie in a list. For the
+/// greatest value first, use a type whose order is reversed. Not safe across threads.
 pub class Heap<T :: [TotalOrder]> {
     var items: List<T>,
 
-    /// An empty heap.
+    /// Creates an empty heap.
     pub static fn new(): Heap<T> {
         return Heap<T> { items = List<T>.new() };
     }
 
-    /// An empty heap with room for `n` values before it grows (10 N3); a negative `n` panics.
+    /// Creates an empty heap with room for `n` values before it grows.
+    ///
+    /// # Panics
+    ///
+    /// When `n` is negative.
     pub static fn withCapacity(n: int): Heap<T> {
         return Heap<T> { items = List<T>.withCapacity(n) };
     }
 
-    /// A heap of the array's values, copied: each parent sunk to its place from the last one up —
-    /// in linear time, where pushing them one by one takes `n log n` (Floyd).
+    /// Creates a heap of the array's values, copied.
+    ///
+    /// Builds the heap in linear time by sinking each parent to its place, from the last one up
+    /// (Floyd's method); pushing the values one by one would take `n log n`.
     pub static fn of(xs: T[]): Heap<T> {
         let heap = Heap<T> { items = List<T>.of(xs) };
         var at = xs.length() / 2 - 1;
@@ -1215,22 +1429,22 @@ pub class Heap<T :: [TotalOrder]> {
         return heap;
     }
 
-    /// How many values it holds.
+    /// Returns how many values it holds.
     pub fn length(): int {
         return this.items.length();
     }
 
-    /// Whether it holds none.
+    /// Returns whether it holds no values.
     pub fn isEmpty(): bool {
         return this.items.isEmpty();
     }
 
-    /// The least value, or `null` where there is none.
+    /// Returns the least value without removing it, or `null` where there is none.
     pub fn peek(): ?T {
         return this.items.get(0);
     }
 
-    /// `v`, risen to its place.
+    /// Adds `v`, letting it rise to its place, in `log n` steps.
     pub mut fn push(v: T): void {
         this.items.push(v);
         var at = this.items.length() - 1;
@@ -1244,8 +1458,9 @@ pub class Heap<T :: [TotalOrder]> {
         }
     }
 
-    /// The least value taken off, or `null` where there is none: the last one put at the top and
-    /// sunk to its place.
+    /// Removes and returns the least value, or `null` where there is none.
+    ///
+    /// The last value is put at the top and sunk to its place, in `log n` steps.
     pub mut fn pop(): ?T {
         let n = this.items.length();
         if (n == 0) {
@@ -1257,7 +1472,7 @@ pub class Heap<T :: [TotalOrder]> {
         return top;
     }
 
-    /// The value at `at` sunk below every child less than it, among the first `m` values.
+    /// Sinks the value at `from` below every child less than it, among the first `m` values.
     mut fn sink(from: int, m: int): void {
         var at = from;
         while (true) {
@@ -1278,7 +1493,7 @@ pub class Heap<T :: [TotalOrder]> {
     }
 }
 
-/// Whether `a` comes before `b` in their order.
+/// Returns whether `a` comes before `b` in their total order.
 fn less<T :: [TotalOrder]>(a: T, b: T): bool {
     return match (a.totalCompare(b)) {
         .Less => true,
@@ -1511,14 +1726,22 @@ extend<K :: [Hashable], V> Map<K, V, DefaultHasher> :: [FromIterator<(K, V)>] {
 }
 
 extend<T :: [TotalOrder]> Heap<T> :: [FromIterator<T>] {
-    /// The values heaped at once, as `of` does an array's.
+    /// Creates a heap of the iterator's values, built at once as [Heap.of] does.
+    ///
+    /// # Errors
+    ///
+    /// Throws what a pull of `it` throws.
     static fn fromIter<I :: [Iterator<Item = T>]>(it: I): Heap<T> throws I.Error {
         return Heap<T>.of(try it.toArray());
     }
 }
 
 extend<I :: [Iterator<Item = T>], T :: [Hashable]> I {
-    /// The values in a set of their own, each once.
+    /// Collects the values into a new set, each once.
+    ///
+    /// # Errors
+    ///
+    /// Throws what a pull of the iterator throws.
     pub fn toSet(): Set<T> throws I.Error {
         let out: Set<T> = try this.collect();
         return out;
@@ -1529,14 +1752,14 @@ extend<I :: [Iterator<Item = T>], T :: [Hashable]> I {
 // A list and a set hold their values, a map its keys: `k in map` is `map.containsKey(k)`.
 
 extend<T :: [Equatable]> List<T> :: [Contains<T>] {
-    /// Whether an element equals `x`.
+    /// Returns whether an element equals `x`; this is `x in list`.
     fn contains(x: T): bool {
         return this.asSlice().contains(x);
     }
 }
 
 extend<K :: [Hashable], V, H :: [Hasher]> Map<K, V, H> :: [Contains<K>] {
-    /// Whether `k` is one of the keys.
+    /// Returns whether `k` is one of the keys; this is `k in map`.
     fn contains(k: K): bool {
         return this.containsKey(k);
     }
