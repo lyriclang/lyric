@@ -14352,6 +14352,51 @@ public sealed class TypeChecker
 
     // --- type resolution: TypeNode to LyrType ---
 
+    /// <summary>The written instances whose bounds were checked: a type node resolves more than once.</summary>
+    private readonly HashSet<TypeNode> _boundsChecked = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The target of every block of the compilation, synthesized ones among them.</summary>
+    private HashSet<TypeNode> BlockTargets => _blockTargets ??= new HashSet<TypeNode>(
+        _comp.Extensions.Blocks.Select(b => b.Decl.Target), ReferenceEqualityComparer.Instance);
+
+    private HashSet<TypeNode>? _blockTargets;
+
+    /// <summary>The type nodes of every alias's right side: an alias is checked where it is used,
+    /// with its arguments in place — its parameters carry no constraints of their own.</summary>
+    private HashSet<TypeNode> AliasBodies => _aliasBodies ??= CollectAliasBodies();
+
+    private HashSet<TypeNode>? _aliasBodies;
+
+    private HashSet<TypeNode> CollectAliasBodies()
+    {
+        var nodes = new HashSet<TypeNode>(ReferenceEqualityComparer.Instance);
+        void Walk(Node node)
+        {
+            if (node is TypeNode t) nodes.Add(t);
+            foreach (var child in AstChildren.Of(node)) Walk(child);
+        }
+        foreach (var module in _comp.Modules)
+            foreach (var alias in _comp.AstOf(module).Declarations.OfType<TypeAliasDecl>())
+                Walk(alias.Aliased);
+        return nodes;
+    }
+
+    /// <summary>Every instance in <paramref name="type"/> against the bounds of its declaration,
+    /// reported at <paramref name="span"/>: an alias's expansion, which no node of the use spells.</summary>
+    private void CheckInstanceBounds(LyrType type, Span span)
+    {
+        switch (type)
+        {
+            case GenericInstance { Definition: var definition, Arguments: var args } when !args.Any(ContainsError):
+                CheckConstraints(definition.Generics, args, span);
+                foreach (var a in args) CheckInstanceBounds(a, span);
+                break;
+            case Optional { Inner: var inner }: CheckInstanceBounds(inner, span); break;
+            case ArrayOf { Element: var element }: CheckInstanceBounds(element, span); break;
+            case TupleOf { Elements: var elements }: foreach (var e in elements) CheckInstanceBounds(e, span); break;
+        }
+    }
+
     private LyrType ResolveType(TypeNode node, SymbolTable scope)
     {
         if (++_depth > MaxNesting) return Deeper(node.Span);
@@ -14534,7 +14579,12 @@ public sealed class TypeChecker
         try
         {
             var underlying = ResolveType(decl.Aliased, scope);
-            if (arguments is not null && !underlying.IsError) underlying = Substitute(underlying, arguments);
+            if (arguments is not null && !underlying.IsError)
+            {
+                underlying = Substitute(underlying, arguments);
+                // the alias's right side is checked as the use spells it: 'Table<NoHash>' is the use's error
+                if (_comp.Lyric5Modules && use is not null && _boundsChecked.Add(use)) CheckInstanceBounds(underlying, span);
+            }
             if (!decl.IsOpaque) return underlying;
             if (underlying.IsError) return LyrType.Error;
 
@@ -14629,6 +14679,14 @@ public sealed class TypeChecker
         if (ts.Generics.Length != args.Length)
             _de.Report("LYR-SEM0026", Severity.Error, n.Span,
                 $"generic type '{ts.Name}' expects {ts.Generics.Length} type argument(s), got {args.Length}");
+        // A written instance meets the bounds of its declaration where it is written — in a
+        // signature, a field, an annotation —, once for the place, not first where a call builds
+        // one: 'fn f(s: Set<NoHash>)' is the signature's error.
+        // A block's target names the type with the block's parameters, and those take the type's
+        // bounds with it: 'extend<I, E> MapIter<I, E>' is MapIter's, whatever its own list says.
+        else if (_comp.Lyric5Modules && args.Length > 0 && !args.Any(ContainsError) && !BlockTargets.Contains(n)
+                 && !AliasBodies.Contains(n) && _boundsChecked.Add(n))
+            CheckConstraints(ts.Generics, args, n.Span);
         if (args.Length == 0 && fixations is null) return new NamedRef(ts);
         return new GenericInstance(ts, args) { Fixations = fixations?.ToArray() };
     }
