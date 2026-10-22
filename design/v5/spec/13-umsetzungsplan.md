@@ -1027,3 +1027,21 @@ die Reihenfolge baut auf ihm auf: erst was der Parser liest (S1), dann was die U
 was die Instanzen erzeugen (S5, S7). P8 steht spät, weil seine Entscheidung die Überladung über Konformanzen
 berührt, die S6 erst ordnet. Verworfen: die Inferenzpunkte einzeln über Sonderfälle zu lösen (S5 und S16 sind
 derselbe Mangel — der erwartete Typ fließt nicht in ein schon gebundenes Argument zurück).
+
+## Nachtrag 2026-10-22 — M12b abgeschlossen; ein Slice vor M12c
+
+M12b ist auf `main` (S1–S9, #529–#538; S9 vor S8, weil S8 auf die Entscheidung wartete). Mit dem Maintainer
+entschieden am 2026-10-22:
+
+| # | Entscheidung | Vergleich / Verworfen |
+|---|---|---|
+| 04 S7 | **Mehrere Konformanzen einer generischen Schnittstelle**: `Label :: [From<int>, From<string>]`; Member gleicher Arität an der Instanz unterschieden, der Aufruf wählt über die Typen der Argumente, die eigenen Typen zuerst; über eine Schranke die Instanz der Schranke (gebaut in S8, Spec 05 §3 Regel 5) | Rusts mehrere `From`. Verworfen: die qualifizierte Form `From<int>.from(…)` — ein statisches Member wird nicht über sein Interface gerufen (05 §4 Regel 2, S9) |
+| 233 | **Keine Lint-Stufe für ein Modul oder eine Datei**: Deklaration, `[lints]`, Kommandozeile (09 A10 nachgetragen) | Rusts `#![allow]` — ein zweiter Mechanismus für dieselbe Sache |
+| 255 | **Ein Typtest sieht die Konformanzen, die ein Blanket- oder Shape-Block gibt** (Option C): für jedes Interface `J`, nach dem ein Programm mit `x is J` oder einem Typmuster `d: J` fragt, baut die Senkung die Zeilen der Blanket- und Shape-Konformanzen aller Typen, die in ein `Any` gelangen; ein Interface-Wert behält die Regel von S7 (Zeilen, wo einer gemacht wird) | A: `is` sieht nur Erklärtes — eine Asymmetrie, die der Compiler bei `Any` nicht anmahnen kann. B: Zeilen für jede festgehaltene Konformanz — Größe in jedem Programm, und die erste S7-Fassung zerbrach damit die Zeilen der std-Iteratoren |
+
+**Der Slice für 255** steht zwischen M12b und M12c: zuerst die Ursache, warum Zeilen für jede festgehaltene
+Konformanz die std-Iteratoren zerbrachen (`sizeHint` „not lowerable“); dann die Sammlung der gefragten
+Interfaces (`TypeTestExpr`, Typmuster) in der Senkung, die Zeilen für sie, ein Konformanzfall (`a is Describe`
+auf einem `Any`, das nie in `Describe` gewandelt wurde) und die Regel in Spec 05 §9. Artefakt: der Fall, rot gegen
+`main`, grün danach. Größe S. Danach M12c nach Bereich 14 (S1–S6, K2a–K2d).
+

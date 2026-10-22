@@ -52,8 +52,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M10 | std after rule D | XL | **done** 2026-10-14 |
 | M11 | Own GC | XL | **done** 2026-10-19 |
 | M12a | Diagnostics and lints | L | **done** 2026-10-21 |
-| M12b | Inference and abstraction (the review clocks) | M | next — plan 2026-10-21 |
-| M12c | Docs foundation and website (comments in the W8 form, `Lyric5.Doc`, Book scaffold, `/dev/` live) | L | — (plan 2026-10-20, design/v5/spec/14) |
+| M12b | Inference and abstraction (the review clocks) | M | **done** 2026-10-22 |
+| M12c | Docs foundation and website (comments in the W8 form, `Lyric5.Doc`, Book scaffold, `/dev/` live) | L | next, after the slice for 255 (plan 2026-10-20, design/v5/spec/14) |
 | M13a | fmt, doc, api | M | — |
 | M13b | LSP, DAP, clients | XL | — |
 | M14 | FFI and embedding | L | — |
@@ -1377,6 +1377,40 @@ released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "
   conformance defaults (188, a compiler bug for the sweep; S11 worked around it); main's macOS
   job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
   step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
+
+### M12b — done (2026-10-22)
+
+The plan is design 13's addendum "der Plan für M12b" (P1–P9, S1–S10), #528. The mode of M12a: no halt until the
+close, merged on green CI with the platform matrix dispatched, open points collected for the report.
+
+- **S1** type arguments at a method, `it.collect<List<int>>()` (#529 + spec#338), **S2** a fixation binds a
+  function's parameter (#530 + spec#339), **S3** a written instance meets its bounds where it is written (#531 +
+  spec#340), **S4** inference at the edges — a plain value binds `?U`, an array literal takes the bound type
+  (#532 + spec#341).
+- **S5** the chain message: a chain of instances ends at depth 128 with the chain in the message (#533 +
+  spec#342; open point 218 — `lyric5 check` ran for hours).
+- **S6** a type's body and its inherent blocks overload by count (#534 + spec#343).
+- **S7** forwarders and interface values (#535 + spec#344): a generic member delegated to a field, a field of a
+  child interface, a value of an interface from a shape and through a blanket conformance; SEM0196 and SEM0230
+  retired. A table row a block gives is built where a value is made — the first version built one for every
+  recorded conformance and broke the std iterators' rows.
+- **S9** before S8 (#537 + spec#345), while S8 waited for its decision: the five ICEs M12a found as programs or
+  codes (an import of an import RES0009, `Pair<int>.of` a value, a static through its interface the new
+  SEM0231, `comptime if` a value in a body, `==` on `void`), the binding's label, the hidden overload's note, and
+  two found on the way (a fix that broke a program, a delegated generic interface instance).
+- **S8** several conformances of one generic interface (#538 + spec#346): decided by the maintainer on
+  2026-10-22 (04 S7). `Label :: [From<int>, From<string>]`; the arguments' types choose, their own types first;
+  through a constraint the constraint's instance. No qualified `From<int>.from(…)` — S9's rule for statics.
+- Between S9 and S8 (2026-10-22): the dev archive carried no runtime and the 4.x stdlib (#536) — found by the
+  maintainer; each archive is now tried away from the checkout before it is published.
+- **S10** the close (this).
+- The exit criterion — one conformance case per point, red against the compiler before, green after; 04 S7
+  decided — holds: twenty-six cases over S1–S9 (3, 1, 3, 2, 1, 2, 4, 4, 6), each red before its slice; four pins of the
+  old refusals retired with their rules (S7).
+- Decided with the maintainer on 2026-10-22: 04 S7 (several conformances: allowed), 233 (no module or file-level
+  lint level; design 09 A10), 255 (a type test `is J` and a type pattern see the conformances a blanket's or a
+  shape's block gives: option C, a row for every interface a program asks about). **Next: the slice for 255,
+  then M12c.** Open points 251–255 from the milestone; 252 is a flake (Windows backtrace names).
 
 ### M12a — done (2026-10-21)
 
