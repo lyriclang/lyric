@@ -165,6 +165,19 @@ public sealed class TypeResult
     public bool BlockConformanceRecorded(LyrType instance, TypeSymbol iface, ExtensionBlock block) =>
         _blockConformances.Any(e => ReferenceEquals(e.Block, block) && ReferenceEquals(e.Iface, iface) && LyrType.Equal(e.Instance, instance));
 
+    /// <summary>The conformances a block on a shape or a blanket block gave a shape (05 §13 rules 6,
+    /// 8), as the sema proved them: a value of the interface is made from the shape in a box.</summary>
+    public IEnumerable<(LyrType Shape, TypeSymbol Iface, ExtensionBlock Block)> ShapeConformances =>
+        _blockConformances.Where(e => (e.Block.IsConstructorTarget || e.Block.IsBlanketTarget)
+            && e.Instance is ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType
+            && !TypeChecker.MentionsTypeParam(e.Instance));
+
+    /// <summary>The blanket block that gives <paramref name="instance"/> the interface, as the sema
+    /// proved it (05 §13 rule 8): a value of the interface is made through it.</summary>
+    public ExtensionBlock? BlanketConformanceOf(LyrType instance, TypeSymbol iface) =>
+        _blockConformances.FirstOrDefault(e => e.Block.IsBlanketTarget && ReferenceEquals(e.Iface, iface)
+            && LyrType.Equal(e.Instance, instance)).Block;
+
     /// <summary>A generic member as the witness of a plain interface member (13 S9; M8c S9b): its
     /// own type arguments as the conformance to that interface instance bound them —
     /// <c>contains&lt;P&gt;</c> for <c>Contains&lt;char&gt;</c> is <c>contains&lt;char&gt;</c>.</summary>

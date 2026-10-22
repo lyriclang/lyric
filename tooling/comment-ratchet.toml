@@ -137,7 +137,7 @@
 "src/Lyric5.Toolchain/UserCache.cs" = 1
 "src/Lyric5/Program.cs" = 3
 
-# frontend: 1626
+# frontend: 1624
 ["frontend"]
 "src/Lyric.Frontend/AST/AstRewriter.cs" = 1
 "src/Lyric.Frontend/AST/CoroutineShape.cs" = 1
@@ -184,7 +184,7 @@
 "src/Lyric.Frontend/Ir/Lowering/InstanceTable.cs" = 12
 "src/Lyric.Frontend/Ir/Lowering/LambdaTable.cs" = 3
 "src/Lyric.Frontend/Ir/Lowering/LoopScope.cs" = 1
-"src/Lyric.Frontend/Ir/Lowering/LoweringDiagnostics.cs" = 4
+"src/Lyric.Frontend/Ir/Lowering/LoweringDiagnostics.cs" = 3
 "src/Lyric.Frontend/Ir/Lowering/ModuleLowerer.cs" = 37
 "src/Lyric.Frontend/Ir/Lowering/NameMangling.cs" = 1
 "src/Lyric.Frontend/Ir/Lowering/SlotAllocator.cs" = 1
@@ -215,12 +215,12 @@
 "src/Lyric.Frontend/Sema/SemaRules.cs" = 34
 "src/Lyric.Frontend/Sema/SemaSymbols.cs" = 1
 "src/Lyric.Frontend/Sema/Semantics.cs" = 1
-"src/Lyric.Frontend/Sema/TypeChecker.cs" = 539
+"src/Lyric.Frontend/Sema/TypeChecker.cs" = 538
 "src/Lyric.Frontend/Sema/TypeFacts.cs" = 15
 "src/Lyric.Frontend/Sema/TypeResult.cs" = 45
 "src/Lyric.Frontend/Sema/WarningAnalyzer.cs" = 13
 
-# tests: 390
+# tests: 389
 ["tests"]
 "tests/Lyric5.Tests/AssertAndBindingSiteTests.cs" = 3
 "tests/Lyric5.Tests/AttributeMacroTests.cs" = 3
@@ -273,7 +273,7 @@
 "tests/Lyric5.Tests/LocalFunctionTests.cs" = 2
 "tests/Lyric5.Tests/LockTests.cs" = 5
 "tests/Lyric5.Tests/LockedTests.cs" = 1
-"tests/Lyric5.Tests/LoweringRefusalTests.cs" = 2
+"tests/Lyric5.Tests/LoweringRefusalTests.cs" = 1
 "tests/Lyric5.Tests/LtoTests.cs" = 1
 "tests/Lyric5.Tests/MacroTests.cs" = 7
 "tests/Lyric5.Tests/ManifestEditTests.cs" = 1

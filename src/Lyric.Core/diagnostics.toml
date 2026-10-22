@@ -9706,57 +9706,7 @@ title = "a delegation the lowering cannot express yet"
 severity = "error"
 area = "05-interfaces"
 summary = "A type delegates an interface to a field whose type is another interface (`[A by inner]` with `inner: B`), or a generic member of an interface is reached on a type that forwards it to a field."
-explanation = '''
-A delegation `:: [A by field]` forwards the interface's members to the field. Two forms are not translated yet: a field typed as another interface than the delegated one (even one that extends it), and a generic interface member a type leaves to a field, which would need a forwarder per instantiation.
-
-Type the field as the delegated interface itself, or write the member on the type and call the field's.
-'''
-wrong = '''
-interface A {
-    fn a(): int;
-}
-
-interface B :: [A] {
-    fn b(): int;
-}
-
-class Impl :: [B] {
-    fn a(): int { return 1; }
-    fn b(): int { return 2; }
-}
-
-class Outer :: [A by inner] {
-    inner: B,
-}
-
-fn main(): void {
-    let o = Outer { inner = Impl {} };
-    assert(o.a() == 1);
-}
-'''
-right = '''
-interface A {
-    fn a(): int;
-}
-
-interface B :: [A] {
-    fn b(): int;
-}
-
-class Impl :: [B] {
-    fn a(): int { return 1; }
-    fn b(): int { return 2; }
-}
-
-class Outer :: [A by inner] {
-    inner: A,
-}
-
-fn main(): void {
-    let o = Outer { inner = Impl {} };
-    assert(o.a() == 1);
-}
-'''
+retired = "M12b S7: a field of a child interface forwards through the parent's table, and a generic member is forwarded per use, on the field's own member; nothing refuses either."
 
 [LYR-SEM0197]
 title = "the monomorphization does not terminate"
@@ -10854,63 +10804,4 @@ title = "an interface value made through a shape's or a blanket block"
 severity = "error"
 area = "05-interfaces"
 summary = "A value is made into an interface it conforms to only through a block on a shape or a blanket conformance: such a value is not built in this release."
-explanation = '''
-A value of an interface carries the method table of its type. For a conformance a block on a shape or a blanket block gives, that table is not made in this release, so a value of the interface cannot be made from it; calling the interface's methods on the value itself, or through a type parameter constrained by the interface, works.
-
-Reach the members through a constraint (`fn greet<T :: [Greeter]>(g: T)`), or conform the type to the interface in a block of its own.
-'''
-wrong = '''
-interface Named {
-    fn name(): string;
-}
-
-interface Greeter {
-    fn greeting(): string;
-}
-
-struct Cat :: [Named] {
-    fn name(): string {
-        return "cat";
-    }
-}
-
-extend<T :: [Named]> T :: [Greeter] {
-    fn greeting(): string {
-        return "hello " + this.name();
-    }
-}
-
-fn main(): void {
-    let g: Greeter = Cat { };
-    let _ = g;
-}
-'''
-right = '''
-interface Named {
-    fn name(): string;
-}
-
-interface Greeter {
-    fn greeting(): string;
-}
-
-struct Cat :: [Named] {
-    fn name(): string {
-        return "cat";
-    }
-}
-
-extend<T :: [Named]> T :: [Greeter] {
-    fn greeting(): string {
-        return "hello " + this.name();
-    }
-}
-
-fn greet<T :: [Greeter]>(g: T): string {
-    return g.greeting();
-}
-
-fn main(): void {
-    let _ = greet(Cat { });
-}
-'''
+retired = "M12b S7: a value of an interface is made through a shape's block or a blanket conformance — the shape in a box, a named type with the block's row in its table; nothing refuses it."

@@ -97,6 +97,33 @@ internal sealed class TypeTable
 
     private readonly List<(TypeSymbol Builtin, IrType Payload, TypeId Id)> _builtinBoxes = new();
 
+    private readonly List<(IrType Payload, TypeId Id)> _shapeBoxes = new();
+
+    private readonly HashSet<(TypeId Concrete, TypeId Iface)> _lifted = new();
+
+    /// <summary>The pairs a value was made into an interface value through, the concrete type and
+    /// the interface: a conformance a block gives reaches a table only where one is made (05 §13
+    /// rules 6, 8), its parents with it.</summary>
+    public IReadOnlyCollection<(TypeId Concrete, TypeId Iface)> Lifted => _lifted;
+
+    public void MarkLifted(TypeId concrete, TypeId iface) => _lifted.Add((concrete, iface));
+
+    /// <summary>The boxes a shape's value went into an interface value through (05 §13 rule 6):
+    /// their rows are built from the blocks that gave the shape the interface.</summary>
+    public IReadOnlyList<(IrType Payload, TypeId Id)> ShapeBoxes => _shapeBoxes;
+
+    /// <summary>The box of a shape's value — an array, an optional, a tuple, a function —, as a
+    /// built-in's: one field, the value; interned by the value's type.</summary>
+    public TypeId BoxOfShape(IrType payload, string shown)
+    {
+        foreach (var (existing, id) in _shapeBoxes)
+            if (IrType.Equal(existing, payload)) return id;
+        var fresh = new TypeId(_defs.Count);
+        _defs.Add(new IrTypeDef($"<box:{shown}>", [payload], ["value"]) { IsStruct = true, IsBuiltinBox = true });
+        _shapeBoxes.Add((payload, fresh));
+        return fresh;
+    }
+
     /// <summary>The boxes a built-in's value went into an interface value through, with the
     /// built-in's symbol: their table rows are built from its blocks.</summary>
     public IReadOnlyList<(TypeSymbol Builtin, IrType Payload, TypeId Id)> BuiltinBoxes => _builtinBoxes;

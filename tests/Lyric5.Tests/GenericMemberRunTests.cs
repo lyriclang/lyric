@@ -190,11 +190,11 @@ public class GenericMemberRunTests
             """));
     }
 
-    /// <summary>A generic member a type leaves to a field (05 §5) would need a forwarder per
-    /// instantiation, which is not built: refused where the type delegates. The compiler crashed
-    /// at the call ("function has no body").</summary>
+    /// <summary>A generic member a type leaves to a field (05 §5 rule 1): the field's own member,
+    /// at the call's type argument. The compiler crashed at the call once ("function has no
+    /// body"), then refused the delegation.</summary>
     [Fact]
-    public void A_generic_member_is_not_forwarded_to_a_field_yet()
+    public void A_generic_member_is_forwarded_to_a_field()
     {
         var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", """
             import std.io { println };
@@ -217,11 +217,6 @@ public class GenericMemberRunTests
                 println(o.tag(3));
             }
             """));
-        var (exit, _, error) = Run("build", "-C", dir);
-        Assert.True(exit == 1, $"exit {exit}\n{error}");
-        // The file's name without its directory: the separator before it is the platform's.
-        Assert.Contains("main.lyr:12:18: error[LYR-SEM0020]: 'Outer' does not implement the generic member 'tag' of interface 'Tagger'", error);
-        Assert.DoesNotContain("LYR-ICE0001", error);
-        Assert.DoesNotContain("LYR-IR0001", error);
+        Assert.Equal("inner\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 }

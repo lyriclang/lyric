@@ -509,6 +509,7 @@ public static class ModuleLowerer
             for (var pass = 0; pass < MaxLoweringRounds && !settled; pass++)
             {
                 var typesBefore = typeTable.Interned.Count();
+                var liftedBefore = typeTable.Lifted.Count;
 
                 impls = BuildImpls(typeTable, binding, compilation, ids, extensions, instances, types,
                     lambdas, de, ref failed);
@@ -522,7 +523,9 @@ public static class ModuleLowerer
                 DrainLate(late, coroutines, instances, lambdas, extensions, types, ids, imports,
                     typeTable, globals);
 
-                settled = typeTable.Interned.Count() == typesBefore;
+                // a value made into an interface by what this pass lowered may need a row the
+                // pass did not build
+                settled = typeTable.Interned.Count() == typesBefore && typeTable.Lifted.Count == liftedBefore;
             }
 
             // Still growing when the passes ran out: the set of instantiations this program asks
@@ -1196,7 +1199,23 @@ public static class ModuleLowerer
                 // its row is the descriptor alone.
                 var isAny = ReferenceEquals(iface, compilation.FindModule(["std", "core"])?.Members.LookupLocal("Any"));
                 if (!isAny && !Conformance.Implements(type, iface, binding) && viaExtension.Count == 0)
+                {
+                    // A blanket conformance (05 §13 rule 8): the row the block gives the type.
+                    LyrType reached = ofInstance is not null ? ofInstance : new NamedRef(type);
+                    if (LiftedInto(typeTable, typeId, iface, interfaces, binding)
+                        && types.BlanketConformanceOf(reached, iface) is { } blanket)
+                    {
+                        if (BlanketRow(blanket, reached, iface, typeTable.MethodSlotsOf(ifaceId), types, binding, ids, instances) is { } row)
+                            impls.Add(new IrImpl(typeId, ifaceId, row));
+                        else
+                        {
+                            LoweringDiagnostics.ReportUnsupported(de, LoweringDiagnostics.Untranslatable, type.Declaration?.Span ?? default,
+                                $"'{type.Name}' is a '{iface.Name}' through a blanket block, but a member of it is not lowerable");
+                            failed = true;
+                        }
+                    }
                     continue;
+                }
 
                 // SEVERAL conformances to one interface — 'Mul<Vec2, Vec2>' beside
                 // 'Mul<float, Vec2>' — are several ROWS, one per interned instance, and each has
@@ -1327,6 +1346,37 @@ public static class ModuleLowerer
                 if (complete) impls.Add(new IrImpl(boxId, ifaceId, methods));
                 else failed = true;
             }
+        }
+
+        // A shape's box (05 §13 rule 6): a row for each interface a block gave the shape — on its
+        // constructor, or a blanket block —, the slot's method from that block, else the default.
+        // A tuple is a struct of the table's already, and its row stands on that type.
+        // Only where a shape's value was made into an interface: lowering a shape interns what it
+        // holds, and a conformance no value goes through has no business in the module.
+        var shapeLifts = typeTable.Lifted
+            .Where(l => typeTable.ShapeBoxes.Any(b => b.Id == l.Concrete) || typeTable.Defs[l.Concrete.Value].Name == "<tuple>")
+            .Select(l => interfaces.FirstOrDefault(i => i.Id == l.Iface).Symbol)
+            .OfType<TypeSymbol>()
+            .ToList();
+        foreach (var (shape, iface, block) in shapeLifts.Count == 0 ? [] : types.ShapeConformances.ToList())
+        {
+            if (!shapeLifts.Any(into => Conformance.WithParents(into, binding).Any(p => ReferenceEquals(p, iface)))) continue;
+            var lowered = typeTable.LowerValue(shape, default);
+            TypeId? holderId = lowered is IrStructType tuple ? tuple.Type
+                : typeTable.ShapeBoxes.Where(b => IrType.Equal(b.Payload, lowered)).Select(b => (TypeId?)b.Id).FirstOrDefault();
+            if (holderId is not { } boxId || !LiftedInto(typeTable, boxId, iface, interfaces, binding)) continue;
+                foreach (var (_, ifaceId) in interfaces.Where(i => ReferenceEquals(i.Symbol, iface)))
+                {
+                    if (impls.Any(r => r.Type == boxId && r.Interface == ifaceId)) continue;
+                    if (BlanketRow(block, shape, iface, typeTable.MethodSlotsOf(ifaceId), types, binding, ids, instances) is { } row)
+                        impls.Add(new IrImpl(boxId, ifaceId, row));
+                    else
+                    {
+                        LoweringDiagnostics.ReportUnsupported(de, LoweringDiagnostics.Untranslatable, block.Decl.Span,
+                            $"'{TypeFacts.Display(shape)}' is a '{iface.Name}' through a block, but a member of it is not lowerable");
+                        failed = true;
+                    }
+                }
         }
 
         // A value of an interface with its associated types fixed (03 M4-1): a row for each type
@@ -1510,8 +1560,14 @@ public static class ModuleLowerer
         var ifaceType = new IrInterfaceType(ifaceId);
         if (fieldType is IrInterfaceType already)
         {
+            // A value of a child interface is one of the parent (05 §11): its table for the
+            // parent, found through the concrete type's conformance list as at any coercion.
             if (already.Type != ifaceId)
-                throw new UnsupportedConstructException(LoweringDiagnostics.DelegationNotExpressible, $"'{type.Name}' delegates '{iface.Name}' to '{field}', a value of another interface — not yet", type.Declaration?.Span ?? default);
+            {
+                var up = Temp(ifaceType);
+                b.Emit(new Downcast(up, held, ifaceId, ifaceType, default));
+                held = up;
+            }
             callee = held;
         }
         else
@@ -1655,6 +1711,38 @@ public static class ModuleLowerer
                 decl.IsStatic ? null : target, decl.IsStatic ? null : block.Decl.Target);
         }
         return null;
+    }
+
+    /// <summary>Was a value of the type made into the interface, or into a child of it?</summary>
+    private static bool LiftedInto(TypeTable typeTable, TypeId concrete, TypeSymbol iface,
+        List<(TypeSymbol Symbol, TypeId Id)> interfaces, BindingResult binding) =>
+        typeTable.Lifted.Any(l => l.Concrete == concrete
+            && interfaces.FirstOrDefault(i => i.Id == l.Iface).Symbol is { } into
+            && Conformance.WithParents(into, binding).Any(p => ReferenceEquals(p, iface)));
+
+    /// <summary>The table a blanket block gives a type (05 §13 rule 8): each slot the block's member
+    /// with its parameter bound by the type — the block implements the interface's whole chain —,
+    /// else the interface's default for the type. <c>null</c> where a slot has neither.</summary>
+    private static FunctionId[]? BlanketRow(ExtensionBlock block, LyrType reached, TypeSymbol iface, string[] slots,
+        TypeResult types, BindingResult binding, Dictionary<FunctionSymbol, FunctionId> ids, InstanceTable instances)
+    {
+        var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        if (block.TargetType is not { } pattern || !TypeFacts.Match(pattern, reached, map)) return null;
+        var row = new FunctionId[slots.Length];
+        for (var i = 0; i < slots.Length; i++)
+        {
+            FunctionId? target = block.MethodScope.LookupLocal(slots[i]) is FunctionSymbol member
+                                 && member.Declaration is FunctionDecl { Body: not null } decl
+                ? instances.RequestExtension(member, decl, block, map, reached, default)
+                : null;
+            target ??= TypeFacts.SymbolOf(reached) is { } holder
+                ? ExpandedDefault(holder, reached, iface, slots[i], types, binding, instances)
+                : null;
+            target ??= DefaultFor(iface, slots[i], reached, instances, binding);
+            if (target is not { } id) return null;
+            row[i] = id;
+        }
+        return row;
     }
 
     private static FunctionId? Resolve(TypeSymbol owner, string method,
