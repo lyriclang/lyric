@@ -1,8 +1,8 @@
-/* The collector's numbers (13 M11 P12; design 11 H5): every pause, the collections young and full,
- * the heap and what lives in it — for measurement point 5 (bench/gc), and for hosts once M14 gives
- * them the header's promise. One recorder for either collector: the own one records a pause from
- * the stop's request to the restart, Boehm's from its world's stop to its start. Every pause is
- * kept, eight bytes each, so that the percentiles are exact. */
+/* The collector's numbers: every pause, the collections young and full, the heap and what lives
+ * in it — for bench/gc, and for hosts once the header is public. One recorder for either
+ * collector: the own one records a pause from the stop's request to the restart, Boehm's from its
+ * world's stop to its start. Every pause is kept, eight bytes each, so that the percentiles are
+ * exact. */
 #include "lyr/gc.h"
 #include "internal.h"
 

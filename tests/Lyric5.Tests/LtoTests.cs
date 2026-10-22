@@ -4,8 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The profile's <c>lto</c> field on every Tier 1 target (design/v5/spec/01 B11; the review's
-/// R9b): ThinLTO at compile time, no LTO flag on the link line, none for macOS. Before, a build
+/// The profile's <c>lto</c> field on every Tier 1 target: ThinLTO at compile time, no LTO flag on the link line, none for macOS. Before, a build
 /// for Windows failed at the link (zig built its own mingw libc as bitcode) and one for macOS at
 /// compile time ("LTO requires using LLD"). Through <c>Main</c>, so in the console collection.
 /// </summary>

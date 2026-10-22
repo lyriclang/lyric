@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A wait nothing can end, and a thread's end (design/v5/spec/06; the review's M6-12, M6-20b).
+/// A wait nothing can end, and a thread's end.
 ///
 /// <para>DEADLOCK: a scheduler with no task ready, no sleeper and nothing that could wake one —
 /// no other living thread — used to wait on its poller for ever: a program whose <c>recv</c>
@@ -16,7 +16,7 @@ namespace Lyric5.Tests;
 /// <para>A THREAD'S END: a thread ended with its first task, and what else lived on it never ran
 /// again — a task of another thread that awaited one of those waited for ever. It cancels them
 /// now and runs until they have ended: their <c>defer</c>s run, their handles are done. A
-/// pool's thread does the same when the pool closes. <c>main</c> stays as it is (06 T6): the
+/// pool's thread does the same when the pool closes. <c>main</c> stays as it is: the
 /// program ends with it.</para>
 ///
 /// <para>Through <c>Main</c>, so in the console collection. A program that waits without end
@@ -210,7 +210,7 @@ public class DeadlockTests
         Assert.Equal("the defer ran\ncancelled\n", Printed(ran));
     }
 
-    /// <summary><c>main</c> stays (06 T6): the program ends with it, what is still ready or
+    /// <summary><c>main</c> stays: the program ends with it, what is still ready or
     /// asleep then never runs again, and no <c>defer</c> of those runs.</summary>
     [Fact]
     public void The_program_still_ends_with_main()

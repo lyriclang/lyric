@@ -4,8 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Three rules of the package graph (design/v5/spec/07 V7; the review's M7-6, M7-10 and the work
-/// list's "tag against the manifest's version"):
+/// Three rules of the package graph:
 ///
 /// <para>No package depends on itself, at once or through others: a cycle is refused with its
 /// path, <c>app -> geo -> app</c> (<c>LYR-PKG0010</c>). Before, a cycle of directories was taken

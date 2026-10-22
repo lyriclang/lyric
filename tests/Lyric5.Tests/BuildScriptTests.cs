@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The packages' build scripts (design/v5/spec/11 W3 BS1–BS6; M8b S13a): a <c>build.lyr</c> runs
+/// The packages' build scripts: a <c>build.lyr</c> runs
 /// before its package compiles — a program of its own, its module <c>build</c> and <c>build/</c> —,
 /// writes modules into <c>gen/</c> the package imports as <c>app.gen.x</c>, names C to compile and
 /// libraries to link, warns; it runs again where it or an input it named changed; a dependency's
@@ -202,7 +202,7 @@ public class BuildScriptTests
         var app = Path.Combine(root, "app");
         Assert.Equal("hi!\n", BuildAndRun(app, "app", "build", "-C", app));
 
-        // the program's graph holds no build dependency (11 W3 BS3)
+        // the program's graph holds no build dependency
         File.WriteAllText(Path.Combine(app, "src", "main.lyr"),
             "import tools { shout };\nimport std.io { println };\n\nfn main(): void {\n    println(shout(\"no\"));\n}\n");
         var (exit, _, error) = Run("build", "-C", app);

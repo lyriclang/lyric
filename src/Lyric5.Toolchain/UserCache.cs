@@ -4,7 +4,7 @@ using System.Text;
 namespace Lyric5.Toolchain;
 
 /// <summary>
-/// The user's cache for what every project shares (design/v5/spec/11 T3, C9): the runtime
+/// The user's cache for what every project shares: the runtime
 /// archives per toolchain version, and small memos such as a C compiler's version, so a warm
 /// build spends no process start on questions whose answers do not change.
 /// <c>~/.cache/lyric</c> (XDG on Linux, local application data on Windows), <c>LYRIC_CACHE</c>

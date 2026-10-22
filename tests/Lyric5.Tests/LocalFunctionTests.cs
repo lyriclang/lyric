@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A local <c>fn</c> (design/v5/spec/08 F8, F9; 13 M9a S8): a named closure — it captures as a
+/// A local <c>fn</c>: a named closure — it captures as a
 /// lambda does, writes a captured <c>var</c> through its cell, calls itself, and is a value of its
 /// function type. No type parameters, no default, no variadic parameter.
 ///
@@ -56,7 +56,7 @@ public class LocalFunctionTests
         Assert.Equal("120 15 2\n11\n4\nodd\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>A closure is one function (F9): no type parameters, no default, no variadic rest
+    /// <summary>A closure is one function: no type parameters, no default, no variadic rest
     /// — each refused where it stands, nothing after it.</summary>
     [Fact]
     public void A_local_function_takes_no_type_parameters_and_no_defaults()

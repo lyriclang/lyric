@@ -1,5 +1,5 @@
 /* Processes (lyr/process.h): fork and exec on POSIX, the reaper's SIGCHLD pipe, a pipe's ends;
- * CreateProcessW on Windows, a registered wait for a child's end (S12b). */
+ * CreateProcessW on Windows, a registered wait for a child's end. */
 #if defined(__linux__)
 #  define _GNU_SOURCE  /* pipe2 */
 #elif defined(__APPLE__)
@@ -45,7 +45,7 @@ static int64_t failed_with(DWORD e) {
     }
 }
 
-/* A parent's end of a child's pipe (10 S12b, 13 M10 P11): a named pipe opened overlapped, one
+/* A parent's end of a child's pipe on Windows: a named pipe opened overlapped, one
  * request in flight at a time — a read or a write — whose completion comes through the poller's
  * port (lyr_poller_attach), so that a task parks for it as for a socket and a cancel reaches it.
  * The request owns its bytes: the caller's slice is the collector's, and a cancelled wait leaves
@@ -561,7 +561,7 @@ int64_t lyr_process_close(int64_t fd) {
 
 extern char **environ;
 
-/* What an errno says, as a failure: the kinds a start can give by their names (10 O3). */
+/* What an errno says, as a failure: the kinds a start can give by their names. */
 static int64_t failed_with(int e) {
     switch (e) {
     case EAGAIN:

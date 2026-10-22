@@ -1,5 +1,4 @@
-/* The error record, what a clause asks of it, and main's report (design/v5/spec/05 E6 O3/O4, 01 L5
- * E1-E2). */
+/* The error record, what a clause asks of it, and main's report. */
 #include "lyr/error.h"
 #include "lyr/console.h"
 #include "lyr/gc.h"
@@ -38,7 +37,7 @@ LyrErr *lyr_err_new_traced(LyrIface value) {
     return err;
 }
 
-/* The suppressed errors, an `Error[]` (05 E6 O3): interface values, whose object word is the
+/* The suppressed errors, an `Error[]`: interface values, whose object word is the
  * reference. Grown by one on the rare path where a defer fails during a failure. */
 static const uint64_t suppressed_refmap[] = { UINT64_C(0x1) };
 static const LyrDesc suppressed_desc = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY | LYR_DESC_HAS_REFS,
@@ -103,7 +102,7 @@ static void write_line(const char *prefix, const LyrStr *text) {
 }
 
 int lyr_err_report(const LyrErr *err, LyrErrMessage message, LyrErrCause cause) {
-    /* what the program wrote before, ahead of the report (10 O9) */
+    /* what the program wrote before, ahead of the report */
     lyr_console_flush_all(1);
     if (message == NULL) {
         write_line("error: ", NULL);
@@ -120,7 +119,7 @@ int lyr_err_report(const LyrErr *err, LyrErrMessage message, LyrErrCause cause) 
     if (err->suppressed != NULL)
         for (int64_t i = 0; i < err->suppressed->len; i++)
             write_line("  suppressed: ", (const LyrStr *)message(LYR_ARR_DATA(err->suppressed, LyrIface)[i]));
-    /* Where it was thrown, where the profile kept it (01 E8). */
+    /* Where it was thrown, where the profile kept it. */
     if (err->trace != NULL) {
         static char text[16 * 1024];
         size_t n = lyr_trace_format_pcs(text, sizeof text, LYR_ARR_DATA(err->trace, uintptr_t), (int)err->trace->len);

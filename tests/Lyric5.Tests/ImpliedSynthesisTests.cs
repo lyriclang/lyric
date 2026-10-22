@@ -4,9 +4,9 @@ namespace Lyric5.Tests;
 
 /// <summary>
 /// A parent an interface of the program implies is synthesized as a listed one is (05 §14 rule
-/// 5; the sweep after M10, W8): <c>struct Start :: [Args]</c> under
+/// 5): <c>struct Start :: [Args]</c> under
 /// <c>interface Args :: [Default]</c> has its <c>default</c>, <c>Display</c> through a chain of
-/// two, the interface in another module. Before W8: <c>LYR-SEM0020</c>, "'Start' does not
+/// two, the interface in another module. It was <c>LYR-SEM0020</c>, "'Start' does not
 /// implement abstract method 'default' of interface 'Default' (implied by 'Args')".
 /// </summary>
 [Collection("console")]

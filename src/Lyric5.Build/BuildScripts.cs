@@ -4,7 +4,7 @@ using Lyric5.Toolchain;
 
 namespace Lyric5.Build;
 
-/// <summary>What the program's build scripts asked of its build (design/v5/spec/11 W3 BS2): C to
+/// <summary>What the program's build scripts asked of its build: C to
 /// compile with the program, each with its flags, and libraries to link.</summary>
 public sealed record ScriptDirectives(IReadOnlyList<CUnit> Sources, IReadOnlyList<string> Libraries)
 {
@@ -12,12 +12,12 @@ public sealed record ScriptDirectives(IReadOnlyList<CUnit> Sources, IReadOnlyLis
 }
 
 /// <summary>
-/// The packages' build scripts (design/v5/spec/11 W3 BS1–BS6; M8b S13a): a package's
+/// The packages' build scripts: a package's
 /// <c>build.lyr</c> is an ordinary program that runs before the package compiles. It does things
 /// — writes modules into <c>gen/</c>, names C to compile and libraries to link — and defines
-/// nothing (P1: the manifest is read, never run).
+/// nothing (the manifest is read, never run).
 ///
-/// <para>A script is a program of its own (BS3): its module is <c>build</c>, a file
+/// <para>A script is a program of its own: its module is <c>build</c>, a file
 /// <c>build/x.lyr</c> beside it the module <c>build.x</c>, std its only library, and nothing of it
 /// is compiled into the package. It is built for the host in the debug profile under the package's
 /// <c>out/build-script/</c>, and runs with the package's root as its working directory; what the
@@ -25,10 +25,10 @@ public sealed record ScriptDirectives(IReadOnlyList<CUnit> Sources, IReadOnlyLis
 /// names (<c>std.build</c>) — its own output stays its own, kept in <c>output.txt</c> and shown
 /// where it fails.</para>
 ///
-/// <para>WHEN (BS4): before the compile, where the script — <c>build.lyr</c>, <c>build/</c>, std, the
+/// <para>When: before the compile, where the script — <c>build.lyr</c>, <c>build/</c>, std, the
 /// toolchain, the target, the profile — changed, where a file it named with
 /// <c>rerunIfChanged</c> changed, or where <c>gen/</c> is not as it left it; else what its last run
-/// asked stands. WHO (BS5): the root package's script always; a dependency's only where the root
+/// asked stands. Which: the root package's script always; a dependency's only where the root
 /// manifest's <c>[trust] build-scripts</c> names it (pnpm 10), else the build stops before it.</para>
 /// </summary>
 public static class BuildScripts
@@ -116,7 +116,7 @@ public static class BuildScripts
         var key = ScriptKey(manifest, own, target, profile, version);
         if (State.Read(state) is { } last && last.Key == key && last.Fresh(manifest)) return (0, last.Directives);
 
-        // the script, a program of its own (BS3): `build` and `build/`, its [build-dependencies]
+        // the script, a program of its own: `build` and `build/`, its [build-dependencies]
         var script = new Project(manifest.BuildScript!, "build", "build", dir, null)
         {
             Graph = own,
@@ -176,14 +176,14 @@ public static class BuildScripts
         return (0, directives);
     }
 
-    /// <summary>What the script is and what it builds for (BS4): its files, std, the toolchain, the
+    /// <summary>What the script is and what it builds for: its files, std, the toolchain, the
     /// compiler that builds it, the target and the profile it is told.</summary>
     private static string ScriptKey(Manifest manifest, PackageGraph? own, Target target, BuildProfile profile, string version)
     {
         var parts = new List<string> { File.ReadAllText(manifest.BuildScript!), version, Pipeline.CompilerKey, target.Triple, profile.Name };
         var modules = Path.Combine(manifest.Root, "build");
         if (Directory.Exists(modules)) Pipeline.AddTree(parts, modules);
-        // its own dependencies, each by its manifest and its sources (BS4)
+        // its own dependencies, each by its manifest and its sources
         if (own is not null)
             foreach (var (name, package) in own.Packages.Where(p => !p.Value.IsScript).OrderBy(p => p.Key, StringComparer.Ordinal))
             {

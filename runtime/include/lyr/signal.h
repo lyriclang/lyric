@@ -1,4 +1,4 @@
-/* Signals as a channel (design/v5/spec/10 Q9, 06 K5). The runtime's handler never runs Lyric code:
+/* Signals as a channel. The runtime's handler never runs Lyric code:
  * it marks the signal and wakes the watcher — the thread std.task's delivery runs on — which takes
  * the marks and hands each signal to the channels that asked for it. A runtime started without
  * signal handlers (LyrConfig.install_signal_handlers = 0, an embedding host's) catches none. */

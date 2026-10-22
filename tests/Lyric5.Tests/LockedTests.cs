@@ -4,7 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>--locked</c> (design/v5/spec/07 M7-9; 11 M7-9) for <c>build</c>, <c>run</c> and <c>test</c>:
+/// <c>--locked</c> for <c>build</c>, <c>run</c> and <c>test</c>:
 /// the build takes <c>lyric.lock</c> exactly as it is and writes nothing — a dependency the lock
 /// does not hold is refused before anything is fetched, a lock that holds what the graph no
 /// longer reads is refused, and no lock where the program reads from git is refused

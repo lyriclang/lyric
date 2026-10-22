@@ -4,7 +4,7 @@ using Lyric5.Toolchain;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>close()</c> in the front end (design/v5/spec/06 A5, M6 S2b), against <c>stdlib5</c>, where
+/// <c>close()</c> in the front end, against <c>stdlib5</c>, where
 /// <c>std.task</c> declares <c>Cancelled</c>: a coroutine's <c>close()</c> is marked and covered
 /// like its pulls, <c>using</c> closes a coroutine, a yield of a body throws <c>Cancelled</c> to the
 /// trys around it — and the <c>try</c> a <c>using</c> writes around its own close never warns.
@@ -42,7 +42,7 @@ public class CoroutineCloseTests
 
     [Fact]
     public void Using_a_closeable_whose_close_cannot_throw_warns_nothing() =>
-        // The parser writes 'defer try c.close();' — a mark no one can drop (M5 warned LYR-SEM0139).
+        // The parser writes 'defer try c.close();' — a mark no one can drop, so no LYR-SEM0139.
         Assert.Empty(Codes("""
             class Conn :: [Closeable] { fn close(): void { } }
             fn main(): int { using let c = Conn {}; return 0; }

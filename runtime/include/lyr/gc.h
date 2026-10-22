@@ -1,7 +1,7 @@
-/* The collector contract, stage 0 (design/v5/spec/01 L1). Emitted code and the runtime talk to
+/* The collector contract, stage 0. Emitted code and the runtime talk to
  * the collector only through this header; what sits behind it changes by stage (1: Boehm,
  * 2: own Immix heap, 3: generational) without touching the emitter. Which collector a build has
- * is a define of the build: LYR_GC_BOEHM for stage 1, kept to compare against (13 M11 P11);
+ * is a define of the build: LYR_GC_BOEHM for stage 1, kept to compare against;
  * without it, the runtime's own (gc_immix.c). */
 #ifndef LYR_GC_H
 #define LYR_GC_H
@@ -21,7 +21,7 @@ void lyr_gc_init(void);
 #endif
 
 /* What compiled code reads of its thread, thread-local: the own collector's allocation buffer
- * (13 M11 P3) and, under either collector, the bound of the stack (P6). */
+ * and, under either collector, the bound of the stack. */
 typedef struct LyrMutator {
     uintptr_t cursor;       /* the buffer's next free byte (the own collector) */
     uintptr_t limit;        /* its end */
@@ -35,7 +35,7 @@ extern _Thread_local LyrMutator lyr_mutator __attribute__((tls_model("initial-ex
 extern _Thread_local LyrMutator lyr_mutator;
 #endif
 
-/* The prologue's check (01 S3, 13 M11 P6): a function that calls compares its frame with the
+/* The prologue's check: a function that calls compares its frame with the
  * thread's bound. Below it the stack has a reserve left — room for the panic that a stack
  * overflow is (LYR-RT0006), which leaves the coroutine like any panic — or a collection asked the
  * thread to stop, which it does there. One compare for both. The frame's address, not a local's:
@@ -69,7 +69,7 @@ LyrStr *lyr_alloc_string(int64_t len);
 
 #else
 
-/* The own collector (13 M11 P3): each thread bumps through a buffer of its own — a run of free
+/* The own collector: each thread bumps through a buffer of its own — a run of free
  * lines in an Immix block — so an allocation is a few instructions inline, and everything else
  * (the next run, a block, a large object, a collection, exhaustion) is the slow path's. The three
  * functions promise what they promise under Boehm: memory zeroed (a buffer is zeroed when it is
@@ -89,7 +89,7 @@ LyrStr *lyr_gc_alloc_string_slow(int64_t len);
  * inline cannot overflow. A negative one is a huge one as unsigned. */
 #define LYR_GC_INLINE_LENGTH ((uint64_t)1 << 40)
 
-/* Under ASan every allocation takes the slow path (01 L12), which tells ASan what it hands out. */
+/* Under ASan every allocation takes the slow path, which tells ASan what it hands out. */
 #if defined(__SANITIZE_ADDRESS__)
 #  define LYR_GC_INLINE 0
 #elif defined(__has_feature)
@@ -102,7 +102,7 @@ LyrStr *lyr_gc_alloc_string_slow(int64_t len);
 #endif
 
 /* The bump: `rounded` bytes from the buffer, or NULL for the slow path. A load of the two
- * bounds, a compare, a store — with the header, the fast path 01 L1 asks for. */
+ * bounds, a compare, a store — with the header, the whole fast path. */
 static inline void *lyr_gc_bump(size_t rounded) {
     uintptr_t at = lyr_mutator.cursor;
     if (LYR_GC_SLOW(!LYR_GC_INLINE || rounded > lyr_mutator.limit - at)) return NULL;
@@ -137,8 +137,8 @@ static inline LyrStr *lyr_alloc_string(int64_t len) {
     return string;
 }
 
-/* Safepoints (13 M11 P5): a collection that stops the world sets the flag, and each thread stops at
- * its next loop back-edge — or at its next function entry, whose check of the stack (P6) the
+/* Safepoints: a collection that stops the world sets the flag, and each thread stops at
+ * its next loop back-edge — or at its next function entry, whose check of the stack the
  * collection makes fail by setting the thread's bound to the maximum. Compiled code polls; the
  * runtime's blocking calls are safe regions instead (below). A loop's head polls every
  * LYR_POLL_EVERY passes (LYR_LOOP_POLL). */
@@ -151,7 +151,7 @@ void lyr_gc_safepoint_slow(void);
             lyr_gc_safepoint_slow();                                                      \
     } while (0)
 
-/* A loop's poll (13 M11 S5): the flag read every LYR_POLL_EVERY passes of the loop's head, counted
+/* A loop's poll: the flag read every LYR_POLL_EVERY passes of the loop's head, counted
  * down in a local of the function. Read at every pass, the flag's load and its branch cost a loop
  * without a call a tenth of its time (measured: bench/structs, 0.168 s against 0.152 s); a stop
  * waits at most that many passes of such a loop — a loop that calls stops at the call's entry. */
@@ -192,7 +192,7 @@ void lyr_gc_leave_safe(void);
 #define LYR_GC_LEAVE_SAFE() ((void)0)
 #endif
 
-/* The cards of stage 3 (13 M11 P8): a byte per 256-byte line of the heap, set where a reference was
+/* The cards of stage 3: a byte per 256-byte line of the heap, set where a reference was
  * stored — a young collection reads the old objects on those lines for references to young ones.
  * Unconditional within the heap, with no test of old or young: the emitter does not always hold
  * the slot's object (below), and a card needs none. A store outside the heap (a struct on a stack,
@@ -229,7 +229,7 @@ static inline void lyr_gc_card_span(const void *at, size_t bytes) {
 #define LYR_WRITE_BARRIER_VALUE(object, slot, value) \
     ((void)(object), (*(slot) = (value)), lyr_gc_card_span((slot), sizeof(*(slot))))
 
-/* Strong roots for pointers the collector cannot see — held by C code or a host (11 X6 GcHandle).
+/* Strong roots for pointers the collector cannot see — held by C code or a host (GcHandle).
  * A root keeps its object alive until it is freed. Drop the handle with it: while the collector is
  * conservative (stage 1), a stale handle in scanned memory keeps alive whatever reuses its cell. */
 typedef struct LyrRoot LyrRoot;
@@ -238,26 +238,26 @@ void *lyr_root_get(const LyrRoot *root);
 void lyr_root_set(LyrRoot *root, void *object);
 void lyr_root_free(LyrRoot *root);
 
-/* The program's module globals (07 V5): the addresses of their reference words, a table the
- * emitted program registers before its initializer runs. The own collector reads them as roots
- * (13 M11 P4); Boehm scans the program's data itself and ignores them. */
+/* The program's module globals: the addresses of their reference words, a table the
+ * emitted program registers before its initializer runs. The own collector reads them as roots;
+ * Boehm scans the program's data itself and ignores them. */
 void lyr_gc_add_globals(void **const *slots, size_t count);
 
 /* Memory ranges scanned conservatively besides the thread stacks the collector knows: coroutine
- * stacks (M6) and any C memory that holds object pointers. */
+ * stacks and any C memory that holds object pointers. */
 void lyr_register_stack(void *low, void *high);
 void lyr_unregister_stack(void *low, void *high);
 
-/* Nothing moves (01 L1), so pinning does nothing. Foreign-code paths call it anyway: the rule
+/* Nothing moves, so pinning does nothing. Foreign-code paths call it anyway: the rule
  * "an object passed to C must stay where it is" stays written at the place it applies. */
 #define lyr_pin(object) ((void)(object))
 #define lyr_unpin(object) ((void)(object))
 
 /* An object's identity as a number: its address, which does not change while it lives, since
- * nothing moves. std.core hashes an `Identity` by it (02 M10). */
+ * nothing moves. std.core hashes an `Identity` by it. */
 #define LYR_IDENTITY(object) ((int64_t)(uintptr_t)(object))
 
-/* Weak references with a callback after death, in the Cleaner form (01 L1): the callback never
+/* Weak references with a callback after death, in the Cleaner form: the callback never
  * sees the object, only its context, so it cannot bring the object back. Callbacks run on the
  * allocating thread at the next allocation or explicit collection after the object died. */
 typedef struct LyrWeak LyrWeak;
@@ -266,7 +266,7 @@ LyrWeak *lyr_weak_new(void *object, LyrWeakCallback on_death, void *context);
 void *lyr_weak_get(const LyrWeak *weak);   /* NULL once the object is dead */
 void lyr_weak_free(LyrWeak *weak);         /* before death: the callback will not run */
 
-/* Threads (01 L6): a thread touches the heap only while attached. lyr_init attaches the main
+/* Threads: a thread touches the heap only while attached. lyr_init attaches the main
  * thread; every other thread calls lyr_thread_attach first and lyr_thread_detach last. */
 int lyr_thread_attach(void);   /* 0 on success */
 void lyr_thread_detach(void);
@@ -280,8 +280,8 @@ size_t lyr_gc_heap_size(void);
 /* Number of collections since start. */
 size_t lyr_gc_collections(void);
 
-/* The collector's numbers (13 M11 P12; design 11 H5) — internal until M14 gives hosts the header's
- * promise: the collections, young and full; every pause's length, from the stop's request to the
+/* The collector's numbers — internal until the header is public to hosts:
+ * the collections, young and full; every pause's length, from the stop's request to the
  * restart, as a total, a maximum, two percentiles and a log2 histogram; what the collector holds and
  * what the last collections found alive. */
 typedef struct LyrGcStats {
@@ -302,14 +302,14 @@ enum {
 };
 int64_t lyr_gc_stat(int64_t which);
 
-/* A young collection now (13 M11 P8: from the roots and the dirty cards — a coroutine's among them),
+/* A young collection now (from the roots and the dirty cards — a coroutine's among them),
  * then the callbacks; a full one where the collector has no generations (Boehm). For the pace of
  * the coroutine stacks (coro.c), tests and measurement. And the young ones among
  * lyr_gc_collections — none under Boehm. */
 void lyr_gc_collect_young(void);
 size_t lyr_gc_young_collections(void);
 
-/* The allocations the calling thread has made since it started, and their bytes (10 X4: what a
+/* The allocations the calling thread has made since it started, and their bytes (what a
  * benchmark's run allocates). */
 int64_t lyr_gc_thread_allocations(void);
 int64_t lyr_gc_thread_allocated_bytes(void);

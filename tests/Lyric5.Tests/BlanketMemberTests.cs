@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A blanket member beside a type's own (design/v5/spec/04 D15, the review's A5): the type's
+/// A blanket member beside a type's own: the type's
 /// comes first on the type, generic code that reaches the member through the block's
 /// constraints calls the block's, and the type's member is warned about. Through <c>Main</c>,
 /// so in the console collection.

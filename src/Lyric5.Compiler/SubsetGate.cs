@@ -4,7 +4,7 @@ using Lyric.Ir;
 namespace Lyric5.Compiler;
 
 /// <summary>
-/// What of the front end's IR the Lyric 5 compiler takes today (design/v5/spec/13, M2–M3):
+/// What of the front end's IR the Lyric 5 compiler takes today:
 /// functions, the number tower (integers, floats, <c>char</c>, <c>bool</c>), strings,
 /// <c>if</c>/<c>while</c>/<c>for</c> over a range, calls, <c>let</c>/<c>var</c>, structs as
 /// values. Everything else the 4.x front end still lowers
@@ -19,7 +19,7 @@ public static class SubsetGate
     /// <summary>The code of the one diagnostic: a construct the compiler does not translate yet.</summary>
     public const string NotYet = "LYR-CG0001";
 
-    /// <summary>A call that runs at compile time only, reached at run time (M9b S1).</summary>
+    /// <summary>A call that runs at compile time only, reached at run time.</summary>
     public const string ComptimeOnly = "LYR-CG0002";
 
     /// <summary>
@@ -162,7 +162,7 @@ public static class SubsetGate
                     var name = module.Imports[i.Target.Value].Name;
                     if (name.StartsWith("std.syntax.", StringComparison.Ordinal))
                     {
-                        // the syntax tree is read, built and written at compile time (10 B13 M2, M9b S1):
+                        // the syntax tree is read, built and written at compile time:
                         // the natives have no runtime call, and never will
                         Refused = true;
                         var said = new Diagnostic(ComptimeOnly, Severity.Error, op.Span,
@@ -194,11 +194,11 @@ public static class SubsetGate
                 case NewInline n:
                     Type(n.Element, op.Span, "the element type");
                     break;
-                // '[x] * n' clones every slot (10 C7): a value copies, a string is shared without
+                // '[x] * n' clones every slot: a value copies, a string is shared without
                 // anyone able to tell, a class or an array — held directly or inside the element
                 // — would be one object in every slot. The sema desugars that case to
-                // std.core's 'repeatArray' under 'Clone' (M4 S9); an instruction over objects
-                // here is one it missed — unless it shares on purpose, std.core's 'filled' (S16).
+                // std.core's 'repeatArray' under 'Clone'; an instruction over objects
+                // here is one it missed — unless it shares on purpose, std.core's 'filled'.
                 case ArrayRepeat r when HoldsObject(r.Element) && !r.Shares:
                     Refuse(op.Span, "'[x] * n' with an element that is or holds an object as an instruction — the sema desugars it through 'Clone'", bug: true);
                     break;
@@ -217,7 +217,7 @@ public static class SubsetGate
                     break;
                 case LoadGlobal or StoreGlobal:
                     break;
-                // Places (03 T12): a place parameter's.
+                // Places: a place parameter's.
                 case AddrLocal or AddrField or AddrElem or AddrGlobal or LoadPlace or StorePlace:
                     break;
                 case MakeClosure m:
@@ -225,7 +225,7 @@ public static class SubsetGate
                     break;
                 case CallIndirect:
                     break;
-                // Coroutines (06 N2): a yield of a body, and one outside it that meets the running
+                // Coroutines: a yield of a body, and one outside it that meets the running
                 // coroutine at run time (§10a).
                 case MakeCoroutine or ResumePull or YieldSuspend or CoroutineDone or CoroutineResult
                     or CoroutineClosing or CoroutineClose:
@@ -254,7 +254,7 @@ public static class SubsetGate
             switch (terminator)
             {
                 case null:
-                // The error path (05 E1-E4, 01 L5): explicit edges, native since M5 S1b.
+                // The error path: explicit edges.
                 case Return or Branch or CondBranch or Unreachable or Throw or ErrorBranch or Propagate or PanicError:
                     break;
                 default:

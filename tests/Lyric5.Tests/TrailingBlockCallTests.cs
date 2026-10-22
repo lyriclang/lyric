@@ -4,7 +4,7 @@ namespace Lyric5.Tests;
 
 /// <summary>
 /// What a call wrote beside its arguments reaches the program: the parentheses
-/// <c>@callerExpr</c> quotes (09 A11) — where a trailing block follows the call, and where the
+/// <c>@callerExpr</c> quotes — where a trailing block follows the call, and where the
 /// call is a type's, <c>Shown(…)</c> for <c>Shown.new(…)</c>.
 /// </summary>
 [Collection("console")]
@@ -29,7 +29,7 @@ public class TrailingBlockCallTests
         Assert.Equal("(1 + 2) = 3\n(1 + 2) = 3\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary><c>Shown(…)</c> is <c>Shown.new(…)</c> (04 D8): the call the checker writes for
+    /// <summary><c>Shown(…)</c> is <c>Shown.new(…)</c>: the call the checker writes for
     /// it is the call as it was written, the parentheses of its arguments with it.</summary>
     [Fact]
     public void The_factorys_call_keeps_the_parentheses_too()

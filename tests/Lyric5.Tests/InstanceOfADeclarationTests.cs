@@ -3,8 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// An instance of a generic function is an instance of ONE declaration (design/v5/spec/01 C3,
-/// 04 D4). The instance table keys by the instance's name, and the name did not say everything
+/// An instance of a generic function is an instance of ONE declaration. The instance table keys by the instance's name, and the name did not say everything
 /// the program says: a static function of a type's body was named without its type, and two of
 /// one name that differ in their count were named alike. So <c>Small.make(7)</c>,
 /// <c>Tiny.make(7)</c> and a free <c>make(7)</c> were ONE function — the first one asked for —,
@@ -131,8 +130,8 @@ public class InstanceOfADeclarationTests
         Assert.Contains("= call std.thread.Thread.spawn<int, never>(", ir);
         Assert.Contains("fn std.thread.Thread.spawn<int, never> ", ir);
         // A thread is started in the body of 'Thread.spawn', and nowhere in the task's. (The program
-        // has its I/O pool besides — a scheduler runs, so the console's flush may park on it, M8b
-        // S8a — and the pool starts its threads in a body of its own.)
+        // has its I/O pool besides — a scheduler runs, so the console's flush may park on it —
+        // and the pool starts its threads in a body of its own.)
         Assert.Contains("callimport std.task.startThread(", Body(ir, "std.thread.Thread.spawn<int, never>"));
         Assert.DoesNotContain("callimport std.task.startThread(", Body(ir, "std.task.spawn<int, never>"));
         Assert.Equal("1 1\n", BuildAndRun(dir, "app", "build", "-C", dir));

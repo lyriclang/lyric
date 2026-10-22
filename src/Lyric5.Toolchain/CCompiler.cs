@@ -5,8 +5,8 @@ namespace Lyric5.Toolchain;
 public enum CCompilerKind { Zig, Clang, Gcc }
 
 /// <summary>
-/// A C compiler the toolchain can drive. <see cref="Locate"/> applies the order of
-/// design/v5/spec/01 C8: <c>LYRIC_CC</c> when set, otherwise the first of <c>zig</c>, <c>clang</c>
+/// A C compiler the toolchain can drive. <see cref="Locate"/> takes
+/// <c>LYRIC_CC</c> when set, otherwise the first of <c>zig</c>, <c>clang</c>
 /// and <c>gcc</c> that answers for its version.
 /// </summary>
 public sealed record CCompiler(CCompilerKind Kind, string Path, string Version)
@@ -50,7 +50,7 @@ public sealed record CCompiler(CCompilerKind Kind, string Path, string Version)
 
     /// <summary>The compiler's own version line, asked once per installed binary: the answer is
     /// memoized under the binary's path, size and time, because starting `zig version` costs
-    /// 25 ms — half of what a warm build may cost in all (11 C9).</summary>
+    /// 25 ms — half of what a warm build may cost in all.</summary>
     private static CCompiler? Probe(string command, CCompilerKind kind)
     {
         var path = FindOnPath(command);
@@ -91,9 +91,9 @@ public static class ProcessRunner
 {
     public sealed record Result(int ExitCode, string Stdout, string Stderr);
 
-    /// <summary>What a captured stream is read as: UTF-8, what a Lyric program writes (10 S1) and
+    /// <summary>What a captured stream is read as: UTF-8, what a Lyric program writes and
     /// the C toolchain too. Left to the default, Windows read it in the console's code page, and
-    /// a program's 'é' came back as two characters of CP437 (M8b S9).</summary>
+    /// a program's 'é' came back as two characters of CP437.</summary>
     private static readonly System.Text.Encoding Utf8 = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
     public static Result Run(string file, IEnumerable<string> arguments, TimeSpan timeout, string? workingDirectory = null,
@@ -127,7 +127,7 @@ public static class ProcessRunner
     }
 
     /// <summary>Runs a program on the caller's own console — its output is the user's, not the
-    /// toolchain's — and answers its exit code. <c>lyric run</c> (11 C5).</summary>
+    /// toolchain's — and answers its exit code. <c>lyric run</c>.</summary>
     public static int RunInherited(string file, IEnumerable<string> arguments, string? workingDirectory = null)
     {
         var info = new ProcessStartInfo(file)
@@ -143,7 +143,7 @@ public static class ProcessRunner
 
     /// <summary>Runs a program and passes on what it writes as it writes it, line by line —
     /// to writers rather than to the console, so a caller that redirects the console gets it —;
-    /// answers its exit code. <c>lyric test</c>'s program (10 B12).</summary>
+    /// answers its exit code. <c>lyric test</c>'s program.</summary>
     public static int Stream(string file, IEnumerable<string> arguments, TextWriter output, TextWriter error,
         string? workingDirectory = null) =>
         Stream(file, arguments, output.WriteLine, error.WriteLine, workingDirectory);

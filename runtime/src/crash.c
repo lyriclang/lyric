@@ -1,10 +1,11 @@
-/* Fault signals and stack overflow (10 Q9, 01 S3).
+/* Fault signals and stack overflow.
  *
  * A fault signal — SEGV, BUS, FPE, ILL, ABRT — is a crash, not a panic: the runtime writes
  * `crash: …` and the backtrace of the faulting thread, then lets the signal take its default
  * course, so the process ends the way the operating system reports that signal. A stack overflow
- * is a panic (RT0006): until the emitter checks the stack pointer in every prologue (M11), the
- * guard page below each stack is the only net, and its fault is told apart by its address.
+ * is a panic (RT0006): compiled code checks its stack in the prologue (stack.c); under the frames
+ * that do not — the runtime's own C, foreign code — the guard page below each stack is the net,
+ * and its fault is told apart by its address.
  * Windows has the same two paths through an unhandled-exception filter — and, on a coroutine's
  * stack, through a vectored handler, since the filter is never reached from there. */
 #if defined(__linux__) && !defined(_GNU_SOURCE)
@@ -248,7 +249,7 @@ static LONG WINAPI lyr_crash_on_exception(EXCEPTION_POINTERS *pointers) {
 /* A coroutine's stack has no frame of the system's below it: the chain ends at lyr_coro_start,
  * which has no unwind data, so the dispatcher's walk finds no handler there — not even the
  * process's last one, which calls the filter — and the thread dies with the exception's code and
- * no line (the review's R6e). A vectored handler sees the exception before the walk; on a
+ * no line. A vectored handler sees the exception before the walk; on a
  * coroutine's stack it does what the filter does, for the faults the filter names. On the thread's
  * own stack it leaves the exception to the chain, as before. Last among the vectored handlers:
  * whoever handles a fault of its own comes first. */

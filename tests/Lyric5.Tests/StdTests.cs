@@ -4,7 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The standard library's own tests (design/v5/spec/13 M8a: <c>lyric test</c> runs them): the
+/// The standard library's own tests, which <c>lyric test</c> runs: the
 /// package <c>tests/std</c>, copied out of the repository so its <c>out/</c> lands elsewhere, and
 /// run by <c>lyric test</c> as a user runs a package's. Through <c>Main</c>, so in the console
 /// collection.

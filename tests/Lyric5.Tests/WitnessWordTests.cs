@@ -4,8 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The word of a member that answers an interface (design/v5/spec/07 V2 S4, S5; the review's
-/// M7-2). A conformance is as visible as its type and its interface, whichever is narrower, and
+/// The word of a member that answers an interface. A conformance is as visible as its type and its interface, whichever is narrower, and
 /// what answers it says at least that word itself: a method written narrower in the type's body
 /// could be called through the interface where its own name is refused
 /// (<c>LYR-SEM0167</c>). In a conformance block the members take the block's visibility and

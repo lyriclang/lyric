@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>f(xs...)</c> at run time (design/v5/spec/08; the review's A2): the spread array IS the
+/// <c>f(xs...)</c> at run time: the spread array IS the
 /// variadic parameter — no copy — and an array without the dots is one element. Through
 /// <c>Main</c>, so in the console collection.
 /// </summary>
@@ -75,7 +75,7 @@ public class SpreadRunTests
             """));
     }
 
-    /// <summary>A method, its qualified form (04 D2 R5) and a type's factory (04 D8) take a
+    /// <summary>A method, its qualified form and a type's factory take a
     /// spread like a function: the calls the checker writes for the last two keep it.</summary>
     [Fact]
     public void A_method_a_qualified_call_and_a_factory_take_a_spread()

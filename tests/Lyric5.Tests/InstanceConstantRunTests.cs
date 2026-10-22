@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A constant of a generic type at run time (design/v5/spec/07 G2; the review's M8a-3, M8a-3b):
+/// A constant of a generic type at run time:
 /// one per instance, folded where it is read — through the written instance, inside the type,
 /// through a constraint, in a generic block. A constant that named its type's parameter did not
 /// lower (<c>LYR-IR0001</c>: "type parameter 'T' reached lowering unsubstituted"). Through
@@ -151,7 +151,7 @@ public class InstanceConstantRunTests
     }
 
     /// <summary>
-    /// The library's <c>infinity</c> and <c>nan</c> (10 B5) are written by their bits,
+    /// The library's <c>infinity</c> and <c>nan</c> are written by their bits,
     /// <c>float.fromBits(0x7FF0000000000000)</c> — the language has no literal for them —, and were
     /// four globals with a call to initialize in every program. They are the floats those bits
     /// are, where they are read: no global of theirs is in the program.

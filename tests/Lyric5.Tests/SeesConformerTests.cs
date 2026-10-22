@@ -3,9 +3,9 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>@SeesConformer</c> (11 §1 rule 15, §4 rule 10; the sweep after M10, W10): an interface's
+/// <c>@SeesConformer</c> (11 §1 rule 15, §4 rule 10): an interface's
 /// defaults ask with the conformer's module and see every field of it; without the marker a
-/// default sees what the interface's module may name (R7) — another module's private field is
+/// default sees what the interface's module may name — another module's private field is
 /// not there, another package's internal one neither.
 /// </summary>
 [Collection("console")]

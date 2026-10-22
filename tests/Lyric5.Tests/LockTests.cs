@@ -5,7 +5,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Minimal version selection and the lock (design/v5/spec/07 P3, P4, P5): of the versions a graph
+/// Minimal version selection and the lock: of the versions a graph
 /// asks for, the build takes the greatest of one line; <c>lyric.lock</c> holds each revision read
 /// at its commit with its content's hash, and <c>lyric update</c> moves it. On local repositories,
 /// through <c>Main</c>, so in the console collection.
@@ -65,7 +65,7 @@ public class LockTests
         Assert.False(File.Exists(LockPath(dir)));
     }
 
-    /// <summary>A branch stays where the lock holds it (P5), until <c>lyric update</c> moves it.</summary>
+    /// <summary>A branch stays where the lock holds it, until <c>lyric update</c> moves it.</summary>
     [Fact]
     public void The_lock_holds_a_branch_where_it_was()
     {
@@ -140,7 +140,7 @@ public class LockTests
         Assert.Equal("no package is read from git\n", output);
     }
 
-    /// <summary>The lock holds the content (P5): a hash that is not the content's is refused.</summary>
+    /// <summary>The lock holds the content: a hash that is not the content's is refused.</summary>
     [Fact]
     public void Content_that_is_not_what_the_lock_holds_is_refused()
     {
@@ -192,7 +192,7 @@ public class LockTests
         Assert.Equal("13\n", BuildAndRun(dir, "app", "build", "-C", dir, "--offline"));
     }
 
-    /// <summary>Minimal version selection (P4): <c>v1.0.0</c> asked for here, <c>v1.1.0</c> by a
+    /// <summary>Minimal version selection: <c>v1.0.0</c> asked for here, <c>v1.1.0</c> by a
     /// dependency — the build reads <c>v1.1.0</c>, the least that satisfies both.</summary>
     [Fact]
     public void The_build_takes_the_greatest_version_asked_for()
@@ -299,7 +299,7 @@ public class LockTests
         };
         var file = Path.Combine(Package(("x", "")), LockFile.FileName);
         LockFile.Write(file, entries);
-        // read back in the normal form (M7-10): 'git@example.org:geo.git' is 'git@example.org:geo'
+        // read back in the normal form: 'git@example.org:geo.git' is 'git@example.org:geo'
         Assert.Equal(LockFile.Sorted(entries.Select(e => e with { Git = e.Git with { Url = GitSource.Normalize(e.Git.Url) } })),
             LockFile.Read(file));
         Assert.StartsWith("# Written by lyric", File.ReadAllText(file));

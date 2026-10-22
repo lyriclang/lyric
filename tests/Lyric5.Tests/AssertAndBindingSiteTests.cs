@@ -2,9 +2,8 @@ using static Lyric5.Tests.PackageFixture;
 
 namespace Lyric5.Tests;
 
-/// <summary>M9a S12b: <c>assert</c> with a lambda message, built on failure alone (design 10
-/// "Review 2026-10-12" D1), and a module binding's <c>comptime</c> site evaluated only where the
-/// program reaches the binding (design 09 "Review 2026-10-12" D8).</summary>
+/// <summary><c>assert</c> with a lambda message, built on failure alone, and a module binding's
+/// <c>comptime</c> site evaluated only where the program reaches the binding.</summary>
 [Collection("console")]
 public class AssertAndBindingSiteTests
 {

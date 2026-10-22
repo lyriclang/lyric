@@ -4,7 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A member's bare name through the whole compiler (design/v5/spec/07, the review's M6-30): a
+/// A member's bare name through the whole compiler: a
 /// call passes a field that cannot be called and reaches the function outside; and what used to
 /// crash the compiler — a bare field or method, typed as nothing and handed to the lowering — is
 /// one diagnostic. Through <c>Main</c>, so in the console collection.

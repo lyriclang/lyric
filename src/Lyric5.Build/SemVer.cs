@@ -5,8 +5,7 @@ namespace Lyric5.Build;
 /// <summary>
 /// A semantic version (semver.org 2.0): <c>MAJOR.MINOR.PATCH</c>, a pre-release after <c>-</c>,
 /// build data after <c>+</c> that no comparison reads. A git tag names one — <c>v1.2.0</c> or
-/// <c>1.2.0</c> — and a dependency on it asks for that version or a later one of its line
-/// (design/v5/spec/07 P2, P4).
+/// <c>1.2.0</c> — and a dependency on it asks for that version or a later one of its line.
 /// </summary>
 public sealed partial record SemVer(long Major, long Minor, long Patch, string? Pre) : IComparable<SemVer>
 {
@@ -24,7 +23,7 @@ public sealed partial record SemVer(long Major, long Minor, long Patch, string? 
     public static SemVer? OfTag(string tag) => Parse(tag.StartsWith('v') ? tag[1..] : tag);
 
     /// <summary>Of <paramref name="tags"/>, the one naming the greatest version of
-    /// <paramref name="current"/>'s line above it (the review's M7-8): never another major — below
+    /// <paramref name="current"/>'s line above it: never another major — below
     /// 1, another minor —, and a pre-release only where the current one is one. <c>null</c> where
     /// none is greater.</summary>
     public static string? Newest(SemVer current, IEnumerable<string> tags) =>
@@ -34,9 +33,9 @@ public sealed partial record SemVer(long Major, long Minor, long Patch, string? 
             .MaxBy(t => t.Version)
             .Tag;
 
-    /// <summary>The versions a requirement accepts besides its own, Cargo's caret (07 P2): the same
+    /// <summary>The versions a requirement accepts besides its own, Cargo's caret: the same
     /// major version; below 1, the same minor; below 0.1, itself alone. Two versions of one line
-    /// are one package for a program, two lines are two (P3).</summary>
+    /// are one package for a program, two lines are two.</summary>
     public (long, long, long) Line => Major > 0 ? (Major, -1, -1) : Minor > 0 ? (0, Minor, -1) : (0, 0, Patch);
 
     /// <summary>Precedence (semver.org §11): the numbers, then a version with a pre-release below

@@ -50,7 +50,7 @@ public class InstanceKeyTests
         Assert.Equal("true 3 true\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>Two function types the source tells apart with parentheses (the review's M6-6)
+    /// <summary>Two function types the source tells apart with parentheses
     /// and the display did not. Their layouts are alike, so the program ran; the IR shows that
     /// it held one instance for the two.</summary>
     [Fact]

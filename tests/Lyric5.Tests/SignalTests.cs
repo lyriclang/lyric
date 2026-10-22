@@ -4,7 +4,7 @@ using Lyric5.Toolchain;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Signals as a channel (design/v5/spec/06 K5; 10 Q9, §12) and the plan's Ctrl+C shutdown (M6): the
+/// Signals as a channel and the Ctrl+C shutdown: the
 /// program <c>shutdown</c> runs until Interrupt while the test sends it signals, as a terminal and a
 /// process manager do — each once the line before it came, since two signals that come before the
 /// first went out may arrive as one. POSIX only: a console control event reaches no child without a

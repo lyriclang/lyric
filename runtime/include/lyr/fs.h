@@ -1,8 +1,8 @@
-/* The file system's calls (design/v5/spec/13 M8b P1): one system call each, EINTR taken again, a
+/* The file system's calls: one system call each, EINTR taken again, a
  * file a handle — a POSIX descriptor, a Windows HANDLE — in an int64_t. A failure is a negative
  * value, -(kind << 32 | raw): `kind` counts std.io's IoErrorKind from 1 (NotFound) — 0 for one it
  * has no name for, `Other { code: raw }` —, `raw` is the system's number (errno, GetLastError).
- * std.fs calls them from its I/O pool (P2), never from a task's thread. */
+ * std.fs calls them from its I/O pool, never from a task's thread. */
 #ifndef LYR_FS_H
 #define LYR_FS_H
 
@@ -16,7 +16,7 @@
 #define LYR_FS_APPEND_BIT 4
 #define LYR_FS_CREATE_BIT 8
 #define LYR_FS_TRUNCATE_BIT 16
-/* With create: fails where the file is there (O_EXCL, CREATE_NEW) — std.fs's tempFile, M8b S7b. */
+/* With create: fails where the file is there (O_EXCL, CREATE_NEW) — std.fs's tempFile. */
 #define LYR_FS_EXCLUSIVE_BIT 32
 
 /* The kinds, as std.io's IoErrorKind counts them from 1. */
@@ -27,7 +27,7 @@
 #define LYR_IO_NOT_DIRECTORY 5
 #define LYR_IO_INVALID_INPUT 6
 #define LYR_IO_INVALID_DATA 7
-/* The network's (M8b S10b); 13, BrokenPipe, is lyr/console.h's. */
+/* The network's; 13, BrokenPipe, is lyr/console.h's. */
 #define LYR_IO_TIMED_OUT 9
 #define LYR_IO_CONNECTION_REFUSED 10
 #define LYR_IO_CONNECTION_RESET 11
@@ -50,7 +50,7 @@ int64_t lyr_fs_seek(int64_t file, int64_t offset, int64_t whence);
 /* The file closed: 0. */
 int64_t lyr_fs_close(int64_t file);
 
-/* The directories (M8b S7a). What a path names, for lyr_fs_stat's first slot and a directory
+/* The directories. What a path names, for lyr_fs_stat's first slot and a directory
  * entry's kind. */
 #define LYR_FS_KIND_FILE 1
 #define LYR_FS_KIND_DIRECTORY 2
@@ -91,7 +91,7 @@ int64_t lyr_fs_canonical(const LyrStr *path, uint8_t *into, int64_t n);
 int64_t lyr_fs_absolute(const LyrStr *path, uint8_t *into, int64_t n);
 
 /* The system's directory for temporary files — TMPDIR where it is set and not empty, else /tmp;
- * GetTempPathW —, without a separator at its end, into `into` as lyr_fs_canonical (M8b S7b). */
+ * GetTempPathW —, without a separator at its end, into `into` as lyr_fs_canonical. */
 int64_t lyr_fs_temp_root(uint8_t *into, int64_t n);
 
 /* A Slice<uint8> of emitted code, `lyr_slice_u8`, is a pointer and a length (CEmitter); a

@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Macros (design/v5/spec/13 M9b P3, P4, P6, P7; 08 Y12): <c>macro</c> declarations over
+/// Macros: <c>macro</c> declarations over
 /// <c>std.syntax</c>, the sites <c>name!(...)</c>, <c>name!(...) { ... }</c> and <c>name! { ... }</c>,
 /// the expansion before the module is checked, per module in import order. Through <c>Main</c>
 /// with a package of two modules, since a macro expands only in the modules that import it.
@@ -63,7 +63,7 @@ public class MacroTests
         return error.Split('\n');
     }
 
-    /// <summary>The artifact (13 M9b S2): <c>twice!(x)</c> as an <c>Expr</c> result, nested
+    /// <summary><c>twice!(x)</c> as an <c>Expr</c> result, nested
     /// (the outer first, the inner in the round after), beside a <c>comptime</c> site, the
     /// statement form with a trailing block, an <c>Ident</c> parameter, and the imports of the
     /// macros counted as used.</summary>
@@ -93,12 +93,12 @@ public class MacroTests
     }
 
     /// <summary>A macro module that uses a macro of a third module: its sites go first, then the
-    /// modules that import it (P6, import order).</summary>
+    /// modules that import it, in import order.</summary>
     /// <summary>A build that expands a macro resolves its modules twice, and the second time
-    /// must synthesize the conformances again (04 D7): the first resolver used to write the
+    /// must synthesize the conformances again: the first resolver used to write the
     /// declarations without their synthesized interfaces into the shared parse, so an `extend`
     /// equality over a synthesized type — and std's own `DateTime` over `Date` — failed only in
-    /// such a build (sweep after M10, open point 188).</summary>
+    /// such a build.</summary>
     [Fact]
     public void A_synthesized_conformance_survives_the_macro_round()
     {
@@ -221,7 +221,7 @@ public class MacroTests
         Assert.Contains(lines, l => l.Contains("'generic' sees syntax, which carries no types"));
     }
 
-    /// <summary><c>error(node, msg)</c> (P7): the main span at the node, the note at the site's <c>!</c>.</summary>
+    /// <summary><c>error(node, msg)</c>: the main span at the node, the note at the site's <c>!</c>.</summary>
     [Fact]
     public void An_error_of_the_macro_points_at_the_node_and_the_site()
     {
@@ -255,7 +255,7 @@ public class MacroTests
         Assert.Contains(lines, l => l.Contains("LYR-CT0007") && l.Contains("did not end after 32 rounds"));
     }
 
-    /// <summary>A macro's body runs under the interpreter's rules (09 Q9): a panic is
+    /// <summary>A macro's body runs under the interpreter's rules: a panic is
     /// <c>LYR-CT0001</c> at the site, with the chain.</summary>
     [Fact]
     public void A_panic_in_the_macro_is_reported_at_the_site()

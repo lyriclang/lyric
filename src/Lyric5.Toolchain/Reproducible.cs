@@ -5,7 +5,7 @@ using System.Text;
 namespace Lyric5.Toolchain;
 
 /// <summary>
-/// What a linker writes into an image besides the program (design/v5/spec/11 W2 P6). lld stamps a
+/// What a linker writes into an image besides the program. lld stamps a
 /// PE image with the time of the link, and pairs it with its PDB by a GUID that hashes the PDB —
 /// which names the objects, the working directory and the linker's command line by their paths.
 /// zig's Mach-O linker writes a debug map into the image, every object by its path and time, and

@@ -3,15 +3,15 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The scheduler without the class <c>Atomic</c> (design/v5/spec/06, the review's M7-5): its
+/// The scheduler without the class <c>Atomic</c>: its
 /// words that other threads read and write — a context's state and its cancellation, a spin
 /// lock, a pool's counters, the channels' ids — are fields of its own, read and written through
 /// the library's atomic operations, which take a PLACE. They were objects of
 /// <c>std.sync</c>'s <c>Atomic&lt;T&gt;</c>: two allocations for every task, and the import that
 /// kept <c>std.sync</c> below <c>std.task</c>, where the locks cannot move to it.
 ///
-/// <para><c>Atomic&lt;T&gt;</c> itself is built on the same operations (10 Q10: one path for a
-/// type), so <c>std.sync</c> imports <c>std.task</c> and not the other way.</para>
+/// <para><c>Atomic&lt;T&gt;</c> itself is built on the same operations, one path for a type,
+/// so <c>std.sync</c> imports <c>std.task</c> and not the other way.</para>
 ///
 /// <para>What the tests can see is the program's IR: which types it holds and which of the
 /// runtime's operations it calls. That the fields are read and written atomically everywhere is

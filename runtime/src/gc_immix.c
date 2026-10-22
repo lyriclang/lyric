@@ -1,28 +1,28 @@
-/* Stages 2 and 3 of the collector contract (design/v5/spec/01 L1, the plan 13 M11): the runtime's
+/* Stages 2 and 3 of the collector contract (gc.h): the runtime's
  * own collector — non-moving, Immix blocks and lines, a precise heap and conservative stacks.
  *
- * The heap is one reservation of address space (P1), taken by chunks of 4 MiB. A chunk holds
- * either Immix blocks of 32 KiB, each of 128 lines of 256 bytes (P2), or large objects, page by
+ * The heap is one reservation of address space, taken by chunks of 4 MiB. A chunk holds
+ * either Immix blocks of 32 KiB, each of 128 lines of 256 bytes, or large objects, page by
  * page; an object larger than half a chunk takes chunks of its own. Beside the heap, addressed in
  * parallel, lie the side tables: a byte per line (the epoch of the collection that found it live)
  * and one for its card (stage 3), a bit per 16-byte granule for where an object starts, and one
  * for its mark.
  *
- * A thread allocates by bumping through a buffer of its own — a run of free lines (gc.h, P3). The
+ * A thread allocates by bumping through a buffer of its own — a run of free lines (gc.h). The
  * start bits are not written as an object is made: a buffer is parsed once, header by header,
  * when the thread leaves it, and every thread's buffer when a collection begins; the same pass
- * counts what the thread allocated (10 X4).
+ * counts what the thread allocated.
  *
- * A collection stops the world (P4), marks from the roots — every stack conservatively, the
+ * A collection stops the world, marks from the roots — every stack conservatively, the
  * module globals, the roots and ranges registered — through the heap precisely, by the
  * descriptors' maps, and leaves the rest to the allocators: a block is looked at again only when
- * one takes it, line by line (P7). Large objects without a mark are freed in the pause.
+ * one takes it, line by line. Large objects without a mark are freed in the pause.
  *
- * The world stops at safepoints (P5): compiled code polls at loop back-edges and function entries,
+ * The world stops at safepoints: compiled code polls at loop back-edges and function entries,
  * and the runtime's blocking calls are safe regions. A thread stopped either way has its registers
  * on its stack and its stack scanned from where it stopped. No signal is involved.
  *
- * Most collections are young (P8, sticky mark bits): they clear no mark — what is marked is old —,
+ * Most collections are young (sticky mark bits): they clear no mark — what is marked is old —,
  * mark from the roots and from the old objects on the lines whose card a store dirtied (gc.h's
  * barrier) — a coroutine's among them, whose card a switch into it or out of it marks: its stack
  * has no barrier of its own —, and descend into no marked object.
@@ -38,7 +38,7 @@
 #include "lyr/time.h"
 #include "internal.h"
 
-/* Under ASan (01 L12) every allocation takes the slow path (gc.h), memory the heap does not hand out
+/* Under ASan every allocation takes the slow path (gc.h), memory the heap does not hand out
  * is poisoned — free lines and blocks, the pages of a large object that died — and a run is made
  * accessible as it is handed out: a stale pointer into freed memory is ASan's to report. The
  * collector's own reads of the heap are not instrumented: a conservative word may point into what
@@ -97,19 +97,19 @@ enum {
 #define RESERVE_MIN ((uintptr_t)4 << 30)
 
 /* A collection comes after this much allocation at least, and after as much as lived through the
- * last one otherwise (P7: the form of Go's GOGC = 100) — but after no more than YOUNG_MAX: a young
- * collection marks what survived since the last one, and its pause grows with that (S9, P12's 99th
- * percentile under 10 ms). The old heap's growth paces the full collections as before (P8). */
+ * last one otherwise (the form of Go's GOGC = 100) — but after no more than YOUNG_MAX: a young
+ * collection marks what survived since the last one, and its pause grows with that (the 99th
+ * percentile is to stay under 10 ms). The old heap's growth paces the full collections. */
 #define MIN_BUDGET ((size_t)4 << 20)
 #define YOUNG_MAX ((size_t)8 << 20)
-/* A full collection marks side by side (S9b) when it expects at least this much alive: below it the
+/* A full collection marks side by side when it expects at least this much alive: below it the
  * marking takes some milliseconds, and waking the helpers costs more than they share (measured: lru,
  * about 100 MiB alive, its longest pause 14.5 ms alone and 17–20 ms side by side; cache's full
  * collections from 438 MiB on are where sharing pays). */
 #define SHARE_MIN ((size_t)128 << 20)
 /* A full collection also after this many times as much allocation since the last full one as lived
- * through it, and FULL_MIN at least (open point 208): a program whose old objects die while it
- * promotes little never doubles its old heap, and P8 alone never collected it fully again — its
+ * through it, and FULL_MIN at least: a program whose old objects die while it
+ * promotes little never doubles its old heap, and the doubling alone never collects it fully — its
  * dead stayed resident and nothing went back to the system. The marking stays a fraction of the
  * allocation, as in Go's GOGC; no clock, so the same program collects the same way every run.
  * FULL_MIN keeps a small heap from collecting fully every few young collections: at 64 MiB
@@ -148,7 +148,7 @@ static bool os_commit(void *at, size_t bytes) {
 #endif
 }
 
-/* Memory the heap holds and does not use, given back to the system (P7, S8): its pages leave the
+/* Memory the heap holds and does not use, given back to the system: its pages leave the
  * process's resident set, the address space stays. Windows decommits, and the memory is committed
  * again before it is handed out (os_commit, which commits what is committed already at no cost);
  * Linux drops the pages, macOS maps fresh ones over them. What it holds afterwards is zeroed when
@@ -190,7 +190,7 @@ typedef enum BlockState { BLOCK_FREE, BLOCK_IN_USE, BLOCK_FULL, BLOCK_RECYCLABLE
 typedef struct Block {
     uint8_t state;
     uint8_t fresh;      /* never handed out since it was committed: its memory is zero already */
-    uint8_t discarded;  /* free, its memory given back (S8): committed again when it is taken */
+    uint8_t discarded;  /* free, its memory given back: committed again when it is taken */
     uint8_t young;      /* a run of it handed out since the last collection: it may hold young objects */
 } Block;
 
@@ -198,7 +198,7 @@ typedef struct Chunk {
     uint8_t kind;
     uint8_t committed;
     uint8_t used;           /* taken once: its memory is no longer the zero the system committed */
-    uint8_t discarded;      /* unused or all free, its memory given back (S8): committed again when taken */
+    uint8_t discarded;      /* unused or all free, its memory given back: committed again when taken */
     uint8_t young;          /* CHUNK_LARGE, CHUNK_HUGE: an object made in it since the last collection */
     Block *blocks;          /* CHUNK_BLOCKS */
     uint16_t *pages;        /* CHUNK_LARGE: per page 0 when free, else 1 + the page its object starts on */
@@ -229,8 +229,8 @@ static uint8_t epoch = 1;
 static size_t bytes_in_use;
 static size_t heap_limit;
 
-/* The pace (P7): bytes handed to allocators since the last collection, against the budget —
- * counted as runs are handed out, by every thread. The generations (P8): what the last full
+/* The pace: bytes handed to allocators since the last collection, against the budget —
+ * counted as runs are handed out, by every thread. The generations: what the last full
  * collection found alive, and what the young ones marked since — the old heap is their sum, the
  * budget grows with it, and a full collection comes when it doubled. */
 static atomic_size_t since_collection;
@@ -300,7 +300,7 @@ static bool commit_chunk(size_t c) {
     return true;
 }
 
-/* Under the lock: chunk `c`'s memory committed again where it was given back (S8). */
+/* Under the lock: chunk `c`'s memory committed again where it was given back. */
 static bool recommit(size_t c) {
     if (!chunks[c].discarded) return true;
     if (!os_commit((void *)(heap_base + c * CHUNK), CHUNK)) return false;
@@ -370,11 +370,11 @@ static ptrdiff_t start_at_or_below(size_t g, size_t first) {
     return found < first ? -1 : (ptrdiff_t)found;
 }
 
-/* The start of the object `at` points into — its start or any byte inside it (views, 01 V9/V10) —
+/* The start of the object `at` points into — its start or any byte inside it (views) —
  * or 0 when `at` points into no object of the heap: outside it (a static object, a number), into
  * a free block, or past the end of the object before it. A conservative word and a reference of a
  * map are asked alike. A word on a start is that object, its header unread: most references are,
- * and a young collection meets an old object, marked already, at every other one (P8) — the
+ * and a young collection meets an old object, marked already, at every other one — the
  * header is a cache miss the mark bit spares. */
 LYR_NO_SANITIZE static uintptr_t object_of(uintptr_t at) {
     if (!in_heap(at)) return 0;
@@ -465,7 +465,7 @@ static uint32_t sweep_one(void) {
 }
 
 /* What a collection is asked for: the budget is spent — a young one, unless the old heap doubled
- * since the last full one (P8) —; the heap has no room — a full one before LYR-RT0005 (P7) —; or
+ * since the last full one —; the heap has no room — a full one before LYR-RT0005 —; or
  * the program asks (lyr_gc_collect, lyr_gc_collect_young). */
 typedef enum Need { PACED, FULL, YOUNG } Need;
 
@@ -824,7 +824,7 @@ static void *allocate_large(Thread *t, size_t rounded, size_t asked) {
 
 /* --- callbacks of what died --------------------------------------------------------------------- */
 
-/* A weak reference whose object died, waiting for its callback (01 L1, the Cleaner form): run on
+/* A weak reference whose object died, waiting for its callback (the Cleaner form): run on
  * the allocating thread at its next allocation or explicit collection, never in the pause. */
 typedef struct Pending {
     struct Pending *next;
@@ -1000,7 +1000,7 @@ void lyr_unregister_stack(void *low, void *high) {
     unlock();
 }
 
-/* The program's module globals (07 V5): the emitted table of their reference words (13 M11 P4). */
+/* The program's module globals: the emitted table of their reference words. */
 typedef struct Globals { void **const *slots; size_t count; } Globals;
 static Globals *globals;
 static size_t globals_count;
@@ -1055,7 +1055,7 @@ void lyr_weak_free(LyrWeak *weak) {
     free(weak);
 }
 
-/* --- coroutines (01 L4, 06 A5) ------------------------------------------------------------------ */
+/* --- coroutines --------------------------------------------------------------------------------- */
 
 /* The descriptor a coroutine is made with; lyr_coro_new puts its type's in place, which says
  * LYR_DESC_CORO as well. */
@@ -1115,13 +1115,13 @@ void lyr_gc_remove_thread_stack(LyrStackCtx *own) {
 
 /* A coroutine's stack changes only while it runs, and has no barrier: the switch is its barrier.
  * The card of the line the coroutine object starts on, marked for the one a switch leaves and the
- * one it enters — a young collection reads the coroutine whole from there, its stack too (P8). */
+ * one it enters — a young collection reads the coroutine whole from there, its stack too. */
 static void ran(const Thread *t, const LyrStackCtx *ctx) {
     if (ctx == NULL || ctx == t->own) return;
     lyr_gc_card((const char *)ctx - offsetof(LyrCoro, ctx));
 }
 
-/* No collection stops a thread inside a switch — the world stops at safepoints (S3), and a switch
+/* No collection stops a thread inside a switch — the world stops at safepoints, and a switch
  * has none — so a switch only says where the thread runs now, and marks what it changes. */
 void lyr_gc_switch_begin(void *gc_handle, const LyrStackCtx *to) {
     Thread *t = gc_handle;
@@ -1134,7 +1134,7 @@ void lyr_gc_switch_end(void) {}
 
 /* --- marking --------------------------------------------------------------------------------- */
 
-/* A marker (S9b): the stack it works off and the bytes it found alive. The collecting thread marks
+/* A marker: the stack it works off and the bytes it found alive. The collecting thread marks
  * with its own, each helper with one of its own; `marker` is the calling thread's. */
 typedef struct Marker {
     uintptr_t *stack;
@@ -1160,11 +1160,11 @@ static void push(uintptr_t object) {
 
 /* The object starting at `start` marked and pushed; nothing when it was marked already. Its header
  * is not read here — where it is found, it is a cache miss —, but when the stack gives it back
- * (drain), fetched ahead by then (S9). Markers mark side by side (S9b): the bit is set in one
- * atomic step, and only the marker that set it pushes the object; a marker alone sets it plainly. (With
- * the locked step everywhere and sharing from 32 MiB, binarytrees' longest pause was 11 ms against 8–9
- * before S9b; plainly alone and sharing from SHARE_MIN, 8–9 again — which of the two did it, the
- * measurement does not separate.) */
+ * (drain), fetched ahead by then. Markers mark side by side: the bit is set in one atomic step,
+ * and only the marker that set it pushes the object; a marker alone sets it plainly. (With the
+ * locked step everywhere and sharing from 32 MiB, binarytrees' longest pause was 11 ms against
+ * 8–9 before markers shared; plainly alone and sharing from SHARE_MIN, 8–9 again — which of the
+ * two did it, the measurement does not separate.) */
 static int markers_running;  /* defined with the marking side by side, below */
 
 LYR_NO_SANITIZE static void mark_object(uintptr_t start) {
@@ -1179,12 +1179,12 @@ LYR_NO_SANITIZE static void mark_object(uintptr_t start) {
     push(start);
 }
 
-/* A young collection under way (P8): what a block or chunk holds that nobody handed out since the
+/* A young collection under way: what a block or chunk holds that nobody handed out since the
  * last collection is old — marked, or dead since then —, and a word into it needs no more look. */
 static bool young_only;
 
 /* A word that may be a reference: the object it points into marked. In a young collection a word
- * into a block or chunk without young objects is answered by that alone (S9): the blocks' records
+ * into a block or chunk without young objects is answered by that alone: the blocks' records
  * are a small table, where the mark bits are the heap's one hundred and twenty-eighth — a young
  * collection meets old objects at most references a dirty line holds. A word on a marked start is
  * answered by the mark bit, without the start bits. Within the chunks taken: their side tables are
@@ -1235,7 +1235,7 @@ LYR_NO_SANITIZE static void trace_map(uintptr_t start, const LyrDesc *desc) {
 
 /* A coroutine: what it keeps alive by its fields, and, while its stack is mapped and stopped,
  * every word of that stack from the saved stack pointer up, conservatively — what a suspended
- * coroutine's frames hold lives as long as the coroutine (06 A5). */
+ * coroutine's frames hold lives as long as the coroutine. */
 LYR_NO_SANITIZE static void trace_coro(const LyrCoro *co) {
     if (co->status == 0) return;
     mark_word((uintptr_t)co->arg);
@@ -1322,7 +1322,7 @@ LYR_NO_SANITIZE static void scan_card(size_t line) {
         uint32_t block = (uint32_t)((low - heap_base) / BLOCK);
         if (block_info(block)->state == BLOCK_FREE) return;
         /* a line the last collection found nothing alive on holds only what was made since: young,
-         * the marking's to reach — an old object marks every line it covers (S9) */
+         * the marking's to reach — an old object marks every line it covers */
         if (line_marks[line] != epoch) return;
         size_t g = granule_of(low);
         ptrdiff_t below = start_at_or_below(g, granule_of(block_address(block)));
@@ -1396,7 +1396,7 @@ LYR_NO_SANITIZE static void scan_object(uintptr_t start) {
     }
 }
 
-/* --- marking side by side (S9b) ---------------------------------------------------------------- */
+/* --- marking side by side ---------------------------------------------------------------------- */
 
 /* The collecting thread and helper threads — one fewer than the machine's processors, at most
  * MARKERS - 1 — work off the marking together once the roots are pushed. A marker whose stack grows
@@ -1465,7 +1465,7 @@ static bool take_packet(Marker *m) {
     (void)m;
 }
 
-/* The stack worked off through a ring of AHEAD objects (S9, Boehm's prefetch buffer): each is
+/* The stack worked off through a ring of AHEAD objects (Boehm's prefetch buffer): each is
  * fetched as it leaves the stack and scanned AHEAD objects later, its header in the cache by then.
  * While markers mark side by side, a stack grown past two packets while one of them waits gives one
  * away; a marker alone keeps its work — a packet given in a young collection would wait in the pool
@@ -1639,7 +1639,7 @@ static void mark_roots(Thread *t) {
 }
 
 #ifdef LYR_GC_VERIFY
-/* The check the tests build in (13 M11 S2): a word of a marked object that its map does not name
+/* The check the tests build in: a word of a marked object that its map does not name
  * and that points at the start of an unmarked object is a reference the map left out — the
  * object would be freed under a live pointer. Reported with the type and the word. */
 LYR_NO_SANITIZE static void verify_object(uintptr_t start) {
@@ -1667,7 +1667,7 @@ LYR_NO_SANITIZE static void verify_object(uintptr_t start) {
     }
 }
 
-/* The other check the tests build in (P8): the heap as the last collection left it, copied, and
+/* The other check the tests build in: the heap as the last collection left it, copied, and
  * at the next collection every reference of an object that collection left marked compared with
  * its copy. One that changed, on a line whose card is clean, to a young object is a store without
  * its barrier — the young object would die under it. (A reference that changed to an old object,
@@ -1849,7 +1849,7 @@ LYR_NO_SANITIZE static void free_dead_large(void) {
     }
 }
 
-/* After a full collection, with the world running again (P7, S8): the blocks no allocator swept
+/* After a full collection, with the world running again: the blocks no allocator swept
  * yet swept now, so that every free one is known; the free ones beyond what the next cycle
  * allocates — the budget — given back to the system, the highest first, in runs; and the free
  * stack rebuilt with the lowest on top, so that allocation stays low and what was given back is
@@ -1940,7 +1940,7 @@ static void restart_the_world(Thread *t) {
 }
 
 /* A collection with the world stopped, young or full as `need` asks and the old heap's growth
- * decides (P8). A thread that finds one under way waits for it in a safe region and does not
+ * decides. A thread that finds one under way waits for it in a safe region and does not
  * collect again — unless it needs a full one and none ran meanwhile. */
 static void collect(Need need) {
     Thread *t = current();
@@ -2182,7 +2182,7 @@ static Thread *register_this_thread(void) {
 void lyr_gc_init(void) {
     if (initialized) return;
     for (uintptr_t span = RESERVE_MAX; span >= RESERVE_MIN && heap_base == 0; span /= 2) {
-        /* the side tables: a byte a line for its mark and one for its card (stage 3, S6), a bit
+        /* the side tables: a byte a line for its mark and one for its card (stage 3), a bit
          * a granule for a start and one for a mark */
         size_t lines = span / LINE, bits = span / GRANULE / 8, tables_size = 2 * lines + 2 * bits;
         uint8_t *tables = os_reserve(tables_size);

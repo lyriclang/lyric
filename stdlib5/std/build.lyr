@@ -85,7 +85,7 @@ fn given(name: string): string {
     if (let value = os.env(name)) {
         return value;
     }
-    panic(f"std.build is a build script's: {name} is not set — this program runs outside a build (11 W3 BS2)");
+    panic(f"std.build is a build script's: {name} is not set — this program runs outside a build");
 }
 
 /// Appends one directive as a line: its word, a tab, and its text with each line end turned into a

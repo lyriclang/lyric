@@ -10,9 +10,9 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>std.syntax</c> and the bridge (design/v5/spec/10 B13 M2; 13 M9b S1): the compiler's tree as
-/// values and back. The round trip over every program of the emitter tests is the slice's
-/// artifact: tree, values, tree, and the formatter writes the same text for both.
+/// <c>std.syntax</c> and the bridge: the compiler's tree as values and back. The round trip over
+/// every program of the emitter tests: tree, values, tree, and the formatter writes the same text
+/// for both.
 /// </summary>
 public class SyntaxTests
 {
@@ -137,7 +137,7 @@ public class SyntaxTests
         Directory.GetFiles(CEmitterTests.Programs, "*.lyr").Select(Path.GetFileNameWithoutExtension).OrderBy(n => n)
             .Select(n => new object[] { n! });
 
-    /// <summary>The artifact (13 M9b S1): every declaration of every program of the emitter tests
+    /// <summary>Every declaration of every program of the emitter tests
     /// goes through the values and comes back the same. What <c>std.syntax</c> has no form for
     /// (the rounds of a <c>comptime for</c> over fields, <c>using let</c>, a local function) is
     /// counted, not hidden.</summary>

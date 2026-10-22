@@ -190,7 +190,7 @@ fn anErrorNamesItsPathAndAWriterTakesTheText(): void throws Error {
         let _ = json.encode(0.0 / 0.0);
         fail("NaN was written");
     } catch (e: EncodeError) {
-        assertEq(e.message(), "nan has no JSON text (RFC 8259 §6)");
+        assertEq(e.message(), "nan has no JSON text — JSON has no NaN or infinity");
     }
     var w = JsonWriter.new();
     try (1, 2).encode(&w);

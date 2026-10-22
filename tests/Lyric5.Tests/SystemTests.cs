@@ -4,7 +4,7 @@ using Profile = Lyric5.Toolchain.Profile;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The program and its system (design/v5/spec/10 Q9; 13 M8b S9): a program run with arguments —
+/// The program and its system: a program run with arguments —
 /// one of them not ASCII, which Windows hands over as UTF-16 — and a variable in its environment;
 /// the variable set again; the platform the test runs on; the end through <c>os.exit</c>, the
 /// console flushed first.

@@ -1,4 +1,4 @@
-/* Processes (design/v5/spec/10 O8, Q9; 13 M8b S12): a child started with its arguments, working
+/* Processes: a child started with its arguments, working
  * directory, environment and three standard streams; its end, as the reaper sees it; a signal to it.
  * Each call answers a value, or a failure as lyr/fs.h writes one.
  *
@@ -6,15 +6,15 @@
  * safe after a fork in a program with threads (its signal mask emptied, SIGPIPE back to its default:
  * an ignored signal outlives exec, Rust's Command resets it too; its streams; its directory) and
  * reports a failed exec through a pipe that exec closes. A child's end comes as SIGCHLD, which the
- * runtime keeps for itself (Q9): its handler writes to a pipe std.process's reaper watches, which
+ * runtime keeps for itself: its handler writes to a pipe std.process's reaper watches, which
  * asks each child it waits for (waitpid, WNOHANG) — never waitpid(-1), which would take a host's
  * children too.
  *
- * Windows (S12b): CreateProcessW — the arguments quoted as the C runtime reads them back, the
+ * Windows: CreateProcessW — the arguments quoted as the C runtime reads them back, the
  * environment a UTF-16 block, only the child's three handles inherited (a handle list). A child is
  * its process handle, in the int64_t a pid takes on POSIX; its end wakes the reaper's poller from a
  * registered wait, as a console signal wakes the signals' watcher. Its pipes are named pipes opened
- * overlapped (10 S12b, 13 M10 P11): a read or a write is one request in flight, whose completion on
+ * overlapped: a read or a write is one request in flight, whose completion on
  * the poller's port fires the task that waits, as a socket's readiness does; the request owns its
  * bytes, so a cancelled wait leaves it running, and a close while it runs is finished at its
  * completion. A pipe is read, and written, on the thread of its first call. There are no signals; a
@@ -66,7 +66,7 @@ int64_t lyr_process_write(int64_t fd, const uint8_t *from, int64_t n);
 int64_t lyr_process_close(int64_t fd);
 
 #ifdef _WIN32
-/* The poller's side of a child's pipe (10 S12b): whether `fd` is one — its readiness comes from its
+/* The poller's side of a child's pipe on Windows: whether `fd` is one — its readiness comes from its
  * request's completion, not from an AFD poll —; and a completion under the pipes' key, by its
  * OVERLAPPED: the pipe's handle, `writing` set for a write, or -1 where nothing is to fire. */
 int lyr_process_owns(int64_t fd);

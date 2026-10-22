@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The compiler instructions of <c>std.core</c> (design/v5/spec/09 A10, A11; 13 M9a P8, S6):
+/// The compiler instructions of <c>std.core</c>:
 /// <c>@callerLine</c> and <c>@callerFile</c>, <c>@Deprecated</c> read from its computed value,
 /// the C compiler's hints, <c>@MustUse</c>, <c>@NonExhaustive</c>, <c>@Allow</c> with the
 /// manifest's list — each one name, each read by its identity. <c>@Test</c> stands in
@@ -19,7 +19,7 @@ public class CompilerInstructionTests
     private static string[] Lines(string text, string code) =>
         text.Split('\n').Where(l => l.Contains($"[{code}]")).ToArray();
 
-    /// <summary>A call's place fills what it leaves out (A11): the line the call begins on, the
+    /// <summary>A call's place fills what it leaves out: the line the call begins on, the
     /// file as the binary's backtrace names it — the package, then the path in it —; through an
     /// interface, in a generic function (SEM0067 falls for compiler instructions), and in a
     /// <c>comptime</c> site.</summary>
@@ -61,10 +61,9 @@ public class CompilerInstructionTests
             BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>A call through an interface passes what it leaves out as a direct call does (04 D5):
-    /// a default — one that reads an earlier parameter —, arguments by name, a variadic rest. It
-    /// passed the written arguments alone before (M9a S6), which C refused in debug and the
-    /// verifier in release.</summary>
+    /// <summary>A call through an interface passes what it leaves out as a direct call does:
+    /// a default — one that reads an earlier parameter —, arguments by name, a variadic rest; the
+    /// written arguments alone are refused by C in debug and by the verifier in release.</summary>
     [Fact]
     public void An_interface_call_passes_defaults_names_and_a_variadic_rest()
     {
@@ -95,7 +94,7 @@ public class CompilerInstructionTests
         Assert.Equal("1,10,2\n1,2,2\n5,10,0\n3 0\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>The verifier knows a slot's arity from the table rows (M9a S6): a call through the
+    /// <summary>The verifier knows a slot's arity from the table rows: a call through the
     /// interface that passes too few arguments is a finding, not C's "too few arguments" in debug,
     /// where nothing inlines the call into a direct one it would check.</summary>
     [Fact]
@@ -153,7 +152,7 @@ public class CompilerInstructionTests
     }
 
     /// <summary>
-    /// <c>@Deprecated</c> warns at every use (A11) with what its computed value says — a message
+    /// <c>@Deprecated</c> warns at every use with what its computed value says — a message
     /// made of a <c>let</c>, a replacement to write instead —: of a function, a struct, a variant,
     /// a member of a deprecated <c>extend</c> block, a generic function. Not inside a deprecated
     /// declaration, and an <c>until</c> not yet due builds.
@@ -208,7 +207,7 @@ public class CompilerInstructionTests
         Assert.DoesNotContain("'inside'", error);
     }
 
-    /// <summary>The C compiler's hints (A11): on the function's C, as a hint; <c>@NoInline</c>
+    /// <summary>The C compiler's hints: on the function's C, as a hint; <c>@NoInline</c>
     /// keeps the IR inliner away in release as well, where a function that small is inlined
     /// otherwise.</summary>
     [Fact]
@@ -251,7 +250,7 @@ public class CompilerInstructionTests
         Assert.Equal("6 5 7\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary><c>@MustUse</c> (A11): a dropped value warns where the function carries it or the
+    /// <summary><c>@MustUse</c>: a dropped value warns where the function carries it or the
     /// value's type does — <c>Result</c>. <c>std.task.spawn</c>'s handle, the only way to the task's
     /// error, has a lint of its own, <c>unused-task</c>. <c>let _ = …</c> drops one on purpose; a
     /// <c>void</c> call gives nothing.</summary>
@@ -302,7 +301,7 @@ public class CompilerInstructionTests
         Assert.Contains(Lines(error, "LYR-SEM0212"), w => w.Contains(":29:5:") && w.Contains("this task's handle is dropped"));
     }
 
-    /// <summary><c>@NonExhaustive</c> (A11): outside the package that declares it a match covers
+    /// <summary><c>@NonExhaustive</c>: outside the package that declares it a match covers
     /// the enum with a default — a later version may add a variant —; inside, its variants cover
     /// it. <c>std.io.IoErrorKind</c> carries it.</summary>
     [Fact]
@@ -365,7 +364,7 @@ public class CompilerInstructionTests
         Assert.Contains("error[LYR-SEM0050]: match on 'IoErrorKind' is not exhaustive", ioError);
     }
 
-    /// <summary><c>@Allow(code)</c> and <c>[lints] allow</c> (A10): a warning the declaration's
+    /// <summary><c>@Allow(code)</c> and <c>[lints] allow</c>: a warning the declaration's
     /// attribute names is not reported, nor one the package's list names; one elsewhere is; an
     /// <c>@Allow</c> that suppresses nothing warns itself.</summary>
     [Fact]

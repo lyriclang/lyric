@@ -4,7 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>lyric test</c> (design/v5/spec/10 B12, 07 V4): the package's <c>@Test</c> functions — beside
+/// <c>lyric test</c>: the package's <c>@Test</c> functions — beside
 /// the code under <c>src/</c>, and under <c>tests/</c> — built into one program and run, each in a
 /// task of its own; the program's exit is the command's. Through <c>Main</c>, so in the console
 /// collection.
@@ -12,7 +12,7 @@ namespace Lyric5.Tests;
 [Collection("console")]
 public class TestCommandTests
 {
-    /// <summary>A module with a test beside its code: the test sees what is private to it (V4).</summary>
+    /// <summary>A module with a test beside its code: the test sees what is private to it.</summary>
     private const string MathModule =
         "import std.test { assertEq };\n\n"
         + "pub fn add(a: int, b: int): int {\n    return a + b;\n}\n\n"
@@ -28,7 +28,7 @@ public class TestCommandTests
     private static string App(params (string Path, string Text)[] more) =>
         Package([("lyric.toml", AppManifest), ("src/math.lyr", MathModule), ("tests/arith.lyr", ArithTests), .. more]);
 
-    /// <summary>14 §3 rule 1 (the sweep after M10, X1): the program runs in the package's directory,
+    /// <summary>The program runs in the package's directory,
     /// wherever <c>lyric</c> is called — here from the test assembly's — so a test reads its
     /// package's files by their paths in it.</summary>
     [Fact]
@@ -88,7 +88,7 @@ public class TestCommandTests
         Assert.EndsWith("4 tests: 3 passed, 0 failed, 1 skipped\n", output);
     }
 
-    /// <summary>A test a <c>@When</c> leaves out is no test of this build (design/v5/spec/09 B2): not
+    /// <summary>A test a <c>@When</c> leaves out is no test of this build: not
     /// counted, not run — on the function, or on its module's header.</summary>
     [Fact]
     public void A_test_the_build_leaves_out_is_none()
@@ -204,8 +204,8 @@ public class TestCommandTests
         Assert.EndsWith("FAIL  app.tests.slow.spins\n      timed out after 1 s — the run ends here\n", output);
     }
 
-    /// <summary>A test's attribute holds values computed while the package compiles (design/v5/
-    /// spec/09 F4; 13 M9a S5): <c>timeout = LIMIT</c> is <c>LIMIT</c>'s value and <c>skip</c> a
+    /// <summary>A test's attribute holds values computed while the package compiles:
+    /// <c>timeout = LIMIT</c> is <c>LIMIT</c>'s value and <c>skip</c> a
     /// string built from a constant — the runner read only literals, and ran such a test with 60
     /// seconds and no reason.</summary>
     [Fact]
@@ -221,7 +221,7 @@ public class TestCommandTests
         Assert.EndsWith("FAIL  app.tests.computed.spins\n      timed out after 1 s — the run ends here\n", output);
     }
 
-    /// <summary>Two tests that wait for each other (X3): one after the other, the first would wait
+    /// <summary>Two tests that wait for each other: one after the other, the first would wait
     /// until its time ran out; marked <c>parallel</c>, they run at once, after the others, and their
     /// lines come in their order.</summary>
     private const string MeetingTests =
@@ -255,7 +255,7 @@ public class TestCommandTests
                           + "and a parallel test runs beside others: it has no subtests\n", output);
     }
 
-    /// <summary>A failed assertion's further lines — the first difference of two long texts (X1) —
+    /// <summary>A failed assertion's further lines — the first difference of two long texts —
     /// come under its first.</summary>
     [Fact]
     public void A_long_difference_is_pointed_at_under_the_failure()
@@ -279,8 +279,7 @@ public class TestCommandTests
         Assert.Contains("'test' runs a package's tests and takes no file", error);
     }
 
-    /// <summary><c>--target</c> as <c>build</c> and <c>run</c> take it (14 §1.1; the review of
-    /// 2026-10-08): the tests are built for another machine and named, not run there — exit 2.</summary>
+    /// <summary><c>--target</c> as <c>build</c> and <c>run</c> take it: the tests are built for another machine and named, not run there — exit 2.</summary>
     [Fact]
     public void A_cross_target_builds_the_tests_and_runs_none()
     {

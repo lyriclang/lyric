@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 namespace Lyric5.Build;
 
 /// <summary>
-/// What a package is made of (design/v5/spec/11 W2 P8): by default its manifest, <c>src/</c>,
+/// What a package is made of: by default its manifest, <c>src/</c>,
 /// <c>native/</c>, <c>build.lyr</c> and the files <c>README*</c> and <c>LICENSE*</c> at its root —
 /// not <c>tests/</c>, not <c>out/</c>. <c>include</c> names the files instead of that default,
 /// <c>exclude</c> takes files out; the manifest always belongs. A package read from git is this
@@ -39,7 +39,7 @@ public static class PackageContent
         return false;
     }
 
-    /// <summary>The hash of the files under <paramref name="root"/> (07 P5), as Go hashes a module
+    /// <summary>The hash of the files under <paramref name="root"/>, as Go hashes a module
     /// ("h1"): SHA-256 over one line per file — the file's SHA-256 in hex, two spaces, its path
     /// with '/' between directories — sorted by path, written <c>h1:</c> and base64.</summary>
     public static string Hash(string root)

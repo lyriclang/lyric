@@ -5,12 +5,12 @@ using Lyric5.Toolchain;
 namespace Lyric5.Build;
 
 /// <summary>
-/// The native part of a package (design/v5/spec/07 B5; 11 W2): C sources compiled with the program
+/// The native part of a package: C sources compiled with the program
 /// under its profile, the directories their includes are found in, the libraries the program is
 /// linked with — <c>[native]</c>, and per operating system <c>[native.linux]</c>,
 /// <c>[native.windows]</c>, <c>[native.macos]</c>, whose entries come on top.
 /// </summary>
-/// <param name="Sources">Patterns of the package's files (11 W2 P8's form): the C sources.</param>
+/// <param name="Sources">Patterns of the package's files, as the package content takes them: the C sources.</param>
 /// <param name="Include">Directories of the package the sources find their includes in.</param>
 /// <param name="Libs">Libraries by name, linked as <c>-l&lt;name&gt;</c>.</param>
 public sealed partial record NativePart(IReadOnlyList<string> Sources, IReadOnlyList<string> Include, IReadOnlyList<string> Libs)

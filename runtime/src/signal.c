@@ -121,7 +121,7 @@ int64_t lyr_signal_kind(int64_t number) {
 }
 
 /* KILL and STOP the kernel never delivers; the faults are crashes with a report (crash.c); PIPE,
- * CHLD and ALRM the runtime keeps for itself (10 Q9). Numbers up to 63: the mask is an int64_t. */
+ * CHLD and ALRM the runtime keeps for itself. Numbers up to 63: the mask is an int64_t. */
 static int catchable(int64_t number) {
     if (number < 1 || number > 63) return 0;
     switch ((int)number) {

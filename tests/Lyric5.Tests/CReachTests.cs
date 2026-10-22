@@ -3,7 +3,7 @@ using Lyric5.Compiler;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The emitted C holds the types the program reaches (design/v5/spec/01 L11, the review's B13) —
+/// The emitted C holds the types the program reaches —
 /// not every type the standard library declares.
 /// </summary>
 public class CReachTests
@@ -40,10 +40,10 @@ public class CReachTests
         Assert.Contains($"struct {Builder} {{", built);
     }
 
-    /// <summary>01 B13 (N1b): a module binding nothing reads, whose initializer only gives its value,
+    /// <summary>A module binding nothing reads, whose initializer only gives its value,
     /// is no part of the C — nor std.collections' constants of a program without a map. One that is
     /// read stays, and so does what its initializer reads; one read only by an initializer that goes
-    /// goes with it; one whose initializer calls stays though nothing reads it (07 G2).</summary>
+    /// goes with it; one whose initializer calls stays though nothing reads it.</summary>
     [Fact]
     public void A_binding_nothing_reads_is_not_in_the_C()
     {
@@ -69,7 +69,7 @@ public class CReachTests
                 return 0;
             }
             """);
-        // by the name's end: the slot carries its module's path (07 K2)
+        // by the name's end: the slot carries its module's path
         Assert.Matches(@"\blyr_g_\w*_derived\b", program);
         Assert.Matches(@"\blyr_g_\w*_base\b", program);
         Assert.DoesNotMatch(@"\blyr_g_\w*_unread\b", program);

@@ -4,7 +4,7 @@ namespace Lyric5.Tests;
 
 /// <summary>
 /// The text form folded to one line per finding, for the tests that ask "is this finding there, at
-/// this place" (M12a S2). Since the rustc-like form (16 §1) the head and the place stand on two
+/// this place". In the rustc-like form (16 §1) the head and the place stand on two
 /// lines — <c>error[CODE]: message</c>, then <c> --> path:line:column</c> —; the fold puts them back
 /// on one, <c>path:line:column: error[CODE]: message</c>, and a note's block on one, <c>  note:
 /// message — path:line:column</c>, a <c>= note:</c> line as <c>  note: message</c> (a <c>= help:</c> line stays).

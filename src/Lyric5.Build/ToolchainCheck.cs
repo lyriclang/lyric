@@ -1,7 +1,7 @@
 namespace Lyric5.Build;
 
 /// <summary>
-/// The toolchain a package asks for (design/v5/spec/11 W2 P12; 07 V9): <c>[package] toolchain =
+/// The toolchain a package asks for: <c>[package] toolchain =
 /// "5.1"</c> — or <c>">=5.1"</c> — is the least toolchain that builds the package. A toolchain below
 /// what any package of the program asks for refuses the program: the environment's failure, exit 2.
 /// </summary>

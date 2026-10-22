@@ -34,7 +34,7 @@ typedef pthread_mutex_t ConsoleLock;
 #endif
 
 /* A stream's lock, waited for in a safe region when another thread holds it: the holder may be
- * blocked in a write the collector does not wait for (13 M11 P5). */
+ * blocked in a write the collector does not wait for. */
 static void console_lock(ConsoleLock *l) {
     if (console_try(l)) return;
     LYR_GC_ENTER_SAFE();
@@ -57,7 +57,7 @@ static Stream streams[2] = { { CONSOLE_LOCK_INIT, UNDECIDED, 0, { 0 } }, { CONSO
 
 static Stream *stream_of(int64_t stream) { return &streams[stream == 2 ? 1 : 0]; }
 
-/* The standard error always a line at a time (Review 2026-10-08, Python's way): a diagnostic in a
+/* The standard error always a line at a time: a diagnostic in a
  * log or a CI job comes out when it is written, not 8 KiB later. */
 static int a_line_at_a_time(int fd) {
     if (fd == 2 || lyr_stream_hooked(fd)) return 1;
@@ -74,8 +74,8 @@ static int64_t failure(int64_t kind, int64_t raw) {
 }
 
 #if defined(_WIN32)
-/* A Windows console takes ECMA-48's sequences once virtual-terminal processing is on (M10 S10,
- * std.term): set when the stream's mode is first decided, so the same bytes mean the same there. */
+/* A Windows console takes ECMA-48's sequences once virtual-terminal processing is on
+ * (std.term): set when the stream's mode is first decided, so the same bytes mean the same there. */
 static void enable_vt(int fd) {
     HANDLE h = GetStdHandle(fd == 2 ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE);
     DWORD mode;
@@ -206,7 +206,7 @@ void lyr_console_gone(void) {
 }
 
 #if defined(_WIN32)
-/* A console's characters as UTF-8 (M8b S8b): at most n / 3 UTF-16 units a read — each becomes at
+/* A console's characters as UTF-8: at most n / 3 UTF-16 units a read — each becomes at
  * most three bytes, a pair four —, a high surrogate at the end held for the next read; one reader
  * at a time. */
 static ConsoleLock reading = CONSOLE_LOCK_INIT;

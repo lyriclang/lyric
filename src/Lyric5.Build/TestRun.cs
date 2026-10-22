@@ -17,7 +17,7 @@ public sealed record TestCase(string Module, string Function, bool Throws, strin
 }
 
 /// <summary>
-/// <c>lyric test</c> (design/v5/spec/10 B12, 07 V4, 11 C2): every function the package marks
+/// <c>lyric test</c>: every function the package marks
 /// <c>@Test</c> — in its modules under <c>src/</c>, and under <c>tests/</c> — built into one
 /// program and run. The program is ordinary Lyric: a module the toolchain writes, which hands the
 /// tests to <c>std.test.run</c>; that runs each in a task of its own and answers the exit.
@@ -30,12 +30,12 @@ public static class TestRun
 
     /// <summary>Builds the package's tests — those whose name holds <paramref name="filter"/>, where
     /// one is given — and runs them, what they print passed on as it comes. The answer is the
-    /// program's exit: 0 when every test held, 1 when one failed (11 C5); a refused program is 1
+    /// program's exit: 0 when every test held, 1 when one failed; a refused program is 1
     /// as well, a build that could not run 2.</summary>
     public static int Run(Project project, BuildProfile profile, Target target, CCompiler compiler, string version, string? filter,
         TextWriter output, TextWriter error)
     {
-        // the scripts first, so that a test may import what they generate (11 W3 BS4, BS6)
+        // the scripts first, so that a test may import what they generate
         var (ran, _) = BuildScripts.Run(project, Target.Host, profile, compiler, version, error);
         if (ran != 0) return ran;
         var tests = Discover(project, error);
@@ -55,8 +55,8 @@ public static class TestRun
 
     /// <summary>The program built for <paramref name="target"/> and run — on this machine only; for
     /// another, the binary is built and named, as <c>run</c> does (14 §1.1), exit 2. It runs in the
-    /// package's directory, wherever <c>lyric</c> was called (14 §3 rule 1, §4 rule 1; the sweep after
-    /// M10, X1): a test reads its package's files by their paths in it, as cargo's do.</summary>
+    /// package's directory, wherever <c>lyric</c> was called:
+    /// a test reads its package's files by their paths in it, as cargo's do.</summary>
     internal static int BuildAndRun(Project program, BuildProfile profile, Target target, CCompiler compiler, string version,
         TextWriter output, TextWriter error)
     {
@@ -90,7 +90,7 @@ public static class TestRun
     public static IReadOnlyList<TestCase>? Discover(Project project, TextWriter error) =>
         Marked(project, "Test", error)?.Select(m =>
         {
-            // the attribute's value, evaluated while the package compiled (09 F4): written or defaulted
+            // the attribute's value, evaluated while the package compiled: written or defaulted
             var skip = m.Fields.GetValueOrDefault("skip") is StringConst { Value: var why } ? why : "";
             var timeout = m.Fields.GetValueOrDefault("timeout") is IntConst { Value: var seconds } ? (long)seconds : 60;
             var parallel = m.Fields.GetValueOrDefault("parallel") is BoolConst { Value: true };
@@ -101,7 +101,7 @@ public static class TestRun
     /// The package's functions marked with std.core's <paramref name="attribute"/> — <c>Test</c>,
     /// <c>Bench</c> — module by module in the order of their paths, each module's in the order they
     /// are written, with the module's path, the mark and the mark's fields by name as the compilation
-    /// evaluated them (09 F4). One compilation of every module under <c>src/</c> and <c>tests/</c>;
+    /// evaluated them. One compilation of every module under <c>src/</c> and <c>tests/</c>;
     /// <c>null</c> after reporting a program the compiler refuses.
     /// </summary>
     internal static IReadOnlyList<(string Module, FunctionDecl Function, AttributeNode Attribute, IReadOnlyDictionary<string, IrConstValue> Fields)>? Marked(
@@ -155,7 +155,7 @@ public static class TestRun
             foreach (var fn in model.Compilation.AstOf(module).Declarations.OfType<FunctionDecl>())
             {
                 if (fn.Attributes.FirstOrDefault(a => ReferenceEquals(model.Types.RefOf(a), mark)) is not { } marked) continue;
-                // one '@When' leaves out is no test of this target (09 B2)
+                // one '@When' leaves out is no test of this target
                 if (result.Inactive?.IsInactive(fn) == true) continue;
                 var fields = new Dictionary<string, IrConstValue>(StringComparer.Ordinal);
                 if (model.Types.AttributeValueOf(marked) is { } site

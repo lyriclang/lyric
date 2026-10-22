@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>lyric bench</c> (design/v5/spec/10 B12 X4, 11 C2): the package's <c>@Bench</c> functions
+/// <c>lyric bench</c>: the package's <c>@Bench</c> functions
 /// built into one program in the release profile and run one after another, a line each — the
 /// time a run, its allocations and their bytes, the bytes a second where the bench says how many a
 /// run handles; <c>--save</c> writes the times, <c>--compare</c> reads them back. Through
@@ -69,7 +69,7 @@ public class BenchCommandTests
             Lines(output)[0]);
     }
 
-    /// <summary>14 §4 rule 1 (the sweep after M10, X1): the program runs in the package's directory,
+    /// <summary>The program runs in the package's directory,
     /// as a test's does; a file it saves to stays where the command line named it.</summary>
     [Fact]
     public void A_benchmark_runs_in_its_packages_directory()

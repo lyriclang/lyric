@@ -5,9 +5,9 @@ namespace Lyric5.Build;
 
 /// <summary>
 /// <c>liblyr.a</c> for a target and profile, built from the runtime's C source into the user's
-/// cache once per toolchain version, target and profile, and reused by every project (11 T3;
+/// cache once per toolchain version, target and profile, and reused by every project (
 /// Zig builds its libc the same way). The source is found above the running toolchain: in the
-/// repository during development, in the archive's own directory once M15 ships it.
+/// repository during development, in the archive's own directory once a release ships it.
 /// </summary>
 public static class RuntimeArchive
 {
@@ -40,7 +40,7 @@ public static class RuntimeArchive
         {
             var built = RuntimeLayout.BuildArchive(new CBuild(compiler, target, profile, cache), root, Path.Combine(cache, "lib"));
             // A new archive is rare — a new version, target or profile —: then the versions nobody
-            // used for a while go (open point 206: a development build's version carries its commit,
+            // used for a while go (a development build's version carries its commit,
             // and the directories had grown to 14 GB).
             PruneVersions(Path.Combine(UserCache.Root, "runtime"), toolchainVersion, DateTime.UtcNow - VersionAge);
             return built;

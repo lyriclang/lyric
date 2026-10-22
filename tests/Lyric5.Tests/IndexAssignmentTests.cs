@@ -5,14 +5,14 @@ namespace Lyric5.Tests;
 
 /// <summary>
 /// An assignment through a type's own index, <c>x[k] = v</c> — <c>x.setIndex(k, v)</c>
-/// (design/v5/spec/04 D6) — and its compound forms (02 M8a-1, the review's decision):
+/// — and its compound forms:
 /// <c>x[k] op= v</c>, <c>x[k]++</c> and <c>x[k]--</c> evaluate the receiver and the key ONCE,
 /// read through <c>index</c>, compute, and write through <c>setIndex</c>, as on an array's
 /// element. They were refused (<c>LYR-SEM0003</c>, "write it out") or not lowered
 /// (<c>LYR-IR0001</c>).
 ///
 /// <para>The plain form had three faults the probes for this slice found. The VALUE was
-/// evaluated before the index (04 D6: the target before the value, as an array has it). The
+/// evaluated before the index, where the target comes before the value, as on an array. The
 /// value was lowered bare, so <c>xs[0] = null</c> had no type to take (<c>LYR-IR0001</c>) and
 /// the assignment AS A VALUE was the right side unconverted — a class where the index holds an
 /// interface, which the IR verifier refused (<c>LYR-ICE0001</c>). And the write rule read the
@@ -202,7 +202,7 @@ public class IndexAssignmentTests
 
     // ------------------------------------------------------------------ the plain form
 
-    /// <summary>The target before the value (04 D6), on a type's own index as on an array: the
+    /// <summary>The target before the value, on a type's own index as on an array: the
     /// list stored the first count at the second — <c>1 10 3</c>.</summary>
     [Fact]
     public void The_target_goes_before_the_value()

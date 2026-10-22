@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>@Shared</c> (design/v5/spec/04 Clone; 13 M9a S8): the <c>clone()</c> the compiler writes
+/// <c>@Shared</c>: the <c>clone()</c> the compiler writes
 /// copies such a field — the reference to a service, a parent — instead of cloning it; without the
 /// mark a field with no <c>clone</c> stops the synthesis.
 ///

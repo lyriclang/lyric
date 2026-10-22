@@ -4,7 +4,7 @@ using Lyric5.Toolchain;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The verbs of <c>lyric5</c> (design/v5/spec/11 C1–C5), run in-process through <c>Main</c>:
+/// The verbs of <c>lyric5</c>, run in-process through <c>Main</c>:
 /// what it does not know is exit 2, what the program did wrong is exit 1, and <c>build --emit ir</c>
 /// prints the IR of a program the subset gate lets through. The tests share the console, so they
 /// run one at a time.
@@ -65,12 +65,12 @@ public class DriverTests
     {
         var (exit, output, err) = Run("build", Program_("hello.lyr"), "--emit", "ir");
         Assert.True(exit == 0, err);
-        // A single file is a package of its own, named after the file (07 M1, 11 C8).
+        // A single file is a package of its own, named after the file.
         Assert.Contains("fn hello.main -> i64", output);
-        // println is std.io's, a Lyric function over the console's buffer (M8b S8a)
+        // println is std.io's, a Lyric function over the console's buffer
         Assert.Contains("call std.io.println<string>(", output);
         Assert.Contains("callimport std.io.consolePut(", output);
-        // An f-string writes into one builder (10 S6; M8a S13), no chain of concat.
+        // An f-string writes into one builder, no chain of concat.
         Assert.Contains("call std.core.fstringEnd(", output);
         Assert.DoesNotContain("std.string.concat", output);
     }
@@ -80,14 +80,14 @@ public class DriverTests
     {
         var (exit, output, err) = Run("build", Program_("fib.lyr"), "--emit", "c");
         Assert.True(exit == 0, err);
-        // External linkage (01 C3, C4): an instance's unit may call it.
+        // External linkage: an instance's unit may call it.
         Assert.Contains("\nint64_t lyr_fib_fib(int64_t l0_n)", output);
-        // The module bindings first — std.core's float constants are every program's (M8a S3c).
+        // The module bindings first — std.core's float constants are every program's.
         Assert.Contains("int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }", output);
         Assert.Contains("return lyr_fib_main(); }", output);
     }
 
-    /// <summary>01 C3: the module's C is one unit, every generic instance another, named by its
+    /// <summary>The module's C is one unit, every generic instance another, named by its
     /// content under 'cache/units/'; the list of them is the build's record, and a second build
     /// of the same program compiles nothing.</summary>
     [Fact]

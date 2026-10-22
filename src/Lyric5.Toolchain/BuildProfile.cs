@@ -1,8 +1,8 @@
 namespace Lyric5.Toolchain;
 
 /// <summary>
-/// A build profile (design/v5/spec/11 W2 P3): one of the four built in — <c>debug</c>,
-/// <c>release</c>, and the sanitizers' <c>asan</c> and <c>tsan</c> (01 C7) — or one a manifest
+/// A build profile: one of the four built in — <c>debug</c>,
+/// <c>release</c>, and the sanitizers' <c>asan</c> and <c>tsan</c> — or one a manifest
 /// names, which inherits from one. A profile is its fields over its base; the base decides what no
 /// field does: the sanitizer, the frame pointers it needs, the C runtime's assertions.
 /// </summary>
@@ -11,21 +11,21 @@ namespace Lyric5.Toolchain;
 /// <param name="Opt">The C optimization level, 0 to 3.</param>
 /// <param name="DebugInfo">Debug information in the binary.</param>
 /// <param name="Lto">Link-time optimization over the program and the runtime — ThinLTO; no
-/// built-in profile asks for it (the review's B11: after the IR optimizer its gain was within the
+/// built-in profile asks for it (after the IR optimizer its gain was within the
 /// noise, its cost a third more build time). <see cref="CBuild"/> keeps it off the link line and
 /// off macOS.</param>
 /// <param name="DenyWarnings">A warning fails the build.</param>
-/// <param name="OverflowChecks">Integer overflow panics (03 T2); off only where a profile says so
+/// <param name="OverflowChecks">Integer overflow panics; off only where a profile says so
 /// — then <c>+ - *</c> and negation wrap.</param>
-/// <param name="FastMath">The program's floating point is no longer IEEE-exact (01 L10).</param>
+/// <param name="FastMath">The program's floating point is no longer IEEE-exact.</param>
 public sealed record BuildProfile(string Name, Profile Base, int Opt, bool DebugInfo, bool Lto,
     bool DenyWarnings, bool OverflowChecks, bool FastMath)
 {
-    /// <summary>The runtime's collector the build links (13 M11 P11): the own one unless the profile's
+    /// <summary>The runtime's collector the build links: the own one unless the profile's
     /// field <c>gc</c> or <c>--gc</c> asks for Boehm.</summary>
     public Collector Gc { get; init; } = Collector.Immix;
 
-    /// <summary>The own collector's check of the descriptors' maps (13 M11 S2): a word of a marked
+    /// <summary>The own collector's check of the descriptors' maps: a word of a marked
     /// object that its map does not name and that points at an unmarked object ends the program
     /// with the type and the word. For the toolchain's tests; no profile field sets it.</summary>
     public bool GcVerify { get; init; }
@@ -55,7 +55,7 @@ public sealed record BuildProfile(string Name, Profile Base, int Opt, bool Debug
             _ => null,
         };
 
-    /// <summary>ASan and TSan runtimes ship with clang, not with zig cc (01 C7).</summary>
+    /// <summary>ASan and TSan runtimes ship with clang, not with zig cc.</summary>
     public bool RequiresClang => Base.RequiresClang();
 
     /// <summary>Optimization and debug flags every unit of the profile gets.</summary>

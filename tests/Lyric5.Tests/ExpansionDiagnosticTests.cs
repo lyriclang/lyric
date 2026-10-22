@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The diagnostics of expanded code (design/v5/spec/13 M9b P7; S5): what a macro gives back stands
+/// The diagnostics of expanded code: what a macro gives back stands
 /// in a synthesized file whose origin is the site, so an error in it is said at the site with the
 /// line of the expansion and the quote it came from; what the caller wrote keeps its place, so an
 /// error in an argument is the caller's and a warning in it stays; a site a result holds chains.
@@ -70,7 +70,7 @@ public class ExpansionDiagnosticTests
         return error.Split('\n');
     }
 
-    /// <summary>The artifact (13 M9b S5): an error in expanded code shows the site, the line of the
+    /// <summary>An error in expanded code shows the site, the line of the
     /// expansion it stood on, and the quote it came from.</summary>
     [Fact]
     public void An_error_in_expanded_code_is_said_at_the_site_with_the_line_and_the_quote()

@@ -6,7 +6,7 @@ public enum TargetOs { Linux, Windows, MacOs }
 
 /// <summary>
 /// A compilation target named by its zig triple — <c>x86_64-linux-gnu</c>, <c>aarch64-macos</c>,
-/// <c>x86_64-windows-gnu</c> (design/v5/spec/11 P4). The Tier 1 set is <see cref="Tier1"/>.
+/// <c>x86_64-windows-gnu</c>. The Tier 1 set is <see cref="Tier1"/>.
 /// </summary>
 public sealed record Target(string Triple, string Arch, TargetOs Os)
 {
@@ -61,13 +61,13 @@ public sealed record Target(string Triple, string Arch, TargetOs Os)
     public override string ToString() => Triple;
 }
 
-/// <summary>The four build shapes of design/v5/spec/01 C7 and L12: the built-in profiles, and the
+/// <summary>The four build shapes: the built-in profiles, and the
 /// base every profile of a manifest comes from (<see cref="BuildProfile"/>).</summary>
 public enum Profile { Debug, Release, Asan, Tsan }
 
 public static class ProfileFlags
 {
-    /// <summary>ASan and TSan runtimes ship with clang, not with zig cc (measured, 01 C7).</summary>
+    /// <summary>ASan and TSan runtimes ship with clang, not with zig cc (measured).</summary>
     public static bool RequiresClang(this Profile profile) => profile is Profile.Asan or Profile.Tsan;
 
     /// <summary>Optimization and debug flags every unit of the profile gets.</summary>

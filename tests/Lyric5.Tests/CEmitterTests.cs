@@ -6,7 +6,7 @@ using Profile = Lyric5.Toolchain.Profile;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The C emitter (M2 S2; design/v5/spec/01 L8) on the programs under <c>programs/</c>: the C is
+/// The C emitter on the programs under <c>programs/</c>: the C is
 /// compared byte for byte against <c>golden/*.c</c> (a change in emission is a deliberate one —
 /// <c>LYRIC_UPDATE_SNAPSHOTS=1</c> rewrites the files), then built with the runtime and run in
 /// both profiles, where the exit code and the panic line are the program's own statement of what
@@ -96,8 +96,8 @@ public class CEmitterTests
 
     /// <summary>
     /// The emission with the line numbers of <c>#line</c> directives into the standard library
-    /// replaced by <c>_</c> (the sweep after M10, X1): a declaration added to std.core moved every
-    /// such line in every golden (45 files in W10) and the goldens said nothing about the program.
+    /// replaced by <c>_</c>: a declaration added to std.core would move every such line in every
+    /// golden, and the goldens would say nothing about the program.
     /// The lines into the program's own files stay, and so does the file each directive names.
     /// </summary>
     internal static string WithoutStdLines(string c)
@@ -125,7 +125,7 @@ public class CEmitterTests
 
     private const string GLOBALS_EXPECTED = "start 3 6 hello!\ncounter 0 3 4\nstatic 0,0 100\nobject 2 bob 9 1\n";
 
-    // Conformance synthesis (04 D7): the family, generic types conditionally, enums, the implicit Debug.
+    // Conformance synthesis: the family, generic types conditionally, enums, the implicit Debug.
     private const string SYNTH_EXPECTED =
         "eq true false lt true false hash true\nclone 1 default 0 0 show P { x = 1, y = 2 }\n"
         + "pair true Pair { a = \"a\", b = \"b\" }\nenum true false true E.B(3) E.R { w = 4 }\n"
@@ -244,7 +244,7 @@ public class CEmitterTests
             data.Add("resources", profile, 0, RESOURCES_EXPECTED);
             data.Add("fn_throws", profile, 0, FN_THROWS_EXPECTED);
             data.Add("loops", profile, 0, "8\n-1\n39\n3\n2\n1\n");
-            // Value blocks and the tail rule (08 Y4, Y5 S1).
+            // Value blocks and the tail rule.
             data.Add("valueblocks", profile, 0,
                 "negative zero small big\nin then\nleft then\nafter 5\nafter 6\n5 6\n3\n0 5 7 1\n"
                 + "zero | small, flagged | small | big\n3 -1 0 1\ntoo big\ntoo big\n1 -1 99\nseven\n36\n7 8 10\n"
@@ -274,7 +274,7 @@ public class CEmitterTests
                 + "closed elsewhere true\n");
             data.Add("threads", profile, 0,
                 "21\nworker ran 3 tasks\nfailed: oops\ncancelled\natomic 4000\nchained 6\n");
-            // A thread cancels what still lives on it and waits for it (06 G2, the review's M6-20b).
+            // A thread cancels what still lives on it and waits for it.
             data.Add("thread_end", profile, 0,
                 "parked: the defer ran\nparked: cancelled\nfresh: the defer ran\nfresh: cancelled\n"
                 + "detached ended true\npool: the defer ran\npool: cancelled\n");
@@ -303,7 +303,7 @@ public class CEmitterTests
             data.Add("patterns", profile, 0,
                 "lights red green green yellow\nshapes 3 6 0\nmatch num-3 flat 5 wide 4 rect 2x3 empty\n"
                 + "either stop stop go\nnested 7 none 0 6\niflet 7 else 1 num 3\noptional none green\n");
-            // M8a's examples (13): the prelude's collections, the iterators, the format language.
+            // The examples: the prelude's collections, the iterators, the format language.
             // ExampleTests runs them through the driver as a user would; here they run in both
             // profiles on the emitter's path.
             data.Add("inventory", profile, 0,
@@ -315,7 +315,7 @@ public class CEmitterTests
         return data;
     }
 
-    /// <summary>The cache unit a function belongs to (01 C3), read off its IR name.</summary>
+    /// <summary>The cache unit a function belongs to, read off its IR name.</summary>
     [Theory]
     [InlineData("app.main.main", null)]
     [InlineData("app.main.main.<lambda1>", null)]
@@ -353,7 +353,7 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// Asking whether a scheduler runs is no wait (06 M6-26, 13 M8b P3): a program whose only
+    /// Asking whether a scheduler runs is no wait: a program whose only
     /// file calls ask it before they park on the I/O pool keeps main off the scheduler, and one
     /// whose tasks read files does not — the same std.fs, the walk telling the two apart.
     /// </summary>
@@ -367,8 +367,8 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// A program that sets no scheduler answers no wherever it asks whether one runs (M6-26, 13
-    /// M8b P3; <c>SchedulerFree</c>): what only the yes runs — the I/O pool, std.thread's Pool, the
+    /// A program that sets no scheduler answers no wherever it asks whether one runs
+    /// (<c>SchedulerFree</c>): what only the yes runs — the I/O pool, std.thread's Pool, the
     /// scheduler — is not in it. The program whose tasks read files keeps all of it.
     /// </summary>
     [Fact]
@@ -385,8 +385,8 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// A struct's synthesized conformances take an inline array field whole (M8c S17; design 04
-    /// "Review 2026-10-09" S3b): a <c>uint8[4096]</c> field is one comparison and one hash call
+    /// A struct's synthesized conformances take an inline array field whole: a
+    /// <c>uint8[4096]</c> field is one comparison and one hash call
     /// through its length's blocks. Unrolled, as before, the C held a branch per element — some
     /// 200 000 lines for this program; whole it is about 5 000.
     /// </summary>
@@ -411,17 +411,16 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// A class graph survives collections (01 V4): the program churns through far more memory
+    /// A class graph survives collections: the program churns through far more memory
     /// than the 16 MiB the harness allows, so it ends only because its garbage is collected, and
     /// it prints the right line only because what the holder references is not — the emitter's
     /// descriptors say which objects hold references, and an object wrongly marked as holding
     /// none would lose what it points at. The harness reports the collections that ran: the
     /// claim needs at least a handful.
     ///
-    /// <para>What this does NOT test: the bits of the reference bitmap. The stage-1 collector
-    /// scans an object that holds references as a whole and reads only the flag; the bitmap is
-    /// held by the layout asserts in the emitted C and by the goldens until a collector reads
-    /// it (stage 2, M11).</para>
+    /// <para>What this does NOT test: the bits of the reference bitmap. Boehm scans an object
+    /// that holds references as a whole and reads only the flag; the bitmap is tested under the
+    /// own collector below.</para>
     /// </summary>
     [Theory]
     [InlineData("objects_gc", Profile.Debug, "kept 499500 held-999999 held-0 alice")]
@@ -444,7 +443,7 @@ public class CEmitterTests
     [InlineData("atomics_gc", Profile.Release, "stack 1000 499500 node-999")]
     public void A_class_graph_survives_collections(string name, Profile profile, string line)
     {
-        // Boehm, kept to compare against (13 M11 P11); the own collector runs the same graphs below
+        // Boehm, kept to compare against; the own collector runs the same graphs below
         var result = RuntimeBuildTests.RunEmittedUnder("limited_main", EmitC(name), name, BuildProfile.Of(profile) with { Gc = Collector.Boehm });
         Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
         var lines = result.Stdout.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -454,13 +453,13 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// The same class graphs under the own collector (13 M11 S2), which reads the maps the stage-1
-    /// collector never read: each program ends under the 16 MiB only because its garbage is
+    /// The same class graphs under the own collector, which reads the maps Boehm never
+    /// reads: each program ends under the 16 MiB only because its garbage is
     /// collected, and right only because what it keeps is marked through the maps. The runtime is
     /// built with its check of the maps (<c>LYR_GC_VERIFY</c>): a word of a marked object that the
     /// map does not name and that points at an unmarked object ends the program — so here the bits
     /// of the bitmaps are tested, which the test above leaves to the layout asserts. And its check
-    /// of the barrier (P8): a reference of an old object that changed since the last collection to
+    /// of the barrier: a reference of an old object that changed since the last collection to
     /// a young object, on a line whose card is clean, ends it too — so every store the emitter
     /// writes is tested against the young collections, of which each graph needs one at least.
     /// </summary>
@@ -504,7 +503,7 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// The own collector stops the world at safepoints (13 M11 P5): a thread spinning on an atomic
+    /// The own collector stops the world at safepoints: a thread spinning on an atomic
     /// (each turn's call checks the stack at its entry), one blocked in its poller waiting for the
     /// spinner, and as the third either one spinning on a field — a loop without a call, which
     /// only its head's poll stops; debug only, where the C compiler reads the field every turn —
@@ -525,7 +524,7 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// Coroutines dropped while suspended, without close() (design/v5/spec/06 A5): nothing of them
+    /// Coroutines dropped while suspended, without close(): nothing of them
     /// runs, and the debug profile reports each one with cleanup when the collector takes it —
     /// the ones without cleanup go in silence, so at most the hundred guarded ones are reported, and
     /// a stale stack word may keep a few. The release profile reports nothing.
@@ -547,7 +546,7 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// What close() finds misused (design/v5/spec/06 A5, A8): a yield while the coroutine is unwound,
+    /// What close() finds misused: a yield while the coroutine is unwound,
     /// a coroutine that closes itself — RT0014, with a trace that starts in the coroutine's body at
     /// the line that did it and ends there: the runtime's primitives above it and the emitted runner
     /// below it are not the program's frames.
@@ -568,8 +567,8 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// A yield outside a coroutine's body that the running coroutine cannot take (design/v5/spec/06
-    /// §10a, A8): a value of another type than the coroutine yields, or no coroutine at all — RT0014,
+    /// A yield outside a coroutine's body that the running coroutine cannot take: a value of
+    /// another type than the coroutine yields, or no coroutine at all — RT0014,
     /// with the trace starting at the yield in the helper, then its caller.
     /// </summary>
     [Theory]
@@ -594,7 +593,7 @@ public class CEmitterTests
         "ready a b c main\nturns a1 b1 a2 b2 a3 b3\nasleep 20 70 120\nzero z main\nchain 1 other 2 end\ndone\n";
 
     /// <summary>
-    /// Tasks (design/v5/spec/06 N4-N9, T6; 10 §2): the program's lines are the order — ready
+    /// Tasks: the program's lines are the order — ready
     /// tasks in turn, sleepers by deadline, a zero sleep, a generator that sleeps inside main's
     /// task — and a second, timed run shows the waits are real: main sleeps 280 ms in all, and the
     /// program ends with main, long before its last detached task's 30 s.
@@ -617,7 +616,7 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// A panic in a task that nobody takes (05 E8; 06 T4; 10 §5): an await of the panicked task, the
+    /// A panic in a task that nobody takes: an await of the panicked task, the
     /// close of its scope, a detached task — the panic comes out again with the first report, the
     /// frames where it happened, and the program ends with 101. Until then it ended its task only.
     /// </summary>
@@ -641,7 +640,7 @@ public class CEmitterTests
     }
 
     /// <summary>
-    /// A panic in a detached task (06 T4, 10 §5 rule 4): the program ends with 101, and the trace
+    /// A panic in a detached task: the program ends with 101, and the trace
     /// runs from the panic through the task's body — the program's lambda, then std.task's wrapper
     /// around it — and stops there: the thunk that makes the lambda a value is glue, and the
     /// runtime's frame below the body is not the program's.
@@ -678,29 +677,29 @@ public class CEmitterTests
 
     private const string FN_THROWS_EXPECTED = "1 2 4 4 3\n40\ncaught negative\n7\ntoo big\n";
 
-    // The M5 program (13, M5): an account's errors, a transfer that puts the money back, 'try?'.
+    // The bank program: an account's errors, a transfer that puts the money back, 'try?'.
     private const string BANK_EXPECTED =
         "refused 200 of 120: not enough funds: 200 requested, 120 available\nmoved 50 70\n"
         + "transfer failed: the account of Ada is closed; back to 50\ntry? -1\nfinal 50 70\n";
 
-    // Generators (06 N2, M6 S2a): the program's header says what each line shows.
+    // Generators: the program's header says what each line shows.
     private const string GENERATORS_EXPECTED =
         "counter 5 6 7\nmade\nstarted\nlazy 1 false none\nthen 2 true true end\nagain true end\nticks 3 false\n"
         + "walk 6 12\nshapes 10\nmaybe 1 -1 3 true\nnames ada,bob,cy,\nstruct 2 3 4 0\nenum green again\n"
         + "extend 3 2 1\nrepeat hi hi -\nrepeat 7 false\n"
         + "doubled 30 3\ncaught x after 2\nafter true true none\nclean 2 all\ndrain fin\n";
 
-    // close() (06 A5, M6 S2b): the program's header says what each line shows.
+    // close(): the program's header says what each line shows.
     private const string GENERATORS_CLOSE_EXPECTED =
         "w: cleaned\nwalk 0 1 done true next true\nfresh true\ncareful: caught cancelled\ncareful 1 stopped\n"
         + "using 0\nu: cleaned\nclose threw oops\nagain true\n";
 
-    // Generator lambdas and 'sequence' (08 Y11 F5, M6 S2c): the program's header says what each line shows.
+    // Generator lambdas and 'sequence': the program's header says what each line shows.
     private const string GENERATOR_LAMBDAS_EXPECTED =
         "seq 1 2 3 end\ncaptured 10 11 12\ncounter 5 6 | 7 8\ncontext true 4\nresult sum 6\n"
         + "lazy made | made pulled 1\ncaught bad\npulled 1\nclosed cleaned\nhanded 1 2\n";
 
-    // Yields outside a coroutine's body (06 §10a, M6 S2d): the program's header says what each line shows.
+    // Yields outside a coroutine's body: the program's header says what each line shows.
     private const string DYNAMIC_YIELDS_EXPECTED =
         "pairs 0 1 10 2 20\nnested a b !\nouter 0 1\nclosed helper cleaned\nbody cleaned\ncaught in helper\n"
         + "patient 0 1 done true\n";
@@ -717,9 +716,9 @@ public class CEmitterTests
         "set took parse\ndisk took disk\nset took timeout\nvalue 4\nsingle disk\nother\n-1\nrethrown disk\n"
         + "parse\ndisk\ntimeout\nok 5\n";
 
-    /// <summary>An error that escapes main (design/v5/spec/05 E6 O4): the output up to the throw,
+    /// <summary>An error that escapes main: the output up to the throw,
     /// then on the error stream its message and each cause in the chain, and the exit code 1 — a
-    /// panic's is 101. The debug profile goes on with where it was thrown (01 E8): 'config' at its
+    /// panic's is 101. The debug profile goes on with where it was thrown: 'config' at its
     /// throw, then 'main' at its call; the release profile keeps no trace.</summary>
     [Theory]
     [InlineData(Profile.Debug)]
@@ -740,7 +739,7 @@ public class CEmitterTests
         Assert.Matches(@"^    at lyr_app_main_main \(.*programs[\\/]uncaught\.lyr:19\)$", lines[3]);
     }
 
-    /// <summary>A defer that fails while an error leaves main (design/v5/spec/05 E7, E6 O4): the first
+    /// <summary>A defer that fails while an error leaves main: the first
     /// error is reported, the defer's below it as suppressed, and the exit code is 1.</summary>
     [Theory]
     [InlineData(Profile.Debug)]
@@ -759,8 +758,7 @@ public class CEmitterTests
             Assert.Equal(2, lines.Length);
     }
 
-    /// <summary>What a clause's binding tells of the error it took (design/v5/spec/05 E6 O3, 06 §4;
-    /// M8c S10): the errors two closes suppressed into it, the last-bound closed first, and where it
+    /// <summary>What a clause's binding tells of the error it took: the errors two closes suppressed into it, the last-bound closed first, and where it
     /// was thrown — in the debug profile a panic's trace form, 'explode' at its throw and 'main' at
     /// its call; the release profile keeps none, so the binding has no backtrace.</summary>
     [Theory]
@@ -782,7 +780,7 @@ public class CEmitterTests
         Assert.Equal(5, lines.Length);
     }
 
-    /// <summary>A bench measures its block (design/v5/spec/10 X4; M8c S12b), in both profiles: its
+    /// <summary>A bench measures its block, in both profiles: its
     /// runs and time, the bytes it said, what a round allocated on this thread. std.core's
     /// <c>blackBox</c> reaches the C as a store whose address an empty asm takes, with a memory
     /// clobber — a value the C compiler can neither drop nor know.</summary>
@@ -798,7 +796,7 @@ public class CEmitterTests
         Assert.Equal("true true 0 64\ntrue true\n42\n", result.Stdout.Replace("\r\n", "\n"));
     }
 
-    /// <summary>An error thrown deep in a recursion (design/v5/spec/01 E8): the debug trace shows the
+    /// <summary>An error thrown deep in a recursion: the debug trace shows the
     /// recursion's frame once with a count, as a panic's does, and says the stack went deeper than
     /// it kept — the capture keeps as many frames as a panic's trace.</summary>
     [Theory]
@@ -822,8 +820,8 @@ public class CEmitterTests
         Assert.Equal("    ... deeper frames not shown", lines[4]);
     }
 
-    /// <summary>A clause that throws its own binding again goes on with the same error
-    /// (design/v5/spec/05 E6 O3): main's report still names what was suppressed into it after a
+    /// <summary>A clause that throws its own binding again goes on with the same error:
+    /// main's report still names what was suppressed into it after a
     /// clause without a type and a typed one each threw it again, and the debug trace is where it
     /// was first thrown, not where it was thrown again.</summary>
     [Theory]
@@ -847,7 +845,7 @@ public class CEmitterTests
             Assert.Matches($@"^    at lyr_app_main_{frames[i].Function} \(.*programs[\\/]rethrow\.lyr:{frames[i].Line}\)$", lines[2 + i]);
     }
 
-    /// <summary><c>try!</c> on an error (design/v5/spec/05 E4, E8): a panic, <c>LYR-RT0010</c>, with
+    /// <summary><c>try!</c> on an error: a panic, <c>LYR-RT0010</c>, with
     /// the error's message and the trace at the <c>try!</c>'s line — and no <c>defer</c> runs, main's
     /// included.</summary>
     [Theory]
@@ -903,7 +901,7 @@ public class CEmitterTests
         { "inverted", Profile.Release, "panic [LYR-RT0003]: range 3..1 out of bounds for length 5" },
         { "inlineindex", Profile.Debug, "panic [LYR-RT0003]: index 4 out of bounds for length 4" },
         { "inlineindex", Profile.Release, "panic [LYR-RT0003]: index 4 out of bounds for length 4" },
-        // The catalogue of std.core (05 E8): 'assert' checks at the call, so the trace starts in
+        // The catalogue of std.core: 'assert' checks at the call, so the trace starts in
         // the program as a check's does; 'unreachable()' takes its default message at the call.
         { "assertfail", Profile.Debug, "panic [LYR-RT0011]: assertion failed: n < 3: 3 is too many" },
         { "assertfail", Profile.Release, "panic [LYR-RT0011]: assertion failed: n < 3: 3 is too many" },
@@ -916,7 +914,7 @@ public class CEmitterTests
         { "path_taken", Profile.Release, "panic [LYR-RT0008]: taken" },
     };
 
-    /// <summary>The checks hold in the release profile too (03 T2: in every profile), and the
+    /// <summary>The checks hold in the release profile too, as in every profile, and the
     /// trace names the program's function and its <c>.lyr</c> line, through <c>#line</c>.</summary>
     [Theory]
     [MemberData(nameof(Panics))]

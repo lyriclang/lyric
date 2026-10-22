@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The member a type has FOR an interface (design/v5/spec/04 D2, D3; lyric-spec 05 §3, §4): its
+/// The member a type has FOR an interface (lyric-spec 05 §3, §4): its
 /// own where it wrote one, in its body or in the block that declares the conformance, else the
 /// interface's default. A name alone does not say it — two blocks of one type may each give a
 /// <c>greet</c>, one for <c>Greeter</c> and one for <c>Waver</c> — and the interface's table was
@@ -146,7 +146,7 @@ public class MemberForAnInterfaceTests
 
         """;
 
-    /// <summary>One name, two blocks, one per interface (04 D3): each is reached through its
+    /// <summary>One name, two blocks, one per interface: each is reached through its
     /// interface — written qualified, through a constraint, through a value, and from the
     /// interface's own default calling it on <c>this</c>.</summary>
     [Fact]

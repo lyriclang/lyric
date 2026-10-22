@@ -46,7 +46,7 @@ size_t lyr_trace_format(char *out, size_t capacity, const LyrFault *fault);
 enum { LYR_TRACE_PCS = 256 };
 
 /* trace.c — the program counters of the calling thread's stack, innermost first, up to `max`:
- * what the debug profile keeps of where an error was thrown (01 E8), named only if the error is
+ * what the debug profile keeps of where an error was thrown, named only if the error is
  * ever reported. Not for a signal handler: the work buffer is on the caller's stack. */
 int lyr_trace_capture(uintptr_t *pcs, int max);
 
@@ -60,16 +60,16 @@ size_t lyr_trace_format_pcs(char *out, size_t capacity, const uintptr_t *pcs, in
 LYR_NORETURN void lyr_panic_report(const char *code, const char *message, const LyrFault *fault, int in_handler);
 
 /* init.c — whether a host's writer takes the stream (1 or 2): console.c holds it a line at a time
- * then (M8b S8a). */
+ * then. */
 int lyr_stream_hooked(int fd);
 
 /* init.c — whether the arguments are the process's own: an emitted program's main handed them to
- * lyr_run_main (or its task form) before lyr_init; a host's are taken as it gives them (M8b S9). */
+ * lyr_run_main (or its task form) before lyr_init; a host's are taken as it gives them. */
 void lyr_mark_process_args(void);
 int lyr_process_args(void);
 
-/* crash.c — handlers for fault signals (10 Q9: a crash, not a panic) and for stack overflow (a
- * panic, 01 S3), installed only when the configuration asks (a host owns its signals). Every
+/* crash.c — handlers for fault signals (a crash, not a panic) and for stack overflow (a
+ * panic), installed only when the configuration asks (a host owns its signals). Every
  * thread that runs Lyric code needs its own alternate signal stack: the thread functions set it
  * up and take it down; they do nothing when the handlers are not installed. */
 void lyr_crash_install(void);
@@ -125,7 +125,7 @@ struct LyrCoro {
     size_t stack_size;             /* usable bytes */
     uint64_t owner;                /* the thread it runs on, by the number of its coroutine state */
     int status;
-    int foreign;                   /* foreign frames on its stack (01 K4) */
+    int foreign;                   /* foreign frames on its stack */
     int closing;                   /* resumed by lyr_coro_close: the next yield returns to throw */
     const char *yield_key;         /* the yield type, for a dynamic yield (lyr_coro_set_yield_key) */
     struct LyrCoro *parked_top;    /* PARKED: the innermost coroutine of its chain, where it parked */
@@ -136,12 +136,12 @@ struct LyrCoro {
     struct LyrStr *panic_trace;
     uintptr_t *panic_pcs;          /* the frames' addresses until its resumer names them (malloc) */
     int panic_pc_count;
-    struct LyrCoro *gc_next;       /* the own collector's list of watched coroutines (13 M11 P9): */
+    struct LyrCoro *gc_next;       /* the own collector's list of watched coroutines: */
     struct LyrCoro *gc_prev;       /* no references — the marking does not follow them */
     int gc_watched;
 };
 
-/* stack.c — the prologue's check (01 S3, 13 M11 P6). The reserve a stack keeps below the bound:
+/* stack.c — the prologue's check. The reserve a stack keeps below the bound:
  * room for the panic of an overflow — measured 6 to 8 KiB in the release profile, 4 to 6 in the
  * debug one (inlined frames are larger) — and for a function that does not check, which calls
  * nothing. The lowest address the calling thread's own stack may reach, 0 when unknown; its bound
@@ -149,19 +149,19 @@ struct LyrCoro {
 enum { LYR_STACK_RESERVE = 16 * 1024 };
 /* A thread's own stack of a mebibyte or more keeps more: its overflow's panic is named where it
  * happened — no resumer names it later, as a coroutine's — and naming takes more than 16 KiB where
- * the system's unwinder or symbols do (macOS; measured by the CI, M11 S4). */
+ * the system's unwinder or symbols do (macOS; measured by the CI). */
 enum { LYR_STACK_OWN_RESERVE = 64 * 1024 };
 uintptr_t lyr_stack_low(void);
 uintptr_t lyr_stack_own_limit(void);
 void lyr_gc_stack_limit(uintptr_t limit);
 LYR_NORETURN void lyr_stack_overflow(void);
 
-/* coro.c — a suspended coroutine the collector found unreachable: its stack goes (06 A5). */
+/* coro.c — a suspended coroutine the collector found unreachable: its stack goes. */
 void lyr_coro_abandoned(LyrCoro *co);
 /* coro.c — a thread leaving the runtime drops its coroutine state. */
 void lyr_coro_thread_end(void);
 
-/* coro.c — a panic leaves the coroutine that runs (05 E8): its resumer finds it PANICKED with the
+/* coro.c — a panic leaves the coroutine that runs: its resumer finds it PANICKED with the
  * report — `trace`, or the frames of where it stands when NULL. Returns only where there is
  * nowhere to leave to: on a thread's own stack, or with foreign frames on the coroutine's stack. */
 void lyr_coro_panic_leave(const char *code, const char *message, const char *trace);
@@ -186,7 +186,7 @@ void lyr_gc_switch_begin(void *gc_handle, const LyrStackCtx *to); /* no world st
 void lyr_gc_switch_end(void);                    /* on the stack that runs now: the world may stop again */
 
 /* gc_stats.c — a pause the collector made (from the stop's request to the restart), and what its
- * collector found alive (13 M11 P12). */
+ * collector found alive. */
 void lyr_gc_record_pause(uint64_t ns, int young);
 size_t lyr_gc_live_bytes(void);
 

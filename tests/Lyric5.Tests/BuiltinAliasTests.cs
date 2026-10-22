@@ -3,9 +3,9 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The 64-bit names are aliases of the word-sized types (design/v5/spec/03 T1a): one symbol under
+/// The 64-bit names are aliases of the word-sized types: one symbol under
 /// two names. They were two builtin symbols, and an <c>extend uint64</c> did not reach a
-/// <c>uint</c> (sweep after M10, open point 149).
+/// <c>uint</c>.
 /// </summary>
 [Collection("console")]
 public class BuiltinAliasTests

@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Lyric 5's attributes (design/v5/spec/09 A1–A3, T7, F1, F4; 13 M9a S5): on every declaration,
+/// Lyric 5's attributes: on every declaration,
 /// where a marker admits them, each a value computed while the program compiles. What
 /// <c>lyric test</c> reads of <c>@Test</c> stands in <c>TestCommandTests</c>.
 ///
@@ -24,10 +24,10 @@ public class AttributeTests
         return error.Split('\n');
     }
 
-    /// <summary>Every declaration takes attributes (T7) — a function and its parameter, a struct,
+    /// <summary>Every declaration takes attributes — a function and its parameter, a struct,
     /// its field and its method, an enum and its variant, an interface, its associated type and
     /// its method, an alias, an extend block and its method, a module-level binding; one open field
-    /// takes its value in parentheses (P7), and a value may be computed (F4).</summary>
+    /// takes its value in parentheses, and a value may be computed.</summary>
     [Fact]
     public void An_attribute_sits_on_every_declaration()
     {
@@ -44,8 +44,8 @@ public class AttributeTests
         Assert.Equal("1 5 8\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>An attribute makes nothing reachable (01 B13): a function only an attribute marks is
-    /// not built — the 4.x rows that made it a root for the host are gone (P7).</summary>
+    /// <summary>An attribute makes nothing reachable: a function only an attribute marks is not
+    /// built.</summary>
     [Fact]
     public void An_attributed_function_is_no_root()
     {
@@ -55,8 +55,8 @@ public class AttributeTests
         Assert.Empty(lowered.Ir.Attributes);
     }
 
-    /// <summary>What an attribute refuses: a marker that admits no function (F1); the parenthesized
-    /// form where it is not the one open field; a field no literal makes (F4); a struct declaring
+    /// <summary>What an attribute refuses: a marker that admits no function; the parenthesized
+    /// form where it is not the one open field; a field no literal makes; a struct declaring
     /// no marker at all.</summary>
     [Theory]
     [InlineData("@Level { value = 1 }\nfn f(): void {\n}\n", "LYR-SEM0065", "'@Level' cannot sit on a function — declare 'Level' with ':: [OnFunction]'")]

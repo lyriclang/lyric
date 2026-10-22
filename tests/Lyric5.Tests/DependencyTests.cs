@@ -3,10 +3,10 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Path dependencies (design/v5/spec/07 V7 P3, P6, P7; 11 W2): a package depends on packages by
+/// Path dependencies: a package depends on packages by
 /// directory, imports from what it declares and nothing further, holds one package of each name
-/// unless its root overrides one — the replaced one never read —, and a library builds as a check
-/// (07 B6). Through <c>Main</c>, so in the console collection.
+/// unless its root overrides one — the replaced one never read —, and a library builds as a
+/// check. Through <c>Main</c>, so in the console collection.
 /// </summary>
 [Collection("console")]
 public class DependencyTests
@@ -26,7 +26,7 @@ public class DependencyTests
         Assert.Equal("12\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>A package imports what its manifest declares (P6) — the flat closure of 4.x gave
+    /// <summary>A package imports what its manifest declares — the flat closure of 4.x gave
     /// every package everything.</summary>
     [Fact]
     public void A_dependency_of_a_dependency_is_not_imported()
@@ -87,7 +87,7 @@ public class DependencyTests
         Assert.Equal("12 3\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>The replaced package is not read (P7): its manifest may be anything.</summary>
+    /// <summary>The replaced package is not read: its manifest may be anything.</summary>
     [Fact]
     public void An_overridden_package_is_never_read()
     {
@@ -97,7 +97,7 @@ public class DependencyTests
         Assert.Equal("12 3\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>A library builds as a check (07 B6): its modules through the front end, nothing
+    /// <summary>A library builds as a check: its modules through the front end, nothing
     /// built — and 'run' has no program there.</summary>
     [Fact]
     public void A_library_builds_as_a_check()

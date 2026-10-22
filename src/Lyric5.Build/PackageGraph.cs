@@ -1,22 +1,22 @@
 namespace Lyric5.Build;
 
 /// <summary>
-/// The packages a program is built from (design/v5/spec/07 V7, 11 W2): its own and, through
+/// The packages a program is built from: its own and, through
 /// <c>[dependencies]</c>, every package those depend on — read from its directory, or from the
-/// revision of a git repository it names, by way of the user's cache (P9).
+/// revision of a git repository it names, by way of the user's cache.
 ///
-/// <para>One package of each name (P3). Versions of one repository — tags that are semantic
+/// <para>One package of each name. Versions of one repository — tags that are semantic
 /// versions of one line — are one package: of every version the graph asks for, directly or
 /// through a version read on the way, the build takes the greatest, the least that satisfies them
 /// all (minimal version selection, P4). Any other second source for a name — a directory, another
 /// repository, another revision, another line — is refused, unless the root's <c>[override]</c>
 /// picks the one: read wherever the graph asks for the package, the replaced one never read, not
-/// even fetched (P7). A dependency names its package: the manifest it finds says the same name.</para>
+/// even fetched. A dependency names its package: the manifest it finds says the same name.</para>
 ///
 /// <para>What is read from git is read at the commit <c>lyric.lock</c> holds for it, and must be
-/// the content the lock holds (P5); <see cref="Locked"/> is what the lock holds afterwards.</para>
+/// the content the lock holds; <see cref="Locked"/> is what the lock holds afterwards.</para>
 ///
-/// <para>No package depends on itself, at once or through others (the review's M7-6): a cycle is
+/// <para>No package depends on itself, at once or through others: a cycle is
 /// refused with its path. A tag that is a semantic version names the version the repository's
 /// manifest gives there — the selection chooses by the tag, the lock writes the manifest's.</para>
 /// </summary>
@@ -24,21 +24,21 @@ namespace Lyric5.Build;
 /// <param name="Packages">Every package of the graph by name, the root's included.</param>
 public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Manifest> Packages)
 {
-    /// <summary>Each package's modules (07 M1): its name to its <c>src/</c>.</summary>
+    /// <summary>Each package's modules: its name to its <c>src/</c>.</summary>
     public IReadOnlyDictionary<string, string> SourceRoots =>
         Packages.ToDictionary(p => p.Key, p => p.Value.SourceRoot, StringComparer.Ordinal);
 
-    /// <summary>What each package declares it imports from (P6) — not what those import.</summary>
+    /// <summary>What each package declares it imports from — not what those import.</summary>
     public IReadOnlyDictionary<string, IReadOnlySet<string>> Declared =>
         Packages.ToDictionary(p => p.Key,
             p => (IReadOnlySet<string>)p.Value.Dependencies.Select(d => d.Name).ToHashSet(StringComparer.Ordinal),
             StringComparer.Ordinal);
 
     /// <summary>Every revision of a repository the resolution read — the chosen versions and the
-    /// ones read on the way — with its commit and content hash: the lock's entries (07 P5).</summary>
+    /// ones read on the way — with its commit and content hash: the lock's entries.</summary>
     public IReadOnlyList<Locked> Locked { get; init; } = [];
 
-    /// <summary>The build scripts' own graphs (11 W3 BS3), by the package whose script it is — for
+    /// <summary>The build scripts' own graphs, by the package whose script it is — for
     /// a script with <c>[build-dependencies]</c>.</summary>
     public IReadOnlyDictionary<string, PackageGraph> Scripts { get; init; } = new Dictionary<string, PackageGraph>();
 
@@ -54,7 +54,7 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
     /// <exception cref="ManifestException">A dependency is refused: no package there, another name,
     /// a second source for one name, a revision that cannot be read, content that is not what the
     /// lock holds.</exception>
-    /// <param name="frozen">The lock is taken as it is (<c>--locked</c>, the review's M7-9): a
+    /// <param name="frozen">The lock is taken as it is (<c>--locked</c>): a
     /// revision it does not hold is refused, before anything is fetched.</param>
     public static PackageGraph Resolve(Manifest root, GitCache? git = null, IReadOnlyList<Locked>? locked = null,
         bool frozen = false)
@@ -73,10 +73,10 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
             foreach (var dependency in package.Dependencies)
             {
                 // An override answers for the package wherever it is asked for; what the manifest
-                // names is then not read at all (P7).
+                // names is then not read at all.
                 var at = overrides.TryGetValue(dependency.Name, out var replaced) ? replaced : dependency;
                 var declaring = ReferenceEquals(at, replaced) ? root.File : package.File;
-                // A package from git is its repository's package content (11 W2 P8): a directory
+                // A package from git is its repository's package content: a directory
                 // beside it is no part of it.
                 if (at.Path is not null && !ReferenceEquals(at, replaced) && node.Revision is not null)
                     throw new ManifestException("LYR-PKG0004", declaring, at.Line, 1,
@@ -143,8 +143,8 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
         return new Node(at, manifest, revision is null ? null : revision with { Version = manifest.Version });
     }
 
-    /// <summary>No package of the graph depends on itself, at once or through others (the review's
-    /// M7-6): the first cycle a walk from the root meets, refused at the dependency that closes it,
+    /// <summary>No package of the graph depends on itself, at once or through others
+    /// The first cycle a walk from the root meets, refused at the dependency that closes it,
     /// with its path — <c>app -> geo -> app</c>. A package's dependencies are built before it, and a
     /// cycle has no first one.</summary>
     private static void RefuseCycles(string root, IReadOnlyDictionary<string, Manifest> packages)
@@ -174,7 +174,7 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
     private static bool SameSource(Dependency a, Dependency b) =>
         a.Path is not null && b.Path is not null ? SameDirectory(a.Path, b.Path) : a.Git is not null && a.Git == b.Git;
 
-    /// <summary>Two versions of one line of one repository (07 P2, P4): tags that are semantic
+    /// <summary>Two versions of one line of one repository: tags that are semantic
     /// versions, one major version — below 1, one minor.</summary>
     private static bool OneLine(Dependency a, Dependency b) =>
         a.Git is { Kind: GitRefKind.Tag } x && b.Git is { Kind: GitRefKind.Tag } y && x.Url == y.Url

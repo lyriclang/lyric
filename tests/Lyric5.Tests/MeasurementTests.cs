@@ -5,17 +5,17 @@ using Profile = Lyric5.Toolchain.Profile;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Measurement point 1 (design/v5/spec/13, M2; 01 L11; 11 C9) as ratchets: a hello-world binary
+/// Measurement point 1 as ratchets: a hello-world binary
 /// under 2 MB that starts in under 5 ms, and a warm <c>lyric5 run</c> that costs at most 50 ms on
 /// top of the program's own start. Times are the minimum of several runs — the number a machine
 /// can reach, not the noise on top of it — and the start is measured against a plain C hello
 /// built the same way, so what is counted is the runtime, not the operating system's process
 /// start. They run on Linux, the platform the plan's numbers come from: on Windows a process
 /// start costs 10–30 ms of its own, and measured through the .NET host and its JIT the
-/// differences drowned (measured, M2 S5); the Windows figures come from CI's NativeAOT job, which
+/// differences drowned (measured); the Windows figures come from CI's NativeAOT job, which
 /// prints them.
 ///
-/// <para>Measurement point 2 (13, M3) the same way: the three programs of <c>bench/</c> —
+/// <para>Measurement point 2 the same way: the three programs of <c>bench/</c> —
 /// integer loops, floating-point arithmetic, an array of structs — against their C twins,
 /// built by the same compiler with the release profile's flags, within 3×. The bound against Go
 /// (1.5×) is <c>bench/run.py</c>'s, which needs a Go toolchain the tests do not assume.</para>

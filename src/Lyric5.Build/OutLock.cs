@@ -1,7 +1,7 @@
 namespace Lyric5.Build;
 
 /// <summary>
-/// <c>out/.lock</c> (design/v5/spec/11 W2 P5): one build at a time writes into a package's
+/// <c>out/.lock</c>: one build at a time writes into a package's
 /// <c>out/</c> — a second one waits until the first is done, as Cargo's build directory lock has
 /// it. The lock is the operating system's on an open file (<c>flock</c> where there is one), so
 /// it ends with its process however that ends: no stale lock file to clear by hand.

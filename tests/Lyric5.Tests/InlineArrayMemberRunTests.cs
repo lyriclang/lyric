@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The members of an inline array, <c>T[N]</c> (design/v5/spec/03 T13 A4; the review's M4-2). It
+/// The members of an inline array, <c>T[N]</c>. It
 /// has <c>length()</c>, <c>isEmpty()</c> and <c>toArray()</c> wherever it lies; where it lies in
 /// the heap — a field of an object, an element of an array — it has the members of a view, called
 /// on a view of all of it, as an array has them (lyric-spec 03 §5.2 rule 4); where it lies in a

@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The driver's text form as written (spec 16 §1–§2; M12a S2): the arrow with the path relative to
+/// The driver's text form as written (spec 16 §1–§2): the arrow with the path relative to
 /// the package — from a directory inside it too —, the gutter, <c>--absolute-paths</c>,
 /// <c>--max-errors</c>, a <c>--color</c> it does not know, and a declaration that does not parse
 /// saying nothing else.

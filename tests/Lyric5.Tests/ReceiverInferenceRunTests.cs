@@ -3,8 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The type arguments of a generic type, inferred, through the whole compiler (design/v5/spec/03
-/// T8, the review's M8a-2): the instance the checker settled is the one that is built — the
+/// The type arguments of a generic type, inferred, through the whole compiler: the instance the checker settled is the one that is built — the
 /// program's own types, and the library's factories, which every program wrote with their
 /// arguments until now (<c>Atomic&lt;int&gt;.new(1)</c>, <c>List&lt;int&gt;.new()</c>). Through
 /// <c>Main</c>, so in the console collection.

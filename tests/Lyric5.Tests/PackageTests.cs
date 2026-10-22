@@ -4,7 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Packages (design/v5/spec/07 V1, V7; 11 C8, P2, P5) through the driver: a package's modules are
+/// Packages through the driver: a package's modules are
 /// named by their paths with the package's name in front and live under <c>src/</c>; its program is
 /// <c>src/main.lyr</c>, or the module a command names; a <c>module</c> header is refused; a single
 /// file is a package of its own and imports only <c>std</c>; a module path names its file exactly.
@@ -53,7 +53,7 @@ public class PackageTests
         Assert.Equal("answer 42\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>A <c>main</c> in an imported module is an ordinary function (07 M7a): the 4.x rule,
+    /// <summary>A <c>main</c> in an imported module is an ordinary function: the 4.x rule,
     /// one <c>main</c> per compilation (SEM0021), was the VM's — one entry per <c>.lyrbc</c>.</summary>
     [Fact]
     public void A_main_in_an_imported_module_is_an_ordinary_function()
@@ -79,7 +79,7 @@ public class PackageTests
         Assert.Contains("error[LYR-SEM0021]: module 'app.util' has no 'main'", error);
     }
 
-    /// <summary><c>main</c> takes no parameters (07 M7b, 08 D18): the 4.x form
+    /// <summary><c>main</c> takes no parameters: the 4.x form
     /// <c>main(args: string[])</c> passed the front end and broke the C compile (LYR-BLD0001, exit 2).</summary>
     [Fact]
     public void Main_takes_no_parameters()
@@ -91,7 +91,7 @@ public class PackageTests
     }
 
     /// <summary>A file beside a package's <c>src/</c> is a single file whose <c>out/</c> lies by the
-    /// manifest (14 §1.2, 11 P5) — it once made an <c>out/</c> of its own beside itself.</summary>
+    /// manifest — it once made an <c>out/</c> of its own beside itself.</summary>
     [Fact]
     public void A_script_beside_src_builds_into_the_packages_out()
     {

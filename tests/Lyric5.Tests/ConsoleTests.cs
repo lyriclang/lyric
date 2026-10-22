@@ -4,9 +4,9 @@ using Profile = Lyric5.Toolchain.Profile;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The console's output (design/v5/spec/10 O9; 13 M8b P3, S8a): print, println, eprint and eprintln
+/// The console's output: print, println, eprint and eprintln
 /// over <c>Display</c>, each stream buffered in the runtime — the output a line at a time at a
-/// terminal and a block otherwise, the error always a line (10 Review 2026-10-08, S8c) — and
+/// terminal and a block otherwise, the error always a line — and
 /// flushed at every end of the program. The order of the two streams in ONE pipe is what tells the
 /// modes apart: the harness captures them apart, a shell or a pty joins them.
 /// </summary>
@@ -57,7 +57,7 @@ public class ConsoleTests
     }
 
     /// <summary>
-    /// The standard input (S8b): a line at a time, raw bytes from the same buffer between, the
+    /// The standard input: a line at a time, raw bytes from the same buffer between, the
     /// rest by lines, null at its end, and one stdin() for the program; the output and the error
     /// as Writers over print's buffers. Fed through a pipe by a shell, so POSIX only here: Windows'
     /// pipe was run by hand (a Windows process through WSL interop), and a console's ReadConsoleW
@@ -76,7 +76,7 @@ public class ConsoleTests
     }
 
     /// <summary>
-    /// A pipe nobody reads is BrokenPipe (10 Q9: SIGPIPE ignored; O9): the program writes after its
+    /// A pipe nobody reads is BrokenPipe, SIGPIPE being ignored: the program writes after its
     /// reader is gone and hears of it, instead of dying of the signal. The test host ignores
     /// SIGPIPE itself (.NET does) and a child inherits that across exec, so the program is started
     /// with the signal's default, as a shell gives it — GNU env's --default-signal; Linux only.
@@ -91,8 +91,8 @@ public class ConsoleTests
     }
 
     /// <summary>
-    /// print into a pipe nobody reads ends the program as SIGPIPE would (10 Review 2026-10-08, Go's
-    /// way; S8c): `prog | head -1` stops when head does, while a Writer of stdout() still hears
+    /// print into a pipe nobody reads ends the program as SIGPIPE would, Go's way:
+    /// `prog | head -1` stops when head does, while a Writer of stdout() still hears
     /// BrokenPipe (above). A print's own flush, or the end's, which writes what print left. The
     /// shell reports the program's status itself: 128 + 13. Linux only, as above; Windows has no
     /// such signal and goes on, as Go does there.

@@ -29,7 +29,7 @@ int lyr_init(const LyrConfig *given) {
         lyr_crash_install();
 #ifndef _WIN32
         /* a write into a pipe nobody reads fails — std.io's BrokenPipe — instead of ending the
-         * process (10 Q9: SIGPIPE ignored); a host owns its signals and decides itself */
+         * process (SIGPIPE ignored); a host owns its signals and decides itself */
         signal(SIGPIPE, SIG_IGN);
 #endif
     }
@@ -42,7 +42,7 @@ int lyr_init(const LyrConfig *given) {
 }
 
 void lyr_shutdown(void) {
-    /* the console's buffers out first (10 O9: flushed at the program's end) */
+    /* the console's buffers out first (flushed at the program's end) */
     lyr_console_finish();
     started = 0;
 }

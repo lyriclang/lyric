@@ -4,11 +4,11 @@ using Lyric5.Toolchain;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Generator lambdas in the front end (design/v5/spec/08 Y11 F5, D11; M6 S2c), against
+/// Generator lambdas in the front end, against
 /// <c>stdlib5</c>: a lambda with a yield of its own is <c>fn(…) -> Coroutine&lt;Y, R&gt;</c>, its
 /// yields and returns checked against a coroutine context or unified into one; calling it throws
 /// nothing, its pulls throw what its body lets escape. A function that returns a coroutine without
-/// yielding is an ordinary function (D11).
+/// yielding is an ordinary function.
 /// </summary>
 public class GeneratorLambdaTests
 {
@@ -102,7 +102,7 @@ public class GeneratorLambdaTests
 
     [Fact]
     public void A_function_that_returns_a_coroutine_without_yielding_is_ordinary() =>
-        // 08 D11: a coroutine is 'Coroutine<…>' AND a yield of its own. Without the yield the body
+        // A coroutine is 'Coroutine<…>' AND a yield of its own. Without the yield the body
         // returns a coroutine value like any function returns any value.
         Assert.Empty(Codes("""
             import std.core { sequence };

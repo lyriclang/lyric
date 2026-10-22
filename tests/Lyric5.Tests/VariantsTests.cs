@@ -2,7 +2,7 @@ using static Lyric5.Tests.PackageFixture;
 
 namespace Lyric5.Tests;
 
-/// <summary>M9a S11 (design/v5/spec/09 A7 R5; 03 T5 "Review 2026-10-12"): enum reflection as
+/// <summary>Enum reflection as
 /// std.core's defaults — <c>VariantName</c> and <c>Variants</c> — and the static defaults they
 /// stand on, set in place per conformer.</summary>
 [Collection("console")]
@@ -10,7 +10,7 @@ public class VariantsTests
 {
     private static string App(string main) => Package(("lyric.toml", AppManifest), ("src/main.lyr", main));
 
-    /// <summary>The artifact of 13 S11: a names table of an enum with no <c>match</c> — every
+    /// <summary>A names table of an enum with no <c>match</c> — every
     /// variant and its name, one by its name, through the enum and through a constraint.</summary>
     [Fact]
     public void An_enums_variants_are_values_and_names_without_a_match()
@@ -38,7 +38,7 @@ public class VariantsTests
         Assert.Equal("Low;Mid;High;\ntrue true 3 High\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>A static member of an interface with a body is a default (03 T5): each conformer's
+    /// <summary>A static member of an interface with a body is a default: each conformer's
     /// instance, its own static of the name in its place, reached through the name and through a
     /// constraint.</summary>
     [Fact]

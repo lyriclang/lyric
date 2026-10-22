@@ -4,7 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>lyric update</c> raises a tag (design/v5/spec/07 P4, M7-8): a tag of the root manifest that
+/// <c>lyric update</c> raises a tag: a tag of the root manifest that
 /// is a version moves to the newest tag of its line the repository has — never another major,
 /// below 1 never another minor, a pre-release only for a pre-release —, written into
 /// <c>lyric.toml</c> on its line, the rest of the file as it was; then the lock. A branch, a

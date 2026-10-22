@@ -1,8 +1,8 @@
-/* Arrays in C, as far as design/v5/spec/01 V10 and 03 T13 put them there: the layout is in
+/* Arrays in C, as far as the runtime has them: the layout is in
  * types.h, the allocation in gc.h, the index check in panic.h. What remains are the two
- * operators that build a new array from old ones (10 C7): concatenation and repetition, both by
+ * operators that build a new array from old ones: concatenation and repetition, both by
  * copying elements as bytes — a struct element is copied whole, a reference element as the
- * reference, which is what a copy of the value means (02 M3). Every other member of T[] is
+ * reference, which is what a copy of the value means. Every other member of T[] is
  * Lyric (std.core). */
 #ifndef LYR_ARRAY_H
 #define LYR_ARRAY_H
@@ -20,12 +20,12 @@ LyrArr *lyr_arr_concat(const LyrDesc *desc, const LyrArr *a, const LyrArr *b);
  * panics with LYR-RT0007; a size that does not fit with LYR-RT0005. */
 LyrArr *lyr_arr_repeat(const LyrDesc *desc, const LyrArr *array, int64_t count);
 
-/* The copy primitive (the review's B16): the first `count` elements of the view `from` into the
+/* The copy primitive: the first `count` elements of the view `from` into the
  * view `into`, both `lyr_slice_<T>` of one element type (a pointer into an array and a length,
  * CEmitter) — memmove, so the two may overlap either way: a struct element is copied whole, a
- * reference element as the reference (02 M3). The counts are the library's to check
+ * reference element as the reference. The counts are the library's to check
  * (std.core's `moveElements` callers; `Slice.copyInto` panics with LYR-RT0003). The barrier for a
- * span (13 M11 P8): the cards of the lines the moved elements now cover. */
+ * span: the cards of the lines the moved elements now cover. */
 #define LYR_SLICE_MOVE(into, from, count)                                                 \
     (memmove((into).ptr, (from).ptr, (size_t)(count) * sizeof(*(into).ptr)),             \
      lyr_gc_card_span((into).ptr, (size_t)(count) * sizeof(*(into).ptr)))

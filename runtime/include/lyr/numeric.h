@@ -1,4 +1,4 @@
-/* The number tower's operations that are not a plain C operator (design/v5/spec/03 T1d, T2):
+/* The number tower's operations that are not a plain C operator:
  * shifts that panic on a count the type cannot take, the wrap operators, a float to an integer
  * that saturates, and the check behind `uint32 as char`. Everything here is a macro or a
  * `static inline` so a site costs a compare and a never-taken branch, as the checked arithmetic
@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include "lyr/panic.h"
 
-/* A shift by a negative count or by the width of the type or more panics (T2: no silent
+/* A shift by a negative count or by the width of the type or more panics (no silent
  * masking, which is what the hardware would do). Bits shifted out are gone — that is a shift,
  * not an overflow. `T` is the operand type, `U` its unsigned twin, `bits` its width: a left
  * shift computes in unsigned arithmetic, where C defines what a signed shift into the sign bit
@@ -35,7 +35,7 @@ LYR_NORETURN void lyr_panic_shift(int64_t count, int bits);
         (T)(lyr_a_ >> (unsigned)lyr_b_);                                                            \
     })
 
-/* `+%` `-%` `*%` (08 Y4): two's-complement wrap at the type's width. The arithmetic is done in
+/* `+%` `-%` `*%`: two's-complement wrap at the type's width. The arithmetic is done in
  * uint64_t, where C defines the wrap, and the result reduced to the width by the conversion —
  * which C defines for the unsigned twin, and clang and gcc define as the same reduction for the
  * signed type. In 64 bits also so that a narrow multiplication never promotes to a signed int
@@ -44,7 +44,7 @@ LYR_NORETURN void lyr_panic_shift(int64_t count, int bits);
 #define LYR_WRAP_SUB(T, U, a, b) ((T)(U)((uint64_t)(U)(a) - (uint64_t)(U)(b)))
 #define LYR_WRAP_MUL(T, U, a, b) ((T)(U)((uint64_t)(U)(a) * (uint64_t)(U)(b)))
 
-/* std.core's number natives (design/v5/spec/10 B5): whether + - * leave the operand type, and
+/* std.core's number natives: whether + - * leave the operand type, and
  * the result wrapped to it — what the builtin stores either way, the `+%` of a builtin —, the bit
  * counts, the rotation. One macro each serves every integer type, through the operand's own type
  * and width; the operand's bits are taken zero-extended (a negative narrow value would
@@ -66,11 +66,11 @@ LYR_NORETURN void lyr_panic_shift(int64_t count, int bits);
         (void)builtin((a), (b), &lyr_result_);                                                      \
         lyr_result_;                                                                                \
     })
-/* `v as U` where U is a type parameter's (03 T1d): the operand converted to the type of `like`,
+/* `v as U` where U is a type parameter's: the operand converted to the type of `like`,
  * which is not evaluated — std.core reads a digit into the integer type it parses. */
 #define LYR_CONVERT(v, like) ((LYR_VALUE_TYPE_(like))(v))
 
-/* A float's bits (10 B5): a `float` its 64, a `float32` its 32 in the low ones — and back, from the
+/* A float's bits: a `float` its 64, a `float32` its 32 in the low ones — and back, from the
  * low 32 for a `float32`. */
 #define LYR_FLOAT_BITS(x)                                                                           \
     __extension__({                                                                                 \
@@ -133,7 +133,7 @@ LYR_NORETURN void lyr_panic_shift(int64_t count, int bits);
                                            & LYR_MASK_(lyr_x_));                                    \
     })
 
-/* A float to an integer (T1d, Rust's rule): toward zero; beyond the range, the nearest bound;
+/* A float to an integer: toward zero; beyond the range, the nearest bound;
  * NaN gives 0. C leaves an out-of-range conversion undefined, so the bounds are tested first,
  * on the double, against the first value OUTSIDE the range in each direction — those are exact
  * doubles for every width, except that -2^63 - 1 is not, and -2^63 itself is INT64_MIN. A
@@ -155,7 +155,7 @@ LYR_SATURATE_(lyr_f64_to_u32, uint32_t, -1.0, 4294967296.0, 0, UINT32_MAX)
 LYR_SATURATE_(lyr_f64_to_u64, uint64_t, -1.0, 18446744073709551616.0, 0, UINT64_MAX)
 #undef LYR_SATURATE_
 
-/* `uint32 as char` (T1d): a char is a Unicode scalar value, so a surrogate or a value above
+/* `uint32 as char`: a char is a Unicode scalar value, so a surrogate or a value above
  * U+10FFFF is refused at the conversion, with RT0009 — the one place a char can come from a
  * number, and therefore the one place the invariant is checked. A macro, as the checked
  * arithmetic is, so the panic's trace starts at the program's line and not in a helper. */

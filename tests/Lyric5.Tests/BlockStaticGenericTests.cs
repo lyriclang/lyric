@@ -4,10 +4,10 @@ namespace Lyric5.Tests;
 
 /// <summary>
 /// A generic static of a generic <c>extend</c> block, called with its own type arguments
-/// (design/v5/spec/03 T7 X1): <c>Pack&lt;int&gt;.rd&lt;StringBuilder&gt;(&amp;sb)</c> from a
+/// as in <c>Pack&lt;int&gt;.rd&lt;StringBuilder&gt;(&amp;sb)</c> from a
 /// block <c>extend&lt;T&gt; Pack&lt;T&gt; :: [Rd]</c>. It went the generic type's way, where only
 /// the type's parameters are bound, and its body kept the block's <c>T</c> — an internal error
-/// of the IR verifier (sweep after M10, open point 147; S1 had worked around it).
+/// of the IR verifier.
 /// </summary>
 [Collection("console")]
 public class BlockStaticGenericTests

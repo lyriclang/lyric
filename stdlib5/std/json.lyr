@@ -427,7 +427,7 @@ pub class JsonWriter :: [Encoder] {
 
     pub mut fn encodeFloat(v: float): void throws EncodeError {
         if (!v.isFinite()) {
-            throw EncodeError { path = this.path(), detail = f"{v} has no JSON text (RFC 8259 §6)" };
+            throw EncodeError { path = this.path(), detail = f"{v} has no JSON text — JSON has no NaN or infinity" };
         }
         if (this.inKey()) {
             throw EncodeError { path = this.path(), detail = "a JSON key is a string, not a float" };
@@ -671,7 +671,7 @@ pub class TreeBuilder :: [Encoder] {
 
     pub mut fn encodeFloat(v: float): void throws EncodeError {
         if (!v.isFinite()) {
-            throw EncodeError { path = this.path(), detail = f"{v} has no JSON text (RFC 8259 §6)" };
+            throw EncodeError { path = this.path(), detail = f"{v} has no JSON text — JSON has no NaN or infinity" };
         }
         try this.put(JsonValue.Float(v));
     }

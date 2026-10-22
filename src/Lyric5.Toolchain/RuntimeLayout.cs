@@ -2,9 +2,9 @@ namespace Lyric5.Toolchain;
 
 /// <summary>
 /// What the Lyric 5 runtime is made of, per target and collector: the runtime's own sources under
-/// <c>runtime/src</c> with the collector the build asks for — its own (<c>gc_immix.c</c>, stages 2
-/// and 3 of design/v5/spec/01 L1) or the vendored Boehm collector (stage 1) with its binding
-/// (<c>gc_boehm.c</c>), kept to compare against (13 M11 P11).
+/// <c>runtime/src</c> with the collector the build asks for — its own (<c>gc_immix.c</c>)
+/// or the vendored Boehm collector with its binding
+/// (<c>gc_boehm.c</c>), kept to compare against.
 /// </summary>
 public static class RuntimeLayout
 {
@@ -26,13 +26,13 @@ public static class RuntimeLayout
 
     private static string BacktraceConfigDir(string root) => Path.Combine(root, "runtime", "src", "backtrace_config");
 
-    /// <summary>musl's double math functions (design 09 D7, 13 M10 S12): exp, log, pow, the trigonometric
+    /// <summary>musl's double math functions: exp, log, pow, the trigonometric
     /// and hyperbolic ones, cbrt and hypot, under the runtime's prefix (lyr_names.h), so every
     /// tier-1 target computes the same bits as the compiler's own port of them (Libm.cs).</summary>
     private static string MuslMathDir(string root) => Path.Combine(root, "runtime", "third_party", "musl-math");
 
     /// <summary>
-    /// The libbacktrace files a target needs (panic backtraces, 01 E8): the DWARF reader, the
+    /// The libbacktrace files a target needs (panic backtraces): the DWARF reader, the
     /// reader for the target's executable format, and mapped file access. Windows has none: the
     /// runtime names its frames through DbgHelp there, because zig cc writes PDB, not DWARF.
     /// </summary>
@@ -48,9 +48,9 @@ public static class RuntimeLayout
     }
 
     /// <summary>
-    /// The collector's configuration. Threads from contract 0 (L6); C11 atomics instead of
+    /// The collector's configuration. Threads from the start; C11 atomics instead of
     /// libatomic_ops; every interior pointer keeps its object alive, because views point into
-    /// strings and arrays (V9, V10); no executable heap.
+    /// strings and arrays; no executable heap.
     /// </summary>
     public static IReadOnlyList<string> CollectorDefines(Target target)
     {
@@ -69,7 +69,7 @@ public static class RuntimeLayout
 
     public static IReadOnlyList<CUnit> Units(string root, Target target, Collector gc)
     {
-        // Where the toolchain lies is no part of what it builds (11 W2 P6).
+        // Where the toolchain lies is no part of what it builds.
         var map = $"-ffile-prefix-map={Path.TrimEndingDirectorySeparator(Path.GetFullPath(root))}=lyric";
         var bdwgc = BdwgcDir(root);
         var bdwgcInclude = Path.Combine(bdwgc, "include");

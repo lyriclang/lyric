@@ -6,14 +6,13 @@ namespace Lyric5.Tests;
 /// <summary>
 /// The front end as <c>lyric5 build</c> runs it on a package: the text is the package's
 /// <c>src/main.lyr</c>, the module <c>app.main</c>, and Lyric 5's module rules hold — names from
-/// paths, visibility, the prelude, the entry's contract (design/v5/spec/07).
+/// paths, visibility, the prelude, the entry's contract.
 /// </summary>
 /// <remarks>
-/// Until the review of 2026-10-05 the tests that compile in memory passed no package roots, and
-/// the front end read that as the 4.x module rules: the prelude was all of <c>std.core</c>, a
-/// re-export gave nothing on, <c>for</c> over an array took 4.x's way. A test program could do
-/// what <c>lyric5 build</c> refuses, and the reverse: the examples of M8a did not compile there
-/// and had to run elsewhere. One mode, the one a user meets.
+/// The tests that compile in memory pass package roots: without them the front end reads the
+/// 4.x module rules — the prelude all of <c>std.core</c>, a re-export giving nothing on,
+/// <c>for</c> over an array 4.x's way —, and a test program could do what <c>lyric5 build</c>
+/// refuses, and the reverse. One mode, the one a user meets.
 /// </remarks>
 internal static class TestCompiler
 {

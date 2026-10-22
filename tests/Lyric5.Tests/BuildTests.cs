@@ -5,7 +5,7 @@ using Profile = Lyric5.Toolchain.Profile;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>lyric5 build</c> and <c>run</c> (M2 S4; design/v5/spec/11 C5, C8, P4, P5; 01 L7): a file is
+/// <c>lyric5 build</c> and <c>run</c>: a file is
 /// an implicit package with <c>out/</c> by it, the binary lands under profile and target, an
 /// unchanged program compiles nothing twice, and <c>run</c> passes the program's exit through.
 /// Every test works in a directory of its own, so no two share an <c>out/</c>.

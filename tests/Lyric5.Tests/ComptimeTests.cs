@@ -6,7 +6,7 @@ using Profile = Lyric5.Toolchain.Profile;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>comptime e</c> through the IR interpreter (design/v5/spec/09 A4, Q3, Q5–Q7; 13 M9a S1): a
+/// <c>comptime e</c> through the IR interpreter: a
 /// site is a constant in the binary, computed as the binary computes it, and a site that stops —
 /// a panic, its budget spent, a call into the world, a native compile time cannot answer yet — is
 /// an error where it stands, with the frames the evaluation went through.
@@ -40,7 +40,7 @@ public class ComptimeTests
     }
 
     /// <summary>The comparison above holds vacuously where a site is not computed at all — lowered
-    /// as the expression it holds, as before M9a: then <c>main</c> calls each case twice. A
+    /// as the expression it holds: then <c>main</c> calls each case twice. A
     /// constant leaves the run's call alone.</summary>
     [Fact]
     public void A_site_is_a_constant_in_its_function()
@@ -74,10 +74,10 @@ public class ComptimeTests
         Assert.Equal("832040\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>A site fills the module bindings it reads and no other (13 M9a S5): std.path's,
-    /// which asks the platform, stays unfilled. Filled with all the others at the first read, as
-    /// S1 did, it stopped every site that read a binding in a program that loads std.path
-    /// (<c>LYR-CT0003</c>) — S5 found it through <c>@Test { timeout = LIMIT }</c>.</summary>
+    /// <summary>A site fills the module bindings it reads and no other: std.path's, which asks
+    /// the platform, stays unfilled. Filled with all the others at the first read, it would stop
+    /// every site that reads a binding in a program that loads std.path (<c>LYR-CT0003</c>) — as
+    /// <c>@Test { timeout = LIMIT }</c> does.</summary>
     [Fact]
     public void A_site_fills_only_the_globals_it_reads()
     {
@@ -90,7 +90,7 @@ public class ComptimeTests
     private const string Spin = Head + "fn spin(n: int): int {\n    var s = 0;\n    var i = 0;\n    while (i < n) {\n"
                                 + "        s += i;\n        i += 1;\n    }\n    return s;\n}\n\n";
 
-    /// <summary>The budget is each site's, from the root manifest (09 Q5): a round of the loop
+    /// <summary>The budget is each site's, from the root manifest: a round of the loop
     /// takes 13 steps, a thousand rounds 13 014 — two such sites fit a budget of 20 000 each, one
     /// of two thousand rounds does not, and the error names the budget and where it is set.</summary>
     [Fact]
@@ -107,7 +107,7 @@ public class ComptimeTests
         Assert.Contains("'comptimeBudget' under [package] in lyric.toml", error);
     }
 
-    /// <summary>A site computes as the binary would (09 Q7): its overflow panics where the profile
+    /// <summary>A site computes as the binary would: its overflow panics where the profile
     /// checks — an error with the run-time code and the frames —, and wraps where it does not.</summary>
     [Fact]
     public void A_site_overflows_as_the_profile_says()
@@ -122,7 +122,7 @@ public class ComptimeTests
         Assert.Contains(errors, l => l.Contains("note: in 'app.main.inc'") && l.Contains("main.lyr:4:12"));
     }
 
-    /// <summary>A panic is an error at the site with the inner backtrace (09 Q6), innermost first:
+    /// <summary>A panic is an error at the site with the inner backtrace, innermost first:
     /// twelve frames, and how many more there were.</summary>
     [Fact]
     public void A_panic_shows_the_frames_it_came_through()
@@ -137,7 +137,7 @@ public class ComptimeTests
         Assert.Contains(errors, l => l.Contains("note: … 9 frames more"));
     }
 
-    /// <summary>Code run at compile time does not reach the world (09 Q3): a file read is an error
+    /// <summary>Code run at compile time does not reach the world: a file read is an error
     /// at the site, with the chain of calls that led to it.</summary>
     [Fact]
     public void A_call_into_the_world_is_an_error_with_its_chain()
@@ -148,10 +148,10 @@ public class ComptimeTests
         Assert.Contains(errors, l => l.Contains("note: in 'app.main.read'"));
     }
 
-    /// <summary>Compile time answers what every platform answers alike (09 Q7): the exactly
-    /// rounded functions, Unicode from the runtime's own tables (S4), and since M10 S12 the
-    /// functions each C library used to round its own way — musl's, in the runtime and in the
-    /// compiler as the same code (09 D7); that the bits are the program's is LibmTests.</summary>
+    /// <summary>Compile time answers what every platform answers alike: the exactly rounded
+    /// functions, Unicode from the runtime's own tables, and the functions each C library would
+    /// round its own way — musl's, in the runtime and in the compiler as the same code; that the
+    /// bits are the program's is LibmTests.</summary>
     [Fact]
     public void What_every_platform_answers_alike_is_answered()
     {
@@ -161,7 +161,7 @@ public class ComptimeTests
         Assert.True(exit == 0, $"exit {exit}\n{error}");
     }
 
-    /// <summary>A site leaves a value of any value type (09 Q1; 13 M9a P3, S2): the CRC table as
+    /// <summary>A site leaves a value of any value type: the CRC table as
     /// a <c>uint32[]</c>, a fresh array at every evaluation, which a write to the first does not
     /// reach; a struct, enums with payloads, a recursive enum through <c>Box</c>, optionals, a
     /// tuple, an inline array, arrays of strings and of arrays, a range.</summary>
@@ -192,7 +192,7 @@ public class ComptimeTests
         Assert.Contains("__builtin_memcpy(", c);
     }
 
-    /// <summary>What no literal makes is refused where the site stands (09 Q1), with the reason:
+    /// <summary>What no literal makes is refused where the site stands, with the reason:
     /// a class's object, a view, a function value, an interface value — also inside an array.
     /// A <c>Box</c> is the one class a site leaves.</summary>
     [Theory]
@@ -220,7 +220,7 @@ public class ComptimeTests
         + "    let s = comptime {\n        let xs = [1, 2, 3];\n        var t = 0;\n        for (v in xs) {\n            t += v;\n        }\n"
         + "        xs.iter().map((v: int) => v * t).fold(0, (a: int, b: int) => a + b)\n    };\n    println(f\"{s}\");\n}\n";
 
-    /// <summary>The forms (09 Q2; 13 M9a S3): a block whose last expression is the value, with
+    /// <summary>The forms: a block whose last expression is the value, with
     /// locals, a loop and a lambda of its own; <c>comptime if</c> with its <c>else if</c> chain,
     /// whose other branches are checked and not lowered — <c>onlyWhenSmall</c> is no part of the
     /// module; <c>comptime for</c> unrolled over an array a site computed — <c>names</c> is gone
@@ -239,7 +239,7 @@ public class ComptimeTests
     /// <summary>What the forms refuse: a site uses no local of the enclosing function and assigns
     /// no module's variable; a branch <c>comptime if</c> does not take is checked all the same;
     /// <c>comptime for</c> walks an array and binds a name; <c>comptime if</c> takes no
-    /// <c>let</c>. The four words are Lyric 5's (08 Y1): no name.</summary>
+    /// <c>let</c>. The four words are Lyric 5's: no name.</summary>
     [Theory]
     [InlineData("let local = 3;\n    let _ = comptime {\n        local + 1\n    };", "LYR-SEM0100", "'local' is a local of the enclosing function")]
     [InlineData("let _ = comptime {\n        counter = 5;\n        1\n    };", "LYR-SEM0100", "assigns only to what it binds itself")]
@@ -264,7 +264,7 @@ public class ComptimeTests
         + "fn main(): void {\n    let bytes = comptime table();\n    let text = comptime embed(\"../data/hello.txt\");\n"
         + "    println(f\"{bytes.length()} {bytes[0]} {bytes[bytes.length() - 1]} {text.length()}\");\n}\n";
 
-    /// <summary><c>embed</c> (09 Q4; 13 M9a S4, its artifact): a file of the package, relative to
+    /// <summary><c>embed</c>: a file of the package, relative to
     /// the module that calls, a <c>uint8[]</c> in the binary — through a function a site calls
     /// too; and the build depends on it: changed, it is read again.</summary>
     [Fact]

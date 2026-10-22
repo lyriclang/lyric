@@ -1,5 +1,5 @@
-/* The operating system's facts (design/v5/spec/10 Q9): M8b S1, the processors; S6a, the platform;
- * S9, the rest of std.os — the arguments, the environment, the working directory, the end. A text
+/* The operating system's facts: the processors, the platform, and the rest of std.os —
+ * the arguments, the environment, the working directory, the end. A text
  * comes back through the caller's buffer, as lyr/fs.h's paths do: its length, and a length beyond
  * `n` says the room it needs; a failure is negative, as lyr/fs.h writes one. */
 #ifndef LYR_OS_H
@@ -13,7 +13,7 @@
 /* The processors the system runs this process on — those online —, one at least. */
 int64_t lyr_os_cpu_count(void);
 
-/* The system the program was built for (M8b S6a, for std.path's separators; S9's os.platform):
+/* The system the program was built for (for std.path's separators and os.platform):
  * 1 Linux, 2 macOS, 3 Windows, 0 another POSIX system. */
 int64_t lyr_os_platform(void);
 
@@ -43,7 +43,7 @@ int64_t lyr_os_set_cwd(const LyrStr *path);
 /* The machine's name. */
 int64_t lyr_os_hostname(uint8_t *into, int64_t n);
 
-/* The program ended with `code`: what the console holds written first, nothing else run (07 M7f). */
+/* The program ended with `code`: what the console holds written first, nothing else run. */
 LYR_NORETURN void lyr_os_exit(int64_t code);
 
 /* A Slice<uint8> of emitted code is a pointer and a length (CEmitter). */

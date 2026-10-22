@@ -4,7 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The type of a catch binding (design/v5/spec/05 K7, C5; the review's M5-6): where only ONE
+/// The type of a catch binding: where only ONE
 /// type can arrive, the binding is that type — in the set form of one, <c>catch (e in A)</c>,
 /// which is <c>catch (e: A)</c>, and in the clause without a type that one type reaches. With
 /// several it stays an <c>Error</c> that carries the set. It was an <c>Error</c> always, so the
@@ -12,7 +12,7 @@ namespace Lyric5.Tests;
 /// (<c>LYR-SEM0012</c>).
 ///
 /// <para>And a clause without a type that NOTHING reaches — the clauses above take every type the
-/// block throws — is warned about (<c>LYR-SEM0171</c>; the review's M5-16). It was silent.</para>
+/// block throws — is warned about (<c>LYR-SEM0171</c>). It was silent.</para>
 ///
 /// <para>Through <c>Main</c>, so in the console collection.</para>
 /// </summary>
@@ -109,7 +109,7 @@ public class CatchBindingTests
     }
 
     /// <summary>The binding is still an error wherever one is asked: an <c>Error</c> parameter,
-    /// an <c>Error</c> binding, and <c>throw e</c> — the same error going on (05 E6 O3).</summary>
+    /// an <c>Error</c> binding, and <c>throw e</c> — the same error going on.</summary>
     [Fact]
     public void A_binding_of_one_type_is_an_error_where_one_is_asked()
     {
@@ -269,7 +269,7 @@ public class CatchBindingTests
     }
 
     /// <summary>A join of two — what a generic function throws when its argument throws two
-    /// (K7) — is two types under one name, and no type for a binding.</summary>
+    /// — is two types under one name, and no type for a binding.</summary>
     [Fact]
     public void A_join_is_not_one_type()
     {
@@ -319,7 +319,7 @@ public class CatchBindingTests
     // ------------------------------------------------------------------ nothing reaches it
 
     /// <summary>The clauses above take every type the block throws: the clause without a type
-    /// is dead, and says so (the review's M5-16, a warning).</summary>
+    /// is dead, and says so with a warning.</summary>
     [Theory]
     [InlineData("try {\n        println(f\"{find(\"\")}\");\n    } catch (e: NotFound) {\n        println(e.path);\n    } catch (_) {\n        println(\"never\");\n    }", "empty\n")]
     [InlineData("try {\n        println(f\"{open(\"x\")}\");\n    } catch (e in [NotFound, Denied]) {\n        println(e.message());\n    } catch (_) {\n        println(\"never\");\n    }", "denied 7\n")]

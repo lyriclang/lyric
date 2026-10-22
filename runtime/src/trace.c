@@ -1,4 +1,4 @@
-/* Backtraces for panics and crashes (01 E8): libbacktrace over the DWARF of the executable on
+/* Backtraces for panics and crashes: libbacktrace over the DWARF of the executable on
  * Linux and macOS, DbgHelp over the PDB on Windows (zig cc writes CodeView there). Both halves
  * capture program counters first, then name them, then share the filtering and the format.
  *
@@ -43,7 +43,7 @@ static void add_frame(uintptr_t pc, const char *function, const char *file, int 
 /* --- Linux, macOS: libbacktrace ----------------------------------------------------------- */
 #include "backtrace.h"
 
-/* Created at the first panic, not at start (01 L11): creating it is cheap, reading the debug
+/* Created at the first panic, not at start: creating it is cheap, reading the debug
  * information happens on the first lookup anyway, but a program that never panics pays nothing. */
 static _Atomic(struct backtrace_state *) state;
 
@@ -134,7 +134,7 @@ static void walk_frames(struct backtrace_state *st, Pcs *pcs, const LyrFault *fa
 }
 
 /* Without a fault, the calling thread's own frames by the same chain: Apple's unwinder takes more
- * stack than the reserve a stack overflow leaves (M11 S4: on macOS a coroutine's overflow ran out
+ * stack than the reserve a stack overflow leaves (on macOS a coroutine's overflow ran out
  * of it inside the unwinder, and the thread's own overflow panicked while it panicked). */
 static __attribute__((noinline)) void walk_here(Pcs *pcs) {
     uintptr_t fp = (uintptr_t)__builtin_frame_address(0);
@@ -406,7 +406,7 @@ static size_t note_repeats(char *out, size_t capacity, size_t used, int repeats)
 static size_t emit(char *out, size_t capacity, uintptr_t fault_pc);
 
 /* The one trace - and DbgHelp, on Windows - serves one thread at a time. A panic lets one report
- * through, but a program's Backtrace is named on any thread at any time (05 E6 O3), and so is
+ * through, but a program's Backtrace is named on any thread at any time, and so is
  * main's report: a spin lock, since naming is rare. The panic path waits for it a bounded while
  * only - it may run in a signal handler on the very thread that holds it, and a garbled trace
  * beats a hang. */
@@ -465,7 +465,7 @@ static size_t emit(char *out, size_t capacity, uintptr_t fault_pc) {
      * it, as lyr_arr_repeat raises RT0007: the first frame of the program's text, a '.lyr' file, is
      * where the trace starts. Names cannot tell them apart: the program's functions are named
      * lyr_<module>_…, and a module called 'trace' or 'panic' looked like the runtime and lost every
-     * frame (N1b). Without line information the names are all there is. */
+     * frame. Without line information the names are all there is. */
     if (start < 0) {
         for (int i = 0; i < trace.count && start < 0; i++) {
             if (is_lyric_frame(&trace.frames[i])) start = i;
@@ -497,7 +497,7 @@ static size_t emit(char *out, size_t capacity, uintptr_t fault_pc) {
     int repeats = 0;
     for (int i = start; i < end && used + 1 < capacity; i++) {
         const Frame *frame = &trace.frames[i];
-        /* The emitted thunk that makes a function without an environment a function value (01 V8):
+        /* The emitted thunk that makes a function without an environment a function value:
          * glue, at a line of the C file — the frames around it are the program's. */
         if (frame->function && starts_with(frame->function, "lyr_thunk_")) continue;
         /* A recursion — a stack overflow's usual cause — shows its frame once, and a count. */

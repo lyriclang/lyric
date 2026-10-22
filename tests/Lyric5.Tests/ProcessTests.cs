@@ -4,10 +4,10 @@ using Profile = Lyric5.Toolchain.Profile;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Processes (design/v5/spec/10 O8, Q9; 13 M8b S12a): children started, their pipes read and
+/// Processes: children started, their pipes read and
 /// written, their ends waited for — a kill, a cancelled wait, SIGPIPE at its default in the child
 /// although the test host and the runtime ignore it, twenty at once, a wait on another thread — and
-/// the plan's pipeline example. POSIX: Windows' processes come with S12b. Each run has a deadline.
+/// the pipeline example. POSIX here; Windows' processes below. Each run has a deadline.
 /// </summary>
 public class ProcessTests
 {
@@ -39,7 +39,7 @@ public class ProcessTests
     }
 
     /// <summary>
-    /// A child's arguments arrive as they were given (S12b): on Windows through one command line,
+    /// A child's arguments arrive as they were given: on Windows through one command line,
     /// quoted as the C runtime reads it back — the child a Lyric program whose os.args() reads it
     /// with CommandLineToArgvW; on POSIX the exec takes them as they are.
     /// </summary>
@@ -56,7 +56,7 @@ public class ProcessTests
     }
 
     /// <summary>
-    /// Windows' processes (S12b): what the POSIX test checks, with what every Windows has — cmd, sort,
+    /// Windows' processes: what the POSIX test checks, with what every Windows has — cmd, sort,
     /// ping —, a kill TerminateProcess's code 1.
     /// </summary>
     [Fact]

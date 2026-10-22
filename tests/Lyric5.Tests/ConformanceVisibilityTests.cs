@@ -3,8 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Where a conformance block reaches (design/v5/spec/04; spec 04 rule 10; the sweep after M10,
-/// W7): wherever its type is, its module imported or not — the synthesized ones among them. A
+/// Where a conformance block reaches (spec 04 rule 10): wherever its type is, its module imported or not — the synthesized ones among them. A
 /// type that comes through a re-export, a return value or a field brings its conformances; a
 /// block of methods alone stays its module's (04 rule 9).
 /// </summary>

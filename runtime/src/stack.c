@@ -1,4 +1,4 @@
-/* The prologue's check of the stack (design/v5/spec/01 S3; 13 M11 P6): every compiled function that
+/* The prologue's check of the stack: every compiled function that
  * calls compares its frame with the thread's bound (gc.h, LYR_STACK_CHECK); below the bound lies a
  * reserve, enough for the panic an overflow is. The bound follows the stack the thread runs on —
  * its own, or a coroutine's (coro.c sets it at each switch). The guard page below each stack and
@@ -22,7 +22,7 @@
 
 _Thread_local LyrMutator lyr_mutator;
 
-/* Under ASan (the asan profile, 01 C7) two of its defaults fight a collector that scans stacks
+/* Under ASan (the asan profile) two of its defaults fight a collector that scans stacks
  * conservatively, whichever it is: fake stacks move locals into memory the scan never sees, so
  * live objects would be collected; and LeakSanitizer does not scan the collector's heap, so malloc
  * blocks referenced only from there would be reported as leaks. */
