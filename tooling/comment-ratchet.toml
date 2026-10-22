@@ -1,56 +1,11 @@
 # Comment lines that cite the design, per file: what CommentRatchetTests allows.
 # A count may only fall. LYRIC_UPDATE_SNAPSHOTS=1 lowers the counts to what the tree holds.
 
-# stdlib5-doc: 332
+# stdlib5-doc: 0
 ["stdlib5-doc"]
-"stdlib5/std/build.lyr" = 4
-"stdlib5/std/codec.lyr" = 25
-"stdlib5/std/compress.lyr" = 1
-"stdlib5/std/crypto.lyr" = 5
-"stdlib5/std/encoding.lyr" = 5
-"stdlib5/std/fs.lyr" = 14
-"stdlib5/std/http.lyr" = 2
-"stdlib5/std/io.lyr" = 35
-"stdlib5/std/json.lyr" = 11
-"stdlib5/std/meta.lyr" = 6
-"stdlib5/std/net.lyr" = 14
-"stdlib5/std/os.lyr" = 9
-"stdlib5/std/path.lyr" = 1
-"stdlib5/std/prelude.lyr" = 4
-"stdlib5/std/process.lyr" = 8
-"stdlib5/std/random.lyr" = 2
-"stdlib5/std/regex.lyr" = 3
-"stdlib5/std/sync.lyr" = 12
-"stdlib5/std/syntax.lyr" = 8
-"stdlib5/std/task.lyr" = 105
-"stdlib5/std/term.lyr" = 2
-"stdlib5/std/test.lyr" = 16
-"stdlib5/std/thread.lyr" = 14
-"stdlib5/std/time.lyr" = 14
-"stdlib5/std/toml.lyr" = 10
-"stdlib5/std/uri.lyr" = 2
 
-# stdlib5: 114
+# stdlib5: 0
 ["stdlib5"]
-"stdlib5/std/collections.lyr" = 19
-"stdlib5/std/core.lyr" = 40
-"stdlib5/std/encoding.lyr" = 1
-"stdlib5/std/fs.lyr" = 7
-"stdlib5/std/hash.lyr" = 1
-"stdlib5/std/http.lyr" = 5
-"stdlib5/std/io.lyr" = 10
-"stdlib5/std/iter.lyr" = 7
-"stdlib5/std/json.lyr" = 1
-"stdlib5/std/math.lyr" = 4
-"stdlib5/std/net.lyr" = 3
-"stdlib5/std/os.lyr" = 3
-"stdlib5/std/path.lyr" = 1
-"stdlib5/std/prelude.lyr" = 1
-"stdlib5/std/process.lyr" = 2
-"stdlib5/std/random.lyr" = 2
-"stdlib5/std/task.lyr" = 3
-"stdlib5/std/test.lyr" = 2
-"stdlib5/std/time.lyr" = 2
 
 # runtime: 277
 ["runtime"]

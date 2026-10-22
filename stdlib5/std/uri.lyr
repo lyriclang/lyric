@@ -1,11 +1,11 @@
-/// `std.uri` (design 10 O11; 13 M10 S5): RFC 3986 strictly. `Uri` is the five parts of a reference
-/// — scheme, authority (user information, host, port), path, query, fragment —, `Uri.parse` reads
-/// them and refuses what the grammar does (a space, a character beyond ASCII, a `%` without two hex
-/// digits, a host that is no IPv6 address inside its brackets), `show` writes them back (§5.3),
-/// `resolve` takes a reference against a base (§5.2), `normalize` the case, the percent-encoding
-/// and the dot segments (§6.2). `percentEncode` and `percentDecode` encode a text for a component
-/// and read it back; `Query` is the pairs of a query in their order. WHATWG's URL is a browser's
-/// leniency, not a library's contract: this module is the RFC.
+/// URI references as RFC 3986 defines them, strictly; section numbers below are RFC 3986's. [Uri]
+/// holds the five parts of a reference — scheme, authority (user information, host, port), path,
+/// query, fragment —; [Uri.parse] reads them and refuses what the grammar refuses (a space, a
+/// character beyond ASCII, a `%` without two hex digits, a host in brackets that is not an IPv6
+/// address), `show` writes them back (§5.3), [Uri.resolve] resolves a reference against a base
+/// (§5.2), and [Uri.normalize] normalizes the case, the percent-encoding and the dot segments
+/// (§6.2). [percentEncode] and [percentDecode] encode a text for a [Component] and decode it
+/// again; [Query] holds the pairs of a query in their order.
 import std.collections { List };
 import std.core { Parse, ParseError, StringBuilder, viewBytes, Utf8Error };
 import std.net { IpAddr };
@@ -57,7 +57,8 @@ fn isSchemeChar(b: uint8): bool {
     return isAlpha(b) || isDigit(b) || b == 43u8 || b == 45u8 || b == 46u8;
 }
 
-/// A component of a URI, for the percent-encoding: what each keeps as it is.
+/// A component of a URI, for percent-encoding: each keeps a different set of characters as they
+/// are.
 pub enum Component :: [Equatable, Debug] {
     /// Before the `@`: unreserved, sub-delims and `:`.
     Userinfo,
@@ -75,7 +76,7 @@ pub enum Component :: [Equatable, Debug] {
     Pair,
 }
 
-/// Whether `b` stands as it is in the component.
+/// Returns whether `b` stands as it is in the component.
 fn keeps(c: Component, b: uint8): bool {
     return match (c) {
         .Userinfo => isUnreserved(b) || isSubDelim(b) || b == 58u8,
@@ -88,7 +89,8 @@ fn keeps(c: Component, b: uint8): bool {
     };
 }
 
-/// Whether `text[from..to]` is the component's grammar: its characters or `%` with two hex digits.
+/// Returns whether `text[from..to]` matches the component's grammar: its characters, or `%` with
+/// two hex digits.
 fn valid(text: Slice<uint8>, from: int, to: int, c: Component): bool {
     var i = from;
     while (i < to) {
@@ -111,7 +113,7 @@ fn hexDigit(v: int): char {
     return if (v < 10) ((48 + v) as uint32) as char else ((55 + v) as uint32) as char;
 }
 
-/// The ASCII bytes `text[from..to]` as a text.
+/// Returns the ASCII bytes `text[from..to]` as a string.
 fn ascii(text: Slice<uint8>, from: int, to: int): string {
     let out = StringBuilder.new();
     var i = from;
@@ -122,8 +124,9 @@ fn ascii(text: Slice<uint8>, from: int, to: int): string {
     return out.toString();
 }
 
-/// `s` percent-encoded for the component `c` (§2.1): every byte the component does not keep as
-/// `%` and two hex digits in capitals; a character beyond ASCII as the bytes of its UTF-8.
+/// Returns `s` percent-encoded for the component `c` (§2.1): every byte the component does not
+/// keep becomes `%` and two hex digits in capitals; a character beyond ASCII is encoded as the
+/// bytes of its UTF-8.
 pub fn percentEncode(s: StringView, c: Component): string {
     let text = viewBytes(s);
     let out = StringBuilder.new();
@@ -139,9 +142,12 @@ pub fn percentEncode(s: StringView, c: Component): string {
     return out.toString();
 }
 
-/// `s` with its percent-encodings decoded: `%` and two hex digits a byte. A `%` without them, or
-/// bytes that are no UTF-8, is `ParseError { kind = .Invalid }`. A `+` stays a `+` — `Query.parse`
-/// reads it as a space, the form convention.
+/// Returns `s` with its percent-encodings decoded, each `%` and two hex digits one byte. A `+`
+/// stays a `+`; [Query.parse] is the one that reads it as a space, the form convention.
+///
+/// # Errors
+/// Throws [ParseError] with kind `Invalid` for a `%` without two hex digits after it, and for
+/// decoded bytes that are not UTF-8.
 pub fn percentDecode(s: StringView): string throws ParseError {
     let text = viewBytes(s);
     let n = text.length();
@@ -173,10 +179,10 @@ pub fn percentDecode(s: StringView): string throws ParseError {
 // The URI.
 // ---------------------------------------------------------------------------------------------
 
-/// A URI reference (§4.1): absolute where it has a scheme, relative else. The host stands without
-/// its brackets — `show` puts them around an address with a `:` —; a `null` host is no authority,
-/// an empty one the empty authority of `file:///etc`. `port` is `null` where none or an empty one
-/// was written.
+/// A URI reference (§4.1): absolute where it has a scheme, relative otherwise. The host is held
+/// without its brackets — `show` puts them around an address with a `:` —; a `null` host means no
+/// authority, an empty one the empty authority of `file:///etc`. `port` is `null` where none or an
+/// empty one was written.
 pub struct Uri :: [Equatable, Hashable, Debug] {
     pub scheme: ?string = null,
     pub userinfo: ?string = null,
@@ -186,12 +192,12 @@ pub struct Uri :: [Equatable, Hashable, Debug] {
     pub query: ?string = null,
     pub fragment: ?string = null,
 
-    /// Whether the reference has a scheme (§4.3).
+    /// Returns whether the reference has a scheme (§4.3).
     pub fn isAbsolute(): bool {
         return this.scheme != null;
     }
 
-    /// The authority as written between `//` and the path, `null` where there is none.
+    /// Returns the authority as written between `//` and the path, `null` where there is none.
     pub fn authority(): ?string {
         if (let h = this.host) {
             let out = StringBuilder.new();
@@ -209,7 +215,10 @@ pub struct Uri :: [Equatable, Hashable, Debug] {
         return null;
     }
 
-    /// The query as its pairs, empty where there is no query.
+    /// Returns the query as its pairs, empty where there is no query.
+    ///
+    /// # Errors
+    /// Throws [ParseError] as [Query.parse] does.
     pub fn queryPairs(): Query throws ParseError {
         if (let q = this.query) {
             return try Query.parse(q);
@@ -217,8 +226,8 @@ pub struct Uri :: [Equatable, Hashable, Debug] {
         return Query.new();
     }
 
-    /// `ref` against this base (§5.2.2, strict: a reference with the base's scheme is absolute).
-    /// The base should be absolute (§5.2.1); a relative base gives a relative result.
+    /// Returns `ref` resolved against this base (§5.2.2, strict: a reference with the base's scheme
+    /// is absolute). The base should be absolute (§5.2.1); a relative base gives a relative result.
     pub fn resolve(ref: Uri): Uri {
         if (ref.scheme != null) {
             return ref with { path = removeDotSegments(ref.path) };
@@ -244,8 +253,8 @@ pub struct Uri :: [Equatable, Hashable, Debug] {
         };
     }
 
-    /// §5.2.3: the reference's path onto the base's — after the base's last `/`, or as the root
-    /// where the base has an authority and no path.
+    /// Returns the reference's path merged onto the base's (§5.2.3) — after the base's last `/`,
+    /// or under the root where the base has an authority and no path.
     fn merge(relative: string): string {
         if (this.host != null && this.path.isEmpty()) {
             return "/" + relative;
@@ -265,10 +274,11 @@ pub struct Uri :: [Equatable, Hashable, Debug] {
         return ascii(text, 0, last + 1) + relative;
     }
 
-    /// The URI normalized (§6.2): the scheme and the host in small letters, a percent-encoding of
-    /// an unreserved character decoded and the others' digits in capitals, the dot segments of the
-    /// path removed, an empty path with an authority `/`, the scheme's default port dropped (80
-    /// for `http` and `ws`, 443 for `https` and `wss`, 21 for `ftp`).
+    /// Returns the URI normalized (§6.2): the scheme and the host in small letters, a
+    /// percent-encoding of an unreserved character decoded and the others' digits in capitals, the
+    /// dot segments of the path removed, an empty path with an authority made `/`, and the
+    /// scheme's default port dropped (80 for `http` and `ws`, 443 for `https` and `wss`, 21 for
+    /// `ftp`).
     pub fn normalize(): Uri {
         let scheme = this.scheme?.toLower();
         let userinfo = normalizeOpt(this.userinfo);
@@ -297,7 +307,7 @@ pub struct Uri :: [Equatable, Hashable, Debug] {
     }
 }
 
-/// The port a scheme implies, `-1` where none is known.
+/// Returns the port a scheme implies, `-1` where none is known.
 fn defaultPort(scheme: string): int {
     return match (scheme) {
         "http" => 80,
@@ -316,7 +326,8 @@ fn normalizeOpt(s: ?string): ?string {
     return null;
 }
 
-/// `%XX` of an unreserved character decoded, the other encodings' digits in capitals (§6.2.2.1–2).
+/// Returns `s` with `%XX` of an unreserved character decoded and the other encodings' digits in
+/// capitals (§6.2.2.1–2).
 fn normalizeEncoding(s: string): string {
     let text = viewBytes(s);
     let out = StringBuilder.new();
@@ -341,7 +352,7 @@ fn normalizeEncoding(s: string): string {
     return out.toString();
 }
 
-/// §5.2.4: `.` and `..` segments resolved, as the RFC's algorithm walks them.
+/// Returns `path` with its `.` and `..` segments resolved, following the algorithm of §5.2.4.
 pub fn removeDotSegments(path: string): string {
     let input = viewBytes(path);
     var at = 0;
@@ -410,14 +421,14 @@ fn pushSegment(segs: List<string>, s: string): void {
     segs.push(s);
 }
 
-/// The last segment and its slash dropped (§5.2.4 C).
+/// Drops the last segment and its slash (§5.2.4, step C).
 fn popSegment(segs: List<string>): void {
     if (!segs.isEmpty()) {
         let _ = segs.pop();
     }
 }
 
-/// A host into `out`: an address with a `:` inside brackets.
+/// Appends a host to `out`, an address with a `:` inside brackets.
 fn writeHost(out: StringBuilder, h: string): void {
     if (h.contains(':')) {
         out.appendChar('[');
@@ -429,7 +440,7 @@ fn writeHost(out: StringBuilder, h: string): void {
 }
 
 extend Uri :: [Display] {
-    /// §5.3: the parts recomposed.
+    /// Returns the parts recomposed into the reference's text (§5.3).
     fn show(): string {
         let out = StringBuilder.new();
         if (let s = this.scheme) {
@@ -454,12 +465,17 @@ extend Uri :: [Display] {
 }
 
 extend Uri :: [Parse] {
-    /// §3 and appendix B: the scheme up to the first `:` where its characters are a scheme's and no
-    /// `/`, `?` or `#` comes first; the authority after `//` up to the next `/`, `?` or `#`, split
-    /// at the last `@` and the port's `:`, a host in brackets an IPv6 address; the path up to `?`
-    /// or `#`; the query up to `#`; the fragment. Every part is checked against its grammar:
-    /// `ParseError { kind = .Invalid }` for what is not — `.Empty` for an empty text is no error,
-    /// the empty reference is one (§4.4): `Uri.parse("")` is `Uri {}`.
+    /// Parses a URI reference as §3 and appendix B split it: the scheme up to the first `:` where
+    /// its characters are a scheme's and no `/`, `?` or `#` comes first; the authority after `//`
+    /// up to the next `/`, `?` or `#`, split at the last `@` and the port's `:`, a host in
+    /// brackets an IPv6 address; the path up to `?` or `#`; the query up to `#`; the fragment.
+    /// Every part is checked against its grammar. An empty text is the empty reference (§4.4):
+    /// `Uri.parse("")` is `Uri {}`.
+    ///
+    /// # Errors
+    /// Throws [ParseError] with kind `Invalid` for a part that does not match its grammar, a port
+    /// that is not digits or beyond 65535, an unclosed bracket, and a `:` in the first segment of a
+    /// relative path.
     static fn parse(s: StringView): Uri throws ParseError {
         let text = viewBytes(s);
         let n = text.length();
@@ -547,7 +563,7 @@ extend Uri :: [Parse] {
     }
 }
 
-/// `text[from..to]` as `[ userinfo "@" ] host [ ":" port ]`: the three.
+/// Splits `text[from..to]` as `[ userinfo "@" ] host [ ":" port ]` and returns the three.
 fn parseAuthority(text: Slice<uint8>, from: int, to: int): (?string, string, ?int) throws ParseError {
     var userinfo: ?string = null;
     var hostFrom = from;
@@ -608,7 +624,8 @@ fn parseAuthority(text: Slice<uint8>, from: int, to: int): (?string, string, ?in
     return (userinfo, ascii(text, hostFrom, hostTo), port);
 }
 
-/// Digits, `null` where there are none; beyond 65535 is `Invalid`.
+/// Returns the port's digits as a number, `null` where there are none; a non-digit or a value
+/// beyond 65535 throws `Invalid`.
 fn parsePort(text: Slice<uint8>, from: int, to: int): ?int throws ParseError {
     if (from == to) {
         return null;
@@ -628,7 +645,7 @@ fn parsePort(text: Slice<uint8>, from: int, to: int): ?int throws ParseError {
     return v;
 }
 
-/// A URI is its text (10 E6, as an `Instant` is).
+/// A URI is encoded as its text, and decoded by parsing it.
 extend Uri :: [Codable] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
 
@@ -646,22 +663,27 @@ extend Uri :: [Codable] {
 // The query as pairs.
 // ---------------------------------------------------------------------------------------------
 
-/// The pairs of a query, `key=value` joined by `&`, in the order written; a key may stand more
+/// The pairs of a query, `key=value` joined by `&`, in the order written; a key may appear more
 /// than once. `parse` decodes the percent-encodings and a `+` as a space (the form convention
 /// servers see); `show` percent-encodes each key and value for `Component.Pair`, a space as `%20`.
 pub class Query {
     var items: List<(string, string)>,
 
+    /// Returns an empty query.
     pub static fn new(): Query {
         return Query { items = List.new() };
     }
 
-    /// The pairs in their order.
+    /// Returns the pairs in their order.
     pub fn pairs(): List<(string, string)> {
         return this.items;
     }
 
-    /// `a=1&b=2&a=3`: a part without `=` is a key with an empty value; an empty part is skipped.
+    /// Parses `a=1&b=2&a=3`: a part without `=` is a key with an empty value; an empty part is
+    /// skipped.
+    ///
+    /// # Errors
+    /// Throws [ParseError] as [percentDecode] does, for a key or value that does not decode.
     pub static fn parse(s: StringView): Query throws ParseError {
         let q = Query.new();
         for (part in s.split('&')) {
@@ -677,7 +699,7 @@ pub class Query {
         return q;
     }
 
-    /// The first value of the key.
+    /// Returns the first value of the key, or `null` where it is not there.
     pub fn get(key: string): ?string {
         for ((k, v) in this.items) {
             if (k == key) {
@@ -687,7 +709,7 @@ pub class Query {
         return null;
     }
 
-    /// Every value of the key, in order.
+    /// Returns every value of the key, in order.
     pub fn all(key: string): string[] {
         let out: List<string> = List.new();
         for ((k, v) in this.items) {
@@ -698,24 +720,28 @@ pub class Query {
         return out.toArray();
     }
 
+    /// Returns whether the key is there.
     pub fn has(key: string): bool {
         return this.get(key) != null;
     }
 
+    /// Returns the number of pairs.
     pub fn length(): int {
         return this.items.length();
     }
 
+    /// Returns whether there are no pairs.
     pub fn isEmpty(): bool {
         return this.items.isEmpty();
     }
 
-    /// A pair at the end.
+    /// Adds a pair at the end.
     pub mut fn add(key: string, value: string): void {
         this.items.push((key, value));
     }
 
-    /// The key's first pair gets the value, its others go; a key not there is added.
+    /// Sets the key's first pair to `value` and removes its others; a key not there is added at
+    /// the end.
     pub mut fn set(key: string, value: string): void {
         let kept: List<(string, string)> = List.new();
         var seen = false;
@@ -735,7 +761,7 @@ pub class Query {
         this.items = kept;
     }
 
-    /// Every pair of the key goes.
+    /// Removes every pair of the key.
     pub mut fn remove(key: string): void {
         let kept: List<(string, string)> = List.new();
         for ((k, v) in this.items) {
@@ -747,7 +773,7 @@ pub class Query {
     }
 }
 
-/// A key or a value: `+` a space, then the percent-encodings.
+/// Decodes a key or a value: `+` as a space, then the percent-encodings.
 fn formDecode(s: StringView): string throws ParseError {
     let text = viewBytes(s);
     let out = StringBuilder.new();

@@ -1,9 +1,12 @@
-/// TOML (design/v5/spec/10 B10 E8; 13 M10 S4): TOML 1.0 — an encoder and a decoder of
-/// `std.codec`'s model, and `TomlValue`, the tree. `toml.encode(v)` writes any `Encode` value
-/// whose form is a table as a document, `toml.decode<T>(text)` reads any `Decode` value out of
-/// one; `toml.parse(text)` is the tree. A struct is a table of its wire names, a sequence an
+/// Reads and writes TOML 1.0 documents through `std.codec`'s model.
+///
+/// The main types are `TomlValue`, the parsed tree, with `TomlTable` and `TomlDatetime`;
+/// `TreeBuilder`, the encoder that builds a tree; `TomlReader`, the decoder over a tree; and
+/// `TomlError`, a parse failure. `toml.encode(v)` writes any `Encode` value whose form is a table
+/// as a document, `toml.decode<T>(text)` reads any `Decode` value out of one, and
+/// `toml.parse(text)` returns the tree. A struct is a table of its wire names, a sequence an
 /// array, a map a table whose keys are strings — a number's digits for a number —, bytes an array
-/// of integers (E6), a unit variant its name, a variant with a payload a table of one key. A
+/// of integers, a unit variant its name, a variant with a payload a table of one key. A
 /// table keeps the order its keys were written in. Date-times are TOML's own form, in their four
 /// kinds; an `Instant` writes as a quoted RFC 3339 string and reads from a date-time or a string.
 import std.codec { Encode, Decode, Codable, Encoder, Decoder, EncodeError, DecodeError };
@@ -16,7 +19,8 @@ import std.time { Date, Time, DateTime, Zone, Duration, TimeError };
 
 // ------------------------------------------------------------------ the error and the tree
 
-/// A text that is no TOML (E5): where, and what was wrong.
+/// The error for a text that is not valid TOML: the line and column where parsing stopped, and
+/// what was wrong.
 pub struct TomlError :: [Error] {
     pub line: int,
     pub column: int,
@@ -36,7 +40,7 @@ pub enum TomlDatetime :: [Equatable] {
 }
 
 extend TomlDatetime :: [Display, Debug] {
-    /// The TOML text: `1979-05-27T07:32:00Z`, `1979-05-27T07:32:00`, `1979-05-27`, `07:32:00`.
+    /// Returns the TOML text: `1979-05-27T07:32:00Z`, `1979-05-27T07:32:00`, `1979-05-27`, `07:32:00`.
     fn show(): string {
         match (this) {
             .Offset(dt) => { return dt.show(); },
@@ -72,7 +76,7 @@ pub class TomlTable {
         return null;
     }
 
-    /// Sets the key: in place where it exists, at the end where it is new.
+    /// Sets the key's value: in place where the key exists, appended at the end where it is new.
     pub mut fn set(key: string, value: TomlValue): void {
         var i = 0;
         while (i < this.entries.length()) {
@@ -93,13 +97,13 @@ pub class TomlTable {
         return out.toArray();
     }
 
-    /// The entries in order.
+    /// Returns the entries in the order they were written.
     pub fn pairs(): (string, TomlValue)[] {
         return this.entries.toArray();
     }
 }
 
-/// A TOML document as a value (E8): the seven forms.
+/// A TOML value in one of its seven forms; a parsed document is a `Table`.
 pub enum TomlValue {
     String(string),
     Int(int),
@@ -111,7 +115,8 @@ pub enum TomlValue {
 }
 
 extend TomlValue :: [Equatable] {
-    /// Equal form and content; two tables with the same keys and equal values, in any order.
+    /// Returns whether both values have the same form and equal content; two tables are equal
+    /// when they have the same keys with equal values, in any order.
     fn equals(o: TomlValue): bool {
         match (this) {
             .String(a) => { match (o) { .String(b) => { return a == b; }, _ => { return false; } } },
@@ -162,7 +167,7 @@ extend TomlValue :: [Equatable] {
 }
 
 extend TomlValue :: [Display, Debug] {
-    /// A table as a document, another value as its text in a document.
+    /// Returns a table as a document, any other value as its inline text.
     fn show(): string {
         match (this) {
             .Table(t) => {
@@ -183,7 +188,7 @@ extend TomlValue :: [Display, Debug] {
     fn debugTo(out: StringBuilder): void { out.appendStr(this.show()); }
 }
 
-/// `v["key"]`: the member, or `null` where the value is no table or has no such key.
+/// Returns the member `v["key"]`, or `null` where the value is no table or has no such key.
 extend TomlValue :: [Index<string>] {
     type Output = ?TomlValue;
 
@@ -196,7 +201,8 @@ extend TomlValue :: [Index<string>] {
 }
 
 extend TomlValue {
-    /// `v.at(3)`: the element, or `null` where the value is no array or the index is out of it.
+    /// Returns the array element at `i`, or `null` where the value is no array or the index is
+    /// out of range.
     pub fn at(i: int): ?TomlValue {
         match (this) {
             .Array(items) => { return if (i >= 0 && i < items.length()) items[i] else null; },
@@ -204,7 +210,8 @@ extend TomlValue {
         }
     }
 
-    /// The value at a path, `"servers.alpha.ports[0]"`.
+    /// Returns the value at a path such as `"servers.alpha.ports[0]"`, or `null` where a step of
+    /// the path does not exist.
     pub fn path(p: string): ?TomlValue {
         var current: ?TomlValue = this;
         let name = StringBuilder.new();
@@ -254,7 +261,7 @@ extend TomlValue {
         match (this) { .Int(i) => { return i; }, _ => { return null; } }
     }
 
-    /// The number as a float: an `Int` widened.
+    /// Returns the number as a float, an `Int` widened; `null` for any other form.
     pub fn asFloat(): ?float {
         match (this) { .Float(f) => { return f; }, .Int(i) => { return i as float; }, _ => { return null; } }
     }
@@ -275,8 +282,12 @@ extend TomlValue {
         match (this) { .Table(t) => { return t; }, _ => { return null; } }
     }
 
-    /// The tree written into any encoder: a table as a map of string keys, an array as a
+    /// Writes the tree into any encoder: a table as a map of string keys, an array as a
     /// sequence, a date-time as its text.
+    ///
+    /// # Errors
+    ///
+    /// Throws `EncodeError` where the encoder rejects a value.
     fn writeTo<E :: [Encoder]>(&e: E): void throws EncodeError {
         match (this) {
             .String(s) => { try e.encodeString(s); },
@@ -302,7 +313,7 @@ extend TomlValue {
     }
 }
 
-/// The tree is `Codable`: it writes its forms into any format, and reads any value's forms.
+/// Makes the tree `Codable`: it writes its forms into any format, and reads any value's forms.
 extend TomlValue :: [Codable] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         try this.writeTo(&e);
@@ -347,7 +358,7 @@ extend TomlValue :: [Codable] {
 
 // ------------------------------------------------------------------ writing
 
-/// Whether a key is written bare: `[A-Za-z0-9_-]+`.
+/// Returns whether a key can be written bare: `[A-Za-z0-9_-]+`.
 fn isBareKey(k: string): bool {
     if (k.isEmpty()) {
         return false;
@@ -368,7 +379,7 @@ fn writeKey(out: StringBuilder, k: string): void {
     }
 }
 
-/// `s` as a basic string: quoted, with TOML's escapes.
+/// Writes `s` as a basic string: quoted, with TOML's escapes.
 fn writeString(out: StringBuilder, s: string): void {
     out.appendChar('"');
     for (c in s.chars()) {
@@ -398,7 +409,8 @@ fn hexDigit(v: int): char {
     return if (v < 10) ((('0' as uint32) + (v as uint32)) as char) else ((('A' as uint32) + ((v - 10) as uint32)) as char);
 }
 
-/// Whether an array holds tables alone (and at least one): written as an array of tables.
+/// Returns whether an array holds tables alone (and at least one); such an array is written as
+/// an array of tables.
 fn isArrayOfTables(items: List<TomlValue>): bool {
     if (items.isEmpty()) {
         return false;
@@ -412,7 +424,7 @@ fn isArrayOfTables(items: List<TomlValue>): bool {
     return true;
 }
 
-/// A value inline: a scalar, an array, an inline table.
+/// Writes a value inline: a scalar, an array, an inline table.
 fn writeValue(out: StringBuilder, v: TomlValue): void {
     match (v) {
         .String(s) => { writeString(out, s); },
@@ -470,7 +482,7 @@ fn writeHeader(out: StringBuilder, path: string[], array: bool): void {
     out.appendStr(if (array) "]]\n" else "]\n");
 }
 
-/// Whether a table has a pair that is written in place (not a sub-table, not an array of tables).
+/// Returns whether a table has a pair written in place (not a sub-table, not an array of tables).
 fn hasPlainPairs(t: TomlTable): bool {
     for ((_, v) in t.pairs()) {
         match (v) {
@@ -482,7 +494,7 @@ fn hasPlainPairs(t: TomlTable): bool {
     return false;
 }
 
-/// A table as a document's section: its plain pairs first, then its sub-tables with their
+/// Writes a table as a document's section: its plain pairs first, then its sub-tables with their
 /// headers, then its arrays of tables — each under the path. A sub-table that holds sub-tables
 /// alone gets no header of its own: theirs make it.
 fn writeTable(out: StringBuilder, path: string[], t: TomlTable): void {
@@ -538,7 +550,7 @@ enum Building {
     Table(TomlTable, ?string),
 }
 
-/// An encoder that builds a `TomlValue` (E8): a struct as a table, a map as a table of string
+/// An encoder that builds a `TomlValue`: a struct as a table, a map as a table of string
 /// keys, a sequence as an array, bytes as an array of integers, a unit variant as its name, a
 /// payload variant as a table of one key.
 pub class TreeBuilder :: [Encoder] {
@@ -551,7 +563,7 @@ pub class TreeBuilder :: [Encoder] {
         return TreeBuilder { };
     }
 
-    /// The value built, after one was encoded; an empty table before.
+    /// Returns the value built once one was encoded; an empty table before.
     pub fn value(): TomlValue {
         if (let b = this.done) {
             return b.value;
@@ -583,7 +595,11 @@ pub class TreeBuilder :: [Encoder] {
         }
     }
 
-    /// TOML has no null: a null field is left out of its table; elsewhere it has no text.
+    /// Encodes a null: since TOML has no null, a null field is left out of its table.
+    ///
+    /// # Errors
+    ///
+    /// Throws `EncodeError` for a null anywhere other than a table's field.
     pub mut fn encodeNull(): void throws EncodeError {
         if (!this.stack.isEmpty()) {
             let top = this.stack.length() - 1;
@@ -690,7 +706,12 @@ pub class TreeBuilder :: [Encoder] {
     }
 }
 
-/// The document of a value (E8): the value's form must be a table.
+/// Encodes a value as a TOML document.
+///
+/// # Errors
+///
+/// Throws `EncodeError` where the value's form is not a table (encode a struct or a map), or
+/// where a part of it has no TOML form.
 pub fn encode<T :: [Encode]>(v: T): string throws EncodeError {
     var b = TreeBuilder.new();
     try v.encode(&b);
@@ -704,7 +725,12 @@ pub fn encode<T :: [Encode]>(v: T): string throws EncodeError {
     }
 }
 
-/// The document of a value, written into `w`.
+/// Encodes a value as a TOML document and writes it into `w`.
+///
+/// # Errors
+///
+/// Throws `EncodeError` as `encode` does, `IoError` where writing fails and `Cancelled` where
+/// the task is cancelled during the write.
 pub fn encodeTo<T :: [Encode], W :: [Writer]>(v: T, &w: W): void throws [EncodeError, IoError, Cancelled] {
     let text = try encode(v);
     try w.writeString(text);
@@ -726,7 +752,7 @@ enum Origin {
     ArrayElement,
 }
 
-/// The parser (TOML 1.0): the bytes, the position, the line and the column; the tables with how
+/// The TOML 1.0 parser: the bytes, the position, the line and the column; the tables with how
 /// they came to be.
 class Parser {
     bytes: uint8[],
@@ -756,14 +782,15 @@ class Parser {
         this.at = this.at + 1;
     }
 
-    /// Spaces and tabs.
+    /// Skips spaces and tabs.
     mut fn skipBlanks(): void {
         while (this.peek() == 0x20 || this.peek() == 0x09) {
             this.at = this.at + 1;
         }
     }
 
-    /// A comment to the end of the line.
+    /// Skips a comment to the end of the line; a control character other than tab in it is an
+    /// error.
     mut fn skipComment(): void throws TomlError {
         if (this.peek() != 0x23) {
             return;
@@ -777,7 +804,7 @@ class Parser {
         }
     }
 
-    /// The end of a line: blanks, a comment, then LF or CRLF or the end.
+    /// Reads the end of a line: blanks, a comment, then LF or CRLF or the end of the text.
     mut fn endOfLine(): void throws TomlError {
         this.skipBlanks();
         try this.skipComment();
@@ -797,7 +824,7 @@ class Parser {
         throw this.fail("the end of the line was expected");
     }
 
-    /// Blank lines, comments and whitespace, as between values of a multi-line array.
+    /// Skips blank lines, comments and whitespace, as between values of a multi-line array.
     mut fn skipSpaceAndComments(): void throws TomlError {
         loop {
             let b = this.peek();
@@ -813,13 +840,11 @@ class Parser {
         }
     }
 
-    /// The document, line by line. Its levels (12 §TOML rule 3; the sweep after M10, W5): the root
-    /// table the first, each segment of a header or a key one more, an array of tables one more
-    /// for its element, an array's elements and an inline table's values below them — past the
-    /// 128th a document is refused, before what nests deeper is read. 128, not JSON's 512: a
-    /// `TomlValue` carries a date-time and weighs some five `JsonValue`s, and a release task's
-    /// 256 KiB held the comparison of 256 levels and no more (measured); 128 leaves room for the
-    /// frames of whoever calls.
+    /// Parses the document line by line. Nesting is counted in levels: the root table is the
+    /// first, each segment of a header or a key adds one, an array of tables one more for its
+    /// element, an array's elements and an inline table's values one below them. A document
+    /// deeper than 128 levels is refused before the deeper part is read, so that parsing and
+    /// comparing the tree stay within a task's stack with room left for the caller's frames.
     mut fn document(): void throws TomlError {
         var current = this.root;
         var currentPath = "";
@@ -868,7 +893,8 @@ class Parser {
         }
     }
 
-    /// `[a.b]`: the table at the path, made on the way; `[[a.b]]`: a new element of the array there.
+    /// Opens the table a header names: for `[a.b]` the table at the path, made on the way; for
+    /// `[[a.b]]` a new element of the array there.
     mut fn openTable(path: string[], array: bool): TomlTable throws TomlError {
         var t = this.root;
         var walked = "";
@@ -932,8 +958,8 @@ class Parser {
         return t;
     }
 
-    /// `a.b.c = v` in the current table: the tables on the way made by the dotted key, the last
-    /// key new.
+    /// Assigns `a.b.c = v` in the current table: the tables on the way are made by the dotted
+    /// key, and the last key must be new.
     mut fn assign(current: TomlTable, currentPath: string, path: string[], v: TomlValue): void throws TomlError {
         var t = current;
         var walked = currentPath;
@@ -974,7 +1000,7 @@ class Parser {
         t.set(last, v);
     }
 
-    /// A key: bare, quoted, or dotted.
+    /// Reads a key, bare, quoted or dotted, as its segments.
     mut fn key(): string[] throws TomlError {
         let parts = List<string>.new();
         loop {
@@ -1003,7 +1029,8 @@ class Parser {
         }
     }
 
-    /// A value at the level `level` (`document`): one past the 128th is refused before it is read.
+    /// Reads a value at nesting level `level` (counted as in `document`); a value past the 128th
+    /// level is refused before it is read.
     mut fn value(level: int): TomlValue throws TomlError {
         if (level > 128) {
             throw this.fail("the document nests deeper than 128 levels");
@@ -1091,8 +1118,8 @@ class Parser {
         }
     }
 
-    /// `"""…"""`: a newline right after the opening is dropped; a backslash at a line's end
-    /// drops the whitespace up to the next non-blank.
+    /// Reads a multi-line basic string `"""…"""`: a newline right after the opening is dropped,
+    /// and a backslash at a line's end drops the whitespace up to the next non-blank.
     mut fn multilineBasic(): string throws TomlError {
         this.at = this.at + 3;
         try this.trimFirstNewline();
@@ -1299,7 +1326,7 @@ class Parser {
         }
     }
 
-    /// A number, or a date-time: both begin with digits or a sign.
+    /// Reads a number or a date-time; both begin with digits or a sign.
     mut fn numberOrDatetime(): TomlValue throws TomlError {
         let start = this.at;
         // a date: four digits and '-'; a local time: two digits and ':'
@@ -1369,7 +1396,7 @@ class Parser {
         }
     }
 
-    /// Digits with underscores between them, the underscores dropped.
+    /// Reads digits with underscores between them and returns them with the underscores dropped.
     mut fn digitRun(radix: int): string throws TomlError {
         let out = StringBuilder.new();
         var lastWasDigit = false;
@@ -1512,7 +1539,12 @@ fn joined(path: string[]): string {
     return path.join(".");
 }
 
-/// The tree a text holds (E8): a table.
+/// Parses a TOML document into its tree, a `TomlValue.Table`.
+///
+/// # Errors
+///
+/// Throws `TomlError` with the line and column where the text is not valid TOML, is not UTF-8,
+/// defines a key or table twice, or nests deeper than 128 levels.
 pub fn parse(text: StringView): TomlValue throws TomlError {
     var p = Parser { bytes = text.toBytes() };
     try p.document();
@@ -1527,7 +1559,7 @@ enum Reading {
     Variant(string, ?TomlValue, bool),
 }
 
-/// The decoder over a tree (E8): a struct from a table by its keys, a sequence from an array, a
+/// A decoder over a `TomlValue` tree: a struct from a table by its keys, a sequence from an array, a
 /// map from a table (its keys as strings, or as the numbers they spell), a variant from a string
 /// or a table of one key, bytes from an array of integers, a string from a string or a date-time's
 /// text. A read that mismatches leaves the value where it was.
@@ -1602,7 +1634,7 @@ pub class TomlReader :: [Decoder] {
         }
     }
 
-    /// TOML has no null: nothing is null.
+    /// Returns `false`: TOML has no null.
     pub mut fn isNull(): bool throws DecodeError {
         return false;
     }
@@ -1657,7 +1689,11 @@ pub class TomlReader :: [Decoder] {
         }
     }
 
-    /// A string, or a date-time's text — so an `Instant` reads from an offset date-time.
+    /// Decodes a string, or a date-time's text, so an `Instant` reads from an offset date-time.
+    ///
+    /// # Errors
+    ///
+    /// Throws `DecodeError` where the value is neither a string nor a date-time.
     pub mut fn decodeString(): string throws DecodeError {
         let v = try this.peek();
         match (v) {
@@ -1824,8 +1860,9 @@ pub class TomlReader :: [Decoder] {
         this.stack.pop();
     }
 
-    /// `Config.servers[0].Server.port`: a struct's name and the key being read with `.` between,
-    /// an array's index without, `{}` for a map, a variant's name.
+    /// Returns where the decoder stands, such as `Config.servers[0].Server.port`: a struct's name
+    /// and the key being read with `.` between, an array's index without, `{}` for a map, a
+    /// variant's name.
     pub fn path(): string {
         let out = StringBuilder.new();
         for (frame in this.stack) {
@@ -1857,25 +1894,40 @@ fn formOf(v: TomlValue): string {
     }
 }
 
-/// The value a document holds (E8): parsed, then read out of the tree.
+/// Decodes a value of type `T` from a TOML document: parses it, then reads the value out of the
+/// tree.
+///
+/// # Errors
+///
+/// Throws `TomlError` where the text is not valid TOML, and `DecodeError` where the tree does not
+/// fit `T`.
 pub fn decode<T :: [Decode]>(text: StringView): T throws [TomlError, DecodeError] {
     var r = TomlReader { root = try parse(text) };
     return try T.decode(&r);
 }
 
-/// The value a reader's document holds, read to its end first.
+/// Decodes a value of type `T` from the TOML document in `r`, read to its end first.
+///
+/// # Errors
+///
+/// Throws `TomlError` and `DecodeError` as `decode` does, `IoError` where reading fails and
+/// `Cancelled` where the task is cancelled during the read.
 pub fn decodeFrom<T :: [Decode], R :: [Reader]>(&r: R): T throws [TomlError, DecodeError, IoError, Cancelled] {
     let text = try r.readToString();
     return try decode<T>(text);
 }
 
 extend TomlValue {
-    /// A decoder over this tree, to pass on.
+    /// Returns a decoder over this tree, to pass on.
     pub fn reader(): TomlReader {
         return TomlReader { root = this };
     }
 
-    /// The value this tree reads as.
+    /// Decodes a value of type `T` from this tree.
+    ///
+    /// # Errors
+    ///
+    /// Throws `DecodeError` where the tree does not fit `T`.
     pub fn read<T :: [Decode]>(): T throws DecodeError {
         var r = TomlReader { root = this };
         return try T.decode(&r);

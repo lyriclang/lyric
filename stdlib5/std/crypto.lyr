@@ -1,33 +1,35 @@
-/// Hashes for security, HMAC and the system's random bytes (design/v5/spec/10 Q4): SHA-256 and
-/// SHA-512 (FIPS 180-4), SHA-1 (FIPS 180-4) and MD5 (RFC 1321) — the last two for what an old
-/// format asks, never where an attacker chooses the input —, HMAC over any of them (RFC 2104),
-/// random bytes from the system, and a comparison of bytes that takes as long whatever it finds.
-/// The doors (U2): Ed25519, X25519, ChaCha20-Poly1305, Argon2. All in Lyric; the system's bytes
-/// come through the runtime's `lyr_random_u64`, which `std.hash` keys its hasher from too.
+/// Cryptographic hashes, HMAC and the system's random bytes: the [Digest] interface with [Sha256]
+/// and [Sha512] (FIPS 180-4), [Sha1] (FIPS 180-4) and [Md5] (RFC 1321) — the last two only for
+/// formats that require them, never where an attacker chooses the input —, [Hmac] over any digest
+/// (RFC 2104), [sha256] for a whole input at once, [randomBytes] and [randomUint64] from the
+/// system, and [constantTimeEq], a comparison of bytes whose time does not depend on where they
+/// differ. Everything is written in Lyric; the system's random bytes come through the runtime's
+/// `lyr_random_u64`.
 
 extern "C" fn lyr_random_u64(): uint64;
 
-/// A hash fed in pieces (10 Q4): `update` as often as there are pieces, `finish` for the hash of
-/// all of them. `finish` leaves the digest as it was, so it may be fed further and finished again.
-/// The decision writes `finish(): uint8[N]`; an interface cannot name a length that is each
-/// implementer's own — 5.0 has no generic constant (03 T13) —, so it answers a `uint8[]` of `size`
-/// bytes, and the one-liner `sha256` an `uint8[32]`. `blockSize` and `new` are what HMAC needs of
-/// a digest it is generic over.
+/// A hash fed in pieces: `update` as often as there are pieces, then `finish` for the hash of all
+/// of them. `finish` leaves the digest as it was, so it may be fed further and finished again.
+/// `finish` returns a `uint8[]` of `size` bytes, since an interface cannot name a length that
+/// differs per implementer. `blockSize` and `new` are what [Hmac] needs of the digest it is
+/// generic over.
 pub interface Digest {
     /// The length of the hash, in bytes.
     static let size: int;
     /// The length of the blocks it hashes, in bytes: what HMAC pads its key to.
     static let blockSize: int;
 
+    /// Returns a digest that has been fed nothing.
     static fn new(): Self;
+    /// Feeds `bytes` to the digest.
     mut fn update(bytes: Slice<uint8>): void;
+    /// Returns the hash of everything fed so far, `size` bytes, leaving the digest unchanged.
     fn finish(): uint8[];
 }
 
 // ---------------------------------------------------------------------------------------------
-// The constants (FIPS 180-4 §4.2.2, §4.2.3, §5.3.3, §5.3.5; RFC 1321 §3.4), computed from their
-// definitions — the fractional parts of the square and cube roots of the first primes, |sin(i)| —
-// rather than copied, and checked against the standards' printed values.
+// The constants (FIPS 180-4 §4.2.2, §4.2.3, §5.3.3, §5.3.5; RFC 1321 §3.4): the fractional parts
+// of the square and cube roots of the first primes, and |sin(i)| for MD5.
 // ---------------------------------------------------------------------------------------------
 
 let sha256K: uint32[] = [
@@ -89,8 +91,8 @@ let md5K: uint32[] = [
 ];
 
 // ---------------------------------------------------------------------------------------------
-// The digests. Each holds its state in arrays and hands its whole blocks to its compression;
-// `finish` pads a copy, so the digest goes on as it was.
+// The digests. Each holds its state in arrays and hands whole blocks to its compression function;
+// `finish` pads a copy, so the digest itself is left unchanged.
 // ---------------------------------------------------------------------------------------------
 
 /// SHA-256 (FIPS 180-4 §6.2): 32 bytes of hash over blocks of 64.
@@ -245,8 +247,8 @@ fn sha512Block(h: uint64[], block: Slice<uint8>, w: uint64[]): void {
     h[7] = h[7] +% k;
 }
 
-/// SHA-1 (FIPS 180-4 §6.1): 20 bytes over blocks of 64. Broken for collisions (SHAttered, 2017):
-/// for what an old format asks — git's object names, a checksum —, never for a signature.
+/// SHA-1 (FIPS 180-4 §6.1): 20 bytes of hash over blocks of 64. Not collision-resistant: use it
+/// only where a format requires it — git's object names, a checksum —, never for a signature.
 pub class Sha1 :: [Digest] {
     state: uint32[],
     scratch: uint32[],
@@ -314,8 +316,8 @@ fn sha1Block(h: uint32[], block: Slice<uint8>, w: uint32[]): void {
 
 let md5Shifts: int[] = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
 
-/// MD5 (RFC 1321): 16 bytes over blocks of 64. Broken for collisions since 2004: for what an old
-/// format asks, never where an attacker chooses the input.
+/// MD5 (RFC 1321): 16 bytes of hash over blocks of 64. Not collision-resistant: use it only where
+/// a format requires it, never where an attacker chooses the input.
 pub class Md5 :: [Digest] {
     state: uint32[],
     blocks: Blocks,
@@ -380,7 +382,7 @@ fn md5Block(h: uint32[], block: Slice<uint8>): void {
     h[3] = h[3] +% d;
 }
 
-/// SHA-256 of `bytes`, at once (10 Q4).
+/// Returns the SHA-256 hash of `bytes`, computed at once.
 pub fn sha256(bytes: Slice<uint8>): uint8[32] {
     let d = Sha256.new();
     d.update(bytes);
@@ -399,11 +401,12 @@ pub fn sha256(bytes: Slice<uint8>): uint8[32] {
 // ---------------------------------------------------------------------------------------------
 
 /// A message authentication code over a digest (RFC 2104): `Hmac<Sha256>.new(key)`, then `update`
-/// and `finish` as a digest's. Compare what it gives with `constantTimeEq`, not `==`.
+/// and `finish` as with a digest. Compare the code it returns with [constantTimeEq], not `==`.
 pub class Hmac<D :: [Digest]> {
     var inner: D,
     outer: uint8[],
 
+    /// Returns an HMAC keyed with `key`, fed nothing yet.
     pub static fn new(key: Slice<uint8>): Hmac<D> {
         // a key longer than a block is hashed first; a shorter one is padded with zeros
         let k: uint8[] = [0u8] * D.blockSize;
@@ -427,10 +430,12 @@ pub class Hmac<D :: [Digest]> {
         return Hmac<D> { inner = inner, outer = opad };
     }
 
+    /// Feeds `bytes` to the message.
     pub mut fn update(bytes: Slice<uint8>): void {
         this.inner.update(bytes);
     }
 
+    /// Returns the code of everything fed so far, `D.size` bytes.
     pub fn finish(): uint8[] {
         let first = this.inner.finish();
         var outer = D.new();
@@ -444,8 +449,10 @@ pub class Hmac<D :: [Digest]> {
 // The system's randomness, and comparing secrets.
 // ---------------------------------------------------------------------------------------------
 
-/// `n` random bytes from the system (getrandom, getentropy, RtlGenRandom). A system that gives
-/// none panics (`LYR-RT0015`): there is no way on without them.
+/// Returns `n` random bytes from the system (getrandom, getentropy, RtlGenRandom).
+///
+/// # Panics
+/// Panics with `LYR-RT0015` when the system provides no random bytes.
 pub fn randomBytes(n: int): uint8[] {
     let out: uint8[] = [0u8] * n;
     var i = 0;
@@ -461,14 +468,17 @@ pub fn randomBytes(n: int): uint8[] {
     return out;
 }
 
-/// 64 random bits from the system.
+/// Returns 64 random bits from the system.
+///
+/// # Panics
+/// Panics with `LYR-RT0015` when the system provides no random bytes.
 pub fn randomUint64(): uint64 {
     return lyr_random_u64();
 }
 
-/// Whether `a` and `b` hold the same bytes, in a time that depends on their length alone — not on
-/// where they first differ, which a comparison that stops there tells whoever measures it. The
-/// lengths are no secret: a MAC's is known.
+/// Returns whether `a` and `b` hold the same bytes, in a time that depends on their length alone —
+/// not on where they first differ, which a comparison that stops early reveals to whoever measures
+/// it. Slices of different lengths return `false` at once; lengths are not treated as secret.
 pub fn constantTimeEq(a: Slice<uint8>, b: Slice<uint8>): bool {
     if (a.length() != b.length()) {
         return false;
@@ -483,11 +493,12 @@ pub fn constantTimeEq(a: Slice<uint8>, b: Slice<uint8>): bool {
 }
 
 // ---------------------------------------------------------------------------------------------
-// What every digest here shares: blocks taken from what is fed, the padding at the end (FIPS
-// 180-4 §5.1, RFC 1321 §3.1–3.2), words read and written either end first.
+// Shared by every digest here: blocks taken from what is fed, the padding at the end (FIPS
+// 180-4 §5.1, RFC 1321 §3.1–3.2), and words read and written either end first.
 // ---------------------------------------------------------------------------------------------
 
-/// What a digest was fed and has not hashed yet — less than a block —, and the count of all.
+/// Holds what a digest was fed and has not hashed yet — less than a block —, and the count of all
+/// bytes fed.
 class Blocks {
     held: uint8[],
     var used: int = 0,
@@ -497,7 +508,7 @@ class Blocks {
         return Blocks { held = [0u8] * size };
     }
 
-    /// `bytes` through the held block to `hash`, a whole block at a time; the rest waits.
+    /// Passes `bytes`, after what is held, to `hash` a whole block at a time; the rest is held.
     mut fn feed(bytes: Slice<uint8>, hash: fn(Slice<uint8>) -> void): void {
         let size = this.held.length();
         this.total = this.total +% (bytes.length() as uint);
@@ -521,8 +532,8 @@ class Blocks {
         this.used = bytes.length() - at;
     }
 
-    /// The last block or two: what is held, a 1 bit, zeros, and the length in bits in `width`
-    /// bytes at the end, the highest byte first or the lowest.
+    /// Returns the last block or two: what is held, a 1 bit, zeros, and the length in bits in
+    /// `width` bytes at the end, highest byte first when `bigEndian`, else lowest first.
     fn tail(width: int, bigEndian: bool): uint8[] {
         let size = this.held.length();
         let out: uint8[] = [0u8] * (if (this.used < size - width) size else 2 * size);

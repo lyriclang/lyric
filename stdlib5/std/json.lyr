@@ -1,11 +1,12 @@
-/// JSON (design/v5/spec/10 B10 E7; 13 M10 S3): RFC 8259, strictly — an encoder and a decoder of
-/// `std.codec`'s model, and `JsonValue`, the dynamic tree. `json.encode(v)` writes any `Encode`
+/// Reads and writes JSON by RFC 8259, strictly: `JsonWriter` and `TreeBuilder` encode and
+/// `JsonReader` decodes in `std.codec`'s model, `JsonValue` is the dynamic tree, `JsonOptions`
+/// steers the text written, and `JsonError` is what a text that is no JSON throws. `json.encode(v)` writes any `Encode`
 /// value as text, `json.decode<T>(text)` reads any `Decode` value out of one; `json.parse(text)`
 /// is the tree. A struct is an object, a sequence an array, a map an object whose keys are
 /// strings — a number's digits where the key is a number —, bytes a Base64 string, a unit variant
 /// its name, a variant with a payload `{"Name": payload}`. `NaN` and the infinities have no text
-/// (E7, RFC 8259 §6): writing one is an `EncodeError`. The text is read whole into the tree first;
-/// a streaming decoder is a door (E9).
+/// (RFC 8259 §6): writing one is an `EncodeError`. The text is read whole into the tree first,
+/// then decoded from it.
 import std.codec { Encode, Decode, Codable, Encoder, Decoder, EncodeError, DecodeError };
 import std.collections { List, Map, Set };
 import std.core { ParseError };
@@ -16,7 +17,7 @@ import std.string { StringBuilder, fromFloat };
 
 // ------------------------------------------------------------------ the options and the error
 
-/// How the text is written: `pretty` with newlines and `indent` spaces per level, `sortKeys` with
+/// Steers how the text is written: `pretty` with newlines and `indent` spaces per level, `sortKeys` with
 /// an object's keys in order (which goes through the tree).
 pub struct JsonOptions {
     pub pretty: bool = false,
@@ -24,7 +25,7 @@ pub struct JsonOptions {
     pub sortKeys: bool = false,
 }
 
-/// A text that is no JSON (E5): where, and what was wrong.
+/// The error a text that is no JSON throws: where (line and column), and what was wrong.
 pub struct JsonError :: [Error] {
     pub line: int,
     pub column: int,
@@ -37,7 +38,7 @@ pub struct JsonError :: [Error] {
 
 // ------------------------------------------------------------------ the tree
 
-/// A JSON document as a value (E7): the six forms, a number as `Int` where it has no fraction or
+/// A JSON document as a value: the six forms, a number as `Int` where it has no fraction or
 /// exponent and fits an `int`, `Float` else.
 pub enum JsonValue {
     Null,
@@ -50,8 +51,8 @@ pub enum JsonValue {
 }
 
 extend JsonValue :: [Equatable] {
-    /// Equal form and content; two objects with the same keys and equal values, whatever the
-    /// order.
+    /// Returns whether both have the same form and content; two objects are equal with the same
+    /// keys and equal values, whatever the order.
     fn equals(o: JsonValue): bool {
         match (this) {
             .Null => { match (o) { .Null => { return true; }, _ => { return false; } } },
@@ -102,7 +103,7 @@ extend JsonValue :: [Equatable] {
 }
 
 extend JsonValue :: [Display, Debug] {
-    /// The compact text.
+    /// Returns the compact text. A `NaN` or an infinity ends the text where it stands.
     fn show(): string {
         var e = JsonWriter { opts = JsonOptions { } };
         try {
@@ -126,7 +127,8 @@ extend JsonValue :: [Display, Debug] {
     }
 }
 
-/// `v["key"]`: the member, or `null` where the value is no object or has no such member.
+/// Returns the member for `v["key"]`, or `null` where the value is no object or has no such
+/// member.
 extend JsonValue :: [Index<string>] {
     type Output = ?JsonValue;
 
@@ -139,8 +141,8 @@ extend JsonValue :: [Index<string>] {
 }
 
 extend JsonValue {
-    /// `v.at(3)`: the element, or `null` where the value is no array or the index is out of it
-    /// (one `[]` a type has: the member's, E7).
+    /// Returns the element at index `i`, or `null` where the value is no array or the index is
+    /// out of it. `[]` on a `JsonValue` takes a member name, so an element is read with `at`.
     pub fn at(i: int): ?JsonValue {
         match (this) {
             .Array(items) => { return if (i >= 0 && i < items.length()) items[i] else null; },
@@ -148,8 +150,8 @@ extend JsonValue {
         }
     }
 
-    /// The value at a path, `"users[0].mail"`: a member by name, an element by index, `null`
-    /// where the path leaves the tree.
+    /// Returns the value at a path such as `"users[0].mail"`: a member by name, an element by
+    /// index; `null` where the path leaves the tree.
     pub fn path(p: string): ?JsonValue {
         var current: ?JsonValue = this;
         let name = StringBuilder.new();
@@ -203,7 +205,7 @@ extend JsonValue {
         match (this) { .Int(i) => { return i; }, _ => { return null; } }
     }
 
-    /// The number as a float: an `Int` widened.
+    /// Returns the number as a float, an `Int` widened; `null` for anything else.
     pub fn asFloat(): ?float {
         match (this) { .Float(f) => { return f; }, .Int(i) => { return i as float; }, _ => { return null; } }
     }
@@ -220,7 +222,7 @@ extend JsonValue {
         match (this) { .Object(o) => { return o; }, _ => { return null; } }
     }
 
-    /// The tree written into any encoder: an object as a map of string keys, an array as a
+    /// Writes the tree into any encoder: an object as a map of string keys, an array as a
     /// sequence.
     fn writeTo<E :: [Encoder]>(&e: E): void throws EncodeError {
         match (this) {
@@ -247,7 +249,7 @@ extend JsonValue {
     }
 }
 
-/// The tree is `Codable`: it writes its forms into any format, and reads any value's forms from
+/// Makes the tree `Codable`: it writes its forms into any format, and reads any value's forms from
 /// one — a struct as an object, a variant as its name or an object of one member.
 extend JsonValue :: [Codable] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
@@ -305,7 +307,7 @@ struct Frame {
     var keyDue: bool,
 }
 
-/// The encoder that writes text (E7): compact, or pretty with newlines and indentation.
+/// The encoder that writes JSON text: compact, or pretty with newlines and indentation.
 pub class JsonWriter :: [Encoder] {
     opts: JsonOptions,
     var out: StringBuilder = StringBuilder.new(),
@@ -314,12 +316,13 @@ pub class JsonWriter :: [Encoder] {
     /// The depth at which a variant with a payload opened its object, innermost last.
     var variants: List<int> = List.new(),
 
-    /// A writer under the options; a program hands it to `v.encode(&w)` and takes `text()`.
+    /// Returns a writer under the options; a program hands it to `v.encode(&w)` and takes
+    /// `text()`.
     pub static fn new(opts: JsonOptions = JsonOptions { }): JsonWriter {
         return JsonWriter { opts = opts };
     }
 
-    /// The text written so far.
+    /// Returns the text written so far.
     pub fn text(): string {
         return this.out.toString();
     }
@@ -498,7 +501,7 @@ pub class JsonWriter :: [Encoder] {
     }
 }
 
-/// `s` as a JSON string: quoted, the quote, the backslash and the control characters escaped,
+/// Appends `s` to `out` as a JSON string: quoted, the quote, the backslash and the control characters escaped,
 /// everything else as it is (UTF-8).
 fn writeString(out: StringBuilder, s: string): void {
     out.appendChar('"');
@@ -529,7 +532,12 @@ fn hexDigit(v: int): char {
     return if (v < 10) ((('0' as uint32) + (v as uint32)) as char) else ((('a' as uint32) + ((v - 10) as uint32)) as char);
 }
 
-/// The text of a value (E7).
+/// Encodes `v` as JSON text under `opts`.
+///
+/// # Errors
+///
+/// Throws `EncodeError` for a `NaN` or an infinity, a map key that is null, a bool, a float or a
+/// container, or whatever `v`'s conformance throws.
 pub fn encode<T :: [Encode]>(v: T, opts: JsonOptions = JsonOptions { }): string throws EncodeError {
     if (opts.sortKeys) {
         return try sorted(v, opts);
@@ -539,13 +547,18 @@ pub fn encode<T :: [Encode]>(v: T, opts: JsonOptions = JsonOptions { }): string 
     return w.text();
 }
 
-/// The text of a value, written into `w`.
+/// Encodes `v` as JSON text under `opts` and writes it into `w`.
+///
+/// # Errors
+///
+/// Throws what `encode` throws, and the `IoError` or `Cancelled` of the write.
 pub fn encodeTo<T :: [Encode], W :: [Writer]>(v: T, &w: W, opts: JsonOptions = JsonOptions { }): void throws [EncodeError, IoError, Cancelled] {
     let text = try encode(v, opts);
     try w.writeString(text);
 }
 
-/// With `sortKeys`: the value as a tree, every object's keys in order, then the text.
+/// Encodes `v` for `sortKeys`: builds the value as a tree, then writes the text with every
+/// object's keys in order.
 fn sorted<T :: [Encode]>(v: T, opts: JsonOptions): string throws EncodeError {
     var builder = TreeBuilder { };
     try v.encode(&builder);
@@ -588,7 +601,7 @@ enum Building {
     Object(Map<string, JsonValue>, ?string),
 }
 
-/// An encoder that builds a `JsonValue` (E7): a struct as an object, a variant as its name or an
+/// An encoder that builds a `JsonValue`: a struct as an object, a variant as its name or an
 /// object of one member, bytes as a Base64 string, a key as its string.
 pub class TreeBuilder :: [Encoder] {
     var stack: List<Building> = List.new(),
@@ -596,12 +609,12 @@ pub class TreeBuilder :: [Encoder] {
     var segments: List<string> = List.new(),
     var variants: List<int> = List.new(),
 
-    /// A builder; a program hands it to `v.encode(&b)` and takes `value()`.
+    /// Returns a new builder; a program hands it to `v.encode(&b)` and takes `value()`.
     pub static fn new(): TreeBuilder {
         return TreeBuilder { };
     }
 
-    /// The value built, after one was encoded; `Null` before.
+    /// Returns the value built, once one was encoded; `Null` before.
     pub fn value(): JsonValue {
         if (let b = this.done) {
             return b.value;
@@ -779,8 +792,8 @@ class Parser {
         this.at = this.at + w.length();
     }
 
-    /// A value at the level `depth`, the document's own the first (12 §JSON rule 3): one past the
-    /// 512th is refused before it is read, so a deep document costs no more stack than 512 levels.
+    /// Parses a value at the level `depth`, the document's own the first: one past the 512th is
+    /// refused before it is read, so a deep document costs no more stack than 512 levels.
     mut fn value(depth: int): JsonValue throws JsonError {
         if (depth > 512) {
             throw this.fail("the document nests deeper than 512 levels");
@@ -991,7 +1004,7 @@ class Parser {
             try {
                 return JsonValue.Int(int.parse(text));
             } catch (_: ParseError) {
-                // beyond int: a float, lossy — reading it as an int is Invalid (E6)
+                // beyond int: a float, lossy — reading it as an int is Invalid
             }
         }
         try {
@@ -1012,8 +1025,13 @@ class Parser {
     }
 }
 
-/// The tree a text holds (E7): strictly RFC 8259 — one value, with whitespace around it and
-/// nothing else.
+/// Parses `text` into the tree it holds, strictly by RFC 8259: one value, with whitespace around
+/// it and nothing else.
+///
+/// # Errors
+///
+/// Throws `JsonError` with the line and column where the text is no JSON, text follows the value,
+/// or the document nests deeper than 512 levels.
 pub fn parse(text: StringView): JsonValue throws JsonError {
     var p = Parser { bytes = text.toBytes() };
     let v = try p.value(1);
@@ -1034,7 +1052,7 @@ enum Reading {
     Variant(string, ?JsonValue, bool),
 }
 
-/// The decoder over a tree (E7): a struct from an object by its members' names, a sequence from
+/// The decoder over a JSON tree: a struct from an object by its members' names, a sequence from
 /// an array, a map from an object (its keys as strings, or as the numbers they spell), a variant
 /// from its name or from an object of one member, bytes from a Base64 string. A read that
 /// mismatches leaves the value where it was.
@@ -1043,7 +1061,12 @@ pub class JsonReader :: [Decoder] {
     var stack: List<Reading> = List.new(),
     var taken: bool = false,
 
-    /// The value the next read takes, or what stands for it: a key as a string.
+    /// Returns the value the next read takes, or what stands for it: a key as a string.
+    ///
+    /// # Errors
+    ///
+    /// Throws `DecodeError` of kind `Missing` where the container is exhausted or the root was
+    /// read already.
     mut fn peek(): JsonValue throws DecodeError {
         if (this.stack.isEmpty()) {
             if (this.taken) {
@@ -1329,8 +1352,9 @@ pub class JsonReader :: [Decoder] {
         this.stack.pop();
     }
 
-    /// `Team.members[0].User`: a struct's name and the member being read with `.` between, an
-    /// array's index without, `{}` for a map, a variant's name.
+    /// Returns where the decoder stands, such as `Team.members[0].User`: a struct's name and the
+    /// member being read with `.` between, an array's index without, `{}` for a map, a variant's
+    /// name.
     pub fn path(): string {
         let out = StringBuilder.new();
         for (frame in this.stack) {
@@ -1362,25 +1386,38 @@ fn formOf(v: JsonValue): string {
     }
 }
 
-/// The value a text holds (E7): parsed, then read out of the tree.
+/// Decodes a `T` out of `text`: parses it into the tree, then reads the value out of the tree.
+///
+/// # Errors
+///
+/// Throws `JsonError` where the text is no JSON, and `DecodeError` where the tree does not hold
+/// a `T`.
 pub fn decode<T :: [Decode]>(text: StringView): T throws [JsonError, DecodeError] {
     var r = JsonReader { root = try parse(text) };
     return try T.decode(&r);
 }
 
-/// The value a reader's text holds, read to its end first.
+/// Decodes a `T` out of the text `r` holds, read to its end first.
+///
+/// # Errors
+///
+/// Throws what `decode` throws, and the `IoError` or `Cancelled` of the read.
 pub fn decodeFrom<T :: [Decode], R :: [Reader]>(&r: R): T throws [JsonError, DecodeError, IoError, Cancelled] {
     let text = try r.readToString();
     return try decode<T>(text);
 }
 
 extend JsonValue {
-    /// A decoder over this tree, to pass on.
+    /// Returns a decoder over this tree, to pass on.
     pub fn reader(): JsonReader {
         return JsonReader { root = this };
     }
 
-    /// The value this tree reads as.
+    /// Decodes a `T` out of this tree.
+    ///
+    /// # Errors
+    ///
+    /// Throws `DecodeError` where the tree does not hold a `T`.
     pub fn read<T :: [Decode]>(): T throws DecodeError {
         var r = JsonReader { root = this };
         return try T.decode(&r);

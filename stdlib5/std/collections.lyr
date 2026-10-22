@@ -16,10 +16,10 @@
 import std.core { arrayOf, AsSlice, Contains, filled, FromArrayLiteral, FromIterator, Hasher, Join, StringBuilder };
 import std.hash { DefaultHasher };
 
-// --- List (10 C3) --------------------------------------------------------------------------------
+// --- List ----------------------------------------------------------------------------------------
 // The elements lie at the front of a buffer that doubles when full. The slots past the length hold
 // copies of a value already there — never read, overwritten on the way back — so the buffer is a
-// `T[]` and `asSlice()` a view of it (C3: growth leaves an older view on the older buffer).
+// `T[]` and `asSlice()` a view of it; growth leaves an older view on the older buffer.
 
 /// A growing array: its elements in order, indexed from 0.
 ///
@@ -158,7 +158,7 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
             panic(f"List.insert: index {i} outside 0..={this.count}");
         }
         this.push(v);
-        // the elements from `i` one place on: overlapping, backwards — memmove's business (B16)
+        // the elements from `i` one place on: overlapping, backwards — memmove's business
         this.buffer[i..this.count - 1].copyInto(this.buffer[i + 1..this.count]);
         this.buffer[i] = v;
     }
@@ -360,7 +360,7 @@ pub struct ListIter<T> :: [Iterator] {
     }
 }
 
-// --- Map (10 C4): a Swiss table ----------------------------------------------------------------
+// --- Map: a Swiss table ------------------------------------------------------------------------
 // Groups of eight slots, each group with a control word of eight bytes, one a slot: 0x80 for an
 // empty slot, 0xFE for a deleted one, the low seven bits of the key's hash for a full one. A
 // lookup matches those seven bits against a whole group at once, and compares keys only where
@@ -590,7 +590,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
             var hits = (x -% lowBits) & ~x & highBits;
             while (hits != 0) {
                 let slot = g * 8 + hits.trailingZeros() / 8;
-                // unwrapped: the key's own equality, not the optionals' (measurement point 3)
+                // unwrapped: the key's own equality, not the optionals' — the cheaper comparison
                 if (let full = this.slots[slot]) {
                     if (full.key == k) {
                         return slot;
@@ -671,9 +671,9 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
         }
         let old = this.slots;
         this.controls = [emptyGroup] * next;
-        // one allocation and a copy a slot, shared: 'null' in every slot (arrayOf called a function
-        // a slot — the most of maps' cache misses before, B14). Not '[empty] * n', which asks a
-        // generic element for Clone (03 §5.1; M8a S16 — every map over objects was refused).
+        // one allocation and a copy a slot, shared: 'null' in every slot, with no function called
+        // per slot. Not '[empty] * n', which asks a generic element for Clone and so would refuse
+        // a map over objects.
         let empty: ?MapSlot<K, V> = null;
         this.slots = filled(next * 8, empty);
         this.free = next * 7;
@@ -758,7 +758,7 @@ pub struct MapValuesIter<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
 /// Implemented by the runtime.
 fn changedWhileWalked(what: string): never;
 
-// --- Set (10 C5): a Map's keys -----------------------------------------------------------------
+// --- Set: a Map's keys -------------------------------------------------------------------------
 
 /// A hash set: values, each once, in no order of its own.
 ///
@@ -843,10 +843,10 @@ extend<T :: [Hashable]> Set<T, DefaultHasher> {
     }
 }
 
-// --- the map's index, the entries, a set's operations (10 C4, C5) --------------------------------
+// --- the map's index, the entries, a set's operations -------------------------------------------
 
 // `map[k]` is the value under `k` or `null`; `map[k] = v` puts `v` there, and `map[k] = null` takes `k`
-// out, as Swift's dictionary does — the index gives an optional, so the place takes one.
+// out — the index gives an optional, so the place takes one.
 extend<K :: [Hashable], V, H :: [Hasher]> Map<K, V, H> :: [IndexSet<K>] {
     type Output = ?V;
 
@@ -871,7 +871,7 @@ extend<K :: [Hashable], V, H :: [Hasher]> Map<K, V, H> {
     }
 }
 
-// A set's operations are methods (10 C5): each makes a new set hashing as this one does, or answers
+// A set's operations are methods: each makes a new set hashing as this one does, or answers
 // a question; no operators.
 extend<T :: [Hashable], H :: [Hasher]> Set<T, H> {
     /// Returns a new set of the values in either set, hashing as this one does.
@@ -947,7 +947,7 @@ extend<T :: [Hashable], H :: [Hasher]> Set<T, H> {
     }
 }
 
-// --- from array literals (10 K4) ----------------------------------------------------------------
+// --- from array literals ------------------------------------------------------------------------
 
 extend<T> List<T> :: [FromArrayLiteral<T>] {
     static fn fromLiteral(items: T[]): List<T> {
@@ -983,7 +983,7 @@ extend<T :: [TotalOrder]> Heap<T> :: [FromArrayLiteral<T>] {
     }
 }
 
-// --- from iterators (10 I4) ----------------------------------------------------------------------
+// --- from iterators ------------------------------------------------------------------------------
 
 extend<I :: [Iterator]> I {
     /// Collects the values into a new list, in order.
@@ -1211,7 +1211,7 @@ extend<K :: [Hashable], V> Map<K, V, DefaultHasher> {
     }
 }
 
-// --- Deque (10 C6) -------------------------------------------------------------------------------
+// --- Deque ---------------------------------------------------------------------------------------
 // The values lie in a ring: `count` of them from `head` on, wrapping at the buffer's end; a full
 // ring is copied, in order, into one twice its size. A slot no value holds is `null`, so the buffer
 // keeps nothing alive.
@@ -1357,7 +1357,7 @@ pub class Deque<T> :: [Index<int>, Iterable] {
         let none: ?T = null;
         let grown = filled(room, none);
         if (old.length() > 0) {
-            // the ring from its head to its end, then what wrapped to the front: two copies (B16)
+            // the ring from its head to its end, then what wrapped to the front: two copies
             let tail = old.length() - this.head;
             old[this.head..old.length()].copyInto(grown[..tail]);
             old[..this.head].copyInto(grown[tail..old.length()]);
@@ -1390,7 +1390,7 @@ pub struct DequeIter<T> :: [Iterator] {
     }
 }
 
-// --- Heap (10 C1) --------------------------------------------------------------------------------
+// --- Heap ----------------------------------------------------------------------------------------
 // A binary tree laid out in a list: the children of `i` at `2i + 1` and `2i + 2`, no value less
 // than its parent.
 
@@ -1501,10 +1501,10 @@ fn less<T :: [TotalOrder]>(a: T, b: T): bool {
     };
 }
 
-// --- equality and display (10 C9; M8a S14) -------------------------------------------------------
+// --- equality and display ------------------------------------------------------------------------
 // A list and a deque compare element by element in order, a set by its values and a map by its
 // entries, in any order; each writes its debug text — `[1, 2]`, `{1, 2}`, `{"a": 1}` — and shows
-// the same (C9). A heap writes its values in its own order, which no program may rely on.
+// the same. A heap writes its values in its own order, which no program may rely on.
 
 extend<T :: [Equatable]> List<T> :: [Equatable] {
     fn equals(o: List<T>): bool {
@@ -1675,7 +1675,7 @@ extend<T :: [TotalOrder, Debug]> Heap<T> :: [Debug] {
     }
 }
 
-// --- built from an iterator (10 B6, I4; M8a S15) ------------------------------------------------
+// --- built from an iterator ---------------------------------------------------------------------
 // Each container is a `FromIterator`: `collect()` into it, the values in the iterator's order — a
 // set's and a map's keys once each, a later value of a key replacing the earlier one.
 
@@ -1748,7 +1748,7 @@ extend<I :: [Iterator<Item = T>], T :: [Hashable]> I {
     }
 }
 
-// --- membership (05 §12 rule 10; 10 C12; M8a S15) -----------------------------------------------
+// --- membership ---------------------------------------------------------------------------------
 // A list and a set hold their values, a map its keys: `k in map` is `map.containsKey(k)`.
 
 extend<T :: [Equatable]> List<T> :: [Contains<T>] {
@@ -1765,10 +1765,10 @@ extend<K :: [Hashable], V, H :: [Hasher]> Map<K, V, H> :: [Contains<K>] {
     }
 }
 
-// --- Clone (10 K5; N2a) ------------------------------------------------------------------------
+// --- Clone --------------------------------------------------------------------------------------
 //
 // A container is Clone where its elements are: a new container of their clones, as deep as the
-// element type owns (K5) — a map keeps its hasher, a heap its order, a deque its order from the
+// element type owns — a map keeps its hasher, a heap its order, a deque its order from the
 // front.
 
 extend<T :: [Clone]> List<T> :: [Clone] {

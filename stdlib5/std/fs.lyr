@@ -1,15 +1,16 @@
-/// The file system (design/v5/spec/10 O4, O5; M8b S6b, S6c, S7a): `File`, a handle on a file — a
-/// class with its identity and a `closed` state — that reads, writes and seeks through `std.io`'s
-/// interfaces; the conveniences that read or write a file whole, or its lines one by one; what a
-/// path names, the directories and their entries. S7b: what is put together from those —
-/// `createDirAll`, `removeAll`, `copy`, `walk`, `tempDir`, `tempFile`.
+/// The file system: [File], a handle on an open file that reads, writes and seeks through
+/// `std.io`'s interfaces, opened as [OpenOptions] say; conveniences that read or write a file whole
+/// ([readText], [readBytes], [writeText], [writeBytes], [appendText]) or its lines one by one
+/// ([lines]); what a path names ([Metadata], [metadata], [exists]); directories and their entries
+/// ([createDir], [removeDir], [readDir], [DirEntry]); and operations built from those —
+/// [createDirAll], [removeAll], [copy], [walk], [tempDir], [tempFile].
 ///
-/// Every call on a file runs on the program's I/O pool (std.io's; 13 M8b P2; 06 S3) where a
-/// scheduler runs: a few threads, started at the first use, do the system's call while the running
-/// task is parked — the thread it runs on goes on with the other tasks; where none runs, on the
-/// thread itself. A call on a regular file ends in a bounded time and is no wait in
-/// the sense of 10 §1 rule 7: a cancellation is seen at the task's next wait. Reads and writes go
-/// through the caller's slice, never a copy (P4).
+/// Where a scheduler runs, every call on a file runs on the program's I/O pool (std.io's): a few
+/// threads, started at the first use, do the system's call while the running task is parked, and
+/// the thread it runs on goes on with the other tasks; where no scheduler runs, the call runs on the
+/// thread itself. A call on a regular file ends in a bounded time and is not a point of
+/// cancellation: a cancellation is seen at the task's next wait. Reads and writes go through the
+/// caller's slice, never a copy.
 import std.collections { List };
 import std.core { Utf8Error };
 import std.crypto { randomUint64 };
@@ -35,9 +36,10 @@ fn fsDirClose(dir: int): int;
 fn fsCanonical(path: string, into: Slice<uint8>): int;
 fn fsAbsolute(path: string, into: Slice<uint8>): int;
 
-/// How a file is opened (10 O5): to read, to write, to append at its end, created where it is not
-/// there, cut to nothing where it is. A file that is neither read nor written, or created or cut
-/// without being written, is refused (`InvalidInput`), as Rust's `OpenOptions` refuses it.
+/// How a file is opened: to read, to write, to append at its end, created where it is not there,
+/// truncated to nothing where it is. [File.openWith] refuses with `InvalidInput` a file opened
+/// neither to read nor to write, one truncated without being written from the start, and one
+/// created without being written.
 pub struct OpenOptions {
     pub read: bool = false,
     pub write: bool = false,
@@ -46,25 +48,35 @@ pub struct OpenOptions {
     pub truncate: bool = false,
 }
 
-/// A file opened (10 O4): read from where its position stands, written there — at the end, where
-/// it was opened to append —, its position moved. `close()` lets it go; a call after it throws
-/// `Closed`, and a second `close()` does nothing.
+/// An open file: read from its position, written there — at the end, where it was opened to
+/// append —, its position moved. `close()` releases it; a call after it throws `Closed`, and a
+/// second `close()` does nothing.
 pub class File :: [Reader, Writer, Seek, Closeable] {
     var handle: int,
     name: string,
     var closed: bool = false,
 
-    /// `path` opened to read.
+    /// Opens `path` to read.
+    ///
+    /// # Errors
+    /// Throws [IoError] with the path when the system cannot open it, such as `NotFound`.
     pub static fn open(path: StringView): File throws IoError {
         return try File.openWith(path, OpenOptions { read = true });
     }
 
-    /// `path` opened to write: made where it is not there, cut to nothing where it is.
+    /// Opens `path` to write: created where it is not there, truncated to nothing where it is.
+    ///
+    /// # Errors
+    /// Throws [IoError] with the path when the system cannot open or create it.
     pub static fn create(path: StringView): File throws IoError {
         return try File.openWith(path, OpenOptions { write = true, create = true, truncate = true });
     }
 
-    /// `path` opened as `options` says.
+    /// Opens `path` as `options` say.
+    ///
+    /// # Errors
+    /// Throws [IoError]: `InvalidInput` for options [OpenOptions] refuses, and the system's
+    /// failure with the path when it cannot open the file.
     pub static fn openWith(path: StringView, options: OpenOptions): File throws IoError {
         let name = path.toString();
         if (!options.read && !options.write && !options.append) {
@@ -90,6 +102,10 @@ pub class File :: [Reader, Writer, Seek, Closeable] {
         return File { handle = handle, name = name };
     }
 
+    /// Reads into `into` from the file's position and returns how many bytes it read; 0 at the end.
+    ///
+    /// # Errors
+    /// Throws [IoError]: `Closed` after `close()`, else the system's failure with the path.
     pub mut fn read(into: Slice<uint8>): int throws IoError {
         try this.stillOpen("read");
         if (into.isEmpty()) {
@@ -103,6 +119,10 @@ pub class File :: [Reader, Writer, Seek, Closeable] {
         return n;
     }
 
+    /// Writes from `from` at the file's position and returns how many bytes it wrote.
+    ///
+    /// # Errors
+    /// Throws [IoError]: `Closed` after `close()`, else the system's failure with the path.
     pub mut fn write(from: Slice<uint8>): int throws IoError {
         try this.stillOpen("written");
         if (from.isEmpty()) {
@@ -116,6 +136,10 @@ pub class File :: [Reader, Writer, Seek, Closeable] {
         return n;
     }
 
+    /// Moves the file's position as `to` says and returns the new position from the start.
+    ///
+    /// # Errors
+    /// Throws [IoError]: `Closed` after `close()`, else the system's failure with the path.
     pub mut fn seek(to: SeekFrom): int throws IoError {
         try this.stillOpen("sought");
         let (offset, whence) = match (to) {
@@ -131,9 +155,12 @@ pub class File :: [Reader, Writer, Seek, Closeable] {
         return at;
     }
 
-    /// Lets the file go. A second close does nothing.
+    /// Closes the file. A second close does nothing.
+    ///
+    /// # Errors
+    /// Throws [IoError] with the path when the system fails to close it.
     pub fn close(): void throws IoError {
-        // through the reference: 'Closeable.close' is no 'mut fn' (as Pool's close)
+        // through the reference: 'Closeable.close' is not a 'mut fn'
         let me = this;
         if (me.closed) {
             return;
@@ -153,58 +180,77 @@ pub class File :: [Reader, Writer, Seek, Closeable] {
     }
 }
 
-/// `e` with the file's path, where it names none — the decoder's `InvalidData` names none.
+/// Returns `e` with the file's path where it names none — the decoder's `InvalidData` names none.
 fn withPath(e: IoError, path: string): IoError {
     return if (e.path == null) e with { path = path } else e;
 }
 
 // ---------------------------------------------------------------------------------------------
-// The conveniences (10 O5; M8b S6c): a file read or written whole, or its lines one by one. Each
-// opens the file, does its work and closes it on every way out; what the close throws counts
-// where nothing went wrong before (05 R4). A file's call is never cancelled, so the `Cancelled`
-// that io's defaults declare for any reader stays out (`uncancelled`, 10 Review 2026-10-08).
+// The conveniences: a file read or written whole, or its lines one by one. Each opens the file,
+// does its work and closes it on every way out; what the close throws counts where nothing went
+// wrong before. A file's call is never cancelled, so the `Cancelled` that io's defaults declare for
+// any reader is kept out with `uncancelled`.
 // ---------------------------------------------------------------------------------------------
 
-/// The file at `path`, all of it, as UTF-8 text. Bytes that are no UTF-8 throw `InvalidData` with
-/// the path. A byte order mark is text like any other (10 O2).
+/// Returns the whole file at `path` as UTF-8 text. A byte order mark is kept as text like any
+/// other.
+///
+/// # Errors
+/// Throws [IoError] with the path: `InvalidData` for bytes that are not UTF-8, else the system's
+/// failure to open, read or close the file.
 pub fn readText(path: StringView): string throws IoError {
     using let f = try File.open(path);
     return try uncancelled(() => try f.readToString()) catch (e: IoError) throw withPath(e, f.name);
 }
 
-/// The file at `path`, all of it.
+/// Returns the whole file at `path` as bytes.
+///
+/// # Errors
+/// Throws [IoError] with the path when the file cannot be opened, read or closed.
 pub fn readBytes(path: StringView): uint8[] throws IoError {
     using let f = try File.open(path);
     return try uncancelled(() => try f.readToEnd());
 }
 
-/// The lines of the file at `path`, one by one, as `TextReader.readLine` gives them: without
-/// their ends, a last line without an end a line all the same. The iterator closes the file at
-/// its end and at an error; a `for` that leaves it early closes it (05 R7), and so does `close()`.
+/// Returns an iterator over the lines of the file at `path`, as `TextReader.readLine` gives them:
+/// without their line ends, and a last line without an end still a line. The iterator closes the
+/// file at its end and at an error; a `for` that leaves it early closes it, and so does `close()`.
+///
+/// # Errors
+/// Throws [IoError] with the path when the file cannot be opened.
 pub fn lines(path: StringView): FileLinesIter throws IoError {
     let f = try File.open(path);
     return FileLinesIter { file = f, reader = TextReader.new(f) };
 }
 
-/// `text` as the file at `path`, made where it is not there, cut to nothing where it is.
+/// Writes `text` as the file at `path`, created where it is not there, truncated where it is.
+///
+/// # Errors
+/// Throws [IoError] with the path when the file cannot be created, written or closed.
 pub fn writeText(path: StringView, text: StringView): void throws IoError {
     using let f = try File.create(path);
     try uncancelled(() => try f.writeString(text));
 }
 
-/// `bytes` as the file at `path`, made where it is not there, cut to nothing where it is.
+/// Writes `bytes` as the file at `path`, created where it is not there, truncated where it is.
+///
+/// # Errors
+/// Throws [IoError] with the path when the file cannot be created, written or closed.
 pub fn writeBytes(path: StringView, bytes: Slice<uint8>): void throws IoError {
     using let f = try File.create(path);
     try uncancelled(() => try f.writeAll(bytes));
 }
 
-/// `text` at the end of the file at `path`, made where it is not there.
+/// Appends `text` to the end of the file at `path`, created where it is not there.
+///
+/// # Errors
+/// Throws [IoError] with the path when the file cannot be opened, written or closed.
 pub fn appendText(path: StringView, text: StringView): void throws IoError {
     using let f = try File.openWith(path, OpenOptions { append = true, create = true });
     try uncancelled(() => try f.writeString(text));
 }
 
-/// The lines of a file (`fs.lines`). After its end or an error it gives no more; after `close()`
+/// The lines of a file, from [lines]. After its end or an error it gives no more; after `close()`
 /// a call throws `Closed`, as the file's would.
 pub class FileLinesIter :: [Iterator, Closeable] {
     type Item = string;
@@ -213,6 +259,11 @@ pub class FileLinesIter :: [Iterator, Closeable] {
     reader: TextReader<File>,
     var done: bool = false,
 
+    /// Returns the next line, or `null` at the end.
+    ///
+    /// # Errors
+    /// Throws [IoError] with the path: `Closed` after `close()`, `InvalidData` for bytes that are
+    /// not UTF-8, else the system's failure to read.
     pub mut fn next(): ?string throws IoError {
         if (this.done) {
             return null;
@@ -225,7 +276,7 @@ pub class FileLinesIter :: [Iterator, Closeable] {
             line = uncancelled(() => try reader.readLine());
         } catch (e: IoError) {
             this.done = true;
-            // the first error wins, the close's is attached to it (05 E7)
+            // the first error wins, the close's is attached to it
             defer { try this.file.close(); }
             throw withPath(e, this.file.name);
         }
@@ -236,20 +287,23 @@ pub class FileLinesIter :: [Iterator, Closeable] {
         return line;
     }
 
-    /// Lets the file go before the end. A second close does nothing.
+    /// Closes the file before the end. A second close does nothing.
+    ///
+    /// # Errors
+    /// Throws [IoError] with the path when the system fails to close it.
     pub fn close(): void throws IoError {
         try this.file.close();
     }
 }
 
 // ---------------------------------------------------------------------------------------------
-// What a path names, the directories and their entries (10 O5; M8b S7a): one call of the
-// system's each, on the I/O pool; what it cannot do is an IoError with the path, as a file's is.
+// What a path names, the directories and their entries: one system call each, on the I/O pool;
+// a failure is an IoError with the path, as a file's is.
 // ---------------------------------------------------------------------------------------------
 
-/// What a path names (10 O5), through links: its size in bytes, when it was last written, whether
-/// it is a file or a directory — neither, for a device or a socket —, whether it cannot be written;
-/// and whether the path itself is a link. A link that leads nowhere is not found.
+/// What a path names, through links: its size in bytes, when it was last written, whether it is a
+/// file or a directory — neither, for a device or a socket —, whether it cannot be written; and
+/// whether the path itself is a link. A link that leads nowhere is not found.
 pub struct Metadata {
     pub size: int,
     pub modified: Instant,
@@ -259,13 +313,17 @@ pub struct Metadata {
     pub readonly: bool,
 }
 
-/// What `path` names.
+/// Returns the [Metadata] of what `path` names, following links.
+///
+/// # Errors
+/// Throws [IoError] with the path: `NotFound` where nothing is there or a link leads nowhere,
+/// else the system's failure.
 pub fn metadata(path: StringView): Metadata throws IoError {
     return try statOf(path.toString());
 }
 
-/// Whether `path` names anything — false where it cannot be told, and for a link that leads
-/// nowhere, as Rust's `Path::exists` answers.
+/// Returns whether `path` names anything — `false` where it cannot be told, and for a link that
+/// leads nowhere.
 pub fn exists(path: StringView): bool {
     try {
         let _ = statOf(path.toString());
@@ -275,7 +333,11 @@ pub fn exists(path: StringView): bool {
     }
 }
 
-/// Makes the directory `path`; the one it is in must be there.
+/// Creates the directory `path`; its parent must exist.
+///
+/// # Errors
+/// Throws [IoError] with the path: `AlreadyExists` where something is there, `NotFound` where the
+/// parent is missing, else the system's failure.
 pub fn createDir(path: StringView): void throws IoError {
     let name = path.toString();
     let answer = onPool(() => fsMakeDir(name));
@@ -284,7 +346,10 @@ pub fn createDir(path: StringView): void throws IoError {
     }
 }
 
-/// Removes the file `path`; a directory is `removeDir`'s.
+/// Removes the file `path`; a directory is removed with [removeDir].
+///
+/// # Errors
+/// Throws [IoError] with the path when the system cannot remove it.
 pub fn remove(path: StringView): void throws IoError {
     let name = path.toString();
     let answer = onPool(() => fsRemove(name));
@@ -293,8 +358,11 @@ pub fn remove(path: StringView): void throws IoError {
     }
 }
 
-/// Removes the directory `path`, which must be empty. One that is not is `Other` with the system's
-/// code: 10 O3 names no kind for it.
+/// Removes the directory `path`, which must be empty.
+///
+/// # Errors
+/// Throws [IoError] with the path when the system cannot remove it; a directory that is not empty
+/// is `Other` with the system's code, since no kind names it.
 pub fn removeDir(path: StringView): void throws IoError {
     let name = path.toString();
     let answer = onPool(() => fsRemoveDir(name));
@@ -303,7 +371,11 @@ pub fn removeDir(path: StringView): void throws IoError {
     }
 }
 
-/// Renames `from` to `to`, a file there replaced — on one file system; across two it fails.
+/// Renames `from` to `to`, replacing a file there. Both must be on the same file system.
+///
+/// # Errors
+/// Throws [IoError] with the source path when the system cannot rename it, including across file
+/// systems.
 pub fn rename(from: StringView, to: StringView): void throws IoError {
     let source = from.toString();
     let target = to.toString();
@@ -313,9 +385,12 @@ pub fn rename(from: StringView, to: StringView): void throws IoError {
     }
 }
 
-/// The entries of the directory `path`, one by one, in the order the system keeps them; `.` and
-/// `..` are not among them. The iterator holds the directory open: it lets it go at its end and at
-/// its first error, a loop that leaves it early lets it go (05 R7), and so does `close()`.
+/// Returns an iterator over the entries of the directory `path`, in the order the system keeps
+/// them; `.` and `..` are not among them. The iterator holds the directory open: it releases it at
+/// its end and at its first error, a loop that leaves it early releases it, and so does `close()`.
+///
+/// # Errors
+/// Throws [IoError] with the path when the directory cannot be opened.
 pub fn readDir(path: StringView): ReadDirIter throws IoError {
     let name = path.toString();
     let handle = onPool(() => fsDirOpen(name));
@@ -325,22 +400,30 @@ pub fn readDir(path: StringView): ReadDirIter throws IoError {
     return ReadDirIter { handle = handle, dir = name, room = [0u8] * 1024 };
 }
 
-/// `path` absolute, its links resolved and its `.` and `..` taken out: where the system says the
-/// file is. It must be there.
+/// Returns `path` absolute, its links resolved and its `.` and `..` removed: where the system says
+/// the file is.
+///
+/// # Errors
+/// Throws [IoError] with the path: `NotFound` where nothing is there, `InvalidData` for a result
+/// that is not UTF-8, else the system's failure.
 pub fn canonicalize(path: StringView): string throws IoError {
     let name = path.toString();
     return try pathFrom(name, "resolved", (into) => fsCanonical(name, into));
 }
 
-/// `path` made absolute by the working directory (10 O6), then normalized: nothing else is asked
-/// of the file system, and a link in it stays.
+/// Returns `path` made absolute against the working directory, then normalized: nothing else is
+/// asked of the file system, and links in it stay.
+///
+/// # Errors
+/// Throws [IoError] with the path when the working directory cannot be read, or `InvalidData`
+/// for a result that is not UTF-8.
 pub fn absolute(path: StringView): string throws IoError {
     let name = path.toString();
     return normalize(try pathFrom(name, "made absolute", (into) => fsAbsolute(name, into)));
 }
 
-/// An entry of a directory (`fs.readDir`): its name, its path — the directory's joined with the
-/// name —, and what the entry is itself: a link is a link, not what it leads to (Go's `DirEntry`).
+/// An entry of a directory, from [readDir]: its name, its path — the directory's joined with the
+/// name —, and what the entry is itself: a link is reported as a link, not as what it leads to.
 pub struct DirEntry {
     pub name: string,
     pub path: string,
@@ -348,13 +431,16 @@ pub struct DirEntry {
     pub isDir: bool,
     pub isSymlink: bool,
 
-    /// What the entry names, through a link (`fs.metadata`).
+    /// Returns the [Metadata] of what the entry names, following a link, as [metadata] does.
+    ///
+    /// # Errors
+    /// Throws [IoError] as [metadata] does.
     pub fn metadata(): Metadata throws IoError {
         return try statOf(this.path);
     }
 }
 
-/// A directory's entries (`fs.readDir`). After its end or an error it gives no more; after
+/// A directory's entries, from [readDir]. After its end or an error it gives no more; after
 /// `close()` a call throws `Closed`.
 pub class ReadDirIter :: [Iterator, Closeable] {
     type Item = DirEntry;
@@ -365,6 +451,11 @@ pub class ReadDirIter :: [Iterator, Closeable] {
     var done: bool = false,
     var closed: bool = false,
 
+    /// Returns the next entry, or `null` at the end.
+    ///
+    /// # Errors
+    /// Throws [IoError] with the directory's path: `Closed` after `close()`, `InvalidData` for a
+    /// name that is not UTF-8, else the system's failure to read.
     pub mut fn next(): ?DirEntry throws IoError {
         if (this.done) {
             return null;
@@ -402,20 +493,24 @@ pub class ReadDirIter :: [Iterator, Closeable] {
         }
         if (let e = error) {
             this.done = true;
-            // the first error wins, the close's is attached to it (05 E7)
+            // the first error wins, the close's is attached to it
             defer { try this.letGo(); }
             throw e;
         }
         return entry;
     }
 
-    /// Lets the directory go before the end. A second close does nothing.
+    /// Closes the directory before the end. A second close does nothing.
+    ///
+    /// # Errors
+    /// Throws [IoError] with the path when the system fails to close it.
     pub fn close(): void throws IoError {
         try this.letGo();
     }
 
+    /// Closes the directory handle once; later calls do nothing.
     fn letGo(): void throws IoError {
-        // through the reference: 'Closeable.close' is no 'mut fn' (as File's close)
+        // through the reference: 'Closeable.close' is not a 'mut fn'
         let me = this;
         if (me.closed) {
             return;
@@ -430,20 +525,25 @@ pub class ReadDirIter :: [Iterator, Closeable] {
 }
 
 // ---------------------------------------------------------------------------------------------
-// What is put together from those (10 O5; M8b S7b): trees made, walked, copied and removed, and
-// the temporary ones.
+// Built from those: trees created, walked, copied and removed, and temporary files and
+// directories.
 // ---------------------------------------------------------------------------------------------
 
-/// Makes the directory `path` and every one above it that is not there (Go's `MkdirAll`). Where
-/// `path` is a directory already there is nothing to do; where it is something else, it is
-/// `NotDirectory`.
+/// Creates the directory `path` and every missing directory above it. Where `path` is already a
+/// directory there is nothing to do.
+///
+/// # Errors
+/// Throws [IoError] with the path: `NotDirectory` where `path` or a directory above it is
+/// something else, else the system's failure.
 pub fn createDirAll(path: StringView): void throws IoError {
     try makeAll(path.toString());
 }
 
-/// Removes `path` and all that is in it (Go's `RemoveAll`): a link is removed, never followed
-/// into, and nothing there is nothing to do. It removes all it can, and throws the first error it
-/// met.
+/// Removes `path` and everything in it: a link is removed, never followed into, and where nothing
+/// is there there is nothing to do. It removes all it can.
+///
+/// # Errors
+/// Throws the first [IoError] it met.
 pub fn removeAll(path: StringView): void throws IoError {
     let name = path.toString();
     if (let own = try statOrNothing(name, false)) {
@@ -453,9 +553,13 @@ pub fn removeAll(path: StringView): void throws IoError {
     }
 }
 
-/// The bytes of the file `from` as the file `to` — made, or cut where it is there —; answers how
-/// many. Onto itself it is refused (`InvalidInput`): the cut would lose what it copies. What is not
-/// a file is not copied, and rights and times stay behind (rights are a door, 10 O5).
+/// Copies the bytes of the file `from` to the file `to` — created, or truncated where it is
+/// there — and returns how many. Permissions and times are not copied.
+///
+/// # Errors
+/// Throws [IoError] with the source path: `IsDirectory` for a directory, `InvalidInput` for
+/// anything else that is not a file and for a copy onto itself — truncating would lose what it
+/// copies —, else the failure of opening, reading or writing.
 pub fn copy(from: StringView, to: StringView): int throws IoError {
     let source = from.toString();
     let target = to.toString();
@@ -471,18 +575,25 @@ pub fn copy(from: StringView, to: StringView): int throws IoError {
     return try uncancelled(() => try io.copy(r, w));
 }
 
-/// The entries under `path`, depth first — a directory before what is in it —, each directory's
-/// in the byte order of their names (Go's `WalkDir`); `path` itself is not among them, and a link
-/// is not followed. Each directory is read whole and let go before its first entry is given, so
-/// the walk holds nothing open. An error ends it.
+/// Returns an iterator over the entries under `path`, depth first — a directory before what is in
+/// it —, each directory's entries in the byte order of their names; `path` itself is not among
+/// them, and links are not followed. Each directory is read whole and closed before its first
+/// entry is given, so the walk holds nothing open. An error ends the walk.
+///
+/// # Errors
+/// Throws [IoError] with the path when `path` cannot be read as a directory.
 pub fn walk(path: StringView): WalkIter throws IoError {
     let it = WalkIter { frames = List.new() };
     try it.enter(path.toString());
     return it;
 }
 
-/// A new directory of its own under the system's directory for temporary files: its path (Go's
-/// `MkdirTemp`). Nothing removes it but `removeAll`. The system's directory itself is `os.tempDir`.
+/// Creates a new directory under the system's directory for temporary files and returns its path.
+/// Nothing removes it but [removeAll]. The system's directory itself is `os.tempDir`.
+///
+/// # Errors
+/// Throws [IoError] when the directory cannot be created, or after 100 random names that all
+/// existed already.
 pub fn tempDir(): string throws IoError {
     let root = try tempRoot();
     var tries = 0;
@@ -500,9 +611,13 @@ pub fn tempDir(): string throws IoError {
     }
 }
 
-/// A new empty file of its own under the system's directory for temporary files: its path (Go's
-/// `CreateTemp`), for `File.openWith` and the conveniences to take from there. Nothing removes it
-/// but `remove`.
+/// Creates a new empty file under the system's directory for temporary files and returns its
+/// path, for [File.openWith] and the conveniences to take from there. Nothing removes it but
+/// [remove].
+///
+/// # Errors
+/// Throws [IoError] when the file cannot be created or closed, or after 100 random names that all
+/// existed already.
 pub fn tempFile(): string throws IoError {
     let root = try tempRoot();
     var tries = 0;
@@ -525,7 +640,7 @@ pub fn tempFile(): string throws IoError {
     }
 }
 
-/// The entries under a directory (`fs.walk`). After its end or an error it gives no more.
+/// The entries under a directory, from [walk]. After its end or an error it gives no more.
 pub class WalkIter :: [Iterator] {
     type Item = DirEntry;
     type Error = IoError;
@@ -533,6 +648,10 @@ pub class WalkIter :: [Iterator] {
     var below: ?string = null,
     var done: bool = false,
 
+    /// Returns the next entry, or `null` at the end.
+    ///
+    /// # Errors
+    /// Throws [IoError] when a directory under the walk cannot be read.
     pub mut fn next(): ?DirEntry throws IoError {
         if (this.done) {
             return null;
@@ -566,7 +685,7 @@ pub class WalkIter :: [Iterator] {
         }
     }
 
-    /// The entries of `dir`, sorted by name, as the walk's next to give.
+    /// Reads the entries of `dir`, sorted by name, as the walk's next to give.
     mut fn enter(dir: string): void throws IoError {
         let entries: List<DirEntry> = List.new();
         for (e in try readDir(dir)) {
@@ -584,7 +703,7 @@ class WalkFrame {
     var at: int = 0,
 }
 
-/// `name` made, and the directories above it that are not there first.
+/// Creates `name`, after the missing directories above it.
 fn makeAll(name: string): void throws IoError {
     if (let m = try statOrNothing(name)) {
         if (m.isDir) {
@@ -611,7 +730,8 @@ fn makeAll(name: string): void throws IoError {
     }
 }
 
-/// `name` taken away — a directory with all that is in it —: the first error met, or null.
+/// Removes `name` — a directory with everything in it — and returns the first error met, or
+/// `null`.
 fn takeAway(name: string, isDir: bool, isLink: bool): ?IoError {
     if (!isDir) {
         try {
@@ -655,7 +775,7 @@ fn takeAway(name: string, isDir: bool, isLink: bool): ?IoError {
     return first;
 }
 
-/// What `name` names, or `null` where nothing is there; any other error is thrown.
+/// Returns what `name` names, or `null` where nothing is there; any other error is thrown.
 fn statOrNothing(name: string, follow: bool = true): ?Metadata throws IoError {
     try {
         return statOf(name, follow);
@@ -667,13 +787,13 @@ fn statOrNothing(name: string, follow: bool = true): ?Metadata throws IoError {
     }
 }
 
-/// The system's directory for temporary files: `os.tempDir`'s (M8b S9).
+/// Returns the system's directory for temporary files, as `os.tempDir` reports it.
 fn tempRoot(): string throws IoError {
     return os.tempDir();
 }
 
-/// What `name` names (lyr/fs.h's five slots): through links, or the path itself where `follow` is
-/// false — a link then neither file nor directory.
+/// Returns what `name` names (lyr/fs.h's five slots): through links, or the path itself where
+/// `follow` is false — a link then neither file nor directory.
 fn statOf(name: string, follow: bool = true): Metadata throws IoError {
     let slots: int[] = [0] * 5;
     let through = if (follow) 1 else 0;
@@ -691,8 +811,8 @@ fn statOf(name: string, follow: bool = true): Metadata throws IoError {
     };
 }
 
-/// A path the system writes into a buffer (`call`): the room it answers it needs, where the first
-/// was too small, and once more.
+/// Returns the path the system writes into a buffer through `call`. Where the buffer is too small
+/// the system answers the room it needs, and the call is repeated with that much.
 fn pathFrom(name: string, doing: string, call: fn(Slice<uint8>) -> int): string throws IoError {
     var room = 1024;
     loop {

@@ -5,15 +5,6 @@
 /// [Display], [Debug], [Clone]), the number tower ([Num], [Integer], [Float]) with [Parse], the
 /// members of `string`, `char` and the arrays and views, the format language behind f-strings,
 /// and the iterator protocol ([Iterator], [Iterable]).
-//
-// In this order (M9a S11c): 0 the preamble - panic, assert, Error, Result, Box, the ranges, arrayOf;
-// 1 the attributes and the compiler's instructions; 2 the operator interfaces and the language's
-// own - Equatable, Ordered, Hashable, Identity, Variants, Index, Display; 3 the scalars' conformances;
-// 4 Debug, Clone, Default, From/Into, char and Unicode; 5 the numbers; 6 parsing; 7 strings, views,
-// bytes to text, f-strings; 8 the format language; 9 iteration - the protocol, the ranges,
-// collecting, membership (the adapters are std.iter's); 10 arrays, views and slices - their members,
-// sorting, equality and display; 11 optionals and tuples; 12 the build's target and profile;
-// 13 type information while compiling.
 
 
 /// Ends the process with a message and a backtrace.
@@ -138,9 +129,7 @@ pub fn arrayOf<T, E :: [Error]>(n: int, f: fn(int) -> T throws E): T[] throws E 
     if (n == 0) {
         return [];
     }
-    // One allocation, every slot the first value until its own is written. (Joined from the
-    // blocks of the length's binary digits, as before, it allocated once per digit and copied
-    // every element several times — the most of maps' cache misses, R9c.)
+    // One allocation, every slot the first value until its own is written.
     let first = try f(0);
     let whole = filled(n, first);
     var i = 1;
@@ -270,14 +259,14 @@ extend<T, E :: [Error]> Result<T, E> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Attributes (design/v5/spec/09 A1–A3, A11; spec chapter 11 §1). An attribute is a struct that
-// says where it may sit — one of the markers below —, and a use writes its fields, each a value
-// computed while the program compiles: `@Test { timeout = LIMIT }`. The compiler reads the ones
-// of the closed list by their identity — `std.core.Test`, not any `Test` (A3).
+// Attributes. An attribute is a struct that says where it may sit — one of the markers below —,
+// and a use writes its fields, each a value computed while the program compiles:
+// `@Test { timeout = LIMIT }`. The compiler reads the ones of the closed list by their identity —
+// `std.core.Test`, not any `Test`.
 //
-// A marker names one kind of declaration, or a set of them (F1); an attribute names the
-// narrowest that fits. The markers inherit nothing from each other: which declarations each
-// admits is the compiler's table, in spec chapter 11 §1.
+// A marker names one kind of declaration, or a set of them; an attribute names the narrowest
+// that fits. The markers inherit nothing from each other: which declarations each admits is the
+// compiler's own table.
 // ---------------------------------------------------------------------------------------------
 
 /// Where an attribute may sit: anywhere one stands.
@@ -518,7 +507,7 @@ pub interface Closeable {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The operator interfaces (design/v5/spec/04 D6). 'a + b' is exactly 'a.add(b)': the conformance
+// The operator interfaces. 'a + b' is exactly 'a.add(b)': the conformance
 // is chosen by the static type of 'b', the result is the conformer's 'Out' — 'Self' unless it
 // says otherwise. The built-in scalars conform below, through the operators the compiler binds
 // itself; a generic 'fn sum<T :: [Add<Out = T>]>' reaches them the same way.
@@ -1211,7 +1200,7 @@ extend string :: [Equatable, Display, Add] {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The synthesized conformances (design/v5/spec/04 D7): a conformance written without a body is
+// The synthesized conformances: a conformance written without a body is
 // implemented from the fields — 'Debug' for every type that writes none. The scalars conform
 // below; the shapes a field may have render through the helpers at the end.
 // ---------------------------------------------------------------------------------------------
@@ -1362,9 +1351,8 @@ extend char :: [Debug, Clone] {
     fn clone(): char { return this; }
 }
 
-// The way into a char (10 B5 Z8): it answers `null` where `as char` would panic — a number from
-// data is no programmer's error (B3). The way out is `c as uint32` (the review's A9e: a method
-// that said the same went).
+// The way into a char: it answers `null` where `as char` would panic, since a number from data is
+// no programmer's error. The way out is `c as uint32`.
 extend char {
     /// Returns the character of a scalar value; `null` for a surrogate, 0xD800…0xDFFF, or beyond
     /// 0x10FFFF.
@@ -1455,10 +1443,10 @@ fn categoryOf(k: int): UnicodeCategory {
     };
 }
 
-// What a character is (10 B9 S5): `isX` asks Unicode — the general category, or for whitespace the
-// property White_Space, from the Unicode Character Database std.string's `unicodeVersion` names —,
+// What a character is: `isX` asks Unicode — the general category, or for whitespace the property
+// White_Space, from the Unicode Character Database std.string's `unicodeVersion` names —,
 // `isAsciiX` asks ASCII alone. Case maps one character to one (the simple case mapping) and knows
-// no locale: `ß` stays `ß` (S4).
+// no locale: `ß` stays `ß`.
 extend char {
     /// Returns the character's general category.
     pub fn category(): UnicodeCategory {
@@ -1707,9 +1695,9 @@ extend string {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The numbers (design/v5/spec/10 B5): ten types, one tower of interfaces with static members.
-// Arithmetic stays in the type — the parent lists fix 'Out' (05 §8 rule 7) — and the defaults are
-// each type's own (04 D9): 'int8.min.abs()' is a direct call, no value of an interface made.
+// The numbers: ten types, one tower of interfaces with static members. Arithmetic stays in the
+// type — the parent lists fix 'Out' — and the defaults are each type's own: 'int8.min.abs()' is a
+// direct call, no value of an interface made.
 // ---------------------------------------------------------------------------------------------
 
 /// Every number type: its zero and its one, arithmetic that stays in the type.
@@ -1876,9 +1864,9 @@ pub interface Integer :: [Num, TotalOrder, Hashable, BitAnd<Out = Self>, BitOr<O
     }
 }
 
-// The natives the defaults stand on (10 B5): one each, generic, a C builtin serving every
-// integer width — whether + - * leave the type and the result wrapped to it (what `+%` gives a
-// builtin, 08 Y4), the bit counts, the rotation.
+// The natives the defaults stand on: one each, generic, a C builtin serving every integer width —
+// whether + - * leave the type and the result wrapped to it (what `+%` gives a builtin), the bit
+// counts, the rotation.
 fn addOverflows<T>(a: T, b: T): bool;
 fn subOverflows<T>(a: T, b: T): bool;
 fn mulOverflows<T>(a: T, b: T): bool;
@@ -1947,7 +1935,7 @@ pub interface Float :: [Signed] {
     }
 }
 
-// The bits as macros (11 W4); libm's functions are std.math's.
+// The bits as macros; libm's functions are std.math's.
 fn floatBits<T>(x: T): uint64;
 fn floatFromBits<T>(b: uint64, like: T): T;
 fn totalOrderKey<T>(x: T): uint64;
@@ -2305,7 +2293,7 @@ extend float32 :: [Num, Signed, Float] {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Parsing (design/v5/spec/10 B3, B4, B5 Z6): a value read from a text, and what is wrong with the
+// Parsing: a value read from a text, and what is wrong with the
 // text thrown — the text is the data's, so it never panics. An integer is read here in Lyric over
 // the string's bytes; a float's form is checked here and its value read by C, correctly rounded.
 // ---------------------------------------------------------------------------------------------
@@ -2561,8 +2549,8 @@ fn isWord(s: StringView, i: int, a: int, b: int, c: int): bool {
     return byteAt(s, i) == a && byteAt(s, i + 1) == b && byteAt(s, i + 2) == c;
 }
 
-// The natives the text stands on: a view's length and bytes (10 S1), which a string gives at the
-// argument; a number converted as `as` converts it (03 T1d) to the type of `like` where that is a
+// The natives the text stands on: a view's length and bytes, which a string gives at the
+// argument; a number converted as `as` converts it to the type of `like` where that is a
 // parameter's; a float's text read by C (`strtod`, `strtof`) once its form is checked.
 fn byteCount(s: StringView): int;
 fn byteAt(s: StringView, i: int): int;
@@ -2584,11 +2572,10 @@ fn compareBytes(a: string, b: string): int;
 fn byteSlice(s: string, from: int, to: int): string;
 /// Creates a string of the array's first `count` bytes.
 fn stringOfBytes(bytes: uint8[], count: int): string;
-// --- strings (10 B9 S1–S3) ----------------------------------------------------------------------
-// UTF-8, immutable, the length in bytes. The members stand once on `StringView` (S1), which a
-// string reaches through a view of all of itself (M8a S12): what cuts gives a view, no copy; what
-// builds gives a string. The search takes a `Pattern` (S2): a view or a string, a character, a
-// test of characters.
+// --- strings ----------------------------------------------------------------------------------
+// UTF-8, immutable, the length in bytes. The members stand once on `StringView`, which a string
+// reaches through a view of all of itself: what cuts gives a view, no copy; what builds gives a
+// string. The search takes a `Pattern`: a view or a string, a character, a test of characters.
 
 extend string :: [Ordered, TotalOrder] {
     /// Compares byte by byte, which is the order of the code points.
@@ -3317,7 +3304,7 @@ fn moveElements<T>(into: Slice<T>, from: Slice<T>, count: int): void;
 /// does.
 fn panicRange(low: int, high: int, length: int): never;
 
-// --- StringView (10 S1, 03 A2; M8a S12): the view of a string's bytes --------------------------
+// --- StringView: the view of a string's bytes -------------------------------------------------
 // A pointer into a string's bytes and a length, read and never written. `s[a..b]` takes one on
 // character boundaries, a string stands where one is expected, and `s[i]` is the character that
 // begins at a byte. The string's search and split members stand on it (the strings, above).
@@ -3422,7 +3409,7 @@ extend string :: [Index<int>] {
     }
 }
 
-// --- bytes to text (10 S3; M8a S12) -----------------------------------------------------------
+// --- bytes to text ----------------------------------------------------------------------------
 
 /// The error `string.fromUtf8` throws when the bytes are no well-formed UTF-8.
 ///
@@ -3463,8 +3450,8 @@ fn utf8Invalid(bytes: Slice<uint8>): int;
 fn stringOfSlice(bytes: Slice<uint8>): string;
 fn stringOfUtf8Lossy(bytes: Slice<uint8>): string;
 
-// --- f-strings into one builder (10 S6; M8a S13) -----------------------------------------------
-// What an f-string compiles to (12 §2 rule 4): a builder sized for its text, each piece appended in
+// --- f-strings into one builder ---------------------------------------------------------------
+// What an f-string compiles to: a builder sized for its text, each piece appended in
 // order, the text taken — one buffer, no string per piece. The checker writes these calls.
 
 pub fn fstringStart(room: int): StringBuilder {
@@ -3557,7 +3544,7 @@ fn textOfFloat32(value: float32): string;
 fn putIntDigits(bytes: uint8[], at: int, value: int): int;
 fn putUintDigits(bytes: uint8[], at: int, value: uint): int;
 
-// --- the format language (08 Y7, 10 S7; spec 12 §2) ---------------------------------------------
+// --- the format language ----------------------------------------------------------------------
 
 /// A type with formats of its own: `{x:spec}` hands it the spec as written.
 ///
@@ -3751,7 +3738,7 @@ fn formatInteger(negative: bool, magnitude: uint, spec: StringView, out: StringB
     let sign = if (negative) "-" else if (s.plus) "+" else "";
     let size = if (radix == 10) 3 else 4;
     // under `0` with a grouping, the zeros are grouped with the digits and the width counts the
-    // separators (12 §2 rule 1; the review's A4): as many digits as fill the width, at least
+    // separators: as many digits as fill the width, at least
     let least = if (zeroGrouped(s)) digitsFor(s.width - byteCount(sign) - byteCount(prefix), size) else 0;
     let digits = digitsOf(magnitude, radix as uint, s.kind == 'X', s.grouping, size, least);
     finishNumber(sign, prefix, digits, s, out);
@@ -4049,7 +4036,7 @@ fn float32OfText(s: string): float32;
 
 
 // ---------------------------------------------------------------------------------------------
-// Iteration (design/v5/spec/10 B6): a source of values, one at a time, and what `for` walks.
+// Iteration: a source of values, one at a time, and what `for` walks.
 // ---------------------------------------------------------------------------------------------
 
 /// A source of values, one at a time.
@@ -4097,7 +4084,7 @@ extend<I :: [Iterator]> I :: [Iterable<Iter = I>] {
     }
 }
 
-// A range is an iterator of its own values, from both ends (I10): the value changes as it is
+// A range is an iterator of its own values, from both ends: the value changes as it is
 // walked — a 'let' range is walked through a copy, as `for` takes one.
 extend<T :: [Step]> Range<T> :: [Iterator, DoubleEnded] {
     type Item = T;
@@ -4247,7 +4234,7 @@ extend<T> Slice<T> :: [Iterable] {
     }
 }
 
-// --- collecting (10 B6, I4; M8a S15) -------------------------------------------------------------
+// --- collecting -------------------------------------------------------------------------------
 // `collect()` builds what the expected type is, through its `FromIterator`: `let xs: List<int> =
 // it.collect();`. An array is one; the containers of std.collections are the others.
 
@@ -4336,8 +4323,8 @@ pub fn repeatText(s: string, n: int): string {
     return out.toString();
 }
 
-// --- the members of arrays and views (10 C2): written once on `Slice<T>`, and reached on an
-// array - and a `T[N]` in the heap (03 §5.3 rule 6) - through a view of all of it. A write goes there.
+// --- the members of arrays and views: written once on `Slice<T>`, and reached on an array - and
+// a `T[N]` in the heap - through a view of all of it. A write goes there.
 extend<T> Slice<T> {
     /// Returns whether there is no element.
     pub fn isEmpty(): bool {
@@ -4518,7 +4505,7 @@ extend<T :: [Display]> Slice<T> {
     }
 }
 
-// --- ordering (10 C10): `sort` and `sortBy` stable (K3), through a buffer of the length;
+// --- ordering: `sort` and `sortBy` stable, through a buffer of the length;
 // `sortUnstable` in place.
 extend<T> Slice<T> {
     /// Sorts the elements in the order `cmp` gives, equal ones keeping theirs.
@@ -4876,7 +4863,7 @@ extend CharsIter :: [Clone] {
 // An inclusive range ends without a flag: its last value leaves `start` past `end` — or `end`
 // before `start` where that value is the type's last (its first from the back), so neither bound
 // leaves the type. A range of characters walks the scalar values, the surrogates passed over
-// (03 S15b; `Step` above).
+// (`Step` above).
 extend<T :: [Step]> RangeInclusive<T> :: [Iterator, DoubleEnded] {
     type Item = T;
 
@@ -5000,10 +4987,10 @@ pub fn sequence<T>(body: fn() -> Coroutine<T>): Coroutine<T> {
     return body();
 }
 
-// --- equality and display of arrays and views (10 C9; M8a S14) ----------------------------------
+// --- equality and display of arrays and views -------------------------------------------------
 // Element by element. The debug text is `[1, 2, 3]`, each element in its own debug text — a string
 // quoted, `["a", "b"]`, where its bounds would be lost unquoted —, and the display text is the
-// same, so an f-string prints a container (C9). Written into the caller's builder (10 S6).
+// same, so an f-string prints a container. Written into the caller's builder.
 
 extend<T :: [Equatable]> T[] :: [Equatable] {
     fn equals(o: T[]): bool {
@@ -5085,7 +5072,7 @@ fn debugText<T :: [Debug]>(xs: Slice<T>): string {
     return out.toString();
 }
 
-// --- optionals and arrays (N2a) --------------------------------------------------------------
+// --- optionals and arrays ---------------------------------------------------------------------
 
 /// Makes an optional [Equatable] where its value's type is: `null` equals `null` only.
 ///
@@ -5140,12 +5127,11 @@ extend<T0 :: [Clone], T1 :: [Clone], T2 :: [Clone]> (T0, T1, T2) :: [Clone] {
     }
 }
 
-// --- tuples (03 T16, 04 D7; N2a) --------------------------------------------------------------
+// --- tuples -----------------------------------------------------------------------------------
 //
 // A tuple is Equatable, Hashable, Debug and Display where its elements are — the conditional
-// synthesis D7 gives structs, written here for each arity from 2 to 8 (a generator wrote them;
-// Rust's own impls stop at 12). Equality and hash take the elements in order; Debug writes
-// `(1, "x")`, Display `(1, x)`.
+// synthesis structs get, written here for each arity from 2 to 8 by a generator. Equality and
+// hash take the elements in order; Debug writes `(1, "x")`, Display `(1, x)`.
 
 extend<T0 :: [Equatable], T1 :: [Equatable]> (T0, T1) :: [Equatable] {
     fn equals(o: (T0, T1)): bool {
@@ -5583,9 +5569,9 @@ extend<Y, R> Coroutine<Y, R> :: [Identity] {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The build's target and profile (design/v5/spec/09 A6 B4, Q7; 11 W2 P11; 13 M9a P9): constants
-// the compiler writes — a cross-build's target, not the host's —, which `comptime if` and `@When`
-// choose by while compiling. `std.os` passes the two kinds on and answers them at run time (10 Q9).
+// The build's target and profile: constants the compiler writes — a cross-build's target, not
+// the host's —, which `comptime if` and `@When` choose by while compiling. `std.os` passes the two
+// kinds on and answers them at run time.
 // ---------------------------------------------------------------------------------------------
 
 /// The system a program runs on, as the target triples name it.
@@ -5702,9 +5688,9 @@ pub struct Shared :: [OnField] { }
 pub struct SeesConformer :: [OnInterface] { }
 
 // ---------------------------------------------------------------------------------------------
-// Type information while compiling (design/v5/spec/09 A7; 10 B13 M1; M9a S9, S10). Declared here,
-// not in std.meta: the synthesized members above are written over these questions, and std.core
-// imports nothing. std.meta passes them on by name.
+// Type information while compiling. Declared here, not in std.meta: the synthesized members
+// above are written over these questions, and std.core imports nothing. std.meta passes them on
+// by name.
 
 /// Who may name a declaration.
 pub enum Visibility :: [Equatable, Debug] { Pub, Internal, Private }

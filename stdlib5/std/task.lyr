@@ -1,46 +1,56 @@
-/// Tasks and their scheduler (design/v5/spec/06 N4, N6, N8, N9; 10 Q10). M6 S3-S6: a scheduler for
-/// each thread that runs tasks, written here over the runtime's park and poller (06 N6 S1); `main`
-/// as a task (T6); `spawn` and its `Task` with its states, `TaskScope`, `spawnDetached`, `sleep`,
-/// `yieldNow`; cancellation and `withTimeout` (N9); a panic that ends a task, not the process (T4);
-/// channels, `Select` and `Timer` (N5 K1-K3), within a thread and across threads. The module cut
-/// (10 Q9, Q10; M8b S1) gave the threads and their pool to std.thread, the locks to std.sync and
-/// the signals to std.os; they stand on what stays here for them, internal to std: the locks'
-/// state, the scheduler, `launchOn`, the registry of the living schedulers and the natives.
+/// Tasks, channels and the scheduler that runs them.
+///
+/// Each thread has a scheduler, written here over the runtime's park and poller, and `main` runs
+/// as a task of it. The module holds [spawn] and its [Task] with its [TaskStatus], [TaskScope],
+/// [spawnDetached], [sleep] and [yieldNow]; cancellation through [Cancelled] and [withTimeout]; a
+/// panic that ends a task, not the process, described by [PanicInfo]; and [Channel], [Select] and
+/// [Timer], which work within a thread and across threads.
+///
+/// The threads and their pool are std.thread's, the locks std.sync's and the signals std.os's;
+/// they stand on parts kept here, internal to std: the locks' state, the scheduler, `launchOn`,
+/// the registry of the living schedulers and the natives.
 
 
 import std.core { filled };
 import std.time { Duration };
 
-/// What a suspended `yield` throws when `close()` unwinds its coroutine (06 A5), and what a wait
-/// throws in a cancelled task (06 N9 X1): an `Error`, so cleanup can catch it — though a coroutine
-/// that catches it may not yield again, and a task that waits again gets it again (X5).
+/// The error a wait throws in a cancelled task, and a suspended `yield` when `close()` unwinds its
+/// coroutine.
+///
+/// It is an [Error], so cleanup can catch it — though a coroutine that catches it may not yield
+/// again, and a task that waits again gets it again.
 pub class Cancelled :: [Error] {
     pub fn message(): string { return "cancelled"; }
 }
 
-/// Parks the running task until `d` has passed, at least (06 K3), while the other tasks of its
-/// thread run. A sleep of zero or less lets the tasks that are ready run first. A wait: in a
-/// cancelled task it throws `Cancelled` (06 N9 X1), and a cancel ends it early.
+/// Parks the running task until at least `d` has passed, while the other tasks of its thread run.
+///
+/// A sleep of zero or less lets the tasks that are ready run first.
+///
+/// # Errors
+/// Throws [Cancelled] in a cancelled task; a cancel during the sleep ends it early.
 pub fn sleep(d: Duration): void throws Cancelled {
     try here().sleep(d.nanos());
 }
 
-/// Lets the other ready tasks of the thread run first (06 N8): the running task goes behind them.
-/// A wait, so a point where a cancelled task throws `Cancelled` (06 N9 X2).
+/// Lets the other ready tasks of the thread run first: the running task goes behind them.
+///
+/// # Errors
+/// Throws [Cancelled] in a cancelled task, as every wait does.
 pub fn yieldNow(): void throws Cancelled {
     try here().yieldNow();
 }
 
-/// What a panic in a task left (06 T3-T4, 05 E8): its code, its message, and the frames where it
-/// happened, as the report writes them.
+/// Describes a panic that ended a task: its code, its message, and the frames where it happened,
+/// as the panic report writes them.
 pub class PanicInfo {
     pub code: string,
     pub message: string,
     pub trace: string,
 }
 
-/// Where a task stands (06 T3): still running; ended with its value, with an error, with
-/// `Cancelled`; or ended by a panic.
+/// Where a task stands: still running; ended with its value, with an error, with [Cancelled]; or
+/// ended by a panic.
 pub enum TaskStatus<T> {
     Running,
     Done(T),
@@ -49,24 +59,26 @@ pub enum TaskStatus<T> {
     Panicked(PanicInfo),
 }
 
-/// A task's handle (06 T1-T3), which `spawn` gives: the body's result once it ended, or the error
-/// it ended with. Its type carries that error — `Task<T> throws E`, as a coroutine's carries what
-/// its pulls throw (05 E10) — and `await()` throws it.
+/// The handle of a task, which [spawn] gives: the body's result once it ended, or the error it
+/// ended with.
+///
+/// Its type carries that error — `Task<T> throws E` — and [Task.await] throws it.
 pub class Task<T> {
     var done: bool = false,
     var value: ?T = null,
     var failure: ?Error = null,
-    /// What a panic of the body left (06 T4).
+    /// What a panic of the body left.
     var crash: ?PanicInfo = null,
     /// The context the body runs in, until it ends.
     var context: ?Context = null,
     /// The tasks parked in `await()` until the body ends, in the order they came.
     waiters: Waiters = Waiters { },
     /// Guards `done`, `context` and the waiters: a task is awaited and cancelled from any thread,
-    /// not only its own (06 G1). Its end publishes what the body left (N7 P1).
+    /// not only its own. Its release publishes what the body left to the thread that acquires it
+    /// next.
     guard: SpinLock = SpinLock { },
 
-    /// Whether the body has ended, with its value, with an error, or by a panic (06 T3).
+    /// Returns whether the body has ended, with its value, with an error, or by a panic.
     pub fn isDone(): bool {
         this.guard.acquire();
         let done = this.done;
@@ -74,8 +86,7 @@ pub class Task<T> {
         return done;
     }
 
-    /// Where the task stands (06 T3) — asked without waiting, and without panicking where the task
-    /// did (T4: the supervisor's look).
+    /// Returns where the task stands, without waiting, and without panicking where the task did.
     pub fn status(): TaskStatus<T> {
         if (!this.isDone()) {
             return TaskStatus.Running;
@@ -92,9 +103,13 @@ pub class Task<T> {
         return TaskStatus.Done(this.value!);
     }
 
-    /// The body's value once it has ended, or its error, thrown here (06 T2): the running task
-    /// waits until then. A wait, so it throws `Cancelled` in a cancelled task (06 N9 X1); what it
-    /// throws is read off the handle's type at the call (10 §2), the declared `Error` stands for it.
+    /// Returns the body's value once it has ended; the running task waits until then.
+    ///
+    /// Where the body panicked, the panic is raised again here, with its code, message and trace.
+    ///
+    /// # Errors
+    /// Throws the error the body ended with, and [Cancelled] in a cancelled task. What it throws
+    /// is read off the handle's type at the call; the declared `Error` stands for it.
     pub mut fn await(): T throws Error {
         let me = here().running ?? panic("an await where no task runs");
         if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
@@ -124,11 +139,15 @@ pub class Task<T> {
         return this.value!;
     }
 
-    /// The body's value once it has ended, waited for through a cancellation (M8b P2): std.fs's
-    /// calls on a regular file run on the I/O pool, in the caller's buffer, and end in a bounded
-    /// time — a caller that left before the end would take the buffer back while the pool still
-    /// wrote into it. No wait in the sense of 10 §1 rule 7: the cancellation stays the task's, for
-    /// its next wait to throw.
+    /// Returns the body's value once it has ended, waiting through a cancellation.
+    ///
+    /// std.fs's calls on a regular file run on the I/O pool, in the caller's buffer, and end in a
+    /// bounded time — a caller that left before the end would take the buffer back while the pool
+    /// still wrote into it. A cancellation does not end this wait; it stays the task's, for its next
+    /// wait to throw.
+    ///
+    /// # Errors
+    /// Throws the error the body ended with.
     mut fn awaitThrough(): T throws Error {
         let me = here().running ?? panic("an await where no task runs");
         this.guard.acquire();
@@ -152,8 +171,8 @@ pub class Task<T> {
         return this.value!;
     }
 
-    /// Cancels the task (06 N9 X1): its next wait throws `Cancelled` — at once, where it waits now
-    /// — and so does every wait after it (X5). A task that has ended stays as it ended.
+    /// Cancels the task: its next wait throws [Cancelled] — at once, where it waits now — and so
+    /// does every wait after it. A task that has ended stays as it ended.
     pub fn cancel(): void {
         this.guard.acquire();
         let context = this.context;
@@ -164,15 +183,15 @@ pub class Task<T> {
     }
 
     /// Cancels the task and waits until it has ended, whatever the running task's mark says: what a
-    /// task does before it lets go of one it started (06 T5).
+    /// task does before it lets go of one it started.
     mut fn settle(): void {
         this.cancel();
         this.join();
     }
 
     /// Waits until the body has ended, however it ended and whatever the running task's mark says,
-    /// without taking on its error or its panic (06 T4): the supervisor's wait — `std.test`'s —,
-    /// after which `status()` tells.
+    /// without taking on its error or its panic: the supervisor's wait — `std.test`'s —, after which
+    /// `status()` tells.
     mut fn join(): void {
         let me = here().running ?? panic("a wait where no task runs");
         this.guard.acquire();
@@ -189,14 +208,15 @@ pub class Task<T> {
         this.guard.release();
     }
 
-    /// The body ended by a panic (06 T4): the task is Panicked, and what it left waits for `await`.
+    /// Records that the body ended by a panic: the task is Panicked, and what it left waits for
+    /// `await`.
     mut fn panicked(info: PanicInfo): void {
         this.crash = info;
         this.finish();
     }
 
-    /// The body has ended: its scope learns of it, and the tasks waiting for it are ready, in the
-    /// order they came.
+    /// Marks the body as ended: its scope learns of it, and the tasks waiting for it are ready, in
+    /// the order they came.
     mut fn finish(): void {
         if (let c = this.context) {
             if (let scope = c.scope) {
@@ -212,25 +232,30 @@ pub class Task<T> {
     }
 }
 
-/// Starts `body` as a task of the running thread and gives its handle (06 T1): the task runs once
-/// the tasks ready before it had their turn, and `await()` on the handle gives its value or throws
-/// its error — `E`, what the body throws, the handle's type carries. The handle is the only way to
-/// that error, so a call that drops it warns (09 A11); `spawnDetached` is the task nobody awaits,
-/// and a scope's `spawn` one its `close()` waits for.
+/// Starts `body` as a task of the running thread and returns its handle.
+///
+/// The task runs once the tasks ready before it had their turn, and [Task.await] on the handle
+/// gives its value or throws its error — `E`, what the body throws, the handle's type carries. The
+/// handle is the only way to that error, so a call that drops it warns; [spawnDetached] is the
+/// task nobody awaits, and [TaskScope.spawn] one the scope's `close()` waits for.
 @MustUse
 pub fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
     return launch(body);
 }
 
-/// What `withTimeout` throws when its time ran out before the body ended (06 N9 X4).
+/// The error [withTimeout] throws when its time ran out before the body ended.
 pub class TimedOut :: [Error] {
     pub fn message(): string { return "timed out"; }
 }
 
-/// Runs `body` as a task of its own and gives what it gives — unless `d` passes first: then the
-/// body is cancelled, and `TimedOut` is thrown once it has ended (06 N9 X4: a scope, a timer and a
-/// cancel). The body's own errors come out as they are. A cancel of the caller cancels the body
-/// too; whenever this returns, the body has ended.
+/// Runs `body` as a task of its own and returns what it returns, unless `d` passes first.
+///
+/// When `d` passes first, the body is cancelled, and [TimedOut] is thrown once it has ended. A
+/// cancel of the caller cancels the body too; whenever this returns, the body has ended.
+///
+/// # Errors
+/// Throws the body's own errors as they are; [TimedOut] when `d` passed before the body ended;
+/// [Cancelled] when the caller was cancelled.
 pub fn withTimeout<T, E :: [Error]>(d: Duration, body: fn() -> T throws E): T throws [E, TimedOut, Cancelled] {
     var late = false;
     let work = spawn(body);
@@ -251,16 +276,18 @@ pub fn withTimeout<T, E :: [Error]>(d: Duration, body: fn() -> T throws E): T th
     }
 }
 
-/// What `send` throws on a closed channel (06 K1).
+/// The error [Channel.send] throws on a closed channel.
 pub class ChannelClosed :: [Error] {
     pub fn message(): string { return "channel closed"; }
 }
 
-/// A channel (06 N5 K1): values go in with `send` and come out with `recv`, in the order they went
-/// in. Unbuffered — a capacity of 0 — a send waits until a receiver takes the value; buffered, it
-/// waits only while the buffer is full. `close()` ends it: what is buffered can still be received,
-/// then `recv` answers null; a send throws `ChannelClosed`. Within a thread and across threads: a
-/// send happens before the receive that gets its value (N7 P1).
+/// A queue of values between tasks: values go in with [Channel.send] and come out with
+/// [Channel.recv], in the order they went in.
+///
+/// Unbuffered — a capacity of 0 — a send waits until a receiver takes the value; buffered, it
+/// waits only while the buffer is full. [Channel.close] ends it: what is buffered can still be
+/// received, then `recv` answers null; a send throws [ChannelClosed]. It works within a thread and
+/// across threads: a send happens before the receive that gets its value.
 ///
 /// The guard holds while the channel's state changes, and never while anything waits or a body runs.
 /// The locks of this module are taken in one order — channels by their ids, then a task's guard or
@@ -277,12 +304,14 @@ pub class Channel<T> {
     /// The tasks waiting to send, each with its value, and those waiting to receive.
     senders: WaitQueue<T>,
     receivers: WaitQueue<T>,
-    /// What else ends with the channel: the signal hub's subscription (M6-28). Run once, after
-    /// the close, outside the guard.
+    /// What else ends with the channel: the signal hub's subscription. Run once, after the close,
+    /// outside the guard.
     var closer: ?fn() -> void = null,
 
-    /// A channel that holds up to `capacity` values no task has received yet; 0 — the default —
-    /// holds none: a send meets a receive.
+    /// Creates a channel that holds up to `capacity` values no task has received yet.
+    ///
+    /// A capacity of 0 — the default — holds none: a send meets a receive. A negative capacity
+    /// counts as 0.
     pub static fn new(capacity: int = 0): Channel<T> {
         return Channel<T> {
             capacity = if (capacity > 0) capacity else 0,
@@ -293,10 +322,12 @@ pub class Channel<T> {
         };
     }
 
-    /// Puts `value` into the channel (06 K1): to a task waiting to receive, into the buffer while
-    /// there is room — else the running task waits until a receiver takes it. On a closed channel,
-    /// and when the channel closes while it waits, it throws `ChannelClosed`. A wait: a cancelled
-    /// task throws `Cancelled` (N9 X1).
+    /// Puts `value` into the channel: to a task waiting to receive, or into the buffer while there
+    /// is room — else the running task waits until a receiver takes it.
+    ///
+    /// # Errors
+    /// Throws [ChannelClosed] on a closed channel, and when the channel closes while it waits;
+    /// [Cancelled] in a cancelled task.
     pub mut fn send(value: T): void throws [ChannelClosed, Cancelled] {
         let s = here();
         let me = s.running ?? panic("a send where no task runs");
@@ -336,9 +367,11 @@ pub class Channel<T> {
         throw ChannelClosed { };
     }
 
-    /// The next value of the channel (06 K1): from the buffer, or from a task waiting to send —
-    /// else the running task waits for one. Null once the channel is closed and empty. A wait: a
-    /// cancelled task throws `Cancelled` (N9 X1).
+    /// Returns the next value of the channel: from the buffer, or from a task waiting to send —
+    /// else the running task waits for one. Returns null once the channel is closed and empty.
+    ///
+    /// # Errors
+    /// Throws [Cancelled] in a cancelled task.
     pub mut fn recv(): ?T throws Cancelled {
         let s = here();
         let me = s.running ?? panic("a receive where no task runs");
@@ -369,7 +402,7 @@ pub class Channel<T> {
         return null;
     }
 
-    /// Closes the channel (06 K1): the tasks waiting to receive get null, those waiting to send throw
+    /// Closes the channel: the tasks waiting to receive get null, those waiting to send throw
     /// `ChannelClosed`; what is buffered can still be received. Closing a closed channel does nothing.
     pub mut fn close(): void {
         let s = here();
@@ -391,9 +424,9 @@ pub class Channel<T> {
         if (let f = closer) { f(); }
     }
 
-    /// `value` into the channel where that needs no wait — to a task waiting to receive, or into the
-    /// buffer while it has room: 1 then; 0 where it would have to wait, and the value is dropped; -1
-    /// for a closed channel.
+    /// Puts `value` into the channel where that needs no wait — to a task waiting to receive, or
+    /// into the buffer while it has room — and returns 1 then; 0 where it would have to wait, and
+    /// the value is dropped; -1 for a closed channel.
     mut fn offer(s: Scheduler, value: T): int {
         this.guard.acquire();
         if (this.closed) {
@@ -418,7 +451,7 @@ pub class Channel<T> {
         return 0;
     }
 
-    /// A value at once, taken out — from the buffer, which a task waiting to send then refills, or
+    /// Takes a value out at once — from the buffer, which a task waiting to send then refills, or
     /// from such a task itself; null where a receive would wait, or find the channel closed and
     /// empty. It never waits. A waiting sender that another waker ended meanwhile is passed over.
     /// Under the guard.
@@ -512,7 +545,7 @@ class WaitQueue<T> {
         w.next = null;
     }
 
-    /// The first task waiting, taken out — or null.
+    /// Takes the first waiting task out and returns it, or null where none waits.
     mut fn take(): ?Waiting<T> {
         let w = this.first;
         if (w == null) { return null; }
@@ -521,18 +554,19 @@ class WaitQueue<T> {
     }
 }
 
-/// The way into a select (06 N5 K2): `Select.on(a) { … }.on(b) { … }.timeout(d) { … }.run()` waits
-/// on the channels `a` and `b` at once and runs the case of the first to have a value — or the
-/// timeout's, when `d` passed first.
+/// The way into a select, a wait on several channels at once.
+///
+/// `Select.on(a) { … }.on(b) { … }.timeout(d) { … }.run()` waits on the channels `a` and `b` at
+/// once and runs the case of the first to have a value — or the timeout's, when `d` passed first.
 pub class Select {
-    /// A select with its first case: a receive from `c` (see `Selection.on`).
+    /// Creates a select with its first case: a receive from `c` (see [Selection.on]).
     pub static fn on<T>(c: Channel<T>, body: fn(?T) -> void throws Error): Selection {
         let s = Selection { };
         return s.on(c, body);
     }
 }
 
-/// A select as it is built (06 K2): its cases, in the order they were added, and a timeout (K3).
+/// A select as it is built: its cases, in the order they were added, and a timeout.
 pub class Selection {
     var first: ?CaseNode = null,
     var last: ?CaseNode = null,
@@ -543,8 +577,8 @@ pub class Selection {
     var timeoutNanos: int = -1,
     var onTimeout: ?fn() -> void throws Error = null,
 
-    /// A case: a receive from `c`. Its body gets what `recv()` would give — the value, or null once
-    /// `c` is closed and empty.
+    /// Adds a case, a receive from `c`, and returns the select. Its body gets what `recv()` would
+    /// give — the value, or null once `c` is closed and empty.
     pub mut fn on<T>(c: Channel<T>, body: fn(?T) -> void throws Error): Selection {
         let node = CaseNode { entry = Case<T> { channel = c, body = body } };
         if (let tail = this.last) {
@@ -557,19 +591,22 @@ pub class Selection {
         return this;
     }
 
-    /// The timeout (06 K3): `body` runs when no case could go on before `d` passed — with `d` of
-    /// zero or less, when none can at once.
+    /// Sets the timeout and returns the select: `body` runs when no case could go on before `d`
+    /// passed — with `d` of zero or less, when none can at once.
     pub mut fn timeout(d: Duration, body: fn() -> void throws Error): Selection {
         this.timeoutNanos = if (d.nanos() > 0) d.nanos() else 0;
         this.onTimeout = body;
         return this;
     }
 
-    /// Runs the select (06 K2): the first case, in the order they were added, whose channel has a
-    /// value or is closed runs at once. Else the running task waits on all of them, and the first
-    /// channel to get a value or to close runs its case — or the timeout's body runs, once its time
-    /// came first. One body runs, and only its case receives. A wait: in a cancelled task it throws
-    /// `Cancelled` (06 N9 X1), and a cancel ends it. What the body throws comes out here.
+    /// Runs the select: the first case, in the order they were added, whose channel has a value or
+    /// is closed runs at once. Else the running task waits on all of them, and the first channel to
+    /// get a value or to close runs its case — or the timeout's body runs, once its time came
+    /// first. One body runs, and only its case receives.
+    ///
+    /// # Errors
+    /// Throws what the chosen body throws; [Cancelled] in a cancelled task, where a cancel also
+    /// ends the wait.
     pub mut fn run(): void throws Error {
         let s = here();
         let me = s.running ?? panic("a select where no task runs");
@@ -626,8 +663,8 @@ pub class Selection {
         try this.timedOut();
     }
 
-    /// The first case, in the order they were added, that can go on at once — what it receives
-    /// taken already; null where none can. Under the guards.
+    /// Returns the first case, in the order they were added, that can go on at once — what it
+    /// receives taken already; null where none can. Under the guards.
     mut fn takeReady(s: Scheduler): ?CaseNode {
         var at = this.first;
         while (let n = at) {
@@ -639,7 +676,7 @@ pub class Selection {
         return null;
     }
 
-    /// The guards of the channels, each once, sorted by the channels' ids.
+    /// Returns the guards of the channels, each once, sorted by the channels' ids.
     fn orderGuards(): ?GuardNode {
         var sorted: ?GuardNode = null;
         var at = this.first;
@@ -710,15 +747,16 @@ interface SelectCase {
     /// The channel's place in the order of locks, and its guard.
     fn channelId(): int;
     fn channelGuard(): SpinLock;
-    /// Where a receive would not wait — a value is there, or the channel is closed — receives at
-    /// once and keeps what came for `finish()`: true then; false where it would wait. Under the
+    /// Receives at once where a receive would not wait — a value is there, or the channel is
+    /// closed — and keeps what came for `finish()`: true then; false where it would wait. Under the
     /// channel's guard.
     mut fn takeReady(s: Scheduler): bool;
-    /// `c` waits on the channel for a value, as one of the select's waits. Under the guard.
+    /// Puts `c` on the channel's wait for a value, as one of the select's waits. Under the guard.
     mut fn enlist(c: Context): void;
-    /// It waits there no more. Under the guard.
+    /// Takes the case's wait off the channel. Under the guard.
     mut fn withdraw(): void;
-    /// A value came to it while it waited, which it keeps for `finish()`. Under the guard.
+    /// Returns whether a value came to it while it waited, which it keeps for `finish()`. Under
+    /// the guard.
     mut fn settled(): bool;
     /// Runs the body with what the case received — the value, or null for a closed channel.
     fn finish(): void throws Error;
@@ -779,11 +817,11 @@ class Case<T> :: [SelectCase] {
     }
 }
 
-/// Timers (06 K3).
+/// Timers, as channels a select can wait on.
 pub class Timer {
-    /// A channel that fires once, when `d` has passed (06 K3): then it closes, so a receive from it
-    /// answers null and a select's case on it runs. A task of its own sleeps until then, which the
-    /// program does not wait for (T6).
+    /// Returns a channel that fires once, when `d` has passed: then it closes, so a receive from it
+    /// answers null and a select's case on it runs. A detached task sleeps until then, which the
+    /// program does not wait for.
     pub static fn after(d: Duration): Channel<void> {
         let ch = Channel<void>.new();
         spawnDetached(() => {
@@ -794,7 +832,7 @@ pub class Timer {
     }
 }
 
-/// A lock a context holds (the review's M6-21): the lock's state, how — alone, or as one of its
+/// A lock a context holds: the lock's state, how — alone, or as one of its
 /// readers —, and the next one down.
 class Hold {
     var state: ?LockState = null,
@@ -817,12 +855,15 @@ class LockState {
     var writersWaiting: int = 0,
     var done: bool = false,
     waiters: Waiters = Waiters { },
-    /// The panic of a task that held the lock when it panicked (the review's M6-21): from then on
-    /// every acquire panics, naming it. The lock itself was released by the scheduler.
+    /// The panic of a task that held the lock when it panicked: from then on every acquire panics,
+    /// naming it. The scheduler releases the lock itself.
     var poisoned: ?PanicInfo = null,
 
-    /// The guard held: a poisoned lock refuses the running task — with its guard released and a
-    /// panic that names the first one.
+    /// Refuses the running task where the lock is poisoned — with its guard released and a panic
+    /// that names the first one. Called with the guard held.
+    ///
+    /// # Panics
+    /// When the lock is poisoned.
     mut fn refuseIfPoisoned(): void {
         if (let p = this.poisoned) {
             this.guard.release();
@@ -830,8 +871,14 @@ class LockState {
         }
     }
 
-    /// The running task holds the lock alone, once no other holds it at all; a writer (`counting`)
-    /// counts itself as waiting the while, which holds back readers that come after it.
+    /// Takes the lock alone for the running task, once no other holds it at all; a writer
+    /// (`counting`) counts itself as waiting the while, which holds back readers that come after it.
+    ///
+    /// # Errors
+    /// Throws [Cancelled] in a cancelled task.
+    ///
+    /// # Panics
+    /// When the lock is poisoned.
     mut fn acquireAlone(counting: bool): void throws Cancelled {
         let s = here();
         let me = s.running ?? panic("a lock where no task runs");
@@ -856,7 +903,14 @@ class LockState {
         this.guard.release();
     }
 
-    /// The running task shares the lock, once nobody holds it alone and no writer waits.
+    /// Takes a share of the lock for the running task, once nobody holds it alone and no writer
+    /// waits.
+    ///
+    /// # Errors
+    /// Throws [Cancelled] in a cancelled task.
+    ///
+    /// # Panics
+    /// When the lock is poisoned.
     mut fn acquireShared(): void throws Cancelled {
         let s = here();
         let me = s.running ?? panic("a lock where no task runs");
@@ -875,7 +929,7 @@ class LockState {
         this.guard.release();
     }
 
-    /// The running task lets go of the lock it holds alone: the body's `defer`.
+    /// Lets go of the lock the running task holds alone: the body's `defer`.
     mut fn releaseAlone(): void {
         let s = here();
         let me = s.running ?? panic("a lock where no task runs");
@@ -883,7 +937,7 @@ class LockState {
         this.freeAlone(s, null);
     }
 
-    /// The running task lets go of its share.
+    /// Lets go of the running task's share.
     mut fn releaseShared(): void {
         let s = here();
         let me = s.running ?? panic("a lock where no task runs");
@@ -891,8 +945,8 @@ class LockState {
         this.freeShared(s, null);
     }
 
-    /// The lock held alone comes free — and is poisoned where `panic` is the panic of the task
-    /// that held it (M6-21): the waiters wake, look, and see it.
+    /// Frees the lock held alone — and poisons it where `panic` is the panic of the task that held
+    /// it: the waiters wake, look, and see it.
     mut fn freeAlone(s: Scheduler, panic: ?PanicInfo): void {
         this.guard.acquire();
         this.alone = false;
@@ -911,13 +965,20 @@ class LockState {
         this.guard.release();
     }
 
-    /// The guard held: the first panic stays.
+    /// Poisons the lock with `panic` unless an earlier panic did: the first one stays. Called with
+    /// the guard held.
     mut fn poison(panic: ?PanicInfo): void {
         if (this.poisoned == null) { this.poisoned = panic; }
     }
 
-    /// A once's start: true for the task that does the work now, false where it is done — one that
-    /// comes while another does it waits.
+    /// Starts a once: returns true for the task that does the work now, false where it is done —
+    /// one that comes while another does it waits.
+    ///
+    /// # Errors
+    /// Throws [Cancelled] in a cancelled task.
+    ///
+    /// # Panics
+    /// When the once is poisoned.
     mut fn beginOnce(): bool throws Cancelled {
         let s = here();
         let me = s.running ?? panic("a once where no task runs");
@@ -940,7 +1001,7 @@ class LockState {
         return first;
     }
 
-    /// The task that does the work has ended it: done, or not — the body threw — for the next.
+    /// Ends the work of the task that does it: done, or not — the body threw — for the next.
     mut fn endOnce(done: bool): void {
         let s = here();
         let me = s.running ?? panic("a once where no task runs");
@@ -948,7 +1009,7 @@ class LockState {
         this.freeOnce(s, done, null);
     }
 
-    /// The work's end — undone and poisoned where `panic` is the panic of the task doing it.
+    /// Ends the work — undone and poisoned where `panic` is the panic of the task doing it.
     mut fn freeOnce(s: Scheduler, done: bool, panic: ?PanicInfo): void {
         this.guard.acquire();
         this.alone = false;
@@ -958,7 +1019,8 @@ class LockState {
         this.guard.release();
     }
 
-    /// One wait for a change, the guard held before and after: false where the task was cancelled.
+    /// Waits once for a change, the guard held before and after; returns false where the task was
+    /// cancelled.
     mut fn awaitChange(s: Scheduler, me: Context): bool {
         me.beginWait();
         this.waiters.add(me);
@@ -972,32 +1034,36 @@ class LockState {
     }
 }
 
-/// The tasks a scope starts end before it does (06 T5): structured concurrency. A scope is
-/// `Closeable` — `using let scope = TaskScope.new();` — and its `close()` waits until every task it
-/// started has ended. The first of them that fails cancels the others (N9 X3), and `close()`
-/// throws that error once they have all ended; a task that ends with `Cancelled` is no failure of
-/// the scope. A task that panics does the same, and `close()` panics again with it (T4). A task
-/// waiting in `close()` that is cancelled cancels the scope's tasks and still waits for them.
+/// A scope whose tasks end before it does: structured concurrency.
+///
+/// A scope is `Closeable` — `using let scope = TaskScope.new();` — and its [TaskScope.close] waits
+/// until every task it started has ended. The first of them that fails cancels the others, and
+/// `close()` throws that error once they have all ended; a task that ends with [Cancelled] is no
+/// failure of the scope. A task that panics does the same, and `close()` panics again with it. A
+/// task waiting in `close()` that is cancelled cancels the scope's tasks and still waits for them.
 pub class TaskScope :: [Closeable] {
     var firstChild: ?Context = null,
     var lastChild: ?Context = null,
     var open: int = 0,
     var failure: ?Error = null,
     var crash: ?PanicInfo = null,
-    /// Set once `close()` has waited for the scope's tasks (the review's M6-27).
+    /// Set once `close()` has waited for the scope's tasks.
     var closed: bool = false,
     /// The task waiting in `close()`.
     closing: Waiters = Waiters { },
 
-    /// A scope with no tasks yet.
+    /// Creates a scope with no tasks yet.
     pub static fn new(): TaskScope {
         return TaskScope { };
     }
 
-    /// `spawn` (06 T1), the task belonging to this scope: `close()` waits for it, and a failure of
-    /// it cancels the other tasks of the scope.
-    /// A closed scope takes no task: that is a panic (M6-27) — none would wait for it. A task given
-    /// while `close()` waits is a child like any, and the wait takes it in.
+    /// Starts `body` as a task of this scope and returns its handle, as [spawn] does: `close()`
+    /// waits for it, and a failure of it cancels the other tasks of the scope.
+    ///
+    /// A task given while `close()` waits is a child like any, and the wait takes it in.
+    ///
+    /// # Panics
+    /// When the scope is closed, since nothing would wait for the task.
     pub mut fn spawn<T, E :: [Error]>(body: fn() -> T throws E): (Task<T> throws E) {
         if (this.closed) {
             panic("a task given to a closed scope");
@@ -1018,7 +1084,7 @@ pub class TaskScope :: [Closeable] {
         return task;
     }
 
-    /// Cancels every task of the scope that has not ended (06 N9 X3).
+    /// Cancels every task of the scope that has not ended.
     pub fn cancel(): void {
         let s = here();
         var at = this.firstChild;
@@ -1028,7 +1094,13 @@ pub class TaskScope :: [Closeable] {
         }
     }
 
-    /// Waits until every task of the scope has ended, then throws the first failure, if any (06 T5).
+    /// Waits until every task of the scope has ended, then throws the first failure, if any.
+    ///
+    /// A task of the scope that panicked makes this panic again, with that panic's code, message
+    /// and trace.
+    ///
+    /// # Errors
+    /// Throws the error the first failed task of the scope ended with.
     pub fn close(): void throws Error {
         let s = here();
         let me = s.running ?? panic("a scope closed where no task runs");
@@ -1049,7 +1121,7 @@ pub class TaskScope :: [Closeable] {
         }
     }
 
-    /// A task of the scope ended, with `failure` or a panic or neither: the first failure —
+    /// Records that a task of the scope ended, with `failure` or a panic or neither: the first failure —
     /// `Cancelled` is none — or panic cancels the others, and the last task to end wakes `close()`.
     mut fn ended(c: Context, failure: ?Error, crash: ?PanicInfo): void {
         if (let p = c.prevChild) {
@@ -1083,13 +1155,14 @@ pub class TaskScope :: [Closeable] {
     }
 }
 
-/// A task around `body`, ready to run, and its handle: what `spawn` and `TaskScope.spawn` share.
+/// Creates a task around `body`, ready to run, and returns its handle: what `spawn` and
+/// `TaskScope.spawn` share.
 fn launch<T, E :: [Error]>(body: fn() -> T throws E): Task<T> {
     return launchOn(here(), body, null);
 }
 
-/// The same on the scheduler `s` — another thread's, for `Thread.spawn` and `Pool.spawn` (06 T1):
-/// readied through its inbox then. `ended` runs once the body has ended, however it ended.
+/// Creates a task around `body` on the scheduler `s` — another thread's, for `Thread.spawn` and
+/// `Pool.spawn` — and returns its handle; it is readied through that scheduler's inbox then. `ended` runs once the body has ended, however it ended.
 fn launchOn<T, E :: [Error]>(s: Scheduler, body: fn() -> T throws E, ended: ?fn() -> void): Task<T> {
     let task = Task<T> { };
     let run = () => {
@@ -1111,9 +1184,11 @@ fn launchOn<T, E :: [Error]>(s: Scheduler, body: fn() -> T throws E, ended: ?fn(
     return task;
 }
 
-/// Starts `body` as a task of the running thread, with no handle (06 T5): it runs once the tasks
-/// ready before it had their turn, and nobody waits for it — the program ends with `main`, done
-/// or not (T6). Only a cancellation may end it early: it handles every other error itself.
+/// Starts `body` as a task of the running thread, with no handle.
+///
+/// It runs once the tasks ready before it had their turn, and nobody waits for it — the program
+/// ends with `main`, done or not. Only a cancellation may end it early: it handles every other
+/// error itself.
 pub fn spawnDetached(body: fn() -> void throws Cancelled): void {
     let run = () => {
         try {
@@ -1126,18 +1201,17 @@ pub fn spawnDetached(body: fn() -> void throws Cancelled): void {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The scheduler (06 N6 S1, S6): one for each thread that runs tasks. It runs one task at a time
-// until that task waits (N8) — the ready ones in the order they became ready, the sleepers once
+// The scheduler: one for each thread that runs tasks. It runs one task at a time
+// until that task waits — the ready ones in the order they became ready, the sleepers once
 // their deadline came, earliest first — and, with nothing ready, waits on the thread's poller
 // until the earliest deadline.
 // ---------------------------------------------------------------------------------------------
 
-/// A task's context as the scheduler holds it: the coroutine its body runs in (13 §1.6), the
-/// scheduler of its thread, which it never leaves (06 G1), and the links of the places it waits in
-/// — the waiting list of a task or a scope, the sleepers' heap; a channel's queue holds a `Waiting`
-/// of its own.
+/// A task's context as the scheduler holds it: the coroutine its body runs in, the scheduler of
+/// its thread, which it never leaves, and the links of the places it waits in — the waiting list
+/// of a task or a scope, the sleepers' heap; a channel's queue holds a `Waiting` of its own.
 ///
-/// A wait (06 N8) begins before the context goes into any of its places and parks it. Whatever ends
+/// A wait begins before the context goes into any of its places and parks it. Whatever ends
 /// the wait — a value, a close, its deadline, a cancel — first claims the context: of all that would,
 /// one does, and readies it; the others leave it be. Running again, the context leaves the places it
 /// still is in itself.
@@ -1165,38 +1239,39 @@ class Context {
     var right: ?Context = null,
     var up: ?Context = null,
     var rank: int = 0,
-    /// Cancelled (06 N9 X1): every wait from here on throws `Cancelled`. Atomic: a cancel may come
+    /// Cancelled: every wait from here on throws `Cancelled`. Atomic: a cancel may come
     /// from another thread.
     var cancelled: bool = false,
-    /// What becomes of a panic of it (06 T4): its handle's — a context without one, main's or a
+    /// What becomes of a panic of it: its handle's — a context without one, main's or a
     /// detached task's, ends the process with the panic.
     var onPanic: ?fn(PanicInfo) -> void = null,
-    /// The scope its task belongs to (06 T5), and the links of that scope's list of tasks.
+    /// The scope its task belongs to, and the links of that scope's list of tasks.
     var scope: ?TaskScope = null,
     var nextChild: ?Context = null,
     var prevChild: ?Context = null,
-    /// The links of its scheduler's register of the contexts that LIVE (the review's M6-12,
-    /// M6-20b): from its first turn to its end.
+    /// The links of its scheduler's register of the contexts that live: from its first turn to its
+    /// end.
     var live: bool = false,
     var liveNext: ?Context = null,
     var livePrev: ?Context = null,
-    /// Its scheduler found that nothing can end the wait it is in (M6-12), and woke it to say so.
+    /// Its scheduler found that nothing can end the wait it is in, and woke it to say so.
     var stuck: bool = false,
     /// The wait it is in is for a task's end — an `await`, a scope's close: where every task of
     /// a thread waits, such a one waits for the reason and is not it.
     var awaits: bool = false,
-    /// The locks it holds, newest first (the review's M6-21): released and poisoned where it
+    /// The locks it holds, newest first: released and poisoned where it
     /// panics, since a panic unwinds nothing. One node is kept for the next lock, so a lock that
     /// nests in no other costs no allocation after the first.
     var holds: ?Hold = null,
     var spareHold: ?Hold = null,
 
-    /// A wait begins: from here a waker may claim it — before it goes into any place a waker looks.
+    /// Begins a wait: from here a waker may claim the context — before it goes into any place a
+    /// waker looks.
     mut fn beginWait(): void {
         atomicStore(&this.state, 1);
     }
 
-    /// It holds `state` from here on — alone, or as one of its readers; a once's work counts as
+    /// Records that it holds `state` from here on — alone, or as one of its readers; a once's work counts as
     /// alone — until it lets go of it, or panics.
     mut fn took(state: LockState, alone: bool): void {
         let hold = this.spareHold ?? Hold { };
@@ -1207,7 +1282,7 @@ class Context {
         this.holds = hold;
     }
 
-    /// It let go of the lock it took last.
+    /// Records that it let go of the lock it took last.
     mut fn released(): void {
         if (let hold = this.holds) {
             this.holds = hold.next;
@@ -1217,8 +1292,8 @@ class Context {
         }
     }
 
-    /// It panicked while it held locks (M6-21): each comes free, as the body's `defer` would have
-    /// made it — newest first —, and is poisoned with the panic where no earlier one poisoned it.
+    /// Frees the locks it held when it panicked, as the body's `defer` would have — newest first —,
+    /// each poisoned with the panic where no earlier one poisoned it.
     mut fn dropHeld(s: Scheduler, panic: PanicInfo): void {
         while (let hold = this.holds) {
             this.holds = hold.next;
@@ -1233,16 +1308,19 @@ class Context {
         }
     }
 
-    /// A waker ends its wait: true for the first, which readies it; false for every other, and
-    /// where it does not wait.
+    /// Claims the context for a waker that ends its wait: true for the first, which readies it;
+    /// false for every other, and where it does not wait.
     mut fn claim(): bool {
         return atomicCompareAndSet(&this.state, 1, 2);
     }
 
-    /// It runs again after a wait; the places it waited in it leaves next. Every wait passes
-    /// here once it woke — so this is where a wait that nothing could have ended ends (the
-    /// review's M6-12): by a panic in the waiting task's own stack, whose trace names the wait.
-    /// The context stays in the places it waited in; no waker can claim it there any more.
+    /// Ends a wait as the context runs again; the places it waited in it leaves next. Every wait
+    /// passes here once it woke — so this is where a wait that nothing could have ended ends: by a
+    /// panic in the waiting task's own stack, whose trace names the wait. The context stays in the
+    /// places it waited in; no waker can claim it there any more.
+    ///
+    /// # Panics
+    /// When the scheduler found that nothing could end the wait.
     mut fn endWait(): void {
         atomicStore(&this.state, 0);
         this.awaits = false;
@@ -1311,8 +1389,8 @@ class SpinLock {
     }
 }
 
-/// The tasks that wait on one socket (13 M8b S10c): a reader and a writer at most, so that its
-/// close ends their waits on whichever thread they wait — Go's `pollDesc`. The guard holds while a
+/// The tasks that wait on one socket: a reader and a writer at most, so that its close ends their
+/// waits on whichever thread they wait. The guard holds while a
 /// task comes or goes and while the close takes them, so a task that comes after the close turns
 /// back, and one that came before is woken: no wake falls between the two.
 class Waits {
@@ -1321,7 +1399,8 @@ class Waits {
     var writing: ?Context = null,
     var closed: bool = false,
 
-    /// `c` waits here, to read (1) or to write (2) — false where the socket was closed first.
+    /// Enters `c` as waiting here, to read (1) or to write (2); returns false where the socket was
+    /// closed first.
     mut fn enter(c: Context, interest: int): bool {
         this.guard.acquire();
         let open = !this.closed;
@@ -1336,7 +1415,7 @@ class Waits {
         return open;
     }
 
-    /// `c` waits here no more.
+    /// Takes `c` out of the waits here.
     mut fn leave(c: Context, interest: int): void {
         this.guard.acquire();
         if (interest == 1) {
@@ -1351,7 +1430,8 @@ class Waits {
         this.guard.release();
     }
 
-    /// The socket closes: no task waits here from now on, and those that do run again.
+    /// Closes the waits as the socket closes: no task waits here from now on, and those that do run
+    /// again.
     mut fn close(): void {
         this.guard.acquire();
         this.closed = true;
@@ -1375,7 +1455,7 @@ class Scheduler {
     var sleepers: ?Context = null,
     var fallenAsleep: int = 0,
     var running: ?Context = null,
-    /// The contexts of this thread that wakers on other threads readied (06 G1), which it moves to
+    /// The contexts of this thread that wakers on other threads readied, which it moves to
     /// its ready queue at its next turn. The lock guards them and the poller a waker wakes: the
     /// thread's, as the runtime numbers it, from the thread's start to its end — 0 outside.
     inboxLock: SpinLock = SpinLock { },
@@ -1384,7 +1464,7 @@ class Scheduler {
     var poller: int = 0,
     /// The signals' watcher where it waits for the poller to wake (lyr/signal.h).
     var pollerWaiter: ?Context = null,
-    /// The register (the review's M6-12, M6-20b): the contexts that live on this thread, oldest
+    /// The register: the contexts that live on this thread, oldest
     /// first — each from its first turn to its end. The thread's own: no other touches it.
     var liveFirst: ?Context = null,
     var liveLast: ?Context = null,
@@ -1395,10 +1475,10 @@ class Scheduler {
     var joined: bool = false,
     var nextLiving: ?Scheduler = null,
     var prevLiving: ?Scheduler = null,
-    /// The thread's random generator's state (10 Q2), `std.random`'s to lay out and to fill: made
+    /// The thread's random generator's state, `std.random`'s to lay out and to fill: made
     /// at its first use on the thread, as an array, so this module names no type of that one.
     var randomState: ?uint32[] = null,
-    /// The tasks that wait on the poller for a descriptor (13 M8b P2, S10b), each in a slot: the
+    /// The tasks that wait on the poller for a descriptor, each in a slot: the
     /// token it armed with is its slot's number with a count above it, so a readiness that comes
     /// after its wait ended finds another token there and wakes nobody. The free slots are a
     /// stack; the turns count to the poll a busy thread makes now and then (`step`).
@@ -1412,15 +1492,16 @@ class Scheduler {
     var turns: int = 0,
     ioFired: int[] = [0] * 64,
 
-    /// The thread begins to run this scheduler: from here a waker on another thread wakes it.
+    /// Records that the thread begins to run this scheduler: from here a waker on another thread
+    /// wakes it.
     mut fn started(): void {
         this.inboxLock.acquire();
         this.poller = currentPoller();
         this.inboxLock.release();
     }
 
-    /// The running task — the signals' watcher — waits until the thread's poller wakes: a caught
-    /// signal wakes it.
+    /// Makes the running task — the signals' watcher — wait until the thread's poller wakes: a
+    /// caught signal wakes it.
     mut fn awaitPoller(): void {
         let me = this.running ?? panic("a wait where no task runs");
         me.beginWait();
@@ -1429,7 +1510,7 @@ class Scheduler {
         me.endWait();
     }
 
-    /// The poller woke the thread: a task waiting for that runs again.
+    /// Wakes the task waiting for the poller, once the poller woke the thread.
     mut fn pollerWoke(): void {
         if (let w = this.pollerWaiter) {
             this.pollerWaiter = null;
@@ -1446,14 +1527,15 @@ class Scheduler {
         this.inboxLock.release();
     }
 
-    /// The thread ends: no waker wakes its poller from here on — it goes with the thread.
+    /// Records that the thread ends: no waker wakes its poller from here on — it goes with the
+    /// thread.
     mut fn stopped(): void {
         this.inboxLock.acquire();
         this.poller = 0;
         this.inboxLock.release();
     }
 
-    /// `c` goes to the end of the ready queue.
+    /// Puts `c` at the end of the ready queue.
     mut fn ready(c: Context): void {
         c.next = null;
         c.prev = null;
@@ -1486,13 +1568,17 @@ class Scheduler {
         if (atomicLoad(&c.cancelled)) { throw Cancelled { }; }
     }
 
-    /// The running task waits until `fd` is ready as `interest` says — 1 to read, 2 to write
-    /// (lyr/poll.h; M8b S10b): a socket's call that would block. A cancel ends the wait with
-    /// `Cancelled` (06 N9; 10 Review 2026-10-08). 0, or the poller's failure as lyr/fs.h writes
-    /// one. The descriptor is armed before the wait begins: its readiness is seen only after the
-    /// task has parked, by this thread's next turn, and a failed arm leaves no wait behind. The
-    /// task is in the socket's `waits` while it waits (S10c), so a close on any thread ends the
-    /// wait; where the close came first, there is none.
+    /// Makes the running task wait until `fd` is ready as `interest` says — 1 to read, 2 to write
+    /// (lyr/poll.h): a socket's call that would block. Returns 0, or the poller's failure as
+    /// lyr/fs.h writes one.
+    ///
+    /// The descriptor is armed before the wait begins: its readiness is seen only after the task
+    /// has parked, by this thread's next turn, and a failed arm leaves no wait behind. The task is
+    /// in the socket's `waits` while it waits, so a close on any thread ends the wait; where the
+    /// close came first, there is none.
+    ///
+    /// # Errors
+    /// Throws [Cancelled] in a cancelled task; a cancel also ends the wait.
     mut fn awaitReady(fd: int, interest: int, waits: Waits): int throws Cancelled {
         let c = this.running ?? panic("a wait where no task runs");
         if (atomicLoad(&c.cancelled)) { throw Cancelled { }; }
@@ -1516,7 +1602,7 @@ class Scheduler {
         return 0;
     }
 
-    /// `c` takes a slot among the descriptors' waiters: its token.
+    /// Gives `c` a slot among the descriptors' waiters and returns its token.
     mut fn ioEnter(c: Context): int {
         var slot = this.ioMade;
         if (this.ioFreeTop > 0) {
@@ -1546,7 +1632,7 @@ class Scheduler {
         return token;
     }
 
-    /// The slot of `token` is free again.
+    /// Frees the slot of `token`.
     mut fn ioLeave(token: int): void {
         let slot = token & 16777215;
         this.ioWaiting[slot] = null;
@@ -1556,7 +1642,7 @@ class Scheduler {
         this.ioCount -= 1;
     }
 
-    /// The readinesses the poller saw: their waiters run again, where they still wait.
+    /// Takes the readinesses the poller saw: their waiters run again, where they still wait.
     mut fn takeFired(): void {
         loop {
             let n = takeFromPoller(this.ioFired[..]);
@@ -1575,7 +1661,7 @@ class Scheduler {
         }
     }
 
-    /// `c` goes into the sleepers' heap, to wake once `nanos` have passed.
+    /// Puts `c` into the sleepers' heap, to wake once `nanos` have passed.
     mut fn fallAsleep(c: Context, nanos: int): void {
         let now = monotonicNanos();
         c.deadline = if (nanos > 9223372036854775807 - now) 9223372036854775807 else now + nanos;
@@ -1586,7 +1672,7 @@ class Scheduler {
         if (let root = this.sleepers) { root.up = null; }
     }
 
-    /// A wait that began in a cancelled task ends at once (06 N9 X1): the cancel may have come from
+    /// Ends at once a wait that began in a cancelled task: the cancel may have come from
     /// another thread before the wait began, and found nothing to claim. Between a wait's beginning
     /// and its park — the mark and the claim are atomic, so of the cancel and the wait one sees the
     /// other.
@@ -1604,7 +1690,7 @@ class Scheduler {
         return true;
     }
 
-    /// `c`, whose wait a waker ended, goes to the ready queue of its own scheduler (06 G1) — through
+    /// Puts `c`, whose wait a waker ended, into the ready queue of its own scheduler — through
     /// that scheduler's inbox where the waker runs on another thread.
     mut fn post(c: Context): void {
         let home = c.home;
@@ -1615,7 +1701,7 @@ class Scheduler {
         }
     }
 
-    /// From a waker on another thread: `c` goes into the inbox, and the thread wakes for it.
+    /// Puts `c` into the inbox for a waker on another thread, and wakes the thread for it.
     mut fn handOver(c: Context): void {
         this.inboxLock.acquire();
         c.next = null;
@@ -1631,8 +1717,8 @@ class Scheduler {
         this.inboxLock.release();
     }
 
-    /// The contexts that wakers on other threads readied go to the ready queue, in the order they
-    /// came.
+    /// Moves the contexts that wakers on other threads readied to the ready queue, in the order
+    /// they came.
     mut fn takeInbox(): void {
         this.inboxLock.acquire();
         var at = this.inboxFirst;
@@ -1653,7 +1739,7 @@ class Scheduler {
         if (atomicLoad(&c.cancelled)) { throw Cancelled { }; }
     }
 
-    /// The running context waits in `list` until it is woken — a wait that ignores the mark: its
+    /// Makes the running context wait in `list` until it is woken — a wait that ignores the mark: its
     /// caller decides what a cancel means to it.
     mut fn parkIn(list: Waiters): void {
         let me = this.running ?? panic("a wait where no task runs");
@@ -1665,13 +1751,13 @@ class Scheduler {
         list.remove(me);
     }
 
-    /// Cancels a context (06 N9 X1): the mark, and the end of the wait it is in now, if any.
+    /// Cancels a context: the mark, and the end of the wait it is in now, if any.
     mut fn cancel(c: Context): void {
         atomicStore(&c.cancelled, true);
         this.wakeUp(c);
     }
 
-    /// The sleepers whose deadline came are woken, earliest first; one that another waker claimed
+    /// Wakes the sleepers whose deadline came, earliest first; one that another waker claimed
     /// meanwhile only leaves the heap.
     mut fn wakeSleepers(now: int): void {
         while (let top = this.sleepers) {
@@ -1709,8 +1795,9 @@ class Scheduler {
         c.asleep = false;
     }
 
-    /// A context ended by a panic (05 E8, 06 T4): its task becomes Panicked, and one without a
-    /// handle — main's, a detached task's — ends the process with the panic.
+    /// Settles a context that ended by a panic: its held locks come free, its task becomes
+    /// Panicked, and one without a handle — main's, a detached task's — ends the process with the
+    /// panic.
     mut fn panicked(c: Context): void {
         let info = PanicInfo {
             code = panicCode(c.body) ?? "",
@@ -1725,22 +1812,21 @@ class Scheduler {
         }
     }
 
-    /// One turn: the next ready context runs until it waits; with none ready, the thread waits for
+    /// Runs one turn: the next ready context runs until it waits; with none ready, the thread waits for
     /// the earliest sleeper — without end where there is none, until another thread wakes it.
     mut fn step(): void {
         this.takeInbox();
         if (this.sleepers != null) { this.wakeSleepers(monotonicNanos()); }
         if (this.ioCount > 0) {
-            // a thread that is never idle asks the poller now and then (Go's 61), so a socket's
-            // readiness does not wait for the busy tasks to end
+            // a thread that is never idle asks the poller every 61 turns, so a socket's readiness
+            // does not wait for the busy tasks to end
             this.turns += 1;
             if (this.turns % 61 == 0) {
                 if (waitOnPoller(0)) { this.pollerWoke(); }
                 this.takeFired();
                 // the wake this poll consumed may have carried a hand-over from another thread:
                 // the inbox once more, or the wait below sleeps on a context already posted and
-                // nobody wakes it again (M10 S13: a pool call never came back on macOS after a
-                // wait stayed armed)
+                // nobody wakes it again
                 this.takeInbox();
             }
         }
@@ -1769,7 +1855,7 @@ class Scheduler {
         this.takeFired();
     }
 
-    /// `c` has its first turn: from here it lives on this thread. On a thread in its last turns
+    /// Admits `c` at its first turn: from here it lives on this thread. On a thread in its last turns
     /// it is cancelled as it begins.
     mut fn admit(c: Context): void {
         c.live = true;
@@ -1784,7 +1870,7 @@ class Scheduler {
         if (this.ending) { atomicStore(&c.cancelled, true); }
     }
 
-    /// `c` has ended — its body returned, or it panicked.
+    /// Takes `c` out of the register once it has ended — its body returned, or it panicked.
     mut fn dismiss(c: Context): void {
         c.live = false;
         if (let p = c.livePrev) {
@@ -1801,7 +1887,7 @@ class Scheduler {
         c.liveNext = null;
     }
 
-    /// Whether another thread has handed a context over that this one has not taken yet.
+    /// Returns whether another thread has handed a context over that this one has not taken yet.
     fn pending(): bool {
         this.inboxLock.acquire();
         let some = this.inboxFirst != null;
@@ -1809,7 +1895,7 @@ class Scheduler {
         return some;
     }
 
-    /// Nothing is ready and nothing sleeps (the review's M6-12). Where no other thread lives
+    /// Detects a deadlock where nothing is ready and nothing sleeps. Where no other thread lives
     /// either, and none has handed anything over, nothing can end a wait of this thread any more:
     /// one of its waiting tasks is marked and woken, and panics in its wait — true then. The
     /// oldest that waits for something other than a task's end: its panic passes to whoever
@@ -1818,8 +1904,7 @@ class Scheduler {
     ///
     /// The count is read BEFORE the inbox: a thread that ends hands its last wake-ups over before
     /// it leaves the count, so with the count at one they are all there to be seen. A task that
-    /// waits on a descriptor waits on the system, which may end it (M6-12's "I/O-Interesse",
-    /// M8b S10b): no deadlock while one does. A file's call waits on the pool, a thread that lives.
+    /// waits on a descriptor waits on the system, which may end it: no deadlock while one does. A file's call waits on the pool, a thread that lives.
     mut fn deadlock(): bool {
         if (this.liveFirst == null || this.ioCount > 0 || living.others(this) || this.pending()) { return false; }
         var at = this.liveFirst;
@@ -1843,7 +1928,7 @@ class Scheduler {
         return false;
     }
 
-    /// The thread's last turns (the review's M6-20b), once its first task has ended: what still
+    /// Runs the thread's last turns, once its first task has ended: what still
     /// lives on it is cancelled — and what begins now, as it begins —, and the thread runs until
     /// all of it has ended.
     mut fn wind(): void {
@@ -1860,7 +1945,7 @@ class Scheduler {
 }
 
 /// The schedulers that live beside another — the threads that run tasks, once there is more than
-/// one — and how many (the review's M6-12): a thread that finds itself the only one, with nothing
+/// one — and how many: a thread that finds itself the only one, with nothing
 /// ready and nothing asleep, knows that no wait of its tasks can end. One is added by whoever
 /// STARTS its thread, before the thread runs — a thread that waits for one it just started is not
 /// alone —, and takes itself out at its end; it then nudges the others, which may be asleep on
@@ -1902,7 +1987,7 @@ class Living {
         this.guard.release();
     }
 
-    /// Whether a scheduler lives beside `s`, which asks: one that never joined — the program's
+    /// Returns whether a scheduler lives beside `s`, which asks: one that never joined — the program's
     /// only thread so far — is not in the count. (Through the reference: a load writes nothing,
     /// and a place of 'this' is a 'mut fn''s to hand on.)
     fn others(s: Scheduler): bool {
@@ -1913,10 +1998,10 @@ class Living {
 
 let living = Living { };
 
-/// A thread is about to start on `s`: `s` lives from here on, and so does the scheduler of the
-/// task that starts it. The main thread's joins this way, with the first thread the program
-/// starts — `runMain` cannot do it: it runs before the module's bindings are filled (07 V5 G2),
-/// and `living` is one of them.
+/// Registers `s`, whose thread is about to start, as living from here on, and so the scheduler of
+/// the task that starts it. The main thread's joins this way, with the first thread the program
+/// starts — `runMain` cannot do it: it runs before the module's bindings are filled, and `living`
+/// is one of them.
 fn enlist(s: Scheduler): void {
     if (let mine = currentScheduler()) { living.join(mine); }
     living.join(s);
@@ -1926,25 +2011,32 @@ fn enlist(s: Scheduler): void {
 @Allow("global-var-without-sync")
 var channelIds: int = 0;
 
-/// The running thread's scheduler: there is one wherever a task runs.
+/// Returns the running thread's scheduler: there is one wherever a task runs.
+///
+/// # Panics
+/// Where no scheduler runs on the thread.
 fn here(): Scheduler {
     return currentScheduler() ?? panic("a wait where no task runs");
 }
 
-/// The running task waits until `fd` is ready to read (1) or to write (2) — std.net's sockets
-/// (M8b S10b), `waits` the socket's (S10c): 0, or the poller's failure as lyr/fs.h writes one; a
-/// cancel throws `Cancelled`, and a close ends the wait as a readiness does.
+/// Makes the running task wait until `fd` is ready to read (1) or to write (2), for std.net's
+/// sockets, `waits` being the socket's. Returns 0, or the poller's failure as lyr/fs.h writes
+/// one; a close ends the wait as a readiness does.
+///
+/// # Errors
+/// Throws [Cancelled] in a cancelled task.
 fn awaitDescriptor(fd: int, interest: int, waits: Waits): int throws Cancelled {
     return try here().awaitReady(fd, interest, waits);
 }
 
-/// `fd` out of the running thread's poller, before it is closed: a task of the thread that waits
+/// Takes `fd` out of the running thread's poller, before it is closed: a task of the thread that waits
 /// on it runs again, and finds it closed.
 fn forgetDescriptor(fd: int): void {
     forgetOnPoller(fd);
 }
 
-/// The running thread's random generator's state, if it has one yet (std.random's free forms).
+/// Returns the running thread's random generator's state, if it has one yet (std.random's free
+/// forms).
 fn threadRandomState(): ?uint32[] {
     return here().randomState;
 }
@@ -1954,7 +2046,7 @@ fn keepThreadRandomState(state: uint32[]): void {
     here().randomState = state;
 }
 
-/// The two heaps of sleepers as one: the earlier root on top, the other merged down its right
+/// Merges two heaps of sleepers into one: the earlier root on top, the other merged down its right
 /// spine, whose length stays logarithmic. The caller sets the result's parent.
 fn merge(a: ?Context, b: ?Context): ?Context {
     if (a == null) { return b; }
@@ -1982,8 +2074,8 @@ fn meld(top: Context, other: Context): Context {
     return top;
 }
 
-/// After a heap changed below `from`: each node up the path keeps its children leftist and its
-/// rank right, until a rank stays as it was.
+/// Restores the heap after it changed below `from`: each node up the path keeps its children
+/// leftist and its rank right, until a rank stays as it was.
 fn fixRanks(from: Context): void {
     var at: ?Context = from;
     while (let n = at) {
@@ -2006,12 +2098,12 @@ fn rankOf(c: ?Context): int {
     return c.rank;
 }
 
-/// The program's scheduler loop where `main` is a task (06 T6), which the runtime calls with main's
-/// context: it runs until that context is done — the program ends with main, and what is still
+/// Runs the program's scheduler loop where `main` is a task; the runtime calls it with main's
+/// context. It runs until that context is done — the program ends with main, and what is still
 /// ready or asleep then never runs again.
 ///
 /// It runs BEFORE the module-level bindings are filled: those are filled at the start of main's
-/// first turn (07 V5 G2), inside the first `step`. Nothing above that turn reads one.
+/// first turn, inside the first `step`. Nothing above that turn reads one.
 fn runMain(main: Coroutine<void>): void {
     let s = Scheduler { };
     setCurrentScheduler(s);
@@ -2024,23 +2116,23 @@ fn runMain(main: Coroutine<void>): void {
     setCurrentScheduler(null);
 }
 
-// The runtime's side (13 §1.6, §1.7), the module's own.
+// The runtime's side, the module's own.
 
-/// A task's context around `body` on a stack of its own — `stack` bytes, 0 for the default: a
-/// coroutine that yields nothing, whose body only ever parks.
+/// Creates a task's context around `body` on a stack of its own — `stack` bytes, 0 for the
+/// default: a coroutine that yields nothing, whose body only ever parks.
 fn startContext(body: fn() -> void, stack: int): Coroutine<void>;
 
-/// Parks the running chain at the scheduler (13 §1.6 rule 7).
+/// Parks the running chain at the scheduler.
 fn park(): void;
 
-/// The panic of a wait nothing can end (the review's M6-12): `LYR-RT0018`.
+/// Panics for a wait nothing can end: `LYR-RT0018`.
 fn deadlocked(): never;
 
-/// The panic of an acquire on a poisoned lock (M6-21): `LYR-RT0019`, naming the first panic.
+/// Panics for an acquire on a poisoned lock: `LYR-RT0019`, naming the first panic.
 fn poisonedBy(code: string, message: string): never;
 
 /// Resumes a task's context until it parks (0), its body returns (1) or it panics (2): a panic
-/// stays the context's, for the scheduler to settle (13 §1.6 rule 10).
+/// stays the context's, for the scheduler to settle.
 fn resumeContext(c: Coroutine<void>): int;
 
 /// The report a panicked context left; null where it did not panic.
@@ -2048,28 +2140,28 @@ fn panicCode(c: Coroutine<void>): ?string;
 fn panicMessage(c: Coroutine<void>): ?string;
 fn panicTrace(c: Coroutine<void>): ?string;
 
-/// A panic again, with a report an earlier one left: its code, its message, its frames.
+/// Panics again, with the report an earlier panic left: its code, its message, its frames.
 fn repanic(code: string, message: string, trace: string): never;
 
 /// The running thread's scheduler, as `runMain` set it.
 fn currentScheduler(): ?Scheduler;
 fn setCurrentScheduler(s: ?Scheduler): void;
 
-/// Whether a scheduler runs on this thread — the question the I/O pool's callers ask (13 M8b P2,
-/// P3): where one runs, a blocking call goes to the pool and the task parks; where none runs,
-/// nothing else waits on the thread and the call runs on it. **Asking makes no task of `main`**
-/// (06 M6-26): the compiler's walk for that decision does not follow the branch this answers yes,
+/// Returns whether a scheduler runs on this thread — the question the I/O pool's callers ask:
+/// where one runs, a blocking call goes to the pool and the task parks; where none runs, nothing
+/// else waits on the thread and the call runs on it. **Asking makes no task of `main`**: the
+/// compiler's walk for that decision does not follow the branch this answers yes,
 /// so a program that only reads a file keeps main off the scheduler.
 fn schedulerRuns(): bool;
 
-/// Waits on the thread's poller (13 §1.7) for `nanos` at most, a negative one without end: true
+/// Waits on the thread's poller for `nanos` at most, a negative one without end; returns true
 /// when woken.
 fn waitOnPoller(nanos: int): bool;
 
-/// The monotonic clock (13 §1.6 rule 8): nanoseconds.
+/// Returns the monotonic clock's reading, in nanoseconds.
 fn monotonicNanos(): int;
 
-/// Starts a thread of the program that runs `body` on its own stack (06 G2).
+/// Starts a thread of the program that runs `body` on its own stack.
 fn startThread(body: fn() -> void): void;
 
 /// The running thread's poller as the runtime numbers it, and the wake of a poller so numbered —
@@ -2077,7 +2169,7 @@ fn startThread(body: fn() -> void): void;
 fn currentPoller(): int;
 fn wakePoller(poller: int): void;
 
-/// A descriptor's readiness on the running thread's poller (lyr/task.h; M8b S10b): armed with a
+/// A descriptor's readiness on the running thread's poller (lyr/task.h): armed with a
 /// waiter's token, out of the poller before its close, and the tokens fired since the last take.
 fn armOnPoller(fd: int, interest: int, token: int): int;
 fn forgetOnPoller(fd: int): void;
@@ -2086,16 +2178,16 @@ fn takeFromPoller(into: Slice<int>): int;
 /// A thread that spins on a lock lets another run.
 fn spin(): void;
 
-/// The atomic operations (06 G4, K6; N7 P2 — lyr/atomic.h), each on a PLACE: a field of the
-/// scheduler's own (the review's M7-5), or the value of std.sync's `Atomic<T>`, which is built on
+/// The atomic operations (lyr/atomic.h), each on a PLACE: a field of the
+/// scheduler's own, or the value of std.sync's `Atomic<T>`, which is built on
 /// these. Sequentially consistent, and one for every type the machine reads and writes in one
 /// step. A place one of them writes is read and written through them alone.
 fn atomicLoad<T>(&at: T): T;
 fn atomicStore<T>(&at: T, value: T): void;
 fn atomicExchange<T>(&at: T, value: T): T;
 
-/// True, and `desired` written, where the place held `expected`: one step.
+/// Writes `desired` where the place held `expected` and returns true then, in one step.
 fn atomicCompareAndSet<T>(&at: T, expected: T, desired: T): bool;
 
-/// Adds `n` and gives the value before. It wraps around, as `+%` does.
+/// Adds `n` and returns the value before. It wraps around, as `+%` does.
 fn atomicFetchAndAdd(&at: int, n: int): int;

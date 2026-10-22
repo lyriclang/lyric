@@ -1,19 +1,19 @@
-/// `std.term` (design 10 Q7; 13 M10 S10): the terminal, as ECMA-48 writes it. `isTerminal(stream)`
-/// asks whether a standard stream is one, `size()` how wide and high the output's is. `Style`
-/// is a set of attributes — a foreground and a background `Color` (the 16, the 256, or RGB),
-/// bold, dim, italic, underline, inverse, strike — whose `apply(text)` wraps the text in the SGR
-/// sequence and the reset where styles are on: a terminal on the standard output, unless
-/// `NO_COLOR` says no or `TERM` is `dumb`; `FORCE_COLOR` says yes anyway. `cursorUp` and the
-/// others are the sequences themselves, to print. Under Windows the runtime switches the
-/// console to virtual-terminal processing once, so the same bytes mean the same there. No
-/// raw mode (Q7: a door).
+/// The terminal, driven by ECMA-48 escape sequences.
+///
+/// [isTerminal] asks whether a standard stream is a terminal, [size] how wide and high the
+/// terminal on the standard output is. A [Style] is a set of attributes — a foreground and a
+/// background [Color] (the 16, one of the 256, or RGB), bold, dim, italic, underline, inverse,
+/// strike — whose [Style.apply] wraps a text in the SGR sequence and the reset where styles are
+/// on (see [colorsEnabled]). [cursorUp] and the functions after it return the sequences
+/// themselves, to print. Under Windows the runtime switches the console to virtual-terminal
+/// processing once, so the same bytes mean the same there. The module has no raw mode.
 import std.os { env };
 import std.core { StringBuilder };
 
 fn consoleIsTerminal(stream: int): int;
 fn consoleSize(stream: int): int;
 
-/// A standard stream.
+/// One of the three standard streams of the process.
 pub enum StdStream :: [Equatable, Debug] {
     Stdin,
     Stdout,
@@ -28,12 +28,16 @@ fn fdOf(s: StdStream): int {
     };
 }
 
-/// Whether the stream is a terminal (a pipe, a file or nothing is none).
+/// Returns whether the stream is a terminal.
+///
+/// A stream redirected to a pipe or a file, or not open at all, is not one.
 pub fn isTerminal(stream: StdStream): bool {
     return consoleIsTerminal(fdOf(stream)) != 0;
 }
 
-/// The columns and rows of the terminal on the standard output, `null` where it is none.
+/// Returns the columns and rows of the terminal on the standard output.
+///
+/// Returns `null` where the standard output is not a terminal.
 pub fn size(): ?(int, int) {
     let v = consoleSize(1);
     if (v < 0) {
@@ -42,9 +46,11 @@ pub fn size(): ?(int, int) {
     return (v >> 16, v & 0xFFFF);
 }
 
-/// Whether styles go out: `NO_COLOR` set and not empty says no, else `FORCE_COLOR` set and not
-/// empty says yes, else `TERM=dumb` says no, else the standard output being a terminal decides
-/// (an empty value counts as not set: `std.os` sets, it does not unset).
+/// Returns whether styles are written out.
+///
+/// `NO_COLOR` set and not empty says no, else `FORCE_COLOR` set and not empty says yes, else
+/// `TERM=dumb` says no, else the standard output being a terminal decides. An empty value
+/// counts as not set, since `std.os` can set a variable but not unset it.
 pub fn colorsEnabled(): bool {
     if (let no = env("NO_COLOR")) {
         if (!no.isEmpty()) {
@@ -64,7 +70,9 @@ pub fn colorsEnabled(): bool {
     return isTerminal(StdStream.Stdout);
 }
 
-/// A color: the 16 of ECMA-48 and aixterm, one of the 256, or RGB.
+/// A terminal color: one of the 16 of ECMA-48 and aixterm, one of the 256, or RGB.
+///
+/// Out-of-range components of [Color.Index] and [Color.Rgb] are clamped to 0..255.
 pub enum Color :: [Equatable, Debug] {
     Black,
     Red,
@@ -82,12 +90,13 @@ pub enum Color :: [Equatable, Debug] {
     BrightMagenta,
     BrightCyan,
     BrightWhite,
-    /// One of the 256 (0..255).
+    /// One of the 256 colors, by index (0..255).
     Index(int),
+    /// A color by its red, green and blue components (each 0..255).
     Rgb(int, int, int),
 }
 
-/// The SGR parameter of the color, as foreground or background.
+/// Returns the SGR parameter of the color, as foreground or background.
 fn colorParam(c: Color, background: bool): string {
     let base = if (background) 40 else 30;
     let bright = if (background) 100 else 90;
@@ -117,15 +126,15 @@ fn clamp(v: int, most: int): int {
     return if (v < 0) 0 else if (v > most) most else v;
 }
 
-/// ESC.
+/// The escape character (ESC).
 let escape = "\u{1b}";
 
-/// The sequence that ends every style.
+/// Returns the SGR sequence that turns every style off.
 pub fn reset(): string {
     return "\u{1b}[0m";
 }
 
-/// A set of attributes to put on a text.
+/// A set of attributes to put on a text: colors and SGR flags, all off by default.
 pub struct Style :: [Equatable, Debug] {
     pub fg: ?Color = null,
     pub bg: ?Color = null,
@@ -136,12 +145,14 @@ pub struct Style :: [Equatable, Debug] {
     pub inverse: bool = false,
     pub strike: bool = false,
 
-    /// Whether the style says nothing.
+    /// Returns whether the style sets no color and no attribute.
     pub fn isPlain(): bool {
         return this.fg == null && this.bg == null && !this.bold && !this.dim && !this.italic && !this.underline && !this.inverse && !this.strike;
     }
 
-    /// The SGR sequence that turns the style on; empty for a plain style.
+    /// Returns the SGR sequence that turns the style on.
+    ///
+    /// Returns an empty string for a plain style.
     pub fn sgr(): string {
         if (this.isPlain()) {
             return "";
@@ -168,7 +179,9 @@ pub struct Style :: [Equatable, Debug] {
         return out.toString();
     }
 
-    /// The text in the style where styles are on (`colorsEnabled()`), the text itself else.
+    /// Returns the text wrapped in the style's sequence and the reset.
+    ///
+    /// Returns the text unchanged where the style is plain or [colorsEnabled] says no.
     pub fn apply(text: string): string {
         if (this.isPlain() || !colorsEnabled()) {
             return text;
@@ -176,7 +189,9 @@ pub struct Style :: [Equatable, Debug] {
         return this.sgr() + text + reset();
     }
 
-    /// The text in the style, whatever the terminal is.
+    /// Returns the text wrapped in the style's sequence and the reset, whatever the terminal is.
+    ///
+    /// Returns the text unchanged only where the style is plain.
     pub fn force(text: string): string {
         if (this.isPlain()) {
             return text;
@@ -189,65 +204,75 @@ pub struct Style :: [Equatable, Debug] {
 // The cursor and the screen (ECMA-48 §8.3): the sequences, to print.
 // ---------------------------------------------------------------------------------------------
 
+/// Returns the sequence that moves the cursor `n` rows up (`CUU`).
 pub fn cursorUp(n: int = 1): string {
     return f"\u{1b}[{n}A";
 }
 
+/// Returns the sequence that moves the cursor `n` rows down (`CUD`).
 pub fn cursorDown(n: int = 1): string {
     return f"\u{1b}[{n}B";
 }
 
+/// Returns the sequence that moves the cursor `n` columns right (`CUF`).
 pub fn cursorForward(n: int = 1): string {
     return f"\u{1b}[{n}C";
 }
 
+/// Returns the sequence that moves the cursor `n` columns left (`CUB`).
 pub fn cursorBack(n: int = 1): string {
     return f"\u{1b}[{n}D";
 }
 
-/// The cursor to the row and column, both counted from 1.
+/// Returns the sequence that moves the cursor to the row and column, both counted from 1 (`CUP`).
 pub fn cursorTo(row: int, column: int): string {
     return f"\u{1b}[{row};{column}H";
 }
 
-/// The cursor to the start of the line `n` lines down (`CNL`).
+/// Returns the sequence that moves the cursor to the start of the line `n` lines down (`CNL`).
 pub fn cursorNextLine(n: int = 1): string {
     return f"\u{1b}[{n}E";
 }
 
+/// Returns the sequence that hides the cursor.
 pub fn cursorHide(): string {
     return "\u{1b}[?25l";
 }
 
+/// Returns the sequence that shows the cursor again.
 pub fn cursorShow(): string {
     return "\u{1b}[?25h";
 }
 
-/// The cursor's position saved and restored (`SCOSC`/`SCORC`, as xterm and Windows take them).
+/// Returns the sequence that saves the cursor's position (`SCOSC`).
+///
+/// [cursorRestore] moves the cursor back there. Both are the forms xterm and the Windows
+/// console accept.
 pub fn cursorSave(): string {
     return "\u{1b}[s";
 }
 
+/// Returns the sequence that moves the cursor to the position [cursorSave] saved (`SCORC`).
 pub fn cursorRestore(): string {
     return "\u{1b}[u";
 }
 
-/// The whole screen erased, the cursor at the top left.
+/// Returns the sequence that erases the whole screen and moves the cursor to the top left.
 pub fn clearScreen(): string {
     return "\u{1b}[2J\u{1b}[H";
 }
 
-/// From the cursor to the end of the screen erased.
+/// Returns the sequence that erases from the cursor to the end of the screen.
 pub fn clearToEnd(): string {
     return "\u{1b}[0J";
 }
 
-/// The whole line erased, the cursor at its start.
+/// Returns the sequence that erases the whole line and moves the cursor to its start.
 pub fn eraseLine(): string {
     return "\u{1b}[2K\r";
 }
 
-/// From the cursor to the end of the line erased.
+/// Returns the sequence that erases from the cursor to the end of the line.
 pub fn eraseToEndOfLine(): string {
     return "\u{1b}[0K";
 }

@@ -1,11 +1,15 @@
-/// Time (design/v5/spec/10 Q1): `Duration`, a span; `Instant`, a moment on the wall clock in UTC;
-/// `Monotonic`, a moment on the clock that only moves forward, for what takes how long. M8b S5a;
-/// the calendar and RFC 3339 with S5b; the time zones' database (TZif, RFC 8536) and the format
-/// patterns (UTS #35) with M10 S11. `sleep` and the timers are `std.task`'s (K3).
+/// Measures time, and reads and writes dates, times of day and time zones.
 ///
-/// The clocks are the runtime's (lyr/time.h), reached through C — `std.task` imports this module,
-/// so the way back to its own reading of the monotonic clock would close a cycle. The zone files
-/// and the environment are reached the same way: `std.fs` and `std.os` import this module too.
+/// The main types are `Duration`, a span; `Instant`, a moment on the wall clock in UTC;
+/// `Monotonic`, a moment on the clock that only moves forward, for how long something takes;
+/// `Date`, `Time` and `DateTime`, the proleptic Gregorian calendar with RFC 3339 text; and `Zone`,
+/// UTC, a fixed offset or a zone of the time zone database (TZif, RFC 8536). `DateTime.format`
+/// and `DateTime.parseWith` use the date patterns of UTS #35. `sleep` and the timers live in
+/// `std.task`.
+//
+// The clocks are the runtime's (lyr/time.h), reached through C: `std.task` imports this module,
+// so the way back to its own reading of the monotonic clock would close a cycle. The zone files
+// and the environment are reached the same way: `std.fs` and `std.os` import this module too.
 import std.collections { List };
 import std.core { Add, Div, Mul, Parse, ParseError, Sub, StringBuilder, viewBytes };
 
@@ -18,7 +22,10 @@ fn zoneFileRead(file: int, into: Slice<uint8>): int;
 fn zoneFileClose(file: int): int;
 fn zoneEnv(name: string, into: Slice<uint8>): int;
 
-/// A span of time in whole nanoseconds, negative or not (10 Q1, N3): some 292 years either way.
+/// A span of time in whole nanoseconds, negative or not: some 292 years either way.
+///
+/// # Panics
+///
 /// Arithmetic that leaves that range panics with an overflow (RT0002), as `int`'s does.
 pub struct Duration :: [Equatable, Ordered, TotalOrder, Hashable, Default, Display, Parse, Add, Sub, Mul<int>, Div<int>] {
     ns: int,
@@ -30,25 +37,29 @@ pub struct Duration :: [Equatable, Ordered, TotalOrder, Hashable, Default, Displ
     pub static fn ofMinutes(n: int): Duration { return Duration { ns = n * 60000000000 }; }
     pub static fn ofHours(n: int): Duration { return Duration { ns = n * 3600000000000 }; }
 
-    /// The span in nanoseconds.
+    /// Returns the span in nanoseconds.
     pub fn nanos(): int { return this.ns; }
 
-    /// The span in whole milliseconds, rounded toward zero.
+    /// Returns the span in whole milliseconds, rounded toward zero.
     pub fn millis(): int { return this.ns / 1000000; }
 
-    /// The span in whole seconds, rounded toward zero.
+    /// Returns the span in whole seconds, rounded toward zero.
     pub fn secs(): int { return this.ns / 1000000000; }
 
-    /// The span in seconds, with their fraction.
+    /// Returns the span in seconds, with their fraction.
     pub fn asSecsFloat(): float { return (this.ns as float) / 1000000000.0; }
 
     pub fn add(rhs: Duration): Duration { return Duration { ns = this.ns + rhs.ns }; }
     pub fn sub(rhs: Duration): Duration { return Duration { ns = this.ns - rhs.ns }; }
     pub fn mul(rhs: int): Duration { return Duration { ns = this.ns * rhs }; }
-    /// Rounded toward zero; by zero it panics (RT0001).
+    /// Divides the span by `rhs`, rounded toward zero.
+    ///
+    /// # Panics
+    ///
+    /// Panics on a division by zero (RT0001).
     pub fn div(rhs: int): Duration { return Duration { ns = this.ns / rhs }; }
 
-    /// Go's form of a duration: `0s`; under a second one unit — `ns`, `µs`, `ms` — with the
+    /// Returns the span as text: `0s`; under a second one unit — `ns`, `µs`, `ms` — with the
     /// fraction, its trailing zeros dropped (`1.5µs`, `500ms`); from a second on hours, minutes and
     /// seconds with their fraction, the larger ones from the first that is not zero (`1.5s`,
     /// `1m30s`, `1h0m0s`); a minus in front of a negative one.
@@ -75,10 +86,15 @@ pub struct Duration :: [Equatable, Ordered, TotalOrder, Hashable, Default, Displ
         return if (this.ns < 0) "-" + text else text;
     }
 
-    /// Go's `ParseDuration`: an optional sign, then one or more numbers each with its unit — `ns`,
+    /// Parses a span: an optional sign, then one or more numbers each with its unit — `ns`,
     /// `us` (or `µs`, `μs`), `ms`, `s`, `m`, `h` —, a number with a fraction allowed: `1h30m`,
-    /// `1.5h`, `-300ms`. `0` alone is zero. A fraction is taken as Go takes it, through a float:
-    /// the nanoseconds of `1.5h` are exact, those of a long fraction of an hour Go's.
+    /// `1.5h`, `-300ms`. `0` alone is zero. A fraction is scaled to its unit through a float: the
+    /// nanoseconds of `1.5h` are exact, those of a long fraction of an hour may be rounded.
+    ///
+    /// # Errors
+    ///
+    /// Throws `ParseError` with kind `Empty` for an empty text, `Invalid` for a number without
+    /// digits or a missing or unknown unit, and `Overflow` where the span does not fit.
     pub static fn parse(s: StringView): Duration throws ParseError {
         let b = viewBytes(s);
         let n = b.length();
@@ -173,7 +189,7 @@ fn isDigit(c: uint8): bool {
     return c >= 48u8 && c <= 57u8;
 }
 
-/// `v` over 10^`precision`: the whole part, and the fraction as `.ddd` without its trailing zeros
+/// Splits `v` over 10^`precision` into the whole part, and the fraction as `.ddd` without its trailing zeros
 /// (nothing where it is zero).
 fn splitFraction(v: uint, precision: int): (uint, string) {
     var scale: uint = 1;
@@ -199,7 +215,7 @@ fn splitFraction(v: uint, precision: int): (uint, string) {
     return (whole, "." + text);
 }
 
-/// The nanoseconds of a unit's name, or 0 for no unit.
+/// Returns the nanoseconds of a unit's name, or 0 for no unit.
 fn unitNanos(name: string): uint {
     return match (name) {
         "ns" => 1,
@@ -215,39 +231,39 @@ fn unitNanos(name: string): uint {
 }
 
 /// A moment on the wall clock, in nanoseconds since 1970-01-01T00:00:00Z — POSIX time, no leap
-/// seconds counted (10 Q1): the years 1677 to 2262. Two compare and order as the moments they are.
+/// seconds counted: the years 1677 to 2262. Two compare and order as the moments they are.
 /// Its text is RFC 3339 in UTC, `2026-10-08T12:34:56.5Z`, the fraction without trailing zeros.
 pub struct Instant :: [Equatable, Ordered, TotalOrder, Hashable, Add<Duration>, Display, Parse] {
     ns: int,
 
-    /// Now, on the system's wall clock — which the system may set back: for how long something
-    /// took, `Monotonic` measures.
+    /// Returns the current moment on the system's wall clock, which the system may set back; to
+    /// measure how long something took, use `Monotonic`.
     pub static fn now(): Instant {
         return Instant { ns = lyr_clock_realtime_ns() };
     }
 
-    /// The whole seconds since the epoch, rounded down (a moment before 1970 gives a negative
-    /// count).
+    /// Returns the whole seconds since the epoch, rounded down (a moment before 1970 gives a
+    /// negative count).
     pub fn epochSecs(): int {
         return floorDiv(this.ns, 1000000000);
     }
 
-    /// The whole milliseconds since the epoch, rounded down.
+    /// Returns the whole milliseconds since the epoch, rounded down.
     pub fn epochMillis(): int {
         return floorDiv(this.ns, 1000000);
     }
 
-    /// The moment `d` later — earlier for a negative `d`.
+    /// Returns the moment `d` later — earlier for a negative `d`.
     pub fn add(d: Duration): Instant {
         return Instant { ns = this.ns + d.nanos() };
     }
 
-    /// How long after `earlier` this is — negative where it is before.
+    /// Returns how long after `earlier` this moment is — negative where it is before.
     pub fn since(earlier: Instant): Duration {
         return Duration.ofNanos(this.ns - earlier.ns);
     }
 
-    /// The date, the time of day and the offset this moment is in `zone`.
+    /// Returns the date, the time of day and the offset of this moment in `zone`.
     pub fn toDateTime(zone: Zone): DateTime {
         let off = zone.offsetAt(this).nanos();
         let local = this.ns + off;
@@ -258,17 +274,25 @@ pub struct Instant :: [Equatable, Ordered, TotalOrder, Hashable, Add<Duration>, 
         return DateTime { d = fromDays(days), t = time, off = off, z = zone };
     }
 
-    /// The seconds since the epoch, floored.
+    /// Returns the seconds since the epoch, floored.
     fn epochSecondsFloored(): int {
         return floorDiv(this.ns, 1000000000);
     }
 
-    /// RFC 3339 in UTC.
+    /// Returns the moment as RFC 3339 text in UTC.
     pub fn show(): string {
         return this.toDateTime(Zone.utc).show();
     }
 
-    /// An RFC 3339 date-time at any offset, the moment it names.
+    /// Parses an RFC 3339 date-time at any offset and returns the moment it names.
+    ///
+    /// # Errors
+    ///
+    /// Throws `ParseError` as `DateTime.parse` does.
+    ///
+    /// # Panics
+    ///
+    /// Panics with an overflow (RT0002) for a date-time outside the years an `Instant` reaches.
     pub static fn parse(s: StringView): Instant throws ParseError {
         return (try DateTime.parse(s)).toInstant();
     }
@@ -276,8 +300,8 @@ pub struct Instant :: [Equatable, Ordered, TotalOrder, Hashable, Add<Duration>, 
 
 let nanosPerDay = 86400000000000;
 
-/// The moment `ns` nanoseconds after 1970 — for the library's own, as std.fs's file times; Q1
-/// gives `Instant` no public constructor from a count.
+/// Returns the moment `ns` nanoseconds after 1970, for the library's own use such as std.fs's file
+/// times; `Instant` has no public constructor from a count.
 fn instantOfEpochNanos(ns: int): Instant {
     return Instant { ns = ns };
 }
@@ -287,7 +311,7 @@ fn floorDiv(a: int, b: int): int {
     return if (a % b < 0) q - 1 else q;
 }
 
-/// A moment on the clock that only moves forward (10 Q1): for how long something takes, never for
+/// A moment on the clock that only moves forward: for how long something takes, never for
 /// the time of day.
 pub struct Monotonic {
     ns: int,
@@ -296,27 +320,28 @@ pub struct Monotonic {
         return Monotonic { ns = lyr_clock_monotonic_ns() };
     }
 
-    /// How long ago this was taken.
+    /// Returns how long ago this moment was taken.
     pub fn elapsed(): Duration {
         return Duration.ofNanos(lyr_clock_monotonic_ns() - this.ns);
     }
 }
 
 // ---------------------------------------------------------------------------------------------
-// The calendar (10 Q1; M8b S5b): the proleptic Gregorian one, every year an `int` holds. A day is
-// counted from 1970-01-01 through Howard Hinnant's civil algorithms ("chrono-Compatible Low-Level
-// Date Algorithms"). The time zones are fixed offsets here; their database comes with M10.
+// The calendar: the proleptic Gregorian one, every year an `int` holds. A day is counted from
+// 1970-01-01 through Howard Hinnant's civil algorithms ("chrono-Compatible Low-Level Date
+// Algorithms").
 // ---------------------------------------------------------------------------------------------
 
-/// Why a `TimeError`: what is none; no zone database on the system; a zone the database has not.
+/// The reason for a `TimeError`: a value that does not exist; no zone database on the system; a
+/// zone the database does not have.
 pub enum TimeErrorKind :: [Equatable, Debug] {
     Invalid,
     NoZoneData,
     NoSuchZone,
 }
 
-/// What is no date, no time of day, no offset (10 Q1): February 30th, 24:00, an offset of 90
-/// seconds; a zone that cannot be had (M10 S11), its `kind` saying why.
+/// The error for what is no date, no time of day, no offset — February 30th, 24:00, an offset of
+/// 90 seconds — or a zone that cannot be loaded, its `kind` saying why.
 pub struct TimeError :: [Error] {
     pub detail: string,
     pub kind: TimeErrorKind = TimeErrorKind.Invalid,
@@ -351,7 +376,7 @@ extend Weekday :: [Display] {
     }
 }
 
-/// A day of the proleptic Gregorian calendar (10 Q1). Its text is ISO 8601's, `2026-10-08`; a year
+/// A day of the proleptic Gregorian calendar. Its text is ISO 8601's, `2026-10-08`; a year
 /// outside 0000–9999 shows its sign and its digits, `+10000-01-01`, which RFC 3339 does not read
 /// back.
 pub struct Date :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
@@ -359,8 +384,12 @@ pub struct Date :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
     m: int,
     d: int,
 
-    /// The date `year-month-day`, or a `TimeError` where there is none — a month outside 1–12, a
-    /// day beyond the month's.
+    /// Returns the date `year-month-day`.
+    ///
+    /// # Errors
+    ///
+    /// Throws `TimeError` where there is no such date: a month outside 1–12, a day beyond the
+    /// month's.
     pub static fn of(year: int, month: int, day: int): Date throws TimeError {
         if (month < 1 || month > 12) {
             throw TimeError { detail = f"there is no month {month}" };
@@ -375,7 +404,7 @@ pub struct Date :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
     pub fn month(): int { return this.m; }
     pub fn day(): int { return this.d; }
 
-    /// Whether the date's year has a February 29th: divisible by 4, and by 400 where by 100.
+    /// Returns whether the date's year has a February 29th: divisible by 4, and by 400 where by 100.
     pub fn isLeapYear(): bool {
         return isLeap(this.y);
     }
@@ -394,7 +423,7 @@ pub struct Date :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
         };
     }
 
-    /// The date `n` days later — earlier for a negative `n`.
+    /// Returns the date `n` days later — earlier for a negative `n`.
     pub fn plusDays(n: int): Date {
         return fromDays(daysOf(this) + n);
     }
@@ -403,7 +432,12 @@ pub struct Date :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
         return f"{yearText(this.y)}-{twoDigits(this.m)}-{twoDigits(this.d)}";
     }
 
-    /// RFC 3339's full-date: `YYYY-MM-DD`, four digits of year, a date that exists.
+    /// Parses RFC 3339's full-date: `YYYY-MM-DD`, four digits of year, a date that exists.
+    ///
+    /// # Errors
+    ///
+    /// Throws `ParseError` with kind `Empty` for an empty text and `Invalid` for a text of another
+    /// shape or a date that does not exist.
     pub static fn parse(s: StringView): Date throws ParseError {
         let b = viewBytes(s);
         if (b.isEmpty()) {
@@ -416,7 +450,7 @@ pub struct Date :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
     }
 }
 
-/// A time of day (10 Q1): hours 0–23, minutes and seconds 0–59 — no leap second, which POSIX time
+/// A time of day: hours 0–23, minutes and seconds 0–59 — no leap second, which POSIX time
 /// does not count —, nanoseconds. Its text is `HH:MM:SS` and the fraction, without trailing zeros.
 pub struct Time :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
     h: int,
@@ -424,8 +458,13 @@ pub struct Time :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
     s: int,
     n: int,
 
-    /// `HH:MM:SS` and a fraction of up to nine digits (RFC 3339's partial-time, no offset): the
-    /// text `show()` writes, read back.
+    /// Parses `HH:MM:SS` and a fraction of up to nine digits (RFC 3339's partial-time, no
+    /// offset): the text `show()` writes, read back. Digits past the ninth are ignored.
+    ///
+    /// # Errors
+    ///
+    /// Throws `ParseError` with kind `Empty` for an empty text and `Invalid` for a text of another
+    /// shape or a time of day that does not exist.
     pub static fn parse(s: StringView): Time throws ParseError {
         let b = viewBytes(s);
         let n = b.length();
@@ -463,7 +502,12 @@ pub struct Time :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
         return try Time.of(hour, minute, second, nano) catch (e: TimeError) throw ParseError { kind = .Invalid, detail = e.message(), offset = 0 };
     }
 
-    /// The time of day, or a `TimeError` where there is none.
+    /// Returns the time of day.
+    ///
+    /// # Errors
+    ///
+    /// Throws `TimeError` where a field is out of range: hour 0–23, minute and second 0–59,
+    /// nanosecond 0–999999999.
     pub static fn of(hour: int, minute: int, second: int, nano: int = 0): Time throws TimeError {
         if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59
             || nano < 0 || nano > 999999999) {
@@ -483,7 +527,7 @@ pub struct Time :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
     }
 }
 
-/// A time zone (10 Q1; M10 S11): UTC, a fixed offset, or a zone of the database — its
+/// A time zone: UTC, a fixed offset, or a zone of the database — its
 /// transitions and the rule for the years beyond them (TZif, RFC 8536; a POSIX TZ string).
 /// `Zone.utc`, `Zone.fixed(offset)`, `Zone.load("Europe/Berlin")` from the system's database,
 /// `Zone.local()` the system's own, `Zone.fromTzif(name, bytes)` and `Zone.fromPosix(name, tz)`
@@ -495,8 +539,12 @@ pub struct Zone {
 
     pub static let utc: Zone = Zone { label = "UTC", off = 0, rules = null };
 
-    /// The zone `offset` east of UTC — west for a negative one —: whole minutes, under 24 hours,
-    /// as RFC 3339 writes an offset.
+    /// Returns the zone `offset` east of UTC — west for a negative one.
+    ///
+    /// # Errors
+    ///
+    /// Throws `TimeError` unless the offset is whole minutes under 24 hours, as RFC 3339 writes
+    /// an offset.
     pub static fn fixed(offset: Duration): Zone throws TimeError {
         let ns = offset.nanos();
         if (ns % 60000000000 != 0 || ns <= -nanosPerDay || ns >= nanosPerDay) {
@@ -505,9 +553,14 @@ pub struct Zone {
         return Zone { label = if (ns == 0) "UTC" else offsetText(ns), off = ns, rules = null };
     }
 
-    /// The zone of the system's database, `/usr/share/zoneinfo` or `TZDIR`, by its IANA name
-    /// (`Europe/Berlin`): `TimeError { kind = .NoZoneData }` where the system has no database
-    /// (Windows), `.NoSuchZone` where it has no such zone, `.Invalid` for a file that is no TZif.
+    /// Loads a zone of the system's database, `/usr/share/zoneinfo` or `TZDIR`, by its IANA name
+    /// (`Europe/Berlin`). `UTC`, `Etc/UTC` and `Z` return `Zone.utc` without the database.
+    ///
+    /// # Errors
+    ///
+    /// Throws `TimeError` with kind `NoZoneData` where the system has no database (Windows),
+    /// `NoSuchZone` for a name that is no zone name or that the database does not have, and
+    /// `Invalid` for a file that is no TZif.
     pub static fn load(name: string): Zone throws TimeError {
         if (name.isEmpty() || name.startsWith("/") || name.contains("..") || name.startsWith(".")) {
             throw TimeError { detail = f"'{name}' is no zone name", kind = .NoSuchZone };
@@ -525,22 +578,29 @@ pub struct Zone {
         throw TimeError { detail = f"the zone database has no '{name}'", kind = .NoSuchZone };
     }
 
-    /// A zone from the bytes of a TZif file (RFC 8536, versions 1 to 4): the transitions, the
-    /// local time types, and the footer's rule for the years beyond.
+    /// Returns a zone from the bytes of a TZif file (RFC 8536, versions 1 to 4): the transitions,
+    /// the local time types, and the footer's rule for the years beyond.
+    ///
+    /// # Errors
+    ///
+    /// Throws `TimeError` for bytes that are no valid TZif file.
     pub static fn fromTzif(name: string, bytes: Slice<uint8>): Zone throws TimeError {
         return Zone { label = name, off = 0, rules = try parseTzif(bytes) };
     }
 
-    /// A zone from a POSIX TZ string (RFC 8536 §3.3.1): `CET-1CEST,M3.5.0,M10.5.0/3`, `EST5EDT`,
-    /// `<+0330>-3:30`.
+    /// Returns a zone from a POSIX TZ string (RFC 8536 §3.3.1): `CET-1CEST,M3.5.0,M10.5.0/3`,
+    /// `EST5EDT`, `<+0330>-3:30`.
+    ///
+    /// # Errors
+    ///
+    /// Throws `TimeError` for a string that is no valid TZ string.
     pub static fn fromPosix(name: string, tz: string): Zone throws TimeError {
         let rule = try parsePosix(tz);
         return Zone { label = name, off = 0, rules = ZoneRules { times = [], idx = [], typeOff = [], typeDst = [], typeAbbr = [], first = 0, footer = rule } };
     }
 
-    /// The system's own zone: `TZ` where set (a name of the database, or a POSIX string), else
-    /// `/etc/localtime`, else UTC — Windows, without a database, is UTC (its registry's zones
-    /// are a door).
+    /// Returns the system's own zone: `TZ` where set (a name of the database, or a POSIX string),
+    /// else `/etc/localtime`, else UTC — on Windows, which has no database, UTC.
     pub static fn local(): Zone {
         if (let tz = envText("TZ")) {
             var spec = tz;
@@ -568,12 +628,12 @@ pub struct Zone {
         return this.label;
     }
 
-    /// Whether the zone is one offset for all time.
+    /// Returns whether the zone is one offset for all time.
     pub fn isFixed(): bool {
         return this.rules == null;
     }
 
-    /// The offset of a fixed zone; of a zone of the database, its offset now.
+    /// Returns the offset of a fixed zone; for a zone of the database, its offset now.
     pub fn offset(): Duration {
         if (this.rules == null) {
             return Duration.ofNanos(this.off);
@@ -581,12 +641,13 @@ pub struct Zone {
         return this.offsetAt(Instant.now());
     }
 
-    /// The offset east of UTC at the moment.
+    /// Returns the offset east of UTC at the moment `at`.
     pub fn offsetAt(at: Instant): Duration {
         return this.infoAt(at).offset;
     }
 
-    /// The offset, whether daylight time is in force, and the abbreviation at the moment.
+    /// Returns the offset, whether daylight time is in force, and the abbreviation at the moment
+    /// `at`.
     pub fn infoAt(at: Instant): ZoneInfo {
         if (let r = this.rules) {
             let (off, dst, abbr) = r.infoAt(at.epochSecondsFloored());
@@ -595,7 +656,7 @@ pub struct Zone {
         return ZoneInfo { offset = Duration.ofNanos(this.off), isDst = false, abbreviation = this.label };
     }
 
-    /// The offset in seconds at the second since the epoch.
+    /// Returns the offset in seconds at the given second since the epoch.
     fn offsetSecsAt(secs: int): int {
         if (let r = this.rules) {
             let (off, _, _) = r.infoAt(secs);
@@ -714,7 +775,8 @@ struct PosixRule {
         return (this.stdOff, false, this.stdAbbr);
     }
 
-    /// The local seconds since the epoch of the rule's day in the year, plus the time of day.
+    /// Returns the local seconds since the epoch of the rule's day in the year, plus the time of
+    /// day.
     fn transitionAt(date: RuleDate, time: int, year: int): int {
         let jan1 = daysOf(Date { y = year, m = 1, d = 1 });
         var days = jan1;
@@ -766,9 +828,9 @@ fn notTzif(detail: string): TimeError {
     return TimeError { detail = f"not TZif: {detail}" };
 }
 
-/// The transitions and types of a TZif file: the 64-bit block of a version 2+ file, the 32-bit
-/// block of a version 1 file; the footer's TZ string as the rule beyond. Leap seconds are read
-/// over.
+/// Parses the transitions and types of a TZif file: the 64-bit block of a version 2+ file, the
+/// 32-bit block of a version 1 file; the footer's TZ string as the rule beyond. Leap seconds are
+/// skipped.
 fn parseTzif(b: Slice<uint8>): ZoneRules throws TimeError {
     let n = b.length();
     if (n < 44 || b[0] != 84u8 || b[1] != 90u8 || b[2] != 105u8 || b[3] != 102u8) {
@@ -895,7 +957,7 @@ class PosixReader {
         return TimeError { detail = f"no POSIX TZ string: {detail}" };
     }
 
-    /// An abbreviation: letters, or anything but `>` inside `<…>`.
+    /// Reads an abbreviation: letters, or anything but `>` inside `<…>`.
     mut fn abbreviation(): string throws TimeError {
         let start = this.at;
         if (this.more() && this.peek() == 60u8) {
@@ -936,7 +998,7 @@ class PosixReader {
         return v;
     }
 
-    /// `[+-]hh[:mm[:ss]]` as seconds.
+    /// Reads `[+-]hh[:mm[:ss]]` as seconds.
     mut fn time(): int throws TimeError {
         var sign = 1;
         if (this.more() && (this.peek() == 43u8 || this.peek() == 45u8)) {
@@ -957,7 +1019,7 @@ class PosixReader {
         return sign * secs;
     }
 
-    /// `Jn`, `n` or `Mm.w.d`, with `/time` where given (2:00 else).
+    /// Reads `Jn`, `n` or `Mm.w.d`, with `/time` where given (2:00 otherwise).
     mut fn ruleDate(): (RuleDate, int) throws TimeError {
         var date = RuleDate.Julian0(0);
         if (this.more() && this.peek() == 74u8) {
@@ -996,7 +1058,7 @@ class PosixReader {
     }
 }
 
-/// `std offset [dst [offset] [,start[/time],end[/time]]]`: the offsets are POSIX's — west is
+/// Parses `std offset [dst [offset] [,start[/time],end[/time]]]`: the offsets are POSIX's — west is
 /// positive — and come out east; a daylight time without its offset is one hour ahead; without a
 /// rule, the US rule (`M3.2.0,M11.1.0`).
 fn parsePosix(tz: string): PosixRule throws TimeError {
@@ -1045,7 +1107,7 @@ fn isAlpha(b: uint8): bool {
 // The runtime's file and environment, as std.fs and std.os read them.
 // ---------------------------------------------------------------------------------------------
 
-/// The whole file, or `null` where it cannot be read.
+/// Returns the whole file, or `null` where it cannot be read or exceeds 4 MiB.
 fn readWhole(path: string): ?uint8[] {
     let file = zoneFileOpen(path, 1);
     if (file < 0) {
@@ -1080,7 +1142,7 @@ fn readWhole(path: string): ?uint8[] {
     return out.toArray();
 }
 
-/// The variable's value, `null` where it is not set or empty.
+/// Returns the environment variable's value, `null` where it is not set or empty.
 fn envText(name: string): ?string {
     var buf: uint8[] = [0u8] * 1024;
     var n = zoneEnv(name, buf[..]);
@@ -1094,7 +1156,7 @@ fn envText(name: string): ?string {
     return string.fromUtf8Lossy(buf[0..n]);
 }
 
-/// A date and a time of day at an offset from UTC (10 Q1): the moment it names, and how it was
+/// A date and a time of day at an offset from UTC: the moment it names, and how it was
 /// written. Its text is RFC 3339, `2026-10-08T12:34:56.5+02:00`, `Z` for no offset. Two compare
 /// field by field: the same moment at two offsets is two date-times — `toInstant()` compares them
 /// as moments.
@@ -1104,9 +1166,9 @@ pub struct DateTime :: [Display, Parse] {
     off: int,
     z: Zone,
 
-    /// The date and time in the zone: for a zone of the database, the offset in force then; a
-    /// local time that does not exist (the hour a clock springs forward) moves forward by the
-    /// gap, one that exists twice (the hour it falls back) takes the earlier moment.
+    /// Returns the date and time in the zone: for a zone of the database, at the offset in force
+    /// then. A local time that does not exist (the hour a clock springs forward) moves forward by
+    /// the gap; one that exists twice (the hour it falls back) takes the earlier moment.
     pub static fn of(date: Date, time: Time, zone: Zone): DateTime {
         if (zone.rules == null) {
             return DateTime { d = date, t = time, off = zone.off, z = zone };
@@ -1137,30 +1199,34 @@ pub struct DateTime :: [Display, Parse] {
     pub fn offset(): Duration { return Duration.ofNanos(this.off); }
     pub fn zone(): Zone { return this.z; }
 
-    /// The same local time `n` days on, in the zone: across a change of the clocks the offset
-    /// follows the zone (a day may be 23 or 25 hours).
+    /// Returns the same local time `n` days on, in the zone: across a change of the clocks the
+    /// offset follows the zone (a day may be 23 or 25 hours).
     pub fn plusDays(n: int): DateTime {
         return DateTime.of(this.d.plusDays(n), this.t, this.z);
     }
 
-    /// The same moment in another zone.
+    /// Returns the same moment in another zone.
     pub fn withZone(zone: Zone): DateTime {
         return this.toInstant().toDateTime(zone);
     }
 
-    /// What the zone says at this moment: the abbreviation, daylight time.
+    /// Returns what the zone says at this moment: the offset, the abbreviation, daylight time.
     pub fn zoneInfo(): ZoneInfo {
         return this.z.infoAt(this.toInstant());
     }
 
-    /// The date and time written by a pattern of UTS #35 (M10 S11): `yyyy-MM-dd HH:mm:ss`. The
+    /// Formats the date and time by a pattern of UTS #35, such as `yyyy-MM-dd HH:mm:ss`. The
     /// fields: `y` the year (`yy` its last two digits, `yyyy` padded to four), `M` the month
     /// (`MM` padded, `MMM` `Jan`, `MMMM` `January`, `MMMMM` `J`), `d` the day (`dd` padded), `H`
     /// the hour of 24 (`HH`), `h` of 12 (`hh`), `m` the minute, `s` the second, `S…` the fraction
     /// to as many digits, `a` `AM`/`PM`, `E`/`EEE` `Tue`, `EEEE` `Tuesday`, `EEEEE` `T`, `Z`
     /// `+0100` (`ZZZZZ` `+01:00`, `Z` for none), `X` `+01`/`+0100`/`+01:00` by its count with `Z`
     /// for none, `x` the same without `Z`; text in `'…'` as it is, `''` a quote; what is no
-    /// letter as it is. Names are English. A letter the pattern does not know is `TimeError`.
+    /// letter as it is. Names are English.
+    ///
+    /// # Errors
+    ///
+    /// Throws `TimeError` for a pattern letter other than those above, or a malformed pattern.
     pub fn format(pattern: string): string throws TimeError {
         let tokens = try patternTokens(pattern);
         let out = StringBuilder.new();
@@ -1223,11 +1289,15 @@ pub struct DateTime :: [Display, Parse] {
         throw TimeError { detail = f"the pattern letter '{letter}' is none of y M d H h m s S a E Z X x" };
     }
 
-    /// The date and time read by a pattern of UTS #35, the fields as `format` writes them: a
+    /// Parses a date and time by a pattern of UTS #35, the fields as `format` writes them: a
     /// number takes as many digits as it finds (a padded field at least its width), a name is
     /// matched without case, a fraction as many digits as there are. What the pattern does not
-    /// name is 1970-01-01 00:00:00; without an offset field the zone given decides. Text that
-    /// does not fit the pattern is `ParseError { kind = .Invalid }`.
+    /// name is 1970-01-01 00:00:00; without an offset field the zone given decides.
+    ///
+    /// # Errors
+    ///
+    /// Throws `ParseError` with kind `Invalid` where the pattern is malformed, the text does not
+    /// fit it, or the fields name no existing date, time of day or offset.
     pub static fn parseWith(pattern: string, text: string, zone: Zone = Zone.utc): DateTime throws ParseError {
         var tokens: List<(char, int, string)> = List.new();
         try {
@@ -1298,7 +1368,11 @@ pub struct DateTime :: [Display, Parse] {
         return DateTime.of(date, time, zone);
     }
 
-    /// The moment this names. One outside the years an `Instant` reaches panics (RT0002).
+    /// Returns the moment this date-time names.
+    ///
+    /// # Panics
+    ///
+    /// Panics with an overflow (RT0002) outside the years an `Instant` reaches.
     pub fn toInstant(): Instant {
         let t = this.t;
         let ofDay = ((t.h * 60 + t.mi) * 60 + t.s) * 1000000000 + t.n;
@@ -1309,9 +1383,14 @@ pub struct DateTime :: [Display, Parse] {
         return f"{this.d}T{this.t}{offsetText(this.off)}";
     }
 
-    /// RFC 3339's date-time (§5.6), strictly: `T` or `t` between the date and the time, a fraction
-    /// of any length — cut to nanoseconds —, `Z`, `z` or `±hh:mm`; no space for the `T`, no second
-    /// 60. A date or a time that does not exist is `Invalid`.
+    /// Parses RFC 3339's date-time (§5.6), strictly: `T` or `t` between the date and the time, a
+    /// fraction of any length — cut to nanoseconds —, `Z`, `z` or `±hh:mm`; no space for the `T`,
+    /// no second 60.
+    ///
+    /// # Errors
+    ///
+    /// Throws `ParseError` with kind `Empty` for an empty text and `Invalid` for a text of another
+    /// shape or a date or time that does not exist.
     pub static fn parse(s: StringView): DateTime throws ParseError {
         let b = viewBytes(s);
         let n = b.length();
@@ -1376,7 +1455,7 @@ pub struct DateTime :: [Display, Parse] {
     }
 }
 
-/// `YYYY-MM-DD` at the front of `b`, a date that exists.
+/// Reads `YYYY-MM-DD` at the front of `b`, a date that exists.
 fn readDate(b: Slice<uint8>): Date throws ParseError {
     if (b[4] != 45u8 || b[7] != 45u8) {
         throw ParseError { kind = .Invalid };
@@ -1407,7 +1486,8 @@ fn twoDigits(n: int): string {
     return if (n < 10) f"0{n}" else f"{n}";
 }
 
-/// Four digits at least; a sign where the year is outside 0000–9999 (ISO 8601's expanded form).
+/// Returns the year as four digits at least, with a sign where it is outside 0000–9999 (ISO 8601's
+/// expanded form).
 fn yearText(y: int): string {
     var text = f"{if (y < 0) -y else y}";
     while (text.length() < 4) {
@@ -1433,7 +1513,7 @@ fn floorRem(a: int, b: int): int {
     return if (r < 0) r + b else r;
 }
 
-/// The days from 1970-01-01 to `date` (Hinnant's days_from_civil).
+/// Returns the days from 1970-01-01 to `date` (Hinnant's days_from_civil).
 fn daysOf(date: Date): int {
     let y = if (date.m <= 2) date.y - 1 else date.y;
     let era = (if (y >= 0) y else y - 399) / 400;
@@ -1443,7 +1523,7 @@ fn daysOf(date: Date): int {
     return era * 146097 + dayOfEra - 719468;
 }
 
-/// The date `days` after 1970-01-01 (Hinnant's civil_from_days).
+/// Returns the date `days` after 1970-01-01 (Hinnant's civil_from_days).
 fn fromDays(days: int): Date {
     let z = days + 719468;
     let era = (if (z >= 0) z else z - 146096) / 146097;
@@ -1457,14 +1537,15 @@ fn fromDays(days: int): Date {
     return Date { y = year, m = month, d = day };
 }
 
-/// The same date, time and offset: the zone's name is not compared.
+/// Compares date, time and offset; the zone's name is not compared.
 extend DateTime :: [Equatable] {
     fn equals(o: DateTime): bool {
         return this.d == o.d && this.t == o.t && this.off == o.off;
     }
 }
 
-/// The fixed zone of an offset in nanoseconds, UTC for none; one RFC 3339 wrote is whole minutes.
+/// Returns the fixed zone of an offset in nanoseconds, UTC for none; an offset RFC 3339 wrote is
+/// whole minutes.
 fn fixedOf(off: int): Zone {
     if (off == 0) {
         return Zone.utc;
@@ -1476,7 +1557,7 @@ fn fixedOf(off: int): Zone {
 // UTS #35 patterns.
 // ---------------------------------------------------------------------------------------------
 
-/// The pattern as tokens: a field letter with its count, or `' '` with a literal.
+/// Splits the pattern into tokens: a field letter with its count, or `' '` with a literal.
 fn patternTokens(pattern: string): List<(char, int, string)> throws TimeError {
     let out: List<(char, int, string)> = List.new();
     let cs: List<char> = List.new();
@@ -1564,19 +1645,19 @@ fn weekdayNames(): string[] {
     return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 }
 
-/// `+0100`, `-0530`; `+0000` for none.
+/// Returns the offset as `+0100`, `-0530`; `+0000` for none.
 fn offsetBasic(off: int): string {
     let mins = floorDiv(if (off < 0) -off else off, 60000000000);
     return (if (off < 0) "-" else "+") + twoDigits(mins / 60) + twoDigits(mins % 60);
 }
 
-/// `+01`, `-05`; `+00` for none.
+/// Returns the offset's hours as `+01`, `-05`; `+00` for none.
 fn offsetHours(off: int): string {
     let mins = floorDiv(if (off < 0) -off else off, 60000000000);
     return (if (off < 0) "-" else "+") + twoDigits(mins / 60);
 }
 
-/// The text read field by field.
+/// A reader over the text `DateTime.parseWith` reads field by field.
 struct FieldReader {
     b: Slice<uint8>,
     var at: int,
@@ -1596,7 +1677,7 @@ struct FieldReader {
         this.at = this.at + want.length();
     }
 
-    /// At least `least` and at most `most` digits.
+    /// Reads a number of at least `least` and at most `most` digits.
     mut fn number(least: int, most: int): int throws ParseError {
         var v = 0;
         var n = 0;
@@ -1611,7 +1692,7 @@ struct FieldReader {
         return v;
     }
 
-    /// Digits as nanoseconds: the first nine count.
+    /// Reads digits as nanoseconds; only the first nine count.
     mut fn fraction(): int throws ParseError {
         var v = 0;
         var n = 0;
@@ -1632,8 +1713,8 @@ struct FieldReader {
         return v;
     }
 
-    /// One of the names, the whole name or its first three letters, without case: its number
-    /// from 1.
+    /// Reads one of the names, the whole name or its first three letters, without case, and
+    /// returns its number from 1.
     mut fn name(names: string[], short: bool): int throws ParseError {
         var i = 0;
         while (i < names.length()) {
@@ -1672,7 +1753,7 @@ struct FieldReader {
         return a == 112u8;
     }
 
-    /// `Z` (where allowed), `+hh`, `+hhmm`, `+hh:mm`: seconds east.
+    /// Reads `Z` (where allowed), `+hh`, `+hhmm` or `+hh:mm` and returns the seconds east.
     mut fn offset(zAllowed: bool): int throws ParseError {
         if (this.at >= this.b.length()) {
             throw ParseError { kind = .Invalid };

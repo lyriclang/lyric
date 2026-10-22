@@ -1,10 +1,12 @@
-/// The network (design/v5/spec/10 O7; 13 M8b P1, P2, S10b, S10c): IP addresses and socket
-/// addresses, TCP — a listener that accepts, a stream that is a `Reader` and a `Writer` —, UDP, and
-/// the names a resolver knows. A call that would block parks the task until the thread's poller
-/// says the socket is ready (06 S2), then asks again; a cancel ends that wait with `Cancelled` (10
-/// Review 2026-10-08), and a close — on any thread — with `Closed`. There are no socket timeouts:
-/// `withTimeout` is the one way (O7). POSIX's sockets over epoll or kqueue, Windows' (S11) over
-/// Winsock and an AFD poll request a socket on the thread's completion port.
+/// The network: IP addresses ([IpAddr]) and socket addresses ([SocketAddr]), TCP — a
+/// [TcpListener] that accepts, a [TcpStream] that is a `Reader` and a `Writer` —, UDP
+/// ([UdpSocket]), and name resolution ([resolve]).
+///
+/// A call that would block parks the task until the thread's poller says the socket is ready, then
+/// tries again; a cancel ends that wait with `Cancelled`, and a close — on any thread — with
+/// `Closed`. There are no socket timeouts: `withTimeout` bounds a call instead. On POSIX the sockets
+/// are polled with epoll or kqueue; on Windows they use Winsock, with an AFD poll request per
+/// socket on the thread's completion port.
 import std.collections { List };
 import std.core { Parse, ParseError, StringBuilder, viewBytes };
 import std.io { IoError, Reader, Writer, failure, onPool };
@@ -26,26 +28,26 @@ fn netSendTo(fd: int, from: Slice<uint8>, family: int, address: Slice<uint8>, po
 fn netRecvFrom(fd: int, into: Slice<uint8>, sender: Slice<uint8>): int;
 fn netResolve(host: string, into: Slice<uint8>): int;
 
-/// What a call that would block answers (lyr/net.h).
+/// The answer of a call that would block (lyr/net.h).
 let wouldBlock = -(64 << 32);
 
-/// How many connections a listener keeps waiting for `accept` (Rust's and Go's 128).
+/// How many connections a listener keeps waiting for `accept`.
 let backlog = 128;
 
 // ---------------------------------------------------------------------------------------------
-// The addresses (10 O7).
+// The addresses.
 // ---------------------------------------------------------------------------------------------
 
-/// An IP address (10 O7): version 4's four bytes, or version 6's eight groups of 16 bits.
+/// An IP address: version 4's four bytes, or version 6's eight groups of 16 bits.
 pub enum IpAddr :: [Equatable, Debug] {
     V4(uint8, uint8, uint8, uint8),
     V6(uint16, uint16, uint16, uint16, uint16, uint16, uint16, uint16),
 }
 
 extend IpAddr :: [Display] {
-    /// Version 4 dotted, `192.0.2.1`; version 6 as RFC 5952 writes it — lower case, no leading
-    /// zero in a group, the longest run of two or more zero groups (the first of equals) as `::`,
-    /// and an IPv4-mapped address with its dotted tail, `::ffff:192.0.2.1`.
+    /// Returns version 4 dotted, `192.0.2.1`; version 6 as RFC 5952 writes it — lower case, no
+    /// leading zero in a group, the longest run of two or more zero groups (the first of equals)
+    /// as `::`, and an IPv4-mapped address with its dotted tail, `::ffff:192.0.2.1`.
     fn show(): string {
         return match (this) {
             .V4(a, b, c, d) => f"{a}.{b}.{c}.{d}",
@@ -55,9 +57,13 @@ extend IpAddr :: [Display] {
 }
 
 extend IpAddr :: [Parse] {
-    /// Version 4 dotted — four decimal bytes, none with a leading zero (RFC 6943 §3.1.1: no octal
-    /// reading) —, or version 6 in the forms of RFC 4291 §2.2: groups of one to four hex digits,
-    /// `::` once for one or more zero groups, an IPv4 tail in the last 32 bits. No zone (`%eth0`).
+    /// Parses version 4 dotted — four decimal bytes, none with a leading zero, so nothing is read
+    /// as octal (RFC 6943 §3.1.1) —, or version 6 in the forms of RFC 4291 §2.2: groups of one to
+    /// four hex digits, `::` once for one or more zero groups, an IPv4 tail in the last 32 bits.
+    /// A zone (`%eth0`) is not accepted.
+    ///
+    /// # Errors
+    /// Throws [ParseError]: `Empty` for empty text, `Invalid` for anything that is neither form.
     static fn parse(s: StringView): IpAddr throws ParseError {
         let text = viewBytes(s);
         if (text.isEmpty()) {
@@ -73,14 +79,14 @@ extend IpAddr :: [Parse] {
     }
 }
 
-/// An IP address and a port (10 O7).
+/// An IP address and a port.
 pub struct SocketAddr :: [Equatable, Debug] {
     pub ip: IpAddr,
     pub port: uint16,
 }
 
 extend SocketAddr :: [Display] {
-    /// `192.0.2.1:8080`; a version 6 address in brackets, `[::1]:8080` (RFC 3986).
+    /// Returns `192.0.2.1:8080`; a version 6 address in brackets, `[::1]:8080` (RFC 3986).
     fn show(): string {
         return match (this.ip) {
             .V4(_, _, _, _) => f"{this.ip}:{this.port}",
@@ -90,8 +96,13 @@ extend SocketAddr :: [Display] {
 }
 
 extend SocketAddr :: [Parse] {
-    /// `192.0.2.1:8080` or `[2001:db8::1]:8080`: the address as `IpAddr.parse` takes it, then a
-    /// decimal port up to 65535.
+    /// Parses `192.0.2.1:8080` or `[2001:db8::1]:8080`: the address as [IpAddr.parse] takes it —
+    /// a version 6 address in brackets, a version 4 one without —, then a decimal port up to
+    /// 65535.
+    ///
+    /// # Errors
+    /// Throws [ParseError]: `Empty` for empty text, `Invalid` for a missing or bad port, an
+    /// unclosed bracket, or an address that is not of the right form.
     static fn parse(s: StringView): SocketAddr throws ParseError {
         let text = viewBytes(s);
         if (text.isEmpty()) {
@@ -131,7 +142,7 @@ extend SocketAddr :: [Parse] {
     }
 }
 
-/// The four bytes of a dotted version 4 address, or null where `text` is none.
+/// Returns the four bytes of a dotted version 4 address, or null where `text` is none.
 fn v4Of(text: Slice<uint8>): ?uint8[] {
     let bytes: uint8[] = [0u8] * 4;
     var part = 0;
@@ -171,7 +182,7 @@ fn v4Of(text: Slice<uint8>): ?uint8[] {
     return bytes;
 }
 
-/// The eight groups of a version 6 address, or null where `text` is none.
+/// Returns the eight groups of a version 6 address, or null where `text` is none.
 fn v6Of(text: Slice<uint8>): ?uint16[] {
     let groups: uint16[] = [0u16] * 8;
     let n = text.length();
@@ -254,7 +265,7 @@ fn v6Of(text: Slice<uint8>): ?uint16[] {
     return groups;
 }
 
-/// One to four hex digits as a group, or null.
+/// Returns one to four hex digits as a group, or null.
 fn hexGroup(text: Slice<uint8>): ?uint16 {
     if (text.isEmpty() || text.length() > 4) {
         return null;
@@ -273,7 +284,7 @@ fn hexGroup(text: Slice<uint8>): ?uint16 {
     return value as uint16;
 }
 
-/// A decimal port, 0 to 65535, no sign and no leading zero; or null.
+/// Returns a decimal port, 0 to 65535, with no sign and no leading zero; or null.
 fn portOf(text: Slice<uint8>): ?uint16 {
     if (text.isEmpty() || text.length() > 5 || (text.length() > 1 && text[0] == 48u8)) {
         return null;
@@ -288,7 +299,7 @@ fn portOf(text: Slice<uint8>): ?uint16 {
     return if (value > 65535) null else value as uint16;
 }
 
-/// Version 6's text (RFC 5952).
+/// Returns the text of a version 6 address (RFC 5952).
 fn v6Text(g: uint16[]): string {
     if (g[0] == 0u16 && g[1] == 0u16 && g[2] == 0u16 && g[3] == 0u16 && g[4] == 0u16 && g[5] == 65535u16) {
         let high = g[6] as int;
@@ -332,7 +343,7 @@ fn v6Text(g: uint16[]): string {
     return out.toString();
 }
 
-/// A group in lower-case hex, no leading zero.
+/// Returns a group in lower-case hex, with no leading zero.
 fn hexText(v: uint16): string {
     let digits = "0123456789abcdef";
     let bytes = viewBytes(digits);
@@ -350,7 +361,7 @@ fn hexText(v: uint16): string {
     return out.toString();
 }
 
-/// An address as it crosses to the runtime (lyr/net.h): its family, its 16 bytes, its port.
+/// Returns the family of an address as it crosses to the runtime (lyr/net.h): 4 or 6.
 fn familyOf(ip: IpAddr): int {
     return match (ip) {
         .V4(_, _, _, _) => 4,
@@ -358,6 +369,7 @@ fn familyOf(ip: IpAddr): int {
     };
 }
 
+/// Returns the 16 bytes of an address as it crosses to the runtime; version 4 in the first four.
 fn bytesOf(ip: IpAddr): uint8[] {
     let bytes: uint8[] = [0u8] * 16;
     match (ip) {
@@ -381,7 +393,7 @@ fn bytesOf(ip: IpAddr): uint8[] {
     return bytes;
 }
 
-/// The address the runtime wrote (lyr/net.h: family, port high and low, 16 bytes).
+/// Returns the address the runtime wrote (lyr/net.h: family, port high and low, 16 bytes).
 fn addressFrom(b: Slice<uint8>): SocketAddr {
     let port = ((b[1] as int) * 256 + (b[2] as int)) as uint16;
     if (b[0] == 4u8) {
@@ -400,12 +412,12 @@ fn addressFrom(b: Slice<uint8>): SocketAddr {
 }
 
 // ---------------------------------------------------------------------------------------------
-// TCP (10 O4, O7): handles are classes with a closed state (P4); every call after `close()`
-// throws `Closed`, and a second `close()` does nothing.
+// TCP: handles are classes with a closed state; every call after `close()` throws `Closed`, and a
+// second `close()` does nothing.
 // ---------------------------------------------------------------------------------------------
 
-/// What a failed call of the runtime says, about `addr` where there is one: an `IoError` whose
-/// path is the address's text.
+/// Returns the [IoError] for a failed runtime call, about `addr` where there is one: its path is
+/// the address's text.
 fn netFailure(answer: int, addr: ?SocketAddr, doing: string): IoError {
     var path: ?string = null;
     if (let a = addr) {
@@ -414,8 +426,8 @@ fn netFailure(answer: int, addr: ?SocketAddr, doing: string): IoError {
     return failure(answer, path, doing);
 }
 
-/// The running task waits until `fd` is ready as `interest` says (1 to read, 2 to write), in the
-/// socket's `waits` — so a close on any thread ends the wait (S10c).
+/// Makes the running task wait until `fd` is ready as `interest` says (1 to read, 2 to write), in
+/// the socket's `waits` — so a close on any thread ends the wait.
 fn waitFor(fd: int, interest: int, waits: Waits, doing: string): void throws [IoError, Cancelled] {
     let armed = try awaitDescriptor(fd, interest, waits);
     if (armed < 0) {
@@ -423,7 +435,7 @@ fn waitFor(fd: int, interest: int, waits: Waits, doing: string): void throws [Io
     }
 }
 
-/// A new socket for `addr`'s family.
+/// Returns a new socket for `addr`'s family.
 fn socketFor(addr: SocketAddr, kind: int, doing: string): int throws IoError {
     let fd = netSocket(familyOf(addr.ip), kind);
     if (fd < 0) {
@@ -432,15 +444,20 @@ fn socketFor(addr: SocketAddr, kind: int, doing: string): int throws IoError {
     return fd;
 }
 
-/// A TCP socket that listens (10 O7): `bind` makes it, `accept` gives each connection that comes
-/// as a `TcpStream`.
+/// A listening TCP socket: `bind` creates it, `accept` returns each incoming connection as a
+/// [TcpStream].
 pub class TcpListener :: [Closeable] {
     fd: int,
     var closed: bool = false,
     waits: Waits = Waits { },
 
-    /// A listener on `addr`; port 0 asks the system for a free one, which `localAddr` says. A port
-    /// that a closed listener's connections still hold (TIME_WAIT) is taken all the same.
+    /// Returns a listener on `addr`; port 0 asks the system for a free one, which `localAddr`
+    /// reports. A port that a closed listener's connections still hold (TIME_WAIT) is taken all the
+    /// same.
+    ///
+    /// # Errors
+    /// Throws [IoError] with the address when the socket cannot be created, bound or set
+    /// listening, such as `AddrInUse`.
     pub static fn bind(addr: SocketAddr): TcpListener throws IoError {
         let fd = try socketFor(addr, 1, "bound");
         let bytes = bytesOf(addr.ip);
@@ -455,7 +472,11 @@ pub class TcpListener :: [Closeable] {
         return TcpListener { fd = fd };
     }
 
-    /// The next connection: waits until one comes.
+    /// Returns the next connection, waiting until one comes.
+    ///
+    /// # Errors
+    /// Throws [IoError] — `Closed` once the listener is closed —, and [Cancelled] when the waiting
+    /// task is cancelled.
     pub mut fn accept(): TcpStream throws [IoError, Cancelled] {
         loop {
             try this.stillOpen("accepted");
@@ -470,14 +491,21 @@ pub class TcpListener :: [Closeable] {
         }
     }
 
-    /// The address it listens on — with the port the system chose, where `bind` asked for 0.
+    /// Returns the address it listens on — with the port the system chose, where `bind` asked
+    /// for 0.
+    ///
+    /// # Errors
+    /// Throws [IoError]: `Closed` after `close()`, else the system's failure.
     pub fn localAddr(): SocketAddr throws IoError {
         try this.stillOpen("asked its address");
         return try nameOf(this.fd, 0);
     }
 
-    /// Lets the socket go; a task that waits in `accept` throws `Closed`. A second close does
+    /// Closes the socket; a task that waits in `accept` throws `Closed`. A second close does
     /// nothing.
+    ///
+    /// # Errors
+    /// Throws [IoError] when the system fails to close it.
     pub fn close(): void throws IoError {
         let me = this;
         if (me.closed) {
@@ -494,21 +522,25 @@ pub class TcpListener :: [Closeable] {
     }
 }
 
-/// How much of a stream `shutdown` ends (10 O7): its reading, its writing, or both.
+/// How much of a stream [TcpStream.shutdown] ends: its reading, its writing, or both.
 pub enum Shutdown :: [Equatable, Debug] {
     Read,
     Write,
     Both,
 }
 
-/// A TCP connection (10 O4, O7): a `Reader` and a `Writer` whose calls wait for the socket — a
-/// read until bytes come, a write until the system takes some.
+/// A TCP connection: a `Reader` and a `Writer` whose calls wait for the socket — a read until
+/// bytes come, a write until the system takes some.
 pub class TcpStream :: [Reader, Writer, Closeable] {
     fd: int,
     var closed: bool = false,
     waits: Waits = Waits { },
 
-    /// A connection to `addr`: waits until it is made, or refused.
+    /// Opens a connection to `addr`, waiting until it is made or refused.
+    ///
+    /// # Errors
+    /// Throws [IoError] with the address when the connection fails, such as `ConnectionRefused`,
+    /// and [Cancelled] when the waiting task is cancelled.
     pub static fn connect(addr: SocketAddr): TcpStream throws [IoError, Cancelled] {
         let fd = try socketFor(addr, 1, "connected");
         let bytes = bytesOf(addr.ip);
@@ -536,7 +568,12 @@ pub class TcpStream :: [Reader, Writer, Closeable] {
         return TcpStream { fd = fd, waits = waits };
     }
 
-    /// Bytes from the connection: waits until some come; 0 once the peer has ended its writing.
+    /// Reads bytes from the connection into `into`, waiting until some come, and returns how many;
+    /// 0 once the peer has ended its writing.
+    ///
+    /// # Errors
+    /// Throws [IoError] — `Closed` after `close()` —, and [Cancelled] when the waiting task is
+    /// cancelled.
     pub mut fn read(into: Slice<uint8>): int throws [IoError, Cancelled] {
         loop {
             try this.stillOpen("read");
@@ -554,8 +591,12 @@ pub class TcpStream :: [Reader, Writer, Closeable] {
         }
     }
 
-    /// Bytes into the connection: waits until the system takes some, and answers how many — maybe
-    /// fewer than `from` holds (`writeAll` takes the rest). A peer that is gone is `BrokenPipe`.
+    /// Writes bytes from `from` into the connection, waiting until the system takes some, and
+    /// returns how many — possibly fewer than `from` holds (`writeAll` writes the rest).
+    ///
+    /// # Errors
+    /// Throws [IoError] — `Closed` after `close()`, `BrokenPipe` for a peer that is gone —, and
+    /// [Cancelled] when the waiting task is cancelled.
     pub mut fn write(from: Slice<uint8>): int throws [IoError, Cancelled] {
         loop {
             try this.stillOpen("written");
@@ -574,6 +615,9 @@ pub class TcpStream :: [Reader, Writer, Closeable] {
     }
 
     /// Ends the reading, the writing or both: a peer reading sees the end once the writing is shut.
+    ///
+    /// # Errors
+    /// Throws [IoError]: `Closed` after `close()`, else the system's failure.
     pub fn shutdown(how: Shutdown): void throws IoError {
         try this.stillOpen("shut down");
         let which = match (how) {
@@ -587,7 +631,10 @@ pub class TcpStream :: [Reader, Writer, Closeable] {
         }
     }
 
-    /// Nagle's waiting off — each small write goes out at once — or on again.
+    /// Turns Nagle's algorithm off when `on` — each small write goes out at once — or on again.
+    ///
+    /// # Errors
+    /// Throws [IoError]: `Closed` after `close()`, else the system's failure.
     pub fn setNoDelay(on: bool): void throws IoError {
         try this.stillOpen("set");
         let answer = netSetNoDelay(this.fd, if (on) 1 else 0);
@@ -596,20 +643,29 @@ pub class TcpStream :: [Reader, Writer, Closeable] {
         }
     }
 
-    /// The address of the connection's other end.
+    /// Returns the address of the connection's other end.
+    ///
+    /// # Errors
+    /// Throws [IoError]: `Closed` after `close()`, else the system's failure.
     pub fn peerAddr(): SocketAddr throws IoError {
         try this.stillOpen("asked its address");
         return try nameOf(this.fd, 1);
     }
 
-    /// The address of this end.
+    /// Returns the address of this end.
+    ///
+    /// # Errors
+    /// Throws [IoError]: `Closed` after `close()`, else the system's failure.
     pub fn localAddr(): SocketAddr throws IoError {
         try this.stillOpen("asked its address");
         return try nameOf(this.fd, 0);
     }
 
-    /// Lets the connection go; a task that waits in a read or a write throws `Closed`. A second
+    /// Closes the connection; a task that waits in a read or a write throws `Closed`. A second
     /// close does nothing.
+    ///
+    /// # Errors
+    /// Throws [IoError] when the system fails to close it.
     pub fn close(): void throws IoError {
         let me = this;
         if (me.closed) {
@@ -626,7 +682,7 @@ pub class TcpStream :: [Reader, Writer, Closeable] {
     }
 }
 
-/// The socket's own address, or its peer's.
+/// Returns the socket's own address, or its peer's where `peer` is 1.
 fn nameOf(fd: int, peer: int): SocketAddr throws IoError {
     let into: uint8[] = [0u8] * 19;
     let n = netName(fd, peer, into[..]);
@@ -636,8 +692,8 @@ fn nameOf(fd: int, peer: int): SocketAddr throws IoError {
     return addressFrom(into[..]);
 }
 
-/// The socket's waiters woken, on whatever thread they wait — they find it closed (S10c) —, the
-/// socket out of this thread's poller, and closed.
+/// Wakes the socket's waiters on whatever thread they wait — they find it closed —, removes the
+/// socket from this thread's poller, and closes it.
 fn closeSocket(fd: int, waits: Waits): void throws IoError {
     let w = waits;
     w.close();
@@ -649,16 +705,20 @@ fn closeSocket(fd: int, waits: Waits): void throws IoError {
 }
 
 // ---------------------------------------------------------------------------------------------
-// UDP and the resolver (10 O7; M8b S10c).
+// UDP and the resolver.
 // ---------------------------------------------------------------------------------------------
 
-/// A UDP socket (10 O7): datagrams sent to an address, and received with their sender's.
+/// A UDP socket: datagrams sent to an address, and received with their sender's.
 pub class UdpSocket :: [Closeable] {
     fd: int,
     var closed: bool = false,
     waits: Waits = Waits { },
 
-    /// A socket bound to `addr`; port 0 asks the system for a free one, which `localAddr` says.
+    /// Returns a socket bound to `addr`; port 0 asks the system for a free one, which `localAddr`
+    /// reports.
+    ///
+    /// # Errors
+    /// Throws [IoError] with the address when the socket cannot be created or bound.
     pub static fn bind(addr: SocketAddr): UdpSocket throws IoError {
         let fd = try socketFor(addr, 2, "bound");
         let bytes = bytesOf(addr.ip);
@@ -670,8 +730,12 @@ pub class UdpSocket :: [Closeable] {
         return UdpSocket { fd = fd };
     }
 
-    /// `from` as one datagram to `addr`: waits until the system takes it, and answers how many
-    /// bytes went — all of them, a datagram goes whole or not at all.
+    /// Sends `from` as one datagram to `addr`, waiting until the system takes it, and returns how
+    /// many bytes went — all of them, since a datagram goes whole or not at all.
+    ///
+    /// # Errors
+    /// Throws [IoError] — `Closed` after `close()`, else the system's failure with the address —,
+    /// and [Cancelled] when the waiting task is cancelled.
     pub mut fn sendTo(from: Slice<uint8>, addr: SocketAddr): int throws [IoError, Cancelled] {
         let bytes = bytesOf(addr.ip);
         loop {
@@ -687,8 +751,12 @@ pub class UdpSocket :: [Closeable] {
         }
     }
 
-    /// The next datagram: waits until one comes, and answers how many of its bytes went into
-    /// `into` — the rest of a longer one is lost — and who sent it.
+    /// Receives the next datagram, waiting until one comes, and returns how many of its bytes went
+    /// into `into` — the rest of a longer one is lost — and who sent it.
+    ///
+    /// # Errors
+    /// Throws [IoError] — `Closed` after `close()` —, and [Cancelled] when the waiting task is
+    /// cancelled.
     pub mut fn recvFrom(into: Slice<uint8>): (int, SocketAddr) throws [IoError, Cancelled] {
         let sender: uint8[] = [0u8] * 19;
         loop {
@@ -704,14 +772,21 @@ pub class UdpSocket :: [Closeable] {
         }
     }
 
-    /// The address it is bound to — with the port the system chose, where `bind` asked for 0.
+    /// Returns the address it is bound to — with the port the system chose, where `bind` asked
+    /// for 0.
+    ///
+    /// # Errors
+    /// Throws [IoError]: `Closed` after `close()`, else the system's failure.
     pub fn localAddr(): SocketAddr throws IoError {
         try this.stillOpen("asked its address");
         return try nameOf(this.fd, 0);
     }
 
-    /// Lets the socket go; a task that waits in a call of it throws `Closed`. A second close does
-    /// nothing.
+    /// Closes the socket; a task that waits in one of its calls throws `Closed`. A second close
+    /// does nothing.
+    ///
+    /// # Errors
+    /// Throws [IoError] when the system fails to close it.
     pub fn close(): void throws IoError {
         let me = this;
         if (me.closed) {
@@ -728,10 +803,14 @@ pub class UdpSocket :: [Closeable] {
     }
 }
 
-/// The addresses `host` names (10 O7): a name the system's resolver knows — `localhost`,
+/// Returns the addresses `host` names: a name the system's resolver knows — `localhost`,
 /// `example.org` — or an address's own text; each address once, in the resolver's order. It runs
-/// on the I/O pool (13 M8b P2), as a file's call does, so it is no point of cancellation: a cancel
-/// shows at the task's next wait. A name nobody knows is `NotFound`, the name as the path.
+/// on the I/O pool, as a file's call does, so it is not a point of cancellation: a cancel shows at
+/// the task's next wait.
+///
+/// # Errors
+/// Throws [IoError] with the name as the path: `NotFound` for a name nobody knows, else the
+/// resolver's failure.
 pub fn resolve(host: StringView): List<IpAddr> throws IoError {
     let name = host.toString();
     var room = 8;

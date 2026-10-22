@@ -1,19 +1,22 @@
-/// `std.compress` (design 10 Q8; 13 M10 S9): DEFLATE (RFC 1951), zlib (RFC 1950) and gzip (RFC
-/// 1952), whole in Lyric. `Inflate` reads stored, fixed and dynamic blocks through a 32 KiB
-/// window; `Deflate` writes them at the levels 0 to 9 — 0 stored, 1 the fixed tables over a
-/// greedy LZ77, 2 and up dynamic tables, 4 and up with lazy matching, the chains longer with the
-/// level. The adapters are streams: `DeflateReader<R>`/`DeflateWriter<W>` raw, `ZlibReader`/
-/// `ZlibWriter` with the zlib header and Adler-32, `GzipReader`/`GzipWriter` with the gzip header
-/// and CRC-32 (members in a row read as one). `Gzip.compress(bytes, level)`, `Gzip.decompress`,
-/// `Zlib.*` and `Deflate.*` for what fits in memory.
+/// Compresses and decompresses DEFLATE (RFC 1951), zlib (RFC 1950) and gzip (RFC 1952), written
+/// entirely in Lyric.
+///
+/// Decoding reads stored, fixed and dynamic blocks through a 32 KiB window; encoding writes them
+/// at the levels 0 to 9 — 0 stored, 1 the fixed tables over a greedy LZ77, 2 and up dynamic
+/// tables, 4 and up with lazy matching, the chains longer with the level. The streams are
+/// `DeflateReader<R>`/`DeflateWriter<W>` raw, `ZlibReader`/`ZlibWriter` with the zlib header and
+/// Adler-32, `GzipReader`/`GzipWriter` with the gzip header and CRC-32 (members in a row read as
+/// one). `Gzip`, `Zlib` and `Deflate` compress and decompress bytes held in memory. Corrupt input
+/// is reported as `IoError { kind = .InvalidData }` carrying a `CompressError`.
 import std.collections { List };
 import std.core { Closeable };
 import std.hash { adler32, crc32 };
 import std.io { Reader, Writer, IoError, ByteBuffer };
 import std.task { Cancelled };
 
-/// What a decoder throws for bytes that are not the format, a checksum or a length that does not
-/// hold, or a level that is none.
+/// The error for bytes that are not the format, a checksum or a length that does not hold, or a
+/// compression level outside 0 to 9. Decoders throw it inside an `IoError`; the constructors and
+/// `compress` functions throw it directly.
 pub struct CompressError :: [Error] {
     pub detail: string,
 
@@ -75,12 +78,12 @@ fn distCode(dist: int): (int, int) {
 // Huffman codes: canonical, from lengths (§3.2.2).
 // ---------------------------------------------------------------------------------------------
 
-/// A decoding table as puff does it: how many codes of each length, the symbols in code order.
+/// A Huffman decoding table: how many codes of each length, the symbols in code order.
 class Huffman {
     var count: int[],
     var symbol: int[],
 
-    /// From the code lengths of `n` symbols; a length 0 is no code. Over-subscribed lengths are
+    /// Builds the table from the code lengths of `n` symbols; a length 0 is no code. Over-subscribed lengths are
     /// an error; an incomplete code is allowed (one code of length 1 is what a single distance
     /// code looks like).
     static fn build(lengths: int[], n: int): Huffman throws IoError {
@@ -120,7 +123,7 @@ class Huffman {
     }
 }
 
-/// The canonical codes of the lengths, bit-reversed for writing LSB-first (§3.2.2).
+/// Returns the canonical codes of the lengths, bit-reversed for writing LSB-first (§3.2.2).
 fn canonicalCodes(lengths: int[], n: int): int[] {
     var count = [0] * 16;
     var i = 0;
@@ -162,7 +165,7 @@ fn reverseBits(code: int, len: int): int {
     return out;
 }
 
-/// The fixed lengths of §3.2.6: literals and lengths.
+/// Returns the fixed code lengths of §3.2.6 for literals and lengths.
 fn fixedLitLengths(): int[] {
     var lengths = [0] * 288;
     var i = 0;
@@ -184,9 +187,12 @@ fn fixedDistLengths(): int[] {
 /// The size of the window: the farthest a match reaches back.
 let windowSize = 32768;
 
-/// DEFLATE's blocks read from `inner`, the bytes they mean given out; `Reader`. Bytes after the
-/// final block stay in `inner` where it was read exactly — the reader takes them one at a time
-/// once the end is near — so a wrapper can read its trailer.
+/// A `Reader` that decompresses raw DEFLATE blocks read from `inner`. Bytes after the final block
+/// stay in `inner` where it is read exactly — the reader takes them one at a time once the end is
+/// near — so a wrapper can read its trailer.
+///
+/// Its `read` throws `IoError { kind = .InvalidData }` with a `CompressError` inside for input that
+/// is not valid DEFLATE.
 pub class DeflateReader<R :: [Reader]> :: [Reader] {
     var inner: R,
     /// The input: a buffer and the bit accumulator.
@@ -220,12 +226,12 @@ pub class DeflateReader<R :: [Reader]> :: [Reader] {
         };
     }
 
-    /// The bytes decoded so far.
+    /// Returns the number of bytes decoded so far.
     pub fn bytesOut(): int {
         return this.totalOut;
     }
 
-    /// Whether the final block has been read whole.
+    /// Returns whether the final block has been read whole and all its bytes given out.
     pub fn isDone(): bool {
         return this.done && this.outHead == this.outTail;
     }
@@ -472,8 +478,8 @@ pub class DeflateReader<R :: [Reader]> :: [Reader] {
         return n;
     }
 
-    /// The bytes the reader took from `inner` beyond the deflate stream, for a wrapper's trailer:
-    /// its own buffer first, then `inner`.
+    /// Reads the bytes beyond the deflate stream, for a wrapper's trailer: what the reader has
+    /// buffered first, then from `inner`.
     mut fn readTrailer(into: Slice<uint8>): int throws [IoError, Cancelled] {
         // the bits left over belong to the trailer as whole bytes
         var n = 0;
@@ -503,7 +509,7 @@ pub class DeflateReader<R :: [Reader]> :: [Reader] {
         return m;
     }
 
-    /// Exactly `into.length()` trailer bytes, or an error.
+    /// Reads exactly `into.length()` trailer bytes; a stream that ends first is corrupt.
     mut fn readTrailerExact(into: Slice<uint8>, what: string): void throws [IoError, Cancelled] {
         var at = 0;
         while (at < into.length()) {
@@ -520,7 +526,7 @@ pub class DeflateReader<R :: [Reader]> :: [Reader] {
 // Deflate.
 // ---------------------------------------------------------------------------------------------
 
-/// Bits into a `Writer`, LSB first, through a buffer.
+/// Writes bits into a `Writer`, LSB first, through a buffer.
 class BitWriter<W :: [Writer]> {
     var inner: W,
     var buf: uint8[],
@@ -552,7 +558,7 @@ class BitWriter<W :: [Writer]> {
         this.total = this.total + 1;
     }
 
-    /// To the byte: the bits left padded with zeros.
+    /// Aligns to the byte: the bits left are padded with zeros.
     mut fn align(): void throws [IoError, Cancelled] {
         if (this.bitCount > 0) {
             try this.byte((this.bitBuf & 0xFF) as uint8);
@@ -617,7 +623,7 @@ let maxMatch = 258;
 /// The lookahead the matcher needs before it decides, unless the input has ended.
 let minLookahead = 262;
 
-/// DEFLATE's blocks written to `inner` from the bytes given; `Writer` and `Closeable` — `close`
+/// A `Writer` that compresses the bytes given into raw DEFLATE blocks written to `inner`; `close`
 /// writes the final block. Level 0 stores, 1 uses the fixed tables over a greedy LZ77, 2 and up
 /// dynamic tables, 4 and up lazy matching.
 pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
@@ -646,7 +652,11 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
     var closed: bool,
     var totalIn: int,
 
-    /// At the level 0..9; 6 is the usual; -1 is 6.
+    /// Returns a writer at the level 0..9; 6 is the default, and -1 means 6.
+    ///
+    /// # Errors
+    ///
+    /// Throws `CompressError` for a level outside -1 to 9.
     pub static fn new(inner: W, level: int = 6): DeflateWriter<W> throws CompressError {
         if (level < -1 || level > 9) {
             throw CompressError { detail = f"the level {level} is none: 0 to 9" };
@@ -662,12 +672,12 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
         };
     }
 
-    /// The bytes taken so far.
+    /// Returns the number of bytes taken so far.
     pub fn bytesIn(): int {
         return this.totalIn;
     }
 
-    /// The bytes written so far (the block under way not counted).
+    /// Returns the number of bytes written so far (the block under way not counted).
     pub fn bytesOut(): int {
         return this.bits.total;
     }
@@ -722,7 +732,12 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
         try this.bits.flush();
     }
 
-    /// The final block written and the inner writer flushed. A second close does nothing.
+    /// Writes the final block and flushes the inner writer. A second close does nothing.
+    ///
+    /// # Errors
+    ///
+    /// Throws `IoError` where writing to `inner` fails, and `Cancelled` where the task is
+    /// cancelled during the write.
     pub fn close(): void throws [IoError, Cancelled] {
         // through the reference: 'Closeable.close' is no 'mut fn'
         let me = this;
@@ -745,7 +760,7 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
         this.closed = true;
     }
 
-    /// The window's older half dropped; the positions move down by the window size.
+    /// Drops the window's older half; the positions move down by the window size.
     mut fn slide(): void {
         let w = windowSize;
         this.win[w..2 * w].copyInto(this.win[0..w]);
@@ -765,7 +780,7 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
 
     // -- level 0
 
-    /// Stored blocks of what is ready: 65535 bytes each, the rest kept until `all`.
+    /// Writes what is ready as stored blocks of 65535 bytes each, the rest kept until `all`.
     mut fn storeReady(all: bool): void throws [IoError, Cancelled] {
         while (this.end - this.strStart >= 65535 || (all && this.end > this.strStart)) {
             let n = if (this.end - this.strStart > 65535) 65535 else this.end - this.strStart;
@@ -804,7 +819,8 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
         this.head[h] = p;
     }
 
-    /// The longest match for the string at `p`, as (length, distance); the length 0 where none.
+    /// Returns the longest match for the string at `p` as (length, distance); the length is 0
+    /// where there is none.
     fn longestMatch(p: int): (int, int) {
         var chain = this.config.maxChain;
         var bestLen = if (this.prevLength >= minMatch) this.prevLength else minMatch - 1;
@@ -869,7 +885,7 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
         }
     }
 
-    /// The matcher over what is ready: with `all`, to the very end.
+    /// Runs the matcher over what is ready: with `all`, to the very end.
     mut fn deflateReady(all: bool): void throws [IoError, Cancelled] {
         while (this.end - this.strStart >= (if (all) 1 else minLookahead)) {
             let p = this.strStart;
@@ -949,8 +965,8 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
 
     // -- the block
 
-    /// The symbols so far as a block: fixed tables at level 1, dynamic ones above, stored where
-    /// that is smaller. With `final`, the last.
+    /// Writes the symbols so far as a block: fixed tables at level 1, dynamic ones above, stored
+    /// where that is smaller. With `final`, the block is marked as the last.
     mut fn writeBlock(final: bool): void throws [IoError, Cancelled] {
         this.litFreq[256] = this.litFreq[256] + 1;
         var litLengths: int[] = [];
@@ -1087,7 +1103,7 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
         this.distFreq = [0] * 30;
     }
 
-    /// The block's bytes as stored blocks: they are the newest `n` bytes before `strStart`
+    /// Writes the block's bytes as stored blocks: they are the newest `n` bytes before `strStart`
     /// (less what a lazy match keeps back).
     mut fn storedFromSymbols(n: int, final: bool): void throws [IoError, Cancelled] {
         let endAt = this.strStart - (if (this.matchAvailable) 1 else 0);
@@ -1100,7 +1116,7 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
     }
 }
 
-/// The extra bits a literal/length symbol carries.
+/// Returns the number of extra bits a literal/length symbol carries.
 fn extraBitsOfLit(sym: int): int {
     if (sym < 257) {
         return 0;
@@ -1109,8 +1125,8 @@ fn extraBitsOfLit(sym: int): int {
     return if (i < 29) lengthExtra()[i] else 0;
 }
 
-/// The code lengths of `n` symbols with the frequencies, none longer than `limit` (zlib's way:
-/// a Huffman tree from a heap, the overflow moved down).
+/// Returns the code lengths of `n` symbols with the given frequencies, none longer than `limit`:
+/// a Huffman tree built from a heap, lengths past the limit moved down.
 fn buildLengths(freq: int[], n: int, limit: int): int[] {
     var lengths = [0] * n;
     // the symbols that occur, as leaves
@@ -1206,9 +1222,9 @@ fn siftDown(heap: int[], size: int, weight: int[], at: int): void {
     }
 }
 
-/// Lengths beyond the limit brought down: the counts per length adjusted as zlib's gen_bitlen
-/// does (an overflow of leaves moved to shorter lengths), then the lengths handed out in order
-/// of frequency.
+/// Brings lengths beyond the limit down: the counts per length are adjusted as zlib's
+/// gen_bitlen does (an overflow of leaves moved to shorter lengths), then the lengths are handed
+/// out in order of frequency.
 fn limitLengths(lengths: int[], freq: int[], n: int, limit: int): void {
     var blCount = [0] * (limit + 2);
     var overflow = 0;
@@ -1262,7 +1278,7 @@ fn limitLengths(lengths: int[], freq: int[], n: int, limit: int): void {
     }
 }
 
-/// The code lengths run-length coded with the symbols 16, 17 and 18 (§3.2.7).
+/// Run-length codes the code lengths with the symbols 16, 17 and 18 (§3.2.7).
 fn runLengthCode(all: int[], n: int, symbols: List<int>, extra: List<int>): void {
     var i = 0;
     while (i < n) {
@@ -1319,7 +1335,9 @@ fn runLengthCode(all: int[], n: int, symbols: List<int>, extra: List<int>): void
 // zlib (RFC 1950).
 // ---------------------------------------------------------------------------------------------
 
-/// A zlib stream read: the two header bytes, the deflate blocks, the Adler-32 checked at the end.
+/// A `Reader` that decompresses a zlib stream: the two header bytes, the deflate blocks, the
+/// Adler-32 checked at the end. A header that names another method, a window beyond 32 KiB or a
+/// preset dictionary, and a checksum that does not match, are `IoError { kind = .InvalidData }`.
 pub class ZlibReader<R :: [Reader]> :: [Reader] {
     var inflate: DeflateReader<R>,
     var headerRead: bool,
@@ -1373,7 +1391,8 @@ pub class ZlibReader<R :: [Reader]> :: [Reader] {
     }
 }
 
-/// A zlib stream written: the header, the deflate blocks, the Adler-32 at `close`.
+/// A `Writer` that compresses into a zlib stream: the header, the deflate blocks, the Adler-32 at
+/// `close`.
 pub class ZlibWriter<W :: [Writer]> :: [Writer, Closeable] {
     var deflate: DeflateWriter<W>,
     var level: int,
@@ -1436,8 +1455,10 @@ pub class ZlibWriter<W :: [Writer]> :: [Writer, Closeable] {
 // gzip (RFC 1952).
 // ---------------------------------------------------------------------------------------------
 
-/// A gzip file read: the header (its extra field, name, comment and header CRC skipped), the
-/// deflate blocks, the CRC-32 and the size checked at the end; members in a row read as one.
+/// A `Reader` that decompresses a gzip file: the header (its extra field, name, comment and header
+/// CRC skipped), the deflate blocks, the CRC-32 and the size checked at the end; members in a row
+/// read as one. Input that is not gzip, or whose CRC-32 or size does not match, is
+/// `IoError { kind = .InvalidData }`.
 pub class GzipReader<R :: [Reader]> :: [Reader] {
     var inflate: DeflateReader<R>,
     var headerRead: bool,
@@ -1449,7 +1470,8 @@ pub class GzipReader<R :: [Reader]> :: [Reader] {
         return GzipReader<R> { inflate = DeflateReader<R>.new(inner), headerRead = false, crc = 0u32, size = 0, ended = false };
     }
 
-    /// The header; `false` where the stream has ended cleanly before one (a member boundary).
+    /// Reads a member's header; returns `false` where the stream has ended cleanly before one (at
+    /// a member boundary).
     mut fn readHeader(first: bool): bool throws [IoError, Cancelled] {
         let head: uint8[] = [0u8] * 10;
         var at = 0;
@@ -1558,7 +1580,8 @@ pub class GzipReader<R :: [Reader]> :: [Reader] {
     }
 }
 
-/// A gzip file written: the header, the deflate blocks, the CRC-32 and the size at `close`.
+/// A `Writer` that compresses into a gzip file: the header, the deflate blocks, the CRC-32 and the
+/// size at `close`.
 pub class GzipWriter<W :: [Writer]> :: [Writer, Closeable] {
     var deflate: DeflateWriter<W>,
     var level: int,
@@ -1572,7 +1595,7 @@ pub class GzipWriter<W :: [Writer]> :: [Writer, Closeable] {
         return GzipWriter<W> { deflate = d, level = if (level < 0) 6 else level, headerWritten = false, crc = 0u32, size = 0, closed = false };
     }
 
-    /// The bytes taken so far.
+    /// Returns the number of bytes taken so far.
     pub fn bytesIn(): int {
         return this.size;
     }
@@ -1641,6 +1664,11 @@ fn readAllOf<R :: [Reader]>(r: R): uint8[] throws [IoError, Cancelled] {
 
 /// The gzip format over bytes in memory.
 pub struct Gzip {
+    /// Compresses `bytes` into a gzip file at `level` (0 to 9, -1 for the default 6).
+    ///
+    /// # Errors
+    ///
+    /// Throws `CompressError` for a level outside -1 to 9.
     pub static fn compress(bytes: Slice<uint8>, level: int = 6): uint8[] throws CompressError {
         let out = ByteBuffer.new();
         var w = try GzipWriter<ByteBuffer>.new(out, level);
@@ -1649,8 +1677,12 @@ pub struct Gzip {
         return out.toArray();
     }
 
-    /// The bytes of the gzip data; what is not gzip, or whose CRC-32 or size does not hold, is
-    /// `IoError { kind = .InvalidData }` with a `CompressError` inside.
+    /// Decompresses gzip data; members in a row are returned as one.
+    ///
+    /// # Errors
+    ///
+    /// Throws `IoError { kind = .InvalidData }` with a `CompressError` inside for data that is
+    /// not gzip, or whose CRC-32 or size does not match.
     pub static fn decompress(bytes: Slice<uint8>): uint8[] throws IoError {
         let src = ByteBuffer.new();
         try! src.write(bytes);
@@ -1661,6 +1693,11 @@ pub struct Gzip {
 
 /// The zlib format over bytes in memory.
 pub struct Zlib {
+    /// Compresses `bytes` into a zlib stream at `level` (0 to 9, -1 for the default 6).
+    ///
+    /// # Errors
+    ///
+    /// Throws `CompressError` for a level outside -1 to 9.
     pub static fn compress(bytes: Slice<uint8>, level: int = 6): uint8[] throws CompressError {
         let out = ByteBuffer.new();
         var w = try ZlibWriter<ByteBuffer>.new(out, level);
@@ -1669,6 +1706,12 @@ pub struct Zlib {
         return out.toArray();
     }
 
+    /// Decompresses a zlib stream.
+    ///
+    /// # Errors
+    ///
+    /// Throws `IoError { kind = .InvalidData }` with a `CompressError` inside for data that is
+    /// not zlib, or whose Adler-32 does not match.
     pub static fn decompress(bytes: Slice<uint8>): uint8[] throws IoError {
         let src = ByteBuffer.new();
         try! src.write(bytes);
@@ -1679,6 +1722,11 @@ pub struct Zlib {
 
 /// Raw DEFLATE over bytes in memory.
 pub struct Deflate {
+    /// Compresses `bytes` into raw DEFLATE at `level` (0 to 9, -1 for the default 6).
+    ///
+    /// # Errors
+    ///
+    /// Throws `CompressError` for a level outside -1 to 9.
     pub static fn compress(bytes: Slice<uint8>, level: int = 6): uint8[] throws CompressError {
         let out = ByteBuffer.new();
         var w = try DeflateWriter<ByteBuffer>.new(out, level);
@@ -1687,6 +1735,12 @@ pub struct Deflate {
         return out.toArray();
     }
 
+    /// Decompresses raw DEFLATE.
+    ///
+    /// # Errors
+    ///
+    /// Throws `IoError { kind = .InvalidData }` with a `CompressError` inside for data that is
+    /// not valid DEFLATE.
     pub static fn decompress(bytes: Slice<uint8>): uint8[] throws IoError {
         let src = ByteBuffer.new();
         try! src.write(bytes);
@@ -1695,7 +1749,8 @@ pub struct Deflate {
     }
 }
 
-/// A reading over memory cannot be cancelled: the `Cancelled` of the signature is impossible here.
+/// Runs a read over memory, which cannot be cancelled: the `Cancelled` of the signature cannot
+/// occur here.
 fn unCancelled(body: fn() -> uint8[] throws [IoError, Cancelled]): uint8[] throws IoError {
     try {
         return body();

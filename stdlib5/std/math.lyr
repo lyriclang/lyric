@@ -78,8 +78,8 @@ pub fn lerp<T :: [Float]>(a: T, b: T, t: T): T {
     return b - (b - a) * (T.one - t);
 }
 
-// The elementary functions (Z2): computed in `float` by C's libm, a `float32` rounded once, at
-// the end. (The transcendental ones have no answer at compile time yet: 09 D7.)
+// The elementary functions: computed in `float` by C's libm, a `float32` rounded once, at the
+// end.
 /// Returns the greatest integral value not above `x`.
 pub fn floor<T :: [Float]>(x: T): T {
     return asTypeOf(libmFloor(asTypeOf(x, 0.0)), x);
@@ -224,9 +224,9 @@ pub fn signum<T :: [Signed]>(x: T): T {
     return T.zero;
 }
 
-// libm's functions, in double (11 W4).
+// libm's functions, in double.
 // The ones every libm computes exactly stay the system's; the rest are musl's, carried by the
-// runtime under its prefix (runtime/third_party/musl-math; 09 D7, M10 S12), so a program
+// runtime under its prefix (runtime/third_party/musl-math), so a program
 // computes the same bits on every tier-1 target and `comptime` the same bits as the program.
 extern "C" fn libmFloor(x: float): float = "floor";
 extern "C" fn libmCeil(x: float): float = "ceil";
