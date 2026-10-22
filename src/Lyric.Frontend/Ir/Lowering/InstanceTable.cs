@@ -20,13 +20,20 @@ namespace Lyric.Ir.Lowering;
 /// <para>The price is code duplication per instantiation. It is visible and bounded: one instance per
 /// type tuple actually used, not per possible one.</para>
 /// </summary>
-internal sealed class InstanceTable
+internal sealed partial class InstanceTable
 {
     /// <summary>A requested instance that has not been lowered yet.</summary>
     private readonly record struct Pending(
         FunctionDecl Decl, string Name, FunctionId Id, TypeSymbol? Receiver,
         IReadOnlyDictionary<GenericParamSymbol, LyrType> Substitution,
-        GenericInstance? Owner = null, LyrType? ReceiverType = null);
+        GenericInstance? Owner = null, LyrType? ReceiverType = null)
+    {
+        /// <summary>The instance whose body asked for this one, -1 for a body that is no instance.</summary>
+        public int Parent { get; init; } = -1;
+
+        /// <summary>How many instances stand between this one and a body that is no instance.</summary>
+        public int Depth { get; init; }
+    }
 
     private readonly List<Pending> _pending = new();
 
@@ -43,6 +50,15 @@ internal sealed class InstanceTable
     /// with a name in it instead of a process to kill.</para>
     /// </summary>
     private const int MaxInstances = 20_000;
+
+    /// <summary>How deep one chain of instances may nest — an instance's body asking for the next —
+    /// before the lowering calls it a runaway, as Rust's <c>recursion_limit</c>. <c>grow&lt;T&gt;</c>
+    /// calling <c>grow&lt;W&lt;T&gt;&gt;</c> reaches it after 128 instances; under the cap on the
+    /// count it ran for hours, every name longer than the one before.</summary>
+    private const int MaxDepth = 128;
+
+    /// <summary>The instance whose body is being lowered, -1 outside one.</summary>
+    private int _current = -1;
 
     /// <summary>What has already been requested, so two calls of <c>id(7)</c> get the same instance
     /// rather than producing two identical functions.</summary>
@@ -278,7 +294,7 @@ internal sealed class InstanceTable
 
         var id = _ids.Next();
         _byKey[name] = (id, decl);
-        _pending.Add(new Pending(decl, name, id, receiver, substitution, owner, receiverType));
+        Add(new Pending(decl, name, id, receiver, substitution, owner, receiverType));
         return id;
     }
 
@@ -286,6 +302,20 @@ internal sealed class InstanceTable
     /// asked for when it gave up — that name is the shape of the recursion.</summary>
     private void Guard(string name, Core.Span span)
     {
+        if (_current >= 0 && _pending[_current].Depth + 1 > MaxDepth)
+        {
+            var chain = new List<string> { name };
+            for (var at = _current; at >= 0; at = _pending[at].Parent) chain.Add(_pending[at].Name);
+            chain.Reverse();
+            var shown = chain.Count <= 5
+                ? chain.Select(Shorten)
+                : [.. chain.Take(3).Select(Shorten), $"… {chain.Count - 4} more …", Shorten(chain[^1])];
+            throw new UnsupportedConstructException(LoweringDiagnostics.Unending,
+                $"the instantiation does not end: a chain of {MaxDepth} instances, each body asking for the next — "
+                + string.Join(" → ", shown)
+                + ". A function that calls itself with a type built from its own asks for a new instance at every "
+                + "level; give the recursion a type that stays the same", span);
+        }
         if (_pending.Count < MaxInstances) return;
 
         throw new UnsupportedConstructException(LoweringDiagnostics.Unending,
@@ -294,6 +324,25 @@ internal sealed class InstanceTable
             + "type demands an instance for the next one, and so on without end — write it as a "
             + "free function, which is instantiated per use rather than per instance", span);
     }
+
+    /// <summary>An instance's name as a chain shows it: without the modules, as the source names it,
+    /// and of a long one the start and the end.</summary>
+    private static string Shorten(string name)
+    {
+        var bare = ModulePrefix().Replace(name, "");
+        return bare.Length <= 60 ? bare : $"{bare[..36]}…{bare[^20..]}";
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?<![\w>\]])(?:[a-z_][A-Za-z0-9_]*\.)+")]
+    private static partial System.Text.RegularExpressions.Regex ModulePrefix();
+
+    /// <summary>A request, chained to the instance whose body asks for it.</summary>
+    private void Add(Pending request) =>
+        _pending.Add(request with
+        {
+            Parent = _current,
+            Depth = _current >= 0 ? _pending[_current].Depth + 1 : 0,
+        });
 
     /// <summary>
     /// Requests a METHOD OF A TYPE INSTANCE: <c>Box&lt;int&gt;.get</c>.
@@ -322,7 +371,7 @@ internal sealed class InstanceTable
         // 'this' is the receiver: the instance for a named target, the shape itself for a
         // built-in constructor (03 T7 X2), where no symbol stands — and whatever a blanket block
         // (04 D15) is reached on, an instance included, which no target symbol names.
-        _pending.Add(new Pending(decl, name, id, method.IsStatic ? null : block.Target,
+        Add(new Pending(decl, name, id, method.IsStatic ? null : block.Target,
             substitution, receiver as GenericInstance,
             method.IsStatic || (receiver is GenericInstance && block.Target is not null) ? null : receiver));
         return id;
@@ -357,7 +406,7 @@ internal sealed class InstanceTable
         for (var i = 0; i < own.Count; i++) substitution[method.Generics[i]] = own[i];
         var id = _ids.Next();
         _byKey[name] = (id, decl);
-        _pending.Add(new Pending(decl, name, id, null, substitution, null, conformer));
+        Add(new Pending(decl, name, id, null, substitution, null, conformer));
         return id;
     }
 
@@ -382,7 +431,7 @@ internal sealed class InstanceTable
         _byKey[name] = (id, decl);
         // A STATIC method gets no 'this'. 'Owner' stays set all the same: its 'T' is that of the type,
         // even when no receiver brings it along.
-        _pending.Add(new Pending(decl, name, id, method.IsStatic ? null : owner.Definition,
+        Add(new Pending(decl, name, id, method.IsStatic ? null : owner.Definition,
             substitution, owner));
         return id;
     }
@@ -400,6 +449,7 @@ internal sealed class InstanceTable
 
         for (; _lowered < _pending.Count; _lowered++)
         {
+            _current = _lowered;
             var p = _pending[_lowered];
             // A default set in place for its conformer (09 A5, A7; M9a S9): that body, checked as
             // the conformer's — a generic conformer's parameters bound by the instance.
@@ -431,6 +481,7 @@ internal sealed class InstanceTable
             lowered.Add((p.Id, new FunctionLowerer(p.Decl, p.Name, types, functions, imports, typeTable,
                 p.Substitution, globals, lambdas, this, p.Receiver, p.Owner, receiverType: p.ReceiverType).Run()));
         }
+        _current = -1;
 
         return lowered;
     }

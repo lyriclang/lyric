@@ -9762,15 +9762,15 @@ fn main(): void {
 title = "the monomorphization does not terminate"
 severity = "error"
 area = "03-types"
-summary = "The set of generic instances a program asks for is not finite: each instance asks for a further one, typically a method whose result type is built from its own element type (`Wrap<T>.deeper(): Wrap<Wrap<T>>` called on its own result)."
+summary = "The set of generic instances a program asks for is not finite: each instance asks for a further one — a function that calls itself with a type built from its own (`grow(W<T> { v = x })`), a method whose result type is built from its own element type (`Wrap<T>.deeper(): Wrap<Wrap<T>>` called on its own result). Refused at a chain 128 deep, or past 20 000 instances."
 explanation = '''
-Lyric compiles generic code by monomorphization: one copy per set of type arguments. That ends only when the program asks for finitely many instances. A method of a generic type that returns an instance built from its own element type, and is called on what it returns, asks for a new instance in every round.
+Lyric compiles generic code by monomorphization: one copy per set of type arguments. That ends only when the program asks for finitely many instances. A function that calls itself with a type built from its own — `grow<T>` calling `grow<W<T>>` — asks for a new instance at every level, whatever the values decide at run time; so does a method of a generic type that returns an instance built from its own element type and is called on what it returns.
 
-Write such a function as a free generic function, which is instantiated per use rather than per instance.
+The compiler follows each chain of instances, a body asking for the next, to a depth of 128, and a program to 20 000 instances; past either it stops with this error, the chain's first and last links in the message. Give the recursion a type that stays the same — `grow(x, n - 1)`, or a box of one type — or write the method as a free generic function, which is instantiated per use rather than per instance.
 '''
 example = '''
 $ lyric build
-error[LYR-SEM0197]: the monomorphization does not terminate: 20000 instances and still asking for 'Wrap<Wrap<Wrap<…>>>.deeper'. A method whose result type is built from its own element type demands an instance for the next one, and so on without end — write it as a free function, which is instantiated per use rather than per instance
+error[LYR-SEM0197]: the instantiation does not end: a chain of 128 instances, each body asking for the next — grow<int> → grow<W<int>> → grow<W<W<int>>> → … 126 more … → grow<W<W<W<W<W<W<W<W<W<W<W<W<W<W<W<W…>>>>>>>>>>>>>>>>>>>>. A function that calls itself with a type built from its own asks for a new instance at every level; give the recursion a type that stays the same
 '''
 
 [LYR-SEM0198]
