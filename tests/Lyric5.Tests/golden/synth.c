@@ -250,6 +250,12 @@ _Static_assert(sizeof(lyr_box_ty_std_core_Ordering) == 16, "layout of lyr_box_ty
 _Static_assert(offsetof(lyr_box_ty_std_core_Ordering, value) == 8, "layout of lyr_box_ty_std_core_Ordering");
 extern const LyrItable lyr_itab_ty_std_core_Ordering[];
 const LyrDesc lyr_desc_box_ty_std_core_Ordering = { sizeof(lyr_box_ty_std_core_Ordering), 0, 0, 0, NULL, "box<std.core.Ordering>", lyr_itab_ty_std_core_Ordering };
+typedef struct { LyrObj header; lyr_ty_app_main_Pair_string__80f539ca value; } lyr_box_ty_app_main_Pair_string__80f539ca;
+_Static_assert(sizeof(lyr_box_ty_app_main_Pair_string__80f539ca) == 24, "layout of lyr_box_ty_app_main_Pair_string__80f539ca");
+_Static_assert(offsetof(lyr_box_ty_app_main_Pair_string__80f539ca, value) == 8, "layout of lyr_box_ty_app_main_Pair_string__80f539ca");
+extern const LyrItable lyr_itab_ty_app_main_Pair_string__80f539ca[];
+static const uint64_t lyr_refmap_box44[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_box_ty_app_main_Pair_string__80f539ca = { sizeof(lyr_box_ty_app_main_Pair_string__80f539ca), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box44, "box<app.main.Pair<string>>", lyr_itab_ty_app_main_Pair_string__80f539ca };
 typedef struct { LyrObj header; lyr_ty_app_main_E value; } lyr_box_ty_app_main_E;
 _Static_assert(sizeof(lyr_box_ty_app_main_E) == 24, "layout of lyr_box_ty_app_main_E");
 _Static_assert(offsetof(lyr_box_ty_app_main_E, value) == 8, "layout of lyr_box_ty_app_main_E");
@@ -271,12 +277,22 @@ _Static_assert(sizeof(lyr_box_ty_app_main_Inner) == 16, "layout of lyr_box_ty_ap
 _Static_assert(offsetof(lyr_box_ty_app_main_Inner, value) == 8, "layout of lyr_box_ty_app_main_Inner");
 extern const LyrItable lyr_itab_ty_app_main_Inner[];
 const LyrDesc lyr_desc_box_ty_app_main_Inner = { sizeof(lyr_box_ty_app_main_Inner), 0, 0, 0, NULL, "box<app.main.Inner>", lyr_itab_ty_app_main_Inner };
+typedef struct { LyrObj header; lyr_ty_app_main_Opt_int__52a0a7e1 value; } lyr_box_ty_app_main_Opt_int__52a0a7e1;
+_Static_assert(sizeof(lyr_box_ty_app_main_Opt_int__52a0a7e1) == 24, "layout of lyr_box_ty_app_main_Opt_int__52a0a7e1");
+_Static_assert(offsetof(lyr_box_ty_app_main_Opt_int__52a0a7e1, value) == 8, "layout of lyr_box_ty_app_main_Opt_int__52a0a7e1");
+extern const LyrItable lyr_itab_ty_app_main_Opt_int__52a0a7e1[];
+const LyrDesc lyr_desc_box_ty_app_main_Opt_int__52a0a7e1 = { sizeof(lyr_box_ty_app_main_Opt_int__52a0a7e1), 0, 0, 0, NULL, "box<app.main.Opt<int>>", lyr_itab_ty_app_main_Opt_int__52a0a7e1 };
 typedef struct { LyrObj header; lyr_ty_app_main_D value; } lyr_box_ty_app_main_D;
 _Static_assert(sizeof(lyr_box_ty_app_main_D) == 24, "layout of lyr_box_ty_app_main_D");
 _Static_assert(offsetof(lyr_box_ty_app_main_D, value) == 8, "layout of lyr_box_ty_app_main_D");
 extern const LyrItable lyr_itab_ty_app_main_D[];
 static const uint64_t lyr_refmap_box61[] = { UINT64_C(0x4) };
 const LyrDesc lyr_desc_box_ty_app_main_D = { sizeof(lyr_box_ty_app_main_D), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box61, "box<app.main.D>", lyr_itab_ty_app_main_D };
+typedef struct { LyrObj header; lyr_ty_app_main_Box_int__d6d5d265 value; } lyr_box_ty_app_main_Box_int__d6d5d265;
+_Static_assert(sizeof(lyr_box_ty_app_main_Box_int__d6d5d265) == 16, "layout of lyr_box_ty_app_main_Box_int__d6d5d265");
+_Static_assert(offsetof(lyr_box_ty_app_main_Box_int__d6d5d265, value) == 8, "layout of lyr_box_ty_app_main_Box_int__d6d5d265");
+extern const LyrItable lyr_itab_ty_app_main_Box_int__d6d5d265[];
+const LyrDesc lyr_desc_box_ty_app_main_Box_int__d6d5d265 = { sizeof(lyr_box_ty_app_main_Box_int__d6d5d265), 0, 0, 0, NULL, "box<app.main.Box<int>>", lyr_itab_ty_app_main_Box_int__d6d5d265 };
 typedef struct { LyrObj header; lyr_ty_app_main_Mat value; } lyr_box_ty_app_main_Mat;
 _Static_assert(sizeof(lyr_box_ty_app_main_Mat) == 40, "layout of lyr_box_ty_app_main_Mat");
 _Static_assert(offsetof(lyr_box_ty_app_main_Mat, value) == 8, "layout of lyr_box_ty_app_main_Mat");
@@ -500,6 +516,8 @@ static LyrStr * lyr_vt_14_std_core_Debug_10_app_main_P_s0(LyrIface self) { retur
 const lyr_vt_ty_std_core_Debug lyr_vt_14_std_core_Debug_10_app_main_P = { &lyr_desc_box_ty_app_main_P, lyr_vt_14_std_core_Debug_10_app_main_P_s0, lyr_std_core_Debug_debugTo };
 static LyrStr * lyr_vt_14_std_core_Debug_17_std_core_Ordering_s0(LyrIface self) { return lyr_std_core__extend__Ordering_debug_17cf0d20(&((lyr_box_ty_std_core_Ordering *)self.data)->value); }
 const lyr_vt_ty_std_core_Debug lyr_vt_14_std_core_Debug_17_std_core_Ordering = { &lyr_desc_box_ty_std_core_Ordering, lyr_vt_14_std_core_Debug_17_std_core_Ordering_s0, lyr_std_core_Debug_debugTo };
+static LyrStr * lyr_vt_14_std_core_Debug_30_app_main_Pair_string__80f539ca_s0(LyrIface self) { return lyr_app_main__extend__app_main_Pair_string__debug_cab6aa77(&((lyr_box_ty_app_main_Pair_string__80f539ca *)self.data)->value); }
+const lyr_vt_ty_std_core_Debug lyr_vt_14_std_core_Debug_30_app_main_Pair_string__80f539ca = { &lyr_desc_box_ty_app_main_Pair_string__80f539ca, lyr_vt_14_std_core_Debug_30_app_main_Pair_string__80f539ca_s0, lyr_std_core_Debug_debugTo };
 static LyrStr * lyr_vt_14_std_core_Debug_10_app_main_E_s0(LyrIface self) { return lyr_app_main__extend__E_debug_2276fd99(&((lyr_box_ty_app_main_E *)self.data)->value); }
 const lyr_vt_ty_std_core_Debug lyr_vt_14_std_core_Debug_10_app_main_E = { &lyr_desc_box_ty_app_main_E, lyr_vt_14_std_core_Debug_10_app_main_E_s0, lyr_std_core_Debug_debugTo };
 static LyrStr * lyr_vt_14_std_core_Debug_10_app_main_C_s0(LyrIface self) { return lyr_app_main__extend__C_debug_c5948287((lyr_ty_app_main_C *)self.data); }
@@ -510,8 +528,12 @@ static LyrStr * lyr_vt_14_std_core_Debug_14_app_main_Outer_s0(LyrIface self) { r
 const lyr_vt_ty_std_core_Debug lyr_vt_14_std_core_Debug_14_app_main_Outer = { &lyr_desc_box_ty_app_main_Outer, lyr_vt_14_std_core_Debug_14_app_main_Outer_s0, lyr_std_core_Debug_debugTo };
 static LyrStr * lyr_vt_14_std_core_Debug_14_app_main_Inner_s0(LyrIface self) { return lyr_app_main__extend__Inner_debug_73e9e85e(&((lyr_box_ty_app_main_Inner *)self.data)->value); }
 const lyr_vt_ty_std_core_Debug lyr_vt_14_std_core_Debug_14_app_main_Inner = { &lyr_desc_box_ty_app_main_Inner, lyr_vt_14_std_core_Debug_14_app_main_Inner_s0, lyr_std_core_Debug_debugTo };
+static LyrStr * lyr_vt_14_std_core_Debug_26_app_main_Opt_int__52a0a7e1_s0(LyrIface self) { return lyr_app_main__extend__app_main_Opt_int__debug_f7ecb9b4(&((lyr_box_ty_app_main_Opt_int__52a0a7e1 *)self.data)->value); }
+const lyr_vt_ty_std_core_Debug lyr_vt_14_std_core_Debug_26_app_main_Opt_int__52a0a7e1 = { &lyr_desc_box_ty_app_main_Opt_int__52a0a7e1, lyr_vt_14_std_core_Debug_26_app_main_Opt_int__52a0a7e1_s0, lyr_std_core_Debug_debugTo };
 static LyrStr * lyr_vt_14_std_core_Debug_10_app_main_D_s0(LyrIface self) { return lyr_app_main__extend__D_debug_31b741e2(&((lyr_box_ty_app_main_D *)self.data)->value); }
 const lyr_vt_ty_std_core_Debug lyr_vt_14_std_core_Debug_10_app_main_D = { &lyr_desc_box_ty_app_main_D, lyr_vt_14_std_core_Debug_10_app_main_D_s0, lyr_std_core_Debug_debugTo };
+static LyrStr * lyr_vt_14_std_core_Debug_26_app_main_Box_int__d6d5d265_s0(LyrIface self) { return lyr_app_main__extend__app_main_Box_int__debug_5c838a08(&((lyr_box_ty_app_main_Box_int__d6d5d265 *)self.data)->value); }
+const lyr_vt_ty_std_core_Debug lyr_vt_14_std_core_Debug_26_app_main_Box_int__d6d5d265 = { &lyr_desc_box_ty_app_main_Box_int__d6d5d265, lyr_vt_14_std_core_Debug_26_app_main_Box_int__d6d5d265_s0, lyr_std_core_Debug_debugTo };
 static LyrStr * lyr_vt_14_std_core_Debug_12_app_main_Mat_s0(LyrIface self) { return lyr_app_main__extend__Mat_debug_988f0238(&((lyr_box_ty_app_main_Mat *)self.data)->value); }
 const lyr_vt_ty_std_core_Debug lyr_vt_14_std_core_Debug_12_app_main_Mat = { &lyr_desc_box_ty_app_main_Mat, lyr_vt_14_std_core_Debug_12_app_main_Mat_s0, lyr_std_core_Debug_debugTo };
 static LyrStr * lyr_vt_14_std_core_Debug_12_app_main_Buf_s0(LyrIface self) { return lyr_app_main__extend__Buf_debug_ec53ffa7(&((lyr_box_ty_app_main_Buf *)self.data)->value); }
@@ -522,12 +544,15 @@ static LyrStr * lyr_vt_14_std_core_Debug_13_app_main_Legs_s0(LyrIface self) { re
 const lyr_vt_ty_std_core_Debug lyr_vt_14_std_core_Debug_13_app_main_Legs = { &lyr_desc_box_ty_app_main_Legs, lyr_vt_14_std_core_Debug_13_app_main_Legs_s0, lyr_std_core_Debug_debugTo };
 const LyrItable lyr_itab_ty_app_main_P[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_10_app_main_P } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_std_core_Ordering[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_17_std_core_Ordering } , { NULL, NULL } };
+const LyrItable lyr_itab_ty_app_main_Pair_string__80f539ca[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_30_app_main_Pair_string__80f539ca } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_app_main_E[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_10_app_main_E } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_app_main_C[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_10_app_main_C } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_app_main_Color[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_14_app_main_Color } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_app_main_Outer[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_14_app_main_Outer } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_app_main_Inner[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_14_app_main_Inner } , { NULL, NULL } };
+const LyrItable lyr_itab_ty_app_main_Opt_int__52a0a7e1[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_26_app_main_Opt_int__52a0a7e1 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_app_main_D[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_10_app_main_D } , { NULL, NULL } };
+const LyrItable lyr_itab_ty_app_main_Box_int__d6d5d265[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_26_app_main_Box_int__d6d5d265 } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_app_main_Mat[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_12_app_main_Mat } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_app_main_Buf[] = { { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_12_app_main_Buf } , { NULL, NULL } };
 const LyrItable lyr_itab_ty_app_main_Legs[] = { { lyr_ifid_ty_app_main_Walker, &lyr_vt_15_app_main_Walker_13_app_main_Legs }, { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_13_app_main_Legs } , { NULL, NULL } };

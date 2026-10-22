@@ -510,6 +510,7 @@ public static class ModuleLowerer
             {
                 var typesBefore = typeTable.Interned.Count();
                 var liftedBefore = typeTable.Lifted.Count;
+                var askedBefore = typeTable.Asked.Count;
 
                 impls = BuildImpls(typeTable, binding, compilation, ids, extensions, instances, types,
                     lambdas, de, ref failed);
@@ -525,7 +526,8 @@ public static class ModuleLowerer
 
                 // a value made into an interface by what this pass lowered may need a row the
                 // pass did not build
-                settled = typeTable.Interned.Count() == typesBefore && typeTable.Lifted.Count == liftedBefore;
+                settled = typeTable.Interned.Count() == typesBefore && typeTable.Lifted.Count == liftedBefore
+                          && typeTable.Asked.Count == askedBefore;
             }
 
             // Still growing when the passes ran out: the set of instantiations this program asks
@@ -1202,7 +1204,7 @@ public static class ModuleLowerer
                 {
                     // A blanket conformance (05 §13 rule 8): the row the block gives the type.
                     LyrType reached = ofInstance is not null ? ofInstance : new NamedRef(type);
-                    if (LiftedInto(typeTable, typeId, iface, interfaces, binding)
+                    if (typeTable.RowWanted(typeId, ifaceId, held => LiftedInto(typeTable, held, iface, interfaces, binding))
                         && types.BlanketConformanceOf(reached, iface) is { } blanket)
                     {
                         if (BlanketRow(blanket, reached, iface, typeTable.MethodSlotsOf(ifaceId), types, binding, ids, instances) is { } row)
@@ -1326,7 +1328,16 @@ public static class ModuleLowerer
                 var reaches = ReferenceEquals(iface, any) || onBuiltin.Any(b => b.Decl.Interfaces.Any(node =>
                     Conformance.InterfaceOf(node, binding) is { } named
                     && Conformance.WithParents(named, binding).Any(p => ReferenceEquals(p, iface))));
-                if (!reaches) continue;
+                if (!reaches)
+                {
+                    // a blanket conformance (05 §13 rule 8), where a value of the built-in is made
+                    // into the interface or a type test asks about it
+                    if (typeTable.RowWanted(boxId, ifaceId, held => LiftedInto(typeTable, held, iface, interfaces, binding))
+                        && types.BlanketConformanceOfBuiltin(builtin, iface) is { } blanketOf
+                        && BlanketRow(blanketOf.Block, blanketOf.Instance, iface, typeTable.MethodSlotsOf(ifaceId), types, binding, ids, instances) is { } row)
+                        impls.Add(new IrImpl(boxId, ifaceId, row));
+                    continue;
+                }
                 var slots = typeTable.MethodSlotsOf(ifaceId);
                 var methods = new FunctionId[slots.Length];
                 var complete = true;
@@ -1353,20 +1364,26 @@ public static class ModuleLowerer
         // A tuple is a struct of the table's already, and its row stands on that type.
         // Only where a shape's value was made into an interface: lowering a shape interns what it
         // holds, and a conformance no value goes through has no business in the module.
-        var shapeLifts = typeTable.Lifted
+        var shapeHeld = typeTable.Lifted
             .Where(l => typeTable.ShapeBoxes.Any(b => b.Id == l.Concrete) || typeTable.Defs[l.Concrete.Value].Name == "<tuple>")
+            .ToList();
+        var shapeLifts = shapeHeld
             .Select(l => interfaces.FirstOrDefault(i => i.Id == l.Iface).Symbol)
             .OfType<TypeSymbol>()
             .ToList();
-        foreach (var (shape, iface, block) in shapeLifts.Count == 0 ? [] : types.ShapeConformances.ToList())
+        // and the interfaces a type test asks about, where a shape's value is in one at all
+        var asked = interfaces.Where(i => typeTable.Asked.Contains(i.Id)).Select(i => i.Symbol).ToList();
+        foreach (var (shape, iface, block) in shapeHeld.Count == 0 ? [] : types.ShapeConformances.ToList())
         {
-            if (!shapeLifts.Any(into => Conformance.WithParents(into, binding).Any(p => ReferenceEquals(p, iface)))) continue;
+            if (!shapeLifts.Any(into => Conformance.WithParents(into, binding).Any(p => ReferenceEquals(p, iface)))
+                && !asked.Any(a => ReferenceEquals(a, iface))) continue;
             var lowered = typeTable.LowerValue(shape, default);
             TypeId? holderId = lowered is IrStructType tuple ? tuple.Type
                 : typeTable.ShapeBoxes.Where(b => IrType.Equal(b.Payload, lowered)).Select(b => (TypeId?)b.Id).FirstOrDefault();
-            if (holderId is not { } boxId || !LiftedInto(typeTable, boxId, iface, interfaces, binding)) continue;
+            if (holderId is not { } boxId) continue;
                 foreach (var (_, ifaceId) in interfaces.Where(i => ReferenceEquals(i.Symbol, iface)))
                 {
+                    if (!typeTable.RowWanted(boxId, ifaceId, held => LiftedInto(typeTable, held, iface, interfaces, binding))) continue;
                     if (impls.Any(r => r.Type == boxId && r.Interface == ifaceId)) continue;
                     if (BlanketRow(block, shape, iface, typeTable.MethodSlotsOf(ifaceId), types, binding, ids, instances) is { } row)
                         impls.Add(new IrImpl(boxId, ifaceId, row));
