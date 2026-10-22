@@ -1764,6 +1764,16 @@ public sealed class TypeChecker
 
     private enum Provenance { Own, Inherent, Block, Default, Delegated, Blanket }
 
+    /// <summary>Do two functions of one name take a number of arguments in common — a call could
+    /// not tell them apart (08 §1.2 rule 2)?</summary>
+    private static bool CountsOverlap(Symbol a, Symbol b)
+    {
+        if (a is not FunctionSymbol f || b is not FunctionSymbol g) return true;
+        var (aMin, aMax) = ArityOf(f);
+        var (bMin, bMax) = ArityOf(g);
+        return aMin <= bMax && bMin <= aMax;
+    }
+
     private void CheckMethodSet(TypeSymbol ts)
     {
         var entries = new List<(string Name, Provenance Kind, Symbol Symbol, Span Span, string Where)>();
@@ -1843,25 +1853,34 @@ public sealed class TypeChecker
             {
                 foreach (var other in inherent.Concat(blocks))
                 {
+                    // The type's members are one scope with its inherent blocks' (08 §1.2 rule 1):
+                    // a count none of its own takes is an overload beside them.
+                    if (other.Kind == Provenance.Inherent && !owns.Any(own => CountsOverlap(own.Symbol, other.Symbol)))
+                        continue;
                     if (other.Kind == Provenance.Block && blockOf.TryGetValue(other.Symbol, out var block)
                         && block.Decl.Interfaces.Any(n => ResolveType(n, DeclarationScope(ts)) is GenericInstance { Definition: var heterogeneous }
                             && heterogeneous.Members.LookupLocal(name) is FunctionSymbol))
                         continue;
                     _de.Report("LYR-SEM0121", Severity.Error, other.Span,
-                        $"'{name}' is a member of '{ts.Name}' already, and a type holds one function of a name — "
+                        $"'{name}' is a member of '{ts.Name}' already"
+                        + (other.Kind == Provenance.Inherent
+                            ? " at this count, and a type holds one function of a name and a count — "
+                            : ", and a type holds one function of a name — ")
                         + (other.Kind == Provenance.Block
                             ? $"'{ts.Name}.{name}' implements it for every conformance; drop this one"
                             : "rename the extension, or make it the member"),
-                        new DiagnosticNote(owns[0].Span, $"'{name}' is declared here"));
+                        new DiagnosticNote(owns.FirstOrDefault(own => CountsOverlap(own.Symbol, other.Symbol)) is { Symbol: not null } near
+                            ? near.Span : owns[0].Span, $"'{name}' is declared here"));
                 }
                 continue;
             }
 
             // Inherent extensions: one, and not beside a default or a conformance's implementation.
             for (var i = 1; i < inherent.Count; i++)
-                _de.Report("LYR-SEM0121", Severity.Error, inherent[i].Span,
-                    $"'{name}' is added to '{ts.Name}' twice — a type holds one function of a name",
-                    new DiagnosticNote(inherent[0].Span, "the other one is here"));
+                if (inherent.Take(i).FirstOrDefault(earlier => CountsOverlap(earlier.Symbol, inherent[i].Symbol)) is { Symbol: not null } clash)
+                    _de.Report("LYR-SEM0121", Severity.Error, inherent[i].Span,
+                        $"'{name}' is added to '{ts.Name}' twice at one count — a type holds one function of a name and a count",
+                        new DiagnosticNote(clash.Span, "the other one is here"));
             if (inherent.Count > 0)
             {
                 foreach (var block in blocks)

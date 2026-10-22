@@ -7096,9 +7096,9 @@ fn main(): void {
 title = "a second member of one name on a type"
 severity = "error"
 area = "05-interfaces"
-summary = "A type would hold two members of one name: an extension beside the type's own member, two extensions of one name, an extension beside a conformance's implementation or an interface default, two delegations or blanket blocks giving the name, or a static constant whose name the type already has."
+summary = "A type would hold two members of one name that a call could not tell apart: an extension beside the type's own member at a count it takes, two extensions of one name at one count, an extension beside a conformance's implementation or an interface default, two delegations or blanket blocks giving the name, or a static constant whose name the type already has."
 explanation = '''
-A type holds one member of a name: `T.name` and `x.name(…)` have one answer, and nothing ranks one source over another. An `extend` block adds a name the type does not have; it does not replace or overload one. The same holds for names that arrive through conformance blocks, interface defaults, delegations (`by field`) and blanket blocks.
+A type holds one member of a name and a count: `T.name` and `x.name(…)` have one answer, and nothing ranks one source over another. An `extend` block adds a name the type does not have, or the name at a count the type does not take — the body and the inherent blocks are one scope, overloaded by count as any scope is; it does not replace a member. The same holds for names that arrive through conformance blocks, interface defaults, delegations (`by field`) and blanket blocks.
 
 Rename the extension, or make it the member itself; where a conformance implements the name, drop the extension or make it the conformance's implementation.
 '''
