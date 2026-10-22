@@ -1,6 +1,10 @@
-/// What the language itself binds without an import (std.core, design/v5/spec/10 U-series; spec
-/// chapter 12): the core interfaces, the number tower, the iterator protocol and the members of the
-/// built-in types.
+/// The core of the standard library, bound in every module without an import.
+///
+/// It holds the preamble ([panic], [assert], [Error], [Result], [Box], the ranges, [arrayOf]),
+/// the attributes, the operator interfaces ([Equatable], [Ordered], [Hashable], [Index],
+/// [Display], [Debug], [Clone]), the number tower ([Num], [Integer], [Float]) with [Parse], the
+/// members of `string`, `char` and the arrays and views, the format language behind f-strings,
+/// and the iterator protocol ([Iterator], [Iterable]).
 //
 // In this order (M9a S11c): 0 the preamble - panic, assert, Error, Result, Box, the ranges, arrayOf;
 // 1 the attributes and the compiler's instructions; 2 the operator interfaces and the language's
@@ -12,51 +16,65 @@
 // 13 type information while compiling.
 
 
-/// Ends the process with a message and a backtrace, exit 101 (05 E8): `LYR-RT0008`. Its type is
-/// `never`, so a call stands wherever a value is wanted and ends the path it is on.
+/// Ends the process with a message and a backtrace.
+///
+/// The report is `LYR-RT0008` and the exit code 101. Its type is `never`, so a call stands
+/// wherever a value is wanted and ends the path it is on.
 pub fn panic(message: string): never;
 
-/// Ends the process unless `condition` holds (05 E8): `LYR-RT0011`, "assertion failed: " and
-/// the condition as it is written, then the message where one is given. The check stands at the
-/// call, set in place; the message is a lambda, `assert(n > 2) { f"n = {n}" }`, built only when
-/// the assertion fails (10 "Review 2026-10-12" D1; M9a S12b) - Kotlin's form.
+/// Ends the process unless `condition` holds.
+///
+/// The check is inlined at the call. The message is a lambda, `assert(n > 2) { f"n = {n}" }`,
+/// built only when the assertion fails.
+///
+/// # Panics
+/// When `condition` is false: `LYR-RT0011`, "assertion failed: " and the condition as it is
+/// written, then the message where one is given.
 pub inline fn assert(condition: bool, message: fn() -> string = () => "", @callerExpr(condition) written: string = ""): void {
     if (!condition) {
         assertFailed(written, message());
     }
 }
 
-/// The panic of a failed assertion (05 E8): `LYR-RT0011`, the word, the condition, the message.
+/// Ends the process for a failed assertion: `LYR-RT0011`, the condition as written, the message.
 fn assertFailed(written: string, message: string): never;
 
-/// A branch the program never takes (05 E8, E12): taking it ends the process, `LYR-RT0012`,
-/// "unreachable" and `message` behind it where one is given.
+/// Marks a branch the program never takes.
+///
+/// # Panics
+/// Always, when reached: `LYR-RT0012`, "unreachable" and `message` behind it where one is given.
 pub fn unreachable(message: string = ""): never;
 
-/// A place still to be written (10 prelude): reaching it ends the process, `LYR-RT0013`,
-/// "not implemented" and `message` behind it where one is given.
+/// Marks a place still to be written.
+///
+/// # Panics
+/// Always, when reached: `LYR-RT0013`, "not implemented" and `message` behind it where one is
+/// given.
 pub fn todo(message: string = ""): never;
 
-/// The bytes of a file of the package, read while the program compiles (design/v5/spec/09 Q4):
-/// `path` relative to the module that calls, within the package's directory — the one thing code
-/// run at compile time reads from outside the program, and a build reads it again when it
-/// changes. A `comptime` site, or what one calls, makes the call: `comptime embed("table.bin")`;
-/// the program itself never does (`LYR-CT0004`).
+/// Returns the bytes of a file of the package, read while the program compiles.
+///
+/// `path` is relative to the calling module, within the package's directory; a build reads the
+/// file again when it changes. Only a `comptime` site, or what one calls, can make the call:
+/// `comptime embed("table.bin")`; a call at run time is `LYR-CT0004`.
 pub fn embed(path: string): uint8[];
 
-/// The empty interface (design/v5/spec/03 T10): every struct, class and enum value is an `Any`
-/// at the transition, and `is` or a type pattern takes it out again (T11). `Any[]` is the
-/// heterogeneous array. Nothing converts here unasked — the target has to say `Any`.
+/// The empty interface, which every struct, class and enum value conforms to.
+///
+/// A value becomes an `Any` where the target type says `Any`, never unasked; `is` or a type
+/// pattern takes it out again. `Any[]` is the heterogeneous array.
 pub interface Any { }
 
-/// A value behind a reference (design/v5/spec/02 M13): the indirection a value type needs to
-/// hold itself. `enum Expr { Num(int), Add(Box<Expr>, Box<Expr>) }` is finite where `Add(Expr,
-/// Expr)` is not. The box is shared, not copied; its value is fixed, so sharing is unobservable.
+/// Holds a value behind a reference.
+///
+/// It is the indirection a value type needs to hold itself: `enum Expr { Num(int),
+/// Add(Box<Expr>, Box<Expr>) }` is finite where `Add(Expr, Expr)` is not. The box is shared, not
+/// copied; its value is fixed, so sharing is unobservable.
 pub class Box<T> {
     pub value: T,
 }
 
-/// A box compares by its value (M10 S1): what it holds is what it is, as its `Debug` text says.
+/// Compares two boxes by the values they hold.
 extend<T :: [Equatable]> Box<T> :: [Equatable] {
     fn equals(o: Box<T>): bool {
         return this.value == o.value;
@@ -64,42 +82,55 @@ extend<T :: [Equatable]> Box<T> :: [Equatable] {
 }
 
 extend<T :: [Debug]> Box<T> :: [Debug] {
-    /// The value, as it shows itself: the box is an indirection and no part of what is said.
+    /// Returns the debug text of the held value; the box itself adds nothing.
     fn debug(): string {
         return this.value.debug();
     }
 }
 
-/// `a..b` (design/v5/spec/03 T13 A3): the values from `start` up to but not including `end`, a
-/// value holding its bounds. In a `for` head a range literal is the counted loop and no value.
+/// The range `a..b`: the values from `start` up to but not including `end`.
+///
+/// A value holding its bounds. In a `for` head a range literal is the counted loop and no value.
 pub struct Range<T> {
     pub var start: T,
     pub var end: T,
 }
 
-/// `a..=b`: the values from `start` to `end`, both included.
+/// The range `a..=b`: the values from `start` to `end`, both included.
 pub struct RangeInclusive<T> {
     pub var start: T,
     pub var end: T,
 }
 
-/// `a..`: from `start` on. Written inside `[…]` only, where it takes a view (03 T13 A2).
+/// The range `a..`: from `start` on.
+///
+/// Written inside `[…]` only, where it takes a view.
 pub struct RangeFrom<T> {
     pub start: T,
 }
 
-/// `..b`: up to but not including `end`. Written inside `[…]` only, where it takes a view.
+/// The range `..b`: up to but not including `end`.
+///
+/// Written inside `[…]` only, where it takes a view.
 pub struct RangeTo<T> {
     pub end: T,
 }
 
-/// `..`: everything. Written inside `[…]` only, where it takes a view of the whole.
+/// The range `..`: everything.
+///
+/// Written inside `[…]` only, where it takes a view of the whole.
 pub struct RangeFull { }
 
-/// `arrayOf(n, f)` (design/v5/spec/10 C7): an array of `n` elements, the element at `i` the value
-/// of `f(i)` — fresh elements each, where `[x] * n` copies one value into every slot; `f` is
-/// called in order, once per index. A negative `n` panics; what `f` throws, the call throws, the
-/// array dropped.
+/// Creates an array of `n` elements, the element at `i` the value of `f(i)`.
+///
+/// Every element is fresh, where `[x] * n` copies one value into every slot; `f` is called in
+/// order, once per index.
+///
+/// # Panics
+/// When `n` is negative.
+///
+/// # Errors
+/// What `f` throws, the call throws, and the array is dropped.
 pub fn arrayOf<T, E :: [Error]>(n: int, f: fn(int) -> T throws E): T[] throws E {
     if (n < 0) {
         panic("arrayOf: a negative length");
@@ -120,25 +151,33 @@ pub fn arrayOf<T, E :: [Error]>(n: int, f: fn(int) -> T throws E): T[] throws E 
     return whole;
 }
 
-/// `n` slots of the one value `x`, an object SHARED — the repetition's instruction without its
-/// clone (M8a S16): the standard library's empty tables (`null` in every slot) and `arrayOf`, which
-/// writes every slot after. Internal: a program's `[x] * n` clones an object (03 §5.1). A negative
-/// `n` panics, as the repetition does.
+/// Creates an array of `n` slots that all hold the one value `x`, an object shared, not cloned.
+///
+/// For the standard library's empty tables (`null` in every slot) and [arrayOf], which writes
+/// every slot after. A program's `[x] * n` clones an object instead.
+///
+/// # Panics
+/// When `n` is negative.
 internal fn filled<T>(n: int, x: T): T[];
 
-/// `[x] * n` over an element that is or holds an object (03 §5.1, 10 C7): every slot a `clone()`
-/// of the pattern's element, so no object is shared into several slots. The compiler desugars
-/// the operator to this call; a value element copies natively. A negative `n` panics.
+/// Repeats `xs` `n` times, every slot a `clone()` of the pattern's element.
+///
+/// The operator `[x] * n` over an element that is or holds an object becomes this call, so no
+/// object is shared into several slots; a value element copies natively.
+///
+/// # Panics
+/// When `n` is negative.
 pub fn repeatArray<T :: [Clone]>(xs: T[], n: int): T[] {
     if (n < 0) { panic("negative repeat count"); }
     let m = xs.length();
     return arrayOf(m * n, (i: int) => xs[i % m].clone());
 }
 
-/// The root of everything thrown, caught and declared (design/v5/spec/05 E6 O1): a struct, a class
-/// or an enum that conforms is throwable (E3), an enum the natural form —
+/// The root of everything thrown, caught and declared.
+///
+/// A struct, a class or an enum that conforms is throwable; an enum is the natural form:
 /// `enum ParseError :: [Error] { Empty, BadDigit(char, int) }`. `cause` names the error this one
-/// wraps, for a report that walks the chain; the wrapping is the type's own field (O2).
+/// wraps, for a report that walks the chain; the wrapped error is held in the type's own field.
 pub interface Error {
     fn message(): string;
 
@@ -147,17 +186,17 @@ pub interface Error {
     }
 }
 
-/// The ready-made `Error` for throwing a message (design/v5/spec/12 E06):
-/// `throw Exception("…");`, and `Exception("…", cause: e)` for the error it wraps. The fields are
-/// `text` and `inner`, not `message` and `cause`: `Error` requires the METHODS `message()` and
-/// `cause()`, and one type's members cannot share a name.
+/// A ready-made [Error] that carries a message.
+///
+/// `throw Exception("…");`, and `Exception("…", cause: e)` for the error it wraps. The fields
+/// are `text` and `inner`; the methods `message()` and `cause()` return them.
 pub class Exception :: [Error] {
     /// What `message()` returns.
     pub text: string,
     /// The error this one wraps, if any: what `cause()` returns.
     pub inner: ?Error = null,
 
-    /// `Exception("…")`, `Exception("…", cause: e)` (08 Y9).
+    /// Creates an exception with `message` and, optionally, the error it wraps.
     pub static fn new(message: string, cause: ?Error = null): Exception {
         return Exception { text = message, inner = cause };
     }
@@ -171,10 +210,12 @@ pub class Exception :: [Error] {
     }
 }
 
-/// Where an error was thrown (design/v5/spec/05 E6 O3, the review's M5-3): what a clause's
-/// `e.backtrace()` answers in the debug profile, which keeps the frames of every throw; the
-/// release profile keeps none. Shown, it is a panic's trace — `    at <function> (<file>:<line>)`,
-/// a line a frame, innermost first —, named only when it is shown.
+/// Records where an error was thrown.
+///
+/// A catch clause's `e.backtrace()` returns one in the debug profile, which keeps the frames of
+/// every throw; the release profile keeps none. Shown, it is a panic's trace,
+/// `    at <function> (<file>:<line>)`, one line a frame, innermost first; the frames are named
+/// only when it is shown.
 pub struct Backtrace :: [Display] {
     pcs: int[],
 
@@ -183,11 +224,11 @@ pub struct Backtrace :: [Display] {
     }
 }
 
-/// The frames at `pcs` in a panic's trace form.
+/// Returns the frames at `pcs` in a panic's trace form.
 fn traceText(pcs: int[]): string;
 
-/// `e.backtrace()` at a clause's binding (06 §4): the lowering reads the program counters the
-/// record kept, none where it kept none, and asks here.
+/// Returns the backtrace for a catch clause's `e.backtrace()`, or `null` where no program
+/// counters were kept.
 fn backtraceOf(pcs: int[]): ?Backtrace {
     if (pcs.length() == 0) {
         return null;
@@ -195,10 +236,11 @@ fn backtraceOf(pcs: int[]): ?Backtrace {
     return Backtrace { pcs = pcs };
 }
 
-/// A failure as a value (05 E1; 10 B3): `Ok` with the value or `Err` with the error, to keep,
-/// collect or decide on later. `throws` stays the mechanism, and the two bridges lead to it and
-/// back — `Result.of { try f() }` catches into one, `try r.get()` throws out of one —, with no
-/// operator of its own. `E` is an `Error`, as Swift's `Result` has it: `get()` throws it.
+/// Holds a failure as a value: `Ok` with the value or `Err` with the error.
+///
+/// A result is kept, collected or decided on later. Two bridges lead to `throws` and back:
+/// `Result.of { try f() }` catches into one, `try r.get()` throws out of one. `E` is an [Error],
+/// which `get()` throws.
 @MustUse
 pub enum Result<T, E :: [Error]> {
     Ok(T),
@@ -206,7 +248,7 @@ pub enum Result<T, E :: [Error]> {
 }
 
 extend<T, E :: [Error]> Result<T, E> {
-    /// What `f` returns, as `Ok`; what it throws, as `Err`.
+    /// Calls `f` and returns what it returns as `Ok`, what it throws as `Err`.
     pub static fn of(f: fn() -> T throws E): Result<T, E> {
         try {
             return .Ok(f());
@@ -215,7 +257,10 @@ extend<T, E :: [Error]> Result<T, E> {
         }
     }
 
-    /// An `Ok`'s value; an `Err`'s error, thrown.
+    /// Returns an `Ok`'s value.
+    ///
+    /// # Errors
+    /// Throws an `Err`'s error.
     pub fn get(): T throws E {
         return match (this) {
             .Ok(v) => v,
@@ -285,22 +330,24 @@ pub interface OnAlias { }
 /// On an `extend` block.
 pub interface OnExtend { }
 
-/// A test (10 B12 X2, 07 V4): `lyric test` runs every function marked so — no parameters, `void`,
-/// not private, throwing if it likes —, each in a task of its own. `skip` says why one is not run,
-/// `timeout` how many seconds it may take: one that outlives them ends the run (X3). The tests run
-/// one after another; `parallel` lets one run beside the others that say so, after the rest (X3:
-/// an opt-in, since what a test shares — the working directory, the environment, a global `var` —
-/// it shares as threads do).
+/// Marks a function as a test, which `lyric test` runs.
+///
+/// A test takes no parameters, returns `void`, is not private and may throw; each runs in a task
+/// of its own. `skip` says why one is not run, `timeout` how many seconds it may take: one that
+/// outlives them ends the run. The tests run one after another; `parallel` lets one run beside
+/// the others that say so, after the rest. What tests share (the working directory, the
+/// environment, a global `var`) parallel tests share as threads do.
 pub struct Test :: [OnFunction] {
     pub skip: string = "",
     pub timeout: int = 60,
     pub parallel: bool = false,
 }
 
-/// A benchmark (10 B12 X4): `lyric bench` runs every function marked so — `fn name(&b: Bench)`,
-/// not private —, one after another. The bench it is handed is its measure: `b.iter { … }` runs the
-/// block until its time a run is known, `b.bytes(n)` says how many bytes a run handles; what it
-/// measured is the bench's after the call.
+/// Marks a function as a benchmark, which `lyric bench` runs; also the measure it is handed.
+///
+/// A benchmark is `fn name(&b: Bench)`, not private; they run one after another.
+/// `b.iter { … }` runs the block until the time of one run is known, `b.bytes(n)` says how many
+/// bytes a run handles; what was measured is in the bench's fields after the call.
 pub struct Bench :: [OnFunction] {
     /// The runs of the round reported, the nanoseconds they took, and the allocations they made
     /// on this thread and their bytes.
@@ -311,10 +358,11 @@ pub struct Bench :: [OnFunction] {
     /// The bytes a run handles, as `bytes(n)` said; 0 where it said nothing.
     pub var bytesPerRun: int = 0,
 
-    /// Runs `body` until its time a run is known (X4): once to warm up, then rounds of ever more
-    /// runs until one takes a tenth of a second, then five rounds of that many — the bench reports
-    /// the round of the median time. The loop's call of `body` is in the time; `blackBox` keeps a
-    /// result the compiler would otherwise drop.
+    /// Runs `body` repeatedly until the time of one run is known.
+    ///
+    /// Once to warm up, then rounds of ever more runs until one takes a tenth of a second, then
+    /// five rounds of that many; the bench reports the round of the median time. The loop's call
+    /// of `body` is in the time; [blackBox] keeps a result the compiler would otherwise drop.
     pub mut fn iter(body: fn() -> void): void {
         body();
         var n = 1;
@@ -339,19 +387,19 @@ pub struct Bench :: [OnFunction] {
         }
     }
 
-    /// A run handles `n` bytes: the report gives the bytes a second.
+    /// Sets the bytes one run handles, so the report gives the bytes a second.
     pub mut fn bytes(n: int): void {
         this.bytesPerRun = n;
     }
 
-    /// The nanoseconds a run took, in the round reported.
+    /// Returns the nanoseconds one run took in the round reported; 0 before any run.
     pub fn nanosPerRun(): float {
         return if (this.runs > 0) (this.nanos as float) / (this.runs as float) else 0.0;
     }
 }
 
-/// `n` runs of `body`: the nanoseconds they took, the allocations they made on this thread, and
-/// their bytes.
+/// Runs `body` `n` times and returns the nanoseconds taken, the allocations made on this thread
+/// and their bytes.
 fn timedRound(body: fn() -> void, n: int): (int, int, int) {
     let allocations = threadAllocations();
     let bytes = threadAllocatedBytes();
@@ -363,89 +411,108 @@ fn timedRound(body: fn() -> void, n: int): (int, int, int) {
     return (took, threadAllocations() - allocations, threadAllocatedBytes() - bytes);
 }
 
-/// The monotonic clock, in nanoseconds (lyr/time.h).
+/// Returns the monotonic clock, in nanoseconds.
 fn benchClock(): int;
 
-/// The allocations this thread has made since it started, and their bytes (lyr/gc.h).
+/// Returns the allocations this thread has made since it started, and their bytes.
 fn threadAllocations(): int;
 fn threadAllocatedBytes(): int;
 
-/// `x`, handed back through a point the compiler cannot see through (10 X4): what computed it is
-/// not dropped as unused, and the value that comes out is not known in advance — for a benchmark's
-/// body, whose result nothing reads. It costs a store.
+/// Returns `x` through a point the compiler cannot see through.
+///
+/// What computed `x` is not dropped as unused, and the value that comes out is not known in
+/// advance; for a benchmark's body, whose result nothing reads. It costs a store.
 pub fn blackBox<T>(x: T): T {
     return x;
 }
 
-/// `@callerExpr(p)` on a `string` parameter with a default (09 A11): where a call leaves the
-/// parameter out, it gets the text the call wrote for `p` — `assertEq(xs.length(), 3)` hands
-/// `std.test` the words `xs.length()`. Named like the compiler instruction it is, not like a type.
+/// Fills a `string` parameter with the source text the call wrote for parameter `p`.
+///
+/// `@callerExpr(p)` stands on a parameter with a default; where a call leaves that parameter
+/// out, it gets the text written for `p`: `assertEq(xs.length(), 3)` hands `std.test` the words
+/// `xs.length()`. Named like a compiler instruction, not like a type.
 @Allow("naming")
 pub struct callerExpr :: [OnParameter] { }
 
-/// `@callerLine` on an `int` parameter with a default (09 A11): where a call leaves the parameter
-/// out, it gets the line the call begins on.
+/// Fills an `int` parameter with the line the call begins on.
+///
+/// `@callerLine` stands on a parameter with a default; it applies where a call leaves the
+/// parameter out.
 @Allow("naming")
 pub struct callerLine :: [OnParameter] { }
 
-/// `@callerFile` on a `string` parameter with a default (09 A11): where a call leaves the
-/// parameter out, it gets the file the call stands in, as the binary's backtrace names it — the
-/// package's name, then the path within the package (`app/src/main.lyr`), with forward slashes.
+/// Fills a `string` parameter with the file the call stands in.
+///
+/// `@callerFile` stands on a parameter with a default; it applies where a call leaves the
+/// parameter out. The file is named as the binary's backtrace names it: the package's name, then
+/// the path within the package (`app/src/main.lyr`), with forward slashes.
 @Allow("naming")
 pub struct callerFile :: [OnParameter] { }
 
-/// A declaration on its way out (09 A11): every use outside a deprecated declaration warns
-/// (`LYR-SEM0076`) with `message`; `until` names the release that removes it — a build of that
-/// toolchain version or later fails at the attribute (`LYR-SEM0081`) —; `replacement` is what the
-/// use should become, for the tools. On whatever a use names: a module, what stands at its top
-/// level — an `extend` block for its members —, a member; not a parameter.
+/// Marks a declaration as deprecated.
+///
+/// Every use outside a deprecated declaration warns (`LYR-SEM0076`) with `message`. `until`
+/// names the release that removes it: a build with that toolchain version or later fails at the
+/// attribute (`LYR-SEM0081`). `replacement` is what the use should become, for the tools. It
+/// stands on a module, on what stands at a module's top level (an `extend` block for its
+/// members) and on a member; not on a parameter.
 pub struct Deprecated :: [OnModule, OnTopLevel, OnMember] {
     pub message: string = "",
     pub until: string = "",
     pub replacement: string = "",
 }
 
-/// A hint to the C compiler (09 A11): inline the function wherever it is called. A hint, no
-/// promise — and not the word `inline`, whose function is spliced into its caller by the language.
+/// Hints to the C compiler to inline the function wherever it is called.
+///
+/// A hint, no promise; unlike the keyword `inline`, whose function the language itself splices
+/// into its caller.
 pub struct AlwaysInline :: [OnCallable] { }
 
-/// A hint to the C compiler (09 A11): keep the function a call; the compiler's own inliner keeps
-/// it one too.
+/// Hints to the C compiler to keep the function a call; the compiler's own inliner keeps it one
+/// too.
 pub struct NoInline :: [OnCallable] { }
 
-/// A hint to the C compiler (09 A11): the function is rarely called — a path of errors, say.
+/// Hints to the C compiler that the function is rarely called, such as a path of errors.
 pub struct Cold :: [OnCallable] { }
 
-/// A value nobody should drop (09 A11): a call of a function marked so, or a call whose value is
-/// of a type marked so, warns where it stands as a statement and its value goes nowhere.
+/// Marks a value nobody should drop.
+///
+/// A call of a function marked so, or a call whose value is of a type marked so, warns where it
+/// stands as a statement and its value goes nowhere.
 pub struct MustUse :: [OnCallable, OnType] { }
 
-/// An enum or a `sealed` interface that may grow (09 A11): a `match` over it outside its package
-/// needs a `_` arm, so a new variant or conformer breaks nobody there.
+/// Marks an enum or a `sealed` interface that may grow.
+///
+/// A `match` over it outside its package needs a `_` arm, so a new variant or conformer breaks
+/// nobody there.
 pub struct NonExhaustive :: [OnType, OnInterface] { }
 
-/// A lint not said where this stands (spec 16 §5): `@Allow("unused-variable")` on a
-/// declaration, or on the module's head, takes the lint back inside it — a lint by its name or its
-/// code, a group (`"unused"`), or `"warnings"` for all; an `@Allow` that takes back nothing warns
-/// itself (`useless-allow`). The manifest's `[lints] allow` does it for the package.
+/// Silences a lint where this attribute stands.
+///
+/// `@Allow("unused-variable")` on a declaration, or on the module's head, silences the lint
+/// inside it: a lint by its name or its code, a group (`"unused"`), or `"warnings"` for all. An
+/// `@Allow` that silences nothing warns itself (`useless-allow`). The manifest's `[lints] allow`
+/// does it for the package.
 pub struct Allow :: [OnAny] {
     pub lint: string,
 }
 
-/// A lint said as a warning where this stands, whatever the package says (spec 16 §5).
+/// Reports a lint as a warning where this attribute stands, whatever the package says.
 pub struct Warn :: [OnAny] {
     pub lint: string,
 }
 
-/// A lint said as an error where this stands (spec 16 §5): the build fails, and the error
-/// names the `@Deny` that made it one.
+/// Reports a lint as an error where this attribute stands.
+///
+/// The build fails, and the error names the `@Deny` that made it one.
 pub struct Deny :: [OnAny] {
     pub lint: string,
 }
 
-/// What a `using let` binding closes when its scope is left (design/v5/spec/05 E7 R1, 10 K1).
-/// `close()` may throw: on a normal exit the error leaves like any other, while one is in flight
-/// it is appended to it as suppressed.
+/// A resource that a `using let` binding closes when its scope is left.
+///
+/// `close()` may throw: on a normal exit the error leaves like any other; while another error is
+/// in flight it is appended to that one as suppressed.
 pub interface Closeable {
     fn close(): void throws Error;
 }
@@ -457,31 +524,31 @@ pub interface Closeable {
 // itself; a generic 'fn sum<T :: [Add<Out = T>]>' reaches them the same way.
 // ---------------------------------------------------------------------------------------------
 
-/// `a + b` is `a.add(b)` (04 D6).
+/// The operator `+`: `a + b` is `a.add(b)`.
 pub interface Add<Rhs = Self> {
     type Out = Self;
     fn add(rhs: Rhs): Self.Out;
 }
 
-/// `a - b` is `a.sub(b)` (04 D6).
+/// The operator `-`: `a - b` is `a.sub(b)`.
 pub interface Sub<Rhs = Self> {
     type Out = Self;
     fn sub(rhs: Rhs): Self.Out;
 }
 
-/// `a * b` is `a.mul(b)` (04 D6).
+/// The operator `*`: `a * b` is `a.mul(b)`.
 pub interface Mul<Rhs = Self> {
     type Out = Self;
     fn mul(rhs: Rhs): Self.Out;
 }
 
-/// `a / b` is `a.div(b)` (04 D6).
+/// The operator `/`: `a / b` is `a.div(b)`.
 pub interface Div<Rhs = Self> {
     type Out = Self;
     fn div(rhs: Rhs): Self.Out;
 }
 
-/// `a % b` is `a.rem(b)` (04 D6).
+/// The operator `%`: `a % b` is `a.rem(b)`.
 pub interface Rem<Rhs = Self> {
     type Out = Self;
     fn rem(rhs: Rhs): Self.Out;
@@ -529,12 +596,15 @@ pub interface Shr<Rhs = int> {
     fn shr(rhs: Rhs): Self.Out;
 }
 
-/// `a == b` is `a.equals(b)`, `!=` its negation (04 D6). Both sides are the conformer's own
-/// type: there is no heterogeneous equality.
+/// The operators `==` and `!=`: `a == b` is `a.equals(b)`, `!=` its negation.
+///
+/// Both sides are the conformer's own type: there is no heterogeneous equality.
 @SeesConformer
 pub interface Equatable {
-    /// Synthesized for a conformance without the member (05 §14; 09 A5): field by field in
-    /// declaration order; an enum the same variant with equal payloads.
+    /// Returns whether this equals `o`.
+    ///
+    /// Synthesized for a conformance without the member: field by field in declaration order;
+    /// for an enum, the same variant with equal payloads.
     fn equals(o: Self): bool {
         comptime if (isEnum<Self>()) {
             comptime for (v in variants<Self>()) {
@@ -562,18 +632,20 @@ pub interface Equatable {
     }
 }
 
-/// The answer of a comparison; equatable, hashable and printable like any plain enum (the
-/// review's M8a-10).
+/// The answer of a comparison; equatable, hashable and printable like any plain enum.
 pub enum Ordering :: [Equatable, Hashable, Debug] { Less, Equal, Greater }
 
-/// `a < b`, `<=`, `>`, `>=` read `a.compare(b)` (04 D6): `.Less` for `<`, and `null` where the
-/// two are not ordered — `float` is partial, NaN compares with nothing — in which case every one
-/// of the four is false.
+/// The operators `<`, `<=`, `>` and `>=`, which read `a.compare(b)`.
+///
+/// `.Less` means `<`; `null` means the two are not ordered (`float` is partial, NaN compares
+/// with nothing), in which case every one of the four is false.
 @SeesConformer
 pub interface Ordered :: [Equatable] {
-    /// Synthesized (05 §14): lexicographic over the fields, the first that is not `.Equal`
-    /// decides, and a field unordered — `null` — is the answer; an enum by the variant's position
-    /// first, then its payload.
+    /// Compares this with `o`; `null` where the two are not ordered.
+    ///
+    /// Synthesized lexicographically over the fields: the first that is not `.Equal` decides,
+    /// and an unordered field (`null`) is the answer; an enum by the variant's position first,
+    /// then its payload.
     fn compare(o: Self): ?Ordering {
         comptime if (isEnum<Self>()) {
             // the two positions first (one test per variant each), the payload only where they meet
@@ -618,8 +690,12 @@ pub interface Ordered :: [Equatable] {
         }
     }
 
-    /// This held to `lo`…`hi` (10 B5 Z2): `lo` below it, `hi` above it. `lo` above `hi` is the
-    /// program's error and panics; a value unordered with the bounds — a NaN — comes back as it is.
+    /// Returns this held to `lo`…`hi`: `lo` below it, `hi` above it.
+    ///
+    /// A value unordered with the bounds, such as a NaN, comes back as it is.
+    ///
+    /// # Panics
+    /// When `lo` is above `hi`.
     fn clamp(lo: Self, hi: Self): Self {
         if (hi < lo) {
             panic("clamp: lo is above hi");
@@ -634,10 +710,12 @@ pub interface Ordered :: [Equatable] {
     }
 }
 
-/// A total order, what sorting and keys need; `float` has none of its own (D6).
+/// A total order, what sorting and keys need; `float` has none of its own.
 @SeesConformer
 pub interface TotalOrder :: [Ordered] {
-    /// Synthesized as `compare` is, every field total.
+    /// Compares this with `o` in the total order.
+    ///
+    /// Synthesized as `compare` is, every field compared totally.
     fn totalCompare(o: Self): Ordering {
         comptime if (isEnum<Self>()) {
             var a = 0;
@@ -676,13 +754,14 @@ pub interface TotalOrder :: [Ordered] {
     }
 }
 
-/// What a hash is computed with (design 10 Q3, K2): a value's parts are written in, the hash is
-/// read out. The hashers are `std.hash`'s.
+/// Computes a hash: a value's parts are written in, the hash is read out.
+///
+/// The hashers themselves live in `std.hash`.
 pub interface Hasher {
-    /// One byte.
+    /// Writes one byte.
     mut fn writeByte(b: uint8): void;
 
-    /// The bytes, in order.
+    /// Writes the bytes, in order.
     mut fn write(bytes: Slice<uint8>): void {
         var i = 0;
         while (i < bytes.length()) {
@@ -691,7 +770,7 @@ pub interface Hasher {
         }
     }
 
-    /// The eight bytes of `v`, the lowest first.
+    /// Writes the eight bytes of `v`, the lowest first.
     mut fn writeUint(v: uint64): void {
         var i = 0;
         while (i < 8) {
@@ -700,21 +779,25 @@ pub interface Hasher {
         }
     }
 
-    /// The eight bytes of `v` in two's complement, the lowest first.
+    /// Writes the eight bytes of `v` in two's complement, the lowest first.
     mut fn writeInt(v: int): void {
         this.writeUint(v as uint64);
     }
 
-    /// What the bytes written so far hash to; more may be written after.
+    /// Returns the hash of the bytes written so far; more may be written after.
     fn finish(): uint64;
 }
 
-/// What a `Map` key and a `Set` element need (10 K2): the value's parts written into a hasher, in an
-/// order of the type's. Equal values write the same; nothing checks it.
+/// A value that can be hashed, as a `Map` key and a `Set` element must be.
+///
+/// The value's parts are written into a [Hasher], in an order of the type's. Equal values must
+/// write the same; nothing checks it.
 @SeesConformer
 pub interface Hashable :: [Equatable] {
-    /// Synthesized (05 §14; 10 K2): the fields into the hasher in declaration order; an enum its
-    /// variant's position, then the payload.
+    /// Writes this value's parts into `h`.
+    ///
+    /// Synthesized as the fields in declaration order; for an enum, its variant's position, then
+    /// the payload.
     fn hash<H :: [Hasher]>(&h: H): void {
         comptime if (isEnum<Self>()) {
             comptime for (v in variants<Self>()) {
@@ -733,18 +816,21 @@ pub interface Hashable :: [Equatable] {
     }
 }
 
-/// An object compared by itself and hashed by where it lives (02 M10, 04 D7): `class Node ::
-/// [Identity]` is given an `equals` that is `same(this, o)` and a `hash` of its address, so a
-/// `Map<Node, X>` keys by the object without a member written. A class's alone — a value has no
-/// identity. Nothing on the heap moves (01 L1), so an object keeps its address while it lives.
+/// Compares an object by itself and hashes it by where it lives.
+///
+/// `class Node :: [Identity]` is given an `equals` that is `same(this, o)` and a `hash` of its
+/// address, so a `Map<Node, X>` keys by the object without a member written. Only a class can
+/// conform; a value has no identity. Nothing on the heap moves, so an object keeps its address
+/// while it lives.
 pub interface Identity :: [Hashable] {
 }
 
-/// The name of the variant an enum value holds, as written (09 A7 R5; M9a S11):
+/// Gives an enum value the name of its variant, as written.
+///
 /// `Color.Red.name()` is `"Red"`. A default over the variants, for any enum.
 @SeesConformer
 pub interface VariantName {
-    /// The variant's name.
+    /// Returns the variant's name.
     fn name(): string {
         comptime for (v in variants<Self>()) {
             if (this is v) {
@@ -755,13 +841,13 @@ pub interface VariantName {
     }
 }
 
-/// An enum's variants as values (09 A7 R5; M9a S11; Swift's `CaseIterable`): all of them in
-/// declaration order, and one by its name. For an enum whose variants all are units — a variant
-/// with a payload has no value without it, and such an enum is refused at its entry.
+/// Gives an enum's variants as values: all of them in declaration order, and one by its name.
+///
+/// Only for an enum whose variants all are units; an enum with a payload variant is refused at
+/// its conformance.
 @SeesConformer
 pub interface Variants :: [VariantName] {
-    /// Every variant, in declaration order. (Named `all`, not `variants`: inside the default the
-    /// latter is the question `variants<Self>()` itself.)
+    /// Returns every variant, in declaration order.
     static fn all(): Self[] {
         let all = variants<Self>();
         var out: Self[] = [];
@@ -774,7 +860,7 @@ pub interface Variants :: [VariantName] {
         return out;
     }
 
-    /// The variant of that name, or `null`.
+    /// Returns the variant named `s`, or `null` where there is none.
     static fn fromName(s: string): ?Self {
         comptime for (v in variants<Self>()) {
             if (s == v.name) {
@@ -785,38 +871,44 @@ pub interface Variants :: [VariantName] {
     }
 }
 
-/// `x[k]` is `x.index(k)` (04 D6, 03 T14): the element a key or a position names, of the type the
-/// conformer answers. An array's and a view's index is built in.
+/// The index operator: `x[k]` is `x.index(k)`, the element a key or a position names.
+///
+/// The element's type is the conformer's `Output`. An array's and a view's index is built in.
 pub interface Index<K> {
     type Output;
     fn index(k: K): Self.Output;
 }
 
-/// `x[k] = v` is `x.setIndex(k, v)`; `x[k] += 1` reads and writes, `x` and `k` evaluated once.
+/// The index assignment: `x[k] = v` is `x.setIndex(k, v)`.
+///
+/// `x[k] += 1` reads and writes, `x` and `k` evaluated once.
 pub interface IndexSet<K> :: [Index<K>] {
     mut fn setIndex(k: K, v: Self.Output): void;
 }
 
-/// `x[a..b]` on a type that gives a view of its elements is the range of the view —
-/// `list[a..b]` is `list.asSlice()[a..b]`, a `Slice<T>` over them, no copy (03 §5.2, design 03
-/// "Review 2026-10-09" S6; M8c S18). A second `Index` for ranges beside `Index<int>` would be two
-/// `index` of one arity (04 D4); an array's, a view's and a string's range are built in.
+/// Gives a view of the elements, which makes `x[a..b]` the range of that view.
+///
+/// `list[a..b]` is `list.asSlice()[a..b]`, a `Slice<T>` over the elements, no copy. An array's,
+/// a view's and a string's range are built in.
 pub interface AsSlice<T> {
     fn asSlice(): Slice<T>;
 }
 
-/// `x in xs` is `xs.contains(x)` (04 D6; the operator comes with the collections).
+/// The operator `in`: `x in xs` is `xs.contains(x)`.
 pub interface Contains<T> {
     fn contains(x: T): bool;
 }
 
-/// `{x}` in an f-string renders through `show()` (04 D6); the scalars render natively and conform
-/// here so a constraint `T :: [Display]` takes them.
+/// Renders a value as text: `{x}` in an f-string renders through `show()`.
+///
+/// The scalars render natively and conform here, so a constraint `T :: [Display]` takes them.
 pub interface Display {
     fn show(): string;
 
-    /// The text written into `out` (10 S6): what f-strings and the containers call, so a text is
-    /// built in one buffer. The default appends `show()`; a type that can write itself does.
+    /// Appends the text to `out`.
+    ///
+    /// F-strings and the containers call it, so a text is built in one buffer. The default
+    /// appends `show()`; a type that can write itself directly overrides it.
     fn showTo(out: StringBuilder): void {
         out.appendStr(this.show());
     }
@@ -1124,23 +1216,27 @@ extend string :: [Equatable, Display, Add] {
 // below; the shapes a field may have render through the helpers at the end.
 // ---------------------------------------------------------------------------------------------
 
-/// The debug rendering of a value: `P { x = 1, y = "a" }`, `E.B(3)`. Every struct, class and enum
-/// has one, written or synthesized (04 D7); a string renders quoted.
+/// Renders a value for debugging: `P { x = 1, y = "a" }`, `E.B(3)`.
+///
+/// Every struct, class and enum has one, written or synthesized; a string renders quoted.
 pub interface Debug {
     fn debug(): string;
 
-    /// The debug text written into `out` (10 S6), as `showTo` is `show()`'s.
+    /// Appends the debug text to `out`, as `showTo` does for `show()`.
     fn debugTo(out: StringBuilder): void {
         out.appendStr(this.debug());
     }
 }
 
-/// A copy of the value: value fields copied, reference fields cloned (04 D13). Synthesized for a
-/// conformance without a body.
+/// Copies a value deeply: value fields copied, reference fields cloned.
+///
+/// Synthesized for a conformance without a body.
 @SeesConformer
 pub interface Clone {
-    /// Synthesized (05 §14): every field cloned — a `@Shared` field copied as it stands (04
-    /// Clone; 09 A11) —; an enum its variant rebuilt from the payload cloned.
+    /// Returns a copy of this value.
+    ///
+    /// Synthesized as every field cloned, a `@Shared` field copied as it stands; for an enum,
+    /// its variant rebuilt from the payload cloned.
     fn clone(): Self {
         comptime if (isEnum<Self>()) {
             comptime for (v in variants<Self>()) {
@@ -1155,23 +1251,28 @@ pub interface Clone {
     }
 }
 
-/// The value a type starts from: `0`, `""`, `[]`, `null`, a field default. Synthesized field-wise.
+/// Gives the value a type starts from: `0`, `""`, `[]`, `null`, a field default.
+///
+/// Synthesized field-wise.
 pub interface Default {
-    /// Synthesized field-wise by the compiler (05 §14): a static member of an interface declares
-    /// only, so no default here builds `Self`.
+    /// Returns the type's default value.
+    ///
+    /// Synthesized field-wise by the compiler; the interface itself gives no body.
     static fn default(): Self;
 }
 
-/// A conversion into the type (10 B4; 04 D6: `as` converts numbers only): `Centimeters.from(m)`.
-/// A type writes `From`; `Into` follows from it.
+/// Converts a value into the type: `Centimeters.from(m)`.
+///
+/// A type writes `From`; [Into] follows from it. `as` converts numbers only.
 pub interface From<T> {
     static fn from(v: T): Self;
 }
 
-/// A conversion out of the type (10 B4): `let cm: Centimeters = m.into();`, the expected type
-/// choosing which. The blanket below gives it wherever a `From` is; a type's own `Into<X>` stands
-/// only where no `X :: [From<…>]` of the type gives the same (04 D15: the blanket excludes it where
-/// it reaches).
+/// Converts a value out of the type: `let cm: Centimeters = m.into();`.
+///
+/// The expected type chooses the target. The blanket conformance below gives it wherever a
+/// [From] is; a type's own `Into<X>` is allowed only where no `X :: [From<…>]` of the type gives
+/// the same.
 pub interface Into<T> {
     fn into(): T;
 }
@@ -1249,7 +1350,8 @@ extend bool :: [Debug, Clone, Default] {
 }
 
 extend char :: [Debug, Clone] {
-    /// Between `'`, escaped as a text's characters are (10 S14) — `'\''`, `'\n'`, `'\u{200b}'`.
+    /// Returns the character between `'`, escaped as a text's characters are: `'\''`, `'\n'`,
+    /// `'\u{200b}'`.
     fn debug(): string {
         let out = StringBuilder.new();
         out.appendChar('\'');
@@ -1264,7 +1366,7 @@ extend char :: [Debug, Clone] {
 // data is no programmer's error (B3). The way out is `c as uint32` (the review's A9e: a method
 // that said the same went).
 extend char {
-    /// The character of a scalar value; `null` for a surrogate, 0xD800…0xDFFF, or beyond
+    /// Returns the character of a scalar value; `null` for a surrogate, 0xD800…0xDFFF, or beyond
     /// 0x10FFFF.
     pub static fn fromUint32(n: uint32): ?char {
         if (n > 0x10FFFF || (n >= 0xD800 && n <= 0xDFFF)) {
@@ -1274,9 +1376,10 @@ extend char {
     }
 }
 
-/// A character's general category (UAX #44), in the standard's order (10 B9 S5). No `char` is a
-/// `Surrogate` — the halves of a UTF-16 pair are no scalar values —; the variant is there because
-/// the standard lists it.
+/// A character's general category (UAX #44), in the standard's order.
+///
+/// No `char` is a `Surrogate`, since the halves of a UTF-16 pair are no scalar values; the
+/// variant is there because the standard lists it.
 pub enum UnicodeCategory :: [Equatable, Hashable, Debug] {
     UppercaseLetter,
     LowercaseLetter,
@@ -1357,84 +1460,94 @@ fn categoryOf(k: int): UnicodeCategory {
 // `isAsciiX` asks ASCII alone. Case maps one character to one (the simple case mapping) and knows
 // no locale: `ß` stays `ß` (S4).
 extend char {
-    /// The general category.
+    /// Returns the character's general category.
     pub fn category(): UnicodeCategory {
         return categoryOf(unicodeCategory(this));
     }
 
-    /// A letter of any script: the categories Lu, Ll, Lt, Lm and Lo.
+    /// Returns whether this is a letter of any script: the categories Lu, Ll, Lt, Lm and Lo.
     pub fn isAlpha(): bool {
         return unicodeCategory(this) <= 4;
     }
 
-    /// A decimal digit of any script: the category Nd — `'٣'` is one. `isAsciiDigit` asks for
-    /// `0`–`9` alone, and `parse` reads those alone (Z6).
+    /// Returns whether this is a decimal digit of any script: the category Nd.
+    ///
+    /// `'٣'` is one. `isAsciiDigit` asks for `0`–`9` alone, and `parse` reads those alone.
     pub fn isDigit(): bool {
         return unicodeCategory(this) == 8;
     }
 
-    /// A letter or a decimal digit: `isAlpha` or `isDigit`.
+    /// Returns whether this is a letter or a decimal digit: `isAlpha` or `isDigit`.
     pub fn isAlphanumeric(): bool {
         let k = unicodeCategory(this);
         return k <= 4 || k == 8;
     }
 
-    /// The property White_Space: the space, the tab, the line ends, the no-break spaces, the
-    /// ideographic space and their kin.
+    /// Returns whether this has the property White_Space.
+    ///
+    /// The space, the tab, the line ends, the no-break spaces, the ideographic space and their
+    /// kin.
     pub fn isWhitespace(): bool {
         return unicodeWhiteSpace(this);
     }
 
-    /// An uppercase letter: the category Lu.
+    /// Returns whether this is an uppercase letter: the category Lu.
     pub fn isUpper(): bool {
         return unicodeCategory(this) == 0;
     }
 
-    /// A lowercase letter: the category Ll.
+    /// Returns whether this is a lowercase letter: the category Ll.
     pub fn isLower(): bool {
         return unicodeCategory(this) == 1;
     }
 
-    /// A control character: the category Cc.
+    /// Returns whether this is a control character: the category Cc.
     pub fn isControl(): bool {
         return unicodeCategory(this) == 25;
     }
 
-    /// The uppercase character, by the simple mapping; the character itself where it has none.
+    /// Returns the uppercase character by the simple mapping; the character itself where it has
+    /// none.
     pub fn toUpper(): char {
         return unicodeUpper(this);
     }
 
-    /// The lowercase character, by the simple mapping; the character itself where it has none.
+    /// Returns the lowercase character by the simple mapping; the character itself where it has
+    /// none.
     pub fn toLower(): char {
         return unicodeLower(this);
     }
 
-    /// `0`–`9`.
+    /// Returns whether this is `0`–`9`.
     pub fn isAsciiDigit(): bool {
         return this >= '0' && this <= '9';
     }
 
-    /// `a`–`z` and `A`–`Z`.
+    /// Returns whether this is one of `a`–`z` and `A`–`Z`.
     pub fn isAsciiAlpha(): bool {
         return (this >= 'a' && this <= 'z') || (this >= 'A' && this <= 'Z');
     }
 
-    /// `0`–`9`, `a`–`f` and `A`–`F`.
+    /// Returns whether this is one of `0`–`9`, `a`–`f` and `A`–`F`.
     pub fn isAsciiHexDigit(): bool {
         return this.isAsciiDigit() || (this >= 'a' && this <= 'f') || (this >= 'A' && this <= 'F');
     }
 
-    /// ASCII's whitespace as WHATWG counts it, Rust too: the space, tab, line feed, form feed and
-    /// carriage return — not the vertical tab.
+    /// Returns whether this is ASCII whitespace as WHATWG counts it.
+    ///
+    /// The space, tab, line feed, form feed and carriage return; not the vertical tab.
     pub fn isAsciiWhitespace(): bool {
         let n = this as uint32;
         return n == 32 || n == 9 || n == 10 || n == 12 || n == 13;
     }
 
-    /// The character's value as a digit in base `radix`, 2–36: `0`–`9`, then `a`–`z` or `A`–`Z` for
-    /// 10–35 — ASCII alone, as `parse` reads. `null` where it is no digit of the base; a radix
-    /// outside 2–36 is a programmer's error and panics.
+    /// Returns the character's value as a digit in base `radix`, or `null` where it is no digit
+    /// of the base.
+    ///
+    /// The digits are `0`–`9`, then `a`–`z` or `A`–`Z` for 10–35; ASCII alone, as `parse` reads.
+    ///
+    /// # Panics
+    /// When `radix` is outside 2–36.
     pub fn toDigit(radix: int): ?int {
         if (radix < 2 || radix > 36) {
             panic(f"radix {radix} is outside 2…36");
@@ -1454,8 +1567,13 @@ extend char {
         return null;
     }
 
-    /// The character of the digit `n` in base `radix`, 2–36, its letters lowercase: `fromDigit(11,
-    /// 16)` is `b`. `null` where `n` is no digit of the base; a radix outside 2–36 panics.
+    /// Returns the character of the digit `n` in base `radix`, or `null` where `n` is no digit
+    /// of the base.
+    ///
+    /// Letters are lowercase: `fromDigit(11, 16)` is `b`.
+    ///
+    /// # Panics
+    /// When `radix` is outside 2–36.
     pub static fn fromDigit(n: int, radix: int): ?char {
         if (radix < 2 || radix > 36) {
             panic(f"radix {radix} is outside 2…36");
@@ -1468,18 +1586,20 @@ extend char {
     }
 }
 
-/// A string writes its bytes and then 255, which no UTF-8 text holds: ("ab", "c") and ("a", "bc")
-/// write differently (10 C8).
+/// Hashes a string as its bytes and then 255, which no UTF-8 text holds.
+///
+/// So ("ab", "c") and ("a", "bc") write differently.
 extend string :: [Hashable] {
     fn hash<H :: [Hasher]>(&h: H): void {
         hashText(this, &h);
     }
 }
 
-/// A text into a hasher (10 K2): its bytes, then 255, which no UTF-8 byte is — "ab" + "c" and "a" +
-/// "bc" differ. Eight bytes at a time as a word, the lowest first, the rest one at a time: the same
-/// bytes in the same order as one at a time, so every hasher answers as it did byte by byte
-/// (sweep 214: the byte loop was most of a string key's hashing).
+/// Writes a text into a hasher: its bytes, then 255, which no UTF-8 byte is.
+///
+/// "ab" + "c" and "a" + "bc" differ. The bytes go eight at a time as a word, the lowest first,
+/// the rest one at a time: the same bytes in the same order as one at a time, so every hasher
+/// answers as it would byte by byte.
 fn hashText<H :: [Hasher]>(s: StringView, &h: H): void {
     let n = byteCount(s);
     var i = 0;
@@ -1495,8 +1615,10 @@ fn hashText<H :: [Hasher]>(s: StringView, &h: H): void {
 }
 
 extend string :: [Debug, Clone, Default] {
-    /// Between `"`, as it would be written (10 S14, Rust's `escape_debug`): `["a\"b", "c"]` prints
-    /// as it is written, and the quotes keep the boundaries C9 draws with them.
+    /// Returns the text between `"`, escaped as it would be written.
+    ///
+    /// `["a\"b", "c"]` prints as it is written, and the quotes keep the boundaries between the
+    /// elements visible.
     fn debug(): string {
         let out = StringBuilder.new();
         debugText(out, this);
@@ -1515,9 +1637,10 @@ fn debugText(out: StringBuilder, s: StringView): void {
     out.appendChar('"');
 }
 
-/// One character as `Debug` writes it between `mark`s (10 S14): `\\`, the mark, `\n`, `\r`,
-/// `\t` and `\0` escaped; a character that does not print as itself as `\u{…}`, its scalar value
-/// in hex.
+/// Appends one character to `out` as `Debug` writes it between `mark`s.
+///
+/// `\\`, the mark, `\n`, `\r`, `\t` and `\0` are escaped; a character that does not print as
+/// itself is written as `\u{…}`, its scalar value in hex.
 fn escapeTo(out: StringBuilder, c: char, mark: char): void {
     let n = c as uint32;
     if (c == mark || c == '\\') {
@@ -1552,8 +1675,10 @@ fn escapeTo(out: StringBuilder, c: char, mark: char): void {
     }
 }
 
-/// Whether a character prints as itself in a `Debug` text: every category but Cc, Cf, Cs, Co,
-/// Cn, Zl and Zp, and of the space separators the space alone.
+/// Returns whether a character prints as itself in a `Debug` text.
+///
+/// Every category but Cc, Cf, Cs, Co, Cn, Zl and Zp, and of the space separators the space
+/// alone.
 fn printsAsItself(c: char): bool {
     let n = c as uint32;
     if (n < 128) {
@@ -1563,7 +1688,10 @@ fn printsAsItself(c: char): bool {
 }
 
 extend string {
-    /// The text of the characters in order (10 S3).
+    /// Creates the text of the characters, in order.
+    ///
+    /// # Errors
+    /// What the iterator throws.
     pub static fn fromChars<I :: [Iterator<Item = char>]>(chars: I): string throws I.Error {
         var walk = chars;
         let out = StringBuilder.new();
@@ -1584,13 +1712,13 @@ extend string {
 // each type's own (04 D9): 'int8.min.abs()' is a direct call, no value of an interface made.
 // ---------------------------------------------------------------------------------------------
 
-/// Every number type (10 B5 Z1): its zero and its one, arithmetic that stays in the type.
+/// Every number type: its zero and its one, arithmetic that stays in the type.
 pub interface Num :: [Equatable, Ordered, Add<Out = Self>, Sub<Out = Self>, Mul<Out = Self>,
     Div<Out = Self>, Rem<Out = Self>, Display, Debug, Parse, Default] {
     static let zero: Self;
     static let one: Self;
 
-    /// Whether this is the type's zero.
+    /// Returns whether this is the type's zero.
     fn isZero(): bool {
         return this == Self.zero;
     }
@@ -1609,28 +1737,28 @@ pub interface Integer :: [Num, TotalOrder, Hashable, BitAnd<Out = Self>, BitOr<O
     static let bitWidth: int;
     static let isSigned: bool;
 
-    /// `v` as this type where it fits, `null` where it does not (10 B5 Z4).
+    /// Returns `v` as this type where it fits, `null` where it does not.
     static fn exact<T :: [Integer]>(v: T): ?Self;
 
-    /// `v` as this type, held at `min` or `max` where it does not fit.
+    /// Returns `v` as this type, held at `min` or `max` where it does not fit.
     static fn clamping<T :: [Integer]>(v: T): Self;
 
-    /// The sum, or `null` where it does not fit the type.
+    /// Returns the sum, or `null` where it does not fit the type.
     fn checkedAdd(o: Self): ?Self {
         return if (addOverflows(this, o)) null else addWrapping(this, o);
     }
 
-    /// The difference, or `null` where it does not fit.
+    /// Returns the difference, or `null` where it does not fit.
     fn checkedSub(o: Self): ?Self {
         return if (subOverflows(this, o)) null else subWrapping(this, o);
     }
 
-    /// The product, or `null` where it does not fit.
+    /// Returns the product, or `null` where it does not fit.
     fn checkedMul(o: Self): ?Self {
         return if (mulOverflows(this, o)) null else mulWrapping(this, o);
     }
 
-    /// The quotient, or `null` for a zero divisor and for `min / -1`, which does not fit.
+    /// Returns the quotient, or `null` for a zero divisor and for `min / -1`, which does not fit.
     fn checkedDiv(o: Self): ?Self {
         if (o == Self.zero || (Self.isSigned && this == Self.min && o == Self.zero - Self.one)) {
             return null;
@@ -1638,7 +1766,7 @@ pub interface Integer :: [Num, TotalOrder, Hashable, BitAnd<Out = Self>, BitOr<O
         return this / o;
     }
 
-    /// The remainder, or `null` for a zero divisor; a remainder by `-1` is `0`.
+    /// Returns the remainder, or `null` for a zero divisor; a remainder by `-1` is `0`.
     fn checkedRem(o: Self): ?Self {
         if (o == Self.zero) {
             return null;
@@ -1649,37 +1777,40 @@ pub interface Integer :: [Num, TotalOrder, Hashable, BitAnd<Out = Self>, BitOr<O
         return this % o;
     }
 
-    /// The sum, held at `min` or `max` where it does not fit.
+    /// Returns the sum, held at `min` or `max` where it does not fit.
     fn saturatingAdd(o: Self): Self {
         return this.checkedAdd(o) ?? (if (o < Self.zero) Self.min else Self.max);
     }
 
-    /// The difference, held at `min` or `max` where it does not fit.
+    /// Returns the difference, held at `min` or `max` where it does not fit.
     fn saturatingSub(o: Self): Self {
         return this.checkedSub(o) ?? (if (o < Self.zero) Self.max else Self.min);
     }
 
-    /// The product, held at `min` or `max` by the sign it would have.
+    /// Returns the product, held at `min` or `max` by the sign it would have.
     fn saturatingMul(o: Self): Self {
         return this.checkedMul(o) ?? (if ((this < Self.zero) != (o < Self.zero)) Self.min else Self.max);
     }
 
-    /// The sum modulo 2^bitWidth, as `+%` on the type (08 Y4).
+    /// Returns the sum modulo 2^bitWidth, as `+%` on the type.
     fn wrappingAdd(o: Self): Self {
         return addWrapping(this, o);
     }
 
-    /// The difference modulo 2^bitWidth, as `-%`.
+    /// Returns the difference modulo 2^bitWidth, as `-%`.
     fn wrappingSub(o: Self): Self {
         return subWrapping(this, o);
     }
 
-    /// The product modulo 2^bitWidth, as `*%`.
+    /// Returns the product modulo 2^bitWidth, as `*%`.
     fn wrappingMul(o: Self): Self {
         return mulWrapping(this, o);
     }
 
-    /// The quotient, where `min / -1` wraps to `min`; a zero divisor panics as `/` does.
+    /// Returns the quotient, where `min / -1` wraps to `min`.
+    ///
+    /// # Panics
+    /// When `o` is zero, as `/` does.
     fn wrappingDiv(o: Self): Self {
         if (Self.isSigned && this == Self.min && o == Self.zero - Self.one) {
             return Self.min;
@@ -1687,7 +1818,10 @@ pub interface Integer :: [Num, TotalOrder, Hashable, BitAnd<Out = Self>, BitOr<O
         return this / o;
     }
 
-    /// The remainder, where a remainder by `-1` is `0`; a zero divisor panics as `%` does.
+    /// Returns the remainder, where a remainder by `-1` is `0`.
+    ///
+    /// # Panics
+    /// When `o` is zero, as `%` does.
     fn wrappingRem(o: Self): Self {
         if (Self.isSigned && o == Self.zero - Self.one) {
             return Self.zero;
@@ -1695,7 +1829,11 @@ pub interface Integer :: [Num, TotalOrder, Hashable, BitAnd<Out = Self>, BitOr<O
         return this % o;
     }
 
-    /// `this` to the `n`th power, by squaring; an overflow is one of `*` (03 T2).
+    /// Returns `this` to the `n`th power, computed by squaring.
+    ///
+    /// # Panics
+    ///
+    /// When the power does not fit the type, as `*` panics on an overflow.
     fn pow(n: uint): Self {
         var result = Self.one;
         var base = this;
@@ -1712,27 +1850,27 @@ pub interface Integer :: [Num, TotalOrder, Hashable, BitAnd<Out = Self>, BitOr<O
         return result;
     }
 
-    /// The zero bits above the highest one bit; `bitWidth` for zero.
+    /// Returns the number of zero bits above the highest one bit; `bitWidth` for zero.
     fn leadingZeros(): int {
         return countLeadingZeros(this);
     }
 
-    /// The zero bits below the lowest one bit; `bitWidth` for zero.
+    /// Returns the number of zero bits below the lowest one bit; `bitWidth` for zero.
     fn trailingZeros(): int {
         return countTrailingZeros(this);
     }
 
-    /// The one bits.
+    /// Returns the number of one bits.
     fn popCount(): int {
         return countOnes(this);
     }
 
-    /// The bits rotated left by `n`, modulo `bitWidth`; a negative `n` rotates right.
+    /// Returns the bits rotated left by `n`, modulo `bitWidth`; a negative `n` rotates right.
     fn rotateLeft(n: int): Self {
         return rotateBitsLeft(this, n);
     }
 
-    /// The bits rotated right by `n`, modulo `bitWidth`; a negative `n` rotates left.
+    /// Returns the bits rotated right by `n`, modulo `bitWidth`; a negative `n` rotates left.
     fn rotateRight(n: int): Self {
         return rotateBitsLeft(this, -(n % Self.bitWidth));
     }
@@ -1752,8 +1890,10 @@ fn countTrailingZeros<T>(x: T): int;
 fn countOnes<T>(x: T): int;
 fn rotateBitsLeft<T>(x: T, n: int): T;
 
-/// The two float types (10 B5 Z1, Z2): what describes the type is a member — its constants, its
-/// bits, its order, NaN and the infinities —; what one computes with a number is `std.math`'s.
+/// The two float types, with what describes the type as members.
+///
+/// Its constants, its bits, its order, NaN and the infinities are members; what one computes
+/// with a number lives in `std.math`.
 pub interface Float :: [Signed] {
     /// The distance from `1.0` to the next value above it.
     static let epsilon: Self;
@@ -1767,26 +1907,28 @@ pub interface Float :: [Signed] {
     /// The least positive value, a subnormal.
     static let leastPositive: Self;
 
-    /// The value a bit pattern names: a `float` its 64 bits, a `float32` the low 32.
+    /// Returns the value a bit pattern names: a `float` its 64 bits, a `float32` the low 32.
     static fn fromBits(b: uint64): Self;
 
-    /// Whether this is NaN, the one value unequal to itself.
+    /// Returns whether this is NaN, the one value unequal to itself.
     fn isNan(): bool {
         return this != this;
     }
 
-    /// Whether this is an infinity, of either sign.
+    /// Returns whether this is an infinity, of either sign.
     fn isInfinite(): bool {
         return this == Self.infinity || this == -Self.infinity;
     }
 
-    /// Whether this is neither NaN nor an infinity.
+    /// Returns whether this is neither NaN nor an infinity.
     fn isFinite(): bool {
         return !this.isNan() && !this.isInfinite();
     }
 
-    /// IEEE 754's total order, for sorting: -NaN, -infinity, the negatives, -0.0, 0.0, the
-    /// positives, infinity, NaN — every value in its one place.
+    /// Compares in IEEE 754's total order, for sorting.
+    ///
+    /// The order is -NaN, -infinity, the negatives, -0.0, 0.0, the positives, infinity, NaN;
+    /// every value has its one place.
     fn totalCompare(o: Self): Ordering {
         let a = totalOrderKey(this);
         let b = totalOrderKey(o);
@@ -1818,22 +1960,31 @@ extend int :: [Num, Signed, Integer] {
     static let bitWidth: int = 64;
     static let isSigned: bool = true;
 
-    /// The decimal integer a text names (`Parse`).
+    /// Parses the decimal integer a text names.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView): int throws ParseError {
         return try parseInteger(s, 10);
     }
 
-    /// The integer a text names in `radix`, 2…36.
+    /// Parses the integer a text names in base `radix`.
+    ///
+    /// # Panics
+    /// When `radix` is outside 2…36.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView, radix: int): int throws ParseError {
         return try parseInteger(s, radix);
     }
 
-    /// `v` as an `int` where it fits, `null` where it does not (10 B5 Z4).
+    /// Returns `v` as an `int` where it fits, `null` where it does not.
     static fn exact<T :: [Integer]>(v: T): ?int {
         return exactly(v);
     }
 
-    /// `v` as an `int`, held at `min` or `max` where it does not fit.
+    /// Returns `v` as an `int`, held at `min` or `max` where it does not fit.
     static fn clamping<T :: [Integer]>(v: T): int {
         return clamped(v);
     }
@@ -1847,22 +1998,31 @@ extend int8 :: [Num, Signed, Integer] {
     static let bitWidth: int = 8;
     static let isSigned: bool = true;
 
-    /// The decimal integer a text names (`Parse`).
+    /// Parses the decimal integer a text names.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView): int8 throws ParseError {
         return try parseInteger(s, 10);
     }
 
-    /// The integer a text names in `radix`, 2…36.
+    /// Parses the integer a text names in base `radix`.
+    ///
+    /// # Panics
+    /// When `radix` is outside 2…36.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView, radix: int): int8 throws ParseError {
         return try parseInteger(s, radix);
     }
 
-    /// `v` as an `int8` where it fits, `null` where it does not (10 B5 Z4).
+    /// Returns `v` as an `int8` where it fits, `null` where it does not.
     static fn exact<T :: [Integer]>(v: T): ?int8 {
         return exactly(v);
     }
 
-    /// `v` as an `int8`, held at `min` or `max` where it does not fit.
+    /// Returns `v` as an `int8`, held at `min` or `max` where it does not fit.
     static fn clamping<T :: [Integer]>(v: T): int8 {
         return clamped(v);
     }
@@ -1876,22 +2036,31 @@ extend int16 :: [Num, Signed, Integer] {
     static let bitWidth: int = 16;
     static let isSigned: bool = true;
 
-    /// The decimal integer a text names (`Parse`).
+    /// Parses the decimal integer a text names.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView): int16 throws ParseError {
         return try parseInteger(s, 10);
     }
 
-    /// The integer a text names in `radix`, 2…36.
+    /// Parses the integer a text names in base `radix`.
+    ///
+    /// # Panics
+    /// When `radix` is outside 2…36.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView, radix: int): int16 throws ParseError {
         return try parseInteger(s, radix);
     }
 
-    /// `v` as an `int16` where it fits, `null` where it does not (10 B5 Z4).
+    /// Returns `v` as an `int16` where it fits, `null` where it does not.
     static fn exact<T :: [Integer]>(v: T): ?int16 {
         return exactly(v);
     }
 
-    /// `v` as an `int16`, held at `min` or `max` where it does not fit.
+    /// Returns `v` as an `int16`, held at `min` or `max` where it does not fit.
     static fn clamping<T :: [Integer]>(v: T): int16 {
         return clamped(v);
     }
@@ -1905,22 +2074,31 @@ extend int32 :: [Num, Signed, Integer] {
     static let bitWidth: int = 32;
     static let isSigned: bool = true;
 
-    /// The decimal integer a text names (`Parse`).
+    /// Parses the decimal integer a text names.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView): int32 throws ParseError {
         return try parseInteger(s, 10);
     }
 
-    /// The integer a text names in `radix`, 2…36.
+    /// Parses the integer a text names in base `radix`.
+    ///
+    /// # Panics
+    /// When `radix` is outside 2…36.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView, radix: int): int32 throws ParseError {
         return try parseInteger(s, radix);
     }
 
-    /// `v` as an `int32` where it fits, `null` where it does not (10 B5 Z4).
+    /// Returns `v` as an `int32` where it fits, `null` where it does not.
     static fn exact<T :: [Integer]>(v: T): ?int32 {
         return exactly(v);
     }
 
-    /// `v` as an `int32`, held at `min` or `max` where it does not fit.
+    /// Returns `v` as an `int32`, held at `min` or `max` where it does not fit.
     static fn clamping<T :: [Integer]>(v: T): int32 {
         return clamped(v);
     }
@@ -1934,22 +2112,31 @@ extend uint :: [Num, Integer] {
     static let bitWidth: int = 64;
     static let isSigned: bool = false;
 
-    /// The decimal integer a text names (`Parse`).
+    /// Parses the decimal integer a text names.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView): uint throws ParseError {
         return try parseInteger(s, 10);
     }
 
-    /// The integer a text names in `radix`, 2…36.
+    /// Parses the integer a text names in base `radix`.
+    ///
+    /// # Panics
+    /// When `radix` is outside 2…36.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView, radix: int): uint throws ParseError {
         return try parseInteger(s, radix);
     }
 
-    /// `v` as an `uint` where it fits, `null` where it does not (10 B5 Z4).
+    /// Returns `v` as an `uint` where it fits, `null` where it does not.
     static fn exact<T :: [Integer]>(v: T): ?uint {
         return exactly(v);
     }
 
-    /// `v` as an `uint`, held at `min` or `max` where it does not fit.
+    /// Returns `v` as an `uint`, held at `min` or `max` where it does not fit.
     static fn clamping<T :: [Integer]>(v: T): uint {
         return clamped(v);
     }
@@ -1963,22 +2150,31 @@ extend uint8 :: [Num, Integer] {
     static let bitWidth: int = 8;
     static let isSigned: bool = false;
 
-    /// The decimal integer a text names (`Parse`).
+    /// Parses the decimal integer a text names.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView): uint8 throws ParseError {
         return try parseInteger(s, 10);
     }
 
-    /// The integer a text names in `radix`, 2…36.
+    /// Parses the integer a text names in base `radix`.
+    ///
+    /// # Panics
+    /// When `radix` is outside 2…36.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView, radix: int): uint8 throws ParseError {
         return try parseInteger(s, radix);
     }
 
-    /// `v` as an `uint8` where it fits, `null` where it does not (10 B5 Z4).
+    /// Returns `v` as an `uint8` where it fits, `null` where it does not.
     static fn exact<T :: [Integer]>(v: T): ?uint8 {
         return exactly(v);
     }
 
-    /// `v` as an `uint8`, held at `min` or `max` where it does not fit.
+    /// Returns `v` as an `uint8`, held at `min` or `max` where it does not fit.
     static fn clamping<T :: [Integer]>(v: T): uint8 {
         return clamped(v);
     }
@@ -1992,22 +2188,31 @@ extend uint16 :: [Num, Integer] {
     static let bitWidth: int = 16;
     static let isSigned: bool = false;
 
-    /// The decimal integer a text names (`Parse`).
+    /// Parses the decimal integer a text names.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView): uint16 throws ParseError {
         return try parseInteger(s, 10);
     }
 
-    /// The integer a text names in `radix`, 2…36.
+    /// Parses the integer a text names in base `radix`.
+    ///
+    /// # Panics
+    /// When `radix` is outside 2…36.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView, radix: int): uint16 throws ParseError {
         return try parseInteger(s, radix);
     }
 
-    /// `v` as an `uint16` where it fits, `null` where it does not (10 B5 Z4).
+    /// Returns `v` as an `uint16` where it fits, `null` where it does not.
     static fn exact<T :: [Integer]>(v: T): ?uint16 {
         return exactly(v);
     }
 
-    /// `v` as an `uint16`, held at `min` or `max` where it does not fit.
+    /// Returns `v` as an `uint16`, held at `min` or `max` where it does not fit.
     static fn clamping<T :: [Integer]>(v: T): uint16 {
         return clamped(v);
     }
@@ -2021,22 +2226,31 @@ extend uint32 :: [Num, Integer] {
     static let bitWidth: int = 32;
     static let isSigned: bool = false;
 
-    /// The decimal integer a text names (`Parse`).
+    /// Parses the decimal integer a text names.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView): uint32 throws ParseError {
         return try parseInteger(s, 10);
     }
 
-    /// The integer a text names in `radix`, 2…36.
+    /// Parses the integer a text names in base `radix`.
+    ///
+    /// # Panics
+    /// When `radix` is outside 2…36.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty, not of the form, or beyond the type's range.
     static fn parse(s: StringView, radix: int): uint32 throws ParseError {
         return try parseInteger(s, radix);
     }
 
-    /// `v` as an `uint32` where it fits, `null` where it does not (10 B5 Z4).
+    /// Returns `v` as an `uint32` where it fits, `null` where it does not.
     static fn exact<T :: [Integer]>(v: T): ?uint32 {
         return exactly(v);
     }
 
-    /// `v` as an `uint32`, held at `min` or `max` where it does not fit.
+    /// Returns `v` as an `uint32`, held at `min` or `max` where it does not fit.
     static fn clamping<T :: [Integer]>(v: T): uint32 {
         return clamped(v);
     }
@@ -2056,7 +2270,10 @@ extend float :: [Num, Signed, Float] {
         return floatFromBits(b, float.zero);
     }
 
-    /// The float a text names, the nearest one (`Parse`).
+    /// Parses the float a text names, rounded to the nearest one.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty or not of a float's form.
     static fn parse(s: StringView): float throws ParseError {
         try checkFloatText(s);
         return floatOfText(s.toString());
@@ -2077,7 +2294,10 @@ extend float32 :: [Num, Signed, Float] {
         return floatFromBits(b, float32.zero);
     }
 
-    /// The float a text names, the nearest one (`Parse`).
+    /// Parses the float a text names, rounded to the nearest one.
+    ///
+    /// # Errors
+    /// A [ParseError] when the text is empty or not of a float's form.
     static fn parse(s: StringView): float32 throws ParseError {
         try checkFloatText(s);
         return float32OfText(s.toString());
@@ -2093,14 +2313,16 @@ extend float32 :: [Num, Signed, Float] {
 /// Why a text is not a value of the type.
 pub enum ParseErrorKind :: [Equatable, Debug] { Empty, Invalid, Overflow }
 
-/// What `parse` throws (10 B3): the text was empty, was not of the type's form, or named a number
-/// beyond the type's range.
+/// The error `parse` throws when a text is not a value of the type.
+///
+/// The text was empty, was not of the type's form, or named a number beyond the type's range.
 pub struct ParseError :: [Error] {
-    /// Why.
+    /// Why the text was refused.
     pub kind: ParseErrorKind,
-    /// What the parser can say beyond the kind — what it expected where it stopped —; empty where
-    /// it says nothing (the number parsers), filled by `Uri.parse`, the address parsers and the
-    /// time parsers (design 10 B3; the review of M10, M14).
+    /// What the parser can say beyond the kind, such as what it expected where it stopped.
+    ///
+    /// Empty where it says nothing (the number parsers); filled by `Uri.parse`, the address
+    /// parsers and the time parsers.
     pub detail: string = "",
     /// The byte offset in the text the refusal points at, where the parser knows one.
     pub offset: ?int = null,
@@ -2121,14 +2343,18 @@ pub struct ParseError :: [Error] {
     }
 }
 
-/// A type read from a text: `T.parse(s)`, throwing `ParseError` with the reason. The number types
-/// conform through `Num`, and `bool`.
+/// A type read from a text: `T.parse(s)`, throwing [ParseError] with the reason.
+///
+/// The number types conform through [Num], and `bool` conforms too.
 pub interface Parse {
     static fn parse(s: StringView): Self throws ParseError;
 }
 
 extend bool :: [Parse] {
-    /// `true` or `false`, exactly.
+    /// Parses `true` or `false`, exactly.
+    ///
+    /// # Errors
+    /// A [ParseError] for any other text.
     static fn parse(s: StringView): bool throws ParseError {
         if (s == "true") {
             return true;
@@ -2140,10 +2366,17 @@ extend bool :: [Parse] {
     }
 }
 
-/// The integer a text names in `radix` (10 B5 Z6): an optional `+` or `-`, ASCII digits, `_`
-/// between two of them, nothing else. A radix outside 2…36 is the program's error and panics (B3).
-/// A byte outside the form is `Invalid` however many digits run before it — only a well-formed
+/// Parses the integer a text names in base `radix`.
+///
+/// The form is an optional `+` or `-`, ASCII digits, `_` between two of them, nothing else. A
+/// byte outside the form is `Invalid` however many digits run before it; only a well-formed
 /// number is an `Overflow`. Negative numbers accumulate downward, so `min` is reached.
+///
+/// # Panics
+/// When `radix` is outside 2…36.
+///
+/// # Errors
+/// A [ParseError] of kind `Empty`, `Invalid` or `Overflow`.
 fn parseInteger<T :: [Integer]>(s: StringView, radix: int): T throws ParseError {
     if (radix < 2 || radix > 36) {
         panic(f"radix {radix} is outside 2..36");
@@ -2219,8 +2452,9 @@ fn parseInteger<T :: [Integer]>(s: StringView, radix: int): T throws ParseError 
     return value;
 }
 
-/// `v` in `U` where it fits, `null` where it does not (10 B5 Z4): converted as `as` wraps, it
-/// fits exactly when it comes back the same and keeps its sign.
+/// Returns `v` in `U` where it fits, `null` where it does not.
+///
+/// Converted as `as` wraps, it fits exactly when it comes back the same and keeps its sign.
 fn exactly<T :: [Integer], U :: [Integer]>(v: T): ?U {
     let w = asTypeOf(v, U.zero);
     if (asTypeOf(w, v) != v || (v < T.zero) != (w < U.zero)) {
@@ -2229,13 +2463,14 @@ fn exactly<T :: [Integer], U :: [Integer]>(v: T): ?U {
     return w;
 }
 
-/// `v` in `U`, held at `U.min` or `U.max` where it does not fit.
+/// Returns `v` in `U`, held at `U.min` or `U.max` where it does not fit.
 fn clamped<T :: [Integer], U :: [Integer]>(v: T): U {
     let w: ?U = exactly(v);
     return w ?? (if (v < T.zero) U.min else U.max);
 }
 
-/// A byte's value as a digit — `0`…`9`, then `a`…`z` or `A`…`Z` for 10…35 — and 36 for any other.
+/// Returns a byte's value as a digit: `0`…`9`, then `a`…`z` or `A`…`Z` for 10…35; 36 for any
+/// other byte.
 fn digitValue(b: int): int {
     if (b >= 48 && b <= 57) {
         return b - 48;
@@ -2249,14 +2484,19 @@ fn digitValue(b: int): int {
     return 36;
 }
 
-/// Whether a byte is an ASCII digit.
+/// Returns whether a byte is an ASCII digit.
 fn isDigit(b: int): bool {
     return b >= 48 && b <= 57;
 }
 
-/// A float's form (10 B5 Z6), thrown where the text is not of it: an optional sign, then `inf`,
-/// `nan`, or digits with an optional `.` and fraction — one digit at least — and an optional
-/// exponent, `e` or `E` with its own sign and digits; `_` between two digits, nothing else.
+/// Checks that a text has a float's form.
+///
+/// The form is an optional sign, then `inf`, `nan`, or digits with an optional `.` and fraction
+/// (one digit at least) and an optional exponent, `e` or `E` with its own sign and digits; `_`
+/// between two digits, nothing else.
+///
+/// # Errors
+/// A [ParseError] where the text is empty or not of the form.
 fn checkFloatText(s: StringView): void throws ParseError {
     let n = byteCount(s);
     if (n == 0) {
@@ -2316,7 +2556,7 @@ fn checkFloatText(s: StringView): void throws ParseError {
     }
 }
 
-/// Whether the three bytes at `i` are `a`, `b`, `c`.
+/// Returns whether the three bytes at `i` are `a`, `b`, `c`.
 fn isWord(s: StringView, i: int, a: int, b: int, c: int): bool {
     return byteAt(s, i) == a && byteAt(s, i + 1) == b && byteAt(s, i + 2) == c;
 }
@@ -2326,18 +2566,23 @@ fn isWord(s: StringView, i: int, a: int, b: int, c: int): bool {
 // parameter's; a float's text read by C (`strtod`, `strtof`) once its form is checked.
 fn byteCount(s: StringView): int;
 fn byteAt(s: StringView, i: int): int;
-/// Whether `p`'s bytes stand in `s` from byte `at` on — memcmp; false where they would run past it.
+/// Returns whether `p`'s bytes stand in `s` from byte `at` on; false where they would run past
+/// its end.
 fn viewMatchesAt(s: StringView, p: StringView, at: int): bool;
-/// Where `p`'s bytes first stand in `s` at or after byte `from` (a negative one counts as 0), -1
-/// where nowhere — memchr to the first byte's places, memcmp there.
+/// Returns where `p`'s bytes first stand in `s` at or after byte `from`, or -1 where nowhere.
+///
+/// A negative `from` counts as 0.
 fn viewFind(s: StringView, p: StringView, from: int): int;
-/// The eight bytes from byte `i` as a word, the lowest first — as `writeUint` writes them.
+/// Returns the eight bytes from byte `i` as a word, the lowest first, as `writeUint` writes them.
 fn viewWordAt(s: StringView, i: int): uint64;
-/// Byte by byte, as `memcmp` and then the length: -1, 0 or 1.
+/// Compares byte by byte, then by length: -1, 0 or 1.
 fn compareBytes(a: string, b: string): int;
-/// The bytes from..to as a string; out of bounds or off a character's boundary, a panic.
+/// Returns the bytes `from..to` as a string.
+///
+/// # Panics
+/// When the range is out of bounds or off a character's boundary.
 fn byteSlice(s: string, from: int, to: int): string;
-/// A string of the array's first `count` bytes.
+/// Creates a string of the array's first `count` bytes.
 fn stringOfBytes(bytes: uint8[], count: int): string;
 // --- strings (10 B9 S1–S3) ----------------------------------------------------------------------
 // UTF-8, immutable, the length in bytes. The members stand once on `StringView` (S1), which a
@@ -2346,7 +2591,7 @@ fn stringOfBytes(bytes: uint8[], count: int): string;
 // test of characters.
 
 extend string :: [Ordered, TotalOrder] {
-    /// Byte by byte (S1), which is the order of the code points.
+    /// Compares byte by byte, which is the order of the code points.
     fn compare(o: string): ?Ordering {
         return this.totalCompare(o);
     }
@@ -2364,30 +2609,32 @@ extend string :: [Ordered, TotalOrder] {
 }
 
 extend string {
-    /// The length in bytes, `O(1)` (S1); `charCount()` counts the characters.
+    /// Returns the length in bytes, `O(1)`; `charCount()` counts the characters.
     pub fn length(): int {
         return byteCount(this);
     }
 
-    /// Whether it has no byte.
+    /// Returns whether it has no byte.
     pub fn isEmpty(): bool {
         return byteCount(this) == 0;
     }
 }
 
-/// What a text is searched for (10 S2): a view or a string, a character, a test of characters.
-/// One signature per operation takes any of them (D4: no overloading by type) — `contains(p)`,
-/// `split(p)`, `stripPrefix(p)` … Two primitives, over byte indices of `text`: a match that begins
-/// at `at`, its end; a match that ends at `end`, its start — `null` where there is none. `at` and
-/// `end` are a character's first byte or the text's length. A third, `nextIn`, finds where the next
-/// match begins; its default walks the first bytes with `matchAt`, and a pattern that can find
-/// faster — a view, a string — says so.
+/// What a text is searched for: a view or a string, a character, a test of characters.
+///
+/// One signature per operation takes any of them: `contains(p)`, `split(p)`, `stripPrefix(p)` …
+/// Two primitives work over byte indices of `text`: `matchAt` returns the end of a match that
+/// begins at `at`, `matchBefore` the start of a match that ends at `end`, `null` where there is
+/// none. `at` and `end` are a character's first byte or the text's length. A third, `nextIn`,
+/// finds where the next match begins; its default walks the first bytes with `matchAt`, and a
+/// pattern that can find faster (a view, a string) overrides it.
 pub interface Pattern {
     fn matchAt(text: StringView, at: int): ?int;
     fn matchBefore(text: StringView, end: int): ?int;
 
-    /// The first byte at or after `from` — a character's first byte or the length — where a
-    /// match begins, or `null`.
+    /// Returns the first byte at or after `from` where a match begins, or `null`.
+    ///
+    /// The byte is a character's first byte or the length.
     fn nextIn(text: StringView, from: int): ?int {
         let n = byteCount(text);
         var at = from;
@@ -2401,7 +2648,7 @@ pub interface Pattern {
     }
 }
 
-/// A view's bytes, where they stand.
+/// Matches a view's bytes, where they stand.
 extend StringView :: [Pattern] {
     fn matchAt(text: StringView, at: int): ?int {
         if (viewMatchesAt(text, this, at)) {
@@ -2427,7 +2674,7 @@ extend StringView :: [Pattern] {
     }
 }
 
-/// A string's bytes, as its view's (a constraint is no coercion site: the string conforms itself).
+/// Matches a string's bytes, as its view does.
 extend string :: [Pattern] {
     fn matchAt(text: StringView, at: int): ?int {
         if (viewMatchesAt(text, this, at)) {
@@ -2453,7 +2700,7 @@ extend string :: [Pattern] {
     }
 }
 
-/// A test of characters: the character where it holds (05 §13 rule 6: a function type's block).
+/// Matches a character for which the test holds.
 extend fn(char) -> bool :: [Pattern] {
     fn matchAt(text: StringView, at: int): ?int {
         if (at >= byteCount(text)) {
@@ -2478,7 +2725,7 @@ extend fn(char) -> bool :: [Pattern] {
     }
 }
 
-/// The character, where it stands.
+/// Matches the character, where it stands.
 extend char :: [Pattern] {
     fn matchAt(text: StringView, at: int): ?int {
         if (at >= byteCount(text) || charOfView(text, at) != this) {
@@ -2499,8 +2746,10 @@ extend char :: [Pattern] {
     }
 }
 
-/// The first byte of the character after the one at `at` — or one past the length, where `at`
-/// is the length: a walk over the characters' first bytes ends there.
+/// Returns the first byte of the character after the one at `at`.
+///
+/// Where `at` is the length it returns one past the length, so a walk over the characters'
+/// first bytes ends there.
 fn nextChar(text: StringView, at: int): int {
     let n = byteCount(text);
     var i = at + 1;
@@ -2510,7 +2759,7 @@ fn nextChar(text: StringView, at: int): int {
     return i;
 }
 
-/// The first byte of the character that ends at `end` — -1 at the start.
+/// Returns the first byte of the character that ends at `end`; -1 at the start.
 fn previousChar(text: StringView, end: int): int {
     var i = end - 1;
     while (i > 0 && (byteAt(text, i) & 192) == 128) {
@@ -2519,7 +2768,7 @@ fn previousChar(text: StringView, end: int): int {
     return i;
 }
 
-/// How many bytes UTF-8 gives `c`.
+/// Returns how many bytes UTF-8 gives `c`.
 fn utf8Width(c: char): int {
     let code = c as uint32;
     if (code < 128) {
@@ -2534,24 +2783,24 @@ fn utf8Width(c: char): int {
     return 4;
 }
 
-/// Whether `p` matches the empty text — a separator or a pattern to replace that would stand
-/// everywhere.
+/// Returns whether `p` matches the empty text, so that as a separator or a pattern to replace it
+/// would stand everywhere.
 fn matchesNothing<P :: [Pattern]>(p: P): bool {
     return p.matchAt("", 0) != null;
 }
 
 extend StringView {
-    /// The characters, decoded from the bytes — from either end.
+    /// Returns an iterator over the characters, decoded from the bytes, from either end.
     pub fn chars(): CharsIter {
         return CharsIter { s = this, at = 0, end = byteCount(this) };
     }
 
-    /// The characters, each with the byte index it begins at.
+    /// Returns an iterator over the characters, each with the byte index it begins at.
     pub fn charIndices(): CharIndicesIter {
         return CharIndicesIter { s = this, at = 0 };
     }
 
-    /// How many characters it holds, `O(n)`.
+    /// Returns how many characters it holds, `O(n)`.
     pub fn charCount(): int {
         let n = byteCount(this);
         var count = 0;
@@ -2565,27 +2814,27 @@ extend StringView {
         return count;
     }
 
-    /// Whether `p` stands in it.
+    /// Returns whether `p` stands in it.
     pub fn contains<P :: [Pattern]>(p: P): bool {
         return this.find(p) != null;
     }
 
-    /// Whether it begins with `p`.
+    /// Returns whether it begins with `p`.
     pub fn startsWith<P :: [Pattern]>(p: P): bool {
         return p.matchAt(this, 0) != null;
     }
 
-    /// Whether it ends with `p`.
+    /// Returns whether it ends with `p`.
     pub fn endsWith<P :: [Pattern]>(p: P): bool {
         return p.matchBefore(this, byteCount(this)) != null;
     }
 
-    /// The byte index of the first `p`, or `null`; an empty `p` stands at 0.
+    /// Returns the byte index of the first `p`, or `null`; an empty `p` stands at 0.
     pub fn find<P :: [Pattern]>(p: P): ?int {
         return p.nextIn(this, 0);
     }
 
-    /// The byte index of the last `p`, or `null`; an empty `p` stands at the length.
+    /// Returns the byte index of the last `p`, or `null`; an empty `p` stands at the length.
     pub fn rfind<P :: [Pattern]>(p: P): ?int {
         var end = byteCount(this);
         while (end >= 0) {
@@ -2597,8 +2846,9 @@ extend StringView {
         return null;
     }
 
-    /// How many times `p` stands in it, none overlapping another; an empty `p` stands between
-    /// every two characters and at both ends.
+    /// Returns how many times `p` stands in it, none overlapping another.
+    ///
+    /// An empty `p` stands between every two characters and at both ends.
     pub fn count<P :: [Pattern]>(p: P): int {
         let n = byteCount(this);
         var count = 0;
@@ -2615,8 +2865,12 @@ extend StringView {
         return count;
     }
 
-    /// The parts between the separators, in order: `"a,b,,c".split(",")` gives `a`, `b`, ``, `c` —
-    /// views, no copies. A separator that matches the empty text panics.
+    /// Returns an iterator over the parts between the separators, in order.
+    ///
+    /// `"a,b,,c".split(",")` gives `a`, `b`, ``, `c`, views with no copies.
+    ///
+    /// # Panics
+    /// When `sep` matches the empty text.
     pub fn split<P :: [Pattern]>(sep: P): SplitIter<P> {
         if (matchesNothing(sep)) {
             panic("split: a separator that matches the empty text");
@@ -2624,8 +2878,12 @@ extend StringView {
         return SplitIter<P> { s = this, sep = sep, at = 0, left = -1 };
     }
 
-    /// At most `n` parts: the first `n - 1` separators split, the rest is the last part. `n` of 0
-    /// gives none.
+    /// Returns an iterator over at most `n` parts between the separators.
+    ///
+    /// The first `n - 1` separators split, the rest is the last part. `n` of 0 gives none.
+    ///
+    /// # Panics
+    /// When `sep` matches the empty text, or `n` is negative.
     pub fn splitN<P :: [Pattern]>(sep: P, n: int): SplitIter<P> {
         if (matchesNothing(sep)) {
             panic("splitN: a separator that matches the empty text");
@@ -2636,7 +2894,8 @@ extend StringView {
         return SplitIter<P> { s = this, sep = sep, at = if (n == 0) -1 else 0, left = n };
     }
 
-    /// The part before the first `sep` and the part after it, or `null` where there is none.
+    /// Returns the part before the first `sep` and the part after it, or `null` where there is
+    /// none.
     pub fn splitOnce<P :: [Pattern]>(sep: P): ?(StringView, StringView) {
         if (let at = sep.nextIn(this, 0)) {
             let parts: (StringView, StringView) = (this[..at], this[sep.matchAt(this, at)!..]);
@@ -2645,24 +2904,27 @@ extend StringView {
         return null;
     }
 
-    /// The matches of `p`, in order, none overlapping another — views.
+    /// Returns an iterator over the matches of `p` as views, in order, none overlapping another.
     pub fn matches<P :: [Pattern]>(p: P): MatchesIter<P> {
         return MatchesIter<P> { s = this, p = p, at = 0 };
     }
 
-    /// The lines: split at `\n`, a `\r` before it taken off, no empty line after a last `\n`.
+    /// Returns an iterator over the lines.
+    ///
+    /// Split at `\n`, a `\r` before it taken off, no empty line after a last `\n`.
     pub fn lines(): LinesIter {
         return LinesIter { s = this, at = 0 };
     }
 
-    /// Without the white space at both ends — the characters with the property White_Space (10
-    /// S4): the ideographic space and the no-break space as well as the tab. A pattern of one's own
-    /// is `trimMatches` (S12c).
+    /// Returns the text without the white space at both ends.
+    ///
+    /// White space is the characters with the property White_Space: the ideographic space and
+    /// the no-break space as well as the tab. `trimMatches` trims a pattern of one's own.
     pub fn trim(): StringView {
         return this.trimStart().trimEnd();
     }
 
-    /// Without the white space at the start.
+    /// Returns the text without the white space at the start.
     pub fn trimStart(): StringView {
         let n = byteCount(this);
         var i = 0;
@@ -2672,7 +2934,7 @@ extend StringView {
         return this[i..];
     }
 
-    /// Without the white space at the end.
+    /// Returns the text without the white space at the end.
     pub fn trimEnd(): StringView {
         var n = byteCount(this);
         while (n > 0) {
@@ -2685,13 +2947,14 @@ extend StringView {
         return this[..n];
     }
 
-    /// Without the matches of `p` at both ends, again and again: `"xxaxx".trimMatches('x')` is `a`
-    /// (10 S12c, Rust's `trim_matches`). A match of the empty text takes nothing.
+    /// Returns the text without the matches of `p` at both ends, removed again and again.
+    ///
+    /// `"xxaxx".trimMatches('x')` is `a`. A match of the empty text takes nothing.
     pub fn trimMatches<P :: [Pattern]>(p: P): StringView {
         return this.trimStartMatches(p).trimEndMatches(p);
     }
 
-    /// Without the matches of `p` at the start, again and again.
+    /// Returns the text without the matches of `p` at the start, removed again and again.
     pub fn trimStartMatches<P :: [Pattern]>(p: P): StringView {
         let n = byteCount(this);
         var i = 0;
@@ -2705,7 +2968,7 @@ extend StringView {
         return this[i..];
     }
 
-    /// Without the matches of `p` at the end, again and again.
+    /// Returns the text without the matches of `p` at the end, removed again and again.
     pub fn trimEndMatches<P :: [Pattern]>(p: P): StringView {
         var n = byteCount(this);
         while (n > 0) {
@@ -2718,13 +2981,14 @@ extend StringView {
         return this[..n];
     }
 
-    /// Whether it holds nothing but white space — the empty text too.
+    /// Returns whether it holds nothing but white space; true for the empty text too.
     pub fn isBlank(): bool {
         return this.trimStart().isEmpty();
     }
 
-    /// Every character by its simple uppercase mapping (10 S4): one character for one and no
-    /// locale, so `"straße".toUpper()` is `STRAßE`.
+    /// Returns the text with every character by its simple uppercase mapping.
+    ///
+    /// One character for one and no locale, so `"straße".toUpper()` is `STRAßE`.
     pub fn toUpper(): string {
         let out = StringBuilder.new();
         for (c in this.chars()) {
@@ -2733,7 +2997,9 @@ extend StringView {
         return out.toString();
     }
 
-    /// Every character by its simple lowercase mapping: one character for one, no locale.
+    /// Returns the text with every character by its simple lowercase mapping.
+    ///
+    /// One character for one, no locale.
     pub fn toLower(): string {
         let out = StringBuilder.new();
         for (c in this.chars()) {
@@ -2742,20 +3008,26 @@ extend StringView {
         return out.toString();
     }
 
-    /// Its bytes, a copy (10 S12d): a `Slice<uint8>` of a string would write into a text that may
-    /// not change.
+    /// Returns a copy of its bytes.
+    ///
+    /// A copy, since a text may not change through a `Slice<uint8>`.
     pub fn toBytes(): uint8[] {
         let bytes: uint8[] = [0u8] * byteCount(this);
         viewBytes(this).copyInto(bytes[..]);
         return bytes;
     }
 
-    /// `T.parse(this)`, the type from where it goes (10 S3): `let n: int = try s.parse();`.
+    /// Parses the text as `T.parse(this)`, the type taken from the expected type.
+    ///
+    /// `let n: int = try s.parse();`.
+    ///
+    /// # Errors
+    /// The [ParseError] `T.parse` throws.
     pub fn parse<T :: [Parse]>(): T throws ParseError {
         return try T.parse(this);
     }
 
-    /// The rest after `p` where it begins with `p`, or `null` (10 S2: absence is information).
+    /// Returns the rest after `p` where it begins with `p`, or `null`.
     pub fn stripPrefix<P :: [Pattern]>(p: P): ?StringView {
         if (let end = p.matchAt(this, 0)) {
             return this[end..];
@@ -2763,7 +3035,7 @@ extend StringView {
         return null;
     }
 
-    /// The rest before `p` where it ends with `p`, or `null`.
+    /// Returns the rest before `p` where it ends with `p`, or `null`.
     pub fn stripSuffix<P :: [Pattern]>(p: P): ?StringView {
         if (let start = p.matchBefore(this, byteCount(this))) {
             return this[..start];
@@ -2771,13 +3043,19 @@ extend StringView {
         return null;
     }
 
-    /// Every `p` replaced by `with`, none overlapping another; a `p` that matches the empty text
-    /// panics.
+    /// Returns the text with every `p` replaced by `with`, none overlapping another.
+    ///
+    /// # Panics
+    /// When `p` matches the empty text.
     pub fn replace<P :: [Pattern]>(p: P, with: StringView): string {
         return this.replaceN(p, with, -1);
     }
 
-    /// The first `n` of `p` replaced by `with` — all of them where `n` is negative.
+    /// Returns the text with the first `n` of `p` replaced by `with`; all of them where `n` is
+    /// negative.
+    ///
+    /// # Panics
+    /// When `p` matches the empty text.
     pub fn replaceN<P :: [Pattern]>(p: P, with: StringView, n: int): string {
         if (matchesNothing(p)) {
             panic("replace: a pattern that matches the empty text");
@@ -2801,7 +3079,8 @@ extend StringView {
         return out.toString();
     }
 
-    /// `fill` before it until it is `width` characters long; a longer one as it is.
+    /// Returns the text with `fill` before it until it is `width` characters long; a longer one
+    /// as it is.
     pub fn padStart(width: int, fill: char = ' '): string {
         let missing = width - this.charCount();
         if (missing <= 0) {
@@ -2817,7 +3096,8 @@ extend StringView {
         return out.toString();
     }
 
-    /// `fill` after it until it is `width` characters long; a longer one as it is.
+    /// Returns the text with `fill` after it until it is `width` characters long; a longer one
+    /// as it is.
     pub fn padEnd(width: int, fill: char = ' '): string {
         let missing = width - this.charCount();
         if (missing <= 0) {
@@ -2838,8 +3118,10 @@ fn isAsciiSpace(b: int): bool {
     return b == 32 || (b >= 9 && b <= 13);
 }
 
-/// A text's parts between a pattern's matches: views of it. `at` is where the next part begins,
-/// -1 once the last was given; `left` how many parts `splitN` still gives, -1 without a bound.
+/// Iterates over a text's parts between a pattern's matches, as views of it.
+///
+/// `at` is where the next part begins, -1 once the last was given; `left` is how many parts
+/// `splitN` still gives, -1 without a bound.
 pub struct SplitIter<P :: [Pattern]> :: [Iterator] {
     type Item = StringView;
     s: StringView,
@@ -2868,7 +3150,7 @@ pub struct SplitIter<P :: [Pattern]> :: [Iterator] {
     }
 }
 
-/// A pattern's matches in a text, none overlapping another: views of it.
+/// Iterates over a pattern's matches in a text, none overlapping another, as views of it.
 pub struct MatchesIter<P :: [Pattern]> :: [Iterator] {
     type Item = StringView;
     s: StringView,
@@ -2889,7 +3171,7 @@ pub struct MatchesIter<P :: [Pattern]> :: [Iterator] {
     }
 }
 
-/// A text's lines: views of it.
+/// Iterates over a text's lines, as views of it.
 pub struct LinesIter :: [Iterator] {
     type Item = StringView;
     s: StringView,
@@ -2912,8 +3194,9 @@ pub struct LinesIter :: [Iterator] {
     }
 }
 
-/// A string built a part at a time (10 S3), in a buffer that doubles: no quadratic chain of
-/// concatenations. `std.string` passes it on.
+/// Builds a string a part at a time, in a buffer that doubles.
+///
+/// It avoids a quadratic chain of concatenations. `std.string` re-exports it.
 pub class StringBuilder {
     var bytes: uint8[],
     var count: int,
@@ -2922,12 +3205,12 @@ pub class StringBuilder {
         return StringBuilder { bytes = [], count = 0 };
     }
 
-    /// How many bytes it holds.
+    /// Returns how many bytes it holds.
     pub fn length(): int {
         return this.count;
     }
 
-    /// `s` at the end — a string, or a view of one.
+    /// Appends `s`, a string or a view of one.
     pub mut fn appendStr(s: StringView): void {
         let n = byteCount(s);
         this.reserve(n);
@@ -2935,25 +3218,25 @@ pub class StringBuilder {
         this.count = this.count + n;
     }
 
-    /// `v`'s decimal digits at the end, written in place — an f-string's integer (10 S6).
+    /// Appends `v`'s decimal digits, written in place; an f-string's integer hole uses it.
     mut fn putInt(v: int): void {
         this.reserve(20);
         this.count = this.count + putIntDigits(this.bytes, this.count, v);
     }
 
-    /// `v`'s decimal digits at the end, written in place.
+    /// Appends `v`'s decimal digits, written in place.
     mut fn putUint(v: uint): void {
         this.reserve(20);
         this.count = this.count + putUintDigits(this.bytes, this.count, v);
     }
 
-    /// An empty builder with room for `room` bytes — an f-string's, sized for its text.
+    /// Creates an empty builder with room for `room` bytes; an f-string sizes it for its text.
     static fn sized(room: int): StringBuilder {
         let zero: uint8 = 0;
         return StringBuilder { bytes = [zero] * room, count = 0 };
     }
 
-    /// `c` at the end, as its UTF-8 bytes.
+    /// Appends `c` as its UTF-8 bytes.
     pub mut fn appendChar(c: char): void {
         let code = (c as uint32) as int;
         this.reserve(4);
@@ -2974,17 +3257,17 @@ pub class StringBuilder {
         }
     }
 
-    /// `v`'s text at the end.
+    /// Appends `v`'s text, through its `showTo`.
     pub mut fn append<T :: [Display]>(v: T): void {
         v.showTo(this);
     }
 
-    /// Every byte taken out; the room stays.
+    /// Removes every byte; the room stays.
     pub mut fn clear(): void {
         this.count = 0;
     }
 
-    /// What it holds, as a string.
+    /// Returns what it holds, as a string.
     pub fn toString(): string {
         return stringOfBytes(this.bytes, this.count);
     }
@@ -2994,17 +3277,17 @@ pub class StringBuilder {
         this.count = this.count + 1;
     }
 
-    /// Room for `n` bytes more. Only the check: small enough for the IR inliner to put into every
-    /// append, so a builder with room calls nothing; the growth is `grow`'s, out of line (01 S13,
-    /// Rust's `reserve` beside its cold `do_reserve_and_handle`).
+    /// Makes room for `n` more bytes.
+    ///
+    /// Only the check, small enough to be inlined into every append, so a builder with room
+    /// calls nothing; the growth itself is `grow`'s, out of line.
     mut fn reserve(n: int): void {
         if (this.count + n > this.bytes.length()) {
             this.grow(this.count + n);
         }
     }
 
-    /// The buffer doubled until `need` bytes fit, the bytes so far copied over. Above the inliner's
-    /// budget by its loop and copy, so it stays one function every growth calls.
+    /// Doubles the buffer until `need` bytes fit, copying the bytes so far over.
     mut fn grow(need: int): void {
         var room = if (this.bytes.length() == 0) 16 else this.bytes.length() * 2;
         while (room < need) {
@@ -3017,16 +3300,21 @@ pub class StringBuilder {
     }
 }
 
-/// `s`'s bytes into `bytes` from `at` on, and the first `count` bytes of `from` into `into` — C's
-/// memcpy (measurement point 3), the ranges checked as an index is.
+/// Copies `s`'s bytes into `bytes` from `at` on, and the first `count` bytes of `from` into
+/// `into`.
+///
+/// # Panics
+/// When a range is out of bounds, as an index is.
 fn putBytes(bytes: uint8[], at: int, s: StringView): void;
 fn copyBytes(into: uint8[], from: uint8[], count: int): void;
 
-/// The copy primitive (10 C2; the review's B16): the first `count` elements of `from` into `into`,
-/// two views of one element type that may overlap either way — C's memmove. The counts are the
-/// caller's to check; `Slice.copyInto` does, and the collections call this where they have.
+/// Copies the first `count` elements of `from` into `into`.
+///
+/// The two views of one element type may overlap either way. The counts are the caller's to
+/// check; [Slice.copyInto] does, and the collections call this where they have.
 fn moveElements<T>(into: Slice<T>, from: Slice<T>, count: int): void;
-/// The panic of a range `low..high` outside `length` (LYR-RT0003), as `xs[a..b]` raises it.
+/// Ends the process for a range `low..high` outside `length` (`LYR-RT0003`), as `xs[a..b]`
+/// does.
 fn panicRange(low: int, high: int, length: int): never;
 
 // --- StringView (10 S1, 03 A2; M8a S12): the view of a string's bytes --------------------------
@@ -3034,46 +3322,53 @@ fn panicRange(low: int, high: int, length: int): never;
 // character boundaries, a string stands where one is expected, and `s[i]` is the character that
 // begins at a byte. The string's search and split members stand on it (the strings, above).
 
-/// `a == b` between a string and a view, or two views: the same bytes. The checker's for the
-/// operator; a program writes `==`.
+/// Returns whether a string and a view, or two views, hold the same bytes.
+///
+/// The operator `==` between them calls it; a program writes `==`.
 pub fn equalViews(a: StringView, b: StringView): bool {
     return viewsHoldTheSameBytes(a, b);
 }
 
-/// `<`, `<=`, `>`, `>=` between a string and a view, or two views: byte by byte, which is the
-/// order of the code points. The checker's for the operators.
+/// Compares a string and a view, or two views, byte by byte, which is the order of the code
+/// points.
+///
+/// The operators `<`, `<=`, `>` and `>=` between them call it.
 pub fn compareViews(a: StringView, b: StringView): ?Ordering {
     return a.totalCompare(b);
 }
 
-/// `s[i]`: the character that begins at byte `i`; outside the bytes, or at a byte that continues
-/// a character, a panic (LYR-RT0003). The checker's for the index.
+/// Returns the character that begins at byte `i`; the index `s[i]` calls it.
+///
+/// # Panics
+/// When `i` is outside the bytes, or at a byte that continues a character (`LYR-RT0003`).
 pub fn charAtByte(v: StringView, i: int): char {
     return charOfView(v, i);
 }
 
 fn viewsHoldTheSameBytes(a: StringView, b: StringView): bool;
-/// Byte by byte, as `memcmp` and then the length: -1, 0 or 1.
+/// Compares byte by byte, then by length: -1, 0 or 1.
 fn compareViewBytes(a: StringView, b: StringView): int;
 fn viewToString(v: StringView): string;
 fn charOfView(v: StringView, i: int): char;
-/// The view's bytes as the `Slice<uint8>` it is below the checker — read here, never written.
+/// Returns the view's bytes as a `Slice<uint8>`, for reading only.
 fn viewBytes(v: StringView): Slice<uint8>;
 
 extend StringView {
-    /// Whether it holds no byte.
+    /// Returns whether it holds no byte.
     pub fn isEmpty(): bool {
         return this.length() == 0;
     }
 
-    /// Its bytes in a string of their own.
+    /// Returns its bytes in a string of their own.
     pub fn toString(): string {
         return viewToString(this);
     }
 }
 
-/// A view compares, hashes and orders by its bytes, as a string does: equal to the string it
-/// shows, hashing as it does (10 C8); it shows its text and debugs quoted.
+/// Compares, hashes and orders a view by its bytes, as a string does.
+///
+/// A view equals the string it shows and hashes as it does; it shows its text and debugs
+/// quoted.
 extend StringView :: [Equatable, Hashable, Ordered, TotalOrder, Display, Debug, Index<int>] {
     type Output = char;
 
@@ -3117,8 +3412,8 @@ extend StringView :: [Equatable, Hashable, Ordered, TotalOrder, Display, Debug, 
     }
 }
 
-/// `s[i]` through `Index<int>` where a type parameter asks for it (04 D6): the character that
-/// begins at byte `i`.
+/// Indexes a string through `Index<int>` where a type parameter asks for it: `s[i]` is the
+/// character that begins at byte `i`.
 extend string :: [Index<int>] {
     type Output = char;
 
@@ -3129,9 +3424,10 @@ extend string :: [Index<int>] {
 
 // --- bytes to text (10 S3; M8a S12) -----------------------------------------------------------
 
-/// What `string.fromUtf8` throws (10 S3, B3: the bytes are the data's, so it throws): they are no
-/// well-formed UTF-8 from `offset` on — an overlong form, a surrogate, beyond U+10FFFF, a byte
-/// that begins nothing, a sequence cut short.
+/// The error `string.fromUtf8` throws when the bytes are no well-formed UTF-8.
+///
+/// From `offset` on the bytes hold an overlong form, a surrogate, a value beyond U+10FFFF, a
+/// byte that begins nothing, or a sequence cut short.
 pub struct Utf8Error :: [Error] {
     /// The first byte that is no well-formed UTF-8.
     pub offset: int,
@@ -3142,7 +3438,10 @@ pub struct Utf8Error :: [Error] {
 }
 
 extend string {
-    /// The text the bytes are, copied; `Utf8Error` where they are no well-formed UTF-8.
+    /// Creates the text the bytes are, copied.
+    ///
+    /// # Errors
+    /// A [Utf8Error] where the bytes are no well-formed UTF-8.
     pub static fn fromUtf8(bytes: Slice<uint8>): string throws Utf8Error {
         let bad = utf8Invalid(bytes);
         if (bad >= 0) {
@@ -3151,14 +3450,15 @@ extend string {
         return stringOfSlice(bytes);
     }
 
-    /// The text the bytes are, each maximal part of a sequence that is not well-formed replaced by
-    /// U+FFFD — the Unicode Standard's recommended practice (3.9), WHATWG's decoding.
+    /// Creates the text the bytes are, each maximal ill-formed part replaced by U+FFFD.
+    ///
+    /// This is the Unicode Standard's recommended practice (3.9) and WHATWG's decoding.
     pub static fn fromUtf8Lossy(bytes: Slice<uint8>): string {
         return stringOfUtf8Lossy(bytes);
     }
 }
 
-/// -1 where the bytes are well-formed UTF-8, else the offset of the first that is not.
+/// Returns -1 where the bytes are well-formed UTF-8, else the offset of the first that is not.
 fn utf8Invalid(bytes: Slice<uint8>): int;
 fn stringOfSlice(bytes: Slice<uint8>): string;
 fn stringOfUtf8Lossy(bytes: Slice<uint8>): string;
@@ -3203,18 +3503,23 @@ pub fn fstringChar(out: StringBuilder, value: char): void {
     out.appendChar(value);
 }
 
-/// A `Display` type's hole: through `showTo`.
+/// Writes an f-string hole of a [Display] type into `out`, through `showTo`.
 pub fn fstringShown<T :: [Display]>(out: StringBuilder, value: T): void {
     value.showTo(out);
 }
 
-/// A `Format` type's hole with a spec: the type reads the spec (10 S7).
+/// Writes an f-string hole of a [Format] type with a spec into `out`; the type reads the spec.
 pub fn fstringFormatted<T :: [Format]>(out: StringBuilder, value: T, spec: StringView): void {
     value.format(spec, out);
 }
 
-/// Another `Display` type's hole with a spec: what `showTo` writes, in its width, alignment and
-/// fill — without a width straight into `out`.
+/// Writes an f-string hole of another [Display] type with a spec into `out`.
+///
+/// What `showTo` writes is set in the spec's width, alignment and fill; without a width it goes
+/// straight into `out`.
+///
+/// # Panics
+/// When the spec says more than fill, alignment and width.
 pub fn fstringPadded<T :: [Display]>(out: StringBuilder, value: T, spec: StringView): void {
     let s = paddingOnly(spec, "a Display type's text");
     if (s.width == 0) {
@@ -3226,7 +3531,8 @@ pub fn fstringPadded<T :: [Display]>(out: StringBuilder, value: T, spec: StringV
     pad(text.toString(), s, '<', out);
 }
 
-/// A hole under `?`: what `debugTo` writes, in the width, alignment and fill before it.
+/// Writes an f-string hole under `?` into `out`: what `debugTo` writes, in the spec's width,
+/// alignment and fill.
 pub fn fstringDebugged<T :: [Debug]>(out: StringBuilder, value: T, spec: StringView): void {
     let s = readSpec(spec);
     if (!padsOnly(s, '?')) {
@@ -3241,25 +3547,30 @@ pub fn fstringDebugged<T :: [Debug]>(out: StringBuilder, value: T, spec: StringV
     pad(text.toString(), s, '<', out);
 }
 
-/// A float's shortest text (12 §1), as `std.string.fromFloat` gives it.
+/// Returns a float's shortest text that reads back as the same value, as
+/// `std.string.fromFloat` gives it.
 fn textOfFloat(value: float): string;
 fn textOfFloat32(value: float32): string;
-/// An integer's decimal digits into `bytes` from `at` on: how many; the room is the caller's.
+/// Writes an integer's decimal digits into `bytes` from `at` on and returns how many.
+///
+/// The caller makes sure there is room.
 fn putIntDigits(bytes: uint8[], at: int, value: int): int;
 fn putUintDigits(bytes: uint8[], at: int, value: uint): int;
 
 // --- the format language (08 Y7, 10 S7; spec 12 §2) ---------------------------------------------
 
-/// A type with formats of its own (10 S7): `{x:spec}` hands it the spec as written. The scalars
-/// conform with the format language, which the compiler checks where a spec is written; the spec
-/// is a view (10 A3), and a string stands for one.
+/// A type with formats of its own: `{x:spec}` hands it the spec as written.
+///
+/// The scalars conform with the format language, which the compiler checks where a spec is
+/// written. The spec is a view, and a string stands for one.
 pub interface Format {
     fn format(spec: StringView, out: StringBuilder): void;
 }
 
-/// A spec read (12 §2 rule 1): `[[fill]align][sign][#][0][width][grouping][.precision][type]`.
+/// A format spec as read: `[[fill]align][sign][#][0][width][grouping][.precision][type]`.
+///
 /// `align` is `<`, `>`, `^`, `=` for the zeros of `0` after the sign, or `'\0'` for the value's
-/// own; `grouping` and `kind` are `'\0'` where none is written, `precision` -1.
+/// own; `grouping` and `kind` are `'\0'` where none is written, `precision` is -1.
 struct FormatSpec {
     fill: char,
     align: char,
@@ -3271,7 +3582,12 @@ struct FormatSpec {
     kind: char,
 }
 
-/// The spec in `text`. The compiler checked a spec an f-string writes; what is no spec panics.
+/// Reads the format spec in `text`.
+///
+/// The compiler has already checked a spec an f-string writes.
+///
+/// # Panics
+/// When `text` is no spec.
 fn readSpec(text: StringView): FormatSpec {
     let cs = text.chars().toArray();
     let n = cs.length();
@@ -3350,15 +3666,19 @@ fn decimalOf(c: char): int {
     return ((c as uint32) as int) - 48;
 }
 
-/// A part of a spec the value's type does not take (12 §2 rule 2) panics when it is read: an
-/// f-string's was refused where it was written (LYR-SEM0164), a template's — `fmt.format`, read
-/// at run time — panics as a broken one does (10 B3; M8c S8c).
+/// Ends the process for a part of a spec the value's type does not take.
+///
+/// An f-string's spec was already refused where it was written (`LYR-SEM0164`); a template's,
+/// read at run time by `fmt.format`, panics here as a broken one does.
 fn refuseSpec(spec: StringView, what: string): never {
     panic(f"'{spec}' does not apply to {what}");
 }
 
-/// The spec of a value that takes fill, alignment and width alone — a `char`, a `bool`, another
-/// `Display` type's text —, the rest refused.
+/// Reads the spec of a value that takes fill, alignment and width alone: a `char`, a `bool`,
+/// another `Display` type's text.
+///
+/// # Panics
+/// When the spec says more.
 fn paddingOnly(spec: StringView, what: string): FormatSpec {
     let s = readSpec(spec);
     if (!padsOnly(s, '\0')) {
@@ -3367,13 +3687,16 @@ fn paddingOnly(spec: StringView, what: string): FormatSpec {
     return s;
 }
 
-/// Whether the spec says no more than fill, alignment and width, besides the type `kind`.
+/// Returns whether the spec says no more than fill, alignment and width, besides the type
+/// `kind`.
 fn padsOnly(s: FormatSpec, kind: char): bool {
     return !s.plus && !s.alternate && s.align != '=' && s.grouping == '\0' && s.precision < 0 && s.kind == kind;
 }
 
-/// `text` in the spec's width, counted in characters: the fill before it, after it, or around it
-/// (the odd one after), as the spec aligns it or else as `natural` does.
+/// Writes `text` into `out` in the spec's width, counted in characters.
+///
+/// The fill goes before it, after it, or around it (the odd one after), as the spec aligns it
+/// or else as `natural` does.
 fn pad(text: string, s: FormatSpec, natural: char, out: StringBuilder): void {
     let room = s.width - text.charCount();
     if (room <= 0) {
@@ -3387,7 +3710,7 @@ fn pad(text: string, s: FormatSpec, natural: char, out: StringBuilder): void {
     fillOut(s.fill, room - before, out);
 }
 
-/// `count` times `c`.
+/// Writes `c` into `out` `count` times.
 fn fillOut(c: char, count: int, out: StringBuilder): void {
     var i = 0;
     while (i < count) {
@@ -3396,8 +3719,10 @@ fn fillOut(c: char, count: int, out: StringBuilder): void {
     }
 }
 
-/// A number's parts in the spec's width: under `0` the zeros between the sign and the prefix and
-/// the digits; otherwise the whole padded, right-aligned unless the spec aligns it.
+/// Writes a number's parts into `out` in the spec's width.
+///
+/// Under `0` the zeros go between the sign and the prefix and the digits; otherwise the whole
+/// is padded, right-aligned unless the spec aligns it.
 fn finishNumber(sign: string, prefix: string, digits: string, s: FormatSpec, out: StringBuilder): void {
     if (s.align == '=') {
         out.appendStr(sign);
@@ -3409,8 +3734,10 @@ fn finishNumber(sign: string, prefix: string, digits: string, s: FormatSpec, out
     pad(sign + prefix + digits, s, '>', out);
 }
 
-/// An integer by its sign and magnitude (12 §2 rule 3): the radix `b`, `o`, `x` or `X` names, the
-/// prefix under `#`, the digits grouped by three (decimal) or four (another radix).
+/// Formats an integer, given by its sign and magnitude, into `out`.
+///
+/// The radix is the one `b`, `o`, `x` or `X` names, the prefix comes under `#`, the digits are
+/// grouped by three (decimal) or four (another radix).
 fn formatInteger(negative: bool, magnitude: uint, spec: StringView, out: StringBuilder): void {
     let s = readSpec(spec);
     if (s.precision >= 0 || !(s.kind == '\0' || s.kind == 'b' || s.kind == 'o' || s.kind == 'x' || s.kind == 'X')) {
@@ -3430,13 +3757,15 @@ fn formatInteger(negative: bool, magnitude: uint, spec: StringView, out: StringB
     finishNumber(sign, prefix, digits, s, out);
 }
 
-/// Whether the spec fills with zeros after the sign and groups: the zeros then count as digits.
+/// Returns whether the spec fills with zeros after the sign and groups; the zeros then count
+/// as digits.
 fn zeroGrouped(s: FormatSpec): bool {
     return s.fill == '0' && s.align == '=' && s.grouping != '\0';
 }
 
-/// The fewest digits that, grouped by `size`, fill `width` characters — a minimum: where no count
-/// fits exactly, the next one; no separator leads.
+/// Returns the fewest digits that, grouped by `size`, fill `width` characters.
+///
+/// A minimum: where no count fits exactly, the next one; no separator leads.
 fn digitsFor(width: int, size: int): int {
     var n = 1;
     while (n + (n - 1) / size < width) {
@@ -3445,14 +3774,17 @@ fn digitsFor(width: int, size: int): int {
     return n;
 }
 
-/// A signed integer: its magnitude in `uint`, where `int`'s least value has one.
+/// Formats a signed integer into `out`, through its magnitude in `uint`, where `int`'s least
+/// value has one.
 fn formatSigned(v: int, spec: StringView, out: StringBuilder): void {
     let magnitude = if (v < 0) (-(v + 1)) as uint + 1 else v as uint;
     formatInteger(v < 0, magnitude, spec, out);
 }
 
-/// The digits of `magnitude` in `radix`, most significant first, `grouping` between each `size`
-/// of them from the right; `least` digits at least, zeros before the first.
+/// Returns the digits of `magnitude` in `radix`, most significant first.
+///
+/// `grouping` stands between each `size` of them from the right; there are `least` digits at
+/// least, zeros before the first.
 fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int, least: int): string {
     var count = 1;
     var rest = magnitude / radix;
@@ -3484,10 +3816,12 @@ fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int
     return stringOfBytes(bytes, total);
 }
 
-/// A float (12 §2 rule 3): its shortest text without a precision or a type (03 §1.7) — a
-/// `float32`'s own where `narrow` says so; fixed with a precision; `e`/`E` with an exponent; `%` a
-/// hundredfold and fixed, the point moved on the exact digits — six digits where those three name
-/// none. Its sign, the integer part grouped (the zeros of `0` with it), padded.
+/// Formats a float into `out`.
+///
+/// Without a precision or a type it is the shortest text, a `float32`'s own where `narrow` says
+/// so; fixed with a precision; `e`/`E` with an exponent; `%` a hundredfold and fixed, the point
+/// moved on the exact digits; six digits where those three name no precision. Then the sign,
+/// the integer part grouped (the zeros of `0` with it), padded.
 fn formatFloat(v: float, narrow: bool, spec: StringView, out: StringBuilder): void {
     let s = readSpec(spec);
     if (s.alternate || !(s.kind == '\0' || s.kind == 'e' || s.kind == 'E' || s.kind == 'f' || s.kind == '%')) {
@@ -3520,7 +3854,7 @@ fn formatFloat(v: float, narrow: bool, spec: StringView, out: StringBuilder): vo
     finishNumber(sign, "", grouped(body, s.grouping, least), s, out);
 }
 
-/// How many digits lead `body`: a float's integer part.
+/// Returns how many digits lead `body`: a float's integer part.
 fn integerDigits(body: string): int {
     let n = byteCount(body);
     var end = 0;
@@ -3530,8 +3864,9 @@ fn integerDigits(body: string): int {
     return end;
 }
 
-/// `body`'s leading digits, a float's integer part, `least` of them at least (zeros before the
-/// first), with `grouping` between each three.
+/// Returns `body`'s leading digits, a float's integer part, with `grouping` between each three.
+///
+/// There are `least` of them at least, zeros before the first.
 fn grouped(body: string, grouping: char, least: int): string {
     let n = byteCount(body);
     let end = integerDigits(body);
@@ -3557,8 +3892,9 @@ fn grouped(body: string, grouping: char, least: int): string {
     return out.toString();
 }
 
-/// The first `count` characters of `text`, or all of them: cut where the next one starts, at a
-/// byte that is no continuation byte (`10xxxxxx`).
+/// Returns the first `count` characters of `text`, or all of them.
+///
+/// The cut is where the next one starts, at a byte that is no continuation byte (`10xxxxxx`).
 fn firstChars(text: string, count: int): string {
     let n = byteCount(text);
     var at = 0;
@@ -3575,10 +3911,12 @@ fn firstChars(text: string, count: int): string {
     return text;
 }
 
-/// A float with a precision (12 §2 rule 3), rounded half away from zero on its exact binary digits
-/// by the runtime: `form` 0 fixed, 1 with an exponent, 2 the same upper case, 3 fixed a hundredfold.
+/// Returns a float's text with a precision, rounded half away from zero on its exact binary
+/// digits.
+///
+/// `form` 0 is fixed, 1 with an exponent, 2 the same upper case, 3 fixed a hundredfold.
 fn floatText(value: float, precision: int, form: int): string;
-/// A `float32`'s own shortest text (03 §1.7).
+/// Returns a `float32`'s own shortest text.
 fn shortestFloat32(value: float32): string;
 
 extend int :: [Format] {
@@ -3617,13 +3955,13 @@ extend float :: [Format] {
     fn format(spec: StringView, out: StringBuilder): void { formatFloat(this, false, spec, out); }
 }
 
-/// A `float32` is formatted as the `float` it widens to — the same value exactly —, its shortest
-/// text its own (03 §1.7; the review's M8a-9).
+/// Formats a `float32` as the `float` it widens to, the same value exactly; its shortest text is
+/// its own.
 extend float32 :: [Format] {
     fn format(spec: StringView, out: StringBuilder): void { formatFloat(this as float, true, spec, out); }
 }
 
-/// A string: fill, alignment, width, and the precision as the most characters it keeps.
+/// Formats a string: fill, alignment, width, and the precision as the most characters it keeps.
 extend string :: [Format] {
     fn format(spec: StringView, out: StringBuilder): void {
         let s = readSpec(spec);
@@ -3643,8 +3981,9 @@ extend bool :: [Format] {
 }
 
 
-/// A string's characters, decoded from its UTF-8 bytes — from the front by `next`, from the back
-/// by `nextBack` (10 S1: `chars()` is `DoubleEnded`), the two meeting in the middle.
+/// Iterates over a string's characters, decoded from its UTF-8 bytes.
+///
+/// From the front by `next`, from the back by `nextBack`, the two meeting in the middle.
 pub struct CharsIter :: [Iterator, DoubleEnded] {
     type Item = char;
     s: StringView,
@@ -3686,8 +4025,9 @@ pub struct CharsIter :: [Iterator, DoubleEnded] {
     }
 }
 
-/// A text's characters with the byte index each begins at (10 S1): the indices `s[i]` and
-/// `s[a..b]` take.
+/// Iterates over a text's characters with the byte index each begins at.
+///
+/// These are the indices `s[i]` and `s[a..b]` take.
 pub struct CharIndicesIter :: [Iterator] {
     type Item = (int, char);
     s: StringView,
@@ -3712,36 +4052,41 @@ fn float32OfText(s: string): float32;
 // Iteration (design/v5/spec/10 B6): a source of values, one at a time, and what `for` walks.
 // ---------------------------------------------------------------------------------------------
 
-/// A source of values, one at a time (10 B6 I1): `next()` gives the next, and `null` at the end —
-/// for good, once given. A struct iterator changes as it goes, so `next` writes it. A walk that
-/// can fail — a file's lines — answers its `Error`, and `next()` throws it (I5): the loop over it
-/// is marked, `for (line in try lines)`.
+/// A source of values, one at a time.
+///
+/// `next()` gives the next value, and `null` at the end, for good once given. A struct
+/// iterator changes as it goes, so `next` writes it. A walk that can fail, such as a file's
+/// lines, names its `Error`, and `next()` throws it; the loop over it is marked,
+/// `for (line in try lines)`.
 pub interface Iterator {
     type Item;
 
-    /// What a walk may throw: nothing, unless a conformer answers otherwise.
+    /// What a walk may throw: nothing, unless a conformer says otherwise.
     type Error :: [Error] = never;
 
     mut fn next(): ?Self.Item throws Self.Error;
 
-    /// How many values are left: at least the first, at most the second where that is known — for
-    /// a collector that sizes its storage once.
+    /// Returns how many values are left: at least the first, at most the second where that is
+    /// known.
+    ///
+    /// A collector uses it to size its storage once.
     fn sizeHint(): (int, ?int) {
         let unknown: ?int = null;
         return (0, unknown);
     }
 }
 
-/// What `for` walks (I2): `iter()` gives an iterator over it, at every loop anew. Every iterator
-/// is iterable as itself: a struct iterator as a copy, a class iterator as the object — two loops
-/// over one go on from each other.
+/// What `for` walks: `iter()` gives an iterator over it, anew at every loop.
+///
+/// Every iterator is iterable as itself: a struct iterator as a copy, a class iterator as the
+/// object, so two loops over one go on from each other.
 pub interface Iterable {
     type Iter :: [Iterator];
 
     fn iter(): Self.Iter;
 }
 
-/// An iterator from both ends (I10): `nextBack()` gives the last value not yet given.
+/// An iterator from both ends: `nextBack()` gives the last value not yet given.
 pub interface DoubleEnded :: [Iterator] {
     mut fn nextBack(): ?Self.Item;
 }
@@ -3775,10 +4120,10 @@ extend<T :: [Step]> Range<T> :: [Iterator, DoubleEnded] {
     }
 }
 
-/// What a range walks by (03 S15b; M8c S3 — Rust's `Step`): the value after and the value before,
-/// and the type's first and last — an integer's `± 1`, `min` and `max`; a character's scalar values
-/// past the surrogates. Within std.core. One block per type: a blanket over `Integer` beside
-/// `char`'s would conform some type twice, and there is no specialization (04).
+/// What a range walks by: the value after and the value before, and the type's first and last.
+///
+/// For an integer, `± 1`, `min` and `max`; for a character, the scalar values past the
+/// surrogates. Internal to std.core, with one conformance block per type.
 interface Step :: [TotalOrder] {
     static fn first(): Self;
     static fn last(): Self;
@@ -3850,8 +4195,9 @@ extend char :: [Step] {
     fn before(): char { return charBefore(this); }
 }
 
-/// The iterator of an array or a view (10 B6 I10): its elements from the front and from the
-/// back, through a view of them — nothing is copied, and a write to a later element is seen.
+/// Iterates over an array's or a view's elements, from the front and from the back.
+///
+/// It walks a view of them: nothing is copied, and a write to a later element is seen.
 pub struct SliceIter<T> {
     items: Slice<T>,
     var front: int,
@@ -3877,7 +4223,7 @@ extend<T> SliceIter<T> :: [Iterator, DoubleEnded] {
         return this.items[this.back];
     }
 
-    /// Exactly the elements left.
+    /// Returns exactly the number of elements left.
     fn sizeHint(): (int, ?int) {
         let left = this.back - this.front;
         let most: ?int = left;
@@ -3905,24 +4251,31 @@ extend<T> Slice<T> :: [Iterable] {
 // `collect()` builds what the expected type is, through its `FromIterator`: `let xs: List<int> =
 // it.collect();`. An array is one; the containers of std.collections are the others.
 
-/// What an array literal becomes where a value of the type is expected (10 K4): the elements check
-/// against `T`, and the literal is `Self.fromLiteral([…])` — `let s: Set<int> = [1, 2, 3];`,
-/// `let m: Map<string, int> = [("a", 1)];` (a map is no literal of its own). A copy, as `of` would
-/// make one.
+/// Builds a value of the type from an array literal where one is expected.
+///
+/// The elements check against `T`, and the literal becomes `Self.fromLiteral([…])`:
+/// `let s: Set<int> = [1, 2, 3];`, `let m: Map<string, int> = [("a", 1)];` (a map has no
+/// literal of its own). The result is a copy, as `of` would make one.
 pub interface FromArrayLiteral<T> {
     static fn fromLiteral(items: T[]): Self;
 }
 
-/// A type built from an iterator's values (10 B6): `collect()` calls `fromIter`, the type's own.
+/// Builds a value of the type from an iterator's values; `collect()` calls the type's own
+/// `fromIter`.
 pub interface FromIterator<T> {
     static fn fromIter<I :: [Iterator<Item = T>]>(it: I): Self throws I.Error;
 }
 
 extend<T> T[] :: [FromIterator<T>] {
-    /// The values in an array, in order: a buffer that doubles, its first value for the slots
-    /// not yet written, then one copy of the length — one pass. The buffer starts at the
-    /// iterator's own guess of its length (`sizeHint`, 10 I4), and where that was exact — an
-    /// array's walk, a view's — the buffer is the array, with no copy at the end.
+    /// Collects the values into an array, in order, in one pass.
+    ///
+    /// A buffer that doubles holds them, its first value in the slots not yet written, then one
+    /// copy of the length is made. The buffer starts at the iterator's `sizeHint`, and where
+    /// that was exact (an array's walk, a view's) the buffer is the array, with no copy at the
+    /// end.
+    ///
+    /// # Errors
+    /// What the iterator throws.
     static fn fromIter<I :: [Iterator<Item = T>]>(it: I): T[] throws I.Error {
         var walk = it;
         let least = walk.sizeHint().0;
@@ -3953,22 +4306,25 @@ extend<T> T[] :: [FromIterator<T>] {
 }
 
 extend<T :: [Ordered]> Range<T> :: [Contains<T>] {
-    /// Whether `x` lies from `start` up to, not including, `end`.
+    /// Returns whether `x` lies from `start` up to, not including, `end`.
     fn contains(x: T): bool {
         return this.start <= x && x < this.end;
     }
 }
 
 extend<T :: [Ordered]> RangeInclusive<T> :: [Contains<T>] {
-    /// Whether `x` lies from `start` to `end`, both included.
+    /// Returns whether `x` lies from `start` to `end`, both included.
     fn contains(x: T): bool {
         return this.start <= x && x <= this.end;
     }
 }
 
-/// `s * n` (10 C7): the text `s`, `n` times over — `""` for none. `n * s` is refused, the one order
-/// of `[x] * n`, and a negative `n` panics as an array's repetition does (`LYR-RT0007`): the count
-/// goes through it. The compiler desugars the operator to this call (N1a).
+/// Repeats the text `s` `n` times; `""` for none.
+///
+/// The operator `s * n` becomes this call; `n * s` is refused, as for `[x] * n`.
+///
+/// # Panics
+/// When `n` is negative (`LYR-RT0007`), as an array's repetition does.
 pub fn repeatText(s: string, n: int): string {
     if (n < 0) {
         let _ = [s] * n;
@@ -3983,14 +4339,17 @@ pub fn repeatText(s: string, n: int): string {
 // --- the members of arrays and views (10 C2): written once on `Slice<T>`, and reached on an
 // array - and a `T[N]` in the heap (03 §5.3 rule 6) - through a view of all of it. A write goes there.
 extend<T> Slice<T> {
-    /// Whether there is no element.
+    /// Returns whether there is no element.
     pub fn isEmpty(): bool {
         return this.length() == 0;
     }
 
-    /// The elements into `into`, which is at least as long: a shorter one panics (`LYR-RT0003`),
-    /// a longer one keeps its rest. The two may overlap either way, `xs[0..4].copyInto(xs[2..6])`
-    /// as well as the reverse (the review's B16b). One call to C's memmove.
+    /// Copies the elements into `into`, which is at least as long; a longer one keeps its rest.
+    ///
+    /// The two may overlap either way, `xs[0..4].copyInto(xs[2..6])` as well as the reverse.
+    ///
+    /// # Panics
+    /// When `into` is shorter (`LYR-RT0003`).
     pub fn copyInto(into: Slice<T>): void {
         let n = this.length();
         if (into.length() < n) {
@@ -3999,7 +4358,7 @@ extend<T> Slice<T> {
         moveElements(into, this, n);
     }
 
-    /// The element at `i`, or `null` outside `0 ≤ i < length()`.
+    /// Returns the element at `i`, or `null` outside `0 ≤ i < length()`.
     pub fn get(i: int): ?T {
         if (i < 0 || i >= this.length()) {
             return null;
@@ -4007,24 +4366,27 @@ extend<T> Slice<T> {
         return this[i];
     }
 
-    /// The first element, or `null` where there is none.
+    /// Returns the first element, or `null` where there is none.
     pub fn first(): ?T {
         return this.get(0);
     }
 
-    /// The last element, or `null` where there is none.
+    /// Returns the last element, or `null` where there is none.
     pub fn last(): ?T {
         return this.get(this.length() - 1);
     }
 
-    /// The elements at `i` and `j` exchanged; an index outside panics as `[i]` does.
+    /// Exchanges the elements at `i` and `j`.
+    ///
+    /// # Panics
+    /// When an index is outside the elements, as `[i]` does.
     pub fn swap(i: int, j: int): void {
         let t = this[i];
         this[i] = this[j];
         this[j] = t;
     }
 
-    /// The elements in place, the last first.
+    /// Reverses the elements in place.
     pub fn reverse(): void {
         var i = 0;
         var j = this.length() - 1;
@@ -4035,14 +4397,19 @@ extend<T> Slice<T> {
         }
     }
 
-    /// A new array of the elements, the last first.
+    /// Returns a new array of the elements, the last first.
     pub fn reversed(): T[] {
         let n = this.length();
         return arrayOf(n, (i: int) => this[n - 1 - i]);
     }
 
-    /// The first index whose element fails `p`, for elements that `p` partitions — every one it
-    /// holds for before every one it does not: a binary search.
+    /// Returns the first index whose element fails `p`, by binary search.
+    ///
+    /// The elements must be partitioned by `p`: every one it holds for before every one it does
+    /// not.
+    ///
+    /// # Errors
+    /// What `p` throws.
     pub fn partitionPoint<E :: [Error]>(p: fn(T) -> bool throws E): int throws E {
         var lo = 0;
         var hi = this.length();
@@ -4058,7 +4425,8 @@ extend<T> Slice<T> {
     }
 }
 
-/// `a + b` of two views (10 C7): a new array of the elements of both, as `xs + ys` of two arrays.
+/// Concatenates two views: `a + b` is a new array of the elements of both, as `xs + ys` of two
+/// arrays.
 extend<T> Slice<T> :: [Add<Out = T[]>] {
     fn add(rhs: Slice<T>): T[] {
         let n = this.length();
@@ -4073,7 +4441,7 @@ extend<T> Slice<T> :: [Add<Out = T[]>] {
     }
 }
 
-/// `x in xs` (10 C12): an element equal to `x`.
+/// Makes `x in xs` true where an element equals `x`.
 extend<T :: [Equatable]> Slice<T> :: [Contains<T>] {
     fn contains(x: T): bool {
         return this.indexOf(x) != null;
@@ -4086,16 +4454,18 @@ extend<T :: [Equatable]> T[] :: [Contains<T>] {
     }
 }
 
-/// `c in text` (10 C12; M8c S9b): a character of the text. The view's `contains<P :: [Pattern]>`
-/// is the witness at `P = char` (13 S9), so the conformance writes nothing.
+/// Makes `c in text` true where the character stands in the text.
+///
+/// The view's `contains<P :: [Pattern]>` serves at `P = char`, so the conformance writes
+/// nothing.
 extend StringView :: [Contains<char>] { }
 
-/// A string's: its view's, as a call on a string reaches the members written once on its view (10
-/// S1) — a member of its own would hide the view's 'contains' of a text.
+/// Makes `c in s` true for a string through its view's `contains`, as a call on a string reaches
+/// the members of its view.
 extend string :: [Contains<char>] { }
 
 extend<T :: [Equatable]> Slice<T> {
-    /// The index of the first element equal to `x`, or `null`.
+    /// Returns the index of the first element equal to `x`, or `null`.
     pub fn indexOf(x: T): ?int {
         var i = 0;
         while (i < this.length()) {
@@ -4109,7 +4479,7 @@ extend<T :: [Equatable]> Slice<T> {
 }
 
 extend<T :: [Clone]> Slice<T> {
-    /// Every element a clone of `v` — no object shared into several slots (10 C7).
+    /// Sets every element to a clone of `v`, so no object is shared into several slots.
     pub fn fill(v: T): void {
         var i = 0;
         while (i < this.length()) {
@@ -4120,8 +4490,9 @@ extend<T :: [Clone]> Slice<T> {
 }
 
 extend<T :: [TotalOrder]> Slice<T> {
-    /// The index of an element equal to `x` in sorted elements, or `null` (10 C10: a `NaN` would
-    /// break the order the search relies on, so a total one is asked).
+    /// Returns the index of an element equal to `x` in sorted elements, or `null`.
+    ///
+    /// The elements must be sorted in their total order.
     pub fn binarySearch(x: T): ?int {
         let at = this.partitionPoint((e: T) => e < x);
         if (at < this.length() && this[at] == x) {
@@ -4132,7 +4503,7 @@ extend<T :: [TotalOrder]> Slice<T> {
 }
 
 extend<T :: [Display]> Slice<T> {
-    /// The elements' texts, `sep` between each two.
+    /// Joins the elements' texts, `sep` between each two.
     pub fn join(sep: string): string {
         let out = StringBuilder.new();
         var i = 0;
@@ -4150,10 +4521,14 @@ extend<T :: [Display]> Slice<T> {
 // --- ordering (10 C10): `sort` and `sortBy` stable (K3), through a buffer of the length;
 // `sortUnstable` in place.
 extend<T> Slice<T> {
-    /// The elements in the order `cmp` gives, equal ones keeping theirs: a merge sort — runs of
-    /// 16 sorted by insertion, then merged pairwise through a buffer of the length.
-    /// A comparison that throws ends the sort, and the call throws it: the elements are then in
-    /// some order, every one still there — Rust's guarantee where its comparison panics.
+    /// Sorts the elements in the order `cmp` gives, equal ones keeping theirs.
+    ///
+    /// A merge sort: runs of 16 sorted by insertion, then merged pairwise through a buffer of the
+    /// length.
+    ///
+    /// # Errors
+    /// What `cmp` throws ends the sort, and the call throws it; the elements are then in some
+    /// order, every one still there.
     pub fn sortBy<E :: [Error]>(cmp: fn(T, T) -> Ordering throws E): void throws E {
         let n = this.length();
         var start = 0;
@@ -4186,17 +4561,19 @@ extend<T> Slice<T> {
         }
     }
 
-    /// The elements in the order of their keys, equal keys keeping theirs; a key that throws, as
-    /// `sortBy`'s comparison.
+    /// Sorts the elements in the order of their keys, equal keys keeping theirs.
+    ///
+    /// # Errors
+    /// What `key` throws, as for `sortBy`'s comparison.
     pub fn sortByKey<K :: [TotalOrder], E :: [Error]>(key: fn(T) -> K throws E): void throws E {
         try this.sortBy((a: T, b: T) => (try key(a)).totalCompare(try key(b)));
     }
 }
 
 extend<T :: [TotalOrder]> Slice<T> {
-    /// The elements in ascending order, equal ones keeping theirs: `sortBy`'s merge sort with
-    /// `totalCompare` called directly. A function value between kept C from inlining the
-    /// comparison — 40 % of the time at measurement point 3.
+    /// Sorts the elements in ascending order, equal ones keeping theirs.
+    ///
+    /// `sortBy`'s merge sort with `totalCompare` called directly.
     pub fn sort(): void {
         let n = this.length();
         var start = 0;
@@ -4225,8 +4602,10 @@ extend<T :: [TotalOrder]> Slice<T> {
         }
     }
 
-    /// The elements in ascending order, equal ones in any: in place, without a buffer — a
-    /// quicksort, a heap sort where it would go quadratic.
+    /// Sorts the elements in ascending order, equal ones in any order.
+    ///
+    /// In place, without a buffer: a quicksort, falling back to a heap sort where it would go
+    /// quadratic.
     pub fn sortUnstable(): void {
         var depth = 0;
         var n = this.length();
@@ -4246,7 +4625,7 @@ fn isGreater(o: Ordering): bool {
     return match (o) { .Greater => true, _ => false };
 }
 
-/// `sortRunBy` under the type's own order.
+/// Sorts a run by insertion as `sortRunBy` does, under the type's own order.
 fn sortRun<T :: [TotalOrder]>(xs: Slice<T>): void {
     var i = 1;
     while (i < xs.length()) {
@@ -4261,9 +4640,9 @@ fn sortRun<T :: [TotalOrder]>(xs: Slice<T>): void {
     }
 }
 
-/// `mergeRunsBy` under the type's own order.
-/// A copy of `xs` as the merges' second buffer: the slots made of its first element, then one
-/// copy — not an element at a time through a closure (B16).
+/// Returns a copy of `xs` as the merges' second buffer.
+///
+/// The slots are made of its first element, then the elements are copied over at once.
 fn sortBuffer<T>(xs: Slice<T>): T[] {
     let first = xs[0];
     let buffer = arrayOf(xs.length(), (i: int) => first);
@@ -4271,6 +4650,7 @@ fn sortBuffer<T>(xs: Slice<T>): T[] {
     return buffer;
 }
 
+/// Merges runs as `mergeRunsBy` does, under the type's own order.
 fn mergeRuns<T :: [TotalOrder]>(src: Slice<T>, dst: Slice<T>, width: int): void {
     let n = src.length();
     var lo = 0;
@@ -4298,8 +4678,11 @@ fn mergeRuns<T :: [TotalOrder]>(src: Slice<T>, dst: Slice<T>, width: int): void 
     }
 }
 
-/// A run sorted by insertion: each element moved before the ones it is less than, so equal ones
+/// Sorts a run by insertion: each element moves before the ones it is less than, so equal ones
 /// keep their order.
+///
+/// # Errors
+/// What `cmp` throws; every element is then still in a slot.
 fn sortRunBy<T, E :: [Error]>(xs: Slice<T>, cmp: fn(T, T) -> Ordering throws E): void throws E {
     // By swaps, not by a hole: a comparison that throws finds every element in a slot.
     var i = 1;
@@ -4313,8 +4696,12 @@ fn sortRunBy<T, E :: [Error]>(xs: Slice<T>, cmp: fn(T, T) -> Ordering throws E):
     }
 }
 
-/// One pass of the merge sort: the runs of `width` in `src` merged pairwise into `dst`, the left
-/// one's element first where two are equal.
+/// Runs one pass of the merge sort: the runs of `width` in `src` merged pairwise into `dst`.
+///
+/// Where two elements are equal, the left run's comes first.
+///
+/// # Errors
+/// What `cmp` throws.
 fn mergeRunsBy<T, E :: [Error]>(src: Slice<T>, dst: Slice<T>, width: int, cmp: fn(T, T) -> Ordering throws E): void throws E {
     let n = src.length();
     var lo = 0;
@@ -4341,9 +4728,10 @@ fn mergeRunsBy<T, E :: [Error]>(src: Slice<T>, dst: Slice<T>, width: int, cmp: f
     }
 }
 
-/// The unstable sort: partitions around the median of three, the smaller side by recursion and
-/// the larger by the loop, insertion below 17 elements, a heap sort once `depth` partitions are
-/// spent.
+/// Sorts unstably by partitioning around the median of three.
+///
+/// The smaller side goes by recursion and the larger by the loop, insertion below 17 elements,
+/// a heap sort once `depth` partitions are spent.
 fn introSort<T :: [TotalOrder]>(xs: Slice<T>, depth: int): void {
     var view = xs;
     var left = depth;
@@ -4365,9 +4753,11 @@ fn introSort<T :: [TotalOrder]>(xs: Slice<T>, depth: int): void {
     sortRunBy(view, (a: T, b: T) => a.totalCompare(b));
 }
 
-/// Hoare's partition around the median of the first, middle and last element: every element
-/// before the answer is at most the pivot, every one from it at least, and both sides hold one.
-/// A sorted part is left as it is; equal elements are split between the sides.
+/// Partitions by Hoare's scheme around the median of the first, middle and last element.
+///
+/// Every element before the returned index is at most the pivot, every one from it at least,
+/// and both sides hold one. A sorted part is left as it is; equal elements are split between
+/// the sides.
 fn partitionHoare<T :: [TotalOrder]>(xs: Slice<T>): int {
     let n = xs.length();
     let pivot = medianOfThree(xs[0], xs[n / 2], xs[n - 1]);
@@ -4411,8 +4801,9 @@ fn medianOfThree<T :: [TotalOrder]>(a: T, b: T, c: T): T {
     return b;
 }
 
-/// A heap sort, `O(n log n)` whatever the order: a max-heap built in place, its top swapped to the
-/// end one at a time.
+/// Sorts by heap sort, `O(n log n)` whatever the order.
+///
+/// A max-heap is built in place, its top swapped to the end one at a time.
 fn heapSort<T :: [TotalOrder]>(xs: Slice<T>): void {
     let n = xs.length();
     var start = n / 2 - 1;
@@ -4446,17 +4837,18 @@ fn siftDown<T :: [TotalOrder]>(xs: Slice<T>, root: int, end: int): void {
     }
 }
 
-/// The join of two thrown types (design/v5/spec/05 E2 K7): what a walk over two sources throws.
-/// The compiler reduces it once both are known — one type where they are one, the other where
-/// one is `never`, the root `Error` where they differ; open, it covers each of its parts. No value
-/// of it is made.
+/// The join of two thrown types: what a walk over two sources throws.
+///
+/// The compiler reduces it once both are known: to the one type where they are the same, to
+/// the other where one is `never`, to the root [Error] where they differ; left open, it covers
+/// each of its parts. No value of it is made.
 pub struct Join<A :: [Error], B :: [Error]> :: [Error] {
     pub fn message(): string {
         return "a joined error";
     }
 }
 
-/// `it.zip(other)`: each value beside the other's at its position, as long as both have one.
+/// Clones an array's or a view's iterator: a copy of its position over the same view.
 extend<T> SliceIter<T> :: [Clone] {
     fn clone(): SliceIter<T> {
         return this;
@@ -4515,7 +4907,7 @@ extend<T :: [Step]> RangeInclusive<T> :: [Iterator, DoubleEnded] {
     }
 }
 
-/// The scalar value after `c`, past the surrogates; `c` is below U+10FFFF.
+/// Returns the scalar value after `c`, past the surrogates; `c` must be below U+10FFFF.
 fn charAfter(c: char): char {
     var n = (c as uint32) + 1;
     if (n == 0xD800) {
@@ -4524,7 +4916,7 @@ fn charAfter(c: char): char {
     return n as char;
 }
 
-/// The scalar value before `c`, past the surrogates; `c` is above U+0000.
+/// Returns the scalar value before `c`, past the surrogates; `c` must be above U+0000.
 fn charBefore(c: char): char {
     var n = (c as uint32) - 1;
     if (n == 0xDFFF) {
@@ -4533,43 +4925,44 @@ fn charBefore(c: char): char {
     return n as char;
 }
 
-/// The debug rendering of an array — what a synthesized `debug()` reaches for, the array's own
-/// (10 C9).
+/// Returns the debug text of an array; a synthesized `debug()` calls it for an array field.
 pub fn debugArray<T :: [Debug]>(xs: T[]): string {
     return debugText(xs);
 }
 
-/// The same for a view.
+/// Returns the debug text of a view, as [debugArray] does for an array.
 pub fn debugSlice<T :: [Debug]>(xs: Slice<T>): string {
     return debugText(xs);
 }
 
-/// The same for an optional: `null`, or the value.
+/// Returns the debug text of an optional: `null`, or the value's.
 pub fn debugOptional<T :: [Debug]>(o: ?T): string {
     if (o == null) { return "null"; }
     return o.debug();
 }
 
-/// Equality of two arrays, element by element — what a synthesized `equals` reaches for, the
-/// arrays' own (10 C9).
+/// Returns whether two arrays are equal, element by element; a synthesized `equals` calls it
+/// for an array field.
 pub fn equalArrays<T :: [Equatable]>(a: T[], b: T[]): bool {
     return sameElements(a, b);
 }
 
-/// The same for two views.
+/// Returns whether two views are equal, element by element.
 pub fn equalSlices<T :: [Equatable]>(a: Slice<T>, b: Slice<T>): bool {
     return sameElements(a, b);
 }
 
-/// Equality of two optionals: both absent, or both present and equal (03 O6).
+/// Returns whether two optionals are equal: both absent, or both present and equal.
 pub fn equalOptionals<T :: [Equatable]>(a: ?T, b: ?T): bool {
     if (a == null) { return b == null; }
     if (b == null) { return false; }
     return a == b;
 }
 
-/// An optional into a hasher: a 0 for `null`, a 1 and the value otherwise — a synthesized `hash`
-/// reaches for it. An array and a view are no `Hashable` (10 C8): their slots can be written.
+/// Writes an optional into a hasher: a 0 for `null`, a 1 and the value otherwise.
+///
+/// A synthesized `hash` calls it. Arrays and views are not [Hashable], since their slots can
+/// be written.
 pub fn hashOptionalInto<T :: [Hashable], H :: [Hasher]>(o: ?T, &h: H): void {
     if (o == null) {
         h.writeByte(0);
@@ -4579,28 +4972,30 @@ pub fn hashOptionalInto<T :: [Hashable], H :: [Hasher]>(o: ?T, &h: H): void {
     o.hash(&h);
 }
 
-/// An object's identity into a hasher: its address, what the `hash` of an `Identity` writes.
+/// Writes an object's identity into a hasher: its address, as the `hash` of an [Identity] does.
 pub fn hashIdentityInto<T :: [Identity], H :: [Hasher]>(o: T, &h: H): void {
     h.writeInt(identityOf(o));
 }
 
-/// The address of an object, as a number.
+/// Returns the address of an object, as a number.
 fn identityOf<T>(o: T): int;
 
-/// A copy of an array with every element cloned — the clone of a reference field (04 D13).
+/// Returns a copy of an array with every element cloned; a synthesized `clone` calls it for an
+/// array field.
 pub fn cloneArray<T :: [Clone]>(xs: T[]): T[] {
     return arrayOf(xs.length(), (i: int) => xs[i].clone());
 }
 
-/// The same for an optional.
+/// Returns a clone of an optional's value, or `null`.
 pub fn cloneOptional<T :: [Clone]>(o: ?T): ?T {
     if (o == null) { return null; }
     return o.clone();
 }
 
-/// `sequence { yield 1; yield 2; }` (design/v5/spec/08 Y11, 10 I7): the shortest way to write a
-/// generator inline. No syntax of its own: the trailing block is a generator lambda (08 F5), and
-/// this calls it — the coroutine it makes runs nothing until it is pulled.
+/// Creates a generator inline: `sequence { yield 1; yield 2; }`.
+///
+/// The trailing block is a generator lambda, and this calls it; the coroutine it makes runs
+/// nothing until it is pulled.
 pub fn sequence<T>(body: fn() -> Coroutine<T>): Coroutine<T> {
     return body();
 }
@@ -4658,7 +5053,7 @@ extend<T :: [Debug]> Slice<T> :: [Debug, Display] {
     }
 }
 
-/// Whether two views hold equal elements in the same order.
+/// Returns whether two views hold equal elements in the same order.
 fn sameElements<T :: [Equatable]>(a: Slice<T>, b: Slice<T>): bool {
     if (a.length() != b.length()) {
         return false;
@@ -4671,7 +5066,7 @@ fn sameElements<T :: [Equatable]>(a: Slice<T>, b: Slice<T>): bool {
     return true;
 }
 
-/// The elements' debug texts in brackets, `, ` between each two, into `out`.
+/// Writes the elements' debug texts into `out`, in brackets, `, ` between each two.
 fn debugElements<T :: [Debug]>(xs: Slice<T>, out: StringBuilder): void {
     out.appendChar('[');
     for (i in 0..xs.length()) {
@@ -4683,7 +5078,7 @@ fn debugElements<T :: [Debug]>(xs: Slice<T>, out: StringBuilder): void {
     out.appendChar(']');
 }
 
-/// The same as a string of its own.
+/// Returns the elements' debug texts as `debugElements` writes them, as a string of its own.
 fn debugText<T :: [Debug]>(xs: Slice<T>): string {
     let out = StringBuilder.new();
     debugElements(xs, out);
@@ -4692,46 +5087,47 @@ fn debugText<T :: [Debug]>(xs: Slice<T>): string {
 
 // --- optionals and arrays (N2a) --------------------------------------------------------------
 
-/// An optional is Equatable where its value's type is (03 O6): `null` equals `null` only — what
-/// `==` on two optionals already did, now a conformance a constraint finds (`Set<?int>`).
+/// Makes an optional [Equatable] where its value's type is: `null` equals `null` only.
+///
+/// A constraint finds the conformance, so a `Set<?int>` works.
 extend<T :: [Equatable]> ?T :: [Equatable] {
     fn equals(o: ?T): bool {
         return equalOptionals(this, o);
     }
 }
 
-/// An optional is Hashable where its value's type is: `null` and a value hash apart.
+/// Makes an optional [Hashable] where its value's type is: `null` and a value hash apart.
 extend<T :: [Hashable]> ?T :: [Hashable] {
     fn hash<H :: [Hasher]>(&h: H): void {
         hashOptionalInto(this, &h);
     }
 }
 
-/// An optional is Debug where its value's type is (10, "Review 2026-10-09" S1; M8c S16): `null`,
-/// or the value's own debug text — no wrapper, as an optional has none (Kotlin's form, not Rust's
-/// `Some(7)`) —, so `assertEq('7'.toDigit(10), 7)` names both sides. The text a synthesized
-/// `debug()` gives an optional field already.
+/// Makes an optional [Debug] where its value's type is: `null`, or the value's own debug text.
+///
+/// There is no wrapper, so `assertEq('7'.toDigit(10), 7)` names both sides alike. It is the
+/// text a synthesized `debug()` gives an optional field.
 extend<T :: [Debug]> ?T :: [Debug] {
     fn debug(): string {
         return debugOptional(this);
     }
 }
 
-/// An array is Clone where its element is (10 K5): a new array of the elements' clones.
+/// Makes an array [Clone] where its element is: a new array of the elements' clones.
 extend<T :: [Clone]> T[] :: [Clone] {
     fn clone(): T[] {
         return cloneArray(this);
     }
 }
 
-/// An optional clones its value (05 §14 rule 2: the synthesized `clone` takes a field as a whole).
+/// Makes an optional [Clone] where its value's type is: it clones its value.
 extend<T :: [Clone]> ?T :: [Clone] {
     fn clone(): ?T {
         return cloneOptional(this);
     }
 }
 
-/// A tuple clones its elements.
+/// Makes a tuple [Clone] where its elements are: it clones its elements.
 extend<T0 :: [Clone], T1 :: [Clone]> (T0, T1) :: [Clone] {
     fn clone(): (T0, T1) {
         return (this.0.clone(), this.1.clone());
@@ -5171,9 +5567,11 @@ extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 ::
     }
 }
 
-/// A coroutine is an object, compared by itself and hashed by its address (06 A7): the same
-/// coroutine met twice is found — in a set of those running, at a second `spawn`. What a pull
-/// throws asks nothing of it, so the block reaches every coroutine of a yield and a result type.
+/// Compares a coroutine by itself and hashes it by its address.
+///
+/// The same coroutine met twice is found, in a set of those running or at a second `spawn`.
+/// The conformance holds for every coroutine of a yield and a result type, whatever a pull
+/// throws.
 extend<Y, R> Coroutine<Y, R> :: [Identity] {
     fn equals(o: Coroutine<Y, R>): bool {
         return same(this, o);
@@ -5190,8 +5588,10 @@ extend<Y, R> Coroutine<Y, R> :: [Identity] {
 // choose by while compiling. `std.os` passes the two kinds on and answers them at run time (10 Q9).
 // ---------------------------------------------------------------------------------------------
 
-/// The system a program runs on (10 Q9), as the target triples name it: one of the Tier 1
-/// targets', `Other` for another POSIX system the runtime was built for.
+/// The system a program runs on, as the target triples name it.
+///
+/// One of the Tier 1 targets' systems, or `Other` for another POSIX system the runtime was
+/// built for.
 pub enum Platform :: [Equatable, Debug] {
     Linux,
     MacOS,
@@ -5210,7 +5610,7 @@ extend Platform :: [Display] {
     }
 }
 
-/// The machine a program runs on (10 Q9), as the target triples name it.
+/// The machine a program runs on, as the target triples name it.
 pub enum Arch :: [Equatable, Debug] {
     X86_64,
     Aarch64,
@@ -5227,20 +5627,23 @@ extend Arch :: [Display] {
     }
 }
 
-/// What a program is built for (09 B4): its system, its machine, the width of a pointer in bits.
+/// Describes what a program is built for: its system, its machine, the width of a pointer in
+/// bits.
 pub struct Target :: [Equatable, Debug] {
     pub os: Platform,
     pub arch: Arch,
     pub pointerWidth: int,
 }
 
-/// What a program is built as (09 B4): `debug` where the profile is the built-in `debug` or one
-/// that inherits from it (11 W2 P3).
+/// Describes what a program is built as.
+///
+/// `debug` is true where the profile is the built-in `debug` or one that inherits from it.
 pub struct Profile :: [Equatable, Debug] {
     pub debug: bool,
 }
 
-/// The target of the build: `comptime if (target.os == .Windows)` chooses while compiling (09 B1).
+/// The target of the build: `comptime if (target.os == .Windows)` chooses while compiling.
+///
 /// A constant; a program that does not read it carries nothing of it.
 pub let target: Target = comptime Target {
     os = platformOf(buildOs()),
@@ -5251,11 +5654,12 @@ pub let target: Target = comptime Target {
 /// The profile of the build: `comptime if (profile.debug)`.
 pub let profile: Profile = comptime Profile { debug = buildDebug() };
 
-/// `@When(cond)` (09 A11 B2, B3): the declaration is built only where `cond` holds — a value
-/// computed while compiling, over `target` and `profile`. Where it does not, the declaration is
-/// checked as every other, and nothing of it is built; a use the program would run is refused
-/// (`LYR-CT0006`), one in the branch a `comptime if` does not take is none. On a module's header
-/// it holds for all the module declares: one module per system.
+/// Builds the declaration only where `cond` holds: `@When(cond)`.
+///
+/// `cond` is computed while compiling, over [target] and [profile]. Where it does not hold, the
+/// declaration is checked as every other and nothing of it is built; a use the program would
+/// run is refused (`LYR-CT0006`), while a use in the branch a `comptime if` does not take is
+/// allowed. On a module's header it holds for all the module declares: one module per system.
 pub struct When :: [OnTopLevel, OnModule] {
     pub cond: bool,
 }
@@ -5283,15 +5687,18 @@ fn buildArch(): int;
 fn buildPointerWidth(): int;
 fn buildDebug(): bool;
 
-/// `@Shared` on a field (04 Clone; 09 A11): a synthesized `clone()` copies the field as it stands
-/// instead of cloning it — a parent, a service, a cycle: what both copies share.
+/// Marks a field that a synthesized `clone()` copies as it stands instead of cloning it.
+///
+/// For what both copies share: a parent, a service, a cycle.
 pub struct Shared :: [OnField] { }
 
-/// `@SeesConformer` on an interface (11 §4 rule 10; the sweep after M10, W10): its defaults over
-/// `fields<Self>()`, `variants<Self>()` and `members<Self>()` ask with the module of the conformer
-/// they are set in place for, and see every field of it, whatever its word — as the family below
-/// and std.codec's `Encode` and `Decode` do, which carry it. Without it a default sees what the
-/// interface's module may name (R7): another package's `pub` fields alone.
+/// Lets an interface's defaults see every field of the conformer, whatever its visibility.
+///
+/// The defaults over `fields<Self>()`, `variants<Self>()` and `members<Self>()` ask with the
+/// module of the conformer they are instantiated for. [Equatable], [Ordered], [TotalOrder],
+/// [Hashable], [VariantName], [Variants], [Clone] and std.codec's `Encode` and `Decode` carry
+/// it. Without it a default sees what the interface's
+/// module may name: another package's `pub` fields alone.
 pub struct SeesConformer :: [OnInterface] { }
 
 // ---------------------------------------------------------------------------------------------
@@ -5299,28 +5706,29 @@ pub struct SeesConformer :: [OnInterface] { }
 // not in std.meta: the synthesized members above are written over these questions, and std.core
 // imports nothing. std.meta passes them on by name.
 
-/// Who may name a declaration (07 V2).
+/// Who may name a declaration.
 pub enum Visibility :: [Equatable, Debug] { Pub, Internal, Private }
 
-/// What a type is (the review's W9): a round decides on it — `comptime if (f.type.kind == .Optional)`.
-/// A struct, a class, an enum, an interface; `Primitive` the built-in scalars and `string`;
-/// `Opaque` an opaque alias; the shapes `?T`, `T[]`, `T[N]`, a view, a tuple, a function; a type
-/// parameter in a generic body; `Other` what none of these names.
+/// The kind of a type, for decisions while compiling: `comptime if (f.type.kind == .Optional)`.
+///
+/// A struct, a class, an enum, an interface; `Primitive` for the built-in scalars and `string`;
+/// `Opaque` for an opaque alias; the shapes `?T`, `T[]`, `T[N]`, a view, a tuple, a function; a
+/// type parameter in a generic body; `Other` for what none of these names.
 pub enum TypeKind :: [Equatable, Debug] {
     Primitive, Struct, Class, Enum, Interface, Opaque, Optional, Array, InlineArray, Slice, Tuple, Function, Parameter, Other,
 }
 
-/// A type as a value while compiling: its name, as `typeName` gives it, and its kind. What else a
-/// type is — set into a `quote` — comes with the macros (13 M9b).
+/// A type as a value while compiling: its name, as [typeName] gives it, and its kind.
 pub struct Type :: [Equatable, Debug] {
     pub name: string,
     pub kind: TypeKind,
 }
 
-/// A field of a struct or a class, in declaration order; in a round over it, `f.type` names its
-/// type and `e.[f]` is the field. `hasDefault` is whether the declaration writes an initializer —
-/// the type's own default counts for nothing, and a payload's field has none — so a round
-/// tells an optional argument from a required one.
+/// Describes a field of a struct or a class, in declaration order.
+///
+/// In a `comptime for` over it, `f.type` names its type and `e.[f]` is the field. `hasDefault`
+/// is whether the declaration writes an initializer (the type's own default does not count,
+/// and a payload's field has none), so a loop tells an optional argument from a required one.
 pub struct FieldInfo :: [Equatable, Debug] {
     pub name: string,
     pub type: Type,
@@ -5330,21 +5738,23 @@ pub struct FieldInfo :: [Equatable, Debug] {
     pub hasDefault: bool,
 }
 
-/// A variant of an enum, in declaration order, and the fields of its payload — a positional one
-/// named by its position, `0`, `1`, ….
+/// Describes a variant of an enum, in declaration order, and the fields of its payload.
+///
+/// A positional field is named by its position, `0`, `1`, ….
 pub struct VariantInfo :: [Equatable, Debug] {
     pub name: string,
     pub index: int,
     pub payload: FieldInfo[],
 }
 
-/// What a member of a type's own body is (the sweep after M10, X4): a function, a constant — a
-/// `static let` —, an associated type.
+/// The kind of a member of a type's own body: a function, a constant (a `static let`), an
+/// associated type.
 pub enum MemberKind :: [Equatable, Debug] { Function, Constant, AssociatedType }
 
-/// A parameter of a function, in declaration order (X4): its name, its type, its place, and whether
-/// its declaration writes a default; in a round over it, `parameterAttribute<A>(p)` reads what it
-/// carries.
+/// Describes a parameter of a function, in declaration order.
+///
+/// Its name, its type, its place, and whether its declaration writes a default; in a
+/// `comptime for` over it, `parameterAttribute<A>(p)` reads what it carries.
 pub struct ParameterInfo :: [Equatable, Debug] {
     pub name: string,
     pub type: Type,
@@ -5352,9 +5762,10 @@ pub struct ParameterInfo :: [Equatable, Debug] {
     pub hasDefault: bool,
 }
 
-/// A member of a type's own body: its name, its word, whether it is static, whether it is `mut`,
-/// what it is, and a function's parameters — none for a constant or an associated type, both of
-/// which are static.
+/// Describes a member of a type's own body.
+///
+/// Its name, its visibility, whether it is static, whether it is `mut`, its kind, and a
+/// function's parameters; none for a constant or an associated type, both of which are static.
 pub struct MemberInfo :: [Equatable, Debug] {
     pub name: string,
     pub visibility: Visibility,
@@ -5364,44 +5775,55 @@ pub struct MemberInfo :: [Equatable, Debug] {
     pub parameters: ParameterInfo[],
 }
 
-/// The fields of a struct or a class that the asking code may name, in declaration order; none
-/// for any other type.
+/// Returns the fields of a struct or a class that the asking code may name, in declaration
+/// order; none for any other type.
 pub fn fields<T>(): FieldInfo[];
 
-/// The functions, constants and associated types of a type's own body that the asking code may
-/// name, in declaration order — a block's members are the block's.
+/// Returns the functions, constants and associated types of a type's own body that the asking
+/// code may name, in declaration order; members written in an `extend` block belong to that
+/// block, not to the body.
 pub fn members<T>(): MemberInfo[];
 
-/// The attribute `A` the field `f` carries, its value — none where it carries none (R4). `f` is
-/// the variable of a `comptime for` over `fields` or over a variant's `payload`, read in its round.
+/// Returns the value of the attribute `A` the field `f` carries, or `null` where it carries none.
+///
+/// `f` is the variable of a `comptime for` over [fields] or over a variant's `payload`, read in
+/// its iteration.
 pub fn attribute<A>(f: FieldInfo): ?A;
 
-/// The attribute `A` the variant `v` carries, its value — none where it carries none. `v` is the
-/// variable of a `comptime for` over `variants`, read in its round.
+/// Returns the value of the attribute `A` the variant `v` carries, or `null` where it carries
+/// none.
+///
+/// `v` is the variable of a `comptime for` over [variants], read in its iteration.
 pub fn variantAttribute<A>(v: VariantInfo): ?A;
 
-/// The attribute `A` the member `m` carries, its value — none where it carries none. `m` is the
-/// variable of a `comptime for` over `members`, read in its round.
+/// Returns the value of the attribute `A` the member `m` carries, or `null` where it carries
+/// none.
+///
+/// `m` is the variable of a `comptime for` over [members], read in its iteration.
 pub fn memberAttribute<A>(m: MemberInfo): ?A;
 
-/// The attribute `A` the parameter `p` carries, its value — none where it carries none. `p` is the
-/// variable of a `comptime for` over a member's `parameters`, read in its round (X4).
+/// Returns the value of the attribute `A` the parameter `p` carries, or `null` where it carries
+/// none.
+///
+/// `p` is the variable of a `comptime for` over a member's `parameters`, read in its iteration.
 pub fn parameterAttribute<A>(p: ParameterInfo): ?A;
 
-/// The attribute `A` the declaration of `T` carries, its value; none where it carries none. A `T`
-/// written as an alias answers with the alias's own attributes, not its target's.
+/// Returns the value of the attribute `A` the declaration of `T` carries, or `null` where it
+/// carries none.
+///
+/// A `T` written as an alias answers with the alias's own attributes, not its target's.
 pub fn typeAttribute<T, A>(): ?A;
 
-/// The variants of an enum, in declaration order; none for any other type.
+/// Returns the variants of an enum, in declaration order; none for any other type.
 pub fn variants<E>(): VariantInfo[];
 
-/// The interfaces `T` conforms to, by its list, its blocks and the parents they bring.
+/// Returns the interfaces `T` conforms to, by its list, its blocks and the parents they bring.
 pub fn conformances<T>(): Type[];
 
-/// Does `T` conform to `I`?
+/// Returns whether `T` conforms to `I`.
 pub fn hasConformance<T, I>(): bool;
 
-/// `T`'s name, its arguments with it: `Pair<int, string>`.
+/// Returns `T`'s name with its type arguments: `Pair<int, string>`.
 pub fn typeName<T>(): string;
 
 pub fn isStruct<T>(): bool;

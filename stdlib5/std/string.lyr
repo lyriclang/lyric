@@ -1,23 +1,33 @@
-/// The string helpers the compiler itself calls (design/v5/spec/10 S-series): f-strings and `+`
-/// on strings lower to these by name. M2 seed, natively backed; M8a brings the module in Lyric.
+/// Converts values to text and joins strings; the compiler calls these functions by name.
+///
+/// f-strings and `+` on strings lower to [concat] and the `from…` conversions. The module also
+/// re-exports [StringBuilder] for building text piece by piece, and names the Unicode version
+/// behind `char` in [unicodeVersion].
 
 
 pub import std.core { StringBuilder };
 
+/// Returns `a` followed by `b`.
 pub fn concat(a: string, b: string): string;
+/// Returns the decimal text of a signed integer.
 pub fn fromInt(value: int): string;
+/// Returns the decimal text of an unsigned integer.
 pub fn fromUint(value: uint): string;
-/// The shortest decimal text that reads back as the same value; `inf`, `-inf` and `NaN` for
-/// the values that are no number.
+/// Returns the shortest decimal text that reads back as the same `float`.
+///
+/// Infinities are written `inf` and `-inf`, a NaN as `NaN`.
 pub fn fromFloat(value: float): string;
-/// A `float32`'s own shortest text (03 §1.7): `0.1`, not the `0.10000000149011612` of the `float`
-/// it widens to.
+/// Returns the shortest decimal text that reads back as the same `float32`.
+///
+/// The text is the `float32`'s own: `0.1`, not the `0.10000000149011612` of the `float` it
+/// widens to.
 pub fn fromFloat32(value: float32): string;
-/// The character as a one-character string.
+/// Returns the character as a one-character string.
 pub fn fromChar(value: char): string;
+/// Returns `true` or `false`.
 pub fn fromBool(value: bool): string;
 
-/// The version of the Unicode Character Database behind `char`'s answers — its category, its
-/// simple case mappings, `isWhitespace` (10 B9 S4, C2). Written by `tooling/unicode/gen.py` from
-/// the files it reads.
+/// The version of the Unicode Character Database behind `char`'s answers.
+///
+/// It governs a character's general category, its simple case mappings and `isWhitespace`.
 pub let unicodeVersion: string = "18.0.0";

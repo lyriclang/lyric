@@ -1,7 +1,13 @@
-/// What a number is stands at its type — `float.epsilon`, `int.max`, `x.isNan()` —; what one
-/// computes with numbers stands here (design/v5/spec/10 B5 Z2, "Review 2026-10-12"): the
-/// elementary functions, free and generic over the tower, and the constants that describe the
-/// world — `math.pi`, typed `float`; `math.pi as float32` for the narrow width.
+/// Provides the elementary functions and the mathematical constants.
+///
+/// The functions are free and generic over the numeric types: [min], [max], [gcd], [lcm],
+/// [abs], [signum], and for floating-point types rounding, roots, powers, logarithms and the
+/// trigonometric and hyperbolic functions. The constants [pi], [e] and [tau] are typed `float`;
+/// `math.pi as float32` gives the narrow width. What describes a number type itself stands at
+/// that type: `float.epsilon`, `int.max`, `x.isNan()`.
+///
+/// The floating-point functions compute in `float` and round a `float32` result once, at the
+/// end; they give the same bits on every tier-1 target.
 import std.core { Signed, asTypeOf };
 
 /// π, a half turn in radians.
@@ -13,18 +19,28 @@ pub let e: float = 2.718281828459045;
 /// τ = 2π, a full turn in radians.
 pub let tau: float = 6.283185307179586;
 
-/// The lesser of two: `a` when they are equal, and when they are unordered — a NaN.
+/// Returns the lesser of `a` and `b`.
+///
+/// Returns `a` when the two are equal, and when they are unordered (a NaN).
 pub fn min<T :: [Ordered]>(a: T, b: T): T {
     return if (b < a) b else a;
 }
 
-/// The greater of two: `a` when they are equal or unordered.
+/// Returns the greater of `a` and `b`.
+///
+/// Returns `a` when the two are equal, and when they are unordered (a NaN).
 pub fn max<T :: [Ordered]>(a: T, b: T): T {
     return if (b > a) b else a;
 }
 
-/// The greatest common divisor, never negative; `gcd(0, 0)` is `0`. A signed type's `min` has a
-/// magnitude beyond it, so `gcd(int.min, 0)` overflows and panics, as `abs` does.
+/// Returns the greatest common divisor of `a` and `b`, never negative.
+///
+/// `gcd(0, 0)` is `0`.
+///
+/// # Panics
+///
+/// When the divisor's magnitude does not fit the type: a signed type's `min` has none, so
+/// `gcd(int.min, 0)` overflows, as [abs] does.
 pub fn gcd<T :: [Integer]>(a: T, b: T): T {
     var x = a;
     var y = b;
@@ -36,8 +52,13 @@ pub fn gcd<T :: [Integer]>(a: T, b: T): T {
     return if (x < T.zero) T.zero - x else x;
 }
 
-/// The least common multiple, never negative; `0` where either is. A multiple beyond the type
-/// overflows and panics.
+/// Returns the least common multiple of `a` and `b`, never negative.
+///
+/// Returns `0` when either is `0`.
+///
+/// # Panics
+///
+/// When the multiple, or its magnitude, does not fit the type.
 pub fn lcm<T :: [Integer]>(a: T, b: T): T {
     if (a == T.zero || b == T.zero) {
         return T.zero;
@@ -46,8 +67,10 @@ pub fn lcm<T :: [Integer]>(a: T, b: T): T {
     return if (m < T.zero) T.zero - m else m;
 }
 
-/// The value the fraction `t` of the way from `a` to `b`: `a` at `0` and `b` at `1`, exactly, and
-/// beyond the two outside 0…1.
+/// Returns the value the fraction `t` of the way from `a` to `b`.
+///
+/// The result is exactly `a` at `t = 0` and exactly `b` at `t = 1`; a `t` outside 0…1
+/// extrapolates beyond the two.
 pub fn lerp<T :: [Float]>(a: T, b: T, t: T): T {
     if (t + t < T.one) {
         return a + (b - a) * t;
@@ -57,117 +80,127 @@ pub fn lerp<T :: [Float]>(a: T, b: T, t: T): T {
 
 // The elementary functions (Z2): computed in `float` by C's libm, a `float32` rounded once, at
 // the end. (The transcendental ones have no answer at compile time yet: 09 D7.)
-/// The greatest integral value not above `x`.
+/// Returns the greatest integral value not above `x`.
 pub fn floor<T :: [Float]>(x: T): T {
     return asTypeOf(libmFloor(asTypeOf(x, 0.0)), x);
 }
 
-/// The least integral value not below `x`.
+/// Returns the least integral value not below `x`.
 pub fn ceil<T :: [Float]>(x: T): T {
     return asTypeOf(libmCeil(asTypeOf(x, 0.0)), x);
 }
 
-/// The nearest integral value, a half away from zero.
+/// Returns the integral value nearest to `x`, rounding halves away from zero.
 pub fn round<T :: [Float]>(x: T): T {
     return asTypeOf(libmRound(asTypeOf(x, 0.0)), x);
 }
 
-/// The integral part of `x`, toward zero.
+/// Returns the integral part of `x`, rounding toward zero.
 pub fn trunc<T :: [Float]>(x: T): T {
     return asTypeOf(libmTrunc(asTypeOf(x, 0.0)), x);
 }
 
-/// The square root; NaN below zero.
+/// Returns the square root of `x`; NaN below zero.
 pub fn sqrt<T :: [Float]>(x: T): T {
     return asTypeOf(libmSqrt(asTypeOf(x, 0.0)), x);
 }
 
-/// The cube root.
+/// Returns the cube root of `x`.
 pub fn cbrt<T :: [Float]>(x: T): T {
     return asTypeOf(libmCbrt(asTypeOf(x, 0.0)), x);
 }
 
-/// *e* to the power `x`.
+/// Returns *e* to the power `x`.
 pub fn exp<T :: [Float]>(x: T): T {
     return asTypeOf(libmExp(asTypeOf(x, 0.0)), x);
 }
 
-/// The natural logarithm; NaN below zero, `-infinity` at zero.
+/// Returns the natural logarithm of `x`; NaN below zero, negative infinity at zero.
 pub fn ln<T :: [Float]>(x: T): T {
     return asTypeOf(libmLn(asTypeOf(x, 0.0)), x);
 }
 
-/// The logarithm to base 2.
+/// Returns the logarithm of `x` to base 2.
 pub fn log2<T :: [Float]>(x: T): T {
     return asTypeOf(libmLog2(asTypeOf(x, 0.0)), x);
 }
 
-/// The logarithm to base 10.
+/// Returns the logarithm of `x` to base 10.
 pub fn log10<T :: [Float]>(x: T): T {
     return asTypeOf(libmLog10(asTypeOf(x, 0.0)), x);
 }
 
-/// The sine, `x` in radians.
+/// Returns the sine of `x`, in radians.
 pub fn sin<T :: [Float]>(x: T): T {
     return asTypeOf(libmSin(asTypeOf(x, 0.0)), x);
 }
 
-/// The cosine.
+/// Returns the cosine of `x`, in radians.
 pub fn cos<T :: [Float]>(x: T): T {
     return asTypeOf(libmCos(asTypeOf(x, 0.0)), x);
 }
 
-/// The tangent.
+/// Returns the tangent of `x`, in radians.
 pub fn tan<T :: [Float]>(x: T): T {
     return asTypeOf(libmTan(asTypeOf(x, 0.0)), x);
 }
 
-/// The arcsine, in radians.
+/// Returns the arcsine of `x`, in radians.
 pub fn asin<T :: [Float]>(x: T): T {
     return asTypeOf(libmAsin(asTypeOf(x, 0.0)), x);
 }
 
-/// The arccosine.
+/// Returns the arccosine of `x`, in radians.
 pub fn acos<T :: [Float]>(x: T): T {
     return asTypeOf(libmAcos(asTypeOf(x, 0.0)), x);
 }
 
-/// The arctangent.
+/// Returns the arctangent of `x`, in radians.
 pub fn atan<T :: [Float]>(x: T): T {
     return asTypeOf(libmAtan(asTypeOf(x, 0.0)), x);
 }
 
-/// The hyperbolic sine.
+/// Returns the hyperbolic sine of `x`.
 pub fn sinh<T :: [Float]>(x: T): T {
     return asTypeOf(libmSinh(asTypeOf(x, 0.0)), x);
 }
 
-/// The hyperbolic cosine.
+/// Returns the hyperbolic cosine of `x`.
 pub fn cosh<T :: [Float]>(x: T): T {
     return asTypeOf(libmCosh(asTypeOf(x, 0.0)), x);
 }
 
-/// The hyperbolic tangent.
+/// Returns the hyperbolic tangent of `x`.
 pub fn tanh<T :: [Float]>(x: T): T {
     return asTypeOf(libmTanh(asTypeOf(x, 0.0)), x);
 }
 
-/// The angle of the point (x, y) from the positive x axis, in radians, -π to π.
+/// Returns the angle of the point (x, y) from the positive x axis, in radians from -π to π.
 pub fn atan2<T :: [Float]>(y: T, x: T): T {
     return asTypeOf(libmAtan2(asTypeOf(y, 0.0), asTypeOf(x, 0.0)), x);
 }
 
-/// The length of the hypotenuse, without the overflow of `sqrt(x * x + y * y)`.
+/// Returns the length of the hypotenuse of a right triangle with legs `x` and `y`.
+///
+/// Unlike `sqrt(x * x + y * y)`, it does not overflow in the intermediate squares.
 pub fn hypot<T :: [Float]>(x: T, y: T): T {
     return asTypeOf(libmHypot(asTypeOf(x, 0.0), asTypeOf(y, 0.0)), x);
 }
 
-/// `x` to the power `e`. (An integer's power by squaring is its own `x.pow(n)`.)
+/// Returns `x` to the power `e`.
+///
+/// For an integer power of an integer, use the integer's own `x.pow(n)`.
 pub fn pow<T :: [Float]>(x: T, e: T): T {
     return asTypeOf(libmPow(asTypeOf(x, 0.0), asTypeOf(e, 0.0)), x);
 }
 
-/// The value without its sign: `0.0` for `-0.0`, which `<` does not tell from `0.0`.
+/// Returns the magnitude of `x`, the value without its sign.
+///
+/// A float's `-0.0` gives `0.0`.
+///
+/// # Panics
+///
+/// For a signed integer type's `min`, whose magnitude the type cannot hold.
 pub fn abs<T :: [Signed]>(x: T): T {
     if (x < T.zero) {
         return -x;
@@ -175,7 +208,9 @@ pub fn abs<T :: [Signed]>(x: T): T {
     return if (x == T.zero) T.zero else x;
 }
 
-/// `-1`, `0` or `1` as a value of the type; a float's NaN stays NaN.
+/// Returns the sign of `x`: `-1`, `0` or `1` as a value of its type.
+///
+/// A float's NaN gives NaN.
 pub fn signum<T :: [Signed]>(x: T): T {
     if (!(x == x)) {
         return x;

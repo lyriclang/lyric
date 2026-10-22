@@ -1,14 +1,26 @@
-/// Text from a template read at run time (design/v5/spec/08 Y7, 10 S7): the f-strings' format
-/// language with the values given apart from it — `fmt.format("{} has {1:>4}", name, n)`. What
-/// the compiler checks in an f-string is checked here when it runs, and what is wrong panics (10
-/// B3): a template that leaves a brace open or closes one it did not open, a value it names that
-/// is not given, a spec that is no format or does not apply to its value.
+/// Formats text from a template read at run time.
+///
+/// [format] speaks the f-strings' format language, with the values given apart from the
+/// template: `fmt.format("{} has {1:>4}", name, n)`. What the compiler checks in an f-string is
+/// checked here when it runs, and a mistake panics: a template that leaves a brace open or closes
+/// one it did not open, a value it names that is not given, a spec that is no format or does not
+/// apply to its value.
 import std.core { Format, fstringDebugged, fstringFormatted, fstringPadded, StringBuilder };
 
-/// The template's text with each hole replaced by its value: `{}` takes the next value, `{i}` the
-/// i-th from 0 — the two mix, `{}` counting only itself, as in Rust —, either with `:spec` after
-/// it (12 §2): what applies to the value's type, or `?` for its `Debug` text. `{{` and `}}` write
-/// a brace. A value no hole names is left out.
+/// Returns the template's text with each hole replaced by its value.
+///
+/// `{}` takes the next value and `{i}` the i-th, counted from 0. The two forms mix; the counter
+/// of `{}` advances only on `{}`. Either may carry a `:spec` before its closing brace: a format
+/// that applies to the value's type, or one ending in `?` for the value's `Debug` text. `{{` and
+/// `}}` write a single brace. A value no hole names is left out.
+///
+/// # Panics
+///
+/// - A `}` that closes no hole and is not part of `}}`.
+/// - A hole without its closing `}`, or holding anything but an index and a `:spec`.
+/// - A hole naming a value beyond those given.
+/// - A spec ending in `?` for a value that is not `Debug`.
+/// - A spec that is no format, or does not apply to its value's type.
 pub fn format(template: string, args: Display...): string {
     let out = StringBuilder.new();
     let cs = template.chars().toArray();
@@ -66,8 +78,10 @@ pub fn format(template: string, args: Display...): string {
     return out.toString();
 }
 
-/// One value into `out` as its hole's spec says: without one its text; under `?` its `Debug` text;
-/// a `Format` type reads the spec itself — the scalars do —; another `Display` type is padded.
+/// Writes one value into `out` as its hole's spec says.
+///
+/// Without a spec the value writes its text; a spec ending in `?` writes its `Debug` text. A
+/// `Format` type, such as the scalars, reads the spec itself; any other `Display` type is padded.
 fn write(value: Display, spec: string, out: StringBuilder): void {
     if (spec.isEmpty()) {
         value.showTo(out);

@@ -1,23 +1,17 @@
 # Comment lines that cite the design, per file: what CommentRatchetTests allows.
 # A count may only fall. LYRIC_UPDATE_SNAPSHOTS=1 lowers the counts to what the tree holds.
 
-# stdlib5-doc: 546
+# stdlib5-doc: 332
 ["stdlib5-doc"]
 "stdlib5/std/build.lyr" = 4
 "stdlib5/std/codec.lyr" = 25
-"stdlib5/std/collections.lyr" = 29
 "stdlib5/std/compress.lyr" = 1
-"stdlib5/std/core.lyr" = 171
 "stdlib5/std/crypto.lyr" = 5
 "stdlib5/std/encoding.lyr" = 5
-"stdlib5/std/fmt.lyr" = 1
 "stdlib5/std/fs.lyr" = 14
-"stdlib5/std/hash.lyr" = 3
 "stdlib5/std/http.lyr" = 2
 "stdlib5/std/io.lyr" = 35
-"stdlib5/std/iter.lyr" = 6
 "stdlib5/std/json.lyr" = 11
-"stdlib5/std/math.lyr" = 1
 "stdlib5/std/meta.lyr" = 6
 "stdlib5/std/net.lyr" = 14
 "stdlib5/std/os.lyr" = 9
@@ -26,7 +20,6 @@
 "stdlib5/std/process.lyr" = 8
 "stdlib5/std/random.lyr" = 2
 "stdlib5/std/regex.lyr" = 3
-"stdlib5/std/string.lyr" = 3
 "stdlib5/std/sync.lyr" = 12
 "stdlib5/std/syntax.lyr" = 8
 "stdlib5/std/task.lyr" = 105
