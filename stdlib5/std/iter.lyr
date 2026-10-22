@@ -432,12 +432,12 @@ pub struct CycleIter<I :: [Iterator, Clone]> :: [Iterator] {
     }
 }
 
-// Closing through an adapter (I6; the review's M8a-4): an adapter over a Closeable iterator is
+// Closing through an adapter: an adapter over a Closeable iterator is
 // Closeable itself and passes `close()` on, so a loop that leaves early closes the generator
 // behind `gen().map(f)`. Its `close()` throws what the inner one's may — the inner's Error, which
 // is the adapter's own —, as the rule at the declaration asks of every Closeable iterator
 // (LYR-SEM0174). The two over two iterators close both; where both throw, the first error wins
-// and the second is suppressed into it (05 E7).
+// and the second is suppressed into it.
 
 extend<I :: [Iterator, Closeable], U, E :: [Error]> MapIter<I, U, E> :: [Closeable] {
     fn close(): void throws I.Error {
@@ -544,7 +544,7 @@ extend<A :: [Iterator, Closeable], B :: [Iterator<Item = A.Item>, Closeable]> Ch
     }
 }
 
-// The adapters (I3): members of every iterator, each a struct of its own — monomorphized, no
+// The adapters: members of every iterator, each a struct of its own — monomorphized, no
 // allocation, no interface value.
 extend<I :: [Iterator]> I {
     /// Returns an iterator over the values, each passed through `f`.
@@ -903,9 +903,9 @@ extend<I :: [Iterator]> I {
     }
 }
 
-// The terminators of an element kind (10 B6 I4): blocks whose `T` the iterator's `Item` binds
-// (05 §13 rule 2), reaching the iterators of numbers, of ordered values, of shown ones.
-// The terminators and adapters of a kind of iterator (10 B6 I4): a flat walk over iterables, runs
+// The terminators of an element kind: blocks whose `T` the iterator's `Item` binds, reaching the
+// iterators of numbers, of ordered values, of shown ones.
+// The terminators and adapters of a kind of iterator: a flat walk over iterables, runs
 // of equal values, the walk from the back, the walk over and over, the mean.
 
 extend<I :: [Iterator<Item = B>], B :: [Iterable]> I {
@@ -919,7 +919,7 @@ extend<I :: [Iterator<Item = B>], B :: [Iterable]> I {
 extend<I :: [Iterator<Item = T>], T :: [Equatable]> I {
     /// Returns an iterator that gives each run of consecutive equal values once.
     pub fn dedup(): DedupIter<I, never> {
-        // the comparison throws nothing: its set is empty (M8c S17 — before it, I.Error stood here)
+        // the comparison throws nothing: its error set is empty
         return DedupIter<I, never> { inner = this, same = (a: T, b: T) => a == b, last = null };
     }
 }
@@ -1111,5 +1111,5 @@ extend<I :: [Iterator]> I {
     }
 }
 
-// --- membership (05 §12 rule 10; 10 C12; M8a S15) -----------------------------------------------
+// --- membership ---------------------------------------------------------------------------------
 // `x in xs` is `xs.contains(x)`: a range holds what lies between its bounds.

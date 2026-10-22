@@ -1,20 +1,20 @@
-/// Serialization as a pair (design/v5/spec/10 B10 E1–E2, E5–E6; 13 M10 P1): `Encode` writes a
-/// value into an `Encoder`, `Decode` reads one out of a `Decoder`, `Codable` is both. A format —
-/// `std.json`, `std.toml` — is an encoder and a decoder of its own; this module holds the pair, the
-/// container model the formats implement, the errors, the conformances of the core types, and
-/// `Value`, a tree of the ten forms that any format could write — the format of no format, for
-/// tests and for data that is passed on unread.
+/// Serializes values in any format: `Encode` writes a value into an `Encoder`, `Decode` reads one
+/// out of a `Decoder`, and `Codable` is both. A format — `std.json`, `std.toml` — is an encoder and
+/// a decoder of its own; this module holds the pair, the container model the formats implement,
+/// the errors (`DecodeError`, `EncodeError`), the conformances of the core types, the `@Codec`
+/// attribute that steers the synthesized conformances, and `Value`, a tree of the ten forms that
+/// any format could write — the format of no format, for tests and for data that is passed on
+/// unread.
 ///
-/// Not `std.encoding`: that module turns bytes into text and back — Base64, hexadecimal — a
-/// method a form; this one writes the form of a value, in whatever format (the maintainer's
-/// review of M10, 2026-10-15).
+/// `std.encoding` is a different module: it turns bytes into text and back (Base64,
+/// hexadecimal); this one writes the form of a value, in whatever format.
 ///
 /// The model has ten forms: null, bool, int, uint, float, string, bytes, a sequence, a map, a
 /// struct of named fields, and a variant of an enum with or without a payload. A format implements
 /// the primitives of `Encoder` and `Decoder` — the scalars, and begin/end around the containers —;
 /// over them lies the layer a conformance writes with: `e.field("id", this.id)` encodes a field,
 /// `d.field<int>("id")` decodes one, `e.element(x)` and `d.next<T>()` an element. An encoder or a
-/// decoder is passed by reference, `&e`, as a hasher is (10 K2): a conformance is generic over the
+/// decoder is passed by reference, `&e`, as a hasher is: a conformance is generic over the
 /// format's type, and the format keeps its state.
 import std.collections { List, Map, Set, Deque };
 import std.core { Hasher, ParseError, StringBuilder, OnField, OnType, fields, variants, attribute, typeAttribute, typeName, isEnum, FieldInfo };
@@ -23,10 +23,10 @@ import std.time { Instant, Duration, Date, Time, DateTime };
 
 // ------------------------------------------------------------------ the attribute
 
-/// How a name is rewritten on the wire (E4): as written, `camelCase`, or `snake_case`.
+/// Selects how a field name is rewritten on the wire: as written, `camelCase`, or `snake_case`.
 pub enum Case :: [Equatable, Debug] { Same, CamelCase, SnakeCase }
 
-/// What steers the synthesis (E4, 09 A2 F2): on a field, `@Codec { name = "user_id" }` writes
+/// Steers the synthesized `encode` and `decode`. On a field, `@Codec { name = "user_id" }` writes
 /// the field under that name, `@Codec { skip = true }` leaves it out (it reads as `null`, so it
 /// is an optional); on an enum, `@Codec { tag = "kind" }` writes a variant as a struct holding
 /// the tag beside the payload's fields (internally tagged); on a struct or a class,
@@ -40,8 +40,8 @@ pub struct Codec :: [OnField, OnType] {
     pub denyUnknown: bool = false,
 }
 
-/// The name a field is written under: its own `@Codec { name }`, else its name under the type's
-/// `rename`.
+/// Returns the name a field is written under: its own `@Codec { name }` where set, else its name
+/// under the type's `rename`.
 pub fn wireName(f: FieldInfo, own: ?Codec, type: ?Codec): string {
     if (let a = own) {
         if (a.name != "") {
@@ -59,7 +59,8 @@ pub fn wireName(f: FieldInfo, own: ?Codec, type: ?Codec): string {
     return f.name;
 }
 
-/// `userId` as `user_id`.
+/// Returns `name` in snake case: `userId` as `user_id`. Every uppercase character becomes `_`
+/// and its lowercase form.
 pub fn snakeCase(name: string): string {
     let out = StringBuilder.new();
     for (c in name.chars()) {
@@ -73,7 +74,8 @@ pub fn snakeCase(name: string): string {
     return out.toString();
 }
 
-/// `user_id` as `userId`.
+/// Returns `name` in camel case: `user_id` as `userId`. Every `_` is dropped and the character
+/// after it is uppercased.
 pub fn camelCase(name: string): string {
     let out = StringBuilder.new();
     var up = false;
@@ -90,7 +92,7 @@ pub fn camelCase(name: string): string {
     return out.toString();
 }
 
-/// The names of `E`'s variants, in order.
+/// Returns the names of `E`'s variants, in declaration order.
 pub fn variantNames<E>(): string[] {
     let out = List<string>.new();
     comptime for (v in variants<E>()) {
@@ -101,13 +103,18 @@ pub fn variantNames<E>(): string[] {
 
 // ------------------------------------------------------------------ the pair
 
-/// A value that writes itself into any encoder (E1).
+/// A value that writes itself into any encoder.
 @SeesConformer
 pub interface Encode {
-    /// Synthesized for a conformance without the member (05 §14; 10 E3): a struct's fields in
-    /// declaration order under their wire names, a `@Codec { skip }` field left out; an enum's
-    /// variant — a unit one as its name, one payload field as the value, several as a sequence
-    /// — or, under the enum's `@Codec { tag }`, as a struct of the tag and the payload's fields.
+    /// Writes this value into `e`. Synthesized for a conformance without the member: a struct's
+    /// fields in declaration order under their wire names, a `@Codec { skip }` field left out; an
+    /// enum's variant — a unit one as its name, one payload field as the value, several as a
+    /// sequence — or, under the enum's `@Codec { tag }`, as a struct of the tag and the payload's
+    /// fields.
+    ///
+    /// # Errors
+    ///
+    /// Throws `EncodeError` where the encoder cannot hold a form or its writer fails.
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         comptime if (isEnum<Self>()) {
             let tag = typeAttribute<Self, Codec>()?.tag ?? "";
@@ -159,13 +166,19 @@ pub interface Encode {
     }
 }
 
-/// A value that reads itself out of any decoder (E1).
+/// A value that reads itself out of any decoder.
 @SeesConformer
 pub interface Decode {
-    /// Synthesized (05 §14; 10 E3): the mirror of `encode` — a struct's fields by their wire
-    /// names, a field the data lacks as `decodeAbsent` gives it (`null` for an optional, `Missing`
-    /// else), unknown fields passed unless `@Codec { denyUnknown }`; an enum's variant by its
-    /// name, or by the tag.
+    /// Reads a value of this type out of `d`. Synthesized for a conformance without the member,
+    /// as the mirror of `encode`: a struct's fields by their wire names, a field the data lacks
+    /// as `decodeAbsent` gives it (`null` for an optional, `Missing` else), unknown fields passed
+    /// unless `@Codec { denyUnknown }`; an enum's variant by its name, or by the tag.
+    ///
+    /// # Errors
+    ///
+    /// Throws `DecodeError`: `Missing` for an absent required field, `UnknownVariant` for a
+    /// variant name or index the enum has not, `UnknownField` under `denyUnknown`, and whatever
+    /// the decoder throws for a mismatched or invalid value.
     static fn decode<D :: [Decoder]>(&d: D): Self throws DecodeError {
         comptime if (isEnum<Self>()) {
             let tag = typeAttribute<Self, Codec>()?.tag ?? "";
@@ -217,20 +230,25 @@ pub interface Decode {
         }
     }
 
-    /// What a field the data lacks reads as (E6): `null` for an optional; for anything else the
-    /// field is `Missing`.
+    /// Returns what a field the data lacks reads as: `null` for an optional (whose conformance
+    /// overrides this member).
+    ///
+    /// # Errors
+    ///
+    /// Throws `DecodeError` of kind `Missing` for any type that does not override it.
     static fn decodeAbsent<D :: [Decoder]>(&d: D, name: string): Self throws DecodeError {
         throw DecodeError { kind = .Missing, path = d.path(), detail = f"field '{name}'" };
     }
 }
 
-/// Both (E1): what `std.json.encode` takes and `std.json.decode<T>` gives.
+/// A value that is both `Encode` and `Decode`: what `std.json.encode` takes and
+/// `std.json.decode<T>` gives.
 pub interface Codable :: [Encode, Decode] {
 }
 
 // ------------------------------------------------------------------ the errors
 
-/// Why a value could not be read (E5): what was missing, mismatched, invalid or unknown.
+/// Classifies why a value could not be read: what was missing, mismatched, invalid or unknown.
 pub enum DecodeErrorKind :: [Equatable, Hashable, Debug] {
     /// A field the type needs is not in the data.
     Missing,
@@ -245,7 +263,8 @@ pub enum DecodeErrorKind :: [Equatable, Hashable, Debug] {
     UnknownVariant,
 }
 
-/// What was wrong, where in the data — `users[0].mail`, `""` at the root — and the detail.
+/// The error a decoder throws: what was wrong, where in the data — `users[0].mail`, `""` at the
+/// root — and the detail. `message()` joins the three.
 pub struct DecodeError :: [Error] {
     pub kind: DecodeErrorKind,
     pub path: string,
@@ -269,8 +288,8 @@ pub struct DecodeError :: [Error] {
     }
 }
 
-/// Why a value could not be written (E5): a format that cannot hold the form — a map keyed by a
-/// struct in JSON — or a writer that failed, at a path in the value.
+/// The error an encoder throws: a format that cannot hold the form — a map keyed by a struct in
+/// JSON — or a writer that failed (then `cause()` is its error), at a path in the value.
 pub struct EncodeError :: [Error] {
     pub path: string,
     pub detail: string = "",
@@ -290,7 +309,7 @@ pub struct EncodeError :: [Error] {
 
 // ------------------------------------------------------------------ the container model
 
-/// What a format writes (E2): the scalars, and the containers as begin/end around their parts.
+/// The writing side of a format: the scalars, and the containers as begin/end around their parts.
 /// The sequence of calls a conformance makes is the contract: `beginSeq(n)`, then `n` values,
 /// then `endSeq()`; `beginMap(n)`, then `n` times `beginKey()`, a key and a value, then
 /// `endMap()`; `beginStruct(name, n)`, then `n` times `beginField(name)` and a value, then
@@ -320,11 +339,11 @@ pub interface Encoder {
     mut fn beginVariant(enumName: string, variant: string, index: int, hasPayload: bool): void throws EncodeError;
     mut fn endVariant(): void throws EncodeError;
 
-    /// Where the encoder stands, for an error: `""` at the root.
+    /// Returns where the encoder stands, for an error: `""` at the root.
     fn path(): string;
 }
 
-/// What a format reads (E2), pull-based: a conformance asks for the form it expects, and the
+/// The reading side of a format, pull-based: a conformance asks for the form it expects, and the
 /// format answers it or throws `TypeMismatch`. The containers: `beginSeq()` answers the count
 /// where the format knows it, `seqHasNext()` whether an element follows — which is how a format
 /// that does not know the count ends a sequence —; `beginMap()`/`mapHasNext()` the same, a key
@@ -336,7 +355,7 @@ pub interface Encoder {
 /// structs in field order) answers `structField` by position. A read that mismatches leaves the
 /// value where it was: the next ask sees it again, which is how `Value` reads whatever comes.
 pub interface Decoder {
-    /// Whether the next value is null, without taking it.
+    /// Returns whether the next value is null, without taking it.
     mut fn isNull(): bool throws DecodeError;
     mut fn decodeNull(): void throws DecodeError;
     mut fn decodeBool(): bool throws DecodeError;
@@ -362,38 +381,58 @@ pub interface Decoder {
     fn variantHasPayload(): bool throws DecodeError;
     mut fn endVariant(): void throws DecodeError;
 
-    /// Where the decoder stands, for an error: `""` at the root, `users[0].mail` below.
+    /// Returns where the decoder stands, for an error: `""` at the root, `users[0].mail` below.
     fn path(): string;
 }
 
 // ------------------------------------------------------------------ the layer over the model
 
 extend<E :: [Encoder]> E {
-    /// An element of the sequence begun.
+    /// Encodes `v` as the next element of the sequence begun.
+    ///
+    /// # Errors
+    ///
+    /// Throws what encoding `v` throws.
     pub mut fn element<T :: [Encode]>(v: T): void throws EncodeError {
         try v.encode(&this);
     }
 
-    /// An entry of the map begun.
+    /// Encodes the key `k` and the value `v` as the next entry of the map begun.
+    ///
+    /// # Errors
+    ///
+    /// Throws `EncodeError` where the format cannot hold the key, or what encoding either throws.
     pub mut fn entry<K :: [Encode], V :: [Encode]>(k: K, v: V): void throws EncodeError {
         try this.beginKey();
         try k.encode(&this);
         try v.encode(&this);
     }
 
-    /// A field of the struct begun.
+    /// Encodes `v` as the field `name` of the struct begun.
+    ///
+    /// # Errors
+    ///
+    /// Throws what encoding `v` throws.
     pub mut fn field<T :: [Encode]>(name: string, v: T): void throws EncodeError {
         try this.beginField(name);
         try v.encode(&this);
     }
 
-    /// A unit variant, whole.
+    /// Encodes a unit variant whole: `beginVariant` without a payload, then `endVariant`.
+    ///
+    /// # Errors
+    ///
+    /// Throws what the encoder throws.
     pub mut fn encodeUnitVariant(enumName: string, variant: string, index: int): void throws EncodeError {
         try this.beginVariant(enumName, variant, index, false);
         try this.endVariant();
     }
 
-    /// A variant with its payload, whole.
+    /// Encodes a variant whole, with `payload` between `beginVariant` and `endVariant`.
+    ///
+    /// # Errors
+    ///
+    /// Throws what the encoder or encoding `payload` throws.
     pub mut fn encodeVariant<T :: [Encode]>(enumName: string, variant: string, index: int, payload: T): void throws EncodeError {
         try this.beginVariant(enumName, variant, index, true);
         try payload.encode(&this);
@@ -402,7 +441,11 @@ extend<E :: [Encoder]> E {
 }
 
 extend<D :: [Decoder]> D {
-    /// The next element of the sequence begun, `null` at its end.
+    /// Decodes the next element of the sequence begun; returns `null` at its end.
+    ///
+    /// # Errors
+    ///
+    /// Throws what decoding the element throws.
     pub mut fn next<T :: [Decode]>(): ?T throws DecodeError {
         if (!(try this.seqHasNext())) {
             return null;
@@ -410,7 +453,12 @@ extend<D :: [Decoder]> D {
         return try T.decode(&this);
     }
 
-    /// The next key of the map begun, `null` at its end; `value<V>()` reads its value.
+    /// Decodes the next key of the map begun; returns `null` at its end. `value<V>()` reads its
+    /// value.
+    ///
+    /// # Errors
+    ///
+    /// Throws what decoding the key throws.
     pub mut fn nextKey<K :: [Decode]>(): ?K throws DecodeError {
         if (!(try this.mapHasNext())) {
             return null;
@@ -418,12 +466,21 @@ extend<D :: [Decoder]> D {
         return try K.decode(&this);
     }
 
-    /// The value of the key read.
+    /// Decodes the value of the key read last.
+    ///
+    /// # Errors
+    ///
+    /// Throws what decoding the value throws.
     pub mut fn value<V :: [Decode]>(): V throws DecodeError {
         return try V.decode(&this);
     }
 
-    /// A field the data must have (E6: a missing one is `Missing`).
+    /// Decodes the field `name` of the struct begun, which the data must have.
+    ///
+    /// # Errors
+    ///
+    /// Throws `DecodeError` of kind `Missing` where the data lacks the field, or what decoding
+    /// its value throws.
     pub mut fn field<T :: [Decode]>(name: string): T throws DecodeError {
         if (!(try this.structField(name))) {
             throw DecodeError { kind = .Missing, path = this.path(), detail = f"field '{name}'" };
@@ -431,7 +488,12 @@ extend<D :: [Decoder]> D {
         return try T.decode(&this);
     }
 
-    /// A field the data may lack: `null` then, as for a `null` in the data (E6).
+    /// Decodes the field `name` of the struct begun, which the data may lack; returns `null` for
+    /// a missing field, as for a `null` in the data.
+    ///
+    /// # Errors
+    ///
+    /// Throws what decoding the value throws.
     pub mut fn optional<T :: [Decode]>(name: string): ?T throws DecodeError {
         if (!(try this.structField(name))) {
             return null;
@@ -439,7 +501,11 @@ extend<D :: [Decoder]> D {
         return try this.decodeNullable<T>();
     }
 
-    /// A value that may be null: `null` for one, the value else.
+    /// Decodes a value that may be null: returns `null` for a null, the decoded value else.
+    ///
+    /// # Errors
+    ///
+    /// Throws what decoding the value throws.
     pub mut fn decodeNullable<T :: [Decode]>(): ?T throws DecodeError {
         if (try this.isNull()) {
             try this.decodeNull();
@@ -448,7 +514,12 @@ extend<D :: [Decoder]> D {
         return try T.decode(&this);
     }
 
-    /// The next element of the sequence begun, `Missing` at its end.
+    /// Decodes the next element of the sequence begun, which must be there.
+    ///
+    /// # Errors
+    ///
+    /// Throws `DecodeError` of kind `Missing` at the end of the sequence, or what decoding the
+    /// element throws.
     pub mut fn element<T :: [Decode]>(): T throws DecodeError {
         if (let x = try this.next<T>()) {
             return x;
@@ -456,14 +527,22 @@ extend<D :: [Decoder]> D {
         throw DecodeError { kind = .Missing, path = this.path(), detail = "an element" };
     }
 
-    /// The payload of the variant begun.
+    /// Decodes the payload of the variant begun.
+    ///
+    /// # Errors
+    ///
+    /// Throws what decoding the payload throws.
     pub mut fn payload<T :: [Decode]>(): T throws DecodeError {
         return try T.decode(&this);
     }
 
-    /// A field as the synthesis reads it: the value where the data has it, else what the type
-    /// gives for an absent field — `null` for an optional, `Missing` else; a skipped field is
-    /// never read.
+    /// Decodes a field as the synthesized `decode` reads it: the value where the data has it,
+    /// else what `decodeAbsent` gives — `null` for an optional. A skipped field is never read.
+    ///
+    /// # Errors
+    ///
+    /// Throws `DecodeError` of kind `Missing` for an absent non-optional field, or what decoding
+    /// the value throws.
     pub mut fn fieldOrAbsent<T :: [Decode]>(name: string, skipped: bool = false): T throws DecodeError {
         if (skipped || !(try this.structField(name))) {
             return try T.decodeAbsent(&this, name);
@@ -494,8 +573,13 @@ extend int :: [Codable] {
     }
 }
 
-/// An integer narrower than `int` reads through `int` and refuses what does not fit (E6: an
-/// overflow is `Invalid`).
+/// Decodes an integer narrower than `int` through `int`, refusing what lies outside
+/// `low..=high`.
+///
+/// # Errors
+///
+/// Throws `DecodeError` of kind `Invalid` for a value that does not fit, or what `decodeInt`
+/// throws.
 fn narrowed<D :: [Decoder]>(&d: D, low: int, high: int, name: string): int throws DecodeError {
     let v = try d.decodeInt();
     if (v < low || v > high) {
@@ -554,7 +638,8 @@ extend string :: [Codable] {
     static fn decode<D :: [Decoder]>(&d: D): string throws DecodeError { return try d.decodeString(); }
 }
 
-/// A character is a string of one character.
+/// Encodes a character as a string of one character; decoding refuses any other length as
+/// `Invalid`.
 extend char :: [Codable] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(f"{this}"); }
 
@@ -568,7 +653,8 @@ extend char :: [Codable] {
     }
 }
 
-/// An `Instant` is its RFC 3339 text (E6).
+/// Encodes an `Instant` as its RFC 3339 text; decoding refuses text that does not parse as
+/// `Invalid`.
 extend Instant :: [Codable] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
 
@@ -582,9 +668,9 @@ extend Instant :: [Codable] {
     }
 }
 
-/// The other time types are their texts too (the review of M10, M15): a `Duration` as Go writes
-/// it (`1h30m`), a `Date` as RFC 3339's full-date, a `Time` as `HH:MM:SS` with its fraction, a
-/// `DateTime` as RFC 3339's date-time with its offset.
+/// Encodes the other time types as their texts too: a `Duration` as `1h30m`, a `Date` as RFC 3339's full-date, a `Time` as `HH:MM:SS` with its fraction, a
+/// `DateTime` as RFC 3339's date-time with its offset. Decoding refuses text that does not parse
+/// as `Invalid`.
 extend Duration :: [Codable] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
 
@@ -639,7 +725,8 @@ extend DateTime :: [Codable] {
 
 // ------------------------------------------------------------------ the containers
 
-/// `null` or the value (E6: a `null` and a missing field read alike into `?T`).
+/// Encodes an optional as `null` or its value. A `null` and a missing field decode alike into
+/// `?T`.
 extend<T :: [Encode]> ?T :: [Encode] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         if (let v = this) {
@@ -660,9 +747,9 @@ extend<T :: [Decode]> ?T :: [Decode] {
     }
 }
 
-/// An array is a sequence of its elements — a `uint8[]` one of numbers. Bytes as the format holds
-/// them (E6: Base64 in JSON) are `Bytes { value }`: a conformance over `T[]` cannot ask what `T` is
-/// (11 §4 rule 6), so the byte form has a type of its own, as Rust's `serde_bytes` has.
+/// Encodes an array as a sequence of its elements — a `uint8[]` as one of numbers. Bytes as the
+/// format holds them (Base64 in JSON) are `Bytes { value }`: a conformance over `T[]` cannot ask
+/// what `T` is, so the byte form has a type of its own.
 extend<T :: [Encode]> T[] :: [Encode] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         try e.beginSeq(this.length());
@@ -689,7 +776,7 @@ extend<T :: [Decode]> T[] :: [Decode] {
     }
 }
 
-/// A slice writes as its array would; it is a view, so it reads into nothing.
+/// Encodes a slice as its array would be; a slice is a view, so it has no `Decode`.
 extend<T :: [Encode]> Slice<T> :: [Encode] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         try e.beginSeq(this.length());
@@ -700,7 +787,7 @@ extend<T :: [Encode]> Slice<T> :: [Encode] {
     }
 }
 
-/// Bytes, as the format holds them (E6): what `encodeBytes`/`decodeBytes` carry — Base64 in JSON,
+/// Bytes in the format's own byte form: what `encodeBytes`/`decodeBytes` carry — Base64 in JSON,
 /// an array of numbers in TOML, the bytes themselves in a binary format.
 pub struct Bytes :: [Codable, Equatable, Debug] {
     pub value: uint8[],
@@ -766,7 +853,7 @@ extend<T :: [Decode]> Deque<T> :: [Decode] {
     }
 }
 
-/// A set is a sequence; its order is the set's (unspecified, as a map's keys — E6).
+/// Encodes a set as a sequence, in the set's own (unspecified) order.
 extend<T :: [Hashable, Encode], H :: [Hasher]> Set<T, H> :: [Encode] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         try e.beginSeq(this.length());
@@ -793,8 +880,8 @@ extend<T :: [Hashable, Decode]> Set<T, DefaultHasher> :: [Decode] {
     }
 }
 
-/// A map is a map; its keys go to the format as values, and a format that holds only text keys
-/// (JSON) writes a number as its digits and refuses the rest (E6).
+/// Encodes a map as a map; its keys go to the format as values, and a format that holds only text
+/// keys (JSON) writes a number as its digits and refuses the rest.
 extend<K :: [Hashable, Encode], V :: [Encode], H :: [Hasher]> Map<K, V, H> :: [Encode] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         try e.beginMap(this.length());
@@ -821,7 +908,7 @@ extend<K :: [Hashable, Decode], V :: [Decode]> Map<K, V, DefaultHasher> :: [Deco
     }
 }
 
-/// A tuple is a sequence of its length.
+/// Encodes a tuple as a sequence of its length.
 extend<T0 :: [Encode], T1 :: [Encode]> (T0, T1) :: [Encode] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         try e.beginSeq(2);
@@ -871,7 +958,7 @@ fn tupleElement<T :: [Decode], D :: [Decoder]>(&d: D, index: int): T throws Deco
 
 // ------------------------------------------------------------------ Value, the format of no format
 
-/// A tree of the ten forms (E2): what any encoder is given and any decoder answers, as a value.
+/// A tree of the ten forms: what any encoder is given and any decoder answers, as a value.
 /// `Value.of(v)` is the tree a value writes, `tree.read<T>()` the value a tree reads as. A struct
 /// is its name and its fields in order, a variant its enum's name, its own, its index and its
 /// payload where it has one; a map is its entries in the order written.
@@ -903,7 +990,7 @@ pub class ValueEncoder :: [Encoder] {
     var done: ?Box<Value> = null,
     var segments: List<string> = List.new(),
 
-    /// The value built, after one value was encoded; `Null` before.
+    /// Returns the value built, once one value was encoded; `Null` before.
     pub fn value(): Value {
         if (let b = this.done) {
             return b.value;
@@ -1045,7 +1132,12 @@ pub class ValueDecoder :: [Decoder] {
     var taken: bool = false,
     var segments: List<string> = List.new(),
 
-    /// The value the next read takes, or throws where the container is exhausted.
+    /// Returns the value the next read takes, without taking it.
+    ///
+    /// # Errors
+    ///
+    /// Throws `DecodeError` of kind `Missing` where the container is exhausted or the root was
+    /// read already.
     fn peek(): Value throws DecodeError {
         if (this.stack.isEmpty()) {
             if (this.taken) {
@@ -1082,8 +1174,8 @@ pub class ValueDecoder :: [Decoder] {
         };
     }
 
-    /// The position moves on, once a read matched its form: a mismatch leaves the value where
-    /// it was, so the next ask sees it again.
+    /// Moves the position on, once a read matched its form: a mismatch does not call it, so the
+    /// next ask sees the same value again.
     mut fn advance(): void {
         if (this.stack.isEmpty()) {
             this.taken = true;
@@ -1321,7 +1413,7 @@ pub class ValueDecoder :: [Decoder] {
     }
 }
 
-/// The form of a value, in words, for an error.
+/// Returns the form of a value in words, for an error.
 fn formOf(v: Value): string {
     return match (v) {
         .Null => "null",
@@ -1339,32 +1431,40 @@ fn formOf(v: Value): string {
 }
 
 extend Value {
-    /// An encoder that builds a tree.
+    /// Returns a new encoder that builds a tree.
     pub static fn encoder(): ValueEncoder {
         return ValueEncoder { };
     }
 
-    /// The tree a value writes.
+    /// Returns the tree `v` writes.
+    ///
+    /// # Errors
+    ///
+    /// Throws what encoding `v` throws.
     pub static fn of<T :: [Encode]>(v: T): Value throws EncodeError {
         var e = ValueEncoder { };
         try v.encode(&e);
         return e.value();
     }
 
-    /// The value this tree reads as.
+    /// Decodes a `T` out of this tree.
+    ///
+    /// # Errors
+    ///
+    /// Throws `DecodeError` where the tree does not hold a `T`.
     pub fn read<T :: [Decode]>(): T throws DecodeError {
         var d = ValueDecoder { root = this };
         return try T.decode(&d);
     }
 
-    /// A decoder over this tree, to pass on.
+    /// Returns a decoder over this tree, to pass on.
     pub fn decoder(): ValueDecoder {
         return ValueDecoder { root = this };
     }
 }
 
-/// A `Value` writes itself as the forms it holds, and reads itself from any format: the dynamic
-/// tree of a format (`JsonValue`) is the same idea over the format's own forms.
+/// Encodes a `Value` as the forms it holds, and decodes one from any format. A format's own
+/// dynamic tree (`JsonValue`) is the same idea over the format's own forms.
 extend Value :: [Codable] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         match (this) {
@@ -1411,6 +1511,11 @@ extend Value :: [Codable] {
     /// a map — and takes the first that is no mismatch. A struct or a variant cannot be asked for
     /// without its name: a format's own tree knows its forms; this one reads the scalars and the
     /// two anonymous containers.
+    ///
+    /// # Errors
+    ///
+    /// Throws `DecodeError` of kind `TypeMismatch` where the data holds a struct or a variant,
+    /// or what reading a nested value throws.
     static fn decode<D :: [Decoder]>(&d: D): Value throws DecodeError {
         if (try d.isNull()) {
             try d.decodeNull();

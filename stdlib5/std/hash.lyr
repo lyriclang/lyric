@@ -164,7 +164,7 @@ pub struct Fnv1a64 :: [Hasher] {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Checksums (10 Q3): CRC-32 of ISO-HDLC — zip, gzip, PNG —, CRC-32C of Castagnoli — iSCSI
+// Checksums: CRC-32 of ISO-HDLC — zip, gzip, PNG —, CRC-32C of Castagnoli — iSCSI
 // (RFC 3720), ext4 —, and Adler-32 of zlib (RFC 1950). Each continues from a running value, as
 // zlib's own do: the checksum of the whole is that of its pieces, one after the other.
 // ---------------------------------------------------------------------------------------------

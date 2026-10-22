@@ -1,7 +1,8 @@
-/// `std.http` (design 10 Q6; 13 M10 S7, S8): HTTP/1.1 over `Reader` and `Writer`. The message
-/// types — `Method`, `Status`, `Headers`, `Request`, `Response` —, the client and the server.
-/// The client: `Client.send`
-/// writes a request over a connection it keeps alive for the next one to the same authority,
+/// Speaks HTTP/1.1 (RFC 9110, RFC 9112) over `Reader` and `Writer`: the message types, a client
+/// and a server.
+///
+/// The message types are `Method`, `Status`, `Headers`, `Request`, `Response` and `Body`; the
+/// errors are `HttpError` beside the I/O errors. The client: `Client.send` writes a request over a connection it keeps alive for the next one to the same authority,
 /// reads the status line and the headers, and hands the body back as a `Reader` that knows its
 /// length (`Content-Length`), its chunks (`Transfer-Encoding: chunked`) or its end (the
 /// connection's close). Redirects are followed where asked, a timeout spans the whole exchange,
@@ -10,7 +11,7 @@
 /// connection, reads each request as the client writes one (its body a `Reader` the handler may
 /// read or leave), answers `Expect: 100-continue`, writes the handler's `Response` with its
 /// length or in chunks, keeps the connection for the next request, and ends with `shutdown()`.
-/// No TLS of its own, no HTTP/2, no cookies (Q6: doors).
+/// The module has no TLS of its own, no HTTP/2 and no cookies.
 import std.collections { List, Map };
 import std.core { StringBuilder, viewBytes, Closeable, ParseError };
 import std.io { Reader, Writer, IoError, ByteBuffer };
@@ -36,7 +37,7 @@ pub enum HttpErrorKind :: [Equatable, Debug] {
     Unsupported,
 }
 
-/// What the client throws beyond the I/O errors of the connection.
+/// The error the client throws beyond the I/O errors of the connection.
 pub struct HttpError :: [Error] {
     pub kind: HttpErrorKind,
     pub detail: string,
@@ -65,7 +66,8 @@ pub enum Method :: [Equatable, Debug] {
     Options,
     Other(string);
 
-    /// The method of a token as it stands on the wire (`GET`), `Other` for one beyond the known.
+    /// Returns the method of a token as it stands on the wire (`GET`), `Other` for one beyond the
+    /// known ones.
     pub static fn of(token: string): Method {
         return match (token) {
             "GET" => Method.Get,
@@ -100,7 +102,7 @@ pub struct Status :: [Equatable, Debug] {
     pub code: int,
     pub reason: string = "",
 
-    /// The status of a code with the phrase RFC 9110 gives it.
+    /// Returns the status of a code with the reason phrase RFC 9110 gives it.
     pub static fn of(code: int): Status {
         return Status { code = code, reason = reasonOf(code) };
     }
@@ -118,7 +120,8 @@ extend Status :: [Display] {
     }
 }
 
-/// RFC 9110 §15's phrases.
+/// Returns the reason phrase RFC 9110 §15 gives a status code, or an empty string for a code
+/// without one here.
 pub fn reasonOf(code: int): string {
     return match (code) {
         100 => "Continue",
@@ -167,7 +170,7 @@ pub class Headers {
         return Headers { items = List.new() };
     }
 
-    /// The first value of the field, `null` where there is none.
+    /// Returns the first value of the field, `null` where there is none.
     pub fn get(name: string): ?string {
         for ((k, v) in this.items) {
             if (sameName(k, name)) {
@@ -177,7 +180,7 @@ pub class Headers {
         return null;
     }
 
-    /// Every value of the field, in order.
+    /// Returns every value of the field, in order.
     pub fn all(name: string): string[] {
         let out: List<string> = List.new();
         for ((k, v) in this.items) {
@@ -192,13 +195,13 @@ pub class Headers {
         return this.get(name) != null;
     }
 
-    /// The field with this value alone: its other values go.
+    /// Sets the field to this value alone, removing its other values.
     pub mut fn set(name: string, value: string): void {
         this.remove(name);
         this.items.push((name, value));
     }
 
-    /// One more value of the field.
+    /// Adds one more value of the field.
     pub mut fn add(name: string, value: string): void {
         this.items.push((name, value));
     }
@@ -221,7 +224,7 @@ pub class Headers {
         return this.items;
     }
 
-    /// Whether `Connection` names the token (`close`, `keep-alive`), without case.
+    /// Returns whether `Connection` names the token (`close`, `keep-alive`), without case.
     fn connectionHas(token: string): bool {
         for (v in this.all("Connection")) {
             for (part in v.split(',')) {
@@ -255,7 +258,7 @@ fn lowerByte(b: uint8): uint8 {
 }
 
 /// A request: the method, the URI, the headers, and a body — a `Reader` with its length where
-/// known (`Content-Length`), sent in chunks else.
+/// known (`Content-Length`), sent in chunks otherwise.
 pub struct Request {
     pub var method: Method = Method.Get,
     pub var uri: Uri,
@@ -267,7 +270,7 @@ pub struct Request {
         return Request { uri = uri };
     }
 
-    /// A POST of the bytes, their length known.
+    /// Returns a POST of the bytes, their length known.
     pub static fn post(uri: Uri, body: Slice<uint8>, contentType: string = "application/octet-stream"): Request {
         var r = Request { method = Method.Post, uri = uri };
         r.headers.set("Content-Type", contentType);
@@ -275,7 +278,7 @@ pub struct Request {
         return r;
     }
 
-    /// The bytes as the body, `Content-Length` their count.
+    /// Sets the bytes as the body, `Content-Length` their count.
     pub mut fn setBody(bytes: Slice<uint8>): void {
         let buf = ByteBuffer.new();
         try! buf.write(bytes);
@@ -283,14 +286,19 @@ pub struct Request {
         this.contentLength = bytes.length();
     }
 
-    /// The text as the body, UTF-8.
+    /// Sets the text as the body, UTF-8, and the `Content-Type`.
     pub mut fn setText(text: string, contentType: string = "text/plain; charset=utf-8"): void {
         this.headers.set("Content-Type", contentType);
         this.setBody(viewBytes(text));
     }
 
-    /// The body read whole (a server's handler reads the request it was given this way); empty
+    /// Reads the body whole (a server's handler reads the request it was given this way); empty
     /// where there is none.
+    ///
+    /// # Errors
+    ///
+    /// Throws `IoError` where reading the body fails, and `Cancelled` where the task is cancelled
+    /// while reading.
     pub fn bytes(): uint8[] throws [IoError, Cancelled] {
         if (let b = this.body) {
             return try readWhole(b);
@@ -298,18 +306,27 @@ pub struct Request {
         return [];
     }
 
-    /// The body read whole as text.
+    /// Reads the body whole as text (UTF-8, a wrong byte U+FFFD).
+    ///
+    /// # Errors
+    ///
+    /// Throws as `bytes` does.
     pub fn text(): string throws [IoError, Cancelled] {
         return string.fromUtf8Lossy((try this.bytes())[..]);
     }
 
-    /// The body read whole and decoded as JSON into `T`.
+    /// Reads the body whole and decodes it as JSON into `T`.
+    ///
+    /// # Errors
+    ///
+    /// Throws `JsonError` for a body that is no JSON, `DecodeError` where it does not fit `T`,
+    /// and `IoError` or `Cancelled` as `bytes` does.
     pub fn json<T :: [Decode]>(): T throws [JsonError, DecodeError, IoError, Cancelled] {
         return try jsonOf<T>(this.text());
     }
 }
 
-/// Every byte of a reader.
+/// Reads every byte of a reader.
 fn readWhole(r: Reader): uint8[] throws [IoError, Cancelled] {
     var reader = r;
     let out = ByteBuffer.new();
@@ -332,7 +349,8 @@ pub class Response {
     pub var headers: Headers,
     pub var body: Body,
 
-    /// A response of the bytes, their length known.
+    /// Returns a response of the bytes, their length known; `Content-Type` is set where there are
+    /// any.
     pub static fn of(status: int, body: Slice<uint8> = [], contentType: string = "application/octet-stream"): Response {
         let headers = Headers.new();
         if (body.length() > 0) {
@@ -341,46 +359,65 @@ pub class Response {
         return Response { status = Status.of(status), headers = headers, body = Body.of(body) };
     }
 
-    /// A response of the text, UTF-8.
+    /// Returns a response of the text, UTF-8.
     pub static fn withText(text: string, status: int = 200, contentType: string = "text/plain; charset=utf-8"): Response {
         return Response.of(status, viewBytes(text), contentType);
     }
 
-    /// A response of the value as JSON.
+    /// Returns a response of the value as JSON, `Content-Type: application/json`.
+    ///
+    /// # Errors
+    ///
+    /// Throws `EncodeError` where the value cannot be encoded as JSON.
     pub static fn withJson<T :: [Encode]>(value: T, status: int = 200): Response throws EncodeError {
         return Response.of(status, viewBytes(try jsonText(value)), "application/json");
     }
 
-    /// A response whose body is read from `source` as it is written — in chunks where `length`
-    /// is `null`, with `Content-Length` else.
+    /// Returns a response whose body is read from `source` as it is written — in chunks where
+    /// `length` is `null`, with `Content-Length` otherwise.
     pub static fn stream(status: int, source: Reader, length: ?int = null, contentType: string = "application/octet-stream"): Response {
         let headers = Headers.new();
         headers.set("Content-Type", contentType);
         return Response { status = Status.of(status), headers = headers, body = Body.from(source, length) };
     }
 
-    /// A response without a body.
+    /// Returns a response without a body.
     pub static fn empty(status: int): Response {
         return Response { status = Status.of(status), headers = Headers.new(), body = Body.empty() };
     }
 
-    /// The body read whole.
+    /// Reads the body whole.
+    ///
+    /// # Errors
+    ///
+    /// Throws `IoError` where the connection fails or the body is framed wrongly, and `Cancelled`
+    /// where the task is cancelled while reading.
     pub fn bytes(): uint8[] throws [IoError, Cancelled] {
         return try this.body.readAll();
     }
 
-    /// The body read whole as text (UTF-8, a wrong byte U+FFFD).
+    /// Reads the body whole as text (UTF-8, a wrong byte U+FFFD).
+    ///
+    /// # Errors
+    ///
+    /// Throws as `bytes` does.
     pub fn text(): string throws [IoError, Cancelled] {
         return string.fromUtf8Lossy((try this.body.readAll())[..]);
     }
 
-    /// The body read whole and decoded as JSON into `T`.
+    /// Reads the body whole and decodes it as JSON into `T`.
+    ///
+    /// # Errors
+    ///
+    /// Throws `JsonError` for a body that is no JSON, `DecodeError` where it does not fit `T`,
+    /// and `IoError` or `Cancelled` as `bytes` does.
     pub fn json<T :: [Decode]>(): T throws [JsonError, DecodeError, IoError, Cancelled] {
         return try jsonOf<T>(this.text());
     }
 }
 
-/// The text decoded (outside the class: inside it, `json` is the method).
+/// Decodes JSON text into `T`; it stands outside the classes because inside them `json` names the
+/// method, not the module.
 fn jsonOf<T :: [Decode]>(text: string): T throws [JsonError, DecodeError] {
     return try json.decode<T>(text);
 }
@@ -393,7 +430,7 @@ fn jsonText<T :: [Encode]>(value: T): string throws EncodeError {
 // The connection: a Stream with a read buffer, lines and bytes out of it.
 // ---------------------------------------------------------------------------------------------
 
-/// What a transport gives: a connection read, written and closed.
+/// A connection a transport gives: read, written and closed.
 pub interface Stream :: [Reader, Writer, Closeable] { }
 
 extend TcpStream :: [Stream] { }
@@ -415,7 +452,8 @@ class Conn {
         return Conn { stream = stream, buf = [0u8] * 8192, start = 0, end = 0, reusable = true };
     }
 
-    /// More bytes into the buffer; `false` at the end of the stream.
+    /// Reads more bytes into the buffer where it is empty; returns `false` at the end of the
+    /// stream.
     mut fn fill(): bool throws [IoError, Cancelled] {
         if (this.start < this.end) {
             return true;
@@ -425,7 +463,8 @@ class Conn {
         return this.end > 0;
     }
 
-    /// A line without its `\r\n` (a lone `\n` ends it too); `null` at the end of the stream.
+    /// Reads a line without its `\r\n` (a lone `\n` ends it too); `null` at the end of the
+    /// stream.
     mut fn readLine(): ?string throws [IoError, Cancelled] {
         let out = ByteBuffer.new();
         var total = 0;
@@ -460,7 +499,7 @@ class Conn {
         return string.fromUtf8Lossy(bytes[0..n]);
     }
 
-    /// Bytes into `into`, from the buffer first; 0 at the end of the stream.
+    /// Reads bytes into `into`, from the buffer first; 0 at the end of the stream.
     mut fn read(into: Slice<uint8>): int throws [IoError, Cancelled] {
         if (this.start < this.end) {
             let n = if (this.end - this.start < into.length()) this.end - this.start else into.length();
@@ -491,8 +530,8 @@ class Conn {
         } catch (_: Error) { }
     }
 
-    /// What the peer still sends read away — up to 64 KiB or its end — then closed: a close with
-    /// unread bytes resets the connection, and the peer loses the answer it was given.
+    /// Reads away what the peer still sends — up to 64 KiB or its end — then closes: a close with
+    /// unread bytes resets the connection, and the peer would lose the answer it was given.
     mut fn drainAndClose(): void {
         let scratch: uint8[] = [0u8] * 4096;
         var total = this.end - this.start;
@@ -528,6 +567,9 @@ enum Framing {
 
 /// A message's body as a `Reader`: the bytes up to the message's end, however it is framed. Once
 /// read to the end, the connection goes back to the client for the next request, or is closed.
+///
+/// Its `read` throws `IoError` with kind `UnexpectedEof` where the connection ends inside the
+/// body, and `InvalidData` for a chunk that is framed wrongly.
 pub class Body :: [Reader] {
     var conn: ?Conn,
     var framing: Framing,
@@ -550,19 +592,19 @@ pub class Body :: [Reader] {
         return Body { conn = null, framing = Framing.Empty, left = 0, done = true, client = null, authority = "", source = null, sourceLength = null, owns = false, failed = false };
     }
 
-    /// A body of the bytes.
+    /// Returns a body of the bytes.
     pub static fn of(bytes: Slice<uint8>): Body {
         let buf = ByteBuffer.new();
         try! buf.write(bytes);
         return Body { conn = null, framing = Framing.Fixed, left = bytes.length(), done = bytes.length() == 0, client = null, authority = "", source = buf, sourceLength = bytes.length(), owns = false, failed = false };
     }
 
-    /// A body read from `source`, its length where known.
+    /// Returns a body read from `source`, with its length where known.
     pub static fn from(source: Reader, length: ?int): Body {
         return Body { conn = null, framing = Framing.UntilClose, left = 0, done = false, client = null, authority = "", source = source, sourceLength = length, owns = false, failed = false };
     }
 
-    /// The body's length where it is known before it is read.
+    /// Returns the body's length where it is known before it is read, `null` otherwise.
     pub fn length(): ?int {
         if (this.source != null) {
             return this.sourceLength;
@@ -649,7 +691,7 @@ pub class Body :: [Reader] {
         }
     }
 
-    /// The size line of a chunk: hex digits, an extension after `;` ignored.
+    /// Reads the size line of a chunk: hex digits, an extension after `;` ignored.
     mut fn chunkSize(conn: Conn): int throws [IoError, Cancelled] {
         let line = try conn.readLine();
         if (line == null) {
@@ -681,8 +723,8 @@ pub class Body :: [Reader] {
         return size;
     }
 
-    /// The body is complete: the connection goes back for the next request, or is closed — where
-    /// the body owns it.
+    /// Marks the body complete: where the body owns the connection, it goes back for the next
+    /// request or is closed.
     mut fn finish(): void {
         this.done = true;
         if (let conn = this.conn) {
@@ -700,8 +742,8 @@ pub class Body :: [Reader] {
         }
     }
 
-    /// The body ended wrongly or with the connection: nothing is kept (a server's connection is
-    /// the server's to close).
+    /// Marks the body as ended wrongly or with the connection: nothing is kept (a server's
+    /// connection is the server's to close).
     mut fn drop(): void {
         this.done = true;
         this.failed = true;
@@ -713,12 +755,17 @@ pub class Body :: [Reader] {
         }
     }
 
-    /// Whether the body has been read to its end.
+    /// Returns whether the body has been read to its end.
     pub fn isDone(): bool {
         return this.done;
     }
 
-    /// The rest of the body, whole.
+    /// Reads the rest of the body, whole.
+    ///
+    /// # Errors
+    ///
+    /// Throws `IoError` where the connection fails or the body is framed wrongly, and `Cancelled`
+    /// where the task is cancelled while reading.
     pub mut fn readAll(): uint8[] throws [IoError, Cancelled] {
         let out = ByteBuffer.new();
         let chunk: uint8[] = [0u8] * 8192;
@@ -737,12 +784,13 @@ pub class Body :: [Reader] {
 // The client.
 // ---------------------------------------------------------------------------------------------
 
-/// How a client behaves. `transport` makes the connection to a host and port — TCP where `null`;
+/// The options of a `Client`. `transport` makes the connection to a host and port — TCP where `null`;
 /// a package's TLS puts its own `Stream` here.
 pub struct ClientOptions {
     pub followRedirects: bool = false,
     pub maxRedirects: int = 10,
-    /// Spans one `send`: the connection, the request, the head and the body's first bytes.
+    /// The time one `send` may take: the connection, the request, the head and the body's first
+    /// bytes.
     pub timeout: ?Duration = null,
     /// Whether a connection is kept for the next request to the same authority.
     pub keepAlive: bool = true,
@@ -764,14 +812,27 @@ pub class Client {
         return Client { options = options, idle = Map<string, Conn>.new(), inFlight = null };
     }
 
-    /// A GET of the URI.
+    /// Sends a GET of the URI; see `send`.
+    ///
+    /// # Errors
+    ///
+    /// Throws as `send` does.
     pub mut fn get(uri: Uri): Response throws [HttpError, IoError, TimedOut, Cancelled] {
         return try this.send(Request.get(uri));
     }
 
-    /// The request sent, its response's head read; the body is read from the response. Redirects
-    /// followed where the options say so (303 and, for a POST, 301 and 302 as a GET; 307 and 308
-    /// with the method kept — a body cannot be sent again); `timeout` spans the whole.
+    /// Sends the request and reads its response's head; the body is read from the response.
+    /// Redirects are followed where the options say so (303 and, for a POST, 301 and 302 as a
+    /// GET; 307 and 308 with the method kept — a body cannot be sent again); `timeout` spans the
+    /// whole.
+    ///
+    /// # Errors
+    ///
+    /// Throws `HttpError` with kind `Unsupported` for a scheme other than `http` (or `https`
+    /// without a transport) or a URI without a host, `Redirects` for too many redirects or one
+    /// that cannot be followed, and `Protocol` for a peer that does not speak HTTP/1.1; `IoError`
+    /// where the connection fails; `TimedOut` where `timeout` passes; `Cancelled` where the task
+    /// is cancelled. On `TimedOut` and `Cancelled` the connection is closed.
     pub mut fn send(request: Request): Response throws [HttpError, IoError, TimedOut, Cancelled] {
         if (let d = this.options.timeout) {
             // withTimeout's body throws one type; the four are told apart again here
@@ -838,8 +899,9 @@ pub class Client {
         }
     }
 
-    /// One exchange: a connection (idle or new), the request written, the head read, the body
-    /// framed. An idle connection the peer closed meanwhile is tried again on a new one.
+    /// Runs one exchange: takes a connection (idle or new), writes the request, reads the head
+    /// and frames the body. An idle connection the peer closed meanwhile is tried again on a new
+    /// one.
     mut fn sendOnce(req: Request): Response throws [HttpError, IoError, Cancelled] {
         let (host, port, authority) = try this.target(req.uri);
         if (let idle = this.takeIdle(authority)) {
@@ -857,7 +919,7 @@ pub class Client {
         return try this.exchange(conn, req, authority);
     }
 
-    /// The host, the port and the authority key of the request's URI.
+    /// Returns the host, the port and the authority key of the request's URI.
     fn target(uri: Uri): (string, int, string) throws HttpError {
         let scheme = uri.scheme ?? "";
         if (scheme != "http" && !(scheme == "https" && this.options.transport != null)) {
@@ -887,7 +949,7 @@ pub class Client {
         }
         let stream = try TcpStream.connect(SocketAddr { ip = ip!, port = port as uint16 });
         // a request is a small write, and its answer comes back before the next: Nagle's waiting
-        // would hold each one for the delayed ACK (M10 S13, Messpunkt 4 found 40 ms a request)
+        // would hold each one for the peer's delayed ACK, some 40 ms a request
         try stream.setNoDelay(true);
         return stream;
     }
@@ -911,7 +973,7 @@ pub class Client {
         this.idle[authority] = conn;
     }
 
-    /// Every idle connection closed.
+    /// Closes every idle connection.
     pub mut fn close(): void {
         for ((_, c) in this.idle) {
             c.close();
@@ -927,9 +989,9 @@ pub class Client {
             this.inFlight = null;
             return response;
         } catch (e: Cancelled) {
-            // the connection stays in flight: `send` drops it, and the drop closes it. A `defer`
-            // here cleared it first, so a timed-out request left its socket open and the peer's
-            // task waiting for the next request for ever (sweep after M10, open point 191)
+            // the connection stays in flight: `send` drops it, and the drop closes it. Clearing it
+            // here would leave a timed-out request's socket open and the peer's task waiting for
+            // the next request for ever
             throw e;
         } catch (e: HttpError) {
             this.inFlight = null;
@@ -940,7 +1002,7 @@ pub class Client {
         }
     }
 
-    /// The exchange was cut short: its connection is closed, so the peer sees the end.
+    /// Closes the connection of an exchange that was cut short, so the peer sees the end.
     mut fn dropInFlight(): void {
         if (let c = this.inFlight) {
             this.inFlight = null;
@@ -1095,7 +1157,7 @@ pub class Client {
             .Fixed => { if (length == 0) { body.finish(); } },
             _ => { },
         }
-        // a compressed body is decoded as it is read (S9): the raw body underneath still returns
+        // a compressed body is decoded as it is read: the raw body underneath still returns
         // the connection at its end
         if (this.options.decompress && !body.isDone()) {
             if (let encoding = headers.get("Content-Encoding")) {
@@ -1115,7 +1177,7 @@ pub class Client {
     }
 }
 
-/// `HTTP/1.1 200 OK`: the status and whether the version is 1.1.
+/// Parses a status line such as `HTTP/1.1 200 OK`: the status and whether the version is 1.1.
 fn parseStatusLine(line: string): (Status, bool) throws HttpError {
     let parts = line.splitN(' ', 3);
     var version = "";
@@ -1144,7 +1206,8 @@ fn parseStatusLine(line: string): (Status, bool) throws HttpError {
     return (Status { code = code, reason = reason }, version == "HTTP/1.1");
 }
 
-/// The header lines up to the empty one. The connection is the caller's to close on an error.
+/// Reads the header lines up to the empty one. The connection is the caller's to close on an
+/// error.
 fn readHeaders(conn: Conn): Headers throws [HttpError, IoError, Cancelled] {
     let headers = Headers.new();
     var count = 0;
@@ -1175,7 +1238,7 @@ fn readHeaders(conn: Conn): Headers throws [HttpError, IoError, Cancelled] {
     }
 }
 
-/// The last comma-separated token of a header value, trimmed.
+/// Returns the last comma-separated token of a header value, trimmed.
 fn lastToken(value: string): string {
     var last = "";
     for (part in value.split(',')) {
@@ -1184,7 +1247,7 @@ fn lastToken(value: string): string {
     return last;
 }
 
-/// A Content-Length: digits alone.
+/// Parses a Content-Length of digits alone; `null` for anything else or a length beyond 1 TiB.
 fn lengthOf(value: string): ?int {
     let text = value.trim();
     if (text.isEmpty()) {
@@ -1203,7 +1266,11 @@ fn lengthOf(value: string): ?int {
     return n;
 }
 
-/// A GET of the URI's text with a client of the defaults, redirects followed.
+/// Sends a GET of the URI's text with a client of the default options, redirects followed.
+///
+/// # Errors
+///
+/// Throws `ParseError` for a text that is no URI, and otherwise as `Client.send` does.
 pub fn get(uri: string): Response throws [HttpError, IoError, TimedOut, Cancelled, ParseError] {
     var client = Client.new(ClientOptions { followRedirects = true });
     return try client.get(Uri.parse(uri));
@@ -1213,7 +1280,7 @@ pub fn get(uri: string): Response throws [HttpError, IoError, TimedOut, Cancelle
 // The server.
 // ---------------------------------------------------------------------------------------------
 
-/// How a server behaves.
+/// The options of a `Server`.
 pub struct ServerOptions {
     /// Whether a connection is kept for the next request.
     pub keepAlive: bool = true,
@@ -1230,7 +1297,11 @@ pub class Server {
     var nextConn: int,
     var closing: bool,
 
-    /// A server bound to the address — port 0 for any; `localAddr()` says which.
+    /// Returns a server bound to the address — port 0 for any; `localAddr()` says which.
+    ///
+    /// # Errors
+    ///
+    /// Throws `IoError` where the address cannot be bound.
     pub static fn bind(addr: SocketAddr, options: ServerOptions = ServerOptions { }): Server throws IoError {
         let listener = try TcpListener.bind(addr);
         return Server { listener = listener, options = options, idle = Map<int, Conn>.new(), nextConn = 0, closing = false };
@@ -1240,10 +1311,14 @@ pub class Server {
         return try this.listener.localAddr();
     }
 
-    /// Connections accepted and served, each on a task of its own, until `shutdown()` closes the
+    /// Accepts and serves connections, each on a task of its own, until `shutdown()` closes the
     /// listener. The handler's response is written as it is; a handler that throws answers 500
     /// with the error's message. A request the server cannot read is answered 400 and the
     /// connection closed.
+    ///
+    /// # Errors
+    ///
+    /// Throws `Cancelled` where the task is cancelled while waiting for a connection.
     pub mut fn serve(handler: fn(Request) -> Response throws Error): void throws Cancelled {
         while (true) {
             var accepted: ?TcpStream = null;
@@ -1255,8 +1330,8 @@ pub class Server {
             }
             let stream = accepted!;
             try {
-                // the head and the body go out as two writes: without this the second waits for
-                // the peer's delayed ACK of the first (M10 S13, Messpunkt 4)
+                // the head and the body may go out as two writes: without this the second waits
+                // for the peer's delayed ACK of the first
                 stream.setNoDelay(true);
             } catch (_: IoError) { }
             this.nextConn = this.nextConn + 1;
@@ -1265,8 +1340,8 @@ pub class Server {
         }
     }
 
-    /// The listener closed — `serve` returns — and the connections waiting for a request closed;
-    /// a request under way is answered first, then its connection closes.
+    /// Stops the server: closes the listener — `serve` returns — and the connections waiting for
+    /// a request; a request under way is answered first, then its connection closes.
     pub mut fn shutdown(): void {
         this.closing = true;
         try {
@@ -1278,7 +1353,7 @@ pub class Server {
         this.idle = Map<int, Conn>.new();
     }
 
-    /// One connection: requests read and answered until a side closes.
+    /// Serves one connection: reads and answers requests until a side closes.
     mut fn connection(id: int, conn: Conn, handler: fn(Request) -> Response throws Error): void {
         while (!this.closing) {
             this.idle[id] = conn;
@@ -1345,7 +1420,7 @@ pub class Server {
         conn.close();
     }
 
-    /// `400 Bad Request` with the reason as text; the connection is closed by the caller.
+    /// Answers `400 Bad Request` with the reason as text; the connection is closed by the caller.
     fn answerBad(conn: Conn, detail: string): void {
         let text = f"bad request: {detail}";
         let head = f"HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {viewBytes(text).length()}\r\nConnection: close\r\n\r\n{text}";
@@ -1354,7 +1429,8 @@ pub class Server {
         } catch (_: Error) { }
     }
 
-    /// The request line and the headers; `null` where the connection ended before a request.
+    /// Reads the request line and the headers; `null` where the connection ended before a
+    /// request.
     fn readRequestHead(conn: Conn): ?RequestHead throws [HttpError, IoError, Cancelled] {
         var line = try conn.readLine();
         // a stray CRLF before the request line is allowed (RFC 9112 §2.2)
@@ -1457,7 +1533,7 @@ pub class Server {
         var body = response.body;
         if (!isHead && !bodiless && !chunked && (length ?? 0) <= 65536) {
             // a body of known, modest length goes out with its head in one write: one system
-            // call, one wake of the peer (M10 S13, Messpunkt 4)
+            // call, one wake of the peer
             let whole = ByteBuffer.new();
             try whole.write(viewBytes(head.toString()));
             let piece: uint8[] = [0u8] * 8192;

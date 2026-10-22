@@ -1,8 +1,10 @@
-/// The syntax tree as values (design/v5/spec/10 B13 M2, 09 A8; M9b S1): what a program can write,
-/// as enums and structs a `comptime` function - a macro from S2 on - reads, builds and writes back.
+/// The syntax tree as values: what a program can write, as enums and structs a `comptime`
+/// function or a macro reads, builds and writes back. The main types are `Expr`, `Stmt`, `Decl`,
+/// `Type` and `Pattern`, with `Node` for any of them and `Span` for where one stands.
 /// `parseExpr(s)`, `parseStmts(s)`, `parseDecls(s)` read source; `toSource()` writes a node as the
 /// formatter would; `children()` and `walk(f)` go over a tree; `Ident.fresh(hint)` names what a
-/// quote binds (S3). The enums are `@NonExhaustive` (M3): a `match` over them outside std writes a
+/// quote binds; `error(at, msg)` ends a macro's expansion with an error. The enums are
+/// `@NonExhaustive`: a `match` over them outside std writes a
 /// `_`, and a form the compiler has that this module has not - the rounds of a `comptime for`
 /// over fields and variants among them - is refused where it is read (`LYR-CT0005`).
 ///
@@ -19,14 +21,14 @@ pub struct Span :: [Equatable, Debug] {
 }
 
 extend Span {
-    /// The span of what was built, not read.
+    /// Returns the span of what was built, not read: file `""`, line and column `0`.
     pub static fn none(): Span {
         return Span { file = "", line = 0, column = 0 };
     }
 }
 
 /// A name as written, with where it was written. `from` is the module a `quote` wrote the name
-/// in (13 M9b P5): such a name is that module's wherever the tree ends up; `null` for a name a
+/// in: such a name is that module's wherever the tree ends up; `null` for a name a
 /// program wrote, or one built here.
 pub struct Ident :: [Equatable, Debug] {
     pub name: string,
@@ -35,12 +37,13 @@ pub struct Ident :: [Equatable, Debug] {
 }
 
 extend Ident {
-    /// A name of its own for what a `quote` binds (S3): `hint` and a number no written name has.
+    /// Returns a name of its own for what a `quote` binds: `hint` and a number no written name
+    /// has.
     pub static fn fresh(hint: string): Ident {
         return Ident { name = freshName(hint), span = Span.none(), from = null };
     }
 
-    /// The name alone, without a place.
+    /// Returns the name alone, without a place.
     pub static fn of(name: string): Ident {
         return Ident { name = name, span = Span.none(), from = null };
     }
@@ -149,9 +152,8 @@ pub struct Catch :: [Debug] {
     pub span: Span,
 }
 
-/// An expression, each form a variant. The spans are of the whole expression.  is a site
-/// of another macro inside an argument (13 M9b P6): the outer macro hands it on, the next round
-/// expands it.
+/// An expression, each form a variant. The spans are of the whole expression. `Macro` is a site
+/// of another macro inside an argument: the outer macro hands it on, the next round expands it.
 @NonExhaustive
 pub enum Expr :: [Debug] {
     Literal(Literal, Span),
@@ -334,7 +336,7 @@ pub struct AssocType :: [Debug] {
 
 /// A struct. `delegates` names, per interface, the field it is delegated to (`:: [Walker by
 /// legs]`), `""` where none; empty when none is. As the first parameter of a `macro` it marks an
-/// attribute macro for structs (13 M9b S4).
+/// attribute macro for structs.
 pub struct StructDecl :: [Debug] {
     pub visibility: Visibility,
     pub name: Ident,
@@ -452,32 +454,32 @@ pub enum Node :: [Debug] {
 
 // --- reading and writing source ---------------------------------------------------------------
 
-/// The expression a text holds, parsed as the compiler parses it; a text that is no expression is
+/// Parses the expression a text holds, as the compiler parses it. A text that is no expression is
 /// an error at the call (`LYR-CT0001`, with the parser's message).
 pub fn parseExpr(s: string): Expr;
 
-/// The statements a text holds, as a block body would.
+/// Parses the statements a text holds, as a block body would.
 pub fn parseStmts(s: string): Stmt[];
 
-/// The declarations a text holds, as a module would.
+/// Parses the declarations a text holds, as a module would.
 pub fn parseDecls(s: string): Decl[];
 
-/// A node written back as the formatter writes it.
+/// Writes a node back as source, as the formatter writes it.
 fn sourceOfExpr(e: Expr): string;
 fn sourceOfStmts(s: Stmt[]): string;
 fn sourceOfDecls(d: Decl[]): string;
 fn sourceOfType(t: Type): string;
 fn sourceOfPattern(p: Pattern): string;
 
-/// A name no written identifier has: `hint` and a number of its own.
+/// Returns a name no written identifier has: `hint` and a number of its own.
 fn freshName(hint: string): string;
 
-/// A macro's own error (design/v5/spec/13 M9b P7): the message at `at`, a node of the site -
-/// `error(e.span(), "...")` - and a note at the site's `!`. Ends the expansion.
+/// Reports a macro's own error and ends the expansion: the message at `at`, a node of the site -
+/// `error(e.span(), "...")` - and a note at the site's `!`.
 pub fn error(at: Span, msg: string): never;
 
 extend Expr {
-    /// Where this expression stands: its span, or an `Ident`'s.
+    /// Returns where this expression stands: its span, or an `Ident`'s.
     pub fn span(): Span {
         return match (this) {
             .Literal(_, s) => s,
@@ -518,7 +520,7 @@ extend Expr {
 }
 
 extend Stmt {
-    /// Where this statement stands.
+    /// Returns where this statement stands.
     pub fn span(): Span {
         return match (this) {
             .Expr(_, s) => s,
@@ -544,7 +546,7 @@ extend Stmt {
 }
 
 extend Decl {
-    /// Where this declaration stands.
+    /// Returns where this declaration stands.
     pub fn span(): Span {
         return match (this) {
             .Fn(f) => f.span,
@@ -564,7 +566,7 @@ extend Decl {
 }
 
 extend Type {
-    /// Where this type stands.
+    /// Returns where this type stands.
     pub fn span(): Span {
         return match (this) {
             .Named(_, _, _, _, s) => s,
@@ -579,7 +581,7 @@ extend Type {
 }
 
 extend Pattern {
-    /// Where this pattern stands.
+    /// Returns where this pattern stands.
     pub fn span(): Span {
         return match (this) {
             .Wildcard(s) => s,
@@ -599,14 +601,14 @@ extend Pattern {
 }
 
 extend Expr {
-    /// This expression as source, as the formatter writes it.
+    /// Returns this expression as source, as the formatter writes it.
     pub fn toSource(): string {
         return sourceOfExpr(this);
     }
 }
 
 extend Block {
-    /// The statements as source, one under the other.
+    /// Returns the statements as source, one under the other.
     pub fn toSource(): string {
         return sourceOfStmts(this.stmts);
     }
@@ -780,7 +782,7 @@ extend Kids {
 }
 
 extend Expr {
-    /// The nodes directly inside this one, in source order.
+    /// Returns the nodes directly inside this one, in source order.
     pub fn children(): Node[] {
         let k = Kids.new();
         match (this) {
@@ -853,7 +855,7 @@ extend Expr {
 }
 
 extend Stmt {
-    /// The nodes directly inside this one, in source order.
+    /// Returns the nodes directly inside this one, in source order.
     pub fn children(): Node[] {
         let k = Kids.new();
         match (this) {
@@ -888,7 +890,7 @@ extend Stmt {
 }
 
 extend Decl {
-    /// The nodes directly inside this one, in source order.
+    /// Returns the nodes directly inside this one, in source order.
     pub fn children(): Node[] {
         let k = Kids.new();
         match (this) {
@@ -948,7 +950,7 @@ extend Decl {
 }
 
 extend Type {
-    /// The nodes directly inside this one, in source order.
+    /// Returns the nodes directly inside this one, in source order.
     pub fn children(): Node[] {
         let k = Kids.new();
         match (this) {
@@ -972,7 +974,7 @@ extend Type {
 }
 
 extend Pattern {
-    /// The nodes directly inside this one, in source order.
+    /// Returns the nodes directly inside this one, in source order.
     pub fn children(): Node[] {
         let k = Kids.new();
         match (this) {
@@ -998,7 +1000,7 @@ extend Pattern {
 }
 
 extend Node {
-    /// The nodes directly inside this one.
+    /// Returns the nodes directly inside this one.
     pub fn children(): Node[] {
         return match (this) {
             .Expr(e) => e.value.children(),
@@ -1010,7 +1012,7 @@ extend Node {
         };
     }
 
-    /// `f` at this node and every node below it, parents before children, in source order.
+    /// Calls `f` at this node and every node below it, parents before children, in source order.
     pub fn walk(f: fn(Node) -> void): void {
         f(this);
         for (c in this.children()) {

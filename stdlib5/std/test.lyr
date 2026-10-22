@@ -1,11 +1,13 @@
-/// Tests (design/v5/spec/10 B12): the assertions a test fails by, and the runner `lyric test`
-/// hands a package's tests to. A test is a function marked `@Test` — no parameters, `void`,
-/// throwing if it likes — in a module of the package or under its `tests/` (07 V4). An assertion
-/// that does not hold panics with what it got against what was expected, each as `Debug` writes
-/// it, and names the expression it got it from (X1): `xs.length() = 2, expected 3`. The actual
-/// value comes first (N13). Two values too long to compare by eye get their first difference
-/// named below: a text's first line that differs, else the first character. The runner of
-/// `lyric bench` is here too (X4).
+/// Tests and benchmarks: the assertions a test fails by ([assertEq], [assertTrue], [assertThrows],
+/// [assertPanics] and the others, [fail]), [subtest], and the runners that `lyric test` ([run],
+/// [TestCase]) and `lyric bench` ([runBenches], [BenchCase]) hand a package's tests and benchmarks
+/// to. A test is a function marked `@Test` — no parameters, `void`, possibly throwing — in a
+/// module of the package or under its `tests/`.
+///
+/// An assertion that does not hold panics with what it got against what was expected, each as
+/// `Debug` writes it, and names the expression it got it from: `xs.length() = 2, expected 3`. The
+/// actual value comes first. Two values too long to compare by eye get their first difference
+/// named below: a text's first line that differs, else the first character.
 
 import std.core { Contains, StringBuilder, filled };
 import std.fs { readText, writeText };
@@ -16,7 +18,7 @@ import std.thread { Pool, Thread };
 import std.sync { Atomic };
 import std.time { Duration };
 
-/// One test as `lyric test` hands it to `run`: its name — the module's path and the function's —,
+/// One test as `lyric test` hands it to [run]: its name — the module's path and the function's —,
 /// its body, why it is skipped, if it is, how many seconds it may take, and whether it runs beside
 /// the others that say so (`@Test { skip = "…", timeout = 10, parallel = true }`).
 pub struct TestCase {
@@ -27,11 +29,11 @@ pub struct TestCase {
     pub parallel: bool = false,
 }
 
-/// Ends the process at once — no handler runs, and nothing flushes what the console holds: the
-/// watchdog flushes first (M8b S8a). Its way out of a test that does not stop.
+/// Ends the process at once — no handler runs, and nothing flushes what the console holds, so the
+/// watchdog flushes first. The watchdog's way out of a test that does not stop.
 extern "C" fn _exit(status: int32): void;
 
-/// The running test, for the watchdog on a thread of its own (X3): which — `together` while the
+/// The running test, for the watchdog on a thread of its own: which — `together` while the
 /// parallel ones run —, until when it may run — 0 while none does —, and how many seconds that is.
 class Watch {
     current: Atomic<int> = Atomic<int>.new(-1),
@@ -42,7 +44,7 @@ class Watch {
 /// What `Watch.current` holds while the parallel tests run.
 let together = -2;
 
-/// What the running test's subtests left (X2): the name they are reported under, and how many
+/// What the running test's subtests left: the name they are reported under, and how many
 /// failed; `apart` is 1 while the parallel tests run, which have none.
 class Subtests {
     var parent: string = "",
@@ -53,11 +55,11 @@ class Subtests {
 let watch = Watch { };
 let subtests = Subtests { };
 
-/// Whether `lyric test --json` asked for the JSON form (spec 16 §4): a line for each test,
+/// Whether `lyric test --json` asked for the JSON form: a line for each test,
 /// `{"type":"test",…}`, and one for the count, `{"type":"tests",…}`, in place of the text.
 let asJson = (env("LYRIC_TEST_FORMAT") ?? "") == "json";
 
-/// A test that held.
+/// Reports a test that held.
 fn sayPassed(name: string): void {
     if (asJson) {
         event(name, "passed", "", "");
@@ -66,7 +68,7 @@ fn sayPassed(name: string): void {
     }
 }
 
-/// A test skipped, and why.
+/// Reports a skipped test, and why it was skipped.
 fn saySkipped(name: string, why: string): void {
     if (asJson) {
         event(name, "skipped", why, "");
@@ -75,8 +77,8 @@ fn saySkipped(name: string, why: string): void {
     }
 }
 
-/// A test that did not hold: what ended it — a message's further lines under its first —, the panic's
-/// code where a panic did, and its backtrace below.
+/// Reports a test that did not hold: what ended it — a message's further lines under its first —,
+/// the panic's code where a panic did, and its backtrace below.
 fn sayFailed(name: string, detail: string, panic: string = "", trace: string = ""): void {
     if (asJson) {
         event(name, "failed", if (trace != "") detail + "\n" + trace else detail, panic);
@@ -87,7 +89,7 @@ fn sayFailed(name: string, detail: string, panic: string = "", trace: string = "
     }
 }
 
-/// One test's line of the JSON form.
+/// Writes one test's line of the JSON form.
 fn event(name: string, outcome: string, message: string, panic: string): void {
     let line = StringBuilder.new();
     line.appendStr("{\"type\":\"test\",\"version\":1,\"name\":");
@@ -107,8 +109,8 @@ fn event(name: string, outcome: string, message: string, panic: string): void {
     println(line.toString());
 }
 
-/// `s` as a JSON string — std.json's rule, written here because importing std.json would bring its
-/// codec into every test program the toolchain builds.
+/// Appends `s` to `out` as a JSON string — std.json's escaping, written here because importing
+/// std.json would bring its codec into every test program the toolchain builds.
 fn quoted(out: StringBuilder, s: string): void {
     out.appendChar('"');
     for (c in s.chars()) {
@@ -134,11 +136,11 @@ fn quoted(out: StringBuilder, s: string): void {
     out.appendChar('"');
 }
 
-/// Runs the tests one after another, each in a task of its own (X3): a panic or an error that
-/// leaves a test fails it, and the run goes on. Those marked `parallel` run after the others, at
-/// once. A line for each test once it has ended — what it printed comes before —, then the count.
-/// A test that outlives its time ends the run, as a failure. The answer is the program's exit: 0
-/// when no test failed, 1 when one did (11 C5).
+/// Runs the tests one after another, each in a task of its own: a panic or an error that leaves a
+/// test fails it, and the run goes on. Those marked `parallel` run after the others, all at once.
+/// It writes a line for each test once it has ended — what the test printed comes before —, then
+/// the count. A test that outlives its time ends the run as a failure. Returns the program's exit
+/// code: 0 when no test failed, 1 when one did.
 pub fn run(cases: TestCase[]): int {
     let _ = Thread.spawn(() => try guard(cases));
     var passed = 0;
@@ -190,10 +192,10 @@ pub fn run(cases: TestCase[]): int {
     return if (failed > 0) 1 else 0;
 }
 
-/// The tests marked `parallel` (X3), after the others: each a task on a pool of a thread for each
-/// processor, all at once; their lines in their order, each once it has ended. One deadline for
+/// Runs the tests marked `parallel`, after the others: each a task on a pool of a thread for each
+/// processor, all at once; their lines in their order, each once it has ended. One deadline covers
 /// them all — the longest of their timeouts, from their start; none where one of them has none.
-/// The number that failed.
+/// Returns the number that failed.
 fn runApart(cases: TestCase[], chosen: List<int>): int {
     var longest = 0;
     var unbounded = false;
@@ -233,21 +235,22 @@ fn runApart(cases: TestCase[], chosen: List<int>): int {
     return failed;
 }
 
-/// When a test given `seconds` from now has outlived them; 0 for none.
+/// Returns the monotonic time `seconds` from now, when a test given them has outlived them; 0 for
+/// no limit.
 fn deadlineAfter(seconds: int): int {
     return if (seconds > 0) monotonicNanos() + seconds * 1000000000 else 0;
 }
 
 /// Runs `body` in a task of its own; where it does not hold, writes `FAIL` with the panic or the
-/// error below it. Whether it held.
+/// error below it. Returns whether it held.
 fn outcome(name: string, body: fn() -> void throws Error): bool {
     var task = spawn(body);
     task.join();
     return reported(name, task.status());
 }
 
-/// How a test's task ended: `FAIL` with the panic or the error below it where it did not hold —
-/// a message's further lines under its first. Whether it held.
+/// Reports how a test's task ended: `FAIL` with the panic or the error below it where it did not
+/// hold — a message's further lines under its first. Returns whether it held.
 fn reported(name: string, status: TaskStatus<void>): bool {
     var held = false;
     match (status) {
@@ -268,14 +271,14 @@ fn reported(name: string, status: TaskStatus<void>): bool {
     return held;
 }
 
-/// A message's lines after its first, under it.
+/// Returns `message` with its lines after the first indented under it.
 fn indented(message: string): string {
     return message.replace("\n", "\n      ");
 }
 
-/// The watchdog (X3): on a thread of its own, it looks every tenth of a second whether the running
-/// test has outlived its time. One that has ends the run — it cannot be stopped from outside: a
-/// task gives way only where it waits.
+/// Runs the watchdog: on a thread of its own, it checks every tenth of a second whether the
+/// running test has outlived its time. One that has ends the run — it cannot be stopped from
+/// outside, since a task gives way only where it waits.
 fn guard(cases: TestCase[]): void throws Cancelled {
     while (true) {
         try sleep(Duration.ofMillis(100));
@@ -290,10 +293,13 @@ fn guard(cases: TestCase[]): void throws Cancelled {
     }
 }
 
-/// A part of the running test, reported under its own name — `parent/name` — and run in a task of
-/// its own, so the test goes on after one fails (X2): a table-driven test, a row each. A failed
-/// one fails the test. A parallel test has none: it runs beside others, and a subtest is reported
-/// under the test that runs.
+/// Runs a part of the running test, reported under its own name — `parent/name` — and run in a
+/// task of its own, so the test goes on after one fails: a table-driven test, a row each. A failed
+/// subtest fails the test.
+///
+/// # Panics
+/// Fails the test when called from a parallel test, which has no subtests: it runs beside others,
+/// and a subtest is reported under the one test that runs.
 pub fn subtest(name: string, body: fn() -> void throws Error): void {
     if (subtests.apart.load() == 1) {
         fail("a subtest is reported under its test, and a parallel test runs beside others: it has no subtests");
@@ -306,8 +312,8 @@ pub fn subtest(name: string, body: fn() -> void throws Error): void {
     }
 }
 
-/// Fails the test unless `f` throws, and gives what it threw — of the type `f` says it throws —,
-/// for the test to look at (X1).
+/// Fails the test unless `f` throws, and returns what it threw — of the type `f` says it throws —,
+/// for the test to look at.
 pub fn assertThrows<E :: [Error]>(f: fn() -> void throws E, message: string = ""): E {
     try {
         f();
@@ -317,8 +323,7 @@ pub fn assertThrows<E :: [Error]>(f: fn() -> void throws E, message: string = ""
     fail(because("threw nothing, expected an error", message));
 }
 
-/// Fails the test unless `f` panics, run in a task of its own (06 T4), and gives what the panic
-/// left.
+/// Fails the test unless `f`, run in a task of its own, panics; returns what the panic left.
 pub fn assertPanics(f: fn() -> void throws Error, message: string = ""): PanicInfo {
     var task = spawn(f);
     task.join();
@@ -371,7 +376,7 @@ pub fn assertNull<T :: [Debug]>(value: ?T, message: string = "", @callerExpr(val
     }
 }
 
-/// Fails the test where `value` is absent; the value otherwise, for the test to go on with.
+/// Fails the test where `value` is absent; returns the value otherwise, for the test to go on with.
 pub fn assertNotNull<T>(value: ?T, message: string = "", @callerExpr(value) written: string = ""): T {
     return value ?? fail(because(got(written, "null") + ", expected a value", message));
 }
@@ -413,7 +418,10 @@ pub fn assertContains<T :: [Debug], C :: [Contains<T>, Debug]>(container: C, x: 
 }
 
 /// Fails the test unless `c` holds nothing: its iterator gives no value — a list, a map, a set, an
-/// array, a slice. It throws what that iterator throws: nothing, for those.
+/// array, a slice.
+///
+/// # Errors
+/// Throws what the iterator of `c` throws — nothing, for the collections above.
 pub fn assertEmpty<C :: [Iterable, Debug]>(c: C, message: string = "",
     @callerExpr(c) written: string = ""): void throws C.Iter.Error {
     var walk = c.iter();
@@ -427,26 +435,27 @@ pub fn fail(message: string): never {
     panic(message);
 }
 
-/// What an assertion got: `xs.length() = 2` where the call wrote an expression, `got 2` where it
-/// wrote the value itself, or where no call's text reached it.
+/// Returns what an assertion got: `xs.length() = 2` where the call wrote an expression, `got 2`
+/// where it wrote the value itself, or where no call's text reached it.
 fn got(written: string, value: string): string {
     return if (written == "" || written == value) "got " + value else written + " = " + value;
 }
 
-/// What an assertion found, and the test's own words after it where it gave some.
+/// Returns what an assertion found, followed by the test's own message where it gave one.
 fn because(found: string, message: string): string {
     return if (message == "") found else found + ": " + message;
 }
 
 // ---------------------------------------------------------------------------------------------
-// The first difference (X1): over what `Debug` shows of the two values (D7), since a value is
-// compared as it is shown — a text's lines are its own, between the quotes, a break written `\n`.
+// The first difference: over what `Debug` shows of the two values, since a value is compared as
+// it is shown — a text's lines are its own, between the quotes, a break written `\n`.
 // ---------------------------------------------------------------------------------------------
 
-/// Where `actual` and `expected` — two values as `Debug` shows them — differ, for a failure's
-/// message: for texts that break lines, the first line that differs, both as `Debug` shows them;
-/// else, where the two are longer than 40 characters together, the first character that differs,
-/// the two around it and a mark under it. Nothing for short ones, which the message shows whole.
+/// Returns where `actual` and `expected` — two values as `Debug` shows them — differ, for a
+/// failure's message: for texts that break lines, the first line that differs, both as `Debug`
+/// shows them; else, where the two are longer than 40 characters together, the first character
+/// that differs, the two around it and a mark under it. The empty string for short ones, which
+/// the message shows whole.
 fn difference(actual: string, expected: string): string {
     let a = linesOfText(actual);
     let e = linesOfText(expected);
@@ -483,7 +492,7 @@ fn difference(actual: string, expected: string): string {
     return out.toString();
 }
 
-/// Up to 40 characters of `cs` from `from` on, an ellipsis where they are cut.
+/// Appends up to 40 characters of `cs` from `from` on, with an ellipsis where they are cut.
 fn windowTo(out: StringBuilder, cs: char[], from: int): void {
     if (from > 0) {
         out.appendChar('…');
@@ -497,13 +506,13 @@ fn windowTo(out: StringBuilder, cs: char[], from: int): void {
     }
 }
 
-/// Line `i` of `lines`, in quotes, or `no line` past their end.
+/// Returns line `i` of `lines` in quotes, or `no line` past their end.
 fn lineOf(lines: List<string>, i: int): string {
     return if (i < lines.length()) "\"" + lines[i] + "\"" else "no line";
 }
 
-/// The lines of a text as `Debug` shows it — between quotes, a break written `\n` —, each as shown;
-/// anything else is one line, the whole.
+/// Returns the lines of a text as `Debug` shows it — between quotes, a break written `\n` —, each
+/// as shown; anything else is one line, the whole.
 fn linesOfText(shown: string): List<string> {
     let lines = List<string>.new();
     let cs = shown.chars().toArray();
@@ -535,23 +544,23 @@ fn linesOfText(shown: string): List<string> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Benchmarks (X4): what `lyric bench` hands a package's `@Bench` functions to.
+// Benchmarks: what `lyric bench` hands a package's `@Bench` functions to.
 // ---------------------------------------------------------------------------------------------
 
-/// One benchmark as `lyric bench` hands it to `runBenches`: its name — the module's path and the
+/// One benchmark as `lyric bench` hands it to [runBenches]: its name — the module's path and the
 /// function's — and its body, handed a bench to measure through.
 pub struct BenchCase {
     pub name: string,
     pub body: fn(&Bench) -> void,
 }
 
-/// Runs the benchmarks one after another on this thread (X4), each with a bench of its own, and
-/// writes a line for each: the nanoseconds a run, its allocations and their bytes, the megabytes a
+/// Runs the benchmarks one after another on this thread, each with a bench of its own, and writes
+/// a line for each: the nanoseconds per run, its allocations and their bytes, the megabytes per
 /// second where the bench said how many bytes a run handles, and the runs measured. Where `compare`
-/// names a file a run saved before, a line also says how the time a run changed against it; where
-/// `save` names one, this run writes it — a line a benchmark: its name, then the nanoseconds, the
-/// allocations and the bytes a run, apart by tabs. The answer is the program's exit: 0, or 1 where
-/// such a file could not be read or written.
+/// names a file an earlier run saved, each line also says how the time per run changed against
+/// it; where `save` names one, this run writes it — a line per benchmark: its name, then the
+/// nanoseconds, the allocations and the bytes per run, separated by tabs. Returns the program's
+/// exit code: 0, or 1 where such a file could not be read or written.
 pub fn runBenches(cases: BenchCase[], save: string = "", compare: string = ""): int {
     let before = Map<string, float>.new();
     if (compare != "") {

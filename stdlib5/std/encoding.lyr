@@ -1,19 +1,18 @@
-/// Bytes as text and back (design/v5/spec/10 Q5): Base64 and its URL-safe alphabet (RFC 4648 §4,
-/// §5), hexadecimal (§8), UTF-16; the integers of a byte slice, either end first. Each encoding is
-/// a struct of static members — a name space, `Base64.encode(bytes)`. 4.x's `std.bytes` goes up in
-/// this module.
+/// Encodes bytes as text and back: [Base64] and [Base64Url] (RFC 4648 §4, §5), [Hex] (RFC 4648
+/// §8) and [Utf16] (RFC 2781), plus reading and writing fixed-width integers as bytes, either end
+/// first. Each encoding is a struct of static members used as a name space:
+/// `Base64.encode(bytes)`.
 ///
-/// Not `std.codec`: that module writes the form of a value — its fields, its variants, its
-/// elements — into a format such as JSON; this one turns bytes into text and back, nothing of a
-/// value's shape (the maintainer's review of M10, 2026-10-15).
+/// This module handles bytes and text only; writing the shape of a value — its fields, variants
+/// and elements — into a format such as JSON is `std.codec`'s job.
 ///
-/// The decoders are strict, as the RFC allows them to be (§3.3, §3.5): Base64 asks for its padding
-/// and for zero bits past the last byte, and takes no whitespace; what is not the encoding throws
-/// an `EncodingError` at the first offset that is wrong.
+/// The decoders are strict, as RFC 4648 §3.3 and §3.5 allow: Base64 requires its padding and zero
+/// bits past the last byte, and accepts no whitespace. Input that is not the encoding throws an
+/// [EncodingError] at the first offset that is wrong.
 import std.core { StringBuilder, viewBytes };
 
-/// Text that is not the encoding it was decoded as (10 Q5): where — a byte of the text, a unit of
-/// UTF-16 — and what is wrong there.
+/// The error thrown for text that is not the encoding it was decoded as: where — a byte of the
+/// text, a unit of UTF-16 — and what is wrong there.
 pub struct EncodingError :: [Error] {
     pub offset: int,
     pub detail: string,
@@ -34,27 +33,38 @@ let urlValues = valuesOf(urlDigits);
 
 /// Base64 with RFC 4648's alphabet (§4), `+` and `/`, padded with `=` to a multiple of four.
 pub struct Base64 {
+    /// Returns `bytes` as padded Base64 text.
     pub static fn encode(bytes: Slice<uint8>): string {
         return encode64(bytes, standardDigits);
     }
 
+    /// Returns the bytes that the padded Base64 text `s` encodes.
+    ///
+    /// # Errors
+    /// Throws [EncodingError] when the length is not a multiple of four, a character is not a
+    /// digit of the alphabet, or the bits past the last byte are not zero.
     pub static fn decode(s: StringView): uint8[] throws EncodingError {
         return try decode64(s, standardValues);
     }
 }
 
-/// Base64 with the URL- and file-safe alphabet (RFC 4648 §5), `-` and `_`, padded as `Base64` is.
+/// Base64 with the URL- and file-safe alphabet (RFC 4648 §5), `-` and `_`, padded as [Base64] is.
 pub struct Base64Url {
+    /// Returns `bytes` as padded URL-safe Base64 text.
     pub static fn encode(bytes: Slice<uint8>): string {
         return encode64(bytes, urlDigits);
     }
 
+    /// Returns the bytes that the padded URL-safe Base64 text `s` encodes.
+    ///
+    /// # Errors
+    /// Throws [EncodingError] as [Base64.decode] does.
     pub static fn decode(s: StringView): uint8[] throws EncodingError {
         return try decode64(s, urlValues);
     }
 
-    /// Without the `=` padding (RFC 7515 §2, "Base64url Encoding" as JOSE and JWT write it; 10
-    /// S4a). The text's length is 4k, 4k + 2 or 4k + 3.
+    /// Returns `bytes` as URL-safe Base64 text without the `=` padding, the form of RFC 7515 §2.
+    /// The text's length is 4k, 4k + 2 or 4k + 3.
     pub static fn encodeUnpadded(bytes: Slice<uint8>): string {
         let padded = encode64(bytes, urlDigits);
         let text = viewBytes(padded);
@@ -66,8 +76,12 @@ pub struct Base64Url {
         return try! string.fromUtf8(text[0..n]);
     }
 
-    /// The way back, as strict as `decode`: a `=` is no digit here, a length of 4k + 1 fails at its
-    /// end, bits past the last byte that are not zero at their character.
+    /// Returns the bytes that the unpadded URL-safe Base64 text `s` encodes; as strict as
+    /// [Base64Url.decode].
+    ///
+    /// # Errors
+    /// Throws [EncodingError] for a `=` anywhere, at the end for a length of 4k + 1, for a
+    /// character outside the alphabet, and for bits past the last byte that are not zero.
     pub static fn decodeUnpadded(s: StringView): uint8[] throws EncodingError {
         let text = viewBytes(s);
         let n = text.length();
@@ -92,7 +106,7 @@ pub struct Base64Url {
     }
 }
 
-/// Each byte's value as a digit of `digits`, or -1.
+/// Returns a table of each byte's value as a digit of `digits`, or -1 for a byte that is none.
 fn valuesOf(digits: string): int[] {
     let values: int[] = [-1] * 256;
     let bytes = viewBytes(digits);
@@ -159,7 +173,7 @@ fn decode64(s: StringView, values: int[]): uint8[] throws EncodingError {
             group = (group << 6) | v;
             k = k + 1;
         }
-        // the bits past the last byte are zero in the one encoding of it (§3.5)
+        // the bits past the last byte must be zero, so each byte sequence has one encoding (RFC 4648 §3.5)
         if ((digits == 2 && (group & 0xFFFF) != 0) || (digits == 3 && (group & 0xFF) != 0)) {
             throw EncodingError { offset = i + digits - 1, detail = "bits past the last byte" };
         }
@@ -180,8 +194,9 @@ fn decode64(s: StringView, values: int[]): uint8[] throws EncodingError {
 // Hexadecimal (RFC 4648 §8, in small letters).
 // ---------------------------------------------------------------------------------------------
 
-/// Two hexadecimal digits a byte: `encode` writes small letters, `decode` reads either.
+/// Hexadecimal, two digits per byte: `encode` writes small letters, `decode` reads either case.
 pub struct Hex {
+    /// Returns `bytes` as hexadecimal text in small letters.
     pub static fn encode(bytes: Slice<uint8>): string {
         let digits = viewBytes("0123456789abcdef");
         let out: uint8[] = [0u8] * (bytes.length() * 2);
@@ -195,6 +210,11 @@ pub struct Hex {
         return try! string.fromUtf8(out[..]);
     }
 
+    /// Returns the bytes that the hexadecimal text `s` encodes, in either case.
+    ///
+    /// # Errors
+    /// Throws [EncodingError] for a character that is not a hexadecimal digit and for an odd
+    /// length.
     pub static fn decode(s: StringView): uint8[] throws EncodingError {
         let text = viewBytes(s);
         let out: uint8[] = [0u8] * (text.length() / 2);
@@ -237,8 +257,9 @@ fn hexValue(b: uint8): int {
 // ---------------------------------------------------------------------------------------------
 
 /// Text as UTF-16 code units and back. A unit that is half of a surrogate pair without its other
-/// half is no UTF-16.
+/// half is not UTF-16.
 pub struct Utf16 {
+    /// Returns `s` as UTF-16 code units, characters above U+FFFF as surrogate pairs.
     pub static fn encode(s: StringView): uint16[] {
         var count = 0;
         for (c in s.chars()) {
@@ -261,6 +282,11 @@ pub struct Utf16 {
         return out;
     }
 
+    /// Returns the text that the UTF-16 code units `units` encode.
+    ///
+    /// # Errors
+    /// Throws [EncodingError] at a high surrogate not followed by a low one, and at a low
+    /// surrogate not preceded by a high one.
     pub static fn decode(units: Slice<uint16>): string throws EncodingError {
         let text = StringBuilder.new();
         var i = 0;
@@ -285,11 +311,11 @@ pub struct Utf16 {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The integers of bytes and their bytes (10 Q5, Z1; M8c S11). `fromBytes*` takes exactly its width
-// in bytes, else it panics, as an index out of range does; `toBytes*` gives it, an inline array.
+// Integers from bytes and to bytes. `fromBytes*` takes exactly its width in bytes and panics
+// otherwise, as an index out of range does; `toBytes*` returns that width as an inline array.
 // ---------------------------------------------------------------------------------------------
 
-/// The `width` bytes of `s`, the first the lowest.
+/// Returns the `width` bytes of `s` as an integer, the first byte the lowest.
 fn littleEnd(s: Slice<uint8>, width: int): uint {
     holdsWidth(s, width);
     var v: uint = 0;
@@ -301,7 +327,7 @@ fn littleEnd(s: Slice<uint8>, width: int): uint {
     return v;
 }
 
-/// The `width` bytes of `s`, the first the highest.
+/// Returns the `width` bytes of `s` as an integer, the first byte the highest.
 fn bigEnd(s: Slice<uint8>, width: int): uint {
     holdsWidth(s, width);
     var v: uint = 0;
@@ -313,11 +339,12 @@ fn bigEnd(s: Slice<uint8>, width: int): uint {
     return v;
 }
 
-/// Byte `i` of `v`, the lowest `0`.
+/// Returns byte `i` of `v`, byte `0` being the lowest.
 fn byteOf(v: uint, i: int): uint8 {
     return ((v >> ((8 * i) as uint)) & 0xFF) as uint8;
 }
 
+/// Panics unless `s` holds exactly `width` bytes.
 fn holdsWidth(s: Slice<uint8>, width: int): void {
     if (s.length() != width) {
         panic(f"a number of {width} bytes from a slice of {s.length()}");
@@ -432,8 +459,10 @@ extend uint {
     }
 }
 
-/// The integers in a byte slice, at a byte offset (10 Q5): the slice must hold the width there,
-/// else it panics.
+/// Reads integers from a byte slice at a byte offset, little-endian (`LE`) or big-endian (`BE`).
+///
+/// # Panics
+/// Panics when the slice does not hold the integer's width at that offset.
 extend Slice<uint8> {
     pub fn getUint16LE(at: int): uint16 { return uint16.fromBytesLE(this[at..at + 2]); }
     pub fn getUint16BE(at: int): uint16 { return uint16.fromBytesBE(this[at..at + 2]); }

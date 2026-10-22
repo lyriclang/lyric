@@ -1,23 +1,23 @@
-/// Paths as strings (design/v5/spec/10 O6): no `Path` type — a path is the text the system takes,
-/// and these functions take it apart and put it together, lexically, as Go's `path/filepath` does:
-/// `join`, `normalize` (Go's `Clean`), `fileName` (`Base`), `parent` (`Dir`), `extension` (`Ext`),
-/// `stem`, `withExtension`, `isAbsolute` (`IsAbs`), `relative` (`Rel`), `components`, `separator`.
-/// None of them asks the file system; `fs.absolute(p)`, which needs the working directory, does.
+/// Lexical operations on paths held as strings. There is no `Path` type: a path is the text the
+/// system takes, and these functions take it apart and put it together without touching the file
+/// system: [join], [normalize], [fileName], [parent], [extension], [stem], [withExtension],
+/// [isAbsolute], [relative], [components] and [separator]. `fs.absolute(p)`, which needs the
+/// working directory, is the one that asks the system.
 ///
 /// On Windows both `\` and `/` separate, a path may start with a volume — a drive, `C:`, or a UNC
 /// share, `\\server\share` — and names compare without regard to the case of ASCII letters; what
 /// these functions build, they build with `\`. Elsewhere `/` separates and names compare exactly.
 import std.core { arrayOf, viewBytes };
 
-// the target's, a constant (09 B4): what a cross-build for Windows writes is Windows' path
+// the target's OS, fixed at compile time: a cross-build for Windows handles Windows paths
 let onWindows = comptime target.os == .Windows;
 
 /// The separator the system writes: `\` on Windows, `/` elsewhere.
 pub let separator: string = if (onWindows) "\\" else "/";
 
-/// `parts` joined by the separator, the empty ones left out, the result normalized; nothing for no
-/// part that is not empty. On Windows a drive alone, `C:`, joins without a separator — `C:a`, the
-/// directory current on that drive.
+/// Returns `parts` joined by the separator, with empty parts left out and the result normalized;
+/// the empty string when no part is non-empty. On Windows a drive alone, `C:`, joins without a
+/// separator — `C:a`, relative to the directory current on that drive.
 @Allow("string-concat-in-loop")
 pub fn join(parts: string...): string {
     var joined = "";
@@ -38,9 +38,10 @@ pub fn join(parts: string...): string {
     return if (any) normalize(joined) else "";
 }
 
-/// The shortest path that names what `p` names, lexically (Go's `Clean`): separators run together,
-/// `.` elements dropped, a `..` taking the element before it away — above the root it stays there,
-/// in a relative path it is kept —, no separator at the end but the root's; `.` for nothing.
+/// Returns the shortest path that names what `p` names, lexically: runs of separators collapse,
+/// `.` elements are dropped, a `..` removes the element before it — at the root it is dropped, at
+/// the start of a relative path it is kept —, and no separator remains at the end but the root's.
+/// Returns `.` for an empty path.
 pub fn normalize(p: StringView): string {
     let b = viewBytes(p);
     let vol = volumeLength(b);
@@ -68,8 +69,8 @@ pub fn normalize(p: StringView): string {
     return if (out.isEmpty()) "." else out;
 }
 
-/// The last element (Go's `Base`): the separators at the end dropped first; `.` for nothing, the
-/// separator for a path of separators alone.
+/// Returns the last element of `p`, after dropping trailing separators. Returns `.` for an empty
+/// path and the separator for a path of separators alone.
 pub fn fileName(p: StringView): string {
     let b = viewBytes(p);
     if (b.isEmpty()) {
@@ -88,8 +89,8 @@ pub fn fileName(p: StringView): string {
     return if (name.isEmpty()) separator else text(name);
 }
 
-/// All but the last element, normalized (Go's `Dir`): `.` where there is no directory before it,
-/// the root for an element under it.
+/// Returns all but the last element of `p`, normalized: `.` where no directory precedes it, the
+/// root for an element directly under the root.
 pub fn parent(p: StringView): string {
     let b = viewBytes(p);
     let vol = volumeLength(b);
@@ -105,8 +106,8 @@ pub fn parent(p: StringView): string {
     return withSeparators(b[..vol]) + dir;
 }
 
-/// The last element's extension with its dot, `.txt` of `notes.txt`, or nothing (Go's `Ext`): from
-/// the last dot of the last element — of `.bashrc` that is all of it.
+/// Returns the extension of the last element with its dot — `.txt` of `notes.txt` — or the empty
+/// string. It runs from the last dot of the last element, so of `.bashrc` it is all of it.
 pub fn extension(p: StringView): string {
     let b = viewBytes(p);
     var i = b.length() - 1;
@@ -119,15 +120,15 @@ pub fn extension(p: StringView): string {
     return "";
 }
 
-/// The last element without its extension: `notes` of `a/notes.txt`.
+/// Returns the last element without its extension: `notes` of `a/notes.txt`.
 pub fn stem(p: StringView): string {
     let name = fileName(p);
     let ext = extension(name);
     return text(viewBytes(name)[..name.length() - ext.length()]);
 }
 
-/// `p` with its extension `ext` — with its dot, which is added where it is missing —, or with none
-/// for an empty `ext`: `withExtension("a/notes.txt", ".md")` is `a/notes.md`.
+/// Returns `p` with its extension replaced by `ext`, adding the dot where `ext` lacks one, or with
+/// the extension removed for an empty `ext`: `withExtension("a/notes.txt", ".md")` is `a/notes.md`.
 pub fn withExtension(p: StringView, ext: StringView): string {
     let b = viewBytes(p);
     let old = extension(p);
@@ -139,8 +140,8 @@ pub fn withExtension(p: StringView, ext: StringView): string {
     return if (e.startsWith(".")) base + e else base + "." + e;
 }
 
-/// Whether `p` names the same place from every working directory (Go's `IsAbs`): it starts with
-/// the root; on Windows with a drive and the root, or a UNC share — `\a` alone is relative there,
+/// Returns whether `p` names the same place from every working directory: it starts with the
+/// root; on Windows with a drive and the root, or with a UNC share — `\a` alone is relative there,
 /// to the current drive.
 pub fn isAbsolute(p: StringView): bool {
     let b = viewBytes(p);
@@ -157,9 +158,10 @@ pub fn isAbsolute(p: StringView): bool {
     return b.length() > vol && isSep(b[vol]);
 }
 
-/// The path that names `target` from `base`, lexically (Go's `Rel`): `relative("/a", "/a/b/c")` is
-/// `b/c`, `relative("/a", "/b")` is `../b`; `.` for the same place. `null` where there is none — one
-/// absolute and the other not, two volumes, or a base that climbs above where the target is.
+/// Returns the path that names `target` from `base`, lexically: `relative("/a", "/a/b/c")` is
+/// `b/c`, `relative("/a", "/b")` is `../b`, and `.` for the same place. Returns `null` where there
+/// is none — one absolute and the other not, different volumes, or a base whose remaining part
+/// starts with `..`.
 pub fn relative(base: StringView, target: StringView): ?string {
     let bb = viewBytes(base);
     let tb = viewBytes(target);
@@ -199,9 +201,9 @@ pub fn relative(base: StringView, target: StringView): ?string {
     return if (out.isEmpty()) "." else out[..].join(separator);
 }
 
-/// The parts of `p` in order, lexically and without normalizing: the root first where there is
-/// one — `/`, on Windows the volume with it, `C:\` —, then each element, the empty ones and `.`
-/// left out, `..` kept.
+/// Returns the parts of `p` in order, lexically and without normalizing: the root first where
+/// there is one — `/`, on Windows the volume with it, `C:\` —, then each element, with empty
+/// elements and `.` left out and `..` kept.
 pub fn components(p: StringView): string[] {
     let b = viewBytes(p);
     let vol = volumeLength(b);
@@ -221,12 +223,12 @@ fn isSep(c: uint8): bool {
     return c == 47u8 || (onWindows && c == 92u8);
 }
 
-/// Bytes cut between ASCII separators are UTF-8.
+/// Returns the bytes as a string; bytes cut between ASCII separators of a string are valid UTF-8.
 fn text(b: Slice<uint8>): string {
     return try! string.fromUtf8(b);
 }
 
-/// A volume's text with the system's separator in it — `//server/share` is `\\server\share`.
+/// Returns a volume's text with the system's separator in it — `//server/share` is `\\server\share`.
 fn withSeparators(b: Slice<uint8>): string {
     if (!onWindows) {
         return text(b);
@@ -234,8 +236,8 @@ fn withSeparators(b: Slice<uint8>): string {
     return text(b).replace("/", "\\");
 }
 
-/// The length of the volume at the front of a path: on Windows a drive, `C:`, or a UNC share,
-/// `\\server\share`; 0 elsewhere and where there is none.
+/// Returns the length of the volume at the front of a path: on Windows a drive, `C:`, or a UNC
+/// share, `\\server\share`; 0 on other systems and where there is none.
 fn volumeLength(b: Slice<uint8>): int {
     if (!onWindows) {
         return 0;
@@ -270,7 +272,7 @@ fn isLetter(c: uint8): bool {
     return (c >= 65u8 && c <= 90u8) || (c >= 97u8 && c <= 122u8);
 }
 
-/// The elements between separators, the empty ones and `.` left out.
+/// Returns the elements between separators, with empty elements and `.` left out.
 fn elementsOf(b: Slice<uint8>): string[] {
     var out: string[] = [];
     var at = 0;
@@ -292,7 +294,8 @@ fn elementsOf(b: Slice<uint8>): string[] {
     return out;
 }
 
-/// Two names alike: exactly, and on Windows without regard to the case of ASCII letters.
+/// Returns whether two names are alike: exactly, and on Windows without regard to the case of
+/// ASCII letters.
 fn sameWord(a: string, b: string): bool {
     if (!onWindows) {
         return a == b;

@@ -1,9 +1,9 @@
-/// `std.regex` (design 10 S8, B1; 13 M10 S6): regular expressions in RE2's syntax, matched in
-/// linear time. A pattern is parsed into a tree, compiled into Thompson's NFA, and run by a Pike
+/// Regular expressions in RE2's syntax, matched in linear time. `Regex` is a compiled pattern,
+/// `Match` one match with its groups, `Matches` the matches of a text in turn, and `RegexError`
+/// what a pattern that does not parse throws. A pattern is parsed into a tree, compiled into Thompson's NFA, and run by a Pike
 /// VM that carries the captures with each thread: every character of the text is looked at once
-/// per instruction at most, so `(a*)*b` over a hundred thousand `a` ends in milliseconds where a
-/// backtracker would not end. What RE2 leaves out is left out here: no backreferences, no
-/// lookaround — they are what makes the time exponential. Literals, `.`, classes (`[a-z]`,
+/// per instruction at most, so `(a*)*b` over a hundred thousand `a` ends in milliseconds. There
+/// are no backreferences and no lookaround: they cannot be matched in linear time. Literals, `.`, classes (`[a-z]`,
 /// `[^…]`, `\d \w \s` and their capitals, `[:alpha:]` and the other POSIX names, `\pL` and
 /// `\p{Lu}` over the Unicode categories), groups (capturing, `(?:…)`, `(?P<name>…)` and
 /// `(?<name>…)`), alternation, the repetitions `* + ? {n} {n,} {n,m}` each greedy or lazy with a
@@ -12,7 +12,7 @@
 import std.collections { List, Map };
 import std.core { StringBuilder, viewBytes, UnicodeCategory };
 
-/// What `Regex.new` throws: `offset` is where in the pattern, `detail` what is wrong there.
+/// The error `Regex.new` throws: `offset` is where in the pattern, `detail` what is wrong there.
 pub struct RegexError :: [Error] {
     pub offset: int,
     pub detail: string,
@@ -208,7 +208,7 @@ struct Flags {
     var s: bool = false,
 }
 
-/// The most a counted repetition may say (RE2's limit).
+/// The largest count a counted repetition may give.
 let repeatLimit = 1000;
 
 class Parser {
@@ -354,7 +354,7 @@ class Parser {
     }
 
     /// `{n}`, `{n,}` or `{n,m}` at the cursor, taken; `null` where the braces are not one, the
-    /// cursor left on the `{` (a literal then, as in RE2).
+    /// cursor left on the `{` (a literal then).
     mut fn counted(): ?(int, int) throws RegexError {
         let start = this.at;
         let _ = this.take();
@@ -975,8 +975,8 @@ class Vm {
     var prog: Program,
     var text: Slice<uint8>,
     var stack: List<Thread>,
-    /// Only whether there is a match (M10 S13, Messpunkt 4): the saves are not recorded — every
-    /// start would copy the slots —, and the first match ends the run.
+    /// Only whether there is a match: the saves are not recorded — every start would copy the
+    /// slots —, and the first match ends the run.
     var any: bool = false,
 
     /// Whether the assertion holds between the character before `at` and the one at it.
@@ -1135,7 +1135,7 @@ pub struct Match :: [Equatable, Debug] {
     texts: List<?string>,
     names: Map<string, int>,
 
-    /// The text of group `i`, `null` where it took no part or there is no such group.
+    /// Returns the text of group `i`; `null` where it took no part or there is no such group.
     pub fn group(i: int): ?string {
         if (i < 0 || i >= this.texts.length()) {
             return null;
@@ -1143,7 +1143,8 @@ pub struct Match :: [Equatable, Debug] {
         return this.texts[i];
     }
 
-    /// Where group `i` is, start and end.
+    /// Returns where group `i` is, start and end as byte offsets; `null` where it took no part or
+    /// there is no such group.
     pub fn span(i: int): ?(int, int) {
         if (i < 0 || i >= this.spans.length()) {
             return null;
@@ -1151,7 +1152,8 @@ pub struct Match :: [Equatable, Debug] {
         return this.spans[i];
     }
 
-    /// The text of the group named `name`.
+    /// Returns the text of the group named `name`; `null` where it took no part or there is no
+    /// such name.
     pub fn named(name: string): ?string {
         if (let i = this.names.get(name)) {
             return this.texts[i];
@@ -1159,7 +1161,7 @@ pub struct Match :: [Equatable, Debug] {
         return null;
     }
 
-    /// How many groups there are, the whole match counted.
+    /// Returns how many groups there are, the whole match counted.
     pub fn groups(): int {
         return this.texts.length();
     }
@@ -1176,7 +1178,11 @@ pub class Regex {
     var prog: Program,
     var source: string,
 
-    /// The pattern compiled; what is not RE2's syntax is `RegexError { offset, detail }`.
+    /// Compiles `pattern`.
+    ///
+    /// # Errors
+    ///
+    /// Throws `RegexError { offset, detail }` where the pattern is not RE2's syntax.
     pub static fn new(pattern: string): Regex throws RegexError {
         let parser = Parser.new(pattern);
         let root = try parser.parseAll();
@@ -1189,17 +1195,17 @@ pub class Regex {
         return Regex { prog = prog, source = pattern };
     }
 
-    /// The pattern as given.
+    /// Returns the pattern as given.
     pub fn pattern(): string {
         return this.source;
     }
 
-    /// How many capture groups the pattern has, the whole match not counted.
+    /// Returns how many capture groups the pattern has, the whole match not counted.
     pub fn groupCount(): int {
         return this.prog.groups - 1;
     }
 
-    /// The names of the named groups with their indices.
+    /// Returns the names of the named groups with their indices.
     pub fn groupNames(): Map<string, int> {
         return this.prog.names;
     }
@@ -1208,19 +1214,20 @@ pub class Regex {
         return Vm { prog = this.prog, text = text, stack = List.new() };
     }
 
-    /// Whether the text holds a match.
+    /// Returns whether the text holds a match.
     pub fn isMatch(s: StringView): bool {
         var vm = this.vm(viewBytes(s));
         vm.any = true;
         return vm.run(0, false, 2) != null;
     }
 
-    /// The leftmost match, with its groups.
+    /// Returns the leftmost match, with its groups; `null` where there is none.
     pub fn find(s: StringView): ?Match {
         return this.findFrom(s, 0);
     }
 
-    /// The leftmost match at or after the byte offset `from`.
+    /// Returns the leftmost match at or after the byte offset `from`; `null` where there is none
+    /// or `from` lies past the end of the text.
     pub fn findFrom(s: StringView, from: int): ?Match {
         let text = viewBytes(s);
         if (from > text.length()) {
@@ -1251,19 +1258,19 @@ pub class Regex {
         return Match { start = slots[0], end = slots[1], value = texts[0] ?? "", spans = spans, texts = texts, names = this.prog.names };
     }
 
-    /// Every match in turn, left to right, none overlapping; an empty match right after a match is
-    /// skipped (as Go does).
+    /// Returns every match in turn, left to right, none overlapping; an empty match right after a
+    /// match is skipped.
     pub fn findAll(s: StringView): Matches {
         return Matches { re = this, text = s.toString(), at = 0, lastEnd = -1, done = false };
     }
 
-    /// The first match replaced by the template: `$1` and `${name}` are the groups, `$0` the
+    /// Returns the text with its first match replaced by the template: `$1` and `${name}` are the groups, `$0` the
     /// whole, `$$` a `$`; an unmatched group is empty.
     pub fn replace(s: StringView, template: string): string {
         return this.replaceUpTo(s, template, 1);
     }
 
-    /// Every match replaced by the template.
+    /// Returns the text with every match replaced by the template, as `replace` expands it.
     pub fn replaceAll(s: StringView, template: string): string {
         return this.replaceUpTo(s, template, -1);
     }
@@ -1287,8 +1294,8 @@ pub class Regex {
         return out.toString();
     }
 
-    /// The pieces of the text between its matches (as Go's `Split` with no limit): an empty text
-    /// is one empty piece; a match at the very start adds no empty piece before it.
+    /// Returns the pieces of the text between its matches. An empty text is one empty piece; an
+    /// empty match at the very start adds no empty piece before it.
     pub fn split(s: StringView): string[] {
         let text = viewBytes(s);
         let out: List<string> = List.new();
@@ -1313,7 +1320,8 @@ pub class Regex {
     }
 }
 
-/// `$1`, `${name}`, `$0`, `$$` into `out`; a `$` before anything else is itself.
+/// Appends `template` to `out` with `$1`, `${name}`, `$0` and `$$` expanded from `m`; a `$`
+/// before anything else is itself.
 fn expandTemplate(out: StringBuilder, template: string, m: Match): void {
     let t = viewBytes(template);
     let n = t.length();

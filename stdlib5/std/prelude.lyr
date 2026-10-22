@@ -1,9 +1,8 @@
-/// The prelude (design/v5/spec/10 B2, 07 V3 I8): what every module names without an import —
-/// what signatures and the language itself need, not effects (U5: `println` is `std.io`'s).
-/// It passes on with `pub import` what other modules declare, and grows with the library:
-/// `List`, `Map` and `Set` are std.collections' (10 B2: "the language's collection vocabulary");
-/// `Result` and `FromIterator` come with theirs.
-/// `Exception` is here as 12 K05 has it; `Closeable` stands for what B2 calls `Resource`.
+/// The prelude: the names every module can use without an import.
+///
+/// It holds what signatures and the language itself need, not effects: `println` is `std.io`'s.
+/// It passes on with `pub import` what other modules declare — the core interfaces, panics and
+/// attributes from `std.core`, and `List`, `Map` and `Set` from `std.collections`.
 pub import std.core {
     panic,
     assert,
@@ -63,6 +62,5 @@ pub import std.core {
     profile
 };
 pub import std.collections { List, Map, Set };
-// The adapters' home (10 B6 I3; M9a S11c): named here, so its blocks reach every iterator in every
-// module; the structs are imported where a type is written, `import std.iter { MapIter }`.
+// The iterator adapters' module, named here so its blocks reach every iterator in every module; the structs are imported where a type is written, `import std.iter { MapIter }`.
 import std.iter;
