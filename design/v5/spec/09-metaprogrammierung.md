@@ -172,6 +172,11 @@ Runner aus dem Kommentar baut. (Rust)
 Paket"). Keine Quelltext-Direktive (Kommentare tun nichts). Ein `@Allow`, das nichts
 unterdrückt, warnt selbst (Clippy). Korpus W10 beantwortet.
 
+**Nachtrag 2026-10-22 (Maintainer, offener Punkt 233):** das **Modul** entfällt als Ort — Lyric 5 hat
+keinen Modulkopf (07 M2, `LYR-RES0008`), und ein Attribut am Dateianfang gehört der ersten
+Deklaration. Eine Stufe steht an einer Deklaration, im Paket (`[lints]`) und auf der Kommandozeile;
+eine dateiweite Form (Rusts `#![allow]`) ist verworfen: ein zweiter Mechanismus für dieselbe Sache.
+
 ## A11 — Die compilergelesenen Attribute (Art 2): **entschieden** (2026-09-29)
 
 | Attribut | Vertrag |
@@ -214,7 +219,7 @@ den anderen Bereichen; wo eine ältere Zeile dieses Dokuments dem widerspricht, 
 
 | # | Entscheidung | Betrifft |
 |---|---|---|
-| A11 | **`@Warn(name)` und `@Deny(name)` neben `@Allow(name)`**: die drei Ebenen eines Lints an Deklaration oder Modul, ein Mechanismus mit `[lints]` und `-A`/`-W`/`-D` (11 W7 L1, das sie schon nannte); jedes nimmt Name, Gruppe oder Nummer | A10, A11 |
+| A11 | **`@Warn(name)` und `@Deny(name)` neben `@Allow(name)`**: die drei Ebenen eines Lints an einer Deklaration (das Modul entfiel 2026-10-22, A10), ein Mechanismus mit `[lints]` und `-A`/`-W`/`-D` (11 W7 L1, das sie schon nannte); jedes nimmt Name, Gruppe oder Nummer | A10, A11 |
 
 ---
 
