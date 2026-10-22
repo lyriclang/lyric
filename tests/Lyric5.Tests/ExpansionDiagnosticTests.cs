@@ -155,7 +155,7 @@ public class ExpansionDiagnosticTests
         var errors = lines.Where(l => l.Contains("error[")).ToList();
         Assert.Equal(2, errors.Count);
         Assert.Contains(errors, l => l.EndsWith("main.lyr:4:1: error[LYR-SEM0001]: in the expansion of '@Logged': cannot assign 'string' to 'int'"));
-        Assert.Contains(errors, l => l.EndsWith("main.lyr:6:5: error[LYR-SEM0001]: cannot assign 'string' to 'int'"));
+        Assert.Contains(errors, l => l.EndsWith("main.lyr:6:18: error[LYR-SEM0001]: cannot assign 'string' to 'int'"));
         Assert.Contains(lines, l => l.Contains("note: synthesized as: let n__1: int = \"wrong\";"));
         Assert.Contains(lines, l => l.Contains("note: from the quote of 'Logged' here") && l.EndsWith("macros.lyr:39:31"));
     }

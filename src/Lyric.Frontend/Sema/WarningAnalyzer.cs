@@ -702,9 +702,16 @@ internal sealed partial class WarningAnalyzer
                     {
                         var unused = Enumerable.Range(0, selective.Names.Length)
                             .Where(i => IsUnusedImport(module, selective.BoundName(i), inFile)).ToHashSet();
+                        // The import brings its module's blocks into sight as well (05 §6): where
+                        // the file calls one, the module stays, its names go.
+                        var keepsBlocks = unused.Count == selective.Names.Length && BringsBlocksUsed(import, inFile);
+                        var whole = unused.Count == selective.Names.Length
+                            ? keepsBlocks ? ModuleAlone(import) : WholeImport(import)
+                            : null;
                         for (var i = 0; i < selective.Names.Length; i++)
                             WarnIfUnusedImport(module, selective.BoundName(i), selective.NameSpans[i], inFile,
-                                unused.Count == selective.Names.Length ? WholeImport(import) : NameOutOf(selective, i));
+                                unused.Count == selective.Names.Length ? whole : NameOutOf(selective, i),
+                                keepsBlocks ? "keep the module alone — the file calls what its blocks add" : "take it out");
                         break;
                     }
                     case ImportAlias alias:
@@ -721,6 +728,23 @@ internal sealed partial class WarningAnalyzer
     private Replacement? WholeImport(ImportDecl import) =>
         _comp.Lyric5Modules ? SourceEdits.DeleteStatement(_comp.Sources, import.Span) : null;
 
+    /// <summary>Does the file call a member a block of the imported module adds — <c>x.toBytesBE()</c>
+    /// through <c>import std.encoding { Hex };</c>?</summary>
+    private bool BringsBlocksUsed(ImportDecl import, HashSet<Symbol>? usedInFile) =>
+        usedInFile is not null && _comp.FindModule(import.Path) is { } brought
+        && usedInFile.Any(used => ExtensionOwners.TryGetValue(used, out var owner) && ReferenceEquals(owner, brought));
+
+    /// <summary>The import as a module import, <c>import std.encoding;</c>: its names out, its blocks
+    /// in sight.</summary>
+    private Replacement? ModuleAlone(ImportDecl import)
+    {
+        if (!_comp.Lyric5Modules || import.Clause is not { } clause) return null;
+        var text = _comp.Sources.GetText(clause.Span.File);
+        var start = clause.Span.Start;
+        while (start > 0 && text[start - 1] is ' ' or '\t') start--;
+        return new Replacement(new Span(clause.Span.File, start, clause.Span.End), "", Applicability.Safe);
+    }
+
     /// <summary>One name out of <c>{ a, b }</c>, with the comma that joins it to its neighbour; a
     /// renamed one (<c>f as g</c>) is left to the hand.</summary>
     private Replacement? NameOutOf(ImportSelective selective, int i)
@@ -734,11 +758,11 @@ internal sealed partial class WarningAnalyzer
     }
 
     private void WarnIfUnusedImport(ModuleSymbol module, string name, Span span,
-        HashSet<Symbol>? usedInFile, Replacement? fix)
+        HashSet<Symbol>? usedInFile, Replacement? fix, string help = "take it out")
     {
         if (IsUnusedImport(module, name, usedInFile))
             _de.Report("LYR-SEM0072", Severity.Warning, span, $"import '{name}' is never used",
-                fix is { } change ? [DiagnosticNote.Suggest("take it out", change)] : []);
+                fix is { } change ? [DiagnosticNote.Suggest(help, change)] : []);
     }
 
     private bool IsUnusedImport(ModuleSymbol module, string name, HashSet<Symbol>? usedInFile)

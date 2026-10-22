@@ -648,6 +648,14 @@ public sealed class Resolver
             return [new ErrorSymbol(name)];
         }
 
+        // Another module's own import is no name of it (04 §3 rule 4): what it imported is imported
+        // from where it is declared, unless a 'pub import' passed it on.
+        if (_comp.Lyric5Modules && found is ImportBindingSymbol or ExternalSymbol && !_comp.Visible(found, module))
+        {
+            _de.Report("LYR-RES0009", Severity.Error, at, _comp.Hidden(found));
+            return [new ErrorSymbol(name)];
+        }
+
         // Lyric 5 (07 V2 S1): the import asks the question every route asks. Of an overload set
         // only the visible functions come along — a private overload beside a 'pub' one is not
         // imported, and none visible is the one error. Bound all the same, as recovery.

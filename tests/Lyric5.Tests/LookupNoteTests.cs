@@ -53,4 +53,26 @@ public class LookupNoteTests
         Assert.Contains("error[LYR-SEM0012]: 'Point' has no member 'norm'", error);
         Assert.Contains("note: 'norm' is added to 'Point' in module 'app.extra', which this module does not import", error);
     }
+
+    private const string Gauge = "pub struct Gauge {\n    pub v: int,\n\n    pub fn read(): int {\n        return this.v;\n    }\n\n"
+        + "    private fn read(scale: int): int {\n        return this.v * scale;\n    }\n}\n\n"
+        + "pub fn tick(): int {\n    return 1;\n}\n\nprivate fn tick(n: int): int {\n    return n;\n}\n";
+
+    [Fact]
+    public void A_count_only_a_private_member_takes_is_named()
+    {
+        var error = Check(("src/util.lyr", Gauge),
+            ("src/main.lyr", "import app.util { Gauge };\n\nfn main(): void {\n    let g = Gauge { v = 2 };\n    let _ = g.read(3);\n}\n"));
+        Assert.Contains("error[LYR-SEM0014]: call expects 0 argument(s), got 1", error);
+        Assert.Contains("note: the one that takes 1 is not for this module: 'read' is private to module 'app.util'", error);
+    }
+
+    [Fact]
+    public void A_count_only_a_private_overload_of_an_import_takes_is_named()
+    {
+        var error = Check(("src/util.lyr", Gauge),
+            ("src/main.lyr", "import app.util { tick };\n\nfn main(): void {\n    let _ = tick(4);\n}\n"));
+        Assert.Contains("error[LYR-SEM0014]: call expects 0 argument(s), got 1", error);
+        Assert.Contains("note: the one that takes 1 is not for this module: 'tick' is private to module 'app.util'", error);
+    }
 }

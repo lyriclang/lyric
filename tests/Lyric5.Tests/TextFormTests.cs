@@ -24,8 +24,9 @@ public class TextFormTests
         var root = Package(("lyric.toml", AppManifest), ("src/main.lyr", TwoMistakes));
         var (exit, _, error) = RunRaw("build", "-C", Path.Combine(root, "src"));
         Assert.Equal(1, exit);
-        var arrow = $" --> {Path.Combine("src", "main.lyr")}:2:5\n";
-        Assert.Contains("error[LYR-SEM0001]: cannot assign 'string' to 'int'\n" + arrow + "  |\n2 |     let x: int = \"text\";\n  |     ^^^^^^^^^^^^^^^^^^^^\n", error);
+        var arrow = $" --> {Path.Combine("src", "main.lyr")}:2:18\n";
+        Assert.Contains("error[LYR-SEM0001]: cannot assign 'string' to 'int'\n" + arrow + "  |\n2 |     let x: int = \"text\";\n"
+            + "  |            ---   ^^^^^^\n  |            |\n  |            expected 'int' here\n", error);
         Assert.Contains("error[LYR-SEM0002]: unknown identifier 'foo'\n", error);
     }
 
@@ -34,7 +35,7 @@ public class TextFormTests
     {
         var root = Package(("lyric.toml", AppManifest), ("src/main.lyr", TwoMistakes));
         var (_, _, error) = RunRaw("build", "--absolute-paths", "-C", root);
-        Assert.Contains($" --> {Path.Combine(root, "src", "main.lyr")}:2:5\n", error);
+        Assert.Contains($" --> {Path.Combine(root, "src", "main.lyr")}:2:18\n", error);
     }
 
     [Fact]

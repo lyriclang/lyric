@@ -10805,3 +10805,53 @@ severity = "error"
 area = "05-interfaces"
 summary = "A value is made into an interface it conforms to only through a block on a shape or a blanket conformance: such a value is not built in this release."
 retired = "M12b S7: a value of an interface is made through a shape's block or a blanket conformance — the shape in a box, a named type with the block's row in its table; nothing refuses it."
+
+[LYR-SEM0231]
+title = "a static member of an interface called through the interface"
+severity = "error"
+area = "05-interfaces"
+summary = "A static member of an interface is called on the interface's name, `Make.make<Item>(s)`: the interface has no value to call it for."
+explanation = '''
+A static member of an interface is answered by each type that conforms, and is called for one of them: on the type, `Item.make(s)`, or in generic code through a type parameter the interface bounds, `T.make(s)` in `fn build<T :: [Make]>(s: string): T`. The interface's name says which member, never which type's answer, and a type argument written after it does not make it one.
+
+Call it on the type, or write the generic function.
+'''
+wrong = '''
+interface Make {
+    static fn make(s: string): Self;
+}
+
+struct Item :: [Make] {
+    name: string,
+
+    static fn make(s: string): Item {
+        return Item { name = s };
+    }
+}
+
+fn main(): void {
+    let _ = Make.make<Item>("x");
+}
+'''
+right = '''
+interface Make {
+    static fn make(s: string): Self;
+}
+
+struct Item :: [Make] {
+    name: string,
+
+    static fn make(s: string): Item {
+        return Item { name = s };
+    }
+}
+
+fn build<T :: [Make]>(s: string): T {
+    return T.make(s);
+}
+
+fn main(): void {
+    let _ = Item.make("x");
+    let _: Item = build("y");
+}
+'''
