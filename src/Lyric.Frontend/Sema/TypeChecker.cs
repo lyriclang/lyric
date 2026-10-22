@@ -7199,8 +7199,17 @@ public sealed class TypeChecker
             : [];
         GenericParamSymbol[] inferable = [.. openReceiver?.Params ?? [], .. openInBlock, .. fsym?.Generics ?? []];
 
+        // An array literal at a position whose type the inference is still to answer is checked
+        // after the other arguments, with the type they bound as its target: in
+        // 'assertEq(x.toBytesBE(), [2u8, 1u8])' the literal is a 'uint8[2]', on either side.
+        var asTarget = new bool[args.Length];
+        if (inferable.Length > 0)
+            for (var i = 0; i < args.Length && i < fn.Parameters.Length; i++)
+                asTarget[i] = args[i] is ArrayLitExpr && !(decl is { Parameters: [.., { IsParams: true }] } && i >= decl.Parameters.Length - 1)
+                    && ConcreteExpectation(expecting, decl, i, false) is null;
+
         for (var i = 0; i < args.Length; i++)
-            if (args[i] is { } given && given is not LambdaExpr)
+            if (args[i] is { } given && given is not LambdaExpr && !asTarget[i])
                 argTypes[i] = given is UnaryExpr { Operator: UnaryOp.Place } mark && fn.PlaceAt(i)
                     ? CheckPlaceArgument(mark, scope)
                     : CheckExpr(given, scope, ConcreteExpectation(expecting, decl, i, Spreads(call, given)));
@@ -7252,7 +7261,7 @@ public sealed class TypeChecker
             var variadicAt = decl is { Parameters: { Length: > 0 } declared } && declared[^1].IsParams ? declared.Length - 1 : -1;
             var n = Math.Min(fn.Parameters.Length, args.Length);
             for (var i = 0; i < n; i++)
-                if (i != variadicAt && args[i] is { } given && given is not LambdaExpr) UnifyInfer(fn.Parameters[i], argTypes[i]!, map, given.Span);
+                if (i != variadicAt && args[i] is { } given && given is not LambdaExpr && !asTarget[i]) UnifyInfer(fn.Parameters[i], argTypes[i]!, map, given.Span);
             // The variadic tail (08 §1.1 rule 1) binds through its element, one argument at a time —
             // an array too, which is one element (the review's A2) — or through the array itself
             // where the call spreads one over it, 'count(xs...)'.
@@ -7261,6 +7270,13 @@ public sealed class TypeChecker
                     if (args[i] is { } element && element is not LambdaExpr)
                         UnifyInfer(Spreads(call, element) ? tail : tail.Element, argTypes[i]!, map, element.Span);
             if (fsym is { Generics.Length: > 0 }) BindThroughFixations(fsym.Generics, map);
+            for (var i = 0; i < args.Length; i++)
+            {
+                if (!asTarget[i]) continue;
+                var target = ExpectedParamAt((FnType)Substitute(fn, map), decl, i, false);
+                argTypes[i] = CheckExpr(args[i]!, scope, target is not null && !MentionsTypeParam(target) ? target : null);
+                UnifyInfer(fn.Parameters[i], argTypes[i]!, map, args[i]!.Span);
+            }
             substituted = (FnType)Substitute(fn, map);
         }
 
@@ -8746,6 +8762,9 @@ public sealed class TypeChecker
             case SliceOf ps when arg is SliceOf or ArrayOf:
                 UnifyInfer(ps.Element, arg is SliceOf sa ? sa.Element : ((ArrayOf)arg).Element, map, argSpan); break;
             case Optional po when arg is Optional ao: UnifyInfer(po.Inner, ao.Inner, map, argSpan); break;
+            // A plain value where '?U' is asked binds 'U' with it, the widening an assignment makes:
+            // 'orNone(3)' is 'orNone<int>'. 'null' says nothing about 'U'.
+            case Optional po when arg is not NullType: UnifyInfer(po.Inner, arg, map, argSpan); break;
             case TupleOf pt when arg is TupleOf at && pt.Elements.Length == at.Elements.Length:
                 for (var i = 0; i < pt.Elements.Length; i++) UnifyInfer(pt.Elements[i], at.Elements[i], map, argSpan);
                 break;
@@ -12481,6 +12500,12 @@ public sealed class TypeChecker
                 ret = LyrType.Error;
                 break;
         }
+
+        // An open '?U' its body answers with a plain value: the lambda gives '?T', widened as a
+        // function declared '?T' widens its returns, and 'U' binds to 'T' —
+        // 'mapNotNull((s) => try int.parse(s))'.
+        if (openGeneric && contextRet is Optional && ret is not (Optional or NullType or NeverType) && !ret.IsError && !TypeFacts.IsVoid(ret))
+            ret = new Optional(ret);
 
         _currentReturn = savedReturn;
         _currentYield = savedYield;
