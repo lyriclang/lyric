@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A function of another module as a VALUE (design/v5/spec/03 T17, 07 V3): by the name a
+/// A function of another module as a VALUE: by the name a
 /// selective import binds — its own, or another —, through the module's name, and through a
 /// module that passes it on. Called, each of these worked; as a value the lowering knew a
 /// function only by its own symbol and refused the import's (<c>LYR-IR0001</c>), or took the

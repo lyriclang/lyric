@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// An enum's constants at run time (the review's M8a-10): one with a literal is the literal where
+/// An enum's constants at run time: one with a literal is the literal where
 /// it is read, one with another initializer is filled before the entry runs — of the enum's own
 /// type too. Through <c>Main</c>, so in the console collection.
 /// </summary>

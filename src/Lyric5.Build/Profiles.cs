@@ -4,14 +4,14 @@ using Lyric5.Toolchain;
 
 namespace Lyric5.Build;
 
-/// <summary>A <c>[profile.&lt;name&gt;]</c> table (design/v5/spec/11 W2 P3): the fields it sets —
+/// <summary>A <c>[profile.&lt;name&gt;]</c> table: the fields it sets —
 /// <c>null</c> where it sets none — and, for a profile of the manifest's own, the one it inherits
 /// from.</summary>
 public sealed record ProfileSpec(string Name, string? Inherits, int? Opt, bool? DebugInfo, bool? Lto,
     bool? DenyWarnings, bool? OverflowChecks, bool? FastMath, Collector? Gc, int Line);
 
 /// <summary>
-/// The profiles of a program (design/v5/spec/11 W2 P3): the four built in, changed by the root
+/// The profiles of a program: the four built in, changed by the root
 /// manifest's <c>[profile.debug]</c> and the like, and the ones the root manifest names, each over
 /// the profile it inherits from. A dependency's profiles are not read: the program is built one way.
 /// </summary>

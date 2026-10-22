@@ -62,20 +62,20 @@ public sealed class CBuild
     public IReadOnlyList<string> FlagsFor(CUnit unit)
     {
         // No contraction of a * b + c into a fused multiply-add: deterministic IEEE arithmetic is
-        // the standard (01 L10), and a fused result differs in the last bit from the two roundings
+        // the standard, and a fused result differs in the last bit from the two roundings
         // the source spells. Fast-math and contraction come back only by an explicit flag.
         var flags = new List<string> { "-std=c11", "-ffunction-sections", "-fdata-sections", "-ffp-contract=off" };
         // The compilation directory a debugger joins a relative path to is '.', not wherever the
-        // build happens to run (11 W2 P6). gcc has no flag for it; it maps the working directory
+        // build happens to run. gcc has no flag for it; it maps the working directory
         // like any other prefix — which puts the directory into its cache keys.
         flags.Add(Compiler.Kind == CCompilerKind.Gcc
             ? $"-fdebug-prefix-map={Path.TrimEndingDirectorySeparator(Environment.CurrentDirectory)}=."
             : "-fdebug-compilation-dir=.");
         // zig cc turns UBSan on by itself at -O0, with zig's own runtime and report format. The
-        // sanitizers belong to their profiles (01 C7), which compile with clang; debug is plain.
+        // sanitizers belong to their profiles, which compile with clang; debug is plain.
         if (Compiler.Kind == CCompilerKind.Zig) flags.Add("-fno-sanitize=undefined");
         // LTO is bitcode in the objects; zig 0.16 links Mach-O with a linker of its own that takes
-        // none ("LTO requires using LLD"), so a build for macOS goes without (the review's B11).
+        // none ("LTO requires using LLD"), so a build for macOS goes without.
         flags.AddRange(Target.Os == TargetOs.MacOs ? Profile.Codegen.Where(f => !IsLto(f)) : Profile.Codegen);
         if (unit.Instrument) flags.AddRange(Profile.Instrumentation);
         foreach (var define in unit.Defines) flags.Add("-D" + define);
@@ -206,11 +206,11 @@ public sealed class CBuild
 
     /// <summary>
     /// Links objects and archives into an executable. Sections nobody references are dropped
-    /// (design/v5/spec/01 L11); the sanitizer runtime comes along in the sanitizer profiles. The
+    /// from the image; the sanitizer runtime comes along in the sanitizer profiles. The
     /// runtime's backtraces need an unwinder — zig cc links a C program without one, so its own
     /// libunwind comes along on Linux; clang and gcc bring libgcc's; macOS has one in libSystem —
     /// and on Windows DbgHelp, loaded by the runtime at the first trace, not imported. The same
-    /// inputs give the same image (11 W2 P6): a PE image's time stamps and PDB GUID come from its
+    /// inputs give the same image: a PE image's time stamps and PDB GUID come from its
     /// own bytes, and a Mach-O image carries no debug map — on a macOS host its .dSYM does, beside
     /// it, which is where libbacktrace reads line tables from (<see cref="Reproducible"/>).
     /// </summary>
@@ -235,7 +235,7 @@ public sealed class CBuild
         var arguments = Driver();
         // No LTO flag at the link: lld runs LTO over bitcode inputs by itself, and with the flag
         // zig builds its own C library as bitcode too — for Windows its mingw part, whose own
-        // symbols then went missing (frexpf, wmemcpy, __DENORM …; the review's B11).
+        // symbols then went missing (frexpf, wmemcpy, __DENORM …).
         arguments.AddRange(Profile.Codegen.Where(f => !IsLto(f)));
         arguments.AddRange(Profile.Instrumentation);
         arguments.AddRange(inputs);
@@ -245,10 +245,10 @@ public sealed class CBuild
         {
             TargetOs.MacOs => ["-Wl,-dead_strip"],
             // The thread's stack as large as the main task's (runtime/include/lyr/task.h,
-            // LYR_MAIN_TASK_STACK): what main has as a task it has on the thread (M6-26). zig's
+            // LYR_MAIN_TASK_STACK): what main has as a task it has on the thread. zig's
             // default for a Windows image is 16 MiB (MSVC's 1 MiB); a POSIX thread's comes from
             // the system's limit, 8 MiB as a rule. shell32 for CommandLineToArgvW: the arguments as
-            // UTF-16 (runtime/src/os.c, M8b S9); ws2_32 for Winsock (runtime/src/net.c, M8b S11).
+            // UTF-16 (runtime/src/os.c); ws2_32 for Winsock (runtime/src/net.c).
             // ntdll's AFD calls are looked up at run time (runtime/src/poll.c), as wepoll does.
             TargetOs.Windows => ["-Wl,--gc-sections", "-Wl,--stack," + MainThreadStack, "-lshell32", "-lws2_32"],
             _ => ["-Wl,--gc-sections", "-lpthread", "-lm"],

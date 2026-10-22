@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A member a type leaves to a field (design/v5/spec/04 D1; lyric-spec 05 §5) is forwarded "as
+/// A member a type leaves to a field (lyric-spec 05 §5) is forwarded "as
 /// if <c>fn walk(d) { this.legs.walk(d); }</c> were written" — so a <c>mut fn</c> writes the
 /// FIELD. It wrote a copy: a call of a delegated member went through the interface's table,
 /// for which a struct receiver is copied into a box, and the forwarder lifted the field into the

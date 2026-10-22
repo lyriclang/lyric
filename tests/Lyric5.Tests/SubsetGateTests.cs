@@ -5,12 +5,12 @@ using Lyric5.Toolchain;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The subset gate (M2 S1): what of the 4.x front end's IR the Lyric 5 compiler takes today, and
-/// what it refuses with the milestone that brings it. Programs compile against <c>stdlib5/</c>,
+/// The subset gate: what of the 4.x front end's IR the Lyric 5 compiler takes, and what it
+/// refuses. Programs compile against <c>stdlib5/</c>,
 /// the seed of the Lyric 5 standard library, never against the 4.x <c>stdlib/</c> — the copy
-/// beside the tests, which carries the test-only <c>std.notyet</c>: since M6 S2d the gate takes
-/// every instruction, and a native without an intrinsic is the refusal left to show — one no
-/// milestone lifts, since a program reaches C through <c>extern "C"</c>.
+/// beside the tests, which carries the test-only <c>std.notyet</c>: the gate takes every
+/// instruction, and a native without an intrinsic is the refusal left to show — one that stays,
+/// since a program reaches C through <c>extern "C"</c>.
 /// </summary>
 public class SubsetGateTests
 {
@@ -60,7 +60,7 @@ public class SubsetGateTests
         Assert.Empty(refusals);
     }
 
-    // The '[x] * n'-over-objects rows retired with their rule (M4 S9): the sema refuses the
+    // No '[x] * n'-over-objects rows: the sema refuses the
     // element without 'Clone' (LYR-SEM0136) and desugars the rest, so no such instruction
     // reaches the gate — OptionalEqualityAndRepeatTests pins it.
     [Theory]

@@ -5,10 +5,10 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A package's native part (design/v5/spec/07 B5; 11 W2) and the C functions the program declares
-/// (<c>extern "C"</c>, 11 W4, stage 1): C sources compiled with the program, include directories,
-/// libraries, per operating system more of each; scalars across, everything else refused until
-/// M14's type table. Through <c>Main</c>, so in the console collection.
+/// A package's native part and the C functions the program declares (<c>extern "C"</c>): C
+/// sources compiled with the program, include directories, libraries, per operating system more
+/// of each; scalars across, everything else refused. Through <c>Main</c>, so in the console
+/// collection.
 /// </summary>
 [Collection("console")]
 public class NativeTests

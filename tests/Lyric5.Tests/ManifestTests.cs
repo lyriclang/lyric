@@ -4,7 +4,7 @@ using Lyric5.Build;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>lyric.toml</c> (design/v5/spec/07 V7, 11 W2): the TOML subset a manifest is written in, and
+/// <c>lyric.toml</c>: the TOML subset a manifest is written in, and
 /// what the toolchain reads of it — <c>[package]</c> with its name, version and edition — and
 /// refuses: what TOML refuses, a manifest without its fields, a section it does not know or does not
 /// read yet.
@@ -78,7 +78,7 @@ public class ManifestTests
         Assert.Null(m.ComptimeBudget);
     }
 
-    /// <summary>The steps one <c>comptime</c> site may take (design/v5/spec/09 Q5).</summary>
+    /// <summary>The steps one <c>comptime</c> site may take.</summary>
     [Fact]
     public void A_manifest_sets_the_budget_of_a_comptime_site()
     {
@@ -111,7 +111,7 @@ public class ManifestTests
         Assert.Contains(why, e.Message);
     }
 
-    /// <summary><c>[lints]</c> (spec 16 §5; M12a S5): <c>allow</c>, <c>warn</c>, <c>deny</c> — each an
+    /// <summary><c>[lints]</c> (spec 16 §5): <c>allow</c>, <c>warn</c>, <c>deny</c> — each an
     /// array of lints by name or code, groups, or <c>warnings</c>; a selector in two levels, one that
     /// names nothing, a level the manifest does not know, a list that is no array are refused.</summary>
     [Fact]
@@ -145,7 +145,7 @@ public class ManifestTests
         Assert.Equal(5, e.Line);
     }
 
-    /// <summary>A build script's sections (11 W3 BS3, BS5; M8b S13): its own dependencies — the name
+    /// <summary>A build script's sections: its own dependencies — the name
     /// `build` its own module, no package's —, and the packages whose scripts the root trusts.</summary>
     [Fact]
     public void A_build_scripts_dependencies_and_the_trust_rule_are_read()
@@ -182,7 +182,7 @@ public class ManifestTests
             + "units = { git = \"git@example.org:units.git\", branch = \"release/1\" }\n"
             + "io = { git = \"file:///srv/io\", rev = \"0123abc\" }\n"
             + "fmt = { git = \"ssh://example.org/fmt\" }\n"));
-        // read in the normal form (M7-10): the '.git' at the end dropped
+        // read in the normal form: the '.git' at the end dropped
         Assert.Equal(
             [new GitSource("https://example.org/geo", GitRefKind.Tag, "v1.2.0"),
              new GitSource("git@example.org:units", GitRefKind.Branch, "release/1"),

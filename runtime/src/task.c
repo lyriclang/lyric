@@ -30,8 +30,8 @@ static const LyrDesc task_body_desc = { .size = sizeof(TaskBody), .flags = LYR_D
                                         .refmap_words = 1, .refmap = task_body_refs, .name = "std.task.<body>" };
 static const LyrDesc task_desc = { .size = 0, .flags = LYR_DESC_CORO, .name = "std.task.<context>" };
 
-/* A task's body: the function value, whose type throws nothing — so its code gets no error slot
- * (03 T17). The trace ends here, as at the runner of a generator's body. */
+/* A task's body: the function value, whose type throws nothing — so its code gets no error slot.
+ * The trace ends here, as at the runner of a generator's body. */
 static void lyr_task_run(void *arg) {
     TaskBody *body = arg;
     body->code(body->env, NULL);
@@ -81,7 +81,7 @@ static void lyr_task_main(void *arg) {
     main_task->result = main_task->program_main();
 }
 
-/* --- threads (06 G1, G2) ----------------------------------------------------------------------- */
+/* --- threads ----------------------------------------------------------------------------------- */
 
 /* What a new thread runs. The environment is a root until the thread holds it: between the start
  * and the thread's attach no stack the collector scans has it. */

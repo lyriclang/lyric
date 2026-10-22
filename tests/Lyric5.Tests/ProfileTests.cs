@@ -5,10 +5,10 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Build profiles (design/v5/spec/11 W2 P3): the four built in, changed or named by the root
+/// Build profiles: the four built in, changed or named by the root
 /// manifest with <c>inherits</c>; their fields — <c>opt</c>, <c>debugInfo</c>, <c>lto</c>,
-/// <c>denyWarnings</c>, <c>overflowChecks</c> (03 T2), <c>fastMath</c> (01 L10) —; the field
-/// flags over the profile, and <c>LYRIC_PROFILE</c> under <c>--profile</c> (11 C4). Through
+/// <c>denyWarnings</c>, <c>overflowChecks</c>, <c>fastMath</c> —; the field
+/// flags over the profile, and <c>LYRIC_PROFILE</c> under <c>--profile</c>. Through
 /// <c>Main</c>, so in the console collection.
 /// </summary>
 [Collection("console")]
@@ -22,8 +22,7 @@ public class ProfileTests
 
     /// <summary>The built-in profiles' flags are what the build always gave them: a profile record
     /// changed no object's cache key. The own collector adds nothing; Boehm says so with a define
-    /// that keeps the allocation functions out of line (13 M11 P11) — asked of both explicitly, since
-    /// the default follows the development switch until M11 S5.</summary>
+    /// that keeps the allocation functions out of line — asked of both explicitly.</summary>
     [Fact]
     public void The_built_in_profiles_keep_their_flags()
     {
@@ -44,7 +43,7 @@ public class ProfileTests
         Assert.Equal(["-ffast-math", "-ffp-contract=fast"], release.ProgramFlags);
     }
 
-    /// <summary>The field <c>gc</c> (13 M11 P11): the own collector unless a profile asks for Boehm;
+    /// <summary>The field <c>gc</c>: the own collector unless a profile asks for Boehm;
     /// a profile of the manifest inherits it like any field.</summary>
     [Fact]
     public void A_profile_chooses_its_collector()
@@ -137,7 +136,7 @@ public class ProfileTests
     private const string Increment = "import std.io { println };\n\nfn inc(x: int32): int32 {\n    return x + 1;\n}\n\n"
                                      + "fn main(): void {\n    println(f\"{inc(2147483647)}\");\n}\n";
 
-    /// <summary>Overflow panics in every profile (03 T2) — unless a profile says otherwise, and then
+    /// <summary>Overflow panics in every profile — unless a profile says otherwise, and then
     /// <c>+</c> wraps.</summary>
     [Fact]
     public void A_profile_without_overflow_checks_wraps()
@@ -166,9 +165,8 @@ public class ProfileTests
         Assert.DoesNotContain("LYR_CHECKED_ADD", output);
     }
 
-    /// <summary>11 M7-12: without overflow checks the arithmetic wraps, and division, remainder and
-    /// shifts stay checked — a zero divisor, a count past the width (the audit of 2026-10-07 found
-    /// that half without a test).</summary>
+    /// <summary>Without overflow checks the arithmetic wraps, and division, remainder and shifts
+    /// stay checked — a zero divisor, a count past the width.</summary>
     [Theory]
     [InlineData("7 / zero", "LYR-RT0001")]
     [InlineData("7 % zero", "LYR-RT0001")]

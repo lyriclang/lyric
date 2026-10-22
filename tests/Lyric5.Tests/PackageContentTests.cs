@@ -3,7 +3,7 @@ using Lyric5.Build;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// What a package is made of (design/v5/spec/11 W2 P8): the default set, <c>include</c> and
+/// What a package is made of: the default set, <c>include</c> and
 /// <c>exclude</c>, and the patterns they are written in.
 /// </summary>
 public class PackageContentTests

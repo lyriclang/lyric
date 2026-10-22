@@ -2,11 +2,11 @@
  * the BSDs, a completion port on Windows. A signal that interrupts a wait — on Linux the collector
  * stops threads with signals — does not end it: it goes on until its deadline.
  *
- * Since M8b S10b it also waits for descriptors — a socket's readiness, one-shot (13 M8b P2): what a
+ * It also waits for descriptors — a socket's readiness, one-shot: what a
  * wait sees goes into the poller's list of fired tokens, which the scheduler takes after the wait.
  * Every event of a wait is looked at before it returns: a one-shot readiness left unread would be
  * lost, the descriptor disarmed by the system with nobody told. Windows waits for its sockets with
- * S11: an AFD poll request each way and wait (06 S2, the review's M6-29), its completion on the
+ * an AFD poll request each way and wait, its completion on the
  * port — mio's and wepoll's way, here without wepoll, whose epoll_wait no other thread can wake. */
 #include "lyr/poll.h"
 #include "lyr/gc.h"

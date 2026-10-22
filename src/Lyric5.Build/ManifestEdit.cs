@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 namespace Lyric5.Build;
 
 /// <summary>
-/// <c>lyric add</c> and <c>lyric remove</c> (design/v5/spec/11 C2): one line of
+/// <c>lyric add</c> and <c>lyric remove</c>: one line of
 /// <c>[dependencies]</c> written or taken out as text — every other line of the manifest, its
 /// comments, its order and its line ends stay as they are. A dependency written otherwise — a
 /// table of its own, dotted keys — is the person's to edit, not this.
@@ -50,8 +50,8 @@ public static partial class ManifestEdit
     }
 
     /// <summary><paramref name="text"/> with the tag on <c>name</c>'s line in <c>[dependencies]</c>
-    /// set to <paramref name="tag"/>, the rest of the line and of the file as it was (the review's
-    /// M7-8: <c>lyric update</c> raises a version). <c>null</c> where the line names no tag.</summary>
+    /// set to <paramref name="tag"/>, the rest of the line and of the file as it was
+    /// (<c>lyric update</c> raises a version). <c>null</c> where the line names no tag.</summary>
     /// <exception cref="InvalidOperationException">The dependency is written in another form.</exception>
     public static string? SetTag(string text, string name, string tag)
     {

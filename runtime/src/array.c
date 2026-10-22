@@ -28,7 +28,7 @@ LyrArr *lyr_arr_repeat(const LyrDesc *desc, const LyrArr *array, int64_t count) 
     if (total == 0) return result;
     /* A byte is a fill; anything else is copied once and the copy doubled until the array is
      * full — log2(count) copies, where a copy per element made `[zero] * n`, every builder's
-     * buffer, a call per byte (M8a S13). */
+     * buffer, a call per byte. */
     if (chunk == 1) {
         memset(result->data, array->data[0], total);
         return result;

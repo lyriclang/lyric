@@ -1,7 +1,7 @@
 namespace Lyric5.Toolchain;
 
 /// <summary>
-/// The runtime's collector (design/v5/spec/01 L1; 13 M11 P11), a profile's field <c>gc</c>:
+/// The runtime's collector, a profile's field <c>gc</c>:
 /// <see cref="Immix"/>, the runtime's own (stages 2 and 3), the default; <see cref="Boehm"/>, stage 1,
 /// the Boehm–Demers–Weiser collector kept to compare against. A build compiles the runtime with one
 /// of them and the program against it: Boehm's build says <c>LYR_GC_BOEHM</c>, which keeps the

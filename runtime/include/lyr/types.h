@@ -1,6 +1,6 @@
-/* The object model of design/v5/spec/01 L2: every heap object starts with one word, a pointer to
- * its type descriptor (V3); the descriptor is static and says how big the object is and which of
- * its words are references (V4). Strings and arrays carry their length after the header (V9, V10).
+/* The object model: every heap object starts with one word, a pointer to
+ * its type descriptor; the descriptor is static and says how big the object is and which of
+ * its words are references. Strings and arrays carry their length after the header.
  * Type identity is the descriptor's address. */
 #ifndef LYR_TYPES_H
 #define LYR_TYPES_H
@@ -15,15 +15,15 @@ enum {
     LYR_DESC_ARRAY    = 1u << 1, /* length-prefixed: size is the fixed part, elem_size the element */
     LYR_DESC_STRING   = 1u << 2, /* the string layout below */
     LYR_DESC_CONSERVATIVE = 1u << 3, /* the refmap does not tell all: some word is a reference only in
-                                        some states of the object — a union under a tag (01 V6). A
+                                        some states of the object — a union under a tag. A
                                         collector that reads the map scans this object as it scans a
                                         stack, word by word; nothing moves, so that is sound */
     LYR_DESC_CORO     = 1u << 4, /* a coroutine object (lyr/coro.h): the runtime's layout whatever
-                                    the size says, its stack traced with it (13 M11 P9). Every
+                                    the size says, its stack traced with it. Every
                                     descriptor lyr_coro_new is given says so */
 };
 
-/* The tag of an absent `?Enum` (01 V5): the optional is the enum itself, with a tag no variant has. */
+/* The tag of an absent `?Enum`: the optional is the enum itself, with a tag no variant has. */
 #define LYR_ENUM_NONE UINT32_MAX
 
 typedef struct LyrDesc {
@@ -35,10 +35,10 @@ typedef struct LyrDesc {
                                     word i of the object (word 0 is the header; its bit stays clear);
                                     for an array, word i of one element */
     const char *name;            /* "module.Type", for backtraces, debuggers and Debug */
-    const void *itables;         /* the type's conformances, a NULL-terminated LyrItable[] (M4 S5) */
+    const void *itables;         /* the type's conformances, a NULL-terminated LyrItable[] */
 } LyrDesc;
 
-/* One conformance of a concrete type (03 T11): the interface's identity — the address of its
+/* One conformance of a concrete type: the interface's identity — the address of its
  * name, one object per interface and program — and the type's table for it. */
 typedef struct LyrItable {
     const void *iface;
@@ -59,7 +59,7 @@ typedef struct LyrObj {
     const LyrDesc *desc;
 } LyrObj;
 
-/* An interface value (01 V7): the data — an object, or the box a value was copied into at the
+/* An interface value: the data — an object, or the box a value was copied into at the
  * transition — and the table of the concrete type's implementations, which begins with that
  * type's descriptor. Two words, passed and copied by value; the data word is a reference. */
 typedef struct LyrIface {
@@ -67,8 +67,8 @@ typedef struct LyrIface {
     const void *vt;
 } LyrIface;
 
-/* A string: immutable UTF-8, length in bytes (10 S1), NUL-terminated so it crosses to C as a
- * `const char *` without a copy (11 X3). */
+/* A string: immutable UTF-8, length in bytes, NUL-terminated so it crosses to C as a
+ * `const char *` without a copy. */
 typedef struct LyrStr {
     LyrObj header;
     int64_t len;

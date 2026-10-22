@@ -1,4 +1,4 @@
-/* Waiting (design/v5/spec/06 N6 S2): a poller per thread, where its scheduler blocks until it is
+/* Waiting: a poller per thread, where its scheduler blocks until it is
  * woken — from any thread — or a timeout passes. */
 #ifndef LYR_POLL_H
 #define LYR_POLL_H
@@ -36,12 +36,12 @@ void lyr_poller_watch(LyrPoller *poller, int fd);
 int64_t lyr_poller_attach(LyrPoller *poller, void *handle);
 #endif
 
-/* A descriptor's readiness (13 M8b P2, S10b): `fd` armed for reading (LYR_POLL_READ) or writing
+/* A descriptor's readiness: `fd` armed for reading (LYR_POLL_READ) or writing
  * (LYR_POLL_WRITE), once — the readiness that comes disarms that direction until it is armed
  * again; the other stays as it is. `token` (> 0) is the caller's: a wait that sees the readiness
  * returns 1, as a wake does, and lyr_poller_take gives the token. An error or a hang-up counts as
  * readiness both ways — the next call on the descriptor says what it is. 0, or a failure as
- * lyr/fs.h writes one; on Windows an AFD poll request (S11). Each of these is the
+ * lyr/fs.h writes one; on Windows an AFD poll request. Each of these is the
  * poller's own thread's, as its waits are. */
 #define LYR_POLL_READ 1
 #define LYR_POLL_WRITE 2

@@ -3,9 +3,9 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A lambda's place parameter at run time (design/v5/spec/03 T12; the review's M6-24): what the
+/// A lambda's place parameter at run time: what the
 /// body writes is written in the caller's variable, field or element. And the locks that hand
-/// their body the place of what they hold (06 G4): <c>m.lock { &amp;n =&gt; n += 1; }</c>.
+/// their body the place of what they hold: <c>m.lock { &amp;n =&gt; n += 1; }</c>.
 /// Through <c>Main</c>, so in the console collection.
 /// </summary>
 [Collection("console")]

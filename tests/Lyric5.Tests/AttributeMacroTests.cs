@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Attribute macros (design/v5/spec/09 A2 F2, A8 Art 3; 13 M9b P4 Art 3, T4, T5; S4): a
+/// Attribute macros: a
 /// <c>macro</c> whose first parameter is a declaration of <c>std.syntax</c> sits on such a
 /// declaration as an attribute, takes it as a value without that attribute, and gives the
 /// declaration or several back in its place.
@@ -107,10 +107,10 @@ public class AttributeMacroTests
         return error.Split('\n');
     }
 
-    /// <summary>The artifacts (13 M9b S4): <c>@Builder struct P</c> adds <c>PBuilder</c>, built
+    /// <summary>The example macros: <c>@Builder struct P</c> adds <c>PBuilder</c>, built
     /// with the constructors; <c>@Retry(3) fn fetch()</c> wraps the body through a quote with the
     /// body spliced; <c>@Logged</c> prepends a statement whose <c>println</c> is the macro
-    /// module's. The other declarations stay as written (T5).</summary>
+    /// module's. The other declarations stay as written.</summary>
     [Fact]
     public void An_attribute_macro_rewrites_the_declaration_it_sits_on()
     {

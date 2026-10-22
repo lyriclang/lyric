@@ -4,11 +4,11 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The root module (design/v5/spec/07 V1 M1, the review's M7-1): a package's <c>src/lib.lyr</c>
+/// The root module: a package's <c>src/lib.lyr</c>
 /// is the module of the package's own name — <c>import geo { Circle }</c> —, the one exception
 /// to "a module is named by its path"; there is no module <c>geo.lib</c>. It may stand beside
 /// <c>main.lyr</c> and beside a directory <c>lib/</c>, and a name it declares is not also one of
-/// the package's modules (07 V6 K1) — asked of the package's files, not of what a program
+/// the package's modules — asked of the package's files, not of what a program
 /// happened to load. Through <c>Main</c>, so in the console collection.
 /// </summary>
 [Collection("console")]
@@ -37,7 +37,7 @@ public class RootModuleTests
     }
 
     /// <summary>The root module as a facade: what it passes on with <c>pub import</c> is its own
-    /// (07 V3 I4) — a name, and a submodule as a namespace.</summary>
+    /// — a name, and a submodule as a namespace.</summary>
     [Theory]
     [InlineData("pub import geo.shapes { rect };\n", "import geo { rect };", "rect(3, 4)")]
     [InlineData("pub import geo.shapes;\n", "import geo;", "geo.shapes.rect(3, 4)")]
@@ -69,7 +69,7 @@ public class RootModuleTests
         Assert.Equal("42\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>A directory is a namespace (07 M5): <c>src/lib/</c> beside <c>src/lib.lyr</c>
+    /// <summary>A directory is a namespace: <c>src/lib/</c> beside <c>src/lib.lyr</c>
     /// holds the modules <c>geo.lib.…</c>, and <c>geo.lib</c> itself is none.</summary>
     [Fact]
     public void A_directory_named_lib_is_a_namespace_beside_the_root_module()
@@ -90,7 +90,7 @@ public class RootModuleTests
         Assert.Equal("12\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>One namespace per module (07 V6 K1): the root module's <c>shapes</c> beside the
+    /// <summary>One namespace per module: the root module's <c>shapes</c> beside the
     /// module <c>geo.shapes</c> — which this program never imports.</summary>
     [Fact]
     public void A_name_of_the_root_module_is_not_also_a_module_of_the_package()
@@ -151,7 +151,7 @@ public class RootModuleTests
         Assert.Equal("geo.lib.extra", Project.ModulePathOf(manifest, Path.Combine(dir, "src", "lib", "extra.lyr")));
     }
 
-    /// <summary>A library is checked module by module under the names its files have (07 B6):
+    /// <summary>A library is checked module by module under the names its files have:
     /// the root module's diagnostics name it by the package.</summary>
     [Fact]
     public void A_library_checks_its_root_module_under_the_packages_name()

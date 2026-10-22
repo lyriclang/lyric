@@ -4,7 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Two faults of <c>std.task</c> (design/v5/spec/06; the review's M6-27, M6-28).
+/// Two faults of <c>std.task</c>.
 ///
 /// <para>A task given to a pool while the pool closes could land on a worker that had already
 /// ended, and never run: <c>spawn</c> looked at "closed", picked a worker and raised its count

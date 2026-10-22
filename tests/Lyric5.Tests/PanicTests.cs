@@ -5,7 +5,7 @@ using Lyric5.Toolchain;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Panics and crashes (M1 S4; design/v5/spec/05 E8, 10 Q9, 01 S3): the programs under
+/// Panics and crashes: the programs under
 /// <c>runtime/tests</c> that end badly on purpose, in the debug and the release profile. The panic
 /// golden is exact — code, message, and the program's own frames with their lines, nothing of the
 /// runtime above them and nothing of the C start-up below. Paths are reduced to file names: the
@@ -70,9 +70,9 @@ public partial class PanicTests
     }
 
     /// <summary>
-    /// Code the compiler holds unreachable, reached (05 E8, the review's M5-4): the debug profile
+    /// Code the compiler holds unreachable, reached: the debug profile
     /// panics with a code and a trace; the release profile stops at once with the processor's
-    /// trap — a crash, which the runtime reports as one (10 Q9) — and in neither does the program
+    /// trap — a crash, which the runtime reports as one — and in neither does the program
     /// go on. What stands before the place has run in both: an undefined place would let the C
     /// compiler drop it.
     /// </summary>
@@ -131,7 +131,7 @@ public partial class PanicTests
         return data;
     }
 
-    /// <summary>The number tower's checks (03 T1d, T2): a shift the width cannot take, and a
+    /// <summary>The number tower's checks: a shift the width cannot take, and a
     /// number that is no scalar value meeting <c>char</c>.</summary>
     [Theory]
     [MemberData(nameof(NumericChecks))]
@@ -225,10 +225,10 @@ public partial class PanicTests
     }
 
     /// <summary>
-    /// The prologue's check (01 S3, 13 M11 S4): a function that checks its stack at its entry, as
+    /// The prologue's check: a function that checks its stack at its entry, as
     /// compiled code does, overflows into a panic on the thread's own stack — the report of every
     /// panic, with the frames of the recursion, and what the program printed before written out
-    /// first (the sweep's open point 192: the fault handler's path did not write it). Under either
+    /// first, on the fault handler's path as on every other. Under either
     /// collector: the overflow is the stack's, not the collector's.
     /// </summary>
     [Theory]
@@ -246,7 +246,7 @@ public partial class PanicTests
         Assert.Contains(lines, line => line.StartsWith("    at down (prologue_overflow.c:"));
     }
 
-    /// <summary>The same under the own collector (13 M11 S2): it collects first, then panics.</summary>
+    /// <summary>The same under the own collector: it collects first, then panics.</summary>
     [Theory]
     [MemberData(nameof(Profiles))]
     public void Allocation_beyond_the_heap_limit_panics_under_the_own_collector(Profile profile)

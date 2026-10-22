@@ -4,8 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The build's target and profile, and <c>@When</c> (design/v5/spec/09 A6 B1–B4, Q7; 13 M9a P9,
-/// S7): constants of the build that <c>comptime if</c> chooses by, and declarations — modules —
+/// The build's target and profile, and <c>@When</c>: constants of the build that <c>comptime if</c> chooses by, and declarations — modules —
 /// only one target builds.
 ///
 /// <para>Through <c>Main</c>, so in the console collection.</para>
@@ -22,7 +21,7 @@ public class TargetTests
         return c;
     }
 
-    /// <summary><c>target</c> and <c>profile</c> are the build's (B4): the host's system and machine
+    /// <summary><c>target</c> and <c>profile</c> are the build's: the host's system and machine
     /// where no target is named, the debug profile by default.</summary>
     [Fact]
     public void Target_and_profile_are_the_builds()
@@ -40,7 +39,7 @@ public class TargetTests
         Assert.Equal($"{os} {arch} 64 true\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>A cross-build's constants are the target's (P9): each emission holds the branch its
+    /// <summary>A cross-build's constants are the target's: each emission holds the branch its
     /// target chooses, and no other.</summary>
     [Fact]
     public void A_cross_build_chooses_the_targets_branch()
@@ -72,7 +71,7 @@ public class TargetTests
     }
 
     /// <summary>A program that reads neither carries neither: <c>target</c> and <c>profile</c> are
-    /// constants, which the global pruning takes out where nothing reads them (01 B13).</summary>
+    /// constants, which the global pruning takes out where nothing reads them.</summary>
     [Fact]
     public void A_program_that_reads_no_target_carries_none()
     {
@@ -84,7 +83,7 @@ public class TargetTests
         Assert.Contains(reads.Ir!.Globals, g => g.Name == "target" && g.Module == "std.core");
     }
 
-    /// <summary><c>@When</c> on a declaration (B2): built where its condition holds; where it does
+    /// <summary><c>@When</c> on a declaration: built where its condition holds; where it does
     /// not, checked and left out — <c>comptime if</c> chooses between the two.</summary>
     [Fact]
     public void When_leaves_a_declaration_out_of_a_build_it_does_not_hold_for()
@@ -120,9 +119,9 @@ public class TargetTests
         Assert.Equal(OperatingSystem.IsWindows() ? "only-on-windows\n" : "only-on-posix\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>One module per build (B3): <c>@When</c> on Lyric 5's header, <c>module;</c>. The
+    /// <summary>One module per build: <c>@When</c> on Lyric 5's header, <c>module;</c>. The
     /// module the build leaves out binds what a C function no library has gives — a binding a
-    /// module's start runs, reached or not (07 G2) —, and the program still links: nothing of it is
+    /// module's start runs, reached or not —, and the program still links: nothing of it is
     /// built. Chosen by the profile, which every host builds alike.</summary>
     [Fact]
     public void A_module_left_out_is_not_built()
@@ -167,8 +166,8 @@ public class TargetTests
 
     /// <summary>What <c>@When</c> refuses: a use the program would run of what the build leaves out
     /// (<c>CT0006</c>), a call or a type; what it does not: the same use in the branch a
-    /// <c>comptime if</c> does not take. A left-out declaration is checked (B2); two of one name stay
-    /// one too many (<c>SEM0085</c>; W5: <c>comptime if</c> chooses between names); a header names nothing.</summary>
+    /// <c>comptime if</c> does not take. A left-out declaration is checked; two of one name stay
+    /// one too many (<c>SEM0085</c>: <c>comptime if</c> chooses between names); a header names nothing.</summary>
     [Theory]
     [InlineData("@When(target.pointerWidth == 16)\nfn f(): int { return 1; }\n\nfn main(): void {\n    let _ = f();\n}\n", "LYR-CT0006", "'f' is not built for this target")]
     [InlineData("@When(target.pointerWidth == 16)\nstruct Narrow { }\n\nfn take(n: Narrow): void { }\n\nfn main(): void {\n}\n", "LYR-CT0006", "'Narrow' is not built for this target")]

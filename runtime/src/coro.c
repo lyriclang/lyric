@@ -1,4 +1,4 @@
-/* Stackful coroutines (design/v5/spec/01 L4, 06 N2): their stacks, the switch between stacks, and
+/* Stackful coroutines: their stacks, the switch between stacks, and
  * what the collector, the sanitizers and the crash net learn at every switch. */
 #if defined(__linux__) && !defined(_GNU_SOURCE)
 #  define _GNU_SOURCE 1
@@ -37,7 +37,7 @@
 #  endif
 #endif
 
-/* --- the switch (01 K2) -------------------------------------------------------------------------
+/* --- the switch ---------------------------------------------------------------------------------
  * lyr_ctx_switch(save, load) pushes the callee-saved registers of the platform's ABI on the running
  * stack, stores the stack pointer in *save, takes `load` as the stack pointer, pops the registers
  * it finds there and returns into that stack. A new coroutine's stack is laid out as though it had
@@ -211,10 +211,10 @@ __asm__(
     "    .cfi_endproc\n"
     ENDF(lyr_coro_start));
 #else
-#  error "coroutines: no context switch for this architecture (01 K2 names x86-64 and AArch64)"
+#  error "coroutines: no context switch for this architecture (only x86-64 and AArch64)"
 #endif
 
-/* --- stacks (01 K1) -----------------------------------------------------------------------------
+/* --- stacks -------------------------------------------------------------------------------------
  * A coroutine's stack is mapped at its first resume: one guard page at the low end, never
  * accessible, and above it the stack, reserved — its pages cost memory once touched. A stack whose
  * coroutine ended goes to a small pool for the next one of the default size.
@@ -356,9 +356,9 @@ static size_t mapping_bytes(size_t stack_size) { return stack_size + below_bytes
 /* The collector paces itself by its own heap and sees nothing of these stacks: a program that
  * starts coroutines and drops them while it keeps a large heap would pile their stacks up between
  * two collections — some four thousand at 64 MiB alive, measured, and in proportion to the heap.
- * So the stacks pace a collection of their own, which takes the dropped ones with it (06 A5): when
+ * So the stacks pace a collection of their own, which takes the dropped ones with it: when
  * those in use reach twice what the last one left, and at least STACKS_PACED. A young one first
- * (13 M11 P8) — what a program drops is mostly what it made since —, a full one when that left
+ * — what a program drops is mostly what it made since —, a full one when that left
  * them in use: the dropped ones were old. */
 enum { STACKS_PACED = 1024 };
 static atomic_size_t collect_at = STACKS_PACED;
@@ -580,7 +580,7 @@ static void release_stack(LyrCoro *co) {
     atomic_fetch_sub(&stacks_in_use, 1);
 }
 
-/* A suspended coroutine nothing references any more (06 A5): nothing on its stack runs again; the
+/* A suspended coroutine nothing references any more: nothing on its stack runs again; the
  * stack goes. Called by the collector stage on any thread, at an allocation or a collection. The
  * debug profile says so where the body had cleanup that now never runs. */
 void lyr_coro_abandoned(LyrCoro *co) {
@@ -609,7 +609,7 @@ LYR_HIDDEN void lyr_coro_main(LyrCoro *co) {
     __builtin_trap();  /* nothing resumes a coroutine that is done */
 }
 
-/* --- the primitives (01 K7) ---------------------------------------------------------------------- */
+/* --- the primitives ------------------------------------------------------------------------------ */
 
 LyrCoro *lyr_coro_new(const LyrDesc *desc, LyrCoroBody body, void *arg, size_t stack_size) {
     size_t page = page_bytes();
@@ -683,7 +683,7 @@ int lyr_coro_resume_quiet(LyrCoro *co) {
     return co->status;
 }
 
-/* A parked chain continues where it parked (06 N3): the outermost coroutine runs again for whoever
+/* A parked chain continues where it parked: the outermost coroutine runs again for whoever
  * resumed it now, and control goes to the innermost one, whose resumers still wait in their resumes. */
 static void resume_parked(CoroThread *ts, LyrCoro *co) {
     if (LYR_UNLIKELY(co->owner != ts->id)) {
@@ -700,7 +700,7 @@ static void resume_parked(CoroThread *ts, LyrCoro *co) {
     came_back(co);
 }
 
-/* --- panics (05 E8) ------------------------------------------------------------------------------ */
+/* --- panics -------------------------------------------------------------------------------------- */
 
 void lyr_coro_panic_leave(const char *code, const char *message, const char *trace) {
     CoroThread *ts = thread_state;
@@ -708,7 +708,7 @@ void lyr_coro_panic_leave(const char *code, const char *message, const char *tra
     if (co == NULL || co->foreign > 0) return;
     /* Only the frames' addresses here; their names come on the resumer's stack (came_back): a stack
      * overflow leaves the reserve below the bound, and naming takes more — DbgHelp loads its modules
-     * the first time on Windows (S4: the coroutine's overflow ended the process there). */
+     * the first time on Windows, and a coroutine's overflow would end the process there. */
     if (trace == NULL) {
         co->panic_pcs = malloc(LYR_TRACE_PCS * sizeof(uintptr_t));
         if (co->panic_pcs == NULL) return;

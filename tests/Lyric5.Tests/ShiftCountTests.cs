@@ -4,8 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The count of a shift is an integer of ANY type, whatever the left operand's (the review's
-/// A9f; Rust and Go have it so): <c>a &lt;&lt; n</c> with an <c>int8</c> and an <c>int</c> was
+/// The count of a shift is an integer of ANY type, whatever the left operand's: <c>a &lt;&lt; n</c> with an <c>int8</c> and an <c>int</c> was
 /// refused as every mixed operator is (<c>LYR-SEM0003</c>). The result has the left operand's
 /// type, and the left operand is what it would be without the shift: <c>1 &lt;&lt; n</c> took
 /// the COUNT's type — a <c>uint8</c> that panics at eight. A count that is negative or not below

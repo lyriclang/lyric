@@ -35,8 +35,8 @@ public class TestHygieneTests
         Assert.True(File.Exists(fresh));
     }
 
-    /// <summary>The user cache's runtime archives, one directory per toolchain version (open point
-    /// 206): what went unused for the age goes, by its stamp or by the directory's time; the version
+    /// <summary>The user cache's runtime archives, one directory per toolchain version: what
+    /// went unused for the age goes, by its stamp or by the directory's time; the version
     /// building keeps its own.</summary>
     [Fact]
     public void A_version_s_archives_go_when_unused_and_the_current_one_stays()

@@ -260,7 +260,7 @@ LyrStr *lyr_str_from_char(uint32_t value) {
 }
 
 /* --- a float's text ------------------------------------------------------------------------------
- * The SHORTEST digits that read back as the same value (10 B5 Z5), laid out as Python's repr and
+ * The SHORTEST digits that read back as the same value, laid out as Python's repr and
  * Swift write them — plain for a decimal exponent from -4 up to below 16, with `.0` on an integral
  * value (`1.0`, `-0.0`, `100.0`), an exponent beyond (`1e+16`, `1.5e-07`) — and `nan`, `inf`,
  * `-inf`. The digits by trial: the first precision whose `%e` text reads back, from one digit up to
@@ -319,7 +319,7 @@ LyrStr *lyr_str_from_float(double value) {
     return laid_out(sci);
 }
 
-/* A float32's own shortest text (the review's M8a-9): `0.1`, not the `0.10000000149011612` of
+/* A float32's own shortest text: `0.1`, not the `0.10000000149011612` of
  * the double it widens to. Nine significant digits always suffice. */
 LyrStr *lyr_str_from_float32(float value) {
     if (value != value) return lyr_str_from_cstr("nan");
@@ -337,7 +337,7 @@ LyrStr *lyr_str_from_float32(float value) {
  * A double is m × 2^e exactly, so its decimal expansion is finite: m × 2^e for e ≥ 0, else
  * m × 5^-e over 10^-e. Either is a big integer of at most 767 decimal digits (m × 5^1074), built
  * here in limbs of 10^9. The format language rounds on THESE digits, half away from zero — the
- * language's one rounding rule, `round()`'s (the review's M8a-8) — where snprintf rounds half to
+ * language's one rounding rule, `round()`'s — where snprintf rounds half to
  * even: `{0.125:.2f}` is `0.13`, `{2.5:.0f}` is `3`, and `{2.675:.2f}` stays `2.67`, since the
  * double nearest 2.675 lies below the half. The same on every host: nothing of the libc decides. */
 enum { BIG_LIMBS = 96 };            /* 96 × 9 = 864 digits ≥ 767 */
@@ -447,7 +447,7 @@ static int rounded_digits(const Exact *x, int keep, char *out, bool *carried) {
     return keep;
 }
 
-/* The text of a float under a precision (08 Y7; spec 12 §2 rule 3). `form` 0: fixed, `precision`
+/* The text of a float under a precision. `form` 0: fixed, `precision`
  * digits after the point (none with 0); 1 and 2: with an exponent, `precision` digits after the
  * first, `e` or `E`, the exponent signed and two digits at least; 3: fixed with the point moved two
  * places right — a percentage, whose `%` the library appends. A NaN is `nan` (`NAN` under 2)
@@ -550,7 +550,7 @@ void lyr_bytes_copy(LyrArr *into, const LyrArr *from, int64_t count) {
     memmove(into->data, from->data, (size_t)count);
 }
 
-/* The text strtod reads: the string's own bytes (NUL-terminated, 11 X3) when it has no '_', else
+/* The text strtod reads: the string's own bytes (NUL-terminated) when it has no '_', else
  * a copy without them — on the stack while it fits, on the heap beyond. */
 static const char *float_text(const LyrStr *text, char *buffer, size_t size, char **owned) {
     *owned = NULL;

@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>inline fn</c> (design/v5/spec/08 F6; 13 M9a P10, S8): its body set in place at every call,
+/// <c>inline fn</c>: its body set in place at every call,
 /// and the lambda literals at its function parameters with it — no closure; a <c>return</c> in
 /// one leaves the function that wrote it, <c>break</c> and <c>continue</c> reach that function's
 /// loops. The value arguments are evaluated first, left to right, each once. What may not be
@@ -19,7 +19,7 @@ public class InlineFunctionTests
     private static string[] Lines(string text, string code) =>
         text.Split('\n').Where(l => l.Contains($"[{code}]")).ToArray();
 
-    /// <summary>The artifact (13 M9a S8): <c>forEach { if (…) return }</c> leaves the function.</summary>
+    /// <summary><c>forEach { if (…) return }</c> leaves the function.</summary>
     [Fact]
     public void A_return_in_a_lambda_set_in_place_leaves_the_function()
     {

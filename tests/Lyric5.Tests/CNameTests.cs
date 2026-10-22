@@ -5,10 +5,9 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// What the emitted C calls a program's types and globals (design/v5/spec/01 L8, the review's
-/// B13): by the module and the name they have in Lyric. Until the review a type was called by its
-/// number in the type table, which holds every type of the standard library — a new type there
-/// renamed every type of every program, and with them every golden.
+/// What the emitted C calls a program's types and globals: by the module and the name they have
+/// in Lyric, not by a number in the type table, which holds every type of the standard library —
+/// a new type there would rename every type of every program, and with them every golden.
 /// </summary>
 [Collection("console")]
 public class CNameTests
@@ -81,7 +80,7 @@ public class CNameTests
     }
 
     /// <summary>An instance writes a declared type among its arguments with the module that
-    /// declares it (07 K2) — a function's instance, a type's, and a type's inside another's; a
+    /// declares it — a function's instance, a type's, and a type's inside another's; a
     /// built-in type has no module to write. A type's own entry carries its module beside its
     /// name, once.</summary>
     [Fact]

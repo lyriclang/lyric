@@ -5,8 +5,8 @@ using System.Text;
 namespace Lyric5.Build;
 
 /// <summary>
-/// The git command line, as the toolchain reads packages from git with it (design/v5/spec/11 W2
-/// P9): the user's own git — its configuration and its credentials — that never asks on the
+/// The git command line, as the toolchain reads packages from git with it
+/// The user's own git — its configuration and its credentials — that never asks on the
 /// terminal (<c>GIT_TERMINAL_PROMPT=0</c>): a build waiting for a password nobody is asked for
 /// hangs.
 /// </summary>

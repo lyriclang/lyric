@@ -13,10 +13,10 @@ namespace Lyric5.Build;
 public sealed record BuildRequest(Project Project, BuildProfile Profile, Target Target, CCompiler Compiler, string ToolchainVersion);
 
 /// <summary>
-/// From a <c>.lyr</c> to a binary (design/v5/spec/13, M2): the front end, the subset gate, the C
+/// From a <c>.lyr</c> to a binary: the front end, the subset gate, the C
 /// emitter, the runtime archive, the C compiler, the linker — each step behind a content key, so
-/// an unchanged program compiles nothing twice (01 L7, 11 C9). Diagnostics go to <c>error</c>;
-/// the exit codes are the driver's (11 C5): 1 for a program the compiler refuses, 2 for a build
+/// an unchanged program compiles nothing twice. Diagnostics go to <c>error</c>;
+/// the exit codes are the driver's: 1 for a program the compiler refuses, 2 for a build
 /// that could not run at all.
 /// </summary>
 public static class Pipeline
@@ -24,7 +24,7 @@ public static class Pipeline
     /// <summary>Where <c>lyric5</c> finds the seed of the Lyric 5 standard library: beside itself.</summary>
     public static string StdlibRoot => Path.Combine(AppContext.BaseDirectory, "stdlib5");
 
-    /// <summary>A target and a profile as the compile-time interpreter answers them (09 B4): a
+    /// <summary>A target and a profile as the compile-time interpreter answers them: a
     /// profile is a debug one where it descends from the built-in <c>debug</c>, as the default does.</summary>
     internal static Lyric.Ir.Interp.BuildFacts FactsOf(Target target, BuildProfile? profile) =>
         Lyric.Ir.Interp.BuildFacts.Of(target.Os switch
@@ -36,15 +36,15 @@ public static class Pipeline
         }, target.Arch, (profile?.Base ?? Lyric5.Toolchain.Profile.Debug) == Lyric5.Toolchain.Profile.Debug);
 
     /// <summary>The version the toolchain claims — three numbers, no dev stamp —, which a
-    /// <c>@Deprecated</c>'s <c>until</c> comes due against (09 A11): it falls due on the branch
+    /// <c>@Deprecated</c>'s <c>until</c> comes due against: it falls due on the branch
     /// that raises the version, before the tag exists.</summary>
     internal static string ClaimedVersion { get; } =
         typeof(Pipeline).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "5.0.0";
 
     /// <summary>The front end and the gate on a project's source: the IR, or <c>null</c> after
-    /// reporting. A profile that denies warnings (11 W2 P3) fails a compilation that warns. The IR
+    /// reporting. A profile that denies warnings fails a compilation that warns. The IR
     /// optimizer — inlining, scalar replacement, devirtualization — runs where the profile
-    /// optimizes C at <c>-O2</c> and above (design/v5/spec/01 B10): release, and a profile of the
+    /// optimizes C at <c>-O2</c> and above: release, and a profile of the
     /// manifest's that asks as much; debug and the sanitizers' profiles see the code as written.</summary>
     public static CompileResult? Compile(Project project, TextWriter error, BuildProfile? profile = null, Target? target = null)
     {
@@ -55,14 +55,14 @@ public static class Pipeline
         return null;
     }
 
-    /// <summary><c>lyric expand</c> (13 M9b P8): the program's entry module after its macros'
+    /// <summary><c>lyric expand</c>: the program's entry module after its macros'
     /// expansion, as source on <paramref name="output"/> - the results in the sites' places, the
     /// rest as written, in the formatter's form; a program without a site prints as it is. The
     /// program is resolved and expanded, not checked: what the expansion needs is reported, the
     /// rest is <c>build</c>'s.</summary>
     public static int Expand(Project project, TextWriter output, TextWriter error, BuildProfile? profile = null, Target? target = null)
     {
-        // the scripts first, for gen/ (11 W3 BS4), as an emission does
+        // the scripts first, for gen/, as an emission does
         if (CCompiler.Locate() is { } compiler)
         {
             var (ran, _) = BuildScripts.Run(project, Target.Host, profile ?? BuildProfile.Of(Lyric5.Toolchain.Profile.Debug), compiler,
@@ -82,7 +82,7 @@ public static class Pipeline
 
     private static CompilerOptions OptionsFor(Project project, BuildProfile? profile, Target? target)
     {
-        // A package's modules by their paths, a single file with std alone (07 M1, 11 C8).
+        // A package's modules by their paths, a single file with std alone.
         return new CompilerOptions
         {
             StdlibRoot = StdlibRoot, PackageRoots = project.PackageRoots,
@@ -90,16 +90,16 @@ public static class Pipeline
             PackageTestRoots = project.TestRoot is { } tests ? new Dictionary<string, string> { [project.Name] = tests } : null,
             PackageGenRoots = GenRoots(project),
             Optimize = profile is { Opt: >= 2 },
-            // 'comptime' computes as the binary would (09 Q7), each site within the root
-            // manifest's budget (09 Q5)
+            // 'comptime' computes as the binary would, each site within the root
+            // manifest's budget
             OverflowChecks = profile?.OverflowChecks ?? true,
             ComptimeBudget = project.Manifest?.ComptimeBudget ?? Lyric.Ir.Interp.ComptimeEvaluator.DefaultBudget,
-            // '@callerFile' names a source as the binary's backtrace does (09 A11, P6)
+            // '@callerFile' names a source as the binary's backtrace does
             PlaceNames = Places(project),
             ToolchainVersion = ClaimedVersion,
             LintLevels = LintLevelsOf(project.LintLevels, project.Name, profile), RootPackage = project.Name,
             WarnDeps = project.LintArgs.WarnDeps,
-            // what 'target' and 'profile' hold: the build's, a cross-build's target (09 B4)
+            // what 'target' and 'profile' hold: the build's, a cross-build's target
             Build = FactsOf(target ?? Target.Host, profile),
         };
     }
@@ -109,7 +109,7 @@ public static class Pipeline
     public static int Emit(Project project, string what, TextWriter output, TextWriter error, BuildProfile? profile = null,
         Target? target = null)
     {
-        // the scripts first, for gen/ (11 W3 BS4); their C is the build's, not the emission's
+        // the scripts first, for gen/; their C is the build's, not the emission's
         if (CCompiler.Locate() is { } compiler)
         {
             var (ran, _) = BuildScripts.Run(project, Target.Host, profile ?? BuildProfile.Of(Lyric5.Toolchain.Profile.Debug), compiler,
@@ -146,11 +146,11 @@ public static class Pipeline
     public static (int Exit, string? Executable) Build(BuildRequest request, TextWriter error)
     {
         var project = request.Project;
-        // One build at a time writes into out/ (11 W2 P5); a second one waits here.
+        // One build at a time writes into out/; a second one waits here.
         using var held = OutLock.Take(project.OutDir, error);
         Directory.CreateDirectory(project.CacheDir);
 
-        // The packages' build scripts before anything is compiled (11 W3 BS4): what they write into
+        // The packages' build scripts before anything is compiled: what they write into
         // gen/ is a source of the program, what they ask is the build's.
         var (scripted, directives) = BuildScripts.Run(project, request.Target, request.Profile, request.Compiler,
             request.ToolchainVersion, error);
@@ -158,12 +158,12 @@ public static class Pipeline
 
         // The C, keyed by the sources, the toolchain and the compiler that emits it: the same
         // program emits the same C, so the front end runs only for a program that changed. The
-        // module's unit is named by that key; a generic instance's unit by its own content (01 C3),
+        // module's unit is named by that key; a generic instance's unit by its own content,
         // under 'units/', where nothing else changes — so its object survives every edit that
         // leaves the instance alone. The list of units is written last: its presence says the C is
         // complete.
         // The C is the profile's too where the profile changes it: without overflow checks the
-        // arithmetic wraps (03 T2).
+        // arithmetic wraps.
         // And what decides the findings is part of it: a build that is up to date runs no
         // front end and says nothing, so '-D warnings' after a plain build would pass on the plain
         // build's C — the command line's lint levels, '--warn-deps' and the profile's denyWarnings.
@@ -171,7 +171,7 @@ public static class Pipeline
             request.Profile.OverflowChecks ? "checked" : "wrapping",
             project.LintArgs.Fingerprint, request.Profile.DenyWarnings ? "deny-warnings" : "");
         var manifest = Path.Combine(project.CacheDir, $"{project.BinaryName}-{key}.units");
-        // What 'embed' read (design/v5/spec/09 Q4) is an input the key cannot name before the front
+        // What 'embed' read is an input the key cannot name before the front
         // end runs: the list beside the units says which, and a file that changed sends the
         // program through the front end again — into a unit named by what it read.
         var embeds = manifest + ".embeds";
@@ -241,7 +241,7 @@ public static class Pipeline
         }
     }
 
-    /// <summary>The native parts of the program's packages (07 B5; 11 W2) for the target: their C
+    /// <summary>The native parts of the program's packages for the target: their C
     /// sources, each with its package's include directories, and their libraries, each once.</summary>
     private static (List<CUnit> Units, List<string> Libraries) Native(Project project, Target target, IReadOnlyList<string> paths)
     {
@@ -260,7 +260,7 @@ public static class Pipeline
     }
 
     /// <summary>
-    /// The same bytes from wherever the package lies (11 W2 P6, Go's <c>-trimpath</c>): each path a
+    /// The same bytes from wherever the package lies (as Go's <c>-trimpath</c>): each path a
     /// binary would carry — a <c>#line</c>'s file, the C file's own, the runtime's headers — written
     /// as the package's name or <c>lyric</c> instead (<c>-ffile-prefix-map</c>). The project's root
     /// first, then each package outside it: a prefix inside another would be mapped twice.
@@ -282,7 +282,7 @@ public static class Pipeline
 
     /// <summary>A unit's text with the packages' places written as their names — as its #line
     /// directives spell them, backslashes doubled — for a name that does not depend on where the
-    /// program lies (P6).</summary>
+    /// program lies.</summary>
     private static string Placeless(Project project, string text)
     {
         foreach (var (from, to) in Places(project))
@@ -309,7 +309,7 @@ public static class Pipeline
     /// <summary>The version a build script's key carries where no request names one (<c>--emit</c>).</summary>
     private const string ScriptVersion = "emit";
 
-    /// <summary>Every package's <c>gen/</c> that is there, by name (11 W3 BS6).</summary>
+    /// <summary>Every package's <c>gen/</c> that is there, by name.</summary>
     internal static IReadOnlyDictionary<string, string>? GenRoots(Project project) =>
         project.Graph?.Packages.Where(p => !p.Value.IsScript && Directory.Exists(p.Value.GenRoot))
             .ToDictionary(p => p.Key, p => p.Value.GenRoot, StringComparer.Ordinal);
@@ -342,7 +342,7 @@ public static class Pipeline
             }
         }
         // A single file — a build script among them, with a graph of its own or none — is its own
-        // entry, outside every package's src/, and its module spaces beside it (11 W3 BS3).
+        // entry, outside every package's src/, and its module spaces beside it.
         if (project.Graph is null || project.Manifest is null) parts.Add(File.ReadAllText(project.Source));
         if (project.ModuleRoots is { } modules)
             foreach (var (name, root) in modules.OrderBy(m => m.Key, StringComparer.Ordinal))
@@ -362,7 +362,7 @@ public static class Pipeline
     }
 
     /// <summary>
-    /// A library built by itself (design/v5/spec/07 B6): every module under its <c>src/</c> through
+    /// A library built by itself: every module under its <c>src/</c> through
     /// the front end and the lowering, one compilation — a check; there is no program to build. Exit
     /// 0 when it holds, 1 after reporting.
     /// </summary>
@@ -476,7 +476,7 @@ public static class Pipeline
     /// <summary>A binary is that link when it was linked from these very inputs — the record in the
     /// cache names them — and is newer than each. Newer alone is not enough: the inputs are
     /// content-keyed and cached, so a build that goes back to inputs built earlier — the other
-    /// collector's archive (13 M11 P11), a profile field and back — finds every one older than the
+    /// collector's archive, a profile field and back — finds every one older than the
     /// binary the other inputs made.</summary>
     private static bool UpToDate(string executable, string record, IReadOnlyList<string> inputs, IReadOnlyList<string> libraries)
     {

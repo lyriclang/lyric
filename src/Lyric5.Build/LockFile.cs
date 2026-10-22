@@ -4,13 +4,13 @@ using System.Text.RegularExpressions;
 
 namespace Lyric5.Build;
 
-/// <summary>A revision of a repository the build read (design/v5/spec/07 P5): the commit it was and
+/// <summary>A revision of a repository the build read: the commit it was and
 /// the hash of its package content.</summary>
 /// <param name="Version">The package's own version, from its manifest — for a person reading the lock.</param>
 public sealed record Locked(string Name, string Version, GitSource Git, string Commit, string Hash);
 
 /// <summary>
-/// <c>lyric.lock</c> beside the root manifest (design/v5/spec/07 P5): every revision of a git
+/// <c>lyric.lock</c> beside the root manifest: every revision of a git
 /// repository the resolution read, with its commit and the hash of its content — minimal version
 /// selection makes the choice, the lock makes the content reproducible. Written by the toolchain,
 /// checked in with the manifest; a dependency's own lock is not read.
@@ -49,7 +49,7 @@ public static partial class LockFile
                 : throw new ManifestException("LYR-PKG0002", file, package.Line, 1, $"a locked package needs a string '{key}'");
             var name = Field("name");
             var packageVersion = Field("version");
-            // a lock an earlier toolchain wrote may hold a URL as the manifest spelled it (M7-10)
+            // a lock an earlier toolchain wrote may hold a URL as the manifest spelled it
             var url = GitSource.Normalize(Field("git"));
             var revisions = new[] { "tag", "branch", "rev" }.Where(package.Contains).ToList();
             if (revisions.Count > 1)
@@ -87,7 +87,7 @@ public static partial class LockFile
         return text.ToString();
     }
 
-    /// <summary>Under <c>--locked</c> (the review's M7-9): the lock is what the graph read — no
+    /// <summary>Under <c>--locked</c>: the lock is what the graph read — no
     /// entry more, none less, none other — or the build is refused; nothing is written. A program
     /// that reads nothing from git needs no lock.</summary>
     /// <exception cref="ManifestException"><c>LYR-PKG0011</c>.</exception>

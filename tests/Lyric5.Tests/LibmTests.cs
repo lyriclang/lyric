@@ -5,10 +5,9 @@ using Profile = Lyric5.Toolchain.Profile;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The runtime's libm and the compiler's are the same code (design/v5/spec/09 D7; 13 M10 S12,
-/// P10): musl's double functions, in C under <c>runtime/third_party/musl-math/</c> and in C# as
+/// The runtime's libm and the compiler's are the same code: musl's double functions, in C under <c>runtime/third_party/musl-math/</c> and in C# as
 /// <see cref="Libm"/>. Bit for bit over a million inputs per function, on every tier-1 target the
-/// tests run on — which is what makes a <c>comptime</c> answer the program's own (09 Q7).
+/// tests run on — which is what makes a <c>comptime</c> answer the program's own.
 /// </summary>
 public class LibmTests
 {

@@ -3,8 +3,8 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The lowering's refusals under the code of their reason (design/v5/spec/11 G4, M12a S1): until M12a
-/// every one was <c>LYR-IR0001</c>, "this compiler version cannot lower it yet". A delegation to a field
+/// The lowering's refusals under the code of their reason, not all under <c>LYR-IR0001</c>, "this
+/// compiler version cannot lower it yet". A delegation to a field
 /// that holds a child interface was one of them, <c>LYR-SEM0196</c>, and is lowered now: the field's
 /// value goes through the parent's table.
 /// </summary>

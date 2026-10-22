@@ -4,22 +4,22 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Generators after the review (design/v5/spec/06 M6-1, M6-3, M6-4; 03 M6-5; 10 M6-7).
+/// Generators: what one is, what <c>main</c> covers, two warnings, and <c>sequence</c>.
 ///
-/// <para>WHAT A GENERATOR IS (M6-3): a function with a <c>Coroutine&lt;…&gt;</c> result that
+/// <para>WHAT A GENERATOR IS: a function with a <c>Coroutine&lt;…&gt;</c> result that
 /// yields itself OR returns no value. One that yields through helpers only, and one with an
 /// empty body, were "ordinary functions" that returned nothing (<c>LYR-SEM0017</c>);
 /// <c>return make();</c> stays a factory.</para>
 ///
-/// <para><c>main</c> COVERS <c>Cancelled</c> ITSELF (M6-4), as a generator's body does: a
+/// <para><c>main</c> COVERS <c>Cancelled</c> ITSELF, as a generator's body does: a
 /// program that awaits needed <c>throws Cancelled</c> on <c>main</c>, a clause about a
 /// cancellation nobody above <c>main</c> can answer.</para>
 ///
 /// <para>TWO WARNINGS: a <c>mut fn</c> generator on a value type changes a copy of its receiver
-/// (M6-1, <c>LYR-SEM0172</c>); a <c>void</c> bound to a name, or written as a parameter's type
-/// (M6-5, <c>LYR-SEM0173</c>). Both were silent.</para>
+/// (<c>LYR-SEM0172</c>); a <c>void</c> bound to a name, or written as a parameter's type
+/// (<c>LYR-SEM0173</c>). Both were silent.</para>
 ///
-/// <para><c>sequence</c> is the prelude's (M6-7).</para>
+/// <para><c>sequence</c> is the prelude's.</para>
 ///
 /// <para>Through <c>Main</c>, so in the console collection.</para>
 /// </summary>
@@ -164,7 +164,7 @@ public class GeneratorDefinitionTests
     }
 
     /// <summary>A cancellation that does leave <c>main</c> is reported as any error that
-    /// leaves it is (05 E6 O4), and the program exits with 1 — as with the clause written.</summary>
+    /// leaves it is, and the program exits with 1 — as with the clause written.</summary>
     [Fact]
     public void A_cancelled_that_leaves_main_is_reported()
     {

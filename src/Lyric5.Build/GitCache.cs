@@ -7,9 +7,9 @@ using Lyric5.Toolchain;
 namespace Lyric5.Build;
 
 /// <summary>
-/// Where the packages read from git are kept (design/v5/spec/11 W2 P9; 07 P10): in the user's
+/// Where the packages read from git are kept: in the user's
 /// cache, not the project — <c>git/db/</c> a bare copy of each repository, <c>git/checkouts/</c>
-/// each revision's package content (W2 P8), written once and then only read, by every project
+/// each revision's package content, written once and then only read, by every project
 /// that asks for it. Offline, the cache answers alone: nothing is fetched. A repository is
 /// fetched at most once by one resolution.
 /// </summary>
@@ -41,7 +41,7 @@ public sealed partial class GitCache(string root, bool offline, Func<string, boo
 
     /// <summary>The directory holding the package <paramref name="dependency"/> reads from git, at
     /// the revision it names — at the commit <paramref name="locked"/> holds, when the lock holds
-    /// one (07 P5) —, the commit, and the hash of the package's content. What the cache does not
+    /// one —, the commit, and the hash of the package's content. What the cache does not
     /// hold is fetched first.</summary>
     /// <param name="declaring">The manifest naming the dependency, for what is refused.</param>
     /// <exception cref="ManifestException">The repository cannot be reached, or offline the cache
@@ -68,8 +68,8 @@ public sealed partial class GitCache(string root, bool offline, Func<string, boo
             + $"holds — 'lyric update {dependency.Name}' resolves it anew");
     }
 
-    /// <summary>The repository's tags — fetched first, unless offline: then the cache's (the
-    /// review's M7-8, where <c>lyric update</c> looks for the newest version of a line).</summary>
+    /// <summary>The repository's tags — fetched first, unless offline: then the cache's
+    /// (where <c>lyric update</c> looks for the newest version of a line).</summary>
     /// <exception cref="ManifestException">As <see cref="Checkout"/>: the repository cannot be
     /// reached, or offline the cache does not hold it (<c>LYR-PKG0007</c>).</exception>
     public IReadOnlyList<string> Tags(Dependency dependency, string declaring)
@@ -171,7 +171,7 @@ public sealed partial class GitCache(string root, bool offline, Func<string, boo
         return result.Exit == 0 ? result.Text : null;
     }
 
-    /// <summary>The package content of the commit (11 W2 P8) into <paramref name="checkout"/>:
+    /// <summary>The package content of the commit into <paramref name="checkout"/>:
     /// written beside it and moved in whole, so a checkout that exists is complete.</summary>
     private static void Export(Dependency dependency, string db, string commit, string checkout, string declaring)
     {

@@ -4,9 +4,9 @@ using Lyric5.Toolchain;
 namespace Lyric5.Build;
 
 /// <summary>
-/// <c>lyric metadata</c> (design/v5/spec/11 W2 P10): a package as one JSON object for the tools
+/// <c>lyric metadata</c>: a package as one JSON object for the tools
 /// around it — its graph, its programs, its profiles, the targets, where <c>out/</c> is. Its
-/// <c>"version"</c> is the schema's (C10): a field is added within a version, none is changed or
+/// <c>"version"</c> is the schema's: a field is added within a version, none is changed or
 /// removed.
 /// </summary>
 public static class Metadata

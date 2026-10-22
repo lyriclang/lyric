@@ -1,11 +1,11 @@
-/* Panics (design/v5/spec/05 E8, 01 E5): a programming error ends the process with a message, a
- * backtrace and exit code 101. Not an exception, not catchable except at a task boundary (M6). */
+/* Panics: a programming error ends the process with a message, a
+ * backtrace and exit code 101. Not an exception, not catchable except at a task boundary. */
 #ifndef LYR_PANIC_H
 #define LYR_PANIC_H
 
 #include <stdint.h>
 
-/* The runtime's panic codes (catalogue: M12). */
+/* The runtime's panic codes (the diagnostics catalogue has each). */
 #define LYR_RT_DIVISION_BY_ZERO "LYR-RT0001"
 #define LYR_RT_OVERFLOW         "LYR-RT0002"
 #define LYR_RT_INDEX            "LYR-RT0003"
@@ -13,25 +13,25 @@
 #define LYR_RT_OUT_OF_MEMORY    "LYR-RT0005"
 #define LYR_RT_STACK_OVERFLOW   "LYR-RT0006"
 #define LYR_RT_ARGUMENT         "LYR-RT0007"  /* a precondition from the program text: negative length, … */
-#define LYR_RT_PANIC            "LYR-RT0008"  /* the program called panic(message) (05 E8) */
-#define LYR_RT_CHAR             "LYR-RT0009"  /* `as char` of a value that is no Unicode scalar value (03 T1d) */
-#define LYR_RT_FORCED_TRY       "LYR-RT0010"  /* `try!` on an error (05 E4, E8) */
-#define LYR_RT_ASSERT           "LYR-RT0011"  /* `assert(condition, message)` with a false condition (05 E8) */
-#define LYR_RT_UNREACHABLE      "LYR-RT0012"  /* `unreachable(message)` reached (05 E8, E12) */
-#define LYR_RT_TODO             "LYR-RT0013"  /* `todo(message)` reached (05 E8, 10 prelude) */
+#define LYR_RT_PANIC            "LYR-RT0008"  /* the program called panic(message) */
+#define LYR_RT_CHAR             "LYR-RT0009"  /* `as char` of a value that is no Unicode scalar value */
+#define LYR_RT_FORCED_TRY       "LYR-RT0010"  /* `try!` on an error */
+#define LYR_RT_ASSERT           "LYR-RT0011"  /* `assert(condition, message)` with a false condition */
+#define LYR_RT_UNREACHABLE      "LYR-RT0012"  /* `unreachable(message)` reached */
+#define LYR_RT_TODO             "LYR-RT0013"  /* `todo(message)` reached */
 #define LYR_RT_COROUTINE        "LYR-RT0014"  /* a coroutine resumed while it runs, after it ended or on another
-                                                 thread; a yield with none running (06 A8) */
+                                                 thread; a yield with none running */
 #define LYR_RT_SYSTEM           "LYR-RT0015"  /* the system refused the runtime what it needs to go on: a poller, random bytes */
-#define LYR_RT_WALKED           "LYR-RT0016"  /* a collection changed while it was walked (10 I9) */
-#define LYR_RT_FLOOR            "LYR-RT0017"  /* control reached code the compiler holds unreachable: a bug in the compiler (05 E8) */
-#define LYR_RT_DEADLOCK         "LYR-RT0018"  /* every task of a thread waits, and nothing can wake one (06, M6-12) */
-#define LYR_RT_POISONED         "LYR-RT0019"  /* a lock a task panicked while holding, acquired again (06 G4, M6-21) */
+#define LYR_RT_WALKED           "LYR-RT0016"  /* a collection changed while it was walked */
+#define LYR_RT_FLOOR            "LYR-RT0017"  /* control reached code the compiler holds unreachable: a bug in the compiler */
+#define LYR_RT_DEADLOCK         "LYR-RT0018"  /* every task of a thread waits, and nothing can wake one */
+#define LYR_RT_POISONED         "LYR-RT0019"  /* a lock a task panicked while holding, acquired again */
 #define LYR_RT_INVARIANT        "LYR-RT0020"  /* the runtime found its own invariant broken: a bug in the runtime or the compiler */
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define LYR_NORETURN __attribute__((noreturn, cold, noinline))
 #  define LYR_NOINLINE __attribute__((noinline))
-/* the hints '@AlwaysInline' and '@Cold' write on a function (09 A11), beside '@NoInline''s above */
+/* the hints '@AlwaysInline' and '@Cold' write on a function, beside '@NoInline''s above */
 #  define LYR_ALWAYS_INLINE __attribute__((always_inline))
 #  define LYR_COLD __attribute__((cold))
 #  define LYR_PRINTF(f, a) __attribute__((format(printf, f, a)))
@@ -49,7 +49,7 @@
  * writer, calls the hook, and exits with 101. A panic on one thread ends the whole process. */
 LYR_NORETURN LYR_PRINTF(2, 3) void lyr_panic(const char *code, const char *format, ...);
 
-/* What a host learns about a panic (05 E8 `Runtime.onPanic`). The strings live until the process
+/* What a host learns about a panic (`Runtime.onPanic`). The strings live until the process
  * ends, which is right after the hook returns. */
 typedef struct LyrPanicInfo {
     const char *code;
@@ -63,7 +63,7 @@ typedef struct LyrPanicInfo {
 typedef void (*LyrPanicHook)(const LyrPanicInfo *info, void *context);
 void lyr_set_panic_hook(LyrPanicHook hook, void *context);
 
-/* The checks emitted code performs (03 T2): a compare and a branch that is never taken, and a
+/* The checks emitted code performs: a compare and a branch that is never taken, and a
  * call without a format string, so a check stays small at every one of its many sites. */
 LYR_NORETURN void lyr_panic_index(int64_t index, int64_t length);
 LYR_NORETURN void lyr_panic_overflow(const char *operation);
@@ -72,17 +72,17 @@ LYR_NORETURN void lyr_panic_null(void);
 /* `panic(message)` from the program: the message as written, code RT0008. */
 struct LyrStr;
 LYR_NORETURN void lyr_panic_message(const struct LyrStr *message);
-/* The catalogue's other three (05 E8), each under its own code: its WORD first — "assertion
+/* The catalogue's other three, each under its own code: its WORD first — "assertion
  * failed", "unreachable", "not implemented" —, then the program's message where it gave one; an
  * assertion names its condition as it was written, between the two. */
 LYR_NORETURN void lyr_panic_assert(const struct LyrStr *written, const struct LyrStr *message);
 LYR_NORETURN void lyr_panic_unreachable(const struct LyrStr *message);
 LYR_NORETURN void lyr_panic_todo(const struct LyrStr *message);
-/* A collection changed while it was walked (10 I9): "List: changed while it was walked". */
+/* A collection changed while it was walked: "List: changed while it was walked". */
 LYR_NORETURN void lyr_panic_walked(const struct LyrStr *what);
-/* A wait nothing can end (06, the review's M6-12): the scheduler's, raised in the waiting task. */
+/* A wait nothing can end: the scheduler's, raised in the waiting task. */
 LYR_NORETURN void lyr_panic_deadlock(void);
-/* An acquire on a poisoned lock (06 G4, the review's M6-21): the first panic's code and message. */
+/* An acquire on a poisoned lock: the first panic's code and message. */
 LYR_NORETURN void lyr_panic_poisoned(const struct LyrStr *code, const struct LyrStr *message);
 
 /* Where the compiler knows control cannot arrive — behind a call that does not return, behind a
@@ -106,7 +106,7 @@ LYR_NORETURN void lyr_panic_floor(void);
         if (LYR_UNLIKELY(!(condition))) lyr_panic_assert(written, message);                         \
     } while (0)
 
-/* A view's bounds (03 T13 A2): 0 <= low <= high <= length, or a panic with the same code as an index. */
+/* A view's bounds: 0 <= low <= high <= length, or a panic with the same code as an index. */
 LYR_NORETURN void lyr_panic_range(int64_t low, int64_t high, int64_t length);
 
 #define LYR_CHECK_RANGE(low, high, length)                                                          \
@@ -121,7 +121,7 @@ LYR_NORETURN void lyr_panic_range(int64_t low, int64_t high, int64_t length);
             lyr_panic_index((int64_t)(index), (int64_t)(length));                                   \
     } while (0)
 
-/* Integer arithmetic that panics instead of wrapping, in every profile (03 T2). Both operands have
+/* Integer arithmetic that panics instead of wrapping, in every profile. Both operands have
  * the operation's type (the emitter converts first); the expression's value is the result.
  * Shifts, the wrap operators and the conversions are in numeric.h. */
 /* The type of x's value: a comma expression converts its operand as an assignment would — no

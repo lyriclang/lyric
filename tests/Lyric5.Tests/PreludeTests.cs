@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The prelude and one namespace per module (design/v5/spec/07 V3 I8, V6 K1, K3, K5, K6; 10 B2):
+/// The prelude and one namespace per module:
 /// <c>std.prelude</c> is named without an import and the rest of the library is imported; a name
 /// hiding the prelude's warns; a builtin type's name is no declaration's; a name is not also a
 /// submodule; <c>std</c> is the library's. Through <c>Main</c>, so in the console collection.
@@ -39,7 +39,7 @@ public class PreludeTests
         Assert.Equal("x 2\n", BuildAndRun(dir, "main", "build", Path.Combine(dir, "main.lyr")));
     }
 
-    /// <summary>What the prelude does not pass on is imported (10 B2): the operator interfaces
+    /// <summary>What the prelude does not pass on is imported: the operator interfaces
     /// (Rust's std::ops), 'Any', 'sequence', 'arrayOf'.</summary>
     [Theory]
     [InlineData("fn take(x: Any): void {\n}\n\nfn main(): void {\n}\n", "Any")]

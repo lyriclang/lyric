@@ -1,5 +1,5 @@
 /* The file system's calls (lyr/fs.h): POSIX's open/read/write/lseek/close, Windows' CreateFileW,
- * ReadFile, WriteFile, SetFilePointerEx, CloseHandle; the directories' (M8b S7a) — stat, mkdir,
+ * ReadFile, WriteFile, SetFilePointerEx, CloseHandle; the directories' — stat, mkdir,
  * rmdir, unlink, rename, opendir/readdir, realpath, getcwd; their Windows kin. One system call
  * each, or a short sequence where the system needs one; EINTR taken again. */
 #if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
@@ -630,7 +630,7 @@ int64_t lyr_fs_absolute(const LyrStr *path, uint8_t *into, int64_t n) {
 }
 
 int64_t lyr_fs_temp_root(uint8_t *into, int64_t n) {
-    /* getenv beside a setenv on another thread is a race; std.os's setEnv (M8b S9) says so */
+    /* getenv beside a setenv on another thread is a race; std.os's setEnv says so */
     const char *dir = getenv("TMPDIR");
     if (dir == NULL || dir[0] == 0) dir = "/tmp";
     size_t len = strlen(dir);

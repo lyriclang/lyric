@@ -5,7 +5,7 @@ using Lyric5.Toolchain;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The runtime as the plan's M1 artifact states it: <c>liblyr.a</c> builds for every Tier 1
+/// The runtime: <c>liblyr.a</c> builds for every Tier 1
 /// target, and its test programs link and run on the host. These tests need zig — the toolchain
 /// requires a C compiler, so a missing one is a failure here, not a skip.
 /// </summary>
@@ -19,7 +19,7 @@ public class RuntimeBuildTests
     /// <summary>
     /// What a checkout builds by name — the programs under <c>bin/</c>, the emitted units under
     /// <c>emitted/</c> — in a directory of its own: two test runs in two worktrees at once ran each
-    /// other's binary, linked between one's link and its run (open point 203). The archives under
+    /// other's binary, linked between one's link and its run. The archives under
     /// <c>lib/</c> are named by their content and stay shared.
     /// </summary>
     private static readonly string Own = Path.Combine(Cache,
@@ -76,7 +76,7 @@ public class RuntimeBuildTests
         ?? throw new InvalidOperationException("zig is required to build the Lyric 5 runtime (tooling/zig-version names the version)");
 
     /// <summary>The runtime builds for every Tier 1 target with either collector — the own one
-    /// (13 M11) compiled for macOS and Windows here even before it runs there — and a program
+    /// compiled for macOS and Windows here — and a program
     /// links against each.</summary>
     [Theory]
     [InlineData(Collector.Boehm)]
@@ -108,16 +108,16 @@ public class RuntimeBuildTests
     [InlineData(Profile.Release)]
     public void The_collector_smoke_runs_on_the_host(Profile profile)
     {
-        // Boehm's own smoke test: it calls Boehm (13 M11 P11 keeps it to compare against)
+        // Boehm's own smoke test: it calls Boehm, kept to compare against
         var result = RunTest("gc_smoke", BuildProfile.Of(profile) with { Gc = Collector.Boehm });
         Assert.Equal(0, result.ExitCode);
         Assert.Equal("gc ok\n", result.Stdout.Replace("\r\n", "\n"));
     }
 
-    /// <summary>M6-26 on Windows: <c>main</c> on the thread's stack has what it has as a task. The
+    /// <summary>On Windows <c>main</c> on the thread's stack has what it has as a task. The
     /// link asks for the main task's 8 MiB (<c>LYR_MAIN_TASK_STACK</c>); zig's default for a
     /// Windows image is 16 MiB (MSVC's 1 MiB), so a recursion went twice as deep on the thread as
-    /// in a task. Read off the image's optional header (PE32+: SizeOfStackReserve at 72).</summary>
+    /// in a task. Read off the image's optional header, PE32+'s SizeOfStackReserve at 72.</summary>
     [Fact]
     public void A_programs_thread_stack_is_the_main_tasks_size_on_windows()
     {
@@ -131,7 +131,7 @@ public class RuntimeBuildTests
 
     /// <param name="binary">The executable's own name in <c>bin/</c> when another test class
     /// links the same program: two classes run in parallel, and on Windows one linking the path
-    /// the other is running fails with "Permission denied" (seen in CI, M4 S1).</param>
+    /// the other is running fails with "Permission denied".</param>
     internal static ProcessRunner.Result RunTest(string name, BuildProfile profile, CCompiler? compiler = null, string[]? args = null, string? binary = null) =>
         RunC(Path.Combine(Root, "runtime", "tests", name + ".c"), binary ?? name, profile, compiler, args);
 
@@ -144,7 +144,7 @@ public class RuntimeBuildTests
         RunC(WriteUnits(units, name), "emitted-" + name, profile, compiler, args);
 
     /// <summary>The emitter's units built as <see cref="RunEmitted"/> builds them, and not run: the
-    /// program's path, for a test that drives it itself — sends it signals (M6 S7).</summary>
+    /// program's path, for a test that drives it itself — sends it signals.</summary>
     internal static string BuildEmitted(IReadOnlyList<CEmitter.Unit> units, string name, BuildProfile profile) =>
         BuildC(WriteUnits(units, name), "emitted-" + name, profile, null);
 
@@ -153,7 +153,7 @@ public class RuntimeBuildTests
         Path.Combine(BinDir(profile), "emitted-" + name + Target.Host.ExecutableSuffix);
 
     /// <summary>Where a profile's programs go: one directory per profile and collector, so a
-    /// program built under Boehm and the same one under the own collector (13 M11 P11) never
+    /// program built under Boehm and the same one under the own collector never
     /// overwrite each other.</summary>
     private static string BinDir(BuildProfile profile) =>
         Path.Combine(Own, "bin", Target.Host.Triple,

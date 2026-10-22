@@ -3,8 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The synthesis as std.core's defaults over the fields and variants (design/v5/spec/05 §14; 09 A5;
-/// 13 M9a S10): <c>Equatable</c>, <c>Hashable</c>, <c>Ordered</c>, <c>TotalOrder</c> and <c>Clone</c>
+/// The synthesis as std.core's defaults over the fields and variants (spec 05 §14): <c>Equatable</c>, <c>Hashable</c>, <c>Ordered</c>, <c>TotalOrder</c> and <c>Clone</c>
 /// are written once in std.core over <c>fields&lt;Self&gt;()</c> and <c>variants&lt;Self&gt;()</c> and set
 /// in place for each conformer; the forms that made it possible — a round per variant, <c>e is v</c>,
 /// <c>E.[v]</c>, <c>e.[v, p]</c>, <c>E.[v] { … }</c>, an initializer over infos, a <c>comptime if</c> a
@@ -18,7 +17,7 @@ public class SynthesisByInfoTests
     private static string App(string main) => Package(("lyric.toml", AppManifest), ("src/main.lyr", main));
 
     /// <summary>The family on a struct (05 §14 rules 1, 2): compares, orders, hashes and clones field
-    /// by field — the internal field too (D2) —; <c>Default</c> stays the compiler's.</summary>
+    /// by field — the internal field too —; <c>Default</c> stays the compiler's.</summary>
     [Fact]
     public void The_family_is_synthesized_over_a_structs_fields()
     {
@@ -80,7 +79,7 @@ public class SynthesisByInfoTests
         Assert.Equal("true true false false\ntrue true false false true\ntrue true 2\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>A <c>@Shared</c> field is copied, not cloned (04 Clone; 09 A11): the <c>comptime if</c>
+    /// <summary>A <c>@Shared</c> field is copied, not cloned: the <c>comptime if</c>
     /// in <c>Clone</c>'s default decides per field and checks the chosen arm alone — the other names a
     /// <c>clone</c> the class has not.</summary>
     [Fact]
@@ -162,7 +161,7 @@ public class SynthesisByInfoTests
         Assert.Contains("note: where the default says it", error);
     }
 
-    /// <summary>The forms of M9a S10 in a program of its own: a round per variant, <c>e is v</c>,
+    /// <summary>The forms in a program of its own: a round per variant, <c>e is v</c>,
     /// <c>E.[v]</c>, <c>e.[v, p]</c>, <c>E.[v] { … }</c> and an initializer over infos.</summary>
     [Fact]
     public void The_variant_forms_build_test_and_read_a_variant()
@@ -245,7 +244,7 @@ public class SynthesisByInfoTests
 
     /// <summary>The forms refused outside their rounds (<c>LYR-SEM0185</c>), a payload of another
     /// variant as a panic, and a write through an info answering to the field's word
-    /// (<c>LYR-SEM0019</c>) — the hole S9 left.</summary>
+    /// (<c>LYR-SEM0019</c>).</summary>
     [Fact]
     public void The_forms_are_refused_outside_their_rounds()
     {

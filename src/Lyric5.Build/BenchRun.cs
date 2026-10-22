@@ -11,7 +11,7 @@ public sealed record BenchCase(string Module, string Function)
 }
 
 /// <summary>
-/// <c>lyric bench</c> (design/v5/spec/10 B12 X4, 11 C2): every function the package marks
+/// <c>lyric bench</c>: every function the package marks
 /// <c>@Bench</c> — <c>fn name(&amp;b: Bench)</c>, in its modules under <c>src/</c> and under
 /// <c>tests/</c> — built into one program and run, one after another. As <c>lyric test</c> does it
 /// (<see cref="TestRun"/>): a module the toolchain writes, which hands the benchmarks to
@@ -27,7 +27,7 @@ public static class BenchRun
     public static int Run(Project project, BuildProfile profile, Target target, CCompiler compiler, string version, string? filter,
         string save, string compare, TextWriter output, TextWriter error)
     {
-        // the scripts first, so that a benchmark may import what they generate (11 W3 BS4, BS6)
+        // the scripts first, so that a benchmark may import what they generate
         var (ran, _) = BuildScripts.Run(project, Target.Host, profile, compiler, version, error);
         if (ran != 0) return ran;
         var marked = TestRun.Marked(project, "Bench", error);

@@ -4,7 +4,7 @@ using Lyric5.Toolchain;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A yield outside a coroutine's own body in the front end (design/v5/spec/06 §10a, A5, A8; M6 S2d),
+/// A yield outside a coroutine's own body in the front end,
 /// against <c>stdlib5</c>: it throws <c>Cancelled</c> at close as a body's yield does, so its
 /// function covers it — <c>throws Cancelled</c> or a clause — and a coroutine's body covers it for
 /// the helpers it calls, as it does for its own yields.

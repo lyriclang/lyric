@@ -2,8 +2,8 @@ using Lyric5.Toolchain;
 
 namespace Lyric5.Build;
 
-/// <summary>A package without <c>src/main.lyr</c> (11 P2): a library, which <c>build</c> checks
-/// (07 B6) and nothing runs.</summary>
+/// <summary>A package without <c>src/main.lyr</c>: a library, which <c>build</c> checks
+/// and nothing runs.</summary>
 public sealed class LibraryException(Manifest manifest, PackageGraph graph)
     : InvalidOperationException($"package '{manifest.Name}' is a library — it has no src/main.lyr and no [[bin]], so there is no program")
 {
@@ -12,34 +12,34 @@ public sealed class LibraryException(Manifest manifest, PackageGraph graph)
 }
 
 /// <summary>
-/// What is being built and where its files go (design/v5/spec/07 V1, V7; 11 C8, P2, P4, P5).
+/// What is being built and where its files go.
 ///
 /// <para>A <b>package</b> has a manifest, <c>lyric.toml</c>: its modules live under <c>src/</c>,
-/// each named by its path with the package's name in front (07 M1) — <c>src/net/http.lyr</c> in
+/// each named by its path with the package's name in front — <c>src/net/http.lyr</c> in
 /// <c>app</c> is <c>app.net.http</c>; <c>src/lib.lyr</c> alone is the package's root module,
-/// <c>app</c> —, and its program is <c>src/main.lyr</c> (P2), or the module a
-/// command names: a module is a library and a program at once (07 M7a). A <b>single file</b> outside
-/// every package is a package of its own, named after the file, which imports only <c>std</c> (C8).</para>
+/// <c>app</c> —, and its program is <c>src/main.lyr</c>, or the module a
+/// command names: a module is a library and a program at once. A <b>single file</b> outside
+/// every package is a package of its own, named after the file, which imports only <c>std</c>.</para>
 ///
 /// <para><c>out/</c> lies by the manifest — for a single file too, where one stands above it —;
-/// without one, by the nearest <c>.git</c>, else in the file's own directory (P5). Inside it:
-/// <c>out/&lt;profile&gt;/&lt;target&gt;/&lt;name&gt;</c> (P4) and <c>out/cache/</c> (L7).</para>
+/// without one, by the nearest <c>.git</c>, else in the file's own directory. Inside it:
+/// <c>out/&lt;profile&gt;/&lt;target&gt;/&lt;name&gt;</c> and <c>out/cache/</c>.</para>
 /// </summary>
 /// <param name="Source">The entry module's file.</param>
 /// <param name="Name">The package's name — the executable's, too.</param>
-/// <param name="Module">The entry module's path (07 M1).</param>
+/// <param name="Module">The entry module's path.</param>
 /// <param name="Root">Where <c>out/</c> goes.</param>
 /// <param name="Manifest">The package's manifest; <c>null</c> for a single file.</param>
 public sealed record Project(string Source, string Name, string Module, string Root, Manifest? Manifest)
 {
-    /// <summary>The packages the program is built from (07 V7): the package's own and its
+    /// <summary>The packages the program is built from: the package's own and its
     /// dependencies; <c>null</c> for a single file, which has std alone.</summary>
     public PackageGraph? Graph { get; init; }
 
-    /// <summary>The name a <c>[[bin]]</c> gives the program (11 W2 P2); <c>null</c> for every other.</summary>
+    /// <summary>The name a <c>[[bin]]</c> gives the program; <c>null</c> for every other.</summary>
     public string? Binary { get; init; }
 
-    /// <summary>The package's <c>tests/</c> (07 V4), where the program is <c>lyric test</c>'s;
+    /// <summary>The package's <c>tests/</c>, where the program is <c>lyric test</c>'s;
     /// <c>null</c> for every other.</summary>
     public string? TestRoot { get; init; }
 
@@ -52,8 +52,8 @@ public sealed record Project(string Source, string Name, string Module, string R
     public string CacheDir => Path.Combine(OutDir, "cache");
 
     /// <summary>The binary: named after the package for its <c>src/main.lyr</c>, as its <c>[[bin]]</c>
-    /// says for another program (P2), after the module's last segment for another module run as a
-    /// program (07 M7a) — beside it, not over it; the test program's under <c>test/</c>, where no
+    /// says for another program, after the module's last segment for another module run as a
+    /// program — beside it, not over it; the test program's under <c>test/</c>, where no
     /// program's name can reach it.</summary>
     public string Executable(BuildProfile profile, Target target) => TestRoot is null
         ? Path.Combine(OutDir, profile.Name, target.Triple, BinaryName + target.ExecutableSuffix)
@@ -88,21 +88,21 @@ public sealed record Project(string Source, string Name, string Module, string R
         }
     }
 
-    /// <summary>What each package declares it imports from (07 P6) — a module space of a
+    /// <summary>What each package declares it imports from — a module space of a
     /// build script's own imports from none.</summary>
     public IReadOnlyDictionary<string, IReadOnlySet<string>> DeclaredDependencies =>
         Graph?.Declared ?? ModuleRoots?.ToDictionary(m => m.Key, _ => (IReadOnlySet<string>)new HashSet<string>(), StringComparer.Ordinal)
         ?? new Dictionary<string, IReadOnlySet<string>>();
 
-    /// <summary>A single file's own module spaces by name — a build script's <c>build/</c> (11 W3
-    /// BS3) —; <c>null</c> for every other.</summary>
+    /// <summary>A single file's own module spaces by name — a build script's <c>build/</c>
+    /// —; <c>null</c> for every other.</summary>
     public IReadOnlyDictionary<string, string>? ModuleRoots { get; init; }
 
     /// <summary>The project a file belongs to: the package whose <c>src/</c> holds it — the file is
     /// its entry then —, else the file alone. A file beside a package's modules rather than among
     /// them — a script next to <c>src/</c> — is a single file whose <c>out/</c> still lies by the
     /// manifest; the manifest is read only for a module of the package.</summary>
-    /// <param name="offline">Whether packages from git come from the user's cache alone (P9).</param>
+    /// <param name="offline">Whether packages from git come from the user's cache alone.</param>
     /// <exception cref="ManifestException">The package's manifest is refused.</exception>
     public static Project ForFile(string path, bool offline = false, bool locked = false)
     {
@@ -122,9 +122,9 @@ public sealed record Project(string Source, string Name, string Module, string R
     }
 
     /// <summary>The programs of the package of a directory — the nearest manifest at or above it
-    /// —: its <c>src/main.lyr</c>, named after the package, then each <c>[[bin]]</c> (P2).
+    /// —: its <c>src/main.lyr</c>, named after the package, then each <c>[[bin]]</c>.
     /// <c>null</c> where there is no manifest.</summary>
-    /// <param name="offline">Whether packages from git come from the user's cache alone (P9).</param>
+    /// <param name="offline">Whether packages from git come from the user's cache alone.</param>
     /// <exception cref="ManifestException">The manifest, or one of the graph's, is refused.</exception>
     /// <exception cref="LibraryException">The package has no program.</exception>
     /// <param name="locked">Whether the lock is taken as it is (<c>--locked</c>).</param>
@@ -153,9 +153,9 @@ public sealed record Project(string Source, string Name, string Module, string R
     }
 
     /// <summary>The test program of the package of a directory — the nearest manifest at or above
-    /// it — (07 V4): named after the package, its entry the module <c>lyric test</c> writes. A
+    /// it —: named after the package, its entry the module <c>lyric test</c> writes. A
     /// library has one as well. <c>null</c> where there is no manifest.</summary>
-    /// <param name="offline">Whether packages from git come from the user's cache alone (P9).</param>
+    /// <param name="offline">Whether packages from git come from the user's cache alone.</param>
     /// <exception cref="ManifestException">The manifest, or one of the graph's, is refused.</exception>
     /// <param name="locked">Whether the lock is taken as it is (<c>--locked</c>).</param>
     public static Project? TestsOf(string directory, bool offline = false, bool locked = false)
@@ -172,8 +172,8 @@ public sealed record Project(string Source, string Name, string Module, string R
     }
 
     /// <summary>The graph of <paramref name="manifest"/>'s program, read at the commits its
-    /// <c>lyric.lock</c> holds; the lock is written afterwards with what the graph read (07 P5) —
-    /// or, <paramref name="locked"/>, taken as it is and not written (the review's M7-9).</summary>
+    /// <c>lyric.lock</c> holds; the lock is written afterwards with what the graph read —
+    /// or, <paramref name="locked"/>, taken as it is and not written.</summary>
     /// <exception cref="ManifestException">The graph, or the lock, is refused.</exception>
     public static PackageGraph Resolve(Manifest manifest, bool offline, Func<string, bool>? refresh = null,
         Func<Locked, bool>? keep = null, bool locked = false)
@@ -182,7 +182,7 @@ public sealed record Project(string Source, string Name, string Module, string R
         var held = LockFile.Read(lockFile).Where(keep ?? (_ => true)).ToList();
         var git = GitCache.ForUser(offline, refresh);
         var graph = PackageGraph.Resolve(manifest, git, held, frozen: locked);
-        // Each build script with dependencies of its own: a graph of its own (11 W3 BS3), read
+        // Each build script with dependencies of its own: a graph of its own, read
         // at the commits the same lock holds, and held in it beside the program's.
         var scripts = new Dictionary<string, PackageGraph>(StringComparer.Ordinal);
         foreach (var package in graph.Packages.Values.OrderBy(p => p.Name, StringComparer.Ordinal))
@@ -194,9 +194,9 @@ public sealed record Project(string Source, string Name, string Module, string R
         return graph with { Scripts = scripts };
     }
 
-    /// <summary>The module path of a file under a package's <c>src/</c> (07 M1), or <c>null</c>
+    /// <summary>The module path of a file under a package's <c>src/</c>, or <c>null</c>
     /// where the file lies elsewhere. <c>src/lib.lyr</c> is the root module, named by the package
-    /// alone (the review's M7-1).</summary>
+    /// alone.</summary>
     public static string? ModulePathOf(Manifest manifest, string file)
     {
         if (!IsUnder(manifest.SourceRoot, file)) return null;
@@ -227,7 +227,7 @@ public sealed record Project(string Source, string Name, string Module, string R
     }
 
     /// <summary>Where a single file's <c>out/</c> goes: the nearest directory with <c>.git</c>,
-    /// else the file's own (P5).</summary>
+    /// else the file's own.</summary>
     private static string SingleFileRoot(string start)
     {
         for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)

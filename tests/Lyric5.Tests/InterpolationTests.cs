@@ -1,7 +1,7 @@
 namespace Lyric5.Tests;
 
 /// <summary>
-/// An f-string is checked as a plan of calls (10 S6; M8a S13): each piece holds its hole's
+/// An f-string is checked as a plan of calls: each piece holds its hole's
 /// expression, checked once as the hole and again in the piece. What the hole reports is reported
 /// once.
 /// </summary>

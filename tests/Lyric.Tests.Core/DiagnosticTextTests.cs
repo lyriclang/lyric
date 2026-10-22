@@ -14,8 +14,9 @@ namespace Lyric.Tests.Core;
 ///
 /// <para>Checked over the SOURCE rather than over emitted messages, because there is no way to make a
 /// compiler emit every diagnostic it can. A string literal is the thing being constrained, so a
-/// string literal is what is inspected; comments and XML documentation are free to cite whatever they
-/// like, and they do.</para>
+/// string literal is what is inspected — the compiler's, and the standard library's and the
+/// runtime's, whose panics and errors a program's user reads; comments are left to the comment
+/// ratchet.</para>
 /// </summary>
 public sealed class DiagnosticTextTests
 {
@@ -35,11 +36,20 @@ public sealed class DiagnosticTextTests
     public static TheoryData<string> ProductionSources()
     {
         var data = new TheoryData<string>();
+        (string Dir, string[] Patterns)[] roots =
+        [
+            ("src", ["*.cs"]),
+            ("stdlib5", ["*.lyr"]),
+            ("runtime/src", ["*.c", "*.h"]),
+            ("runtime/include", ["*.c", "*.h"]),
+        ];
+        foreach (var (dir, patterns) in roots)
+        foreach (var pattern in patterns)
         foreach (var file in Directory.EnumerateFiles(
-            Path.Combine(RepoRoot(), "src"), "*.cs", SearchOption.AllDirectories))
+            Path.Combine(RepoRoot(), dir), pattern, SearchOption.AllDirectories))
         {
             var path = file.Replace('\\', '/');
-            if (path.Contains("/obj/") || path.Contains("/bin/")) continue;
+            if (path.Contains("/obj/") || path.Contains("/bin/") || path.Contains("/third_party/")) continue;
             data.Add(file);
         }
         return data;
@@ -56,9 +66,10 @@ public sealed class DiagnosticTextTests
         {
             var line = lines[i].TrimStart();
 
-            // A '//' or '///' line is a comment in full. Citing a document there is the point of
-            // having documents.
-            if (line.StartsWith("//", StringComparison.Ordinal)) continue;
+            // A '//' or '///' line is a comment in full, and so is a C block comment's line.
+            if (line.StartsWith("//", StringComparison.Ordinal)
+                || line.StartsWith("/*", StringComparison.Ordinal)
+                || line.StartsWith('*')) continue;
 
             foreach (Match literal in StringLiteral.Matches(lines[i]))
                 if (Citation.IsMatch(literal.Value))

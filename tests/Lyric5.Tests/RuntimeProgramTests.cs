@@ -49,8 +49,8 @@ public class RuntimeProgramTests
     }
 
     /// <summary>
-    /// The programs that ask the collector most, under Boehm too (13 M11 P11: kept to compare
-    /// against) — the table above runs under the default, the own collector.
+    /// The programs that ask the collector most, under Boehm too, kept to compare against —
+    /// the table above runs under the default, the own collector.
     /// </summary>
     public static TheoryData<string, Profile, int, string, string[]> UnderBoehm()
     {
@@ -83,7 +83,7 @@ public class RuntimeProgramTests
     }
 
     /// <summary>A coroutine resumed while it runs or after it ended, and a yield on a thread's own
-    /// stack (design/v5/spec/06 A8): a panic, RT0014.</summary>
+    /// stack: a panic, RT0014.</summary>
     [Theory]
     [InlineData("self", Profile.Debug)]
     [InlineData("done", Profile.Debug)]
@@ -97,7 +97,7 @@ public class RuntimeProgramTests
         Assert.Equal("", result.Stdout);
     }
 
-    /// <summary>Parking misused (06 N3): with no coroutine running, or closing a parked one — RT0014.</summary>
+    /// <summary>Parking misused: with no coroutine running, or closing a parked one — RT0014.</summary>
     [Theory]
     [InlineData("outside", Profile.Debug, "a park with no coroutine running")]
     [InlineData("closed", Profile.Debug, "a coroutine closed while it is parked")]
@@ -110,7 +110,7 @@ public class RuntimeProgramTests
         Assert.Equal("", result.Stdout);
     }
 
-    /// <summary>A yield in a task, outside every generator (10 §1.13, 06 N3): there is nothing to
+    /// <summary>A yield in a task, outside every generator: there is nothing to
     /// yield to — RT0014.</summary>
     [Theory]
     [InlineData(Profile.Debug)]
@@ -123,7 +123,7 @@ public class RuntimeProgramTests
         Assert.Equal("", result.Stdout);
     }
 
-    /// <summary>A panic with nowhere to leave to (05 E8): from a coroutine on the thread's own stack
+    /// <summary>A panic with nowhere to leave to: from a coroutine on the thread's own stack
     /// it ends the process with the first report, the frames where it happened; with a foreign
     /// frame on the coroutine's stack it ends the process at once, even under the quiet resume.</summary>
     [Theory]
@@ -140,7 +140,7 @@ public class RuntimeProgramTests
         Assert.Equal("", result.Stdout);
     }
 
-    /// <summary>A poller the system refuses (06 N6 S2): with no descriptors left, a panic — RT0015.
+    /// <summary>A poller the system refuses: with no descriptors left, a panic — RT0015.
     /// Not on Windows, where a process cannot be denied the event a poller is.</summary>
     [Theory]
     [InlineData(Profile.Debug)]
@@ -154,8 +154,8 @@ public class RuntimeProgramTests
         Assert.Equal("", result.Stdout);
     }
 
-    /// <summary>A coroutine's stack overflow (01 S3, K1): its guard page makes it a panic with the
-    /// coroutine's frames. On Windows too (the review's R6e): the coroutine's stack is laid out
+    /// <summary>A coroutine's stack overflow: its guard page makes it a panic with the
+    /// coroutine's frames. On Windows too: the coroutine's stack is laid out
     /// as a thread's, and the kernel raises the overflow with room for the filter — before, the
     /// dispatch had no stack to run on below the guard page, and the process ended without a
     /// line.</summary>

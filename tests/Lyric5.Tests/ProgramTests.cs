@@ -5,10 +5,10 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A package's programs (design/v5/spec/11 W2 P2, C8): its <c>src/main.lyr</c> and each
+/// A package's programs: its <c>src/main.lyr</c> and each
 /// <c>[[bin]]</c>; <c>build</c> builds every one, <c>run</c> and <c>--emit</c> the one <c>--bin</c>
-/// names, else <c>src/main.lyr</c>'s, else the only one. And the toolchain a package asks for
-/// (P12; 07 V9). Through <c>Main</c>, so in the console collection.
+/// names, else <c>src/main.lyr</c>'s, else the only one. And the toolchain a package asks
+/// for. Through <c>Main</c>, so in the console collection.
 /// </summary>
 [Collection("console")]
 public class ProgramTests
@@ -138,7 +138,7 @@ public class ProgramTests
         Assert.Contains("error[LYR-CLI0003]: '--bin' names a program of the package; a file is a program by itself", error);
     }
 
-    /// <summary>The toolchain a package asks for (P12): this one is a 5.0 — a pin above refuses the
+    /// <summary>The toolchain a package asks for: this one is a 5.0 — a pin above refuses the
     /// program, for whichever package of it asks; a pin it meets builds.</summary>
     [Fact]
     public void A_package_names_the_least_toolchain_that_builds_it()

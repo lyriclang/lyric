@@ -5,21 +5,21 @@ using Lyric.Ir;
 namespace Lyric5.Compiler;
 
 /// <summary>
-/// The IR of one module as one C file (design/v5/spec/01 L8): C11 against <c>lyr/lyr.h</c>, one
-/// C function per IR function in the platform ABI (S1), locals and temps as C locals (S2), blocks
-/// as labels and terminators as <c>goto</c> (C5), a <c>#line</c> wherever the source line changes
-/// (C6), names mangled <c>lyr_&lt;module&gt;_&lt;name&gt;</c> (C4). Integer arithmetic goes through
-/// the runtime's checked forms, the wrap operators and shifts through <c>lyr/numeric.h</c> (03 T2);
+/// The IR of one module as one C file: C11 against <c>lyr/lyr.h</c>, one
+/// C function per IR function in the platform ABI, locals and temps as C locals, blocks
+/// as labels and terminators as <c>goto</c>, a <c>#line</c> wherever the source line changes,
+/// names mangled <c>lyr_&lt;module&gt;_&lt;name&gt;</c>. Integer arithmetic goes through
+/// the runtime's checked forms, the wrap operators and shifts through <c>lyr/numeric.h</c>;
 /// floats are C's <c>double</c> and <c>float</c> under IEEE semantics, compiled without
-/// contraction (01 L10); a conversion wraps, saturates or checks as T1d says. Strings are the runtime's
-/// <c>LyrStr *</c>, literals static objects (V9). A class is a heap object (V3): a C struct that
+/// contraction; a conversion wraps, saturates or checks as its kind says. Strings are the runtime's
+/// <c>LyrStr *</c>, literals static objects. A class is a heap object: a C struct that
 /// begins with the header, reached through a pointer, allocated by <c>lyr_alloc</c> with a static
-/// descriptor the emitter writes beside it (V4) — size, reference bitmap, qualified name — and
-/// every reference stored into an object goes through the write barrier (L1). An optional (V5)
+/// descriptor the emitter writes beside it — size, reference bitmap, qualified name — and
+/// every reference stored into an object goes through the write barrier. An optional
 /// of a reference is that pointer, null when absent — the niche, zero bytes; of anything else a
-/// C struct of the value and a flag, held by value like a struct. An enum (V6) is a tag and a
+/// C struct of the value and a flag, held by value like a struct. An enum is a tag and a
 /// union of its variants' payloads, inline and by value; an optional of an enum takes a tag no
-/// variant has. A struct is a C struct by value (V2): locals,
+/// variant has. A struct is a C struct by value: locals,
 /// parameters, fields and results hold it; the IR's struct-typed temps are aliases into that
 /// storage — <c>load</c> and a struct-typed <c>loadfield</c> alias, <c>newobj</c> and
 /// <c>structcopy</c> make fresh storage, <c>store</c>, <c>storefield</c>, arguments and
@@ -72,13 +72,13 @@ public sealed class CEmitter
     private readonly string? _stdlibRoot;
 
     /// <summary>The generic instance this emitter writes the unit of, or <c>null</c> for the
-    /// module's own unit (01 C3); <see cref="_scope"/> are the functions that belong to it.</summary>
+    /// module's own unit; <see cref="_scope"/> are the functions that belong to it.</summary>
     private readonly string? _instance;
     private readonly bool _main;
     private readonly List<int> _scope;
 
-    /// <summary>Whether <c>+ - *</c> and negation panic on overflow (03 T2) — or wrap, where a
-    /// profile says so (11 W2 P3).</summary>
+    /// <summary>Whether <c>+ - *</c> and negation panic on overflow — or wrap, where a
+    /// profile says so.</summary>
     private readonly bool _overflowChecks;
 
     private CEmitter(IrModule module, SourceManager sources, string? stdlibRoot, string? instance, bool overflowChecks)
@@ -131,22 +131,22 @@ public sealed class CEmitter
     }
 
     /// <summary>One translation unit of the emission: the module's own (<see cref="Instance"/>
-    /// is <c>null</c>) or the cache unit of one generic instance (01 C3), named by it.</summary>
+    /// is <c>null</c>) or the cache unit of one generic instance, named by it.</summary>
     public sealed record Unit(string? Instance, string Text);
 
     /// <summary>
     /// The C of the module, as units: the module's own — its types, descriptors, globals and
     /// every function that is no generic instance — and one per generic instance, holding the
     /// instance's functions and nothing the program would change under them, so the build caches
-    /// its object by content and compiles it once (01 C3). <paramref name="sources"/> answers the
+    /// its object by content and compiles it once. <paramref name="sources"/> answers the
     /// <c>#line</c> positions.
     /// </summary>
     /// <param name="stdlibRoot">The directory of the standard library, when known: a source
     /// under it is named in <c>#line</c> relative to the directory's parent (<c>stdlib5/std/core.lyr</c>),
     /// so the emitted C is the same on every machine — a golden compares it byte for byte, and
     /// the build cache keys on it.</param>
-    /// <param name="overflowChecks">Whether integer overflow panics (03 T2), as every profile has
-    /// it unless it says otherwise (11 W2 P3): without, <c>+ - *</c> and negation wrap.</param>
+    /// <param name="overflowChecks">Whether integer overflow panics, as every profile has
+    /// it unless it says otherwise: without, <c>+ - *</c> and negation wrap.</param>
     public static IReadOnlyList<Unit> Emit(IrModule module, SourceManager sources, string? stdlibRoot = null, bool overflowChecks = true)
     {
         var units = new List<Unit> { new(null, new CEmitter(module, sources, stdlibRoot, null, overflowChecks).Text()) };
@@ -164,7 +164,7 @@ public sealed class CEmitter
         string.Concat(units.Select(u => u.Instance is null ? u.Text : $"\n/* ==== unit: {u.Instance} ==== */\n{u.Text}"));
 
     /// <summary>
-    /// The cache unit a function belongs to (01 C3): the generic instance whose body it is or
+    /// The cache unit a function belongs to: the generic instance whose body it is or
     /// lies in — <c>std.core.arrayOf&lt;int&gt;</c>; <c>std.core.Range&lt;int&gt;</c> for every
     /// method of that instance; the same for a lambda lifted out of one — or <c>null</c> for the
     /// module itself. Read off the IR name: an instance carries its arguments in angle brackets
@@ -288,7 +288,7 @@ public sealed class CEmitter
         IrScalarType { Kind: IrScalar.Bool } => "uint8_t",
         IrScalarType { Kind: IrScalar.String } => "LyrStr *",
         IrScalarType { Kind: IrScalar.Void } => "void",
-        // A place (03 T12) is the address of the value where it lies.
+        // A place is the address of the value where it lies.
         IrPlaceType p => CType(p.Value) + " *",
         _ => throw new InvalidOperationException($"the C emitter has no type for {type}; the gate let it through"),
     };
@@ -327,7 +327,7 @@ public sealed class CEmitter
     private static bool IsString(IrType type) => type is IrScalarType { Kind: IrScalar.String };
 
     /// <summary>
-    /// An optional in the niche (01 V5): around a reference — a class value, a string, a
+    /// An optional in the niche: around a reference — a class value, a string, a
     /// coroutine — the pointer itself says whether there is a value, and the optional costs
     /// nothing. Around an optional there is no niche left: <c>??Node</c> tells "absent" from
     /// "present and null", and needs its flag.
@@ -346,7 +346,7 @@ public sealed class CEmitter
         type is IrStructType or IrEnumType or IrInlineArrayType || (type is IrOptionalType && !IsNiche(type));
 
     /// <summary>
-    /// An optional of an enum (01 V5): the enum itself, with a tag no variant has standing for
+    /// An optional of an enum: the enum itself, with a tag no variant has standing for
     /// "no value" (<c>LYR_ENUM_NONE</c>). No flag, no growth. Around that optional there is no
     /// niche left, as for a reference.
     /// </summary>
@@ -356,22 +356,22 @@ public sealed class CEmitter
     /// named after what it holds.</summary>
     private string OptionalName(IrOptionalType type) => "lyr_opt_" + Mangle(type.Inner);
 
-    /// <summary><c>lyr_slice_&lt;element&gt;</c>: a view of <c>T[]</c> (03 T13 A2), a pointer into
+    /// <summary><c>lyr_slice_&lt;element&gt;</c>: a view of <c>T[]</c>, a pointer into
     /// the elements and a length — two words, a value C passes and copies as one.</summary>
     private string SliceName(IrSliceType type) => "lyr_slice_" + Mangle(type.Element);
 
-    /// <summary><c>lyr_inl&lt;N&gt;_&lt;element&gt;</c>: an inline array (03 T13 A4), a struct around a
+    /// <summary><c>lyr_inl&lt;N&gt;_&lt;element&gt;</c>: an inline array, a struct around a
     /// C array so that C copies it as a value.</summary>
     private string InlineName(IrInlineArrayType type) => $"lyr_inl{type.Length}_" + Mangle(type.Element);
 
-    /// <summary><c>lyr_fn_&lt;signature&gt;</c>: a function value (01 V8), a pointer to the code and
+    /// <summary><c>lyr_fn_&lt;signature&gt;</c>: a function value, a pointer to the code and
     /// the environment it runs in — two words, a value. The code takes the environment first,
     /// as <c>void *</c>; a function without one gets a thunk that drops it.</summary>
     private string FnName(IrFunctionType type) => "lyr_" + Mangle(type);
 
     /// <summary>The C type of the code pointer of a function value: the environment first, the
-    /// caller's error slot last (03 T17) — whether the type throws or not. One code pointer per
-    /// signature makes a value with a smaller set fit a type with a larger one as it is (05 E2 K6):
+    /// caller's error slot last — whether the type throws or not. One code pointer per
+    /// signature makes a value with a smaller set fit a type with a larger one as it is:
     /// nothing is wrapped, and code that cannot throw never writes the slot.</summary>
     private string CodePointer(IrFunctionType type, string name) =>
         $"{CType(type.Return)} (*{name})(void *{string.Concat(type.Parameters.Select(p => ", " + CType(p)))}, LyrErr **)";
@@ -458,7 +458,7 @@ public sealed class CEmitter
     /// <summary>
     /// The size and alignment C gives a type on every Tier 1 target (all LP64 or LLP64 with
     /// natural alignment: a scalar aligns to its size, a pointer is eight bytes). The emitter
-    /// needs the numbers for one thing, the reference bitmap of a descriptor (V4), and it does
+    /// needs the numbers for one thing, the reference bitmap of a descriptor, and it does
     /// not trust them: every class carries a <c>_Static_assert</c> on its size and on each
     /// field offset, so a target that lays a type out differently fails to compile instead of
     /// handing the collector a wrong map.
@@ -506,7 +506,7 @@ public sealed class CEmitter
     private static IrType[] Payload(IrTypeDef variant) => variant.FieldTypes.Skip(1).ToArray();
 
     /// <summary>
-    /// An enum (01 V6): the tag, four bytes, then the union of the variants' payloads, aligned
+    /// An enum: the tag, four bytes, then the union of the variants' payloads, aligned
     /// as the widest of them asks. An enum whose variants carry nothing is the tag alone.
     /// </summary>
     private ((int Size, int Align) Total, int UnionOffset) EnumLayout(IrTypeDef def)
@@ -564,7 +564,7 @@ public sealed class CEmitter
     /// tag and a number under another, and a bitmap has one bit for it. Where an enum that holds
     /// references lies in an object, <paramref name="ambiguous"/> is set and the descriptor says
     /// so (<c>LYR_DESC_CONSERVATIVE</c>): the bitmap is not the whole truth, and a collector
-    /// scans the object as it scans a stack. Nothing moves (01 L1), so that is sound.</para>
+    /// scans the object as it scans a stack. Nothing moves, so that is sound.</para>
     /// </summary>
     private void ReferenceWords(IrTypeDef def, int start, List<int> words, ref bool ambiguous)
     {
@@ -588,7 +588,7 @@ public sealed class CEmitter
     }
 
     /// <summary>
-    /// The module globals as the collector's roots (13 M11 P4): the address of every reference
+    /// The module globals as the collector's roots: the address of every reference
     /// word — a reference global's own, and through a struct, a view, a closure or an interface the
     /// words <see cref="ReferenceWords(IrType, int, List{int}, ref bool)"/> names —, and the globals
     /// holding an enum with references, whose words are references only under some tags: those are
@@ -613,7 +613,7 @@ public sealed class CEmitter
 
     private string DescriptorName(TypeId id) => "lyr_desc_ty_" + TypeToken(id.Value);
 
-    /// <summary>The descriptor of <c>T[]</c>, one per element type (V10).</summary>
+    /// <summary>The descriptor of <c>T[]</c>, one per element type.</summary>
     private string ArrayDescriptor(IrType element) => "lyr_desc_arr_" + Mangle(element);
 
     /// <summary>The elements of an array or a view temp, typed: <c>LYR_ARR_DATA(t, T)[i]</c>, or
@@ -622,7 +622,7 @@ public sealed class CEmitter
     {
         IrSliceType => $"{Temp(array)}.ptr",
         IrInlineArrayType => $"{Temp(array)}->v", // the temp aliases the value's storage
-        IrScalarType { Kind: IrScalar.String } => $"(uint8_t *){Temp(array)}->bytes", // a string's bytes (10 S1)
+        IrScalarType { Kind: IrScalar.String } => $"(uint8_t *){Temp(array)}->bytes", // a string's bytes
         _ => $"LYR_ARR_DATA({Temp(array)}, {CType(element)})",
     };
 
@@ -653,8 +653,8 @@ public sealed class CEmitter
         _out.AppendLine("#include <math.h>");
         _out.AppendLine();
 
-        // The C functions the program declares (extern "C", 11 W4): a prototype each, in the
-        // platform's C ABI; the linker finds the symbol in the native part (07 B5) or a library.
+        // The C functions the program declares (extern "C"): a prototype each, in the
+        // platform's C ABI; the linker finds the symbol in the native part or a library.
         var foreign = _module.Imports.Where(i => Intrinsics.IsForeign(i.Name)).ToList();
         foreach (var import in foreign)
         {
@@ -665,9 +665,9 @@ public sealed class CEmitter
 
         Structs();
 
-        // The module's globals (07 V5): variables of the module's unit, filled by the initializer
+        // The module's globals: variables of the module's unit, filled by the initializer
         // before the entry runs; an instance's unit declares the ones it touches. They are roots of
-        // the collector (01 L1): the table of their reference words follows them (13 M11 P4).
+        // the collector: the table of their reference words follows them.
         if (_main && _module.Globals.Count > 0)
         {
             _out.AppendLine("/* module-level bindings */");
@@ -717,8 +717,8 @@ public sealed class CEmitter
         foreach (var index in declared) prototypes.Append(Signature(_module.Functions[index])).AppendLine(";");
 
         // A function used as a value without an environment gets a thunk that takes and drops
-        // one, so every function value is called the same way (01 V8) — and takes the error slot,
-        // forwarded where the function throws (03 T17). Static, in every unit that makes the value:
+        // one, so every function value is called the same way — and takes the error slot,
+        // forwarded where the function throws. Static, in every unit that makes the value:
         // two thunks of one function are two spellings of the same call.
         var thunked = ScopeOps()
             .OfType<MakeClosure>().Where(m => m.Environment is null).Select(m => m.Target.Value).Distinct().Order().ToList();
@@ -739,10 +739,10 @@ public sealed class CEmitter
             }
         }
 
-        // A coroutine (06 N2) starts from an environment — the arguments it was called with and the
+        // A coroutine starts from an environment — the arguments it was called with and the
         // place its body leaves the result, on the heap, where the coroutine keeps it alive — and
         // runs a C body around the IR one: the call, then the result or the error left on the
-        // coroutine for the pull that ran into the end (05 E10). Static, in every unit that makes
+        // coroutine for the pull that ran into the end. Static, in every unit that makes
         // one, as the thunks are.
         var started = ScopeOps().OfType<MakeCoroutine>().DistinctBy(m => m.Body.Value).OrderBy(m => m.Body.Value).ToList();
         if (started.Count > 0)
@@ -754,14 +754,14 @@ public sealed class CEmitter
             foreach (var made in started) prototypes.Append(CoroutineBody(made.Body.Value, made.Type));
         }
 
-        // The interface tables (01 V7): one per (type, interface) row, defined in the module's
+        // The interface tables: one per (type, interface) row, defined in the module's
         // unit with the thunks they point at, declared in an instance's unit that lifts a value.
         var tables = new StringBuilder();
         if (_main && _module.Impls.Count > 0)
         {
             tables.AppendLine("/* interface tables: the descriptor, then the implementation of every slot */");
             foreach (var row in _module.Impls) tables.Append(Table(row));
-            // The conformance lists (03 T11): per concrete type its rows — the interface's
+            // The conformance lists: per concrete type its rows — the interface's
             // identity and the table — NULL-terminated, where the type's descriptor points.
             foreach (var group in _module.Impls.GroupBy(r => r.Type.Value).OrderBy(g => g.Key))
                 tables.AppendLine($"const LyrItable {ItableName(group.Key)}[] = {{ "
@@ -778,7 +778,7 @@ public sealed class CEmitter
             }
         }
 
-        // The members of Error the runtime reports through (05 E6 O4, E8): defined by the module's
+        // The members of Error the runtime reports through: defined by the module's
         // unit wherever an error can end the program, declared by an instance's unit that panics.
         var adapters = !ErrorsEndTheProgram() ? ""
             : _main ? ReportAdapters(define: true)
@@ -842,7 +842,7 @@ public sealed class CEmitter
         _out.AppendLine("/* types: a struct is a value, a class an object behind its header, an enum a tag and a union */");
         foreach (var i in indices)
         {
-            // An interface is its table's type (01 V7): the value itself is 'LyrIface' for every
+            // An interface is its table's type: the value itself is 'LyrIface' for every
             // interface, and only the table knows the slots.
             if (_module.Types[i].IsInterface)
             {
@@ -923,7 +923,7 @@ public sealed class CEmitter
         foreach (var i in indices) Define(i);
         foreach (var type in used) Require(type);
         foreach (var element in elements) { Require(element); ArrayDescriptorOf(element); }
-        // The boxes (V7, D12): a value type copied to the heap at its transition to an interface
+        // The boxes: a value type copied to the heap at its transition to an interface
         // value, behind a header, with a descriptor of its own that maps the value's references.
         foreach (var boxed in Boxed())
         {
@@ -933,7 +933,7 @@ public sealed class CEmitter
         _out.AppendLine();
     }
 
-    // --- interfaces (01 V7) ----------------------------------------------------------------------
+    // --- interfaces ------------------------------------------------------------------------------
 
     private string VtType(int iface) => "lyr_vt_ty_" + TypeToken(iface);
 
@@ -944,14 +944,14 @@ public sealed class CEmitter
     private string ItableName(int concrete) => "lyr_itab_ty_" + TypeToken(concrete);
 
     /// <summary>An interface's identity at runtime: the address of its name, defined once in the
-    /// module's unit (03 T11).</summary>
+    /// module's unit.</summary>
     private string IfaceId(int iface) => "lyr_ifid_ty_" + TypeToken(iface);
 
     /// <summary>The conformance list of a concrete type, or <c>NULL</c> where no row names it.</summary>
     private string ItablesOf(int concrete) =>
         _module.Impls.Any(r => r.Type.Value == concrete) ? ItableName(concrete) : "NULL";
 
-    /// <summary>The descriptor an interface value's table begins with (01 V7).</summary>
+    /// <summary>The descriptor an interface value's table begins with.</summary>
     private string DescOfIface(TempId value) => $"(*(const LyrDesc *const *){Temp(value)}.vt)";
 
     /// <summary>The descriptor a concrete type's values carry behind an interface: the class's own,
@@ -1036,7 +1036,7 @@ public sealed class CEmitter
     private void DefineBox(int type)
     {
         var def = _module.Types[type];
-        // A built-in's box holds the value itself (M8c S8b): its one field's type, an 'int64_t' or a
+        // A built-in's box holds the value itself: its one field's type, an 'int64_t' or a
         // string's reference, which the thunks read as the receiver.
         var inner = def.IsBuiltinBox ? def.FieldTypes[0]
             : def.IsEnum ? (IrType)new IrEnumType(new TypeId(type)) : new IrStructType(new TypeId(type));
@@ -1069,7 +1069,7 @@ public sealed class CEmitter
     }
 
     /// <summary>
-    /// One table row (V7): the descriptor, then per slot the implementation — a default as it is,
+    /// One table row: the descriptor, then per slot the implementation — a default as it is,
     /// since its receiver is the interface value; a concrete method behind a thunk that takes the
     /// value out of the data word (the object, or the box's payload — as the place, for a
     /// struct's or an enum's method, which writes through it).
@@ -1086,7 +1086,7 @@ public sealed class CEmitter
         {
             var f = _module.Functions[row.Methods[k].Value];
             var throws = SlotThrows(iface, k);
-            // An implementation throws at most what its slot declares (05 K6): one that throws
+            // An implementation throws at most what its slot declares: one that throws
             // nothing ignores the slot's error parameter; the other way round the sema refused.
             if (f.Throws && !throws)
                 throw new InvalidOperationException($"'{f.Name}' throws, and slot {k} of {Display(new IrInterfaceType(row.Interface))} does not");
@@ -1113,7 +1113,7 @@ public sealed class CEmitter
         return text.ToString();
     }
 
-    // --- coroutines (06 N2) ------------------------------------------------------------------------
+    // --- coroutines --------------------------------------------------------------------------------
 
     /// <summary>The descriptor of a coroutine type: the object is the runtime's, traced by its own
     /// kind, so the descriptor names the type and describes nothing.</summary>
@@ -1132,9 +1132,9 @@ public sealed class CEmitter
     /// What a coroutine's body needs beside its IR function: the environment — a heap object of
     /// the arguments, <c>a0</c>…, and the result, laid out and described like a class — and the
     /// runner the runtime calls on the coroutine's stack. The runner calls the body with the
-    /// arguments (the receiver of a value's method as the place in the environment, 02 M5), then
+    /// arguments (the receiver of a value's method as the place in the environment), then
     /// leaves on the coroutine what the pull that ran into the end reads: the result's address,
-    /// or the error and no result (05 E10).
+    /// or the error and no result.
     /// </summary>
     private string CoroutineBody(int index, IrCoroutineType type)
     {
@@ -1170,7 +1170,7 @@ public sealed class CEmitter
         }
 
         // The error slot as any call passes it (SlotArgument): the body's own where it throws, none
-        // to write for a generator lambda's body that cannot — it takes one either way (03 T17).
+        // to write for a generator lambda's body that cannot — it takes one either way.
         var arguments = parameters.Select((_, i) => body.ReceiverByRef && i == 0 ? $"&lyr_env->a{i}" : $"lyr_env->a{i}")
             .Concat(body.Throws ? ["&lyr_e"] : TakesEnvironment(body) ? ["NULL"] : []);
         var call = $"{FunctionName(body.Name)}({string.Join(", ", arguments)})";
@@ -1194,7 +1194,7 @@ public sealed class CEmitter
         : HoldsReferences(type) ? $"LYR_WRITE_BARRIER_VALUE({place}, &{slot}, {value});"
         : $"{slot} = {value};";
 
-    /// <summary>A coroutine over its environment (06 A1): the arguments stored, then the runtime's
+    /// <summary>A coroutine over its environment: the arguments stored, then the runtime's
     /// object — not started; nothing of the body runs before the first pull.</summary>
     private string StartCoroutine(MakeCoroutine m)
     {
@@ -1207,7 +1207,7 @@ public sealed class CEmitter
     }
 
     /// <summary>A body with cleanup marks its coroutine, so the debug profile can report it dropped
-    /// without <c>close()</c> (06 A5).</summary>
+    /// without <c>close()</c>.</summary>
     private string Cleanup(MakeCoroutine m) =>
         (_module.Functions[m.Body.Value].Cleanup ? $" lyr_coro_set_cleanup({Temp(m.Dest)});" : "")
         + (YieldsDynamically ? $" lyr_coro_set_yield_key({Temp(m.Dest)}, \"{YieldKey(m.Type.Yield)}\");" : "");
@@ -1224,7 +1224,7 @@ public sealed class CEmitter
     private string YieldKey(IrType type) => Display(type).Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     /// <summary>
-    /// <c>co.close()</c> (06 A5): the runtime unwinds a suspended coroutine; the error its body
+    /// <c>co.close()</c>: the runtime unwinds a suspended coroutine; the error its body
     /// ended with is taken, and the <c>Cancelled</c> the close itself threw — told by its
     /// descriptor — is dropped. Anything else goes on to the error branch where the coroutine's type
     /// throws; where it does not, nothing else can come.
@@ -1234,7 +1234,7 @@ public sealed class CEmitter
         var co = Temp(c.Coroutine);
         var cancelled = $"&{DescriptorName(c.Cancelled)}";
         // The Cancelled the body ended with is dropped — but not what a defer threw on the way
-        // out, which was suppressed into it: the first of those goes on (the review's M6-10).
+        // out, which was suppressed into it: the first of those goes on.
         return c.Throws
             ? $"lyr_coro_close({co}); lyr_e = lyr_coro_take_error({co}); "
               + $"if (lyr_e != NULL && *(const LyrDesc *const *)lyr_e->value.vt == {cancelled}) lyr_e = lyr_err_unsuppress(lyr_e);"
@@ -1242,10 +1242,10 @@ public sealed class CEmitter
     }
 
     /// <summary>
-    /// <c>co.next()</c> (06 N2 A2): a coroutine that is not done runs to its next yield or past its
+    /// <c>co.next()</c>: a coroutine that is not done runs to its next yield or past its
     /// end — one that runs, or belongs to another thread, the runtime refuses (RT0014). Done, it
     /// answers null — false where it yields nothing — and a coroutine whose type throws hands over
-    /// the error its body ended with, once, to the error branch that follows (05 E10). Else the
+    /// the error its body ended with, once, to the error branch that follows. Else the
     /// value is copied out of the suspended frame, where the yield left its address.
     /// </summary>
     private string Pull(ResumePull r)
@@ -1281,7 +1281,7 @@ public sealed class CEmitter
 
     /// <summary>
     /// The types the program reaches: what any of its functions names — the pruning has left
-    /// only the functions its roots reach (01 L11) —, what its globals hold, every row of the
+    /// only the functions its roots reach —, what its globals hold, every row of the
     /// interface tables, and the table the report of an escaping error goes through.
     /// </summary>
     private HashSet<int> ReachedByProgram() =>
@@ -1343,7 +1343,7 @@ public sealed class CEmitter
     }
 
     /// <summary>
-    /// The descriptor of an array of <paramref name="element"/> (V10): the fixed part is the
+    /// The descriptor of an array of <paramref name="element"/>: the fixed part is the
     /// header and the length, then <c>len</c> elements of the element's size, each laid out as
     /// the element type is — the reference map describes ONE element. An element that is an
     /// enum holding references makes the whole array conservative, as it does an object.
@@ -1373,7 +1373,7 @@ public sealed class CEmitter
     }
 
     /// <summary>
-    /// An enum (V6): one struct per variant for its payload, named fields as the IR names them,
+    /// An enum: one struct per variant for its payload, named fields as the IR names them,
     /// then the enum itself — the tag and the union of the payloads that hold something. A
     /// variant without a payload is a tag value and nothing else; its struct exists so the IR's
     /// reference to it has a type, and holds one unused byte because C has no empty struct.
@@ -1405,7 +1405,7 @@ public sealed class CEmitter
     }
 
     /// <summary>
-    /// The descriptor of a class (V4): its size, which of its words are references — the header
+    /// The descriptor of a class: its size, which of its words are references — the header
     /// is word 0 and never one — and its qualified name. Constant, defined once in the module's
     /// unit and declared in every other; its address is the type's identity. The asserts hold
     /// the emitter's layout against the compiler's.
@@ -1441,7 +1441,7 @@ public sealed class CEmitter
     }
 
     /// <summary>A parameter: a value, except the receiver of a struct method, which is the
-    /// caller's place (02 M5).</summary>
+    /// caller's place.</summary>
     private string Parameter(IrFunction function, IrLocal local) =>
         function.ReceiverByRef && local.Id.Value == 0
             ? $"{CType(local.Type)} *{LocalName(local)}"
@@ -1454,19 +1454,19 @@ public sealed class CEmitter
     private string Signature(IrFunction function)
     {
         var parameters = function.Locals.Take(function.ParamCount).Select(p => Parameter(function, p)).ToList();
-        // The caller's error slot (01 L5 E1), the last parameter: a throwing function's own keep
+        // The caller's error slot, the last parameter: a throwing function's own keep
         // their places, and a set slot is the status. A closure's code takes it either way: every
-        // function value is called with one (03 T17).
+        // function value is called with one.
         if (function.Throws || TakesEnvironment(function)) parameters.Add("LyrErr **lyr_err");
         // External linkage: an instance's unit calls the module's functions and the module the
-        // instance's, and the names are unique by construction (01 C3, C4).
+        // instance's, and the names are unique by construction.
         //
         // The program's main stays a frame of its own: 'lyr_entry' calls it, and a trace ends at
         // lyr_entry's frame — main folded into it took the program's frames with it (Windows,
         // whose symbolizer gives the physical frame before the inlined ones).
         var keep = _module.EntryFunction is { } entry && ReferenceEquals(_module.Functions[entry.Value], function)
             || function.Hints.HasFlag(IrHints.NoInline) ? "LYR_NOINLINE " : "";
-        // what the source asks of the C compiler (09 A11): a hint, no promise
+        // what the source asks of the C compiler: a hint, no promise
         var hints = (function.Hints.HasFlag(IrHints.AlwaysInline) ? "LYR_ALWAYS_INLINE " : "")
                     + (function.Hints.HasFlag(IrHints.Cold) ? "LYR_COLD " : "");
         return $"{keep}{hints}{CType(function.ReturnType)} {FunctionName(function.Name)}({(parameters.Count == 0 ? "void" : string.Join(", ", parameters))})";
@@ -1483,7 +1483,7 @@ public sealed class CEmitter
                 || op is CoroutineClose { Throws: true }
                 || op is CallVirt v && SlotThrows(v.Interface.Value, v.Slot)));
 
-    /// <summary>Whether slot <paramref name="slot"/> of an interface takes the error slot (05 E2).</summary>
+    /// <summary>Whether slot <paramref name="slot"/> of an interface takes the error slot.</summary>
     private bool SlotThrows(int iface, int slot) =>
         _module.Types[iface].SlotThrows is { } flags && slot < flags.Length && flags[slot];
 
@@ -1504,8 +1504,8 @@ public sealed class CEmitter
 
     /// <summary>
     /// The program's <c>main</c>: the runtime's <c>lyr_run_main</c> around the entry function,
-    /// whose value is the exit code masked to 0..255 by the runtime (11 C5); a <c>void</c> entry
-    /// exits with 0. Where main is a task (06 T6), <c>lyr_run_main_task</c>, which runs the same
+    /// whose value is the exit code masked to 0..255 by the runtime; a <c>void</c> entry
+    /// exits with 0. Where main is a task, <c>lyr_run_main_task</c>, which runs the same
     /// function as main's context under std.task's loop.
     /// </summary>
     private string Entry(IrFunction entry)
@@ -1514,8 +1514,8 @@ public sealed class CEmitter
         var text = new StringBuilder();
         text.AppendLine();
         text.AppendLine("/* the program */");
-        // The globals are filled first (07 V5 G2), in declaration order, then the entry runs —
-        // registered with the collector before anything is stored in them (13 M11 P4).
+        // The globals are filled first, in declaration order, then the entry runs —
+        // registered with the collector before anything is stored in them.
         var init = _module.GlobalInit is { } id ? FunctionName(_module.Functions[id.Value].Name) + "(); " : "";
         if (_module.Globals.Count > 0)
         {
@@ -1526,7 +1526,7 @@ public sealed class CEmitter
         }
         if (entry.Throws)
         {
-            // An error that escapes main (05 E6 O4): its message and its causes on the error
+            // An error that escapes main: its message and its causes on the error
             // writer, and the exit code 1 — through Error's own table, which the runtime cannot name.
             var (message, cause) = ReportNames();
             var call = $"{name}(&lyr_e)";
@@ -1548,14 +1548,14 @@ public sealed class CEmitter
     }
 
     /// <summary>The runtime's start around the program's main function, as a task under std.task's
-    /// loop where the program waits (06 T6).</summary>
+    /// loop where the program waits.</summary>
     private string RunMain(string program) =>
         _module.TaskMain is { } loop
             ? $"lyr_run_main_task(argc, argv, {program}, {FunctionName(_module.Functions[loop.Value].Name)})"
             : $"lyr_run_main(argc, argv, {program})";
 
-    /// <summary>Whether an error can end the program: <c>main</c> throws (05 E6 O4), or a
-    /// <c>try!</c> panics with an error's message (E4, E8). Asked of the whole module, so every
+    /// <summary>Whether an error can end the program: <c>main</c> throws, or a
+    /// <c>try!</c> panics with an error's message. Asked of the whole module, so every
     /// unit agrees on whether the adapters exist.</summary>
     private bool ErrorsEndTheProgram() =>
         _module.EntryFunction is { } entry && _module.Functions[entry.Value].Throws
@@ -1579,7 +1579,7 @@ public sealed class CEmitter
         ErrorSlots().Index < 0 ? ("NULL", "NULL") : ("lyr_error_message", "lyr_error_cause");
 
     /// <summary>
-    /// The two members of <c>Error</c> the runtime calls (05 E6 O1, O4, E8): <c>message()</c> and
+    /// The two members of <c>Error</c> the runtime calls: <c>message()</c> and
     /// <c>cause()</c>, each through the value's own table. External, so an instance's unit that
     /// panics with an error reaches the module's definition.
     /// </summary>
@@ -1612,14 +1612,14 @@ public sealed class CEmitter
         // The definition itself under #line as well, at the function's first statement: a debugger
         // places the function in the .lyr, and DbgHelp keeps the inline sites of a function whose
         // definition and body are in one file — with the definition left in the C, the inlined
-        // frames of a Windows backtrace went missing (measured, M2 S2).
+        // frames of a Windows backtrace went missing (measured).
         Line(FirstSpan(function));
         _fn.Append(Signature(function)).AppendLine(" {");
 
-        // The prologue's check of the stack (01 S3; 13 M11 P6) — the first statement, before the
+        // The prologue's check of the stack — the first statement, before the
         // locals are zeroed: a function that calls compares its frame with the thread's bound; one
         // whose locals reach past the reserve below the bound (an inline array) does so with their
-        // size, whether it calls or not. It is the safepoint at a function's entry too (P5).
+        // size, whether it calls or not. It is the safepoint at a function's entry too.
         var frameBytes = function.Locals.Select(l => l.Type).Concat(function.Temps.Select(t => t.Type))
             .Where(t => !IsVoid(t))
             .Sum(t => t is IrInlineArrayType or IrStructType or IrEnumType or IrOptionalType ? (long)LayoutOf(t).Size : 16);
@@ -1640,10 +1640,10 @@ public sealed class CEmitter
         }
         foreach (var local in function.Locals.Skip(function.ParamCount))
             _fn.AppendLine($"    {Declare(local.Type, LocalName(local))} = {Zero(local.Type)};");
-        // The in-flight error (01 L5 E1): what a throw sets, what a call that failed wrote, what a
+        // The in-flight error: what a throw sets, what a call that failed wrote, what a
         // catch reads and clears.
         if (UsesErrors(function)) _fn.AppendLine("    LyrErr *lyr_e = NULL;");
-        // The errors set aside while a defer body runs with one in flight (05 E7).
+        // The errors set aside while a defer body runs with one in flight.
         foreach (var stash in function.Blocks.SelectMany(b => b.Insts).OfType<StashError>().Select(s => s.Stash).Distinct().Order())
             _fn.AppendLine($"    LyrErr *lyr_s{stash} = NULL;");
         foreach (var temp in function.Temps)
@@ -1657,8 +1657,8 @@ public sealed class CEmitter
             else _fn.AppendLine($"    {Declare(temp.Type, Temp(temp.Id))} = {Zero(temp.Type)};");
         }
 
-        // A loop polls at its head, the target of a jump from where the loop's body ends (13 M11 P5) —
-        // every LYR_POLL_EVERY passes, counted down in a local of the function (S5: the flag read at
+        // A loop polls at its head, the target of a jump from where the loop's body ends —
+        // every LYR_POLL_EVERY passes, counted down in a local of the function (the flag read at
         // every pass cost a loop without a call a tenth of its time).
         var loopHeads = LoopHeads(function);
         if (loopHeads.Count > 0) _fn.AppendLine("    uint32_t lyr_poll = LYR_POLL_EVERY;");
@@ -1725,7 +1725,7 @@ public sealed class CEmitter
 
     /// <summary>
     /// A <c>#line</c> before every statement that has a source position: the debugger, the
-    /// profiler and the backtrace then show the <c>.lyr</c> line (L12), never the C. Before EVERY
+    /// profiler and the backtrace then show the <c>.lyr</c> line, never the C. Before EVERY
     /// statement, because the directive numbers only the line that follows it and C counts on from
     /// there — two statements from one <c>.lyr</c> line would otherwise land on two. The file name
     /// goes only where it changes.
@@ -1776,7 +1776,7 @@ public sealed class CEmitter
             ? $"{Temp(l.Dest)} = &{GlobalName(l.Global.Value)};"
             : $"{Temp(l.Dest)} = {GlobalName(l.Global.Value)};",
         StoreGlobal g => $"{GlobalName(g.Global.Value)} = {Value(g.Value)};",
-        // Places (03 T12). The receiver of a struct method already is one.
+        // Places. The receiver of a struct method already is one.
         AddrLocal a => IsReceiverPlace(a.Local)
             ? $"{Temp(a.Dest)} = {LocalName(_function.Locals[a.Local.Value])};"
             : $"{Temp(a.Dest)} = &{LocalName(_function.Locals[a.Local.Value])};",
@@ -1796,8 +1796,8 @@ public sealed class CEmitter
         NewObject n => $"{Storage(n.Dest)} = ({CType(n.Result)}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
         StructCopy c => $"{Storage(c.Dest)} = *{Temp(c.Value)}; {Temp(c.Dest)} = &{Storage(c.Dest)};",
         CopyValue c => $"{Storage(c.Dest)} = *{Temp(c.Value)}; {Temp(c.Dest)} = &{Storage(c.Dest)};",
-        // An inline array (A4): its storage filled element by element, or from one value.
-        // An interface value (01 V7): an object as it is; a value copied into a fresh box. The
+        // An inline array: its storage filled element by element, or from one value.
+        // An interface value: an object as it is; a value copied into a fresh box. The
         // call goes through the table the value carries, by slot.
         MakeInterface m when _module.Types[m.Concrete.Value].IsClass =>
             $"{Temp(m.Dest)} = (LyrIface){{ {Temp(m.Value)}, &{VtName(m.Concrete.Value, m.Interface.Value)} }};",
@@ -1806,25 +1806,25 @@ public sealed class CEmitter
             + $"{Temp(m.Dest)} = (LyrIface){{ lyr_box, &{VtName(m.Concrete.Value, m.Interface.Value)} }}; }}",
         CallVirt c => Assign(c.Dest, $"((const {VtType(c.Interface.Value)} *){Temp(c.Args[0])}.vt)->s{c.Slot}({string.Join(", ", c.Args.Select(Value))}"
             + $"{ErrorArgument(SlotThrows(c.Interface.Value, c.Slot), c.Args.Length)})"),
-        // The in-flight error's value, and the clause that takes it (05 E4, E9).
+        // The in-flight error's value, and the clause that takes it.
         CurrentError e => $"{Temp(e.Dest)} = lyr_e->value;",
         ClearError => "lyr_e = NULL;",
-        // A defer body with an error in flight (05 E7): set aside, back, or the body's own appended
+        // A defer body with an error in flight: set aside, back, or the body's own appended
         // to it as suppressed — the first wins.
         StashError s => $"lyr_s{s.Stash} = lyr_e; lyr_e = NULL;",
         RestoreError r => $"lyr_e = lyr_s{r.Stash};",
         SuppressError s => $"lyr_err_suppress(lyr_s{s.Stash}, lyr_e); lyr_e = lyr_s{s.Stash};",
-        // What a clause asks of the error it kept (05 E6 O3), into arrays of the program's own.
+        // What a clause asks of the error it kept, into arrays of the program's own.
         SuppressedErrors s when s.Type is IrArrayType errors =>
             $"{Temp(s.Dest)} = lyr_err_suppressed(lyr_s{s.Stash}, &{ArrayDescriptor(errors.Element)});",
         ErrorTrace t when t.Type is IrArrayType pcs =>
             $"{Temp(t.Dest)} = lyr_err_trace(lyr_s{t.Stash}, &{ArrayDescriptor(pcs.Element)});",
-        // std.core's blackBox (10 X4): the value stored, and its address handed to an empty asm that
+        // std.core's blackBox: the value stored, and its address handed to an empty asm that
         // may read and write any memory — Google Benchmark's DoNotOptimize. An aggregate's temp
         // points at its storage: the value is stored there, and that is held.
         BlackBox b => Assign(b.Dest, Value(b.Value))
             + $" __asm__ volatile(\"\" : : \"r\"(&{(IsAggregate(TypeOf(b.Dest)) ? Storage(b.Dest) : Temp(b.Dest))}) : \"memory\");",
-        // 'x is T' (03 T11): the descriptor the value's table begins with, or the conformance
+        // 'x is T': the descriptor the value's table begins with, or the conformance
         // list behind that descriptor for an interface.
         TypeTest t when _module.Types[t.Target.Value].IsInterface =>
             $"{Temp(t.Dest)} = (lyr_iface_find({DescOfIface(t.Value)}, {IfaceId(t.Target.Value)}) != NULL);",
@@ -1834,9 +1834,9 @@ public sealed class CEmitter
         Downcast d when _module.Types[d.Target.Value].IsClass =>
             $"{Temp(d.Dest)} = ({CType(d.Result)}){Temp(d.Value)}.data;",
         Downcast d => Assign(d.Dest, $"(({BoxName(d.Target.Value)} *){Temp(d.Value)}.data)->value"),
-        // A function value (01 V8): the code and its environment, or a thunk and no environment.
+        // A function value: the code and its environment, or a thunk and no environment.
         MakeClosure m => $"{Temp(m.Dest)} = ({CType(m.Type)}){{ {CodeOf(_module.Functions[m.Target.Value])}, {(m.Environment is { } e ? Temp(e) : "NULL")} }};",
-        // The slot goes with every call of a function value (03 T17): the caller's own where the
+        // The slot goes with every call of a function value: the caller's own where the
         // type throws, none to write where it cannot.
         CallIndirect c => Assign(c.Dest, $"{Temp(c.Callee)}.fn({Temp(c.Callee)}.env{string.Concat(c.Args.Select(a => ", " + Value(a)))}, "
             + $"{(c.Throws ? "&lyr_e" : "NULL")})"),
@@ -1860,14 +1860,14 @@ public sealed class CEmitter
         NewArray n => $"{Temp(n.Dest)} = lyr_alloc_array(&{ArrayDescriptor(n.Element)}, {n.Elements.Length});"
             + string.Concat(n.Elements.Select((e, i) => $" {Elements(n.Dest, n.Element)}[{i}] = {Value(e)};")),
         ArrayLen a => $"{Temp(a.Dest)} = {Length(a.Array)};",
-        // A view (03 T13 A2): its bounds checked against the source, then a pointer into the
+        // A view: its bounds checked against the source, then a pointer into the
         // source's elements and a length — of an array, or of a view of one.
         MakeSlice s => (s.Chars
                 ? $"LYR_CHECK_CHAR_RANGE({Elements(s.Array, s.Element)}, {Temp(s.Low)}, {Temp(s.High)}, {Length(s.Array)}); "
                 : $"LYR_CHECK_RANGE({Temp(s.Low)}, {Temp(s.High)}, {Length(s.Array)}); ")
             + $"{Temp(s.Dest)} = ({CType(TypeOf(s.Dest))}){{ {Elements(s.Array, s.Element)} + {Temp(s.Low)}, {Temp(s.High)} - {Temp(s.Low)} }};",
-        // An element is a place in the array (02 M3): a struct element is aliased where it lies,
-        // a scalar or a reference read out. The check is the one of 03 T14 N5, in every profile.
+        // An element is a place in the array: a struct element is aliased where it lies,
+        // a scalar or a reference read out. The bounds check runs in every profile.
         LoadElem e => $"LYR_CHECK_INDEX({Temp(e.Index)}, {Length(e.Array)}); {Temp(e.Dest)} = "
             + (IsAggregate(e.Element) ? "&" : "") + $"{Elements(e.Array, e.Element)}[{Temp(e.Index)}];",
         StoreElem s => StoreElement(s),
@@ -1878,7 +1878,7 @@ public sealed class CEmitter
         EnumAs a => _module.Types[a.Variant.Value].FieldTypes.Length > 1
             ? $"{Temp(a.Dest)} = &{Temp(a.Value)}->as.v{_variants[a.Variant.Value].Tag};"
             : $"{Temp(a.Dest)} = ({StructName(a.Variant)} *)(void *){Temp(a.Value)};",
-        // A coroutine (06 N2): made over its environment, pulled, asked whether it is done and
+        // A coroutine: made over its environment, pulled, asked whether it is done and
         // what its body returned. A yield hands the resumer the value's address in the frame —
         // a temp's own, or the storage an aggregate temp points at.
         MakeCoroutine m => StartCoroutine(m),
@@ -1902,7 +1902,7 @@ public sealed class CEmitter
     /// <summary>
     /// The value inside an optional. After a test — a narrowing, a <c>??</c>, a <c>?.</c> — it
     /// is a read and nothing more. After <c>x!</c> it is the one unwrap that can be wrong, and
-    /// panics with <c>LYR-RT0004</c> at the program's line (03 T4 O4). A struct or an optional
+    /// panics with <c>LYR-RT0004</c> at the program's line. A struct or an optional
     /// inside is aliased in place, not copied out: a narrowed <c>?Point</c> is written where it
     /// lies.
     /// </summary>
@@ -1929,7 +1929,7 @@ public sealed class CEmitter
     };
 
     /// <summary>The arguments of a call: values, except the receiver of a struct method, which
-    /// goes as the place its temp aliases (02 M5) — so a <c>mut fn</c> writes the caller's
+    /// goes as the place its temp aliases — so a <c>mut fn</c> writes the caller's
     /// value and not a copy of it.</summary>
     /// <summary>A value of a variant: the tag, and the payload under its name in the union. The
     /// rest of the union stays zero, so a word no variant wrote is never a stray pointer.</summary>
@@ -1946,7 +1946,7 @@ public sealed class CEmitter
         string.Join(", ", args.Select((arg, i) => callee.ReceiverByRef && i == 0 ? Temp(arg) : Value(arg)));
 
     /// <summary>
-    /// A field write. A reference goes through the write barrier (01 L1) wherever the field
+    /// A field write. A reference goes through the write barrier wherever the field
     /// lives: in an object, or in a struct that may itself lie inside one — the temp that names
     /// the place does not say which, so the barrier takes the place as it is, a heap object, an
     /// interior pointer or a stack address. A struct value that holds references is stored
@@ -1962,7 +1962,7 @@ public sealed class CEmitter
         return $"{slot} = {Value(f.Value)};";
     }
 
-    /// <summary>A write through a place (03 T12), through the barrier when the value is or holds a
+    /// <summary>A write through a place, through the barrier when the value is or holds a
     /// reference: the place is the slot, wherever it lies — in an object, in a struct on the
     /// stack, in a global — and the barrier takes it as it is (the note on <see cref="Store"/>).</summary>
     private string StoreThrough(StorePlace s)
@@ -1987,7 +1987,7 @@ public sealed class CEmitter
         var slot = $"{Elements(s.Array, element)}[{Temp(s.Index)}]";
         var check = $"LYR_CHECK_INDEX({Temp(s.Index)}, {Length(s.Array)}); ";
         // Through a view the barrier gets the interior pointer as the place: it takes a place as
-        // it is (the note on Store), and the collector understands interior pointers (01 L1).
+        // it is (the note on Store), and the collector understands interior pointers.
         var place = TypeOf(s.Array) is IrSliceType ? $"{Temp(s.Array)}.ptr" : Temp(s.Array);
         if (IsReference(element)) return $"{check}LYR_WRITE_BARRIER({place}, &{slot}, {Value(s.Value)});";
         if (HoldsReferences(element)) return $"{check}LYR_WRITE_BARRIER_VALUE({place}, &{slot}, {Value(s.Value)});";
@@ -2005,7 +2005,7 @@ public sealed class CEmitter
     };
 
     /// <summary>
-    /// An array a <c>comptime</c> site computed (design/v5/spec/09 Q1, 13 M9a P3): its elements
+    /// An array a <c>comptime</c> site computed: its elements
     /// as static data, never written, from which each evaluation fills a fresh array — or the
     /// inline array's storage —, as a literal is filled. A string element is its static object.
     /// </summary>
@@ -2038,7 +2038,7 @@ public sealed class CEmitter
     };
 
     /// <summary>
-    /// A string literal as a static object the runtime reads without a copy (V9): one per distinct
+    /// A string literal as a static object the runtime reads without a copy: one per distinct
     /// text, as UTF-8 in a C literal with octal escapes for everything that is not plain printable
     /// ASCII (octal, because a hex escape would swallow a following hex digit).
     /// </summary>
@@ -2127,7 +2127,7 @@ public sealed class CEmitter
             // comparison would ask whether they are one object).
             IrBinKind.Eq when IsString(TypeOf(b.Lhs)) => $"(uint8_t)lyr_str_eq({lhs}, {rhs})",
             IrBinKind.Ne when IsString(TypeOf(b.Lhs)) => $"(uint8_t)!lyr_str_eq({lhs}, {rhs})",
-            // A view of bytes by its bytes — a StringView matched against a literal (10 S1).
+            // A view of bytes by its bytes — a StringView matched against a literal.
             IrBinKind.Eq when TypeOf(b.Lhs) is IrSliceType { Element: IrScalarType { Kind: IrScalar.U8 } }
                 => $"(uint8_t)LYR_VIEW_EQ({lhs}, {rhs})",
             IrBinKind.Ne when TypeOf(b.Lhs) is IrSliceType { Element: IrScalarType { Kind: IrScalar.U8 } }
@@ -2156,7 +2156,7 @@ public sealed class CEmitter
     }
 
     /// <summary>
-    /// <c>as</c> and the implicit widening, one instruction (03 T1c, T1d). Between integers, and
+    /// <c>as</c> and the implicit widening, one instruction. Between integers, and
     /// from an integer to a float, the C conversion is the rule: a widening is exact, a narrowing
     /// reduces modulo the width (C defines that for the unsigned target; clang and gcc define it
     /// the same way for the signed one), an integer to a float rounds to nearest. A float to an
@@ -2191,14 +2191,14 @@ public sealed class CEmitter
         CondBranch c => $"if ({Temp(c.Cond)}) goto bb{c.IfTrue.Value}; else goto bb{c.IfFalse.Value};",
         // Reached only after a call that does not return; the verifier vouches for it.
         Unreachable => "LYR_UNREACHABLE();",
-        // The error path (01 L5 E1-E3): a throw allocates the record and goes to its landing, a
+        // The error path: a throw allocates the record and goes to its landing, a
         // failed call goes there too, the bottom hands the error to the caller's slot.
         Throw t => $"lyr_e = lyr_err_new({Value(t.Value)}); goto bb{t.Landing.Value};",
         ErrorBranch e => $"if (LYR_UNLIKELY(lyr_e != NULL)) goto bb{e.OnError.Value}; goto bb{e.Continue.Value};",
         Propagate => IsVoid(_function.ReturnType)
             ? "*lyr_err = lyr_e; return;"
             : $"*lyr_err = lyr_e; return {ZeroValue(_function.ReturnType)};",
-        // 'try!' (05 E4, E8): the error's message through Error's own table, then the panic.
+        // 'try!': the error's message through Error's own table, then the panic.
         PanicError => $"lyr_panic_error(lyr_e, {ReportNames().Message});",
         _ => throw new InvalidOperationException($"the C emitter has no case for {terminator.GetType().Name}; the gate let it through"),
     };

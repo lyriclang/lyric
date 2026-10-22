@@ -1,4 +1,4 @@
-/* The network's calls (lyr/net.h): sockets, non-blocking — POSIX's, and Winsock's since M8b S11.
+/* The network's calls (lyr/net.h): sockets, non-blocking — POSIX's and Winsock's.
  * One call each; the few places where the two differ are the helpers below: what a failure says,
  * how a socket is made non-blocking, closed, its name resolved. */
 #if defined(__linux__)
@@ -51,8 +51,8 @@ static Length length_of(int64_t n) {
     return n < 0 ? 0 : (uint64_t)n > (uint64_t)LENGTH_MAX ? (Length)LENGTH_MAX : (Length)n;
 }
 
-/* What the system's last error says, as a failure: the kinds a socket can give by their names
- * (10 O3), any other as Other with its number; a call that would block, as such. */
+/* What the system's last error says, as a failure: the kinds a socket can give by their names,
+ * any other as Other with its number; a call that would block, as such. */
 #ifdef _WIN32
 static int64_t failed(void) {
     int e = WSAGetLastError();

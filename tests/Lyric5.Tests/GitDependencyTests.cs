@@ -5,7 +5,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Git dependencies (design/v5/spec/11 W2 P2, P8, P9; 07 V7, P10): a package read from a revision
+/// Git dependencies: a package read from a revision
 /// of a repository — a tag, a branch, a commit, the default branch — by way of the user's cache,
 /// which <c>--offline</c> reads alone; what the package is made of; one source for each name.
 /// The repositories are local ones (<c>file://</c>): the tests reach no network. Through
@@ -82,7 +82,7 @@ public class GitDependencyTests
     }
 
     /// <summary>A repository that cannot be reached is the environment's failure, not the
-    /// manifest's (11 C5): exit 2.</summary>
+    /// manifest's: exit 2.</summary>
     [Fact]
     public void A_repository_that_cannot_be_read_is_the_environments_failure()
     {
@@ -93,7 +93,7 @@ public class GitDependencyTests
         Assert.Contains($"error[LYR-PKG0007]: 'geo' cannot be read from {nowhere}: ", error);
     }
 
-    /// <summary>What was fetched once stays in the user's cache (P9): offline, with the repository
+    /// <summary>What was fetched once stays in the user's cache: offline, with the repository
     /// gone, the package is read from there.</summary>
     [Fact]
     public void Offline_the_cache_answers()
@@ -117,7 +117,7 @@ public class GitDependencyTests
         Assert.Contains("which the cache does not hold, and --offline fetches nothing", error);
     }
 
-    /// <summary>The replaced package is not read (07 P7) — not even fetched: the repository does not exist.</summary>
+    /// <summary>The replaced package is not read — not even fetched: the repository does not exist.</summary>
     [Fact]
     public void An_override_replaces_a_package_from_git_unfetched()
     {
@@ -142,7 +142,7 @@ public class GitDependencyTests
         Assert.Contains("error[LYR-PKG0004]: 'geo' is read from git and names 'units' by a directory", error);
     }
 
-    /// <summary>What a package from git delivers is its package content (11 W2 P8): the default
+    /// <summary>What a package from git delivers is its package content: the default
     /// set minus what it excludes — not its tests, not its notes.</summary>
     [Fact]
     public void A_package_from_git_is_its_package_content()
@@ -168,7 +168,7 @@ public class GitDependencyTests
         Assert.Contains("error[LYR-RES0003]: cannot find module 'geo.draft'", error);
     }
 
-    /// <summary>One package of each name (07 P3): a tag and a branch of one repository are two
+    /// <summary>One package of each name: a tag and a branch of one repository are two
     /// sources.</summary>
     [Fact]
     public void Two_revisions_of_one_package_are_refused()

@@ -3,8 +3,8 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Imports (design/v5/spec/07 V3): the three forms, a selective item renamed (I2), <c>pub import</c>
-/// passing on what it binds (I4), and one rule for an import never used (I5). Through <c>Main</c>,
+/// Imports: the three forms, a selective item renamed, <c>pub import</c> passing on what it binds,
+/// and one rule for an import never used. Through <c>Main</c>,
 /// so in the console collection.
 /// </summary>
 [Collection("console")]
@@ -29,7 +29,7 @@ public class ImportTests
     }
 
     /// <summary>What a 'pub import' binds is a pub member of its module: imported from there,
-    /// named through it, renamed as it was renamed — the curated surface (I4).</summary>
+    /// named through it, renamed as it was renamed — the curated surface.</summary>
     [Fact]
     public void A_pub_import_passes_a_name_on()
     {
@@ -66,7 +66,7 @@ public class ImportTests
         Assert.Contains("error[LYR-RES0010]: 'helper' is not pub, and 'pub import' passes on what is pub", error);
     }
 
-    /// <summary>One rule for every form (I5): the qualified form warned never before.</summary>
+    /// <summary>One rule for every form: the qualified form warned never before.</summary>
     [Theory]
     [InlineData("import std.io;", "io")]
     [InlineData("import std.io as console;", "console")]

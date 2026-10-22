@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A generic member of an interface at run time (design/v5/spec/04 D9, the review's A8, M8a-7):
+/// A generic member of an interface at run time:
 /// a conformer's own member is the one that runs — on the type, through a constraint, and from
 /// inside ANOTHER default of the interface, which is the case a default instantiated for the
 /// interface's value could not see. And a generic STATIC member through a constraint, the form

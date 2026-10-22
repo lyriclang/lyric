@@ -1,4 +1,4 @@
-/* The panic path (05 E8): message, backtrace, hook, exit 101. */
+/* The panic path: message, backtrace, hook, exit 101. */
 #include "internal.h"
 #include "lyr/gc.h"
 #include "lyr/console.h"
@@ -57,7 +57,7 @@ LYR_NORETURN static void report_and_end(const char *code, const char *message, c
     }
     this_thread_panicking = 1;
     if (atomic_exchange(&panicking, 1)) lyr_panic_wait();
-    /* what the program wrote before, ahead of the report (10 O9); a stream another thread holds is
+    /* what the program wrote before, ahead of the report; a stream another thread holds is
      * left, and none in a signal handler, where no lock is to be taken */
     if (!in_handler) lyr_console_flush_all(0);
 
@@ -94,7 +94,7 @@ void lyr_panic(const char *code, const char *format, ...) {
     va_start(args, format);
     vsnprintf(message, sizeof message, format, args);
     va_end(args);
-    /* A panic leaves the coroutine it happens in (05 E8), and its resumer takes it from there. Out
+    /* A panic leaves the coroutine it happens in, and its resumer takes it from there. Out
      * of memory is the process's: allocating the report would only fail again. */
     if (strcmp(code, LYR_RT_OUT_OF_MEMORY) != 0) lyr_coro_panic_leave(code, message, NULL);
     lyr_panic_report(code, message, NULL, 0);

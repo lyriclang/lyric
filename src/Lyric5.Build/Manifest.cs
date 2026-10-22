@@ -3,8 +3,8 @@ using System.Text.RegularExpressions;
 
 namespace Lyric5.Build;
 
-/// <summary>A package a manifest depends on (design/v5/spec/11 W2 P2, P9; 07 V7): read from a
-/// directory or from a git repository — a registry's version is no part of 5.0 (07 P8).</summary>
+/// <summary>A package a manifest depends on: read from a
+/// directory or from a git repository — a registry's version is no part of 5.0.</summary>
 /// <param name="Path">The package's directory, absolute, for <c>{ path = "…" }</c>.</param>
 /// <param name="Git">The repository and its revision, for <c>{ git = "…" }</c>.</param>
 /// <param name="Line">The line it is written on, for what is refused about it.</param>
@@ -14,12 +14,12 @@ public sealed record Dependency(string Name, string? Path, GitSource? Git, int L
     public string Describe() => Git?.ToString() ?? $"'{Path}'";
 }
 
-/// <summary>A git repository and the revision of it a dependency reads (11 W2 P9): a tag, a
+/// <summary>A git repository and the revision of it a dependency reads: a tag, a
 /// branch, a commit — or, none named, the branch the repository's <c>HEAD</c> names.</summary>
 public sealed record GitSource(string Url, GitRefKind Kind, string? Ref)
 {
-    /// <summary>The form a repository's URL is compared, cached and locked in (design/v5/spec/07
-    /// M7-10): a <c>/</c> and a <c>.git</c> at the end dropped, the scheme and the host in lower
+    /// <summary>The form a repository's URL is compared, cached and locked in:
+    /// a <c>/</c> and a <c>.git</c> at the end dropped, the scheme and the host in lower
     /// case — <c>HTTPS://Example.com/org/geo.git/</c> is <c>https://example.com/org/geo</c>. The
     /// rest keeps its case, a user's name as a path's; <c>https</c> and <c>ssh</c> to one host stay
     /// two URLs. Git reaches a repository through this form too: a local one by its suffixes, a
@@ -58,72 +58,71 @@ public sealed record GitSource(string Url, GitRefKind Kind, string? Ref)
 
 public enum GitRefKind { Default, Tag, Branch, Rev }
 
-/// <summary>A program of the package besides its <c>src/main.lyr</c> (design/v5/spec/11 W2 P2):
+/// <summary>A program of the package besides its <c>src/main.lyr</c>:
 /// <c>[[bin]] name = "tool" entry = "src/tool.lyr"</c>.</summary>
 /// <param name="Entry">The entry module's file, absolute: a module of the package.</param>
 public sealed record Binary(string Name, string Entry, int Line);
 
-/// <summary>The least toolchain that builds the package (11 W2 P12; 07 V9).</summary>
+/// <summary>The least toolchain that builds the package.</summary>
 public sealed record ToolchainPin(SemVer Minimum, int Line);
 
 /// <summary>
-/// A package's manifest, <c>lyric.toml</c> (design/v5/spec/07 V7, 11 W2): read, never run (P1).
-/// <c>[package]</c> names the package — the first segment of its module paths (07 M1, M3) —, its
-/// version and its edition (07 V9). The other sections come with the slices that give them a
-/// meaning; until then a section, like a key, the toolchain does not know is an error, as an
-/// unknown option is (11 C3).
+/// A package's manifest, <c>lyric.toml</c>: read, never run.
+/// <c>[package]</c> names the package — the first segment of its module paths —, its
+/// version and its edition. A section or a key the toolchain does not know is an error, as an
+/// unknown option is.
 /// </summary>
 public sealed partial record Manifest(string File, string Name, string Version, string Edition)
 {
-    /// <summary><c>[dependencies]</c>: the packages this one imports from (P6).</summary>
+    /// <summary><c>[dependencies]</c>: the packages this one imports from.</summary>
     public IReadOnlyList<Dependency> Dependencies { get; init; } = [];
 
-    /// <summary><c>[build-dependencies]</c> (11 W3 BS3): what the package's build script imports from —
+    /// <summary><c>[build-dependencies]</c>: what the package's build script imports from —
     /// a graph of the script's own, which the package's program does not see.</summary>
     public IReadOnlyList<Dependency> BuildDependencies { get; init; } = [];
 
-    /// <summary>The root of a build script's own graph (BS3): the package's manifest seen as the
+    /// <summary>The root of a build script's own graph: the package's manifest seen as the
     /// script's — its dependencies the package's build dependencies —, with no script of its own.</summary>
     public bool IsScript { get; init; }
 
-    /// <summary><c>[override]</c> (07 P7): a package of the graph read from another directory,
+    /// <summary><c>[override]</c>: a package of the graph read from another directory,
     /// wherever it is asked for — the root manifest's alone count.</summary>
     public IReadOnlyList<Dependency> Overrides { get; init; } = [];
 
-    /// <summary><c>include</c> (11 W2 P8): the files the package is made of, instead of the
+    /// <summary><c>include</c>: the files the package is made of, instead of the
     /// default; <c>null</c> where the default holds.</summary>
     public IReadOnlyList<string>? Include { get; init; }
 
-    /// <summary><c>exclude</c> (P8): files taken out of what the package is made of.</summary>
+    /// <summary><c>exclude</c>: files taken out of what the package is made of.</summary>
     public IReadOnlyList<string> Exclude { get; init; } = [];
 
-    /// <summary><c>[profile.&lt;name&gt;]</c> (P3): the built-in profiles changed, the manifest's own
+    /// <summary><c>[profile.&lt;name&gt;]</c>: the built-in profiles changed, the manifest's own
     /// named — the root manifest's alone count.</summary>
     public IReadOnlyDictionary<string, ProfileSpec> Profiles { get; init; } = new Dictionary<string, ProfileSpec>();
 
-    /// <summary><c>[[bin]]</c> (P2): the programs besides <c>src/main.lyr</c>.</summary>
+    /// <summary><c>[[bin]]</c>: the programs besides <c>src/main.lyr</c>.</summary>
     public IReadOnlyList<Binary> Binaries { get; init; } = [];
 
-    /// <summary><c>toolchain</c> (P12): the least toolchain that builds the package; <c>null</c> for any.</summary>
+    /// <summary><c>toolchain</c>: the least toolchain that builds the package; <c>null</c> for any.</summary>
     public ToolchainPin? Toolchain { get; init; }
 
-    /// <summary><c>comptimeBudget</c> (09 Q5; M9a S1): the steps one <c>comptime</c> site may take —
+    /// <summary><c>comptimeBudget</c>: the steps one <c>comptime</c> site may take —
     /// the root manifest's counts; <c>null</c> for the toolchain's default.</summary>
     public long? ComptimeBudget { get; init; }
 
-    /// <summary><c>[lints]</c> (spec 16 §5; M12a S5): the levels the package gives its lints —
+    /// <summary><c>[lints]</c>: the levels the package gives its lints —
     /// each package's own, for its own files.</summary>
     public IReadOnlyList<LintSettings.Rule> Lints { get; init; } = [];
 
-    /// <summary><c>[trust] build-scripts</c> (11 W3 BS5): the packages of the graph whose
+    /// <summary><c>[trust] build-scripts</c>: the packages of the graph whose
     /// <c>build.lyr</c> may run — the root manifest's alone count; the root's own script always runs.</summary>
     public IReadOnlyList<string> TrustedScripts { get; init; } = [];
 
-    /// <summary>The package's build script (BS1): <c>build.lyr</c> at its root, where there is one.</summary>
+    /// <summary>The package's build script: <c>build.lyr</c> at its root, where there is one.</summary>
     public string? BuildScript => !IsScript && System.IO.File.Exists(System.IO.Path.Combine(Root, "build.lyr"))
         ? System.IO.Path.Combine(Root, "build.lyr") : null;
 
-    /// <summary>The root of the build script's own graph (BS3): <c>build</c>, its dependencies the
+    /// <summary>The root of the build script's own graph: <c>build</c>, its dependencies the
     /// package's build dependencies, the root package's trust carried over.</summary>
     public Manifest ScriptRoot(Manifest root) => new(File, "build", Version, Edition)
     {
@@ -132,11 +131,11 @@ public sealed partial record Manifest(string File, string Name, string Version, 
         IsScript = true,
     };
 
-    /// <summary>Where its script writes the package's generated modules (BS6): <c>gen/</c>, the module
+    /// <summary>Where its script writes the package's generated modules: <c>gen/</c>, the module
     /// space <c>&lt;package&gt;.gen</c>.</summary>
     public string GenRoot => System.IO.Path.Combine(Root, "gen");
 
-    /// <summary><c>[native]</c> (07 B5): the native part every target gets.</summary>
+    /// <summary><c>[native]</c>: the native part every target gets.</summary>
     public NativePart Native { get; init; } = NativePart.None;
 
     /// <summary><c>[native.linux]</c> and its siblings: what one operating system gets on top.</summary>
@@ -147,17 +146,17 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     public NativePart NativeOn(Lyric5.Toolchain.TargetOs os) =>
         NativePerSystem.TryGetValue(os, out var more) ? Native.With(more) : Native;
 
-    /// <summary>The directory of the manifest: the package's root, where <c>out/</c> lies (P5).</summary>
+    /// <summary>The directory of the manifest: the package's root, where <c>out/</c> lies.</summary>
     public string Root => Path.GetDirectoryName(File)!;
 
-    /// <summary>Where the package's modules are (07 M1): <c>src/</c>.</summary>
+    /// <summary>Where the package's modules are: <c>src/</c>.</summary>
     public string SourceRoot => Path.Combine(Root, "src");
 
-    /// <summary>The editions this toolchain knows (07 V9).</summary>
+    /// <summary>The editions this toolchain knows.</summary>
     private static readonly string[] Editions = ["5"];
 
     /// <summary>The keys of <c>[package]</c> the toolchain reads, and the ones that describe the
-    /// package and change no build — for <c>lyric metadata</c> (P10).</summary>
+    /// package and change no build — for <c>lyric metadata</c>.</summary>
     private static readonly string[] PackageKeys = ["name", "version", "edition", "include", "exclude", "toolchain", "comptimeBudget"];
 
     private static readonly string[] DescriptiveStrings = ["description", "license", "repository"];
@@ -246,7 +245,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
         };
     }
 
-    /// <summary><c>[lints]</c> (spec 16 §5; 13 M12a P8): <c>allow</c>, <c>warn</c> and <c>deny</c>, each
+    /// <summary><c>[lints]</c>: <c>allow</c>, <c>warn</c> and <c>deny</c>, each
     /// an array of what it sets — a lint by its name or code, a group, or <c>warnings</c> for all. One
     /// selector stands in one of them: <c>deny = ["unused"]</c> beside <c>allow = ["unused"]</c> says
     /// two things of one thing.</summary>
@@ -286,7 +285,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
         return rules;
     }
 
-    /// <summary><c>comptimeBudget</c> (design/v5/spec/09 Q5): the steps one <c>comptime</c> site may
+    /// <summary><c>comptimeBudget</c>: the steps one <c>comptime</c> site may
     /// take, a positive number; the root manifest's holds for the whole build.</summary>
     private static long? ReadComptimeBudget(TomlTable package, string file)
     {
@@ -297,7 +296,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
         return steps;
     }
 
-    /// <summary><c>[build-dependencies]</c> (11 W3 BS3): read as <c>[dependencies]</c> is; the name
+    /// <summary><c>[build-dependencies]</c>: read as <c>[dependencies]</c> is; the name
     /// <c>build</c> is the script's own module and no package of its graph.</summary>
     private static IReadOnlyList<Dependency> ReadBuildDependencies(TomlTable document, string file)
     {
@@ -308,7 +307,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
         return dependencies;
     }
 
-    /// <summary><c>[trust] build-scripts = ["geo"]</c> (11 W3 BS5): the packages whose build scripts
+    /// <summary><c>[trust] build-scripts = ["geo"]</c>: the packages whose build scripts
     /// may run, by name — pnpm 10's rule, against Cargo's and npm's running every one.</summary>
     private static List<string> ReadTrust(TomlTable document, string file)
     {
@@ -332,7 +331,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     }
 
     /// <summary><c>toolchain = "5.1"</c> or <c>">=5.1"</c>: the least toolchain that builds the
-    /// package (11 W2 P12; 07 V9). A pin the toolchain did not check would be a promise it did not keep.</summary>
+    /// package. A pin the toolchain did not check would be a promise it did not keep.</summary>
     private static ToolchainPin? ReadToolchain(TomlTable package, string file)
     {
         if (!package.TryGet("toolchain", out var given)) return null;
@@ -344,7 +343,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     }
 
     /// <summary><c>[[bin]]</c>: each program a name and an entry — a module of the package, a
-    /// <c>.lyr</c> file under <c>src/</c> (11 W2 P2). One name per program: the package's own,
+    /// <c>.lyr</c> file under <c>src/</c>. One name per program: the package's own,
     /// for <c>src/main.lyr</c>, included.</summary>
     private static List<Binary> ReadBinaries(TomlTable document, string file, string package)
     {
@@ -379,7 +378,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
         return binaries;
     }
 
-    /// <summary><c>include</c> or <c>exclude</c>: patterns of the package's files (11 W2 P8).</summary>
+    /// <summary><c>include</c> or <c>exclude</c>: patterns of the package's files.</summary>
     private static List<string>? Patterns(TomlTable package, string key, string file)
     {
         if (!package.TryGet(key, out var value)) return null;
@@ -400,7 +399,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     private static readonly string[] Revisions = ["tag", "branch", "rev"];
 
     /// <summary><c>name = { path = "…" }</c>, the path relative to the manifest's directory, or
-    /// <c>name = { git = "…", tag | branch | rev = "…" }</c>. An override reads a directory (07 P7).</summary>
+    /// <c>name = { git = "…", tag | branch | rev = "…" }</c>. An override reads a directory.</summary>
     private static List<Dependency> ReadDependencies(TomlTable document, string section, string file)
     {
         var dependencies = new List<Dependency>();
@@ -451,7 +450,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     /// <summary>The git form: a URL git reads, and at most one revision of the repository.</summary>
     private static GitSource GitForm(string name, string url, TomlTable spec, List<string> revisions, string file, int line)
     {
-        // the normal form first (M7-10): a scheme in capitals is the scheme
+        // the normal form first: a scheme in capitals is the scheme
         url = GitSource.Normalize(url);
         if (!GitUrlPattern().IsMatch(url))
             throw new ManifestException("LYR-PKG0002", file, line, 1,
@@ -521,8 +520,8 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     private static partial Regex ToolchainPattern();
 }
 
-/// <summary>A manifest the toolchain refuses: its code (11 W6), file, line and column, and why —
-/// exit 1; a package from git that cannot be reached is the environment's failure, exit 2 (11 C5).</summary>
+/// <summary>A manifest the toolchain refuses: its code, file, line and column, and why —
+/// exit 1; a package from git that cannot be reached is the environment's failure, exit 2.</summary>
 public sealed class ManifestException(string code, string file, int line, int column, string message, int exit = 1)
     : Exception(message)
 {

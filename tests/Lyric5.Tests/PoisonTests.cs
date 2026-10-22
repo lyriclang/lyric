@@ -3,10 +3,9 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A panic in the body of a lock (design/v5/spec/06 G4; the review's M6-21). A panic unwinds
-/// nothing (10 §5 rule 1), so the <c>defer</c> that releases the lock never ran: the lock
-/// stayed held, and every task that came for it waited for ever — since R6b a deadlock panic,
-/// which names the wrong thing. Now the scheduler RELEASES what the panicked task held, and
+/// A panic in the body of a lock. A panic unwinds nothing (10 §5 rule 1), so the <c>defer</c>
+/// that releases the lock never ran: the lock stayed held, and every task that came for it waited
+/// for ever — or ended in a deadlock panic, which names the wrong thing. Now the scheduler RELEASES what the panicked task held, and
 /// POISONS it: every <c>lock</c>, <c>read</c>, <c>write</c> and <c>run</c> from then on panics
 /// with <c>LYR-RT0019</c>, naming the first panic. A <c>Once</c> whose body panicked is poisoned
 /// the same way.

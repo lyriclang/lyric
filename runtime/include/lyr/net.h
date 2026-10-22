@@ -1,10 +1,10 @@
-/* The network's calls (design/v5/spec/10 O7; 13 M8b P1, P2, S10b): one system call each, EINTR
+/* The network's calls: one system call each, EINTR
  * taken again, a socket a POSIX descriptor in an int64_t — non-blocking and closed on exec. A call
  * that would block answers LYR_NET_WOULD_BLOCK, and std.net waits on the poller (lyr/poll.h) for
  * the socket's readiness, then asks again. A failure is as lyr/fs.h writes one. An address crosses
  * as its family (4 or 6), its 16 bytes — an IPv4 address in the first four — and its port.
  *
- * Windows' sockets are Winsock's (S11): a SOCKET in the int64_t, waited for by AFD (lyr/poll.h). */
+ * Windows' sockets are Winsock's: a SOCKET in the int64_t, waited for by AFD (lyr/poll.h). */
 #ifndef LYR_NET_H
 #define LYR_NET_H
 
@@ -46,7 +46,7 @@ int64_t lyr_net_connect(int64_t fd, int64_t family, const uint8_t *address, int6
 int64_t lyr_net_connected(int64_t fd);
 
 /* At most `n` bytes of the stream into `into`: how many, 0 at its end. At most `n` bytes of `from`
- * into the stream: how many. A peer that is gone is BrokenPipe — the signal is ignored (10 Q9),
+ * into the stream: how many. A peer that is gone is BrokenPipe — the signal is ignored,
  * and Linux is asked not to send it. */
 int64_t lyr_net_recv(int64_t fd, uint8_t *into, int64_t n);
 int64_t lyr_net_send(int64_t fd, const uint8_t *from, int64_t n);
@@ -64,13 +64,13 @@ int64_t lyr_net_name(int64_t fd, int64_t peer, uint8_t *into, int64_t n);
 /* The socket closed: 0, or the failure the system's close gave — the socket is gone either way. */
 int64_t lyr_net_close(int64_t fd);
 
-/* A datagram (M8b S10c): at most `n` bytes of `from` sent to the address — how many; and the next
+/* A datagram: at most `n` bytes of `from` sent to the address — how many; and the next
  * datagram received, at most `n` of its bytes into `into` — how many, the rest of a longer one
  * lost — with its sender into `sender` as lyr_net_name writes an address. */
 int64_t lyr_net_sendto(int64_t fd, const uint8_t *from, int64_t n, int64_t family, const uint8_t *address, int64_t port);
 int64_t lyr_net_recvfrom(int64_t fd, uint8_t *into, int64_t n, uint8_t *sender, int64_t room);
 
-/* The addresses `host` names (M8b S10c, getaddrinfo — a blocking call, which std.net makes on the
+/* The addresses `host` names (getaddrinfo — a blocking call, which std.net makes on the
  * I/O pool): each as LYR_NET_HOST_BYTES — its family, its 16 bytes — into `into`, each once, in the
  * resolver's order; how many there are, which may be more than fit: then call again with room. A
  * name nobody knows is NotFound. */

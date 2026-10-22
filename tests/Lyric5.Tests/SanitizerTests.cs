@@ -4,7 +4,7 @@ using Lyric5.Toolchain;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The runtime under clang's sanitizers (M1 S5; design/v5/spec/01 C7): ASan with UBSan over every
+/// The runtime under clang's sanitizers: ASan with UBSan over every
 /// program that ends on its own or by a panic, TSan over the programs that run threads. They run
 /// on Linux x86-64, the platform the plan names for them, in the run that asks for them with
 /// <c>LYRIC5_SANITIZERS=1</c> — CI's C toolchain job, which also prepares the kernel for TSan.
@@ -49,7 +49,7 @@ public class SanitizerTests
         { "panic_index", [], 101 },
         { "panic_hook", [], 101 },
         { "heap_limit", [], 101 },
-        // Coroutines (M6): ASan follows every switch between stacks, and a stack released while
+        // Coroutines: ASan follows every switch between stacks, and a stack released while
         // frames on it never returned is unpoisoned before its next use.
         { "coro_basic", [], 0 },
         { "coro_basic", ["self"], 101 },
@@ -66,7 +66,7 @@ public class SanitizerTests
         { "coro_storm", [], 0 },
     };
 
-    /// <summary>The threaded programs under TSan with the own collector, the default (13 M11 S3): it
+    /// <summary>The threaded programs under TSan with the own collector, the default: it
     /// stops the world at safepoints, with atomics and a condition variable TSan sees — Boehm's
     /// signals make its stop abort here (the test below). The threads program among them.</summary>
     public static TheoryData<string, string[], int> TsanPrograms() => new()
@@ -101,10 +101,10 @@ public class SanitizerTests
 
 
     /// <summary>
-    /// The throw paths under ASan and UBSan (13, M5): the emitter's C for every program that throws,
+    /// The throw paths under ASan and UBSan: the emitter's C for every program that throws,
     /// catches, runs a defer or a close on the error path, suppresses, asks a clause's binding of
     /// its record, rethrows, or lets an error leave main — and the floor under the blocks the
-    /// lowering sealed as unreachable (01 M5-4)
+    /// lowering sealed as unreachable
     /// holds them to never being reached: one reached would panic. An error escaping main exits 1, a 'try!' on
     /// an error 101. Each under a name of its own, so the plain run of the same program in
     /// <see cref="CEmitterTests"/> never shares its sources.
@@ -127,7 +127,7 @@ public class SanitizerTests
     public void A_program_that_throws_runs_clean_under_ASan_and_UBSan(string name, int exit) => RunEmittedClean(name, exit);
 
     /// <summary>
-    /// Generators under ASan and UBSan (M6 S2a): every pull switches stacks, a yield hands the
+    /// Generators under ASan and UBSan: every pull switches stacks, a yield hands the
     /// puller an address in the suspended frame, a result and an error cross from the coroutine's
     /// stack to the puller's, and the dropped coroutines go with their stacks.
     /// </summary>
@@ -149,7 +149,7 @@ public class SanitizerTests
     [InlineData("locks", 0)]
     [InlineData("pool", 0)]
     [InlineData("files", 0)]
-    // the poller's descriptors (M8b S10b): its table, its fired tokens, a close that fires them
+    // the poller's descriptors: its table, its fired tokens, a close that fires them
     [InlineData("net_echo", 0)]
     [InlineData("net_many", 0)]
     [InlineData("net_duplex", 0)]
@@ -181,9 +181,9 @@ public class SanitizerTests
     /// Ubuntu runner (clang 18) the collector's stop-the-world signals now and then reach a thread
     /// only after its retry limit and it aborts ("Signals delivery fails constantly") — in 3 of 5
     /// runs, with and without the kernel preparation. Locally (clang 22) 96 stressed runs passed.
-    /// The mechanism is not found; it goes with the signal-based stop of stage 1 (M11 stops at
-    /// safepoints). Until then this run is local: STATUS keeps the thread open. The emitted
-    /// program with Lyric's own threads (M6 S6b) runs here too, for the same reason.
+    /// The mechanism is not found; it belongs to Boehm's signal-based stop, which the own
+    /// collector does not use. This run is local: STATUS keeps the thread open. The emitted
+    /// program with Lyric's own threads runs here too, for the same reason.
     /// </summary>
     [Fact]
     public void The_threads_program_runs_clean_under_TSan_where_asked_for()

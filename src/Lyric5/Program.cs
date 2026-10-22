@@ -84,7 +84,7 @@ public static partial class Program
         return 0;
     }
 
-    /// <summary>The toolchain's own failure (11 G4): not the program's fault, and worth a report.</summary>
+    /// <summary>The toolchain's own failure: not the program's fault, and worth a report.</summary>
     private static int Crashed(Exception crash)
     {
         {
@@ -107,8 +107,8 @@ public static partial class Program
     }
 
     /// <summary>
-    /// The options of every verb that say how its diagnostics read (design/v5/spec/11 G5, G6, C7;
-    /// M12a S2): <c>--color auto|always|never</c>, <c>--absolute-paths</c>, <c>--max-errors N</c>
+    /// The options of every verb that say how its diagnostics read:
+    /// <c>--color auto|always|never</c>, <c>--absolute-paths</c>, <c>--max-errors N</c>
     /// (0 for all), anywhere before a <c>--</c>. They are taken out of <paramref name="args"/> and
     /// set as <see cref="Lyric.Core.Rendering.RenderStyle.Current"/> — every verb, the same style, and
     /// set afresh by each command, so none leaks into the next. Paths are said relative to the

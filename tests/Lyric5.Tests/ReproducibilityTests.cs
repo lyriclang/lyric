@@ -6,7 +6,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Reproducibility (design/v5/spec/11 W2 P6): the same source, options, toolchain and C compiler
+/// Reproducibility: the same source, options, toolchain and C compiler
 /// give the same bytes — wherever the package lies, and whenever it is built. Two copies of one
 /// package, built from two directories a second apart, are compared byte for byte, a path
 /// dependency and a generic instance's unit included: for the host in both built-in profiles, and

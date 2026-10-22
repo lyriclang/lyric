@@ -3,11 +3,11 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>std.meta</c> (design/v5/spec/09 A7; 10 B13 M1; 13 M9a P5, S9): what a type is, while
+/// <c>std.meta</c>: what a type is, while
 /// compiling. A <c>comptime for</c> over <c>fields&lt;T&gt;()</c> sets its body in place once per
 /// field — <c>e.[f]</c> the field of its own type —, and a default that walks <c>Self</c>'s fields
 /// is set in place for each conformer. Each answer is a constant of the instance it is asked at;
-/// a field is listed where the asking code may name it (R7).
+/// a field is listed where the asking code may name it.
 ///
 /// <para>Through <c>Main</c>, so in the console collection.</para>
 /// </summary>
@@ -41,7 +41,7 @@ public class MetaTests
 
         """;
 
-    /// <summary>The artifact (13 M9a S9): a synthesis of one's own, <c>ToJson</c>, written once
+    /// <summary>A synthesis of one's own, <c>ToJson</c>, written once
     /// over <c>Self</c>'s fields — each conformer gets the default set in place for its fields,
     /// each round's <c>this.[f]</c> of that field's type. Nothing is said twice: the hint that a
     /// <c>var</c> is never written read the copies too.</summary>
@@ -128,9 +128,9 @@ public class MetaTests
             BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
-    /// <summary>The questions (10 B13 M1): a generic function's fields per instance, the name and
+    /// <summary>The questions: a generic function's fields per instance, the name and
     /// kind of a type, an enum's variants and their payloads, the conformances, the members of a
-    /// type's own body, the attributes a field and a type carry (R4).</summary>
+    /// type's own body, the attributes a field and a type carry.</summary>
     [Fact]
     public void The_questions_are_constants_of_the_type_asked()
     {
@@ -287,7 +287,7 @@ public class MetaTests
         Assert.Contains(errors, l => l.Contains("main.lyr:32:21: error[LYR-SEM0100]") && l.Contains("std.meta"));
     }
 
-    /// <summary>R4, the sweep after M10 (W6): every declaration that takes an attribute has a reader —
+    /// <summary>Every declaration that takes an attribute has a reader —
     /// a variant's through <c>variantAttribute</c>, a member's through <c>memberAttribute</c>, a
     /// payload field's through <c>attribute</c> in a round over the payload, a type's, an interface's
     /// and an alias's own through <c>typeAttribute</c>. A round over members decides a
@@ -401,7 +401,7 @@ public class MetaTests
         Assert.Contains(errors, l => l.Contains("main.lyr:25:40: error[LYR-SEM0001]") && l.Contains("'VariantInfo'"));
     }
 
-    /// <summary>11 §4 rules 1 and 9, the sweep after M10 (W9): <c>hasDefault</c> is whether the
+    /// <summary>11 §4 rules 1 and 9: <c>hasDefault</c> is whether the
     /// field's declaration writes an initializer, <c>f.type.kind</c> what its type is, and a round
     /// decides a <c>comptime if</c> over both — written short or qualified. A payload's field has
     /// no default.</summary>

@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>quote { ... }</c> and <c>#{...}</c> (design/v5/spec/08 Y12 Q2, Q3; 13 M9b P5): a tree as a
+/// <c>quote { ... }</c> and <c>#{...}</c>: a tree as a
 /// value of its content's kind, the splices set in by their positions, every name the quote
 /// binds fresh per expansion, every free name the macro module's.
 /// </summary>
@@ -103,7 +103,7 @@ public class QuoteTests
         return error.Split('\n');
     }
 
-    /// <summary>The artifacts (13 M9b S3): <c>retry!(3) { ... }</c> from a quote with a trailing
+    /// <summary><c>retry!(3) { ... }</c> from a quote with a trailing
     /// block spliced as statements; the quote's <c>attempts</c> and the caller's are two names
     /// (hygiene); <c>helper</c> is the macro module's though the caller never imports it;
     /// <c>fn #{name}()</c> builds a name; <c>#{stmts}</c> splices an array.</summary>

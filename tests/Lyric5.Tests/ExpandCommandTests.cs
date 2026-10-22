@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>lyric expand</c> (design/v5/spec/13 M9b P8; 14 §1.1): the program's entry module after
+/// <c>lyric expand</c>: the program's entry module after
 /// its macros' expansion, as source on standard output - the results in the sites' places, the
 /// rest as written, in the formatter's form.
 /// </summary>
@@ -26,7 +26,7 @@ public class ExpandCommandTests
     private static string Build(string main) =>
         Package(("lyric.toml", AppManifest), ("src/macros.lyr", Macros), ("src/main.lyr", main));
 
-    /// <summary>The artifact (13 M9b S5): the module with its sites replaced, nothing built.</summary>
+    /// <summary>The module with its sites replaced, nothing built.</summary>
     [Fact]
     public void Expand_prints_the_module_with_its_sites_replaced()
     {

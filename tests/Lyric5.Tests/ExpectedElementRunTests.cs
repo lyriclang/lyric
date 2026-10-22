@@ -3,8 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A tuple literal's elements and a field default at run time (design/v5/spec/03 T8; the
-/// review's R4a): the element is BUILT as the type the tuple asks for — a <c>?int</c> that is
+/// A tuple literal's elements and a field default at run time: the element is BUILT as the type the tuple asks for — a <c>?int</c> that is
 /// <c>null</c>, a <c>?string</c> that holds one —, and a default of a generic type is evaluated
 /// for the instance that is built, two instances in one function included. Through
 /// <c>Main</c>, so in the console collection.

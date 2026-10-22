@@ -4,13 +4,13 @@ using Profile = Lyric5.Toolchain.Profile;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The network (design/v5/spec/10 O7; 13 M8b P2, S10b): TCP within one program on 127.0.0.1, every
+/// The network: TCP within one program on 127.0.0.1, every
 /// wait a socket's on the thread's poller — an echo, 100 connections at once on one thread, the
 /// waits a cancel or a close end, a refused connection, both ways of one socket waiting at once,
 /// and a thread too busy to be idle that still sees a socket's readiness; UDP, the resolver, a
-/// close across threads (S10c). On every platform since S11 — Windows' poller over AFD, Winsock —
-/// but the echo server's, whose Interrupt a POSIX kill sends. Each run has a deadline (13 M8b's
-/// tests: a hanging test is a red job).
+/// close across threads. On every platform — Windows' poller over AFD, Winsock — but the echo
+/// server's, whose Interrupt a POSIX kill sends. Each run has a deadline: a hanging test is a red
+/// job.
 /// </summary>
 public class NetTests
 {
@@ -77,7 +77,7 @@ public class NetTests
         Assert.Equal("localhost: a loopback\n127.0.0.1: [127.0.0.1]\n", Run("net_resolve"));
     }
 
-    /// <summary>The M8b open point 1t, S10c: a close on the main thread ends a read that waits on
+    /// <summary>A close on the main thread ends a read that waits on
     /// another thread's poller.</summary>
     [Fact]
     public void A_close_on_one_thread_ends_a_wait_on_another()
@@ -86,7 +86,7 @@ public class NetTests
     }
 
     /// <summary>
-    /// The echo server, M8b S10's artifact: three clients of the test's own — .NET's sockets —
+    /// The echo server: three clients of the test's own — .NET's sockets —
     /// each get their lines back; one of them stays connected and idle while Interrupt comes, and
     /// the server cancels its task, waits for it, and ends with 0. POSIX: a console control event
     /// reaches no child without a console of its own (as SignalTests).

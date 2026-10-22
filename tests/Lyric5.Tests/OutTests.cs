@@ -6,7 +6,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>out/</c> and the package's verbs around it (design/v5/spec/11 W2 P5, P10): one build at a
+/// <c>out/</c> and the package's verbs around it: one build at a
 /// time writes into <c>out/</c>, <c>lyric clean</c> removes it, <c>lyric metadata</c> writes the
 /// package as JSON. Through <c>Main</c>, so in the console collection.
 /// </summary>
@@ -66,7 +66,7 @@ public class OutTests
         Assert.Equal(2, Run("clean", "--all", "-C", dir).Exit);
     }
 
-    /// <summary>The package as JSON (P10): the graph with where each package is read from, the
+    /// <summary>The package as JSON: the graph with where each package is read from, the
     /// programs, the profiles with their fields, the targets, <c>out/</c>.</summary>
     [Fact]
     public void Metadata_writes_the_package_as_json()

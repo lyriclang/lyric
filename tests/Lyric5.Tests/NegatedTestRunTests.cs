@@ -5,7 +5,7 @@ namespace Lyric5.Tests;
 /// <summary>
 /// A negated test narrows, at run time: behind <c>if (!(s is Circle)) { return; }</c> the name
 /// is the <c>Circle</c> and its field is read; behind <c>if (!(x != null)) { return; }</c> the
-/// value is unwrapped (design/v5/spec/03 T4 O3, T11). Through <c>Main</c>, so in the console
+/// value is unwrapped. Through <c>Main</c>, so in the console
 /// collection.
 /// </summary>
 [Collection("console")]

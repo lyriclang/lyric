@@ -4,7 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>lyric add</c> and <c>lyric remove</c> (design/v5/spec/11 C2): one line of
+/// <c>lyric add</c> and <c>lyric remove</c>: one line of
 /// <c>[dependencies]</c> written or taken out, the rest of the manifest as it was; a graph that
 /// refuses the edit leaves the manifest as it was. Through <c>Main</c>, so in the console
 /// collection.

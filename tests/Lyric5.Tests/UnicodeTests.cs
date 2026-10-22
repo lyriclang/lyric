@@ -6,7 +6,7 @@ using Profile = Lyric5.Toolchain.Profile;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// <c>char</c> over the Unicode Character Database (design/v5/spec/10 B9 S4, C2; 13 M8c S1): every
+/// <c>char</c> over the Unicode Character Database: every
 /// scalar value's category, simple case mappings and White_Space as a Lyric program reports them,
 /// against this test's own reading of the checked-in files — a reader apart from
 /// <c>tooling/unicode/gen.py</c>, so a fault in the generator or in the lookups shows.

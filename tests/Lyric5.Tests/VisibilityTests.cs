@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Visibility (design/v5/spec/07 V2): a declaration is its module's (<c>private</c>), its package's
+/// Visibility: a declaration is its module's (<c>private</c>), its package's
 /// (<c>internal</c> — the default) or everyone's (<c>pub</c>), and the question is asked at every
 /// route a name takes out of its module, by one rule (LYR-RES0009) — the 4.x front end asked it at
 /// the selective import alone. Through <c>Main</c>, so in the console collection.
@@ -107,7 +107,7 @@ public class VisibilityTests
         Assert.Contains($"error[LYR-PAR0053]: {why}", error);
     }
 
-    /// <summary>The members of a type follow the same words (07 V2 S0, S5): a field, a method, a
+    /// <summary>The members of a type follow the same words: a field, a method, a
     /// static; an extend block's word is its methods' default; a conformance is as visible as its
     /// type and interface.</summary>
     private const string Members = """
@@ -174,7 +174,7 @@ public class VisibilityTests
     }
 
     /// <summary>A method its block keeps to its module is not there for another — the way a hidden
-    /// overload is not (07 V2 S5).</summary>
+    /// overload is not.</summary>
     [Fact]
     public void A_private_extension_method_is_not_there()
     {
@@ -202,7 +202,7 @@ public class VisibilityTests
         Assert.Contains($"error[{code}]: {why}", error);
     }
 
-    /// <summary>An interface's private helper (07 V2 S4): its defaults call it, on any value of
+    /// <summary>An interface's private helper: its defaults call it, on any value of
     /// the interface; no conformer answers it, and a conformer's method of its name is the
     /// conformer's own — the default still calls the helper.</summary>
     private const string Greeter = """
@@ -261,8 +261,7 @@ public class VisibilityTests
         Assert.Contains("error[LYR-SEM0118]: 'private' on 'f' — a private member of an interface is a helper and has a body", error);
     }
 
-    /// <summary>A declaration is no more visible than the types it names (07 V2 S2, Swift's general
-    /// form): what another module could reach but not use is refused where it is declared.</summary>
+    /// <summary>A declaration is no more visible than the types it names: what another module could reach but not use is refused where it is declared.</summary>
     [Theory]
     [InlineData("a pub result", "pub fn make(): Secret {\n    return Secret { n = 1 };\n}\n", "'make' is pub, but it names 'Secret', which is private")]
     [InlineData("an internal parameter", "fn take(s: Secret): int {\n    return s.n;\n}\n", "'take' is internal, but it names 'Secret', which is private")]
@@ -283,7 +282,7 @@ public class VisibilityTests
     }
 
     /// <summary>A private declaration names private types freely, and a member without a word
-    /// follows its type — no warning for what nobody wrote (07 V2 S3).</summary>
+    /// follows its type — no warning for what nobody wrote.</summary>
     [Fact]
     public void A_private_declaration_names_private_types()
     {
@@ -294,8 +293,8 @@ public class VisibilityTests
         Assert.DoesNotContain("LYR-SEM015", error);
     }
 
-    /// <summary>A member whose written word is wider than its type's is allowed and said (07 V2
-    /// S3): it is exported only once the type is.</summary>
+    /// <summary>A member whose written word is wider than its type's is allowed and said: it is
+    /// exported only once the type is.</summary>
     [Fact]
     public void A_member_wider_than_its_type_warns()
     {
@@ -305,7 +304,7 @@ public class VisibilityTests
         Assert.Contains("warning[LYR-SEM0152]: 'x' is pub, but its type 'Wide' is internal — the member is exported only once the type is", error);
     }
 
-    /// <summary>The same of an inherent block (07 V2 S3, S5): a member's own word, or the
+    /// <summary>The same of an inherent block: a member's own word, or the
     /// block's — its members' default — wider than the type the block extends.</summary>
     [Theory]
     [InlineData("struct Wide {\n    n: int,\n}\n\nextend Wide {\n    pub fn twice(): int {\n        return this.n * 2;\n    }\n}\n",
@@ -340,7 +339,7 @@ public class VisibilityTests
         Assert.DoesNotContain("LYR-SEM0152", error);
     }
 
-    /// <summary>A program roots in its entry's main (07 B6): a 'pub' function nothing reaches is
+    /// <summary>A program roots in its entry's main: a 'pub' function nothing reaches is
     /// no part of it — the 4.x tools kept every 'pub' function as a library's root.</summary>
     [Fact]
     public void A_program_roots_in_its_main()

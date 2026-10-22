@@ -3,13 +3,13 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A prelude name in the two places that ask what a NAME is before they check a call
-/// (design/v5/spec/08 Y9; 04 D2 R5): a type in call position — <c>Exception("…")</c> is
+/// A prelude name in the two places that ask what a NAME is before they check a call: a type
+/// in call position — <c>Exception("…")</c> is
 /// <c>Exception.new("…")</c> — and an interface before a member — <c>Display.show(x)</c>.
 /// Both asked the scope alone, and a prelude name is in no scope: it is what a name means where
 /// the scope has nothing. With an import of the same name both worked; nobody met the first,
 /// because <c>Exception</c> is the first prelude type without type parameters that has a
-/// <c>new</c> (the review's M5-2).
+/// <c>new</c>.
 ///
 /// <para>Through <c>Main</c>, so in the console collection.</para>
 /// </summary>

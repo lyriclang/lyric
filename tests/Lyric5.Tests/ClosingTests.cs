@@ -4,14 +4,14 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Closing a generator (design/v5/spec/06 A5; the review's M6-10, M8a-4).
+/// Closing a generator.
 ///
-/// <para>M6-10: <c>close()</c> unwinds the body with <c>Cancelled</c> and drops it. A
+/// <para>The suppressed error: <c>close()</c> unwinds the body with <c>Cancelled</c> and drops it. A
 /// <c>defer</c> that threw on the way out was SUPPRESSED into that <c>Cancelled</c> — and
 /// dropped with it, in silence. Now <c>close()</c> throws the first suppressed error; an early
 /// <c>break</c> out of a <c>for</c> over such a generator throws it at the loop.</para>
 ///
-/// <para>M8a-4: a <c>for</c> over a <c>Closeable</c> iterator closes it on every way out. Where
+/// <para>The instance closes: a <c>for</c> over a <c>Closeable</c> iterator closes it on every way out. Where
 /// the iterator's type is a type parameter, the checked code did not know, and nothing closed:
 /// a generic <c>first(it)</c> left the generator suspended, its <c>defer</c> never run. Now the
 /// INSTANCE decides: each monomorphized loop closes where the concrete iterator is
@@ -47,7 +47,7 @@ public class ClosingTests
         return error;
     }
 
-    // ------------------------------------------------------------------ M6-10: the suppressed error
+    // ------------------------------------------------------------------ the suppressed error
 
     [Fact]
     public void Close_throws_the_first_suppressed_error()
@@ -98,7 +98,7 @@ public class ClosingTests
             """));
     }
 
-    // ------------------------------------------------------------------ M8a-4: the instance closes
+    // ------------------------------------------------------------------ the instance closes
 
     [Fact]
     public void A_generic_loop_closes_the_instance_s_iterator()

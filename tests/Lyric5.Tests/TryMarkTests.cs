@@ -3,7 +3,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// A mark over what is marked already, where it takes the library to say it (the review's M5-5):
+/// A mark over what is marked already, where it takes the library to say it:
 /// the head of a loop in a <c>try</c> block. The block marks the loop's calls, so the head's mark
 /// says nothing new — that is the one warning, and none comes about what the loop walks.
 /// Through <c>Main</c>, so in the console collection.

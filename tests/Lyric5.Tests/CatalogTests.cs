@@ -7,11 +7,11 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The diagnostic catalog against the compiler (design/v5/spec/11 G10; 13 M12a P5): every code the
+/// The diagnostic catalog against the compiler: every code the
 /// sources report stands in it (a), every code in it is reported or retired (b), each entry's programs
 /// report what it says under its severity (c), and the messages they bring out begin in lowercase and
 /// end without a period (e). (d) — a red and a green conformance case per warning and lint — comes
-/// with the lints (S6).
+/// with the lints.
 /// </summary>
 [Collection("console")]
 public partial class CatalogTests

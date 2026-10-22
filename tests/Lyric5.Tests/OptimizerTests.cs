@@ -3,11 +3,11 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The IR optimizer in the release profile (design/v5/spec/01 B10; the review's B10): the
+/// The IR optimizer in the release profile: the
 /// inliner, scalar replacement and devirtualization run where the profile optimizes C at
 /// <c>-O2</c> and above, and not in debug. What they run keeps the language's values: a method
-/// of a struct or an enum takes the caller's place as <c>this</c> (02 M5), and a binding copies
-/// (03 §3). Through <c>Main</c>, so in the console collection.
+/// of a struct or an enum takes the caller's place as <c>this</c>, and a binding copies.
+/// Through <c>Main</c>, so in the console collection.
 /// </summary>
 [Collection("console")]
 public class OptimizerTests

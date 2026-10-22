@@ -5,12 +5,12 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// M8a's artifact (design/v5/spec/13): the examples inventory, stats and stack, 4.x's examples/ in
-/// Lyric 5, each built as a package and run. And M7's artifacts: the multi-package example — <c>programs/three_packages</c>, a
+/// The examples: inventory, stats and stack, 4.x's examples/ in Lyric 5, each built as a package
+/// and run. The multi-package example — <c>programs/three_packages</c>, a
 /// path dependency and one from git — builds offline once the cache holds it, and builds for the
-/// other operating system; a dependency's globals are ready before the importer's (07 G2).
-/// And M8b's: the file tool, <c>programs/filetool.lyr</c>, over a tree the test makes. And M8c's:
-/// the word counter, <c>programs/wordcount.lyr</c>, over a text in four scripts. And M10's: the log
+/// other operating system; a dependency's globals are ready before the importer's.
+/// The file tool, <c>programs/filetool.lyr</c>, over a tree the test makes. The word counter,
+/// <c>programs/wordcount.lyr</c>, over a text in four scripts. The log
 /// filter, <c>programs/logfilter.lyr</c>, over a log; the JSON server, <c>programs/jsonserver.lyr</c>, with its
 /// client; the gzip tool, <c>programs/gzipfile.lyr</c>, against .NET's GZipStream and the platform's gzip.
 /// Through <c>Main</c>, so in the console collection.
@@ -82,7 +82,7 @@ public class ExampleTests
         Assert.Equal(magic, binary[..magic.Length]);
     }
 
-    /// <summary>Module globals are made eagerly at the start, a module's imports first (07 G2) —
+    /// <summary>Module globals are made eagerly at the start, a module's imports first —
     /// across packages as within one.</summary>
     [Fact]
     public void A_dependency_s_globals_are_ready_before_the_importer_s()
@@ -98,7 +98,7 @@ public class ExampleTests
 
     private const string TreeStats = "5 files, 3 directories, 2325 bytes\n  1000 sub/c.txt\n  1000 sub/e.bin\n  300 b.log\n";
 
-    /// <summary>M8b's artifact (13, S14): the file tool built as a package — its three commands over
+    /// <summary>The file tool built as a package — its three commands over
     /// a tree with an empty directory and two files of one size (the walk's order between them
     /// kept), the copy byte for byte the original, a missing directory and an unknown command.</summary>
     [Fact]
@@ -153,7 +153,7 @@ public class ExampleTests
         "Grüße aus Zürich! Zürich ist groß, ZÜRICH ist schön.\nΕλλάδα, ελλάδα — Ωραία μέρα.\n"
         + "東京 und São Paulo: São Paulo ist groß.\n";
 
-    /// <summary>M9a's example (13, S12): constants a module computes before its entry, and ones
+    /// <summary>The compile-time example: constants a module computes before its entry, and ones
     /// computed while compiling — <c>fib(30)</c> is data in the program, and <c>fib</c> is not built.</summary>
     [Fact]
     public void Constants_are_filled_before_the_entry_or_computed_while_compiling()
@@ -165,7 +165,7 @@ public class ExampleTests
         Assert.DoesNotContain("fn app.main.fib ", ir);
     }
 
-    /// <summary>M8c's artifact (13, S14): the word counter built as a package, over a text in four
+    /// <summary>The word counter built as a package, over a text in four
     /// scripts — the counts and the ranking checked against Python's reading of the same text
     /// (<c>str.split</c>, <c>isalnum</c>, <c>lower</c>), the CRC-32 against zlib's.</summary>
     [Fact]
@@ -196,7 +196,7 @@ public class ExampleTests
         + "2026-10-14T08:00:09Z INFO  request GET /health 2ms\n"
         + "2026-10-14T08:00:11Z ERROR db: timeout after 5000ms\n";
 
-    /// <summary>M10's artifact (13, S6): the log filter built as a package, over a log — the lines a
+    /// <summary>The log filter built as a package, over a log — the lines a
     /// regular expression selects, inverted, counted, numbered; a pattern RE2 refuses is reported
     /// with its offset.</summary>
     [Fact]
@@ -235,7 +235,7 @@ public class ExampleTests
         Assert.Equal(2, usage.ExitCode);
         Assert.StartsWith("usage: logfilter", usage.Stderr);
 
-        // M10 S10: the matches in color where asked (the output here is a pipe: plain unless --color)
+        // The matches in color where asked (the output here is a pipe: plain unless --color)
         var colored = ProcessRunner.Run(exe, ["--color", "-n", "ERROR", log], TimeSpan.FromMinutes(1));
         Assert.Equal("\u001b[32m3\u001b[0m:2026-10-14T08:00:07Z \u001b[1;31mERROR\u001b[0m db: connection refused (attempt 3)\n"
                      + "\u001b[32m5\u001b[0m:2026-10-14T08:00:11Z \u001b[1;31mERROR\u001b[0m db: timeout after 5000ms\n", colored.Stdout.Replace("\r\n", "\n"));
@@ -243,7 +243,7 @@ public class ExampleTests
         Assert.DoesNotContain("\u001b", plain.Stdout);
     }
 
-    /// <summary>M10's artifact (13, S8): the JSON server built as a package — the server answers
+    /// <summary>The JSON server built as a package — the server answers
     /// JSON, the client of the same program fetches it, posts one, reads it back, misses one.</summary>
     [Fact]
     public void The_json_server_serves_and_its_client_fetches()
@@ -272,7 +272,7 @@ public class ExampleTests
         return crc ^ 0xFFFFFFFF;
     }
 
-    /// <summary>M10's artifact (13, S9): the gzip file tool built as a package — a file compressed
+    /// <summary>The gzip file tool built as a package — a file compressed
     /// here is read by .NET's GZipStream and, where the platform has it, by <c>gzip -d</c>; a file
     /// compressed by GZipStream is read here; the CRC-32 is the same on both sides.</summary>
     [Fact]
@@ -331,7 +331,7 @@ public class ExampleTests
     private static string MacrosExample([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "examples", "macros"));
 
-    /// <summary>M9b's artifact (design/v5/spec/13, S6): <c>examples/macros</c> — <c>retry!</c> from a
+    /// <summary>The macros example, <c>examples/macros</c> — <c>retry!</c> from a
     /// quote, <c>@Builder</c> from the constructors, <c>formula!</c> over <c>parseExpr</c> — built
     /// and run; and <c>lyric expand</c> shows the three sites replaced.</summary>
     [Fact]

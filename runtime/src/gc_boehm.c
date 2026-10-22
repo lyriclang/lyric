@@ -53,7 +53,7 @@ static void tsan_on_collection(GC_EventType event) {
 #  define TSAN_RECEIVE() __tsan_acquire(&tsan_collector_side)
 /* An explicit free hands a cell back without a collection: the allocation that gets it next sees
  * what the freeing thread wrote, as after a collection — a root that one thread frees and another
- * allocates again (a thread's start, M6 S6b). */
+ * allocates again (a thread's start). */
 #  define TSAN_RETURN() __tsan_release(&tsan_collector_side)
 #else
 #  define TSAN_PUBLISH() ((void)0)
@@ -95,7 +95,7 @@ void lyr_gc_init(void) {
     initialized = 1;
 }
 
-/* What this thread has allocated (10 X4: a benchmark's allocations a run) — the collector's own
+/* What this thread has allocated (a benchmark's allocations a run) — the collector's own
  * total is the process's, every thread's at once. Two adds an allocation, no atomics. */
 static _Thread_local uint64_t thread_allocations;
 static _Thread_local uint64_t thread_allocated_bytes;
@@ -283,7 +283,7 @@ void lyr_thread_detach(void) {
     GC_unregister_my_thread();
 }
 
-/* --- coroutines (01 L4, 06 A5) ------------------------------------------------------------------ */
+/* --- coroutines --------------------------------------------------------------------------------- */
 
 /* A coroutine object is of a kind of its own. Its mark procedure traces its argument and its
  * resumer and, while its stack is mapped and stopped, every word of that stack from the saved
@@ -430,7 +430,7 @@ void lyr_gc_switch_begin(void *gc_handle, const LyrStackCtx *to) {
 
 void lyr_gc_switch_end(void) { atomic_fetch_sub(&switches_under_way, 1); }
 
-/* The world's stop to its start: the pause the stats keep (13 M11 P12). Under Boehm's lock. */
+/* The world's stop to its start: the pause the stats keep. Under Boehm's lock. */
 static int64_t stopped_at;
 
 static void GC_CALLBACK on_collection_event(GC_EventType event) {
