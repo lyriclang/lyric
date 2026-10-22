@@ -68,6 +68,10 @@ jobs:
         with:
           global-json-file: global.json
 
+      # The archive is tried as a user meets it: lyric5 builds its runtime with zig.
+      - name: Set up zig
+        uses: ./.github/actions/setup-zig
+
       # One version string for every binary in the archive: 5.0.0-dev.<date>+<sha>. MSBuild reads
       # environment variables as properties, so the inner publishes pick it up as well.
       - name: Stamp the dev version
@@ -99,6 +103,31 @@ jobs:
             tar -czf "dist/${name}.tar.gz" -C out .
           fi
 
+      # Unpacked away from the checkout, where no runtime/ above the binary stands in for the
+      # archive's own: a program is built and run with what the archive holds, and the 4.x
+      # standard library, which lyric5 never reads, is not in it.
+      - name: The archive builds and runs a program
+        shell: bash
+        run: |
+          trial="$RUNNER_TEMP/trial"
+          rm -rf "$trial" && mkdir -p "$trial/toolchain" "$trial/hello/src"
+          archive=$(ls dist/*)
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z x -o"$trial/toolchain" "$archive" > /dev/null
+            lyric5="$trial/toolchain/lyric5.exe"
+          else
+            tar -xzf "$archive" -C "$trial/toolchain"
+            lyric5="$trial/toolchain/lyric5"
+          fi
+          test -d "$trial/toolchain/runtime/include/lyr" || { echo "the archive holds no runtime"; exit 1; }
+          test -d "$trial/toolchain/stdlib5" || { echo "the archive holds no stdlib5"; exit 1; }
+          if [ -e "$trial/toolchain/stdlib" ]; then echo "the archive holds the 4.x stdlib"; exit 1; fi
+          printf '[package]\nname = "hello"\nversion = "0.1.0"\n' > "$trial/hello/lyric.toml"
+          printf 'import std.io { println };\n\nfn main(): void {\n    println("hello from the dev archive");\n}\n' > "$trial/hello/src/main.lyr"
+          out=$(cd "$trial/hello" && "$lyric5" run | tr -d '\r')
+          echo "$out"
+          [ "$out" = "hello from the dev archive" ]
+
       - name: Upload archive
         uses: actions/upload-artifact@v7
         with:
@@ -106,9 +135,11 @@ jobs:
           path: dist/*
           retention-days: 7
 
+  # From main alone: a run dispatched on a branch tries the archives and leaves the channel as it is.
   publish:
     name: Publish dev
     needs: package
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
@@ -139,5 +170,5 @@ jobs:
           gh release create dev dist/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "dev ($(date -u +%Y-%m-%d), ${GITHUB_SHA::7})" \
-            --notes "Lyric 5 in development, built from main at ${GITHUB_SHA::7}. No promise of any kind. The archive holds lyric5, the Lyric 5 command line as it grows." \
+            --notes "Lyric 5 in development, built from main at ${GITHUB_SHA::7}. No promise of any kind. The archive holds lyric5, the Lyric 5 command line as it grows, its standard library (stdlib5/) and the runtime's C source (runtime/), which lyric5 builds on first use. Building a program needs zig on the PATH." \
             --prerelease
