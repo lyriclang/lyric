@@ -3129,7 +3129,7 @@ public sealed class TypeChecker
         quiet = _de.ErrorCount - quiet;
 
         LyrType type;
-        if (declared is not null && initT is not null) { CheckAssignable(bnd.Initializer!, initT, declared, bnd.Span); type = declared; }
+        if (declared is not null && initT is not null) { CheckBindingAssignable(bnd.Initializer!, initT, declared, bnd.Span, bnd.Type); type = declared; }
         else if (declared is not null) type = declared;
         // 'null' and '[]' fix no type of their own (§7.1 of the specification). Without this
         // report the null type or the empty array's error element flowed SILENTLY into the
@@ -4135,7 +4135,7 @@ public sealed class TypeChecker
     {
         var declared = stmt.Type is null ? null : ResolveType(stmt.Type, scope);
         var actual = CheckExpr(stmt.Initializer, scope, declared);
-        if (declared is not null) CheckAssignable(stmt.Initializer, actual, declared, stmt.Span);
+        if (declared is not null) CheckBindingAssignable(stmt.Initializer, actual, declared, stmt.Span, stmt.Type);
         var source = declared ?? actual;
 
         if (stmt.Else is { } els)
@@ -4941,10 +4941,11 @@ public sealed class TypeChecker
 
         if (fitting.Count == 0)
         {
+            var notes = candidates.Select(c => new DiagnosticNote(c.Fn.Declaration?.Span ?? default,
+                $"this one takes {DisplayArity(c.Fn)}")).ToList();
+            if (HiddenOverload(call, candidates[0].Fn.Name, count) is { } hidden) notes.Add(hidden);
             _de.Report("LYR-SEM0087", Severity.Error, call.Span,
-                $"no '{candidates[0].Fn.Name}' takes {count} argument(s)",
-                candidates.Select(c => new DiagnosticNote(c.Fn.Declaration?.Span ?? default,
-                    $"this one takes {DisplayArity(c.Fn)}")).ToArray());
+                $"no '{candidates[0].Fn.Name}' takes {count} argument(s)", notes.ToArray());
             return null;
         }
 
@@ -5419,6 +5420,13 @@ public sealed class TypeChecker
                 CheckOrdered(b, l, r, scope);
                 return LyrType.Bool;
             case BinaryOp.Eq or BinaryOp.Ne:
+                // A 'void' value is nothing (03 §9.1 rule 7): there is nothing to compare.
+                if (TypeFacts.IsVoid(l) || TypeFacts.IsVoid(r))
+                {
+                    _de.Report("LYR-SEM0003", Severity.Error, b.Span,
+                        $"operator '{(b.Operator is BinaryOp.Eq ? "==" : "!=")}' is not applicable to 'void' — a 'void' value holds nothing to compare");
+                    return LyrType.Bool;
+                }
                 // '?T == ?T', and 'x == 5' with 'x: ?int' through the coercion (03 O6).
                 if (OptionalEquality(l, r) is { } inner)
                 {
@@ -7053,6 +7061,23 @@ public sealed class TypeChecker
         if (ConstructedType(call.Callee, calleeScope) is { } constructed)
             return CheckConstruction(call, constructed, scope, calleeScope, expected);
 
+        // A static member through its interface, 'Make.make<Item>(s)': the interface has no value
+        // to call it for (05 §4 rule 2). A type that conforms names it, or a type parameter the
+        // interface bounds.
+        if (call.Callee is MemberExpr { IsOptional: false } staticQualified
+            && InterfaceNamed(staticQualified.Target, scope) is { } staticOwner
+            && Conformance.WithParents(staticOwner, _binding)
+                .Select(i => i.Members.LookupLocal(staticQualified.Member)).OfType<FunctionSymbol>()
+                .FirstOrDefault() is { IsStatic: true })
+        {
+            foreach (var leftover in call.Arguments) CheckOrphanArgument(leftover, scope);
+            var conformer = call.TypeArguments is [NamedType { Path: var written }, ..] ? string.Join(".", written) : "Item";
+            return Report(call.Span, Lyric5Code("LYR-SEM0231"),
+                $"'{staticOwner.Name}.{staticQualified.Member}' is a static member of the interface, and the interface has no value "
+                + $"to call it for — call it on a type that conforms, '{conformer}.{staticQualified.Member}(…)', or through a type "
+                + $"parameter the interface bounds, 'T.{staticQualified.Member}(…)'");
+        }
+
         // 'Walker.describe(x)' (04 D2 R5): the interface's member, called with its receiver as
         // the first argument — the qualified form that reaches an implementation the unqualified
         // call cannot name (D3). Checked as the method call it stands for, on a receiver that
@@ -7479,8 +7504,14 @@ public sealed class TypeChecker
                         $"call gives no argument for '{ps[i].Name}', which has no default");
         }
         else if (given < minRequired || (!variadic && given > fn.Parameters.Length))
+        {
+            // the one of that count this module may not call, where the call names one
+            var calleeName = call.Callee switch { MemberExpr m => m.Member, IdentifierExpr i => i.Name, _ => null };
+            var hidden = calleeName is not null ? HiddenOverload(call, calleeName, given) : null;
             _de.Report("LYR-SEM0014", Severity.Error, call.Span,
-                $"call expects {(variadic ? $"at least {minRequired}" : minRequired == fn.Parameters.Length ? minRequired.ToString() : $"{minRequired}–{fn.Parameters.Length}")} argument(s), got {given}");
+                $"call expects {(variadic ? $"at least {minRequired}" : minRequired == fn.Parameters.Length ? minRequired.ToString() : $"{minRequired}–{fn.Parameters.Length}")} argument(s), got {given}",
+                hidden is { } note ? [note] : []);
+        }
 
         // 'f(xs...)' (08 §1.1 rule 1; the review's A2): the argument is the REST — one, at a
         // variadic parameter, alone there, and that parameter's array. Said once where it is
@@ -9519,6 +9550,41 @@ public sealed class TypeChecker
         return null;
     }
 
+    /// <summary>An overload that takes the call's count and that this module may not call — a
+    /// member its type keeps to itself, one a block adds in a module not imported here, a private
+    /// overload beside an imported function: said beside the counts the call could choose from.</summary>
+    private DiagnosticNote? HiddenOverload(CallExpr call, string name, int count)
+    {
+        if (!_comp.Lyric5Modules) return null;
+        switch (call.Callee)
+        {
+            case MemberExpr mem when TypeFacts.SymbolOf(ReceiverTypeOf(mem)) is { } owner:
+                foreach (var own in owner.Members.OverloadsLocal(name))
+                    if (Takes(own, count) && !MayName(own))
+                        return new DiagnosticNote(NameSpanOf(own), $"the one that takes {DisplayArity(own)} is not for this module: {_comp.Hidden(own)}");
+                foreach (var ext in _comp.Extensions.MethodsFor(owner))
+                    if (ext.Symbol.Name == name && Takes(ext.Symbol, count))
+                    {
+                        if (!_comp.Reaches(_currentModule, ext))
+                            return new DiagnosticNote(NameSpanOf(ext.Symbol), $"the one that takes {DisplayArity(ext.Symbol)} is added to "
+                                + $"'{owner.Name}' in module '{ext.Module.FullName}', which this module does not import");
+                        if (!MayName(ext.Symbol))
+                            return new DiagnosticNote(NameSpanOf(ext.Symbol), $"the one that takes {DisplayArity(ext.Symbol)} is not for this module: {_comp.Hidden(ext.Symbol)}");
+                    }
+                return null;
+            case IdentifierExpr id when _result.RefOf(id) is ImportBindingSymbol { Target: FunctionSymbol { Home: { } home } }:
+                foreach (var other in home.Members.OverloadsLocal(name))
+                    if (Takes(other, count) && !MayName(other))
+                        return new DiagnosticNote(NameSpanOf(other), $"the one that takes {DisplayArity(other)} is not for this module: {_comp.Hidden(other)}");
+                return null;
+            default:
+                return null;
+        }
+    }
+
+    private static Span NameSpanOf(FunctionSymbol fn) =>
+        fn.Declaration is FunctionDecl decl ? decl.NameSpan : fn.Declaration?.Span ?? default;
+
     /// <summary>Where <c>x.m</c> fails on a local <c>x</c> and the module or the prelude name it hides
     /// has an <c>m</c>: the note says that the name is the local here, and what it hides.</summary>
     private DiagnosticNote? ShadowNote(MemberExpr mem)
@@ -9688,7 +9754,9 @@ public sealed class TypeChecker
             var interfaces = blocks.Select(b => Conformance.InterfaceOf(b.Decl.Interfaces[0], _binding)?.Name ?? "?").ToList();
             _de.Report("LYR-SEM0122", Severity.Error, span,
                 $"'{member}' is implemented on '{ts.Name}' for {string.Join(" and ", interfaces.Select(i => $"'{i}'"))} "
-                + $"separately — qualify the call: '{interfaces[0]}.{member}(…)'");
+                + (visible[0].Symbol is { IsStatic: true }
+                    ? $"separately — reach it through a type parameter one of them bounds: 'fn f<T :: [{interfaces[0]}]>(…)' and 'T.{member}(…)'"
+                    : $"separately — qualify the call: '{interfaces[0]}.{member}(…)'"));
             return visible[0].Symbol;
         }
 
@@ -11622,7 +11690,7 @@ public sealed class TypeChecker
         var declared = stmt.Type is null ? null : ResolveType(stmt.Type, scope);
         var actual = CheckExpr(stmt.Initializer, scope, declared);
 
-        if (declared is not null) CheckAssignable(stmt.Initializer, actual, declared, stmt.Span);
+        if (declared is not null) CheckBindingAssignable(stmt.Initializer, actual, declared, stmt.Span, stmt.Type);
         var source = declared ?? actual;
 
         if (source.IsError) return; // already reported
@@ -13884,6 +13952,19 @@ public sealed class TypeChecker
         return null;
     }
 
+    /// <summary>A binding with a written type, <c>let x: int = "three"</c>: in Lyric 5 the mismatch
+    /// is the initializer's, and the written type carries the label — "expected 'int' here".</summary>
+    private void CheckBindingAssignable(Expr initializer, LyrType from, LyrType to, Span statement, TypeNode? written)
+    {
+        if (!_comp.Lyric5Modules || written is null) { CheckAssignable(initializer, from, to, statement); return; }
+        _expectedAt = written.Span;
+        try { CheckAssignable(initializer, from, to, initializer.Span); }
+        finally { _expectedAt = null; }
+    }
+
+    /// <summary>Where the type a mismatch is measured against is written, while a binding is checked.</summary>
+    private Span? _expectedAt;
+
     private void CheckAssignable(Expr expr, LyrType from, LyrType to, Span span)
     {
         // An optional of an interface made here is made the way the interface is, the value
@@ -13938,8 +14019,14 @@ public sealed class TypeChecker
                   + "monomorphized)"
                 : FixationMismatch(from, to) is { } differs ? $" — {differs}"
                 : "";
-            _de.Report("LYR-SEM0001", Severity.Error, span,
-                $"cannot assign '{fromText}' to '{toText}'{hint}");
+            if (_expectedAt is { } at)
+                _de.Report(new Diagnostic("LYR-SEM0001", Severity.Error, span, $"cannot assign '{fromText}' to '{toText}'{hint}")
+                {
+                    Labels = [new LabeledSpan(at, $"expected '{toText}' here")],
+                });
+            else
+                _de.Report("LYR-SEM0001", Severity.Error, span,
+                    $"cannot assign '{fromText}' to '{toText}'{hint}");
             return;
         }
 

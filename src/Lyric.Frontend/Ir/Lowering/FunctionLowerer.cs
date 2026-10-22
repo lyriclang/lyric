@@ -5622,6 +5622,17 @@ internal sealed class FunctionLowerer
             throw NotSupported($"a generic method ('{method.Name}') as a value — wrap it in a lambda", expr.Span);
         if (TypeOfExpr(expr) is not IrFunctionType signature)
             throw NotSupported($"'{method.Name}' as a value", expr.Span);
+        // A static of a generic type's instance, 'Pair<int>.of': the instance's function, as its
+        // call requests it, in a closure without an environment.
+        if (method.Declaration is FunctionDecl { IsStatic: true, Body: not null } ofInstance
+            && _types.TypeOf(expr.Target) is Sema.NonValueType { Instance: { } written })
+        {
+            var owner = SubstituteType(written) as GenericInstance ?? written;
+            var made = _instances.RequestMethod(method, ofInstance, owner, expr.Span);
+            var instanceValue = _slots.NewTemp(signature);
+            _b.Emit(new MakeClosure(instanceValue, made, null, signature, expr.Span));
+            return instanceValue;
+        }
         if (!TryResolveFunction(method, out var target))
             throw NotSupported($"reference to '{method.Name}' as a value", expr.Span);
 
@@ -6973,12 +6984,38 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary><c>comptime if (c) a else b</c> as a value whose condition no round decided: the
-    /// evaluator's answer chooses the arm here.</summary>
+    /// evaluator's answer chooses the arm here. Before it has answered — the function is lowered
+    /// for the evaluator itself, to compute another site — the condition, a pure expression, is
+    /// asked as the run would ask it, and gives the same arm.</summary>
     private TempId? LowerComptimeIfExpr(ComptimeIfExpr cif)
     {
         if (cif.Condition is ComptimeExpr site && ComptimeValue(site) is BoolConst chosen)
             return LowerExprOrVoid(chosen.Value ? cif.Then : cif.Else);
-        throw Bug($"a 'comptime if' at {cif.Span} whose condition the evaluator did not decide");
+        if (cif.Condition is not ComptimeExpr { Inner: var asked })
+            throw Bug($"a 'comptime if' at {cif.Span} without its site");
+
+        var type = TypeOfExpr(cif);
+        var slot = IsVoid(type) ? (LocalId?)null : _slots.DeclareSynthetic("comptimeIf", type);
+        var test = LowerExpr(asked);
+        var whenTrue = _b.NewBlock();
+        var whenFalse = _b.NewBlock();
+        var merge = _b.NewBlock();
+        _b.Seal(new CondBranch(test, whenTrue, whenFalse, cif.Span));
+        foreach (var (block, arm) in new[] { (whenTrue, cif.Then), (whenFalse, cif.Else) })
+        {
+            _b.SwitchTo(block);
+            if (ComesOut(() =>
+                {
+                    if (slot is { } held) _b.Emit(new StoreLocal(held, LowerExprAs(arm, type), cif.Span));
+                    else LowerExprOrVoid(arm);
+                }))
+                _b.Seal(new Branch(merge, cif.Span));
+        }
+        _b.SwitchTo(merge);
+        if (slot is not { } result) return null;
+        var value = _slots.NewTemp(type);
+        _b.Emit(new LoadLocal(value, result, type, cif.Span));
+        return value;
     }
 
     /// <summary><c>E.[v] { … }</c> (M9a S10): the variant built from the values the checker

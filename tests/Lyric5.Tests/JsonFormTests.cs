@@ -47,7 +47,7 @@ public class JsonFormTests
         var span = d.GetProperty("span");
         Assert.Equal(Path.Combine("src", "main.lyr"), span.GetProperty("file").GetString());
         Assert.Equal(2, span.GetProperty("start").GetProperty("line").GetInt32());
-        Assert.Equal(5, span.GetProperty("start").GetProperty("column").GetInt32());
+        Assert.Equal(18, span.GetProperty("start").GetProperty("column").GetInt32());
         Assert.StartsWith("error[LYR-SEM0001]: cannot assign 'string' to 'int'\n --> ", d.GetProperty("rendered").GetString());
         Assert.Equal(1, events[1].GetProperty("errors").GetInt32());
     }

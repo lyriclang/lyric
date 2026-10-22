@@ -152,4 +152,34 @@ public class FixTests
         Assert.Contains("let x = helper();", File.ReadAllText(Path.Combine(root, "app", "src", "main.lyr")));
         Assert.Contains("warning[LYR-SEM0075]: 'n' is never reassigned", error);
     }
+
+    /// <summary>An import whose names go unused while the file calls what its module's blocks add:
+    /// the module stays, alone — taken out, the call would be refused.</summary>
+    [Fact]
+    public void An_import_whose_module_adds_what_the_file_calls_keeps_the_module()
+    {
+        const string main = """
+            import std.encoding { Hex };
+
+            fn main(): void {
+                let x: uint16 = 513;
+                let _ = x.toBytesBE();
+            }
+
+            """;
+        var root = Package(("lyric.toml", AppManifest), ("src/main.lyr", main));
+        var (exit, _, error) = RunRaw("fix", "-C", root, "--color", "never");
+        Assert.True(exit == 0, error);
+        Assert.Equal("""
+            import std.encoding;
+
+            fn main(): void {
+                let x: uint16 = 513;
+                let _ = x.toBytesBE();
+            }
+
+            """, File.ReadAllText(Path.Combine(root, "src", "main.lyr")));
+        var (built, _, said) = RunRaw("check", "-C", root, "--color", "never");
+        Assert.True(built == 0, said);
+    }
 }

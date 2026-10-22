@@ -1534,8 +1534,17 @@ public static class ModuleLowerer
         var fieldType = def.FieldTypes[fieldIndex];
         if (iface.Members.LookupLocal(typeTable.MethodSlotsOf(ifaceId)[slot]) is not FunctionSymbol { Declaration: FunctionDecl promised })
             throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable, $"'{iface.Name}' has no declaration for slot {slot}", type.Declaration?.Span ?? default);
-        var parameters = promised.Parameters.Select(p => typeTable.Lower(p.Type)).ToArray();
-        var returnType = promised.ReturnType is null ? new IrScalarType(IrScalar.Void) : typeTable.Lower(promised.ReturnType);
+        // A generic interface's member in the instance's terms: 'fn key(): K' of 'Keyed<int>' is an 'int'.
+        var ofInstance = typeTable.InstanceOf(ifaceId) is { } instance
+            ? instance.Definition.Generics.Zip(instance.Arguments).ToDictionary(pair => pair.First.Name, pair => pair.Second, StringComparer.Ordinal)
+            : null;
+        IrType[] parameters;
+        IrType returnType;
+        using (ofInstance is not null ? typeTable.PushSubstitution(ofInstance) : null)
+        {
+            parameters = promised.Parameters.Select(p => typeTable.Lower(p.Type)).ToArray();
+            returnType = promised.ReturnType is null ? new IrScalarType(IrScalar.Void) : typeTable.Lower(promised.ReturnType);
+        }
         var isClass = type.Kind == TypeSymbolKind.Class;
         IrType receiver = isClass ? new IrRefType(typeId) : type.Kind == TypeSymbolKind.Enum ? new IrEnumType(typeId) : new IrStructType(typeId);
 
