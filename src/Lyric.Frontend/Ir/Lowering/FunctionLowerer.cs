@@ -4722,8 +4722,10 @@ internal sealed class FunctionLowerer
             from = parentIface;
         }
 
+        // An optional's own value goes in too, where a block gave '?T' the interface (05 §13
+        // rule 6): the levels the target adds are none then, and the whole optional is the shape.
         if (target is IrInterfaceType iface && source is not IrInterfaceType
-            && from is not IrOptionalType)
+            && (from is not IrOptionalType || missing == 0 && IrType.Equal(from, source)))
         {
             // The way behind an interface is a binding point too: a struct is copied there, or the
             // interface value would share the slot array with its source and a mutation through the
@@ -4788,12 +4790,16 @@ internal sealed class FunctionLowerer
             IrEnumType e => e.Type,
             // A built-in's value in a box of its own (01 V7; M8c S8b): 'let d: Display = 5;'.
             _ when _typeTable.BuiltinOfIr(concrete) is { } builtin => _typeTable.BoxOfBuiltin(concrete, builtin),
+            // A shape's value, through the block that gave the shape the interface (05 §13 rule 6).
+            IrArrayType or IrOptionalType or IrFunctionType or IrInlineArrayType or IrSliceType
+                => _typeTable.BoxOfShape(concrete, "shape"),
             _ => throw NotSupported(
                 "a value of this type cannot be used through an interface "
                 + "(only classes, structs, enums and the built-in types)",
                 span),
         };
 
+        _typeTable.MarkLifted(concreteId, iface.Type);
         var dest = _slots.NewTemp(iface);
         _b.Emit(new MakeInterface(dest, value, concreteId, iface.Type, span));
         return dest;
@@ -5867,13 +5873,13 @@ internal sealed class FunctionLowerer
         if (method.Declaration is not FunctionDecl declaration)
             throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
 
-        // An abstract generic member has no body to instantiate for the interface's value. What
-        // comes here is one its type leaves to a field (05 §5): the forwarder would be one
-        // function per instantiation, and is not built. Asked here, an instance of nothing was
-        // requested and the compiler failed on it ("function has no body").
+        // An abstract generic member has no body to instantiate for the interface's value. One a
+        // type leaves to a field is called on the field where the type is known
+        // (TryLowerGenericForward), and an interface with such a member is no type of a value
+        // (LYR-SEM0126): nothing that comes here is the program's to fix.
         if (declaration.Body is null)
-            throw Refused(LoweringDiagnostics.DelegationNotExpressible, $"the generic member '{member.Member}' of '{iface.Name}' where its type forwards it "
-                               + "to a field — write it on the type, calling the field's", expr.Span);
+            throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
+                $"the generic member '{member.Member}' of '{iface.Name}' was reached without a body to instantiate", expr.Span);
 
         var typeArguments = SubstitutedTypeArguments(expr);
 
@@ -6330,6 +6336,57 @@ internal sealed class FunctionLowerer
         return result;
     }
 
+    /// <summary>
+    /// A generic member a type leaves to a field (05 §5 rule 1), as the forwarder written by hand
+    /// would be: the field where it lies, and its type's member at the call's type arguments —
+    /// one instance per use. A field that holds a value of the interface has no slot for a
+    /// generic member, and the checker refuses that delegation.
+    /// </summary>
+    private bool TryLowerGenericForward(MemberExpr member, FunctionSymbol promised, TypeId typeId, string field,
+        CallExpr expr, out TempId? result)
+    {
+        result = null;
+        var def = _typeTable.Defs[typeId.Value];
+        var fieldIndex = Array.IndexOf(def.FieldNames, field);
+        if (fieldIndex < 0) return false;
+        var fieldType = def.FieldTypes[fieldIndex];
+        TypeId? heldId = fieldType switch { IrRefType r => r.Type, IrStructType s => s.Type, IrEnumType e => e.Type, _ => null };
+        if (heldId is not { } held || _typeTable.Interned.FirstOrDefault(e => e.Id == held).Symbol is not { } heldType) return false;
+        var ofInstance = _typeTable.InstanceOf(held);
+        var implementation = heldType.Members.LookupLocal(member.Member) as FunctionSymbol
+                             ?? _types.ConformanceImpl(heldType, TypeTable.InterfaceOwning(promised)!, member.Member, null);
+        if (implementation is not { Declaration: FunctionDecl { Body: not null } decl }
+            || implementation.Generics.Length != promised.Generics.Length) return false;
+
+        var own = SubstitutedTypeArguments(expr);
+        var target = ofInstance is not null
+            ? _instances.Request(implementation, decl, $"{ofInstance.Definition.Name}.{implementation.Name}",
+                ofInstance.Definition, own, _typeTable, expr.Span, ofInstance)
+            : _instances.Request(implementation, decl, $"{heldType.Name}.{implementation.Name}", heldType, own,
+                _typeTable, expr.Span);
+        var passed = MaterializeArguments(decl, ArgumentsOf(expr), member.Member, expr.Span,
+            ofInstance is not null ? InstanceSubstitution(ofInstance, implementation, own)
+                : NamedSubstitutionFor(implementation, _types.TypeArgumentsOf(expr)));
+
+        var outer = LowerExpr(member.Target);
+        var inField = _slots.NewTemp(fieldType);
+        _b.Emit(new LoadField(inField, outer, typeId, new FieldId(fieldIndex), fieldType, expr.Span));
+        var all = new TempId[passed.Length + 1];
+        all[0] = inField;
+        passed.CopyTo(all, 1);
+        var resultType = TypeOfExpr(expr);
+        if (IsVoid(resultType))
+        {
+            _b.Emit(new Call(null, target, all, expr.Span));
+            return true;
+        }
+        var value = _slots.NewTemp(resultType);
+        _b.Emit(new Call(value, target, all, expr.Span));
+        _fresh.Add(value);
+        result = value;
+        return true;
+    }
+
     /// <summary>Does the receiver's constraint name an interface the concrete type conforms to
     /// more than once? Then the member name does not identify the implementation and the call has
     /// to go through the instance-keyed dispatch table.</summary>
@@ -6575,14 +6632,18 @@ internal sealed class FunctionLowerer
         CallExpr expr, out TempId? result)
     {
         result = null;
-        if (iface.Generics.Length > 0 || _types.DelegationOf(owner, iface) is not { } field) return false;
+        if (_types.DelegationOf(owner, iface) is not { } field) return false;
         if (iface.Members.LookupLocal(member.Member) is not FunctionSymbol
-            { Generics.Length: 0, IsStatic: false, Declaration: FunctionDecl { Body: null } promised })
+            { IsStatic: false, Declaration: FunctionDecl { Body: null } promised } promisedSymbol)
             return false;
 
         var typeId = SubstituteType(receiver) is GenericInstance instance
             ? _typeTable.Intern(instance.Definition, instance.Arguments)
             : _typeTable.Intern(owner);
+        // A generic member needs no row, a generic interface's included: the field's member, direct.
+        if (promisedSymbol.Generics.Length > 0)
+            return TryLowerGenericForward(member, promisedSymbol, typeId, field, expr, out result);
+        if (iface.Generics.Length > 0) return false;
         var ifaceId = _typeTable.InterfaceOf(iface).Type;
         var slot = Array.IndexOf(_typeTable.MethodSlotsOf(ifaceId), member.Member);
         if (slot < 0) return false;

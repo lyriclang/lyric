@@ -17,10 +17,6 @@ internal static class LoweringDiagnostics
     /// <summary>A part of the standard library a construct is lowered through is not on the module path.</summary>
     public const string StdMissing = "LYR-SEM0195";
 
-    /// <summary>A delegation the lowering cannot express yet: a generic member forwarded to a field, a
-    /// field of another interface (design 13, M12b).</summary>
-    public const string DelegationNotExpressible = "LYR-SEM0196";
-
     /// <summary>The monomorphization does not terminate (design 03 T19).</summary>
     public const string Unending = "LYR-SEM0197";
 

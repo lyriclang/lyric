@@ -108,16 +108,20 @@ public class GenericMemberTests
         Assert.Contains("the generic interface 'Source'", error.Message);
     }
 
-    /// <summary>A generic member a type leaves to a field (05 §5) would need a forwarder per
-    /// instantiation, which is not built: refused where the type delegates. A call of it crashed
-    /// the compiler ("function has no body"). In both paths — neither can forward it.</summary>
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void A_generic_member_is_not_forwarded_to_a_field_yet(bool lyric5)
+    private const string Delegating = "interface Tagger {\n    fn tag<U>(u: U): string;\n}\nstruct Inner :: [Tagger] {\n    n: int,\n    fn tag<U>(u: U): string { return \"inner\"; }\n}\n"
+                                      + "struct Outer :: [Tagger by inner] {\n    inner: Inner,\n}\n";
+
+    /// <summary>A generic member a type leaves to a field is forwarded in Lyric 5, one forwarder
+    /// per use (05 §5 rule 1).</summary>
+    [Fact]
+    public void A_generic_member_is_forwarded_to_a_field() => Silent(Delegating, lyric5: true);
+
+    /// <summary>The 4.x lowering builds no such forwarder: refused where the type delegates. A call
+    /// of it crashed the compiler ("function has no body").</summary>
+    [Fact]
+    public void A_generic_member_is_not_forwarded_to_a_field_in_4x()
     {
-        var error = One("interface Tagger {\n    fn tag<U>(u: U): string;\n}\nstruct Inner :: [Tagger] {\n    n: int,\n    fn tag<U>(u: U): string { return \"inner\"; }\n}\n"
-                        + "struct Outer :: [Tagger by inner] {\n    inner: Inner,\n}\n", "LYR-SEM0020", lyric5);
+        var error = One(Delegating, "LYR-SEM0020", lyric5: false);
         Assert.Contains("'Outer' does not implement the generic member 'tag' of interface 'Tagger'", error.Message);
         Assert.Contains("not forwarded to a field yet", error.Message);
     }

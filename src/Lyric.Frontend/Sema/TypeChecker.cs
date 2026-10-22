@@ -2253,11 +2253,11 @@ public sealed class TypeChecker
                     {
                         if (delegated.Contains(iface))
                         {
-                            // Forwarded to the field (D1) — but not a generic member: its
-                            // forwarder would be one function per instantiation, and none is
-                            // built. Said here, where the type delegates; at a call it was the
-                            // compiler's failure ("function has no body").
-                            if (im.Generics.Length > 0 && im.Body is null)
+                            // Forwarded to the field (05 §5 rule 1) — a generic member too, one
+                            // forwarder per use. A field of an interface holds no generic member:
+                            // such an interface is no type of a value (LYR-SEM0126). The 4.x
+                            // lowering builds no such forwarder.
+                            if (!_comp.Lyric5Modules && im.Generics.Length > 0 && im.Body is null)
                                 _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
                                     $"'{name}' does not implement the generic member '{im.Name}' of interface "
                                     + $"'{iface.Name}'{implied} — a generic member is not forwarded to a field yet; "
@@ -2268,7 +2268,7 @@ public sealed class TypeChecker
                             // struct, an enum, a builtin — is in a 'var' field, as the written
                             // forwarder would need it (LYR-SEM0019 there). A reference — a class,
                             // a value of an interface — is written through, whatever the field.
-                            else if (im.IsMut && im.Body is null
+                            if (im.IsMut && im.Body is null
                                      && _result.DelegationOf(implementer, iface) is { } to
                                      && implementer.Members.LookupLocal(to) is FieldSymbol { Declaration: FieldDecl { IsVar: false } } fixedField
                                      && FieldType(fixedField) is var heldType && !heldType.IsError
@@ -7427,7 +7427,7 @@ public sealed class TypeChecker
         call.Spreads is { } spreads && Array.Exists(spreads, s => ReferenceEquals(s.Argument, argument));
 
     /// <summary>Does this type still carry a type parameter anywhere inside it?</summary>
-    private static bool MentionsTypeParam(LyrType type) => type switch
+    internal static bool MentionsTypeParam(LyrType type) => type switch
     {
         TypeParamType => true,
         AssocOf a => MentionsTypeParam(a.Base),
@@ -9498,7 +9498,7 @@ public sealed class TypeChecker
     /// <summary>A code of Lyric 5's own: where one rule of the shared front end was split off a code
     /// the 4.x tools still report it under, their suites keep the old one.</summary>
     private string Lyric5Code(string code, string before = "LYR-SEM0001") =>
-        _comp.Lyric5Modules ? code : code == "LYR-SEM0230" ? "LYR-SEM0047" : before;
+        _comp.Lyric5Modules ? code : before;
 
     private bool MayName(Symbol symbol) => _currentModule is null || _comp.Visible(symbol, _currentModule);
 
@@ -13905,12 +13905,12 @@ public sealed class TypeChecker
             return;
         }
         // A value of an interface through a shape's block or a blanket conformance (05 §13
-        // rules 6, 8): such a value needs a table for the shape, or one per type the block
-        // reaches — not written yet; a constraint reaches the conformance.
-        if (TypeFacts.KindOf(liftedTo) == TypeSymbolKind.Interface && !LyrType.Equal(from, liftedTo) && !from.IsError
+        // rules 6, 8) is made in Lyric 5 — the shape in a box, the type with the block's row. The
+        // 4.x lowering has neither; a constraint reaches the conformance there.
+        if (!_comp.Lyric5Modules && TypeFacts.KindOf(liftedTo) == TypeSymbolKind.Interface && !LyrType.Equal(from, liftedTo) && !from.IsError
             && TypeFacts.SymbolOf(liftedTo) is { } through && OnlyThroughABlock(from, through, liftedTo))
         {
-            _de.Report(Lyric5Code("LYR-SEM0230"), Severity.Error, span,
+            _de.Report("LYR-SEM0047", Severity.Error, span,
                 $"'{TypeFacts.Display(from)}' is a '{through.Name}' through "
                 + (IsShape(from) ? "the block on its shape" : "a blanket block")
                 + $", and a value of '{through.Name}' made that way is not written yet — reach it through a constraint, "
@@ -14343,6 +14343,10 @@ public sealed class TypeChecker
         // in a box (01 V7, 03 T3; M8c S8b): 'let d: Display = 5;', 'f(1, "two")' for 'f(xs: Display...)'.
         // Lyric 5's: the 4.x lowering has no box for it.
         if (_comp.Lyric5Modules && BoxesAsBuiltin(from))
+            return Satisfies(from, target, to);
+        // A shape's value conforms through a block on its constructor or a blanket block, and goes
+        // into its interface in a box as a built-in's does (05 §13 rule 6).
+        if (_comp.Lyric5Modules && IsShape(from))
             return Satisfies(from, target, to);
 
         // A type parameter satisfies what its constraints demand. It has no symbol of its own, so it
