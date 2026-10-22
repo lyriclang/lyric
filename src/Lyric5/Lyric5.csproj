@@ -32,4 +32,33 @@
     <Content Include="..\..\stdlib5\**\*.lyr" Link="stdlib5\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!--
+    The runtime's C source, beside the published binary: lyric5 builds liblyr.a from it on the user's
+    machine (RuntimeLayout.FindRoot looks for runtime/include/lyr above the binary). A build in the tree
+    finds the checkout's own runtime, so only a publish carries a copy. Its tests and the Unicode data
+    the table generator reads stay out; the notices of the third-party code go along.
+  -->
+  <ItemGroup>
+    <Content Include="..\..\runtime\include\**\*" Link="runtime\include\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\runtime\src\**\*" Link="runtime\src\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\runtime\third_party\**\*" Exclude="..\..\runtime\third_party\ucd\**\*"
+             Link="runtime\third_party\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\runtime\THIRD_PARTY.md" Link="runtime\THIRD_PARTY.md"
+             CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!--
+    The front end's project carries the 4.x standard library (stdlib/) to every output that references
+    it; lyric5 compiles against stdlib5/ alone, so a publish leaves the other one out.
+  -->
+  <Target Name="LeaveOutTheScriptStdlib" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\', '/').StartsWith('stdlib/'))" />
+    </ItemGroup>
+  </Target>
+
 </Project>
