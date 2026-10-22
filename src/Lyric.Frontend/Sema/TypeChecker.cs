@@ -501,7 +501,7 @@ public sealed class TypeChecker
     /// every implementing type would owe both. The same structural reason that gives generic
     /// members no slot (LYR-SEM0088).</para>
     /// </summary>
-    private void CheckOverloadSets(SymbolTable scope, string what, bool inInterface)
+    private void CheckOverloadSets(SymbolTable scope, string what, bool inInterface, TypeSymbol? owner = null)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var symbol in scope.Symbols)
@@ -529,6 +529,7 @@ public sealed class TypeChecker
                     var (aMin, aMax) = ArityOf(overloads[i]);
                     var (bMin, bMax) = ArityOf(overloads[j]);
                     if (aMin > bMax || bMin > aMax) continue;
+                    if (owner is not null && AnswerTwoInstances(owner, overloads[i], overloads[j])) continue;
                     var shared = Math.Max(aMin, bMin);
                     _de.Report("LYR-SEM0085", Severity.Error,
                         overloads[j].Declaration?.Span ?? default,
@@ -539,6 +540,32 @@ public sealed class TypeChecker
                             $"the other one takes {DisplayArity(overloads[i])}"));
                 }
         }
+    }
+
+    /// <summary>
+    /// Two members of one name and count that answer two instances of one generic interface the
+    /// type conforms to (05 §3 rule 5): <c>from(v: int)</c> for <c>From&lt;int&gt;</c> beside
+    /// <c>from(v: string)</c> for <c>From&lt;string&gt;</c>. The instance tells them apart, and a
+    /// call by its arguments' types.
+    /// </summary>
+    private bool AnswerTwoInstances(TypeSymbol owner, FunctionSymbol a, FunctionSymbol b)
+    {
+        if (!_comp.Lyric5Modules) return false;
+        var at = SelfType(owner);
+        var answers = new List<(TypeSymbol Iface, LyrType Instance, FunctionSymbol Member)>();
+        foreach (var (iface, subst) in InterfacesOf(owner))
+        {
+            if (iface.Generics.Length == 0) continue;
+            if (iface.Members.LookupLocal(a.Name) is not FunctionSymbol { Declaration: FunctionDecl promised } member) continue;
+            var want = (FnType)Substitute(FnTypeOf(member), WithSelf(subst, iface, at));
+            if (ContainsError(want)) continue;
+            var instance = InstanceOfConformance(iface, subst);
+            foreach (var candidate in new[] { a, b })
+                if (SignatureMismatch(want, promised, candidate, at) is null)
+                    answers.Add((iface, instance, candidate));
+        }
+        return answers.Any(x => ReferenceEquals(x.Member, a)
+            && answers.Any(y => ReferenceEquals(y.Member, b) && ReferenceEquals(x.Iface, y.Iface) && !LyrType.Equal(x.Instance, y.Instance)));
     }
 
     /// <summary>The interface instance a conformance names, rebuilt from the substitution the
@@ -585,7 +612,7 @@ public sealed class TypeChecker
                     module.Members, "a struct");
                 CheckValueTypeIsFinite(s, s.Name, "struct", module);
                 if (module.Members.LookupLocal(s.Name) is TypeSymbol sType)
-                    CheckOverloadSets(sType.Members, $"'{s.Name}'", inInterface: false);
+                    CheckOverloadSets(sType.Members, $"'{s.Name}'", inInterface: false, sType);
                 CheckMethods(s.Name, s.Members, module);
                 CheckTypeConformance(s.Name, s.Interfaces, module, s.Delegates);
                 break;
@@ -593,7 +620,7 @@ public sealed class TypeChecker
                 CheckAttributes(c.Attributes, AttributeSite.Type, c.Generics.Length > 0,
                     module.Members, "a class");
                 if (module.Members.LookupLocal(c.Name) is TypeSymbol cType)
-                    CheckOverloadSets(cType.Members, $"'{c.Name}'", inInterface: false);
+                    CheckOverloadSets(cType.Members, $"'{c.Name}'", inInterface: false, cType);
                 CheckMethods(c.Name, c.Members, module);
                 CheckTypeConformance(c.Name, c.Interfaces, module, c.Delegates);
                 break;
@@ -4837,7 +4864,9 @@ public sealed class TypeChecker
         var found = ts.Members.OverloadsLocal(member).Where(MayName)
             .Select(f => new OverloadCandidate(f, FromExtension: false)).ToList();
         if (!withBlocks) return found;
-        var scoped = ConformanceBlocksNaming(ts, member) > 1;
+        // Blocks giving instances of one generic interface hold one set the arguments choose
+        // from (05 §3 rule 5), not names scoped to their interfaces.
+        var scoped = ConformanceBlocksNaming(ts, member) > 1 && !InstancesOfOneInterface(ts, member);
         foreach (var ext in _comp.Extensions.MethodsFor(ts))
             if (ext.Symbol.Name == member
                 && _comp.Reaches(_currentModule, ext)
@@ -4846,6 +4875,19 @@ public sealed class TypeChecker
                 && !found.Any(c => ReferenceEquals(c.Fn, ext.Symbol)))
                 found.Add(new OverloadCandidate(ext.Symbol, FromExtension: true));
         return found;
+    }
+
+    /// <summary>Do the conformance blocks that implement a name all give instances of one generic
+    /// interface — <c>From&lt;int&gt;</c> and <c>From&lt;string&gt;</c>?</summary>
+    private bool InstancesOfOneInterface(TypeSymbol ts, string member)
+    {
+        if (!_comp.Lyric5Modules) return false;
+        var given = _comp.Extensions.MethodsFor(ts)
+            .Where(ext => ext.Symbol.Name == member && ext.InConformanceBlock)
+            .Select(ext => ext.Block).Distinct()
+            .SelectMany(block => block.Decl.Interfaces.Select(node => Conformance.InterfaceOf(node, _binding)))
+            .Distinct().ToList();
+        return given is [{ Generics.Length: > 0 }];
     }
 
     /// <summary>How many conformance BLOCKS implement a name — blocks, not members: one block that
@@ -4955,6 +4997,9 @@ public sealed class TypeChecker
         if (fitting.Count > 1 && fitting.Any(f => !f.FromExtension))
             fitting = fitting.Where(f => !f.FromExtension).ToList();
 
+        if (fitting.Count > 1 && ChosenByInstance(call, fitting, scope) is { } byType)
+            return byType.Chosen;
+
         if (fitting.Count > 1)
         {
             _de.Report("LYR-SEM0086", Severity.Error, call.Span,
@@ -4966,6 +5011,49 @@ public sealed class TypeChecker
         }
 
         return fitting[0].Fn;
+    }
+
+    /// <summary>
+    /// Members of one count that answer instances of one generic interface (05 §3 rule 5):
+    /// the one whose parameters take the arguments' types — <c>Label.from(3)</c> is the
+    /// <c>From&lt;int&gt;</c> one. <c>null</c> where they are no such set; no choice where the
+    /// arguments fit none or more than one, the ambiguity reported with the way to write it.
+    /// </summary>
+    private (FunctionSymbol? Chosen, bool Settled)? ChosenByInstance(CallExpr call, List<OverloadCandidate> fitting, SymbolTable scope)
+    {
+        if (!_comp.Lyric5Modules || call.Callee is not MemberExpr mem) return null;
+        var owner = _result.TypeOf(mem.Target) switch
+        {
+            NonValueType { Symbol: TypeSymbol named } => named,
+            var t when t is not null => TypeFacts.SymbolOf(t),
+            _ => null,
+        };
+        if (owner is null) return null;
+        for (var i = 0; i < fitting.Count; i++)
+            for (var j = i + 1; j < fitting.Count; j++)
+                if (!AnswerTwoInstances(owner, fitting[i].Fn, fitting[j].Fn)) return null;
+
+        LyrType?[] given;
+        using (_de.Mute())
+            given = call.Arguments.Select(a => a is LambdaExpr ? null : (LyrType?)CheckExpr(a, scope)).ToArray();
+        var taking = fitting.Where(f => FnTypeOf(f.Fn) is FnType fn
+            && given.Select((t, i) => t is null || i >= fn.Parameters.Length || IsAssignable(call.Arguments[i], t, fn.Parameters[i])).All(ok => ok))
+            .ToList();
+        if (taking.Count == 1) return (taking[0].Fn, true);
+        // A literal takes several types; the one whose parameters are the arguments' own types
+        // comes first — '3' is an 'int' and takes the 'From<int>' one beside 'From<float>'.
+        var exact = taking.Where(f => FnTypeOf(f.Fn) is FnType fn
+            && given.Select((t, i) => t is null || i >= fn.Parameters.Length || LyrType.Equal(t, fn.Parameters[i])).All(ok => ok))
+            .ToList();
+        if (exact.Count == 1) return (exact[0].Fn, true);
+        var shown = string.Join(", ", given.Select(t => t is null ? "_" : TypeFacts.Display(t)));
+        _de.Report("LYR-SEM0086", Severity.Error, call.Span,
+            taking.Count == 0
+                ? $"no '{fitting[0].Fn.Name}' of '{owner.Name}' takes ({shown}) — each answers an instance of one interface, and the arguments' types choose"
+                : $"'{fitting[0].Fn.Name}' of '{owner.Name}' is ambiguous for ({shown}): {taking.Count} instances take it and none is the argument's own type — write it with 'as'",
+            (taking.Count == 0 ? fitting : taking).Select(f => new DiagnosticNote(f.Fn.Declaration?.Span ?? default,
+                $"this one takes {TypeFacts.Display(FnTypeOf(f.Fn))}")).ToArray());
+        return (null, true);
     }
 
     /// <summary>

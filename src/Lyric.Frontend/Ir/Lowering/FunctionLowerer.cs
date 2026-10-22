@@ -6398,6 +6398,25 @@ internal sealed class FunctionLowerer
         return true;
     }
 
+    /// <summary>The instance of <paramref name="iface"/> the receiver's constraint names, in this
+    /// instance's terms — <c>From&lt;string&gt;</c> for <c>U :: [From&lt;T&gt;]</c> with <c>T = string</c>:
+    /// of a type that answers several instances, the one the call means (05 §3 rule 5).</summary>
+    private LyrType? ConstraintInstance(MemberExpr member, TypeSymbol iface, Span span)
+    {
+        // a static is called on the parameter as a type, 'U.from(x)'
+        var parameter = ReceiverType(member.Target) switch
+        {
+            TypeParamType value => value.Param,
+            Sema.NonValueType { Symbol: GenericParamSymbol named } => named,
+            _ => null,
+        };
+        if (parameter is null) return null;
+        foreach (var constraint in parameter.Constraints)
+            if (ReferenceEquals(_typeTable.ConstraintInterface(constraint), iface))
+                return _typeTable.InstanceOf(LiftTargetOf(constraint, span).Type);
+        return null;
+    }
+
     /// <summary>Does the receiver's constraint name an interface the concrete type conforms to
     /// more than once? Then the member name does not identify the implementation and the call has
     /// to go through the instance-keyed dispatch table.</summary>
@@ -6533,6 +6552,11 @@ internal sealed class FunctionLowerer
         var chosen = owner is not null && _types.RefOf(member) is FunctionSymbol promised
                      && TypeTable.InterfaceOwning(promised) is { } iface
             ? _types.ConformanceImpl(owner, iface, member.Member, null)
+              // asked only where the name does not say it: the instance is interned when asked,
+              // and an interface no value is made of has no business in the type table
+              ?? (_typeTable.ConformsSeveralTimes(owner, iface)
+                  ? _types.ConformanceImpl(owner, iface, member.Member, ConstraintInstance(member, iface, expr.Span))
+                  : null)
             : null;
         var function = chosen
                        ?? owner?.Members.LookupLocal(member.Member) as FunctionSymbol
