@@ -116,7 +116,7 @@ jobs:
     # cap with no red test. The cap is for a hang; 45 left a hang red and a slow runner green until
     # M11's sweep, when the job took 41 minutes on main and twice lost a green suite (1668 passed in
     # 39 minutes) to the cap: 60.
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -155,10 +155,24 @@ jobs:
       # The runtime (M1): liblyr.a for every Tier 1 triple, and its tests run on this runner — on
       # Linux x86-64 also under ASan+UBSan and TSan (clang), and there without clang they fail.
       # Only this job asks for the sanitizer runs; the whole-suite jobs skip them.
+      - name: Runner
+        shell: bash
+        run: |
+          if command -v sysctl >/dev/null && [ "$RUNNER_OS" = macOS ]; then sysctl -n hw.ncpu hw.memsize machdep.cpu.brand_string; fi
+          if command -v nproc >/dev/null; then nproc; fi
+          if [ "$RUNNER_OS" = Linux ]; then free -g | head -2; fi
+
       - name: Runtime tests
         env:
           LYRIC5_SANITIZERS: '1'
-        run: dotnet test tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release
+        run: dotnet test tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release --logger "trx;LogFileName=times.trx" --logger "console;verbosity=normal" --results-directory testresults
+
+      - name: Test times
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: times-${{ matrix.os }}
+          path: testresults/*.trx
 
   lyric5-aot:
     # The seed of the Lyric 5 command line as one NativeAOT binary per Tier 1 target (11 C1). The
