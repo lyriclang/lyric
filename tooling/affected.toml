@@ -10,12 +10,14 @@
 # conformance labels ("12-"), or "all", or "imports": the cases that name the touched std module
 # (`std.string`); a module the prelude imports reaches every case.
 
-# The harness itself: everything runs.
-full = [".github/", "tooling/", "global.json", "Directory.Build.props", "Directory.Build.targets", "Lyric.slnx",
-        "tests/Lyric5.Tests/Lyric5.Tests.csproj", "tests/Directory.Build.props"]
+# The harness itself — what builds and runs the tests and chooses them: everything runs. The rest
+# of tooling/ and .github/ has its rules below.
+full = [".github/workflows/ci.yml", ".github/workflows/dev.yml", ".github/actions/setup-zig/", "tooling/conformance/",
+        "tooling/affected.py", "tooling/c-smoke/", "tooling/valgrind/", "global.json", "Directory.Build.props",
+        "Directory.Build.targets", "Lyric.slnx", "tests/Lyric5.Tests/Lyric5.Tests.csproj", "tests/Directory.Build.props"]
 
 # Text no test reads. spec.pin is read apart: the cases the pin moved over always run.
-ignore = ["docs/Bytecode.md", "docs/Grammar.md", "docs/Pack.md", "docs/archive/", "docs/guide/", "design/", "bench/",
+ignore = ["tooling/textmate/", "docs/Bytecode.md", "docs/Grammar.md", "docs/Pack.md", "docs/archive/", "docs/guide/", "design/", "bench/",
           "STATUS.md", "CHANGELOG.md", "README.md", "CONTRIBUTING.md", "LICENSE", "spec.pin", ".gitignore", ".gitattributes"]
 
 [regression]
@@ -110,3 +112,33 @@ cases = []
 
 # tests/Lyric5.Tests/<Name>.cs selects the class <Name> (affected.py); a file there that is no
 # test class — a fixture, a helper — selects every Lyric5 class.
+
+[[rule]]
+# This table: what the other files of the change select, by the table as it now stands, and the
+# regression group — no class of its own.
+paths = ["tooling/affected.toml"]
+tests = []
+cases = []
+
+[[rule]]
+# The site's workflow, the Pagefind action and pin, the site's scripts.
+paths = [".github/workflows/site.yml", ".github/actions/setup-pagefind/", "tooling/pagefind", "tooling/site/"]
+tests = ["SiteTests", "SearchTests", "LegacyTests", "CatalogPageTests"]
+cases = []
+
+[[rule]]
+# The appendix generator reads the catalog.
+paths = ["tooling/diagnostics/"]
+tests = ["CatalogTests", "CatalogPageTests"]
+cases = []
+
+[[rule]]
+# The generators of the runtime's Unicode tables and of the front end's libm tables.
+paths = ["tooling/unicode/"]
+tests = ["UnicodeTests"]
+cases = []
+
+[[rule]]
+paths = ["tooling/libm/"]
+tests = ["LibmTests", "ComptimeTests"]
+cases = []
