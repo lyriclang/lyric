@@ -160,7 +160,6 @@ Each subsystem has its own test project:
 - `tests/Lyric.Tests.Ir/` — AST to IR lowering
 - `tests/Lyric.Tests.Formatting/` — the formatter, over the whole corpus
 - `tests/Lyric.Tests.Lsp/` — the language server over the front end
-- `tests/Lyric.Tests.DocGen/` — the documentation site generator
 - `tests/Lyric5.Tests/` — the Lyric 5 runtime (C, built and run for every Tier 1 target)
   and its toolchain driver
 

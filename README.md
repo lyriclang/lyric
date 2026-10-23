@@ -97,7 +97,7 @@ lyric/
 ├── design/v5/            the Lyric 5 design round: corpus and decisions (spec/00–14)
 ├── tooling/              zig-version and c-smoke/ — the C toolchain; valgrind/ — memcheck locally;
 │                         textmate/ — the editor grammar, pinned against the lexer by the tests
-├── tools/                DocGen, the documentation site generator
+├── tools/                Site, the website: home, Book, spec, diagnostics, releases
 └── docs/                 guide and 4.x references; archive/4.x/ — 4.x planning
 ```
 
@@ -115,10 +115,13 @@ lyric/
 The normative specification lives in [lyriclang/lyric-spec](https://github.com/lyriclang/lyric-spec):
 `main` is the Lyric 5.0 text, written milestone by milestone; `script` is the 4.x text.
 
-`tools/DocGen` renders the guide and the references into the documentation site:
+`tools/Site` renders the website — the home page, the Book (`docs/book/`), the specification at
+`spec.pin`, the diagnostic catalog and the releases — into one directory per version; the `Site`
+workflow publishes `dev` from `main`. The 4.x guide under `docs/guide/` is no longer rendered.
 
 ```bash
-dotnet run --project tools/DocGen -- site . artifacts/site dev
+dotnet run --project tools/Site -- --out artifacts/site --version dev --spec ../lyric-spec
+dotnet run --project tools/Site -- check --site artifacts/site/dev
 ```
 
 ## Versioning

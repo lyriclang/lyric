@@ -1,0 +1,148 @@
+# The .NET version comes from global.json and the SDK preinstalled on the runner, not from
+# actions/setup-dotnet — see the comment in ci.yml for what that action cost on 2026-08-17.
+name: Site
+
+# The website (tools/Site): the home page, the Book, the specification at spec.pin, the diagnostic
+# catalog and the releases, one directory per version.
+#
+# A pull request builds the whole site as it would be published and checks it — every link reaches
+# its page and anchor, nothing is fetched from another host. A push to main publishes /dev/; a
+# release tag of Lyric 5 publishes its /X.Y/. Every other directory of gh-pages is left as it is,
+# and versions.json and the root page are brought up to date.
+on:
+  pull_request:
+  push:
+    branches: [main]
+    # Lyric 5 releases only: the v1–v4 tags of this repository belong to the old line, whose pages
+    # are kept under /legacy/ and are never built again.
+    tags: ['v[5-9].[0-9]+.[0-9]+', 'v[1-9][0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Build and check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Read the specification's pin
+        id: pin
+        run: |
+          sha=$(tr -d '[:space:]' < spec.pin)
+          echo "$sha" | grep -qE '^[0-9a-f]{40}$' || { echo "spec.pin holds one full commit of lyriclang/lyric-spec and nothing else; it holds '$sha'"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout the specification
+        uses: actions/checkout@v7
+        with:
+          repository: lyriclang/lyric-spec
+          ref: ${{ steps.pin.outputs.sha }}
+          path: spec-repo
+
+      - name: Set up Pagefind
+        uses: ./.github/actions/setup-pagefind
+
+      # Pagefind named explicitly: without it the site would build with no search, and say so only
+      # as a notice.
+      - name: Build the site
+        run: >
+          dotnet run --project tools/Site -c Release --
+          --out "$RUNNER_TEMP/site" --version dev --ref main --spec spec-repo --pagefind "$LYRIC_PAGEFIND"
+
+      - name: Check the site
+        run: dotnet run --project tools/Site -c Release --no-build -- check --site "$RUNNER_TEMP/site/dev"
+
+  publish:
+    name: Publish
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # One deploy at a time: two jobs pushing to gh-pages would race for the branch. Queued rather
+    # than cancelled, so a release's deploy is never dropped for a later push.
+    concurrency:
+      group: site-deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # main is dev; a tag vX.Y.Z is the frozen X.Y, its links into the repository at the tag.
+      - name: Decide what is being published
+        id: target
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            echo "$GITHUB_REF_NAME" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "'$GITHUB_REF_NAME' is no release tag"; exit 1; }
+            major=$(echo "$GITHUB_REF_NAME" | sed -E 's/^v([0-9]+)\..*/\1/')
+            [ "$major" -ge 5 ] || { echo "'$GITHUB_REF_NAME' belongs to the 1.x–4.x line, whose pages are under /legacy/"; exit 1; }
+            echo "version=$(echo "$GITHUB_REF_NAME" | sed -E 's/^v([0-9]+\.[0-9]+)\..*/\1/')" >> "$GITHUB_OUTPUT"
+            echo "ref=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            [ "$GITHUB_REF" = refs/heads/main ] || { echo "dev is published from main only, not from $GITHUB_REF"; exit 1; }
+            echo "version=dev" >> "$GITHUB_OUTPUT"
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Read the specification's pin
+        id: pin
+        run: |
+          sha=$(tr -d '[:space:]' < spec.pin)
+          echo "$sha" | grep -qE '^[0-9a-f]{40}$' || { echo "spec.pin holds one full commit of lyriclang/lyric-spec and nothing else; it holds '$sha'"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout the specification
+        uses: actions/checkout@v7
+        with:
+          repository: lyriclang/lyric-spec
+          ref: ${{ steps.pin.outputs.sha }}
+          path: spec-repo
+
+      - name: Set up Pagefind
+        uses: ./.github/actions/setup-pagefind
+
+      # A second working tree of this repository on the publishing branch. Cloned rather than
+      # initialised, so 'origin' and the push credentials are already in place.
+      - name: Checkout the published site
+        uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+          path: pages
+
+      # The version's directory is written anew; everything else on the branch stays. --index
+      # refuses while the old site's versions.json is still at the root: the 1.x–4.x pages must be
+      # moved under legacy/ first, by hand ('site legacy'), so this deploy cannot hide them.
+      - name: Build the site into the published tree
+        run: |
+          rm -rf "pages/${{ steps.target.outputs.version }}"
+          dotnet run --project tools/Site -c Release -- \
+            --out pages --version "${{ steps.target.outputs.version }}" --ref "${{ steps.target.outputs.ref }}" \
+            --spec spec-repo --pagefind "$LYRIC_PAGEFIND" --index \
+          || { echo "::error::the site was not published — if the message above names the old versions.json, run 'site legacy --pages <work tree of gh-pages>', push gh-pages, and run this workflow again"; exit 1; }
+
+      - name: Check the site
+        run: dotnet run --project tools/Site -c Release --no-build -- check --site "pages/${{ steps.target.outputs.version }}"
+
+      # Without it Pages runs the tree through Jekyll, which drops paths beginning with an
+      # underscore — Pagefind's index has none today, and the file costs nothing.
+      - name: Keep Pages from processing the tree
+        run: touch pages/.nojekyll
+
+      - name: Publish
+        working-directory: pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "the site is unchanged"
+            exit 0
+          fi
+          git commit -m "site: ${{ steps.target.outputs.version }} from ${GITHUB_SHA::7}"
+          git push origin HEAD:gh-pages

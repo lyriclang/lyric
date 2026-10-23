@@ -13,8 +13,12 @@ using Lyric5.Site;
 //
 // legacy moves the 1.x–4.x documentation of the published site under legacy/ (Legacy.Plan says what
 // it does); --dry-run prints the steps and changes nothing.
+//
+// site check --site <dir> reads a built site as a browser would: every relative link reaches a file
+// and its anchor, no page or stylesheet asks another host for anything. It exits with 1 on a finding.
 
 if (args.Length > 0 && args[0] == "legacy") return LegacyCommand(args[1..]);
+if (args.Length > 0 && args[0] == "check") return CheckCommand(args[1..]);
 
 const string Usage = "usage: site --out <dir> --version <name> [--root <repository>] [--ref <git ref>] [--spec <checkout>] [--pagefind <binary>] [--index]";
 string? output = null, version = null, root = null, gitRef = null, specDir = null, pagefind = null;
@@ -53,6 +57,7 @@ if (index)
     catch (InvalidOperationException refused)
     {
         Console.Error.WriteLine($"site: {refused.Message}");
+        Console.Error.WriteLine("site: run 'site legacy --pages <work tree of gh-pages>' there, commit and push it, then publish again");
         return 1;
     }
 }
@@ -98,6 +103,25 @@ if (index)
     Console.WriteLine($"site: {list.Count} versions in {Path.Combine(output, Versions.ListFile)}, the root leads to {Versions.Landing(list).Path}");
 }
 return 0;
+
+static int CheckCommand(string[] args)
+{
+    if (args.Length != 2 || args[0] != "--site" || !Directory.Exists(args[1]))
+    {
+        Console.Error.WriteLine("usage: site check --site <built site>");
+        return 2;
+    }
+    var result = SiteCheck.Run(args[1]);
+    foreach (var link in result.Broken) Console.Error.WriteLine($"site check: leads nowhere: {link}");
+    foreach (var request in result.External) Console.Error.WriteLine($"site check: asks another host: {request}");
+    Console.WriteLine($"site check: {result.Checked} links, {result.Broken.Count} leading nowhere, {result.External.Count} requests to another host");
+    if (result.Checked == 0)
+    {
+        Console.Error.WriteLine("site check: no link was checked — is this a built site?");
+        return 1;
+    }
+    return result.Passed ? 0 : 1;
+}
 
 static int LegacyCommand(string[] args)
 {

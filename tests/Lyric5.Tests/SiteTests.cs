@@ -135,12 +135,6 @@ public partial class SiteTests
         Assert.Contains("<a href=\"book/\">Book</a>", home);
     }
 
-    [GeneratedRegex("(?:href|src)=\"(?<target>[^\"]*)\"")]
-    private static partial Regex Target();
-
-    [GeneratedRegex("\\sid=\"(?<id>[^\"]*)\"")]
-    private static partial Regex Id();
-
     /// <summary>The site of the repository, built into a fresh directory.</summary>
     private static string BuildSite()
     {
@@ -151,39 +145,7 @@ public partial class SiteTests
 
     /// <summary>Every relative link of a built site that reaches no written file or no anchor
     /// there, and how many links were looked at.</summary>
-    internal static (List<string> Broken, int Checked) LinksOf(string output)
-    {
-        var broken = new List<string>();
-        var checkedLinks = 0;
-        var ids = new Dictionary<string, HashSet<string>>();
-        foreach (var file in Directory.EnumerateFiles(output, "*.html", SearchOption.AllDirectories))
-        {
-            var html = File.ReadAllText(file);
-            foreach (Match m in Target().Matches(html))
-            {
-                var target = m.Groups["target"].Value.Replace("&amp;", "&");
-                if (target.Contains("://", StringComparison.Ordinal) || target.StartsWith('/')
-                    || target.StartsWith("mailto:", StringComparison.Ordinal))
-                    continue;
-                checkedLinks++;
-                var hash = target.IndexOf('#');
-                var path = hash < 0 ? target : target[..hash];
-                var anchor = hash < 0 ? "" : target[(hash + 1)..];
-                var resolved = path.Length == 0
-                    ? file
-                    : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(file)!, SiteContext.FileOf(path)));
-                var where = $"{Path.GetRelativePath(output, file)}: {target}";
-                if (!File.Exists(resolved)) broken.Add(where);
-                else if (anchor.Length > 0)
-                {
-                    if (!ids.TryGetValue(resolved, out var known))
-                        ids[resolved] = known = Id().Matches(File.ReadAllText(resolved)).Select(id => id.Groups["id"].Value).ToHashSet();
-                    if (!known.Contains(anchor)) broken.Add(where + " (no such anchor)");
-                }
-            }
-        }
-        return (broken, checkedLinks);
-    }
+    internal static (List<string> Broken, int Checked) LinksOf(string output) => SiteCheck.Links(output);
 
     [Fact]
     public void The_built_site_has_no_link_that_leads_nowhere()
@@ -201,11 +163,42 @@ public partial class SiteTests
         }
     }
 
-    [GeneratedRegex("<link[^>]*\\shref=\"(?:https?:)?//|<script[^>]*\\ssrc=\"(?:https?:)?//", RegexOptions.IgnoreCase)]
-    private static partial Regex ExternalInHtml();
+    /// <summary>The check the publishing workflow runs over the built tree: a good tree passes, a
+    /// link to a missing page, a missing anchor and a stylesheet from another host are each found.</summary>
+    [Fact]
+    public void The_site_check_finds_what_would_break_on_the_published_site()
+    {
+        var output = Directory.CreateTempSubdirectory("lyric5-site-check").FullName;
+        try
+        {
+            void Write(string path, string text)
+            {
+                var file = Path.Combine(output, path);
+                Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                File.WriteAllText(file, text);
+            }
+            Write("index.html", "<a href=\"book/\">Book</a> <a href=\"book/#start\">start</a> <a href=\"/legacy/\">old</a> <a href=\"https://example.org/\">x</a>");
+            Write("book/index.html", "<h1 id=\"start\">Start</h1> <a href=\"../\">home</a>");
+            Write("site.css", "body { font-family: Inter; }");
 
-    [GeneratedRegex("url\\(\\s*[\"']?(?:https?:)?//|@import", RegexOptions.IgnoreCase)]
-    private static partial Regex ExternalInCss();
+            var good = SiteCheck.Run(output);
+            Assert.True(good.Passed, string.Join("\n", good.Broken.Concat(good.External)));
+            Assert.Equal(3, good.Checked);
+
+            Write("book/index.html", "<h1 id=\"begin\">Start</h1> <a href=\"../spec/\">spec</a> <link rel=\"stylesheet\" href=\"https://fonts.example/a.css\">");
+            Write("site.css", "@import url(\"https://fonts.example/b.css\");");
+            var bad = SiteCheck.Run(output);
+            Assert.False(bad.Passed);
+            Assert.Equal(["book/index.html: ../spec/", "index.html: book/#start (no such anchor)"],
+                bad.Broken.Select(b => b.Replace('\\', '/')).Order(StringComparer.Ordinal));
+            // The link element, and in the stylesheet both the @import and its url().
+            Assert.Equal(3, bad.External.Count);
+        }
+        finally
+        {
+            Directory.Delete(output, recursive: true);
+        }
+    }
 
     [Fact]
     public void No_page_asks_another_host_for_anything()
@@ -213,19 +206,7 @@ public partial class SiteTests
         var output = BuildSite();
         try
         {
-            var offenders = new List<string>();
-            foreach (var file in Directory.EnumerateFiles(output, "*.*", SearchOption.AllDirectories))
-            {
-                var pattern = Path.GetExtension(file) switch
-                {
-                    ".html" => ExternalInHtml(),
-                    ".css" => ExternalInCss(),
-                    _ => null,
-                };
-                if (pattern is null) continue;
-                foreach (Match m in pattern.Matches(File.ReadAllText(file)))
-                    offenders.Add($"{Path.GetRelativePath(output, file)}: {m.Value}");
-            }
+            var offenders = SiteCheck.External(output);
             Assert.True(offenders.Count == 0, "requests to another host:\n  " + string.Join("\n  ", offenders));
         }
         finally
