@@ -1,9 +1,5 @@
 [
   {
-    "version": "nightly",
-    "stable": false
-  },
-  {
     "version": "v4.5.0",
     "stable": true
   },
