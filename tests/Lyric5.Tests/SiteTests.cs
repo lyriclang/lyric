@@ -1,0 +1,310 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
+using Lyric5.Doc;
+using Lyric5.Site;
+using Lyric5.Toolchain;
+
+namespace Lyric5.Tests;
+
+/// <summary>
+/// The website's renderer and its tool: each page form against its golden
+/// (<c>site/golden/*.html</c>; <c>LYRIC_UPDATE_SNAPSHOTS=1</c> rewrites them), the built site with
+/// no link that leads nowhere and no request to another host, the palette's contrast, and the
+/// highlighting of Lyric code by the compiler's lexer.
+/// </summary>
+public partial class SiteTests
+{
+    private static readonly string Root = RuntimeLayout.FindRoot(AppContext.BaseDirectory);
+    private static readonly string Golden = Path.Combine(Root, "tests", "Lyric5.Tests", "site", "golden");
+
+    private const string Program = "fn add(a: int, b: int): int {\n    return a + b; // the sum\n}";
+
+    private const string Changelog = """
+        # Changelog
+
+        What this file is.
+
+        ## v2.0.0 — today
+
+        - **A change** ([the plan](design/plan.md)), shown:
+
+        ```lyric
+        let total = 1 + 2;
+        ```
+
+        ## v1.0.0
+
+        The first. See [README](README.md#versioning), [Rust](https://www.rust-lang.org/) and [above](#v2.0.0-today).
+        """;
+
+    private static SiteContext Site(params string[] pages) => new("dev", pages, SiteContext.DefaultAreas);
+
+    private static void MatchesGolden(string name, string actual)
+    {
+        var path = Path.Combine(Golden, name + ".html");
+        if (Environment.GetEnvironmentVariable("LYRIC_UPDATE_SNAPSHOTS") == "1")
+        {
+            Directory.CreateDirectory(Golden);
+            File.WriteAllText(path, actual);
+        }
+        Assert.True(File.Exists(path), $"no golden at {path}; set LYRIC_UPDATE_SNAPSHOTS=1 to write it");
+        Assert.Equal(File.ReadAllText(path).ReplaceLineEndings("\n"), actual);
+    }
+
+    [Fact]
+    public void The_start_page_matches_its_golden()
+    {
+        var site = Site(SiteBuilder.HomePath, SiteBuilder.ReleasesPath);
+        MatchesGolden("home", Pages.Home(site, SiteBuilder.HomePath, SiteBuilder.Home(Program)));
+    }
+
+    [Fact]
+    public void An_article_page_matches_its_golden()
+    {
+        var site = Site(SiteBuilder.HomePath, SiteBuilder.ReleasesPath);
+        MatchesGolden("article", Pages.Article(site, SiteBuilder.ReleasesPath, SiteBuilder.Releases(Changelog, "v2.0.0")));
+    }
+
+    [Fact]
+    public void A_reference_page_matches_its_golden()
+    {
+        const string path = "std/collections/List/index.html";
+        var site = Site(SiteBuilder.HomePath, path);
+        var text = Markdown.Render("# List\n\nA growable array.\n\n## Methods\n\n### push\n\nAppends a value.\n\n```lyric\nxs.push(1);\n```\n", dropTitle: true);
+        var page = new ReferenceContent("List", text.Html,
+            [new Link("std.collections", "std/collections/"), new Link("List", "std/collections/List/")],
+            "std.collections", text.Headings);
+        MatchesGolden("reference", Pages.Reference(site, path, page));
+    }
+
+    [GeneratedRegex("(?:href|src)=\"(?<target>[^\"]*)\"")]
+    private static partial Regex Target();
+
+    [GeneratedRegex("\\sid=\"(?<id>[^\"]*)\"")]
+    private static partial Regex Id();
+
+    /// <summary>The site of the repository, built into a fresh directory.</summary>
+    private static string BuildSite()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "lyric5-site-" + Guid.NewGuid().ToString("N"));
+        SiteWriter.Write(Path.Combine(output, "dev"), SiteBuilder.Build(Root, "dev", "main"));
+        return output;
+    }
+
+    [Fact]
+    public void The_built_site_has_no_link_that_leads_nowhere()
+    {
+        var output = BuildSite();
+        try
+        {
+            var broken = new List<string>();
+            var checkedLinks = 0;
+            foreach (var file in Directory.EnumerateFiles(output, "*.html", SearchOption.AllDirectories))
+            {
+                var html = File.ReadAllText(file);
+                foreach (Match m in Target().Matches(html))
+                {
+                    var target = m.Groups["target"].Value.Replace("&amp;", "&");
+                    if (target.Contains("://", StringComparison.Ordinal) || target.StartsWith('/')
+                        || target.StartsWith("mailto:", StringComparison.Ordinal))
+                        continue;
+                    checkedLinks++;
+                    var hash = target.IndexOf('#');
+                    var path = hash < 0 ? target : target[..hash];
+                    var anchor = hash < 0 ? "" : target[(hash + 1)..];
+                    var resolved = path.Length == 0
+                        ? file
+                        : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(file)!, SiteContext.FileOf(path)));
+                    var where = $"{Path.GetRelativePath(output, file)}: {target}";
+                    if (!File.Exists(resolved)) broken.Add(where);
+                    else if (anchor.Length > 0
+                             && !Id().Matches(File.ReadAllText(resolved)).Any(id => id.Groups["id"].Value == anchor))
+                        broken.Add(where + " (no such anchor)");
+                }
+            }
+            Assert.True(broken.Count == 0, "links that lead nowhere:\n  " + string.Join("\n  ", broken));
+            Assert.True(checkedLinks > 20, $"only {checkedLinks} links were checked");
+        }
+        finally
+        {
+            Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [GeneratedRegex("<link[^>]*\\shref=\"(?:https?:)?//|<script[^>]*\\ssrc=\"(?:https?:)?//", RegexOptions.IgnoreCase)]
+    private static partial Regex ExternalInHtml();
+
+    [GeneratedRegex("url\\(\\s*[\"']?(?:https?:)?//|@import", RegexOptions.IgnoreCase)]
+    private static partial Regex ExternalInCss();
+
+    [Fact]
+    public void No_page_asks_another_host_for_anything()
+    {
+        var output = BuildSite();
+        try
+        {
+            var offenders = new List<string>();
+            foreach (var file in Directory.EnumerateFiles(output, "*.*", SearchOption.AllDirectories))
+            {
+                var pattern = Path.GetExtension(file) switch
+                {
+                    ".html" => ExternalInHtml(),
+                    ".css" => ExternalInCss(),
+                    _ => null,
+                };
+                if (pattern is null) continue;
+                foreach (Match m in pattern.Matches(File.ReadAllText(file)))
+                    offenders.Add($"{Path.GetRelativePath(output, file)}: {m.Value}");
+            }
+            Assert.True(offenders.Count == 0, "requests to another host:\n  " + string.Join("\n  ", offenders));
+        }
+        finally
+        {
+            Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [GeneratedRegex("url\\(\\s*\"(?<path>[^\"]+)\"\\s*\\)")]
+    private static partial Regex CssUrl();
+
+    [Fact]
+    public void Every_font_the_stylesheet_names_is_shipped_with_its_licence()
+    {
+        var files = Theme.Files().Select(f => f.Path).ToHashSet();
+        var urls = CssUrl().Matches(Theme.Text(Theme.Stylesheet)).Select(m => m.Groups["path"].Value).ToList();
+
+        Assert.True(urls.Count >= 5, $"the stylesheet names {urls.Count} files");
+        Assert.All(urls, url => Assert.Contains(url, files));
+        Assert.Contains("fonts/Inter-LICENSE.txt", files);
+        Assert.Contains("fonts/JetBrainsMono-OFL.txt", files);
+    }
+
+    [GeneratedRegex("--(?<name>[a-z]+):\\s*(?<value>#[0-9a-f]{6});")]
+    private static partial Regex Colour();
+
+    /// <summary>The colours of the block that opens with <paramref name="selector"/>.</summary>
+    private static Dictionary<string, string> Palette(string css, string selector)
+    {
+        var start = css.IndexOf(selector + " {", StringComparison.Ordinal);
+        Assert.True(start >= 0, $"no block {selector}");
+        var end = css.IndexOf('}', start);
+        return Colour().Matches(css[start..end]).ToDictionary(m => m.Groups["name"].Value, m => m.Groups["value"].Value);
+    }
+
+    private static readonly string Css = Theme.Text(Theme.Stylesheet);
+
+    [Fact]
+    public void The_palette_is_the_one_of_the_design()
+    {
+        var light = Palette(Css, ":root");
+        var dark = Palette(Css, ":root[data-theme=\"dark\"]");
+        Assert.Equal(("#ffffff", "#16181d", "#535a69", "#e1e4e9", "#f4f5f7", "#6440c4"),
+            (light["bg"], light["text"], light["muted"], light["line"], light["surface"], light["accent"]));
+        Assert.Equal(("#111317", "#e7e9ee", "#a3aab6", "#2b2f37", "#181b21", "#b29aff"),
+            (dark["bg"], dark["text"], dark["muted"], dark["line"], dark["surface"], dark["accent"]));
+        // The system's dark and the switch's dark are one palette.
+        Assert.Equal(dark, Palette(Css, ":root:not([data-theme=\"light\"])"));
+    }
+
+    [Theory]
+    [InlineData(":root")]
+    [InlineData(":root[data-theme=\"dark\"]")]
+    public void Every_text_colour_reads_at_4_5_to_1_on_its_grounds(string selector)
+    {
+        var palette = Palette(Css, selector);
+        (string Fore, string Back)[] pairs =
+        [
+            ("text", "bg"), ("muted", "bg"), ("accent", "bg"), ("literal", "bg"),
+            ("text", "surface"), ("muted", "surface"), ("accent", "surface"), ("literal", "surface"),
+            ("bg", "accent"),
+        ];
+        var low = pairs
+            .Select(p => (p.Fore, p.Back, Ratio: Contrast(palette[p.Fore], palette[p.Back])))
+            .Where(p => p.Ratio < 4.5)
+            .Select(p => $"{p.Fore} on {p.Back}: {p.Ratio.ToString("0.00", CultureInfo.InvariantCulture)}:1")
+            .ToList();
+        Assert.True(low.Count == 0, "below 4.5:1:\n  " + string.Join("\n  ", low));
+    }
+
+    /// <summary>The contrast ratio of two colours as WCAG 2 defines it.</summary>
+    private static double Contrast(string a, string b)
+    {
+        var (la, lb) = (Luminance(a), Luminance(b));
+        return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
+    }
+
+    private static double Luminance(string hex)
+    {
+        double Channel(int at)
+        {
+            var c = int.Parse(hex.AsSpan(at, 2), NumberStyles.HexNumber) / 255.0;
+            return c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
+        }
+        return 0.2126 * Channel(1) + 0.7152 * Channel(3) + 0.0722 * Channel(5);
+    }
+
+    [Fact]
+    public void Lyric_code_is_marked_by_its_tokens()
+    {
+        const string source = "fn main(): int throws Error {\n    let s = \"hi\"; // greet\n    return 42;\n}";
+        var html = Highlighter.Highlight(source);
+
+        Assert.Contains("<span class=\"kw\">fn</span>", html);
+        Assert.Contains("<span class=\"kw\">throws</span>", html);
+        Assert.Contains("<span class=\"ty\">int</span>", html);
+        Assert.Contains("<span class=\"ty\">Error</span>", html);
+        Assert.Contains("<span class=\"str\">\"hi\"</span>", html);
+        Assert.Contains("<span class=\"com\">// greet</span>", html);
+        Assert.Contains("<span class=\"num\">42</span>", html);
+        Assert.Equal(source, Unmarked(html));
+    }
+
+    [Fact]
+    public void Code_the_lexer_refuses_stays_unmarked()
+    {
+        const string source = "let s = \"never closed <b>";
+        Assert.Equal(Html.Text(source), Highlighter.Highlight(source));
+    }
+
+    private static string Unmarked(string html) =>
+        Regex.Replace(html, "<[^>]+>", "").Replace("&lt;", "<").Replace("&gt;", ">").Replace("&amp;", "&");
+
+    [Fact]
+    public void Only_a_lyric_fence_is_highlighted()
+    {
+        var html = Markdown.Render("```lyric,no_run\nlet x = 1;\n```\n\n```toml\n[package]\nname = \"a\"\n```\n").Html;
+        Assert.Contains("<pre><code class=\"language-lyric\"><span class=\"kw\">let</span> x = <span class=\"num\">1</span>;</code></pre>", html);
+        Assert.Contains("<pre><code class=\"language-toml\">[package]\nname = \"a\"</code></pre>", html);
+    }
+
+    [Theory]
+    [InlineData("design/plan.md", "https://github.com/lyriclang/lyric/blob/main/design/plan.md")]
+    [InlineData("README.md#versioning", "https://github.com/lyriclang/lyric/blob/main/README.md#versioning")]
+    [InlineData("./docs/Grammar.md", "https://github.com/lyriclang/lyric/blob/main/docs/Grammar.md")]
+    [InlineData("#v1-0-0", "#v1-0-0")]
+    [InlineData("https://www.rust-lang.org/", "https://www.rust-lang.org/")]
+    public void A_link_into_the_repository_points_at_its_file_on_GitHub(string target, string expected) =>
+        Assert.Equal(expected, SiteBuilder.RepositoryLink(target, "main"));
+
+    [Fact]
+    public void A_page_the_version_lacks_is_named_not_linked()
+    {
+        var book = new Link("Book", "book/");
+        Assert.Equal("<span class=\"pending\">Book</span>", Layout.Anchor(Site("index.html"), "index.html", book));
+        var site = Site("index.html", "book/index.html", "releases/index.html");
+        Assert.Equal("<a href=\"book/\">Book</a>", Layout.Anchor(site, "index.html", book));
+        Assert.Equal("<a href=\"../book/\">Book</a>", Layout.Anchor(site, "releases/index.html", book));
+        Assert.Equal("<a href=\"../\">Home</a>", Layout.Anchor(site, "releases/index.html", new Link("Home", "")));
+    }
+
+    [Fact]
+    public void The_start_page_shows_a_function_of_the_server_example()
+    {
+        var source = File.ReadAllText(Path.Combine(Root, SiteBuilder.HomeProgramFile));
+        var function = SiteBuilder.FunctionOf(source, SiteBuilder.HomeProgramFunction);
+        Assert.StartsWith("fn handle(", function);
+        Assert.EndsWith("\n}", function);
+        Assert.Contains("throws", function);
+        Assert.Contains("<span class=\"kw\">fn</span>", Highlighter.Highlight(function));
+    }
+}
