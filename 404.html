@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Not found — Lyric</title>
+<script>
+(function () {
+  var path = location.pathname, to = null;
+  var old = new RegExp("^/(v\\d+\\.\\d+\\.\\d+)(/.*)?$").exec(path);
+  if (old) to = "/legacy/" + old[1] + (old[2] || "/");
+  else if (/^\/nightly(\/|$)/.test(path)) to = "/legacy/";
+  if (to) location.replace(to + location.search + location.hash);
+})();
+</script>
+<style>body { font: 15px/1.5 system-ui, sans-serif; max-width: 40em; margin: 3em auto; padding: 0 16px; }</style>
+</head>
+<body>
+<h1>Not found</h1>
+<p>There is no page at this address. The documentation of Lyric 1.0.0–4.5.0 is under <a href="/legacy/">/legacy/</a>; the current site starts at <a href="/">/</a>.</p>
+</body>
+</html>
