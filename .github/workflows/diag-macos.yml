@@ -1,0 +1,45 @@
+name: diag macOS
+
+# Not for main. Runs the macOS-slow test classes alone and lists, every 10 s, every process older
+# than 20 s with its parent, to name what keeps a finished program's pipes open.
+
+on:
+  push:
+    branches: ['diag/macos-test-times']
+
+jobs:
+  slow:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-zig
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Build the tests
+        run: dotnet build tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release
+
+      - name: The slow classes, with the process list beside them
+        shell: bash
+        run: |
+          (while sleep 10; do
+             echo "=== $(date +%T)"
+             ps -axo pid,ppid,etime,stat,command | awk 'NR == 1 || ($3 ~ /:/ && $3 !~ /^00:[01][0-9]$/)' \
+               | grep -vE "launchd|/System/|/usr/libexec|/usr/sbin|Runner\.(Listener|Worker)|provjobd|sleep 10|awk|ps -axo" | cut -c1-220
+           done) > procs.log 2>&1 &
+          watcher=$!
+          dotnet test tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release --no-build \
+            --filter "FullyQualifiedName~PanicTests|FullyQualifiedName~SignalTests|FullyQualifiedName~RuntimeProgramTests|FullyQualifiedName~A_program_runs_natively" \
+            --logger "trx;LogFileName=slow.trx" --results-directory testresults || true
+          kill $watcher
+          grep -v "^===" procs.log | sort | uniq -c | sort -rn | head -60
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: diag-macos
+          path: |
+            procs.log
+            testresults/*.trx
