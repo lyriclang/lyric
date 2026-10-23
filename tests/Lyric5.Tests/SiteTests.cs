@@ -347,6 +347,19 @@ public partial class SiteTests
         Assert.Contains("<pre><code class=\"language-toml\">[package]\nname = \"a\"</code></pre>", html);
     }
 
+    [Fact]
+    public void A_snippet_that_must_fail_says_so_and_with_which_code()
+    {
+        var fails = Markdown.Render("```lyric,compile_fail=LYR-SEM0138\nlet x = f();\n```\n").Html;
+        Assert.Contains("<p class=\"snippet-note fails\">Does not compile — the compiler reports <code>LYR-SEM0138</code></p>\n<pre class=\"fails\">", fails);
+
+        var noRun = Markdown.Render("```lyric,no_run\nlet x = 1;\n```\n").Html;
+        Assert.Contains("<p class=\"snippet-note no-run\">Compiles; not run here</p>", noRun);
+
+        var runs = Markdown.Render("```lyric\nlet x = 1;\n```\n").Html;
+        Assert.DoesNotContain("snippet-note", runs);
+    }
+
     [Theory]
     [InlineData("design/plan.md", "https://github.com/lyriclang/lyric/blob/main/design/plan.md")]
     [InlineData("README.md#versioning", "https://github.com/lyriclang/lyric/blob/main/README.md#versioning")]

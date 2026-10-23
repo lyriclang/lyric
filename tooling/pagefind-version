@@ -1,0 +1,11 @@
+# Pagefind, the site's search index: the version the site is built with and the sha256 of each
+# release archive (pagefind-v<version>-<target>.tar.gz on github.com/CloudCannon/pagefind), as
+# the release publishes them. tooling/pagefind/install.sh fetches and checks an archive;
+# tools/Site reads the version to find an installed binary.
+version = 1.5.2
+x86_64-unknown-linux-musl = afb824a9e7f64905a934900481cea5be679c03975e527329e0e5e6cc70f5feda
+aarch64-unknown-linux-musl = f50ec608bcbf431cebd84e0efa3a5b041ee63df2ad81f138023e0cfd2f509424
+x86_64-apple-darwin = 26f51b4ba921897142338fb13b836420696e251fe197b1782ea7981de311156d
+aarch64-apple-darwin = 7286f394a349bd37677d44a65a20078a02b1747da0b0814d83403bf86be17abe
+x86_64-pc-windows-msvc = fab125d5e8e2d3481ffe7d36dec6e101f54a6581cd51cf5e2e09220d4bc78e9c
+aarch64-pc-windows-msvc = c4d869293a9cd5c14c2dff7e7f568b27a5f4acb1124a2097b638cffc0d82b840

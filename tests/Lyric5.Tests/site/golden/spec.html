@@ -11,7 +11,7 @@
 <header class="topbar">
 <div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
 <nav class="areas" aria-label="Areas"><span class="pending">Book</span><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><span class="pending">Diagnostics</span><span class="pending">Download</span></nav>
-<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" disabled="disabled" /></form>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
 <button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
 <a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
 </header>
@@ -24,7 +24,7 @@
 <li><a href="../../spec/02-second/">Second things</a></li>
 </ul>
 </nav>
-<main class="text">
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
 <h1>First things</h1>
 <p>The start. See <a href="../../spec/02-second/#2-the-second-rule">the second chapter</a>, <a href="../../spec/02-second/">its start</a>,
 <a href="#1-the-first-rule">a rule here</a>, the <a href="https://github.com/lyriclang/lyric-spec/blob/0123456789abcdef0123456789abcdef01234567/conformance/README.md">suite</a> and the
@@ -46,5 +46,6 @@
 <footer class="footer"><span class="pending">Releases</span><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
 <script src="../../nav.js" defer="defer"></script>
 <script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
 </body>
 </html>

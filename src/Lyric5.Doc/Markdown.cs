@@ -16,8 +16,8 @@ public sealed record RenderedMarkdown(string Html, IReadOnlyList<Heading> Headin
 
 /// <summary>
 /// Markdown to HTML, with pipe tables and an id on every heading. A code block fenced as
-/// <c>lyric</c> — its info string's first word — is highlighted by <see cref="Highlighter"/>, the
-/// rest of the info string left out; a block fenced as <c>output</c> is what a program printed,
+/// <c>lyric</c> — its info string's first word — is highlighted by <see cref="Highlighter"/>, with a
+/// note above it when it must not compile or is not run; a block fenced as <c>output</c> is what a program printed,
 /// set apart from code; every other block is written as escaped text.
 /// </summary>
 public static class Markdown
@@ -92,6 +92,22 @@ public static class Markdown
         return end < 0 ? info : info[..end];
     }
 
+    /// <summary>What a reader is told above a snippet that is not a whole working program: one that
+    /// must fail says so and with which code, one that only compiles says that it is not run.</summary>
+    internal static (string Class, string Html)? SnippetNote(string? info)
+    {
+        if (string.IsNullOrEmpty(info)) return null;
+        foreach (var part in info.Split(','))
+        {
+            var word = part.Trim();
+            if (word.StartsWith("compile_fail=", StringComparison.Ordinal))
+                return ("fails", $"Does not compile — the compiler reports <code>{Html.Text(word["compile_fail=".Length..])}</code>");
+            if (word == "compile_fail") return ("fails", "Does not compile");
+            if (word == "no_run") return ("no-run", "Compiles; not run here");
+        }
+        return null;
+    }
+
     private sealed class HighlightingCodeBlockRenderer : HtmlObjectRenderer<CodeBlock>
     {
         protected override void Write(HtmlRenderer renderer, CodeBlock block)
@@ -106,10 +122,16 @@ public static class Markdown
             }
 
             renderer.EnsureLine();
-            if (language == "output")
-                renderer.Write("<pre class=\"output\"><code>").Write(Html.Text(text.ToString()));
+            if (language is "output" or "diagnostic")
+                renderer.Write("<pre class=\"").Write(language).Write("\"><code>").Write(Html.Text(text.ToString()));
             else if (language == "lyric")
-                renderer.Write("<pre><code class=\"language-lyric\">").Write(Highlighter.Highlight(text.ToString()));
+            {
+                var kind = SnippetNote(block is FencedCodeBlock f ? f.Info : null);
+                if (kind is { } note)
+                    renderer.Write("<p class=\"snippet-note ").Write(note.Class).Write("\">").Write(note.Html).WriteLine("</p>");
+                renderer.Write(kind is { Class: "fails" } ? "<pre class=\"fails\">" : "<pre>")
+                    .Write("<code class=\"language-lyric\">").Write(Highlighter.Highlight(text.ToString()));
+            }
             else if (language.Length > 0)
                 renderer.Write("<pre><code class=\"language-").Write(Html.Attr(language)).Write("\">").Write(Html.Text(text.ToString()));
             else

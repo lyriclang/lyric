@@ -81,12 +81,12 @@ public static class Pages
         var sb = new StringBuilder();
         sb.Append("<div class=\"columns\">\n");
         Sidebar(sb, site, path, article.Navigation, article.Where);
-        sb.Append("<main class=\"text\">\n");
+        sb.Append($"<main class=\"text\"{Indexed(path)}>\n");
         sb.Append($"<h1>{Html.Text(article.Title)}</h1>\n");
         sb.Append(article.Html);
         if (article.Previous is not null || article.Next is not null)
         {
-            sb.Append("<nav class=\"pager\" aria-label=\"Previous and next\">");
+            sb.Append("<nav class=\"pager\" aria-label=\"Previous and next\" data-pagefind-ignore=\"all\">");
             if (article.Previous is { } previous)
                 sb.Append(Layout.Anchor(site, path, previous with { Label = "← " + previous.Label }, "previous"));
             if (article.Next is { } next)
@@ -105,7 +105,7 @@ public static class Pages
         var sb = new StringBuilder();
         sb.Append("<div class=\"columns\">\n");
         Sidebar(sb, site, path, reference.Navigation, reference.Where);
-        sb.Append("<main class=\"text\">\n");
+        sb.Append($"<main class=\"text\"{Indexed(path)}>\n");
         sb.Append($"<h1>{Html.Text(reference.Title)}</h1>\n");
         sb.Append(reference.Html);
         sb.Append("</main>\n");
@@ -132,6 +132,28 @@ public static class Pages
             sb.Append($"<li>{Layout.Anchor(site, path, link, IsCurrent(path, link.Target) ? "current" : null)}</li>\n");
         sb.Append("</ul>\n");
         sb.Append("</nav>\n");
+    }
+
+    /// <summary>The area a page belongs to, by the first directory of its path, as the search
+    /// shows it beside a result; <c>null</c> for a page in none.</summary>
+    public static string? AreaOf(string path) => path.Split('/')[0] switch
+    {
+        "book" => "Book",
+        "spec" => "Spec",
+        "diagnostics" => "Diagnostics",
+        "releases" => "Releases",
+        "std" => "std",
+        _ => null,
+    };
+
+    /// <summary>The attributes that give a page's text to the search index: the text alone, not
+    /// the navigation around it, with its area as a filter and as a field of the result.</summary>
+    private static string Indexed(string path)
+    {
+        var attrs = " data-pagefind-body=\"\"";
+        if (AreaOf(path) is { } area)
+            attrs += $" data-pagefind-filter=\"area:{Html.Attr(area)}\" data-pagefind-meta=\"area:{Html.Attr(area)}\"";
+        return attrs;
     }
 
     private static bool IsCurrent(string path, string target) =>

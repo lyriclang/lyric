@@ -162,8 +162,37 @@ fn main(): void throws ParseError {
 }
 ```
 
-`int.parse` throws a `ParseError` for text that is no number, so `try int.parse(text)` is what
-`twice` means. `try … catch` handles an error where it happens instead.
+```diagnostic
+error[LYR-SEM0138]: the call to 'parse' throws 'ParseError' — mark it 'try', so the propagation is seen where it happens
+ --> src/main.lyr:4:12
+  |
+4 |     return int.parse(text) * 2;
+  |            ^^^^^^^^^^^^^^^
+```
+
+`main` marks its call to `twice`, but line 4 does not mark the call to `int.parse`: it throws a
+`ParseError` for text that is no number, and `twice`'s `throws` lets the error go on — yet the
+compiler wants to see, at the call itself, that it may. The fix is the missing `try` in front of
+`int.parse`; with the mark in both places the program compiles:
+
+```lyric
+import std.core { ParseError };
+import std.io { println };
+
+fn twice(text: string): int throws ParseError {
+    return try int.parse(text) * 2;
+}
+
+fn main(): void throws ParseError {
+    println(try twice("21"));
+}
+```
+
+```output
+42
+```
+
+`try … catch` handles an error where it happens instead.
 
 Here is the whole calculator, run over four lines:
 

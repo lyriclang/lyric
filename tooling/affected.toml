@@ -93,7 +93,7 @@ cases = []
 [[rule]]
 # The documentation's renderer, the site tool and the site's goldens.
 paths = ["src/Lyric5.Doc/", "tools/Site/", "tests/Lyric5.Tests/site/"]
-tests = ["SiteTests", "BookTests", "CatalogPageTests"]
+tests = ["SiteTests", "BookTests", "CatalogPageTests", "SearchTests"]
 cases = []
 
 [[rule]]
