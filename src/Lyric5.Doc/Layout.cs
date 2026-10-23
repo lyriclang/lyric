@@ -40,6 +40,7 @@ public static class Layout
         Footer(sb, site, path);
         sb.Append($"<script src=\"{root}{Theme.NavScript}\" defer=\"defer\"></script>\n");
         sb.Append($"<script src=\"{root}{Theme.VersionScript}\" defer=\"defer\"></script>\n");
+        sb.Append($"<script src=\"{root}{Theme.SearchScript}\" defer=\"defer\"></script>\n");
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
@@ -55,8 +56,12 @@ public static class Layout
         foreach (var area in site.Areas)
             sb.Append(Anchor(site, path, area, IsWithin(path, area.Target) ? "current" : null));
         sb.Append("</nav>\n");
+        // The field stays off until the search script finds the version's index; without scripts
+        // there is no search.
         sb.Append("<form class=\"search\" role=\"search\">");
-        sb.Append("<input type=\"search\" name=\"q\" placeholder=\"Search\" aria-label=\"Search\" disabled=\"disabled\" />");
+        sb.Append("<input type=\"search\" name=\"q\" placeholder=\"Search\" aria-label=\"Search\" autocomplete=\"off\"");
+        sb.Append(" aria-controls=\"search-results\" aria-expanded=\"false\" disabled=\"disabled\" />");
+        sb.Append("<ul class=\"search-results\" id=\"search-results\" role=\"listbox\" aria-label=\"Search results\" hidden=\"hidden\"></ul>");
         sb.Append("</form>\n");
         sb.Append("<button class=\"theme-toggle\" type=\"button\" aria-label=\"Switch between light and dark\" hidden=\"hidden\">◐</button>\n");
         sb.Append($"<a class=\"github\" href=\"{Repository}\">GitHub</a>\n");

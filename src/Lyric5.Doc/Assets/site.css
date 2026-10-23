@@ -124,6 +124,31 @@ th, td { border-bottom: 1px solid var(--line); padding: 4px 8px; text-align: lef
   border: 1px solid var(--line);
   padding: 4px 8px;
 }
+.search input:disabled { opacity: 0.6; }
+.search { position: relative; }
+.search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: min(480px, calc(100vw - 2 * var(--space)));
+  max-height: 60vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+.search-results li { border-bottom: 1px solid var(--line); }
+.search-results li:last-child { border-bottom: none; }
+.search-results a { display: block; padding: 8px var(--space); color: var(--text); }
+.search-results a:hover, .search-results li[aria-selected="true"] a { background: var(--surface); text-decoration: none; }
+.search-results .title { font-weight: 600; }
+.search-results .area { margin-left: 8px; color: var(--muted); font-size: 12px; }
+.search-results .excerpt { display: block; color: var(--muted); font-size: 13px; }
+.search-results mark { background: none; color: var(--accent); font-weight: 600; }
+.search-results .none { padding: 8px var(--space); color: var(--muted); }
 .theme-toggle {
   font: 16px var(--sans);
   color: var(--text);
@@ -191,6 +216,14 @@ body.reference .columns { grid-template-columns: 240px minmax(0, 1fr) 200px; }
 /* What a program printed: right under its code, set apart by a rule instead of a surface. */
 pre.output { background: none; border-left: 2px solid var(--line); margin-top: calc(var(--space) * -0.5); }
 
+/* A snippet that is not a working program says so above it; one that must fail is marked at its edge. */
+.snippet-note { margin: 0; padding: 2px var(--space); font-size: 13px; color: var(--muted); background: var(--surface); border-bottom: 1px solid var(--line); }
+.snippet-note.fails { color: var(--text); border-left: 3px solid var(--muted); }
+.snippet-note.fails::before { content: "✗ "; }
+pre.fails { border-left: 3px solid var(--muted); }
+/* What the compiler says about it, right under the snippet, like a program's output. */
+pre.diagnostic { background: none; border-left: 3px solid var(--muted); margin-top: calc(var(--space) * -0.5); }
+
 /* The way on through the Book: the chapter before and the one after. */
 .pager {
   display: flex;
@@ -241,6 +274,8 @@ span.button.primary { background: var(--surface); color: var(--muted); }
   .topbar { flex-wrap: wrap; padding: 6px var(--space); gap: var(--space); }
   .areas { order: 3; flex-basis: 100%; }
   .search input { width: 120px; }
+  .search { position: static; }
+  .search-results { top: 100%; left: var(--space); right: var(--space); width: auto; }
 
   .columns, body.reference .columns { display: block; padding: 0 var(--space); }
   .sidebar {

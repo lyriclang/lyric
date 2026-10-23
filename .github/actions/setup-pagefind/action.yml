@@ -1,0 +1,30 @@
+name: Set up Pagefind
+description: Installs the Pagefind version pinned in tooling/pagefind-version, checked against its sha256 — the site's search index.
+
+runs:
+  using: composite
+  steps:
+    - name: Pick the release target
+      id: target
+      shell: bash
+      run: |
+        case "${{ runner.os }}-${{ runner.arch }}" in
+          Linux-X64) t=x86_64-unknown-linux-musl ;;
+          Linux-ARM64) t=aarch64-unknown-linux-musl ;;
+          macOS-X64) t=x86_64-apple-darwin ;;
+          macOS-ARM64) t=aarch64-apple-darwin ;;
+          Windows-X64) t=x86_64-pc-windows-msvc ;;
+          Windows-ARM64) t=aarch64-pc-windows-msvc ;;
+          *) echo "no Pagefind target for ${{ runner.os }}-${{ runner.arch }}" >&2; exit 1 ;;
+        esac
+        echo "name=$t" >> "$GITHUB_OUTPUT"
+
+    - name: Install Pagefind
+      shell: bash
+      run: |
+        dir="$RUNNER_TEMP/pagefind"
+        bash tooling/pagefind/install.sh "${{ steps.target.outputs.name }}" "$dir"
+        echo "$dir" >> "$GITHUB_PATH"
+        binary="$dir/pagefind"
+        [ "${{ runner.os }}" = Windows ] && binary="$dir/pagefind.exe"
+        echo "LYRIC_PAGEFIND=$binary" >> "$GITHUB_ENV"

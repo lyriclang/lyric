@@ -11,7 +11,7 @@
 <header class="topbar">
 <div class="brand"><a class="wordmark" href="./">Lyric</a><span class="version" id="version">dev</span></div>
 <nav class="areas" aria-label="Areas"><span class="pending">Book</span><span class="pending">std</span><span class="pending">Spec</span><span class="pending">Diagnostics</span><span class="pending">Download</span></nav>
-<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" disabled="disabled" /></form>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
 <button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
 <a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
 </header>
@@ -40,5 +40,6 @@
 <footer class="footer"><a href="releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
 <script src="nav.js" defer="defer"></script>
 <script src="version.js" defer="defer"></script>
+<script src="search.js" defer="defer"></script>
 </body>
 </html>

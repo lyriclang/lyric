@@ -11,7 +11,7 @@
 <header class="topbar">
 <div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
 <nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><span class="pending">std</span><span class="pending">Spec</span><span class="pending">Diagnostics</span><span class="pending">Download</span></nav>
-<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" disabled="disabled" /></form>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
 <button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
 <a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
 </header>
@@ -25,18 +25,20 @@
 <li><a href="../../book/last/">Last</a></li>
 </ul>
 </nav>
-<main class="text">
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
 <h1>Next steps</h1>
 <p>After <a href="../../book/start/#install">the start</a>, and before <a href="../../book/last/">the last</a>; the
 <a href="https://github.com/lyriclang/lyric/blob/main/docs/Grammar.md">grammar</a> is elsewhere.</p>
+<p class="snippet-note no-run">Compiles; not run here</p>
 <pre><code class="language-lyric"><span class="kw">let</span> x = <span class="num">1</span>;</code></pre>
 <pre><code class="language-lyric">println(<span class="num">2</span>);</code></pre>
 <pre class="output"><code>2</code></pre>
-<nav class="pager" aria-label="Previous and next"><a class="previous" href="../../book/start/">← Start</a><a class="next" href="../../book/last/">Last →</a></nav>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/start/">← Start</a><a class="next" href="../../book/last/">Last →</a></nav>
 </main>
 </div>
 <footer class="footer"><span class="pending">Releases</span><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
 <script src="../../nav.js" defer="defer"></script>
 <script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
 </body>
 </html>

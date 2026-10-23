@@ -48,6 +48,11 @@ public partial class BookTests
             var codes = ErrorCode().Matches(said).Select(m => m.Groups["code"].Value).Distinct().ToList();
             Assert.True(exit != 0, $"{where}: the check passed; the snippet should fail with {snippet.Error}");
             Assert.True(codes.SequenceEqual([snippet.Error!]), $"{where}: expected only {snippet.Error}, the check said:\n{said}");
+            if (snippet.Output is { } diagnostic)
+            {
+                var text = said.Replace("\r\n", "\n").Replace("src\\main.lyr", "src/main.lyr").TrimEnd('\n') + "\n";
+                Assert.True(diagnostic == text, $"{where}: the diagnostic block says\n{diagnostic}\nthe check said\n{text}");
+            }
             return;
         }
 
@@ -76,13 +81,14 @@ public partial class BookTests
     public void A_fence_names_its_kind_and_an_output_block_belongs_to_the_snippet_above()
     {
         const string text = "# T\n\n```lyric\nprintln(1);\n```\n\n```output\n1\n```\n\n```lyric,no_run\nlet a = 1;\n```\n\n"
-            + "```lyric,compile_fail=LYR-SEM0001\nlet a: int = \"x\";\n```\n\n```toml\n[package]\n```\n";
+            + "```lyric,compile_fail=LYR-SEM0001\nlet a: int = \"x\";\n```\n\n```diagnostic\nerror[LYR-SEM0001]\n```\n\n```toml\n[package]\n```\n";
         var snippets = Snippet.Extract("t.md", text);
         Assert.Equal(["t.md:3", "t.md:11", "t.md:15"], snippets.Select(s => s.ToString()));
         Assert.Equal([SnippetKind.Run, SnippetKind.NoRun, SnippetKind.CompileFail], snippets.Select(s => s.Kind));
         Assert.Equal("1\n", snippets[0].Output);
         Assert.Null(snippets[1].Output);
         Assert.Equal("LYR-SEM0001", snippets[2].Error);
+        Assert.Equal("error[LYR-SEM0001]\n", snippets[2].Output);
     }
 
     [Theory]
@@ -91,6 +97,7 @@ public partial class BookTests
     [InlineData("```lyric,no_run\nx;\n```\n\n```output\n1\n```\n", "right below a snippet that runs")]
     [InlineData("```lyric\nx;\n```\n\ntext between\n\n```output\n1\n```\n", "right below a snippet that runs")]
     [InlineData("```lyric\nx;\n", "not closed")]
+    [InlineData("```lyric\nx;\n```\n\n```diagnostic\nerror\n```\n", "right below a snippet that must fail")]
     public void A_snippet_the_suite_cannot_read_is_refused(string text, string said)
     {
         var e = Assert.Throws<InvalidDataException>(() => Snippet.Extract("t.md", text));

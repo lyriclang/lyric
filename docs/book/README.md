@@ -17,6 +17,7 @@ show code the compiler does not take.
 | ` ```lyric,no_run ` | builds; for code that waits for input, a network or a file |
 | ` ```lyric,compile_fail=LYR-SEM0001 ` | the check fails with that code and no other error |
 | ` ```output ` right below a `lyric` snippet | exactly what the snippet prints |
+| ` ```diagnostic ` right below a `compile_fail` snippet | exactly what `lyric check` says about it, as the program is built (a snippet with `fn main` keeps its line numbers) |
 | ` ```text `, ` ```toml `, ` ```sh ` … | nothing |
 
 A snippet that declares `fn main` is the program as it stands. Without one, a snippet is one of two
@@ -26,5 +27,7 @@ runs. **Statements** are the body of `main`: the snippet's `import` lines go abo
 else into `fn main(): void { … }`. A snippet writes its imports itself — the prelude is all it has
 without them — and declares what it uses; it sees nothing of the snippets before it.
 
-The snippet's info string after `lyric` does not show on the page, and an `output` block shows as
-what the program printed, set apart from code.
+The page says above a snippet what its info string says — "Does not compile" with the code, or
+"Compiles; not run here"; an `output` or `diagnostic` block shows as what the program printed or
+the compiler said, set apart from code. A snippet that must fail should have its `diagnostic`: a
+reader new to the language sees from it what is wrong and where.

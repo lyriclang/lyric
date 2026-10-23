@@ -11,7 +11,7 @@
 <header class="topbar">
 <div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
 <nav class="areas" aria-label="Areas"><span class="pending">Book</span><span class="pending">std</span><span class="pending">Spec</span><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
-<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" disabled="disabled" /></form>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
 <button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
 <a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
 </header>
@@ -23,7 +23,7 @@
 <li><a class="current" href="../../diagnostics/LYR-SEM0999/">LYR-SEM0999</a></li>
 </ul>
 </nav>
-<main class="text">
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
 <h1>LYR-SEM0999</h1>
 <p class="code-title">a value that is never read</p>
 <p class="meta">warning · <a href="../../spec/07-statements/">spec 07-statements</a> · lint <code>unused-value</code>, group <code>unused</code>, warn unless said</p>
@@ -51,5 +51,6 @@
 <footer class="footer"><span class="pending">Releases</span><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
 <script src="../../nav.js" defer="defer"></script>
 <script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
 </body>
 </html>

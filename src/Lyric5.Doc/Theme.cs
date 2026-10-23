@@ -1,7 +1,7 @@
 namespace Lyric5.Doc;
 
 /// <summary>
-/// The files every version of the site carries at its root: the stylesheet, the three scripts and
+/// The files every version of the site carries at its root: the stylesheet, the four scripts and
 /// the fonts. They are embedded in this assembly; each is named by its path under the version root.
 /// </summary>
 public static class Theme
@@ -10,6 +10,7 @@ public static class Theme
     public const string ThemeScript = "theme.js";
     public const string NavScript = "nav.js";
     public const string VersionScript = "version.js";
+    public const string SearchScript = "search.js";
 
     /// <summary>Every theme file as its path under the version root and its bytes. The fonts are
     /// those the assembly holds under <c>fonts/</c>; with none, the stylesheet falls back to the

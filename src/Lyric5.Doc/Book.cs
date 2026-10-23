@@ -73,8 +73,9 @@ public enum SnippetKind
 /// <summary>A Lyric snippet of a chapter.</summary>
 /// <param name="Line">The line of its opening fence in the chapter, from 1.</param>
 /// <param name="Code">The snippet as written.</param>
-/// <param name="Output">The <c>output</c> block right below it, ending with a newline; <c>null</c>
-/// where there is none.</param>
+/// <param name="Output">The <c>output</c> block right below a snippet that runs, or the
+/// <c>diagnostic</c> block right below one that must fail — what the check says —, ending with a
+/// newline; <c>null</c> where there is none.</param>
 /// <param name="Error">The code a <see cref="SnippetKind.CompileFail"/> snippet fails with.</param>
 public sealed partial record Snippet(string File, int Line, SnippetKind Kind, string Code, string? Output, string? Error)
 {
@@ -113,11 +114,13 @@ public sealed partial record Snippet(string File, int Line, SnippetKind Kind, st
     /// The Lyric snippets of a chapter, in order. A fence whose info string starts with
     /// <c>lyric</c> is a snippet: <c>lyric</c> runs, <c>lyric,no_run</c> builds,
     /// <c>lyric,compile_fail=CODE</c> fails with <c>CODE</c>. An <c>output</c> fence right below a
-    /// snippet — nothing but blank lines between — is what the snippet prints. Other fences are
-    /// not checked.
+    /// snippet — nothing but blank lines between — is what the snippet prints; a <c>diagnostic</c>
+    /// fence right below one that must fail is what the check says about it. Other fences are not
+    /// checked.
     /// </summary>
-    /// <exception cref="InvalidDataException">An unknown snippet kind, an unclosed fence, or an
-    /// <c>output</c> block below no runnable snippet.</exception>
+    /// <exception cref="InvalidDataException">An unknown snippet kind, an unclosed fence, an
+    /// <c>output</c> block below no runnable snippet, or a <c>diagnostic</c> block below no snippet
+    /// that must fail.</exception>
     public static IReadOnlyList<Snippet> Extract(string file, string markdown)
     {
         var lines = markdown.ReplaceLineEndings("\n").Split('\n');
@@ -137,6 +140,13 @@ public sealed partial record Snippet(string File, int Line, SnippetKind Kind, st
             {
                 if (!adjacent || last!.Kind != SnippetKind.Run || last.Output is not null)
                     throw new InvalidDataException($"{file}:{i + 1}: an output block stands right below a snippet that runs");
+                snippets[^1] = last with { Output = text + "\n" };
+                last = null;
+            }
+            else if (info == "diagnostic")
+            {
+                if (!adjacent || last!.Kind != SnippetKind.CompileFail || last.Output is not null)
+                    throw new InvalidDataException($"{file}:{i + 1}: a diagnostic block stands right below a snippet that must fail");
                 snippets[^1] = last with { Output = text + "\n" };
                 last = null;
             }
