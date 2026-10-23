@@ -103,7 +103,7 @@ internal static class Reachability
     /// <remarks>With <paramref name="unless"/>, a native answering a <c>bool</c>, what runs only
     /// where it answers yes does not count: a block that ends on a branch over that call's answer
     /// leads on through its no alone, here and for every function reached. That is how asking
-    /// whether a scheduler runs makes no task of <c>main</c> (06 M6-26, 13 M8b P3) — the branch
+    /// whether a scheduler runs makes no task of <c>main</c> — the branch
     /// that parks on the I/O pool runs only where one runs already. The pruning walks everything:
     /// a spawned task takes that branch.</remarks>
     public static bool CallsImport(IrModule module, string name, string? unless = null)

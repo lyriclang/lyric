@@ -54,9 +54,9 @@ public sealed class SymbolTable
     }
 
     /// <summary>Declares <paramref name="symbol"/> under another name as well: a second name for
-    /// the same symbol, so that what either name resolves to is one identity (the 64-bit aliases of
-    /// 03 T1a: <c>uint64</c> IS <c>uint</c> — sweep after M10, open point 149: an extend of
-    /// <c>uint64</c> did not reach a <c>uint</c>). False where the name is taken.</summary>
+    /// the same symbol, so that what either name resolves to is one identity (the 64-bit aliases:
+    /// <c>uint64</c> IS <c>uint</c>, and an extend of one reaches the other).
+    /// False where the name is taken.</summary>
     public bool TryDeclareAs(string name, Symbol symbol)
     {
         if (_byName.ContainsKey(name)) return false;
@@ -98,7 +98,7 @@ public sealed class SymbolTable
         foreach (var candidate in OverloadsLocal(name))
             if (ReferenceEquals(candidate.Declaration, declaration))
                 return candidate;
-        // A declaration parsed again (M9a S9, S10) is a fresh node over the same text: the one
+        // A declaration parsed again is a fresh node over the same text: the one
         // whose span it has.
         foreach (var candidate in OverloadsLocal(name))
             if (candidate.Declaration is { } own && own.Span == declaration.Span)

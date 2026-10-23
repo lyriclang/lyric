@@ -5,20 +5,16 @@ using Lyric5.Toolchain;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// Comments describe what the code does and how, never the history of its design. A comment line
-/// that cites a design document, a decision label, a milestone or one of its slices, or a design
-/// round is counted per file against <c>tooling/comment-ratchet.toml</c>: a file may lose such lines
-/// and never gain one, and a file that lost some must have its count lowered with it, so the
-/// numbers only ever go down. <c>LYRIC_UPDATE_SNAPSHOTS=1</c> lowers them; it never raises one.
+/// Comments describe what the code does and how, never the history of its design. No comment line
+/// of the compiler, the runtime, the standard library or their tests may cite a design document, a
+/// decision label, a milestone or one of its slices, or a design round.
 /// </summary>
-public partial class CommentRatchetTests
+public partial class CommentCitationTests
 {
     private static readonly string Root = RuntimeLayout.FindRoot(AppContext.BaseDirectory);
-    private static readonly string BaselinePath = Path.Combine(Root, "tooling", "comment-ratchet.toml");
 
-    /// <summary>One counted part of the tree. <see cref="Doc"/> splits a language's comments by
-    /// whether they are documentation (<c>///</c>); <c>null</c> takes them all.</summary>
-    private sealed record Area(string Name, string[] Dirs, string[] Extensions, bool? Doc);
+    /// <summary>One read part of the tree: its directories and the extensions read in them.</summary>
+    private sealed record Area(string Name, string[] Dirs, string[] Extensions);
 
     private static Area[] Areas()
     {
@@ -30,12 +26,12 @@ public partial class CommentRatchetTests
             .ToArray();
         return
         [
-            new("stdlib5-doc", ["stdlib5"], [".lyr"], true),
-            new("stdlib5", ["stdlib5"], [".lyr"], false),
-            new("runtime", ["runtime/src", "runtime/include"], [".c", ".h"], null),
-            new("compiler", compiler, [".cs"], null),
-            new("frontend", ["src/Lyric.Frontend"], [".cs"], null),
-            new("tests", ["tests/Lyric5.Tests"], [".cs"], null),
+            new("stdlib5", ["stdlib5"], [".lyr"]),
+            new("runtime", ["runtime/src", "runtime/include"], [".c", ".h"]),
+            new("compiler", compiler, [".cs"]),
+            new("frontend", ["src/Lyric.Frontend", "src/Lyric.Core"], [".cs"]),
+            new("tests", ["tests/Lyric5.Tests"], [".cs"]),
+            new("std-tests", ["tests/std"], [".lyr"]),
         ];
     }
 
@@ -186,93 +182,24 @@ public partial class CommentRatchetTests
                     if (!area.Extensions.Contains(Path.GetExtension(file))) continue;
                     var relative = Path.GetRelativePath(Root, file).Replace('\\', '/');
                     if (relative.Split('/').Any(s => s is "obj" or "bin" or "third_party")) continue;
-                    foreach (var (line, text, doc) in Comments(File.ReadAllLines(file)))
-                    {
-                        if (area.Doc is { } wanted && doc != wanted) continue;
+                    foreach (var (line, text, _) in Comments(File.ReadAllLines(file)))
                         if (Cites(text)) hits.Add(new Hit(area.Name, relative, line, text.Trim()));
-                    }
                 }
             }
         }
         return hits;
     }
 
-    private static readonly Regex Section = new(@"^\[""(?<area>[^""]+)""\]\s*$");
-    private static readonly Regex Entry = new(@"^""(?<file>[^""]+)""\s*=\s*(?<count>\d+)\s*$");
-
-    private static Dictionary<(string Area, string File), int> ReadBaseline()
-    {
-        var counts = new Dictionary<(string, string), int>();
-        if (!File.Exists(BaselinePath)) return counts;
-        var area = "";
-        foreach (var raw in File.ReadLines(BaselinePath))
-        {
-            var line = raw.Trim();
-            if (line.Length == 0 || line.StartsWith('#')) continue;
-            if (Section.Match(line) is { Success: true } s) area = s.Groups["area"].Value;
-            else if (Entry.Match(line) is { Success: true } e)
-                counts[(area, e.Groups["file"].Value)] = int.Parse(e.Groups["count"].Value);
-            else throw new InvalidDataException($"{BaselinePath}: cannot read '{raw}'");
-        }
-        return counts;
-    }
-
-    private static void WriteBaseline(Dictionary<(string Area, string File), int> counts)
-    {
-        var text = new StringBuilder();
-        text.AppendLine("# Comment lines that cite the design, per file: what CommentRatchetTests allows.");
-        text.AppendLine("# A count may only fall. LYRIC_UPDATE_SNAPSHOTS=1 lowers the counts to what the tree holds.");
-        foreach (var area in Areas())
-        {
-            var entries = counts.Where(kv => kv.Key.Area == area.Name && kv.Value > 0)
-                .OrderBy(kv => kv.Key.File, StringComparer.Ordinal)
-                .ToList();
-            text.AppendLine();
-            text.AppendLine($"# {area.Name}: {entries.Sum(kv => kv.Value)}");
-            text.AppendLine($"[\"{area.Name}\"]");
-            foreach (var (key, count) in entries) text.AppendLine($"\"{key.File}\" = {count}");
-        }
-        File.WriteAllText(BaselinePath, text.ToString());
-    }
-
     [Fact]
-    public void No_file_gains_comments_that_cite_the_design()
+    public void No_comment_cites_the_design()
     {
         var hits = Scan();
-        var current = hits.GroupBy(h => (h.Area, h.File)).ToDictionary(g => g.Key, g => g.Count());
-        var update = Environment.GetEnvironmentVariable("LYRIC_UPDATE_SNAPSHOTS") == "1";
-        var exists = File.Exists(BaselinePath);
-        var baseline = ReadBaseline();
+        if (hits.Count == 0) return;
 
-        var rose = current.Where(kv => kv.Value > baseline.GetValueOrDefault(kv.Key)).Select(kv => kv.Key).ToList();
-        var fell = baseline.Where(kv => kv.Value > current.GetValueOrDefault(kv.Key)).Select(kv => kv.Key).ToList();
-
-        if (update)
-        {
-            var lowered = exists
-                ? baseline.Keys.ToDictionary(k => k, k => Math.Min(baseline[k], current.GetValueOrDefault(k)))
-                : current;
-            WriteBaseline(lowered);
-            if (!exists) return;
-        }
-        else Assert.True(exists, $"no baseline at {BaselinePath}; set LYRIC_UPDATE_SNAPSHOTS=1 to write it");
-
-        if (rose.Count > 0)
-        {
-            var message = new StringBuilder("comments that cite the design grew; say what the code does instead:\n");
-            foreach (var key in rose.OrderBy(k => k.File, StringComparer.Ordinal))
-            {
-                message.AppendLine($"  {key.File} ({key.Area}): {baseline.GetValueOrDefault(key)} → {current[key]}");
-                foreach (var hit in hits.Where(h => (h.Area, h.File) == key))
-                    message.AppendLine($"    {hit.File}:{hit.Line}: {hit.Text}");
-            }
-            Assert.Fail(message.ToString());
-        }
-        if (!update && fell.Count > 0)
-        {
-            var files = string.Join(", ", fell.Select(k => $"{k.File} ({baseline[k]} → {current.GetValueOrDefault(k)})"));
-            Assert.Fail($"the count fell in {files}; set LYRIC_UPDATE_SNAPSHOTS=1 to lower the baseline with it");
-        }
+        var message = new StringBuilder("comments that cite the design; say what the code does instead:\n");
+        foreach (var hit in hits.OrderBy(h => h.File, StringComparer.Ordinal).ThenBy(h => h.Line))
+            message.AppendLine($"  {hit.File}:{hit.Line} ({hit.Area}): {hit.Text}");
+        Assert.Fail(message.ToString());
     }
 
     [Fact]

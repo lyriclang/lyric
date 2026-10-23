@@ -1,4 +1,4 @@
-// The adapters and terminators of I4 that M8a left (M8c S5): mapNotNull, flatMap, flatten, dedup,
+// More adapters and terminators: mapNotNull, flatMap, flatten, dedup,
 // dedupBy, scan, peekable, rev, cycle; average, minBy, maxBy, chunks, windows, sorted, sortedBy,
 // partition, groupBy, toMap — and collect reading the iterator's guess of its length.
 import std.collections { List };

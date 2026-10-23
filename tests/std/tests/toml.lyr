@@ -1,4 +1,4 @@
-// std.toml (design/v5/spec/10 B10 E8; 13 M10 S4): TOML 1.0 - the document of a value and the
+// std.toml: TOML 1.0 - the document of a value and the
 // value of a document, TomlValue the tree with its tables in order, the rules against redefinition,
 // the four date-times.
 import std.toml;
@@ -208,7 +208,7 @@ fn tomlHeader(n: int): string {
     return b.toString();
 }
 
-/// 12 §TOML rule 3 (the sweep after M10, W5): a document may nest 128 levels, the root table the
+/// Spec 12 §TOML rule 3: a document may nest 128 levels, the root table the
 /// first, and what the library does with it holds in a test's task; the 129th level is refused —
 /// through an array, an inline table or a header — before it is read, not overflowed.
 @Test

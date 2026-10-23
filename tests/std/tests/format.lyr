@@ -1,4 +1,4 @@
-// The format language (design/v5/spec/08 Y7, 10 S7; spec 12 §2): a hole's spec, checked where it
+// The format language (spec 12 §2): a hole's spec, checked where it
 // is written, applied by std.core — numbers, text, Debug, a Display type, a type's own formats.
 import std.core { Format, fstringStart, fstringFormatted, fstringEnd };
 import std.string { StringBuilder };
@@ -96,7 +96,7 @@ class Badge :: [Display] {
     }
 }
 
-/// Formats of its own (10 S7): 'C' and 'F' name the scale.
+/// Formats of its own: 'C' and 'F' name the scale.
 struct Celsius :: [Format] {
     degrees: float,
 
@@ -128,7 +128,7 @@ fn theHelpersAreStdCores(): void {
 
 @Test
 fn showToWritesEachScalarsText(): void {
-    // each scalar's own writer, the string's and the view's (10 S6; M8a S13), at the extremes
+    // each scalar's own writer, the string's and the view's, at the extremes
     let least = int.min;
     let most: uint = 18446744073709551615;
     let small: int8 = -128;

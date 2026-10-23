@@ -1,7 +1,7 @@
 namespace Lyric.Ir.Interp;
 
 /// <summary>
-/// A value of the compile-time interpreter (design/v5/spec/09 A4; 13 M9a P1): a scalar's bits, or
+/// A value of the compile-time interpreter: a scalar's bits, or
 /// one of the heap objects of this file in <see cref="Ref"/>.
 /// <para>The bits hold an integer in two's complement, sign-extended to 64 for a signed type and
 /// zero-extended for an unsigned one; a <c>float</c> as its 64 bits, a <c>float32</c> as its 32 in
@@ -26,7 +26,7 @@ public readonly record struct Value(ulong Bits, object? Ref)
     public float AsSingle => BitConverter.UInt32BitsToSingle(unchecked((uint)Bits));
 }
 
-/// <summary>A string: its UTF-8 bytes, which nothing changes (10 S1).</summary>
+/// <summary>A string: its UTF-8 bytes, which nothing changes.</summary>
 public sealed class StrObj(byte[] bytes)
 {
     public byte[] Bytes { get; } = bytes;
@@ -72,7 +72,7 @@ public sealed class AggObj(AggKind kind, TypeId type, Value[] slots)
 
 public enum AggKind { Struct, Enum, Inline }
 
-/// <summary>An optional, present or not — one form for the niche and the flag (01 V5), whose
+/// <summary>An optional, present or not — one form for the niche and the flag, whose
 /// difference is C's layout, not the language's.</summary>
 public sealed class OptObj(bool has, Value inner)
 {
@@ -80,7 +80,7 @@ public sealed class OptObj(bool has, Value inner)
     public Value Inner { get; set; } = inner;
 }
 
-/// <summary>An interface value (01 V7): the object of a class, or a box holding a value's copy,
+/// <summary>An interface value: the object of a class, or a box holding a value's copy,
 /// with the concrete type the table row is found by.</summary>
 public sealed class IfaceObj(Value data, TypeId concrete, TypeId iface)
 {
@@ -96,21 +96,21 @@ public sealed class BoxObj(Value payload)
     public Value Payload { get; set; } = payload;
 }
 
-/// <summary>A function value (01 V8): the lifted function and its environment, or none.</summary>
+/// <summary>A function value: the lifted function and its environment, or none.</summary>
 public sealed class ClosureObj(FunctionId target, Value environment)
 {
     public FunctionId Target { get; } = target;
     public Value Environment { get; } = environment;
 }
 
-/// <summary>A place (03 T12): what a place parameter holds — a slot to read and write.</summary>
+/// <summary>A place: what a place parameter holds — a slot to read and write.</summary>
 public sealed class PlaceObj(Func<Value> get, Action<Value> set)
 {
     public Value Get() => get();
     public void Set(Value v) => set(v);
 }
 
-/// <summary>An error in flight (05 E1, E6): the thrown value as an <c>Error</c> interface value,
+/// <summary>An error in flight: the thrown value as an <c>Error</c> interface value,
 /// with the errors suppressed into it.</summary>
 public sealed class ErrorRecord(Value value)
 {

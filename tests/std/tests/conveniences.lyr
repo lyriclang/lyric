@@ -1,8 +1,8 @@
-// std.fs's conveniences (design/v5/spec/10 O5; M8b S6c): a file read and written whole, appended
+// std.fs's conveniences: a file read and written whole, appended
 // to, its lines one by one — the lines' iterator closed at its end, at an error, and by a loop that
-// leaves early —; and the plan's check for M8b S6, every kind a file can give, each with its path.
+// leaves early —; and every kind a file can give, each with its path.
 // Each test that writes works in a directory of its own from fs.tempDir() and removes it: a run
-// leaves nothing in its working directory (M9a's point 104).
+// leaves nothing in its working directory.
 import std.fs;
 import std.fs { File, OpenOptions };
 import std.io { IoError, IoErrorKind };
@@ -151,9 +151,9 @@ fn bytesThatAreNoUtf8AreSaidWithThePath(): void throws IoError {
     try fs.removeAll(w);
 }
 
-/// The plan's check for M8b S6: each kind a file can give, with its path and what was done.
-/// `AlreadyExists` needs a file opened to be new, which 10 O5 does not have, `PermissionDenied`
-/// rights, a door (O5), or a system's own refusal — Windows's for a directory.
+/// Each kind a file can give, with its path and what was done.
+/// `AlreadyExists` needs a file opened to be new, which std.fs does not have, `PermissionDenied`
+/// rights, a door, or a system's own refusal — Windows's for a directory.
 @Test
 fn everyKindAFileCanGive(): void throws IoError {
     let w = try fs.tempDir();

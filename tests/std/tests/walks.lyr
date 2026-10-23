@@ -1,4 +1,4 @@
-// std.collections' walks (design/v5/spec/10 C4, C5, I4, I8, I9): a map's entries, keys and values,
+// std.collections' walks: a map's entries, keys and values,
 // the rest of its core, a set, a list from an iterator.
 import std.collections { List, Map, Set };
 import std.test { assertEq, assertFalse, assertPanics, assertTrue };

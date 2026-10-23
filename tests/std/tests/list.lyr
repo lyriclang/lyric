@@ -1,4 +1,4 @@
-// std.collections' List (design/v5/spec/10 C3, I9): a growing array.
+// std.collections' List: a growing array.
 import std.collections { List };
 import std.test { assertEq, assertFalse, assertNull, assertPanics, assertTrue };
 

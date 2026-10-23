@@ -118,7 +118,7 @@ namespace Lyric.Parsing
         public static string DecodeString(ReadOnlySpan<char> lexme, Span span, DiagnosticEngine de)
         {
             var text = lexme.ToString();
-            // 'r"…"', 'r#"…"#', 'r"""…"""' (08 Y7 L5, L6): the text as written, no escape.
+            // 'r"…"', 'r#"…"#', 'r"""…"""': the text as written, no escape.
             if (text.StartsWith('r'))
             {
                 var hashes = 0;
@@ -128,7 +128,7 @@ namespace Lyric.Parsing
                     return Dedent(Between(body, 3, 0), span, de);
                 return Between(body, 1, hashes);
             }
-            // '"""…"""' (L6): the lines first, then the escapes — an escaped '\n' is no line.
+            // '"""…"""': the lines first, then the escapes — an escaped '\n' is no line.
             if (text.StartsWith("\"\"\"", StringComparison.Ordinal))
                 return ResolveEscapes(Dedent(Between(text, 3, 0), span, de));
             return ResolveEscapes(StripQuotes(text));
@@ -146,7 +146,7 @@ namespace Lyric.Parsing
         }
 
         /// <summary>
-        /// The lines of a multi-line string (08 Y7 L6, Swift's rule): the text begins on the line after
+        /// The lines of a multi-line string (Swift's rule): the text begins on the line after
         /// the opening <c>"""</c> and ends on the line before the closing one, which stands on a line of
         /// its own; its indentation is taken off every line, and a line indented less is refused. A
         /// blank line may be indented less. The line breaks are <c>\n</c>, whatever the file has.
@@ -183,7 +183,7 @@ namespace Lyric.Parsing
             return string.Join('\n', lines);
         }
 
-        /// <summary><c>b"…"</c> (08 Y7 L7): ASCII text and the escapes, <c>\xNN</c> any byte. What
+        /// <summary><c>b"…"</c>: ASCII text and the escapes, <c>\xNN</c> any byte. What
         /// is no byte was reported by the lexer and is left out.</summary>
         public static byte[] DecodeBytes(ReadOnlySpan<char> lexme, Span span, DiagnosticEngine de)
         {

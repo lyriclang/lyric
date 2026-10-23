@@ -1,4 +1,4 @@
-// An array literal where a FromArrayLiteral is expected (10 K4; M8c S6b): the collections, the empty
+// An array literal where a FromArrayLiteral is expected: the collections, the empty
 // literal, an argument and a return, a literal inside a literal, a type of the program's own.
 import std.collections { Deque, Heap, List, Map, Set };
 import std.core { FromArrayLiteral };

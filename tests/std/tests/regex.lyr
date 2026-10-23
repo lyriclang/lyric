@@ -1,4 +1,4 @@
-// std.regex (design/v5/spec/10 S8, B1; 13 M10 S6): RE2's syntax matched in linear time by a Pike
+// std.regex: RE2's syntax matched in linear time by a Pike
 // VM - the matches and their groups, the syntax, leftmost-first alternation with greedy and lazy
 // repetition, replace and split, what is refused with its offset, and the time over a pattern a
 // backtracker would not survive.

@@ -21,7 +21,7 @@ public abstract record Expr(Span Span) : Node(Span);
 public sealed record IntLiteralExpr(ulong Value, IntSuffix? Suffix, Span Span) : Expr(Span);
 public sealed record FloatLiteralExpr(double Value, FloatSuffix? Suffix, Span Span) : Expr(Span);
 public sealed record StringLiteralExpr(string Value, Span Span) : Expr(Span);
-/// <summary><c>b"…"</c> (08 Y7 L7): a <c>uint8[]</c> of these bytes, a new array each time it is evaluated.</summary>
+/// <summary><c>b"…"</c>: a <c>uint8[]</c> of these bytes, a new array each time it is evaluated.</summary>
 public sealed record ByteStringExpr(byte[] Bytes, Span Span) : Expr(Span);
 public sealed record CharLiteralExpr(int CodePoint, Span Span) : Expr(Span);
 public sealed record BoolLiteralExpr(bool Value, Span Span) : Expr(Span);
@@ -30,13 +30,13 @@ public sealed record NullLiteralExpr(Span Span) : Expr(Span);
 // --- names ---
 public sealed record IdentifierExpr(string Name, Span Span) : Expr(Span)
 {
-    /// <summary>The module a <c>quote</c> wrote this name in (13 M9b P5): a free name of a quote
+    /// <summary>The module a <c>quote</c> wrote this name in: a free name of a quote
     /// is the macro's module's, not the site's; <c>null</c> for every name a program writes.</summary>
     public string? QuotedFrom { get; init; }
 }
 
-/// <summary><c>.Red</c>: a member of the type the position expects, the type unnamed
-/// (design/v5/spec/03 T9, 08 Y9). A unit variant as it stands; the callee of <c>.Num(3)</c>;
+/// <summary><c>.Red</c>: a member of the type the position expects, the type unnamed.
+/// A unit variant as it stands; the callee of <c>.Num(3)</c>;
 /// what the sema binds it to says which. Without an expected enum type it is an error.</summary>
 public sealed record ImplicitMemberExpr(string Name, Span Span) : Expr(Span);
 public sealed record AtIdentifierExpr(string Name, Expr[]? Arguments, Span Span) : Expr(Span); // Name INCLUDING the leading '@' (for example "@test"); Arguments == null when none were written
@@ -54,8 +54,7 @@ public sealed record ComptimeExpr(Expr Inner, Span Span) : Expr(Span);
 // 'throw e' in expression position: the type never (§6.9, §9.4). 'throw e;' at statement start stays a
 // ThrowStmt — one form per position, and the statement form has always been the one the flow rules name.
 public sealed record ThrowExpr(Expr Value, Span Span) : Expr(Span);
-/// <summary>Which member of the <c>try</c> family a <see cref="TryExpr"/> is (design/v5/spec/05
-/// E4; 08 Y4).</summary>
+/// <summary>Which member of the <c>try</c> family a <see cref="TryExpr"/> is.</summary>
 public enum TryKind
 {
     /// <summary><c>try e</c>: an error goes on — to a clause of this expression, to a <c>catch</c>
@@ -67,11 +66,11 @@ public enum TryKind
     /// null".</summary>
     Optional,
 
-    /// <summary><c>try! e</c>: an error is a panic (05 E8, <c>LYR-RT0010</c>).</summary>
+    /// <summary><c>try! e</c>: an error is a panic (<c>LYR-RT0010</c>).</summary>
     Force,
 }
 
-/// <summary><c>try e</c> (design/v5/spec/05 E1, E4; 08 Y4): marks every throw site in <c>e</c> —
+/// <summary><c>try e</c>: marks every throw site in <c>e</c> —
 /// the whole expression to its right (<c>try a + b</c> is <c>try (a + b)</c>) — as propagated to the
 /// enclosing function, or to a <c>catch</c> around it. The value is <c>e</c>'s. <c>try?</c> and
 /// <c>try!</c> take every error themselves (<see cref="Kind"/>); <c>try e catch (x: A) v</c> takes
@@ -79,8 +78,8 @@ public enum TryKind
 public sealed record TryExpr(Expr Value, Span Span) : Expr(Span)
 {
     /// <summary>
-    /// Set on a mark that stands to the RIGHT of an operator, <c>a + try b() + c()</c> (the
-    /// review's M5-9). The mark changes nothing about how the expression is grouped — it is a
+    /// Set on a mark that stands to the RIGHT of an operator, <c>a + try b() + c()</c>.
+    /// The mark changes nothing about how the expression is grouped — it is a
     /// prefix of its operand, <see cref="Value"/> — and it covers every throw site from the
     /// keyword to the end of the expression it stands in: <c>b()</c> and <c>c()</c>, not what
     /// stands left of it. <c>null</c> for a mark at the start of its expression, whose Value IS
@@ -115,12 +114,12 @@ public sealed record PostfixExpr(Expr Operand, PostfixOp Operator, Span Span) : 
 public sealed record BinaryExpr(Expr Left, BinaryOp Operator, Expr Right, Span Span) : Expr(Span);
 public sealed record AssignExpr(Expr Target, BinaryOp? Operator, Expr Value, Span Span) : Expr(Span); // Operator == null means '='; otherwise a compound assignment
 public sealed record RangeExpr(Expr Low, Expr High, bool IsInclusive, Span Span) : Expr(Span);
-/// <summary>The range inside <c>[…]</c> that takes a view (design/v5/spec/03 T13 A2): <c>a..b</c>,
+/// <summary>The range inside <c>[…]</c> that takes a view: <c>a..b</c>,
 /// <c>a..=b</c>, <c>..b</c>, <c>a..</c>, <c>..</c> — either bound may be left open.</summary>
 public sealed record SliceRangeExpr(Expr? Low, Expr? High, bool IsInclusive, Span Span) : Expr(Span);
 public sealed record CastExpr(Expr Operand, TypeNode Type, Span Span) : Expr(Span);
 
-/// <summary><c>x is Circle</c> (design/v5/spec/03 T11): does the interface value hold a value
+/// <summary><c>x is Circle</c>: does the interface value hold a value
 /// of that type? In the branch the test guards, the name is that type (smart cast).</summary>
 public sealed record TypeTestExpr(Expr Operand, TypeNode Type, Span Span) : Expr(Span);
 
@@ -131,19 +130,19 @@ public sealed record TypeTestExpr(Expr Operand, TypeNode Type, Span Span) : Expr
 public sealed record CallExpr(Expr Callee, Expr[] Arguments, Span Span,
     TypeNode[]? TypeArguments = null) : Expr(Span)
 {
-    /// <summary>The name an argument was written with — <c>connect(host: "h")</c>, design/v5/spec/04
-    /// D5 — by argument index, <c>null</c> where the argument is positional; <c>null</c> as a whole
+    /// <summary>The name an argument was written with — <c>connect(host: "h")</c>
+    /// — by argument index, <c>null</c> where the argument is positional; <c>null</c> as a whole
     /// when no argument is named, which is nearly every call.</summary>
     public string?[]? ArgumentNames { get; init; }
 
     /// <summary>The arguments written in parentheses of their own, <c>f((a + b))</c>, each with
     /// the span that holds its parentheses: the argument's node is the tree inside them, and
-    /// <c>@callerExpr</c> hands on the text the call wrote (09 A11). <c>null</c> where none is,
+    /// <c>@callerExpr</c> hands on the text the call wrote. <c>null</c> where none is,
     /// which is nearly every call.</summary>
     public (Expr Argument, Span Written)[]? Parenthesized { get; init; }
 
-    /// <summary>The arguments written with <c>...</c> behind them, <c>sum(base, xs...)</c>
-    /// (design/v5/spec/08; the review's A2), each with where its dots stand: an array spread
+    /// <summary>The arguments written with <c>...</c> behind them, <c>sum(base, xs...)</c>,
+    /// each with where its dots stand: an array spread
     /// over the variadic parameter — the parameter IS the array — where without the dots the
     /// array would be one element. A call spreads one argument, the rest; the parser notes the
     /// dots wherever they stand, and the checker says where they may not (LYR-SEM0166).
@@ -151,27 +150,27 @@ public sealed record CallExpr(Expr Callee, Expr[] Arguments, Span Span,
     public (Expr Argument, Span Dots)[]? Spreads { get; init; }
 }
 public sealed record IndexExpr(Expr Target, Expr Index, Span Span) : Expr(Span);
-/// <summary><c>e.[f]</c> (design/v5/spec/09 A7 R2): the field of <c>e</c> that the variable of a
+/// <summary><c>e.[f]</c>: the field of <c>e</c> that the variable of a
 /// <c>comptime for</c> over <c>std.meta.fields</c> names — set in place once per field, so each
-/// round has the field's own type (M9a S9).</summary>
+/// round has the field's own type.</summary>
 public sealed record FieldByInfoExpr(Expr Target, Expr Info, Span Span) : Expr(Span);
 
-/// <summary><c>e.[v, p]</c> (09 A7 R2; M9a S10): the payload field <c>p</c> of the variant
+/// <summary><c>e.[v, p]</c>: the payload field <c>p</c> of the variant
 /// <c>v</c> of the enum value <c>e</c> — <c>v</c> the variable of a <c>comptime for</c> over
 /// <c>std.meta.variants</c>, <c>p</c> one over <c>v.payload</c>. A panic where <c>e</c> holds
 /// another variant.</summary>
 public sealed record PayloadByInfoExpr(Expr Target, Expr Variant, Expr Field, Span Span) : Expr(Span);
 
-/// <summary><c>comptime if (c) a else b</c> in expression position (09 Q2; M9a S10): the arm the
+/// <summary><c>comptime if (c) a else b</c> in expression position: the arm the
 /// condition chooses while compiling; in a round that decides the condition, the chosen arm alone
 /// is checked.</summary>
 public sealed record ComptimeIfExpr(Expr Condition, Expr Then, Expr Else, Span Span) : Expr(Span);
 
-/// <summary><c>E.[v] { [p] = …, comptime for (p in v.payload) [p] = … }</c> (M9a S10): a variant
+/// <summary><c>E.[v] { [p] = …, comptime for (p in v.payload) [p] = … }</c>: a variant
 /// built by its info, its struct payload set field by field.</summary>
 public sealed record VariantInitExpr(Expr Target, Expr Variant, StructInitField[] Fields, StructInitRound[] Rounds, Span Span) : Expr(Span);
 
-/// <summary><c>comptime for (f in fields&lt;T&gt;()) [f] = e</c> inside an initializer (M9a S10): one
+/// <summary><c>comptime for (f in fields&lt;T&gt;()) [f] = e</c> inside an initializer: one
 /// field per round, <c>e</c> checked with <c>f</c> that field's info.</summary>
 public sealed record StructInitRound(string Variable, Expr Iterable, StructInitField Item, Span Span) : Node(Span)
 {
@@ -199,8 +198,8 @@ public sealed record InterpText(string Text, Span Span) : InterpSegment(Span)   
     private readonly string? _value;
 
     /// <summary>What the text stands for: <c>{{</c> and <c>}}</c> folded to one brace, the escapes
-    /// resolved — not in a raw <c>fr"…"</c> —, a multi-line <c>f"""…"""</c>'s indentation taken off
-    /// (08 Y7 L6, L8). The parser sets it; a text made elsewhere is read in the plain form.</summary>
+    /// resolved — not in a raw <c>fr"…"</c> —, a multi-line <c>f"""…"""</c>'s indentation taken off.
+    /// The parser sets it; a text made elsewhere is read in the plain form.</summary>
     public string Value
     {
         get => _value ?? Escapes.Resolve(Text.Replace("{{", "{").Replace("}}", "}"));
@@ -218,8 +217,8 @@ public sealed record LambdaExpr(LambdaParam[] Parameters, TypeNode? ReturnType, 
     public LambdaForm Form { get; init; } = LambdaForm.Parenthesized;
 
     /// <summary>The set the parenthesized form writes after its return type,
-    /// <c>(s: string): int throws ParseError =&gt; …</c> (design/v5/spec/08 Y11 F7); null where the
-    /// lambda's set comes from its position or from its body (05 E2 K3).</summary>
+    /// <c>(s: string): int throws ParseError =&gt; …</c>; null where the
+    /// lambda's set comes from its position or from its body.</summary>
     public ThrowsClause? Throws { get; init; }
 
     /// <summary>Whether the return type is written in parentheses — as on a declaration
@@ -244,8 +243,8 @@ public sealed record LambdaParam(string Name, TypeNode? Type, Span Span) : Node(
     public Pattern? Pattern { get; init; }
     public bool Implicit { get; init; }
 
-    /// <summary><c>(&amp;n) =&gt; …</c>, <c>{ &amp;n =&gt; … }</c> (design/v5/spec/03 T12; the review's
-    /// M6-24): the parameter takes a place, as a declaration's <c>&amp;n: T</c> does — the body
+    /// <summary><c>(&amp;n) =&gt; …</c>, <c>{ &amp;n =&gt; … }</c>:
+    /// the parameter takes a place, as a declaration's <c>&amp;n: T</c> does — the body
     /// reads and writes the caller's, and the lambda's type is <c>fn(&amp;T) -&gt; R</c>.</summary>
     public bool IsPlace { get; init; }
 }
@@ -254,12 +253,12 @@ public sealed record LambdaParam(string Name, TypeNode? Type, Span Span) : Node(
 // IfExpr branches are EXPRESSIONS: 'if (c) a else b', or 'if (c) { …; a } else { …; b }' with a
 // value block as a branch (a BlockExpr). The else is mandatory; 'else if' is a nested IfExpr. An
 // 'if' whose branches are statement blocks, with or without an else, is an IfStmt — unless it
-// stands last in a value block, where it is the block's value (08 Y4, the tail rule).
+// stands last in a value block, where it is the block's value (the tail rule).
 public sealed record IfExpr(Expr Condition, Expr Then, Expr Else, Span Span) : Expr(Span);
 public sealed record MatchExpr(Expr Scrutinee, MatchArm[] Arms, Span Span) : Expr(Span);
 
 /// <summary>
-/// A value block where an expression is wanted (08 Y4): a branch of an <c>if</c> expression,
+/// A value block where an expression is wanted: a branch of an <c>if</c> expression,
 /// <c>if (c) { …; a } else { …; b }</c>, and the right of <c>??</c>, <c>x ?? { return 0; }</c>.
 /// It is worth its tail; without one it gives no value — it leaves, or it is worth nothing.
 ///
@@ -269,7 +268,7 @@ public sealed record MatchExpr(Expr Scrutinee, MatchArm[] Arms, Span Span) : Exp
 /// </summary>
 public sealed record BlockExpr(Block Block, Span Span) : Expr(Span);
 
-/// <summary><c>loop { … }</c> (design/v5/spec/05 E11, 08 S3/S4): the block again and again, left by
+/// <summary><c>loop { … }</c>: the block again and again, left by
 /// a <c>break</c> — <c>break value</c> gives the loop its value — or by nothing at all, the loop
 /// then of type <c>never</c>. At the start of a statement it is one, with no <c>;</c> after its
 /// block; elsewhere an expression, <c>let found = loop { …; break x; };</c>. Labeled like the other
@@ -286,14 +285,14 @@ public sealed record LoopExpr(Block Body, Span Span) : Expr(Span)
 public sealed record StructInitExpr(string[] Path, TypeNode[] TypeArguments, StructInitField[] Fields, Span Span) : Expr(Span)
 {
     /// <summary><c>.Rect { w = 1 }</c>: the path is the one variant name, and the enum is the
-    /// type the position expects (08 Y9).</summary>
+    /// type the position expects.</summary>
     public bool IsImplicit { get; init; }
 
     /// <summary>The span of the LAST path segment — the name the initializer's symbol answers for.
     /// The segments before it qualify; only this one is the type's own name.</summary>
     public required Span NameSpan { get; init; }
 
-    /// <summary><c>comptime for (f in fields&lt;T&gt;()) [f] = e</c> items (M9a S10) beside the named
+    /// <summary><c>comptime for (f in fields&lt;T&gt;()) [f] = e</c> items beside the named
     /// fields; none in the common case.</summary>
     public StructInitRound[] Rounds { get; init; } = [];
 }
@@ -313,7 +312,7 @@ public sealed record TypePathExpr(string[] Path, TypeNode[] TypeArguments, Span 
     public required Span NameSpan { get; init; }
 }
 
-/// <summary><c>p with { x = 3, pos.y = 4 }</c> (design/v5/spec/02 M6): a copy of the struct
+/// <summary><c>p with { x = 3, pos.y = 4 }</c>: a copy of the struct
 /// <c>p</c> with the named fields replaced, <c>p</c> untouched; a path reaches into a struct
 /// held by value. The values see the old <c>p</c>.</summary>
 public sealed record WithExpr(Expr Target, WithField[] Fields, Span Span) : Expr(Span);
@@ -325,11 +324,11 @@ public sealed record StructInitField(string Name, Expr Value, Span Span) : Node(
     /// <c>name = value</c>.</summary>
     public required Span NameSpan { get; init; }
 
-    /// <summary><c>S { v }</c> (02 I3): the name alone, <c>v = v</c> — <see cref="Value"/> is the
+    /// <summary><c>S { v }</c>: the name alone, <c>v = v</c> — <see cref="Value"/> is the
     /// read of the name, at the name's own span. The formatter writes it back alone.</summary>
     public bool IsShorthand { get; init; }
 
-    /// <summary><c>[f] = e</c> (M9a S10): the field that the info <c>f</c> names — a round's
+    /// <summary><c>[f] = e</c>: the field that the info <c>f</c> names — a round's
     /// variable — rather than a written name; <see cref="Name"/> is empty then.</summary>
     public Expr? Info { get; init; }
 }
@@ -337,20 +336,20 @@ public sealed record StructInitField(string Name, Expr Value, Span Span) : Node(
 // --- recovery ---
 public sealed record ErrorExpr(Span Span) : Expr(Span);
 
-/// <summary><c>quote { ... }</c> (design/v5/spec/08 Y12 Q2; 13 M9b P5): a tree as a value of its
+/// <summary><c>quote { ... }</c>: a tree as a value of its
 /// content's kind - statements (a last expression without ';' the tail, which makes it an Expr),
 /// or declarations. The content is syntax, checked nowhere; the splices are the code of the
 /// surrounding function, evaluated at the quote in order. A name splice stands in the content as
 /// the name "#i" of its index.</summary>
 public sealed record QuoteExpr(Node[] Content, Expr[] Splices, bool Declarations, Span Span) : Expr(Span);
 
-/// <summary><c>#{e}</c> inside a quote (08 Y12 Q3): the value of <see cref="Inner"/> set into the
+/// <summary><c>#{e}</c> inside a quote: the value of <see cref="Inner"/> set into the
 /// tree at this place - an expression here, statements where it stands as one.</summary>
 public sealed record SpliceExpr(int Index, Expr Inner, Span Span) : Expr(Span);
 
-/// <summary><c>twice!(x)</c>, <c>retry!(3) { ... }</c>, <c>run! { ... }</c> (design/v5/spec/08 Y12 Q5;
-/// 13 M9b P4): a macro's expansion site. The arguments are syntax, not values, and are checked
-/// nowhere: the expander (M9b S2) replaces the node by what the macro gives back before the module
+/// <summary><c>twice!(x)</c>, <c>retry!(3) { ... }</c>, <c>run! { ... }</c>:
+/// a macro's expansion site. The arguments are syntax, not values, and are checked
+/// nowhere: the expander replaces the node by what the macro gives back before the module
 /// is checked. A tree holds one only before its expansion; the checker types it as a hole, the
 /// lowering as a trap, and neither is reached in a program that compiles.</summary>
 public sealed record MacroCallExpr(string Name, Expr[] Arguments, Block? Trailing, Span Span) : Expr(Span)

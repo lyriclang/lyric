@@ -42,7 +42,7 @@ public sealed class TypeResult
     /// </summary>
     public SiteList ComptimeSites { get; } = new();
 
-    /// <summary>The quotes of the program (13 M9b P5), in the order the checker met them, each
+    /// <summary>The quotes of the program, in the order the checker met them, each
     /// with the module it stands in: the lowering numbers them for the interpreter, which builds
     /// the tree, and a free name of the content is that module's.</summary>
     public List<QuoteExpr> Quotes { get; } = [];
@@ -55,7 +55,7 @@ public sealed class TypeResult
 
     private readonly Dictionary<AttributeNode, ComptimeExpr> _attributeValues = new(ReferenceEqualityComparer.Instance);
 
-    /// <summary>A Lyric 5 attribute's value (design/v5/spec/09 F4): the struct it writes, as the
+    /// <summary>A Lyric 5 attribute's value: the struct it writes, as the
     /// <c>comptime</c> site the checker made of it — one of <see cref="ComptimeSites"/>, whose
     /// evaluated constant holds every field, written or defaulted.</summary>
     public ComptimeExpr? AttributeValueOf(AttributeNode attribute) => _attributeValues.GetValueOrDefault(attribute);
@@ -73,7 +73,7 @@ public sealed class TypeResult
 
     public void BindRef(Node node, Symbol symbol) => _refs[node] = symbol;
 
-    /// <summary>The parameters <c>@callerExpr</c> sits on (design/v5/spec/09 A11), each with the
+    /// <summary>The parameters <c>@callerExpr</c> sits on, each with the
     /// parameter whose argument's text it gives, and where that text comes from.</summary>
     private readonly Dictionary<Param, string> _callerExpr = new(ReferenceEqualityComparer.Instance);
 
@@ -83,7 +83,7 @@ public sealed class TypeResult
     /// <c>null</c> where no <c>@callerExpr</c> sits on it.</summary>
     public string? CallerExprOf(Param parameter) => _callerExpr.GetValueOrDefault(parameter);
 
-    /// <summary>The parameters <c>@callerLine</c> or <c>@callerFile</c> sits on (09 A11), each with
+    /// <summary>The parameters <c>@callerLine</c> or <c>@callerFile</c> sits on, each with
     /// what of the call's place it takes.</summary>
     private readonly Dictionary<Param, CallerPlace> _callerPlace = new(ReferenceEqualityComparer.Instance);
 
@@ -97,7 +97,7 @@ public sealed class TypeResult
     /// <summary>The source text of a span — what a call wrote —, for the lowering.</summary>
     public Func<Lyric.Core.Span, string>? SourceText { get; internal set; }
 
-    /// <summary>Where a span begins, as the binary names it (09 A11 against 11 W2 P6): the file
+    /// <summary>Where a span begins, as the binary names it: the file
     /// as a backtrace has it, and the line. The compiler sets it before it lowers.</summary>
     public Func<Lyric.Core.Span, (string File, int Line)>? SourcePlace { get; internal set; }
 
@@ -129,16 +129,16 @@ public sealed class TypeResult
 
     /// <summary>Whether a type conforms to an interface — the sema's answer at an instance the
     /// lowering reached, for a question the checked code could not settle: is the concrete
-    /// iterator of a generic loop Closeable (the review's M8a-4).</summary>
+    /// iterator of a generic loop Closeable.</summary>
     public Func<LyrType, TypeSymbol, bool>? Satisfies { get; internal set; }
 
-    /// <summary>Whether an interface can be the type of a value (04 D9) — only such a one has a
+    /// <summary>Whether an interface can be the type of a value — only such a one has a
     /// table, and only its defaults are lowered once for it.</summary>
     public Func<TypeSymbol, bool>? ValueInterface { get; internal set; }
 
-    /// <summary>Whether the program is Lyric 5's (04 D9 whole): there a generic default of an
+    /// <summary>Whether the program is Lyric 5's: there a generic default of an
     /// interface is instantiated per conformer, and a conformer's own may stand in its place. The
-    /// 4.x path keeps a generic default for the interface's value until it leaves main (M16).</summary>
+    /// 4.x path keeps a generic default for the interface's value until it leaves main.</summary>
     public bool Lyric5Modules { get; internal set; }
 
     /// <summary>
@@ -155,7 +155,7 @@ public sealed class TypeResult
     private readonly Dictionary<(TypeSymbol, TypeSymbol, string), List<(LyrType Instance, FunctionSymbol Impl)>>
         _conformanceImpls = new();
 
-    // The conformances a GENERIC block gave (03 T7 X1), as the sema proved them at a use: the
+    // The conformances a GENERIC block gave, as the sema proved them at a use: the
     // instance, the interface, the block. A row in the lowering's tables is built for exactly
     // these, since a block's constraints may hold for one instance and not for another.
     private readonly List<(LyrType Instance, TypeSymbol Iface, ExtensionBlock Block)> _blockConformances = new();
@@ -188,7 +188,7 @@ public sealed class TypeResult
         _blockConformances.FirstOrDefault(e => e.Block.IsBlanketTarget && ReferenceEquals(e.Iface, iface)
             && LyrType.Equal(e.Instance, instance)).Block;
 
-    /// <summary>A generic member as the witness of a plain interface member (13 S9; M8c S9b): its
+    /// <summary>A generic member as the witness of a plain interface member: its
     /// own type arguments as the conformance to that interface instance bound them —
     /// <c>contains&lt;P&gt;</c> for <c>Contains&lt;char&gt;</c> is <c>contains&lt;char&gt;</c>.</summary>
     private readonly List<(FunctionSymbol Witness, LyrType Instance, LyrType[] Arguments)> _witnessArguments = new();
@@ -218,7 +218,7 @@ public sealed class TypeResult
         if (!entries.Any(e => LyrType.Equal(e.Instance, instance))) entries.Add((instance, impl));
     }
 
-    /// <summary><c>:: [Walker by legs]</c> (04 D1): the field a type delegates an interface's
+    /// <summary><c>:: [Walker by legs]</c>: the field a type delegates an interface's
     /// members to — the interface and every parent of it. The lowering builds the forwarders
     /// from it; the checker answers member lookups with it.</summary>
     private readonly Dictionary<(TypeSymbol, TypeSymbol), (string Field, FieldSymbol Symbol)> _delegations = new();
@@ -258,7 +258,7 @@ public sealed class TypeResult
 
     public void MarkThrowingPull(Node pull, LyrType thrown) => _throwingPulls[pull] = thrown;
 
-    /// <summary>The yields of coroutine bodies (06 A5): where <c>close()</c> finds the coroutine
+    /// <summary>The yields of coroutine bodies: where <c>close()</c> finds the coroutine
     /// suspended, such a yield throws <c>Cancelled</c>. Recorded by the checker, which knows whose
     /// body a yield stands in — a lambda's yield in a body is the other, dynamic kind.</summary>
     private readonly HashSet<YieldStmt> _bodyYields = new(ReferenceEqualityComparer.Instance);
@@ -267,7 +267,7 @@ public sealed class TypeResult
 
     public bool IsBodyYield(YieldStmt yield) => _bodyYields.Contains(yield);
 
-    /// <summary>The generator lambdas (08 Y11 F5): a lambda with a yield of its own, of type
+    /// <summary>The generator lambdas: a lambda with a yield of its own, of type
     /// <c>fn(…) -> Coroutine&lt;Y, R&gt;</c>, lowered as a coroutine's factory and body.</summary>
     private readonly HashSet<LambdaExpr> _generatorLambdas = new(ReferenceEqualityComparer.Instance);
 
@@ -288,7 +288,7 @@ public sealed class TypeResult
         _throwingPulls.TryGetValue(pull, out var t) ? t : null;
 
     /// <summary>The members a clause's binding answers of its record, <c>e.suppressed()</c> and
-    /// <c>e.backtrace()</c> (06 §4, 05 E6 O3): the member, and the binding whose record the
+    /// <c>e.backtrace()</c>: the member, and the binding whose record the
     /// lowering keeps for the clause and reads.</summary>
     private readonly Dictionary<MemberExpr, LocalSymbol> _recordQueries = new(ReferenceEqualityComparer.Instance);
 
@@ -296,7 +296,7 @@ public sealed class TypeResult
 
     public LocalSymbol? RecordQueryOf(MemberExpr member) => _recordQueries.GetValueOrDefault(member);
 
-    // --- errors (design/v5/spec/05 E2) ---------------------------------------------------------
+    // --- errors ---------------------------------------------------------
 
     private readonly Dictionary<Node, LyrType[]> _declaredThrows = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<CallExpr, LyrType[]> _callThrows = new(ReferenceEqualityComparer.Instance);
@@ -312,7 +312,7 @@ public sealed class TypeResult
     public LyrType[] DeclaredThrows(FunctionDecl fn) => _declaredThrows.GetValueOrDefault(fn) ?? [];
 
     /// <summary>The program's <c>main</c> throws <paramref name="thrown"/> although it does not
-    /// say so (06 M6-4: <c>Cancelled</c>, which it covers itself): from here on its set holds
+    /// say so (<c>Cancelled</c>, which it covers itself): from here on its set holds
     /// it, and its call may throw — what the lowering asks for the error slot.</summary>
     public void RecordEntryThrows(FunctionDecl main, LyrType thrown)
     {
@@ -325,12 +325,12 @@ public sealed class TypeResult
 
     public void RecordThrowsAtCall(FunctionDecl fn) => _throwsAtCall.Add(fn);
 
-    /// <summary>Whether a CALL of the function may throw (05 E2): its set is non-empty and it is no
+    /// <summary>Whether a CALL of the function may throw: its set is non-empty and it is no
     /// coroutine function, whose clause belongs to its pulls. What a back end gives the caller's
     /// error slot.</summary>
     public bool ThrowsAtCall(FunctionDecl fn) => _throwsAtCall.Contains(fn);
 
-    /// <summary>What a call may throw, in its instance's terms (K5) — the checker's settled callee,
+    /// <summary>What a call may throw, in its instance's terms — the checker's settled callee,
     /// overloads and generic substitution done. Recorded for throwing calls only.</summary>
     public void RecordCallThrows(CallExpr call, LyrType[] set) => _callThrows[call] = set;
 
@@ -342,7 +342,7 @@ public sealed class TypeResult
     public LyrType? CatchType(CatchClause clause) => _catchTypes.GetValueOrDefault(clause);
 
     /// <summary>
-    /// The set a catch binding carries (design/v5/spec/05 E2 K7): the types of a set clause, or
+    /// The set a catch binding carries: the types of a set clause, or
     /// what reaches a clause without a type. A rethrow of the binding throws exactly it, a match
     /// over the binding is exhaustive without a default; stored, the binding is an <c>Error</c>.
     /// </summary>
@@ -357,7 +357,7 @@ public sealed class TypeResult
 
     private readonly Dictionary<TypeSetPattern, LyrType[]> _typeSets = new(ReferenceEqualityComparer.Instance);
 
-    /// <summary>The types a type-set pattern tests, resolved (08 Y6) — the set its binding carries.</summary>
+    /// <summary>The types a type-set pattern tests, resolved — the set its binding carries.</summary>
     public void RecordTypeSet(TypeSetPattern pattern, LyrType[] set) => _typeSets[pattern] = set;
 
     public LyrType[]? TypeSet(TypeSetPattern pattern) => _typeSets.GetValueOrDefault(pattern);
@@ -365,7 +365,7 @@ public sealed class TypeResult
     private readonly Dictionary<CallExpr, StructInitExpr> _shorthands = new(ReferenceEqualityComparer.Instance);
 
     /// <summary><c>Point { v }</c>, read as a call with a trailing block, which the checker found to be
-    /// the shorthand initializer (02 I3): checked as that, and lowered as that.</summary>
+    /// the shorthand initializer: checked as that, and lowered as that.</summary>
     public void DesugarShorthand(CallExpr call, StructInitExpr init) => _shorthands[call] = init;
 
     public StructInitExpr? ShorthandOf(CallExpr call) => _shorthands.GetValueOrDefault(call);
@@ -442,22 +442,22 @@ public sealed class TypeResult
 
     public void DesugarOperator(Node op, CallExpr call) => _operatorCalls[op] = call;
 
-    /// <summary>A <c>for</c> over Lyric 5's protocol (design/v5/spec/10 B6 I2): the two calls the loop
+    /// <summary>A <c>for</c> over Lyric 5's protocol: the two calls the loop
     /// makes and the hidden variable the iterator lives in, checked as written calls are.</summary>
     public sealed record ForInProtocol(CallExpr IterCall, CallExpr NextCall, LocalSymbol Cursor)
     {
-        /// <summary>The close of a Closeable iterator (10 B6 I6), a defer of the loop's own.</summary>
+        /// <summary>The close of a Closeable iterator, a defer of the loop's own.</summary>
         public DeferStmt? Close { get; init; }
 
-        /// <summary>The close stands for an iterator whose type names a type parameter (the
-        /// review's M8a-4): whether it is Closeable is the INSTANCE's to say — the lowering keeps
+        /// <summary>The close stands for an iterator whose type names a type parameter:
+        /// whether it is Closeable is the INSTANCE's to say — the lowering keeps
         /// the close where the concrete iterator is one, and drops it otherwise.</summary>
         public bool CloseIfCloseable { get; init; }
     }
 
     private readonly Dictionary<ForInStmt, ForInProtocol> _forIns = new(ReferenceEqualityComparer.Instance);
 
-    /// <summary>An f-string written into one builder (10 S6; M8a S13): the builder's local, the call
+    /// <summary>An f-string written into one builder: the builder's local, the call
     /// that makes it, the calls that append the pieces in order, the call that takes the text.</summary>
     public sealed record InterpolationPlan(LocalSymbol Builder, CallExpr Start, CallExpr[] Pieces, CallExpr Finish);
 
@@ -474,8 +474,7 @@ public sealed class TypeResult
 
     public ForInProtocol? ForInOf(ForInStmt loop) => _forIns.TryGetValue(loop, out var p) ? p : null;
 
-    /// <summary>A <c>for</c> over an array, a view or an inline array in Lyric 5: the index loop
-    /// (design/v5/spec/10 B6 I10).</summary>
+    /// <summary>A <c>for</c> over an array, a view or an inline array in Lyric 5: the index loop.</summary>
     private readonly HashSet<ForInStmt> _indexed = new(ReferenceEqualityComparer.Instance);
 
     public void MarkIndexed(ForInStmt loop) => _indexed.Add(loop);
@@ -484,8 +483,8 @@ public sealed class TypeResult
 
     public CallExpr? OperatorCallOf(Node op) => _operatorCalls.GetValueOrDefault(op);
 
-    /// <summary>A range on a type that gives a view of itself (std.core's <c>AsSlice&lt;T&gt;</c>;
-    /// M8c S18): <c>list[a..b]</c> checked as <c>list.asSlice()[a..b]</c>, the index the lowering
+    /// <summary>A range on a type that gives a view of itself (std.core's <c>AsSlice&lt;T&gt;</c>):
+    /// <c>list[a..b]</c> checked as <c>list.asSlice()[a..b]</c>, the index the lowering
     /// takes in its place.</summary>
     private readonly Dictionary<IndexExpr, IndexExpr> _rangesThroughViews = new(ReferenceEqualityComparer.Instance);
 
@@ -493,7 +492,7 @@ public sealed class TypeResult
 
     public IndexExpr? RangeThroughViewOf(IndexExpr range) => _rangesThroughViews.GetValueOrDefault(range);
 
-    /// <summary>An array literal that stands for a <c>FromArrayLiteral&lt;T&gt;</c> (10 K4; M8c S6b),
+    /// <summary>An array literal that stands for a <c>FromArrayLiteral&lt;T&gt;</c>,
     /// with the element type its elements were checked against: the lowering builds the array of
     /// them and calls the expected type's <c>fromLiteral</c>.</summary>
     private readonly Dictionary<ArrayLitExpr, LyrType> _literalsInto = new(ReferenceEqualityComparer.Instance);
@@ -519,7 +518,7 @@ public sealed class TypeResult
     public void SetTypeArguments(Node call, LyrType[] arguments) =>
         _typeArguments[call] = arguments;
 
-    /// <summary>The arguments of a call that names some of them (04 D5), in PARAMETER order: the
+    /// <summary>The arguments of a call that names some of them, in PARAMETER order: the
     /// entry of a parameter the call leaves to its default is <c>null</c>; what overflows into a
     /// <c>params</c> tail follows the fixed parameters. Absent for a call that names nothing,
     /// whose arguments stand in parameter order already.</summary>
@@ -559,7 +558,7 @@ public sealed class TypeResult
     /// cell.</summary>
     public bool IsBoxed(Symbol symbol) => _boxed.Contains(symbol);
 
-    /// <summary>The lambda literals an <c>inline fn</c>'s call sets in place (design/v5/spec/08 F6):
+    /// <summary>The lambda literals an <c>inline fn</c>'s call sets in place:
     /// no closure, their <c>return</c> the enclosing function's, their loops its loops.</summary>
     private readonly HashSet<LambdaExpr> _inlineLambdas = new(ReferenceEqualityComparer.Instance);
 
@@ -567,7 +566,7 @@ public sealed class TypeResult
 
     public bool IsInlineLambda(LambdaExpr lambda) => _inlineLambdas.Contains(lambda);
 
-    // ------------------------------------------------------------------ std.meta (09 A7; M9a S9)
+    // ------------------------------------------------------------------ std.meta
 
     /// <summary>A field as <c>std.meta.fields</c> answers it: name, type, position in the
     /// declaration, word, whether it is a <c>var</c>.</summary>
@@ -576,11 +575,11 @@ public sealed class TypeResult
         /// <summary>The field's declaration where it has no symbol — a variant's payload field.</summary>
         public FieldDecl? Declaration { get; init; }
 
-        /// <summary>The attributes the field carries (R4): what <c>attribute&lt;A&gt;(f)</c> reads.</summary>
+        /// <summary>The attributes the field carries: what <c>attribute&lt;A&gt;(f)</c> reads.</summary>
         public AttributeNode[] Attributes => (Declaration ?? Symbol?.Declaration as FieldDecl)?.Attributes ?? [];
 
-        /// <summary>Whether the field's declaration writes an initializer (W9): the type's own
-        /// default counts for nothing; a payload's field as a struct's (X2).</summary>
+        /// <summary>Whether the field's declaration writes an initializer: the type's own
+        /// default counts for nothing; a payload's field as a struct's.</summary>
         public bool HasDefault => (Declaration ?? Symbol?.Declaration as FieldDecl)?.Default is not null;
     }
 
@@ -595,7 +594,7 @@ public sealed class TypeResult
     /// parsed again, its variable — whose value is the field's info —, the field.</summary>
     public sealed record MetaRound(Block Body, LocalSymbol Variable, MetaField Field);
 
-    /// <summary>The fields of a type that a module may name (R7), as the checker reads them;
+    /// <summary>The fields of a type that a module may name, as the checker reads them;
     /// asked by the lowering, too, for an instance it settles.</summary>
     public Func<LyrType, ModuleSymbol?, MetaField[]>? MetaFields { get; internal set; }
 
@@ -606,10 +605,10 @@ public sealed class TypeResult
         /// whose attributes <c>memberAttribute&lt;A&gt;(m)</c> reads.</summary>
         public Decl? Declaration { get; init; }
 
-        /// <summary>What it is, by std.core's <c>MemberKind</c> (X4).</summary>
+        /// <summary>What it is, by std.core's <c>MemberKind</c>.</summary>
         public string Kind { get; init; } = "Function";
 
-        /// <summary>A function's parameters, in declaration order; none for another member (X4).</summary>
+        /// <summary>A function's parameters, in declaration order; none for another member.</summary>
         public MetaParam[] Parameters { get; init; } = [];
 
         public AttributeNode[] Attributes => Declaration switch
@@ -621,7 +620,7 @@ public sealed class TypeResult
         };
     }
 
-    /// <summary>A parameter as <c>m.parameters</c> answers it (X4): its declaration carries its default
+    /// <summary>A parameter as <c>m.parameters</c> answers it: its declaration carries its default
     /// and its attributes.</summary>
     public sealed record MetaParam(string Name, LyrType Type, int Index, Param? Declaration)
     {
@@ -630,7 +629,7 @@ public sealed class TypeResult
         public AttributeNode[] Attributes => Declaration?.Attributes ?? [];
     }
 
-    /// <summary>The functions of a type's own body that a module may name (R7).</summary>
+    /// <summary>The functions of a type's own body that a module may name.</summary>
     public Func<LyrType, ModuleSymbol?, MetaMember[]>? MetaMembers { get; internal set; }
 
     /// <summary>The variants of an enum (its instance's payload types).</summary>
@@ -676,7 +675,7 @@ public sealed class TypeResult
     internal void SetKnownField(LocalSymbol variable, MetaField field) => _knownFields[variable] = field;
 
     /// <summary>A default whose body walks the fields of <c>Self</c>, set in place for one
-    /// conformer (09 A5): parsed again, checked with <c>Self</c> that conformer.</summary>
+    /// conformer: parsed again, checked with <c>Self</c> that conformer.</summary>
     public FunctionDecl? ExpansionOf(FunctionDecl @default, TypeSymbol conformer) =>
         _expansions.TryGetValue((@default, conformer), out var found) ? found.Expansion : null;
     /// <summary>The <c>Self</c> an expansion was checked with: a generic conformer's instance over
@@ -686,7 +685,7 @@ public sealed class TypeResult
     internal void SetExpansion(FunctionDecl @default, TypeSymbol conformer, FunctionDecl expansion, LyrType self) =>
         _expansions[(@default, conformer)] = (expansion, self);
 
-    // ------------------------------------------------------------------ M9a S10: variants and initializers over infos
+    // ------------------------------------------------------------------ variants and initializers over infos
     private readonly Dictionary<LocalSymbol, MetaVariant> _knownVariants = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<LocalSymbol, MetaVariant> _knownPayloads = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<LocalSymbol, MetaMember> _knownMembers = new(ReferenceEqualityComparer.Instance);
@@ -735,7 +734,7 @@ public sealed class TypeResult
     public FunctionDecl? ReparsedOwnerOf(Node root) => _reparsedOwners.GetValueOrDefault(root);
     internal void SetReparsedOwner(Node root, FunctionDecl? owner) { if (owner is not null) _reparsedOwners[root] = owner; }
 
-    /// <summary>A <c>comptime if</c> statement whose condition a round decided (M9a S10): the
+    /// <summary>A <c>comptime if</c> statement whose condition a round decided: the
     /// branch the checker checked, the one the lowering takes.</summary>
     public bool? DecidedIf(IfStmt stmt) => _decidedIfs.TryGetValue(stmt, out var chosen) ? chosen : null;
     internal void SetDecidedIf(IfStmt stmt, bool chosen) => _decidedIfs[stmt] = chosen;
@@ -759,7 +758,7 @@ public sealed class TypeResult
 }
 
 /// <summary>
-/// The <c>comptime</c> sites in the order the checker met them, each known BY ITS NODE (M9a S9).
+/// The <c>comptime</c> sites in the order the checker met them, each known BY ITS NODE.
 /// An AST node is a record, equal to any node of the same text at the same place — and a body
 /// parsed again for a round or a conformer is exactly that: its sites are sites of their own, with
 /// values of their own. A list's <c>IndexOf</c> found the first of them for every one.
@@ -787,7 +786,7 @@ public sealed class SiteList : IReadOnlyList<ComptimeExpr>
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-/// <summary>What of a call's place a parameter takes where the call leaves it out (09 A11).</summary>
+/// <summary>What of a call's place a parameter takes where the call leaves it out.</summary>
 public enum CallerPlace
 {
     /// <summary><c>@callerLine</c>: the line the call begins on.</summary>

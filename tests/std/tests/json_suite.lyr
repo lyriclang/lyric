@@ -1,6 +1,6 @@
 // JSONTestSuite (Nicolas Seriot, MIT; `fixtures/json/LICENSE`): every parsing case of the suite
 // through `json.parse` — a `y_` file parses, an `n_` file is refused, an `i_` file goes either
-// way without a panic (12 §JSON rule 2; the review of M10, M16). The suite's counts: 95, 188, 35.
+// way without a panic (spec 12 §JSON rule 2). The suite's counts: 95, 188, 35.
 import std.collections { List };
 import std.core { Utf8Error };
 import std.fs;

@@ -47,7 +47,7 @@ public sealed class SemaRules
                 CheckDecl(decl);
                 CheckNeverPositions(decl, null);
             }
-        // The bodies parsed again — a round per field, a default per conformer (M9a S9, S10):
+        // The bodies parsed again — a round per field, a default per conformer:
         // 'e.[f]' is a member there, and a write through it answers to the field's word and the
         // function's 'mut' as any member write does.
         foreach (var root in _types.ReparsedRoots)
@@ -65,7 +65,7 @@ public sealed class SemaRules
     // --- the surface rule ---
 
     /// <summary>
-    /// A declaration is no more visible than the types it names (design/v5/spec/07 V2 S2, in
+    /// A declaration is no more visible than the types it names (in
     /// Swift's general form): a <c>pub fn</c> whose result is an <c>internal</c> type hands out what
     /// no other package can name, an <c>internal</c> one taking a <c>private</c> type does the same
     /// inside its package (<c>LYR-SEM0151</c>). Read are the signatures — parameters, result,
@@ -89,7 +89,7 @@ public sealed class SemaRules
                         BindingType(g.Binding, gs, gs.Visibility);
                         break;
                     case TypeAliasDecl a when module.Members.LookupLocal(a.Name) is TypeSymbol alias:
-                        // 'opaque type' is no form of Lyric 5 (03 T15; N1a: it was taken in silence)
+                        // 'opaque type' is no form of Lyric 5
                         if (a.IsOpaque)
                             _de.Report("LYR-SEM0175", Severity.Error, a.Span,
                                 $"'opaque type' is no form of Lyric 5 — a struct of one field has the layout of its field: 'struct {a.Name} {{ value: … }}'");
@@ -242,7 +242,7 @@ public sealed class SemaRules
     };
 
     /// <summary>
-    /// <c>never</c> stands only as a return type (design/v5/spec/05 E12): the whole return type of a
+    /// <c>never</c> stands only as a return type: the whole return type of a
     /// function, a lambda or a function type. Anywhere else — a parameter, a binding, a field, an
     /// element, an optional, a thrown set, an alias — it would type a value that cannot exist
     /// (<c>LYR-SEM0145</c>); three of those positions crashed the compiler before. A type argument
@@ -258,8 +258,8 @@ public sealed class SemaRules
     }
 
     /// <summary>A written type argument — of a type, a call, a struct literal, a type path — or a
-    /// type parameter's default (<c>E :: [Error] = never</c>, M8c S20): the empty set where the
-    /// parameter's bound is <c>Error</c> (design/v5/spec/05 "Review 2026-10-09" S5; M8c S17,
+    /// type parameter's default (<c>E :: [Error] = never</c>): the empty set where the
+    /// parameter's bound is <c>Error</c> (as in
     /// <c>DedupIter&lt;I, never&gt;</c>), which the checker asks, knowing the parameter.</summary>
     private static bool IsTypeArgument(TypeNode type, Node? parent) => parent switch
     {
@@ -274,7 +274,7 @@ public sealed class SemaRules
 
     /// <summary>An associated type's answer, written or fixed — <c>type Error = never</c>,
     /// <c>Iterator&lt;Error = never&gt;</c>: an empty thrown set where the member's bound is
-    /// <c>Error</c> (05 E2 K4), which the checker asks, knowing the member.</summary>
+    /// <c>Error</c>, which the checker asks, knowing the member.</summary>
     private static bool AnswersAnAssociatedType(TypeNode type, Node? parent)
     {
         if (parent is AssociatedTypeDecl decl) return ReferenceEquals(decl.Type, type);
@@ -313,7 +313,7 @@ public sealed class SemaRules
                 break;
             case InterfaceDecl i: foreach (var m in i.Members) { CheckSignature(m, true); RunBody(m); } break;
             case ExtendDecl x: foreach (var m in x.Methods) { CheckSignature(m, true); RunBody(m); } break;
-            // A generic alias is Lyric 5's (03 T15); the 4.x grammar the shared parser also serves has none.
+            // A generic alias is Lyric 5's; the 4.x grammar the shared parser also serves has none.
             case TypeAliasDecl { Generics: [var first, ..] } a when !_comp.Lyric5Modules:
                 _de.Report("LYR-SEM0177", Severity.Error, first.Span,
                     $"the type alias '{a.Name}' takes no type parameters — a generic alias is a form of Lyric 5");
@@ -329,7 +329,7 @@ public sealed class SemaRules
     }
 
     /// <summary>
-    /// A <c>mut fn</c> needs something to write (design/v5/spec/02 M4): a <c>var</c> field of
+    /// A <c>mut fn</c> needs something to write: a <c>var</c> field of
     /// its type, or <c>this</c> as a whole. On a type that has neither, the word promises a
     /// write that cannot happen — and costs its callers a <c>var</c> root for nothing.
     ///
@@ -341,7 +341,7 @@ public sealed class SemaRules
     /// <para>Asked of VALUES only, a struct and an enum. On a class the word costs a caller
     /// nothing (a reference is always a place), and a class without a <c>var</c> field changes
     /// all the same when it holds a <c>let</c> reference to an object that does — a stack over
-    /// a list says <c>mut fn pop</c> and means it. Whether M4 wants that refused is the
+    /// a list says <c>mut fn pop</c> and means it. Whether that should be refused is the
     /// maintainer's question; until it is answered, a class is not asked.</para>
     /// </summary>
     private void CheckMutHasATarget(string owner, TypeNode[] interfaces, IEnumerable<Decl> members)
@@ -388,7 +388,7 @@ public sealed class SemaRules
         for (var i = 0; i < ps.Length; i++)
             if (ps[i].IsParams)
             {
-                // Lyric 5 writes the variadic parameter 'nums: int...' (design/v5/spec/08, 12 S01);
+                // Lyric 5 writes the variadic parameter 'nums: int...';
                 // 'params' is Lyric 4's word.
                 if (_comp.Lyric5Modules && !ps[i].IsEllipsis)
                     _de.Report("LYR-SEM0024", Severity.Error, ps[i].Span,
@@ -404,7 +404,7 @@ public sealed class SemaRules
                         $"{what} takes no default — a call without its arguments passes the empty array");
             }
 
-        // A default may stand at any position (design/v5/spec/04 D5 F3): a call names what follows
+        // A default may stand at any position: a call names what follows
         // it. Lyric 4's LYR-SEM0025, "required parameter after a default parameter", is gone.
     }
 
@@ -412,7 +412,7 @@ public sealed class SemaRules
 
     private void CheckMain()
     {
-        // Lyric 5: the entry module's 'main' alone has a contract (07 M7a); a library checked as a
+        // Lyric 5: the entry module's 'main' alone has a contract; a library checked as a
         // workspace has no entry, and its 'main's are ordinary functions.
         if (_comp.Lyric5Modules)
         {
@@ -440,7 +440,7 @@ public sealed class SemaRules
     }
 
     /// <summary>
-    /// Lyric 5's entry (design/v5/spec/07 M7a, M7b; 08 D18): the program starts at the <c>main</c> of
+    /// Lyric 5's entry: the program starts at the <c>main</c> of
     /// its entry module, which is <c>fn main(): void</c> or <c>fn main(): int</c>, may declare
     /// <c>throws</c>, and takes no parameters — the arguments come from the standard library. A
     /// <c>main</c> in any other module is an ordinary function: a module may be a library and a
@@ -468,9 +468,9 @@ public sealed class SemaRules
             _de.Report("LYR-SEM0021", Severity.Error, mains[i].Span, "duplicate 'main' function");
     }
 
-    /// <summary>The entry contract (design/v5/spec/08 D18): <c>fn main(): void | int</c>, with or
+    /// <summary>The entry contract: <c>fn main(): void | int</c>, with or
     /// without <c>args: string[]</c>, and it may declare <c>throws</c> — an error that escapes is
-    /// reported with its message and causes, and the process exits with 1 (05 E6 O4).</summary>
+    /// reported with its message and causes, and the process exits with 1.</summary>
     private static bool ValidMain(FunctionDecl fn)
     {
         if (fn.ReturnType is not null && !IsNamed(fn.ReturnType, "int") && !IsNamed(fn.ReturnType, "void")) return false;
@@ -581,7 +581,7 @@ public sealed class SemaRules
         CheckClauses(tr.Catches);
     }
 
-    /// <summary>The rules of a clause list, the block's or the expression's (05 E9).</summary>
+    /// <summary>The rules of a clause list, the block's or the expression's.</summary>
     private void CheckClauses(CatchClause[] catches)
     {
         for (var i = 0; i < catches.Length - 1; i++)
@@ -592,7 +592,7 @@ public sealed class SemaRules
 
     private void CheckExprStmt(ExprStmt es)
     {
-        // 'try f();' is the call it marks (05 E4).
+        // 'try f();' is the call it marks.
         var ok = TypeChecker.Unmarked(es.Expr) is CallExpr or AssignExpr or ThrowExpr or LoopExpr
             or PostfixExpr { Operator: PostfixOp.Inc or PostfixOp.Dec }
             or UnaryExpr { Operator: UnaryOp.PreInc or UnaryOp.PreDec } or ErrorExpr;
@@ -613,7 +613,7 @@ public sealed class SemaRules
                 return;
 
             // A 'mut fn' writes its receiver, so the receiver is a place that is written: the
-            // same rule as an assignment into it (design/v5/spec/02 M4).
+            // same rule as an assignment into it.
             // 'Counter.bump(c)' IS the member call 'c.bump()' (05 §4), which the sema stored for
             // it: the receiver it writes is the first argument. Read as it is written, the call
             // had an argument and no receiver, and a 'let' was written through it.
@@ -650,7 +650,7 @@ public sealed class SemaRules
             // to the lowering, which has no diagnostic for it and threw.
             case LambdaExpr lambda:
             {
-                // Its own loops only (08 Y11 F5): a label around the lambda is out of its reach.
+                // Its own loops only: a label around the lambda is out of its reach.
                 var outer = _labels.ToList();
                 _labels.Clear();
                 if (lambda.Body is Block block) WalkStmt(block);
@@ -676,7 +676,7 @@ public sealed class SemaRules
                 }
                 return;
 
-            // The clauses of a 'try' expression (05 E4): their bodies are blocks, which 'Children'
+            // The clauses of a 'try' expression: their bodies are blocks, which 'Children'
             // cannot carry either, and the clause rules are the statement's.
             case TryExpr { Catches.Length: > 0 } tried:
                 CheckClauses(tried.Catches);
@@ -708,8 +708,8 @@ public sealed class SemaRules
 
     /// <summary>
     /// <c>x[k] = v</c>, <c>x[k] op= v</c> and <c>x[k]++</c> on a type's own index are
-    /// <c>x.setIndex(k, …)</c> (04 D6), the call the sema stored on the node: a <c>mut fn</c>
-    /// writes its receiver, by the rule of the call written out (M4). Read as it is written, the
+    /// <c>x.setIndex(k, …)</c>, the call the sema stored on the node: a <c>mut fn</c>
+    /// writes its receiver, by the rule of the call written out. Read as it is written, the
     /// node had a target and no receiver — and a <c>let</c> struct was written through
     /// <c>r[0] = 9</c>, where <c>r.setIndex(0, 9)</c> was refused.
     /// </summary>
@@ -735,7 +735,7 @@ public sealed class SemaRules
 
     /// <summary>
     /// Whether an expression names a place that may be written, as the reason it may not —
-    /// <c>null</c> when it may (design/v5/spec/02 M2, M3, M4, M9).
+    /// <c>null</c> when it may.
     ///
     /// <para>ONE RULE FOR STRUCTS AND CLASSES: a field is written only when it is declared
     /// <c>var</c>, and only through a root that may be written. The root of <c>a.b[i].c</c> is
@@ -751,7 +751,7 @@ public sealed class SemaRules
     /// </summary>
     private string? WhyNotWritable(Expr expr)
     {
-        // 'e.[f]' (M9a S9) is the member it stands for in its round; in the body checked once,
+        // 'e.[f]' is the member it stands for in its round; in the body checked once,
         // where the field is no one's yet, nothing can be said
         if (expr is FieldByInfoExpr byInfo)
         {
@@ -770,7 +770,7 @@ public sealed class SemaRules
                     ParameterSymbol { IsPlace: true } => null,
                     ParameterSymbol => $"'{id.Name}' is a parameter, and a parameter is a 'let' binding; copy it into a 'var' to change it",
                     LocalSymbol => $"'{id.Name}' is bound with 'let'; declare it 'var' to write it",
-                    // A module-level 'var' is written (07 V5 G5); a module-level 'let' is not.
+                    // A module-level 'var' is written; a module-level 'let' is not.
                     GlobalSymbol { Declaration: GlobalBindingDecl { Binding.IsMutable: true } } => null,
                     GlobalSymbol { Declaration: GlobalBindingDecl } => $"'{id.Name}' is a module-level 'let'; declare it 'var' to write it",
                     GlobalSymbol => $"'{id.Name}' is a 'static let', a constant",
@@ -780,7 +780,7 @@ public sealed class SemaRules
             case ThisExpr:
                 // 'this = value' replaces a VALUE as a whole, a struct or an enum. Anything else
                 // is the reference (or the scalar copy) the caller handed in, and is not rebound.
-                // A receiver of a type parameter's type (an extension over a constraint, M10 S1:
+                // A receiver of a type parameter's type (an extension over a constraint,
                 // 'extend<E :: [Encoder]> E') is a place where the method is 'mut' — '&this'
                 // hands it on, as '&h' hands a hasher on.
                 if (_types.TypeOf(expr) is not TypeParamType
@@ -788,7 +788,7 @@ public sealed class SemaRules
                     return "'this' is replaced as a whole only in a 'mut fn' of a struct or an enum";
                 return _thisMut ? null : NotMutReason;
 
-            // '?.' reads; it does not assign (design/v5/spec/03 T4 O4). What a write through a
+            // '?.' reads; it does not assign. What a write through a
             // chain that may be absent would mean — skip it, or fail — is a door, not a rule.
             case MemberExpr { IsOptional: true }:
                 return "'?.' reads a value that may be absent and does not assign through it; narrow first";
@@ -822,14 +822,14 @@ public sealed class SemaRules
                 return WhyNotAPlace(m.Target);
             }
 
-            // An element of an inline array is written where the array lies (A4): through a
+            // An element of an inline array is written where the array lies: through a
             // 'var' local, a 'var' field of a place, an element of an array — as a struct field is.
             case IndexExpr ix when _types.TypeOf(ix.Target) is InlineArrayOf:
                 return WhyNotAPlace(ix.Target);
 
             // An element is writable as soon as the container is a REFERENCE, exactly like a class
             // field. A 'let' pins the name, not the object behind it.
-            // A type's own index (04 D6): the checker desugared it and asked IndexSet of a write.
+            // A type's own index: the checker desugared it and asked IndexSet of a write.
             case IndexExpr ix when _types.OperatorCallOf(ix) is not null:
                 return null;
             case IndexExpr ix:
@@ -862,7 +862,7 @@ public sealed class SemaRules
     /// names it is: a <c>var</c> binding, <c>this</c> in a <c>mut fn</c>, a <c>var</c> field
     /// of a place, an array element. Anything else is a temporary — the result of a call, an
     /// element a container's <c>get</c> handed out — and writing into it would change a copy
-    /// nobody reads (M4): refused, never copied in silence.</para>
+    /// nobody reads: refused, never copied in silence.</para>
     /// </summary>
     private string? WhyNotAPlace(Expr expr)
     {
@@ -886,8 +886,8 @@ public sealed class SemaRules
             case IdentifierExpr or MemberExpr:
                 return WhyNotWritable(expr);
             case IndexExpr ix when _types.TypeOf(ix.Target) is ArrayOf or SliceOf or ErrorType:
-                return null; // an array element is a place in the array's block, through a view too (A2)
-            // An element of an inline array lies in the value that holds it (A4): a place when
+                return null; // an array element is a place in the array's block, through a view too
+            // An element of an inline array lies in the value that holds it: a place when
             // that value is one, like a field of a struct.
             case IndexExpr ix when _types.TypeOf(ix.Target) is InlineArrayOf:
                 return WhyNotAPlace(ix.Target);
@@ -899,7 +899,7 @@ public sealed class SemaRules
     }
 
     /// <summary>
-    /// A call of a <c>mut fn</c> writes its receiver (M4): the receiver has to be a place, by
+    /// A call of a <c>mut fn</c> writes its receiver: the receiver has to be a place, by
     /// the rule a field write follows. Transitively, too — a method that is not <c>mut</c>
     /// may not call a <c>mut fn</c> on <c>this</c>, or the word would promise nothing.
     /// </summary>

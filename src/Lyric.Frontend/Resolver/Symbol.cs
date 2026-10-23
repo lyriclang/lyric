@@ -7,7 +7,7 @@ namespace Lyric.Resolver;
 // rather than records.
 
 /// <summary>
-/// Who may name a declaration (design/v5/spec/07 V2): its module, its package, everyone. What a
+/// Who may name a declaration: its module, its package, everyone. What a
 /// declaration without a word gets is the reader's rule — <see cref="Internal"/> in Lyric 5,
 /// <see cref="Private"/> for the 4.x tools, whose unmarked names were their module's.
 /// </summary>
@@ -64,7 +64,7 @@ public sealed class TypeSymbol : Symbol
     public SymbolTable Members { get; } // fields, methods and enum variants; empty for a builtin or an alias
     public GenericParamSymbol[] Generics { get; set; } = []; // the type parameters, set after the declaration
 
-    /// <summary>An interface's <c>Self</c> (design/v5/spec/03 T5): the conforming type, as a type
+    /// <summary>An interface's <c>Self</c>: the conforming type, as a type
     /// parameter of its own — bound to the implementer at a conformance, to the type parameter
     /// at a constraint. <c>null</c> for every other kind of type, whose <c>Self</c> is itself.</summary>
     public GenericParamSymbol? SelfParam { get; init; }
@@ -87,7 +87,7 @@ public sealed class FunctionSymbol : Symbol
     /// Always <c>false</c> for a free function.</summary>
     public bool IsStatic { get; }
 
-    /// <summary>A <c>macro</c> (13 M9b P3): expanded at its sites by the interpreter, never called
+    /// <summary>A <c>macro</c>: expanded at its sites by the interpreter, never called
     /// by the program and never a value.</summary>
     public bool IsMacro { get; init; }
 
@@ -107,7 +107,7 @@ public sealed class FunctionSymbol : Symbol
 /// TypeNodes; the sema resolves them.</summary>
 public sealed class GenericParamSymbol : Symbol
 {
-    /// <summary>The interface whose <c>Self</c> this is (03 T5), <c>null</c> for an ordinary
+    /// <summary>The interface whose <c>Self</c> this is, <c>null</c> for an ordinary
     /// type parameter.</summary>
     public TypeSymbol? SelfOf { get; set; }
 
@@ -119,7 +119,7 @@ public sealed class GenericParamSymbol : Symbol
 
 public sealed class FieldSymbol : Symbol
 {
-    /// <summary>The field's word (design/v5/spec/07 V2 S0): a field follows the rule of every
+    /// <summary>The field's word: a field follows the rule of every
     /// member.</summary>
     public Visibility Visibility { get; }
 
@@ -128,7 +128,7 @@ public sealed class FieldSymbol : Symbol
 }
 
 /// <summary>
-/// An associated type (design/v5/spec/03 T6). Declared on an interface, <c>type Item;</c>, it
+/// An associated type. Declared on an interface, <c>type Item;</c>, it
 /// is a question every conformer answers: <see cref="Bindings"/> holds the answer per
 /// conforming type once the checker has read the conformance. Declared on a struct, class,
 /// enum or in a conformance block, <c>type Item = int;</c>, it is one conformer's answer.
@@ -140,7 +140,7 @@ public sealed class AssociatedTypeSymbol : Symbol
     /// <summary>The interface that declares it; <c>null</c> for a conformer's answer.</summary>
     public TypeSymbol? Owner { get; set; }
 
-    // The answers, per conformer and per conformance INSTANCE (04 D6): 'Mul<int>' and
+    // The answers, per conformer and per conformance INSTANCE: 'Mul<int>' and
     // 'Mul<float>' of one type each answer 'Out' for themselves. The instance is the interface
     // at the conformance's arguments with 'Self' as the conformer.
     private readonly Dictionary<TypeSymbol, List<(Sema.LyrType Instance, Sema.LyrType Answer)>> _answers =
@@ -163,14 +163,14 @@ public sealed class AssociatedTypeSymbol : Symbol
         return exact ? null : list[0].Answer;
     }
 
-    /// <summary>What every answer conforms to (design/v5/spec/10 B6): the interfaces of
+    /// <summary>What every answer conforms to: the interfaces of
     /// <c>type Iter :: [Iterator];</c>, resolved in the declaring interface, whose <c>Self</c>
     /// stands for the conformer.</summary>
     public Sema.LyrType[] Bounds { get; set; } = [];
 
     /// <summary>The interface's default answer, <c>type Error :: [Error] = never;</c>, where it names
     /// no <c>Self</c>: what a value of the interface answers when its type leaves the member
-    /// unfixed — <c>Iterator&lt;Item = int&gt;</c> throws nothing (03 M4-1). Set by the checker.</summary>
+    /// unfixed — <c>Iterator&lt;Item = int&gt;</c> throws nothing. Set by the checker.</summary>
     public Sema.LyrType? Default { get; set; }
 
     /// <summary>The answer a blanket or shape block gives a type that has none of its own (05 §13
@@ -214,7 +214,7 @@ public sealed class ImportBindingSymbol : Symbol
         Target = target;
     }
 
-    /// <summary>Bound by a <c>pub import</c> (design/v5/spec/07 V3 I4): visible as a 'pub'
+    /// <summary>Bound by a <c>pub import</c>: visible as a 'pub'
     /// declaration of its module, where every other import is its module's own.</summary>
     public bool Reexported { get; set; }
 }

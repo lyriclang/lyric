@@ -16,17 +16,17 @@ public sealed record NamedType(string[] Path, TypeNode[] TypeArguments, Span Spa
 {
     public required Span NameSpan { get; init; }
 
-    /// <summary>The module a <c>quote</c> wrote this type name in (13 M9b P5), as
+    /// <summary>The module a <c>quote</c> wrote this type name in, as
     /// <see cref="IdentifierExpr.QuotedFrom"/>.</summary>
     public string? QuotedFrom { get; init; }
 
-    /// <summary><c>Iterator&lt;Item = int&gt;</c> (design/v5/spec/03 T6): the associated type an
+    /// <summary><c>Iterator&lt;Item = int&gt;</c>: the associated type an
     /// argument fixes, by argument index, <c>null</c> where the argument is positional; <c>null</c>
     /// as a whole when none is named.</summary>
     public string?[]? ArgumentNames { get; init; }
 }
 /// <summary><c>T[]</c>, the length a property of the value; or <c>T[N]</c> with a literal
-/// length, the inline array — a value of N elements (design/v5/spec/03 T13 A4).</summary>
+/// length, the inline array — a value of N elements.</summary>
 public sealed record ArrayType(TypeNode Element, Span Span) : TypeNode(Span)
 {
     public int? Length { get; init; }
@@ -38,16 +38,16 @@ public sealed record ArrayType(TypeNode Element, Span Span) : TypeNode(Span)
 /// coroutine cannot throw. Only a coroutine type may carry it (<c>LYR-SEM0084</c>): everything else
 /// runs at its call, where the function's own clause already says so.</remarks>
 public sealed record ThrowingType(TypeNode Inner, TypeNode? Thrown, Span Span) : TypeNode(Span);
-/// <summary><c>(A, B)</c>, or with labels <c>(x: A, y: B)</c> (design/v5/spec/03 T16): a label
+/// <summary><c>(A, B)</c>, or with labels <c>(x: A, y: B)</c>: a label
 /// names an element for <c>.x</c> beside <c>.0</c> and is no part of the type's identity.</summary>
 public sealed record TupleType(TypeNode[] Elements, Span Span) : TypeNode(Span)                        // (A, B[, C])
 {
     public string?[]? Labels { get; init; }
 }
-/// <summary><c>fn(A, B) -&gt; R</c>, and with a thrown set <c>fn(A) -&gt; R throws E</c>
-/// (design/v5/spec/03 T17, 05 E2): <see cref="Throws"/> is the TYPE's set, written after its return
+/// <summary><c>fn(A, B) -&gt; R</c>, and with a thrown set <c>fn(A) -&gt; R throws E</c>:
+/// <see cref="Throws"/> is the TYPE's set, written after its return
 /// type. Where that return type could carry the set itself — a function type, a task, a
-/// coroutine — parentheses say whose it is (the review's M5-7, M6-6):
+/// coroutine — parentheses say whose it is:
 /// <c>fn() -&gt; (fn() -&gt; int throws E)</c> returns a throwing function,
 /// <c>fn() -&gt; (fn() -&gt; int) throws E</c> throws itself. Null when the type throws nothing.</summary>
 public sealed record FunctionType(TypeNode[] Parameters, TypeNode ReturnType, Span Span) : TypeNode(Span)
@@ -59,7 +59,7 @@ public sealed record FunctionType(TypeNode[] Parameters, TypeNode ReturnType, Sp
     /// parentheses carry meaning: the <c>throws</c> after them is this type's.</summary>
     public bool ReturnGrouped { get; init; }
 
-    /// <summary><c>fn(&amp;int) -&gt; void</c> (design/v5/spec/03 T12, T17): which parameters take a
+    /// <summary><c>fn(&amp;int) -&gt; void</c>: which parameters take a
     /// place, by position; empty when none does.</summary>
     public bool[] Places { get; init; } = [];
 }
@@ -68,7 +68,7 @@ public sealed record FunctionType(TypeNode[] Parameters, TypeNode ReturnType, Sp
 // The counterpart of ErrorExpr.
 public sealed record ErrorType(Span Span) : TypeNode(Span);
 
-/// <summary><c>T.[f]</c> in a type's place (design/v5/spec/09 A7; the sweep after M10, X5): the type of
+/// <summary><c>T.[f]</c> in a type's place: the type of
 /// the field the variable <c>f</c> of a round over <c>fields&lt;T&gt;()</c> names — <c>Owner</c> the
 /// type the round walks, as <c>e.[f]</c> reads that field of a value.</summary>
 public sealed record FieldTypeByInfo(TypeNode Owner, string Info, Span InfoSpan, Span Span) : TypeNode(Span);

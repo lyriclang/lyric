@@ -34,7 +34,7 @@ internal sealed partial class WarningAnalyzer
     private readonly Dictionary<ModuleSymbol, Deprecation>
         _deprecatedModules = new(ReferenceEqualityComparer.Instance);
 
-    /// <summary>What a <c>@Deprecated</c> says: the message, what a use should become (09 A11),
+    /// <summary>What a <c>@Deprecated</c> says: the message, what a use should become,
     /// and where it stands.</summary>
     private readonly record struct Deprecation(string Message, string Replacement, Span AttributeSpan);
     private readonly List<(FileId File, Span Extent)> _deprecatedExtents = [];
@@ -93,7 +93,7 @@ internal sealed partial class WarningAnalyzer
     }
 
     /// <summary>
-    /// <c>@Deprecated</c> in Lyric 5 (09 A11; 13 M9a P8): a pass of its own, after the compiler
+    /// <c>@Deprecated</c> in Lyric 5: a pass of its own, after the compiler
     /// has computed the attributes' values (11 §1 rule 5) — <paramref name="fieldsOf"/> gives the
     /// string fields of one, by name. <c>until</c> is checked against
     /// <paramref name="toolchain"/>, the version the toolchain claims.
@@ -113,7 +113,7 @@ internal sealed partial class WarningAnalyzer
     private string? _toolchain;
 
     /// <summary>
-    /// A member whose word says more than its type's (design/v5/spec/07 V2 S3): <c>pub x</c> in an
+    /// A member whose word says more than its type's: <c>pub x</c> in an
     /// <c>internal struct</c>. Allowed — it is exported the day the type is — and said once, at
     /// the member, since a reader of the line takes the word at its value.
     /// </summary>
@@ -152,7 +152,7 @@ internal sealed partial class WarningAnalyzer
             }
         }
 
-        // The same of an INHERENT block (S5): a member's own word, or the block's — its members'
+        // The same of an INHERENT block: a member's own word, or the block's — its members'
         // default, said once for all of them — against the type the block extends. A conformance
         // block writes no word (LYR-SEM0150), and a shape has no type to compare with.
         foreach (var block in _comp.Extensions.Blocks)
@@ -191,8 +191,8 @@ internal sealed partial class WarningAnalyzer
     };
 
     /// <summary>
-    /// A name a program declares or imports that hides one of the prelude's (design/v5/spec/07 V3
-    /// I8, V6 K6): legal — the program's own wins in its module —, and said, because a reader of
+    /// A name a program declares or imports that hides one of the prelude's:
+    /// legal — the program's own wins in its module —, and said, because a reader of
     /// 'assert(x)' takes it for the one every module has. The standard library, which declares
     /// them, is not warned.
     /// </summary>
@@ -313,7 +313,7 @@ internal sealed partial class WarningAnalyzer
                     StructDecl s => s.Attributes,
                     ClassDecl c => c.Attributes,
                     EnumDecl e => e.Attributes,
-                    // Lyric 5's (09 T7); the 4.x parser refuses attributes on these
+                    // Lyric 5's; the 4.x parser refuses attributes on these
                     InterfaceDecl i => i.Attributes,
                     TypeAliasDecl a => a.Attributes,
                     GlobalBindingDecl g => g.Attributes,
@@ -435,7 +435,7 @@ internal sealed partial class WarningAnalyzer
         }
     }
 
-    /// <summary>Where the attribute stands, and what to write instead where it says (09 A11).</summary>
+    /// <summary>Where the attribute stands, and what to write instead where it says.</summary>
     private static DiagnosticNote[] Notes(Deprecation info, Node? use = null)
     {
         if (info.Replacement.Length == 0) return [new DiagnosticNote(info.AttributeSpan, "declared deprecated here")];
@@ -518,10 +518,10 @@ internal sealed partial class WarningAnalyzer
     }
 
     /// <summary>
-    /// A <c>Closeable</c> nobody closes (design/v5/spec/05 E7 R3): one a call makes and an
+    /// A <c>Closeable</c> nobody closes: one a call makes and an
     /// expression statement drops, and one a plain <c>let</c> binds and uses only to call its other
     /// methods — not closed, not <c>using</c>-bound, not stored, returned or passed on. The
-    /// collector catches the rest (01 L1); this catches the usual slip. A binding never used at all
+    /// collector catches the rest; this catches the usual slip. A binding never used at all
     /// is the unused warning's.
     /// </summary>
     private void WarnNeverClosed()
@@ -583,7 +583,7 @@ internal sealed partial class WarningAnalyzer
     }
 
     /// <summary>
-    /// A value <c>@MustUse</c> asks for, dropped (design/v5/spec/09 A11): an expression statement
+    /// A value <c>@MustUse</c> asks for, dropped: an expression statement
     /// whose call is of a function that carries it — <c>std.task.spawn</c>, whose handle is the
     /// only way to the task's error — or gives a value of a type that does — <c>Result</c>. A
     /// <c>void</c> call gives nothing to use; <c>let _ = …</c> drops a value on purpose.
@@ -647,7 +647,7 @@ internal sealed partial class WarningAnalyzer
     /// </summary>
     private void HintNeverReassigned()
     {
-        // what was parsed again (M9a S9) is read at the declaration it repeats
+        // what was parsed again is read at the declaration it repeats
         var reparsed = new HashSet<Node>(ReferenceEqualityComparer.Instance);
         void Collect(Node node)
         {
@@ -824,7 +824,7 @@ internal sealed partial class WarningAnalyzer
     // blocks of their own — lambdas and match expressions.
 
     /// <summary>
-    /// A <c>void</c> under a name (03 M6-5): written, the type is allowed — it has one value, and
+    /// A <c>void</c> under a name: written, the type is allowed — it has one value, and
     /// <c>?void</c>, <c>void[]</c> and <c>T = void</c> need it —, but a binding that holds it and a
     /// parameter that takes it say nothing. A warning; in generic code, where a <c>T</c> happens
     /// to be <c>void</c>, there is none — the binding is a <c>T</c>.
@@ -851,7 +851,7 @@ internal sealed partial class WarningAnalyzer
     }
 
     /// <summary>
-    /// A <c>mut fn</c> generator on a value type (06 M6-1): a generator holds its receiver as a
+    /// A <c>mut fn</c> generator on a value type: a generator holds its receiver as a
     /// call holds an argument, so a struct or an enum is COPIED into it — what the body writes to
     /// <c>this</c> stays in the copy, and the caller's value is as it was. Allowed, and warned
     /// about where the method is declared.

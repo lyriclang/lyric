@@ -134,7 +134,7 @@ internal sealed class ExtensionTable
         for (; _lowered < _pending.Count; _lowered++)
         {
             var p = _pending[_lowered];
-            // A coroutine in an 'extend' block is factory and body, as a written one is (06 N2).
+            // A coroutine in an 'extend' block is factory and body, as a written one is.
             if (ModuleLowerer.CoroutineReturn(p.Decl) is not null)
             {
                 lowered.AddRange(CoroutineFactory.Split(FunctionLowerer.ForCoroutineBody(p.Decl, $"{p.Name}.<body>",

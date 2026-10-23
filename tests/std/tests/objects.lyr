@@ -1,4 +1,4 @@
-// Containers over objects (M8a S16): a map, a deque and a list whose elements are objects, each
+// Containers over objects: a map, a deque and a list whose elements are objects, each
 // slot its own. Since R9d every map over objects was refused ('[x] * n' over an object in the
 // table's fill, LYR-CG0001) and no test held one.
 import std.collections { Deque, List, Map };

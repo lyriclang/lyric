@@ -13,11 +13,10 @@ namespace Lyric.Ir.Lowering;
 /// made one instance of the two — one layout, one body, the second caller's values in the first
 /// one's shape.</para>
 ///
-/// <para>A declared type is written with its module in front, always (07 K2: "generic instances
-/// carry the full type path"). It was written so only where two modules declared the name, and
-/// then a second <c>Cat</c> anywhere in the program renamed every instance over the first: its
-/// frames in a trace, its unit in the cache, its names in the C. A name that depends on nothing
-/// but the instance is the same in every program that has it.</para>
+/// <para>A declared type is written with its module in front, always: a name that depends on
+/// nothing but the instance is the same in every program that has it, and a second <c>Cat</c>
+/// elsewhere in the program renames nothing of the first's — its frames in a trace, its unit in
+/// the cache, its names in the C.</para>
 /// </summary>
 internal static class InstanceNames
 {

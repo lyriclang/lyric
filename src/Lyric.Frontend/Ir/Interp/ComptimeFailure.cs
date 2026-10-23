@@ -3,7 +3,7 @@ using Lyric.Core;
 namespace Lyric.Ir.Interp;
 
 /// <summary>
-/// Why an evaluation stopped without a value (design/v5/spec/09 Q3, Q5, Q6): a panic of the
+/// Why an evaluation stopped without a value: a panic of the
 /// program — with the code the run would have ended with —, the budget spent, a call into the
 /// world, or a form the interpreter does not run yet. <see cref="Trace"/> is the interpreter's
 /// stack where it stopped, innermost first, which the diagnostic shows as the inner backtrace.
@@ -36,7 +36,7 @@ public sealed class ComptimeFailure : Exception
     public static ComptimeFailure Embed(string what) => new("LYR-CT0004", null, what);
     public static ComptimeFailure NotYet(string what) => new("LYR-CT0005", null, what);
 
-    /// <summary>A macro's own error (13 M9b P7): <c>error(at, msg)</c> from its body, the message
+    /// <summary>A macro's own error: <c>error(at, msg)</c> from its body, the message
     /// the macro's and the span the node's it names - <see cref="At"/>, or none where the
     /// macro named a place the program does not hold.</summary>
     public static ComptimeFailure Macro(Span at, string message) => new("LYR-MAC0001", null, message) { At = at };

@@ -1,4 +1,4 @@
-// The network's addresses (design/v5/spec/10 O7; M8b S10b): IpAddr and SocketAddr read and written
+// The network's addresses: IpAddr and SocketAddr read and written
 // — version 4 dotted, version 6 as RFC 4291 reads it and RFC 5952 writes it —, and what neither
 // takes. No socket here: the addresses are the same on every platform.
 import std.core { ParseError };

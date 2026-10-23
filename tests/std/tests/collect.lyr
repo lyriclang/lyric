@@ -1,4 +1,4 @@
-// collect() and FromIterator (design/v5/spec/10 B6, I4; spec 12 §Iteration): the expected type
+// collect() and FromIterator (spec 12 §Iteration): the expected type
 // built from an iterator's values, in their order, throwing what the iterator throws.
 import std.collections { Deque, Heap, List, Map, Set };
 import std.test { assertEq, assertTrue };

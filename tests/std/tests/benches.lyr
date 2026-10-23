@@ -1,4 +1,4 @@
-// The standard library's benchmarks (10 X4; M8c S12b): `lyric5 bench -C tests/std` runs them, in
+// The standard library's benchmarks: `lyric5 bench -C tests/std` runs them, in
 // the release profile. Each is small — a thousand of a thing, or a page of bytes —, so a run is
 // measured often in a tenth of a second; blackBox keeps what the body computes.
 import std.core { blackBox };

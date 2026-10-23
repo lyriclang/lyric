@@ -58,7 +58,7 @@ public static class ModuleLowerer
 
     /// <summary>A pass-1 function's substitution: none — but an interface's member, whose 'Self'
     /// is the interface here: the default as a value of the interface reaches it, through the
-    /// table (04 D9). Its instances per conformer bind 'Self' to the conformer.</summary>
+    /// table. Its instances per conformer bind 'Self' to the conformer.</summary>
     private static Dictionary<GenericParamSymbol, LyrType> SelfSubstitution(TypeSymbol? receiver) =>
         receiver is { Kind: TypeSymbolKind.Interface, SelfParam: { } self }
             ? new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance) { [self] = new NamedRef(receiver) }
@@ -124,7 +124,7 @@ public static class ModuleLowerer
         // Receiver == null means a free function or a 'static fn'. Otherwise the type whose instance is
         // passed as parameter 0.
         var pending = new List<(FunctionDecl Decl, string Name, TypeSymbol? Receiver, TypeNode? ExtendTarget)>();
-        var macroRoots = new List<FunctionId>(); // the macros of an expansion round (13 M9b P6)
+        var macroRoots = new List<FunctionId>(); // the macros of an expansion round
         var ids = new Dictionary<FunctionSymbol, FunctionId>(ReferenceEqualityComparer.Instance);
         var imports = new ImportTable();
         var typeTable = new TypeTable(binding) { Compilation = compilation, Comptime = comptime };
@@ -135,7 +135,7 @@ public static class ModuleLowerer
 
         // Pass 1: the function table. The order is module order then declaration order and therefore
         // deterministic; FunctionIds land as indices in the bytecode.
-        // what the build leaves out (09 B2) gets no id, no body and no slot
+        // what the build leaves out gets no id, no body and no slot
         bool Built(Decl decl) => comptime?.Inactive is not { } inactive || !inactive.IsInactive(decl);
 
         foreach (var module in compilation.Modules)
@@ -207,7 +207,7 @@ public static class ModuleLowerer
                     continue;
                 }
 
-                // a macro (13 M9b P3, P6) is lowered for its expansion only: in the hoisting pass of
+                // a macro is lowered for its expansion only: in the hoisting pass of
                 // a round, and only when the expander names it; the program never calls one, and
                 // its body reads syntax the gate refuses at run time
                 if (function.IsMacro && !(comptime is { Hoist: true, MacroRoots: { } wanted } && wanted.Contains(symbol))) continue;
@@ -226,7 +226,7 @@ public static class ModuleLowerer
 
                 // The entry contract: exactly one 'main' per executable. The sema checked that it is
                 // unique; here it is only recorded — the entry module's, where the compilation knows
-                // one (design/v5/spec/07 M7a: a 'main' elsewhere is an ordinary function).
+                // one (in Lyric 5 a 'main' elsewhere is an ordinary function).
                 if (function.Name != "main") continue;
                 if (compilation.Entry is { } home && !ReferenceEquals(module, home)) continue;
 
@@ -269,7 +269,7 @@ public static class ModuleLowerer
                 };
                 if (typeName is null || members is null) continue;
                 if (module.Members.LookupLocal(typeName) is not TypeSymbol type) continue;
-                // A constraint-only interface (04 D9) has no table, and its defaults exist only as
+                // A constraint-only interface has no table, and its defaults exist only as
                 // instances per conformer; lowered once with 'Self' the interface, one naming 'Self'
                 // beyond 'this' would not even lower.
                 if (type.Kind == TypeSymbolKind.Interface && types.ValueInterface?.Invoke(type) == false) continue;
@@ -345,7 +345,7 @@ public static class ModuleLowerer
         // exactly what the sites reach, and the capability bits are read off that — so a site
         // that needs no capability evaluates even in a program that, elsewhere, reads files.
         var comptimeReturns = new Dictionary<FunctionDecl, IrType>(ReferenceEqualityComparer.Instance);
-        // The hoisting pass keeps the program's own roots aside (09 D8; M9a S12b): a module
+        // The hoisting pass keeps the program's own roots aside: a module
         // binding's site is evaluated only where the program reaches the binding.
         var realEntry = entry;
         var realRoots = exportRoots.ToList();
@@ -385,7 +385,7 @@ public static class ModuleLowerer
         // missing constructs of their program in one run rather than one per call.
         var functions = new List<IrFunction>(pending.Count);
         var reported = new HashSet<(Span Span, string Message)>();
-        // the files of the modules an expansion round has not expanded yet (13 M9b P6): their
+        // the files of the modules an expansion round has not expanded yet: their
         // bodies hold holes, nobody runs them this round, and each is lowered as a stub that
         // keeps its id and its signature
         var unexpandedFiles = comptime?.Unexpanded?.Select(m => compilation.AstOf(m).Span.File).ToHashSet();
@@ -441,7 +441,7 @@ public static class ModuleLowerer
                 downstreamSeed.Add((globalInit.Value,
                     GlobalInitializer.Build(globals, types, ids, imports, typeTable, lambdas, instances)));
                 // The hoisting pass gives each global an initializer of its own as well, which the
-                // interpreter runs at the global's first access (13 M9a S5); roots, so the pruning
+                // interpreter runs at the global's first access; roots, so the pruning
                 // keeps them.
                 if (comptime is { Hoist: true })
                     foreach (var (global, each) in GlobalInitializer.BuildEach(globals, types, ids, imports, typeTable, lambdas, instances))
@@ -516,7 +516,7 @@ public static class ModuleLowerer
                     lambdas, de, ref failed);
                 if (failed) return null;
 
-                // The forwarders the rows and the calls asked for (04 D1), now that the rows they
+        // The forwarders the rows and the calls asked for, now that the rows they
                 // call into are there; one whose row is not there yet waits for the next pass.
                 var rows = impls;
                 lambdas.BuildForwarders(request => BuildForwarder(request, typeTable, rows, last: false));
@@ -601,9 +601,9 @@ public static class ModuleLowerer
         // Attribute rows AFTER the function lowering and BEFORE the module is assembled: function
         // ids are final here, and the rows may still intern types — an attribute struct nobody
         // constructs, or an attributed type nobody uses, enters the table exactly because the row
-        // references it. Lyric 5 writes none (09 F4; 13 M9a P7): an attribute is a value the
+        // references it. Lyric 5 writes none: an attribute is a value the
         // build evaluates and its readers take from there, and an attributed function is no root
-        // (01 B13) — a test is reached from the program 'lyric test' writes, a benchmark from
+        // — a test is reached from the program 'lyric test' writes, a benchmark from
         // 'lyric bench''s.
         var attributes = compilation.Lyric5Modules ? [] : CollectAttributes(compilation, types, ids, typeTable);
 
@@ -619,10 +619,10 @@ public static class ModuleLowerer
         };
         if (failed) return null;
 
-        // main is a task where the program waits (06 T6): when what it reaches asks for its
+        // main is a task where the program waits: when what it reaches asks for its
         // thread's scheduler, std.task's loop runs main's context. A program that never waits runs
-        // main on the thread's own stack, and cannot tell. Asking whether one runs is no wait
-        // (M6-26, 13 M8b P3): what runs only where std.task's schedulerRuns says yes — a file's
+        // main on the thread's own stack, and cannot tell. Asking whether one runs is no wait:
+        // what runs only where std.task's schedulerRuns says yes — a file's
         // call parked on the I/O pool — does not count.
         if (entry is not null
             && compilation.FindModule(["std", "task"])?.Members.LookupLocal("runMain") is FunctionSymbol loop
@@ -641,12 +641,12 @@ public static class ModuleLowerer
         // for this reason.
         if (verifies) Timed(timings, () => IrVerifier.VerifyOrThrow(result, "after the lowering"));
 
-        // A program that never sets a scheduler answers no wherever it asks whether one runs
-        // (M6-26, 13 M8b P3): what only the yes would run — the I/O pool's park — goes before the
-        // global pruning, so the pool's bindings can go with it. A program's only.
+        // A program that never sets a scheduler answers no wherever it asks whether one runs:
+        // what only the yes would run — the I/O pool's park — goes before the global pruning, so
+        // the pool's bindings can go with it. A program's only.
         var narrowed = entry is not null && SchedulerFree.Run(result);
 
-        // 01 B13: a module binding nothing reads, whose initializer only gives its value, goes —
+        // A module binding nothing reads, whose initializer only gives its value, goes —
         // here, while the init function is as the lowering wrote it, so its ranges hold. A program's
         // only: a library keeps what it declares.
         var prunedGlobals = entry is not null && GlobalPruning.Run(result, globals.InitRanges);
@@ -671,8 +671,8 @@ public static class ModuleLowerer
             }
         }
 
-        // A module binding's site is evaluated where the program reaches the binding (09 D8; M9a
-        // S12b): from the program's own roots and the sites outside bindings, the globals touched,
+        // A module binding's site is evaluated where the program reaches the binding:
+        // from the program's own roots and the sites outside bindings, the globals touched,
         // each one's own initializer walked in turn - a table built of another. The sites of the
         // rest are left out of the evaluation, their initializers out of the roots, and the real
         // pass lowers them as the expressions they hold, which the pruning drops with the global.
@@ -714,7 +714,7 @@ public static class ModuleLowerer
         // cover up — a malformed body nobody calls — the first verification has already seen.
         Reachability.Prune(result);
 
-        // 'embed' reads its file while the program compiles (09 Q4): what a 'comptime' site
+        // 'embed' reads its file while the program compiles: what a 'comptime' site
         // reaches may call it, what the program runs never does. Asked of the pruned module — a
         // function only a site called was lowered all the same, and is gone now.
         if (comptime is not { Hoist: true } && entry is not null
@@ -877,9 +877,9 @@ public static class ModuleLowerer
     /// <summary>
     /// A type in a native's signature: what a host binds by layout — a primitive, an optional, a
     /// host type, an array of primitives — as <see cref="DeclaredTypes"/> has it. Beyond that, for
-    /// the standard library's own natives only, what the runtime holds without knowing a layout
-    /// (design/v5/spec/06 N6 S1, 13 §1.6): a reference — an object, a coroutine — or a function
-    /// value, whose two words the runtime's ABI fixes (01 V8). An 'extern' keeps the host's set.
+    /// the standard library's own natives only, what the runtime holds without knowing a layout:
+    /// a reference — an object, a coroutine — or a function value, whose two words the runtime's
+    /// ABI fixes. An 'extern' keeps the host's set.
     /// </summary>
     private static IrType NativeType(TypeNode? node, Func<TypeNode, string?> host, TypeTable typeTable,
         FunctionDecl function)
@@ -1158,8 +1158,8 @@ public static class ModuleLowerer
     /// <para>Sorted deterministically: the rows land as a section in the bytecode, and the same input
     /// has to give byte-identical output. The enumeration order of a dictionary does not do that.</para>
     /// </summary>
-    /// <summary>The instance of a default set in place for <paramref name="type"/> (09 A5, A7; M9a
-    /// S9) that fills its row, or none.</summary>
+    /// <summary>The instance of a default set in place for <paramref name="type"/> that fills
+    /// its row, or none.</summary>
     private static FunctionId? ExpandedDefault(TypeSymbol type, LyrType conformer, TypeSymbol iface, string slot,
         TypeResult types, BindingResult binding, InstanceTable instances)
     {
@@ -1190,14 +1190,14 @@ public static class ModuleLowerer
                 // Conformance may be declared OR come from an 'extend T :: [I]'. The vtable row is the
                 // same; which of the two established it is no longer distinguishable at runtime.
                 var viaExtension = ExtendBlocksFor(compilation, type, iface, binding);
-                // A GENERIC block gives the conformance where the sema proved it for this instance
-                // (03 T7 X1): its constraints may hold for one instance and not for another.
+                // A GENERIC block gives the conformance where the sema proved it for this
+                // instance: its constraints may hold for one instance and not for another.
                 var ofInstance = typeTable.InstanceOf(typeId);
                 viaExtension = viaExtension
                     .Where(b => b.Decl.Target is not NamedType { TypeArguments.Length: > 0 }
                                 || (ofInstance is not null && types.BlockConformanceRecorded(ofInstance, iface, b)))
                     .ToList();
-                // 'Any' (03 T10) is conformed to by every struct, class and enum, undeclared:
+                // 'Any' is conformed to by every struct, class and enum, undeclared:
                 // its row is the descriptor alone.
                 var isAny = ReferenceEquals(iface, compilation.FindModule(["std", "core"])?.Members.LookupLocal("Any"));
                 if (!isAny && !Conformance.Implements(type, iface, binding) && viaExtension.Count == 0)
@@ -1277,7 +1277,7 @@ public static class ModuleLowerer
                                  ?? ResolveInInstance(typeTable, typeId, slots[i], instances)
                                  ?? (ownDeclares ? Resolve(type, slots[i], ids) : null)
                                  ?? ResolveInExtensions(viaExtension, slots[i], extensions, typeTable, typeId, instances)
-                                 // a default set in place for this type (M9a S9): its own instance —
+                                 // a default set in place for this type: its own instance —
                                  // the interface's one walks no one's fields
                                  ?? ExpandedDefault(type, typeTable.InstanceOf(typeId) ?? (LyrType)new NamedRef(type), iface,
                                      slots[i], types, binding, instances)
@@ -1292,7 +1292,7 @@ public static class ModuleLowerer
                                  ?? ResolveInInstance(typeTable, ifaceId, slots[i], instances);
                     if (target is { } id) { methods[i] = id; continue; }
 
-                    // Delegated (04 D1): the slot forwards to the field — the type's own members and
+                    // Delegated: the slot forwards to the field — the type's own members and
                     // the interface's defaults came first above, as the rule says.
                     if (types.DelegationOf(type, iface) is { } field)
                     {
@@ -1315,10 +1315,10 @@ public static class ModuleLowerer
             }
         }
 
-        // A built-in's box (01 V7; M8c S8b): a row for each interface a block on the built-in
+        // A built-in's box: a row for each interface a block on the built-in
         // names, or reaches as a parent — 'extend int :: [Display]' —, the slot's method from any
         // block on it, else the interface's default: 'showTo' left to 'Display'. And 'Any', which
-        // every built-in is undeclared (05 §9 rule 1): its row is the descriptor alone.
+        // every built-in is undeclared: its row is the descriptor alone.
         var any = compilation.FindModule(["std", "core"])?.Members.LookupLocal("Any");
         foreach (var (builtin, _, boxId) in typeTable.BuiltinBoxes)
         {
@@ -1396,10 +1396,10 @@ public static class ModuleLowerer
                 }
         }
 
-        // A value of an interface with its associated types fixed (03 M4-1): a row for each type
+        // A value of an interface with its associated types fixed: a row for each type
         // that conforms and answers as the value is written — 'SliceIter<int>' for 'Iterator<Item =
         // int>', no 'SliceIter<string>' —, a slot from the type's members, else the interface's
-        // default for the type, whose 'this' is the type's value (04 D9).
+        // default for the type, whose 'this' is the type's value.
         foreach (var (fixedType, fixedId) in typeTable.FixedInterfaces)
         {
             var iface = fixedType.Definition;
@@ -1439,7 +1439,7 @@ public static class ModuleLowerer
     }
 
     /// <summary>Whether a type answers every associated type of a fixed interface value as the
-    /// value does (03 M4-1): the fixed ones as written, the others as the interface's default —
+    /// value does: the fixed ones as written, the others as the interface's default —
     /// a throwing iterator is no value of an <c>Iterator&lt;Item = string&gt;</c>, whose
     /// <c>Error</c> is <c>never</c>.</summary>
     private static bool AnswersAsTheValue(LyrType concrete, GenericInstance fixedType, BindingResult binding) =>
@@ -1448,7 +1448,7 @@ public static class ModuleLowerer
             .All(member => LyrType.Equal(TypeChecker.ResolveAssociated(concrete, member),
                                          TypeChecker.ResolveAssociated(fixedType, member)));
 
-    /// <summary>The interface's default of a slot for one conformer (04 D9): an instance whose
+    /// <summary>The interface's default of a slot for one conformer: an instance whose
     /// 'Self' is the conformer — what a fixed value's row holds where the type leaves it.</summary>
     private static FunctionId? DefaultFor(TypeSymbol iface, string slot, LyrType conformer,
         InstanceTable instances, BindingResult binding)
@@ -1461,7 +1461,7 @@ public static class ModuleLowerer
 
     /// <summary>
     /// Is this a coroutine function, and of which type? It stands there syntactically:
-    /// <c>Coroutine&lt;Y, R&gt;</c> is a built-in type rather than a library class (08 D11).
+    /// <c>Coroutine&lt;Y, R&gt;</c> is a built-in type rather than a library class.
     /// </summary>
     internal static NamedType? CoroutineReturn(FunctionDecl decl) =>
         decl.ReturnType is NamedType { TypeArguments.Length: 1 or 2 } named && CoroutineShape.IsCoroutine(decl)
@@ -1525,7 +1525,7 @@ public static class ModuleLowerer
     }
 
     /// <summary>
-    /// The forwarder of one delegated slot (04 D1): <c>fn walk(d) { this.legs.walk(d); }</c> as IR
+    /// The forwarder of one delegated slot: <c>fn walk(d) { this.legs.walk(d); }</c> as IR
     /// — the receiver, the field where it lies, and the call of the field type's own function for
     /// the slot: the one its row of the interface holds. A field that holds an interface value
     /// is called through that value's table. The receiver of a struct or an enum is the caller's
@@ -1632,8 +1632,8 @@ public static class ModuleLowerer
         if (direct is { } own) b.Emit(new Call(result, own, args, default));
         else b.Emit(new CallVirt(result, ifaceId, slot, args, returnType, default));
 
-        // The slot's member throws (05 E2): the forwarder does, as the function written by hand
-        // would — the error its call set goes on through the caller's slot (01 L5 E1), the value
+        // The slot's member throws: the forwarder does, as the function written by hand
+        // would — the error its call set goes on through the caller's slot, the value
         // on to the return. Built as a function that throws nothing, it had no slot to pass the
         // error through: the error was dropped, and the call answered a zero.
         var slotThrows = typeTable.Defs[ifaceId.Value].SlotThrows;
@@ -1722,7 +1722,7 @@ public static class ModuleLowerer
             if (symbol.Declaration is not FunctionDecl decl || decl.Body is null) continue;
             if (block.Target is not { } target) continue;
 
-            // A generic block's method for THIS instance (03 T7 X1): the block's parameters as the
+            // A generic block's method for THIS instance: the block's parameters as the
             // instance binds them.
             if (block.Generics.Length > 0)
             {

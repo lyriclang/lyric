@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace Lyric.Ir.Interp;
 
 /// <summary>
-/// What a build is for and as (design/v5/spec/09 A6 B4, Q7; 13 M9a P9): the target's system, its
+/// What a build is for and as: the target's system, its
 /// machine and the width of its pointers, and whether the profile descends from the built-in
 /// <c>debug</c> — what <c>std.core</c>'s <c>target</c> and <c>profile</c> hold. The interpreter
 /// answers them; nothing at run time asks. The codes are <c>std.core</c>'s: system 1 Linux,

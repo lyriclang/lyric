@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace Lyric.Core.Rendering;
 
 /// <summary>
-/// The JSON form (design/v5/spec/11 G8, C6; 13 M12a P7; spec 16 §4): one line per event, each an
+/// The JSON form (spec 16 §4): one line per event, each an
 /// object with its <c>type</c> and the schema's <c>version</c> — <c>diagnostic</c>, <c>artifact</c>,
 /// <c>test</c>, <c>summary</c>, <c>ice</c>. A reader takes a line at a time while the command runs;
 /// it never waits for a closing bracket. The lines go to the standard output, where nothing else is
@@ -131,7 +131,7 @@ public sealed class EventWriter(TextWriter output)
         });
     }
 
-    /// <summary>The toolchain's own failure (11 G4): a bug of lyric, never of the program.</summary>
+    /// <summary>The toolchain's own failure: a bug of lyric, never of the program.</summary>
     public void Ice(string code, string message, string? place, string? trace) => Line("ice", w =>
     {
         w.WriteString("code", code);

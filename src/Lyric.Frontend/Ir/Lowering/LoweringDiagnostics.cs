@@ -3,9 +3,8 @@ using Lyric.Core;
 namespace Lyric.Ir.Lowering;
 
 /// <summary>
-/// The codes of the lowering's refusals (design/v5/spec/11 G4: no catch-all — every refusal names its
-/// reason in a code of its own). Until M12a every refusal was <c>LYR-IR0001</c>, "this compiler version
-/// cannot lower it yet"; the code is retired. A refusal is the language's where the checker does not
+/// The codes of the lowering's refusals: no catch-all — every refusal names its reason in a code
+/// of its own. A refusal is the language's where the checker does not
 /// check its rule itself and a program meets it in the lowering — three reasons, <c>LYR-SEM0195..0197</c>.
 /// Everything else is something the checker accepted and the lowering cannot translate, the checker's
 /// own refusals among them (the never-null family, a generic function as a value, a type that does not
@@ -17,7 +16,7 @@ internal static class LoweringDiagnostics
     /// <summary>A part of the standard library a construct is lowered through is not on the module path.</summary>
     public const string StdMissing = "LYR-SEM0195";
 
-    /// <summary>The monomorphization does not terminate (design 03 T19).</summary>
+    /// <summary>The monomorphization does not terminate.</summary>
     public const string Unending = "LYR-SEM0197";
 
     /// <summary>What the checker accepted and the lowering cannot translate.</summary>

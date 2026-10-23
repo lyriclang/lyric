@@ -8,7 +8,7 @@ namespace Lyric.Ir.Lowering;
 ///
 /// <para>One instruction of substance: <c>mkcoro</c> takes the arguments — <c>this</c> first when
 /// the coroutine is a method — and builds the coroutine over them; the first pull hands them to
-/// the body as its parameters (06 A1). The factory's parameters are the body's, read off its
+/// the body as its parameters. The factory's parameters are the body's, read off its
 /// lowerer before the body runs, so the two cannot disagree — a generic instance's included.</para>
 ///
 /// <para>A file of its own rather than a mode in the FunctionLowerer, because the factory lowers no

@@ -75,7 +75,7 @@ public sealed partial class Parser
     }
 
     /// <summary>
-    /// Tells the engine which declarations hold a lexer or parser error (11 G6; M12a S2 P3): what
+    /// Tells the engine which declarations hold a lexer or parser error: what
     /// the resolver and the checker would say about them is said about the recovery's leftovers,
     /// and the engine keeps it back. The parser's errors are found by their place, not counted as
     /// they come — the lexer reported its own before the first declaration was read.
@@ -214,9 +214,9 @@ public sealed partial class Parser
     }
 
     /// <summary>A <c>module</c> header ahead: the word, or in Lyric 5 the name <c>module</c> before a
-    /// path (08 Y1) — read as the header still, for the resolver to refuse it (LYR-RES0008) — or
+    /// path — read as the header still, for the resolver to refuse it (LYR-RES0008) — or
     /// before <c>;</c> alone: Lyric 5's header, which names nothing and carries the module's
-    /// attributes (09 T7, B3: <c>@When(…) module;</c>).</summary>
+    /// attributes (<c>@When(…) module;</c>).</summary>
     private bool AtModuleHeader => _buffer.Check(TokenKind.Module)
         || AtContextual("module") && _buffer.Peek(1).TokenKind == TokenKind.Identifier
         || _sm.Lyric5 && AtContextual("module") && _buffer.Peek(1).TokenKind == TokenKind.Semicolon;
@@ -224,7 +224,7 @@ public sealed partial class Parser
     private ModulePath ParseModuleHeader()
     {
         var kw = _buffer.Advance(); // 'module'
-        // Lyric 5's header names nothing: the path does (07 M2)
+        // Lyric 5's header names nothing: the path does
         var segments = _sm.Lyric5 && _buffer.Check(TokenKind.Semicolon) ? Array.Empty<string>() : ParseDottedName();
         var semi = ExpectSemicolon();
         return new ModulePath(segments, Span.Union(kw.Span, semi.Span));
@@ -250,7 +250,7 @@ public sealed partial class Parser
 
         var isPublic = ParseVisibility();
 
-        // 'pub import' passes on what it binds (07 V3 I4); an import is otherwise its module's own,
+        // 'pub import' passes on what it binds; an import is otherwise its module's own,
         // and no other word says anything about it.
         if (_buffer.Check(TokenKind.Import))
         {
@@ -261,7 +261,7 @@ public sealed partial class Parser
             return ParseImport(isPublic, start);
         }
 
-        // 'sealed' before 'interface' (04 D8): a contextual word, and nothing else's.
+        // 'sealed' before 'interface': a contextual word, and nothing else's.
         var isSealed = false;
         if (AtContextual("sealed"))
         {
@@ -323,7 +323,7 @@ public sealed partial class Parser
     }
 
     /// <summary>
-    /// The visibility word before a declaration, a member or a field (design/v5/spec/07 V2, 08 D3):
+    /// The visibility word before a declaration, a member or a field:
     /// <c>pub</c>, <c>internal</c>, <c>private</c>, or none. One word: a second is reported and
     /// read past, the first one standing.
     /// </summary>
@@ -357,7 +357,7 @@ public sealed partial class Parser
             + "a member of one, or the module header carries one");
     }
 
-    /// <summary>In Lyric 5 every declaration carries attributes (design/v5/spec/09 T7); the 4.x
+    /// <summary>In Lyric 5 every declaration carries attributes; the 4.x
     /// parser refuses them where its module format had no row for them.</summary>
     private Decl Attach(Decl decl, AttributeNode[] attributes, string what)
     {
@@ -438,7 +438,7 @@ public sealed partial class Parser
             var (name, span) = ExpectNamed("LYR-PAR0026", "import item");
             names.Add(name);
             spans.Add(span);
-            // '{ f as g }' (07 V3 I2): bound here under the second name.
+            // '{ f as g }': bound here under the second name.
             renames.Add(_buffer.Match(TokenKind.As) ? ExpectNamed("LYR-PAR0026", "name after 'as'").Name : null);
             if (!_buffer.Match(TokenKind.Comma)) break;
         }
@@ -482,7 +482,7 @@ public sealed partial class Parser
     private FunctionDecl ParseFunctionDecl(VisibilityWord isPublic, Span start, bool isStatic = false,
         ExternSpec? spec = null)
     {
-        // 'inline fn' (08 F6): a word of Lyric 5's alone — the 4.x lexer reads 'inline' as a name
+        // 'inline fn': a word of Lyric 5's alone — the 4.x lexer reads 'inline' as a name
         var isInline = _buffer.Match(TokenKind.Inline);
         // the order is '[static] [inline] [mut] fn': 'inline static' is refused and read as what it
         // says — the rest of the member parses as written, no cascade
@@ -493,7 +493,7 @@ public sealed partial class Parser
             isStatic = true;
         }
         var isMut = _buffer.Match(TokenKind.Mut);
-        // 'macro name(...)' (08 Y12 Q1): a function over syntax, written with its own word in the
+        // 'macro name(...)': a function over syntax, written with its own word in the
         // place of 'fn' and nothing else about it different
         var isMacro = _buffer.Match(TokenKind.Macro);
         if (!isMacro) _buffer.Expect(TokenKind.Fn, "LYR-PAR0032", $"expected 'fn', got {Shown(_buffer.Current)}");
@@ -508,7 +508,7 @@ public sealed partial class Parser
         // since 1.0. For a coroutine function the checker moves it into the returned type, which
         // is what it has always described: the body runs at the pull, not at the call.
         // Whether the return type is written in parentheses: '(Task<int>) throws E' says the
-        // 'throws' is the function's, where 'Task<int> throws E' could mean the task's (M6-6).
+        // 'throws' is the function's, where 'Task<int> throws E' could mean the task's.
         // The grouping leaves no node, so the declaration remembers it.
         var returnGrouped = false;
         TypeNode? returnType = null;
@@ -557,7 +557,7 @@ public sealed partial class Parser
     }
 
     /// <summary>
-    /// What follows a declaration's <c>throws</c> (design/v5/spec/08 D9) — or a lambda's (Y11 F7):
+    /// What follows a declaration's <c>throws</c> — or a lambda's:
     /// nothing — the bare form, <c>Error</c> — before the body, the <c>;</c>, an extern's <c>=</c> or
     /// a lambda's <c>=&gt;</c>; one type; or a bracketed list (the list rule, D5/D6). Several types
     /// without the brackets are the list rule's error, reported with the form to write and parsed as
@@ -609,12 +609,12 @@ public sealed partial class Parser
             if (_buffer.Check(TokenKind.RParen)) break; // trailing comma
             var start = _buffer.Current.Span;
 
-            // '@callerExpr(actual)' (design/v5/spec/09 A11): which attribute a parameter takes is
+            // '@callerExpr(actual)': which attribute a parameter takes is
             // the checker's rule, as it is for a declaration's.
             var attributes = ParseAttributeList();
 
             var isParams = _buffer.Match(TokenKind.Params);
-            // In Lyric 5 'params' is a name (08 Y1); before a parameter's name it is still Lyric 4's
+            // In Lyric 5 'params' is a name; before a parameter's name it is still Lyric 4's
             // word, which the sema refuses with the form that replaced it (LYR-SEM0024).
             if (!isParams && AtContextual("params") && _buffer.Peek(1).TokenKind == TokenKind.Identifier
                 && _buffer.Peek(2).TokenKind == TokenKind.Colon)
@@ -622,12 +622,12 @@ public sealed partial class Parser
                 _buffer.Advance();
                 isParams = true;
             }
-            // '&x: T' (design/v5/spec/03 T12): the mark at the parameter, never at the type.
+            // '&x: T': the mark at the parameter, never at the type.
             var isPlace = _buffer.Match(TokenKind.Amp);
             var name = ExpectNamed("LYR-PAR0026", "parameter name");
             _buffer.Expect(TokenKind.Colon, "LYR-PAR0031", "expected ':' after parameter name");
             var type = ParseType();
-            // 'nums: int...' (design/v5/spec/08): the variadic parameter names its element; it is
+            // 'nums: int...': the variadic parameter names its element; it is
             // an array of it, as 4.x's 'params nums: int[]' was, and the rules are the same ones.
             var isEllipsis = _buffer.Check(TokenKind.DotDotDot);
             if (isEllipsis) type = new ArrayType(type, Span.Union(type.Span, _buffer.Advance().Span));
@@ -699,12 +699,12 @@ public sealed partial class Parser
     {
         var start = _buffer.Current.Span;
 
-        // 'type Item = int;' binds an associated type of a conformance (03 T6).
+        // 'type Item = int;' binds an associated type of a conformance.
         if (AtContextual("type") && _buffer.Peek(1).TokenKind == TokenKind.Identifier)
             return ParseAssociatedType();
 
         // Member forms: [word] [static] [mut] fn …  |  [word] static let …  |  [word] [var] a
-        // field — the word one of 'pub', 'internal', 'private' (07 V2 S0). 'static' precedes
+        // field — the word one of 'pub', 'internal', 'private'. 'static' precedes
         // 'mut', so the order is unambiguous; 'mut static fn' does not exist. The sema rejects
         // the combination anyway: a static member has no receiver for 'mut' to apply to.
         var isPublic = ParseVisibility();
@@ -723,7 +723,7 @@ public sealed partial class Parser
         if (_buffer.Check(TokenKind.Fn) || _buffer.Check(TokenKind.Mut) || _buffer.Check(TokenKind.Inline))
             return ParseFunctionDecl(isPublic, start);
 
-        // 'var name: T' — the one word that makes a field writable (design/v5/spec/02 M2).
+        // 'var name: T' — the one word that makes a field writable.
         if (_buffer.Check(TokenKind.Var))
         {
             _buffer.Advance();
@@ -759,12 +759,12 @@ public sealed partial class Parser
         var membersBegin = false;
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.Check(TokenKind.Semicolon) && !_buffer.AtEnd)
         {
-            // attributes before a variant's name (Lyric 5, 09 T7); before a member they are the member's
+            // attributes before a variant's name (Lyric 5); before a member they are the member's
             var variantAttributes = AtAttributedVariant() ? ParseAttributeList() : [];
             // A member where a variant's name is expected: the ';' that ends the variants is
             // missing. Said once, and the members are read as what they are — 'static' and 'let'
             // were taken for two variants, and what was synthesized from those names failed to
-            // parse in turn (the review's M8a-10).
+            // parse in turn.
             if (AtEnumMember())
             {
                 _de.Report("LYR-PAR0057", Severity.Error, _buffer.Current.Span,
@@ -814,7 +814,7 @@ public sealed partial class Parser
     }
 
     /// <summary>Do attributes stand here before a variant's name — not before a member's start
-    /// (Lyric 5, 09 T7)? Read ahead over the list: each <c>@Name</c> with its dotted path and its
+    /// (Lyric 5)? Read ahead over the list: each <c>@Name</c> with its dotted path and its
     /// braces or parentheses, each <c>@[…]</c> group, balanced.</summary>
     private bool AtAttributedVariant()
     {
@@ -859,7 +859,7 @@ public sealed partial class Parser
 
     private EnumVariant ParseEnumVariant()
     {
-        // A variant is as visible as its enum (07 V2 S0): the word belongs before 'enum'.
+        // A variant is as visible as its enum: the word belongs before 'enum'.
         if (WordOf(_buffer.Current.TokenKind) != VisibilityWord.None)
             _de.Report("LYR-PAR0053", Severity.Error, _buffer.Advance().Span,
                 "a variant is as visible as its enum — the word stands before 'enum'");
@@ -916,7 +916,7 @@ public sealed partial class Parser
         var members = new List<FunctionDecl>();
         var types = new List<AssociatedTypeDecl>();
         var statics = new List<StaticBindingDecl>();
-        ParseMethodSequence(members, types: types, statics: statics); // a static member declares, through a constraint (03 T5)
+        ParseMethodSequence(members, types: types, statics: statics); // a static member declares, through a constraint
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close interface body");
         return new InterfaceDecl(isPublic, name.Name, generics, interfaces, members.ToArray(), Span.Union(start, close.Span))
             { NameSpan = name.Span, Types = types.ToArray(), IsSealed = isSealed, Statics = statics.ToArray() };
@@ -927,7 +927,7 @@ public sealed partial class Parser
     private Decl ParseExtend(VisibilityWord isPublic, Span start)
     {
         _buffer.Advance(); // 'extend'
-        // 'extend<T :: [C]> Target' (03 T7): the block's parameters before the target.
+        // 'extend<T :: [C]> Target': the block's parameters before the target.
         var generics = _buffer.Check(TokenKind.Less) ? ParseGenericParams() : [];
         var target = ParseType();
         var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceListWithoutBy() : [];
@@ -957,11 +957,11 @@ public sealed partial class Parser
     /// conforming type MUST implement what the interface requires, so a warning there would be
     /// one nobody can act on without breaking conformance, and an unactionable warning is the
     /// thing this project keeps refusing to ship.</para></param>
-    /// <param name="types">Where an associated type may stand (03 T6) — an interface's
+    /// <param name="types">Where an associated type may stand — an interface's
     /// declaration <c>type Item;</c>, a conformance block's binding <c>type Item = int;</c> —
     /// the list it goes to.</param>
     /// <param name="statics">The list a <c>static let</c> goes to: an interface's declaration
-    /// <c>static let zero: Self;</c> (03 T5), a block's constant (05 §6), an enum's (03 §4.1).
+    /// <c>static let zero: Self;</c>, a block's constant, an enum's (03 §4.1).
     /// Every member sequence takes one — LYR-PAR0040, which refused it in an enum, is retired.</param>
     private void ParseMethodSequence(List<FunctionDecl> methods, List<StaticBindingDecl> statics,
         bool allowAttributes = true, List<AssociatedTypeDecl>? types = null)
@@ -976,7 +976,7 @@ public sealed partial class Parser
             }
             if (types is not null && AtContextual("type") && _buffer.Peek(1).TokenKind == TokenKind.Identifier)
             {
-                // an associated type carries attributes in Lyric 5 (09 T7)
+                // an associated type carries attributes in Lyric 5
                 if (attributes.Length > 0 && !_sm.Lyric5) RejectAttributes(attributes, "an associated type");
                 types.Add(ParseAssociatedType() with { Attributes = _sm.Lyric5 ? attributes : [] });
                 continue;
@@ -992,7 +992,7 @@ public sealed partial class Parser
                 _buffer.Advance();
 
                 // 'static let' is a StaticBinding, as in a struct's or a class's body: an
-                // interface's declaration (03 T5), a block's constant (05 §6), an enum's.
+                // interface's declaration, a block's constant, an enum's.
                 if (_buffer.Check(TokenKind.Let) || _buffer.Check(TokenKind.Var))
                 {
                     var binding = RequireNamedBinding(ParseBinding(), "static let");
@@ -1000,7 +1000,7 @@ public sealed partial class Parser
                     continue;
                 }
 
-                // every member sequence takes a static member since 03 T5 (an interface's declares
+                // every member sequence takes a static member (an interface's declares
                 // through a constraint): LYR-PAR0041, which refused one in an interface, is retired
                 isStatic = true;
             }
@@ -1010,9 +1010,9 @@ public sealed partial class Parser
         }
     }
 
-    /// <summary><c>type Item;</c> or <c>type Item = T;</c> (03 T6): an associated type declared,
+    /// <summary><c>type Item;</c> or <c>type Item = T;</c>: an associated type declared,
     /// with its default, or bound; <c>type Iter :: [Iterator];</c> with what every answer conforms
-    /// to (10 B6), written as a type parameter's constraints are.</summary>
+    /// to, written as a type parameter's constraints are.</summary>
     private AssociatedTypeDecl ParseAssociatedType()
     {
         var start = _buffer.Advance().Span; // contextual 'type'
@@ -1034,7 +1034,7 @@ public sealed partial class Parser
 
     // --- Global binding & type alias (§2) ---
 
-    /// <summary>A module-level <c>let</c> or <c>var</c> (design/v5/spec/07 V5 G2, G5): filled
+    /// <summary>A module-level <c>let</c> or <c>var</c>: filled
     /// eagerly at program start in declaration order; a <c>var</c> is written like a local one.
     /// Lyric 4 allowed <c>let</c> only.</summary>
     private Decl ParseGlobalBinding(VisibilityWord isPublic, Span start)
@@ -1063,7 +1063,7 @@ public sealed partial class Parser
     {
         _buffer.Advance(); // contextual 'type'
         var name = ExpectNamed("LYR-PAR0026", "type alias name");
-        // 'type Pair<T> = (T, T);' (03 T15): parameters as on any generic declaration.
+        // 'type Pair<T> = (T, T);': parameters as on any generic declaration.
         var generics = _buffer.Check(TokenKind.Less) ? ParseGenericParams() : [];
         _buffer.Expect(TokenKind.Equal, "LYR-PAR0028", "expected '=' in type alias");
         var aliased = ParseType();
@@ -1092,7 +1092,7 @@ public sealed partial class Parser
                 end = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close constraint list").Span;
                 constraints = cs.ToArray();
             }
-            // 'Rhs = Self': a default type argument (03 T18).
+            // 'Rhs = Self': a default type argument.
             TypeNode? fallback = null;
             if (_buffer.Match(TokenKind.Equal))
             {
@@ -1109,7 +1109,7 @@ public sealed partial class Parser
         return parameters.ToArray();
     }
 
-    /// <param name="delegates">The field each entry delegates to — <c>Walker by legs</c> (04 D1)
+    /// <param name="delegates">The field each entry delegates to — <c>Walker by legs</c>
     /// — by index, <c>null</c> where none; <c>null</c> as a whole when no entry does.</param>
     /// <param name="bySpan">The span of the first <c>by</c>, for a list that may not carry one.</param>
     private TypeNode[] ParseInterfaceList(out string?[]? delegates, out Span bySpan)
@@ -1170,7 +1170,7 @@ public sealed partial class Parser
     /// </summary>
     private (string Name, Span Span) ExpectNamed(string code, string what)
     {
-        // 'fn #{name}()' inside a quote (08 Y12 Q3): the name is a splice, which the content
+        // 'fn #{name}()' inside a quote: the name is a splice, which the content
         // holds as "#i" - the bridge sets the Ident's name in its place
         if (_quoteDepth > 0 && _buffer.Check(TokenKind.Hash) && _buffer.Peek(1).TokenKind == TokenKind.LBrace)
         {

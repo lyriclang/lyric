@@ -36,7 +36,7 @@ internal sealed class LambdaTable
     private readonly List<Pending> _pending = new();
 
     /// <summary>Functions built directly as IR rather than lowered from a lambda: the bound
-    /// method values (08 Y11 F10), one per site.</summary>
+    /// method values, one per site.</summary>
     private readonly List<(FunctionId Id, IrFunction Function)> _built = new();
     private int _builtDrained;
 
@@ -52,7 +52,7 @@ internal sealed class LambdaTable
     /// <summary>A name for a built function, unique in the module.</summary>
     public string BuiltName(string enclosing, string what) => $"{enclosing}.<{what}{_built.Count}>";
 
-    /// <summary>The forwarder of one delegated slot (04 D1), asked for before it can be built:
+    /// <summary>The forwarder of one delegated slot, asked for before it can be built:
     /// its body calls into the field type's row of the interface, and the rows are built after
     /// the lowering.</summary>
     internal readonly record struct ForwarderRequest(FunctionId Id, TypeSymbol Type, TypeId TypeId,
@@ -143,7 +143,7 @@ internal sealed class LambdaTable
         for (; _lowered < _pending.Count; _lowered++)
         {
             var p = _pending[_lowered];
-            // A generator lambda (08 Y11 F5) is a coroutine's factory — the function value — and its
+            // A generator lambda is a coroutine's factory — the function value — and its
             // body behind it, which takes the environment and the parameters the factory was given.
             var generator = types.IsGeneratorLambda(p.Lambda);
             var lowerer = FunctionLowerer.ForLambda(

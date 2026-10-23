@@ -14,7 +14,7 @@ public sealed partial class Parser
 {
     /// <summary>Entry point for exactly ONE statement; a block covers sequences.</summary>
     /// <summary>Every statement of the text, to its end, as a block body would hold them — what
-    /// <c>std.syntax</c>'s <c>parseStmts</c> reads (M9b S1). A last expression without its <c>;</c>
+    /// <c>std.syntax</c>'s <c>parseStmts</c> reads. A last expression without its <c>;</c>
     /// is the tail, as in a value block.</summary>
     public Stmt[] ParseStatements()
     {
@@ -50,20 +50,20 @@ public sealed partial class Parser
         // 'name:' at the start of a statement is a loop label — nothing else begins that way
         // (§6.8: an expression statement is a call, an assignment or 'resume').
         TokenKind.Identifier when _buffer.Peek(1).TokenKind == TokenKind.Colon => ParseLabeled(),
-        // 'using let f = …;' (08 Y5 S5): contextual, as nothing else starts with a name and 'let'.
+        // 'using let f = …;': contextual, as nothing else starts with a name and 'let'.
         TokenKind.Identifier when AtContextual("using") && _buffer.Peek(1).TokenKind is TokenKind.Let or TokenKind.Var
             => ParseUsing(),
-        // 'loop { … }' (08 S3, 05 E11): contextual, as 'loop' before a brace starts nothing else. A
+        // 'loop { … }': contextual, as 'loop' before a brace starts nothing else. A
         // statement here — no ';' after its block — and an expression anywhere else.
         TokenKind.Identifier when IsLoopAhead(0) => LoopStatement(ParseLoop(null, default)),
         TokenKind.LBrace => ParseBlock(),
         TokenKind.Let or TokenKind.Var => ParseBinding(),
-        // a local 'fn' (08 F8): Lyric 5's; the 4.x grammar has none
+        // a local 'fn': Lyric 5's; the 4.x grammar has none
         TokenKind.Fn when _sm.Lyric5 && _buffer.Peek(1).TokenKind == TokenKind.Identifier => ParseLocalFunction(),
-        // 'comptime if' and 'comptime for' (design/v5/spec/09 Q2); 'comptime e;' is an
+        // 'comptime if' and 'comptime for'; 'comptime e;' is an
         // expression statement, as any other expression.
         TokenKind.Comptime when _buffer.Peek(1).TokenKind is TokenKind.If or TokenKind.For => ParseComptimeStatement(),
-        // In a value block an 'if' may be an expression (08 Y4, the tail rule): the form without
+        // In a value block an 'if' may be an expression (the tail rule): the form without
         // braces, and the block form with its 'else' standing last — the block's value.
         TokenKind.If when _allowTail && IfIsExpression(0) => ParseExprStmt(),
         TokenKind.If => ParseIf(),
@@ -77,7 +77,7 @@ public sealed partial class Parser
         TokenKind.Defer => ParseDefer(),
         TokenKind.Throw => ParseThrow(),
         // 'try {' is the block form; 'try f();' is an expression statement whose expression is
-        // marked (design/v5/spec/05 E4).
+        // marked.
         TokenKind.Try when _buffer.Peek(1).TokenKind == TokenKind.LBrace => ParseTry(),
         TokenKind.Match => ParseMatchStmt(),
         _ => ParseExprStmt(),
@@ -92,7 +92,7 @@ public sealed partial class Parser
         _buffer.Advance();               // ':'
         var label = _sm.Slice(nameTok.Span).ToString();
         var start = nameTok.Span;
-        // The label is in scope in the loop's body, where a 'break' reads the name as it (08 S4).
+        // The label is in scope in the loop's body, where a 'break' reads the name as it.
         _loopLabels.Add(label);
         try
         {
@@ -125,10 +125,10 @@ public sealed partial class Parser
     }
 
     /// <summary>
-    /// A local <c>fn</c> (design/v5/spec/08 F8, F9): a named closure — captures as a lambda's, a
+    /// A local <c>fn</c>: a named closure — captures as a lambda's, a
     /// call of itself in its body. Written as the binding it is (<see cref="BindingStmt.LocalFunction"/>):
     /// the function's type, a lambda of its parameters and body. No type parameters — a closure is
-    /// one function —, no default and no variadic parameter (F9); a body of its own, out of reach of
+    /// one function —, no default and no variadic parameter; a body of its own, out of reach of
     /// the loops around it.
     /// </summary>
     private Stmt ParseLocalFunction()
@@ -158,11 +158,11 @@ public sealed partial class Parser
     }
 
     /// <summary>The labels of the loops around what is being parsed, innermost last: a name after
-    /// 'break' is a label exactly when one of them is it (08 S4).</summary>
+    /// 'break' is a label exactly when one of them is it.</summary>
     private readonly List<string> _loopLabels = new();
 
     /// <summary>A lambda's body: a function of its own, out of reach of the loops around the lambda
-    /// (08 Y11 F5) — their labels name nothing in it, and a name after 'break' there is a value.</summary>
+    /// — their labels name nothing in it, and a name after 'break' there is a value.</summary>
     private T OutsideLoops<T>(Func<T> parse)
     {
         var around = _loopLabels.ToArray();
@@ -179,7 +179,7 @@ public sealed partial class Parser
                && _buffer.Peek(at + 1).TokenKind == TokenKind.LBrace;
     }
 
-    /// <summary>'loop { … }' (05 E11): the block, again and again until a 'break' leaves it.</summary>
+    /// <summary>'loop { … }': the block, again and again until a 'break' leaves it.</summary>
     private LoopExpr ParseLoop(string? label, Span labelSpan)
     {
         var kw = _buffer.Advance(); // 'loop'
@@ -195,7 +195,7 @@ public sealed partial class Parser
 
     /// <summary>
     /// Does the statement just parsed stand LAST in a value block, with no ';' behind it? Then it
-    /// is the block's value (08 Y4, design 05's review M5-1; Rust's rule): an 'if' with its
+    /// is the block's value (Rust's rule): an 'if' with its
     /// 'else', a 'match' and a 'loop' are worth what their expression forms are worth. In the
     /// middle of the block they are statements, and so is each of them in a statement block.
     /// </summary>
@@ -216,11 +216,11 @@ public sealed partial class Parser
     /// <summary>A block; with <paramref name="valueBlock"/> one in value position — a match arm,
     /// a lambda body, a clause of a 'try' expression, a branch of an 'if' expression, the right
     /// of '??' — whose last statement may be a tail without ';': an expression, or an 'if', a
-    /// 'match' or a 'loop' (§6.9, 08 Y4). The flag holds for the block's OWN statements only: a
+    /// 'match' or a 'loop'. The flag holds for the block's OWN statements only: a
     /// nested statement block resets it, so a tail can stand exactly where its value has
     /// somewhere to go.</summary>
     /// <summary>
-    /// The body of <c>if</c>, <c>else</c>, <c>while</c>, <c>do</c> and <c>for</c> (08 Y5 S1): a block,
+    /// The body of <c>if</c>, <c>else</c>, <c>while</c>, <c>do</c> and <c>for</c>: a block,
     /// always. A statement written without the braces is refused once, with the form, and read as
     /// the block it belongs in — "expected '}'" behind it was the same mistake said again.
     /// </summary>
@@ -266,7 +266,7 @@ public sealed partial class Parser
     }
 
     /// <summary>
-    /// <c>using let f = open(p);</c> (design/v5/spec/05 E7 R1–R2, 08 Y5 S5): a binding whose value
+    /// <c>using let f = open(p);</c>: a binding whose value
     /// is closed when its scope is left — on every way out but a panic, in the scope's one LIFO list
     /// with the <c>defer</c>s. The parser writes that close beside the binding as the
     /// <c>defer try f.close();</c> it is, at the keyword. One name and a value; a <c>let</c>, since
@@ -312,7 +312,7 @@ public sealed partial class Parser
             && _buffer.Peek(1).TokenKind is TokenKind.LParen or TokenKind.LBrace or TokenKind.Dot)
             return ParseLetPattern(kw, isMutable);
 
-        // 'let .Num(n) = …': the dotted variant of the initializer's enum (08 Y6) is a pattern
+        // 'let .Num(n) = …': the dotted variant of the initializer's enum is a pattern
         // as well; a binding name never starts with a dot.
         if (_buffer.Check(TokenKind.Dot) && _buffer.Peek(1).TokenKind == TokenKind.Identifier)
             return ParseLetPattern(kw, isMutable);
@@ -432,8 +432,8 @@ public sealed partial class Parser
     }
 
     /// <summary>
-    /// <c>comptime if (c) { … } else { … }</c> and <c>comptime for (x in w) { … }</c> (design/v5/
-    /// spec/09 Q2): the condition, or the value walked, becomes a <c>comptime</c> site; the rest
+    /// <c>comptime if (c) { … } else { … }</c> and <c>comptime for (x in w) { … }</c>:
+    /// the condition, or the value walked, becomes a <c>comptime</c> site; the rest
     /// is the <c>if</c> or the <c>for</c> it was — checked whole, then its branch chosen or its
     /// rounds unrolled where it is lowered. An <c>else if</c> after it chooses at compile time
     /// too: one chain, one kind of choice.
@@ -461,7 +461,7 @@ public sealed partial class Parser
     /// <summary>
     /// Is the 'if' <paramref name="at"/> tokens ahead — the start of a statement in a value block
     /// — an EXPRESSION? Two shapes are: the form without braces, 'if (c) a else b', which is a
-    /// statement nowhere (08 Y5 S1); and the block form whose chain ends in an 'else' and which
+    /// statement nowhere; and the block form whose chain ends in an 'else' and which
     /// stands last in the block — the block's value.
     ///
     /// <para>A statement, as in every other block: an 'if' without a final 'else' (it gives no
@@ -568,7 +568,7 @@ public sealed partial class Parser
     private Stmt ParseBreak()
     {
         var kw = _buffer.Advance();
-        // 'break', 'break outer', 'break value', 'break outer value' (08 S4): a name is the label
+        // 'break', 'break outer', 'break value', 'break outer value': a name is the label
         // when a loop around the 'break' carries it, and the value's beginning otherwise —
         // 'break (x);' is a value whatever 'x' names.
         string? label = null;
@@ -662,7 +662,7 @@ public sealed partial class Parser
         return new TryStmt(body, catches.ToArray(), Span.Union(kw.Span, end));
     }
 
-    /// <summary>A clause: <c>catch (e: T) { … }</c>. In the expression form (08 Y4) the body is a
+    /// <summary>A clause: <c>catch (e: T) { … }</c>. In the expression form the body is a
     /// value block, or an expression standing for one — <c>catch (e) v</c> is <c>catch (e) { v }</c>
     /// with the braces left off.</summary>
     private CatchClause ParseCatch(bool expressionForm = false)
@@ -702,8 +702,8 @@ public sealed partial class Parser
             { NameSpan = idTok.Span, BindingTypes = set };
     }
 
-    /// <summary>The types after a clause's <c>in</c> (05 E9 C5, 08 Y6): one type, or a bracketed
-    /// list — the list rule (D5/D6), as for <c>throws</c>.</summary>
+    /// <summary>The types after a clause's <c>in</c>: one type, or a bracketed
+    /// list — the list rule, as for <c>throws</c>.</summary>
     private TypeNode[] ParseCaughtSet()
     {
         if (!_buffer.Check(TokenKind.LBracket))

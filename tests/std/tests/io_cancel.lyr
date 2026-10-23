@@ -1,4 +1,4 @@
-// A reader's and a writer's call may be cancelled (design/v5/spec/10 Review 2026-10-08; M8b S10a):
+// A reader's and a writer's call may be cancelled:
 // a stream of the test's own that waits without bound — on a channel nobody sends on, or whose
 // receiver never takes — ends at withTimeout's cancel, and its Cancelled passes every wrapper of
 // std.io: TimedOut comes out.

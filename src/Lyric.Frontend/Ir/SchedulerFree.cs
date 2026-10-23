@@ -1,8 +1,8 @@
 namespace Lyric.Ir;
 
 /// <summary>
-/// A program that sets no scheduler answers no to <c>std.task.schedulerRuns</c> everywhere (06
-/// M6-26, 13 M8b P3) — and keeps nothing of what only its yes would run.
+/// A program that sets no scheduler answers no to <c>std.task.schedulerRuns</c> everywhere —
+/// and keeps nothing of what only its yes would run.
 ///
 /// <para>WHY THIS IS SOUND. A scheduler runs on a thread only after <c>setCurrentScheduler</c> set
 /// one there, and only Lyric code calls that native (<c>runMain</c>, std.thread's threads and

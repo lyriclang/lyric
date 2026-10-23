@@ -4,7 +4,7 @@ using System.Text;
 namespace Lyric.Core.Rendering;
 
 /// <summary>
-/// One diagnostic as text, after rustc (design/v5/spec/11 G5; M12a S2):
+/// One diagnostic as text, after rustc:
 ///
 /// <code>
 /// error[LYR-SEM0176]: 'x' is bound in this scope already

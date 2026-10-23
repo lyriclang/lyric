@@ -1,5 +1,5 @@
-// std.fs's trees and temporary places (design/v5/spec/10 O5; M8b S7b): createDirAll, removeAll,
-// copy, walk, tempDir, tempFile — and the plan's check for S7, a tree made, walked and removed.
+// std.fs's trees and temporary places: createDirAll, removeAll,
+// copy, walk, tempDir, tempFile — and a tree made, walked and removed.
 // Each test works in a directory of its own from fs.tempDir() and removes it.
 import std.fs;
 import std.io { IoError, IoErrorKind };
@@ -118,7 +118,7 @@ fn removeAllTakesAllThatIsThere(): void throws IoError {
     assertFalse(fs.exists(t));
 }
 
-/// The plan's check for M8b S7: a tree made, walked and removed — on every platform the std tests
+/// A tree made, walked and removed — on every platform the std tests
 /// run on.
 @Test
 fn aTreeIsMadeWalkedAndRemoved(): void throws IoError {

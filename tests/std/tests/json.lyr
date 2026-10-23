@@ -1,4 +1,4 @@
-// std.json (design/v5/spec/10 B10 E7; 13 M10 S3): RFC 8259 strictly, the text of any Encode value
+// std.json: RFC 8259 strictly, the text of any Encode value
 // and the value of any text, JsonValue the tree, the errors with their place.
 import std.json;
 import std.json { JsonValue, JsonOptions, JsonError, JsonWriter };
@@ -207,7 +207,7 @@ fn nestedArrays(n: int): string {
     return b.toString();
 }
 
-/// 12 §JSON rule 3 (the sweep after M10, W5): a document may nest 512 levels, the outermost the
+/// Spec 12 §JSON rule 3: a document may nest 512 levels, the outermost the
 /// first, and what the library does with it holds in a test's task — whose stack is a task's
 /// default, in the debug profile too; the 513th level is refused, not overflowed.
 @Test

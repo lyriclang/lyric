@@ -1,7 +1,7 @@
-// std.http, the server (design/v5/spec/10 Q6; 13 M10 S8): a handler per request, a task per
+// std.http, the server: a handler per request, a task per
 // connection, the body framed as the client wrote it, Expect: 100-continue answered, the response
 // with its length or in chunks, keep-alive, a request that is none answered 400, a handler that
-// throws answered 500, shutdown. The client of S7 on the other side, a raw socket where the
+// throws answered 500, shutdown. std.http's client on the other side, a raw socket where the
 // client would not misbehave.
 import std.io { IoError, IoErrorKind, ByteBuffer };
 import std.net { IpAddr, SocketAddr, TcpStream };
@@ -160,7 +160,7 @@ fn aServerAnswersAndKeepsTheConnection(): void throws Error {
     assertEq(try u.text(), "left it");
     let after = try (client.get(uri(base, "/echo"))).json<Echo>();
     assertEq(after, Echo { method = "GET", path = "/echo", query = null, length = 0, text = "" });
-    // a gzipped body is decoded as it is read (S9); the headers lose the encoding; the connection stays
+    // a gzipped body is decoded as it is read; the headers lose the encoding; the connection stays
     let gz = try client.get(uri(base, "/gzipped"));
     assertNull(gz.headers.get("Content-Encoding"));
     assertNull(gz.headers.get("Content-Length"));

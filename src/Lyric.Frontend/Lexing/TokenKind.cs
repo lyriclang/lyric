@@ -22,10 +22,10 @@ public enum TokenKind
     As,
     Pub,
 
-    /// <summary>A declaration of its module alone (design/v5/spec/07 V2).</summary>
+    /// <summary>A declaration of its module alone.</summary>
     Private,
 
-    /// <summary>A declaration of its package — the default the word only says out loud (07 V2).</summary>
+    /// <summary>A declaration of its package — the default the word only says out loud.</summary>
     Internal,
 
     // Type declarations
@@ -101,7 +101,7 @@ public enum TokenKind
     QuestionDot,
     QuestionQuestion,
     Exclamation, // prefix (logical not) and postfix (unwrap); the parser disambiguates
-    Hash,        // '#': before '{' inside a 'quote' a splice (08 Y12 Q3); an error elsewhere, as it was
+    Hash,        // '#': before '{' inside a 'quote' a splice; an error elsewhere, as it was
     
     //Arithmetic
     Plus,
@@ -109,7 +109,7 @@ public enum TokenKind
     Star,
     Slash,
     Percent,
-    PlusPercent, // +%  wrapping add (design/v5/spec/08 Y4)
+    PlusPercent, // +%  wrapping add
     MinusPercent, // -%
     StarPercent, // *%
     Inc, //++
@@ -138,7 +138,7 @@ public enum TokenKind
     
     //Range 
     DotDot, //..
-    DotDotDot, //... — a variadic parameter's mark (design/v5/spec/08)
+    DotDotDot, //... — a variadic parameter's mark
     DotDotEqual, //..= 
     
     //Assignment
@@ -163,7 +163,7 @@ public enum TokenKind
     // This
     This,
 
-    // The compile-time words (design/v5/spec/08 Y1; 13 M9a P4): Lyric 5's, names in 4.x. Only
+    // The compile-time words: Lyric 5's, names in 4.x. Only
     // 'comptime' has a form yet; 'inline', 'quote' and 'macro' are reserved for theirs.
     Comptime,
     Inline,

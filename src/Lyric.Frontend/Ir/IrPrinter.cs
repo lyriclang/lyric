@@ -269,7 +269,7 @@ public static class IrPrinter
 
     // --- formatting helpers ---
 
-    /// <summary>The C compiler's hints (09 A11), as ' [alwaysinline noinline cold]'; nothing
+    /// <summary>The C compiler's hints, as ' [alwaysinline noinline cold]'; nothing
     /// without one.</summary>
     private static string Hints(IrHints hints) => hints == IrHints.None ? "" :
         " [" + string.Join(' ', new[] { (IrHints.AlwaysInline, "alwaysinline"), (IrHints.NoInline, "noinline"), (IrHints.Cold, "cold") }

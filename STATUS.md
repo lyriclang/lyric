@@ -27,10 +27,11 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
   pull requests checked together, the specification merges first, and main is green in between.
   **A pull request runs what its diff reaches** (`tooling/affected.toml`, 2026-10-11) and a fixed regression group;
   main after a merge, and a dispatched run, run everything — a break the selection misses shows on main.
-- **Comments describe, they do not cite** (design/v5/spec/14 W8): `CommentRatchetTests` counts, per
-  file, the comment lines that still name a decision, milestone, slice or design round — 3353 on
-  2026-10-20 (#518), in `tooling/comment-ratchet.toml` — and fails a pull request that adds one.
-  The counts only fall; M12c (K2a–K2d) takes them to zero, and the guard turns hard.
+- **Comments describe, they do not cite** (design/v5/spec/14 W8): `CommentCitationTests` fails on
+  any comment line of the compiler, the frontend, the runtime, std and their tests that names a
+  decision, milestone, slice or design round. 3353 such lines on 2026-10-20 (#518), counted down
+  file by file through M12c K2a–K2d; the guard is hard since K2d. `DiagnosticTextTests` holds the
+  string literals of `src/`, `stdlib5` and `runtime/` to the same, and to no `§` or document name.
 
 ## Milestones
 

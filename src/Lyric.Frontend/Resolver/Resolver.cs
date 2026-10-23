@@ -53,12 +53,12 @@ public sealed class Resolver
     }
 
     /// <summary>
-    /// An inline array is <c>Equatable</c> and <c>Hashable</c> where its element is (design/v5/spec/10
-    /// C8, "Review 2026-10-08" S4b; M8c S3b), and <c>Debug</c> and <c>Display</c> as an array is
-    /// ("Review 2026-10-09" S11; M8c S16): for every length the program writes — in any module,
+    /// An inline array is <c>Equatable</c> and <c>Hashable</c> where its element is,
+    /// and <c>Debug</c> and <c>Display</c> as an array is:
+    /// for every length the program writes — in any module,
     /// std's among them — a block of each, synthesized as source into std.core as the conformances
-    /// of 04 D7 are. A block over a generic length cannot be written (no generic constant, 03 T13);
-    /// one over a written length can, and no other block targets an inline array (03 M4-2). A
+    /// of a type are. A block over a generic length cannot be written (no generic constant);
+    /// one over a written length can, and no other block targets an inline array. A
     /// length nobody compares or hashes costs nothing: the lowering takes what is reached. A fault
     /// in a block is pointed at the first place the length was written.
     /// </summary>
@@ -110,7 +110,7 @@ public sealed class Resolver
                 }
 
                 """;
-            // Clone element by element (M9a S10): std.core's Clone default clones each field with
+            // Clone element by element: std.core's Clone default clones each field with
             // 'clone()', where the provisional synthesis unrolled an inline array itself. After the
             // two above, so their lines stay as they were.
             if (declared.Contains("Clone"))
@@ -132,7 +132,7 @@ public sealed class Resolver
                 $"in the 'Equatable' and 'Hashable' synthesized for 'T[{n}]'"));
             if (!shows) continue;
 
-            // Debug and Display as an array's (10, "Review 2026-10-09" S11; M8c S16): `[1, 2]`,
+            // Debug and Display as an array's: `[1, 2]`,
             // each element in its debug text, the display text the same. A source of its own, so
             // the first one's name — in the #line of a lowered 'equals' — stays as it was.
             var shown = $$"""
@@ -187,11 +187,11 @@ public sealed class Resolver
     {
         // a copy: the synthesis replaces a declaration by one without its synthesized interfaces,
         // and that must not reach the loaded tree, which a rebuild after a macro round resolves
-        // again (open point 188)
+        // again
         var declarations = _comp.AstOf(module).Declarations.ToArray();
         var coreHasDebug = _comp.Modules.Any(m => m.FullName == "std.core"
             && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Debug" }));
-        // The form std.core's Hashable asks for (10 K2): 'hash<H :: [Hasher]>(&h: H)' writes into a
+        // The form std.core's Hashable asks for: 'hash<H :: [Hasher]>(&h: H)' writes into a
         // hasher; the 4.x library's 'hash(): int' answers a number, and keeps its form.
         var streamsHash = _comp.Modules.Any(m => m.FullName == "std.core"
             && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Hashable" } h
@@ -213,7 +213,7 @@ public sealed class Resolver
                 case InterfaceDecl i: DeclareInterface(module, i); break;
                 case TypeAliasDecl a:
                 {
-                    // The alias's own scope holds its parameters (03 T15), under the module's: the
+                    // The alias's own scope holds its parameters, under the module's: the
                     // aliased type and a parameter's default are bound there.
                     var aliasScope = new SymbolTable(module.Members);
                     var aliasSymbol = new TypeSymbol(a.Name, TypeSymbolKind.Alias, Vis(a.Visibility), aliasScope, a) { Generics = MakeGenerics(a.Generics) };
@@ -235,7 +235,7 @@ public sealed class Resolver
 
     /// <summary>
     /// The conformances an interface of the program implies for a type that lists it (05 §14
-    /// rule 5; the sweep after M10, W7b): <c>struct Start :: [Args]</c> under
+    /// rule 5): <c>struct Start :: [Args]</c> under
     /// <c>interface Args :: [Default]</c> has <c>default</c> synthesized as <c>:: [Default]</c>
     /// would — after the imports, since the interface may be another module's. The compiler
     /// writes <c>Default</c> and <c>Display</c>; the std.core defaults a parent brings are
@@ -314,10 +314,10 @@ public sealed class Resolver
     }
 
     /// <summary>
-    /// Conformance synthesis (04 D7) for one type declaration: every listed interface of the
+    /// Conformance synthesis for one type declaration: every listed interface of the
     /// family without its member written, and <c>Debug</c> unasked, become an extend block of
     /// this module — written as source, parsed, declared like any block — and the listed node
-    /// leaves the type's own list (one conformance per type and interface, 03 T7 X3). The
+    /// leaves the type's own list (one conformance per type and interface). The
     /// declaration comes back without those nodes; the AST holds the result.
     /// </summary>
     private Decl Synthesize(ModuleSymbol module, Decl decl, bool coreHasDebug, bool streamsHash, bool coreHasIdentity)
@@ -334,8 +334,8 @@ public sealed class Resolver
         if (requests.Count == 0) return decl;
         // A declaration the parser could not read whole gets nothing synthesized: its fields are what
         // the recovery left — a ':' or a keyword taken as a name —, and a block written over them failed
-        // to parse five times over, ahead of the parser's own errors (open point 200). The engine's
-        // own rule (M12a S2) would not catch it: a synthesized member's errors stand in its own file.
+        // to parse five times over, ahead of the parser's own errors. The engine's
+        // own rule would not catch it: a synthesized member's errors stand in its own file.
         if (_de.IsUnparsed(decl.Span)) return decl;
 
         var taken = new HashSet<TypeNode>(ReferenceEqualityComparer.Instance);
@@ -375,7 +375,7 @@ public sealed class Resolver
     private void DeclareExtend(ModuleSymbol module, ExtendDecl ex, bool implicitly = false)
     {
         var methodScope = new SymbolTable(module.Members);
-        // The block's own parameters (03 T7 X1) stand in its scope, so the target and every
+        // The block's own parameters stand in its scope, so the target and every
         // signature may name them.
         var blockGenerics = MakeGenerics(ex.Generics);
         DeclareGenerics(methodScope, blockGenerics);
@@ -409,7 +409,7 @@ public sealed class Resolver
         var scope = new SymbolTable(module.Members);
         var ts = new TypeSymbol(name, kind, vis, scope, decl) { Generics = MakeGenerics(generics) };
         DeclareGenerics(scope, ts.Generics);
-        scope.TryDeclare(new ImportBindingSymbol("Self", ts, decl)); // 'Self' is the type itself (03 T5)
+        scope.TryDeclare(new ImportBindingSymbol("Self", ts, decl)); // 'Self' is the type itself
         DeclareTop(module, ts, decl);
         foreach (var m in members)
         {
@@ -448,11 +448,11 @@ public sealed class Resolver
     private void DeclareInterface(ModuleSymbol module, InterfaceDecl i)
     {
         var scope = new SymbolTable(module.Members);
-        // 'Self' in an interface is the conforming type, a type parameter of the interface's own
-        // (03 T5): every use site binds it — the conformance to the implementer, the constraint
+        // 'Self' in an interface is the conforming type, a type parameter of the interface's own:
+        // every use site binds it — the conformance to the implementer, the constraint
         // to the type parameter. In the interface's own bodies it is constrained by the interface
         // itself, so a default reaches its members as through any constraint and is monomorphized
-        // per conformer (04 D9). The constraint stands in no source: the node is made, and bound,
+        // per conformer. The constraint stands in no source: the node is made, and bound,
         // here.
         var generics = MakeGenerics(i.Generics);
         var itself = new NamedType([i.Name],
@@ -466,14 +466,14 @@ public sealed class Resolver
         for (var k = 0; k < generics.Length; k++) _binding.Bind(itself.TypeArguments[k], generics[k]);
         DeclareGenerics(scope, ts.Generics);
         DeclareTop(module, ts, i);
-        // An interface's members are as visible as the interface (07 V2 S4) — a word of their
+        // An interface's members are as visible as the interface — a word of their
         // own is refused by the sema, and not read here — but for a private helper, which is
         // its module's: the interface's defaults call it, nothing else does.
         foreach (var fn in i.Members)
             DeclareMember(module, scope,
                 Fn(fn, !_comp.Lyric5Modules || fn.IsPrivateHelper ? fn.Visibility : i.Visibility), fn);
         foreach (var t in i.Types) DeclareMember(module, scope, new AssociatedTypeSymbol(t.Name, t) { Owner = ts }, t);
-        // Its constants (03 T5) as visible as the interface, like its members.
+        // Its constants as visible as the interface, like its members.
         foreach (var sb in i.Statics)
             DeclareMember(module, scope, new GlobalSymbol(sb.Binding.Name, Vis(_comp.Lyric5Modules ? i.Visibility : sb.Visibility), sb), sb);
     }
@@ -482,7 +482,7 @@ public sealed class Resolver
         new(fn.Name, Vis(word), fn.IsMut, fn, fn.IsStatic) { Generics = MakeGenerics(fn.Generics), IsMacro = fn.IsMacro };
 
     /// <summary>
-    /// The word a method of an <c>extend</c> block has (07 V2 S5): in a conformance block, none
+    /// The word a method of an <c>extend</c> block has: in a conformance block, none
     /// that narrows the conformance — it is visible wherever its type and its interface are, its
     /// methods with it; in an inherent block its own, else the block's, which is the default of
     /// the methods in it (<c>private extend Foo { … }</c>). The 4.x tools read the method's.
@@ -514,7 +514,7 @@ public sealed class Resolver
     private void DeclareTop(ModuleSymbol module, Symbol sym, Node decl)
     {
         sym.Home = module;
-        // A builtin type's name is no declaration's (design/v5/spec/07 V6 K5): 'struct int' would
+        // A builtin type's name is no declaration's: 'struct int' would
         // make 'int' mean two things, one of them the language's own.
         if (_comp.Lyric5Modules && _comp.Builtins.LookupLocal(sym.Name) is TypeSymbol)
         {
@@ -552,7 +552,7 @@ public sealed class Resolver
     private readonly HashSet<ModuleSymbol> _importsResolved = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>Binds a module's imports, once. A selective import asks for its target's first —
-    /// the names a <c>pub import</c> passes on (07 V3 I4) are members only once they are bound.
+    /// the names a <c>pub import</c> passes on are members only once they are bound.
     /// A module marks itself before its imports, so a cycle stops here; it is reported as one
     /// (LYR-RES0005).</summary>
     private void ResolveImports(ModuleSymbol module)
@@ -595,7 +595,7 @@ public sealed class Resolver
                     _de.Report("LYR-RES0003", Severity.Error, imp.Span, $"cannot find module '{written}'");
             }
         }
-        // A package imports what its manifest declares (07 P6) — not what those depend on.
+        // A package imports what its manifest declares — not what those depend on.
         else if (_comp.Lyric5Modules && _comp.PackageDependencies is { } declared)
         {
             var from = Compilation.PackageOf(module);
@@ -656,7 +656,7 @@ public sealed class Resolver
             return [new ErrorSymbol(name)];
         }
 
-        // Lyric 5 (07 V2 S1): the import asks the question every route asks. Of an overload set
+        // Lyric 5: the import asks the question every route asks. Of an overload set
         // only the visible functions come along — a private overload beside a 'pub' one is not
         // imported, and none visible is the one error. Bound all the same, as recovery.
         if (_comp.Lyric5Modules)
@@ -667,7 +667,7 @@ public sealed class Resolver
                 return visible.Select(Symbol (fn) => new ImportBindingSymbol(bound, fn, imp)).ToArray();
             if (visible.Length == 0 && !_comp.Visible(found, module))
                 _de.Report("LYR-RES0009", Severity.Error, at, _comp.Hidden(found));
-            // A re-export passes on what is 'pub' and nothing narrower (07 V3 I4): what the
+            // A re-export passes on what is 'pub' and nothing narrower: what the
             // module may name itself is not therefore every package's.
             else if (imp.IsPublic && !_comp.Exported(found))
                 _de.Report("LYR-RES0010", Severity.Error, at,
@@ -685,7 +685,7 @@ public sealed class Resolver
         return overloads.Select(Symbol (fn) => new ImportBindingSymbol(bound, fn, imp)).ToArray();
     }
 
-    /// <summary>What a name a <c>pub import</c> passed on stands for (07 V3 I4), through every
+    /// <summary>What a name a <c>pub import</c> passed on stands for, through every
     /// re-export; anything else is itself.</summary>
     private static Symbol PassedOn(Symbol symbol)
     {
@@ -704,12 +704,12 @@ public sealed class Resolver
     }
 
     /// <summary>
-    /// One namespace per module (design/v5/spec/07 V6 K1, K3): a name a module declares or imports
+    /// One namespace per module: a name a module declares or imports
     /// is not also the last segment of one of its submodules — 'app.net.http' would otherwise mean
     /// the module and the member, and which one depended on the route. Asked of the modules the
     /// program loads and of the files of its packages (<see cref="Compilation.ModuleOnDisk"/>):
     /// a submodule nobody imported here is one all the same — for the root module too, whose
-    /// names stand beside every module of its package (the review's M7-1).
+    /// names stand beside every module of its package.
     ///
     /// <para>An import that binds a module under its own last segment — <c>pub import
     /// geo.shapes;</c> in <c>geo</c> — is that module: the name has one meaning, and a root
@@ -817,18 +817,18 @@ public sealed class Resolver
 
             var sym = _binding.Resolve(block.Decl.Target);
             if (sym is ImportBindingSymbol ib) sym = ib.Target;
-            // A named target, plain or an instance ('List<T>', 'Box<int>' — 03 T7 X1); an array,
+            // A named target, plain or an instance ('List<T>', 'Box<int>'); an array,
             // an optional, a tuple or a function type has no symbol and leaves Target null — the
-            // constructor target below says what it is (X2).
+            // constructor target below says what it is.
             block.Target = block.Decl.Target is NamedType ? sym as TypeSymbol : null;
-            // 'extend<T> T[]', 'extend<T> ?T', a tuple, a function type (03 T7 X2; 05 §13 rule 6):
+            // 'extend<T> T[]', 'extend<T> ?T', a tuple, a function type (spec 05 §13 rule 6):
             // a shape, no symbol.
             block.IsConstructorTarget = block.Decl.Target is ArrayType or NullableType or AST.TupleType or AST.FunctionType;
-            // 'extend<T :: [I]> T' (04 D15): the target is the block's own parameter — a blanket
+            // 'extend<T :: [I]> T': the target is the block's own parameter — a blanket
             // block, which every type its constraints admit receives.
             block.IsBlanketTarget = block.Decl.Target is NamedType { TypeArguments.Length: 0 }
                 && sym is GenericParamSymbol blanket && block.Generics.Contains(blanket);
-            // 'Self' in the block is the target (03 T5), known before the signatures bind — for a
+            // 'Self' in the block is the target, known before the signatures bind — for a
             // plain target; an instance target is written out.
             if (block.Target is { } target && block.Decl.Target is NamedType { TypeArguments.Length: 0 })
                 scope.TryDeclare(new ImportBindingSymbol("Self", target, block.Decl));
@@ -849,7 +849,7 @@ public sealed class Resolver
         }
     }
 
-    /// <summary>An associated type's bound and its default or answer (03 T6, 10 B6).</summary>
+    /// <summary>An associated type's bound and its default or answer.</summary>
     private void BindAssociatedType(AssociatedTypeDecl t, SymbolTable scope)
     {
         foreach (var b in t.Bounds) BindType(b, scope);
@@ -892,7 +892,7 @@ public sealed class Resolver
         {
             foreach (var c in g.Constraints)
                 BindType(c, scope);
-            // A default type argument (03 T18) binds in the declaration's scope, where 'Self' and
+            // A default type argument binds in the declaration's scope, where 'Self' and
             // the earlier parameters are.
             if (g.Default is not null) BindType(g.Default, scope);
         }
@@ -917,7 +917,7 @@ public sealed class Resolver
                 BindType(th.Inner, scope);
                 if (th.Thrown is not null) BindType(th.Thrown, scope);
                 break;
-            case FieldTypeByInfo byInfo: BindType(byInfo.Owner, scope); break; // the field is the round's (X5)
+            case FieldTypeByInfo byInfo: BindType(byInfo.Owner, scope); break; // the field is the round's
             case ArrayType a: BindType(a.Element, scope); break;
             case TupleType t: foreach (var e in t.Elements) BindType(e, scope); break;
             case FunctionType f:
@@ -931,12 +931,12 @@ public sealed class Resolver
 
     private Symbol? ResolveTypePath(NamedType node, SymbolTable scope)
     {
-        // a type name a 'quote' wrote (13 M9b P5) is the macro's module's
+        // a type name a 'quote' wrote is the macro's module's
         if (node.QuotedFrom is { } quoted && _comp.FindModule(quoted.Split('.')) is { } quotedHome) scope = quotedHome.Members;
         var path = node.Path;
         var file = node.Span.File;
         var head = scope.Lookup(path[0]);
-        // 'T.Item', 'Self.Item', 'P.Item' (03 T6): the second segment names an associated type,
+        // 'T.Item', 'Self.Item', 'P.Item': the second segment names an associated type,
         // which the sema reads off the head, and a further one an associated type of that
         // ('A.Iter.Item', 05 §8 rule 4); the node is bound to the head.
         if (path.Length >= 2 && (head is GenericParamSymbol or TypeSymbol or ImportBindingSymbol { Target: TypeSymbol }))
@@ -948,7 +948,7 @@ public sealed class Resolver
             // A value of the name in the way (a variant, a function, a global) is no type, and a
             // type position looks past it as it looks past a module (BuiltinType): in
             // 'enum Expr { Literal(Literal, Span) }' the payload names the TYPE Literal of the
-            // module, not the enum's own variant, which stands nearer (M9b S1, std.syntax).
+            // module, not the enum's own variant, which stands nearer (std.syntax).
             return scope.Lookup(path[0], IsTypeLike) ?? BuiltinType(path[0], file);
         }
 
@@ -961,7 +961,7 @@ public sealed class Resolver
                 case ImportBindingSymbol { Target: ModuleSymbol mod } qualifier:
                     var next = mod.Members.LookupLocal(path[i]);
                     if (next is null) return null;
-                    // A type named through a module is visible from here, or reported (07 V2 S1)
+                    // A type named through a module is visible from here, or reported
                     // — and bound all the same, so its uses fail no second time.
                     if (_module is { } from && !_comp.Visible(next, from))
                         _de.Report("LYR-RES0009", Severity.Error, node.Span, _comp.Hidden(next));
@@ -999,20 +999,20 @@ public sealed class Resolver
     private Symbol? BuiltinType(string name, FileId file) =>
         _comp.Builtins.LookupLocal(name) as TypeSymbol ?? ImplicitType(name, file);
 
-    /// <summary>A type named without an import (07 V3 I8): the prelude's in a program's own code;
+    /// <summary>A type named without an import: the prelude's in a program's own code;
     /// std.core's in what the compiler wrote, and for the 4.x tools.</summary>
     private TypeSymbol? ImplicitType(string name, FileId file) =>
         _comp.Lyric5Modules && !_comp.IsSynthesized(file) ? _comp.PreludeMember(name) as TypeSymbol : CoreType(name);
 
-    /// <summary>A public type of <c>std.core</c>, visible without an import (design/v5/spec/10
-    /// U-series; 03 T10 for <c>Any</c>): the last answer for a bare type name, after the scope
+    /// <summary>A public type of <c>std.core</c>, visible without an import
+    /// (<c>Any</c> among them): the last answer for a bare type name, after the scope
     /// and the builtins — a program's own name of the kind wins.</summary>
     private TypeSymbol? CoreType(string name) =>
         _comp.FindModule(["std", "core"])?.Members.LookupLocal(name) is TypeSymbol { Visibility: Visibility.Public } core ? core : null;
 
     // --- Helpers ---
 
-    /// <summary>The word as a visibility (07 V2): none means <c>internal</c> in Lyric 5, the
+    /// <summary>The word as a visibility: none means <c>internal</c> in Lyric 5, the
     /// module's for the 4.x tools.</summary>
     private Visibility Vis(VisibilityWord word) => word switch
     {

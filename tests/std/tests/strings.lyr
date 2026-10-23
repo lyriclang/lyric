@@ -1,4 +1,4 @@
-// std.core's strings (design/v5/spec/10 B9 S1–S3): UTF-8, the length in bytes, the characters
+// std.core's strings: UTF-8, the length in bytes, the characters
 // decoded, the order of the bytes, the search over a string pattern.
 import std.test { assertEq, assertFalse, assertNull, assertTrue };
 

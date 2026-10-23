@@ -1,4 +1,4 @@
-// Lambdas that throw (13 M8c P2, 05 K4; M8c S4): what a function given to an adapter, a terminator or
+// Lambdas that throw: what a function given to an adapter, a terminator or
 // a higher function throws, the walk or the call throws — beside what the source throws — and what a
 // throw leaves behind: a sort every element, removeWhere what it decided and the rest, a map itself.
 import std.collections { List, Map };

@@ -98,12 +98,12 @@ namespace Lyric.Ir
     /// </summary>
     public sealed record IrArrayType(IrType Element) : IrType;
 
-    /// <summary><c>Slice&lt;T&gt;</c> (design/v5/spec/03 T13 A2): a view of <c>T[]</c> — a
+    /// <summary><c>Slice&lt;T&gt;</c>: a view of <c>T[]</c> — a
     /// pointer into the array's elements and a length, a value of two words that shares the
     /// elements. Like the array, the element type is inline.</summary>
     public sealed record IrSliceType(IrType Element) : IrType;
 
-    /// <summary><c>T[N]</c> (design/v5/spec/03 T13 A4): N elements inline, a value like a struct
+    /// <summary><c>T[N]</c>: N elements inline, a value like a struct
     /// — copied at a binding point, laid out as a C array where it lies.</summary>
     public sealed record IrInlineArrayType(IrType Element, int Length) : IrType;
 
@@ -188,14 +188,14 @@ public sealed record IrHostType(string Name) : IrType;
 public sealed record IrFunctionType(IrType[] Parameters, IrType Return) : IrType;
 
 /// <summary>
-/// A coroutine (design/v5/spec/06 N2): a reference to the runtime's coroutine object, which runs
+/// A coroutine: a reference to the runtime's coroutine object, which runs
 /// its body on a stack of its own. <see cref="Yield"/> is what a pull hands over, <see cref="Result"/>
 /// what the body returns when it ends. Structural, like a function type: it has no declaration.
 /// </summary>
 public sealed record IrCoroutineType(IrType Yield, IrType Result) : IrType;
 
 /// <summary>
-/// The place of a value of <see cref="Value"/> (design/v5/spec/03 T12): what a place parameter
+/// The place of a value of <see cref="Value"/>: what a place parameter
 /// holds — a pointer, in C — and what an <c>addr</c> instruction makes for the argument. No value
 /// of the program is one: a place stands in a parameter, in a function type's parameter, and in
 /// the temps between its address and the call.

@@ -9,7 +9,7 @@ namespace Lyric.Ir.Interp;
 /// back — found by the same trials, <c>%e</c> at one precision after another until the text reads
 /// back, which .NET's correctly rounded <c>E</c> format and parser answer as glibc does — laid out
 /// as <c>laid_out</c> lays them; and the text under a precision, rounded half away from zero on
-/// the exact decimal expansion (<c>lyr_str_float_text</c>). Bit for bit (09 Q7).
+/// the exact decimal expansion (<c>lyr_str_float_text</c>). Bit for bit.
 /// </summary>
 public static class FloatText
 {

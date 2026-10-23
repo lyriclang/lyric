@@ -20,8 +20,8 @@ namespace Lyric.Parsing
         private readonly Dictionary<int, string> _docs = [];
         private int _pos = 0;
 
-        /// <summary>The tokens of a file, lexed again, for a part of it to be parsed again (M9a
-        /// S9). The file was lexed once already and what was wrong in it reported: what the lexer
+        /// <summary>The tokens of a file, lexed again, for a part of it to be parsed again.
+        /// The file was lexed once already and what was wrong in it reported: what the lexer
         /// says goes to <paramref name="de"/>, which the caller throws away.</summary>
         public static List<Token> Lex(SourceManager sm, FileId id, DiagnosticEngine de) => new TokenBuffer(sm, id, de)._buffer;
 

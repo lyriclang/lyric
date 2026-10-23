@@ -24,12 +24,12 @@ public sealed record BindingStmt(bool IsMutable, string Name, TypeNode? Type, Ex
 {
     public required Span NameSpan { get; init; }
 
-    /// <summary><c>using let f = open(p);</c> (design/v5/spec/05 E7 R1–R2, 08 Y5 S5): the
+    /// <summary><c>using let f = open(p);</c>: the
     /// <c>defer try f.close();</c> the binding owes its scope, written by the parser at the
     /// keyword — one LIFO list with the scope's other defers. <c>null</c> for a plain binding.</summary>
     public DeferStmt? Cleanup { get; init; }
 
-    /// <summary>A local <c>fn</c> (design/v5/spec/08 F8, F9), which the parser writes as this
+    /// <summary>A local <c>fn</c>, which the parser writes as this
     /// binding: its type the function's, its initializer a lambda of the parameters and the body.
     /// The name is bound before the lambda is checked — the body calls itself — and a closure that
     /// captures it holds a cell, filled once the closure stands.</summary>
@@ -60,7 +60,7 @@ public sealed record LetPatternStmt(bool IsMutable, Pattern Pattern, TypeNode? T
 // Else is a block, an IfStmt (else-if) or null.
 public sealed record IfStmt(Expr Condition, Block Then, Stmt? Else, Span Span) : Stmt(Span)
 {
-    /// <summary><c>comptime if</c> (design/v5/spec/09 Q2): <see cref="Condition"/> is a
+    /// <summary><c>comptime if</c>: <see cref="Condition"/> is a
     /// <c>comptime</c> site; both branches are checked, the one it chooses is lowered.</summary>
     public bool Comptime { get; init; }
 }
@@ -91,7 +91,7 @@ public sealed record ForInStmt(string Variable, Expr Iterable, Block Body, Span 
     /// pattern takes it apart at the top of every iteration.</summary>
     public Pattern? Pattern { get; init; }
 
-    /// <summary><c>comptime for</c> (design/v5/spec/09 Q2): <see cref="Iterable"/> is a
+    /// <summary><c>comptime for</c>: <see cref="Iterable"/> is a
     /// <c>comptime</c> site holding an array; the body is checked once and lowered once for each
     /// element, the variable that element's value.</summary>
     public bool Comptime { get; init; }
@@ -105,7 +105,7 @@ public sealed record BreakStmt(Span Span) : Stmt(Span)
     public string? Label { get; init; }
     public Span LabelSpan { get; init; }
 
-    /// <summary><c>break value;</c> (design/v5/spec/05 E11): the value the loop it leaves gives —
+    /// <summary><c>break value;</c>: the value the loop it leaves gives —
     /// only a <c>loop</c> takes one.</summary>
     public Expr? Value { get; init; }
 }
@@ -116,7 +116,7 @@ public sealed record ContinueStmt(Span Span) : Stmt(Span)
 }
 public sealed record ReturnStmt(Expr? Value, Span Span) : Stmt(Span);
 public sealed record YieldStmt(Expr? Value, Span Span) : Stmt(Span);
-// A coroutine is pulled with 'co.next()' (design/v5/spec/06 N2); Lyric 4's 'resume' is gone.
+// A coroutine is pulled with 'co.next()'; Lyric 4's 'resume' is gone.
 
 // The body is a block or an ExprStmt.
 public sealed record DeferStmt(Stmt Body, Span Span) : Stmt(Span);
@@ -147,8 +147,8 @@ public sealed record CatchClause(string? BindingName, TypeNode? BindingType, Blo
     /// writes it back bare.</summary>
     public bool ExpressionBody { get; init; }
 
-    /// <summary>The set form's types, <c>catch (e in [A, B])</c> (design/v5/spec/05 E9 C5, 08 Y6):
-    /// the clause takes a value of any of them, and the binding carries the set (K7). Empty for the
+    /// <summary>The set form's types, <c>catch (e in [A, B])</c>:
+    /// the clause takes a value of any of them, and the binding carries the set. Empty for the
     /// other forms.</summary>
     public TypeNode[] BindingTypes { get; init; } = [];
 

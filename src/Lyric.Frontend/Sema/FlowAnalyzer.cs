@@ -24,7 +24,7 @@ internal sealed class FlowAnalyzer
         _de = de;
     }
 
-    /// <summary>A loop around the statement being analyzed (05 E11): its label, the sets its
+    /// <summary>A loop around the statement being analyzed: its label, the sets its
     /// breaks carried out of it, and those its continues carried to its next pass.</summary>
     private sealed class LoopFrame(string? label)
     {
@@ -111,7 +111,7 @@ internal sealed class FlowAnalyzer
             case Block b:
                 return AnalyzeStatements(b.Statements, assigned);
             case BindingStmt bd:
-                // a local 'fn' (08 F8) is assigned within its own lambda: the body runs once called,
+                // a local 'fn' is assigned within its own lambda: the body runs once called,
                 // and the binding holds the closure by then
                 if (bd.LocalFunction && _types.RefOf(bd) is { } own) assigned.Add(own);
                 if (bd.Initializer is not null)
@@ -176,7 +176,7 @@ internal sealed class FlowAnalyzer
                 if (fo.Pattern is not null) AddPatternBindings(fo.Pattern, loopSet);
                 InFrame(new LoopFrame(fo.Label), () => AnalyzeStatements(fo.Body.Statements, loopSet));
                 return assigned;
-            // What a break carries out of its loop: the set as it stands here (05 E11) — after a
+            // What a break carries out of its loop: the set as it stands here — after a
             // 'loop', what every one of its breaks saw.
             case BreakStmt br:
                 if (br.Value is not null) AnalyzeExpr(br.Value, assigned);
@@ -255,7 +255,7 @@ internal sealed class FlowAnalyzer
     }
 
     // Checks reads, where unassigned is an error, and handles assignments.
-    /// <summary>A 'comptime for' item of an initializer (M9a S10): its variable is the round's,
+    /// <summary>A 'comptime for' item of an initializer: its variable is the round's,
     /// assigned as a loop's is; the value is read once, as the body of a loop is.</summary>
     private void AnalyzeInitRound(StructInitRound round, HashSet<Symbol> assigned)
     {
@@ -372,7 +372,7 @@ internal sealed class FlowAnalyzer
                 return;
             case LoopExpr loop:
             {
-                // The body runs at least once, and only a break leaves (05 E11): what is assigned
+                // The body runs at least once, and only a break leaves: what is assigned
                 // after the loop is what every break of it saw. No break: nothing follows it.
                 var frame = new LoopFrame(loop.Label);
                 var end = InFrame(frame, () => AnalyzeStatements(loop.Body.Statements, Clone(assigned)));
@@ -389,7 +389,7 @@ internal sealed class FlowAnalyzer
                     if (_types.RefOf(p) is { } ps) lamSet.Add(ps);
                     if (p.Pattern is not null) AddPatternBindings(p.Pattern, lamSet);
                 }
-                // Its loops are its own (08 Y11 F5).
+                // Its loops are its own.
                 var outerFrames = _loopFrames;
                 _loopFrames = new();
                 if (lam.Body is Block lb) AnalyzeStatements(lb.Statements, lamSet);

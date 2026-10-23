@@ -1,4 +1,4 @@
-// std.fmt.format (08 Y7, 10 S7; M8c S8c): a template read at run time in the f-strings' format
+// std.fmt.format: a template read at run time in the f-strings' format
 // language — the next value and the i-th, a spec on either, Debug under '?', braces doubled.
 import std.fmt { format };
 import std.test { assertEq };

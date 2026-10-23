@@ -18,8 +18,8 @@ public sealed class ExtensionRegistry
 
     public void Add(ExtensionBlock block) => _blocks.Add(block);
 
-    /// <summary>Takes a block back as if never declared: an implicit synthesis (04 D7 "Debug
-    /// bei Bedarf") whose body does not check. The index is rebuilt, so no lookup finds it.</summary>
+    /// <summary>Takes a block back as if never declared: an implicit synthesis (the unasked
+    /// <c>Debug</c>) whose body does not check. The index is rebuilt, so no lookup finds it.</summary>
     public void Withdraw(ExtensionBlock block)
     {
         _blocks.Remove(block);
@@ -63,14 +63,14 @@ public sealed class ExtensionBlock
     public FunctionSymbol[] Methods { get; }
     public TypeSymbol? Target { get; set; }
 
-    /// <summary>The block's own type parameters (03 T7 X1), declared in <see cref="MethodScope"/>.</summary>
+    /// <summary>The block's own type parameters, declared in <see cref="MethodScope"/>.</summary>
     public GenericParamSymbol[] Generics { get; init; } = [];
 
     /// <summary>The target as a type, <c>List&lt;T&gt;</c> with the block's own parameters; resolved
     /// by the sema on first use. <c>null</c> until then and for a plain target.</summary>
     public Sema.LyrType? TargetType { get; set; }
 
-    /// <summary>The target is a built-in constructor — <c>T[]</c>, <c>?T</c>, a tuple (03 T7 X2):
+    /// <summary>The target is a built-in constructor — <c>T[]</c>, <c>?T</c>, a tuple:
     /// no symbol of its own, matched by shape.</summary>
     public bool IsConstructorTarget { get; set; }
 
@@ -90,11 +90,11 @@ public sealed class ExtensionBlock
     /// until asked.</summary>
     public GenericParamSymbol[]? OpenParameters { get; set; }
 
-    /// <summary>The target is the block's own parameter, <c>extend&lt;T :: [I]&gt; T</c> (04 D15): a
+    /// <summary>The target is the block's own parameter, <c>extend&lt;T :: [I]&gt; T</c>: a
     /// blanket block, matched by its constraints alone.</summary>
     public bool IsBlanketTarget { get; set; }
 
-    /// <summary>Synthesized unasked — the <c>Debug</c> every type gets where it can (04 D7). The
+    /// <summary>Synthesized unasked — the <c>Debug</c> every type gets where it can. The
     /// sema checks it muted and withdraws it where the fields give no rendering.</summary>
     public bool IsImplicit { get; init; }
 
@@ -108,7 +108,7 @@ public sealed class ExtensionBlock
 }
 
 /// <param name="Block">The block that declares it: a conformance block (<c>extend T :: [I]</c>)
-/// scopes its members to the conformance (design/v5/spec/04 D3), an inherent one does not.</param>
+/// scopes its members to the conformance, an inherent one does not.</param>
 public readonly record struct ExtensionMethod(FunctionSymbol Symbol, ModuleSymbol Module, ExtensionBlock Block)
 {
     public bool InConformanceBlock => Block.Decl.Interfaces.Length > 0;

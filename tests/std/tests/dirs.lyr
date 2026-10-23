@@ -1,7 +1,7 @@
-// std.fs's directories and what a path names (design/v5/spec/10 O5; M8b S7a): made, read and
+// std.fs's directories and what a path names: made, read and
 // removed; metadata; renamed over a file; exists, canonicalize, absolute; the entries' iterator
 // closed on every way out. Each test works in a directory of its own from fs.tempDir() and removes
-// it at its end: a run leaves nothing in its working directory (M9a's point 104).
+// it at its end: a run leaves nothing in its working directory.
 import std.fs;
 import std.io { IoError, IoErrorKind };
 import std.path;

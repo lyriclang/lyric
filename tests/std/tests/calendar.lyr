@@ -1,4 +1,4 @@
-// std.time's calendar (design/v5/spec/10 Q1; M8b S5b): days counted against Python's datetime,
+// std.time's calendar: days counted against Python's datetime,
 // the proleptic Gregorian calendar, a dense walk over 4400 years, RFC 3339 both ways, what is no
 // date and no time.
 import std.core { ParseError };

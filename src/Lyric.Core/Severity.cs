@@ -1,8 +1,7 @@
 namespace Lyric.Core;
 
 /// <summary>
-/// How bad a diagnostic is (design/v5/spec/11 G1: <c>Error</c>, <c>Warning</c>, <c>Hint</c> — the
-/// neutral <c>Info</c> went, nothing reported it). The stage belongs to the CODE: one code always reports at one
+/// How bad a diagnostic is: <c>Error</c>, <c>Warning</c> or <c>Hint</c>. The stage belongs to the CODE: one code always reports at one
 /// severity, which is what lets a catalogue say what a code means without asking who raised it.
 /// </summary>
 public enum Severity

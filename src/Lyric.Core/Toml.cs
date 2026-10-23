@@ -4,7 +4,7 @@ using System.Text;
 namespace Lyric.Core;
 
 /// <summary>
-/// The TOML a manifest is written in (design/v5/spec/11 W2: <c>lyric.toml</c>), the subset it uses:
+/// The TOML a manifest is written in (<c>lyric.toml</c>), the subset it uses:
 /// tables, arrays of tables and dotted headers; bare, quoted and dotted keys; basic strings with
 /// their escapes, literal strings; integers; booleans; arrays and inline tables; comments. What a
 /// manifest never holds — floats, dates and times, multi-line strings — is refused with its
@@ -18,7 +18,7 @@ public static class Toml
     public static TomlTable Parse(string text) => new Reader(text, false).Document();
 
     /// <summary>The subset with literal multi-line strings (<c>'''…'''</c>, no escapes inside, a line
-    /// break right after the opening dropped) — the diagnostic catalog's (M12a S3), whose explanations
+    /// break right after the opening dropped) — the diagnostic catalog's, whose explanations
     /// and programs run over lines. A manifest still refuses them.</summary>
     public static TomlTable ParseCatalog(string text) => new Reader(text, true).Document();
 

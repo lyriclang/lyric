@@ -1,4 +1,4 @@
-// std.syntax (design/v5/spec/10 B13 M2; M9b S1): the syntax tree as values at compile time - read
+// std.syntax: the syntax tree as values at compile time - read
 // from text, built by hand, walked, written back as the formatter writes it.
 import std.test { assertEq, assertTrue };
 import std.syntax { parseExpr, parseStmts, parseDecls, Expr, Ident, Literal, BinaryOp, Span, Node, Block };

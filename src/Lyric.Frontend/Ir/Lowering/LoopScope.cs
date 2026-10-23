@@ -27,7 +27,7 @@ internal sealed class LoopScope(BlockBuilder blocks)
     /// walking outward through the loop stack.</summary>
     public string? Label { get; init; }
 
-    /// <summary>For a <c>loop</c> that gives a value (05 E11): the synthetic local its breaks write
+    /// <summary>For a <c>loop</c> that gives a value: the synthetic local its breaks write
     /// and its exit reads, and the value's type. Null for every other loop.</summary>
     public LocalId? ValueSlot { get; init; }
 

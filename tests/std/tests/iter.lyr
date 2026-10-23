@@ -1,4 +1,4 @@
-// std.core's iteration protocol (design/v5/spec/10 B6): ranges from both ends, the size hint, an
+// std.core's iteration protocol: ranges from both ends, the size hint, an
 // iterator iterable as itself.
 import std.test { assertEq, assertNull, assertTrue };
 

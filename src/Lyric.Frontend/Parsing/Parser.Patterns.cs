@@ -59,7 +59,7 @@ public sealed partial class Parser
                 if (AtContextual("_"))
                 {
                     _buffer.Advance();
-                    // '_: Circle' (03 T11): the type is tested, nothing is bound.
+                    // '_: Circle': the type is tested, nothing is bound.
                     if (_buffer.Match(TokenKind.Colon))
                     {
                         var tested = ParseType();
@@ -70,7 +70,7 @@ public sealed partial class Parser
                 }
                 return ParsePathPattern();
             // '.Red', '.Num(v)', '.Rect { w = 0, h }': the variant of the scrutinee's enum, the
-            // enum unnamed (08 Y6).
+            // enum unnamed.
             case TokenKind.Dot when _buffer.Peek(1).TokenKind == TokenKind.Identifier:
             {
                 _buffer.Advance();
@@ -138,12 +138,12 @@ public sealed partial class Parser
             path.Add(_sm.Slice(last.Span).ToString());
         }
 
-        // A single bare identifier is a binding — always (08 Y6: a variant is written '.Red' or
+        // A single bare identifier is a binding — always (a variant is written '.Red' or
         // 'Signal.Red'; a name that spells a variant is refused by the sema). A qualified one,
         // and a name with a payload, is a variant.
         if (path.Count == 1 && !_buffer.Check(TokenKind.LParen) && !_buffer.Check(TokenKind.LBrace))
         {
-            // 'c: Circle' (03 T11): the type pattern, the form of 'catch (e: T)'.
+            // 'c: Circle': the type pattern, the form of 'catch (e: T)'.
             if (_buffer.Match(TokenKind.Colon))
             {
                 var tested = ParseType();
@@ -156,8 +156,8 @@ public sealed partial class Parser
     }
 
     /// <summary>
-    /// <c>s in [Circle, Rect]</c> (08 Y6), after the name: one type bare, several in brackets — the
-    /// list rule (D5/D6), as on <c>catch (e in [A, B])</c>. Unlike the clause, no bracket-less list
+    /// <c>s in [Circle, Rect]</c>, after the name: one type bare, several in brackets — the
+    /// list rule, as on <c>catch (e in [A, B])</c>. Unlike the clause, no bracket-less list
     /// is read as the set meant: a ',' after the type is the next element of the pattern around
     /// it, <c>(s in Circle, n)</c>.
     /// </summary>
@@ -360,11 +360,11 @@ public sealed partial class Parser
         return new IfExpr(cond, then, elseBranch, Span.Union(kw.Span, Whole(elseBranch)));
     }
 
-    /// <summary>A branch of an 'if' expression (08 Y5 S1): an expression, 'if (c) a else b', or a
+    /// <summary>A branch of an 'if' expression: an expression, 'if (c) a else b', or a
     /// value block, 'if (c) { …; a } else { …; b }'.</summary>
     private Expr ParseBranch() => _buffer.Check(TokenKind.LBrace) ? ParseValueBlock() : ParseExpr(0);
 
-    /// <summary>A value block as an expression (08 Y4): the statements, and a tail without ';'
+    /// <summary>A value block as an expression: the statements, and a tail without ';'
     /// that is the block's value.</summary>
     private BlockExpr ParseValueBlock()
     {

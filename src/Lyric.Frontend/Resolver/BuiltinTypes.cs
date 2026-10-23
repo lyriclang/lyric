@@ -6,7 +6,7 @@ namespace Lyric.Resolver;
 /// <summary>
 /// The built-in types plus the language built-ins `panic` (return type never) and `same`
 /// (identity of two references). The root of what is thrown is no built-in since Lyric 5: it is
-/// `std.core`'s `Error` (design/v5/spec/05 E6 O1), visible without an import like every public
+/// `std.core`'s `Error`, visible without an import like every public
 /// type of `std.core`.
 ///
 /// They live in a scope that is the root parent of every module scope, so a name resolves through
@@ -23,8 +23,8 @@ public static class BuiltinTypes
         "bool", "char", "string", "void", "never"
     };
 
-    /// <summary>The 64-bit names are aliases (03 T1a): <c>int64</c> IS <c>int</c>, one symbol under
-    /// two names, so that an extend of either reaches both (open point 149).</summary>
+    /// <summary>The 64-bit names are aliases: <c>int64</c> IS <c>int</c>, one symbol under
+    /// two names, so that an extend of either reaches both.</summary>
     public static readonly (string Alias, string Of)[] Aliases =
     {
         ("int64", "int"), ("uint64", "uint"), ("float64", "float"),
@@ -44,18 +44,18 @@ public static class BuiltinTypes
         // Coroutine<T>: the name resolves here, the type form is built by the sema.
         scope.TryDeclare(new TypeSymbol("Coroutine", TypeSymbolKind.Builtin, Visibility.Public,
             new SymbolTable(), declaration: null));
-        // Slice<T>, the view of T[] (design/v5/spec/03 T13 A2; 10 C2: a language primitive of
+        // Slice<T>, the view of T[] (a language primitive of
         // std.core, visible without an import): the same way.
         scope.TryDeclare(new TypeSymbol("Slice", TypeSymbolKind.Builtin, Visibility.Public,
             new SymbolTable(), declaration: null));
-        // StringView, the view of a string's bytes (10 S1, 03 A2): the same way, with no
+        // StringView, the view of a string's bytes: the same way, with no
         // parameter; its members come from std.core's blocks, as a string's do.
         scope.TryDeclare(new TypeSymbol("StringView", TypeSymbolKind.Builtin, Visibility.Public,
             new SymbolTable(), declaration: null));
         return scope;
     }
 
-    // `panic(message: string): never` (05 E8, E12): it does not return, which its type says like
+    // `panic(message: string): never`: it does not return, which its type says like
     // any other function's would.
     private static FunctionSymbol CreatePanic()
     {
@@ -70,7 +70,7 @@ public static class BuiltinTypes
         return new FunctionSymbol("panic", Visibility.Public, isMut: false, decl);
     }
 
-    // `same(a, b)`: whether two references are one object (design/v5/spec/02 M10). Identity is
+    // `same(a, b)`: whether two references are one object. Identity is
     // a function and not an operator — `==` means value equality through `Equatable` and nothing
     // else. The declaration reads as the generic it is for a reader (`fn same<T>(a: T, b: T):
     // bool`); what it accepts — two references of one type, never a value — is the sema's rule,

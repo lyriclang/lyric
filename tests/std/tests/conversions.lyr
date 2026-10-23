@@ -1,4 +1,4 @@
-// From and Into (10 B4; M8c S7): a type writes From, and Into follows through std.core's blanket —
+// From and Into: a type writes From, and Into follows through std.core's blanket —
 // the expected type chooses the target, a constraint on Into reaches the blanket, a generic type
 // is From its element.
 import std.test { assertEq };

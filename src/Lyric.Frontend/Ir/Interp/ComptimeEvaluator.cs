@@ -5,7 +5,7 @@ using Lyric.Sema;
 namespace Lyric.Ir.Interp;
 
 /// <summary>
-/// The evaluation pass (design/v5/spec/09 A4; 13 M9a P1, P11): over the module the hoisting
+/// The evaluation pass: over the module the hoisting
 /// lowering made — each <c>comptime</c> site a function <c>&lt;comptime:i&gt;</c> and the module's
 /// only roots, so it holds what the sites reach — the globals are filled and every site run; its
 /// value becomes the constant the real lowering writes (<see cref="ComptimeTable"/>). A site that
@@ -13,21 +13,21 @@ namespace Lyric.Ir.Interp;
 /// </summary>
 public static class ComptimeEvaluator
 {
-    /// <summary>The steps one site may take unless the root manifest says otherwise (09 Q5):
+    /// <summary>The steps one site may take unless the root manifest says otherwise:
     /// a few seconds of interpretation.</summary>
     public const long DefaultBudget = 50_000_000;
 
     /// <summary>The frames of the inner backtrace a diagnostic shows, innermost first.</summary>
     private const int ShownFrames = 12;
 
-    /// <param name="embed">What <c>embed</c> reads through (09 Q4), which notes each file read.</param>
-    /// <param name="build">What the build is for and as (09 B4): <c>target</c>'s and <c>profile</c>'s
+    /// <param name="embed">What <c>embed</c> reads through, which notes each file read.</param>
+    /// <param name="build">What the build is for and as: <c>target</c>'s and <c>profile</c>'s
     /// answers; the host's without.</param>
     /// <param name="include">Which sites to evaluate, by index; all without. A site left out has no
-    /// value — one in what the build leaves out (09 B2).</param>
-    /// <param name="standard">Which sites are the standard library's (M9a S12): they run under
+    /// value — one in what the build leaves out.</param>
+    /// <param name="standard">Which sites are the standard library's: they run under
     /// <see cref="DefaultBudget"/>, the program's manifest's budget being the program's — a tight one
-    /// stopped std.hash's tables in every program that set it.</param>
+    /// would stop std.hash's tables in every program that set it.</param>
     /// <returns>Each site's constant, or <c>null</c> where a site was reported.</returns>
     public static IReadOnlyDictionary<int, IrConstValue>? Evaluate(IrModule hoisted, TypeResult types,
         DiagnosticEngine diagnostics, long budget, bool overflowChecks, EmbedReader? embed = null, BuildFacts? build = null,
@@ -57,7 +57,7 @@ public static class ComptimeEvaluator
         return failed ? null : values;
     }
 
-    /// <summary>A site's value as the constant the real lowering writes (09 Q1; 13 M9a P3).
+    /// <summary>A site's value as the constant the real lowering writes.
     /// <paramref name="type"/> is its type in <paramref name="module"/>, the hoisted one, whose
     /// layouts the value's slots follow: an integer in the IR's encoding of its width, an
     /// aggregate as the tree the lowering builds it from — fields in layout order, a variant by
@@ -71,7 +71,7 @@ public static class ComptimeEvaluator
         IrScalarType { Kind: IrScalar.F32 } => new FloatConst(value.AsSingle),
         IrScalarType scalar => new IntConst(Arith.Pattern(value.Bits, scalar.Kind)),
         IrStructType s => new StructConst(Fields(((AggObj)value.Ref!).Slots, module.Types[s.Type.Value].FieldTypes, 0, module)),
-        // a Box's object (02 M13), the one class whose value is a constant: its value is fixed
+        // a Box's object, the one class whose value is a constant: its value is fixed
         IrRefType r => new StructConst(Fields(((ClassObj)value.Ref!).Fields, module.Types[r.Type.Value].FieldTypes, 0, module)),
         IrEnumType e => Variant((AggObj)value.Ref!, module.Types[e.Type.Value], module),
         IrOptionalType o => (OptObj)value.Ref! is { Has: true } some

@@ -1,4 +1,4 @@
-// The checksums of std.hash (10 Q3; M8c S11) against their norms: CRC-32's and CRC-32C's check
+// The checksums of std.hash against their norms: CRC-32's and CRC-32C's check
 // value over "123456789" (the CRC catalogue's), RFC 3720 B.4's four vectors for CRC-32C, Adler-32
 // of "Wikipedia", and larger inputs against zlib and a bitwise CRC-32C from the definition
 // (r/c11/vectors.py) — past Adler-32's 5552 bytes between reductions. Each continues from a

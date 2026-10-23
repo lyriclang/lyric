@@ -1,4 +1,4 @@
-// Capacities and a heap of an array (design/v5/spec/10 N3, C1, C3; spec 12 §Collections).
+// Capacities and a heap of an array (spec 12 §Collections).
 import std.collections { Deque, Heap, List, Map, Set };
 import std.test { assertEq, assertPanics };
 

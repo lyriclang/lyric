@@ -1,4 +1,4 @@
-// std.io's buffers and text (design/v5/spec/10 O2; M8b S3): a codepoint split between reads, the
+// std.io's buffers and text: a codepoint split between reads, the
 // line ends, a BOM only when asked, invalid UTF-8 as InvalidData, a BufWriter holding back until a
 // flush or its close, a BufReader reading its inner reader in blocks.
 import std.io { BufReader, BufWriter, ByteBuffer, ByteReader, IoError, Reader, TextReader, TextWriter, Writer };

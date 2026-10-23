@@ -1,4 +1,4 @@
-// A generic member as the witness of a plain interface member (13 S9; M8c S9b): a string and a view
+// A generic member as the witness of a plain interface member: a string and a view
 // are Contains<char> through the view's contains<P :: [Pattern]>, a type of the program's own
 // through its generic member, reached from a constraint and by 'in'.
 import std.core { Contains };

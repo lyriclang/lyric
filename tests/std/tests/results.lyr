@@ -1,4 +1,4 @@
-// Result (05 E1; M8c S7): the two bridges — Result.of catches a call's error into a value, get()
+// Result: the two bridges — Result.of catches a call's error into a value, get()
 // throws it out again — the variants matched, a result built by hand, the join of two errors.
 import std.test { assertEq, assertFalse, assertTrue };
 

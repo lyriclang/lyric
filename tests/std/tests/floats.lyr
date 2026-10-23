@@ -1,4 +1,4 @@
-// std.core's floats (design/v5/spec/10 B5 Z1, Z2): the type's constants, IEEE's total order, the
+// std.core's floats: the type's constants, IEEE's total order, the
 // bits - and std.math's elementary functions over them.
 import std.math { abs, acos, pow, asin, atan, atan2, cbrt, ceil, cos, cosh, exp, floor, hypot, ln, log10, log2, round, sin, sinh, sqrt, tan, tanh, trunc };
 import std.test { assertEq, assertTrue, assertFalse, assertClose };

@@ -81,7 +81,7 @@ public static class IrVerifier
             findings.Add($"global initializer {init} is out of range " +
                          $"(module has {module.Functions.Count} function(s))");
 
-        // The scheduler loop the runtime hands main's context to (06 T6): a C function pointer of
+        // The scheduler loop the runtime hands main's context to: a C function pointer of
         // one shape, 'void (*)(LyrCoro *)' — a coroutine of nothing in, nothing out, no error slot.
         if (module.TaskMain is { } loop)
         {
@@ -785,7 +785,7 @@ public static class IrVerifier
                     RequireDestType(cr.Dest, new IrOptionalType(cr.ResultType), "coresult", block, index);
                     break;
                 case YieldSuspend y: CheckYieldSuspend(y, block, index); break;
-                // The in-flight error is an Error interface value (05 E6 O1); taking it off is a
+                // The in-flight error is an Error interface value; taking it off is a
                 // statement about the function's state, with nothing to type.
                 case CurrentError e:
                     if (e.Type is not IrInterfaceType)
@@ -797,7 +797,7 @@ public static class IrVerifier
                 case RestoreError:
                 case SuppressError:
                     break;
-                // What a clause asks of the error it kept (05 E6 O3): an array of interface values,
+                // What a clause asks of the error it kept: an array of interface values,
                 // and one of 'int'.
                 case SuppressedErrors s:
                     if (s.Type is not IrArrayType { Element: IrInterfaceType })
@@ -824,7 +824,7 @@ public static class IrVerifier
         {
             RequireDestType(c.Dest, c.Type, "const", block, index);
 
-            // A comptime array of scalars or strings (13 M9a P3): static data, each element a
+            // A comptime array of scalars or strings: static data, each element a
             // scalar const of the element type. The rest of a comptime value is built by the
             // lowering and never stands in a const.
             if (c.Value is ArrayConst array)
@@ -980,7 +980,7 @@ public static class IrVerifier
 
             RequireDestType(cv.Dest, cv.To, "convert", block, index);
 
-            // 'as' converts between numeric types, and a char to and from U32 (03 T1d).
+            // 'as' converts between numeric types, and a char to and from U32.
             var charSide = IsChar(cv.From) ? cv.To : IsChar(cv.To) ? cv.From : null;
             var allowed = charSide is null
                 ? IsNumeric(cv.From) && IsNumeric(cv.To)
@@ -1169,7 +1169,7 @@ public static class IrVerifier
             IrRefType r => (TypeId?)r.Type,
             IrStructType v => v.Type,
             IrEnumType e => e.Type,
-            // A built-in's value into its box (M8c S8b): the box's one field is the value's type.
+            // A built-in's value into its box: the box's one field is the value's type.
             var value when m.Concrete.Value >= 0 && m.Concrete.Value < _module.Types.Count
                            && _module.Types[m.Concrete.Value] is { IsBuiltinBox: true, FieldTypes: [var payload] }
                            && IrType.Equal(payload, value) => m.Concrete,
@@ -1378,7 +1378,7 @@ public static class IrVerifier
         // The slot's arity is its functions' — every row agrees, conformance saw to that, and the
         // C table's type is read off the first. A call with fewer arguments is C's "too few
         // arguments" in debug, where nothing inlines it into a direct call this verifier checks:
-        // an interface call once left a default out that way (M9a S6).
+        // an interface call that leaves a default out would reach the C compiler that way.
         var row = _module.Impls.FindIndex(r => r.Interface == c.Interface);
         if (row >= 0 && _module.Impls[row].Methods is { } methods && c.Slot < methods.Length
             && methods[c.Slot].Value is var target and >= 0 && target < _module.Functions.Count
@@ -1437,7 +1437,7 @@ public static class IrVerifier
                                  $"but {g.Value} is {Show(actual)}");
     }
 
-    // ------------------------------------------------------------------ places (03 T12)
+    // ------------------------------------------------------------------ places
     //
     // Each 'addr' holds the place of what it names, of exactly its type; a load through a place
     // yields that type and a store takes it. Where a place may be MADE — an argument only — is the
@@ -1625,7 +1625,7 @@ public static class IrVerifier
         if (TypeOf(array) is IrArrayType a) return a.Element;
         if (TypeOf(array) is IrSliceType s) return s.Element;
         if (TypeOf(array) is IrInlineArrayType ia) return ia.Element;
-        // A string's bytes (10 S1): what a view of it, and the length of it, read.
+        // A string's bytes: what a view of it, and the length of it, read.
         if (TypeOf(array) is IrScalarType { Kind: IrScalar.String } && what is "mkslice" or "arraylen")
             return new IrScalarType(IrScalar.U8);
 
@@ -1745,10 +1745,8 @@ public static class IrVerifier
             RequireDestType(r.Dest, new IrArrayType(element), "arrrep", block, index);
     }
 
-    /// <summary>An optional is not nestable: <c>??T</c> would be indistinguishable from <c>?T</c> in the
-    /// runtime representation.</summary>
-    // An optional of an optional is a type since Lyric 5 (design/v5/spec/03 T4 O1): 'optnone'
-    // and 'optsome' take any inner type, an optional included, and each works on one level.
+    /// <summary>An optional of an optional is a type: <c>optnone</c> and <c>optsome</c> take any
+    /// inner type, an optional included, and each works on one level.</summary>
     private void CheckOptNone(OptNone n, BlockId block, int index)
     {
         RequireDestType(n.Dest, new IrOptionalType(n.Inner), "optnone", block, index);
@@ -1887,7 +1885,7 @@ public static class IrVerifier
                         ReportTerm(block, $"condition {c.Cond} is {Show(TypeOf(c.Cond))}, must be bool");
                     break;
 
-                // What is thrown conforms to Error, which the sema checked (05 E3); the lowering hands
+                // What is thrown conforms to Error, which the sema checked; the lowering hands
                 // it over as the Error interface value — boxed or re-tabled. Anything else here is a
                 // lowering bug, not a user error.
                 case Throw t when TypeOf(t.Value) is not IrInterfaceType:
@@ -1947,7 +1945,7 @@ public static class IrVerifier
         private static bool IsBool(IrType type) => type is IrScalarType { Kind: IrScalar.Bool };
 
         // The twin of TypeFacts.IsInteger, on IrType instead of LyrType: the verifier has to check
-        // the IR without the sema. 'Char' is NOT an integer (design/v5/spec/03 T1e): it orders and
+        // the IR without the sema. 'Char' is NOT an integer: it orders and
         // compares equal among its own, and converts to and from U32 only.
         private static bool IsInteger(IrType type) => type is IrScalarType
         {
@@ -1972,12 +1970,12 @@ public static class IrVerifier
             {
                 Kind: IrScalar.Bool or IrScalar.Char or IrScalar.String
             }
-            // Identity: 'same(a, b)' compares two references (design/v5/spec/02 M10) — objects,
+            // Identity: 'same(a, b)' compares two references — objects,
             // arrays, coroutines (03 §2.6). '==' never reaches here for them — the sema sends it
             // through 'Equatable'.
             || type is IrRefType or IrArrayType or IrCoroutineType
             // A view of bytes compares by its bytes: a StringView matched against a string
-            // literal (10 S1). '==' written between views is std.core's equalViews, never this.
+            // literal. '==' written between views is std.core's equalViews, never this.
             || type is IrSliceType { Element: IrScalarType { Kind: IrScalar.U8 } };
 
         private static bool IsBitwiseOrShift(IrBinKind kind) => kind is
@@ -2012,7 +2010,7 @@ public static class IrVerifier
             BoolConst => kind == IrScalar.Bool,
             CharConst => kind == IrScalar.Char,
             StringConst => kind == IrScalar.String,
-            // a comptime value's tree is built by the lowering, never a scalar's const (13 M9a P3)
+            // a comptime value's tree is built by the lowering, never a scalar's const
             ArrayConst or StructConst or VariantConst or OptionalConst => false,
             _ => throw new InternalCompilationException(
                 $"ir-verifier: unhandled const {value.GetType().Name}")

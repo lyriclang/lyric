@@ -4,7 +4,7 @@ using Lyric.Core;
 namespace Lyric.Ir.Lowering;
 
 /// <summary>
-/// What a build leaves out (design/v5/spec/09 A6 B2, B3; 13 M9a P9): the declarations whose
+/// What a build leaves out: the declarations whose
 /// <c>@When</c> is false, and the modules whose header carries a false one — every declaration of
 /// such a module. They are checked as the rest; the lowering builds none of them, their
 /// <c>comptime</c> sites are not evaluated, and an active use of one is refused.

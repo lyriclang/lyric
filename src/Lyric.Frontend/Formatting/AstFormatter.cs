@@ -68,7 +68,7 @@ public sealed class AstFormatter
     public static Doc Build(Module module, string source, IReadOnlyList<Trivia> comments) =>
         new AstFormatter(source, comments).ModuleDoc(module);
 
-    /// <summary>A node that was built, not read, <c>std.syntax</c>'s (M9b S1): there is no source
+    /// <summary>A node that was built, not read, <c>std.syntax</c>'s: there is no source
     /// to copy a spelling from, so a literal is written from its value, and there are no comments.
     /// A <see cref="Block"/> is written with its braces.</summary>
     public static string FormatNode(Node node) => DocRenderer.Render(new AstFormatter(null, []).NodeDoc(node));
@@ -326,8 +326,8 @@ public sealed class AstFormatter
         TypeAliasDecl d => Doc.Of(Pub(d.Visibility),
             Doc.From($"{(d.IsOpaque ? "opaque " : "")}type {d.Name}"), GenericsDoc(d.Generics), Doc.From(" = "),
             TypeDoc(d.Aliased), Doc.From(";")),
-        // 'type Item;' declares, 'type Item = int;' answers or defaults (03 T6); 'type Iter ::
-        // [Iterator];' bounds (10 B6).
+        // 'type Item;' declares, 'type Item = int;' answers or defaults; 'type Iter ::
+        // [Iterator];' bounds.
         AssociatedTypeDecl d => Doc.Of(Doc.From($"type {d.Name}"),
             d.Bounds.Length == 0 ? Doc.Nil
                 : Doc.Of(Doc.From(" :: ["), Doc.Join(Doc.From(", "), d.Bounds.Select(TypeDoc).ToArray()), Doc.From("]")),
@@ -450,7 +450,7 @@ public sealed class AstFormatter
     private Doc ParamDoc(Param parameter)
     {
         var parts = new List<Doc>();
-        // '@callerExpr(actual)' (09 A11) stands before the name, on the parameter's line.
+        // '@callerExpr(actual)' stands before the name, on the parameter's line.
         foreach (var attribute in parameter.Attributes) parts.Add(Doc.Of(AttributeDoc(attribute), Doc.Space));
         if (parameter.IsParams && !parameter.IsEllipsis) parts.Add(Doc.From("params "));
         if (parameter.IsPlace) parts.Add(Doc.From("&"));
@@ -504,7 +504,7 @@ public sealed class AstFormatter
         return new Doc.Concat(parts);
     }
 
-    /// <param name="delegates">The field an entry delegates to (<c>Walker by legs</c>, 04 D1).</param>
+    /// <param name="delegates">The field an entry delegates to (<c>Walker by legs</c>).</param>
     private Doc InterfaceListDoc(TypeNode[] interfaces, string?[]? delegates = null) =>
         interfaces.Length == 0
             ? Doc.Nil
@@ -618,7 +618,7 @@ public sealed class AstFormatter
         finally { _loopLabels.RemoveAt(_loopLabels.Count - 1); }
     }
 
-    /// <summary>'break', its label, its value (05 E11, 08 S4).</summary>
+    /// <summary>'break', its label, its value.</summary>
     private Doc BreakDoc(BreakStmt b)
     {
         var parts = new List<Doc> { Doc.From(b.Label is null ? "break" : $"break {b.Label}") };
@@ -662,7 +662,7 @@ public sealed class AstFormatter
         MatchStmt s => MatchDoc(s.Scrutinee, s.Arms, s.Span),
         TryStmt s => TryDoc(s),
         ExprStmt { Expr: CallExpr { Arguments: [.., LambdaExpr { Form: LambdaForm.Trailing }] } } s => ExprDoc(s.Expr, Assign),
-        // a splice standing as a statement ends at its brace, as the parser reads it (M9b S3)
+        // a splice standing as a statement ends at its brace, as the parser reads it
         ExprStmt { Expr: SpliceExpr } s => ExprDoc(s.Expr, Assign),
         // A loop is a statement of its own: no ';' after its block.
         ExprStmt { Expr: LoopExpr } s => ExprDoc(s.Expr, Assign),
@@ -769,7 +769,7 @@ public sealed class AstFormatter
     private Doc CatchBindingDoc(CatchClause clause)
     {
         var name = clause.BindingName ?? "_";
-        // The set form: one type alone, several in brackets (the list rule, 08 D5/D6).
+        // The set form: one type alone, several in brackets (the list rule).
         if (clause.BindingTypes is [var only]) return Doc.Of(Doc.From($"{name} in "), TypeDoc(only));
         if (clause.BindingTypes.Length > 1)
             return Doc.Of(Doc.From($"{name} in ["),
@@ -779,8 +779,8 @@ public sealed class AstFormatter
             : Doc.Of(Doc.From($"{name}: "), TypeDoc(clause.BindingType));
     }
 
-    /// <summary><c>try e</c>, <c>try? e</c>, <c>try! e</c> and the expression form with its clauses
-    /// (05 E4). A clause binds to the nearest <c>try</c> on its left, so a <c>try</c> standing as
+    /// <summary><c>try e</c>, <c>try? e</c>, <c>try! e</c> and the expression form with its clauses.
+    /// A clause binds to the nearest <c>try</c> on its left, so a <c>try</c> standing as
     /// the operand of one with clauses, or as the body of a clause another follows, keeps its
     /// parentheses — without them the reparse hands it the clauses.</summary>
     private Doc TryExprDoc(TryExpr t)
@@ -789,7 +789,7 @@ public sealed class AstFormatter
         var parts = new List<Doc>
         {
             Doc.From(keyword),
-            // A mark to the right of an operator is a prefix of its operand (M5-9): parentheses
+            // A mark to the right of an operator is a prefix of its operand: parentheses
             // around more than that would be another program.
             ExprDoc(t.Value, t.Reach is not null ? Prefix : t.Catches.Length > 0 && t.Value is TryExpr ? Primary : Assign),
         };
@@ -887,7 +887,7 @@ public sealed class AstFormatter
         AssignExpr => Assign,
         // An if or a lambda extends to the end of the expression: as an operand it must be
         // parenthesized or the reparse reads past the operator. Treated as the loosest level.
-        // So does 'try', which covers everything to its right (08 Y4) — but for the mark that
+        // So does 'try', which covers everything to its right — but for the mark that
         // stands to the right of an operator, which is a prefix there and must stay one: in
         // parentheses it would be a mark at the start of them, and cover less.
         TryExpr { Reach: not null } => Prefix,
@@ -1147,7 +1147,7 @@ public sealed class AstFormatter
 
     private Doc LambdaDoc(LambdaExpr lambda)
     {
-        // '{ acc, x => … }': the parameters stand in the block's head, before '=>' (08 Y11 F2).
+        // '{ acc, x => … }': the parameters stand in the block's head, before '=>'.
         if (lambda.Form == LambdaForm.Trailing && lambda.Parameters is not [{ Implicit: true }] && lambda.Body is Block withParameters)
         {
             var head = Doc.Join(Doc.From(", "), lambda.Parameters.Select(p =>
@@ -1298,8 +1298,8 @@ public sealed class AstFormatter
     };
 
     /// <summary>
-    /// A return type, with the parentheses that say whose a 'throws' is (03 T17; the review's
-    /// M5-7, M6-6). They are written where the type ends in a set of its own — a function type
+    /// A return type, with the parentheses that say whose a 'throws' is.
+    /// They are written where the type ends in a set of its own — a function type
     /// that throws, a throwing task or coroutine: '(fn() -> int throws E)', '(Task&lt;int&gt; throws
     /// E)'; without them the set would be read as the clause of whoever returns the type. And
     /// where a set stands after a type that could have taken it: '(fn() -> int) throws E', and
@@ -1328,7 +1328,7 @@ public sealed class AstFormatter
         _ => false,
     };
 
-    /// <summary>A thrown set (05 E2): one type alone, several in brackets (the list rule, 08 D5/D6),
+    /// <summary>A thrown set: one type alone, several in brackets (the list rule),
     /// none for the bare form.</summary>
     private Doc ThrowsDoc(ThrowsClause throws) => throws.Types switch
     {
@@ -1337,7 +1337,7 @@ public sealed class AstFormatter
         var several => Doc.Of(Doc.From(" throws ["), Doc.Join(Doc.From(", "), several.Select(TypeDoc).ToArray()), Doc.From("]")),
     };
 
-    /// <param name="names">The associated type an argument fixes, 'Iterator&lt;Item = int&gt;' (03 T6).</param>
+    /// <param name="names">The associated type an argument fixes, 'Iterator&lt;Item = int&gt;'.</param>
     private Doc TypeArgsDoc(TypeNode[] arguments, string?[]? names = null) =>
         arguments.Length == 0
             ? Doc.Nil

@@ -1,5 +1,5 @@
 // The tables of musl's math functions, the bits exact, generated from musl 1.2.5's
-// exp_data.c, log_data.c, log2_data.c, pow_data.c and __rem_pio2_large.c (MIT; M10 S12,
+// exp_data.c, log_data.c, log2_data.c, pow_data.c and __rem_pio2_large.c (MIT;
 // tooling/libm/gen_tables.py). Not written by hand.
 namespace Lyric.Ir.Interp;
 

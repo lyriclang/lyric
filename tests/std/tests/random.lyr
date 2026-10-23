@@ -1,4 +1,4 @@
-// std.random (design/v5/spec/10 Q2; M8b S4c): the seeded stream — the same in every 5.x —, each
+// std.random: the seeded stream — the same in every 5.x —, each
 // drawing method's use of it, the free forms over the thread's generator, the panics. The seeded
 // values come from a reference of the stream (Python, checked against openssl's ChaCha20).
 import std.core { arrayOf };

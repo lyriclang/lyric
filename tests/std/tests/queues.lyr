@@ -1,4 +1,4 @@
-// std.collections' Deque (design/v5/spec/10 C6) and Heap (C1).
+// std.collections' Deque and Heap.
 import std.collections { Deque, Heap };
 import std.test { assertEq, assertNull, assertPanics, assertTrue };
 

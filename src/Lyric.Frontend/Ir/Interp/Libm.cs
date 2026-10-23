@@ -3,7 +3,7 @@ using static Lyric.Ir.Interp.LibmTables;
 namespace Lyric.Ir.Interp;
 
 /// <summary>
-/// musl 1.2.5's double math functions, ported line for line (design 09 D7, 13 M10 S12; MIT,
+/// musl 1.2.5's double math functions, ported line for line (MIT,
 /// runtime/third_party/musl-math/COPYRIGHT): <c>exp</c>, <c>log</c>, <c>log2</c>, <c>log10</c>,
 /// <c>pow</c>, <c>sin</c>, <c>cos</c>, <c>tan</c>, <c>asin</c>, <c>acos</c>, <c>atan</c>,
 /// <c>atan2</c>, <c>sinh</c>, <c>cosh</c>, <c>tanh</c>, <c>cbrt</c>, <c>hypot</c>. The runtime

@@ -1,4 +1,4 @@
-// std.core's strings, second part (design/v5/spec/10 B9 S2, S3): split, the lines, trimming,
+// std.core's strings, second part: split, the lines, trimming,
 // stripping, replacing, padding, StringBuilder.
 import std.string { StringBuilder };
 import std.test { assertEq, assertNull, assertTrue };

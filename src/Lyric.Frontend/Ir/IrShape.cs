@@ -178,7 +178,7 @@ public static class IrShape
         Return => Array.Empty<BlockId>(),
         Branch b => new[] { b.Target },
         CondBranch c => new[] { c.IfTrue, c.IfFalse },
-        // The error edges are CFG edges (05, 01 L5): a throw goes to its landing, a call that may
+        // The error edges are CFG edges: a throw goes to its landing, a call that may
         // fail to its continuation or its landing; the error leaves the function by Propagate.
         Throw t => new[] { t.Landing },
         ErrorBranch e => new[] { e.Continue, e.OnError },

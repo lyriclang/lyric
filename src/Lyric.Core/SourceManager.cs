@@ -5,7 +5,7 @@ namespace Lyric.Core;
 public sealed class SourceManager
 {
     /// <summary>The language line its files are read for: Lyric 5 refuses what only the 4.x grammar
-    /// has — a <c>\x</c> escape outside a byte string (design/v5/spec/08 Y7 L4). Set by the compiler
+    /// has — a <c>\x</c> escape outside a byte string. Set by the compiler
     /// that compiles Lyric 5 packages; the 4.x front end, which the tree still builds, leaves it.</summary>
     public bool Lyric5 { get; set; }
 
@@ -20,11 +20,11 @@ public sealed class SourceManager
     /// <summary>Where a synthesized file comes from: the written node it stands for (a conformance
     /// list entry, a declaration, a macro's site) and how to name it in a diagnostic (<c>"'Equatable'
     /// synthesized for 'P'"</c>), with notes every error in the file carries (the quote an expansion
-    /// came from, M9b S5). Nobody wrote the file, so nothing in it can be pointed at.</summary>
+    /// came from). Nobody wrote the file, so nothing in it can be pointed at.</summary>
     public readonly record struct Synthesized(Span At, string Label, IReadOnlyList<DiagnosticNote>? Notes = null);
 
-    /// <summary>A file the compiler wrote on the program's behalf (conformance synthesis, 04 D7; a
-    /// macro's expansion, 13 M9b S5). It parses and checks like any other; its diagnostics are
+    /// <summary>A file the compiler wrote on the program's behalf (a conformance's synthesis, a
+    /// macro's expansion). It parses and checks like any other; its diagnostics are
     /// re-pointed at <paramref name="at"/> by the <see cref="DiagnosticEngine"/>.</summary>
     public FileId AddSynthesized(string displayName, string text, Span at, string label, IReadOnlyList<DiagnosticNote>? notes = null)
     {

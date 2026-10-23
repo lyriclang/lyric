@@ -50,7 +50,7 @@ internal sealed class TypeTable
     /// instances and extensions included — and a site may stand in any of them.</summary>
     public ComptimeTable? Comptime { get; init; }
 
-    /// <summary>The quotes the lowering met (13 M9b P5), numbered as their imports are.</summary>
+    /// <summary>The quotes the lowering met, numbered as their imports are.</summary>
     public List<IrQuote> Quotes { get; } = [];
 
     public int NoteQuote(Lyric.AST.QuoteExpr quote, string module)
@@ -146,8 +146,8 @@ internal sealed class TypeTable
     public IReadOnlyList<(TypeSymbol Builtin, IrType Payload, TypeId Id)> BuiltinBoxes => _builtinBoxes;
 
     /// <summary>
-    /// The box of a built-in's value (01 V7 "ein Struct wird beim Übergang geboxt — immer", 03 T3
-    /// Typ → Interface; M8c S8b): an entry whose one field is the value itself. Interned by the
+    /// The box of a built-in's value — a value is boxed at the step into an interface, always: an
+    /// entry whose one field is the value itself. Interned by the
     /// value's type, as a cell is: two boxes of an <c>int</c> are one type. A string is boxed too
     /// — the data word of an interface value is always a reference to a box or an object, and a
     /// string's own header describes no table.
@@ -354,10 +354,9 @@ internal sealed class TypeTable
     /// environments. A tuple IS an object with N fields, so <c>newobj</c> and <c>ldfld</c> do it; the
     /// verifier checks it like any other object, and the bytecode format stays unchanged.</para>
     ///
-    /// <para>A VALUE, a struct with positional fields (design/v5/spec/01 V11): inline where it
-    /// lies, copied at a binding point. Lyric 4 made it an object, which a tuple's immutability
-    /// hid; the layout is now the one C gives an anonymous struct, which the ABI hands over by
-    /// value (01 S1).</para>
+    /// <para>A VALUE, a struct with positional fields: inline where it lies, copied at a binding
+    /// point. The layout is the one C gives an anonymous struct, which the ABI hands over by
+    /// value.</para>
     ///
     /// <para>Interned, because two tuples of the same shape have the same layout. The field names are
     /// the positions; a label of the written type is a name for the sema, not for the layout.</para>
@@ -807,7 +806,7 @@ internal sealed class TypeTable
         _fixedInterfaces.FirstOrDefault(f => f.Id == id) is { Type: { } type } ? type : null;
 
     /// <summary>
-    /// The entry of an interface value whose associated types are fixed (03 M4-1, T6): one per
+    /// The entry of an interface value whose associated types are fixed: one per
     /// interface instance and fixations, as a generic interface has one per instance. Its slots are
     /// the members typed by an associated type too — <c>next(): ?int</c> has one signature for every
     /// value of <c>Iterator&lt;Item = int&gt;</c> —, and a slot throws only where what it throws is
@@ -855,8 +854,8 @@ internal sealed class TypeTable
                 SpanOf(symbol));
 
         // A table may hold its descriptor only: members without a slot — generic, static, or
-        // typed by an associated type — and the empty 'Any' (03 T10), whose values are told
-        // apart by 'is' alone (04 D9: the slotless rule falls).
+        // typed by an associated type — and the empty 'Any', whose values are told
+        // apart by 'is' alone.
         var slots = SlotNames(symbol, decl);
 
         var id = new TypeId(_defs.Count);
@@ -870,13 +869,13 @@ internal sealed class TypeTable
             MethodSlots = slots, IsInterface = true,
             SlotThrows = slots.Select(slot => SlotThrows(symbol, decl, slot)).ToArray(),
             // Where it is declared, as for a class: a back end finds std.core's Error by it (the
-            // report of an error escaping main, 05 E6 O4), not by a name a program may reuse.
+            // report of an error escaping main), not by a name a program may reuse.
             Module = ModuleNameOf(symbol),
         });
         return id;
     }
 
-    /// <summary>Whether the member behind a slot declares <c>throws</c> (design/v5/spec/05 E2): its
+    /// <summary>Whether the member behind a slot declares <c>throws</c>: its
     /// own or a parent's, the one declaration a name has (<c>LYR-SEM0079</c>).</summary>
     private bool SlotThrows(TypeSymbol symbol, InterfaceDecl decl, string slot, GenericInstance? fixedType = null)
     {
@@ -931,15 +930,15 @@ internal sealed class TypeTable
             // monomorphization instead — which is what makes it unavailable through an interface
             // VALUE, the trade Rust makes for the same reason.
             if (member.Generics.Length > 0) continue;
-            // A STATIC member has no receiver to dispatch on (03 T5): it is reached through a
+            // A STATIC member has no receiver to dispatch on: it is reached through a
             // constraint, as the conformer's own static.
             if (member.IsStatic) continue;
-            // A PRIVATE helper (07 V2 S4) is never overridden: its interface's defaults call it
+            // A PRIVATE helper is never overridden: its interface's defaults call it
             // directly, and a slot would let a conformer's method of its name stand in.
             if (member.IsPrivateHelper) continue;
-            // A member typed by an ASSOCIATED type (03 T6), 'fn first(): Self.Item', has one C
+            // A member typed by an ASSOCIATED type, 'fn first(): Self.Item', has one C
             // signature per conformer: no slot can hold it. It is reached through a constraint
-            // only (04 D9) — but on a value whose type fixes the associated types (03 M4-1), where
+            // only — but on a value whose type fixes the associated types, where
             // it has one signature, and the checker refused a value that leaves one open.
             if (fixedType is null
                 && (member.Parameters.Any(p => MentionsAssociated(p.Type))
@@ -951,7 +950,7 @@ internal sealed class TypeTable
         return slots.ToArray();
     }
 
-    /// <summary>Does a written type reach an associated type, <c>Self.Item</c> (03 T6)?</summary>
+    /// <summary>Does a written type reach an associated type, <c>Self.Item</c>?</summary>
     private bool MentionsAssociated(TypeNode node) => node switch
     {
         NamedType { Path.Length: 2 } named when _binding.Resolve(named) is GenericParamSymbol { SelfOf: not null } => true,
@@ -977,8 +976,8 @@ internal sealed class TypeTable
                 types.Add(ValueOf(Lower(tuple[i], tuple[i].Span)));
             }
         else if (variant.StructFields is { } fields)
-            // a field's default is no part of the layout: the construction site evaluates it (03 §4
-            // rule 2 under §2.4; the sweep after M10, X2), as for a struct's field
+            // a field's default is no part of the layout: the construction site evaluates it,
+            // as for a struct's field
             foreach (var field in fields)
             {
                 names.Add(field.Name);
@@ -1041,7 +1040,7 @@ internal sealed class TypeTable
 
     /// <summary>
     /// The unit: what holds a value of type <c>void</c> where a place must hold one
-    /// (design/v5/spec/03 §9.1) — a parameter, a local, a field, an element, the inside of an
+    /// — a parameter, a local, a field, an element, the inside of an
     /// optional, in an instance whose type argument is <c>void</c>. A value of type <c>void</c> is
     /// nothing, so the unit is one byte that is always 0: a <c>bool</c>, which every back end
     /// knows. A return keeps <c>void</c> — a function of type <c>fn() -> T</c> at <c>T = void</c>
@@ -1049,7 +1048,7 @@ internal sealed class TypeTable
     /// </summary>
     public static readonly IrType Unit = new IrScalarType(IrScalar.Bool);
 
-    /// <summary>A <c>StringView</c> below the checker (10 S1): a view of bytes.</summary>
+    /// <summary>A <c>StringView</c> below the checker: a view of bytes.</summary>
     public static readonly IrType ViewOfBytes = new IrSliceType(new IrScalarType(IrScalar.U8));
 
     /// <summary>A type as what holds a value of it: the <see cref="Unit"/> for <c>void</c>.</summary>
@@ -1099,7 +1098,7 @@ internal sealed class TypeTable
         // An instance of a generic type: 'Box<int>' is a table entry of its own with its own layout.
         GenericInstance g => InstanceType(g, span),
 
-        // A coroutine is the runtime's object around a body (06 N2): what it yields, what it returns.
+        // A coroutine is the runtime's object around a body: what it yields, what it returns.
         CoroutineOf c => new IrCoroutineType(Lower(c.Yield, span), Lower(c.Result, span)),
 
         FnType f => new IrFunctionType(
@@ -1123,7 +1122,7 @@ internal sealed class TypeTable
         TypeParamType p => throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
             $"type parameter '{p.Param.Name}' reached lowering unsubstituted", span),
 
-        // 'T.Item' with T known is the conformer's answer (03 T6); with T open it is the
+        // 'T.Item' with T known is the conformer's answer; with T open it is the
         // same gap as the parameter itself.
         AssocOf { Base: not (TypeParamType or AssocOf) } a => LowerAnswer(a, span),
         AssocOf a => throw new UnsupportedConstructException(LoweringDiagnostics.Untranslatable,
@@ -1155,8 +1154,8 @@ internal sealed class TypeTable
         return Lower(answer, span);
     }
 
-    /// <summary>'?T' around whatever <c>T</c> is — an optional included: '??T' is a type since
-    /// Lyric 5 (design/v5/spec/03 T4 O1), and a generic '?T' at 'T = ?int' is exactly that.</summary>
+    /// <summary>'?T' around whatever <c>T</c> is — an optional included: '??T' is a type, and a
+    /// generic '?T' at 'T = ?int' is exactly that.</summary>
     private static IrType OptionalOf(IrType inner, Core.Span span) => new IrOptionalType(inner);
 
     /// <summary>
@@ -1198,7 +1197,7 @@ internal sealed class TypeTable
 
         if (node is NamedType named)
         {
-            // 'T.Item' (03 T6) is the conformer's answer under the substitution of 'T'.
+            // 'T.Item' is the conformer's answer under the substitution of 'T'.
             if (AssociatedOf(named) is { } associated) return Lower(associated, span);
 
             // A type parameter in the layout of an instance: 'v: T' in 'Box<int>' is an int. The question
@@ -1214,7 +1213,7 @@ internal sealed class TypeTable
             var bound = _binding.Resolve(named);
             if (bound is ImportBindingSymbol import) bound = import.Target;
 
-            // 'StringView' (10 S1): a view of a string's bytes, a 'Slice<uint8>' in the IR.
+            // 'StringView': a view of a string's bytes, a 'Slice<uint8>' in the IR.
             if (bound is TypeSymbol { Kind: TypeSymbolKind.Builtin, Name: "StringView" })
                 return ViewOfBytes;
 
@@ -1227,19 +1226,19 @@ internal sealed class TypeTable
                     named.TypeArguments.Length == 2
                         ? Lower(named.TypeArguments[1], named.TypeArguments[1].Span)
                         : new IrScalarType(IrScalar.Void));
-            // 'Slice<T>' likewise (03 T13 A2): a view, with its element type inline.
+            // 'Slice<T>' likewise: a view, with its element type inline.
             if (bound is TypeSymbol { Kind: TypeSymbolKind.Builtin, Name: "Slice" }
                 && named.TypeArguments.Length == 1)
                 return new IrSliceType(Lower(named.TypeArguments[0], named.TypeArguments[0].Span));
 
-            // A generic alias (03 T15) is what it names, its arguments in place of its parameters:
+            // A generic alias is what it names, its arguments in place of its parameters:
             // 'Pair<int>' of 'type Pair<T> = (T, T)' lowers as '(int, int)'. The arguments are read
             // under the substitution of the use, the aliased type under theirs alone.
             if (bound is TypeSymbol { Kind: TypeSymbolKind.Alias, Generics.Length: > 0, Declaration: TypeAliasDecl generalized } aliasSymbol)
                 using (PushSubstitution(AliasArguments(aliasSymbol, named, span)))
                     return Lower(generalized.Aliased, span);
 
-            // 'Iterator<Item = int>' (03 M4-1, T6): an argument that names an associated type fixes
+            // 'Iterator<Item = int>': an argument that names an associated type fixes
             // it, and a value of the interface so written has an entry of its own.
             if (named.ArgumentNames is { } argumentNames && argumentNames.Any(n => n is not null)
                 && bound is TypeSymbol { Kind: TypeSymbolKind.Interface }
@@ -1314,7 +1313,7 @@ internal sealed class TypeTable
     /// what the definition is.</summary>
     public IrType InstanceType(GenericInstance instance, Core.Span span)
     {
-        // A value of an interface with its associated types fixed (03 M4-1): an entry of its own.
+        // A value of an interface with its associated types fixed: an entry of its own.
         if (instance.Definition.Kind == TypeSymbolKind.Interface && instance.Fixations is { Length: > 0 })
             return new IrInterfaceType(InternFixedInterface(instance, span));
         var id = Intern(instance.Definition, instance.Arguments);
@@ -1383,7 +1382,7 @@ internal sealed class TypeTable
     }
 
     /// <summary>
-    /// A written <c>T.Item</c> or <c>Self.Item</c> (03 T6): the associated type's binding for
+    /// A written <c>T.Item</c> or <c>Self.Item</c>: the associated type's binding for
     /// what the head is here — a type parameter through the substitution, the type itself in its
     /// own body —, and on through every further segment, <c>A.Iter.Item</c> (05 §8 rule 4).
     /// <c>null</c> where the node is not such a path or the head is not known.
@@ -1509,7 +1508,7 @@ internal sealed class TypeTable
                 && generic.TypeArguments.Length == 1)
                 return new SliceOf(Resolve(generic.TypeArguments[0], span));
 
-            // 'Iterator<Item = int>' (03 M4-1): a named argument of an interface fixes its
+            // 'Iterator<Item = int>': a named argument of an interface fixes its
             // associated type, as the sema resolves it.
             if (definition is TypeSymbol { Kind: TypeSymbolKind.Interface } fixedInterface
                 && generic.ArgumentNames is { } argumentNames && argumentNames.Any(n => n is not null))
@@ -1545,7 +1544,7 @@ internal sealed class TypeTable
             return new TupleOf(tuple.Elements.Select(e => Resolve(e, span)).ToArray()) { Labels = tuple.Labels };
 
         // 'fn(A) -> B' as a type argument. No known case needs it today; it stands here so the list is
-        // not a partial copy of the others — the set included, which is part of the type (03 T17)
+        // not a partial copy of the others — the set included, which is part of the type
         // and so of the instance's name.
         if (node is FunctionType fn)
             return new FnType(fn.Parameters.Select(p => Resolve(p, span)).ToArray(),

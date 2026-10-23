@@ -1,4 +1,4 @@
-// A bare T[N] compares and hashes where T does (10 C8, "Review 2026-10-08" S4b; M8c S3b): element
+// A bare T[N] compares and hashes where T does: element
 // by element, the elements written into the hasher in order — a digest compares with `==`, and an
 // inline array is a key of a Map or a Set.
 import std.collections { Map, Set };

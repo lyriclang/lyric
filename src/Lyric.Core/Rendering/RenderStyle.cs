@@ -1,20 +1,20 @@
 namespace Lyric.Core.Rendering;
 
 /// <summary>
-/// How the text renderer draws (design/v5/spec/11 G5, G6, C7; M12a S2): in colour or not, the paths
+/// How the text renderer draws: in colour or not, the paths
 /// relative to the package or absolute, how many errors before it stops, how wide a source line may
 /// be. The driver sets it once per command from its options; a library caller gets
 /// <see cref="Plain"/>.
 /// </summary>
 public sealed record RenderStyle
 {
-    /// <summary><c>--max-errors</c> unless said (11 G6, D8).</summary>
+    /// <summary><c>--max-errors</c> unless said.</summary>
     public const int DefaultMaxErrors = 50;
 
     /// <summary>The columns a quoted source line may take before it is cut around its marks.</summary>
     public const int DefaultWidth = 140;
 
-    /// <summary>ANSI colour in the output (C7: <c>--color</c>, <c>NO_COLOR</c>, <c>TERM=dumb</c>).</summary>
+    /// <summary>ANSI colour in the output (<c>--color</c>, <c>NO_COLOR</c>, <c>TERM=dumb</c>).</summary>
     public bool Color { get; init; }
 
     /// <summary><c>--absolute-paths</c>: every path as the file system has it, none made relative.</summary>
@@ -49,7 +49,7 @@ public sealed record RenderStyle
     }
 
     /// <summary>
-    /// Whether to colour (C7): <c>always</c> and <c>never</c> say it; <c>auto</c> colours a terminal
+    /// Whether to colour: <c>always</c> and <c>never</c> say it; <c>auto</c> colours a terminal
     /// unless <c>NO_COLOR</c> is set to anything or <c>TERM</c> is <c>dumb</c>. <c>null</c> for a
     /// mode that is none of the three.
     /// </summary>

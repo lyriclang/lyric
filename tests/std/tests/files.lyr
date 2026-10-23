@@ -1,8 +1,8 @@
-// std.fs's File (design/v5/spec/10 O4, O5; 13 M8b P2, P4; M8b S6b): written, read back, sought,
+// std.fs's File: written, read back, sought,
 // appended to, cut; the kinds a file gives; closed is closed; tasks reading at once through the I/O
 // pool; a cancellation seen at the task's next wait, not inside a file's call. Each test that writes
 // works in a directory of its own from fs.tempDir() and removes it: a run leaves nothing in its
-// working directory (M9a's point 104).
+// working directory.
 import std.fs;
 import std.fs { File, OpenOptions };
 import std.io { IoError, IoErrorKind };

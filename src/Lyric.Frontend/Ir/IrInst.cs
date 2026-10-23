@@ -10,13 +10,13 @@ public sealed record BoolConst(bool Value) : IrConstValue;
 public sealed record CharConst(int CodePoint) : IrConstValue;
 public sealed record StringConst(string Value) : IrConstValue;
 
-/// <summary>An array a <c>comptime</c> site computed (design/v5/spec/09 Q1; 13 M9a P3). In a
+/// <summary>An array a <c>comptime</c> site computed. In a
 /// <see cref="Const"/> only where its elements are scalars or strings: static data in the C,
 /// from which each evaluation fills a fresh array — or the inline array's storage —, as a
 /// literal is filled. Of other elements, the lowering builds it element by element.</summary>
 public sealed record ArrayConst(IrConstValue[] Elements) : IrConstValue;
 
-// The rest of a 'comptime' value (P3), which the lowering builds as it builds a literal and which
+// The rest of a 'comptime' value, which the lowering builds as it builds a literal and which
 // never stands in a Const: a struct, a tuple or a Box's object by its fields in layout order, an
 // enum by its variant's index and payload, an optional present or not.
 public sealed record StructConst(IrConstValue[] Fields) : IrConstValue;
@@ -63,15 +63,15 @@ public sealed record NewArray(TempId Dest, IrType Element, TempId[] Elements, Sp
 public sealed record LoadElem(TempId Dest, TempId Array, TempId Index, IrType Element, Span Span) : IrOp(Span);
 public sealed record StoreElem(TempId Array, TempId Index, TempId Value, Span Span) : IrOp(Span);
 public sealed record ArrayLen(TempId Dest, TempId Array, Span Span) : IrOp(Span);
-/// <summary>A view of the elements <c>[Low, High)</c> of an array or of a view (03 T13 A2): checked
+/// <summary>A view of the elements <c>[Low, High)</c> of an array or of a view: checked
 /// against the source's length, then a pointer and a length, no copy. <c>Array</c> is the source
 /// — an array or a slice — and loadelem, storeelem and arraylen take a slice too. With
-/// <c>Chars</c> the source is a string's bytes or a view of them (10 S1): a bound inside a
+/// <c>Chars</c> the source is a string's bytes or a view of them: a bound inside a
 /// character panics as one outside does, and the source may be a string.</summary>
 public sealed record MakeSlice(TempId Dest, TempId Array, TempId Low, TempId High, IrType Element, Span Span,
     bool Chars = false) : IrOp(Span);
-/// <summary>An inline array (03 T13 A4) built from its elements — <c>Length</c> of them, or one
-/// repeated when <c>Repeat</c> is set (<c>[x] * N</c>, 10 C7). A fresh value, like a struct.</summary>
+/// <summary>An inline array built from its elements — <c>Length</c> of them, or one
+/// repeated when <c>Repeat</c> is set (<c>[x] * N</c>). A fresh value, like a struct.</summary>
 public sealed record NewInline(TempId Dest, IrType Element, int Length, TempId[] Elements, bool Repeat, Span Span) : IrOp(Span);
 /// <summary>A copy of a value that is not a struct — an inline array — at a binding point.</summary>
 public sealed record CopyValue(TempId Dest, TempId Value, IrType Type, Span Span) : IrOp(Span);
@@ -79,7 +79,7 @@ public sealed record CopyValue(TempId Dest, TempId Value, IrType Type, Span Span
 // xs + ys and xs * n — built-in language semantics, not a library. Both yield a NEW array.
 public sealed record ArrayConcat(TempId Dest, TempId Left, TempId Right, IrType Element, Span Span) : IrOp(Span);
 /// <summary><c>Shares</c>: the one value in every slot, an object included — std.core's
-/// <c>filled</c> (M8a S16), never the language's <c>[x] * n</c>, which clones an object (03 §5.1).</summary>
+/// <c>filled</c>, never the language's <c>[x] * n</c>, which clones an object.</summary>
 public sealed record ArrayRepeat(TempId Dest, TempId Array, TempId Count, IrType Element, Span Span, bool Shares = false) : IrOp(Span);
 
 // Optionals. '??', '??=' and '?.' are NOT here: they evaluate their right side conditionally and
@@ -122,7 +122,7 @@ public sealed record CallVirt(TempId? Dest, TypeId Interface, int Slot, TempId[]
     IrType ReturnType, Span Span) : IrOp(Span);
 
 /// <summary>
-/// <c>x is T</c> (03 T11): does the interface value <paramref name="Value"/> hold a value of
+/// <c>x is T</c>: does the interface value <paramref name="Value"/> hold a value of
 /// <paramref name="Target"/>? For a class, struct or enum a comparison of the descriptor the
 /// value's table begins with; for an interface a search of the concrete type's conformance list.
 /// The result is a bool.
@@ -130,8 +130,8 @@ public sealed record CallVirt(TempId? Dest, TypeId Interface, int Slot, TempId[]
 public sealed record TypeTest(TempId Dest, TempId Value, TypeId Target, Span Span) : IrOp(Span);
 
 /// <summary>
-/// The value behind an interface value, as <paramref name="Target"/> (03 T11): the object for a
-/// class, a copy out of the box for a struct or an enum (04 D12), the value with another table
+/// The value behind an interface value, as <paramref name="Target"/>: the object for a
+/// class, a copy out of the box for a struct or an enum, the value with another table
 /// for an interface. Emitted only where a <see cref="TypeTest"/> or the sema's narrowing proved
 /// the type; it checks nothing.
 /// </summary>
@@ -142,7 +142,7 @@ public sealed record Downcast(TempId Dest, TempId Value, TypeId Target, IrType R
 // (newobj, a call result) does not need it, because it belongs to nobody yet.
 public sealed record StructCopy(TempId Dest, TempId Value, TypeId Type, Span Span) : IrOp(Span);
 
-// Places (design/v5/spec/03 T12): what a place parameter takes. Four instructions make one — of a
+// Places: what a place parameter takes. Four instructions make one — of a
 // local, a field, an element, a global — and two go through one. The lowering makes a place for an
 // argument only, and goes through one only in the function that takes it: nothing stores a place
 // anywhere else, so a place never outlives the call it was made for.
@@ -188,7 +188,7 @@ public sealed record MakeClosure(TempId Dest, FunctionId Target, TempId? Environ
 public sealed record CallIndirect(TempId? Dest, TempId Callee, TempId[] Args,
     IrType ReturnType, Span Span) : IrOp(Span)
 {
-    /// <summary>Whether the value's type throws (05 E2, 03 T17): the caller's error slot goes with
+    /// <summary>Whether the value's type throws: the caller's error slot goes with
     /// the call and an error branch follows it. Every function value takes a slot; one whose type
     /// cannot throw is handed none to write.</summary>
     public bool Throws { get; init; }
@@ -207,7 +207,7 @@ public sealed record CallIndirect(TempId? Dest, TempId Callee, TempId[] Args,
 public sealed record MakeCoroutine(TempId Dest, FunctionId Body, TempId[] Args,
     IrCoroutineType Type, Span Span) : IrOp(Span);
 
-/// <summary><c>co.next()</c> (06 N2 A2): runs the coroutine to its next yield and writes
+/// <summary><c>co.next()</c>: runs the coroutine to its next yield and writes
 /// <c>?Y</c> — the value, or null once the body has ended — or, for a coroutine that yields
 /// nothing, whether it stopped at a yield. A coroutine whose type throws ends with its body's
 /// error on this pull, which an <c>ErrorBranch</c> after it takes like a call's.</summary>
@@ -215,7 +215,7 @@ public sealed record MakeCoroutine(TempId Dest, FunctionId Body, TempId[] Args,
 /// <see cref="CallIndirect.ReturnType"/>.</param>
 public sealed record ResumePull(TempId Dest, TempId Coroutine, IrType YieldType, Span Span) : IrOp(Span)
 {
-    /// <summary>Whether the coroutine's type throws (05 E10): the pull takes the error the body
+    /// <summary>Whether the coroutine's type throws: the pull takes the error the body
     /// ended with, and an error branch follows it.</summary>
     public bool Throws { get; init; }
 }
@@ -223,15 +223,15 @@ public sealed record ResumePull(TempId Dest, TempId Coroutine, IrType YieldType,
 /// <summary><c>co.isDone()</c>: whether the body has ended, without pulling.</summary>
 public sealed record CoroutineDone(TempId Dest, TempId Coroutine, Span Span) : IrOp(Span);
 
-/// <summary><c>co.result()</c> (06 A2): <c>?R</c> — what the body returned, null until it
+/// <summary><c>co.result()</c>: <c>?R</c> — what the body returned, null until it
 /// has ended, and after an error.</summary>
 public sealed record CoroutineResult(TempId Dest, TempId Coroutine, IrType ResultType, Span Span) : IrOp(Span);
 
 /// <summary>Right after a yield of a coroutine's body: whether <c>close()</c> resumed it to be
-/// unwound (06 A5) — then the body throws <c>Cancelled</c> where it stands.</summary>
+/// unwound — then the body throws <c>Cancelled</c> where it stands.</summary>
 public sealed record CoroutineClosing(TempId Dest, Span Span) : IrOp(Span);
 
-/// <summary><c>co.close()</c> (06 A5, 01 K7a): a coroutine suspended at a yield is resumed to be
+/// <summary><c>co.close()</c>: a coroutine suspended at a yield is resumed to be
 /// unwound; one that is done or never ran ends without running. The <c>Cancelled</c> its body
 /// ends with is the close's own and is dropped; any other error goes to the <c>ErrorBranch</c>
 /// that follows when the coroutine's type throws.</summary>
@@ -262,30 +262,30 @@ public sealed record Branch(BlockId Target, Span Span) : IrTerminator(Span);
 public sealed record CondBranch(TempId Cond, BlockId IfTrue, BlockId IfFalse, Span Span) : IrTerminator(Span);
 public sealed record Unreachable(Span Span) : IrTerminator(Span);
 
-// Errors (design/v5/spec/05 E1-E4, 01 L5): EXPLICIT edges. A throw or a failed call goes to a
+// Errors: EXPLICIT edges. A throw or a failed call goes to a
 // landing — the defers of the scopes it leaves, then the catch dispatch of the innermost try
 // around it or the function's bottom — and every one of those is an ordinary block of the CFG. A
-// throw costs what a return costs (L5); no table describes where control goes.
+// throw costs what a return costs; no table describes where control goes.
 
 /// <summary>
-/// <c>throw</c> (05 E1): <paramref name="Value"/> — the thrown value as an <c>Error</c> interface
+/// <c>throw</c>: <paramref name="Value"/> — the thrown value as an <c>Error</c> interface
 /// value, boxed or re-tabled where it was not one — becomes the in-flight error, and control goes
 /// to <paramref name="Landing"/>.
 /// </summary>
 public sealed record Throw(TempId Value, BlockId Landing, Span Span) : IrTerminator(Span);
 
 /// <summary>
-/// The edge after a call of a throwing function (01 L5 E3): when the call set the in-flight error,
+/// The edge after a call of a throwing function: when the call set the in-flight error,
 /// control goes to <paramref name="OnError"/>, otherwise on to <paramref name="Continue"/>, where the
 /// call's value is used. A terminator, so a block stays a straight line and the edge a CFG edge.
 /// </summary>
 public sealed record ErrorBranch(BlockId OnError, BlockId Continue, Span Span) : IrTerminator(Span);
 
-/// <summary>The in-flight error leaves the function through its caller's error slot (01 L5 E1).
+/// <summary>The in-flight error leaves the function through its caller's error slot.
 /// Only in a function that throws.</summary>
 public sealed record Propagate(Span Span) : IrTerminator(Span);
 
-/// <summary><c>try!</c> on an error (05 E4, E8): the in-flight error ends the program as a panic
+/// <summary><c>try!</c> on an error: the in-flight error ends the program as a panic
 /// with its message (<c>LYR-RT0010</c>). No <c>defer</c> runs after it, as after any panic.</summary>
 public sealed record PanicError(Span Span) : IrTerminator(Span);
 
@@ -296,7 +296,7 @@ public sealed record CurrentError(TempId Dest, IrType Type, Span Span) : IrOp(Sp
 /// <summary>A catch clause took the in-flight error: none is in flight any more.</summary>
 public sealed record ClearError(Span Span) : IrOp(Span);
 
-/// <summary>A <c>defer</c> body runs with an error in flight (05 E7): the error is set aside in
+/// <summary>A <c>defer</c> body runs with an error in flight: the error is set aside in
 /// stash <paramref name="Stash"/> — a slot of the function, not a temp — and none is in flight
 /// while the body runs.</summary>
 public sealed record StashError(int Stash, Span Span) : IrOp(Span);
@@ -308,7 +308,7 @@ public sealed record RestoreError(int Stash, Span Span) : IrOp(Span);
 /// first wins — and the stashed one is in flight again.</summary>
 public sealed record SuppressError(int Stash, Span Span) : IrOp(Span);
 
-/// <summary><c>e.suppressed()</c> in a clause (05 E6 O3, the review's M5-3): the errors suppressed
+/// <summary><c>e.suppressed()</c> in a clause: the errors suppressed
 /// into the error the clause kept in stash <paramref name="Stash"/>, a new <c>Error[]</c>.</summary>
 public sealed record SuppressedErrors(TempId Dest, IrType Type, int Stash, Span Span) : IrOp(Span);
 
@@ -316,7 +316,7 @@ public sealed record SuppressedErrors(TempId Dest, IrType Type, int Stash, Span 
 /// thrown, a new <c>int[]</c> — empty where none were kept, as in the release profile.</summary>
 public sealed record ErrorTrace(TempId Dest, IrType Type, int Stash, Span Span) : IrOp(Span);
 
-/// <summary>std.core's <c>blackBox(x)</c> (10 X4): <paramref name="Value"/> into
+/// <summary>std.core's <c>blackBox(x)</c>: <paramref name="Value"/> into
 /// <paramref name="Dest"/> through a point the C compiler cannot see through — what computed the
 /// value is not dropped, and the value that comes out is not known in advance.</summary>
 public sealed record BlackBox(TempId Dest, TempId Value, IrType Type, Span Span) : IrOp(Span);
