@@ -15,13 +15,14 @@ full = [".github/", "tooling/", "global.json", "Directory.Build.props", "Directo
         "tests/Lyric5.Tests/Lyric5.Tests.csproj", "tests/Directory.Build.props"]
 
 # Text no test reads. spec.pin is read apart: the cases the pin moved over always run.
-ignore = ["docs/", "design/", "bench/", "STATUS.md", "CHANGELOG.md", "README.md", "CONTRIBUTING.md", "LICENSE",
-          "spec.pin", ".gitignore", ".gitattributes"]
+ignore = ["docs/Bytecode.md", "docs/Grammar.md", "docs/Pack.md", "docs/archive/", "docs/guide/", "design/", "bench/",
+          "STATUS.md", "CHANGELOG.md", "README.md", "CONTRIBUTING.md", "LICENSE", "spec.pin", ".gitignore", ".gitattributes"]
 
 [regression]
-# Always: the goldens and the native runs of every program, the examples, and the cases that
-# once went red after a merge, with one run case per chapter (tooling/conformance/regression.txt).
-tests = ["CEmitterTests", "ExampleTests", "RuntimeProgramTests", "ProgramTests", "CommentCitationTests"]
+# Always: the goldens and the native runs of every program, the examples, the Book's snippets, and
+# the cases that once went red after a merge, with one run case per chapter
+# (tooling/conformance/regression.txt).
+tests = ["CEmitterTests", "ExampleTests", "RuntimeProgramTests", "ProgramTests", "CommentCitationTests", "BookTests"]
 cases = "tooling/conformance/regression.txt"
 
 [[rule]]
@@ -86,7 +87,13 @@ cases = []
 [[rule]]
 # The documentation's renderer, the site tool and the site's goldens.
 paths = ["src/Lyric5.Doc/", "tools/Site/", "tests/Lyric5.Tests/site/"]
-tests = ["SiteTests"]
+tests = ["SiteTests", "BookTests"]
+cases = []
+
+[[rule]]
+# The Book: its pages and its snippets.
+paths = ["docs/book/"]
+tests = ["SiteTests", "BookTests"]
 cases = []
 
 [[rule]]

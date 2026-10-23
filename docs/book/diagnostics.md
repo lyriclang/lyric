@@ -1,9 +1,5 @@
 # What the compiler tells you
 
-> **Draft.** This chapter is written for the Lyric Book, which the website renders from M12c on. Its
-> snippets follow the Book's form: a `lyric` block compiles and runs, `compile_fail=CODE` fails with
-> that code, `no_run` only compiles.
-
 A compiler that refuses a program owes its writer more than "no". This chapter is about what Lyric
 says when something is wrong, how to read it, which of it you decide, and the verbs of the `lyric`
 command that work with it.

@@ -23,18 +23,85 @@ public static class SiteBuilder
         throw new DirectoryNotFoundException($"no repository above {start}");
     }
 
-    /// <summary>The version's pages: the start page and the releases.</summary>
+    /// <summary>The Book's sources, its contents in <c>SUMMARY.md</c>.</summary>
+    public const string BookDirectory = "docs/book";
+    public const string BookPath = "book/index.html";
+    public const string SummaryFile = "SUMMARY.md";
+
+    /// <summary>The version's pages: the start page, the Book and the releases.</summary>
     /// <param name="gitRef">The branch or tag a link into the repository's files points at.</param>
     public static List<Page> Build(string root, string version, string gitRef)
     {
-        var site = new SiteContext(version, [HomePath, ReleasesPath], SiteContext.DefaultAreas);
+        var bookDir = Path.Combine(root, BookDirectory);
+        var summaryText = File.ReadAllText(Path.Combine(bookDir, SummaryFile));
+        var summary = Book.ReadSummary(summaryText, SummaryFile);
+        var chapterTexts = summary.Chapters.ToDictionary(c => c, c => File.ReadAllText(Path.Combine(bookDir, c.File)));
+
+        var paths = new List<string> { HomePath, ReleasesPath, BookPath };
+        paths.AddRange(summary.Chapters.Select(c => SiteContext.FileOf(Book.PageOf(c))));
+        var site = new SiteContext(version, paths, SiteContext.DefaultAreas);
+
         var program = FunctionOf(File.ReadAllText(Path.Combine(root, HomeProgramFile)), HomeProgramFunction);
         var changelog = File.ReadAllText(Path.Combine(root, "CHANGELOG.md"));
-        return
-        [
-            new Page(HomePath, Pages.Home(site, HomePath, Home(program))),
-            new Page(ReleasesPath, Pages.Article(site, ReleasesPath, Releases(changelog, gitRef))),
-        ];
+        var pages = new List<Page>
+        {
+            new(HomePath, Pages.Home(site, HomePath, Home(program))),
+            new(ReleasesPath, Pages.Article(site, ReleasesPath, Releases(changelog, gitRef))),
+            new(BookPath, Pages.Article(site, BookPath, BookIndex(summary, summaryText, gitRef))),
+        };
+        foreach (var chapter in summary.Chapters)
+        {
+            var path = SiteContext.FileOf(Book.PageOf(chapter));
+            pages.Add(new Page(path, Pages.Article(site, path, BookChapter(summary, chapter, chapterTexts[chapter], gitRef))));
+        }
+        return pages;
+    }
+
+    /// <summary>The Book's first page: its contents as <c>SUMMARY.md</c> writes them, each
+    /// chapter a link, and the first chapter as the way on.</summary>
+    public static ArticleContent BookIndex(BookSummary summary, string summaryText, string gitRef)
+    {
+        var rendered = Markdown.Render(summaryText, target => BookLink(summary, BookPath, target, gitRef), dropTitle: true);
+        var first = summary.Chapters.Count > 0 ? ChapterLink(summary.Chapters[0]) : null;
+        return new ArticleContent(summary.Title, rendered.Html, BookNavigation(summary), summary.Title, Next: first);
+    }
+
+    /// <summary>A chapter's page: its text under its own title, the Book's contents beside it,
+    /// the chapters before and after it below.</summary>
+    public static ArticleContent BookChapter(BookSummary summary, Chapter chapter, string text, string gitRef)
+    {
+        var path = SiteContext.FileOf(Book.PageOf(chapter));
+        var rendered = Markdown.Render(text, target => BookLink(summary, path, target, gitRef), dropTitle: true);
+        var title = rendered.Headings.FirstOrDefault(h => h.Level == 1)?.Text ?? chapter.Label;
+        var at = summary.Chapters.ToList().IndexOf(chapter);
+        var previous = at == 0 ? new Link(summary.Title, "book/") : ChapterLink(summary.Chapters[at - 1]);
+        var next = at + 1 < summary.Chapters.Count ? ChapterLink(summary.Chapters[at + 1]) : null;
+        return new ArticleContent(title, rendered.Html, BookNavigation(summary), chapter.Label, previous, next);
+    }
+
+    private static Link ChapterLink(Chapter chapter) => new(chapter.Label, Book.PageOf(chapter));
+
+    private static IReadOnlyList<Link> BookNavigation(BookSummary summary) =>
+        [new Link(summary.Title, "book/"), .. summary.Chapters.Select(ChapterLink)];
+
+    /// <summary>
+    /// Where a link of the Book's page at <paramref name="pagePath"/> points on the site: a
+    /// chapter's file to the chapter's page, relative to the page, an anchor kept; another file of
+    /// the repository, relative to the Book's directory, to that file on GitHub; a web address or
+    /// an anchor as written.
+    /// </summary>
+    public static string BookLink(BookSummary summary, string pagePath, string target, string gitRef)
+    {
+        if (target.StartsWith('#') || target.Contains("://", StringComparison.Ordinal)
+            || target.StartsWith("mailto:", StringComparison.Ordinal))
+            return target;
+        var hash = target.IndexOf('#');
+        var file = hash < 0 ? target : target[..hash];
+        var anchor = hash < 0 ? "" : target[hash..];
+        if (summary.Chapters.FirstOrDefault(c => c.File == file) is { } chapter)
+            return Layout.Href(pagePath, Book.PageOf(chapter)) + anchor;
+        var repositoryPath = Path.GetRelativePath(".", Path.Combine(BookDirectory, file)).Replace('\\', '/');
+        return RepositoryLink(repositoryPath + anchor, gitRef);
     }
 
     /// <summary>What the start page says, around <paramref name="program"/>.</summary>

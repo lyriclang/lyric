@@ -23,7 +23,15 @@ public sealed record HomeContent(
 /// <param name="Html">The text's HTML, its title not included.</param>
 /// <param name="Navigation">The links of the side navigation.</param>
 /// <param name="Where">The side navigation's own name, shown in its bar on a narrow window.</param>
-public sealed record ArticleContent(string Title, string Html, IReadOnlyList<Link> Navigation, string Where);
+/// <param name="Previous">The page before this one in reading order, linked below the text.</param>
+/// <param name="Next">The page after it.</param>
+public sealed record ArticleContent(
+    string Title,
+    string Html,
+    IReadOnlyList<Link> Navigation,
+    string Where,
+    Link? Previous = null,
+    Link? Next = null);
 
 /// <summary>A reference page: navigation, text, and the page's own contents beside it.</summary>
 public sealed record ReferenceContent(
@@ -76,6 +84,15 @@ public static class Pages
         sb.Append("<main class=\"text\">\n");
         sb.Append($"<h1>{Html.Text(article.Title)}</h1>\n");
         sb.Append(article.Html);
+        if (article.Previous is not null || article.Next is not null)
+        {
+            sb.Append("<nav class=\"pager\" aria-label=\"Previous and next\">");
+            if (article.Previous is { } previous)
+                sb.Append(Layout.Anchor(site, path, previous with { Label = "← " + previous.Label }, "previous"));
+            if (article.Next is { } next)
+                sb.Append(Layout.Anchor(site, path, next with { Label = next.Label + " →" }, "next"));
+            sb.Append("</nav>\n");
+        }
         sb.Append("</main>\n");
         sb.Append("</div>\n");
         return Layout.Shell(site, path, $"{article.Title} — Lyric", "article", sb.ToString());
