@@ -16,8 +16,9 @@ public sealed record RenderedMarkdown(string Html, IReadOnlyList<Heading> Headin
 
 /// <summary>
 /// Markdown to HTML, with pipe tables and an id on every heading. A code block fenced as
-/// <c>lyric</c> — its info string's first word — is highlighted by <see cref="Highlighter"/>;
-/// every other block is written as escaped text.
+/// <c>lyric</c> — its info string's first word — is highlighted by <see cref="Highlighter"/>, the
+/// rest of the info string left out; a block fenced as <c>output</c> is what a program printed,
+/// set apart from code; every other block is written as escaped text.
 /// </summary>
 public static class Markdown
 {
@@ -95,7 +96,9 @@ public static class Markdown
             }
 
             renderer.EnsureLine();
-            if (language == "lyric")
+            if (language == "output")
+                renderer.Write("<pre class=\"output\"><code>").Write(Html.Text(text.ToString()));
+            else if (language == "lyric")
                 renderer.Write("<pre><code class=\"language-lyric\">").Write(Highlighter.Highlight(text.ToString()));
             else if (language.Length > 0)
                 renderer.Write("<pre><code class=\"language-").Write(Html.Attr(language)).Write("\">").Write(Html.Text(text.ToString()));

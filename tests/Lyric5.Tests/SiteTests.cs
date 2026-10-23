@@ -77,6 +77,64 @@ public partial class SiteTests
         MatchesGolden("reference", Pages.Reference(site, path, page));
     }
 
+    private static readonly BookSummary Summary =
+        Book.ReadSummary("# The Book\n\n- [Start](start.md)\n- [Next steps](next.md)\n- [Last](last.md)\n", "SUMMARY.md");
+
+    private const string Chapter = """
+        # Next steps
+
+        After [the start](start.md#install), and before [the last](last.md); the
+        [grammar](../Grammar.md) is elsewhere.
+
+        ```lyric,no_run
+        let x = 1;
+        ```
+
+        ```lyric
+        println(2);
+        ```
+
+        ```output
+        2
+        ```
+        """;
+
+    [Fact]
+    public void A_book_page_matches_its_golden()
+    {
+        var paths = new[] { SiteBuilder.HomePath, SiteBuilder.BookPath }
+            .Concat(Summary.Chapters.Select(c => SiteContext.FileOf(Book.PageOf(c))));
+        var site = Site([.. paths]);
+        var chapter = Summary.Chapters[1];
+        var path = SiteContext.FileOf(Book.PageOf(chapter));
+        MatchesGolden("book", Pages.Article(site, path, SiteBuilder.BookChapter(Summary, chapter, Chapter, "main")));
+    }
+
+    [Fact]
+    public void A_book_page_links_its_neighbours_and_shows_no_fence_kind()
+    {
+        var html = SiteBuilder.BookChapter(Summary, Summary.Chapters[1], Chapter, "main").Html;
+        Assert.Contains("<a href=\"../../book/start/#install\">the start</a>", html);
+        Assert.Contains("<a href=\"../../book/last/\">the last</a>", html);
+        Assert.Contains("<a href=\"https://github.com/lyriclang/lyric/blob/main/docs/Grammar.md\">grammar</a>", html);
+        Assert.Contains("<pre class=\"output\"><code>2</code></pre>", html);
+        Assert.DoesNotContain("no_run", html);
+
+        var first = SiteBuilder.BookChapter(Summary, Summary.Chapters[0], "# Start\n", "main");
+        Assert.Equal(new Link("The Book", "book/"), first.Previous);
+        Assert.Equal(new Link("Next steps", "book/next/"), first.Next);
+        Assert.Null(SiteBuilder.BookChapter(Summary, Summary.Chapters[2], "# Last\n", "main").Next);
+    }
+
+    [Fact]
+    public void The_built_start_page_leads_into_the_Book()
+    {
+        var home = SiteBuilder.Build(Root, "dev", "main").Single(p => p.Path == SiteBuilder.HomePath).Html;
+        Assert.Contains("<a class=\"button primary\" href=\"book/getting-started/\">Get started</a>", home);
+        Assert.Contains("<a class=\"button\" href=\"book/\">Read the Book</a>", home);
+        Assert.Contains("<a href=\"book/\">Book</a>", home);
+    }
+
     [GeneratedRegex("(?:href|src)=\"(?<target>[^\"]*)\"")]
     private static partial Regex Target();
 

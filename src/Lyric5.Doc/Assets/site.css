@@ -188,6 +188,20 @@ body.reference .columns { grid-template-columns: 240px minmax(0, 1fr) 200px; }
 }
 .text blockquote p:last-child { margin-bottom: 0; }
 
+/* What a program printed: right under its code, set apart by a rule instead of a surface. */
+pre.output { background: none; border-left: 2px solid var(--line); margin-top: calc(var(--space) * -0.5); }
+
+/* The way on through the Book: the chapter before and the one after. */
+.pager {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space);
+  margin: calc(var(--space) * 2) 0;
+  padding-top: var(--space);
+  border-top: 1px solid var(--line);
+}
+.pager .next { margin-left: auto; }
+
 /* The start page. */
 .home-main { max-width: 1200px; margin: 0 auto; padding: calc(var(--space) * 3) calc(var(--space) * 1.5) 0; }
 .hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: calc(var(--space) * 3); align-items: start; }

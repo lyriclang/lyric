@@ -2,7 +2,7 @@ using Lyric5.Site;
 
 // site --out <dir> --version <name> [--root <repository>] [--ref <git ref>]
 //
-// Writes <dir>/<name>/: the start page and the releases. The repository defaults to the one the
+// Writes <dir>/<name>/: the start page, the Book and the releases. The repository defaults to the one the
 // tool runs in; the ref is what links into the repository's files point at — main unless given,
 // a release's tag for a release.
 
