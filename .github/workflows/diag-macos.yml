@@ -1,16 +1,16 @@
 name: diag macOS
 
-# Not for main. Runs the macOS-slow test classes alone and lists, every 10 s, every process older
-# than 20 s with its parent, to name what keeps a finished program's pipes open.
+# Not for main. Where a fresh process costs its time on macOS: zig's start, one C file, a build
+# cold and warm, a new binary's first and second start.
 
 on:
   push:
     branches: ['diag/macos-test-times']
 
 jobs:
-  slow:
+  starts:
     runs-on: macos-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-zig
@@ -18,28 +18,39 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Build the tests
-        run: dotnet build tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release
+      - name: Build lyric5
+        run: dotnet build src/Lyric5 --configuration Release
 
-      - name: The slow classes, with the process list beside them
+      - name: Measure
         shell: bash
         run: |
-          (while sleep 10; do
-             echo "=== $(date +%T)"
-             ps -axo pid,ppid,etime,stat,command | awk 'NR == 1 || ($3 ~ /:/ && $3 !~ /^00:[01][0-9]$/)' \
-               | grep -vE "launchd|/System/|/usr/libexec|/usr/sbin|Runner\.(Listener|Worker)|provjobd|sleep 10|awk|ps -axo" | cut -c1-220
-           done) > procs.log 2>&1 &
-          watcher=$!
-          dotnet test tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release --no-build \
-            --filter "FullyQualifiedName~PanicTests|FullyQualifiedName~SignalTests|FullyQualifiedName~RuntimeProgramTests|FullyQualifiedName~A_program_runs_natively" \
-            --logger "trx;LogFileName=slow.trx" --results-directory testresults || true
-          kill $watcher
-          grep -v "^===" procs.log | sort | uniq -c | sort -rn | head -60
-
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: diag-macos
-          path: |
-            procs.log
-            testresults/*.trx
+          t() { local s=$(python3 -c 'import time; print(time.time())'); "$@" > /dev/null 2>&1; local rc=$?; python3 -c "import time; print(f'{time.time() - $s:7.2f}s rc=$rc', end=' ')"; echo "$*" | cut -c1-90; }
+          echo "--- zig's start"
+          for i in 1 2 3 4 5; do t zig version; done
+          printf 'int main(void){return 0;}\n' > /tmp/one.c
+          echo "--- one C file, compile and link"
+          for i in 1 2 3; do t zig cc -O0 -o /tmp/one-$i /tmp/one.c; done
+          echo "--- a fresh binary, first and second start"
+          for i in 1 2 3; do t /tmp/one-$i; t /tmp/one-$i; done
+          echo "--- the same with a system cc"
+          for i in 1 2 3; do t cc -O0 -o /tmp/two-$i /tmp/one.c; t /tmp/two-$i; t /tmp/two-$i; done
+          L=$(ls src/Lyric5/bin/Release/net*/lyric5)
+          mkdir -p /tmp/hello/src && printf '[package]\nname = "hello"\nversion = "0.1.0"\n' > /tmp/hello/lyric.toml
+          printf 'import std.io { println };\n\nfn main(): void {\n    println("hi");\n}\n' > /tmp/hello/src/main.lyr
+          echo "--- lyric5 build: the runtime's first build, then a warm build, then one change"
+          t $L build -C /tmp/hello
+          t $L build -C /tmp/hello
+          printf 'import std.io { println };\n\nfn main(): void {\n    println("ho");\n}\n' > /tmp/hello/src/main.lyr
+          t $L build -C /tmp/hello
+          B=$(find /tmp/hello/out -type f -name hello | head -1)
+          echo "--- the built program: first and second start"
+          t $B; t $B; t $B
+          echo "--- a panic's backtrace"
+          printf 'fn main(): void {\n    let xs: int[] = [];\n    let _ = xs[3];\n}\n' > /tmp/hello/src/main.lyr
+          t $L build -C /tmp/hello
+          B=$(find /tmp/hello/out -type f -name hello | head -1)
+          t $B; t $B
+          echo "--- the machine"
+          sysctl -n hw.ncpu hw.memsize machdep.cpu.brand_string
+          spctl --status || true
+          ps -axo pid,pcpu,etime,command | grep -E "syspolicyd|XProtect|endpointsecurityd|trustd|amfid" | grep -v grep | cut -c1-140
