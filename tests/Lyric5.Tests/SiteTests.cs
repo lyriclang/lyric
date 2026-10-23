@@ -39,7 +39,7 @@ public partial class SiteTests
 
     private static SiteContext Site(params string[] pages) => new("dev", pages, SiteContext.DefaultAreas);
 
-    private static void MatchesGolden(string name, string actual)
+    internal static void MatchesGolden(string name, string actual)
     {
         var path = Path.Combine(Golden, name + ".html");
         if (Environment.GetEnvironmentVariable("LYRIC_UPDATE_SNAPSHOTS") == "1")
@@ -149,37 +149,49 @@ public partial class SiteTests
         return output;
     }
 
+    /// <summary>Every relative link of a built site that reaches no written file or no anchor
+    /// there, and how many links were looked at.</summary>
+    internal static (List<string> Broken, int Checked) LinksOf(string output)
+    {
+        var broken = new List<string>();
+        var checkedLinks = 0;
+        var ids = new Dictionary<string, HashSet<string>>();
+        foreach (var file in Directory.EnumerateFiles(output, "*.html", SearchOption.AllDirectories))
+        {
+            var html = File.ReadAllText(file);
+            foreach (Match m in Target().Matches(html))
+            {
+                var target = m.Groups["target"].Value.Replace("&amp;", "&");
+                if (target.Contains("://", StringComparison.Ordinal) || target.StartsWith('/')
+                    || target.StartsWith("mailto:", StringComparison.Ordinal))
+                    continue;
+                checkedLinks++;
+                var hash = target.IndexOf('#');
+                var path = hash < 0 ? target : target[..hash];
+                var anchor = hash < 0 ? "" : target[(hash + 1)..];
+                var resolved = path.Length == 0
+                    ? file
+                    : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(file)!, SiteContext.FileOf(path)));
+                var where = $"{Path.GetRelativePath(output, file)}: {target}";
+                if (!File.Exists(resolved)) broken.Add(where);
+                else if (anchor.Length > 0)
+                {
+                    if (!ids.TryGetValue(resolved, out var known))
+                        ids[resolved] = known = Id().Matches(File.ReadAllText(resolved)).Select(id => id.Groups["id"].Value).ToHashSet();
+                    if (!known.Contains(anchor)) broken.Add(where + " (no such anchor)");
+                }
+            }
+        }
+        return (broken, checkedLinks);
+    }
+
     [Fact]
     public void The_built_site_has_no_link_that_leads_nowhere()
     {
         var output = BuildSite();
         try
         {
-            var broken = new List<string>();
-            var checkedLinks = 0;
-            foreach (var file in Directory.EnumerateFiles(output, "*.html", SearchOption.AllDirectories))
-            {
-                var html = File.ReadAllText(file);
-                foreach (Match m in Target().Matches(html))
-                {
-                    var target = m.Groups["target"].Value.Replace("&amp;", "&");
-                    if (target.Contains("://", StringComparison.Ordinal) || target.StartsWith('/')
-                        || target.StartsWith("mailto:", StringComparison.Ordinal))
-                        continue;
-                    checkedLinks++;
-                    var hash = target.IndexOf('#');
-                    var path = hash < 0 ? target : target[..hash];
-                    var anchor = hash < 0 ? "" : target[(hash + 1)..];
-                    var resolved = path.Length == 0
-                        ? file
-                        : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(file)!, SiteContext.FileOf(path)));
-                    var where = $"{Path.GetRelativePath(output, file)}: {target}";
-                    if (!File.Exists(resolved)) broken.Add(where);
-                    else if (anchor.Length > 0
-                             && !Id().Matches(File.ReadAllText(resolved)).Any(id => id.Groups["id"].Value == anchor))
-                        broken.Add(where + " (no such anchor)");
-                }
-            }
+            var (broken, checkedLinks) = LinksOf(output);
             Assert.True(broken.Count == 0, "links that lead nowhere:\n  " + string.Join("\n  ", broken));
             Assert.True(checkedLinks > 20, $"only {checkedLinks} links were checked");
         }

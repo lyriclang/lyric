@@ -1,3 +1,4 @@
+using Lyric.Core;
 using Lyric5.Doc;
 
 namespace Lyric5.Site;
@@ -28,17 +29,31 @@ public static class SiteBuilder
     public const string BookPath = "book/index.html";
     public const string SummaryFile = "SUMMARY.md";
 
-    /// <summary>The version's pages: the start page, the Book and the releases.</summary>
+    /// <summary>The diagnostic catalog of the repository.</summary>
+    public const string CatalogFile = "src/Lyric.Core/diagnostics.toml";
+
+    /// <summary>The commit of the specification the toolchain is built against.</summary>
+    public const string SpecPinFile = "spec.pin";
+
+    /// <summary>The commit <c>spec.pin</c> names.</summary>
+    public static string SpecPin(string root) => File.ReadAllText(Path.Combine(root, SpecPinFile)).Trim();
+
+    /// <summary>The version's pages: the start page, the Book, the diagnostic catalog, the
+    /// releases, and the specification where a checkout of it is given.</summary>
     /// <param name="gitRef">The branch or tag a link into the repository's files points at.</param>
-    public static List<Page> Build(string root, string version, string gitRef)
+    public static List<Page> Build(string root, string version, string gitRef, SpecSource? spec = null)
     {
         var bookDir = Path.Combine(root, BookDirectory);
         var summaryText = File.ReadAllText(Path.Combine(bookDir, SummaryFile));
         var summary = Book.ReadSummary(summaryText, SummaryFile);
         var chapterTexts = summary.Chapters.ToDictionary(c => c, c => File.ReadAllText(Path.Combine(bookDir, c.File)));
+        var catalog = DiagnosticCatalog.Read(File.ReadAllText(Path.Combine(root, CatalogFile)));
+        IReadOnlyList<SpecChapter> specChapters = spec is null ? [] : SpecPages.Chapters(spec);
 
         var paths = new List<string> { HomePath, ReleasesPath, BookPath };
         paths.AddRange(summary.Chapters.Select(c => SiteContext.FileOf(Book.PageOf(c))));
+        paths.AddRange(CatalogPages.Paths(catalog));
+        if (spec is not null) paths.AddRange(SpecPages.Paths(specChapters));
         var site = new SiteContext(version, paths, SiteContext.DefaultAreas);
 
         var program = FunctionOf(File.ReadAllText(Path.Combine(root, HomeProgramFile)), HomeProgramFunction);
@@ -54,6 +69,8 @@ public static class SiteBuilder
             var path = SiteContext.FileOf(Book.PageOf(chapter));
             pages.Add(new Page(path, Pages.Article(site, path, BookChapter(summary, chapter, chapterTexts[chapter], gitRef))));
         }
+        pages.AddRange(CatalogPages.Build(site, catalog));
+        if (spec is not null) pages.AddRange(SpecPages.Build(site, specChapters, spec.Commit));
         return pages;
     }
 

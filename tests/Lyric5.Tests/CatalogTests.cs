@@ -226,6 +226,8 @@ public partial class CatalogTests
         Assert.StartsWith("LYR-SEM0001: ", output);
         Assert.Contains("\nWrong:\n\n    fn main(): void {\n", output);
         Assert.Contains("\nRight:\n\n", output);
+        var version = RunRaw("--version").Item2.Split('\n')[0]["lyric ".Length..].Trim();
+        Assert.EndsWith($"\n\nOn the web: {DiagnosticCatalog.PageUrl("LYR-SEM0001", version)}\n", output.ReplaceLineEndings("\n"));
         var (refused, _, error) = RunRaw("explain", "LYR-XYZ9999");
         Assert.Equal(2, refused);
         Assert.Contains("error[LYR-CLI0003]: no code or lint 'LYR-XYZ9999' in the catalog", error);

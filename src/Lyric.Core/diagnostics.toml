@@ -1,4 +1,4 @@
-# The diagnostic catalog of the Lyric 5 toolchain (design/v5/spec/11 G9; 13 M12a P4). Every code the
+# The diagnostic catalog of the Lyric 5 toolchain. Every code the
 # toolchain reports, in code order. The form of an entry is DiagnosticCatalog's; CatalogTests check each
 # against the compiler; the spec's Appendix A is generated from this file (tooling/diagnostics/appendix.py).
 
@@ -168,7 +168,7 @@ example = '''
 $ lyric5 build
 error[LYR-CLI0002]: no C compiler found — install zig (recommended), clang or gcc, or set LYRIC_CC
 $ lyric5 build --profile asan
-error[LYR-CLI0002]: the asan profile needs clang (01 C7), and none was found
+error[LYR-CLI0002]: the asan profile needs clang, and none was found
 '''
 
 [LYR-CLI0003]
@@ -224,7 +224,7 @@ version = "1.0.0"
 $ ls src
 lib.lyr
 $ lyric5 run
-error[LYR-CLI0005]: package 'geo' is a library — it has no src/main.lyr and no [[bin]], so there is no program (11 P2)
+error[LYR-CLI0005]: package 'geo' is a library — it has no src/main.lyr and no [[bin]], so there is no program
 '''
 
 [LYR-CLI0006]
@@ -232,7 +232,7 @@ title = "the external runtime could not be started"
 severity = "error"
 area = "14-cli"
 summary = "Reported by the 4.x drivers when the bytecode VM or another tool they started as a separate process could not be launched."
-retired = "Lyric 5: lyric5 builds native binaries and starts no VM; only the 4.x launcher in Lyric.Core reports it, and the M12a S1 denyWarnings error moved to LYR-CLI0016"
+retired = "Lyric 5: lyric5 builds native binaries and starts no VM; only the 4.x launcher in Lyric.Core reports it, and the error for a profile that denies warnings is LYR-CLI0016"
 
 [LYR-CLI0007]
 title = "several programs and none named"
@@ -339,7 +339,7 @@ title = "warnings under a profile that denies them"
 severity = "error"
 area = "15-project"
 summary = "Reported after a compilation that warned when the profile had `denyWarnings`: one error that counted the warnings, which stayed warnings."
-retired = "M12a S5: a profile that denies warnings is `-D warnings` — each warning is the error, with a note naming the profile."
+retired = "A profile that denies warnings is `-D warnings` — each warning is the error, with a note naming the profile."
 
 [LYR-CLI0017]
 title = "a `lyric.json` holds something suspect"
@@ -705,8 +705,8 @@ error[LYR-ICE0002]: …
 title = "a construct this compiler version could not lower"
 severity = "error"
 area = "16-diagnostics"
-summary = "The lowering's one code for every refusal until M12a: what the language does not express yet, what the standard library lacked, and its own bugs, all under one number."
-retired = "M12a S1: each refusal of the lowering says its reason under a code of its own — LYR-SEM0195, LYR-SEM0196, LYR-SEM0197, or LYR-ICE0002 for a construct the checker accepted and the lowering cannot translate."
+summary = "The lowering's one code for every refusal in earlier versions: what the language does not express yet, what the standard library lacked, and its own bugs, all under one number."
+retired = "Each refusal of the lowering says its reason under a code of its own — LYR-SEM0195, LYR-SEM0196, LYR-SEM0197, or LYR-ICE0002 for a construct the checker accepted and the lowering cannot translate."
 
 [LYR-LEX0001]
 title = "a character that starts no token, or a name beyond ASCII"
@@ -1134,7 +1134,7 @@ title = "a token after one whole expression, pattern or statement"
 severity = "error"
 area = "02-grammar"
 summary = "The parser was asked for exactly one expression, pattern or statement, and a token follows it."
-retired = "M9b: Lyric 5 parses a file whole; the single-item entry points that report it serve `std.syntax` and a macro's read-back, which turn any parse error into LYR-CT0001 or an internal error"
+retired = "Lyric 5 parses a file whole; the single-item entry points that report it serve `std.syntax` and a macro's read-back, which turn any parse error into LYR-CT0001 or an internal error"
 
 [LYR-PAR0002]
 title = "an expression is missing"
@@ -1996,7 +1996,7 @@ title = "a static member in an interface"
 severity = "error"
 area = "05-interfaces"
 summary = "An interface member is declared `static`."
-retired = "Lyric 5 (03 T5): an interface declares static members, which a constraint reaches, and every member sequence admits `static`"
+retired = "In Lyric 5 an interface declares static members, which a constraint reaches, and every member sequence admits `static`"
 
 [LYR-PAR0042]
 title = "an attribute with no declaration to carry it"
@@ -3018,7 +3018,7 @@ summary = "Reported when `lyric.lock` holds a commit the dependency's repository
 explanation = '''
 `lyric.lock` records, for each revision read from git, the commit it was and a hash of the package content. A build reads that commit and checks the hash, so the program is built from the same sources everywhere. A commit that has gone — a force-push — or content that differs means the lock no longer describes what the repository holds.
 
-Resolve the dependency anew with `lyric5 update <name>`, which writes the lock from what the repository holds now, and review what changed.
+Resolve the dependency anew with `lyric5 update <name>`, which writes the lock from what the repository holds now, and check what changed.
 '''
 example = '''
 $ lyric5 build
@@ -5540,7 +5540,7 @@ title = "a host type constructed in the program"
 severity = "error"
 area = "03-types"
 summary = "An initializer builds a host type — a field-less class of a native module — which only the host can create."
-retired = "M12a S3: Lyric 5 has no host types; no native module of lyric5 declares a field-less class, so the check never fires"
+retired = "Lyric 5 has no host types; no native module of lyric5 declares a field-less class, so the check never fires"
 
 [LYR-SEM0062]
 title = "'?.' calling a field that holds a function"
@@ -5680,7 +5680,7 @@ title = "an attribute argument that is not a compile-time value"
 severity = "error"
 area = "11-metaprogramming"
 summary = "A field of an attribute is set to an expression that is not a literal, a unit variant or a constant."
-retired = "M9a: a Lyric 5 attribute's value is computed while the program compiles (11 §1 rule 5); the literal-only check is left to the 4.x path"
+retired = "A Lyric 5 attribute's value is computed while the program compiles; the literal-only check is left to the 4.x path"
 
 [LYR-SEM0067]
 title = "an attribute on a generic declaration"
@@ -5772,7 +5772,7 @@ title = "an attribute field left without a compile-time value"
 severity = "error"
 area = "11-metaprogramming"
 summary = "An attribute use leaves a field unset whose declaration has no literal default."
-retired = "M9a: a Lyric 5 attribute is checked as the struct initializer it writes, and a missing field is LYR-SEM0106 there; only the 4.x path reports this code"
+retired = "A Lyric 5 attribute is checked as the struct initializer it writes, and a missing field is LYR-SEM0106 there; only the 4.x path reports this code"
 
 [LYR-SEM0070]
 title = "a field written twice in one initializer or 'with'"
@@ -6394,14 +6394,14 @@ title = "a range value without std.core's 'Range'"
 severity = "error"
 area = "03-types"
 summary = "A range expression is used as a value while `Range`/`RangeInclusive` of `std.core` is not loaded."
-retired = "M12a S3: lyric5 always loads std.core, which declares 'Range' and 'RangeInclusive'; no program reaches the check"
+retired = "lyric5 always loads std.core, which declares 'Range' and 'RangeInclusive'; no program reaches the check"
 
 [LYR-SEM0091]
 title = "a loop over optional elements without the iterator protocol"
 severity = "error"
 area = "07-statements"
 summary = "A `for` loop walks elements of an optional type through a path where the end of the walk is signalled by null."
-retired = "M12a S3: Lyric 5's protocol has '??T' (10 B6 I1) and walks arrays by index; only the 4.x path could reach this check"
+retired = "Lyric 5's protocol has '??T' and walks arrays by index; only the 4.x path could reach this check"
 
 [LYR-SEM0092]
 title = "inference through a type that conforms twice"
@@ -6469,7 +6469,7 @@ title = "an opaque type made outside its module"
 severity = "error"
 area = "03-types"
 summary = "A cast turns a value of the underlying type into an opaque alias outside the module that declares the alias."
-retired = "M12a S3: Lyric 5 has no 'opaque type' (LYR-SEM0175 refuses the declaration, 03 T15), so no program reaches the cast check without that error"
+retired = "Lyric 5 has no 'opaque type' (LYR-SEM0175 refuses the declaration), so no program reaches the cast check without that error"
 
 [LYR-SEM0094]
 title = "a parenthesized attribute value with no one field to fill"
@@ -6519,14 +6519,14 @@ title = "an attribute whose 'WithArg' promise its first field breaks"
 severity = "error"
 area = "11-metaprogramming"
 summary = "A struct declares `WithArg<T>` but has no field, or its first field is not of type `T`."
-retired = "M12a S3: std.core of Lyric 5 declares no 'WithArg'; the parenthesized form fills the one field without a default (LYR-SEM0094)"
+retired = "std.core of Lyric 5 declares no 'WithArg'; the parenthesized form fills the one field without a default (LYR-SEM0094)"
 
 [LYR-SEM0096]
 title = "an attribute with a field a metadata row cannot hold"
 severity = "error"
 area = "11-metaprogramming"
 summary = "An attribute's struct has a field whose type is not a number, string, char, bool or unit enum."
-retired = "M9a: a Lyric 5 attribute's value is a struct computed at compile time, not a metadata row; only the 4.x path checks the field types"
+retired = "A Lyric 5 attribute's value is a struct computed at compile time, not a metadata row; only the 4.x path checks the field types"
 
 [LYR-SEM0097]
 title = "a name bound twice in one pattern"
@@ -9769,7 +9769,7 @@ title = "a delegation the lowering cannot express yet"
 severity = "error"
 area = "05-interfaces"
 summary = "A type delegates an interface to a field whose type is another interface (`[A by inner]` with `inner: B`), or a generic member of an interface is reached on a type that forwards it to a field."
-retired = "M12b S7: a field of a child interface forwards through the parent's table, and a generic member is forwarded per use, on the field's own member; nothing refuses either."
+retired = "A field of a child interface forwards through the parent's table, and a generic member is forwarded per use, on the field's own member; nothing refuses either."
 
 [LYR-SEM0197]
 title = "the monomorphization does not terminate"
@@ -10867,7 +10867,7 @@ title = "an interface value made through a shape's or a blanket block"
 severity = "error"
 area = "05-interfaces"
 summary = "A value is made into an interface it conforms to only through a block on a shape or a blanket conformance: such a value is not built in this release."
-retired = "M12b S7: a value of an interface is made through a shape's block or a blanket conformance — the shape in a box, a named type with the block's row in its table; nothing refuses it."
+retired = "A value of an interface is made through a shape's block or a blanket conformance — the shape in a box, a named type with the block's row in its table; nothing refuses it."
 
 [LYR-SEM0231]
 title = "a static member of an interface called through the interface"

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYR-SEM0999 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><span class="pending">Book</span><span class="pending">std</span><span class="pending">Spec</span><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" disabled="disabled" /></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">SEM</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../diagnostics/">All codes</a></li>
+<li><a class="current" href="../../diagnostics/LYR-SEM0999/">LYR-SEM0999</a></li>
+</ul>
+</nav>
+<main class="text">
+<h1>LYR-SEM0999</h1>
+<p class="code-title">a value that is never read</p>
+<p class="meta">warning · <a href="../../spec/07-statements/">spec 07-statements</a> · lint <code>unused-value</code>, group <code>unused</code>, warn unless said</p>
+<p>Reported where a <code>let</code> names a value nothing reads.</p>
+<h2 id="explanation">Explanation</h2>
+<p>A value no one reads is work for nothing, or a name that was meant elsewhere.</p>
+<h2 id="wrong">Wrong</h2>
+<pre><code class="language-lyric"><span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> unused = <span class="num">1</span>;
+}</code></pre>
+<h2 id="right">Right</h2>
+<pre><code class="language-lyric"><span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> _ = <span class="num">1</span>;
+}</code></pre>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#explanation">Explanation</a></li>
+<li class="level-2"><a href="#wrong">Wrong</a></li>
+<li class="level-2"><a href="#right">Right</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><span class="pending">Releases</span><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The specification's Appendix A from the toolchain's diagnostic catalog (design/v5/spec/13, M12a P4).
+"""The specification's Appendix A from the toolchain's diagnostic catalog.
 
     python3 tooling/diagnostics/appendix.py [--catalog src/Lyric.Core/diagnostics.toml] > appendix-a-diagnostics.md
 
@@ -24,7 +24,7 @@ GROUPS = [
     ("PKG", "Packages and manifests", "`lyric.toml`, the lock file, dependencies."),
     ("BLD", "The build", "The C toolchain, the runtime, the build script."),
     ("CLI", "The command line", "The driver's options and verbs."),
-    ("IR", "The lowering", "Retired with M12a S1: each refusal of the lowering has a code of its own."),
+    ("IR", "The lowering", "Retired: each refusal of the lowering has a code of its own."),
     ("ICE", "Internal compiler errors", "The toolchain's own failure: a bug to report, never the program's fault."),
     ("RT", "Runtime panics", "A panic ends the program with exit code 101 and a backtrace; the compile-time evaluation reports the same codes inside `LYR-CT0001`."),
 ]
