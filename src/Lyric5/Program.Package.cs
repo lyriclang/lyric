@@ -144,7 +144,8 @@ public static partial class Program
     }
 
     /// <summary><c>lyric explain &lt;code&gt;</c>: the catalog's entry — what the
-    /// code means, why, what to do, a wrong and a right program. A code is read as a reader may write
+    /// code means, why, what to do, a wrong and a right program, and the code's page on the website
+    /// for this toolchain's version. A code is read as a reader may write
     /// it (<c>sem0001</c>, <c>LYR-SEM0001</c>), a lint by its name (<c>unused-import</c>); one the
     /// catalog does not hold is exit 2.</summary>
     private static int Explain(string[] args)
@@ -156,6 +157,8 @@ public static partial class Program
             && !Lyric.Core.DiagnosticCatalog.Entries.TryGetValue(Lyric.Core.DiagnosticCatalog.Normalize(args[0]), out entry))
             return Unknown($"no code or lint '{args[0]}' in the catalog");
         Console.Out.Write(Lyric.Core.DiagnosticCatalog.Explain(entry));
+        Console.Out.WriteLine();
+        Console.Out.WriteLine($"On the web: {Lyric.Core.DiagnosticCatalog.PageUrl(entry.Code, DisplayVersion())}");
         return 0;
     }
 

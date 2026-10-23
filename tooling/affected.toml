@@ -62,6 +62,12 @@ tests = ["BuildTests", "BuildScriptTests", "PackageTests", "PackageRuleTests", "
 cases = ["13-", "15-"]
 
 [[rule]]
+# The diagnostic catalog: its reader, its entries, the pages the site makes of them.
+paths = ["src/Lyric.Core/diagnostics.toml", "src/Lyric.Core/DiagnosticCatalog.cs"]
+tests = ["4x", "CatalogTests", "LintTests", "CatalogPageTests"]
+cases = []
+
+[[rule]]
 paths = ["src/Lyric.Core/", "src/Lyric.Lsp/", "stdlib/", "tests/Lyric.Tests."]
 tests = ["4x"]
 cases = []
@@ -87,7 +93,7 @@ cases = []
 [[rule]]
 # The documentation's renderer, the site tool and the site's goldens.
 paths = ["src/Lyric5.Doc/", "tools/Site/", "tests/Lyric5.Tests/site/"]
-tests = ["SiteTests", "BookTests"]
+tests = ["SiteTests", "BookTests", "CatalogPageTests"]
 cases = []
 
 [[rule]]

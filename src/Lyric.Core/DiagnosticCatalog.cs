@@ -235,4 +235,26 @@ public static class DiagnosticCatalog
         var upper = code.Trim().ToUpperInvariant();
         return upper.StartsWith("LYR-", StringComparison.Ordinal) ? upper : "LYR-" + upper;
     }
+
+    /// <summary>The website, under which every version of the toolchain has its pages.</summary>
+    public const string Site = "https://lyric.oil1i.de";
+
+    /// <summary>A code's page under a version's root: <c>diagnostics/LYR-SEM0001/</c>.</summary>
+    public static string PagePath(string code) => $"diagnostics/{code}/";
+
+    /// <summary>The site's version a toolchain's pages live under: <c>5.0</c> for a release
+    /// <c>5.0.2</c>, <c>dev</c> for every other version — a dev build's
+    /// <c>5.0.0-dev.20261023+6d7bd38</c>, a local build's <c>5.0.0+…</c>.</summary>
+    public static string SiteVersion(string toolVersion)
+    {
+        var parts = toolVersion.Split('.');
+        return parts.Length == 3 && parts.All(p => p.Length > 0 && p.All(char.IsAsciiDigit))
+            ? $"{parts[0]}.{parts[1]}"
+            : "dev";
+    }
+
+    /// <summary>The page of <paramref name="code"/> for the toolchain of
+    /// <paramref name="toolVersion"/>: what <c>lyric explain</c> names and an editor links.</summary>
+    public static string PageUrl(string code, string toolVersion) =>
+        $"{Site}/{SiteVersion(toolVersion)}/{PagePath(code)}";
 }

@@ -27,13 +27,23 @@ public static class Markdown
         .UseAutoIdentifiers()
         .Build();
 
+    /// <summary>Heading ids as GitHub writes them — <c>## 8.5 Inline functions</c> is
+    /// <c>85-inline-functions</c> —, for text whose links were written against GitHub.</summary>
+    private static readonly MarkdownPipeline GitHubPipeline = new MarkdownPipelineBuilder()
+        .UsePipeTables()
+        .UseAutoIdentifiers(Markdig.Extensions.AutoIdentifiers.AutoIdentifierOptions.GitHub)
+        .Build();
+
     /// <summary>Renders <paramref name="markdown"/>.</summary>
     /// <param name="link">Rewrites each link's target; <c>null</c> leaves the targets as written.</param>
     /// <param name="dropTitle">Leaves the first level-1 heading out of the HTML, for a page form
     /// that writes the title itself; it is still in <see cref="RenderedMarkdown.Headings"/>.</param>
-    public static RenderedMarkdown Render(string markdown, Func<string, string>? link = null, bool dropTitle = false)
+    /// <param name="gitHubAnchors">Gives the headings GitHub's ids instead of the site's own.</param>
+    public static RenderedMarkdown Render(string markdown, Func<string, string>? link = null, bool dropTitle = false,
+        bool gitHubAnchors = false)
     {
-        var document = Markdig.Markdown.Parse(markdown, Pipeline);
+        var pipeline = gitHubAnchors ? GitHubPipeline : Pipeline;
+        var document = Markdig.Markdown.Parse(markdown, pipeline);
 
         if (link is not null)
         {
@@ -51,7 +61,7 @@ public static class Markdown
 
         var writer = new StringWriter();
         var renderer = new HtmlRenderer(writer);
-        Pipeline.Setup(renderer);
+        pipeline.Setup(renderer);
         renderer.ObjectRenderers.ReplaceOrAdd<CodeBlockRenderer>(new HighlightingCodeBlockRenderer());
         renderer.Render(document);
         writer.Flush();
