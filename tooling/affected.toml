@@ -35,7 +35,8 @@ cases = ["06-", "10-", "12-", "13-"]
 [[rule]]
 # The text of the language: lexing, parsing, the tree, the formatter.
 paths = ["src/Lyric.Frontend/Lexing/", "src/Lyric.Frontend/Parsing/", "src/Lyric.Frontend/AST/", "src/Lyric.Frontend/Formatting/"]
-tests = ["4x", "InterpolationTests", "UnicodeTests", "TrailingBlockCallTests", "ShiftCountTests", "ManifestTests"]
+tests = ["4x", "InterpolationTests", "UnicodeTests", "TrailingBlockCallTests", "ShiftCountTests", "ManifestTests",
+         "SiteTests"]
 cases = ["01-", "07-", "08-", "09-"]
 
 [[rule]]
@@ -79,7 +80,13 @@ cases = []
 
 [[rule]]
 paths = ["examples/"]
-tests = ["ExampleTests"]
+tests = ["ExampleTests", "SiteTests"]
+cases = []
+
+[[rule]]
+# The documentation's renderer, the site tool and the site's goldens.
+paths = ["src/Lyric5.Doc/", "tools/Site/", "tests/Lyric5.Tests/site/"]
+tests = ["SiteTests"]
 cases = []
 
 [[rule]]

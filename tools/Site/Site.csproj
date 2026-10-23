@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The website: the start page, the releases from CHANGELOG.md, and the areas as they arrive,
+    rendered with Lyric5.Doc into one directory per version. A tool; nothing ships it.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Version>5.0.0</Version>
+    <AssemblyName>site</AssemblyName>
+    <RootNamespace>Lyric5.Site</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Lyric5.Doc\Lyric5.Doc.csproj" />
+  </ItemGroup>
+
+</Project>

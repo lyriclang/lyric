@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The documentation's renderer: the theme (stylesheet, scripts, fonts), Markdown, the highlighting
+    of Lyric code through the compiler's lexer, and the forms of a page. tools/Site renders the
+    website with it, and `lyric doc` a package's reference.
+  -->
+  <PropertyGroup>
+    <Version>5.0.0</Version>
+    <AssemblyName>Lyric5.Doc</AssemblyName>
+    <RootNamespace>Lyric5.Doc</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Lyric.Core\Lyric.Core.csproj" />
+    <ProjectReference Include="..\Lyric.Frontend\Lyric.Frontend.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Markdig" Version="1.3.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The theme travels inside the assembly: a renderer in a single binary has no directory
+         beside it to read from. The name of each resource is its path under Assets/. -->
+    <EmbeddedResource Include="Assets\**\*" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

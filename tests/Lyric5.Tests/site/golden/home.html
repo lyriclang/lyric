@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en" data-root="" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric</title>
+<link rel="stylesheet" href="site.css" />
+<script src="theme.js"></script>
+</head>
+<body class="home">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="./">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><span class="pending">Book</span><span class="pending">std</span><span class="pending">Spec</span><span class="pending">Diagnostics</span><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" disabled="disabled" /></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<main class="home-main">
+<section class="hero">
+<div class="pitch">
+<h1>Lyric: native programs, plainly written.</h1>
+<p class="lead">A statically typed language for applications, command-line tools and servers. It compiles through C to one binary per program, runs its tasks on coroutines with their own stacks, and says in a function's signature what it throws.</p>
+<p class="actions"><span class="pending button primary">Get started</span><span class="pending button">Read the Book</span></p>
+</div>
+<pre class="program"><code class="language-lyric"><span class="kw">fn</span> add(a: <span class="ty">int</span>, b: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> a + b; <span class="com">// the sum</span>
+}</code></pre>
+</section>
+<section class="claims">
+<div class="claim"><h2>Native binaries</h2><p>A program builds into one executable for Linux, macOS or Windows — no virtual machine to install beside it.</p></div>
+<div class="claim"><h2>Concurrency without colouring</h2><p>A task runs on a stack of its own, so any function may wait for input or output; none is marked async.</p></div>
+<div class="claim"><h2>Errors in the signature</h2><p>A function names what it throws; a caller handles it or passes it on with try — no error leaves unseen.</p></div>
+</section>
+<section class="entries">
+<div class="entry"><h2><span class="pending">The Book</span></h2><p>The language from the first program to a server, chapter by chapter.</p></div>
+<div class="entry"><h2><span class="pending">Standard library</span></h2><p>Every module, type and function of std.</p></div>
+<div class="entry"><h2><span class="pending">Specification</span></h2><p>The rules of the language, precisely.</p></div>
+</section>
+</main>
+<footer class="footer"><a href="releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="nav.js" defer="defer"></script>
+<script src="version.js" defer="defer"></script>
+</body>
+</html>

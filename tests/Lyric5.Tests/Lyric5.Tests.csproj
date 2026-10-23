@@ -4,6 +4,7 @@
     <ProjectReference Include="..\..\src\Lyric5.Compiler\Lyric5.Compiler.csproj" />
     <ProjectReference Include="..\..\src\Lyric5.Build\Lyric5.Build.csproj" />
     <ProjectReference Include="..\..\src\Lyric5\Lyric5.csproj" />
+    <ProjectReference Include="..\..\tools\Site\Site.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- A test-only module beside the shipped stdlib5: a native the C emitter has no intrinsic
