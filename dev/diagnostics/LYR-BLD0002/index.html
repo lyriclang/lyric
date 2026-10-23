@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYR-BLD0002 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a href="../../spec/">Spec</a><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">BLD</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../diagnostics/">All codes</a></li>
+<li><a href="../../diagnostics/LYR-BLD0001/">LYR-BLD0001</a></li>
+<li><a class="current" href="../../diagnostics/LYR-BLD0002/">LYR-BLD0002</a></li>
+<li><a href="../../diagnostics/LYR-BLD0003/">LYR-BLD0003</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
+<h1>LYR-BLD0002</h1>
+<p class="code-title">a package's build script did not build or did not succeed</p>
+<p class="meta">error · <a href="../../spec/15-project/">spec 15-project</a></p>
+<p>Reported when a package's <code>build.lyr</code> does not compile, ends with an exit code other than 0, or does not end within 10 minutes. The package is not built; for a script that ran, what it wrote follows the message.</p>
+<h2 id="explanation">Explanation</h2>
+<p>A package's <code>build.lyr</code> is a program of its own that runs before the package compiles: it writes modules into <code>gen/</code>, names C to compile and libraries to link. A package whose script fails cannot be built, because what the script was to produce is missing.</p>
+<p>When the script does not compile, its own diagnostics come first and point into <code>build.lyr</code> or <code>build/</code>. When it ran and failed, the message gives its exit code and the output it wrote, which is also kept in <code>out/build-script/output.txt</code>. Fix the script, or what it reads.</p>
+<h2 id="wrong">Wrong</h2>
+<pre><code class="language-lyric"><span class="com">//- build.lyr</span>
+<span class="kw">fn</span> main(): <span class="ty">int</span> {
+    <span class="kw">return</span> <span class="num">3</span>;
+}
+<span class="com">//- src/main.lyr</span>
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+}</code></pre>
+<h2 id="right">Right</h2>
+<pre><code class="language-lyric"><span class="com">//- build.lyr</span>
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+}
+<span class="com">//- src/main.lyr</span>
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+}</code></pre>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#explanation">Explanation</a></li>
+<li class="level-2"><a href="#wrong">Wrong</a></li>
+<li class="level-2"><a href="#right">Right</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

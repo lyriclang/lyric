@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en" data-root="../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Diagnostics — Lyric</title>
+<link rel="stylesheet" href="../site.css" />
+<script src="../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../book/">Book</a><span class="pending">std</span><a href="../spec/">Spec</a><a class="current" href="../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Diagnostics</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="#lex">Lexing</a></li>
+<li><a href="#par">Parsing</a></li>
+<li><a href="#res">Names</a></li>
+<li><a href="#sem">Checking</a></li>
+<li><a href="#ct">Compile-time evaluation</a></li>
+<li><a href="#mac">Macros</a></li>
+<li><a href="#ir">Lowering</a></li>
+<li><a href="#cg">C generation</a></li>
+<li><a href="#pkg">Packages</a></li>
+<li><a href="#bld">Building</a></li>
+<li><a href="#cli">The command line</a></li>
+<li><a href="#rt">Run time</a></li>
+<li><a href="#ice">The toolchain itself</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
+<h1>Diagnostics</h1>
+<p>Every code the toolchain reports. <code>lyric explain</code> prints a code's page in the terminal.</p>
+<h2 id="lex">Lexing <span class="family">LEX</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-LEX0001/"><code>LYR-LEX0001</code></a></td><td>a character that starts no token, or a name beyond ASCII</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0002/"><code>LYR-LEX0002</code></a></td><td>a block comment that is not closed</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0003/"><code>LYR-LEX0003</code></a></td><td>a numeric literal with a suffix that does not fit it</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0004/"><code>LYR-LEX0004</code></a></td><td>a base prefix with no digits after it</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0005/"><code>LYR-LEX0005</code></a></td><td>a digit separator right after a base prefix</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0006/"><code>LYR-LEX0006</code></a></td><td>an exponent with no digits</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0007/"><code>LYR-LEX0007</code></a></td><td>a malformed escape sequence</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0008/"><code>LYR-LEX0008</code></a></td><td>a character literal that holds no character or several</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0009/"><code>LYR-LEX0009</code></a></td><td>a string literal that is not closed</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0010/"><code>LYR-LEX0010</code></a></td><td>a character literal that is not closed</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0011/"><code>LYR-LEX0011</code></a></td><td>an f-string that is not closed</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0012/"><code>LYR-LEX0012</code></a></td><td>a byte string holding no byte, or an '@' without a name</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0013/"><code>LYR-LEX0013</code></a></td><td>a byte escape in a string or character</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0014/"><code>LYR-LEX0014</code></a></td><td>a multi-line string whose quotes do not stand on lines of their own</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0015/"><code>LYR-LEX0015</code></a></td><td>a line of a multi-line string indented less than its closing quotes</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-LEX0016/"><code>LYR-LEX0016</code></a></td><td>a float literal without digits on one side of its point</td><td>error</td></tr>
+</tbody>
+</table>
+<h2 id="par">Parsing <span class="family">PAR</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-PAR0001/"><code>LYR-PAR0001</code></a></td><td>a token after one whole expression, pattern or statement</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0002/"><code>LYR-PAR0002</code></a></td><td>an expression is missing</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0003/"><code>LYR-PAR0003</code></a></td><td>a member name or a compile-time form is incomplete</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0004/"><code>LYR-PAR0004</code></a></td><td>a ']' is missing</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0005/"><code>LYR-PAR0005</code></a></td><td>range operators chained</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0006/"><code>LYR-PAR0006</code></a></td><td>a numeric literal with an unknown suffix</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0007/"><code>LYR-PAR0007</code></a></td><td>a numeric literal too large</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0008/"><code>LYR-PAR0008</code></a></td><td>a parenthesis is missing</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0009/"><code>LYR-PAR0009</code></a></td><td>an angle bracket of a type list is missing</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0010/"><code>LYR-PAR0010</code></a></td><td>a tuple of fewer than two elements, or a label given twice</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0011/"><code>LYR-PAR0011</code></a></td><td>a type is missing</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0012/"><code>LYR-PAR0012</code></a></td><td>a lambda without '=&gt;' before its body</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0013/"><code>LYR-PAR0013</code></a></td><td>a lambda parameter without a name</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0014/"><code>LYR-PAR0014</code></a></td><td>an interpolation not closed by '}'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0015/"><code>LYR-PAR0015</code></a></td><td>a function type without '-&gt;'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0016/"><code>LYR-PAR0016</code></a></td><td>a ';' is missing</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0017/"><code>LYR-PAR0017</code></a></td><td>a '{' is missing, or a body without braces</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0018/"><code>LYR-PAR0018</code></a></td><td>a '}' is missing</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0019/"><code>LYR-PAR0019</code></a></td><td>a '(' is missing after a keyword</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0020/"><code>LYR-PAR0020</code></a></td><td>a binding without its name, pattern or value</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0021/"><code>LYR-PAR0021</code></a></td><td>a for loop without 'in'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0022/"><code>LYR-PAR0022</code></a></td><td>a do block without 'while'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0025/"><code>LYR-PAR0025</code></a></td><td>something else than a declaration at module level</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0026/"><code>LYR-PAR0026</code></a></td><td>a name is missing</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0028/"><code>LYR-PAR0028</code></a></td><td>a type alias without '='</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0029/"><code>LYR-PAR0029</code></a></td><td>fields of a struct or class without ',' between them</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0030/"><code>LYR-PAR0030</code></a></td><td>a list after '::' without its '['</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0031/"><code>LYR-PAR0031</code></a></td><td>a parameter or field without ':' before its type</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0032/"><code>LYR-PAR0032</code></a></td><td>a function without 'fn', or its words out of order</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0033/"><code>LYR-PAR0033</code></a></td><td>a malformed pattern</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0034/"><code>LYR-PAR0034</code></a></td><td>a match arm without '=&gt;'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0035/"><code>LYR-PAR0035</code></a></td><td>match arms without ',' between them</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0036/"><code>LYR-PAR0036</code></a></td><td>an if expression without 'else'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0037/"><code>LYR-PAR0037</code></a></td><td>a field in an initializer without '='</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0041/"><code>LYR-PAR0041</code></a></td><td>a static member in an interface</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0042/"><code>LYR-PAR0042</code></a></td><td>an attribute with no declaration to carry it</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0043/"><code>LYR-PAR0043</code></a></td><td>an inline array of no positive literal length</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0044/"><code>LYR-PAR0044</code></a></td><td>an extern symbol that is not a string</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0045/"><code>LYR-PAR0045</code></a></td><td>nesting deeper than the parser carries</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0046/"><code>LYR-PAR0046</code></a></td><td>a label on something that is no loop</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0047/"><code>LYR-PAR0047</code></a></td><td>'by' where nothing is delegated</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0048/"><code>LYR-PAR0048</code></a></td><td>'sealed' before something that is no interface</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0049/"><code>LYR-PAR0049</code></a></td><td>several types not in brackets, or an empty type list</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0050/"><code>LYR-PAR0050</code></a></td><td>a 'try' that changes the value, not at the start</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0051/"><code>LYR-PAR0051</code></a></td><td>a 'catch' clause on 'try?' or 'try!'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0052/"><code>LYR-PAR0052</code></a></td><td>a 'using' that is not one 'let' with a value</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0053/"><code>LYR-PAR0053</code></a></td><td>a visibility word where none or another belongs</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0054/"><code>LYR-PAR0054</code></a></td><td>'&amp;' outside an argument</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0055/"><code>LYR-PAR0055</code></a></td><td>an initializer at the start of a statement</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0056/"><code>LYR-PAR0056</code></a></td><td>a 'throws' behind a function type that is a return type</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0057/"><code>LYR-PAR0057</code></a></td><td>an enum's variants not ended by ';' before its members</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0058/"><code>LYR-PAR0058</code></a></td><td>'&amp;' before a lambda parameter's pattern</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0059/"><code>LYR-PAR0059</code></a></td><td>comparisons or equalities chained</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0060/"><code>LYR-PAR0060</code></a></td><td>a local function that is not one plain closure</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0061/"><code>LYR-PAR0061</code></a></td><td>a 'comptime if' in expression position without 'else'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0062/"><code>LYR-PAR0062</code></a></td><td>a 'comptime for' in an initializer without '[f] = e'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0063/"><code>LYR-PAR0063</code></a></td><td>'quote' without a block</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0064/"><code>LYR-PAR0064</code></a></td><td>a field that ends with ';'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PAR0065/"><code>LYR-PAR0065</code></a></td><td>a 'continue', 'break' or 'return' where a value stands</td><td>error</td></tr>
+</tbody>
+</table>
+<h2 id="res">Names <span class="family">RES</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-RES0001/"><code>LYR-RES0001</code></a></td><td>a name declared twice in one scope</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0002/"><code>LYR-RES0002</code></a></td><td>a type name that names no type</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0003/"><code>LYR-RES0003</code></a></td><td>an import of a module that does not exist</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0004/"><code>LYR-RES0004</code></a></td><td>an imported name the module does not declare</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0005/"><code>LYR-RES0005</code></a></td><td>modules that import each other</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0006/"><code>LYR-RES0006</code></a></td><td>a file whose module header disagrees with its path</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0007/"><code>LYR-RES0007</code></a></td><td>two files that are the same module</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0008/"><code>LYR-RES0008</code></a></td><td>a module header</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0009/"><code>LYR-RES0009</code></a></td><td>a name the place may not see</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0010/"><code>LYR-RES0010</code></a></td><td>a pub import of a name that is not pub</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0011/"><code>LYR-RES0011</code></a></td><td>a declaration that takes a builtin type's name</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0012/"><code>LYR-RES0012</code></a></td><td>a name that is also a submodule</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0013/"><code>LYR-RES0013</code></a></td><td>a single file named std.lyr</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0014/"><code>LYR-RES0014</code></a></td><td>an import of a package the manifest does not declare</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-RES0015/"><code>LYR-RES0015</code></a></td><td>a test module under both src/tests/ and tests/</td><td>error</td></tr>
+</tbody>
+</table>
+<h2 id="sem">Checking <span class="family">SEM</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-SEM0001/"><code>LYR-SEM0001</code></a></td><td>a value of another type than the place takes</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0002/"><code>LYR-SEM0002</code></a></td><td>a name that nothing in scope declares</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0003/"><code>LYR-SEM0003</code></a></td><td>an operator its operands do not provide</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0004/"><code>LYR-SEM0004</code></a></td><td>a condition that is not a bool</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0005/"><code>LYR-SEM0005</code></a></td><td>a null operator on a value that is never null</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0006/"><code>LYR-SEM0006</code></a></td><td>a conversion that does not exist</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0007/"><code>LYR-SEM0007</code></a></td><td>a value that cannot be indexed or iterated</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0008/"><code>LYR-SEM0008</code></a></td><td>this outside a method</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0009/"><code>LYR-SEM0009</code></a></td><td>array elements of different types</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0010/"><code>LYR-SEM0010</code></a></td><td>a binding whose type nothing fixes</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0011/"><code>LYR-SEM0011</code></a></td><td>a name in type position that is no type</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0012/"><code>LYR-SEM0012</code></a></td><td>a member the type does not have</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0013/"><code>LYR-SEM0013</code></a></td><td>a call on something that is not a function</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0014/"><code>LYR-SEM0014</code></a></td><td>a call with the wrong number of arguments</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0015/"><code>LYR-SEM0015</code></a></td><td>a field the type does not declare</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0016/"><code>LYR-SEM0016</code></a></td><td>branches whose types do not unify</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0017/"><code>LYR-SEM0017</code></a></td><td>a path of a function that returns no value</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0018/"><code>LYR-SEM0018</code></a></td><td>a variable read before it is surely assigned</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0019/"><code>LYR-SEM0019</code></a></td><td>a write to something that cannot be written</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0020/"><code>LYR-SEM0020</code></a></td><td>a conformance that leaves an interface member unimplemented</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0021/"><code>LYR-SEM0021</code></a></td><td>a missing, duplicated or malformed main</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0022/"><code>LYR-SEM0022</code></a></td><td>an expression statement without an effect</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0023/"><code>LYR-SEM0023</code></a></td><td>a mut function that has nothing to write</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0024/"><code>LYR-SEM0024</code></a></td><td>a variadic parameter out of place</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0026/"><code>LYR-SEM0026</code></a></td><td>the wrong number of type arguments</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0027/"><code>LYR-SEM0027</code></a></td><td>a member of a type parameter that no constraint provides</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0028/"><code>LYR-SEM0028</code></a></td><td>a type argument that does not satisfy its constraint</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0029/"><code>LYR-SEM0029</code></a></td><td>a pattern that cannot match the scrutinee's type</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0030/"><code>LYR-SEM0030</code></a></td><td>a thrown, declared or caught type that is not an Error</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0031/"><code>LYR-SEM0031</code></a></td><td>an enum variant used against its shape</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0032/"><code>LYR-SEM0032</code></a></td><td>or-pattern alternatives that bind differently</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0033/"><code>LYR-SEM0033</code></a></td><td>a block that gives no value where one is wanted</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0034/"><code>LYR-SEM0034</code></a></td><td>an error that nothing handles</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0035/"><code>LYR-SEM0035</code></a></td><td>a catch-all clause before another clause</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0036/"><code>LYR-SEM0036</code></a></td><td>a try block without a catch</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0038/"><code>LYR-SEM0038</code></a></td><td>a bare yield in a coroutine that yields values</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0039/"><code>LYR-SEM0039</code></a></td><td>a value returned from a coroutine that returns nothing</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0042/"><code>LYR-SEM0042</code></a></td><td>an implementation that does not match the interface's signature</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0043/"><code>LYR-SEM0043</code></a></td><td>one member defaulted by two interfaces</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0045/"><code>LYR-SEM0045</code></a></td><td>a lambda parameter whose type nothing gives</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0046/"><code>LYR-SEM0046</code></a></td><td>a lambda that can end without its value</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0047/"><code>LYR-SEM0047</code></a></td><td>an extend target or conversion not supported</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0050/"><code>LYR-SEM0050</code></a></td><td>a match that does not cover every value</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0051/"><code>LYR-SEM0051</code></a></td><td>a function without a body</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0052/"><code>LYR-SEM0052</code></a></td><td>a type, module or generic function used as a value</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0053/"><code>LYR-SEM0053</code></a></td><td>an attribute used as an expression</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0054/"><code>LYR-SEM0054</code></a></td><td>a static member declared 'mut'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0055/"><code>LYR-SEM0055</code></a></td><td>a member that needs a receiver named without one</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0056/"><code>LYR-SEM0056</code></a></td><td>a value type that contains itself</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0057/"><code>LYR-SEM0057</code></a></td><td>a global read before it is initialized</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0058/"><code>LYR-SEM0058</code></a></td><td>a destructuring that does not fit the value</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0059/"><code>LYR-SEM0059</code></a></td><td>an equality, null or membership test the type does not support</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0060/"><code>LYR-SEM0060</code></a></td><td>a type argument nothing determines</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0061/"><code>LYR-SEM0061</code></a></td><td>a host type constructed in the program</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0062/"><code>LYR-SEM0062</code></a></td><td>'?.' calling a field that holds a function</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0063/"><code>LYR-SEM0063</code></a></td><td>a generic type named without its type arguments</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0064/"><code>LYR-SEM0064</code></a></td><td>a type alias that expands to itself</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0065/"><code>LYR-SEM0065</code></a></td><td>an attribute that cannot stand here</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0066/"><code>LYR-SEM0066</code></a></td><td>an attribute argument that is not a compile-time value</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0067/"><code>LYR-SEM0067</code></a></td><td>an attribute on a generic declaration</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0068/"><code>LYR-SEM0068</code></a></td><td>an attribute repeated on one declaration</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0069/"><code>LYR-SEM0069</code></a></td><td>an attribute field left without a compile-time value</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0070/"><code>LYR-SEM0070</code></a></td><td>a field written twice in one initializer or 'with'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0071/"><code>LYR-SEM0071</code></a></td><td>a local that is never used</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0072/"><code>LYR-SEM0072</code></a></td><td>an import that is never used</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0073/"><code>LYR-SEM0073</code></a></td><td>an unreachable statement</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0074/"><code>LYR-SEM0074</code></a></td><td>a static extension called on a value</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0075/"><code>LYR-SEM0075</code></a></td><td>a 'var' that is never reassigned</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0076/"><code>LYR-SEM0076</code></a></td><td>a use of a deprecated declaration</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0077/"><code>LYR-SEM0077</code></a></td><td>an import that shadows a builtin type</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0078/"><code>LYR-SEM0078</code></a></td><td>a conformance or parent list entry that does not fit</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0079/"><code>LYR-SEM0079</code></a></td><td>an interface member inherited twice or redeclared</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0081/"><code>LYR-SEM0081</code></a></td><td>a deprecation whose release has come or that names no version</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0082/"><code>LYR-SEM0082</code></a></td><td>a member replacing a generic default of a generic interface</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0083/"><code>LYR-SEM0083</code></a></td><td>an operator with two conformances that fit the operand</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0084/"><code>LYR-SEM0084</code></a></td><td>'throws' on a type that is no coroutine or task</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0085/"><code>LYR-SEM0085</code></a></td><td>two functions of one name taking the same number of arguments</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0086/"><code>LYR-SEM0086</code></a></td><td>a call that more than one function of the name fits</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0087/"><code>LYR-SEM0087</code></a></td><td>a call that no function of the name takes</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0088/"><code>LYR-SEM0088</code></a></td><td>an overloaded interface member</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0089/"><code>LYR-SEM0089</code></a></td><td>a shared function name used as a value without a type to choose by</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0090/"><code>LYR-SEM0090</code></a></td><td>a range value without std.core's 'Range'</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0091/"><code>LYR-SEM0091</code></a></td><td>a loop over optional elements without the iterator protocol</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0092/"><code>LYR-SEM0092</code></a></td><td>inference through a type that conforms twice</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0093/"><code>LYR-SEM0093</code></a></td><td>an opaque type made outside its module</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0094/"><code>LYR-SEM0094</code></a></td><td>a parenthesized attribute value with no one field to fill</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0095/"><code>LYR-SEM0095</code></a></td><td>an attribute whose 'WithArg' promise its first field breaks</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0096/"><code>LYR-SEM0096</code></a></td><td>an attribute with a field a metadata row cannot hold</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0097/"><code>LYR-SEM0097</code></a></td><td>a name bound twice in one pattern</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0098/"><code>LYR-SEM0098</code></a></td><td>a refutable pattern without a path for a miss</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0099/"><code>LYR-SEM0099</code></a></td><td>an extern declaration that cannot cross into C</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0100/"><code>LYR-SEM0100</code></a></td><td>a 'comptime' form that cannot be evaluated while compiling</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0101/"><code>LYR-SEM0101</code></a></td><td>a jump to a label no enclosing loop carries</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0102/"><code>LYR-SEM0102</code></a></td><td>a label that repeats the label of an enclosing loop</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0103/"><code>LYR-SEM0103</code></a></td><td>a loop label nothing jumps to</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0104/"><code>LYR-SEM0104</code></a></td><td>a pattern that cannot fail where a test is promised</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0105/"><code>LYR-SEM0105</code></a></td><td>an expression or type nested deeper than the checker walks</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0106/"><code>LYR-SEM0106</code></a></td><td>an initializer that omits a field without a default</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0111/"><code>LYR-SEM0111</code></a></td><td>a bare name in a pattern that spells a variant of the scrutinee's enum</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0112/"><code>LYR-SEM0112</code></a></td><td>a match arm no value can reach</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0113/"><code>LYR-SEM0113</code></a></td><td>an implicit member where no enum is expected</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0114/"><code>LYR-SEM0114</code></a></td><td>a from-the-end index '^n' outside the place it means something</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0115/"><code>LYR-SEM0115</code></a></td><td>a view of an inline array that lies in a frame</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0116/"><code>LYR-SEM0116</code></a></td><td>'with' on something other than a struct</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0117/"><code>LYR-SEM0117</code></a></td><td>the placeholder type '_' where nothing infers it</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0118/"><code>LYR-SEM0118</code></a></td><td>a visibility word on an interface member</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0119/"><code>LYR-SEM0119</code></a></td><td>a named argument that does not fit the parameters</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0120/"><code>LYR-SEM0120</code></a></td><td>a parameter default that reads 'this'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0121/"><code>LYR-SEM0121</code></a></td><td>a second member of one name on a type</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0122/"><code>LYR-SEM0122</code></a></td><td>an unqualified call of a name two conformance blocks implement</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0123/"><code>LYR-SEM0123</code></a></td><td>a delegated conformance whose field cannot answer it</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0124/"><code>LYR-SEM0124</code></a></td><td>an extend block on an interface</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0125/"><code>LYR-SEM0125</code></a></td><td>a qualified interface call on a receiver that does not conform</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0126/"><code>LYR-SEM0126</code></a></td><td>an interface usable only as a constraint used as a value type</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0127/"><code>LYR-SEM0127</code></a></td><td>a value for an interface's static 'let'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0128/"><code>LYR-SEM0128</code></a></td><td>an associated type that is not answered or not declared</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0129/"><code>LYR-SEM0129</code></a></td><td>an associated type answer that no interface asks for</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0131/"><code>LYR-SEM0131</code></a></td><td>a type test that asks nothing an interface value could answer</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0132/"><code>LYR-SEM0132</code></a></td><td>a conformance to a sealed interface outside its module</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0133/"><code>LYR-SEM0133</code></a></td><td>two conformances of one type to one interface</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0134/"><code>LYR-SEM0134</code></a></td><td>a member of a constrained block on a type that fails its constraints</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0135/"><code>LYR-SEM0135</code></a></td><td>a conformance the compiler cannot synthesize, or Identity on a value</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0136/"><code>LYR-SEM0136</code></a></td><td>a repeated array literal of an element that would need cloning</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0137/"><code>LYR-SEM0137</code></a></td><td>a type named twice in one 'throws' set</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0138/"><code>LYR-SEM0138</code></a></td><td>a call that may throw without a 'try' mark</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0139/"><code>LYR-SEM0139</code></a></td><td>a 'try' mark over nothing that can throw</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0140/"><code>LYR-SEM0140</code></a></td><td>'try?' over a call without a value, used as a value</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0141/"><code>LYR-SEM0141</code></a></td><td>an error type caught twice by one 'try'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0142/"><code>LYR-SEM0142</code></a></td><td>a 'catch' clause no error can reach</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0143/"><code>LYR-SEM0143</code></a></td><td>'using' on a value that is not Closeable</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0144/"><code>LYR-SEM0144</code></a></td><td>a Closeable value nothing closes</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0145/"><code>LYR-SEM0145</code></a></td><td>'never' where a value of it would have to exist</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0146/"><code>LYR-SEM0146</code></a></td><td>a 'return' in a function returning 'never'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0147/"><code>LYR-SEM0147</code></a></td><td>'break' or 'continue' outside a loop</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0148/"><code>LYR-SEM0148</code></a></td><td>a 'break' with a value out of a 'while' or 'for'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0149/"><code>LYR-SEM0149</code></a></td><td>a 'loop' whose breaks give a value only in part</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0150/"><code>LYR-SEM0150</code></a></td><td>a visibility word on a conformance or its methods</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0151/"><code>LYR-SEM0151</code></a></td><td>a declaration names a type less visible than itself</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0152/"><code>LYR-SEM0152</code></a></td><td>a member is written wider than its type</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0153/"><code>LYR-SEM0153</code></a></td><td>a name hides one of the prelude's</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0154/"><code>LYR-SEM0154</code></a></td><td>a test takes parameters, returns a value or is private</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0155/"><code>LYR-SEM0155</code></a></td><td>a caller attribute sits on the wrong parameter</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0156/"><code>LYR-SEM0156</code></a></td><td>a place argument or parameter that is no place</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0157/"><code>LYR-SEM0157</code></a></td><td>an argument's place mark does not fit its parameter</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0158/"><code>LYR-SEM0158</code></a></td><td>a place outlives the call that handed it over</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0160/"><code>LYR-SEM0160</code></a></td><td>an associated type's answer does not meet its bound</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0161/"><code>LYR-SEM0161</code></a></td><td>an associated type's answer carries a bound</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0162/"><code>LYR-SEM0162</code></a></td><td>a second loop over the same iterator</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0163/"><code>LYR-SEM0163</code></a></td><td>a loop's head takes 'try?', 'try!' or a catching form</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0164/"><code>LYR-SEM0164</code></a></td><td>a format spec in an f-string hole is malformed or does not apply</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0165/"><code>LYR-SEM0165</code></a></td><td>a 'throws' behind a task or coroutine return type is ambiguous</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0166/"><code>LYR-SEM0166</code></a></td><td>a spread argument is not the whole rest of a variadic call</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0167/"><code>LYR-SEM0167</code></a></td><td>an implementing member is less visible than its conformance</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0168/"><code>LYR-SEM0168</code></a></td><td>a type's member hides a blanket member</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0169/"><code>LYR-SEM0169</code></a></td><td>a generic type's constant is not a constant expression</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0170/"><code>LYR-SEM0170</code></a></td><td>an extend block's type parameter is bound by nothing</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0171/"><code>LYR-SEM0171</code></a></td><td>a catch-all clause that nothing reaches</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0172/"><code>LYR-SEM0172</code></a></td><td>a 'mut fn' generator on a value type changes a copy</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0173/"><code>LYR-SEM0173</code></a></td><td>a binding or parameter holds a 'void'</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0174/"><code>LYR-SEM0174</code></a></td><td>a closeable iterator's close() throws more than its Error allows</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0175/"><code>LYR-SEM0175</code></a></td><td>'opaque type' is no form of Lyric 5</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0176/"><code>LYR-SEM0176</code></a></td><td>a name is bound twice in one scope</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0177/"><code>LYR-SEM0177</code></a></td><td>'@AlwaysInline' and '@NoInline' on one function</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0178/"><code>LYR-SEM0178</code></a></td><td>the value of a '@MustUse' call is dropped</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0179/"><code>LYR-SEM0179</code></a></td><td>a lint attribute names no lint</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0180/"><code>LYR-SEM0180</code></a></td><td>an '@Allow' that takes back nothing</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0181/"><code>LYR-SEM0181</code></a></td><td>an inline function keeps a function parameter</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0182/"><code>LYR-SEM0182</code></a></td><td>an inline function reaches itself</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0183/"><code>LYR-SEM0183</code></a></td><td>an inline function used as a value</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0184/"><code>LYR-SEM0184</code></a></td><td>a function that cannot be inline</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0185/"><code>LYR-SEM0185</code></a></td><td>a reflection access outside a round of its own</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0186/"><code>LYR-SEM0186</code></a></td><td>a macro's signature is not syntax to syntax</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0187/"><code>LYR-SEM0187</code></a></td><td>a macro called as a function</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0188/"><code>LYR-SEM0188</code></a></td><td>a macro's result does not fit its site</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0189/"><code>LYR-SEM0189</code></a></td><td>a macro expanded in its own module</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0190/"><code>LYR-SEM0190</code></a></td><td>a macro site names no macro</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0191/"><code>LYR-SEM0191</code></a></td><td>a macro site's arguments do not fit the macro</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0193/"><code>LYR-SEM0193</code></a></td><td>a splice outside a quote or of the wrong kind</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0194/"><code>LYR-SEM0194</code></a></td><td>a quote in a program that does not reach std.syntax</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0195/"><code>LYR-SEM0195</code></a></td><td>a part of the standard library the lowering needs is missing</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0196/"><code>LYR-SEM0196</code></a></td><td>a delegation the lowering cannot express yet</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0197/"><code>LYR-SEM0197</code></a></td><td>the monomorphization does not terminate</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0198/"><code>LYR-SEM0198</code></a></td><td>a parameter that is never used</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0199/"><code>LYR-SEM0199</code></a></td><td>a 'var' that is written and never read</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0200/"><code>LYR-SEM0200</code></a></td><td>a type parameter that is never used</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0201/"><code>LYR-SEM0201</code></a></td><td>a declaration nothing uses</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0202/"><code>LYR-SEM0202</code></a></td><td>an assignment written as a condition</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0203/"><code>LYR-SEM0203</code></a></td><td>an assignment of a value to itself</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0204/"><code>LYR-SEM0204</code></a></td><td>a comparison of an unsigned value with 0 that cannot fail</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0205/"><code>LYR-SEM0205</code></a></td><td>an equality test on floats</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0206/"><code>LYR-SEM0206</code></a></td><td>a local that hides one of the same name</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0207/"><code>LYR-SEM0207</code></a></td><td>a local that hides a module the file imports</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0208/"><code>LYR-SEM0208</code></a></td><td>an integer literal that takes another type than int</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0209/"><code>LYR-SEM0209</code></a></td><td>a block's implicit 'it' that hides the 'it' around it</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0210/"><code>LYR-SEM0210</code></a></td><td>an exit code outside 0 to 255</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0211/"><code>LYR-SEM0211</code></a></td><td>a conformance of another package's type to another package's interface</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0212/"><code>LYR-SEM0212</code></a></td><td>a task's handle dropped</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0213/"><code>LYR-SEM0213</code></a></td><td>a module 'var' in a program that starts threads</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0214/"><code>LYR-SEM0214</code></a></td><td>a construct an edition retires</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0215/"><code>LYR-SEM0215</code></a></td><td>a name against the naming convention</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0216/"><code>LYR-SEM0216</code></a></td><td>a module named as a Windows device</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0217/"><code>LYR-SEM0217</code></a></td><td>'clone()' of a value a copy makes whole</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0218/"><code>LYR-SEM0218</code></a></td><td>a 'return;' that ends a body</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0219/"><code>LYR-SEM0219</code></a></td><td>'while (true)' where 'loop' is meant</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0220/"><code>LYR-SEM0220</code></a></td><td>a string grown with '+' in a loop</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0221/"><code>LYR-SEM0221</code></a></td><td>a large struct passed by value</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0222/"><code>LYR-SEM0222</code></a></td><td>a value boxed as an interface in a loop</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0223/"><code>LYR-SEM0223</code></a></td><td>a pub declaration without documentation</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0224/"><code>LYR-SEM0224</code></a></td><td>a doc link that names nothing</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0225/"><code>LYR-SEM0225</code></a></td><td>a module without module documentation</td><td>warning</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0226/"><code>LYR-SEM0226</code></a></td><td>a 'return' without the value the function returns</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0227/"><code>LYR-SEM0227</code></a></td><td>an integer literal too large for 'int'</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0228/"><code>LYR-SEM0228</code></a></td><td>an inline array of another length</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0229/"><code>LYR-SEM0229</code></a></td><td>a place of another type than the place parameter</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0230/"><code>LYR-SEM0230</code></a></td><td>an interface value made through a shape's or a blanket block</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0231/"><code>LYR-SEM0231</code></a></td><td>a static member of an interface called through the interface</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-SEM0232/"><code>LYR-SEM0232</code></a></td><td>a loop over a string</td><td>error</td></tr>
+</tbody>
+</table>
+<h2 id="ct">Compile-time evaluation <span class="family">CT</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-CT0001/"><code>LYR-CT0001</code></a></td><td>a panic while evaluating at compile time</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CT0002/"><code>LYR-CT0002</code></a></td><td>a compile-time evaluation over its budget</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CT0003/"><code>LYR-CT0003</code></a></td><td>compile-time code that reaches outside the program</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CT0004/"><code>LYR-CT0004</code></a></td><td>an embed that cannot read its file</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CT0005/"><code>LYR-CT0005</code></a></td><td>a form that does not run at compile time yet</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CT0006/"><code>LYR-CT0006</code></a></td><td>a use of a declaration the build leaves out</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CT0007/"><code>LYR-CT0007</code></a></td><td>a macro expansion that does not end</td><td>error</td></tr>
+</tbody>
+</table>
+<h2 id="mac">Macros <span class="family">MAC</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-MAC0001/"><code>LYR-MAC0001</code></a></td><td>an error a macro reports</td><td>error</td></tr>
+</tbody>
+</table>
+<h2 id="ir">Lowering <span class="family">IR</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-IR0001/"><code>LYR-IR0001</code></a></td><td>a construct this compiler version could not lower</td><td>error, retired</td></tr>
+</tbody>
+</table>
+<h2 id="cg">C generation <span class="family">CG</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-CG0001/"><code>LYR-CG0001</code></a></td><td>a construct the C backend does not translate</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CG0002/"><code>LYR-CG0002</code></a></td><td>a compile-time-only function called at run time</td><td>error</td></tr>
+</tbody>
+</table>
+<h2 id="pkg">Packages <span class="family">PKG</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-PKG0001/"><code>LYR-PKG0001</code></a></td><td>`lyric.toml` or `lyric.lock` is not valid TOML</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PKG0002/"><code>LYR-PKG0002</code></a></td><td>a manifest or lock field that is missing or malformed</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PKG0003/"><code>LYR-PKG0003</code></a></td><td>a key or section the manifest does not have</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PKG0004/"><code>LYR-PKG0004</code></a></td><td>a dependency's source holds no package of that name</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PKG0005/"><code>LYR-PKG0005</code></a></td><td>one package name read from two sources</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PKG0006/"><code>LYR-PKG0006</code></a></td><td>a repository has no such revision or no package at it</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PKG0007/"><code>LYR-PKG0007</code></a></td><td>a git dependency cannot be read</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PKG0008/"><code>LYR-PKG0008</code></a></td><td>the lock disagrees with the repository</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PKG0009/"><code>LYR-PKG0009</code></a></td><td>a package asks for a newer toolchain</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PKG0010/"><code>LYR-PKG0010</code></a></td><td>packages that depend on each other in a cycle</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PKG0011/"><code>LYR-PKG0011</code></a></td><td>`--locked` and a lock that does not match</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-PKG0012/"><code>LYR-PKG0012</code></a></td><td>a dependency's build script the root does not trust</td><td>error</td></tr>
+</tbody>
+</table>
+<h2 id="bld">Building <span class="family">BLD</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-BLD0001/"><code>LYR-BLD0001</code></a></td><td>the C compiler or the linker failed</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-BLD0002/"><code>LYR-BLD0002</code></a></td><td>a package's build script did not build or did not succeed</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-BLD0003/"><code>LYR-BLD0003</code></a></td><td>a warning a build script reported</td><td>warning</td></tr>
+</tbody>
+</table>
+<h2 id="cli">The command line <span class="family">CLI</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-CLI0001/"><code>LYR-CLI0001</code></a></td><td>a directory or file named on the command line does not exist</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0002/"><code>LYR-CLI0002</code></a></td><td>no C compiler was found</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0003/"><code>LYR-CLI0003</code></a></td><td>a command line the toolchain does not accept</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0004/"><code>LYR-CLI0004</code></a></td><td>no package here or above</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0005/"><code>LYR-CLI0005</code></a></td><td>a library has no program to run or print</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0006/"><code>LYR-CLI0006</code></a></td><td>the external runtime could not be started</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0007/"><code>LYR-CLI0007</code></a></td><td>several programs and none named</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0008/"><code>LYR-CLI0008</code></a></td><td>a dependency `add` or `remove` cannot edit</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0009/"><code>LYR-CLI0009</code></a></td><td>the function named by `--function` is not in the module</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0010/"><code>LYR-CLI0010</code></a></td><td>a `lyric.json` that cannot be understood</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0011/"><code>LYR-CLI0011</code></a></td><td>no `build.lyr` in the directory a build was pointed at</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0012/"><code>LYR-CLI0012</code></a></td><td>the build script ran and did not finish its job</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0013/"><code>LYR-CLI0013</code></a></td><td>the stub was started without a program</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0014/"><code>LYR-CLI0014</code></a></td><td>a packed executable is damaged</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0015/"><code>LYR-CLI0015</code></a></td><td>no stub to pack into</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0016/"><code>LYR-CLI0016</code></a></td><td>warnings under a profile that denies them</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0017/"><code>LYR-CLI0017</code></a></td><td>a `lyric.json` holds something suspect</td><td>warning, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0018/"><code>LYR-CLI0018</code></a></td><td>a `lyric.json` asks for a newer toolchain</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0019/"><code>LYR-CLI0019</code></a></td><td>`--only` named an artifact the build script did not declare</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0020/"><code>LYR-CLI0020</code></a></td><td>an internal failure of the 4.x compiler</td><td>error, retired</td></tr>
+<tr><td><a href="../diagnostics/LYR-CLI0021/"><code>LYR-CLI0021</code></a></td><td>no package can be made here</td><td>error</td></tr>
+</tbody>
+</table>
+<h2 id="rt">Run time <span class="family">RT</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-RT0001/"><code>LYR-RT0001</code></a></td><td>integer division by zero</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0002/"><code>LYR-RT0002</code></a></td><td>integer overflow</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0003/"><code>LYR-RT0003</code></a></td><td>an index or a range out of bounds</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0004/"><code>LYR-RT0004</code></a></td><td>a null value unwrapped</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0005/"><code>LYR-RT0005</code></a></td><td>out of memory</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0006/"><code>LYR-RT0006</code></a></td><td>stack overflow</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0007/"><code>LYR-RT0007</code></a></td><td>an argument that breaks a precondition</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0008/"><code>LYR-RT0008</code></a></td><td>panic called by the program</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0009/"><code>LYR-RT0009</code></a></td><td>a conversion to char of no Unicode scalar value</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0010/"><code>LYR-RT0010</code></a></td><td>try! on an error</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0011/"><code>LYR-RT0011</code></a></td><td>a failed assertion</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0012/"><code>LYR-RT0012</code></a></td><td>unreachable reached</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0013/"><code>LYR-RT0013</code></a></td><td>todo reached</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0014/"><code>LYR-RT0014</code></a></td><td>a coroutine misused</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0015/"><code>LYR-RT0015</code></a></td><td>the system refused the runtime what it needs</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0016/"><code>LYR-RT0016</code></a></td><td>a collection changed while it was walked</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0017/"><code>LYR-RT0017</code></a></td><td>control reached code the compiler holds unreachable</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0018/"><code>LYR-RT0018</code></a></td><td>a deadlock</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0019/"><code>LYR-RT0019</code></a></td><td>a lock poisoned by a panic</td><td>panic</td></tr>
+<tr><td><a href="../diagnostics/LYR-RT0020/"><code>LYR-RT0020</code></a></td><td>the runtime found its own invariant broken</td><td>panic</td></tr>
+</tbody>
+</table>
+<h2 id="ice">The toolchain itself <span class="family">ICE</span></h2>
+<table class="codes">
+<tbody>
+<tr><td><a href="../diagnostics/LYR-ICE0001/"><code>LYR-ICE0001</code></a></td><td>the toolchain crashed</td><td>error</td></tr>
+<tr><td><a href="../diagnostics/LYR-ICE0002/"><code>LYR-ICE0002</code></a></td><td>a construct the lowering cannot translate</td><td>error</td></tr>
+</tbody>
+</table>
+</main>
+</div>
+<footer class="footer"><a href="../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../nav.js" defer="defer"></script>
+<script src="../version.js" defer="defer"></script>
+<script src="../search.js" defer="defer"></script>
+</body>
+</html>

@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Types and values — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a class="current" href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>Types and values</h1>
+<blockquote>
+<p><strong>Partly written.</strong> §1 to §10 were written with milestones <strong>M3</strong> to <strong>M8a</strong> of the Lyric 5 plan
+and the catch-up block N (2026-10-07); what later milestones add lands here spec-first: each rule
+with its conformance case before or with its implementation. Source of the decisions:
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/02-wertmodell.md">02 Value model</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 Type system</a>.</p>
+</blockquote>
+<h2 id="scope">Scope</h2>
+<p>Scalars and their aliases, widening and coercions, overflow, <code>as</code>, structs and classes, mutability, optionals, arrays, <code>Slice&lt;T&gt;</code>, <code>StringView</code>, ranges, tuples, enums, generics by monomorphization.</p>
+<h2 id="1-scalars">1. Scalars</h2>
+<p>The number tower, <code>bool</code> and <code>char</code>
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T1, T2</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/03-types/</code>.</p>
+<h3 id="11-the-scalar-types">1.1 The scalar types</h3>
+<ol>
+<li>The integer types are <code>int8</code>, <code>int16</code>, <code>int32</code>, <code>int</code> (signed, two's complement) and
+<code>uint8</code>, <code>uint16</code>, <code>uint32</code>, <code>uint</code> (unsigned), of the width their name says; <code>int</code> and
+<code>uint</code> are 64 bits wide. The float types are <code>float32</code> and <code>float</code>, IEEE 754 binary32 and
+binary64. <code>bool</code> holds <code>true</code> and <code>false</code>. <code>char</code> holds one Unicode scalar value.</li>
+<li><code>int64</code>, <code>uint64</code> and <code>float64</code> are <strong>aliases</strong> of <code>int</code>, <code>uint</code> and <code>float</code>: the same type
+under a second name, not a distinct type. A diagnostic names the type as <code>int</code>, <code>uint</code>,
+<code>float</code>.</li>
+<li>There is no <code>usize</code>: at the C boundary <code>size_t</code> is <code>uint</code> (<a href="../../spec/13-abi/">13</a>).</li>
+</ol>
+<h3 id="12-literals">1.2 Literals</h3>
+<ol>
+<li>An unsuffixed integer literal takes the integer type its position expects — an
+initializer with a written type, an argument, a return, an operand beside a typed operand;
+without one it is <code>int</code>. An unsuffixed float literal likewise takes the float type its
+position expects, <code>float</code> otherwise.</li>
+<li>A literal that does not fit its type is an error, not a wrapped value: <code>let x: uint8 = 300</code>
+is refused, and so is <code>-129</code> as an <code>int8</code>.</li>
+<li>An integer literal takes a float type only when the float holds its value exactly:
+<code>let f: float = 9007199254740993</code> (2⁵³ + 1) is an error, never a silent rounding.</li>
+<li>An integer literal never takes <code>char</code>: <code>let c: char = 65</code> is an error. A <code>char</code> is written
+as a character literal, or reached through <code>uint32</code> (§1.4).</li>
+</ol>
+<h3 id="13-widening">1.3 Widening</h3>
+<ol>
+<li>At a <strong>coercion site</strong> — an initializer with a written type, an assignment, an argument, a
+return, an arm under a written context type — an integer value stands where a wider integer
+type is expected when the wider type's range contains the narrower one's: <code>int8 → int16 → int32 → int</code>, <code>uint8 → uint16 → uint32 → uint</code>, and an unsigned type into every signed type
+of greater width (<code>uint8 → int16</code>, <code>uint16 → int32</code>, <code>uint32 → int</code>). <code>float32</code> stands
+where <code>float</code> is expected. The value is converted; nothing else changes.</li>
+<li>Nothing else is implicit: no narrowing, no signed into unsigned, no <code>uint</code> into <code>int</code>, no
+integer into a float (<code>let f: float = n</code> with <code>n: int</code> is an error: an integer stays an
+integer), no float into an integer, no <code>float</code> into <code>float32</code>, nothing into or out of <code>char</code>
+or <code>bool</code>.</li>
+<li>Widening happens at coercion sites only, never inside an expression: the operands of an
+operator have one type, and <code>a + b</code> with <code>a: int8</code> and <code>b: int</code> is an error. Arms of an
+<code>if</code> or <code>match</code> without a context type unify exactly. Coercion follows the inference, it
+does not take part in it (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T8</a>).</li>
+</ol>
+<h3 id="14-as">1.4 <code>as</code></h3>
+<ol>
+<li><code>x as T</code> converts between any two number types and always succeeds:
+<ul>
+<li>integer to integer: the value modulo 2ᵂ of the target width, reinterpreted in the
+target's signedness (<code>300 as uint8</code> is <code>44</code>, <code>-1 as uint8</code> is <code>255</code>, <code>128 as int8</code> is
+<code>-128</code>); a widening is exact;</li>
+<li>integer to float: the nearest representable value, ties to even;</li>
+<li>float to integer: toward zero; a value outside the target's range gives the nearest
+bound; NaN gives <code>0</code>;</li>
+<li>float to float: IEEE rounding to nearest, ties to even.</li>
+</ul>
+</li>
+<li><code>char</code> converts to <code>uint32</code> and from <code>uint32</code> and to no other type. <code>c as uint32</code> is the
+scalar value. <code>n as char</code> yields the character with that scalar value and <strong>panics</strong> with
+<code>LYR-RT0009</code> when <code>n</code> is a surrogate (<code>0xD800..0xDFFF</code>) or above <code>0x10FFFF</code>
+(<a href="../../spec/13-abi/">13 §1.4</a>). A <code>char</code> meets <code>int</code> through <code>uint32</code>: <code>c as uint32 as int</code>.</li>
+<li><code>bool</code> converts to nothing and from nothing by <code>as</code>.</li>
+<li><code>as</code> is the one conversion operator. It never fails on numbers, so it never answers an
+optional; a checked narrowing is a method (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T1d</a>, form with the standard library).</li>
+<li>Between any other two types <code>as</code> converts nothing (<code>LYR-SEM0006</code>; <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/04-abstraktion.md">04 D6</a>):
+a conversion is a method, <code>T.from(v)</code> or <code>v.into()</code> through a <code>From</code>
+(<a href="../../spec/12-stdlib/">12</a>), and no <code>From</code> makes a cast of it.</li>
+</ol>
+<h3 id="15-char-and-bool-are-not-numbers">1.5 <code>char</code> and <code>bool</code> are not numbers</h3>
+<ol>
+<li><code>char</code> has no arithmetic and no bit operators, and does not compare with a number: <code>c + 1</code>,
+<code>-c</code>, <code>c &lt;&lt; 1</code>, <code>c++</code>, <code>c &lt; 98</code>, <code>c == 97</code> are errors. Two <code>char</code> values compare with <code>==</code>,
+<code>!=</code> and the four orderings, by scalar value.</li>
+<li><code>bool</code> has the logical operators and equality, and nothing of arithmetic.</li>
+</ol>
+<h3 id="16-arithmetic-and-overflow">1.6 Arithmetic and overflow</h3>
+<ol>
+<li>On integers, <code>+ - * / %</code> and unary <code>-</code> <strong>panic on overflow</strong> with <code>LYR-RT0002</code>, in every
+build profile that keeps its overflow checks — every one does unless it says otherwise (rule
+6): a result outside the type's range, an unsigned result below zero,
+<code>MIN / -1</code>, <code>MIN % -1</code>, <code>-MIN</code>. Division and remainder by zero panic with <code>LYR-RT0001</code>.
+<code>/</code> rounds toward zero and <code>%</code> takes the sign of the dividend, as C does.</li>
+<li><code>&lt;&lt;</code> and <code>&gt;&gt;</code> panic with <code>LYR-RT0002</code> when the count is negative or not below the width of
+the left operand's type. Otherwise bits shifted out are discarded, <code>&gt;&gt;</code> on a signed type
+is arithmetic (the sign is kept) and on an unsigned type logical. The <strong>count is an integer
+of any type</strong>, whatever the left operand's (the review's A9f): <code>a &lt;&lt; n</code> with an <code>int8</code> and
+an <code>int</code> is an <code>int8</code>, and the count is checked as it is, in its own type — 259 is not
+below eight. The result has the left operand's type, and the left operand is what it would
+be without the shift: a literal there takes the type its position wants, as a literal alone
+does — a typed binding, a parameter, the other operand of an operator: <code>flags &amp; (1 &lt;&lt; bit)</code>
+is the flags' type —, or is an <code>int</code>; it does not take the count's. The other binary
+operators keep one type on both sides.</li>
+<li>The <strong>wrap operators</strong> <code>+%</code>, <code>-%</code>, <code>*%</code> (and the compounds <code>+%=</code>, <code>-%=</code>, <code>*%=</code>) compute the
+result modulo 2ᵂ of the type's width and never panic. They bind like <code>+</code>, <code>-</code> and <code>*</code>. They
+are defined on integer types only: a float or a <code>char</code> operand is an error
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Y4</a>).</li>
+<li><code>&amp; | ^ ~ &lt;&lt; &gt;&gt;</code> and the wrap operators take integers; the arithmetic operators take
+integers and floats.</li>
+<li>On floats, <code>+ - * / %</code> and unary <code>-</code> are the IEEE 754 operations in round-to-nearest-even:
+there is no overflow and no division fault — <code>1.0 / 0.0</code> is <code>inf</code>, <code>0.0 / 0.0</code> is <code>NaN</code> —
+and <code>%</code> is the remainder of the truncated division (<code>fmod</code>), <code>3.0 % 2.5</code> is <code>0.5</code>. An
+implementation computes each operation as written: no contraction of <code>a * b + c</code> into a
+fused multiply-add, no reassociation, no fast-math, unless a build asks for it explicitly —
+a profile with <code>fastMath</code> (<a href="../../spec/15-project/">15 §4</a>; <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 L10</a>).
+The same program computes the same bits on every Tier 1 target.</li>
+<li>A profile with <code>overflowChecks = false</code> (<a href="../../spec/15-project/">15 §4</a>) takes the overflow checks
+out: <code>+</code>, <code>-</code>, <code>*</code> and unary <code>-</code> compute as the wrap operators do. A division, a remainder
+and a shift keep their checks — a zero divisor or a shift past the width is no overflow to
+wrap. No profile is without the checks unless it says so.</li>
+</ol>
+<h3 id="17-the-text-of-a-number">1.7 The text of a number</h3>
+<p>What an f-string hole and the converters of <code>std.string</code> write (<a href="../../spec/12-stdlib/">12 §1</a>):</p>
+<ol>
+<li>An integer is its decimal digits, with a leading <code>-</code> when negative.</li>
+<li>A float is the <strong>shortest</strong> decimal text that reads back as the same value (design 10 B5
+Z5): <code>0.1</code>, <code>0.30000000000000004</code>, <code>1.5</code>. It is written plain for a decimal exponent from
+-4 up to below 16, an integral value with <code>.0</code> — <code>1.0</code>, <code>-0.0</code>, <code>100.0</code>,
+<code>1000000000000000.0</code> —, and with an exponent beyond, its sign always and two digits at
+least: <code>1e+16</code>, <code>1e+21</code>, <code>1.5e-07</code>, <code>5e-324</code>. <code>inf</code>, <code>-inf</code> and <code>nan</code> stand for the values
+that are no number. A <code>float32</code> is written as its own shortest text — the one that reads
+back as the same <code>float32</code> (the review's M8a-9): <code>0.1</code> as a <code>float32</code> prints <code>0.1</code>; widened
+to a <code>float</code> it prints <code>0.10000000149011612</code>, the value it holds.</li>
+<li><code>bool</code> is <code>true</code> or <code>false</code>; <code>char</code> is the character itself, UTF-8 encoded.</li>
+</ol>
+<h2 id="2-structs-and-classes">2. Structs and classes</h2>
+<p>Two forms of a composite type, chosen once at the type
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/02-wertmodell.md">02 M1–M5, M9, M10, M14</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/03-types/</code>.</p>
+<h3 id="21-values-and-references">2.1 Values and references</h3>
+<ol>
+<li>A <code>struct</code> is a <strong>value</strong>: it is stored where it is declared — in a local, inline in the
+object or the struct that holds it — and a binding, an assignment, an argument and a return
+<strong>copy</strong> it. A copy is shallow: a reference held in a field is copied as a reference.</li>
+<li>A <code>class</code> is an <strong>object</strong> reached through a <strong>reference</strong>: a binding, an assignment, an
+argument and a return pass the reference, and every holder sees the one object.</li>
+<li>A struct has no identity. A class has: two references are the same object or they are not
+(§2.5).</li>
+</ol>
+<h3 id="22-fields-and-places">2.2 Fields and places</h3>
+<ol>
+<li>A field is <strong>fixed</strong> once the value holding it is built, unless it is declared <code>var</code>:
+<code>var balance: int</code>. The rule is one for structs and classes.</li>
+<li>An assignment, a compound assignment, <code>++</code> and <code>--</code> write a <strong>place</strong>. A field <code>a.f</code> is a
+place that may be written when <code>f</code> is declared <code>var</code> <strong>and</strong> <code>a</code> may be changed in place:
+<ul>
+<li>a local is a place when it is bound with <code>var</code>; a <code>let</code> freezes a struct to the bottom —
+no field of it, and no field of a struct it holds, is written through it;</li>
+<li>a <strong>parameter is a <code>let</code></strong> — a place parameter is the caller's place (§2.3a);</li>
+<li>a <strong>reference starts the chain anew</strong>: when <code>a</code> is of a class type, the object is the
+place, whatever the binding or the field that holds the reference says — <code>let c: C</code> does
+not keep <code>c.count = 1</code> from writing the object, and neither does a fixed field of class
+type on the way;</li>
+<li>an element of an array is a place in the array, whatever holds the array;</li>
+<li><code>this</code> is a place inside a <code>mut fn</code> and nowhere else (§2.3).</li>
+</ul>
+</li>
+<li>A <strong>temporary</strong> is not a place: the result of a call that answers a struct cannot be
+written into, and no <code>mut fn</code> can be called on it. The program is refused; the value is
+never copied in silence so that the write has somewhere to go. A call that answers a class
+answers a reference, and that is a place.</li>
+<li>Writing what is not a place is <code>LYR-SEM0019</code>; the diagnostic says which part of the chain
+refuses: the field without <code>var</code>, the <code>let</code> or the parameter at the root, the method
+without <code>mut</code>, the temporary.</li>
+</ol>
+<h3 id="23-methods-and-mut-fn">2.3 Methods and <code>mut fn</code></h3>
+<ol>
+<li>In a method of a struct, <code>this</code> <strong>is the caller's value</strong>, not a copy of it: what a method
+writes through <code>this</code>, the caller sees, and a write that happened before a panic stays.</li>
+<li>A method that writes <code>this</code> — a field of it, <code>this</code> as a whole, or by calling a <code>mut fn</code>
+on it — is declared <strong><code>mut fn</code></strong>, on a class as on a struct. A method without the word that
+does so is refused (<code>LYR-SEM0019</code>).</li>
+<li>A <code>mut fn</code> is called on a place (§2.2): on a struct bound with <code>let</code>, on a parameter of a
+struct type — a place parameter aside (§2.3a) — and on a temporary the call is refused. On a
+class it is called through any reference.</li>
+<li><code>this = value</code> in a <code>mut fn</code> of a struct replaces the caller's value as a whole. The
+<code>this</code> of a class method is the reference the caller holds and is never replaced.</li>
+<li>A <code>mut fn</code> of a struct has something to write: the struct has a <code>var</code> field, or the method
+replaces <code>this</code>, or it calls a <code>mut fn</code> on <code>this</code>, or an interface of the struct declares
+the method <code>mut</code>. Otherwise the declaration is refused (<code>LYR-SEM0023</code>).</li>
+</ol>
+<h3 id="23a-place-parameters">2.3a Place parameters</h3>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T12</a>)</p>
+<ol>
+<li>A parameter written <strong><code>&amp;x: T</code></strong> takes a <strong>place</strong> of the caller, not a value: the function
+reads and writes the caller's variable, field or element itself, and what it wrote stays
+written however the call ends — a return, an error, a panic. Inside the function <code>x</code> is a
+place of type <code>T</code>, written like a <code>var</code>.</li>
+<li>The argument is marked as the parameter is — <code>swap(&amp;a, &amp;b)</code> — and is a place the caller may
+write (§2.2): a <code>var</code> local, a module-level <code>var</code>, a <code>var</code> field under a root that may be
+changed, an element of an array, a view or an inline array, a place parameter of the
+caller's own, <code>this</code> inside a <code>mut fn</code>. A <code>let</code>, a value parameter, a fixed field, an element
+of a container and a temporary are refused (<code>LYR-SEM0156</code>); so are a place parameter's
+argument without the mark and a value parameter's with it (<code>LYR-SEM0157</code>). The place's type
+is the parameter's exactly: nothing widens and nothing is wrapped into an optional
+(<code>LYR-SEM0001</code>).</li>
+<li>A place parameter has no default and is no variadic parameter: either would hand it a value
+the call makes (<code>LYR-SEM0156</code>).</li>
+<li>The place of an optional, <code>&amp;x: ?T</code>, lets the function write <code>null</code> into it; the place of a
+class value lets it bind the caller's variable to another object.</li>
+<li>A function type writes the mark at the parameter: <code>fn(&amp;int, string) -&gt; void</code> is a type of
+its own, not <code>fn(int, string) -&gt; void</code>. An implementation of an interface member takes a
+place where the member does (<code>LYR-SEM0042</code>).
+5a. A <strong>lambda</strong> takes a place as a function does, the mark before the parameter's name:
+<code>(&amp;n) =&gt; …</code>, <code>(&amp;n: int) =&gt; …</code>, and in a trailing block's parameter list <code>{ &amp;n =&gt; … }</code>
+(<a href="#82-lambdas">§8.2</a>); its type is <code>fn(&amp;T) -&gt; R</code>. The mark is the lambda's to write, as the
+argument's is the call's: where the position hands a place over, the parameter is marked,
+and where it hands a value, it is not (<code>LYR-SEM0157</code>) — so the implicit <code>it</code> takes no
+place, and a block that is handed one names its parameter. The mark stands before a name,
+not before a pattern (<code>LYR-PAR0058</code>), and not in the bare form <code>x =&gt; …</code>.</li>
+<li>A place is the call's: no lambda captures a place parameter — a function's or a lambda's
+own — and a coroutine, whose body runs after the call has returned, takes none: neither a
+coroutine function nor a generator lambda (<code>LYR-SEM0158</code>).</li>
+<li>Two places of one call may be the same place (<code>swap(&amp;a, &amp;a)</code>); what the function then reads
+after a write is not specified.</li>
+</ol>
+<h3 id="24-construction">2.4 Construction</h3>
+<ol>
+<li>The <strong>initializer</strong> <code>T { field = value, … }</code> builds a value of a struct or a class. Every
+field without a default is given; one diagnostic names all that are missing
+(<code>LYR-SEM0106</code>). The written values are evaluated in the order they are written, then the
+defaults of the omitted fields in the order of their declaration. A default does not see
+<code>this</code>. It is checked with its type's parameters in scope —
+<code>items: List&lt;T&gt; = List&lt;T&gt;.new()</code> — and evaluated for the instance that is built.</li>
+<li>A field of an optional type <code>?T</code> has the default <code>null</code> without saying so.</li>
+<li>There are <strong>no constructors</strong>. A type name in call position, <code>T(args)</code>, is the call
+<code>T.new(args)</code> of the type's <code>static fn new</code> — an ordinary static function, which may
+validate, answer any type, and hand out an object that exists already. A type that declares
+no <code>static fn new</code> is not callable (<code>LYR-SEM0013</code>).</li>
+<li><strong>A name alone is its field</strong> (02 I3; N2c): <code>Point { x, y }</code> is <code>Point { x = x, y = y }</code>, the
+value the read of the binding of that name, and the two forms mix, <code>Point { x, y = 0 }</code>. A
+struct variant's initializer takes it too, <code>Shape.Rect { w, h }</code> and <code>.Rect { w, h }</code>.</li>
+</ol>
+<h3 id="25-with">2.5 <code>with</code></h3>
+<ol>
+<li><strong><code>p with { x = 3, y = 4 }</code></strong> is a <strong>copy</strong> of the struct <code>p</code> with the named fields
+replaced, of <code>p</code>'s type; <code>p</code> is unchanged. It is the way to change a fixed field: no
+<code>var</code> is needed, since nothing is written in place
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/02-wertmodell.md">02 M6</a>).</li>
+<li>The values are evaluated left to right and see the <strong>old</strong> <code>p</code>: <code>p with { x = p.y, y = p.x }</code>
+swaps. A field named twice (<code>LYR-SEM0070</code>) and a field the type does not have
+(<code>LYR-SEM0015</code>) are refused.</li>
+<li>A <strong>path</strong> reaches into a struct the value holds by value: <code>line with { to.x = 9 }</code> is
+<code>line with { to = line.to with { x = 9 } }</code>. Every segment but the last names a struct
+(<code>LYR-SEM0116</code>).</li>
+<li><code>with</code> stands on a <strong>struct</strong> only: on a class — an object is changed in place, or cloned
+(<a href="../../spec/05-interfaces/">05</a>) — and on a tuple, which has no field names, it is refused
+(<code>LYR-SEM0116</code>).</li>
+<li><code>with</code> is a postfix: <code>p with { x = 1 }.x</code> reads the copy's <code>x</code>, and <code>q + p with { … }</code> is
+<code>q + (p with { … })</code>. As a statement it has no effect and is refused like any other value
+(<code>LYR-SEM0022</code>).</li>
+</ol>
+<h3 id="26-identity-and-equality">2.6 Identity and equality</h3>
+<ol>
+<li><code>same(a, b)</code> answers whether two references are one object. Both arguments are references
+— class values, arrays, coroutines — of one type. On a value it is an error
+(<code>LYR-SEM0003</code>), not <code>false</code>: a struct has no identity to ask about.</li>
+<li><code>==</code> and <code>!=</code> mean value equality and nothing else (<a href="../../spec/05-interfaces/">05</a>): a class
+without it has no <code>==</code>, and never falls back to identity.</li>
+</ol>
+<h2 id="3-optionals">3. Optionals</h2>
+<p>A value or nothing (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T4</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 V5</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/03-types/</code>.</p>
+<h3 id="31-the-type">3.1 The type</h3>
+<ol>
+<li><code>?T</code> holds a value of <code>T</code> or nothing, written <code>null</code>. <code>T</code> is any type, an optional included:
+<code>??T</code> is a type, and its three states are distinct — nothing, a <code>?T</code> that is <code>null</code>, a <code>?T</code>
+that holds a value. Levels do not collapse: a generic <code>?T</code> at <code>T = ?int</code> is <code>??int</code>.</li>
+<li>At a coercion site (<a href="#13-widening">§1.3</a>) a value stands where an optional of its type is
+expected, and is wrapped once for every level the expected type has more: an <code>int</code> where
+<code>??int</code> is expected is a present <code>?int</code> that holds the value; a <code>?int</code> there is a present
+<code>??int</code> whatever it holds. <code>null</code> is the absence at the <strong>outermost</strong> level of the type
+expected.</li>
+<li>There is no implicit way down: a <code>?T</code> does not stand where a <code>T</code> is expected, nor a <code>??T</code>
+where a <code>?T</code> is. The ways down are a test (§3.2), <code>??</code> and <code>!</code> (§3.3).</li>
+<li><em>(Informative.)</em> An optional of a class value or of a string occupies the one word of the
+reference, null when there is no value. Any other optional holds its value and a flag.</li>
+</ol>
+<h3 id="32-tests-and-narrowing">3.2 Tests and narrowing</h3>
+<ol>
+<li><code>x == null</code> and <code>x != null</code> ask whether the outermost level of <code>x</code> holds a value. They are
+asked of an optional only: on a type that is never <code>null</code> the test is refused
+(<code>LYR-SEM0059</code>).</li>
+<li>A <strong>bare type parameter is opaque</strong>: on an expression of type <code>T</code> there is no <code>== null</code>,
+no <code>??</code>, no <code>??=</code>, no <code>!</code> and no <code>null</code> pattern, whatever an instantiation binds <code>T</code> to. The
+body of a generic is checked at its declaration; it asks these of a <code>?T</code>.</li>
+<li>Where a test has proven a name present, the name has the type <strong>one level down</strong>: inside
+the <code>then</code> of <code>if (x != null)</code>, in the body of <code>while (x != null)</code>, on the right of
+<code>x != null &amp;&amp;</code>, after <code>if (x == null) { return …; }</code> and the other forms that leave. A
+second test narrows again: a <code>??int</code> proven present is a <code>?int</code>, and proven present once
+more an <code>int</code>. A <strong>negated</strong> test proves what the test refutes and refutes what it proves:
+<code>!(x == null)</code> narrows as <code>x != null</code> does, <code>if (!(x != null)) { return …; }</code> leaves <code>x</code>
+present behind it, and a negation around <code>&amp;&amp;</code> or <code>||</code> follows from their own rules — where
+<code>!(a != null &amp;&amp; b != null)</code> is false, both are present.</li>
+<li>Narrowing belongs to the binding. An assignment to a <code>var</code> ends it: from there on the name
+has its declared type again. A module-level <code>var</code> and a place parameter (§2.3a) are not
+narrowed at all: a call — and for a place, a write through another name — may change them
+while the test holds. <code>if (let v = x)</code> (rule 5) reads one once.</li>
+<li><code>if (let v = e)</code> and <code>while (let v = e)</code> bind <code>v</code> to the value of the optional <code>e</code> when
+there is one, one level down, and take the branch only then.</li>
+<li>A narrowed name is the value where it lies, not a copy of it: through a narrowed <code>var</code> of
+type <code>?S</code>, with <code>S</code> a struct, a <code>var</code> field of the struct is written in place
+(<a href="#22-fields-and-places">§2.2</a>).</li>
+<li><strong>Equality.</strong> <code>a == b</code> on two <code>?T</code> is true when both hold nothing, or both hold a value and
+the values are equal through <code>T</code>'s own equality (<a href="../../spec/05-interfaces/">05 §12</a> rule 5 — the
+scalars natively); <code>!=</code> is its negation. A <code>T</code> on one side coerces up to <code>?T</code> (§3.1): <code>x == 5</code>
+with <code>x: ?int</code> asks whether <code>x</code> holds a 5. A <code>T</code> without <code>Equatable</code> gives its optional no
+equality (<code>LYR-SEM0059</code>). There is <strong>no ordering</strong> on an optional: <code>&lt;</code> and its siblings are
+refused (<code>LYR-SEM0003</code>), and <code>null</code> orders with nothing.</li>
+</ol>
+<h3 id="33---and-">3.3 <code>??</code>, <code>!</code> and <code>?.</code></h3>
+<ol>
+<li><code>a ?? b</code> is the value of <code>a</code> when it holds one, <strong>one level down</strong>, and <code>b</code> otherwise. <code>b</code>
+is evaluated only when <code>a</code> holds nothing. The operator is right-associative. On a left side
+that is never <code>null</code> it is refused (<code>LYR-SEM0005</code>).</li>
+<li><code>a ??= b</code> assigns <code>b</code> to <code>a</code> when <code>a</code> holds nothing, and evaluates <code>b</code> only then.</li>
+<li><code>x!</code> is the value of <code>x</code>, one level down, and <strong>panics</strong> with <code>LYR-RT0004</code> when <code>x</code> holds
+nothing (<a href="../../spec/13-abi/">13 §1.4</a>). On a type that is never <code>null</code> it is refused
+(<code>LYR-SEM0005</code>).</li>
+<li><code>a?.m</code> reads the member <code>m</code> of the value of <code>a</code> when there is one, and is <code>null</code> otherwise.
+Chains <strong>flatten</strong>: the result is an optional of the member's type, and when the member's
+type is itself an optional, it is that type — <code>a?.b?.c</code> can be absent in one way only and
+is a <code>?C</code>, not a <code>??C</code>. <code>a?.f(args)</code> calls the method under the same rule and evaluates the
+arguments only when <code>a</code> holds a value.</li>
+<li>Nothing is assigned through <code>?.</code>: <code>a?.f = v</code> is refused (<code>LYR-SEM0019</code>). Narrow first.</li>
+</ol>
+<h3 id="34-equality-and-hashing">3.4 Equality and hashing</h3>
+<ol>
+<li>An optional is <code>Equatable</code> and <code>Hashable</code> where its value's type is (N2a): <code>null</code> equals only
+<code>null</code>, and a <code>?int</code> is a set's element. It is <code>Debug</code> where its value's type is (M8c S16): its
+debug text is <code>null</code> or the value's own, with no wrapper — <code>{d:?}</code>, and
+<code>assertEq('7'.toDigit(10), 7)</code> names both sides. It is no <code>Display</code>: a hole asks for a value,
+and a <code>null</code> is tested first (<code>LYR-SEM0006</code>).</li>
+</ol>
+<h2 id="4-enums">4. Enums</h2>
+<p>One of several variants, each with a payload or none
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 V5, V6</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/02-wertmodell.md">02 M13</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T9</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/03-types/</code>.</p>
+<h3 id="41-variants-and-payloads">4.1 Variants and payloads</h3>
+<ol>
+<li>An <code>enum</code> declares its <strong>variants</strong>, each of which is a <strong>unit</strong> variant (<code>Red</code>), a
+<strong>tuple</strong> variant with positional payload (<code>Num(int)</code>, <code>Tagged(string, Point)</code>) or a
+<strong>struct</strong> variant with named fields (<code>Rect { w: int, h: int }</code>). One enum may mix the
+three forms. After the variants, separated by <code>;</code>, an enum declares methods, <code>mut fn</code>
+included, as a struct does (<a href="#23-methods-and-mut-fn">§2.3</a>), and constants, <code>static let</code>,
+which are the enum's under its name as a struct's are
+(<a href="../../spec/04-modules/">04 §1</a> rule 2): <code>Level.fallback</code>. The <code>;</code> is what ends the variants — a
+member where the next variant's name is expected is refused (<code>LYR-PAR0057</code>).</li>
+<li>A value of the enum is exactly one variant with that variant's payload. A unit variant is
+written by its name, <code>Signal.Red</code>; a tuple variant is called, <code>Shape.Num(3)</code>; a struct
+variant is built with the initializer, <code>Shape.Rect { w = 1, h = 2 }</code>, under the rules of
+<a href="#24-construction">§2.4</a>: a payload's field may write a default, checked against its type with
+the enum's parameters in scope, and an initializer that leaves the field out takes it (the
+sweep after M10, X2). A variant is not a type: <code>Num</code> names no type, and a payload is
+read by a pattern (<a href="../../spec/09-patterns/">09</a>) and in no other way.</li>
+<li>An enum is a <strong>value</strong> (<a href="#21-values-and-references">§2.1</a>): stored inline, copied by a
+binding, an assignment, an argument and a return, without identity. <code>this</code> in a method is
+the caller's value; a <code>mut fn</code> replaces it whole with <code>this = value</code>
+(<a href="#23-methods-and-mut-fn">§2.3</a>), which is how a method moves a value to another variant.</li>
+<li>A value type cannot hold itself: an enum whose payload holds the enum by value — directly,
+through a struct, a tuple or an optional — is refused (<code>LYR-SEM0056</code>); the diagnostic
+names the cycle. A recursive payload lies behind a reference: <code>Box&lt;T&gt;</code> of <code>std.core</code>, a
+class of one's own, or an array. <code>enum Tree { Leaf(int), Node(Box&lt;Tree&gt;, Box&lt;Tree&gt;) }</code>.</li>
+<li><em>(Informative.)</em> An enum occupies a tag and the union of its payloads, inline. An optional
+of an enum is the enum with a tag no variant has (<a href="#31-the-type">§3.1</a>).</li>
+</ol>
+<h3 id="42-the-enum-the-position-names">4.2 The enum the position names</h3>
+<ol>
+<li><strong><code>.Red</code></strong> is the member <code>Red</code> of the enum the position expects, the enum unnamed: a unit
+variant as it stands, the callee of <code>.Num(3)</code>, the head of <code>.Rect { w = 1, h = 2 }</code>. The
+position expects an enum where a value of one is required: an initializer with a written
+type, an assignment, an argument, a return, an arm under a context type, a field of an
+initializer, a default, and either side of <code>==</code> and <code>!=</code> when the other side has the enum
+type. An expected <code>?E</code> names <code>E</code>: <code>let o: ?Signal = .Green</code> is a present optional.</li>
+<li>Where the position expects no particular type, or a type that is not an enum, the form is
+refused (<code>LYR-SEM0113</code>), and the diagnostic says to name the enum. The qualified form
+<code>Signal.Red</code> stands everywhere, whatever the position expects.</li>
+<li>In a pattern the same form tests the variant (<a href="../../spec/09-patterns/">09 §2</a>); a bare name never
+does.</li>
+</ol>
+<h2 id="5-arrays-views-and-inline-arrays">5. Arrays, views and inline arrays</h2>
+<p>Elements in a row: behind a reference, through a view, or as a value
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 V10</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T13, T14</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 C2, C7, N8</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/03-types/</code>.</p>
+<h3 id="51-t">5.1 <code>T[]</code></h3>
+<ol>
+<li><code>T[]</code> is an <strong>object</strong> of a fixed length holding its elements inline and contiguous — a
+struct element lies in the array, not behind it — reached through a <strong>reference</strong>
+(<a href="#21-values-and-references">§2.1</a>): a binding, an assignment, an argument and a return share
+the one array. The length is a property of the value, not of the type.</li>
+<li><code>[a, b, c]</code> builds an array of its elements; <code>[]</code> takes its element type from the position —
+an array's, or a view's, where an array stands as a view of itself (§5.2 rule 4):
+<code>take([])</code> for <code>take(s: Slice&lt;uint8&gt;)</code>. A position that gives none — the target of an index or
+a member, <code>[].length()</code>; an operand of <code>+</code>; a hole of an f-string — refuses it
+(<code>LYR-SEM0060</code>).
+Where a <strong><code>FromArrayLiteral&lt;T&gt;</code></strong> of <code>std.core</code> is expected at a coercion site
+(<a href="#13-widening">§1.3</a>), through an optional as every coercion (§3.1),
+the literal is that type's <code>fromLiteral</code> of a fresh <code>T[]</code> of its elements, each checked
+against <code>T</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 K4</a>):
+<code>let s: Set&lt;int&gt; = [1, 2, 2];</code> is a set of two, <code>let m: Map&lt;string, int&gt; = [(&quot;a&quot;, 1)];</code> a
+map — there is no map literal — and <code>[]</code> takes <code>T</code> from the type. A literal inside such a
+literal is checked against <code>T</code> in turn. A type of the program's own is one as the
+library's are; a type that is not one refuses the literal (<code>LYR-SEM0001</code>).
+<code>[x] * n</code> builds an array of <code>n</code> elements each a copy of <code>x</code> — a value copied, a string
+shared — and panics with <code>LYR-RT0007</code> when <code>n</code> is negative; <code>xs * n</code> is the only order.
+<code>xs + ys</code> builds a new array of the elements of both (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 C7</a>);
+so does a view plus a view, <code>xs[1..] + ys[..]</code>, through std.core's <code>Add</code> on <code>Slice&lt;T&gt;</code>.
+An element that is or holds an object — a class, an array, a view, a function value, an
+interface value, directly or inside a struct, an enum, a tuple, an optional or an inline
+array — is repeated by <strong><code>clone</code></strong> (<a href="../../spec/05-interfaces/">05 §14</a>), never shared into every slot:
+its type conforms to <code>Clone</code>, or the repetition is refused with <code>arrayOf</code> as the way out
+(<code>LYR-SEM0136</code>). A string is shared; nobody can tell. In a generic body an element whose type
+a type parameter or an associated type decides counts as one that holds an object: <code>[x] * n</code>
+with <code>x: T</code> repeats by <code>clone</code> under <code>T :: [Clone]</code> and is refused without it, whatever the
+instances are — the body is checked once (<a href="#9-generics">§9</a>; M8a S16).</li>
+<li><code>xs.length()</code> is the length, a <strong>call</strong> with its parentheses like every length in the
+language (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 N8</a>);
+the bare name is refused (<code>LYR-SEM0012</code>). The length and the index are the two primitives of
+an array; every other member is written in the standard library.</li>
+<li><code>xs[i]</code> is the element at <code>i</code>. The index is an <strong><code>int</code></strong>: a narrower integer widens to it as
+at any coercion site (<a href="#13-widening">§1.3</a>), a <code>uint</code> or a <code>uint64</code> is converted with
+<code>as</code>, nothing else stands there (<code>LYR-SEM0007</code>). An index outside <code>0 ≤ i &lt; length()</code>
+<strong>panics</strong> with <code>LYR-RT0003</code>, in every profile — a negative index like any other; there is
+no counting from the end by sign. An element is a place in the array, whatever holds the
+array (<a href="#22-fields-and-places">§2.2</a>): <code>xs[i] = v</code> and <code>xs[i].f = v</code> write the array
+through a <code>let</code> as through a <code>var</code>.</li>
+<li><strong><code>^n</code></strong> inside the brackets counts from the end: <code>xs[^1]</code> is the last element, <code>xs[^n]</code>
+stands for <code>xs[xs.length() - n]</code> with <code>xs</code> evaluated once. It is sugar for that
+subtraction and nothing more — no type, no value of its own: outside <code>[…]</code>, or as a part
+of a larger index expression, it is refused (<code>LYR-SEM0114</code>). <code>^0</code> as an index panics as
+<code>length()</code> does; as the end of a range (§5.2) it is the length.</li>
+</ol>
+<h3 id="52-slicet">5.2 <code>Slice&lt;T&gt;</code></h3>
+<ol>
+<li><code>Slice&lt;T&gt;</code> is a <strong>view</strong> of the elements of an array — a pointer into them and a length,
+a value of two words that is copied by a binding and <strong>shares the elements</strong>: what is
+written through a view is written in the array, and what is written in the array is seen
+through every view of it. <code>Slice</code> is a primitive of <code>std.core</code>, visible without an import.</li>
+<li><code>xs[a..b]</code> is the view of the elements from <code>a</code> up to but not including <code>b</code>; <code>xs[a..=b]</code>
+includes <code>b</code>; <code>xs[..b]</code>, <code>xs[a..]</code> and <code>xs[..]</code> leave the start, the end or both open.
+The bounds are indices as in §5.1, <code>^n</code> among them, and satisfy <code>0 ≤ a ≤ b ≤ length()</code>
+or the expression <strong>panics</strong> with <code>LYR-RT0003</code>, in every profile; <code>xs[n..n]</code> is the empty
+view, <code>xs[length()..]</code> too.</li>
+<li>A view is indexed, measured and counted from the end as the array is (§5.1), its elements
+are places in the array, <code>v[a..b]</code> is a view of the same array, and an array pattern
+matches it (<a href="../../spec/09-patterns/">09 §2</a>).</li>
+<li>At a coercion site an array stands where a view of its element type is expected and gives a
+view of itself, whole; a view never stands where an array is expected (<code>LYR-SEM0001</code>). A
+<strong>receiver</strong> is such a site for the members written on <code>Slice&lt;T&gt;</code> (design 03 A2): where the
+array's own blocks give no member of the name, <code>xs.m()</code> is the view's member, called on a view
+of all of <code>xs</code>, its constraints checked as for the view (<code>LYR-SEM0134</code>); a blanket member
+comes after it (<a href="../../spec/05-interfaces/">05 §13</a> rule 7). The library writes such a member once.
+An array literal at such a site checks its elements against the view's element type, as
+against an array's (§5.1): <code>take([1, 2])</code> with <code>take(s: Slice&lt;uint8&gt;)</code> builds a <code>uint8[]</code>
+and passes a view of it.</li>
+<li>There is no lifetime: the array lives as long as any view of it does, and a view kept in an
+object or returned from a function is as good as one in a local (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 L1</a>).</li>
+<li><code>StringView</code>, the view of a string's bytes, is written with the strings (<a href="../../spec/12-stdlib/">12</a>).</li>
+<li><strong>A type that gives a view of itself</strong> conforms to <code>AsSlice&lt;T&gt;</code> of <code>std.core</code>, whose
+<code>asSlice()</code> is a <code>Slice&lt;T&gt;</code> of its elements; <code>List&lt;T&gt;</code> does. On such a value <code>x[a..b]</code> is
+<code>x.asSlice()[a..b]</code>, rule 2 over the view, its bounds and <code>^n</code> the view's — a view of the
+elements, which a write through it writes (design 03 &quot;Review 2026-10-09&quot; S6). Its <code>x[i]</code> stays
+its own <code>Index</code>: a second conformance for ranges would be two <code>index</code> of one arity (04 D4).
+A range on a value of any other type has no view to take (<code>LYR-SEM0007</code>).</li>
+</ol>
+<h3 id="53-tn">5.3 <code>T[N]</code></h3>
+<ol>
+<li><code>T[N]</code> is a <strong>value</strong> of exactly <code>N</code> elements, <code>N</code> a positive decimal literal, laid out
+inline where it lies — in a local, in a struct, in an object, in an element of an array —
+with the size and the identity of a struct (<a href="#21-values-and-references">§2.1</a>): a binding,
+an assignment, an argument and a return <strong>copy</strong> it. The length is part of the type:
+<code>int[3]</code> and <code>int[4]</code> are two types, and neither stands for <code>int[]</code> nor <code>int[]</code> for
+them. <code>T[N][M]</code> is an inline array of inline arrays; <code>T[N][]</code> is an array of inline arrays.</li>
+<li>It is built from a literal of exactly <code>N</code> elements, or from <code>[x] * N</code> with the literal
+count <code>N</code>, where a <code>T[N]</code> is expected; another length is refused (<code>LYR-SEM0001</code>).</li>
+<li>It is indexed, measured and counted from the end as an array is (§5.1), with the same
+check. An element is a place when the array is one — a <code>var</code> local, a <code>var</code> field of a
+place, an element of an array — as a field of a struct is (<a href="#22-fields-and-places">§2.2</a>);
+a <code>let</code> freezes it (<code>LYR-SEM0019</code>).</li>
+<li>A view of an inline array (§5.2) is taken where the array lies in the <strong>heap</strong> — a field of
+an object, an element of an array or of a view, a struct inside those — never of a local,
+a parameter, or a field of a struct local, whose frame may end before the view
+(<code>LYR-SEM0115</code>); such an array is copied or passed whole. A value type cannot hold itself
+through an inline array (<a href="#41-variants-and-payloads">§4.1</a>).</li>
+<li>An array pattern of the one length covers the type (<a href="../../spec/09-patterns/">09 §3</a>).</li>
+<li>An inline array has <strong><code>length()</code>, <code>isEmpty()</code> and <code>toArray()</code></strong> wherever it lies (the review's
+M4-2); <code>toArray()</code> is a new <code>T[]</code> holding copies of its elements. Where it lies in the heap
+(rule 4) it has the <strong>members of a view</strong> too, called on a view of all of it, as an array has
+them (§5.2 rule 4): <code>board.cells.contains(x)</code>, and <code>board.cells.sort()</code> sorts the array
+itself. Where it lies in a frame no view of it exists,
+and such a member is refused where it is called, with the way out — a copy,
+<code>xs.toArray().contains(x)</code> (<code>LYR-SEM0115</code>). An extend block does not target an inline array
+(<code>LYR-SEM0047</code>): a member written on <code>Slice&lt;T&gt;</code> is the one that reaches it.</li>
+<li><strong>Equality and hashing.</strong> <code>T[N]</code> is <code>Equatable</code> where <code>T</code> is, and <code>==</code> compares the two
+element by element; it is <code>Hashable</code> where <code>T</code> is, and <code>hash</code> writes its elements into the
+hasher in order — nothing after them, as the length is the type's (design 10 C8). Wherever it
+lies: <code>d == sha256(x)</code>, and a <code>uint8[16]</code> is a key of a <code>Map</code>. An element type that is
+neither leaves the array neither (<code>LYR-SEM0059</code> for <code>==</code>).</li>
+<li><strong>Text.</strong> <code>T[N]</code> is <code>Debug</code> and <code>Display</code> where <code>T</code> is <code>Debug</code>, as an array is
+(<a href="../../spec/12-stdlib/#arrays-and-views">12 §Arrays and views</a>): <code>[1, 2, 3]</code>, each element in its debug text, the display text
+the same — <code>{x.toBytesLE()}</code>, and a width pads it. Wherever it lies: <code>names.show()</code> on an array
+in a frame is its own member, not a view's (M8c S16).</li>
+</ol>
+<h2 id="6-tuples">6. Tuples</h2>
+<p>Positional elements in one value
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T16</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 V11</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/03-types/</code>.</p>
+<ol>
+<li><code>(A, B)</code> and on, from two elements — there is no tuple of one and no empty tuple (<code>void</code>
+stays what it is) — is a <strong>value</strong> of positional elements laid out inline where it lies,
+copied like a struct (<a href="#21-values-and-references">§2.1</a>); it has no identity. <code>(1, &quot;a&quot;)</code>
+builds one. Its elements are not written; the tuple is replaced whole.</li>
+<li><code>t.0</code>, <code>t.1</code>, … read the elements by position; a position the tuple does not have is refused
+(<code>LYR-SEM0012</code>).</li>
+<li>A written type may <strong>label</strong> its elements: <code>(x: int, y: int)</code>, and <code>p.x</code> reads <code>p.0</code>. A
+label is a name for the reader and no part of the type: <code>(x: int, y: int)</code> and <code>(int, int)</code>
+are <strong>one type</strong>, a value of either stands where the other is expected, and the label is
+seen through the type of the binding it was written on, not through another's. A label
+twice in one type is refused.</li>
+<li>A tuple is taken apart by a pattern (<a href="../../spec/09-patterns/">09 §2</a>) and by <code>let (a, b) = t;</code>.
+Equality, hashing and display: rule 6.</li>
+<li>A tuple <strong>literal</strong> takes the types the position expects of its elements (T8): where a tuple
+of its length is expected — a binding with a type, an assignment, an argument, a return, a
+field — each element stands where its element type is expected, as a binding's value does:
+<code>return (0, null);</code> for a <code>(int, ?int)</code>, <code>(1, [])</code> for a <code>(int, int[])</code>, <code>(.Red, 1)</code> for a
+<code>(Color, int)</code>. An element that does not fit is the element's error (<code>LYR-SEM0001</code>). A tuple
+that is no literal is one value of its type and is converted by nothing: an <code>(int, int)</code> is
+no <code>(int, ?int)</code>.</li>
+<li>A tuple of <strong>two to eight</strong> elements is <code>Equatable</code>, <code>Hashable</code>, <code>Debug</code> and <code>Display</code> where
+each of its elements is (04 D7, T16; the audit of 2026-10-07 found none built): <code>==</code> compares
+the elements in order, <code>hash</code> feeds them in order, <code>{t:?}</code> writes <code>(1, &quot;x&quot;)</code> and <code>{t}</code>
+<code>(1, x)</code> — so <code>(1.5, 2) == (1.5, 2)</code> holds and <code>(int, string)</code> is a set's element. std.core
+gives them through blocks, each under its own condition (<a href="../../spec/05-interfaces/">05 §13</a> rule 6); a
+longer tuple has none of them.</li>
+</ol>
+<h2 id="7-ranges">7. Ranges</h2>
+<p>The values <code>a..b</code> and <code>a..=b</code>
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T13 A3</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/03-types/</code>.</p>
+<ol>
+<li><code>a..b</code> is a value of <code>Range&lt;T&gt;</code> and <code>a..=b</code> of <code>RangeInclusive&lt;T&gt;</code>, structs of <code>std.core</code>
+holding their bounds as <code>start</code> and <code>end</code>; <code>T</code> is the bounds' one type, a number type or
+<code>char</code> — two characters bound a range of characters, <code>'a'..='z'</code>; other bounds are refused
+(<code>LYR-SEM0003</code>). The
+open forms <code>a..</code>, <code>..b</code> and <code>..</code> are the structs <code>RangeFrom&lt;T&gt;</code>, <code>RangeTo&lt;T&gt;</code> and
+<code>RangeFull</code> and are written inside <code>[…]</code> only, where they take a view (<a href="#52-slicet">§5.2</a>).</li>
+<li>In a <strong><code>for</code> head</strong>, <code>for (i in a..b)</code> and <code>for (i in a..=b)</code> with the range written there
+are the counted loop: no value is built, and <code>for (i in ..b)</code> is refused. A range held in
+a binding is walked as an <code>Iterator</code> (<a href="../../spec/05-interfaces/">05</a>), and so is a range of
+characters in a head: its walk passes over the surrogates (<a href="../../spec/12-stdlib/">12</a> §Iteration).</li>
+<li>A range is an ordinary value everywhere else: bound, stored in a field or an array, passed
+and returned. A range is not an integer (<code>LYR-SEM0001</code>).</li>
+</ol>
+<h2 id="8-function-values">8. Function values</h2>
+<p>Functions as values, and the lambdas that make them
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T17</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 V8</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/02-wertmodell.md">02 M8</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Y11, F6, F8, F9</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/03-types/</code>.</p>
+<h3 id="81-the-type">8.1 The type</h3>
+<ol>
+<li><code>fn(A, B) -&gt; R</code> is the type of a function value taking <code>A</code> and <code>B</code> and answering <code>R</code>;
+<code>fn() -&gt; void</code> takes nothing and answers nothing; <code>fn(A) -&gt; R throws E</code> may throw, its set part
+of the type (<a href="../../spec/06-errors/#8-function-values-that-throw">06 §8</a>). A free function, a lambda and
+a method bound to its object are values of it alike (V8): what a value of the type is made of is
+not observable. The type has no variance: <code>fn(int) -&gt; int</code> and <code>fn(int8) -&gt; int</code> are two types.
+That a value throwing less fits a type throwing more is a coercion of its own (06 §8 rule 3), not
+a variance.</li>
+<li>A value of a function type is <strong>called</strong> with <code>f(a, b)</code>; it is copied by a binding, held in
+a field, an array or an optional, passed and returned. Two function values are not compared.</li>
+<li><em>(Informative.)</em> A function value is a pointer to the code and the environment it runs in,
+two words; a function without an environment costs no allocation.</li>
+</ol>
+<h3 id="82-lambdas">8.2 Lambdas</h3>
+<ol>
+<li>A lambda is written in <strong>three forms</strong> (Y11 F1): parenthesized, <code>(n: int): int =&gt; n + 1</code>,
+with the types and the return type as written or, when the position expects a function
+type, taken from it (F11); bare, <code>x =&gt; x * 3</code>, one parameter, its type from the position;
+trailing, <code>xs.map { it * 2 }</code> — a block after a call's parentheses, or after the callee
+alone, is the call's <strong>last argument</strong>, its one parameter the implicit <code>it</code>, or none when
+the position expects a function of none.</li>
+<li>A trailing block may name its parameters before <code>=&gt;</code>: <code>fold(xs, 0) { acc, x =&gt; acc + x }</code>,
+<code>{ (k, v) =&gt; v }</code> with a pattern (F2), <code>{ &amp;n =&gt; n += 1; }</code> with a place
+(<a href="#23a-place-parameters">§2.3a</a> rule 5a). The body is then the rest of the block.</li>
+<li>The body is an expression or a block; a block's last expression without <code>;</code> is its value
+(F3). An empty block is a body of no statements, a trailing one too: <code>labelled(&quot;row&quot;) { }</code>,
+<code>() =&gt; { }</code>. <code>return</code> leaves the lambda, never the enclosing function; <code>break</code> and <code>continue</code>
+belong to loops inside the lambda (F5) — but in a lambda an inline function's call sets in
+place (<a href="#85-inline-functions">§8.5</a>).</li>
+<li>Without a position that expects a function type, the parameters of a bare or trailing
+lambda have no type and are refused (<code>LYR-SEM0045</code>); the parenthesized form writes them.</li>
+<li><strong>A brace after a name alone</strong> is an initializer's (<a href="#24-construction">§2.4</a>) or a trailing
+block's, and what it holds says which
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Y4</a>). An
+initializer holds nothing, or begins <code>name = value</code> followed by a <code>,</code> or the closing brace,
+or is a <strong>list of names</strong> (<a href="#24-construction">§2.4</a> rule 4), <code>{ x, y }</code>, <code>{ x, y = 0 }</code>,
+that no <code>=&gt;</code> ends — the names before a <code>=&gt;</code> are a trailing block's parameters,
+<code>{ acc, x =&gt; … }</code>. <strong>One name alone</strong>, <code>S { v }</code>, is the shorthand initializer where <code>S</code>
+names a struct, a class or a struct variant — a type takes no trailing block, its factory is
+called with parentheses — and a trailing block's everywhere else, <code>run { v }</code>; after type
+arguments, <code>Box&lt;int&gt; { v }</code>, it is an initializer.
+Anything else is a block — and a block may begin with an assignment: a <strong><code>;</code> behind that
+first value</strong> makes it a statement, <code>run { total = 5; }</code>. An assigning block without its <code>;</code>
+therefore reads as an initializer of the name before it, and is refused where that name is
+no type (<code>LYR-SEM0011</code>). An initializer begins no statement — its value would be dropped
+(<code>LYR-PAR0055</code>) — and a call with a trailing block does.</li>
+</ol>
+<h3 id="83-captures">8.3 Captures</h3>
+<ol>
+<li>A lambda uses the bindings of the scopes around it. A captured <strong><code>let</code></strong> — a parameter
+included — lies in the closure as a <strong>copy</strong> taken when the lambda is made, which nothing
+can tell from the original since it cannot change; a captured <strong><code>var</code></strong> lies in a <strong>box</strong>
+the closure and the enclosing scope share, from its declaration on: what either side writes,
+the other reads (M8).</li>
+<li>A loop binding is fresh per pass: the closures of <code>for (i in 0..3) { fs = fs + [() =&gt; i]; }</code>
+answer 0, 1 and 2 (M8 C1).</li>
+<li><code>this</code> of a class is captured as the shared reference; <code>this</code> of a struct as a copy of the
+value (M8 C2).</li>
+</ol>
+<h3 id="84-functions-and-methods-as-values">8.4 Functions and methods as values</h3>
+<ol>
+<li>A <strong>free function</strong> named without a call is a value of its type; a <strong>static function</strong>
+named through its type, <code>Point.new</code>, likewise (F10). A function of another module is a value
+by every name that reaches it (<a href="../../spec/04-modules/">04 §4</a>): the name a selective import binds —
+its own, or another, <code>import app.util { twice as double }</code> —, the module's, <code>util.twice</code>,
+and those of a module that passes it on. A module's binding that holds a function value is
+called by the name an import gives it, as the function is. A generic function is not a value
+until instantiated (<a href="#94-instantiated-functions-as-values">§9.4</a>).</li>
+<li><code>obj.method</code> without a call is a closure <strong>bound</strong> to <code>obj</code> (F10): it holds the object — a
+class shared, a struct copied at the binding — and calls the method on it; its type is the
+method's without the receiver. It is called like any function value, and a call through it
+on a struct's copy changes the copy.</li>
+<li><code>arrayOf(n, f)</code> of <code>std.core</code> builds an array of <code>n</code> elements, the element at <code>i</code> the value
+of <code>f(i)</code> — fresh elements each, where <code>[x] * n</code> copies one (<a href="#51-t">§5.1</a>).</li>
+</ol>
+<h3 id="85-inline-functions">8.5 Inline functions</h3>
+<ol>
+<li><strong><code>inline fn</code></strong> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 F6</a>) declares a function whose body is <strong>set in place</strong> at every
+call: a free function, a type's method or static, a block's, an enum's. The words stand
+<code>[static] inline [mut] fn</code>; <code>inline static</code> is refused (<code>LYR-PAR0032</code>). The call is a call as
+any other (<a href="../../spec/08-expressions/#1-calls">08 §1</a>): its arguments are evaluated first, left to
+right, each once, its type arguments are bound as a generic call binds them, and the body's
+<code>return</code> gives the call's value. It has no frame of its own and is nothing to point at, and
+what runs in the body stands at the call: a panic in it names the call's line in the trace
+(M9a S12b; <code>assert</code>'s does), a lambda set in place its own.</li>
+<li>A <strong>lambda literal</strong> at one of its function parameters is set in place where the body calls the
+parameter — no closure is made. Its <code>return</code> leaves the function that <strong>wrote</strong> it, through the
+body's <code>defer</code>s; its <code>break</code> and <code>continue</code> reach that function's loops and never the body's;
+what it throws leaves through the body. A block gives its value as its last expression
+(<code>LYR-SEM0046</code> where a value is wanted and none stands). So
+<code>xs.iter().forEach { if (it &gt; limit) { return it; } }</code> leaves the function that wrote it. A
+function <strong>value</strong> at the parameter — a binding, a function's name — is called as any value is.</li>
+<li>A function parameter of an inline function is <strong>called</strong>, or passed on as the argument of
+another inline function's function parameter, which sets the same lambda in place there; kept,
+returned, captured or passed to anything else it is refused (<code>LYR-SEM0181</code>).</li>
+<li>An inline function that reaches itself through calls of inline functions is refused at the
+call that closes the cycle (<code>LYR-SEM0182</code>): setting it in place would not end. An inline
+function is called and is <strong>no value</strong> (<code>LYR-SEM0183</code>).</li>
+<li>What a body set in place cannot hold is refused at the declaration (<code>LYR-SEM0184</code>): an
+<strong>interface's</strong> member — it is called through its conformer's table —, a function <strong>without
+a body</strong>, a <strong><code>mut fn</code></strong> — its receiver would be the caller's place —, a <strong>place parameter</strong>
+(<a href="#23a-place-parameters">§2.3a</a>), a body that <strong>yields</strong> — a coroutine's body runs where it is
+pulled, not where it is called.</li>
+<li><em>(Informative.)</em> Kotlin's <code>inline fun</code> is the model: a lambda set in place is code of the
+caller, which the C compiler sees whole. <code>std.core</code>'s <code>forEach</code> is inline
+(<a href="../../spec/12-stdlib/">12 §Iteration</a>).</li>
+</ol>
+<h3 id="86-local-functions">8.6 Local functions</h3>
+<ol>
+<li>A <strong>local <code>fn</code></strong> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 F8</a>) in a block is a <strong>named closure</strong>,
+<code>fn fact(n: int): int { return if (n &lt;= 1) 1 else n * fact(n - 1); }</code>. It binds its name as a
+<code>let</code> binds one (<a href="../../spec/07-statements/#4-bindings">07 §4</a>) — from its statement on, once in its
+scope — and the name is in its own body: it calls itself. It captures as a lambda does
+(<a href="#83-captures">§8.3</a>), a <code>var</code> it writes in the box the scope shares; it is a value of its
+function type, its <code>throws</code> included; its <code>return</code>, <code>break</code> and <code>continue</code> are its own.</li>
+<li>A closure is <strong>one function</strong> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 F9</a>): a local <code>fn</code> takes no type parameters, and its
+parameters take no default and no variadic rest (<code>LYR-PAR0060</code>).</li>
+</ol>
+<h2 id="9-generics">9. Generics</h2>
+<p>Type parameters, their inference, and what an instance is
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T5–T8, T17, T18</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 C3</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/03-types/</code>.</p>
+<h3 id="91-type-parameters-and-instances">9.1 Type parameters and instances</h3>
+<ol>
+<li>A function, a struct, a class, an enum, an interface and a type alias (<a href="#10-aliases">§10</a>)
+may declare <strong>type parameters</strong>,
+<code>fn ident&lt;T&gt;(x: T): T</code>, <code>struct Pair&lt;A, B&gt; { … }</code>; a parameter may carry <strong>constraints</strong>,
+<code>&lt;T :: [Show, Eq&lt;T&gt;]&gt;</code>, the interfaces an argument must satisfy (<a href="../../spec/05-interfaces/">05</a>).
+Inside the declaration a value of type <code>T</code> has the members its constraints give it and no
+others (T18): the body is checked once, at the declaration, not per instance.</li>
+<li>An <strong>instance</strong> names the arguments: <code>Pair&lt;int, string&gt;</code>, <code>ident&lt;int&gt;</code>. Two argument lists
+that differ are two types with no relation between them (T3): nothing coerces
+<code>Pair&lt;int, string&gt;</code> to <code>Pair&lt;int8, string&gt;</code>, and a <code>T[]</code> at <code>T = int8</code> is an <code>int8[]</code>, laid
+out as one. An instance is an instance of <strong>one declaration</strong>: what else carries the name —
+the module's function beside a type's static, the statics of two types, two of a name that
+differ in their count (<a href="../../spec/08-expressions/#12-one-name-several-counts">08 §1.2</a>) — is another
+function under the same arguments too. <code>Small.make&lt;int&gt;</code>, <code>Tiny.make&lt;int&gt;</code> and <code>make&lt;int&gt;</code>
+are three.</li>
+<li>The number of arguments is the number of parameters (<code>LYR-SEM0026</code>); an argument that does
+not satisfy its parameter's constraints is refused (<code>LYR-SEM0028</code>), written or inferred
+alike. A <strong>written</strong> instance is checked where it is written — a parameter, a result, a
+field, an annotation —, once for the place: <code>fn f(s: Set&lt;NoHash&gt;)</code> is
+the signature's error, not first that of a call that builds the set. A block's target names
+the type with the block's own parameters, and those carry the type's constraints with them:
+<code>extend&lt;I, E&gt; MapIter&lt;I, E&gt;</code> is checked as <code>MapIter</code> is declared. An alias's right side is
+checked where the alias is used, with the use's arguments in place: <code>type Table&lt;K&gt; = Map&lt;K, int&gt;</code>
+asks nothing of <code>K</code>, and <code>Table&lt;NoHash&gt;</code> is the use's error.</li>
+<li>Every instance is compiled as code of its own — <strong>monomorphization</strong> —
+with <code>T</code> replaced throughout: an <code>int8</code> field takes one byte, a call on a <code>T</code> is a direct
+call. The compiler collects the instances of a program and compiles each once (C3). The
+set must be <strong>finite</strong> (T19): a chain of instances, each body asking for the next, is refused
+at a depth of 128 (<code>LYR-SEM0197</code>), the message naming the chain by its first links and its
+last — <code>fn grow&lt;T&gt;(x: T, n: int)</code> that calls <code>grow(W&lt;T&gt; { v = x }, n - 1)</code> asks for
+<code>grow&lt;W&lt;T&gt;&gt;</code> at every level and is refused, whatever <code>n</code> is at run time; a program that asks
+for more than 20 000 instances is refused alike.</li>
+<li>A type parameter may carry a <strong>default</strong> (T18): <code>interface Add&lt;Rhs = Self&gt; { … }</code>,
+<code>class Map&lt;K, V, H = DefaultHasher&gt;</code>. A use that writes fewer arguments takes the defaults
+for the trailing ones, resolved where the type is declared — <code>Self</code> there is the conforming
+type, so <code>Vec2 :: [Add]</code> is <code>Vec2 :: [Add&lt;Vec2&gt;]</code>, and the constraint <code>T :: [Add]</code> is
+satisfied by either spelling.</li>
+<li>A constraint may fix an <strong>associated type</strong> of its interface, <code>T :: [Iterator&lt;Item = int&gt;]</code>,
+and the declaration names one as a type path, <code>T.Item</code> (<a href="../../spec/05-interfaces/#8-associated-types">05 §8</a>).</li>
+<li>A type parameter may stand for <strong><code>void</code></strong> — a lambda that returns nothing binds it so,
+<code>run(() =&gt; { println(&quot;x&quot;); })</code>. A value of type <code>void</code> is nothing: a parameter, a local, a
+field or an element of that type holds nothing, a <code>?void</code> holds only whether one was given,
+and a call of a function that returns nothing gives that value wherever one is expected —
+passed, stored, wrapped, returned. <em>(Informative: such a place costs one byte.)</em> Written,
+<code>void</code> is a type like any other — <code>?void</code>, <code>void[]</code> — but a <strong>name</strong> for its one value says
+nothing: a binding that holds a <code>void</code> and a parameter written with it are warned about
+(<code>LYR-SEM0173</code>; the review's M6-5). In generic code there is no warning: the binding is a
+<code>T</code>. <code>==</code> and <code>!=</code> on a <code>void</code> are refused (<code>LYR-SEM0003</code>): there is nothing to compare.</li>
+</ol>
+<h3 id="92-inference-at-a-call">9.2 Inference at a call</h3>
+<ol>
+<li>A call of a generic function may <strong>omit</strong> the type arguments: <code>ident(3)</code> is <code>ident&lt;int&gt;(3)</code>.
+Each argument's type binds the parameters that occur in the parameter type it is passed
+to, at any depth — <code>firstOf([1, 2])</code> binds <code>T = int</code> through <code>T[]</code> — and a lambda's type
+binds through <code>fn(T) -&gt; U</code> once its own parameters are known from the position. A parameter
+a <strong>fixation</strong> names takes the answer of the parameter it constrains, as in a block
+(<a href="../../spec/05-interfaces/">05 §13</a> rule 2): in <code>fn countOf&lt;I :: [Iterator&lt;Item = T&gt;], T&gt;(it: I)</code> the
+argument binds <code>I</code>, and <code>T</code> is <code>I</code>'s <code>Item</code>; a fixed structure, <code>Item = (K, V)</code>, binds what it
+names by matching. A plain value where <code>?U</code> is asked binds <code>U</code> with it, the widening an
+assignment makes: <code>orNone(3)</code> binds <code>U = int</code>, and a lambda whose body gives an <code>int</code> at
+<code>fn(string) -&gt; ?U</code> is a <code>fn(string) -&gt; ?int</code> — <code>mapNotNull((s) =&gt; try int.parse(s))</code>. <code>null</code>
+binds nothing. An <strong>array literal</strong> at a parameter that still holds a type parameter is
+checked after the other arguments, with the type they bound as its target (T8): in
+<code>assertEq(x.toBytesBE(), [2u8, 1u8])</code> the literal is a <code>uint8[2]</code>, and so it is in
+<code>assertEq([2u8, 1u8], x.toBytesBE())</code>; where they bind nothing, it binds as any argument.</li>
+<li>What the arguments leave open, the <strong>expected type</strong> of the call's position binds (T8):
+<code>let xs: int[] = empty();</code>, <code>return empty();</code>, <code>count(empty())</code>. The arguments bind first
+and the position never overrides them: <code>let xs: int[] = ident(&quot;x&quot;);</code> is the assignment's
+error, not a different instance.</li>
+<li>A parameter that occurs in no argument, in no fixation of a bound parameter's constraint, and
+not in the expected type is not inferred:
+<code>let xs = empty();</code> is refused (<code>LYR-SEM0060</code>), with the instruction to write it.</li>
+<li>Type arguments may be <strong>written</strong>, <code>empty&lt;int&gt;()</code>, at a method as at a function:
+<code>it.collect&lt;List&lt;int&gt;&gt;()</code>, <code>s.parse&lt;int&gt;()</code> — without a <code>::</code> before them. Written ones bind
+before any argument, and an argument that does not fit them is the argument's error,
+<code>ident&lt;int&gt;(&quot;x&quot;)</code>; they meet their constraints with the parameters of the block the method
+stands in bound by its receiver (<code>collect</code>'s <code>C :: [FromIterator&lt;I.Item&gt;]</code> with <code>I</code> the
+receiver's iterator). After a member, <code>&lt;</code> opens type arguments where a <code>(</code> follows its <code>&gt;</code>;
+else it is a comparison. A
+<strong>placeholder</strong> <code>_</code> stands for one argument the inference fills (T8): <code>collect&lt;_, string&gt;(1, f)</code>
+writes <code>U</code> and infers <code>T</code>. A placeholder nothing determines is refused as in rule 3.</li>
+<li><code>_</code> stands only in a list of type arguments — of a call, of an initializer (<a href="#93-generic-types-in-an-initializer">§9.3</a>),
+of an instantiated function (<a href="#94-instantiated-functions-as-values">§9.4</a>). Anywhere else,
+<code>let p: Pair&lt;_, int&gt; = …</code> included, it is refused (<code>LYR-SEM0117</code>).</li>
+<li>A <strong>static function of a generic type</strong>, a <strong>variant that takes values</strong> and a static of a
+generic block (<a href="../../spec/05-interfaces/">05 §13</a>) may be called through the type's bare name —
+<code>Cell.of(3)</code>, <code>Opt.Some(7)</code>, <code>Map.new()</code> —, and the call binds the type's parameters as it
+binds its own (the review's M8a-2). For the type's parameters the <strong>expected type comes
+first</strong>, as for an initializer (<a href="#93-generic-types-in-an-initializer">§9.3</a>): in
+<code>let a: Atomic&lt;?int&gt; = Atomic.new(1);</code> the <code>1</code> is checked as a <code>?int</code>; then the arguments
+bind what is open. A parameter neither determines is refused (<code>LYR-SEM0060</code>), with the form
+to write, <code>Cell&lt;…&gt;.none(…)</code>. Nothing else determines it — not a statement before, not a use
+behind. Without a call the bare name of a generic type names no member (<code>LYR-SEM0063</code>).</li>
+</ol>
+<h3 id="93-generic-types-in-an-initializer">9.3 Generic types in an initializer</h3>
+<ol>
+<li>An initializer of a generic type takes its arguments from what is <strong>written</strong>,
+<code>Pair&lt;int, string&gt; { first = 1, second = &quot;x&quot; }</code>, else from the <strong>context</strong> — a binding with
+a type, an argument, a return, a field — <code>let p: Pair&lt;int, string&gt; = Pair { first = 1, second = &quot;x&quot; };</code>,
+else from its <strong>field values</strong>, each binding the parameters in its field's type as an
+argument binds a call's (<a href="#92-inference-at-a-call">§9.2</a>; the review's M8a-2):
+<code>Pair { first = 1, second = &quot;x&quot; }</code> is a <code>Pair&lt;int, string&gt;</code>. The context comes before the
+values — <code>let c: Cell&lt;?int&gt; = Cell { v = 3 };</code> is a <code>Cell&lt;?int&gt;</code>. A parameter no field value
+determines is refused (<code>LYR-SEM0060</code>), with the form to write.</li>
+<li>A written list may hold placeholders: <code>Pair&lt;_, string&gt; { first = 3, second = &quot;x&quot; }</code>. A
+placeholder is filled from the context when the position names an instance, else from the
+<strong>field values</strong>, each checked with as much of its field's type as is known; a value that
+fixes no type of its own (<code>[]</code>, <code>null</code>) fills nothing (<code>LYR-SEM0060</code>).</li>
+</ol>
+<h3 id="94-instantiated-functions-as-values">9.4 Instantiated functions as values</h3>
+<ol>
+<li>A generic function with its arguments written, <code>ident&lt;int&gt;</code>, is a <strong>value</strong> of the
+instance's type, <code>fn(int) -&gt; int</code> (T17): held, passed and called like any function value
+(<a href="#8-function-values">§8</a>). A static method through its type likewise, <code>Counter.make&lt;bool&gt;</code>,
+and through an instance of a generic type, <code>Pair&lt;int&gt;.of</code>;
+an instance method through its type is no value (<code>LYR-SEM0055</code>) — it becomes one through
+its object, <code>obj.method</code> (<a href="#84-functions-and-methods-as-values">§8.4</a>).</li>
+<li>A placeholder in the list is filled from the <strong>function type the position expects</strong>:
+<code>let s: fn(string) -&gt; string = ident&lt;_&gt;;</code>, <code>apply(ident&lt;_&gt;, 4)</code> with <code>apply(f: fn(int) -&gt; int, …)</code>.
+Where the position expects no function type, or one still holding an open parameter of
+its own, the argument is written.</li>
+<li>The bare name of a generic function is no value (<code>LYR-SEM0052</code>): a function value is
+monomorphic.</li>
+<li>The arguments of the value form follow <a href="#91-type-parameters-and-instances">§9.1</a> rule 3 —
+their number, also for a function that is not generic (<code>plain&lt;int&gt;</code>), and their
+constraints.</li>
+</ol>
+<h2 id="10-aliases">10. Aliases</h2>
+<p>A <strong>type alias</strong> names a type (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T15</a>).</p>
+<ol>
+<li><code>type Name = T;</code> names <code>T</code>: the alias and <code>T</code> are one type — a value of either is a value of the
+other —, and the alias is as visible as its word says (<a href="../../spec/04-modules/">04</a>).</li>
+<li><strong><code>opaque type</code> is refused</strong> (<code>LYR-SEM0175</code>; the audit of 2026-10-07 found it taken in silence).
+A struct of one field takes its place: it has the layout of its field (03 T15), and its
+conformances, <code>with</code> and the field reach what an opaque type reached through <code>as</code> twice.</li>
+<li>An alias may take <strong>type parameters</strong>, <code>type Pair&lt;T&gt; = (T, T);</code> (03 T15; N2b): a use names
+the arguments, and <code>Pair&lt;int&gt;</code> is <code>(int, int)</code>. They follow <a href="#91-type-parameters-and-instances">§9.1</a>
+— as many as the alias has parameters (<code>LYR-SEM0026</code>), a default for the trailing ones, the
+constraints checked at the use (<code>LYR-SEM0028</code>). An alias has no associated type of its own,
+so a named argument fixes nothing (<code>LYR-SEM0128</code>). An alias defined through itself is
+refused (<code>LYR-SEM0064</code>); <code>Pair&lt;Pair&lt;int&gt;&gt;</code> is none — the argument is expanded first.</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-scalars">1. Scalars</a></li>
+<li class="level-3"><a href="#11-the-scalar-types">1.1 The scalar types</a></li>
+<li class="level-3"><a href="#12-literals">1.2 Literals</a></li>
+<li class="level-3"><a href="#13-widening">1.3 Widening</a></li>
+<li class="level-3"><a href="#14-as">1.4 as</a></li>
+<li class="level-3"><a href="#15-char-and-bool-are-not-numbers">1.5 char and bool are not numbers</a></li>
+<li class="level-3"><a href="#16-arithmetic-and-overflow">1.6 Arithmetic and overflow</a></li>
+<li class="level-3"><a href="#17-the-text-of-a-number">1.7 The text of a number</a></li>
+<li class="level-2"><a href="#2-structs-and-classes">2. Structs and classes</a></li>
+<li class="level-3"><a href="#21-values-and-references">2.1 Values and references</a></li>
+<li class="level-3"><a href="#22-fields-and-places">2.2 Fields and places</a></li>
+<li class="level-3"><a href="#23-methods-and-mut-fn">2.3 Methods and mut fn</a></li>
+<li class="level-3"><a href="#23a-place-parameters">2.3a Place parameters</a></li>
+<li class="level-3"><a href="#24-construction">2.4 Construction</a></li>
+<li class="level-3"><a href="#25-with">2.5 with</a></li>
+<li class="level-3"><a href="#26-identity-and-equality">2.6 Identity and equality</a></li>
+<li class="level-2"><a href="#3-optionals">3. Optionals</a></li>
+<li class="level-3"><a href="#31-the-type">3.1 The type</a></li>
+<li class="level-3"><a href="#32-tests-and-narrowing">3.2 Tests and narrowing</a></li>
+<li class="level-3"><a href="#33---and-">3.3 ??, ! and ?.</a></li>
+<li class="level-3"><a href="#34-equality-and-hashing">3.4 Equality and hashing</a></li>
+<li class="level-2"><a href="#4-enums">4. Enums</a></li>
+<li class="level-3"><a href="#41-variants-and-payloads">4.1 Variants and payloads</a></li>
+<li class="level-3"><a href="#42-the-enum-the-position-names">4.2 The enum the position names</a></li>
+<li class="level-2"><a href="#5-arrays-views-and-inline-arrays">5. Arrays, views and inline arrays</a></li>
+<li class="level-3"><a href="#51-t">5.1 T[]</a></li>
+<li class="level-3"><a href="#52-slicet">5.2 Slice&lt;T&gt;</a></li>
+<li class="level-3"><a href="#53-tn">5.3 T[N]</a></li>
+<li class="level-2"><a href="#6-tuples">6. Tuples</a></li>
+<li class="level-2"><a href="#7-ranges">7. Ranges</a></li>
+<li class="level-2"><a href="#8-function-values">8. Function values</a></li>
+<li class="level-3"><a href="#81-the-type">8.1 The type</a></li>
+<li class="level-3"><a href="#82-lambdas">8.2 Lambdas</a></li>
+<li class="level-3"><a href="#83-captures">8.3 Captures</a></li>
+<li class="level-3"><a href="#84-functions-and-methods-as-values">8.4 Functions and methods as values</a></li>
+<li class="level-3"><a href="#85-inline-functions">8.5 Inline functions</a></li>
+<li class="level-3"><a href="#86-local-functions">8.6 Local functions</a></li>
+<li class="level-2"><a href="#9-generics">9. Generics</a></li>
+<li class="level-3"><a href="#91-type-parameters-and-instances">9.1 Type parameters and instances</a></li>
+<li class="level-3"><a href="#92-inference-at-a-call">9.2 Inference at a call</a></li>
+<li class="level-3"><a href="#93-generic-types-in-an-initializer">9.3 Generic types in an initializer</a></li>
+<li class="level-3"><a href="#94-instantiated-functions-as-values">9.4 Instantiated functions as values</a></li>
+<li class="level-2"><a href="#10-aliases">10. Aliases</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

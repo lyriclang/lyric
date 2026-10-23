@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Diagnostics — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a class="current" href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>Diagnostics</h1>
+<blockquote>
+<p><strong>Partly written.</strong> §1–§5 were written with milestone <strong>M12a</strong> of the Lyric 5 plan (slices S2–S5); the
+rest follows, spec-first: each rule lands here with its conformance case before or with its
+implementation. Source of the decisions:
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 Tooling and interop W6/W7</a>.</p>
+</blockquote>
+<h2 id="scope">Scope</h2>
+<p>The diagnostic record, codes and areas, severities, lints and their levels, fixes, the output forms.</p>
+<h2 id="1-the-text-form">1. The text form</h2>
+<p>What the toolchain writes to the standard error for a person to read
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 G5, C7</a>). A
+program reads the JSON form instead (§4).</p>
+<p><strong>Conformance.</strong> The suite reads the head lines (rule 1) of every rejecting case; the layout in the
+toolchain's own tests (<code>tests/Lyric.Tests.Core</code>, <code>TextRendererTests</code>).</p>
+<ol>
+<li>A diagnostic begins with its <strong>head</strong>, <code>severity[CODE]: message</code>, on a line of its own; the
+severity is <code>error</code>, <code>warning</code> or <code>hint</code>. Nothing else in the output begins a line that way.</li>
+<li>A diagnostic with a place follows it with the <strong>arrow</strong>, <code> --&gt; path:line:column</code> — line and
+column from 1, the column in characters of the line as the file holds them.</li>
+<li>The <strong>source lines</strong> of its places follow, in a gutter of line numbers: the primary place marked
+<code>^</code>, the secondary ones <code>-</code>, each with its label beside or under its mark. The places of one file
+stand together, in line order; a place in another file has its lines under <code> ::: path:line:column</code>.
+A span across lines is marked on its first line and its last. A tab takes four columns, a wide
+character two, a combining one none, a control character one stand-in, so a mark stands under
+what it marks; a line too wide is cut around its marks, with <code>…</code> where it was cut.</li>
+<li>A <strong>note</strong> without a place is the line <code>= note: …</code>, advice <code>= help: …</code>. A note with a place is a
+block of its own, <code>note: …</code> with its arrow and lines; a suggested change is <code>help: …</code> with the line
+as it would read after it.</li>
+<li><strong>Paths</strong> are said relative to the package's root where the file lies under it, else as the file
+system has them; <code>--absolute-paths</code> says every one as the file system has it.</li>
+<li><strong>Colour</strong>: <code>--color auto|always|never</code>. <code>auto</code>, the default, colours where the standard error
+is a terminal, unless <code>NO_COLOR</code> is set to a non-empty value or <code>TERM</code> is <code>dumb</code>. Colour changes no
+character of the text.</li>
+<li>The diagnostics come in the order of their files, then their places; the order is the same for
+the same input and is not otherwise a contract. Each is said once.</li>
+<li>Rules 1, 2 and 6 and what rules 3–4 show are normative; the widths, the spacing and the colours
+chosen are not.</li>
+</ol>
+<h2 id="2-what-follows-from-an-error">2. What follows from an error</h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 G6</a>)</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/16-diagnostics/</code>.</p>
+<ol>
+<li>A declaration the parser cannot read whole reports its lexical and syntax errors (<code>LYR-LEX…</code>,
+<code>LYR-PAR…</code>) and nothing that follows from them: no finding whose place lies inside it. The other
+declarations of the file report as they would.</li>
+<li><strong>A mistake is said once.</strong> What follows from it is not said again: an instance whose type
+arguments an annotation got wrong, refused there and not again where an initializer takes them;
+the names an or-pattern's alternative does not bind, in one finding; the parser's recovery, which
+skips the rest of an unclosed interpolation and reads <code>T { x: 1 }</code> as the initializer it is
+(<code>LYR-PAR0037</code>, with <code>=</code> as its fix), a field or an initializer's field that ends with <code>;</code> instead
+of <code>,</code>, said once at the <code>;</code> and read as the <code>,</code> it stands for — <code>T { a = 1; }</code> after the name of
+a type is the initializer, not a call with a trailing block (<code>LYR-PAR0064</code>, with <code>,</code> as its fix) —,
+and a <code>continue</code>, <code>break</code> or <code>return</code> where a value stands, a match arm or a branch of an <code>if</code>,
+read as the block it belongs in (<code>LYR-PAR0065</code>, with <code>{ continue; }</code> as its fix); a literal's
+suffix the lexer refused, which the parser does
+not refuse again; a conformance written twice (<code>LYR-SEM0133</code>), whose second block the calls do not
+see; a compile-time-only call, said where the program makes it and not again inside the standard
+library.</li>
+<li>A file the parser reads as holding nothing — nesting it does not carry (<code>LYR-PAR0045</code>) — holds
+nothing for the rest of the build: neither its missing <code>main</code> nor a name its importers do not
+find is said.</li>
+<li><strong><code>--max-errors N</code></strong> draws the first <code>N</code> errors, 50 unless said, all of them for <code>0</code>; what comes
+after is counted, and one closing line, <code>note: …</code>, says how many errors and other findings were
+not drawn. The exit code is what it would be without the limit.</li>
+</ol>
+<h2 id="3-codes-and-the-catalogue">3. Codes and the catalogue</h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 G9, G10</a>)</p>
+<p><strong>Conformance.</strong> Every rejecting case names its codes; the catalogue against the compiler in the toolchain's
+own tests (<code>tests/Lyric5.Tests</code>, <code>CatalogTests</code>).</p>
+<ol>
+<li>A code is <code>LYR-</code>, an area — <code>LEX</code>, <code>PAR</code>, <code>RES</code>, <code>SEM</code>, <code>MAC</code>, <code>CT</code>, <code>CG</code>, <code>PKG</code>, <code>BLD</code>, <code>CLI</code>, <code>ICE</code>,
+<code>RT</code>, and <code>IR</code>, retired —, and four digits. The code and its severity are contract; the message's wording is not.</li>
+<li>Every code the toolchain reports stands in <a href="../../spec/appendix-a-diagnostics/">Appendix A</a>, generated from the
+toolchain's catalogue, with its severity, the chapter whose rule it is, and when it is reported. A code no
+longer reported is <strong>retired</strong> there: its number is not given to another finding.</li>
+<li><strong><code>lyric explain CODE</code></strong> prints the catalogue's entry — for an error or a warning an explanation, a
+program that reports it and the program put right. A code is read as <code>LYR-SEM0001</code>, <code>SEM0001</code> or
+<code>sem0001</code>; one the catalogue does not hold is a usage error (exit 2, <a href="../../spec/14-cli/">14 §1.1</a>).</li>
+<li>A message begins in lowercase and ends without a period; it names the program's own names in quotes.</li>
+</ol>
+<h2 id="4-the-json-form">4. The JSON form</h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 G8, C6</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>JsonFormTests</code>; <code>tests/Lyric.Tests.Core</code>,
+<code>EventWriterTests</code>).</p>
+<ol>
+<li><strong><code>--json</code></strong> on <code>build</code>, <code>run</code>, <code>check</code>, <code>test</code> and <code>fix</code> writes, in place of the text form, one JSON object a line on
+the standard output — a reader takes a line at a time while the command runs. Nothing else is written
+there, but the output of the program <code>run</code> runs, after the build's lines; the standard error stays
+empty. (<code>metadata --json</code> is a document of its own, 14 §2.)</li>
+<li>Every line holds <code>&quot;type&quot;</code> and <code>&quot;version&quot;</code>, the schema's version, <code>1</code>. A reader skips a type it does not
+know and refuses a version it does not know.</li>
+<li><strong><code>diagnostic</code></strong>: <code>code</code>, <code>severity</code> (<code>error</code>, <code>warning</code>, <code>hint</code>), <code>message</code>, <code>span</code>, the primary
+<code>label</code> where there is one, <code>labels</code> (each <code>span</code> and <code>label</code>), <code>notes</code> (each <code>kind</code> — <code>note</code>, <code>help</code>,
+<code>suggestion</code>, <code>category</code> —, <code>message</code>, <code>span</code>, and for a suggestion its <code>fix</code>: <code>span</code>, <code>text</code>,
+<code>applicability</code> <code>safe</code> or <code>needs-review</code>), and <code>rendered</code>, the finding in the text form without colour.
+A span is <code>null</code> or <code>{file, start, end}</code>, <code>start</code> and <code>end</code> each <code>{line, column, offset}</code>, the file as
+the text form says it (§1 rule 5). Every finding is a line — §2's limit is the text form's.</li>
+<li><strong><code>artifact</code></strong>: what a build wrote — <code>kind</code> (<code>binary</code>), <code>name</code>, <code>path</code>.</li>
+<li><strong><code>test</code></strong>: a test of <code>lyric test</code> as it ends — <code>name</code>, <code>outcome</code> (<code>passed</code>, <code>failed</code>, <code>skipped</code>), and
+where there is one a <code>message</code> (why it was skipped, what ended it) and the <code>panic</code>'s code. <strong><code>tests</code></strong>:
+the run's count — <code>passed</code>, <code>failed</code>, <code>skipped</code>. <strong><code>output</code></strong>: a line the program wrote that is no event
+— <code>stream</code> (<code>stdout</code>, <code>stderr</code>) and <code>text</code>.</li>
+<li><strong><code>fix</code></strong>: a change <code>lyric fix</code> made (§6) — <code>path</code>, the <code>line</code> and <code>column</code> where it begins, the <code>code</code>
+of the finding it answers, and the <code>text</code> put in.</li>
+<li><strong><code>summary</code></strong> closes the command — <code>errors</code> and <code>warnings</code>, the findings said — once; <code>run</code> writes it
+before its program runs. <strong><code>ice</code></strong>: the toolchain's own failure (<code>LYR-ICE…</code>) — <code>code</code>, <code>message</code>, where
+it was (<code>while</code>) and its <code>trace</code>.</li>
+</ol>
+<h2 id="5-lints">5. Lints</h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W7 L1–L5</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/09-metaprogrammierung.md">09 A10, A11</a>)</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/16-diagnostics/</code>; the places and the precedence in the toolchain's own tests
+(<code>tests/Lyric5.Tests</code>, <code>LintTests</code>).</p>
+<ol>
+<li><strong>Every warning is a lint</strong>: a name — lowercase words joined by <code>-</code>, as <code>unused-variable</code> —, a group, and a
+level of its own; <a href="../../spec/appendix-a-diagnostics/">Appendix A</a> lists them, <code>lyric explain NAME</code> prints one. The
+groups are <code>unused</code>, <code>correctness</code>, <code>resources</code>, <code>concurrency</code>, <code>deprecation</code>, <code>style</code>, <code>perf</code> and <code>docs</code>;
+<code>warnings</code> names every lint. A warning that is no lint does not exist.</li>
+<li>A lint's <strong>level</strong> is <code>allow</code> — it is not said —, <code>warn</code> — it is said as a warning —, or <code>deny</code> — it is said as
+an error, with a note that names who denied it, and the build fails (exit 1, <a href="../../spec/14-cli/">14 §1.1</a>).</li>
+<li>A <strong>selector</strong> names a lint, by its name or its code, a group, or <code>warnings</code>. One that names nothing is
+refused: in an attribute <code>LYR-SEM0179</code>, in a manifest <code>LYR-PKG0002</code>, on the command line as a usage error
+(exit 2) — each with the selector closest to it in spelling, where one is.</li>
+<li><strong>Three places, one mechanism</strong>: <code>@Allow</code>, <code>@Warn</code>, <code>@Deny</code> with a selector on a declaration set the level
+in what the declaration holds (<a href="../../spec/11-metaprogramming/">11 §1</a> rule 13); <code>allow</code>, <code>warn</code>, <code>deny</code> of a
+package's <code>[lints]</code>, each an array of selectors, set it in the package's files
+(<a href="../../spec/15-project/">15 §1</a> rule 4) — a selector in one of them; <code>-A</code>, <code>-W</code>, <code>-D</code> with a selector on the command
+line of <code>build</code>, <code>run</code>, <code>check</code>, <code>expand</code>, <code>test</code>, <code>bench</code> and <code>fix</code> set it in the files of the package built.</li>
+<li><strong>Precedence</strong>: the narrowest attribute around the finding decides; without one the command line, then the
+manifest, then the lint's own level. Within one place the more specific selector decides — a lint over its
+group over <code>warnings</code> —, and of two alike the later.</li>
+<li>The warnings of a <strong>dependency</strong> and of <strong><code>std</code></strong> are not said; <code>--warn-deps</code> says them, at the
+dependency's own levels — but never as errors: another package's levels do not fail this build. Their
+errors always are.</li>
+<li>An <code>@Allow</code> that decides no warning — none of its lints is met in what it sits on, or a narrower level
+decides each — warns: <code>useless-allow</code> (<code>LYR-SEM0180</code>). The <code>@Allow</code> itself never decides that warning.</li>
+<li><strong>Warnings as errors</strong> is a switch: a profile's <code>denyWarnings</code> (<a href="../../spec/15-project/">15 §4</a> rule 4) and
+<code>--deny-warnings</code> are <code>-D warnings</code> for the package built, in front of the command line's own levels —
+each warning is an error, and its note names the profile. A build script's warnings are the lint
+<code>build-script-warning</code> and denied the same way.</li>
+<li><strong>Every lint is held by two cases</strong> of the suite: a red one, whose program the lint reads (<code>warning:</code>
+its code), and a green one, the same program put right, which compiles in silence (<code>clean:</code> its name).
+Two lints are held otherwise: <code>reserved-device-name</code> by its green case alone, as its red program is a
+file Windows cannot hold — the toolchain's own tests read it where such a file can be made —, and
+<code>deprecated-edition</code> by neither, as it names the warning on a construct an edition retires and there is
+no edition yet.</li>
+</ol>
+<h2 id="6-fixes-and-lyric-fix">6. Fixes and <code>lyric fix</code></h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 G7</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>FixTests</code>): the suite compiles and runs
+programs; it does not change them.</p>
+<ol>
+<li>A finding may carry a <strong>suggestion</strong>: a note with a change — a span and the text put in its place — and
+its <strong>applicability</strong>, <code>safe</code> or <code>needs-review</code>. A safe change is the finding's whole remedy and leaves
+the program's meaning as it was; one that needs a reader is a guess, or a remedy among others. The
+text form draws the line as the change would leave it (§1); the JSON form carries the change (§4 rule 3).</li>
+<li><strong><code>lyric fix [&lt;file.lyr&gt;]</code></strong> makes the safe changes of the findings in the package's own files —
+under its <code>src/</code>; a file alone, its own — and none in a dependency's or in <code>std</code>. A pass checks the
+program as <code>build</code> does, without building it, and makes in each file the changes that do not overlap
+one before them, in source order; the next pass checks the changed text, until a pass finds nothing to
+change. Then it says what stays — the findings without a safe change, each change that needs a reader
+among them —, and exits 1 where an error stays, else 0. A second <code>fix</code> changes nothing.</li>
+<li><code>fix</code> takes <code>-C</code>, <code>--offline</code>, the lint options of §5 rule 4 — a lint set to <code>allow</code> says nothing and
+so suggests nothing — and <code>--json</code> (§4). <strong><code>--dry-run</code></strong> makes one pass and writes nothing: it prints
+the changes as a unified diff on the standard output.</li>
+<li>The safe changes: <code>unused-import</code> takes the import out, or the one name out of its list;
+<code>unused-var</code> writes <code>let</code> for <code>var</code>; <code>useless-try</code> takes a plain <code>try</code> out (<code>try?</code> and <code>try!</code> change the
+value's type, and a <code>catch</code> is code); <code>needless-return</code> takes the <code>return;</code> out; <code>self-assignment</code>
+writes <code>x++</code> for <code>x = x++</code>; <code>deprecated</code> writes the <code>@Deprecated</code>'s <code>replacement</code> where it is a name.
+A change that needs a reader: <code>naming</code>'s new name, written where the name is declared (its uses are an
+editor's rename); <code>self-assignment</code>'s removal of <code>x = x</code>, which may stand for an assignment meant
+otherwise; an unknown name's closest known one (<code>did you mean</code>).</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-the-text-form">1. The text form</a></li>
+<li class="level-2"><a href="#2-what-follows-from-an-error">2. What follows from an error</a></li>
+<li class="level-2"><a href="#3-codes-and-the-catalogue">3. Codes and the catalogue</a></li>
+<li class="level-2"><a href="#4-the-json-form">4. The JSON form</a></li>
+<li class="level-2"><a href="#5-lints">5. Lints</a></li>
+<li class="level-2"><a href="#6-fixes-and-lyric-fix">6. Fixes and lyric fix</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

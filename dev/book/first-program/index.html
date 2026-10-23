@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>A first program — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><span class="pending">std</span><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">A first program</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a class="current" href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>A first program</h1>
+<p>This chapter writes a small calculator: it reads lines like <code>6 * 7</code> and prints what they come to.
+On the way it meets values and functions, an enum, a struct, and how a function says that it can
+fail.</p>
+<h2 id="values">Values</h2>
+<p>A few statements are a program already. <code>let</code> names a value; an f-string puts values into text
+between braces:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> answer = <span class="num">6</span> * <span class="num">7</span>;
+println(<span class="str">f"</span><span class="str">6 * 7 = </span>{answer}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>6 * 7 = 42</code></pre>
+<p><code>answer</code> is an <code>int</code>: the compiler knows it from <code>6 * 7</code>, so nothing has to say so. A <code>let</code> never
+changes; <code>var</code> names a value that does:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">var</span> total = <span class="num">0</span>;
+<span class="kw">for</span> (n <span class="kw">in</span> <span class="num">1</span>..<span class="num">5</span>) {
+    total += n;
+}
+println(<span class="str">f"</span><span class="str">1 + 2 + 3 + 4 = </span>{total}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>1 + 2 + 3 + 4 = 10</code></pre>
+<p><code>1..5</code> is the range from 1 up to 5, without the 5.</p>
+<h2 id="functions">Functions</h2>
+<p>A function names its parameters' types and the type it returns:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> add(a: <span class="ty">int</span>, b: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> a + b;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(add(<span class="num">2</span>, <span class="num">3</span>));
+}</code></pre>
+<pre class="output"><code>5</code></pre>
+<p><code>void</code> is the type of nothing: <code>main</code> returns no value. Its program declares a function of its
+own, so it writes its <code>main</code> too.</p>
+<h2 id="an-enum-for-the-operator">An enum for the operator</h2>
+<p>The calculator knows four operators. An <strong>enum</strong> is a type whose values are a list of cases, and
+<code>match</code> takes a value apart case by case:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">enum</span> <span class="ty">Op</span> { <span class="ty">Add</span>, <span class="ty">Sub</span>, <span class="ty">Mul</span>, <span class="ty">Div</span> }
+
+<span class="kw">fn</span> apply(op: <span class="ty">Op</span>, a: <span class="ty">int</span>, b: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> <span class="kw">match</span> (op) {
+        .<span class="ty">Add</span> =&gt; a + b,
+        .<span class="ty">Sub</span> =&gt; a - b,
+        .<span class="ty">Mul</span> =&gt; a * b,
+        .<span class="ty">Div</span> =&gt; a / b,
+    };
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(apply(<span class="ty">Op</span>.<span class="ty">Mul</span>, <span class="num">6</span>, <span class="num">7</span>));
+    println(apply(.<span class="ty">Sub</span>, <span class="num">6</span>, <span class="num">7</span>));
+}</code></pre>
+<pre class="output"><code>42
+-1</code></pre>
+<p>A <code>match</code> names every case, or the compiler says which one it misses. Where the type is clear —
+<code>apply</code> takes an <code>Op</code> — a case is written <code>.Sub</code> without the enum's name.</p>
+<h2 id="a-struct-for-the-line">A struct for the line</h2>
+<p>A line of input is three things: a number, an operator, a number. A <strong>struct</strong> holds them together,
+and its fields are given by name:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">enum</span> <span class="ty">Op</span> { <span class="ty">Add</span>, <span class="ty">Sub</span>, <span class="ty">Mul</span>, <span class="ty">Div</span> }
+
+<span class="kw">struct</span> <span class="ty">Expr</span> {
+    left: <span class="ty">int</span>,
+    op: <span class="ty">Op</span>,
+    right: <span class="ty">int</span>,
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> e = <span class="ty">Expr</span> { left = <span class="num">6</span>, op = .<span class="ty">Mul</span>, right = <span class="num">7</span> };
+    println(<span class="str">f"</span>{e.left}<span class="str"> and </span>{e.right}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>6 and 7</code></pre>
+<h2 id="errors">Errors</h2>
+<p>Not every line is a sum: <code>2 ^ 8</code> has an operator the calculator does not know, <code>seven</code> is no number,
+and <code>1 / 0</code> has no answer. A function that can fail says so in its signature with <code>throws</code>, and
+names what it throws. An error is a type that conforms to <code>Error</code> — it has a <code>message()</code>:</p>
+<pre><code class="language-lyric"><span class="kw">enum</span> <span class="ty">Op</span> { <span class="ty">Add</span>, <span class="ty">Sub</span>, <span class="ty">Mul</span>, <span class="ty">Div</span> }
+
+<span class="kw">struct</span> <span class="ty">CalcError</span> :: [<span class="ty">Error</span>] {
+    text: <span class="ty">string</span>,
+
+    <span class="kw">fn</span> message(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="kw">this</span>.text;
+    }
+}
+
+<span class="kw">fn</span> opOf(word: <span class="ty">StringView</span>): <span class="ty">Op</span> <span class="kw">throws</span> <span class="ty">CalcError</span> {
+    <span class="kw">if</span> (word == <span class="str">"+"</span>) { <span class="kw">return</span> .<span class="ty">Add</span>; }
+    <span class="kw">if</span> (word == <span class="str">"-"</span>) { <span class="kw">return</span> .<span class="ty">Sub</span>; }
+    <span class="kw">if</span> (word == <span class="str">"*"</span>) { <span class="kw">return</span> .<span class="ty">Mul</span>; }
+    <span class="kw">if</span> (word == <span class="str">"/"</span>) { <span class="kw">return</span> .<span class="ty">Div</span>; }
+    <span class="kw">throw</span> <span class="ty">CalcError</span> { text = <span class="str">f"</span><span class="str">unknown operator '</span>{word}<span class="str">'</span><span class="str">"</span> };
+}</code></pre>
+<p>A call to a function that throws is marked with <code>try</code>: the error, if one comes, goes on to the
+caller — whose own <code>throws</code> must name it. A call without the mark does not compile:</p>
+<p class="snippet-note fails">Does not compile — the compiler reports <code>LYR-SEM0138</code></p>
+<pre class="fails"><code class="language-lyric"><span class="kw">import</span> std.core { <span class="ty">ParseError</span> };
+
+<span class="kw">fn</span> twice(text: <span class="ty">string</span>): <span class="ty">int</span> <span class="kw">throws</span> <span class="ty">ParseError</span> {
+    <span class="kw">return</span> <span class="ty">int</span>.parse(text) * <span class="num">2</span>;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">ParseError</span> {
+    <span class="kw">let</span> _ = <span class="kw">try</span> twice(<span class="str">"21"</span>);
+}</code></pre>
+<pre class="diagnostic"><code>error[LYR-SEM0138]: the call to 'parse' throws 'ParseError' — mark it 'try', so the propagation is seen where it happens
+ --&gt; src/main.lyr:4:12
+  |
+4 |     return int.parse(text) * 2;
+  |            ^^^^^^^^^^^^^^^</code></pre>
+<p><code>main</code> marks its call to <code>twice</code>, but line 4 does not mark the call to <code>int.parse</code>: it throws a
+<code>ParseError</code> for text that is no number, and <code>twice</code>'s <code>throws</code> lets the error go on — yet the
+compiler wants to see, at the call itself, that it may. The fix is the missing <code>try</code> in front of
+<code>int.parse</code>; with the mark in both places the program compiles:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.core { <span class="ty">ParseError</span> };
+<span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> twice(text: <span class="ty">string</span>): <span class="ty">int</span> <span class="kw">throws</span> <span class="ty">ParseError</span> {
+    <span class="kw">return</span> <span class="kw">try</span> <span class="ty">int</span>.parse(text) * <span class="num">2</span>;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">ParseError</span> {
+    println(<span class="kw">try</span> twice(<span class="str">"21"</span>));
+}</code></pre>
+<pre class="output"><code>42</code></pre>
+<p><code>try … catch</code> handles an error where it happens instead.</p>
+<p>Here is the whole calculator, run over four lines:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.core { <span class="ty">ParseError</span> };
+<span class="kw">import</span> std.io { println };
+
+<span class="kw">enum</span> <span class="ty">Op</span> { <span class="ty">Add</span>, <span class="ty">Sub</span>, <span class="ty">Mul</span>, <span class="ty">Div</span> }
+
+<span class="kw">struct</span> <span class="ty">Expr</span> {
+    left: <span class="ty">int</span>,
+    op: <span class="ty">Op</span>,
+    right: <span class="ty">int</span>,
+}
+
+<span class="kw">struct</span> <span class="ty">CalcError</span> :: [<span class="ty">Error</span>] {
+    text: <span class="ty">string</span>,
+
+    <span class="kw">fn</span> message(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="kw">this</span>.text;
+    }
+}
+
+<span class="kw">fn</span> opOf(word: <span class="ty">StringView</span>): <span class="ty">Op</span> <span class="kw">throws</span> <span class="ty">CalcError</span> {
+    <span class="kw">if</span> (word == <span class="str">"+"</span>) { <span class="kw">return</span> .<span class="ty">Add</span>; }
+    <span class="kw">if</span> (word == <span class="str">"-"</span>) { <span class="kw">return</span> .<span class="ty">Sub</span>; }
+    <span class="kw">if</span> (word == <span class="str">"*"</span>) { <span class="kw">return</span> .<span class="ty">Mul</span>; }
+    <span class="kw">if</span> (word == <span class="str">"/"</span>) { <span class="kw">return</span> .<span class="ty">Div</span>; }
+    <span class="kw">throw</span> <span class="ty">CalcError</span> { text = <span class="str">f"</span><span class="str">unknown operator '</span>{word}<span class="str">'</span><span class="str">"</span> };
+}
+
+<span class="kw">fn</span> parse(line: <span class="ty">string</span>): <span class="ty">Expr</span> <span class="kw">throws</span> [<span class="ty">CalcError</span>, <span class="ty">ParseError</span>] {
+    <span class="kw">let</span> words = line.split(<span class="str">' '</span>).toArray();
+    <span class="kw">if</span> (words.length() != <span class="num">3</span>) {
+        <span class="kw">throw</span> <span class="ty">CalcError</span> { text = <span class="str">"write: number operator number"</span> };
+    }
+    <span class="kw">return</span> <span class="ty">Expr</span> {
+        left = <span class="kw">try</span> <span class="ty">int</span>.parse(words[<span class="num">0</span>]),
+        op = <span class="kw">try</span> opOf(words[<span class="num">1</span>]),
+        right = <span class="kw">try</span> <span class="ty">int</span>.parse(words[<span class="num">2</span>]),
+    };
+}
+
+<span class="kw">fn</span> eval(e: <span class="ty">Expr</span>): <span class="ty">int</span> <span class="kw">throws</span> <span class="ty">CalcError</span> {
+    <span class="kw">return</span> <span class="kw">match</span> (e.op) {
+        .<span class="ty">Add</span> =&gt; e.left + e.right,
+        .<span class="ty">Sub</span> =&gt; e.left - e.right,
+        .<span class="ty">Mul</span> =&gt; e.left * e.right,
+        .<span class="ty">Div</span> =&gt; <span class="kw">if</span> (e.right == <span class="num">0</span>) <span class="kw">throw</span> <span class="ty">CalcError</span> { text = <span class="str">"division by zero"</span> } <span class="kw">else</span> e.left / e.right,
+    };
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">for</span> (line <span class="kw">in</span> [<span class="str">"6 * 7"</span>, <span class="str">"1 / 0"</span>, <span class="str">"2 ^ 8"</span>, <span class="str">"seven"</span>]) {
+        <span class="kw">try</span> {
+            <span class="kw">let</span> e = parse(line);
+            println(<span class="str">f"</span>{line}<span class="str"> = </span>{eval(e)}<span class="str">"</span>);
+        } <span class="kw">catch</span> (err) {
+            println(<span class="str">f"</span>{line}<span class="str">: </span>{err.message()}<span class="str">"</span>);
+        }
+    }
+}</code></pre>
+<pre class="output"><code>6 * 7 = 42
+1 / 0: division by zero
+2 ^ 8: unknown operator '^'
+seven: write: number operator number</code></pre>
+<p><code>parse</code> throws two kinds of error, so its <code>throws</code> lists both. Inside the <code>try</code> block every call
+that throws is covered, and <code>catch (err)</code> takes whichever comes; <code>err.message()</code> says what it was.
+<code>throw</code> is an expression too: the <code>.Div</code> arm is a value or an error.</p>
+<h2 id="reading-input">Reading input</h2>
+<p>The last step reads the lines from the standard input instead of an array. <code>stdin().lines()</code> gives
+them one by one until the input ends; reading can fail, so the loop is marked <code>try</code> too:</p>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println, stdin, <span class="ty">IoError</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span> {
+    <span class="kw">for</span> (line <span class="kw">in</span> <span class="kw">try</span> stdin().lines()) {
+        println(<span class="str">f"</span><span class="str">read: </span>{line}<span class="str">"</span>);
+    }
+}</code></pre>
+<p>Put the calculator's <code>main</code> loop over <code>stdin().lines()</code> and it answers what you type:</p>
+<pre><code class="language-text">$ lyric run
+6 * 7
+6 * 7 = 42</code></pre>
+<p>The next chapter, <a href="../../book/diagnostics/">What the compiler tells you</a>, is about the messages you meet
+when a program is not right yet.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/getting-started/">← Getting started</a><a class="next" href="../../book/diagnostics/">What the compiler tells you →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

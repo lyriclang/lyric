@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>6. Errors — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a class="current" href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>6. Errors</h1>
+<p>A function that can fail says so in its signature, a call of it is marked where it stands, and
+what it throws is caught or passed on by a function that says so in turn — two channels, the
+value and the error, each in plain sight
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/05-fehler.md">05 E1–E12</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 L5</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 D9, D18, Y4, Y5</a>).</p>
+<h2 id="scope">Scope</h2>
+<p>What is thrown, the <code>throws</code> set, the <code>try</code> mark and what covers a thrown type (S1a); the <code>try</code>
+block with its clauses and the error path at run time — propagation, <code>defer</code> on the way out,
+<code>main</code>'s report (S1b); the expression forms <code>try?</code>, <code>try!</code> and <code>try … catch</code> (S2a); a clause over
+several types, the set a binding carries and the refusal of a clause no error can reach (S2b); a
+<code>defer</code> that throws (S3a); <code>using</code> and <code>Exception</code> (S3b); where an error was thrown, and a rethrow
+that keeps it (S3c); the thrown set of a function type (S4a); panics and <code>never</code> (S4b). Written
+with M5; what a clause's binding tells of the error it took (§4 rule 4) with M8c. What is not
+written here yet is decided in the design documents, not here.</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/06-errors/</code>.</p>
+<h2 id="1-what-is-thrown">1. What is thrown</h2>
+<ol>
+<li><strong><code>Error</code></strong> of <code>std.core</code> is the root of everything thrown, caught and declared:
+<code>interface Error { fn message(): string; fn cause(): ?Error { return null; } }</code> (05 E6 O1).
+<code>cause</code> names the error this one wraps; the wrapping is the type's own field (O2).</li>
+<li>A value is <strong>throwable</strong> when its type conforms to <code>Error</code> (E3): a struct, a class or an enum
+that conforms, an interface value of <code>Error</code> or of an interface extending it, a type
+parameter constrained to it. An enum is the natural form —
+<code>enum ParseError :: [Error] { Empty, BadDigit(char, int); … }</code>. Anything else — a number, a
+string, an array, an optional — is not (<code>LYR-SEM0030</code>).</li>
+<li><code>throw e</code> throws <code>e</code>; it is a statement, or an expression of type <code>never</code> wherever an
+expression may stand (<code>x ?? throw NotFound { }</code>). <code>e</code> is throwable (<code>LYR-SEM0030</code>).</li>
+<li><strong><code>Exception</code></strong> of <code>std.core</code> is the ready-made error for a message:
+<code>throw Exception(&quot;…&quot;)</code>, and <code>Exception(&quot;…&quot;, cause: e)</code> for the error it wraps — what its
+<code>cause()</code> gives (12 E06; the review's M5-2). The call is its <code>new</code> (<a href="../../spec/08-expressions/">08 §1.2</a>
+rule 4); the fields behind it are <code>text</code> and <code>inner</code>, not <code>message</code> and <code>cause</code>: a type's
+members share one name space, and those two are <code>Error</code>'s methods.</li>
+</ol>
+<h2 id="2-the-throws-set">2. The <code>throws</code> set</h2>
+<ol>
+<li>A function that may throw declares it after its return type: <strong><code>throws E</code></strong> for one type,
+<strong><code>throws [A, B]</code></strong> for several — a <strong>set</strong>, in brackets from two on like every list
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 D5/D6</a>); two
+without the brackets are refused (<code>LYR-PAR0049</code>). The order means nothing; a type named
+twice is refused (<code>LYR-SEM0137</code>). Every element is throwable (<code>LYR-SEM0030</code>).</li>
+<li>The bare <strong><code>throws</code></strong> is <code>throws Error</code>: anything may be thrown, and the caller learns what by
+testing the value's type. The list is the form to prefer.</li>
+<li>The set is <strong>declared, never inferred</strong>, for a named function (K3). A function without a
+clause throws nothing.</li>
+<li>An implementation of an interface member throws <strong>at most</strong> what the member declares: every
+type of its set is covered by the member's (<a href="#3-the-try-mark-and-coverage">§3</a> rule 4, K6) —
+<code>LYR-SEM0042</code> otherwise.</li>
+<li><code>fn main()</code> may declare <code>throws</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 D18</a>),
+like any function; its return type is <code>int</code> or <code>void</code>, with or without <code>args: string[]</code>
+(<code>LYR-SEM0021</code>).</li>
+<li>A <strong>function type</strong> has a set too, <code>fn(string) -&gt; int throws ParseError</code>: a function value and
+a lambda throw what their type says (<a href="#8-function-values-that-throw">§8</a>).</li>
+</ol>
+<h2 id="3-the-try-mark-and-coverage">3. The <code>try</code> mark and coverage</h2>
+<ol>
+<li>Every call of a throwing function is <strong>marked</strong>: it stands under <strong><code>try</code></strong> — the prefix
+<code>try e</code>, <code>try? e</code> or <code>try! e</code> (<a href="#6-the-expression-forms">§6</a>), or the body of a <code>try { … }</code>
+block — of its own function (<code>LYR-SEM0138</code>). A
+refactoring that makes a function throw shows at every caller instead of passing through
+unseen (E1). A lambda's body is a function of its own: a <code>try</code> around the lambda does not mark
+what its body calls.</li>
+<li><code>try</code> <strong>covers everything to its right</strong>: <code>try a + b</code> is <code>try (a + b)</code> and marks every call in
+it (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Y4</a>). At the
+<strong>start</strong> of an expression — a binding's value, an argument, a <code>return</code>, the right of an
+<code>=</code>, what stands in parentheses, a branch — it covers all of it. The plain mark may also
+stand <strong>to the right of an operator</strong>: there it covers from where it stands to the end of
+that expression and changes nothing about how the expression is grouped — in
+<code>a() + try b() * c()</code> the calls <code>b()</code> and <code>c()</code> are marked and <code>a()</code> is not, and a throwing
+call left of the mark is refused as any unmarked one is (<code>LYR-SEM0138</code>). <code>try?</code>, <code>try!</code> and
+a <code>try</code> with clauses are worth something else than what they cover, so they stand at its
+start, and to the right of an operator they are refused (<code>LYR-PAR0050</code>). The value and the
+type are the expression's. A <code>try</code> that marks nothing is warned about (<code>LYR-SEM0139</code>): no
+error reaches it — nothing it covers throws, or a <code>try</code> inside it takes all of it — or what
+it covers is <strong>marked already</strong>, by a <code>try</code> block or a <code>try</code> around it or by a mark to its
+left in the same expression.</li>
+<li>Every type a site may throw — a marked call, or a <code>throw</code> — is <strong>covered</strong> (K8): by a <code>try?</code>
+or <code>try!</code> around the site, by a <code>catch</code> clause of a <code>try</code> around it
+(<a href="#4-the-try-block-and-its-clauses">§4</a>, <a href="#6-the-expression-forms">§6</a>), or by the <code>throws</code> set
+of the function the site stands in (<code>LYR-SEM0034</code>). A global's initializer, a constant's
+(a <code>static let</code>'s) and a default cover nothing.</li>
+<li>An element <strong>covers</strong> a thrown type when it <strong>is</strong> that type — on the instance: <code>Box&lt;int&gt;</code>
+does not cover <code>Box&lt;string&gt;</code> (K5) — or when it is an interface the type conforms to. <code>Error</code>
+covers everything thrown.</li>
+<li>A call throws its function's set <strong>in the instance's terms</strong>: a method of <code>Box&lt;int&gt;</code> declared
+<code>throws Wrong&lt;T&gt;</code> throws <code>Wrong&lt;int&gt;</code>.</li>
+</ol>
+<h2 id="4-the-try-block-and-its-clauses">4. The <code>try</code> block and its clauses</h2>
+<ol>
+<li><code>try { … } catch (e: T) { … } catch (e) { … }</code> runs the body; when something in it throws,
+the clauses are asked <strong>in order</strong>, and the first whose type covers the thrown value's type
+(<a href="#3-the-try-mark-and-coverage">§3</a> rule 4) takes it: the error is handled, its clause runs, and
+execution continues after the <code>try</code>. A block without a clause is refused (<code>LYR-SEM0036</code>).</li>
+<li>A typed clause binds the value under its own type — a class's object, a struct's or an
+enum's value, an interface value of the clause's interface — so its fields and its variants
+are there to read and match. The <strong>set form</strong> <code>catch (e in [A, B])</code> takes a value of any of its
+types — one alone without the brackets, <code>catch (e in A)</code>, several in them, the list rule
+(<code>LYR-PAR0049</code>) — and <code>e</code> is an <code>Error</code> that carries the set (rule 6); a set of one is the
+typed clause, <code>catch (e in A)</code> binds an <code>A</code>. <code>catch (e)</code> and <code>catch (_)</code> take everything
+that reaches them; <code>e</code> is the one type that does, where it is one, and an <code>Error</code>
+otherwise (rule 6). A clause without a type stands last (<code>LYR-SEM0035</code>). A clause's types
+conform to <code>Error</code> (<code>LYR-SEM0030</code>).</li>
+<li>When no clause covers the value, it goes on as though the <code>try</code> were not there: to the
+clauses of a <code>try</code> around this one, or out of the function (<a href="#5-the-error-path">§5</a>).</li>
+<li>A clause is not inside its own <code>try</code>: what it throws goes past its sister clauses to the next
+<code>try</code> around, or out of the function (E9 C6). <code>throw e</code> in a clause throws the value it took;
+where <code>e</code> is the clause's own binding, thrown in the clause itself, it is <strong>the same error
+going on</strong> (05 E6 O3): the errors suppressed into it stay with it
+(<a href="#5-the-error-path">§5</a> rule 5), and so, in the debug profile, does where it was first thrown
+(§5 rule 3). Any other <code>throw</code> — the value under another name, or from a lambda — starts an
+error of its own. The binding also <strong>tells of that record</strong> (05 E6 O3, the review's M5-3):
+<code>e.suppressed()</code> is an <code>Error[]</code> of the errors suppressed into it, in the order they were
+(<a href="#5-the-error-path">§5</a> rule 5, <a href="#7-closing-using">§7</a> rule 3), a new array each call;
+<code>e.backtrace()</code> is a <code>?Backtrace</code> of <code>std.core</code>, where it was first thrown — kept in the debug
+profile, and <code>null</code> in the release profile, which keeps none. A <strong><code>Backtrace</code></strong> is a <code>Display</code>
+whose text is the frames in a panic's trace form, a line <code>    at &lt;function&gt; (&lt;file&gt;:&lt;line&gt;)</code>
+each, innermost first. Both are asked of the binding itself, in its clause: an error stored,
+passed on or captured by a lambda is a value like any other and has neither
+(<code>LYR-SEM0012</code>). Where the binding's type has a member of either name, the name is that
+member.</li>
+<li>A type is caught <strong>once</strong> per <code>try</code> (<code>LYR-SEM0141</code>, E9 C1), and a clause no value can reach is
+refused (<code>LYR-SEM0142</code>, C2): a type of it is covered (<a href="#3-the-try-mark-and-coverage">§3</a> rule 4)
+by a type caught before it — <code>catch (e: IoError)</code> above <code>catch (e: Disk)</code>, or <code>Error</code> above
+anything. Within a set the same holds from left to right. Below the clause without a type,
+rule 2's <code>LYR-SEM0035</code> is the one error.</li>
+<li>The binding of a set clause, or of a clause without a type, <strong>carries a set</strong> (05 E2 K7): the
+set's types; for the clause without a type, what reaches it — every type the body throws past
+the <code>try</code>s inside it, less the types the clauses above cover. <code>throw e</code> throws exactly that set
+(precise rethrow): <code>catch (_: NotFound) { … } catch (e) { throw e; }</code> in a function that
+declares <code>throws Parse</code> is covered when the body throws <code>[NotFound, Parse]</code>. A <code>match (e)</code>
+whose type patterns cover the set needs no default (<code>LYR-SEM0050</code> names a missing type). The
+set is the binding's alone: stored elsewhere, the value is an <code>Error</code>. Where the set is
+<strong>one type</strong>, the binding is that type (the review's M5-6): its fields and its variants are
+there, as in a typed clause, and it is an error wherever one is asked. A second type the body
+comes to throw makes it an <code>Error</code> again. Where the set is <strong>empty</strong> although the body
+throws — the clauses above cover every type of it — the clause is dead, and warned about
+(<code>LYR-SEM0171</code>).</li>
+<li><em>(Informative.)</em> Since the value travels with its type, the clause test is one comparison of
+the value's type descriptor, an interface clause a search of the type's short conformance
+list.</li>
+</ol>
+<h2 id="5-the-error-path">5. The error path</h2>
+<ol>
+<li>A throw site that is not caught where it stands <strong>leaves</strong>: the function returns to its caller
+at once, without a value, and the caller's marked call is now the site — caught there, or
+leaving in turn (E1). No frame is skipped; a throw costs what a return costs (01 L5).</li>
+<li>On the way out of every scope it leaves, an error runs the scope's <strong><code>defer</code>s</strong>, the last
+registered first, innermost scope first — the same bodies a normal exit runs — before a
+clause of an enclosing <code>try</code> takes it (E7).</li>
+<li>An error that leaves <strong><code>main</code></strong> ends the program: <code>error: &lt;message&gt;</code> on the error stream, then
+<code>  caused by: &lt;message&gt;</code> for each <code>cause()</code> in the chain and <code>  suppressed: &lt;message&gt;</code> for each
+error appended to it (rule 5), and the <strong>exit code 1</strong> (05 E6 O4) — a panic's is 101. In the
+<strong>debug profile</strong> the report goes on with where the error was thrown, its frames in a panic's
+trace form (01 E8); the release profile keeps no trace of an error.</li>
+<li>A <code>defer</code> body runs <strong>where its <code>defer</code> was registered</strong>: under the <code>try</code>s around that scope,
+not those inside it. A <code>defer</code> registered outside a <code>try</code> and run by a <code>return</code> inside it is
+not that <code>try</code>'s to catch; one registered in a <code>try</code>'s body is. What the body throws is a site
+of that scope (<a href="#3-the-try-mark-and-coverage">§3</a>).</li>
+<li>A <code>defer</code> that <strong>throws on a normal exit</strong> — the end of its scope, a <code>return</code>, a <code>break</code>, a
+<code>continue</code> — ends that exit: the error leaves like any other, and the <code>defer</code>s registered
+before it run all the same. One that <strong>throws while an error is in flight</strong> does not replace
+it: the <strong>first error wins</strong>, the second is appended to it as <strong>suppressed</strong>, and the remaining
+<code>defer</code>s run (05 E7). Of two that throw on a normal exit, the first that ran wins.</li>
+</ol>
+<h2 id="6-the-expression-forms">6. The expression forms</h2>
+<ol>
+<li><strong><code>try? e</code></strong> is worth <code>?T</code> for an <code>e</code> of type <code>T</code>: the value, or <strong><code>null</code></strong> when something
+under it throws — the error is dropped. It is <strong>not flattened</strong>: for an <code>e</code> of type <code>?int</code> it
+is <code>??int</code>, so &quot;the call failed&quot; stays apart from &quot;the call gave <code>null</code>&quot; (05 E4). Over an
+expression without a value <code>try?</code> stands as a statement, where it only drops the error;
+anywhere else it is refused (<code>LYR-SEM0140</code>).</li>
+<li><strong><code>try! e</code></strong> is worth <code>e</code>'s value; when something under it throws, the program ends with a
+<strong>panic</strong> — <code>panic [LYR-RT0010]: 'try!' on an error: &lt;message&gt;</code>, exit code 101 — and no
+<code>defer</code> runs past it (05 E8).</li>
+<li><code>try?</code> and <code>try!</code> take every error under them themselves: they mark the calls they cover
+(<a href="#3-the-try-mark-and-coverage">§3</a> rule 1) and cover what those throw (rule 3). The sign is
+written against the keyword — <code>try !done()</code> is the mark over a negation — and the form stands
+at the start of what it covers, as the mark does (<code>LYR-PAR0050</code>).</li>
+<li><strong><code>try e catch (x: A) v catch (y) w</code></strong> is the expression form of the block (05 E4): its
+clauses are asked as a block's are (<a href="#4-the-try-block-and-its-clauses">§4</a>), and the
+expression is worth <code>e</code>'s value, or the value of the clause that took the error. A clause's
+body is an expression, or a value block <code>{ …; v }</code>; a value block without a tail leaves on
+every path — <code>return</code>, <code>throw</code>, <code>break</code>, <code>continue</code> — unless the expression has no value
+(<code>LYR-SEM0033</code>). The parts unify like the arms of a <code>match</code>, or each meets the context where
+there is one (<code>LYR-SEM0016</code>). The rules of §4 hold: the clause without a type last
+(<code>LYR-SEM0035</code>), a clause not inside its own <code>try</code>. <code>throw</code> as a clause's body throws with
+context — <code>try read(p) catch (e: IoError) throw ConfigError { inner = e }</code>.</li>
+<li>A clause belongs to the <strong>nearest <code>try</code> on its left</strong> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Y4</a>): in
+<code>try f() catch (_: A) try g() catch (_: B) 0</code> the clause for <code>B</code> is <code>g</code>'s, and parentheses
+give it to the outer <code>try</code>. <code>try?</code> and <code>try!</code> take no clause (<code>LYR-PAR0051</code>).</li>
+<li><em>(Informative.)</em> Each form opens a dispatch of its own, as the block does: <code>try?</code> clears the
+error and gives <code>null</code> there, <code>try!</code> panics there, the clauses are tested there. Nothing is
+unwound; the cost is the block's (§4 rule 7, §5 rule 1).</li>
+</ol>
+<h2 id="7-closing-using">7. Closing: <code>using</code></h2>
+<ol>
+<li><strong><code>using let f = e;</code></strong> binds <code>f</code> like a <code>let</code> and <strong>closes</strong> it — calls <code>f.close()</code> — when its
+scope is left, on every way out but a panic, in the scope's one LIFO list with its <code>defer</code>s
+(05 E7 R2): <code>using let a = …; defer d; using let b = …;</code> closes <code>b</code>, runs <code>d</code>, closes <code>a</code>.
+<code>using var</code>, and a <code>using</code> without one name and a value, are refused (<code>LYR-PAR0052</code>). <code>using</code>
+is a word only before <code>let</code> or <code>var</code>.</li>
+<li>What <code>using</code> binds is a <strong><code>Closeable</code></strong> of <code>std.core</code>,
+<code>interface Closeable { fn close(): void throws Error; }</code> (<code>LYR-SEM0143</code>, R6). The close is a
+site of the scope, <code>using</code> its mark: what <code>close()</code> throws on the bound type is covered as any
+site is (<a href="#3-the-try-mark-and-coverage">§3</a>) — and a close that cannot throw needs no mark
+and draws no warning (no <code>LYR-SEM0139</code>).</li>
+<li>An error from <code>close()</code> is a <code>defer</code>'s error (<a href="#5-the-error-path">§5</a> rule 5, R4): on a normal
+exit it leaves, while an error is in flight it is appended to it as suppressed.</li>
+<li>A <code>Closeable</code> nothing closes is warned about (<code>LYR-SEM0144</code>, R3): a call's result an expression
+statement drops, or a plain <code>let</code> used only to call its other methods — not closed, not
+<code>using</code>-bound, not stored, returned or passed on.</li>
+<li><em>(Informative.)</em> A use after the close is a run-time error once the library's types track it
+(R5); a <code>for</code> loop closes a <code>Closeable</code> iterator (R7) with the iterators.</li>
+</ol>
+<h2 id="8-function-values-that-throw">8. Function values that throw</h2>
+<ol>
+<li>A <strong>function type</strong> may say what a call of it throws, after its return type and under the
+rules of a function's clause (<a href="#2-the-throws-set">§2</a>): <code>fn(string) -&gt; int throws ParseError</code>,
+<code>fn() -&gt; void throws [IoError, ParseError]</code>, the bare <code>throws</code> for <code>Error</code>
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T17</a>).
+Without it the type throws nothing. The set is part of the type, as a set: <code>throws [A, B]</code> and
+<code>throws [B, A]</code> are one type, <code>fn() -&gt; int</code> and <code>fn() -&gt; int throws A</code> two. Where a function
+type is itself a <strong>return type</strong> — of a function, of a lambda, of another function type — a
+<code>throws</code> behind it could be its own or that of the one that returns it, and without
+parentheses it is refused (<code>LYR-PAR0056</code>): <code>fn make(): (fn() -&gt; int throws E)</code> returns a
+throwing function and throws nothing itself, <code>fn make(): (fn() -&gt; int) throws E</code> throws.
+After one type a comma ends the function type, as in a parameter list; several are written
+in brackets.</li>
+<li>A <strong>call through a value</strong> of such a type is a site like the call of a throwing function: it is
+marked (<a href="#3-the-try-mark-and-coverage">§3</a> rule 1), and its set is covered (rule 3).</li>
+<li>A function value <strong>coerces</strong> to a function type that throws more: the same parameters and
+return, and every type of its set covered by the target's (05 E2 K6) — <code>fn(int) -&gt; int</code> where
+<code>fn(int) -&gt; int throws E</code> is expected, <code>throws A</code> where <code>throws [A, B]</code> is. Never the other way:
+a value that may throw does not fit a type that throws less (<code>LYR-SEM0001</code>). The parameters and
+the return still match exactly (<a href="../../spec/03-types/#81-the-type">03 §8.1</a>).</li>
+<li>A throwing <strong>function or method named as a value</strong> has its set in its type, in the instance's
+terms (<a href="#3-the-try-mark-and-coverage">§3</a> rule 5): <code>check</code>, declared
+<code>fn check(n: int): int throws Negative</code>, is a <code>fn(int) -&gt; int throws Negative</code>, and <code>limit.take</code>
+bound to its object likewise (<a href="../../spec/03-types/#84-functions-and-methods-as-values">03 §8.4</a>).</li>
+<li>A <strong>lambda</strong> throws what its type says (05 E2 K3). The parenthesized form may write the set
+after its return type, <code>(s: string): int throws ParseError =&gt; try parse(s)</code>, and several types
+in brackets (<code>LYR-PAR0049</code>); otherwise a position that expects a function type gives the set,
+and the body is held to it (<code>LYR-SEM0034</code>); where neither fixes it, the set is what the body lets
+escape — the types its sites throw past every <code>try</code> inside it. The function around the lambda
+covers nothing of it: the lambda runs later.</li>
+<li>A <strong>type parameter</strong> may stand as the set, <code>throws E</code> with <code>E :: [Error]</code>
+(<a href="#1-what-is-thrown">§1</a> rule 2, <code>LYR-SEM0030</code>), and is <strong>inferred</strong> at a call from the
+argument's set (05 E2 K4): a set of none binds <code>never</code>, one type binds it, several bind <code>Error</code>
+(the K7 join) — <code>fn map&lt;T, U, E :: [Error]&gt;(xs: T[], f: fn(T) -&gt; U throws E): U[] throws E</code>
+throws what <code>f</code> throws. Where several arguments could bind it, one binding stands, as for any
+type parameter (<a href="../../spec/03-types/#92-inference-at-a-call">03 §9.2</a>), and an argument that throws
+beyond it is refused there. An <code>E</code> bound to <code>never</code> names nothing: a call
+whose set comes out empty throws nothing, needs no <code>try</code>, and a <code>try</code> over it is warned about
+(<code>LYR-SEM0139</code>).</li>
+<li><em>(Informative.)</em> A function value is two words, code and environment
+(<a href="../../spec/03-types/#81-the-type">03 §8.1</a>); the code takes its caller's error slot whether its type
+throws or not, so the coercion of rule 3 changes nothing at run time and wraps nothing, and code
+that cannot throw never writes the slot. An instance whose <code>E</code> is <code>never</code> is compiled as a
+function that does not throw.</li>
+</ol>
+<h2 id="9-panics-and-never">9. Panics and <code>never</code></h2>
+<ol>
+<li>A <strong>panic</strong> is no error: nothing throws it and no clause takes it. It ends the program with
+its report and the exit code 101, and no <code>defer</code> and no <code>using</code> close runs past it (05 E8) —
+the report and the codes are the runtime's (<a href="../../spec/13-abi/#14-panics-and-crashes">13 §1.4</a>).
+Besides the runtime's checks, a program panics through four functions of <code>std.core</code>, in scope
+without an import: <code>panic(message): never</code> (<code>LYR-RT0008</code>), which says the message as it is
+written; <code>assert(condition) { message }</code>, which panics with <code>LYR-RT0011</code> when the condition
+is false — the message a lambda, <code>assert(n &gt; 2) { f&quot;n = {n}&quot; }</code>, built only then (design 10
+&quot;Review 2026-10-12&quot; D1, Kotlin's form; a string in its place is a type mismatch,
+<code>LYR-SEM0001</code>); <code>assert</code> is <code>inline</code>, so the check and the message stand at the call;
+<code>unreachable(message = &quot;&quot;): never</code> (<code>LYR-RT0012</code>); and <code>todo(message = &quot;&quot;): never</code>
+(<code>LYR-RT0013</code>). The last three say their <strong>word first</strong> (the review's M5-14) — <code>assertion failed</code>, <code>unreachable</code>, <code>not implemented</code> — and the message behind it where one is given:
+<code>not implemented: the parser</code>. An assertion names its <strong>condition as it is written</strong> between
+the two: <code>assertion failed: n &gt; 2: n is small</code>.</li>
+<li><strong><code>never</code></strong> is the type of what gives no value (05 E12): a <code>throw</code>, a call of a function that
+returns <code>never</code> — <code>panic</code>, <code>unreachable</code>, <code>todo</code> among them — a <code>loop</code> no <code>break</code> leaves
+(<a href="../../spec/07-statements/#1-loop-and-the-jumps">07 §1</a>), an <code>if</code> or <code>match</code> whose every branch is
+one, and an operator over one alone. It <strong>fits every type</strong> where a value is wanted,
+an operand included: <code>let n: int = found ?? unreachable();</code>, and <code>ok || fail(&quot;why&quot;)</code> is a
+<code>bool</code>. Where it is reached, what holds it goes no further; and it ends <strong>the path it stands
+on and no other</strong>: in <code>if (c) wrap(todo()) else 5</code> the branch is a call, typed as one, and
+its argument ends that branch alone — with <code>c</code> false the expression is <code>5</code>. So for an arm
+and its guard, the right of <code>??</code>, <code>&amp;&amp;</code> and <code>||</code> and of their assignments, the call behind
+<code>?.</code>, and the operand of a <code>try</code> with clauses.</li>
+<li><code>never</code> is written <strong>only as a return type</strong>: the whole return type of a function, a lambda or
+a function type, <code>fn fail(m: string): never</code>. Anywhere else — a parameter, a binding, a field,
+an element, an optional, a type argument for any other parameter, a thrown set, an alias — it
+would type a value that cannot exist and is refused (<code>LYR-SEM0145</code>); <code>?never</code> and <code>never[]</code> are
+refused in a return position too. As a type argument for a parameter whose bound is <code>Error</code> it
+is the empty thrown set, as <code>E = never</code> is what a set of nothing binds (design 05 E2 K4, &quot;Review
+2026-10-09&quot; S5): <code>MapIter&lt;SliceIter&lt;int&gt;, int, never&gt;</code>, <code>f&lt;never&gt;()</code> for <code>f&lt;E :: [Error]&gt;</code>, a
+struct literal's and a type path's arguments alike. So too as a type parameter's default under
+<code>Error</code> (M8c S20): the adapters' <code>E :: [Error] = never</code>, so <code>MapIter&lt;SliceIter&lt;int&gt;, int&gt;</code> is
+<code>MapIter&lt;SliceIter&lt;int&gt;, int, never&gt;</code>. <code>try?</code> over an expression of type <code>never</code> would be worth <code>?never</code> and is refused
+the same way.</li>
+<li>A function that returns <code>never</code> <strong>does not return</strong>: every path ends in a <code>throw</code>, a panic, a
+call that does not return or a <code>loop</code> no <code>break</code> leaves (<code>LYR-SEM0017</code> otherwise), and a
+<code>return</code> in it is refused unless what it returns does not return either (<code>LYR-SEM0146</code>).</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-what-is-thrown">1. What is thrown</a></li>
+<li class="level-2"><a href="#2-the-throws-set">2. The throws set</a></li>
+<li class="level-2"><a href="#3-the-try-mark-and-coverage">3. The try mark and coverage</a></li>
+<li class="level-2"><a href="#4-the-try-block-and-its-clauses">4. The try block and its clauses</a></li>
+<li class="level-2"><a href="#5-the-error-path">5. The error path</a></li>
+<li class="level-2"><a href="#6-the-expression-forms">6. The expression forms</a></li>
+<li class="level-2"><a href="#7-closing-using">7. Closing: using</a></li>
+<li class="level-2"><a href="#8-function-values-that-throw">8. Function values that throw</a></li>
+<li class="level-2"><a href="#9-panics-and-never">9. Panics and never</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

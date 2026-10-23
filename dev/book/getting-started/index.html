@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Getting started — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><span class="pending">std</span><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Getting started</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a class="current" href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Getting started</h1>
+<p>This chapter installs the toolchain, makes a package and runs it. Lyric compiles a program through
+C into one native binary, so besides the toolchain you need a C compiler.</p>
+<h2 id="installing">Installing</h2>
+<p>Lyric 5 is in development; nothing is released yet. Every change to <code>main</code> is built into the <code>dev</code>
+prerelease on GitHub: <a href="https://github.com/lyriclang/lyric/releases/tag/dev">https://github.com/lyriclang/lyric/releases/tag/dev</a>. Take the archive for
+your system — Linux (x64 or ARM64), macOS (ARM64) or Windows (x64) — and unpack it where you keep
+tools:</p>
+<pre><code class="language-sh">mkdir -p ~/.local/lyric
+tar -xzf lyric-5.0.0-dev.*-linux-x64.tar.gz -C ~/.local/lyric
+export PATH="$HOME/.local/lyric:$PATH"</code></pre>
+<p>The archive holds the command <code>lyric5</code>, the standard library and the runtime's C source. Until the
+first release the command is called <code>lyric5</code>; this Book writes <code>lyric</code>, and every <code>lyric</code> here is
+<code>lyric5</code> for now.</p>
+<p>The C compiler is <code>zig</code>, version 0.16.0, from <a href="https://ziglang.org/download/">https://ziglang.org/download/</a>, on your <code>PATH</code>;
+clang or gcc work too. <code>lyric5 --version</code> says which one it found:</p>
+<pre><code class="language-text">$ lyric5 --version
+lyric 5.0.0-dev.20261023+6d7bd38
+  edition     5
+  c compiler  zig 0.16.0 (/usr/bin/zig)</code></pre>
+<p>The first build of a program also builds the runtime for your system, once; it takes a little
+longer than the ones after it.</p>
+<h2 id="a-package">A package</h2>
+<p>A program lives in a <strong>package</strong>: a directory with a manifest, <code>lyric.toml</code>, and its source under
+<code>src/</code>. <code>lyric new</code> makes one:</p>
+<pre><code class="language-text">$ lyric new hello
+created program package 'hello' in /home/you/hello</code></pre>
+<p>The manifest names the package and its version:</p>
+<pre><code class="language-toml">[package]
+name = "hello"
+version = "0.1.0"</code></pre>
+<p>and <code>src/main.lyr</code> is the program:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(<span class="str">"Hello, world!"</span>);
+}</code></pre>
+<pre class="output"><code>Hello, world!</code></pre>
+<p>A program starts at <code>main</code>. <code>println</code> comes from the standard library's module <code>std.io</code>, and the
+<code>import</code> at the top names what the file takes from it. A statement ends with <code>;</code>.</p>
+<h2 id="building-and-running">Building and running</h2>
+<p>In the package's directory, <code>lyric run</code> builds the program and runs it:</p>
+<pre><code class="language-text">$ cd hello
+$ lyric run
+Hello, world!</code></pre>
+<p><code>lyric build</code> builds without running; the binary lands under <code>out/</code>, by profile and target —
+<code>out/debug/x86_64-linux-gnu/hello</code> on Linux. The default profile is <code>debug</code>: quick to build, with
+checks and debug information. <code>--profile release</code> builds the optimized program:</p>
+<pre><code class="language-text">$ lyric build --profile release
+$ ./out/release/x86_64-linux-gnu/hello
+Hello, world!</code></pre>
+<p><code>lyric check</code> says what a build would say about the program, without making a binary — the
+quickest way to hear about a mistake. The chapter <a href="../../book/diagnostics/">What the compiler tells you</a>
+reads what it says.</p>
+<p>Next, <a href="../../book/first-program/">a first program</a> that does a little more than greet.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/">← The Lyric Book</a><a class="next" href="../../book/first-program/">A first program →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

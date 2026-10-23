@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lexical structure — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a class="current" href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>Lexical structure</h1>
+<p>The tokens of a source file — what separates them, the names and the words, the literals and the
+comments. Source of the decisions: <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Syntax</a> Y1 (the words), Y7 (the literals), Y8 (the
+comments).</p>
+<h2 id="scope">Scope</h2>
+<p>Source text, tokens, the reserved and contextual words, literals (integer, float, char, string,
+raw, multi-line, byte strings, f-strings), comments and doc comments.</p>
+<h2 id="1-source-text">1. Source text</h2>
+<ol>
+<li>A source file is UTF-8 text; a byte order mark at its start is no part of it. A line ends at a
+line feed, or at a carriage return and a line feed — a string over lines (§4.4 rule 3) has
+<code>\n</code> between its lines either way.</li>
+<li>Tokens are separated by whitespace — space, tab, line feed, carriage return — and by comments
+where one would otherwise run on into the next; the longest token that fits is taken: <code>&gt;&gt;=</code> is
+one token, <code>a-b</code> three. A list of type arguments closes on a <code>&gt;</code> the lexer read as part of
+<code>&gt;&gt;</code>, <code>&gt;=</code> or <code>&gt;&gt;=</code> (<a href="../../spec/03-types/">03 §9</a>): the parser takes it apart.</li>
+</ol>
+<h2 id="2-comments">2. Comments</h2>
+<ol>
+<li><code>//</code> begins a comment that runs to the end of its line. <code>/* … */</code> is a comment that may run
+over lines, and <strong>nests</strong>: <code>/* a /* b */ c */</code> is one comment.</li>
+<li><code>///</code> begins a <strong>doc comment</strong> of the declaration that follows — a function, a type, a field, a
+variant — in Markdown (<a href="../../spec/11-metaprogramming/">11</a>); <code>//!</code> at the start of a file is the
+<strong>module's</strong> doc comment. Both are optional, and neither changes what the program means.</li>
+</ol>
+<h2 id="3-names-and-words">3. Names and words</h2>
+<ol>
+<li>A <strong>name</strong> begins with an ASCII letter or <code>_</code> and goes on with ASCII letters, digits and <code>_</code>. A
+character beyond ASCII stands in no name and is refused where it stands (<code>LYR-LEX0001</code>); a word
+of letters and digits that holds such characters — <code>größe</code> — is refused once, as the name it
+would be, naming them, and read as that name, so its uses refuse it again and say nothing
+else. <code>_</code> alone is the wildcard where a name would bind.</li>
+<li>The <strong>reserved words</strong> are no names: <code>import as pub internal private static struct class enum interface extend fn mut let var if else while do for in is match break continue return yield defer try catch throw true false null this</code>, and the compile-time words <code>comptime inline quote macro</code> (<a href="../../spec/11-metaprogramming/">11 §2</a>; <code>inline</code> sets a function in place,
+<a href="../../spec/03-types/#85-inline-functions">03 §8.5</a>; <code>macro</code> declares a macro and <code>name!</code> is its site, <code>quote { … }</code> a tree as a value with <code>#{…}</code> splices, <a href="../../spec/11-metaprogramming/#5-macros">11 §5</a>). One where a name belongs is refused — the
+parser's error for a missing name, <code>LYR-PAR0020</code> for a binding, with a note that it is a word —
+and read as that name, so nothing further is reported about it.</li>
+<li>The <strong>contextual words</strong> are names everywhere but at their place: <code>type</code> before a type alias,
+<code>opaque</code> before <code>type</code> (and refused there, <a href="../../spec/03-types/#10-aliases">03 §10</a>), <code>throws</code> after a
+signature, <code>extern</code> before its ABI string, <code>sealed</code> before <code>interface</code>, <code>by</code> in a conformance
+list, <code>with</code> after an expression, <code>loop</code> before its <code>{</code> (<a href="../../spec/07-statements/#1-loop-and-the-jumps">07 §1</a>),
+and <code>using</code> before <code>let</code> or <code>var</code> (<a href="../../spec/06-errors/#7-closing-using">06 §7</a>).</li>
+<li><code>module</code> and <code>params</code> are names (08 Y1: they were Lyric 4's words). At their old places —
+<code>module a.b;</code> at the start of a file, <code>params xs: T[]</code> in a list of parameters — they are read
+as they were, to be refused with what replaced them (<code>module;</code> alone is Lyric 5's header,
+<a href="../../spec/04-modules/">04 §2</a> rule 2): <code>LYR-RES0008</code> (<a href="../../spec/04-modules/">04 §2</a>) and
+<code>LYR-SEM0024</code> (<a href="../../spec/08-expressions/#11-arguments">08 §1.1</a>).</li>
+<li>The builtin type names — <code>int</code>, <code>uint</code>, <code>float</code>, <code>int8</code> … <code>int64</code>, <code>uint8</code> … <code>uint64</code>,
+<code>float32</code>, <code>float64</code>, <code>bool</code>, <code>char</code>, <code>string</code>, <code>void</code>, <code>never</code>, <code>Self</code> — are names that no
+declaration takes (<a href="../../spec/03-types/">03</a>).</li>
+</ol>
+<h2 id="4-literals">4. Literals</h2>
+<h3 id="41-integers">4.1 Integers</h3>
+<ol>
+<li>An integer literal is decimal digits, or <code>0x</code> and hex digits, <code>0o</code> and octal digits, <code>0b</code> and
+binary digits. <code>_</code> may stand among and after the digits and means nothing: <code>1_000_000</code>, <code>0xFF</code>,
+<code>0o755</code>, <code>0b1010</code>. A suffix <code>i8</code>, <code>i16</code>, <code>i32</code>, <code>i64</code>, <code>u8</code>, <code>u16</code>, <code>u32</code> or <code>u64</code> gives the
+literal its type (<a href="../../spec/03-types/">03 §1</a>); without one its position does.</li>
+<li>A <code>-</code> directly before an integer literal belongs to it (08 Y7 L2): <code>-9223372036854775808</code> is
+<code>int</code>'s least value. Before parentheses the <code>-</code> is the operator, on the value inside them.</li>
+<li>A literal beyond 64 bits is refused (<code>LYR-PAR0007</code>), and so is an unknown suffix
+(<code>LYR-PAR0006</code>).</li>
+</ol>
+<h3 id="42-floats">4.2 Floats</h3>
+<ol>
+<li>A float literal is digits, a <code>.</code> and digits, or an exponent — <code>e</code> or <code>E</code>, an optional sign,
+digits —, or both: <code>1.0</code>, <code>2.5e3</code>, <code>1e-2</code>, <code>1_000.5</code>. A digit stands on both sides of the <code>.</code>:
+<code>1.</code> and <code>.5</code> are no float literals, each refused once (<code>LYR-LEX0016</code>) and read as the float it
+means, <code>1.0</code> and <code>0.5</code>. <code>1.</code> is it where no digit, name or second <code>.</code> follows the point —
+<code>3.show()</code> calls, <code>1..3</code> is a range —; <code>.5</code> where an operand begins — after one it names a
+tuple's element. A suffix <code>f32</code> or <code>f64</code> gives it its type.</li>
+</ol>
+<h3 id="43-characters">4.3 Characters</h3>
+<ol>
+<li>A character literal is <strong>one Unicode scalar value</strong> between <code>'</code>, as written or escaped:
+<code>'a'</code>, <code>'😀'</code> (08 Y7 L3). None or two are refused (<code>LYR-LEX0008</code>).</li>
+<li>The escapes are <code>\n</code>, <code>\r</code>, <code>\t</code>, <code>\\</code>, <code>\'</code>, <code>\&quot;</code>, <code>\0</code> and <code>\u{…}</code> with one to eight hex
+digits naming a scalar value — at most <code>10FFFF</code>, no surrogate (<code>LYR-LEX0007</code> for any other
+sequence). <code>\xNN</code> is a byte's and refused here (§4.5 rule 2).</li>
+</ol>
+<h3 id="44-strings">4.4 Strings</h3>
+<ol>
+<li>A string literal is text between <code>&quot;</code> on one line, with the escapes of §4.3: <code>&quot;tab\there&quot;</code>. An
+unterminated one is refused (<code>LYR-LEX0009</code>).</li>
+<li>A <strong>raw string</strong> takes no escape — a backslash is itself (08 Y7 L5): <code>r&quot;C:\path\n&quot;</code>. It ends
+at the first <code>&quot;</code>; one opened with hashes, <code>r#&quot;…&quot;#</code>, ends at the first <code>&quot;</code> followed by as many
+<code>#</code>, and holds quotes: <code>r#&quot;say &quot;hi&quot;&quot;#</code>.</li>
+<li>A <strong>multi-line string</strong> <code>&quot;&quot;&quot;…&quot;&quot;&quot;</code> (L6, Swift's rule): the text begins on the line after the
+opening <code>&quot;&quot;&quot;</code>, which ends its own line, and ends with the line before the closing <code>&quot;&quot;&quot;</code>, which
+stands on a line of its own (<code>LYR-LEX0014</code> for either). The closing line's indentation is taken
+off every line — a line indented less is refused (<code>LYR-LEX0015</code>), a blank one need not be. The
+lines are joined by <code>\n</code>; the line break before the closing <code>&quot;&quot;&quot;</code> is no part of the text.
+Escapes are resolved after the lines are read — an escaped <code>\n</code> is no line. <code>r&quot;&quot;&quot;…&quot;&quot;&quot;</code> is the
+raw form.</li>
+</ol>
+<h3 id="45-byte-strings">4.5 Byte strings</h3>
+<ol>
+<li><code>b&quot;…&quot;</code> is a <strong><code>uint8[]</code></strong> of its bytes (08 Y7 L7), a new array each time it is evaluated: ASCII
+text, the escapes of §4.3 but <code>\u{…}</code>, and <code>\xNN</code>, any byte by two hex digits. A character
+beyond ASCII and <code>\u{…}</code> are refused (<code>LYR-LEX0012</code>): a byte string holds bytes, and they are
+written by their number.</li>
+<li><code>\xNN</code> is a byte's escape and stands in a byte string alone (L4): in a string, a character or an
+f-string it is refused (<code>LYR-LEX0013</code>) — a character is <code>\u{…}</code>.</li>
+</ol>
+<h3 id="46-f-strings">4.6 f-strings</h3>
+<ol>
+<li><code>f&quot;…&quot;</code> is text with <strong>holes</strong>, <code>{expr}</code> and <code>{expr:spec}</code> in the format language of
+<a href="../../spec/12-stdlib/#2-the-format-language">12 §2</a>; <code>{{</code> and <code>}}</code> are a brace. A hole stays on one line.</li>
+<li>The prefixes combine (08 Y7 L8): <code>fr&quot;…&quot;</code> resolves no escape, <code>f&quot;&quot;&quot;…&quot;&quot;&quot;</code> runs over lines as
+§4.4 rule 3 says — a hole counts as text there, so a line that begins with one is indented as
+any other —, and <code>fr&quot;&quot;&quot;…&quot;&quot;&quot;</code> is both.</li>
+</ol>
+<h3 id="47-words-as-literals">4.7 Words as literals</h3>
+<ol>
+<li><code>true</code> and <code>false</code> are <code>bool</code>'s literals, <code>null</code> every optional's (<a href="../../spec/03-types/">03 §3</a>).</li>
+</ol>
+<h2 id="5-punctuation-and-operators">5. Punctuation and operators</h2>
+<ol>
+<li>The punctuation: <code>(</code> <code>)</code> <code>[</code> <code>]</code> <code>{</code> <code>}</code> <code>,</code> <code>;</code> <code>:</code> <code>::</code> <code>.</code> <code>-&gt;</code> <code>=&gt;</code> <code>@</code> <code>@[</code> <code>..</code> <code>..=</code>
+<code>...</code> <code>?</code> <code>?.</code> <code>??</code> <code>!</code>.</li>
+<li>The operators: <code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code> <code>+%</code> <code>-%</code> <code>*%</code> <code>++</code> <code>--</code> <code>&amp;</code> <code>|</code> <code>^</code> <code>~</code> <code>&lt;&lt;</code> <code>&gt;&gt;</code> <code>==</code> <code>!=</code>
+<code>!in</code> <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code> <code>&amp;&amp;</code> <code>||</code>, and the assignments <code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>%=</code> <code>+%=</code> <code>-%=</code>
+<code>*%=</code> <code>&amp;=</code> <code>|=</code> <code>^=</code> <code>&lt;&lt;=</code> <code>&gt;&gt;=</code> <code>&amp;&amp;=</code> <code>||=</code> <code>??=</code>. What each means is
+<a href="../../spec/08-expressions/">08 Expressions</a>'.</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-source-text">1. Source text</a></li>
+<li class="level-2"><a href="#2-comments">2. Comments</a></li>
+<li class="level-2"><a href="#3-names-and-words">3. Names and words</a></li>
+<li class="level-2"><a href="#4-literals">4. Literals</a></li>
+<li class="level-3"><a href="#41-integers">4.1 Integers</a></li>
+<li class="level-3"><a href="#42-floats">4.2 Floats</a></li>
+<li class="level-3"><a href="#43-characters">4.3 Characters</a></li>
+<li class="level-3"><a href="#44-strings">4.4 Strings</a></li>
+<li class="level-3"><a href="#45-byte-strings">4.5 Byte strings</a></li>
+<li class="level-3"><a href="#46-f-strings">4.6 f-strings</a></li>
+<li class="level-3"><a href="#47-words-as-literals">4.7 Words as literals</a></li>
+<li class="level-2"><a href="#5-punctuation-and-operators">5. Punctuation and operators</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

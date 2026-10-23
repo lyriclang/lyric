@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYR-CT0001 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a href="../../spec/">Spec</a><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">CT</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../diagnostics/">All codes</a></li>
+<li><a class="current" href="../../diagnostics/LYR-CT0001/">LYR-CT0001</a></li>
+<li><a href="../../diagnostics/LYR-CT0002/">LYR-CT0002</a></li>
+<li><a href="../../diagnostics/LYR-CT0003/">LYR-CT0003</a></li>
+<li><a href="../../diagnostics/LYR-CT0004/">LYR-CT0004</a></li>
+<li><a href="../../diagnostics/LYR-CT0005/">LYR-CT0005</a></li>
+<li><a href="../../diagnostics/LYR-CT0006/">LYR-CT0006</a></li>
+<li><a href="../../diagnostics/LYR-CT0007/">LYR-CT0007</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
+<h1>LYR-CT0001</h1>
+<p class="code-title">a panic while evaluating at compile time</p>
+<p class="meta">error · <a href="../../spec/11-metaprogramming/">spec 11-metaprogramming</a></p>
+<p>Code run at compile time — a <code>comptime</code> site, an attribute's value, a macro — panics. The message names the panic and the run-time code (<code>LYR-RT…</code>) the built program would have ended with; the notes show where the evaluation went.</p>
+<h2 id="explanation">Explanation</h2>
+<p>A <code>comptime</code> site computes as the built program would: overflow, a division by zero, an index out of bounds, <code>panic</code>, <code>assert</code>, <code>try!</code> on an error and the rest panic there too. A panic at compile time has no program to end, so it is an error at the site, and the run-time code it carries is the one the catalog explains under <code>LYR-RT…</code>. A text <code>std.syntax</code> cannot parse is reported under this code as well.</p>
+<p>Fix the computation or its arguments; the notes point to the frame that panicked.</p>
+<h2 id="wrong">Wrong</h2>
+<pre><code class="language-lyric"><span class="kw">fn</span> ratio(a: <span class="ty">int</span>, b: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> a / b;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> r = <span class="kw">comptime</span> ratio(<span class="num">1</span>, <span class="num">0</span>);
+    assert(r == <span class="num">0</span>);
+}</code></pre>
+<h2 id="right">Right</h2>
+<pre><code class="language-lyric"><span class="kw">fn</span> ratio(a: <span class="ty">int</span>, b: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> a / b;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> r = <span class="kw">comptime</span> ratio(<span class="num">4</span>, <span class="num">2</span>);
+    assert(r == <span class="num">2</span>);
+}</code></pre>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#explanation">Explanation</a></li>
+<li class="level-2"><a href="#wrong">Wrong</a></li>
+<li class="level-2"><a href="#right">Right</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

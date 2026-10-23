@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYR-RT0012 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a href="../../spec/">Spec</a><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">RT</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../diagnostics/">All codes</a></li>
+<li><a href="../../diagnostics/LYR-RT0001/">LYR-RT0001</a></li>
+<li><a href="../../diagnostics/LYR-RT0002/">LYR-RT0002</a></li>
+<li><a href="../../diagnostics/LYR-RT0003/">LYR-RT0003</a></li>
+<li><a href="../../diagnostics/LYR-RT0004/">LYR-RT0004</a></li>
+<li><a href="../../diagnostics/LYR-RT0005/">LYR-RT0005</a></li>
+<li><a href="../../diagnostics/LYR-RT0006/">LYR-RT0006</a></li>
+<li><a href="../../diagnostics/LYR-RT0007/">LYR-RT0007</a></li>
+<li><a href="../../diagnostics/LYR-RT0008/">LYR-RT0008</a></li>
+<li><a href="../../diagnostics/LYR-RT0009/">LYR-RT0009</a></li>
+<li><a href="../../diagnostics/LYR-RT0010/">LYR-RT0010</a></li>
+<li><a href="../../diagnostics/LYR-RT0011/">LYR-RT0011</a></li>
+<li><a class="current" href="../../diagnostics/LYR-RT0012/">LYR-RT0012</a></li>
+<li><a href="../../diagnostics/LYR-RT0013/">LYR-RT0013</a></li>
+<li><a href="../../diagnostics/LYR-RT0014/">LYR-RT0014</a></li>
+<li><a href="../../diagnostics/LYR-RT0015/">LYR-RT0015</a></li>
+<li><a href="../../diagnostics/LYR-RT0016/">LYR-RT0016</a></li>
+<li><a href="../../diagnostics/LYR-RT0017/">LYR-RT0017</a></li>
+<li><a href="../../diagnostics/LYR-RT0018/">LYR-RT0018</a></li>
+<li><a href="../../diagnostics/LYR-RT0019/">LYR-RT0019</a></li>
+<li><a href="../../diagnostics/LYR-RT0020/">LYR-RT0020</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
+<h1>LYR-RT0012</h1>
+<p class="code-title">unreachable reached</p>
+<p class="meta">panic · <a href="../../spec/06-errors/">spec 06-errors</a></p>
+<p>Control reached <code>unreachable()</code> or <code>unreachable(message)</code> — a place the program's author held unreachable. The message starts with the word <code>unreachable</code>, followed by the program's own message.</p>
+<h2 id="program">Program</h2>
+<pre><code class="language-lyric"><span class="kw">fn</span> name(n: <span class="ty">int</span>): <span class="ty">string</span> {
+    <span class="kw">if</span> (n == <span class="num">0</span>) {
+        <span class="kw">return</span> <span class="str">"zero"</span>;
+    }
+    <span class="kw">if</span> (n == <span class="num">1</span>) {
+        <span class="kw">return</span> <span class="str">"one"</span>;
+    }
+    unreachable(<span class="str">"n is 0 or 1"</span>);
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    assert(name(<span class="num">2</span>) == <span class="str">"two"</span>);
+}</code></pre>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#program">Program</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

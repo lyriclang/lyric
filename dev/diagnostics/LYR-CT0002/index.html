@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYR-CT0002 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a href="../../spec/">Spec</a><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">CT</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../diagnostics/">All codes</a></li>
+<li><a href="../../diagnostics/LYR-CT0001/">LYR-CT0001</a></li>
+<li><a class="current" href="../../diagnostics/LYR-CT0002/">LYR-CT0002</a></li>
+<li><a href="../../diagnostics/LYR-CT0003/">LYR-CT0003</a></li>
+<li><a href="../../diagnostics/LYR-CT0004/">LYR-CT0004</a></li>
+<li><a href="../../diagnostics/LYR-CT0005/">LYR-CT0005</a></li>
+<li><a href="../../diagnostics/LYR-CT0006/">LYR-CT0006</a></li>
+<li><a href="../../diagnostics/LYR-CT0007/">LYR-CT0007</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
+<h1>LYR-CT0002</h1>
+<p class="code-title">a compile-time evaluation over its budget</p>
+<p class="meta">error · <a href="../../spec/11-metaprogramming/">spec 11-metaprogramming</a></p>
+<p>A <code>comptime</code> site, or a macro's expansion, runs more interpreter steps than its budget: 50 000 000 by default, or what <code>comptimeBudget</code> under <code>[package]</code> in the root <code>lyric.toml</code> sets.</p>
+<h2 id="explanation">Explanation</h2>
+<p>Each site has a budget of steps, so a loop that does not end at compile time ends the compilation with an error instead of hanging it. The budget is per site; one site's work does not count against another's.</p>
+<p>Make the computation smaller, move it to run time, or raise <code>comptimeBudget</code> in the manifest.</p>
+<h2 id="wrong">Wrong</h2>
+<pre><code class="language-lyric"><span class="com">//- lyric.toml</span>
+[package]
+name = <span class="str">"app"</span>
+version = <span class="str">"0.1.0"</span>
+comptimeBudget = <span class="num">1000</span>
+<span class="com">//- src/main.lyr</span>
+<span class="kw">fn</span> count(n: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">var</span> i = <span class="num">0</span>;
+    <span class="kw">while</span> (i &lt; n) {
+        i += <span class="num">1</span>;
+    }
+    <span class="kw">return</span> i;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> n = <span class="kw">comptime</span> count(<span class="num">1000000</span>);
+    assert(n == <span class="num">1000000</span>);
+}</code></pre>
+<h2 id="right">Right</h2>
+<pre><code class="language-lyric"><span class="com">//- lyric.toml</span>
+[package]
+name = <span class="str">"app"</span>
+version = <span class="str">"0.1.0"</span>
+comptimeBudget = <span class="num">1000</span>
+<span class="com">//- src/main.lyr</span>
+<span class="kw">fn</span> count(n: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">var</span> i = <span class="num">0</span>;
+    <span class="kw">while</span> (i &lt; n) {
+        i += <span class="num">1</span>;
+    }
+    <span class="kw">return</span> i;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> n = <span class="kw">comptime</span> count(<span class="num">100</span>);
+    assert(n == <span class="num">100</span>);
+}</code></pre>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#explanation">Explanation</a></li>
+<li class="level-2"><a href="#wrong">Wrong</a></li>
+<li class="level-2"><a href="#right">Right</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

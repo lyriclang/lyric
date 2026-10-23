@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Patterns — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a class="current" href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>Patterns</h1>
+<blockquote>
+<p><strong>Partly written.</strong> §1 to §4 were written with milestone <strong>M3</strong> of the Lyric 5 plan (slices S4
+to S6), the type patterns with <strong>M4</strong>, the type-set pattern with the catch-up block N (N2c), a
+built-in type in both with <strong>M8c</strong> S15,
+spec-first: each rule lands here with its conformance case before or with its implementation.
+Source of the decisions:
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Syntax Y6</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 Type system T9</a>.</p>
+</blockquote>
+<h2 id="scope">Scope</h2>
+<p>Literal, binding (a bare name always binds), variant (<code>.Red</code>), field, tuple, array with rest, type and or patterns; exhaustiveness.</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/09-patterns/</code>.</p>
+<h2 id="1-where-a-pattern-stands">1. Where a pattern stands</h2>
+<ol>
+<li>A pattern stands in an arm of <code>match</code>, after <code>let</code> or <code>var</code> in a binding
+(<code>let .Num(n) = s else { … };</code>, <a href="../../spec/07-statements/">07</a>), and in <code>if (let P = e)</code> and
+<code>while (let P = e)</code>.</li>
+<li>A pattern is tried against the <strong>scrutinee</strong>; it <strong>matches</strong> or it does not, and when it
+matches its <strong>bindings</strong> hold parts of the value. A pattern that matches every value of the
+scrutinee's type is <strong>irrefutable</strong>.</li>
+<li>The arms of a <code>match</code> are tried in the order they are written, and the first that matches
+wins. An arm may carry a <strong>guard</strong>, <code>Pattern if expr</code>, evaluated with the pattern's bindings
+in scope only when the pattern matched; the arm is taken only when the guard is <code>true</code>.</li>
+<li>In a binding, <code>let</code> or <code>var</code> before the pattern decides the mutability of <strong>all</strong> its
+bindings. A binding <strong>copies</strong> the part it names, as any binding does
+(<a href="../../spec/03-types/#21-values-and-references">03 §2.1</a>): writing through a <code>var</code> binding of a
+struct payload leaves the scrutinee as it was; a reference bound is the object.</li>
+<li><code>let P = e else { … };</code> binds the names of <code>P</code> when it matches and runs the block
+otherwise; the block <strong>leaves</strong> — by <code>return</code>, <code>throw</code>, <code>break</code>, <code>continue</code> or a panic — on
+every path, or the statement is refused (<code>LYR-SEM0098</code>), since after it the names are
+bound. Without <code>else</code> the pattern is irrefutable, or the statement is refused. An
+<code>if (let P = e)</code> whose pattern is irrefutable is a warning (<code>LYR-SEM0104</code>).</li>
+</ol>
+<h2 id="2-the-forms">2. The forms</h2>
+<ol>
+<li><strong>Wildcard.</strong> <code>_</code> matches every value and binds nothing.</li>
+<li><strong>Binding.</strong> A <strong>bare name</strong> binds the whole value it stands against, always, whatever the
+name spells. A bare name that spells a variant of the scrutinee's enum is refused
+(<code>LYR-SEM0111</code>), and the diagnostic names the two forms that test the variant: it would
+otherwise match every value under the variant's name, and a typo in a variant would match
+in silence.</li>
+<li><strong>Literal.</strong> An integer, float, character, string, <code>bool</code> or <code>null</code> literal matches the
+value equal to it, by the equality of the scrutinee's type; a negative number literal is a
+literal. A <code>null</code> literal stands against an optional only (<a href="../../spec/03-types/#32-tests-and-narrowing">03 §3.2</a>).
+A float literal never matches NaN.</li>
+<li><strong>Range.</strong> <code>a..b</code> and <code>a..=b</code> over integer and character literals match the values of the
+range, <code>-5..=-1</code> included.</li>
+<li><strong>Variant.</strong> <code>.Red</code>, <code>.Num(v)</code> and <code>.Rect { w = 0, h }</code> match one variant of the
+scrutinee's enum, the enum unnamed (<a href="../../spec/03-types/#42-the-enum-the-position-names">03 §4.2</a>);
+the qualified <code>Signal.Red</code>, <code>Shape.Num(v)</code> and <code>Shape.Rect { … }</code> say the same with the enum
+named, and both forms may stand in one <code>match</code>. A tuple variant's pattern has one
+sub-pattern per payload element. A struct variant's pattern names fields: <code>w = P</code> tests the
+field <code>w</code> against <code>P</code>, and a bare <code>h</code> binds the field <code>h</code> to the name <code>h</code>. A field left out
+is not read; the pattern <strong>may leave fields out</strong>. A name the variant does not have, a
+payload form the variant does not have and a variant the enum does not have are refused
+(<code>LYR-SEM0015</code>, <code>LYR-SEM0031</code>, <code>LYR-SEM0029</code>). The dotted form on a scrutinee that is no
+enum is refused (<code>LYR-SEM0029</code>).</li>
+<li><strong>Field.</strong> <code>Point { x = 0, y }</code> over a struct or a class names the type the scrutinee
+already has, reads the fields it names and no others, and matches when every field pattern
+does. <code>Point { x, y }</code> tests nothing and is irrefutable.</li>
+<li><strong>Or.</strong> <code>P | Q</code> matches when either alternative does; the alternatives are tried in order.
+Every alternative binds the <strong>same names at the same types</strong> (<code>LYR-SEM0032</code>).</li>
+<li>A name binds <strong>once</strong> in a pattern (<code>LYR-SEM0097</code>): <code>.Rect { w = n, h = n }</code> is refused,
+not read as one of its halves. An or-pattern's alternatives repeat the names by rule.</li>
+<li>A pattern tests and binds at <strong>every depth</strong>: <code>.Some(.Num(n))</code>, <code>.Rect { w = 0 }</code> inside
+an or-pattern, a literal under a field. There is no depth at which a form is refused for
+being nested.</li>
+<li><strong>Array.</strong> <code>[a, b, c]</code> matches an array, a view or an inline array (<a href="../../spec/03-types/">03 §5</a>)
+of exactly that many elements, each against its pattern; <code>[first, ..rest]</code>, <code>[.., last]</code>
+and <code>[first, .., last]</code> match one long enough for the elements beside the rest. At most
+one rest stands in a pattern, and <code>..rest</code> <strong>binds a view</strong> of the elements it covers —
+a <code>Slice&lt;T&gt;</code>, sharing them, never a copy.</li>
+<li><strong>Tuple.</strong> <code>(a, _)</code> matches a tuple (<a href="../../spec/03-types/">03 §6</a>) of that many elements, each
+against its pattern; <code>let (a, b) = t;</code> binds through the same pattern, and a nested tuple
+is taken apart in place: <code>((a, b), c)</code>. The arity is the type's, or the pattern is refused
+(<code>LYR-SEM0029</code>).</li>
+<li><strong>Type.</strong> <code>c: Circle</code> and <code>_: Circle</code> stand against an <strong>interface value</strong> and match when
+it holds a value of that type (<a href="../../spec/05-interfaces/#9-any-type-tests-and-type-patterns">05 §9</a>);
+<code>c</code> binds that value <strong>as that type</strong> — the object for a class, a copy for a struct, an
+enum or a built-in's value; the type may be a built-in one (<code>n: int</code>), tested exactly as <code>is</code>
+tests it (<a href="../../spec/05-interfaces/#9-any-type-tests-and-type-patterns">05 §9</a> rule 2). On a scrutinee
+whose type is no interface the pattern is refused (<code>LYR-SEM0131</code>): the static type answers
+already.</li>
+<li><strong>Type set</strong> (08 Y6; N2c). <code>s in [Circle, Rect]</code> and <code>_ in [Circle, Rect]</code> stand against an
+interface value and match when it holds a value of <strong>one of the types</strong>, tested in order —
+the form of <code>catch (e in [A, B])</code> (<a href="../../spec/06-errors/#4-the-try-block-and-its-clauses">06 §4</a>),
+under the same list rule: one type bare, <code>s in Circle</code>, several in brackets, an empty list
+refused (<code>LYR-PAR0049</code>). <code>s</code> binds as the one type of a set of one, as <code>s: Circle</code> does; of
+a larger set it binds the <strong>interface value</strong> itself, which <strong>carries the set</strong> as a catch
+binding does (05 K7): a <code>match</code> over a <code>let</code> binding of it is exhaustive with an arm per
+type, and a <code>throw</code> of it throws the set. On a scrutinee whose type is no interface the
+pattern is refused (<code>LYR-SEM0131</code>).</li>
+</ol>
+<h2 id="3-exhaustiveness">3. Exhaustiveness</h2>
+<ol>
+<li>A <code>match</code> is <strong>exhaustive</strong>: its arms cover every value of the scrutinee's type, or the
+<code>match</code> is refused (<code>LYR-SEM0050</code>). The diagnostic names a <strong>witness</strong>: a value no arm
+matches, written the way a pattern is written — <code>.Rect { … }</code>, <code>.Some(false)</code>, <code>null</code> —
+so that what it names can be added as an arm.</li>
+<li>The values are enumerated for an enum (its variants, each with its payload enumerated in
+turn), for <code>bool</code> (<code>true</code>, <code>false</code>) and for an optional (<code>null</code> and the values of the inner
+type); a field pattern enumerates through its fields. An array or a view is enumerated by
+its <strong>length classes</strong>: an arm whose fixed positions all bind without testing covers its
+length, or every length from there up when it carries a rest, and the witness is the
+smallest length nothing covers; an inline array has one length. A tuple is enumerated
+<strong>through its columns</strong>: the arms cover it when every combination of the elements' values
+does, and the witness is written as a tuple. Every other type — <code>int</code>, <code>string</code>, <code>float</code>,
+<code>char</code>, a class — is <strong>open</strong> and needs a <code>_</code> or a binding arm.</li>
+<li>A guarded arm covers nothing: whether its guard holds is not known to the check.</li>
+<li>A scrutinee of type <code>?E</code> admits <code>null</code> and the variants of <code>E</code> in one <code>match</code>; presence is
+established before a variant is examined, and the arms are still tried in order.</li>
+<li>An enum or a sealed interface that carries <code>@NonExhaustive</code> is <strong>open</strong> outside the package
+that declares it (<a href="../../spec/11-metaprogramming/">11 §1</a> rule 12): there a <code>match</code> over it needs a <code>_</code>
+or a binding arm, whatever its other arms cover — a later version may add to it.</li>
+</ol>
+<p>A type pattern covers one conformer, a type-set pattern each of its types. Over an open interface the set of conformers is open, so a
+match of type patterns needs <code>_</code> (<code>LYR-SEM0050</code>); over a <strong>sealed</strong> interface
+(<a href="../../spec/05-interfaces/#10-sealed-interfaces">05 §10</a>) the set is closed, and unguarded type
+patterns for every conformer make the match exhaustive — the diagnostic names the conformer
+missing as the pattern to add, <code>_: Rect</code>.</p>
+<h2 id="4-unreachable-arms">4. Unreachable arms</h2>
+<ol>
+<li>An arm no value can reach is a <strong>warning</strong> (<code>LYR-SEM0112</code>), not an error: every arm after
+an unguarded arm that is irrefutable, and an unguarded arm that repeats a unit variant, a
+literal or <code>null</code> an unguarded arm above already tests. A payload pattern and a guarded arm
+keep a case open.</li>
+<li>Together with §2.2, a misspelt variant in a bare name gets two messages and no silent way
+through: the binding it would be is refused when the spelling is a variant, and shadows
+the arms below it — reported as unreachable — when it is not.</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-where-a-pattern-stands">1. Where a pattern stands</a></li>
+<li class="level-2"><a href="#2-the-forms">2. The forms</a></li>
+<li class="level-2"><a href="#3-exhaustiveness">3. Exhaustiveness</a></li>
+<li class="level-2"><a href="#4-unreachable-arms">4. Unreachable arms</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

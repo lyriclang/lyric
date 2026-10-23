@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>5. Interfaces and conformance — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a class="current" href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>5. Interfaces and conformance</h1>
+<p>An interface names the methods a type promises; a type <strong>conforms</strong> by implementing them; a
+value of the interface's type carries any conforming value and reaches its implementation —
+the language's one dynamic dispatch
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/04-abstraktion.md">04 D1–D15</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 V7</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T5–T7, T10, T11</a>).</p>
+<h2 id="scope">Scope</h2>
+<p>Declaring an interface and a conformance, the interface value, how a call resolves. Written with
+M4 S1, S3, S4, S4b, S5a, S5b, S6, S7a and S7b; the chapter grows with the milestone's slices —
+synthesis (D7). Of the associated types (T6, <a href="#8-associated-types">§8</a>) the value form
+<code>Iterator&lt;Item = int&gt;</code> is rule 6 there; of the operators (D6,
+<a href="#12-the-operator-interfaces">§12</a>) the conversions <code>From</code>/<code>Into</code> stand in <a href="../../spec/12-stdlib/">12</a>,
+their blanket under <a href="#13-generic-extends">§13</a> rule 9. What is not written here yet is decided in the design documents, not here.</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/05-interfaces/</code>.</p>
+<h2 id="1-interfaces-and-conformance">1. Interfaces and conformance</h2>
+<ol>
+<li><code>interface I { … }</code> declares <strong>instance methods</strong>: abstract, <code>fn area(): int;</code>, or with a
+<strong>default</strong> body. A member carries no <code>pub</code> (<code>LYR-SEM0118</code>): an interface's members are
+public always (D14).</li>
+<li>A struct, a class or an enum <strong>conforms</strong> in its interface list, <code>struct S :: [I, J] { … }</code>,
+or through an extend block, <code>extend T :: [I] { … }</code>; every entry names an interface
+(<code>LYR-SEM0078</code>). A conformance implements every abstract member of the interface's chain with
+an exact signature — arity, parameter types, return type, <code>mut</code> (<code>LYR-SEM0020</code>,
+<code>LYR-SEM0042</code>); a default may be left as it is, and an own member of the name overrides it.
+A <strong>generic</strong> member answers a plain one where its own type parameters bind — its parameter
+and return types unified with the member's — and their constraints hold for what they bound
+(design 13 M8c S9): <code>contains&lt;P :: [Pattern]&gt;(p: P): bool</code> answers
+<code>Contains&lt;char&gt;.contains(x: char)</code> at <code>P = char</code>; where they do not, <code>LYR-SEM0042</code>. A <code>string</code>
+takes such a witness from its view, as a call on a string reaches the view's members
+(<a href="../../spec/12-stdlib/">12</a>); a call through the constraint runs the witness at that binding.</li>
+<li>An interface may name <strong>parents</strong>, <code>interface Labeled :: [Named]</code>: conforming to the child
+conforms to every parent, a parent's defaults are inherited, a parent constraint is satisfied
+by the child. The list holds interfaces only and no cycle (<code>LYR-SEM0078</code>), and a name stays
+one: a child does not redeclare a parent's member, two parents do not bring one name from
+two declarations (<code>LYR-SEM0079</code>); a name reached twice through one declaration — a diamond —
+is one member.</li>
+<li>A default is <strong>generic over <code>Self</code></strong>, the conformer (04 D9): <code>this</code> is the conformer's value,
+<code>Self</code> its type. Called on a conformer — on a value of the type, through a constraint, through
+a block (§13) — it runs as that type's own, also on a builtin, <code>extend int :: [Named]</code>, and for
+an interface that is a constraint only (§7 rule 3): a parameter <code>o: Self</code> takes the
+conformer, <code>Self.zero</code> reads its constant. <code>this</code> passes as the interface and as a parent of
+it, as a type parameter does. A <strong>private helper</strong> is the defaults' alone — through a
+constraint from anywhere else as well (04 §3 rule 8, <code>LYR-RES0009</code>) — and never a
+conformer's method of its name.</li>
+<li>A member may be <strong>generic</strong>, <code>fn hash&lt;H :: [Hasher]&gt;(&amp;h: H): void</code> (04 D9). Abstract, every
+conformer writes it with as many type parameters, constrained alike, at the same signature
+once its parameters are read as the interface's (<code>LYR-SEM0042</code>); a call through a constraint
+reaches the conformer's own at the call's type arguments — monomorphized, there is no table
+slot for it. With a <strong>default</strong>, it is the conformer's where the conformer writes none — the
+default runs as that type's own, as every default does (rule 4) — and a conformer may write
+its own in its place, at the default's signature (<code>LYR-SEM0042</code>): that one runs on the type,
+through a constraint, and where another default of the interface calls the member on <code>this</code>
+(the review's A8). With a body or without, a generic member makes its interface a constraint
+only (§7 rule 3). A default of a <strong>generic interface</strong> is not replaced by a conformer's own
+yet (<code>LYR-SEM0082</code>).</li>
+</ol>
+<h2 id="2-interface-values">2. Interface values</h2>
+<ol>
+<li>A value whose static type is an interface holds <strong>any conforming value</strong> of a struct, a
+class or an enum: <code>let d: Damageable = Player.new(100);</code>,
+or of a <strong>built-in type</strong> that conforms through
+<code>std.core</code>'s blocks — a number, <code>bool</code>, <code>char</code>, <code>string</code>, a string's view: <code>let d: Display = 5;</code>,
+<code>f(1, &quot;two&quot;)</code> for <code>f(xs: Display...)</code> (design 01 V7) —, or of a <strong>shape</strong> or a type that conforms
+through a block on its shape or a blanket block (<a href="#13-generic-extends">§13</a> rules 6, 8). The transition happens at the
+positions of 03 T8 — a binding with a type, an argument, a return, a field, an array element
+under a context. <em>(Informative.)</em> It is a fat pointer: the data and the table of the concrete
+type's implementations, two words, by value (V7).</li>
+<li>A <strong>class</strong> value is shared through the interface value: what one side writes, the other
+reads. A <strong>struct</strong> or an <strong>enum</strong> value is <strong>copied</strong> at the transition (D12) and lives in
+the interface value from then on: a <code>mut fn</code> called through it writes that copy, the original
+stays as it was, and a later change to the original is not seen. A built-in's value is
+copied as a struct's is; a string's text, which nothing changes, is shared. <em>(Informative.)</em>
+The copy lies in a box on the heap, a string's reference too.</li>
+<li>A call through the interface value runs the conforming type's implementation — the language's
+only <strong>dynamic dispatch</strong>. A default called through it runs with <code>this</code> as the <strong>interface
+value</strong> — the interface is the conformer there (§1 rule 4) —, so a call on <code>this</code> inside it
+dispatches again: <code>fn isAlive(): bool { return this.getHp() &gt; 0; }</code> reaches whichever <code>getHp</code>
+stands behind the value.</li>
+<li>An interface value is held in a binding, a field, an array, an optional, passed and returned
+like any value, and answers every member of the interface's chain. Two interface values are
+not compared.</li>
+</ol>
+<h2 id="3-one-method-set">3. One method set</h2>
+<ol>
+<li>A type holds <strong>one function per name and count</strong> (D2, R4a3): its own members, the methods
+its inherent extend blocks add, and the implementations of its conformances — an own member,
+a member of a conformance block, an interface's default, a member delegated to a field (§5).
+Its own members and its inherent blocks' are one scope (<a href="../../spec/08-expressions/">08 §1.2</a> rule 1):
+<code>fn get()</code> in the body beside <code>fn get(scale: int)</code> in an <code>extend</code>, or in two of them, is an
+overload by count. A name two of these would give it at a count they share is refused where
+the second is declared (<code>LYR-SEM0121</code>): an extension beside an own member, two extensions,
+and — at any count — an extension beside a default of a conformed interface, a conformance
+block beside an own member. A blanket block's member is none of
+these: it stands behind them all (<a href="#13-generic-extends">§13</a> rule 7).</li>
+<li>An <strong>own member is the implementation</strong> of every conformance's member of that name, and
+overrides a default. Two defaults of one name from two interfaces, which the type does not
+write itself, are the type's to settle: it writes the member, one function for both
+(<code>LYR-SEM0043</code>, D3).</li>
+<li><strong>Every path reads the same set</strong> (R3): a call on the concrete type, a call through an
+interface value, a call through a constraint reach the one function.</li>
+<li>The one exception is scoped (D3): a type may implement one name <strong>separately per
+interface</strong>, in separate conformance blocks — <code>extend C :: [I1] { fn greet() … }</code> beside
+<code>extend C :: [I2] { fn greet() … }</code>. The name then belongs to each block: the unqualified
+call <code>c.greet()</code> is refused and says how to qualify (<code>LYR-SEM0122</code>); through an interface
+value of <code>I1</code> or <code>I2</code>, through a constraint that names one of them, from a default of that
+interface calling the member on <code>this</code>, and through the qualified call (§4), each is
+reached — a static member through the type parameter its interface bounds, <code>T.make(s)</code>. One block that
+holds a name at two counts holds an overload set (<a href="../../spec/08-expressions/">08 §1.2</a>), not two
+scopes; blocks that give instances of one generic interface hold one set as well (rule 5).</li>
+<li>A type may conform to <strong>several instances</strong> of one generic interface, <code>struct Label :: [From&lt;int&gt;, From&lt;string&gt;]</code> — in its list, or each in a block of its own. Members of one name
+and count stand side by side where each answers its own instance, <code>from(v: int)</code> beside
+<code>from(v: string)</code> (D4 holds per conformance; <code>LYR-SEM0085</code> where they answer one). A call
+chooses by its arguments' types: the member whose parameters take them, and of several the
+one whose parameters are the arguments' own types — <code>Label.from(3)</code> is the <code>From&lt;int&gt;</code> one
+beside <code>From&lt;float&gt;</code>, a literal being its default type. None or several left is refused
+(<code>LYR-SEM0086</code>); the argument is written with <code>as</code>, <code>Label.from(3 as int16)</code>. Through a
+constraint, <code>U :: [From&lt;T&gt;]</code>, the instance the constraint names chooses; through a value of
+an interface instance, its table does. There is no qualified form for a static member (§4
+rule 2).</li>
+</ol>
+<h2 id="4-the-qualified-call">4. The qualified call</h2>
+<ol>
+<li><code>I.m(x, …)</code> calls the member <code>m</code> of the interface <code>I</code> with <code>x</code> as its receiver — the
+implementation <code>x</code>'s type has for <code>I</code> (D2 R5). The receiver conforms to <code>I</code> (<code>LYR-SEM0125</code>
+otherwise) and comes first (<code>LYR-SEM0014</code>). It is the form that names what the unqualified
+call cannot (§3.4), and it is checked as the member call it is: a <code>mut fn</code> writes <code>x</code>
+itself — no copy of a struct stands in for it —, so <code>x</code> is a place as the receiver of
+<code>x.m(…)</code> is (<code>LYR-SEM0019</code>).</li>
+<li>A <strong>static</strong> member is not called through its interface: <code>Make.make&lt;Item&gt;(s)</code> is refused
+(<code>LYR-SEM0231</code>) — the interface has no value to call it for, and a type argument written after
+it does not make it one. It is called on a type that conforms, <code>Item.make(s)</code>, or through a
+type parameter the interface bounds, <code>T.make(s)</code> (<a href="#7-self-and-static-members">§7</a>).</li>
+</ol>
+<h2 id="5-delegation">5. Delegation</h2>
+<ol>
+<li>A struct or a class may conform <strong>by delegating</strong> to one of its fields: <code>class Dog :: [Walker by legs] { var legs: Legs, … }</code> (D1). The field exists and conforms to the
+interface, or holds a value of it or of a child of it (<code>LYR-SEM0123</code> otherwise) — a child's
+value is one of the parent (<a href="#11-the-child-interface-value-as-a-parent-value">§11</a>). Every
+abstract member of the interface's chain that the type does not write itself is <strong>forwarded</strong>
+to the field, as if <code>fn walk(d) { this.legs.walk(d); }</code> were written; a <strong>generic</strong> member too
+(R4b), as if <code>fn tag&lt;U&gt;(u: U) { return this.inner.tag(u); }</code> were written — one forwarder per
+use, called on the type or through a constraint. A forwarded <code>mut fn</code> writes the field as that function would:
+a value in the field — a struct, an enum, a builtin — is written where it lies, so its field
+is a <code>var</code> (<code>LYR-SEM0019</code>); a class, and a value of the interface, are written through. And
+what the field's implementation throws leaves the forwarded member as it would leave that
+function (<a href="../../spec/06-errors/">06</a>).</li>
+<li>Own members win. The interface's defaults run on the outer type, as every default does, and
+reach the forwarded members through <code>this</code>. There is no passthrough of <code>this</code>: the field's
+implementation runs with the field as its receiver, never the outer value — a call on
+<code>this</code> inside it reaches the field's own members, which is why delegation has no fragile
+base.</li>
+<li>A <code>var</code> field may be exchanged at run time; the next call forwards to the new value.</li>
+<li>Two delegations that would answer one name are refused (<code>LYR-SEM0121</code>); an enum delegates
+nothing (<code>LYR-PAR0047</code>).</li>
+</ol>
+<h2 id="6-extend-blocks">6. Extend blocks</h2>
+<ol>
+<li><code>extend T { … }</code> adds methods to a type and <code>extend T :: [I] { … }</code> a conformance, in any
+module (03 T7 X3): there is no orphan rule — coherence is checked for the whole program. An
+interface is not extended directly (<code>LYR-SEM0124</code>); the generic form, <code>extend&lt;T :: [I]&gt; T { … }</code>, is the one (D15, with 03 §11).</li>
+<li>A block adds <strong>constants</strong> too: a <code>static let</code> in it is the type's, under the type's name,
+as one in the type's body is — <code>extend int { static let answer: int = 42; }</code> makes
+<code>int.answer</code> (10 N1: a constant is a static member). A type holds one member of a name: a
+block's constant repeating a member of the type or of another block is refused
+(<code>LYR-SEM0121</code>). A generic block's constant is one per instance of the block's parameters
+(<a href="../../spec/04-modules/">04 §1</a> rule 6), read on an instance the block reaches (<code>LYR-SEM0134</code> where
+its constraints do not hold); in a conformance block it answers the interface's constant for
+those instances (<a href="#7-self-and-static-members">§7</a> rule 2).</li>
+</ol>
+<h2 id="7-self-and-static-members">7. <code>Self</code> and static members</h2>
+<ol>
+<li>In an interface, <strong><code>Self</code></strong> is the conforming type (03 T5): <code>fn equals(o: Self): bool</code>. An
+implementation writes its own type where the interface writes <code>Self</code> (<code>LYR-SEM0042</code>
+otherwise); through a constraint <code>T :: [I]</code>, <code>Self</code> is <code>T</code>. In a struct, a class or an enum,
+<code>Self</code> is the type itself — a generic one at its own parameters.</li>
+<li>An interface may declare <strong>static members</strong> — <code>static fn parse(s: StringView): Self;</code> and
+<code>static let zero: Self;</code> — a constant without a value (<code>LYR-SEM0127</code>), a function with a body or none: every conforming type
+implements one with a static member of its own, in its body or in its conformance block
+(<code>LYR-SEM0042</code>; <code>LYR-SEM0020</code> where it has none). A <code>static let</code> answers with the type the
+interface writes, <code>Self</code> read as the conformer — <code>static let zero: int = 0;</code> in
+<code>extend int :: [Num]</code>. The member is reached through a type parameter alone, <code>T.parse(s)</code>,
+<code>T.zero</code> — the conformer's own static, a direct call or a read; of several of the name, the
+one that answers the member. A static member may be generic (§1 rule 5),
+<code>static fn exact&lt;T :: [Integer]&gt;(v: T): ?Self;</code>: <code>U.exact(v)</code> is the conformer's own at the
+call's type arguments. On a value of the parameter
+it is not reached (<code>LYR-SEM0055</code>). A static function <strong>with a body is a default</strong> (M9a S11): a
+conformer without a static of the name takes it, set in place for the conformer as an instance
+default is (<a href="../../spec/11-metaprogramming/">11 §4</a> rule 5), <code>Self</code> the conformer — <code>E.m(…)</code> and
+<code>T.m(…)</code> are its instance; the conformer's own static of the name replaces it.</li>
+<li>An interface that names <code>Self</code> beyond the receiver, declares a static member or a generic
+one — abstract or with a default (§1 rule 5) —, is a <strong>constraint only</strong> (04 D9): no value of it arises — a table would hold no one function for
+such a member — and the transition says so (<code>LYR-SEM0126</code>). A type written for a value — a
+binding's, a parameter's, a function's return type, a field's — that is a constraint only, an
+optional of one, or holds one as an element of an array, a view or a tuple or as a type argument
+(<code>List&lt;Equatable&gt;</code>), says so where it is written, once, and goes on as no type: its uses, its
+initializers and the calls of its function say nothing more. An interface with neither is a value as
+<a href="#2-interface-values">§2</a> says.</li>
+</ol>
+<h2 id="8-associated-types">8. Associated types</h2>
+<ol>
+<li>An interface may declare an <strong>associated type</strong>, <code>type Item;</code> (03 T6): a type every
+conforming type names, once. Where a type parameter of the interface is an input — chosen
+by whoever writes the conformance, <code>Add&lt;int&gt;</code> beside <code>Add&lt;Vec2&gt;</code> — an associated type is an
+output of the conformance: one answer per type, read off the type wherever it is used. The
+two combine, <code>interface Index&lt;K&gt; { type Output; fn get(k: K): Self.Output; }</code>.</li>
+<li>Inside the interface the associated type is <strong><code>Self.Item</code></strong>. The declaration may carry a
+default, <code>type Out = Self;</code>, resolved with <code>Self</code> as the conforming type, and a <strong>bound</strong>,
+<code>type Iter :: [Iterator];</code> (design 10 B6) — interfaces, written as a type parameter's
+constraints are (<code>LYR-SEM0078</code> otherwise), <code>Self</code> again the conforming type. Every answer
+conforms to the bound (<code>LYR-SEM0160</code>); an answer carries none of its own (<code>LYR-SEM0161</code>).
+<code>never</code> answers — as a default, an answer or a fixation — only an associated type bounded
+by <code>Error</code>, as the empty thrown set (<a href="../../spec/06-errors/">06</a>, design 05 E2 K4); elsewhere it
+would type a value that cannot exist (<code>LYR-SEM0145</code>).</li>
+<li>A conforming type <strong>answers</strong> in its body or in the conformance block: <code>type Item = int;</code>.
+A conformer without an answer, where the interface gives no default, is refused
+(<code>LYR-SEM0128</code>); an answer that no interface of the type asks for is refused
+(<code>LYR-SEM0129</code>); the answer is what the signatures read — <code>fn first(): Self.Item</code> is
+implemented by <code>fn first(): int</code> (<code>LYR-SEM0042</code> otherwise). The answer belongs to the
+<strong>conformance instance</strong>: <code>Mul&lt;int&gt;</code> and <code>Mul&lt;float&gt;</code> of one type each answer <code>Out</code> for
+themselves (<a href="#12-the-operator-interfaces">§12</a>); a second conformance block for the same
+instance is refused as a whole, its answers with it (<code>LYR-SEM0133</code>). In a type's own body
+<code>Self.Item</code> is its answer. A built-in conforms through its block alone and answers there. A
+<strong>blanket or shape block</strong> (<a href="#13-generic-extends">§13</a> rules 6–8) answers in its body or by
+a fixation in its list — <code>extend&lt;I :: [Iterator]&gt; I :: [Iterable&lt;Iter = I&gt;]</code> — for every
+type it reaches: a type with no answer of its own is answered there, at the parameters it
+binds, and the block's signatures read the answer.</li>
+<li>Through a constraint the associated type is a <strong>type path</strong>, <code>T.Item</code>:
+<code>fn firstOf&lt;T :: [Container]&gt;(c: T): T.Item { return c.first(); }</code> — the answer of whatever
+<code>T</code> becomes, <code>int</code> at <code>firstOf(IntBox { … })</code>. The parameter's constraints declare it
+(<code>LYR-SEM0128</code> where none does). An interface is no head for the path: <code>Container.Item</code> is
+nobody's answer. Through the path the associated type has <strong>what its bound provides</strong> — the
+members, <code>a.iter().next()</code>, and the constraints the bound reaches, <code>count(a.iter())</code> with
+<code>count&lt;I :: [Iterator]&gt;</code> — and nothing else: without a bound it has no member
+(<code>LYR-SEM0027</code>) and satisfies no constraint (<code>LYR-SEM0028</code>) until its answer is known. The
+path goes on through what each step provides: <code>A.Iter.Item</code> is the <code>Item</code> of what <code>A</code>'s
+<code>Iter</code> becomes, through <code>Iter</code>'s bound while that is open (<code>LYR-SEM0128</code> where the bound
+declares none), the answer on a type — <code>Bag.Iter.Item</code>. A blanket block reaches the
+associated type as it reaches a type parameter (<a href="#13-generic-extends">§13</a>): bounded by
+<code>Iterator</code>, it is <code>Iterable</code> and has <code>iter()</code>.</li>
+<li>A constraint may <strong>fix</strong> an associated type: <code>T :: [Iterator&lt;Item = int&gt;]</code>. Inside the
+declaration <code>T.Item</code> is <code>int</code>, wherever it stands — a <code>T.Item[]</code> is an <code>int[]</code>, a
+<code>List&lt;T.Item&gt;</code> a <code>List&lt;int&gt;</code>, an instance a constraint asks for, <code>FromIterator&lt;T.Item&gt;</code>, a
+<code>FromIterator&lt;int&gt;</code> (M8a S15); an argument whose answer is another type does not satisfy
+the constraint (<code>LYR-SEM0028</code>); a name no associated type of the interface carries is
+refused (<code>LYR-SEM0128</code>).</li>
+<li><strong>The value form</strong> (design 03 M4-1, T6): an interface declaring associated types is the type
+of a value where that type answers every one of them — fixed as rule 5 writes it,
+<code>Iterator&lt;Item = int&gt;</code>, or by the interface's default, <code>Iterator</code>'s <code>Error</code> being <code>never</code>.
+The members typed by an associated type then have one signature, <code>next(): ?int</code>, and are
+called through the value (<a href="#2-interface-values">§2</a>). A type stands for such a value where it
+conforms and answers <strong>every</strong> associated type as the value does (<code>LYR-SEM0001</code> otherwise,
+the answer named): a throwing iterator is no <code>Iterator&lt;Item = int&gt;</code>, and neither is a type
+parameter whose constraints leave its <code>Error</code> open — <code>T :: [Iterator&lt;Item = int, Error = never&gt;]</code> is one. Where the value's type leaves an associated type unanswered the interface
+stays a constraint only (<a href="#7-self-and-static-members">§7</a> rule 3, <code>LYR-SEM0126</code>). A member
+that names <code>Self</code> itself, <code>equals(o: Self)</code>, keeps it one too.</li>
+<li>An interface's <strong>parent list</strong> is a constraint on <code>Self</code> and may <strong>fix</strong> a parent's
+associated type the same way: <code>interface Num :: [Add&lt;Out = Self&gt;] { … }</code>. Every conformer
+answers as fixed — another answer does not conform (<code>LYR-SEM0042</code>) — and through a
+constraint <code>T :: [Num]</code> the answer is the fixed type: <code>a + b</code> is a <code>T</code>.</li>
+</ol>
+<h2 id="9-any-type-tests-and-type-patterns">9. <code>Any</code>, type tests and type patterns</h2>
+<ol>
+<li><strong><code>Any</code></strong> is the empty interface of <code>std.core</code> (03 T10), imported as any other of its public types
+— the prelude does not pass it on (design 10 B2). Every struct, class and enum value is an
+<code>Any</code> at the transition, nothing declared, and so is every value of a built-in type an
+interface value holds (<a href="#2-interface-values">§2</a> rule 1) — a number, <code>bool</code>, <code>char</code>, <code>string</code>,
+a string's view: <code>let a: Any = 5;</code>. It is the ordinary transition of §2, a copy into a box
+for a struct, an enum or a built-in's value. Nothing converts to <code>Any</code> unasked: only a
+position whose type is <code>Any</code> takes a value that way. <code>Any[]</code> is the heterogeneous array.</li>
+<li><strong><code>x is T</code></strong> (03 T11) asks an interface value what it holds and answers a <code>bool</code>: for a
+struct, a class, an enum or a built-in type <code>T</code>, whether the value is one — a comparison of the descriptor
+the value's table begins with, a built-in's box having one of its own. For a built-in type the
+test is <strong>exact</strong>: <code>5 as int8</code> is no <code>int</code> and nothing widens, an alias is the type it names
+(<code>int64</code> is <code>int</code>), and a <code>string</code> is no <code>StringView</code>. For an interface <code>T</code> that is a value type
+(<a href="#7-self-and-static-members">§7</a> rule 3), whether the concrete type conforms to it — a
+search of the conformance list behind that descriptor, which holds what a constraint sees:
+the type's own list, its blocks, and a blanket's or a shape's block that gives it the
+interface (<a href="#13-generic-extends">§13</a> rules 6, 8). <code>a is Describe</code> holds for a <code>Cat</code> a block
+makes a <code>Describe</code> through <code>Named</code>, whether or not the program made one a <code>Describe</code> before. <code>is</code> stands at the comparison level
+and does not chain.</li>
+<li>The operand's static type is an <strong>interface</strong>. On a known type (<code>c is Circle</code> with
+<code>c: Circle</code>), on an optional (<code>?Shape</code>: test for <code>null</code> first), against a type parameter
+(<code>s is T</code>, O2: a dynamic test takes <code>Any</code>) and against a type no interface value holds —
+<code>void</code>, an array, a tuple, an optional, a function type: <code>d is int[]</code> — the test is refused
+(<code>LYR-SEM0131</code>); against a constraint-only interface it is refused as a value of it is
+(<code>LYR-SEM0126</code>).</li>
+<li><strong>Narrowing.</strong> In the branch <code>x is T</code> guards, the name <code>x</code> <strong>is a <code>T</code></strong> — the smart cast,
+the mechanism of the null test (<a href="../../spec/03-types/#32-tests-and-narrowing">03 §3.2</a>):
+<code>if (s is Circle) { s.r }</code>, <code>s is Circle &amp;&amp; s.r &gt; 0</code>. The branch's end ends it, as an
+assignment to the name does; the other branch learns nothing. A <strong>negated</strong> test turns the
+two around (<a href="../../spec/03-types/#32-tests-and-narrowing">03 §3.2</a> rule 3): behind
+<code>if (!(s is Circle)) { return; }</code> the name is a <code>Circle</code> — the guard form of a type test. A
+read of the narrowed name
+takes the value out of the interface value: the object for a class, a <strong>copy</strong> for a struct
+or an enum (04 D12).</li>
+<li><strong>Type patterns.</strong> <code>c: Circle</code> and <code>_: Circle</code> in a <code>match</code> over an interface value test
+the same way and bind <code>c</code> as the type (<a href="../../spec/09-patterns/#2-the-forms">09 §2</a> rule 12). A
+match of type patterns over an interface needs <code>_</code>: the set of conformers is open
+(<code>LYR-SEM0050</code>) — unless the interface is sealed (<a href="#10-sealed-interfaces">§10</a>).</li>
+<li>There is no <code>as?</code>: <code>as</code> is the bit-near conversion of scalars (03 T1d), and <code>is</code> with its
+narrowing is the downcast.</li>
+</ol>
+<h2 id="10-sealed-interfaces">10. Sealed interfaces</h2>
+<ol>
+<li><strong><code>sealed interface Shape { … }</code></strong> (04 D8) closes the set of its conformers: every struct,
+class and enum that conforms to it — in its own list or in a conformance block — and every
+interface that names it as a parent stands in the <strong>module that declares it</strong>
+(<code>LYR-SEM0132</code> elsewhere). <code>sealed</code> is a contextual word and stands before <code>interface</code>
+only (<code>LYR-PAR0048</code>).</li>
+<li>A <code>match</code> of type patterns over a sealed interface value is <strong>exhaustive without <code>_</code></strong> when
+every conformer has an unguarded arm; the diagnostic names the conformer missing, as the
+pattern to add (<code>LYR-SEM0050</code>, <code>_: Rect</code>). A conformer added later makes every such match
+without it an error — the point of sealing. Against an enum: an enum is closed variants
+with payloads, a sealed interface closed types with members of their own.</li>
+<li><em>(Informative.)</em> The compiler may dispatch such a match as a switch over the descriptors.</li>
+</ol>
+<h2 id="11-the-child-interface-value-as-a-parent-value">11. The child interface value as a parent value</h2>
+<ol>
+<li>A value of an interface is a value of each <strong>parent</strong> in its chain (04 D10, <a href="#1-interfaces-and-conformance">§1</a>
+rule 4): <code>let d: Display = shape;</code> with <code>Shape :: [Display]</code> is a coercion at the ordinary
+sites — a binding, an argument, a return — never inside a container (<code>Shape[]</code> is no
+<code>Display[]</code>). The parent's table is found at the transition through the concrete type's
+conformance list; the data stays the same object or box.</li>
+<li>Only up the chain: an unrelated interface and the way down are refused (<code>LYR-SEM0001</code>); the
+way down is <code>is</code> (<a href="#9-any-type-tests-and-type-patterns">§9</a>).</li>
+</ol>
+<h2 id="12-the-operator-interfaces">12. The operator interfaces</h2>
+<ol>
+<li>The operators on a struct, a class or an enum are <strong>method calls through the interfaces of
+<code>std.core</code></strong> (04 D6), one per operator: <code>a + b</code> is exactly <code>a.add(b)</code> through
+<code>Add&lt;Rhs = Self&gt; { type Out = Self; fn add(rhs: Rhs): Self.Out; }</code>, and likewise <code>-</code> <code>Sub</code>,
+<code>*</code> <code>Mul</code>, <code>/</code> <code>Div</code>, <code>%</code> <code>Rem</code>, <code>&amp;</code> <code>BitAnd</code>, <code>|</code> <code>BitOr</code>, <code>^</code> <code>BitXor</code>, <code>&lt;&lt;</code> <code>Shl&lt;Rhs = int&gt;</code>,
+<code>&gt;&gt;</code> <code>Shr&lt;Rhs = int&gt;</code>; the unary <code>-x</code> is <code>x.neg()</code> through <code>Neg</code>, <code>~x</code> is <code>x.bitNot()</code>
+through <code>BitNot</code>. <code>!x</code> is <code>bool</code> only. The scalars keep their own arithmetic and conform
+besides, so a constraint <code>T :: [Add]</code> takes them.</li>
+<li><strong>One resolution.</strong> The conformance is chosen by the <strong>static type of the right operand</strong>:
+<code>v * 2</code> takes <code>Mul&lt;int&gt;</code>, <code>v * 2.5</code> takes <code>Mul&lt;float&gt;</code>; a literal adapts
+(<a href="../../spec/03-types/">03 §9.2</a>), and two conformances a literal fits are an ambiguity to annotate
+(<code>LYR-SEM0083</code>). The result is the conformance's <strong><code>Out</code></strong> — <code>Self</code> unless the conformer
+answers otherwise. The homogeneous case is <code>struct Vec2 :: [Add]</code>; a heterogeneous
+conformance stands in a <strong>conformance block</strong> of its own with its answer,
+<code>extend Vec2 :: [Mul&lt;float&gt;] { type Out = float; fn mul(rhs: float): float { … } }</code>, beside the
+type's own <code>mul</code> (<a href="#3-one-method-set">§3</a>: the operand tells the two apart, and the block's
+stays reachable qualified).</li>
+<li>Without the conformance the operator is <strong>refused</strong>, with the conformance to write
+(<code>LYR-SEM0003</code>): a method of the name alone is not the operator — nominal, not structural.</li>
+<li><strong><code>a += b</code></strong> and the other compound forms are <code>a = a.add(b)</code> on a <code>var</code> place whose type the
+answer is; there is no <code>AddAssign</code>. <code>++</code> and <code>--</code> stay the integers' own.</li>
+<li><strong>Equality.</strong> <code>a == b</code> on a struct, a class or an enum is <code>a.equals(b)</code> through
+<code>Equatable { fn equals(o: Self): bool; }</code>, <code>!=</code> its negation; both sides are the one type,
+and the scalars compare natively. Without the conformance <code>==</code> is refused (<code>LYR-SEM0059</code>).</li>
+<li><strong>Ordering.</strong> <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code> and <code>&gt;=</code> read <code>a.compare(b)</code> through
+<code>Ordered :: [Equatable] { fn compare(o: Self): ?Ordering; }</code> with
+<code>enum Ordering :: [Equatable, Hashable, Debug] { Less, Equal, Greater }</code> (the review's
+M8a-10: an answer can be compared, keyed and printed): <code>&lt;</code> is <code>.Less</code>, <code>&gt;</code> is <code>.Greater</code>, <code>&lt;=</code> is not
+<code>.Greater</code>, <code>&gt;=</code> is not <code>.Less</code>; <strong><code>null</code></strong> — the two are not ordered, as <code>float</code> with NaN —
+makes all four <strong>false</strong>. <code>TotalOrder :: [Ordered] { fn totalCompare(o: Self): Ordering; }</code>
+is what sorting and keys ask; <code>float</code> has none. Without <code>Ordered</code> an ordering is refused
+(<code>LYR-SEM0003</code>).</li>
+<li>A generic body sees the answer the constraint fixes: <code>fn sum&lt;T :: [Add&lt;Out = T&gt;]&gt;(a: T, b: T): T</code>
+adds; under <code>T :: [Add]</code> alone <code>a + b</code> is a <code>T.Out</code>, which is not a <code>T</code>
+(<a href="#8-associated-types">§8</a> rule 5).</li>
+<li><code>{x}</code> in an f-string renders through
+<code>Display { fn show(): string; fn showTo(out: StringBuilder): void; }</code>: the f-string calls
+<code>showTo</code>, which by default appends <code>show()</code>, so a type that can write itself into the buffer
+does (design 10 S6); <code>StringBuilder.append(v)</code> calls it too. The builder is a class, written
+through the reference it is passed as — no <code>&amp;</code> (design 10 S13). The scalars render natively and
+conform besides.</li>
+<li><strong>Indexing.</strong> <code>x[k]</code> on a struct, a class or an enum is <code>x.index(k)</code> through
+<code>Index&lt;K&gt; { type Output; fn index(k: K): Self.Output; }</code>, and <code>x[k] = v</code> is <code>x.setIndex(k, v)</code>
+through <code>IndexSet&lt;K&gt; :: [Index&lt;K&gt;] { mut fn setIndex(k: K, v: Self.Output): void; }</code> — the
+containers' <code>[i]</code> and <code>[k]</code> (<a href="../../spec/12-stdlib/">12</a>). A type read and not written refuses every
+form of the assignment (<code>LYR-SEM0019</code>). <code>setIndex</code> is a <code>mut fn</code>, so the receiver is a place
+as for the call written out: a struct bound with <code>let</code>, or one an index handed out, is not
+written through <code>[…]</code> (<code>LYR-SEM0019</code>). A <strong>compound assignment</strong> <code>x[k] op= v</code>, and <code>x[k]++</code>
+and <code>x[k]--</code> on an integer element, evaluate <code>x</code> and <code>k</code> <strong>once</strong> and are
+<code>x.setIndex(k, x.index(k) op v)</code> — read, compute, write, as on an array's element (the
+review's M8a-1); <code>&amp;&amp;=</code>, <code>||=</code> and <code>??=</code> read once and write only when they assign. The order
+and the value of an assignment are <a href="../../spec/08-expressions/">08 §3</a>'s. An element so read is a
+value, no place: <code>x[k].f = v</code> is refused (03 §2.2). The index of an array, a view and an
+inline array is built in (<a href="../../spec/03-types/">03 §5</a>).</li>
+<li><strong>Membership.</strong> <code>x in xs</code> is <code>xs.contains(x)</code> through <code>Contains&lt;T&gt; { fn contains(x: T): bool; }</code>
+(04 D6, design 10 C12) — a range, an array, a view, a list, a set and a map's keys conform
+(<a href="../../spec/12-stdlib/">12</a>) — and <code>x !in xs</code> its negation. The conformance is the <strong>right operand's</strong>,
+and <code>x</code> adapts to its <code>T</code> as a literal does: <code>200 in bytes</code> with <code>bytes: uint8[]</code>. On a <code>string</code>
+or a <code>StringView</code> the left operand is any <code>Pattern</code> and the text's own <code>contains</code> answers —
+<code>'a' in s</code>, <code>&quot;ab&quot; in s</code>. The operands are evaluated <strong>left to right</strong>, <code>x</code> before <code>xs</code>, though
+the call is the container's. <code>in</code> and <code>!in</code> bind as the comparisons do; <code>!in</code> is one token,
+<code>!</code> written against <code>in</code> (<code>x! in xs</code> unwraps <code>x</code> first). Without the conformance <code>in</code> is refused
+(<code>LYR-SEM0059</code>), a method <code>contains</code> alone included; <code>[]</code> beside it fixes no element
+(<code>LYR-SEM0060</code>).</li>
+</ol>
+<h2 id="13-generic-extends">13. Generic extends</h2>
+<ol>
+<li>An extend block may carry <strong>type parameters</strong> of its own, <code>extend&lt;T&gt; List&lt;T&gt; { … }</code>
+(03 T7 X1), with constraints as a function's: <code>extend&lt;T :: [Display]&gt; List&lt;T&gt; { … }</code>. The
+target is a named type at the block's parameters, or one instance of it, <code>extend Box&lt;int&gt; { … }</code>,
+or a <strong>built-in constructor</strong> (X2, rule 6) — a function type among them (M8a S12).
+In the block, <code>this</code> is the target as written; <code>Self</code> stands for a plain target only.</li>
+<li>A member of such a block is reached on every receiver the target <strong>matches</strong>: the receiver
+binds the parameters — <code>List&lt;int&gt;.first()</code> is an <code>int</code> — and the block's constraints must
+hold for what it bound; where they do not, the member is not there (<code>LYR-SEM0134</code>). A block
+on one instance adds to that instance alone (<code>LYR-SEM0012</code> elsewhere). A parameter the target
+does not name is bound where a <strong>fixation</strong> in another's constraint names it:
+<code>extend&lt;I :: [Iterator&lt;Item = T&gt;], T :: [Num]&gt; I</code> binds <code>I</code> to the receiver and <code>T</code> to its
+<code>Item</code>, whose constraints then hold or the member is not there. A fixation may name parameters
+inside a type: <code>extend&lt;I :: [Iterator&lt;Item = (K, V)&gt;], K :: [Hashable], V&gt; I</code> matches the
+receiver's <code>Item</code> against <code>(K, V)</code> and binds both — a receiver whose <code>Item</code> is no pair has no
+such member. A parameter that neither the
+target, a fixation nor the block's conformance (rule 9) names is bound by nothing: the block reaches no type, and is refused
+where the parameter stands (<code>LYR-SEM0170</code>).</li>
+<li><strong>Conditional conformance.</strong> <code>extend&lt;T :: [Display]&gt; Bag&lt;T&gt; :: [Display] { … }</code> gives the
+conformance to every instance whose arguments satisfy the block's constraints and to no
+other: <code>Bag&lt;int&gt;</code> is a <code>Display</code>, <code>Bag&lt;Foo&gt;</code> is not (<code>LYR-SEM0001</code>) — the form the
+library's containers take (<a href="../../spec/12-stdlib/">12</a>, 10 C9). A block on one instance conforms that
+instance alone. The signatures are checked at the block's target (<code>Bag&lt;T&gt;</code> with the block's
+<code>T</code>), as <a href="#1-interfaces-and-conformance">§1</a> checks them at the type.</li>
+<li><strong>Coherence</strong> (X3, X4): one conformance per <strong>type instance and interface instance</strong> in the
+whole program, from whichever site — the type's own list, a block, a generic block. Two sites
+that could meet on one instance are refused where the second stands (<code>LYR-SEM0133</code>):
+<code>extend Bag&lt;int&gt; :: [Display]</code> beside <code>extend&lt;T :: [Display]&gt; Bag&lt;T&gt; :: [Display]</code>, a block
+beside the type's own declaration, two generic blocks over the same target. There is <strong>no
+specialization</strong>; two blocks on instances that never meet (<code>Box&lt;int&gt;</code>, <code>Box&lt;string&gt;</code>) stand.
+There is no orphan rule: a block may stand in any module.</li>
+<li><em>(Informative.)</em> A generic block's member is compiled per receiver instance, as a method of
+a generic type is; a table row for a conformance a block gives is built for the instances
+the program uses it on.</li>
+<li><strong>The built-in constructors</strong> (X2): <code>extend&lt;T&gt; T[] { … }</code>, <code>extend&lt;T&gt; ?T { … }</code>,
+<code>extend&lt;T&gt; Slice&lt;T&gt; { … }</code>, a tuple of fixed arity <code>extend&lt;A, B&gt; (A, B) { … }</code>, a function
+type <code>extend&lt;T&gt; fn(T) -&gt; T { … }</code> (design 10 S2; M8a S12: <code>this</code> is the function, <code>this(x)</code>
+calls it), and the same at fixed types, <code>extend int[] { … }</code>, <code>extend fn(char) -&gt; bool { … }</code>.
+A function type's shape is its parameters, their places, its return and its set, matched as
+written. A coroutine's shape is what it yields and what it returns, <code>extend&lt;Y, R&gt; Coroutine&lt;Y, R&gt; { … }</code> (N2d); what its pulls throw is no part of it — the block reaches every coroutine of
+those, and where a member names the target, it names the receiver. The members are reached on every value of
+that <strong>shape</strong>, the shape binding the parameters as rule 2 says, the constraints checked
+the same way (<code>LYR-SEM0134</code>); <code>this</code> is the shape, so <code>this[0]</code> and <code>this.length()</code> stand
+in an array's block, <code>this == null</code> and <code>this!</code> in an optional's, <code>let (a, _) = this;</code> in a
+tuple's. <code>length()</code> stays the primitive (<a href="../../spec/03-types/">03 §5</a>). An element of a tuple comes
+first, a block's member after. A shape <strong>conforms</strong> through a block that names the interface,
+<code>extend&lt;T :: [Describe]&gt; T[] :: [Describe] { … }</code> — every shape the block's constraints admit
+(rule 3), with the signatures checked at the shape, <code>Self</code> read as it (<code>LYR-SEM0020</code>,
+<code>LYR-SEM0042</code>). That is the one way a shape satisfies a constraint (<code>LYR-SEM0028</code>
+otherwise), and a member called through the constraint is the block's. Two blocks on
+overlapping shapes giving one interface — of either's chain — are two conformances
+(<code>LYR-SEM0133</code>), except a <strong>parent</strong> another block on the same shape gives under constraints
+this block's entail: a block giving <code>Hashable</code> to <code>(A, B)</code> of <code>Hashable</code> elements leaves
+<code>Equatable</code> to the block that gives it to <code>(A, B)</code> of <code>Equatable</code> ones, whose <code>equals</code> answers
+— each interface under its own condition, as 04 D7 synthesizes them (N2a). A shape that conforms to <code>Equatable</code> so compares with <code>==</code> and <code>!=</code>
+through its block's <code>equals</code>, and one that conforms to <code>Display</code> or <code>Debug</code> renders in an
+f-string hole, as a named type does — std.core's arrays and views do (10 C9; M8a S14). A
+<strong>value of the interface</strong> is made from the shape in a box, as from a built-in (<a href="#2-interface-values">§2</a>):
+<code>let d: Describe = [1, 2];</code>, its table the block's members and, where the block writes none,
+the interface's defaults.</li>
+<li><strong>Blanket blocks</strong> (04 D15): a block whose target is its own parameter, <code>extend&lt;T :: [I]&gt; T { … }</code>, adds its members to <strong>every type its constraints admit</strong> — the receiver binds <code>T</code>,
+<code>this</code> is the receiver: <code>x.greeting()</code> on every <code>Named</code>. A member of the type's own, of
+another block or of a default comes first: a blanket member of a name the type already has
+is <strong>hidden for that type</strong> (the review's A5) — a call on the type reaches the type's, while
+generic code that reaches the name through the block's constraints calls the block's, for
+that type too. They are two functions of one name, so the type's member is warned about
+where it stands (<code>LYR-SEM0168</code>; at the type, for a default it inherits or a member it leaves
+to a field). Two blanket blocks that give a type one name it does not have itself are
+refused (<code>LYR-SEM0121</code>), and a member the receiver's type does not admit is not
+there (<code>LYR-SEM0012</code>). In a generic body a type parameter whose constraints imply the
+block's receives it too (D2 R4). A shape receives a blanket member where it satisfies the
+block's constraints (rule 6). A member with type parameters of its own, <code>fn mapped&lt;U&gt;(…)</code>,
+is one function per receiver and per its own type arguments.</li>
+<li><strong>Blanket conformance</strong> (D15): <code>extend&lt;T :: [I]&gt; T :: [J] { … }</code> gives <code>J</code> to every type the
+constraints admit — the signatures checked at <code>T</code> — so a <code>Named</code> satisfies a constraint on
+<code>J</code> and a call through it is the block's member; a type it does not reach keeps its own.
+Such a block implements <code>J</code>'s whole chain, so it excludes, by interface: a type's own
+conformance to one of the chain where it reaches the type (X4); a shape's block giving one
+where it reaches the shape — the shape, or an overlapping one another block names, meeting
+its constraints, which a shape does through a block naming them alone (rule 6); and another
+blanket block giving one, even where no type could meet both (<code>LYR-SEM0133</code>). A <strong>value of
+<code>J</code></strong> is made from a type the block reaches, with the block's members in its table:
+<code>let d: J = cat;</code>.</li>
+<li><strong>A parameter only the conformance names</strong> (design 10 B4): in <code>extend&lt;T, U :: [From&lt;T&gt;]&gt; T :: [Into&lt;U&gt;] { … }</code> the target does not name <code>U</code>, nor does a fixation; the block's conformance
+does. The instance a constraint asks for binds it: <code>Meters</code> satisfies <code>Into&lt;Centimeters&gt;</code>
+where <code>Centimeters :: [From&lt;Meters&gt;]</code> holds, and a call through the constraint is the block's
+member with <code>U</code> that instance's. At a call of the block's member on a receiver the call binds
+it, as it binds the member's own parameters (<a href="../../spec/03-types/">03 §9.2</a>) — from the arguments,
+then from the type the position expects: <code>let c: Centimeters = m.into();</code>. Where nothing
+determines it the call is refused (<code>LYR-SEM0060</code>), and where what binds it fails the block's
+constraints too (<code>LYR-SEM0028</code>). Such a block reaches a type at the instances bound so and at
+no other, so it excludes a type's own conformance (rule 8) at those alone, whole-program:
+<code>Meters :: [Into&lt;int&gt;]</code> stands while <code>int</code> is no <code>From&lt;Meters&gt;</code>, and is refused where it is
+one (<code>LYR-SEM0133</code>), said at the type's conformance.</li>
+</ol>
+<h2 id="14-conformance-synthesis">14. Conformance synthesis</h2>
+<ol>
+<li>A conformance to one of the <strong>family</strong> — <code>Equatable</code>, <code>Hashable</code>, <code>Ordered</code>, <code>TotalOrder</code>,
+<code>Clone</code>, <code>Default</code>, <code>Display</code>, <code>Debug</code> — written in a struct's, class's or enum's own list
+<strong>without the member</strong> is <strong>synthesized</strong> from the fields (04 D7): <code>struct P :: [Equatable, Hashable] { x: int, y: string }</code> compares and hashes field by field, in declaration order.
+There is no <code>derive</code> word. A member the type writes itself replaces the synthesis for that
+member; the others are still synthesized. The list is fixed in 5.0; a synthesis of the
+program's own interfaces is <a href="../../spec/11-metaprogramming/">11</a>'s question. <code>Equatable</code>, <code>Hashable</code>,
+<code>Ordered</code>, <code>TotalOrder</code> and <code>Clone</code> are std.core's defaults, written once over the
+conformer's fields and variants and set in place for each conformer (<a href="../../spec/11-metaprogramming/">11 §4</a>
+rules 5 and 10; 09 A5); <code>Default</code> — no form names a field's type or its written default —,
+<code>Display</code>, <code>Debug</code> and <code>Identity</code> are the compiler's.</li>
+<li><strong>Field by field, declaration order.</strong> <code>equals</code> is the conjunction of the fields' equalities;
+<code>hash</code> writes the fields into the hasher in order (<a href="../../spec/12-stdlib/">12</a> §Hashing) — an
+optional as a mark and its value, a tuple's and an inline array's elements in order;
+<code>compare</code> and <code>totalCompare</code> are lexicographic,
+the first field that is not <code>.Equal</code> decides, and a <code>compare</code> that meets <code>null</code> is <code>null</code>;
+<code>clone</code> copies the value fields and clones the reference fields — an array element by
+element, an optional's value, a tuple's elements —, and <strong>copies a field marked <code>@Shared</code></strong>
+(<a href="../../spec/11-metaprogramming/">11 §1</a> rule 14) instead, whatever it holds: a parent, a service, a
+cycle; such a field's type needs no <code>Clone</code>; <code>default</code> takes every field's <code>default()</code>,
+or the field's own initializer where it has one, <code>[]</code> for an array, <code>null</code> for an optional
+and a tuple of its elements' defaults;
+<code>show</code> on request is the <code>debug</code> form; <code>debug</code> renders <code>P { x = 1, y = &quot;a&quot; }</code> with every
+field's <code>debug()</code>, an array as <code>[1, 2]</code>, an optional as its value or <code>null</code>, a tuple as
+<code>(1, &quot;a&quot;)</code>, a string quoted and a char in single quotes. An <strong>inline array</strong> field is taken
+element by element.</li>
+<li><strong>Enums</strong> as structs, variant by variant: two values are equal when they are the same
+variant with equal payloads; the hash writes the variant's position, then its payload; the
+order is the <strong>variant's position first</strong>, then the payload lexicographically; <code>clone</code>
+rebuilds the variant; <code>debug</code> renders <code>E.B(3)</code>, <code>E.R { w = 4 }</code>, <code>E.A</code>. A <code>Default</code> of an
+enum is <strong>refused</strong> — no variant is the default (<code>LYR-SEM0135</code>).</li>
+<li><strong>Generic types conditionally</strong> (04 D7, Rust's derive bound): <code>struct Pair&lt;T&gt; :: [Equatable]</code>
+is <code>extend&lt;T :: [Equatable]&gt; Pair&lt;T&gt; :: [Equatable]</code>, so <code>Pair&lt;int&gt;</code> compares and
+<code>Pair&lt;NoEq&gt;</code> does not (<code>LYR-SEM0059</code> at the comparison, <a href="#13-generic-extends">§13</a> rule 3);
+<code>Display</code> asks <code>Debug</code> of the parameters.</li>
+<li><strong>The implied parents come along.</strong> A type listing <code>Hashable</code> or <code>Ordered</code> alone gets
+<code>Equatable</code> synthesized too, <code>TotalOrder</code> brings <code>Ordered</code> and <code>Equatable</code> — unless the
+type lists them or writes their member. A conformance written in a block of its own beside
+such a list meets the synthesized one as two sites (<a href="#13-generic-extends">§13</a> rule 4,
+<code>LYR-SEM0133</code>): list it, and the block is the one site. A parent an interface of the
+program implies comes along the same way where the compiler writes the member —
+<code>interface Args :: [Default]</code> gives <code>struct Start :: [Args]</code> its <code>default</code>, through the whole
+chain of parents, the interface another module's or not —, while the std.core defaults a
+parent brings are inherited as every default is (<a href="#1-interfaces-and-conformance">§1</a> rule 3). A type that lists
+the implied interface itself, writes the member, or gives the interface in a block of its own
+module has that one (the sweep after M10, W8).</li>
+<li><strong>What is refused is said at the declaration.</strong> A field whose type lacks the conformance
+the synthesis needs is the diagnostic of the missing operation, with its own code, at the
+type's conformance-list entry — <code>'Equatable' is not synthesized for 'P': …</code> —, the field's
+round and the default's line as notes (<code>note: in the round for the field 'f' of 'P'</code>); a
+shape the synthesis has no form for — a
+<code>Slice&lt;T&gt;</code> or a function to <code>clone</code>, a function to <code>default</code>, an array or a view to <code>hash</code>
+(10 C8) — is
+<code>LYR-SEM0135</code> with the field's type, and the member is written by hand.</li>
+<li><strong><code>Debug</code> is given unasked</strong> to every struct, class and enum that writes none — in its
+declaration or in a block, a block under a constraint included, as std's containers write
+theirs —, <strong>where the
+fields allow it</strong>: a type holding an interface value, a function, or a type that has no
+<code>debug()</code> of its own gets none, silently — there was nothing asked and nothing to report —
+and <code>x.debug()</code> on it is <code>LYR-SEM0012</code>. Listing <code>Debug</code> asks, and then rule 6 names the
+field. <code>Display</code> is never automatic (<a href="#12-the-operator-interfaces">§12</a> rule 8). <code>Debug</code> is
+<code>{ fn debug(): string; fn debugTo(out: StringBuilder): void; }</code>, <code>debugTo</code> by default
+appending <code>debug()</code>, as <code>Display</code>'s <code>showTo</code> appends <code>show()</code>; <code>{x:?}</code> calls <code>debugTo</code>.</li>
+<li><strong><code>Identity</code></strong> (02 M10, 04 D7; N2b) is an object's: <code>class Node :: [Identity]</code> is given
+<code>Equatable</code> and <code>Hashable</code> <strong>by the object</strong> — <code>equals</code> is <code>same(this, o)</code>, <code>hash</code> writes the
+object's address, which holds while it lives (nothing moves, 01 L1) — so a <code>Map&lt;Node, X&gt;</code>
+keys by the object and two objects of equal fields are two keys. Listed beside it,
+<code>Equatable</code> and <code>Hashable</code> are those two; a generic class asks nothing of its parameters.
+A struct or an enum is a value and has no identity, and an <code>equals</code> or a <code>hash</code> the class
+writes beside <code>Identity</code> would be a second answer to its question: both are refused
+(<code>LYR-SEM0135</code>), a conformance a block writes by hand as one a list does. The prelude
+passes <code>Identity</code> on beside <code>Equatable</code> and <code>Hashable</code>.</li>
+<li><em>(Informative.)</em> The synthesized member stands in an <code>extend</code> block of the type's own
+module, generated as source and compiled like one written; it is reached, overridden and
+qualified exactly as a block's member is. Hints about its style are nobody's to act on and
+are not reported.</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-interfaces-and-conformance">1. Interfaces and conformance</a></li>
+<li class="level-2"><a href="#2-interface-values">2. Interface values</a></li>
+<li class="level-2"><a href="#3-one-method-set">3. One method set</a></li>
+<li class="level-2"><a href="#4-the-qualified-call">4. The qualified call</a></li>
+<li class="level-2"><a href="#5-delegation">5. Delegation</a></li>
+<li class="level-2"><a href="#6-extend-blocks">6. Extend blocks</a></li>
+<li class="level-2"><a href="#7-self-and-static-members">7. Self and static members</a></li>
+<li class="level-2"><a href="#8-associated-types">8. Associated types</a></li>
+<li class="level-2"><a href="#9-any-type-tests-and-type-patterns">9. Any, type tests and type patterns</a></li>
+<li class="level-2"><a href="#10-sealed-interfaces">10. Sealed interfaces</a></li>
+<li class="level-2"><a href="#11-the-child-interface-value-as-a-parent-value">11. The child interface value as a parent value</a></li>
+<li class="level-2"><a href="#12-the-operator-interfaces">12. The operator interfaces</a></li>
+<li class="level-2"><a href="#13-generic-extends">13. Generic extends</a></li>
+<li class="level-2"><a href="#14-conformance-synthesis">14. Conformance synthesis</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

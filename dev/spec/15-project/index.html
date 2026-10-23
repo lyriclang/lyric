@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Projects — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a class="current" href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>Projects</h1>
+<blockquote>
+<p><strong>Partly written.</strong> §1–§6 were written with milestone <strong>M7</strong> of the Lyric 5 plan (slices S1, S4,
+S5a–S6e, S8a), §7 with <strong>M8a</strong>; the rest follows, spec-first: each rule lands here with its
+conformance case before or with its implementation. Source of the decisions:
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 Tooling and interop W2/W3</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 Modules</a>.</p>
+</blockquote>
+<h2 id="scope">Scope</h2>
+<p><code>lyric.toml</code>, profiles, targets, the lock file, <code>out/</code>, build scripts and their trust rule, reproducibility.</p>
+<h2 id="1-the-manifest">1. The manifest</h2>
+<p>A package's manifest, <code>lyric.toml</code> at its root, is read and never run
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 P1</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V7</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases; the TOML subset in the
+toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>ManifestTests</code>), the programs and the toolchain pin
+in <code>ProgramTests</code>.</p>
+<ol>
+<li>A manifest is <strong>TOML</strong>, the part of it a manifest needs: tables and arrays of tables; bare,
+quoted and dotted keys; basic and literal strings, integers, booleans, arrays and inline
+tables; comments. Floats, dates and times, and multi-line strings are refused, as is what TOML
+itself refuses — a key or a table defined twice, a value where a table is needed
+(<code>LYR-PKG0001</code>, at its line and column).</li>
+<li><strong><code>[package]</code></strong> is required. Its <code>name</code> is a lowercase letter followed by lowercase letters,
+digits and <code>_</code> — the first segment of every module path of the package
+(<a href="../../spec/04-modules/">04 §2</a>) — and not <code>std</code>, the standard library's (07 M3, D1). Its <code>version</code> is
+a semantic version, <code>MAJOR.MINOR.PATCH</code> with optional pre-release and build parts. Its
+<code>edition</code> names the edition of the language the package is written in (07 V9): <code>&quot;5&quot;</code>, the one
+there is, and the default. A missing or malformed field is refused (<code>LYR-PKG0002</code>).</li>
+<li><code>[package]</code> may also hold <code>description</code>, <code>license</code> and <code>repository</code> — strings — and <code>authors</code>,
+an array of strings: they describe the package and change no build (<code>LYR-PKG0002</code> for another
+type).</li>
+<li>A key or a section the toolchain does not know is refused (<code>LYR-PKG0003</code>), as an unknown option
+is (<a href="../../spec/14-cli/">14 §1.1</a>). <code>[dependencies]</code>, <code>[override]</code>, <code>include</code> and <code>exclude</code> are §2's.
+<code>[profile]</code> is §4's, <code>[native]</code> §5's, <code>[build-dependencies]</code> and <code>[trust]</code> §8's. <code>[lints]</code>
+holds <code>allow</code>, <code>warn</code> and <code>deny</code>, each an array of lints, groups or <code>warnings</code> — the levels of the
+package's lints in its files (<a href="../../spec/16-diagnostics/#5-lints">16 §5</a>): <code>[lints] deny = [&quot;unused&quot;]</code>; a
+selector that names nothing, or stands in two of them, is refused (<code>LYR-PKG0002</code>), another key
+(<code>LYR-PKG0003</code>).</li>
+<li>A package's <strong>programs</strong> are its <code>src/main.lyr</code>, whose binary is named after the package
+(<a href="../../spec/14-cli/">14 §1.2</a>), and each <code>[[bin]]</code>: <code>name = &quot;tool&quot;</code> — a lowercase letter, then
+letters, digits, <code>_</code> and <code>-</code> —, its binary's, and <code>entry = &quot;src/tool.lyr&quot;</code>, a module of the
+package under <code>src/</code> (<code>LYR-PKG0002</code>, as for an entry that is no file and for two programs of
+one name; another key is <code>LYR-PKG0003</code>). Without any program, the package is a library (P2).
+A package's <strong>root module</strong> is its <code>src/lib.lyr</code> (<a href="../../spec/04-modules/">04 §2</a> rule 1a), what
+<code>import geo { … }</code> names; it is no program, and a package may hold both.
+<code>lyric build</code> builds every program; <code>run</code> and <code>--emit</code> the one <code>--bin</code> names, else
+<code>src/main.lyr</code>'s, else the only one — of several, <code>--bin</code> names it (<code>LYR-CLI0007</code>).</li>
+<li><strong><code>toolchain = &quot;5.1&quot;</code></strong> — or <code>&quot;&gt;=5.1&quot;</code> — in <code>[package]</code> is the least toolchain that builds the
+package (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 P12</a>): a toolchain below what any package of the program asks
+for refuses the program (<code>LYR-PKG0009</code>, exit 2, <a href="../../spec/14-cli/">14 §1.3</a>), a development build of
+a version counting as that version. Another form is refused (<code>LYR-PKG0002</code>).</li>
+<li><strong><code>comptimeBudget = 100_000_000</code></strong> in <code>[package]</code> is the steps one <code>comptime</code> site may take
+(<a href="../../spec/11-metaprogramming/">11 §2</a> rule 5), for the whole program but the standard library where
+it stands in the root manifest; a dependency's changes no build. A number that is not positive, or another value,
+is refused (<code>LYR-PKG0002</code>).</li>
+</ol>
+<h2 id="2-dependencies">2. Dependencies</h2>
+<p>The packages a package imports from (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V7</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases that hold their dependencies in
+their own directories, and the git repositories they read as their versions
+(<a href="https://github.com/lyriclang/lyric-spec/blob/3a45314764b99572b35da3b1a26cfe2059db50e6/conformance/README.md">the suite's README</a>); the toolchain's own tests
+(<code>tests/Lyric5.Tests</code>: <code>DependencyTests</code>, <code>GitDependencyTests</code>, <code>PackageContentTests</code>).</p>
+<ol>
+<li><code>[dependencies]</code> names them, each where it is read from: a directory,
+<code>geo = { path = &quot;../geo&quot; }</code>, relative to the manifest — or a git repository,
+<code>http = { git = &quot;https://…&quot;, tag = &quot;v1.2.0&quot; }</code>. The directory, or the root of the
+repository, holds a manifest that names the package (<code>LYR-PKG0004</code>). A version alone,
+<code>geo = &quot;1.2&quot;</code>, is a registry's form, and 5.0 has no registry (<code>LYR-PKG0003</code>) (07 P8).</li>
+<li>A git dependency reads <strong>one revision</strong> of its repository
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 P9</a>): a <code>tag</code>, a <code>branch</code>, a commit — <code>rev</code>, its id or the first 7 to
+64 hexadecimal digits of it — or, naming none, the branch the repository's <code>HEAD</code> names. Its
+<code>git</code> is a URL — <code>https://</code>, <code>http://</code>, <code>ssh://</code>, <code>git://</code>, <code>file://</code> — or <code>user@host:path</code>
+(<code>LYR-PKG0002</code>, as for two revisions, or a revision beside a <code>path</code>). The URL is compared,
+cached and locked in its <strong>normal form</strong> (the review's M7-10): a <code>/</code> and a <code>.git</code> at the end
+dropped, the scheme and the host in lower case — <code>HTTPS://Example.com/org/geo.git/</code> and
+<code>https://example.com/org/geo</code> are one repository; the rest keeps its case, and <code>https://</code> and
+<code>ssh://</code> to one host stay two. A revision the repository does not have, or a repository
+without a package at its root, is refused (<code>LYR-PKG0006</code>), and so is a tag that is a version
+over a manifest that gives another — <code>v1.2.0</code> where the manifest says <code>version = &quot;1.1.0&quot;</code>:
+the build chooses among versions by the tag. A repository that cannot be reached is the
+environment's failure (<code>LYR-PKG0007</code>, exit 2, <a href="../../spec/14-cli/">14 §1.3</a>).</li>
+<li>What is read from git is kept in the <strong>user's cache</strong>, not in the project: each repository
+once, each revision's package once, for every project that reads it (P9; 07 P10). A tag or a
+commit the cache holds is not fetched again; a branch, or no revision, is read where the lock
+holds it (§3), and at its head — fetched — where the lock holds nothing for it yet.
+<strong><code>--offline</code></strong> fetches nothing: what the cache does not hold is refused (<code>LYR-PKG0007</code>).</li>
+<li>A package read from git is its <strong>package content</strong> (11 P8): its manifest, <code>src/</code>,
+<code>native/</code>, <code>build.lyr</code>, and the files <code>README*</code> and <code>LICENSE*</code> at its root — not <code>tests/</code>,
+not <code>out/</code>. <code>[package] include = […]</code> names the files instead of that default — the
+manifest belongs always —, and <code>exclude = […]</code> takes files out. A pattern is relative to the
+package's root, <code>/</code> between directories; <code>*</code> stands for any characters within a directory,
+<code>?</code> for one, <code>**</code> for any number of directories, and a pattern that names a directory holds
+what lies below it (<code>LYR-PKG0002</code> for another form). A module outside the content is not
+there (<code>LYR-RES0003</code>). A package read from git names its own dependencies by git: a directory
+is no part of it (<code>LYR-PKG0004</code>).</li>
+<li>A module imports from its own package, from <code>std</code>, and from the packages its package's
+manifest declares — not from what those depend on (<code>LYR-RES0014</code>) (07 P6).</li>
+<li>A program holds <strong>one package of each name</strong> (07 P3). <strong>Versions of one repository</strong> are one
+package: a tag that is a semantic version, <code>v1.2.0</code> or <code>1.2.0</code>, asks for that version or a
+later one of its <strong>line</strong> — the same major version; below 1, the same minor; below 0.1, the
+version alone (07 P2) —, and of all the versions the graph asks for, directly or through a
+version read on the way, the build takes the greatest: the least that satisfies them all
+(<strong>minimal version selection</strong>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 P4</a>). Any other two sources for one name —
+two directories, two repositories, two revisions of one, versions of two lines — are refused
+(<code>LYR-PKG0005</code>), unless the root manifest's <code>[override] units = { path = &quot;…&quot; }</code> picks the one — read wherever the graph
+asks for <code>units</code>, and what it replaces is not read at all, not fetched either (07 P7). An
+override reads a directory (<code>LYR-PKG0003</code> for the git form); an override in another
+package's manifest is not read. No package depends on itself, at once or through others: a
+<strong>cycle</strong> is refused with its path, <code>app -&gt; geo -&gt; app</code> (<code>LYR-PKG0010</code>; the review's M7-6) — a
+package's dependencies are built before it, and a cycle has no first one.</li>
+<li>A <strong>library</strong> — a package without <code>src/main.lyr</code> — builds as a check: every module of it
+through the compiler, nothing built (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 B6</a>); <code>lyric run</code> has no program there
+(<code>LYR-CLI0005</code>).</li>
+</ol>
+<h2 id="3-the-lock-file">3. The lock file</h2>
+<p>What a build read from git, kept so that the next build reads the same
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 P5</a>): minimal version selection makes the choice, the lock makes the content
+reproducible.</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases that hold their <code>lyric.lock</code>;
+the toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>LockTests</code>).</p>
+<ol>
+<li><strong><code>lyric.lock</code></strong>, beside the root manifest, holds every revision of a git repository the
+graph read — the versions chosen and the ones read on the way —, each with its package's name
+and version, its repository and revision, the <strong>commit</strong> it was, and the <strong>hash</strong> of its
+package content (§2): SHA-256 over one line per file — the file's SHA-256 in hexadecimal, two
+spaces, its path with <code>/</code> between directories —, the lines sorted by path; written <code>h1:</code> and
+base64. The toolchain writes the lock — only when what it holds changes, and none for a
+program that reads nothing from git —, and it is checked in with the manifest. A
+dependency's lock is not read.</li>
+<li>A build reads a revision the lock holds <strong>at the commit the lock holds</strong>: a branch stays where
+it was locked, and a tag moved in the repository too. Content that is not what the lock holds
+is refused, as is a locked commit the repository does not have (<code>LYR-PKG0008</code>). What the lock
+does not hold yet is resolved and added; what the graph no longer reads is dropped. A lock that
+is not one is refused (<code>LYR-PKG0001</code>, <code>LYR-PKG0002</code>).</li>
+<li><strong><code>lyric update [&lt;package&gt;…]</code></strong> reads every package from git anew — or those it names, the
+others staying at their commits —, fetching their repositories first, and writes the lock: a
+branch moves to its head, a moved tag to its commit. A tag of the root manifest that is a
+version is first <strong>raised to the newest tag of its line</strong> the repository has (the review's
+M7-8) — never another major version; below 1, never another minor; a pre-release only for a
+pre-release — and written on its line of <code>lyric.toml</code>, the rest of the file as it was; a
+dependency's own manifest is its own, and a branch, a commit or a tag that is no version stays.
+A name that no package read from git has is refused (<code>LYR-CLI0003</code>).</li>
+<li>Under <strong><code>--locked</code></strong> (the review's M7-9), <code>build</code>, <code>run</code> and <code>test</code> take the lock <strong>as it
+is</strong> and write nothing: a revision the graph reads that the lock does not hold is refused
+before anything is fetched, and so is a lock that holds what the graph does not read, or no
+lock where the program reads from git (<code>LYR-PKG0011</code>, exit 1). A program that reads nothing
+from git needs none. Without the flag a build writes the lock on (rule 1).</li>
+</ol>
+<h2 id="4-profiles">4. Profiles</h2>
+<p>How a program is built — the compiler's settings, not the program
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 P3</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases whose manifest changes the
+built-in profiles the suite builds with; the toolchain's own tests (<code>tests/Lyric5.Tests</code>,
+<code>ProfileTests</code>, <code>LtoTests</code>).</p>
+<ol>
+<li><strong><code>debug</code>, <code>release</code>, <code>asan</code> and <code>tsan</code></strong> are built in. <code>[profile.&lt;name&gt;]</code> changes a built-in
+profile, or names one of the manifest's own — a lowercase letter, then letters, digits, <code>_</code>
+and <code>-</code> —, which <strong>inherits</strong> from another, <code>inherits = &quot;release&quot;</code>, the chain ending in a
+built-in one. A built-in profile inherits from nothing, a manifest's own profile always does,
+and none inherits from itself (<code>LYR-PKG0002</code>). Only the root manifest's profiles count: the
+program is built one way. <code>out/&lt;profile&gt;/</code> is named after the profile
+(<a href="../../spec/14-cli/">14 §1.2</a>).</li>
+<li>A profile sets <strong>fields</strong>: <code>opt</code>, the C optimization level from 0 to 3; <code>debugInfo</code>, <code>lto</code>,
+<code>denyWarnings</code>, <code>overflowChecks</code>, <code>fastMath</code>, each <code>true</code> or <code>false</code>; and <code>gc</code>, <code>&quot;immix&quot;</code> or
+<code>&quot;boehm&quot;</code> (<code>LYR-PKG0002</code> for another type or value, <code>LYR-PKG0003</code> for another key). A field a
+profile does not set is the one it inherits — as the manifest has that profile. The built-in
+ones: <code>debug</code> <code>opt = 0</code>, <code>release</code> <code>opt = 2</code>, the sanitizers' <code>opt = 1</code>; all four with
+<code>debugInfo</code> and <code>overflowChecks</code>, none with <code>lto</code>, <code>denyWarnings</code> or <code>fastMath</code>, all with
+<code>gc = &quot;immix&quot;</code>.</li>
+<li><strong><code>overflowChecks = false</code></strong> makes integer overflow wrap instead of panicking, for the whole
+program (<a href="../../spec/03-types/">03 §1.6</a>). Nothing is without the checks unless a profile says so.</li>
+<li><strong><code>denyWarnings = true</code></strong> fails a compilation that warns: it is <code>-D warnings</code>
+(<a href="../../spec/16-diagnostics/#5-lints">16 §5</a> rule 8) — each warning is an error, its note naming the profile.</li>
+<li><strong><code>fastMath = true</code></strong> lets the C compiler treat the program's floating point as not
+IEEE-exact (<a href="../../spec/03-types/">03 §1.6</a>); the runtime's stays exact.</li>
+<li><strong><code>lto = true</code></strong> lets the C compiler optimize across the program, the native parts
+(<a href="#5-the-native-part">§5</a>) and the runtime as they are linked — ThinLTO. A target whose linker
+takes none — macOS, with the toolchain's C compiler — is built without it, not refused. What a
+program does is the same either way.</li>
+<li><strong><code>gc</code></strong> chooses the runtime's collector
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 L1</a>):
+<code>&quot;immix&quot;</code>, its own, or <code>&quot;boehm&quot;</code>, the Boehm–Demers–Weiser collector it began with, kept to
+compare against. What a program does is the same under either; what it costs in time and
+memory is not.</li>
+</ol>
+<h2 id="5-the-native-part">5. The native part</h2>
+<p>C a package brings with it, compiled with the program and linked into it
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 B5</a>; <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code>, package cases that call their native part; the
+toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>NativeTests</code>).</p>
+<ol>
+<li><code>[native]</code> names <code>sources</code>, patterns of the package's files as §2's <code>include</code> has them — the C
+sources compiled with the program under its profile —, <code>include</code>, directories of the package
+the sources find their includes in, and <code>libs</code>, libraries linked by name (<code>-lz</code>). Another key
+is refused (<code>LYR-PKG0003</code>), as is another form of an entry (<code>LYR-PKG0002</code>).</li>
+<li><code>[native.linux]</code>, <code>[native.windows]</code> and <code>[native.macos]</code> take the same keys: what a build for
+that operating system gets on top of <code>[native]</code>.</li>
+<li>Every package of the program brings its native part — a dependency's too —, and each library is
+linked once. The C functions of a native part are called through <code>extern &quot;C&quot;</code>
+(<a href="../../spec/13-abi/">13 §2</a>).</li>
+</ol>
+<h2 id="6-reproducibility">6. Reproducibility</h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 P6</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>ReproducibilityTests</code>): one
+package built in two directories a second apart — for the host in both built-in profiles, and for
+each operating system from any host — compared byte for byte.</p>
+<ol>
+<li>The same sources, options, toolchain and C compiler give the <strong>same bytes</strong> — wherever the
+package lies, wherever the build runs from, and whenever it is built. A binary carries no time
+stamp, and no path of the machine that built it: a path the build would write into it — a
+source's, the emitted C's, the runtime's — is written as the name of the package it lies in, or
+<code>lyric</code> for the toolchain's own, and the directory the C compiler works in as <code>.</code>. A library
+the C compiler brings of its own — zig's <code>libunwind</code> on Linux — comes as the C compiler built
+it.</li>
+<li>Debug information that names the machine's paths lies <strong>beside</strong> the binary, not in it: a
+Windows binary's PDB, a macOS binary's <code>.dSYM</code> — gathered on a macOS host, where <code>dsymutil</code> is.
+The binary names it by a hash of its own bytes — a PE image's PDB GUID, a Mach-O image's UUID —,
+so the two still pair.</li>
+</ol>
+<h2 id="7-tests">7. Tests</h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V4</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>TestCommandTests</code>).</p>
+<ol>
+<li>A package's <strong><code>tests/</code></strong>, beside <code>src/</code>, holds modules of the package: <code>tests/math.lyr</code> in
+<code>app</code> is <code>app.tests.math</code>. A test there sees what the package does not make <code>private</code>; a test
+beside the code, in the module it tests, sees that module's <code>private</code> too. A module that would
+lie both under <code>src/tests/</code> and under <code>tests/</code> is refused (<code>LYR-RES0015</code>).</li>
+<li>Only <code>lyric test</code> compiles <code>tests/</code> (<a href="../../spec/14-cli/">14 §3</a>): no program's build reaches it, and a
+package's content (§2) leaves it out.</li>
+</ol>
+<h2 id="8-the-build-script">8. The build script</h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W3 BS1–BS6</a>; M8b S13.)</p>
+<ol>
+<li>A package's <strong><code>build.lyr</code></strong>, at its root, is a program that runs before the package compiles.
+It does things — writes modules into <code>gen/</code>, names C to compile and libraries to link — and
+defines nothing: what the package is, the manifest says (§1).</li>
+<li>It is <strong>a program of its own</strong>: its module is <code>build</code>, a file <code>build/x.lyr</code> beside it the
+module <code>build.x</code>, and it imports from <code>std</code> and from the packages of the manifest's
+<strong><code>[build-dependencies]</code></strong>, a graph of its own (§2), read at the commits the same lock holds and
+held in it beside the program's (§3). Nothing of it is compiled into the package, and the
+package's program sees none of its dependencies; <code>build</code> names no package of that graph. It runs
+on the host, with the package's root as its working directory, whatever the build's target.</li>
+<li><strong><code>std.build</code></strong> is its view of the build: <code>target()</code> and <code>profile()</code>, the build's; <code>outDir()</code>,
+the package's <code>out/</code>; <code>genDir()</code>; <code>rerunIfChanged(paths…)</code>, <code>linkLib(name)</code>,
+<code>cFlags(flags…)</code>, <code>compileC(sources…)</code> — paths from the package's root —, and <code>warn(message)</code>,
+which the build shows (<code>LYR-BLD0003</code>). Outside a build script they panic.</li>
+<li><strong><code>gen/</code></strong>, which the toolchain makes before the script runs, is a module space of the
+package: <code>gen/schema.lyr</code> in <code>app</code> is <code>app.gen.schema</code>, as <code>tests/</code> is §7's. It is no part of
+the package's content (§2).</li>
+<li><strong>When it runs</strong>: before the compile, where the script changed — <code>build.lyr</code>, <code>build/</code>, its
+dependencies, the toolchain, the target, the profile —, where a file it named with <code>rerunIfChanged</code> changed, or
+where <code>gen/</code> is not as it left it; else what its last run asked stands. A script that does not
+compile, that ends with an exit other than 0, or that does not end within 10 minutes, stops the
+build (<code>LYR-BLD0002</code>), with what it wrote — exit 1, as a program refused (<a href="../../spec/14-cli/">14 §1.3</a>):
+the package's code failed, not the environment.</li>
+<li><strong>Trust</strong>: the root package's script always runs; a dependency's only where the root
+manifest's <strong><code>[trust] build-scripts = [&quot;geo&quot;]</code></strong> names the package. Else the build stops before
+anything runs (<code>LYR-PKG0012</code>), at the line that declares the dependency.</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-the-manifest">1. The manifest</a></li>
+<li class="level-2"><a href="#2-dependencies">2. Dependencies</a></li>
+<li class="level-2"><a href="#3-the-lock-file">3. The lock file</a></li>
+<li class="level-2"><a href="#4-profiles">4. Profiles</a></li>
+<li class="level-2"><a href="#5-the-native-part">5. The native part</a></li>
+<li class="level-2"><a href="#6-reproducibility">6. Reproducibility</a></li>
+<li class="level-2"><a href="#7-tests">7. Tests</a></li>
+<li class="level-2"><a href="#8-the-build-script">8. The build script</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

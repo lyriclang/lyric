@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYR-RES0014 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a href="../../spec/">Spec</a><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">RES</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../diagnostics/">All codes</a></li>
+<li><a href="../../diagnostics/LYR-RES0001/">LYR-RES0001</a></li>
+<li><a href="../../diagnostics/LYR-RES0002/">LYR-RES0002</a></li>
+<li><a href="../../diagnostics/LYR-RES0003/">LYR-RES0003</a></li>
+<li><a href="../../diagnostics/LYR-RES0004/">LYR-RES0004</a></li>
+<li><a href="../../diagnostics/LYR-RES0005/">LYR-RES0005</a></li>
+<li><a href="../../diagnostics/LYR-RES0006/">LYR-RES0006</a></li>
+<li><a href="../../diagnostics/LYR-RES0007/">LYR-RES0007</a></li>
+<li><a href="../../diagnostics/LYR-RES0008/">LYR-RES0008</a></li>
+<li><a href="../../diagnostics/LYR-RES0009/">LYR-RES0009</a></li>
+<li><a href="../../diagnostics/LYR-RES0010/">LYR-RES0010</a></li>
+<li><a href="../../diagnostics/LYR-RES0011/">LYR-RES0011</a></li>
+<li><a href="../../diagnostics/LYR-RES0012/">LYR-RES0012</a></li>
+<li><a href="../../diagnostics/LYR-RES0013/">LYR-RES0013</a></li>
+<li><a class="current" href="../../diagnostics/LYR-RES0014/">LYR-RES0014</a></li>
+<li><a href="../../diagnostics/LYR-RES0015/">LYR-RES0015</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
+<h1>LYR-RES0014</h1>
+<p class="code-title">an import of a package the manifest does not declare</p>
+<p class="meta">error · <a href="../../spec/15-project/">spec 15-project</a></p>
+<p>A module imports from a package that its own package's <code>lyric.toml</code> does not list under <code>[dependencies]</code>, such as a dependency of a dependency.</p>
+<h2 id="explanation">Explanation</h2>
+<p>A package imports what its manifest declares, and <code>std</code>. A package that only a dependency declares is that dependency's: it may go away or change its version without the importer having a say.</p>
+<p>Declare the package under <code>[dependencies]</code> in your own <code>lyric.toml</code>.</p>
+<h2 id="wrong">Wrong</h2>
+<pre><code class="language-lyric"><span class="com">//- lyric.toml</span>
+[package]
+name = <span class="str">"app"</span>
+version = <span class="str">"0.1.0"</span>
+
+[dependencies]
+geo = { path = <span class="str">"deps/geo"</span> }
+<span class="com">//- src/main.lyr</span>
+<span class="kw">import</span> units.count { three };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    assert(three() == <span class="num">3</span>);
+}
+<span class="com">//- deps/geo/lyric.toml</span>
+[package]
+name = <span class="str">"geo"</span>
+version = <span class="str">"0.1.0"</span>
+
+[dependencies]
+units = { path = <span class="str">"../units"</span> }
+<span class="com">//- deps/geo/src/lib.lyr</span>
+<span class="kw">pub</span> <span class="kw">fn</span> area(w: <span class="ty">int</span>, h: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> w * h;
+}
+<span class="com">//- deps/units/lyric.toml</span>
+[package]
+name = <span class="str">"units"</span>
+version = <span class="str">"0.1.0"</span>
+<span class="com">//- deps/units/src/count.lyr</span>
+<span class="kw">pub</span> <span class="kw">fn</span> three(): <span class="ty">int</span> {
+    <span class="kw">return</span> <span class="num">3</span>;
+}</code></pre>
+<h2 id="right">Right</h2>
+<pre><code class="language-lyric"><span class="com">//- lyric.toml</span>
+[package]
+name = <span class="str">"app"</span>
+version = <span class="str">"0.1.0"</span>
+
+[dependencies]
+geo = { path = <span class="str">"deps/geo"</span> }
+units = { path = <span class="str">"deps/units"</span> }
+<span class="com">//- src/main.lyr</span>
+<span class="kw">import</span> units.count { three };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    assert(three() == <span class="num">3</span>);
+}
+<span class="com">//- deps/geo/lyric.toml</span>
+[package]
+name = <span class="str">"geo"</span>
+version = <span class="str">"0.1.0"</span>
+
+[dependencies]
+units = { path = <span class="str">"../units"</span> }
+<span class="com">//- deps/geo/src/lib.lyr</span>
+<span class="kw">pub</span> <span class="kw">fn</span> area(w: <span class="ty">int</span>, h: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> w * h;
+}
+<span class="com">//- deps/units/lyric.toml</span>
+[package]
+name = <span class="str">"units"</span>
+version = <span class="str">"0.1.0"</span>
+<span class="com">//- deps/units/src/count.lyr</span>
+<span class="kw">pub</span> <span class="kw">fn</span> three(): <span class="ty">int</span> {
+    <span class="kw">return</span> <span class="num">3</span>;
+}</code></pre>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#explanation">Explanation</a></li>
+<li class="level-2"><a href="#wrong">Wrong</a></li>
+<li class="level-2"><a href="#right">Right</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

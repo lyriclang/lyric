@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ABI and embedding — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a class="current" href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>ABI and embedding</h1>
+<blockquote>
+<p><strong>Partly written.</strong> §1 was written with milestone <strong>M1</strong> of the Lyric 5 plan, §1.6 and §1.7 with <strong>M6</strong>, §2 with <strong>M7</strong>; the rest comes
+with <strong>M14</strong>, spec-first: each rule lands here with its conformance case before or with its
+implementation. Source of the decisions:
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 Runtime</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 Tooling and interop W4/W5</a>.</p>
+</blockquote>
+<h2 id="scope">Scope</h2>
+<p>The C ABI as the one foreign boundary: the type table, <code>@Layout(C)</code>, pointers, callbacks, exports, and the embedding API (<code>lyr_init</code>, exports as tasks, <code>LyrStatus</code>). Replaces the 4.x bytecode chapter.</p>
+<h2 id="1-the-runtime-contract-stage-0">1. The runtime contract, stage 0</h2>
+<p>What compiled code and the runtime agree on, whatever collector sits behind the runtime. The
+collector is staged (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 L1</a>):
+a later stage replaces the one before without changing this section. The C declarations are the
+runtime's headers, <code>runtime/include/lyr/</code> in the toolchain repository.</p>
+<p><strong>Conformance.</strong> Until compiled Lyric code can observe these rules (M2), the runtime's own test
+programs are their conformance: <code>runtime/tests/</code> in the toolchain repository, run for every
+Tier 1 target by <code>tests/Lyric5.Tests</code>.</p>
+<h3 id="11-objects">1.1 Objects</h3>
+<ol>
+<li>Every heap object begins with one pointer-sized word, its <strong>header</strong>: the address of the
+object's type descriptor. Two objects have the same type exactly when their headers are equal.</li>
+<li>A <strong>type descriptor</strong> is static and never changes. It gives:
+<ul>
+<li><code>size</code> — the bytes of a fixed-size object, header included; for a string or an array, the
+bytes before its first element;</li>
+<li><code>flags</code> — <code>HAS_REFS</code> (some word of the object, or of an element, is a reference), <code>ARRAY</code>,
+<code>STRING</code>;</li>
+<li><code>elem_size</code> — for an array, the bytes of one element;</li>
+<li><code>refmap</code> — a bit set: bit <em>i</em> set means word <em>i</em> is a reference. For a fixed-size object the
+words are the object's own, word 0 being the header, whose bit is always clear; for an
+array they are the words of one element;</li>
+<li><code>name</code> — the type's qualified name, <code>module.Type</code>;</li>
+<li>the interface tables (<a href="../../spec/05-interfaces/">05</a>).</li>
+</ul>
+</li>
+<li>An object whose descriptor lacks <code>HAS_REFS</code> holds no reference. The collector may skip it.</li>
+<li>Allocation yields memory set to zero with the header in place. It never yields a null
+pointer: when no memory is left — including beyond a configured heap limit (§1.5) — the
+allocation panics with <code>LYR-RT0005</code> (§1.4).</li>
+<li>Compiled code stores every reference into a heap object through the runtime's write barrier
+(<code>LYR_WRITE_BARRIER</code>), from the first stage on, whatever the barrier does in the current stage.</li>
+</ol>
+<h3 id="12-strings">1.2 Strings</h3>
+<p>A string is an object of this layout:</p>
+<table>
+<thead>
+<tr>
+<th>Offset</th>
+<th>Size</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>8</td>
+<td>header</td>
+</tr>
+<tr>
+<td>8</td>
+<td>8</td>
+<td>the length in bytes, a signed 64-bit integer, never negative</td>
+</tr>
+<tr>
+<td>16</td>
+<td>length + 1</td>
+<td>the bytes (UTF-8), then one NUL byte that the length does not count</td>
+</tr>
+</tbody>
+</table>
+<p>A string never changes after it is built. The trailing NUL lets a string reach C as a
+<code>const char *</code> without a copy.</p>
+<h3 id="13-arrays">1.3 Arrays</h3>
+<p>An array is an object of this layout:</p>
+<table>
+<thead>
+<tr>
+<th>Offset</th>
+<th>Size</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>8</td>
+<td>header</td>
+</tr>
+<tr>
+<td>8</td>
+<td>8</td>
+<td>the number of elements, a signed 64-bit integer, never negative</td>
+</tr>
+<tr>
+<td>16</td>
+<td>count × <code>elem_size</code></td>
+<td>the elements, inline and contiguous</td>
+</tr>
+</tbody>
+</table>
+<p>The first element sits at offset 16, aligned to 16 bytes.</p>
+<h3 id="14-panics-and-crashes">1.4 Panics and crashes</h3>
+<ol>
+<li><p>A <strong>panic</strong> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/05-fehler.md">05 E8</a>)
+writes a report to the error output and ends the process with exit code <strong>101</strong> — unless it
+happens in a coroutine, which it leaves (§1.6 rule 10). No <code>defer</code> and no <code>using</code> runs.</p>
+</li>
+<li><p>The report's first line is <code>panic [CODE]: message</code>. The lines after it are the frames of the
+panicking thread, innermost first, each starting with <code>   at</code> (four spaces). A frame names
+its function and, where the debug information has it, its source position:
+<code>    at function (file:line)</code>. In the release profile a frame may be missing: that of a function
+inlined into its caller, and that of a function whose last act is a call, which hands its frame
+to the callee; the debug profile shows every frame (design 01, review 2026-10-07). The
+program's frames are those of its text, whatever its packages and modules are called; the
+runtime's own frames on the way to the report — the function that raised it among them — are
+not shown,
+and neither is anything below the program's entry. <em>(Informative: consecutive equal frames are
+shown once, followed by <code>    ... the frame above repeats N more times</code>; a trace cut at its depth
+limit ends with <code>    ... deeper frames not shown</code>.)</em></p>
+</li>
+<li><p>A panic on any thread ends the whole process, with one report. A panic on another thread
+meanwhile waits for that end and writes nothing. A second panic on the panicking thread
+itself — while its report is written or the hook runs (item 5) — ends the process at once
+with the line <code>panic while panicking [CODE]: message</code>, still with 101.</p>
+</li>
+<li><p>The runtime's panic codes:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LYR-RT0001</code></td>
+<td>integer division by zero</td>
+</tr>
+<tr>
+<td><code>LYR-RT0002</code></td>
+<td>integer overflow, including <code>MIN / -1</code>, <code>MIN % -1</code> and a shift by a count the type cannot take (<a href="../../spec/03-types/">03 §1.6</a>)</td>
+</tr>
+<tr>
+<td><code>LYR-RT0003</code></td>
+<td>an index outside its sequence</td>
+</tr>
+<tr>
+<td><code>LYR-RT0004</code></td>
+<td>unwrapping a null value</td>
+</tr>
+<tr>
+<td><code>LYR-RT0005</code></td>
+<td>no memory left, or the heap limit reached</td>
+</tr>
+<tr>
+<td><code>LYR-RT0006</code></td>
+<td>stack overflow</td>
+</tr>
+<tr>
+<td><code>LYR-RT0007</code></td>
+<td>a precondition of a runtime operation stated by the program text (a negative length)</td>
+</tr>
+<tr>
+<td><code>LYR-RT0008</code></td>
+<td><code>panic(message)</code>: the program's own message, as written</td>
+</tr>
+<tr>
+<td><code>LYR-RT0009</code></td>
+<td><code>as char</code> of a value that is no Unicode scalar value (<a href="../../spec/03-types/">03 §1.4</a>)</td>
+</tr>
+<tr>
+<td><code>LYR-RT0010</code></td>
+<td><code>try!</code> on an error: <code>'try!' on an error: &lt;message&gt;</code> (<a href="../../spec/06-errors/#6-the-expression-forms">06 §6</a>)</td>
+</tr>
+<tr>
+<td><code>LYR-RT0011</code></td>
+<td><code>assert(condition, message)</code> with a false condition: <code>assertion failed: </code>, the condition as written, then the message where one is given (<a href="../../spec/06-errors/#9-panics-and-never">06 §9</a>)</td>
+</tr>
+<tr>
+<td><code>LYR-RT0012</code></td>
+<td><code>unreachable(message)</code> reached: <code>unreachable</code>, then the message where one is given</td>
+</tr>
+<tr>
+<td><code>LYR-RT0013</code></td>
+<td><code>todo(message)</code> reached: <code>not implemented</code>, then the message where one is given</td>
+</tr>
+<tr>
+<td><code>LYR-RT0014</code></td>
+<td>a coroutine resumed while it runs, after its body returned or on a thread other than its own; a yield or a park with no coroutine running; a yield of another type than the running coroutine yields (<a href="../../spec/10-concurrency/">10 §1.13</a>), or in a task where no generator runs; a yield while the coroutine is being closed; a close of one that runs or is parked (§1.6)</td>
+</tr>
+<tr>
+<td><code>LYR-RT0015</code></td>
+<td>the system refused the runtime what it needs to go on: a poller, or a wait on one (§1.7); random bytes (<a href="../../spec/12-stdlib/">12</a>)</td>
+</tr>
+<tr>
+<td><code>LYR-RT0016</code></td>
+<td>a collection of the library changed while it was walked: <code>List: changed while it was walked</code> — a list, a map, a set, a deque (<a href="../../spec/12-stdlib/">12</a>)</td>
+</tr>
+<tr>
+<td><code>LYR-RT0017</code></td>
+<td>control reached a place the implementation holds unreachable — behind a call that does not return, behind a <code>match</code> that covers every case. No program causes it: it is a defect of the implementation, reported instead of acted on. A build that optimizes may end as a crash there instead (item 6): at once, and never by going on</td>
+</tr>
+<tr>
+<td><code>LYR-RT0018</code></td>
+<td>every task of a thread waits, none sleeps, and no other thread lives that could wake one: <code>deadlock: every task waits, and nothing can wake one</code>, raised in one of the waiting tasks (<a href="../../spec/10-concurrency/">10 §2</a> rule 12)</td>
+</tr>
+<tr>
+<td><code>LYR-RT0019</code></td>
+<td><code>lock</code>, <code>read</code>, <code>write</code> or <code>run</code> on a lock a task panicked while it held: <code>lock poisoned by a panic: &lt;code&gt;: &lt;message&gt;</code>, the first panic named (<a href="../../spec/10-concurrency/">10 §10</a> rule 6)</td>
+</tr>
+</tbody>
+</table>
+</li>
+<li><p>A host may set one <strong>panic hook</strong>. It is called once per process, after the report is
+written, on the panicking thread, with the code, the message and the frames as written. It
+cannot prevent the end: when it returns, the process exits with 101.</p>
+</li>
+<li><p>A <strong>crash</strong> is not a panic: an invalid memory access, an illegal instruction, a trap, an
+arithmetic fault or an abort. When the runtime installed its handlers (§1.5), it writes <code>crash: </code> and a
+description, then the frames from the faulting one outward, in the form of item 2; then the
+process ends the way the operating system ends it for that fault — not with 101.</p>
+</li>
+<li><p>A stack overflow is a panic (<code>LYR-RT0006</code>), not a crash. A compiled function finds it at its
+entry, before it writes its frame: below the stack's end it keeps a reserve the panic runs in
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 S3</a>). In a
+coroutine the panic leaves it as any panic does (§1.6 rule 10) — a task that overflows ends
+alone —, and what the output holds is written before the report, as for any panic. A guard
+page below each stack is the net under frames that do not check — the runtime's own and
+foreign code —: running into it ends the process with the same report.</p>
+</li>
+</ol>
+<h3 id="15-program-start-and-end">1.5 Program start and end</h3>
+<ol>
+<li>A standalone program starts the runtime with its defaults, which install the handlers of
+§1.4 item 6. Its exit code is the value <code>main</code> returns, masked to <code>0..255</code>
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C5</a>).</li>
+<li>A host starts the runtime itself (<code>lyr_init</code>), once per process: a second start is refused and
+changes nothing. The host chooses the program's arguments, a heap limit (0: none), whether the
+runtime installs its fault handlers (a host owns its signals, so an embedding host says no),
+and where the runtime's standard and error output go.</li>
+</ol>
+<h3 id="16-coroutines">1.6 Coroutines</h3>
+<p>A coroutine runs a body on a stack of its own
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 L4</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 N2</a>). The
+runtime gives the primitives only — create, resume, yield, park, close, status, the running
+coroutine (<code>lyr/coro.h</code>); generators, tasks and channels are built on them
+(<a href="../../spec/10-concurrency/">10</a>).</p>
+<ol>
+<li>A coroutine is created around a body and an argument, and does not run until it is first
+<strong>resumed</strong>. A resume runs it until it <strong>yields</strong> or its body returns; then the resumer goes
+on. A yield goes back to the coroutine's resumer — the thread's own stack, or the coroutine
+that resumed it — and nowhere else (asymmetric), and nothing interrupts a coroutine between a
+resume and its next yield (cooperative).</li>
+<li>A coroutine's stack is reserved at its first resume — 256 KiB in the release profile and
+2 MiB in the others, whose unoptimized frames are some four times as large, unless its
+creation says otherwise (the sweep after M10, W5) — and costs memory only as its pages are
+reached. Running out of it is a stack overflow (<code>LYR-RT0006</code>, §1.4 item 7), as on a thread's
+stack.</li>
+<li>A coroutine runs on the thread that first resumed it, and only there.</li>
+<li>A coroutine is an object. While it is suspended, what its frames hold lives as long as the
+coroutine: one that nothing references any more is collected with its stack, and nothing on
+that stack runs again — no <code>defer</code>, no <code>using</code>.</li>
+<li>Resuming a coroutine that runs — itself, or one that waits for a coroutine it resumed — or one
+whose body returned, or one that runs on another thread, and yielding where no coroutine runs,
+is a panic (<code>LYR-RT0014</code>).</li>
+<li>C frames may lie on a coroutine's stack between a resume and a yield — a callback from C that
+yields (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 K4</a>).
+The runtime counts them for each coroutine: a stack with C frames on it cannot be unwound.</li>
+<li>A <strong>park</strong> stops the coroutine that runs where it stands and hands control back to the thread's
+own stack — where a scheduler runs — past every coroutine between
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 N3</a>):
+the outermost coroutine of the chain, the one resumed from there, is <strong>parked</strong>, and those in
+between go on waiting for the ones they resumed. Resuming the parked one continues the
+coroutine that parked, where it parked; when that one yields, it yields to its own resumer,
+as before. A park where no coroutine runs, and a close of a parked coroutine, is a panic
+(<code>LYR-RT0014</code>).</li>
+<li>The runtime has a <strong>monotonic clock</strong>: nanoseconds that only move forward, from an unspecified
+start — for intervals and deadlines, not for the time of day.</li>
+<li>A <strong>task's context</strong> (<a href="../../spec/10-concurrency/">10 §2</a>) is a coroutine around a function value
+<code>fn() -&gt; void</code>, called with its environment and no error slot. Nothing yields to its resumer:
+a yield in it, outside every generator, is a panic (<code>LYR-RT0014</code>). Where <code>main</code> is a task,
+the program's start makes main's context — on a stack of 8 MiB — and hands it to the
+scheduler of <code>std.task</code>, which runs until that context is done; the exit code is main's
+value as before (§1.5).</li>
+<li>A panic in a coroutine <strong>leaves</strong> it (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/05-fehler.md">05 E8</a>):
+nothing on its stack runs again — no <code>defer</code>, no <code>using</code> — and its resumer finds it
+<strong>panicked</strong>, with the report: the code, the message, and the frames where the panic
+happened. A resume passes the panic on: the resumer panics again, with that report — so a
+panic climbs the coroutines that resumed one another until a task's scheduler takes it
+(<a href="../../spec/10-concurrency/">10 §5</a>), or until it reaches a thread's own stack and ends the process
+with the report (§1.4). A coroutine with foreign frames on its stack (rule 6), and a panic
+for want of memory (<code>LYR-RT0005</code>), end the process at once.</li>
+</ol>
+<h3 id="17-waiting">1.7 Waiting</h3>
+<p>A thread's scheduler waits on the thread's <strong>poller</strong>
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 N6</a>) —
+blocking the thread until another thread wakes it or a deadline passes (<code>lyr/poll.h</code>).</p>
+<ol>
+<li>Every thread has one poller, made when it is first asked for. A <strong>wait</strong> on it blocks the
+thread until the poller is woken or the wait's timeout passes; a timeout of zero asks without
+blocking, and a wait may have no timeout at all.</li>
+<li>Any thread may <strong>wake</strong> a poller. A wake while no wait runs is kept for the next wait, which
+returns at once; the wakes before one wait count as one.</li>
+<li>A wait never ends early: its timeout runs on the monotonic clock (§1.6 item 8), and a signal
+that interrupts it — the collector's, which stops threads with signals on some platforms —
+does not end it.</li>
+<li>A poller the system refuses — no descriptors left, say — or a wait the system fails is a
+panic (<code>LYR-RT0015</code>).</li>
+</ol>
+<h2 id="2-c-functions-stage-1">2. C functions, stage 1</h2>
+<p>A C function the program calls, declared in Lyric and found by the linker in a package's native
+part (<a href="../../spec/15-project/">15 §5</a>) or a library (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W4</a>). Stage 1 carries the
+scalars C has as they are; strings, pointers, structs, callbacks and exports are the type table
+of a later stage (M14).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code>, package cases with a native part; the toolchain's
+own tests (<code>tests/Lyric5.Tests</code>, <code>NativeTests</code>).</p>
+<ol>
+<li><code>extern &quot;C&quot; fn add(a: int, b: int): int;</code> declares the C function <code>add</code>; <code>= &quot;c_add&quot;</code> after the
+signature names its symbol instead, a C identifier (<code>LYR-SEM0099</code> for another). The ABI is
+<code>&quot;C&quot;</code>, the one foreign boundary there is (<code>LYR-SEM0099</code> for another). The declaration has no
+body, no type parameters and no <code>throws</code> — a C function throws nothing (<code>LYR-SEM0099</code>).</li>
+<li>What crosses: <code>int8</code> to <code>int64</code> and <code>uint8</code> to <code>uint64</code> as the C integer of their width,
+<code>int</code>/<code>uint</code> as the 64-bit ones; <code>float32</code> as <code>float</code>, <code>float</code> as <code>double</code>; <code>bool</code> as C's
+<code>bool</code>, 0 or 1; and <code>void</code> as a return. Each by value: a place parameter (<code>&amp;x: T</code>,
+<a href="../../spec/03-types/">03 §2.3a</a>) is an address and does not cross. Every other type is refused, as a parameter and as a
+result (<code>LYR-SEM0099</code>).</li>
+<li>A call is a direct call in the target platform's C ABI. A symbol nothing defines fails the link
+(exit 2, <a href="../../spec/14-cli/">14 §1.3</a>).</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-the-runtime-contract-stage-0">1. The runtime contract, stage 0</a></li>
+<li class="level-3"><a href="#11-objects">1.1 Objects</a></li>
+<li class="level-3"><a href="#12-strings">1.2 Strings</a></li>
+<li class="level-3"><a href="#13-arrays">1.3 Arrays</a></li>
+<li class="level-3"><a href="#14-panics-and-crashes">1.4 Panics and crashes</a></li>
+<li class="level-3"><a href="#15-program-start-and-end">1.5 Program start and end</a></li>
+<li class="level-3"><a href="#16-coroutines">1.6 Coroutines</a></li>
+<li class="level-3"><a href="#17-waiting">1.7 Waiting</a></li>
+<li class="level-2"><a href="#2-c-functions-stage-1">2. C functions, stage 1</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

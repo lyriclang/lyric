@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Expressions — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a class="current" href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>Expressions</h1>
+<blockquote>
+<p><strong>Partly written.</strong> §1 to §6 were written with milestones <strong>M4</strong> to <strong>M8a</strong> of the Lyric 5 plan
+and the catch-up block N (2026-10-07); lambdas, trailing blocks and <code>with</code> follow, spec-first:
+each rule lands here with its conformance case before or with its implementation. Source of the
+decisions:
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Syntax</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/04-abstraktion.md">04 Abstraction D6</a>.</p>
+</blockquote>
+<h2 id="scope">Scope</h2>
+<p>Precedence, evaluation order, assignment as an expression, <code>++</code>/<code>--</code>, wrapping operators, <code>??</code>, <code>if</code> and <code>match</code> as values, lambdas and trailing blocks, <code>with</code>.</p>
+<h2 id="1-calls">1. Calls</h2>
+<p>A call names a function and gives it arguments
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/04-abstraktion.md">04 D4, D5</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Y9</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/08-expressions/</code>.</p>
+<h3 id="11-arguments">1.1 Arguments</h3>
+<ol>
+<li>An argument is <strong>positional</strong>, in parameter order, or <strong>named</strong>, <code>connect(host: &quot;h&quot;, port: 80)</code>:
+the name is the parameter's own, every parameter has one, and a parameter's name is therefore
+part of the function's public form (D5 F5). Positional arguments come first, named ones after
+them in any order (F6); a positional argument after a named one, a name given twice or for a
+parameter already set positionally, and a name no parameter has are refused (<code>LYR-SEM0119</code>).
+A trailing block (<a href="../../spec/03-types/">03 §8.2</a>) is a positional argument, the call's last: behind
+named ones it is refused like any other.
+A <strong>variadic</strong> parameter, <code>nums: int...</code>, takes the remaining positional arguments as an
+array of what it names, <code>int[]</code>, and is not named (F8). It stands last and has no default — a
+call without its arguments passes the empty array. Each remaining argument is <strong>one
+element</strong>, an array too: <code>sum(xs)</code> with <code>xs: int[]</code> hands <code>sum</code> one argument that is no <code>int</code>
+(<code>LYR-SEM0001</code>), and where the element type takes an array — <code>Any...</code>, a type parameter's
+<code>T...</code> — the array is that one element. <strong><code>xs...</code></strong> spreads an array over the parameter
+instead: the argument is the rest — the one argument the call spreads, alone in the rest,
+of the parameter's array type, at a parameter that is variadic (<code>LYR-SEM0166</code>) — and the
+parameter <em>is</em> that array, nothing is copied. So one variadic function hands its arguments
+on to another, <code>fn logged(xs: int...): int { return sum(xs...); }</code>. Lyric 4's
+<code>params xs: int[]</code> is gone (<code>LYR-SEM0024</code>).</li>
+<li>A parameter may carry a <strong>default</strong>, <code>fn connect(host: string, port: int = 80)</code>, at any
+position (F3): a call that leaves it out gets the default, and a default in the middle is
+left out by naming what follows. The default is evaluated <strong>per call, in the function's
+scope</strong>, after the arguments before it, and may read the parameters declared before it —
+<code>fn span(from: int, to: int = from + 10)</code>; a later parameter is not in its scope, and
+neither is <code>this</code> (<code>LYR-SEM0120</code>) — the receiver is nobody's before the call (F2). A
+parameter without a default that a call gives nothing for is refused (<code>LYR-SEM0014</code>).</li>
+<li>A call through a function value is positional only: the value's parameters have no names
+(<code>LYR-SEM0119</code>).</li>
+<li><strong><code>&amp;x</code></strong> marks the argument of a place parameter (<a href="../../spec/03-types/">03 §2.3a</a>): the place <code>x</code>,
+not its value. The mark covers the whole argument and stands at an argument and nowhere else
+(<code>LYR-PAR0054</code>).</li>
+<li><strong>The order.</strong> A call through a receiver evaluates the receiver first, then the arguments
+(04 D6: left to right everywhere) — for a member a block gives as for a type's own (M8a S15:
+a block's evaluated its arguments first).</li>
+</ol>
+<h3 id="12-one-name-several-counts">1.2 One name, several counts</h3>
+<ol>
+<li>Functions and methods of one scope may share a name when they take <strong>different numbers of
+arguments</strong> — <code>of(hex)</code> beside <code>of(r, g, b)</code> — and never otherwise (D4): a call counts its
+arguments and finds one candidate, with no ranking and no conversion of any kind; none that
+takes that many is refused (<code>LYR-SEM0087</code>). The names of the arguments decide nothing (F7).
+Members that answer instances of one generic interface are the one exception: they share a
+count, and the arguments' types choose (<a href="../../spec/05-interfaces/">05 §3</a> rule 5).
+A type's members are one scope with its blocks' (<a href="../../spec/05-interfaces/">05 §13</a>): a method and a
+static reached through the type's name count among them alike — <code>int8.parse(s)</code> beside
+<code>int8.parse(s, 16)</code>.</li>
+<li>Two declarations of one name whose counts overlap for any number — a default widens a
+count to a range — are a redeclaration (<code>LYR-SEM0085</code>), at the declaration and never at a
+call. An interface declares a member once (<code>LYR-SEM0088</code>).</li>
+<li>The bare name of a shared one is a value only where the position says which, by its
+function type (<code>LYR-SEM0089</code>).</li>
+<li><code>Point(1, 2)</code> is <code>Point.new(1, 2)</code> (Y9): <code>new</code> is an ordinary static function, so <code>Point(4)</code>
+reaches a one-argument factory declared beside the two-argument one.</li>
+</ol>
+<h2 id="2-if-and-match-as-values">2. <code>if</code> and <code>match</code> as values</h2>
+<ol>
+<li><strong><code>if (c) a else b</code></strong> is an expression: <code>c</code> is a <code>bool</code>, the <code>else</code> is required
+(<code>LYR-PAR0036</code>), and exactly one branch is evaluated. A branch is an expression or a <strong>value
+block</strong> (<a href="../../spec/07-statements/#3-value-blocks">07 §3</a>): <code>if (c) { …; a } else { …; b }</code>; the two
+forms mix, and <code>else if</code> goes on. A block ends its branch — an operator behind it takes the
+whole <code>if</code>, <code>if (c) { 1 } else { 2 } + 3</code> is a sum — where a branch without braces takes
+everything to its right.</li>
+<li><strong>Its type.</strong> Where the position wants a type, each branch meets it and the <code>if</code> has it;
+otherwise the branches unify, as arms do (<code>LYR-SEM0016</code>), a <code>null</code> branch making the other
+optional. A branch worth <code>never</code> — one that leaves — contributes nothing: <code>if (x &lt; 0) { continue; } else { x }</code> is <code>x</code>'s type. Both branches worth <code>never</code>: so is the <code>if</code>. Both
+worth nothing — two calls that give none, two blocks without a tail — and so is the <code>if</code>: it
+stands where nobody takes a value, <code>(c) =&gt; if (c) yes() else no()</code>.</li>
+<li><strong><code>x ?? { … }</code></strong>: the right of <code>??</code> may be a value block, evaluated only when <code>x</code> is absent —
+<code>let n = v ?? { return 0; };</code>, <code>v ?? { let d = base(); d + 1 }</code>.</li>
+<li><strong><code>match (e) { p =&gt; v, p =&gt; { …; v } }</code></strong> is worth the arm that is taken. An arm's body is an
+expression or a value block; the arms unify as the branches of an <code>if</code> do, or each meets the
+type the position wants. A block arm that leaves — <code>return</code>, <code>throw</code>, and a <strong><code>break</code> or
+<code>continue</code></strong> of the loop around the <code>match</code> — contributes nothing; a <code>match</code> whose arms all
+leave is worth <code>never</code>, and one whose arms are all worth nothing is worth nothing. A block
+arm that runs to its end without a tail beside an arm that gives a value, or where the
+position wants one, is refused (<code>LYR-SEM0033</code>).</li>
+<li><strong>Definite assignment</strong> (<a href="../../spec/07-statements/#1-loop-and-the-jumps">07 §1</a> rule 5) treats the
+branches of an <code>if</code> expression as an <code>if</code> statement's: behind it a variable is assigned when
+every branch that completes assigned it.</li>
+<li><strong><code>comptime if (c) a else b</code></strong> is a value whose condition is decided while compiling, the arms
+expressions (<a href="../../spec/11-metaprogramming/">11 §4</a> rule 9): where a round decides <code>c</code>, the chosen arm
+alone is checked; otherwise both arms are, of one type, and the site chooses.</li>
+</ol>
+<h2 id="3-assignment">3. Assignment</h2>
+<p>An assignment is an expression
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/04-abstraktion.md">04 D6</a>:
+left to right everywhere, the target before the value).</p>
+<ol>
+<li><strong>The target before the value.</strong> What leads to the place — the receiver, then the index or
+the key — is evaluated first, left to right and once; then the value; then the store.
+<code>xs[next()] = next()</code> stores the second count at the first — in an array as through a type's
+own index (<a href="../../spec/05-interfaces/">05 §12</a> rule 9).</li>
+<li><strong>A compound assignment</strong> <code>t op= v</code>, and <code>t++</code> and <code>t--</code>, evaluate what leads to the place
+once, read it, compute, and write it: <code>xs[next()] += 1</code> calls <code>next</code> once.</li>
+<li><strong>Its value</strong> is the value stored, at the type of the place: <code>o = v</code> where <code>o</code> holds a <code>?T</code>
+or an interface is worth that <code>?T</code> or that interface. A compound assignment is worth the
+new value; <code>t++</code> the old one, <code>++t</code> the new.</li>
+</ol>
+<h2 id="4-precedence">4. Precedence</h2>
+<ol>
+<li><p>The operators bind by these levels, the tightest first (08 Y4):</p>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Operators</th>
+<th>Associativity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>postfix</td>
+<td><code>.</code> <code>?.</code> <code>[ … ]</code> <code>( … )</code> <code>!</code> <code>++</code> <code>--</code> <code>with { … }</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td>prefix</td>
+<td><code>!</code> <code>-</code> <code>~</code> <code>++</code> <code>--</code> <code>&amp;</code> <code>try</code> <code>try?</code> <code>try!</code> <code>throw</code> <code>comptime</code></td>
+<td>right</td>
+</tr>
+</tbody>
+</table>
+<p>A <code>!</code> directly behind a name, before <code>(</code> or <code>{</code>, is no postfix: it is a macro's site, <code>name!(args)</code>
+(<a href="../../spec/11-metaprogramming/#5-macros">11 §5</a>); <code>x! in xs</code> and <code>x!.f()</code> unwrap as ever. <code>quote { … }</code>
+is a primary expression, a tree as a value, and <code>#{e}</code> inside it a splice (11 §5 rules 6, 7);
+<code>#</code> stands nowhere else.
+| cast | <code>as</code> | left |
+| multiplicative | <code>*</code> <code>/</code> <code>%</code> <code>*%</code> | left |
+| additive | <code>+</code> <code>-</code> <code>+%</code> <code>-%</code> | left |
+| shift | <code>&lt;&lt;</code> <code>&gt;&gt;</code> | left |
+| range | <code>..</code> <code>..=</code> | none |
+| bitwise and | <code>&amp;</code> | left |
+| bitwise xor | <code>^</code> | left |
+| bitwise or | <code>\|</code> | left |
+| comparison | <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code> <code>is</code> <code>in</code> <code>!in</code> | none |
+| equality | <code>==</code> <code>!=</code> | none |
+| logical and | <code>&amp;&amp;</code> | left |
+| logical or | <code>\|\|</code> | left |
+| coalescing | <code>??</code> | right |
+| assignment | <code>=</code> and every compound assignment | right |</p>
+<p>So <code>1 &lt;&lt; 2 + 1</code> is <code>1 &lt;&lt; 3</code>, <code>x as int * 2</code> casts before it multiplies, and <code>0..n + 1</code> ends at
+<code>n + 1</code>.</p>
+</li>
+<li><p>A level <strong>without associativity does not chain</strong>: <code>a..b..c</code> is refused (<code>LYR-PAR0005</code>), and so
+are <code>a &lt; b &lt; c</code> and <code>a == b == c</code> (<code>LYR-PAR0059</code>) — a chained comparison would compare a <code>bool</code>
+with the third operand, a chained equality would take a <code>bool</code> for what was meant. Parentheses
+say which: <code>(a == b) == c</code>. <em>(Informative.)</em> The diagnostic names the form likely meant,
+<code>a &lt; b &amp;&amp; b &lt; c</code>.</p>
+</li>
+<li><p><code>try</code> covers everything to its right in the expression it stands in: <code>try a + b</code> is
+<code>try (a + b)</code> (<a href="../../spec/06-errors/#3-the-try-mark-and-coverage">06 §3</a>).</p>
+</li>
+</ol>
+<h2 id="5-evaluation-order">5. Evaluation order</h2>
+<ol>
+<li><strong>Left to right, everywhere</strong> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/04-abstraktion.md">04 D6</a>):
+the left operand of an operator before the right one; a call's receiver before its arguments,
+and the arguments in the order they are written; the parts of a literal, a tuple and an
+initializer in the order they stand. An assignment evaluates its target before its value
+(§3 rule 1).</li>
+<li><code>a &amp;&amp; b</code> evaluates <code>b</code> only when <code>a</code> is <code>true</code>, <code>a || b</code> only when <code>a</code> is <code>false</code>, <code>a ?? b</code> only
+when <code>a</code> is <code>null</code> (§2 rule 3).</li>
+</ol>
+<h2 id="6--and---">6. <code>++</code> and <code>--</code></h2>
+<ol>
+<li><strong><code>++</code> and <code>--</code></strong> add and take one on a place that holds a number — a <code>var</code>, a field, an
+element: <code>x++</code>, <code>p.count--</code>, <code>++xs[i]</code>. A place that cannot be written is refused
+(<code>LYR-SEM0019</code>). The step is checked as <code>+</code> and <code>-</code> are: past the type's range it panics
+(<code>LYR-RT0002</code>, <a href="../../spec/03-types/">03 §1</a>).</li>
+<li><code>x++</code> and <code>x--</code> are worth the <strong>old</strong> value, <code>++x</code> and <code>--x</code> the <strong>new</strong> one (§3 rule 3); what
+leads to the place is evaluated once (§3 rule 2).</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-calls">1. Calls</a></li>
+<li class="level-3"><a href="#11-arguments">1.1 Arguments</a></li>
+<li class="level-3"><a href="#12-one-name-several-counts">1.2 One name, several counts</a></li>
+<li class="level-2"><a href="#2-if-and-match-as-values">2. if and match as values</a></li>
+<li class="level-2"><a href="#3-assignment">3. Assignment</a></li>
+<li class="level-2"><a href="#4-precedence">4. Precedence</a></li>
+<li class="level-2"><a href="#5-evaluation-order">5. Evaluation order</a></li>
+<li class="level-2"><a href="#6--and---">6. ++ and --</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

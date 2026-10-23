@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en" data-root="" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyric</title>
+<link rel="stylesheet" href="site.css" />
+<script src="theme.js"></script>
+</head>
+<body class="home">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="./">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="book/">Book</a><span class="pending">std</span><a href="spec/">Spec</a><a href="diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<main class="home-main">
+<section class="hero">
+<div class="pitch">
+<h1>Lyric: native programs, plainly written.</h1>
+<p class="lead">A statically typed language for applications, command-line tools and servers. It compiles through C to one binary per program, runs its tasks on coroutines with their own stacks, and says in a function's signature what it throws.</p>
+<p class="actions"><a class="button primary" href="book/getting-started/">Get started</a><a class="button" href="book/">Read the Book</a></p>
+</div>
+<pre class="program"><code class="language-lyric"><span class="kw">fn</span> handle(req: <span class="ty">Request</span>): <span class="ty">Response</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> path = req.uri.path;
+    <span class="kw">if</span> (path == <span class="str">"/items"</span> &amp;&amp; req.method == <span class="ty">Method</span>.<span class="ty">Get</span>) {
+        <span class="kw">return</span> <span class="kw">try</span> <span class="ty">Response</span>.withJson(items.toArray());
+    }
+    <span class="kw">if</span> (path == <span class="str">"/items"</span> &amp;&amp; req.method == <span class="ty">Method</span>.<span class="ty">Post</span>) {
+        <span class="kw">let</span> fresh = <span class="kw">try</span> req.json&lt;<span class="ty">NewItem</span>&gt;();
+        <span class="kw">let</span> item = <span class="ty">Item</span> { id = items.length() + <span class="num">1</span>, name = fresh.name, price = fresh.price };
+        items.push(item);
+        <span class="kw">var</span> r = <span class="kw">try</span> <span class="ty">Response</span>.withJson(item, <span class="num">201</span>);
+        r.headers.set(<span class="str">"Location"</span>, <span class="str">f"</span><span class="str">/items/</span>{item.id}<span class="str">"</span>);
+        <span class="kw">return</span> r;
+    }
+    <span class="kw">if</span> (path.startsWith(<span class="str">"/items/"</span>)) {
+        <span class="kw">let</span> id = <span class="kw">try</span> <span class="ty">int</span>.parse(path.splitOnce(<span class="str">"/items/"</span>)!.<span class="num">1</span>);
+        <span class="kw">for</span> (item <span class="kw">in</span> items) {
+            <span class="kw">if</span> (item.id == id) {
+                <span class="kw">return</span> <span class="kw">try</span> <span class="ty">Response</span>.withJson(item);
+            }
+        }
+        <span class="kw">return</span> <span class="kw">try</span> <span class="ty">Response</span>.withJson(<span class="ty">Problem</span> { error = <span class="str">f"</span><span class="str">no item </span>{id}<span class="str">"</span> }, <span class="num">404</span>);
+    }
+    <span class="kw">return</span> <span class="kw">try</span> <span class="ty">Response</span>.withJson(<span class="ty">Problem</span> { error = <span class="str">f"</span><span class="str">no </span>{path}<span class="str">"</span> }, <span class="num">404</span>);
+}</code></pre>
+</section>
+<section class="claims">
+<div class="claim"><h2>Native binaries</h2><p>A program builds into one executable for Linux, macOS or Windows — no virtual machine to install beside it.</p></div>
+<div class="claim"><h2>Concurrency without colouring</h2><p>A task runs on a stack of its own, so any function may wait for input or output; none is marked async.</p></div>
+<div class="claim"><h2>Errors in the signature</h2><p>A function names what it throws; a caller handles it or passes it on with try — no error leaves unseen.</p></div>
+</section>
+<section class="entries">
+<div class="entry"><h2><a href="book/">The Book</a></h2><p>The language from the first program to a server, chapter by chapter.</p></div>
+<div class="entry"><h2><span class="pending">Standard library</span></h2><p>Every module, type and function of std.</p></div>
+<div class="entry"><h2><a href="spec/">Specification</a></h2><p>The rules of the language, precisely.</p></div>
+</section>
+</main>
+<footer class="footer"><a href="releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="nav.js" defer="defer"></script>
+<script src="version.js" defer="defer"></script>
+<script src="search.js" defer="defer"></script>
+</body>
+</html>

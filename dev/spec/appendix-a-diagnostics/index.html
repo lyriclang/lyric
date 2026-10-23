@@ -1,0 +1,3264 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Appendix A — Diagnostic catalogue — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a class="current" href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>Appendix A — Diagnostic catalogue</h1>
+<blockquote>
+<p><strong>Generated</strong> from the toolchain's <code>diagnostics.toml</code> by <code>tooling/diagnostics/appendix.py</code>; not edited by hand.
+Source of the decisions: <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 Tooling and interop G9</a>.</p>
+</blockquote>
+<p>Every code the reference toolchain reports, with its severity, the chapter whose rule it is, and when it is
+reported. The <strong>code and the severity are contract</strong>; the message's wording is not (16 §1). <code>lyric explain CODE</code>
+prints a code's whole entry: its explanation, a program that reports it and the program put right. A retired
+code is no longer reported, and its number is not given again.</p>
+<p>Severities: <strong>E</strong> error, <strong>W</strong> warning, <strong>H</strong> hint, <strong>P</strong> panic (at run time, exit code 101).</p>
+<h2 id="a1-lex--lexical-errors">A.1 LEX — Lexical errors</h2>
+<p>The lexer's: a token that cannot be formed.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-LEX0001</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a character that starts no token, or a name beyond ASCII</td>
+<td>The source holds a character that begins no token (<code>$</code>, a backtick, a control character), or a word holding letters, digits or marks beyond ASCII. A word beyond ASCII is refused once where it stands and read as the name it would be.</td>
+</tr>
+<tr>
+<td>LYR-LEX0002</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a block comment that is not closed</td>
+<td>A <code>/*</code> comment runs to the end of the file without its <code>*/</code>. Block comments nest, so a <code>/*</code> inside one needs its own <code>*/</code> as well.</td>
+</tr>
+<tr>
+<td>LYR-LEX0003</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a numeric literal with a suffix that does not fit it</td>
+<td>A number carries a suffix that is no type's (<code>10i7</code>), an integer suffix on a float literal (<code>1.5u8</code>), or a float suffix on a literal with a base prefix (<code>0b1f32</code>).</td>
+</tr>
+<tr>
+<td>LYR-LEX0004</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a base prefix with no digits after it</td>
+<td>A literal is written <code>0x</code>, <code>0o</code> or <code>0b</code> and no digit of that base follows the prefix.</td>
+</tr>
+<tr>
+<td>LYR-LEX0005</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a digit separator right after a base prefix</td>
+<td>A literal with a base prefix has <code>_</code> directly after the prefix, as in <code>0x_FF</code>.</td>
+</tr>
+<tr>
+<td>LYR-LEX0006</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>an exponent with no digits</td>
+<td>A decimal literal has an <code>e</code> or <code>E</code>, perhaps with a sign, and no decimal digit after it: <code>1e</code>, <code>2.5e+</code>.</td>
+</tr>
+<tr>
+<td>LYR-LEX0007</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a malformed escape sequence</td>
+<td>A string, character or f-string holds a <code>\</code> that starts no escape (<code>\q</code>), a <code>\x</code> without two hex digits, or a <code>\u</code> that is not <code>\u{…}</code> with one to eight hex digits naming a Unicode scalar value (at most <code>10FFFF</code>, no surrogate).</td>
+</tr>
+<tr>
+<td>LYR-LEX0008</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a character literal that holds no character or several</td>
+<td>Between the quotes of a character literal stand no characters (<code>''</code>) or more than one (<code>'ab'</code>). An escape counts as one.</td>
+</tr>
+<tr>
+<td>LYR-LEX0009</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a string literal that is not closed</td>
+<td>A string, raw string or byte string reaches the end of its line or of the file without its closing quote; a multi-line string <code>&quot;&quot;&quot;…</code> reaches the end of the file without its closing <code>&quot;&quot;&quot;</code>.</td>
+</tr>
+<tr>
+<td>LYR-LEX0010</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a character literal that is not closed</td>
+<td>A character literal reaches the end of its line or of the file without its closing <code>'</code>.</td>
+</tr>
+<tr>
+<td>LYR-LEX0011</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>an f-string that is not closed</td>
+<td>An f-string reaches the end of its line (or, for <code>f&quot;&quot;&quot;</code>, of the file) without its closing quote — also when the line ends inside an interpolation or its format spec.</td>
+</tr>
+<tr>
+<td>LYR-LEX0012</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a byte string holding no byte, or an '@' without a name</td>
+<td>A byte string <code>b&quot;…&quot;</code> holds a character beyond ASCII or a <code>\u{…}</code> escape, which name characters and not bytes; or an <code>@</code> is followed by neither a name nor <code>[</code>.</td>
+</tr>
+<tr>
+<td>LYR-LEX0013</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a byte escape in a string or character</td>
+<td>A string, character literal or f-string holds the escape <code>\xNN</code>, which writes a byte and stands in a byte string <code>b&quot;…&quot;</code> only.</td>
+</tr>
+<tr>
+<td>LYR-LEX0014</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a multi-line string whose quotes do not stand on lines of their own</td>
+<td>A multi-line string <code>&quot;&quot;&quot;…&quot;&quot;&quot;</code> has text on the line of its opening <code>&quot;&quot;&quot;</code>, or text before its closing <code>&quot;&quot;&quot;</code> on the closing line.</td>
+</tr>
+<tr>
+<td>LYR-LEX0015</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a line of a multi-line string indented less than its closing quotes</td>
+<td>A line of a multi-line string (or a multi-line f-string) does not begin with the indentation of the line that holds the closing <code>&quot;&quot;&quot;</code>. A blank line may be indented less.</td>
+</tr>
+<tr>
+<td>LYR-LEX0016</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a float literal without digits on one side of its point</td>
+<td>A float literal is written <code>1.</code> or <code>.5</code>. Each is refused once and read as the float it means.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a2-par--syntax-errors">A.2 PAR — Syntax errors</h2>
+<p>The parser's. A declaration that does not parse reports these and nothing that follows from them (16 §2).</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-PAR0001</td>
+<td>E</td>
+<td><a href="../../spec/02-grammar/">02-grammar</a></td>
+<td>a token after one whole expression, pattern or statement <em>(retired)</em></td>
+<td>The parser was asked for exactly one expression, pattern or statement, and a token follows it. Retired: Lyric 5 parses a file whole; the single-item entry points that report it serve <code>std.syntax</code> and a macro's read-back, which turn any parse error into LYR-CT0001 or an internal error</td>
+</tr>
+<tr>
+<td>LYR-PAR0002</td>
+<td>E</td>
+<td><a href="../../spec/02-grammar/">02-grammar</a></td>
+<td>an expression is missing</td>
+<td>An expression is needed — after <code>=</code>, as an argument, an operand, a returned value — and the token there begins none.</td>
+</tr>
+<tr>
+<td>LYR-PAR0003</td>
+<td>E</td>
+<td><a href="../../spec/02-grammar/">02-grammar</a></td>
+<td>a member name or a compile-time form is incomplete</td>
+<td>A <code>.</code> or <code>?.</code> is followed by no member name (or by a number that is no tuple position), or the parts of a compile-time form are missing: the parentheses of <code>comptime if</code> or <code>comptime for</code> in an initializer, the <code>]</code> of <code>e.[f]</code>, the field and <code>=</code> of a <code>with</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0004</td>
+<td>E</td>
+<td><a href="../../spec/02-grammar/">02-grammar</a></td>
+<td>a ']' is missing</td>
+<td>A <code>[</code> is not closed: an array literal, an index, an array pattern, an array type, a <code>throws</code> or <code>catch</code> list, a type set in a pattern, a constraint or conformance list, a bound, or <code>T.[f]</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0005</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>range operators chained</td>
+<td>A range <code>a..b</code> or <code>a..=b</code> is followed by another range operator, as in <code>1..5..9</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0006</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a numeric literal with an unknown suffix</td>
+<td>A numeric literal ends in letters that are no suffix. The lexer refuses such a literal first (LYR-LEX0003, LEX0004, LEX0006), so this code comes only together with that one.</td>
+</tr>
+<tr>
+<td>LYR-PAR0007</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a numeric literal too large</td>
+<td>An integer literal does not fit in 64 bits, or a float literal is beyond the range of <code>float</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0008</td>
+<td>E</td>
+<td><a href="../../spec/02-grammar/">02-grammar</a></td>
+<td>a parenthesis is missing</td>
+<td>A <code>(</code> or <code>)</code> the construct needs is missing: a call, a grouping, a tuple, a parameter list, a function type, the condition of <code>if</code> or <code>while</code>, a <code>for</code> header, a <code>catch</code> binding, a pattern.</td>
+</tr>
+<tr>
+<td>LYR-PAR0009</td>
+<td>E</td>
+<td><a href="../../spec/02-grammar/">02-grammar</a></td>
+<td>an angle bracket of a type list is missing</td>
+<td>A list of type arguments <code>&lt;…&gt;</code> or of type parameters is not closed by <code>&gt;</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0010</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a tuple of fewer than two elements, or a label given twice</td>
+<td>A tuple literal or tuple type is written with one element and a comma, <code>(1,)</code>, or a tuple type gives the same label to two elements.</td>
+</tr>
+<tr>
+<td>LYR-PAR0011</td>
+<td>E</td>
+<td><a href="../../spec/02-grammar/">02-grammar</a></td>
+<td>a type is missing</td>
+<td>A type is needed — after <code>:</code>, in a type argument list, after <code>as</code> or <code>is</code> — and the token there begins none; or a dotted type path ends in something else than a name.</td>
+</tr>
+<tr>
+<td>LYR-PAR0012</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a lambda without '=&gt;' before its body</td>
+<td>A lambda's parameters, or its parameters and return type, are not followed by <code>=&gt;</code>; or the parameters of a trailing block <code>{ a, b =&gt; … }</code> are not.</td>
+</tr>
+<tr>
+<td>LYR-PAR0013</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a lambda parameter without a name</td>
+<td>Where a lambda's parameter name belongs stands something else — a literal, or a reserved word, which is then read as the name it was meant to be.</td>
+</tr>
+<tr>
+<td>LYR-PAR0014</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>an interpolation not closed by '}'</td>
+<td>In an f-string, the expression of an interpolation <code>{…}</code> is followed by something else than its <code>}</code> or its format spec <code>:…}</code> — a second expression, a stray <code>)</code>, or the end of the line.</td>
+</tr>
+<tr>
+<td>LYR-PAR0015</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a function type without '-&gt;'</td>
+<td>A function type <code>fn(…)</code> is not followed by <code>-&gt;</code> and its return type.</td>
+</tr>
+<tr>
+<td>LYR-PAR0016</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a ';' is missing</td>
+<td>A statement is not ended by <code>;</code>; a function has neither a body <code>{ … }</code> nor a <code>;</code>; an extern declaration is not ended by <code>;</code>. Within a statement block, a value without <code>;</code> before the end of a block is refused too.</td>
+</tr>
+<tr>
+<td>LYR-PAR0017</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a '{' is missing, or a body without braces</td>
+<td>The body of <code>if</code>, <code>else</code>, <code>while</code>, <code>do</code> or <code>for</code> is a single statement without braces, or a block, a match body, or the body of a struct, class, enum, interface or extend does not open with <code>{</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0018</td>
+<td>E</td>
+<td><a href="../../spec/02-grammar/">02-grammar</a></td>
+<td>a '}' is missing</td>
+<td>A <code>{</code> is not closed by its <code>}</code>: a block, a match body, a declaration's body, an initializer, a <code>with</code>, an import list, attribute arguments, a quote or splice, a trailing block — or the <code>)</code> of an attribute's one value is missing.</td>
+</tr>
+<tr>
+<td>LYR-PAR0019</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a '(' is missing after a keyword</td>
+<td><code>if</code>, <code>while</code>, <code>for</code>, <code>match</code> or <code>catch</code> is not followed by <code>(</code>, or a function's name is not followed by its parameter list.</td>
+</tr>
+<tr>
+<td>LYR-PAR0020</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a binding without its name, pattern or value</td>
+<td>A <code>let</code>, <code>var</code>, loop variable or <code>catch</code> binding has no name (a reserved word stands there, read as the name); a pattern binding or destructuring has no <code>=</code> and value; a <code>let</code> condition has no <code>=</code>; or a module-level or <code>static</code> binding takes a pattern.</td>
+</tr>
+<tr>
+<td>LYR-PAR0021</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a for loop without 'in'</td>
+<td>The header of a <code>for</code> loop has its variable or pattern but no <code>in</code> before what it walks.</td>
+</tr>
+<tr>
+<td>LYR-PAR0022</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a do block without 'while'</td>
+<td>The block of a <code>do</code> loop is not followed by <code>while</code> and its condition.</td>
+</tr>
+<tr>
+<td>LYR-PAR0025</td>
+<td>E</td>
+<td><a href="../../spec/02-grammar/">02-grammar</a></td>
+<td>something else than a declaration at module level</td>
+<td>At the top level of a file stands a token that begins no declaration — a statement, an expression, a stray brace. The parser skips to the next declaration.</td>
+</tr>
+<tr>
+<td>LYR-PAR0026</td>
+<td>E</td>
+<td><a href="../../spec/02-grammar/">02-grammar</a></td>
+<td>a name is missing</td>
+<td>Where a declaration, a parameter, a field, a variant, a type parameter, an attribute, an import item or a path segment is named, no name stands — or a reserved word, which is then read as the name; an import list <code>{ }</code> names nothing.</td>
+</tr>
+<tr>
+<td>LYR-PAR0028</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a type alias without '='</td>
+<td>A <code>type</code> or <code>opaque type</code> declaration names the alias, and its type parameters, but no <code>=</code> follows.</td>
+</tr>
+<tr>
+<td>LYR-PAR0029</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>fields of a struct or class without ',' between them</td>
+<td>In the body of a struct or class, a field is followed by another member without a <code>,</code> between them.</td>
+</tr>
+<tr>
+<td>LYR-PAR0030</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a list after '::' without its '['</td>
+<td>The interfaces after <code>::</code> — of a struct, class, enum, interface or extend block, of a type parameter's constraints, of an associated type's bound — do not open with <code>[</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0031</td>
+<td>E</td>
+<td><a href="../../spec/02-grammar/">02-grammar</a></td>
+<td>a parameter or field without ':' before its type</td>
+<td>A function's parameter or a field of a struct, class or variant is named, and no <code>:</code> follows before its type.</td>
+</tr>
+<tr>
+<td>LYR-PAR0032</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a function without 'fn', or its words out of order</td>
+<td>Where a function or method is declared, <code>fn</code> is missing after its other words, or <code>inline static</code> is written where the order is <code>static inline</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0033</td>
+<td>E</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>a malformed pattern</td>
+<td>Where a pattern stands, the token begins none; a <code>-</code> in a pattern is not followed by a number; a range pattern's bound is no literal; or an array pattern holds two rests <code>..</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0034</td>
+<td>E</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>a match arm without '=&gt;'</td>
+<td>A match arm's pattern, or its guard, is not followed by <code>=&gt;</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0035</td>
+<td>E</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>match arms without ',' between them</td>
+<td>A match arm whose body is an expression is followed by another arm without a <code>,</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0036</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>an if expression without 'else'</td>
+<td>An <code>if</code> in expression position — after <code>=</code>, as an argument, without braces around its branch — has no <code>else</code> branch.</td>
+</tr>
+<tr>
+<td>LYR-PAR0037</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a field in an initializer without '='</td>
+<td>In a struct initializer, in the braces of an attribute, or after <code>[f]</code> in an initializer over infos, a field's name is not followed by <code>=</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0041</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a static member in an interface <em>(retired)</em></td>
+<td>An interface member is declared <code>static</code>. Retired: In Lyric 5 an interface declares static members, which a constraint reaches, and every member sequence admits <code>static</code></td>
+</tr>
+<tr>
+<td>LYR-PAR0042</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>an attribute with no declaration to carry it</td>
+<td>An attribute stands at the end of a file, before something that is no declaration, or before an <code>import</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0043</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an inline array of no positive literal length</td>
+<td>An inline array type <code>T[n]</code> gives a length that is not a positive decimal literal: <code>int[0]</code>, <code>int[0x4]</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0044</td>
+<td>E</td>
+<td><a href="../../spec/13-abi/">13-abi</a></td>
+<td>an extern symbol that is not a string</td>
+<td>An <code>extern</code> declaration has <code>=</code> after its signature, and no string literal follows to name the symbol.</td>
+</tr>
+<tr>
+<td>LYR-PAR0045</td>
+<td>E</td>
+<td><a href="../../spec/02-grammar/">02-grammar</a></td>
+<td>nesting deeper than the parser carries</td>
+<td>Expressions or types in a file nest deeper than this implementation parses — 192 levels of parentheses, brackets, operands or type arguments. Reported once, and the file is then read as holding no declaration.</td>
+</tr>
+<tr>
+<td>LYR-PAR0046</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a label on something that is no loop</td>
+<td>A label <code>name:</code> stands before a statement that is not <code>while</code>, <code>do</code>, <code>for</code> or <code>loop</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0047</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>'by' where nothing is delegated</td>
+<td>An entry of the interface list of an enum, of an interface's parents, or of an <code>extend</code> block names a field to delegate to with <code>by</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0048</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>'sealed' before something that is no interface</td>
+<td>The word <code>sealed</code> stands before a struct, class, enum, function or other declaration that is not an <code>interface</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0049</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>several types not in brackets, or an empty type list</td>
+<td>Several types follow <code>throws</code>, or a <code>catch</code> binding's <code>:</code> or <code>in</code>, without brackets around them; or a bracketed list after <code>throws</code>, <code>catch (e in …)</code> or a pattern's <code>in</code> is empty.</td>
+</tr>
+<tr>
+<td>LYR-PAR0050</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a 'try' that changes the value, not at the start</td>
+<td><code>try?</code> or <code>try!</code>, or a <code>try</code> with <code>catch</code> clauses, stands to the right of an operator instead of at the start of the expression it covers.</td>
+</tr>
+<tr>
+<td>LYR-PAR0051</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a 'catch' clause on 'try?' or 'try!'</td>
+<td>A <code>try?</code> or <code>try!</code> expression is followed by <code>catch</code> clauses.</td>
+</tr>
+<tr>
+<td>LYR-PAR0052</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a 'using' that is not one 'let' with a value</td>
+<td><code>using var</code> is written, or a <code>using</code> binding takes a pattern or has no value.</td>
+</tr>
+<tr>
+<td>LYR-PAR0053</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a visibility word where none or another belongs</td>
+<td>A declaration or member has two visibility words (<code>pub private</code>), an enum variant has one, or an <code>import</code> has one other than <code>pub</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0054</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>'&amp;' outside an argument</td>
+<td>The mark <code>&amp;</code> stands before an operand that is not an argument of a call — in a binding, an operation, a returned value.</td>
+</tr>
+<tr>
+<td>LYR-PAR0055</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an initializer at the start of a statement</td>
+<td>A statement begins with <code>Name { … }</code> whose braces read as an initializer's: <code>Point { x = 1 };</code>, or a call with a trailing block whose assignment lost its <code>;</code>, <code>run { total = 5 }</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0056</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a 'throws' behind a function type that is a return type</td>
+<td>A declaration's or lambda's return type is a function type without parentheses, followed by <code>throws</code>: <code>fn make(): fn() -&gt; int throws E</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0057</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an enum's variants not ended by ';' before its members</td>
+<td>In an enum body a member — <code>fn</code>, <code>static</code>, an attribute, <code>type Item =</code> — stands where the next variant's name is expected: the <code>;</code> after the variants is missing.</td>
+</tr>
+<tr>
+<td>LYR-PAR0058</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>'&amp;' before a lambda parameter's pattern</td>
+<td>A lambda parameter written as a pattern in parentheses carries the place mark <code>&amp;</code>: <code>(&amp;(a, b)) =&gt; …</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0059</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>comparisons or equalities chained</td>
+<td>A comparison (<code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>, <code>in</code>, <code>not in</code>) is followed by another one, or <code>==</code> or <code>!=</code> by another, as in <code>a &lt; b &lt; c</code> or <code>a == b == c</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0060</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a local function that is not one plain closure</td>
+<td>A <code>fn</code> declared inside a function body has type parameters, a parameter with a default value or a variadic parameter, or has no body.</td>
+</tr>
+<tr>
+<td>LYR-PAR0061</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a 'comptime if' in expression position without 'else'</td>
+<td>A <code>comptime if (c) a</code> stands where a value is taken and has no <code>else</code> branch.</td>
+</tr>
+<tr>
+<td>LYR-PAR0062</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a 'comptime for' in an initializer without '[f] = e'</td>
+<td>In an initializer, a <code>comptime for (f in …)</code> is followed by something else than an item <code>[f] = e</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0063</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>'quote' without a block</td>
+<td>The word <code>quote</code> is not followed by <code>{</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0064</td>
+<td>E</td>
+<td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
+<td>a field that ends with ';'</td>
+<td>A field of a struct or class, or a field of an initializer, ends with <code>;</code> where its list separates with <code>,</code>; read as the <code>,</code> it stands for.</td>
+</tr>
+<tr>
+<td>LYR-PAR0065</td>
+<td>E</td>
+<td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
+<td>a 'continue', 'break' or 'return' where a value stands</td>
+<td>A jump stands where an expression is wanted — a match arm, a branch of an <code>if</code> expression —; it is a statement and goes in a block, <code>=&gt; { continue; }</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a3-res--names-and-modules">A.3 RES — Names and modules</h2>
+<p>The resolver's: what a name, an import or a module path refers to.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-RES0001</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a name declared twice in one scope</td>
+<td>Two declarations take the same name in one scope: a module, a type's members, an <code>extend</code> block, an import beside a declaration, or a parameter list. The second is reported; the first stays.</td>
+</tr>
+<tr>
+<td>LYR-RES0002</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a type name that names no type</td>
+<td>A type annotation names a type that is neither declared in the module, imported, a builtin, nor passed on by the prelude.</td>
+</tr>
+<tr>
+<td>LYR-RES0003</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>an import of a module that does not exist</td>
+<td>An <code>import</code> names a module that no file provides: no <code>src/&lt;path&gt;.lyr</code> in the package, no module of a dependency or of <code>std</code> by that path.</td>
+</tr>
+<tr>
+<td>LYR-RES0004</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>an imported name the module does not declare</td>
+<td>A selective import <code>import m { x };</code> asks for a name the module <code>m</code> neither declares nor passes on with <code>pub import</code>.</td>
+</tr>
+<tr>
+<td>LYR-RES0005</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>modules that import each other</td>
+<td>The imports of the program's modules form a cycle: a module imports, directly or through others, a module that imports it.</td>
+</tr>
+<tr>
+<td>LYR-RES0006</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a file whose module header disagrees with its path <em>(retired)</em></td>
+<td>A file loaded for an import declared, in its <code>module</code> header, a different module than the path it was found at. Retired: Lyric 5.0: a module is named by its path alone and the <code>module</code> header is refused (LYR-RES0008), so a header can no longer disagree with the path</td>
+</tr>
+<tr>
+<td>LYR-RES0007</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>two files that are the same module</td>
+<td>Two source files of a package map to the same module path, for example <code>src/geo/point.lyr</code> and <code>src/geo.point.lyr</code>, which are both <code>app.geo.point</code>. Reported where every file of the package is compiled: when a library is built, and by <code>lyric test</code>.</td>
+</tr>
+<tr>
+<td>LYR-RES0008</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a module header</td>
+<td>A file begins with a <code>module</code> header that names a path: <code>module tools.gen;</code>.</td>
+</tr>
+<tr>
+<td>LYR-RES0009</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a name the place may not see</td>
+<td>A use or an import reaches a declaration its visibility hides from this place: a <code>private</code> name from another module, an internal name from another package, a hidden field, or another module's import.</td>
+</tr>
+<tr>
+<td>LYR-RES0010</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a pub import of a name that is not pub</td>
+<td>A <code>pub import</code> passes on a name that is not <code>pub</code> where it is declared.</td>
+</tr>
+<tr>
+<td>LYR-RES0011</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a declaration that takes a builtin type's name</td>
+<td>A top-level declaration is named like a builtin type: <code>struct int</code>, <code>fn string()</code>.</td>
+</tr>
+<tr>
+<td>LYR-RES0012</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a name that is also a submodule</td>
+<td>A module declares or imports a name that is also the last segment of one of its submodules: <code>http</code> in <code>app.net</code> beside the file <code>src/net/http.lyr</code>. Reported whether or not the submodule is imported.</td>
+</tr>
+<tr>
+<td>LYR-RES0013</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a single file named std.lyr</td>
+<td>A file built by itself, outside a package, is named <code>std.lyr</code>: its module would be named <code>std</code>.</td>
+</tr>
+<tr>
+<td>LYR-RES0014</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>an import of a package the manifest does not declare</td>
+<td>A module imports from a package that its own package's <code>lyric.toml</code> does not list under <code>[dependencies]</code>, such as a dependency of a dependency.</td>
+</tr>
+<tr>
+<td>LYR-RES0015</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a test module under both src/tests/ and tests/</td>
+<td><code>lyric test</code> finds the same test module twice: as <code>src/tests/&lt;name&gt;.lyr</code> and as <code>tests/&lt;name&gt;.lyr</code>. Both are the module <code>&lt;package&gt;.tests.&lt;name&gt;</code>; the run stops before anything is compiled.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a4-sem--semantic-errors-and-warnings">A.4 SEM — Semantic errors and warnings</h2>
+<p>The checker's: types, interfaces, errors, patterns, and the warnings.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-SEM0001</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a value of another type than the place takes</td>
+<td>An expression's type does not fit where it stands: an initializer, an argument, a return value, an assignment.</td>
+</tr>
+<tr>
+<td>LYR-SEM0002</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a name that nothing in scope declares</td>
+<td>An identifier in an expression names no local, parameter, function, global or imported item visible at that point. The message may carry a did-you-mean note.</td>
+</tr>
+<tr>
+<td>LYR-SEM0003</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an operator its operands do not provide</td>
+<td>An operator is applied to a type it is not defined for: arithmetic on a <code>bool</code> or <code>char</code>, <code>&lt;</code> on a type without <code>Ordered</code>, <code>+</code> on a type without the operator interface, <code>same</code> on values that are not references, or a compound assignment through an operator interface on a field or element.</td>
+</tr>
+<tr>
+<td>LYR-SEM0004</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a condition that is not a bool</td>
+<td>The condition of an <code>if</code>, <code>while</code>, <code>do … while</code> or a guard has a type other than <code>bool</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0005</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a null operator on a value that is never null</td>
+<td>A force-unwrap <code>!</code>, a <code>??</code> or a <code>??=</code> is applied to a type that is not optional, so the null case it handles cannot happen. A bare type parameter counts as not optional.</td>
+</tr>
+<tr>
+<td>LYR-SEM0006</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a conversion that does not exist</td>
+<td>An <code>as</code> between types it does not convert (it converts numbers only, and <code>char</code> to and from <code>uint32</code>), or an f-string hole whose value has no <code>Display</code> conformance or carries a format specifier <code>Display</code> does not take.</td>
+</tr>
+<tr>
+<td>LYR-SEM0007</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a value that cannot be indexed or iterated</td>
+<td>An index whose type is not <code>int</code> (or an integer type that widens to it), an index or range on a type that provides none, or a <code>for</code> over a value that is not an <code>Iterable</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0008</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>this outside a method</td>
+<td>The keyword <code>this</code> appears where there is no receiver: in a free function or in a module-level initializer.</td>
+</tr>
+<tr>
+<td>LYR-SEM0009</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>array elements of different types</td>
+<td>An array literal without an expected type has elements whose types differ from the first element's.</td>
+</tr>
+<tr>
+<td>LYR-SEM0010</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a binding whose type nothing fixes</td>
+<td>A local, global or static binding has neither a declared type nor an initializer, or its only initializer is <code>null</code> or <code>[]</code>, which fix no type on their own. A static member of an interface without a type is reported here too.</td>
+</tr>
+<tr>
+<td>LYR-SEM0011</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a name in type position that is no type</td>
+<td>A type name, an initializer <code>T { … }</code> or an attribute names something that is not a type, or nothing at all. A non-type name before braces is also reported here, since the braces then read as an initializer's fields.</td>
+</tr>
+<tr>
+<td>LYR-SEM0012</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a member the type does not have</td>
+<td>A member access <code>x.name</code> names no field, method or element of the value's type, or reads a member that is a method without calling it (<code>length</code> instead of <code>length()</code>). A tuple position past its last element is reported here too.</td>
+</tr>
+<tr>
+<td>LYR-SEM0013</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a call on something that is not a function</td>
+<td>A call <code>f(…)</code> whose callee is not a function value: a number, a field that is no function, or a type <code>T(…)</code> that declares no <code>static fn new</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0014</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a call with the wrong number of arguments</td>
+<td>A call gives fewer arguments than the function's required parameters or more than it takes, or a call with named arguments leaves out a parameter that has no default.</td>
+</tr>
+<tr>
+<td>LYR-SEM0015</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a field the type does not declare</td>
+<td>An initializer <code>T { name = … }</code>, a struct variant's initializer or a field pattern names a field that the struct, class or variant does not declare.</td>
+</tr>
+<tr>
+<td>LYR-SEM0016</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>branches whose types do not unify</td>
+<td>The branches of an <code>if</code> expression, the arms of a <code>match</code> expression, the parts of a <code>try</code> expression or the yields and returns of an inferred lambda produce types that have no common type.</td>
+</tr>
+<tr>
+<td>LYR-SEM0017</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a path of a function that returns no value</td>
+<td>A function whose return type is not <code>void</code> has a path that reaches the end of its body without a <code>return</code> or a <code>throw</code>. A function returning <code>never</code> whose body can end, and a coroutine whose result is not returned on every path, are reported here too.</td>
+</tr>
+<tr>
+<td>LYR-SEM0018</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a variable read before it is surely assigned</td>
+<td>A local declared without an initializer is read on a path where no assignment has reached it.</td>
+</tr>
+<tr>
+<td>LYR-SEM0019</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a write to something that cannot be written</td>
+<td>An assignment, <code>++</code>/<code>--</code>, an index write or a call of a <code>mut fn</code> targets something that is not a writable place: a <code>let</code>, a parameter, a field without <code>var</code>, a temporary, a module <code>let</code>, a value reached through a <code>let</code> or through an optional chain.</td>
+</tr>
+<tr>
+<td>LYR-SEM0020</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a conformance that leaves an interface member unimplemented</td>
+<td>A type or a conformance block declares an interface but does not implement one of its abstract methods, or does not answer one of its static <code>let</code>s.</td>
+</tr>
+<tr>
+<td>LYR-SEM0021</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a missing, duplicated or malformed main</td>
+<td>The entry module has no <code>main</code>, declares it twice, or declares it with parameters or with a return type other than <code>void</code> or <code>int</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0022</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>an expression statement without an effect</td>
+<td>A statement consists of an expression whose value is discarded and which does nothing else: a literal, a name, an arithmetic expression, a <code>with</code>. Only calls, assignments, <code>++</code>/<code>--</code>, <code>throw</code> and loops stand alone.</td>
+</tr>
+<tr>
+<td>LYR-SEM0023</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a mut function that has nothing to write</td>
+<td><code>mut</code> is written on a free function, which has no receiver, or on a method of a type that has no <code>var</code> field and whose body does not replace <code>this</code> (unless an interface demands the method as <code>mut</code>).</td>
+</tr>
+<tr>
+<td>LYR-SEM0024</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a variadic parameter out of place</td>
+<td>A variadic parameter <code>name: T...</code> is not the last parameter or has a default, or a parameter is written with Lyric 4's <code>params</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0026</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>the wrong number of type arguments</td>
+<td>A generic type, alias or function is given more or fewer type arguments than it declares type parameters (after defaults), or a function that is not generic is given type arguments.</td>
+</tr>
+<tr>
+<td>LYR-SEM0027</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a member of a type parameter that no constraint provides</td>
+<td>A generic body uses a member on a value of a type parameter (or of an associated type) that none of the parameter's constraints, and no blanket block they admit, declares.</td>
+</tr>
+<tr>
+<td>LYR-SEM0028</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a type argument that does not satisfy its constraint</td>
+<td>A type argument, written or inferred, does not conform to an interface its type parameter is constrained by.</td>
+</tr>
+<tr>
+<td>LYR-SEM0029</td>
+<td>E</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>a pattern that cannot match the scrutinee's type</td>
+<td>A pattern's shape does not fit the scrutinee's type: <code>null</code> against a non-optional, a literal or range of another type, a tuple pattern of another arity, an array pattern against a non-array, or a dotted variant path against a type that is not an enum.</td>
+</tr>
+<tr>
+<td>LYR-SEM0030</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a thrown, declared or caught type that is not an Error</td>
+<td>A <code>throw</code> throws a value, a <code>throws</code> clause lists a type, or a <code>catch</code> names a type that does not conform to <code>Error</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0031</td>
+<td>E</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>an enum variant used against its shape</td>
+<td>A variant is constructed or matched in a form its declaration does not have: a struct variant called like a function, a tuple variant built with braces, a payload pattern on a variant without one, or a variant name the enum does not declare.</td>
+</tr>
+<tr>
+<td>LYR-SEM0032</td>
+<td>E</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>or-pattern alternatives that bind differently</td>
+<td>The alternatives of an or-pattern <code>p \| q</code> do not bind the same names, or bind one name at different types.</td>
+</tr>
+<tr>
+<td>LYR-SEM0033</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a block that gives no value where one is wanted</td>
+<td>A block that stands where a value is wanted — an arm of a <code>match</code> expression beside arms that give values, a clause of a <code>try</code> expression, a block expression — ends without a tail expression and does not leave on every path.</td>
+</tr>
+<tr>
+<td>LYR-SEM0034</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>an error that nothing handles</td>
+<td>A call, <code>throw</code> or other site may throw an error type that no surrounding <code>catch</code> takes and the enclosing function's <code>throws</code> does not declare. In a lambda, an initializer or a detached body, where nothing can be declared, the error has to be caught there.</td>
+</tr>
+<tr>
+<td>LYR-SEM0035</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a catch-all clause before another clause</td>
+<td>A <code>catch</code> clause without a type, which takes every error, is followed by further <code>catch</code> clauses.</td>
+</tr>
+<tr>
+<td>LYR-SEM0036</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a try block without a catch</td>
+<td>A <code>try { … }</code> block statement has no <code>catch</code> clause.</td>
+</tr>
+<tr>
+<td>LYR-SEM0038</td>
+<td>E</td>
+<td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
+<td>a bare yield in a coroutine that yields values</td>
+<td>A <code>yield;</code> without a value stands in a coroutine whose yield type is not <code>void</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0039</td>
+<td>E</td>
+<td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
+<td>a value returned from a coroutine that returns nothing</td>
+<td>A <code>return v;</code> with a value stands in a coroutine whose type gives no result, <code>Coroutine&lt;Y&gt;</code> rather than <code>Coroutine&lt;Y, R&gt;</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0042</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an implementation that does not match the interface's signature</td>
+<td>A method or static that implements an interface member differs from the member's declaration: in parameters, return type, <code>mut</code>, <code>static</code>, place parameters, the errors it throws, or the answer it gives an associated type the interface fixes.</td>
+</tr>
+<tr>
+<td>LYR-SEM0043</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>one member defaulted by two interfaces</td>
+<td>A type conforms to two interfaces that both provide a default for a member of one name, and the type implements the member itself nowhere.</td>
+</tr>
+<tr>
+<td>LYR-SEM0045</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a lambda parameter whose type nothing gives</td>
+<td>A lambda parameter has no written type and the lambda stands where no function type is expected, or a trailing lambda's implicit <code>it</code> stands where the expected function does not take exactly one parameter.</td>
+</tr>
+<tr>
+<td>LYR-SEM0046</td>
+<td>E</td>
+<td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
+<td>a lambda that can end without its value</td>
+<td>A block lambda whose result is not <code>void</code> — a generator lambda with a result, or a lambda an inline function sets in place — has a path that ends its body without returning the value.</td>
+</tr>
+<tr>
+<td>LYR-SEM0047</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an extend target or conversion not supported</td>
+<td>An <code>extend</code> block targets an inline array <code>T[N]</code>, or something that is no named type and no built-in constructor.</td>
+</tr>
+<tr>
+<td>LYR-SEM0050</td>
+<td>E</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>a match that does not cover every value</td>
+<td>The arms of a <code>match</code> leave values of the scrutinee's type unmatched: a variant, <code>null</code>, a conformer of a sealed interface, a length class of an array, or the rest of an open type. The message names a missing pattern. Guarded arms do not count.</td>
+</tr>
+<tr>
+<td>LYR-SEM0051</td>
+<td>E</td>
+<td><a href="../../spec/13-abi/">13-abi</a></td>
+<td>a function without a body</td>
+<td>A function declaration outside the standard library has no body and is not an <code>extern</code> declaration.</td>
+</tr>
+<tr>
+<td>LYR-SEM0052</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a type, module or generic function used as a value</td>
+<td>A name that is not a value — a type, a module, an interface — stands where a value is wanted, or the bare name of a generic function is used as a function value.</td>
+</tr>
+<tr>
+<td>LYR-SEM0053</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>an attribute used as an expression</td>
+<td>An <code>@Name</code> stands where an expression is expected. Attributes describe the declaration they precede and have no value.</td>
+</tr>
+<tr>
+<td>LYR-SEM0054</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a static member declared 'mut'</td>
+<td>A member function is declared both <code>static</code> and <code>mut</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0055</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a member that needs a receiver named without one</td>
+<td>A method or field of a type is named bare inside the type (without <code>this.</code>), an instance member is reached through the type, or a static member through a value; a variant is named bare inside its enum.</td>
+</tr>
+<tr>
+<td>LYR-SEM0056</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a value type that contains itself</td>
+<td>A struct or enum holds itself by value — directly or through other structs, enum payloads, optionals or tuples — and would have infinite size.</td>
+</tr>
+<tr>
+<td>LYR-SEM0057</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a global read before it is initialized</td>
+<td>The initializer of a module-level binding reads a global of the same module that is declared after it.</td>
+</tr>
+<tr>
+<td>LYR-SEM0058</td>
+<td>E</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>a destructuring that does not fit the value</td>
+<td>A <code>let (a, b) = …</code> takes apart a value that is not a tuple, or binds a different number of names than the tuple has elements.</td>
+</tr>
+<tr>
+<td>LYR-SEM0059</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an equality, null or membership test the type does not support</td>
+<td><code>==</code>/<code>!=</code> is applied to a type without <code>Equatable</code> or to an optional, <code>== null</code> to a value that can never be null, or <code>in</code>/<code>!in</code> to a container without <code>Contains&lt;T&gt;</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0060</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a type argument nothing determines</td>
+<td>A generic call leaves a type argument that neither the arguments nor the expected type determine, or an empty <code>[]</code> stands where nothing gives it an element type.</td>
+</tr>
+<tr>
+<td>LYR-SEM0061</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a host type constructed in the program <em>(retired)</em></td>
+<td>An initializer builds a host type — a field-less class of a native module — which only the host can create. Retired: Lyric 5 has no host types; no native module of lyric5 declares a field-less class, so the check never fires</td>
+</tr>
+<tr>
+<td>LYR-SEM0062</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>'?.' calling a field that holds a function</td>
+<td><code>a?.f()</code> is written where <code>f</code> is a field of function type, not a method.</td>
+</tr>
+<tr>
+<td>LYR-SEM0063</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a generic type named without its type arguments</td>
+<td>A static member, constant or variant of a generic type is reached through the bare type name, where nothing supplies the type arguments.</td>
+</tr>
+<tr>
+<td>LYR-SEM0064</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a type alias that expands to itself</td>
+<td>A <code>type</code> alias names itself in its own definition, directly or through other aliases.</td>
+</tr>
+<tr>
+<td>LYR-SEM0065</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>an attribute that cannot stand here</td>
+<td>An <code>@Name</code> names something that is not a struct, names a generic struct, or names a struct whose markers do not admit the declaration it sits on.</td>
+</tr>
+<tr>
+<td>LYR-SEM0066</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>an attribute argument that is not a compile-time value <em>(retired)</em></td>
+<td>A field of an attribute is set to an expression that is not a literal, a unit variant or a constant. Retired: A Lyric 5 attribute's value is computed while the program compiles; the literal-only check is left to the 4.x path</td>
+</tr>
+<tr>
+<td>LYR-SEM0067</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>an attribute on a generic declaration</td>
+<td>An attribute other than a compiler instruction sits on a generic function or type.</td>
+</tr>
+<tr>
+<td>LYR-SEM0068</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>an attribute repeated on one declaration</td>
+<td>The same attribute type sits on one declaration twice, under any spelling.</td>
+</tr>
+<tr>
+<td>LYR-SEM0069</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>an attribute field left without a compile-time value <em>(retired)</em></td>
+<td>An attribute use leaves a field unset whose declaration has no literal default. Retired: A Lyric 5 attribute is checked as the struct initializer it writes, and a missing field is LYR-SEM0106 there; only the 4.x path reports this code</td>
+</tr>
+<tr>
+<td>LYR-SEM0070</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a field written twice in one initializer or 'with'</td>
+<td>A struct, class or variant initializer, an attribute, or a <code>with</code> copy names the same field more than once.</td>
+</tr>
+<tr>
+<td>LYR-SEM0071</td>
+<td>W</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a local that is never used</td>
+<td>A local binding, loop variable, catch binding or pattern binding is never read after it is declared.</td>
+</tr>
+<tr>
+<td>LYR-SEM0072</td>
+<td>W</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>an import that is never used</td>
+<td>A name an import binds is never referred to in the file.</td>
+</tr>
+<tr>
+<td>LYR-SEM0073</td>
+<td>W</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>an unreachable statement</td>
+<td>A statement follows one that always leaves the block (<code>return</code>, <code>throw</code>, <code>break</code>, <code>continue</code>, a panic) and can never run; reported once per block.</td>
+</tr>
+<tr>
+<td>LYR-SEM0074</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a static extension called on a value</td>
+<td>A <code>static</code> function added by an <code>extend</code> block is called through a value instead of through the type.</td>
+</tr>
+<tr>
+<td>LYR-SEM0075</td>
+<td>W</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a 'var' that is never reassigned</td>
+<td>A <code>var</code> with an initializer is read but never reassigned, written through, or used for a <code>mut fn</code> call; <code>let</code> would do.</td>
+</tr>
+<tr>
+<td>LYR-SEM0076</td>
+<td>W</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a use of a deprecated declaration</td>
+<td>A declaration or module marked <code>@Deprecated</code> is used or imported outside another deprecated declaration.</td>
+</tr>
+<tr>
+<td>LYR-SEM0077</td>
+<td>W</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>an import that shadows a builtin type</td>
+<td>An import binds a name that is also a builtin type, such as <code>import std.string;</code> binding <code>string</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0078</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a conformance or parent list entry that does not fit</td>
+<td>A <code>::</code> list of a type, an <code>extend</code> block or an interface names something that is not an interface, repeats an entry, or makes an interface inherit itself; an associated type's bound names a non-interface.</td>
+</tr>
+<tr>
+<td>LYR-SEM0079</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an interface member inherited twice or redeclared</td>
+<td>An interface inherits a method of one name from two different parents, or declares a member with the name of one it inherits.</td>
+</tr>
+<tr>
+<td>LYR-SEM0081</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a deprecation whose release has come or that names no version</td>
+<td>The <code>until</code> of a <code>@Deprecated</code> is not a version (<code>major.minor[.patch]</code>), or names a release the toolchain has reached.</td>
+</tr>
+<tr>
+<td>LYR-SEM0082</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a member replacing a generic default of a generic interface</td>
+<td>A conformer declares its own version of a generic method that a generic interface provides as a default.</td>
+</tr>
+<tr>
+<td>LYR-SEM0083</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an operator with two conformances that fit the operand</td>
+<td>An arithmetic operator finds two conformances of the left operand's type to its interface (<code>Mul&lt;int32&gt;</code>, <code>Mul&lt;int16&gt;</code> …) that both take the right operand, with different implementations.</td>
+</tr>
+<tr>
+<td>LYR-SEM0084</td>
+<td>E</td>
+<td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
+<td>'throws' on a type that is no coroutine or task</td>
+<td>A type written <code>T throws E</code> where <code>T</code> is neither a coroutine nor a task type.</td>
+</tr>
+<tr>
+<td>LYR-SEM0085</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>two functions of one name taking the same number of arguments</td>
+<td>Two functions or methods of one name in one scope can take the same number of arguments, counting the ranges their defaults allow.</td>
+</tr>
+<tr>
+<td>LYR-SEM0086</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a call that more than one function of the name fits</td>
+<td>A call's name reaches several functions — for example the same name imported from two modules — and more than one takes the number of arguments passed.</td>
+</tr>
+<tr>
+<td>LYR-SEM0087</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a call that no function of the name takes</td>
+<td>A name shared by several functions is called with a number of arguments none of them takes.</td>
+</tr>
+<tr>
+<td>LYR-SEM0088</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an overloaded interface member</td>
+<td>An interface declares two members of the same name.</td>
+</tr>
+<tr>
+<td>LYR-SEM0089</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a shared function name used as a value without a type to choose by</td>
+<td>The bare name of several functions stands where a value is wanted, and no expected function type picks exactly one of them.</td>
+</tr>
+<tr>
+<td>LYR-SEM0090</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a range value without std.core's 'Range' <em>(retired)</em></td>
+<td>A range expression is used as a value while <code>Range</code>/<code>RangeInclusive</code> of <code>std.core</code> is not loaded. Retired: lyric5 always loads std.core, which declares 'Range' and 'RangeInclusive'; no program reaches the check</td>
+</tr>
+<tr>
+<td>LYR-SEM0091</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a loop over optional elements without the iterator protocol <em>(retired)</em></td>
+<td>A <code>for</code> loop walks elements of an optional type through a path where the end of the walk is signalled by null. Retired: Lyric 5's protocol has '??T' and walks arrays by index; only the 4.x path could reach this check</td>
+</tr>
+<tr>
+<td>LYR-SEM0092</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>inference through a type that conforms twice</td>
+<td>A generic call infers a type argument from an argument's conformance to an interface, and the argument's type conforms to that interface more than once with different type arguments.</td>
+</tr>
+<tr>
+<td>LYR-SEM0093</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an opaque type made outside its module <em>(retired)</em></td>
+<td>A cast turns a value of the underlying type into an opaque alias outside the module that declares the alias. Retired: Lyric 5 has no 'opaque type' (LYR-SEM0175 refuses the declaration), so no program reaches the cast check without that error</td>
+</tr>
+<tr>
+<td>LYR-SEM0094</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a parenthesized attribute value with no one field to fill</td>
+<td>An attribute is written <code>@Name(value)</code>, but its struct does not have exactly one field without a default, or the use also names fields.</td>
+</tr>
+<tr>
+<td>LYR-SEM0095</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>an attribute whose 'WithArg' promise its first field breaks <em>(retired)</em></td>
+<td>A struct declares <code>WithArg&lt;T&gt;</code> but has no field, or its first field is not of type <code>T</code>. Retired: std.core of Lyric 5 declares no 'WithArg'; the parenthesized form fills the one field without a default (LYR-SEM0094)</td>
+</tr>
+<tr>
+<td>LYR-SEM0096</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>an attribute with a field a metadata row cannot hold <em>(retired)</em></td>
+<td>An attribute's struct has a field whose type is not a number, string, char, bool or unit enum. Retired: A Lyric 5 attribute's value is a struct computed at compile time, not a metadata row; only the 4.x path checks the field types</td>
+</tr>
+<tr>
+<td>LYR-SEM0097</td>
+<td>E</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>a name bound twice in one pattern</td>
+<td>One pattern binds the same name in two places, such as <code>.Rect { w = n, h = n }</code> or <code>E.B(x, x)</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0098</td>
+<td>E</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>a refutable pattern without a path for a miss</td>
+<td>A <code>let</code> pattern that can fail has no <code>else</code>, the <code>else</code> of a <code>let … else</code> does not leave on every path, a <code>for</code> head or lambda parameter has a refutable pattern, or a <code>let</code> condition stands outside an <code>if</code>/<code>while</code> head.</td>
+</tr>
+<tr>
+<td>LYR-SEM0099</td>
+<td>E</td>
+<td><a href="../../spec/13-abi/">13-abi</a></td>
+<td>an extern declaration that cannot cross into C</td>
+<td>An <code>extern</code> function names an ABI other than &quot;C&quot;, a symbol that is no C name, type parameters, <code>throws</code>, a place parameter, or a parameter or return type that does not cross into C.</td>
+</tr>
+<tr>
+<td>LYR-SEM0100</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a 'comptime' form that cannot be evaluated while compiling</td>
+<td>A 'comptime' expression, 'comptime if' or 'comptime for' asks for something the compiler cannot compute and keep as a constant: a result that is no literal (an object of a class), a read of 'this' or of a local of the enclosing function, an assignment to anything it does not bind itself, a 'comptime for' over something other than an array, a 'comptime if' with a 'let' condition or with arms of two types.</td>
+</tr>
+<tr>
+<td>LYR-SEM0101</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a jump to a label no enclosing loop carries</td>
+<td>A 'break' or 'continue' names a label that no loop around it carries — usually a misspelling, or a label of a loop the statement does not stand in.</td>
+</tr>
+<tr>
+<td>LYR-SEM0102</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a label that repeats the label of an enclosing loop</td>
+<td>A loop is labeled with a name a loop around it already carries.</td>
+</tr>
+<tr>
+<td>LYR-SEM0103</td>
+<td>W</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a loop label nothing jumps to</td>
+<td>A loop carries a label, and no 'break' or 'continue' in its body names it.</td>
+</tr>
+<tr>
+<td>LYR-SEM0104</td>
+<td>W</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>a pattern that cannot fail where a test is promised</td>
+<td>The pattern of an 'if (let …)', 'while (let …)' or the 'let … else' form matches every value of the type it is given, so the test never fails ('if let', 'while let') or the 'else' never runs.</td>
+</tr>
+<tr>
+<td>LYR-SEM0105</td>
+<td>E</td>
+<td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
+<td>an expression or type nested deeper than the checker walks</td>
+<td>An expression or a type is nested deeper than the type checker's fixed bound (192 levels) — for example a chain of a few hundred binary operators, which the parser reads in a loop and the checker walks recursively.</td>
+</tr>
+<tr>
+<td>LYR-SEM0106</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an initializer that omits a field without a default</td>
+<td>A struct, class or enum-variant initializer leaves out a field that has no default; all missing fields are named in one message.</td>
+</tr>
+<tr>
+<td>LYR-SEM0111</td>
+<td>E</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>a bare name in a pattern that spells a variant of the scrutinee's enum</td>
+<td>A pattern binds a bare name, and the scrutinee's enum has a variant of that name — the pattern would match every value, not the variant.</td>
+</tr>
+<tr>
+<td>LYR-SEM0112</td>
+<td>W</td>
+<td><a href="../../spec/09-patterns/">09-patterns</a></td>
+<td>a match arm no value can reach</td>
+<td>An arm of a 'match' stands after an arm that already matches every value, or tests the same variant or literal as an unguarded arm above it.</td>
+</tr>
+<tr>
+<td>LYR-SEM0113</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an implicit member where no enum is expected</td>
+<td>An implicit member '.Name' or an implicit variant initializer '.Name { … }' stands where the position expects no particular type, a type that is no enum, or an enum without a variant of that name.</td>
+</tr>
+<tr>
+<td>LYR-SEM0114</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a from-the-end index '^n' outside the place it means something</td>
+<td>'^n' stands outside '[…]' as a value of its own, indexes a string directly, or indexes a value that has no length.</td>
+</tr>
+<tr>
+<td>LYR-SEM0115</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a view of an inline array that lies in a frame</td>
+<td>A view ('Slice<T>') of an inline array 'T[n]' is taken — by slicing it, passing it as a view, or calling a member written for views — where the array is a local, a parameter or a field of a struct local, not in the heap.</td>
+</tr>
+<tr>
+<td>LYR-SEM0116</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>'with' on something other than a struct</td>
+<td>The target of 'with' is not a struct — a class, a tuple, another type — or a path inside its field list reaches through a field that is no struct.</td>
+</tr>
+<tr>
+<td>LYR-SEM0117</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>the placeholder type '_' where nothing infers it</td>
+<td>The placeholder '_' is written as a type, or as a type argument outside a call or initializer that infers it — for example in the type of a binding.</td>
+</tr>
+<tr>
+<td>LYR-SEM0118</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a visibility word on an interface member</td>
+<td>A member of an interface carries 'pub' or 'internal', or 'private' on a requirement without a body.</td>
+</tr>
+<tr>
+<td>LYR-SEM0119</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a named argument that does not fit the parameters</td>
+<td>A call's named arguments are wrong: a name no parameter has, a parameter given twice or already set by position, a positional argument or trailing block after a named one, a name for a variadic parameter, or names in a call of a function value.</td>
+</tr>
+<tr>
+<td>LYR-SEM0120</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a parameter default that reads 'this'</td>
+<td>The default value of a method's parameter mentions 'this'.</td>
+</tr>
+<tr>
+<td>LYR-SEM0121</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a second member of one name on a type</td>
+<td>A type would hold two members of one name that a call could not tell apart: an extension beside the type's own member at a count it takes, two extensions of one name at one count, an extension beside a conformance's implementation or an interface default, two delegations or blanket blocks giving the name, or a static constant whose name the type already has.</td>
+</tr>
+<tr>
+<td>LYR-SEM0122</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an unqualified call of a name two conformance blocks implement</td>
+<td>A member is called by its bare name on a type that implements it separately in two conformance blocks, for two interfaces.</td>
+</tr>
+<tr>
+<td>LYR-SEM0123</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a delegated conformance whose field cannot answer it</td>
+<td>A conformance delegated with 'by field' names a field the type does not have, or a field whose type does not conform to the interface.</td>
+</tr>
+<tr>
+<td>LYR-SEM0124</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an extend block on an interface</td>
+<td>An 'extend' block names an interface as its target.</td>
+</tr>
+<tr>
+<td>LYR-SEM0125</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a qualified interface call on a receiver that does not conform</td>
+<td>A call 'Interface.member(receiver, …)' passes a first argument whose type does not conform to the interface.</td>
+</tr>
+<tr>
+<td>LYR-SEM0126</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an interface usable only as a constraint used as a value type</td>
+<td>An interface that cannot be a value type — it has a static member, a static 'let', an associated type, a generic member, or mentions 'Self' beyond the receiver — is used as the type of a value: a binding, a field, a parameter, an optional, an 'is' test.</td>
+</tr>
+<tr>
+<td>LYR-SEM0127</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a value for an interface's static 'let'</td>
+<td>A 'static let' in an interface is given a value.</td>
+</tr>
+<tr>
+<td>LYR-SEM0128</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an associated type that is not answered or not declared</td>
+<td>A conformance does not say what an interface's associated type is, or a type path or a fixation ('Iterator&lt;Item = int&gt;') names an associated type that the type, the interface or the bound does not declare.</td>
+</tr>
+<tr>
+<td>LYR-SEM0129</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an associated type answer that no interface asks for</td>
+<td>A type or conformance block declares 'type Name = …;' and no interface it conforms to there declares an associated type 'Name'.</td>
+</tr>
+<tr>
+<td>LYR-SEM0131</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a type test that asks nothing an interface value could answer</td>
+<td>An 'is' test or a type pattern is applied to a value that is no interface value (its type is known already), or tests against a type parameter or a type that never stands behind an interface value.</td>
+</tr>
+<tr>
+<td>LYR-SEM0132</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a conformance to a sealed interface outside its module</td>
+<td>A type, conformance block or child interface outside the module that declares a sealed interface conforms to it — for example a program's type to 'std.sync.AtomicValue'.</td>
+</tr>
+<tr>
+<td>LYR-SEM0133</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>two conformances of one type to one interface</td>
+<td>A type conforms to the same interface twice in the whole program: in two blocks, in its own list and a block, or through a blanket block that reaches a type which also conforms on its own or through another block.</td>
+</tr>
+<tr>
+<td>LYR-SEM0134</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a member of a constrained block on a type that fails its constraints</td>
+<td>A member added by a generic extend block ('extend&lt;T :: [Display]&gt; Slice<T> { … }') is used on an instance whose type arguments do not satisfy the block's constraints.</td>
+</tr>
+<tr>
+<td>LYR-SEM0135</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a conformance the compiler cannot synthesize, or Identity on a value</td>
+<td>An interface that is normally synthesized ('Equatable', 'Hashable', 'Default', 'Identity' …) cannot be synthesized for the type: 'Identity' on a struct or an enum, a 'Default' of an enum, a field whose type gives no such member; also a 'comptime for' over 'Variants' of an enum whose variants carry a payload.</td>
+</tr>
+<tr>
+<td>LYR-SEM0136</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a repeated array literal of an element that would need cloning</td>
+<td>'[x] * n' repeats an element that is or holds an object (or may, in a generic body), and the element type does not conform to 'Clone'.</td>
+</tr>
+<tr>
+<td>LYR-SEM0137</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a type named twice in one 'throws' set</td>
+<td>A function's 'throws [ … ]' list names the same error type more than once.</td>
+</tr>
+<tr>
+<td>LYR-SEM0138</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a call that may throw without a 'try' mark</td>
+<td>A call (or 'await', a loop over a throwing iterator or coroutine, a close) that may throw is not marked 'try', or stands to the left of a 'try' that marks only what follows it.</td>
+</tr>
+<tr>
+<td>LYR-SEM0139</td>
+<td>W</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a 'try' mark over nothing that can throw</td>
+<td>A 'try' mark, a 'try?' or 'try!', a 'try' block or a marked loop covers no call that can throw, or marks what an enclosing or earlier mark covers already.</td>
+</tr>
+<tr>
+<td>LYR-SEM0140</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>'try?' over a call without a value, used as a value</td>
+<td>'try?' is applied to an expression of type 'void' and its result is used as a value.</td>
+</tr>
+<tr>
+<td>LYR-SEM0141</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>an error type caught twice by one 'try'</td>
+<td>Two 'catch' clauses of one 'try' name the same error type.</td>
+</tr>
+<tr>
+<td>LYR-SEM0142</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a 'catch' clause no error can reach</td>
+<td>A 'catch' clause names a type every value of which is already taken by an earlier clause — typically an interface caught before one of its conformers.</td>
+</tr>
+<tr>
+<td>LYR-SEM0143</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>'using' on a value that is not Closeable</td>
+<td>'using let' binds a value whose type does not conform to 'Closeable' (and is no coroutine).</td>
+</tr>
+<tr>
+<td>LYR-SEM0144</td>
+<td>W</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a Closeable value nothing closes</td>
+<td>A value of a 'Closeable' type is made and dropped by an expression statement, or bound with a plain 'let', used, and neither closed nor handed on.</td>
+</tr>
+<tr>
+<td>LYR-SEM0145</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>'never' where a value of it would have to exist</td>
+<td>The type 'never' stands somewhere other than a return type — a parameter, a binding, a field, an element, an optional — or answers an associated type or a type parameter whose bound is not 'Error', or 'try?' is applied to an expression of type 'never'.</td>
+</tr>
+<tr>
+<td>LYR-SEM0146</td>
+<td>E</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a 'return' in a function returning 'never'</td>
+<td>A function whose return type is 'never' contains a 'return', other than one returning a call that itself does not return.</td>
+</tr>
+<tr>
+<td>LYR-SEM0147</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>'break' or 'continue' outside a loop</td>
+<td>A 'break' or 'continue' without a label stands outside every loop of its function — including in a lambda's body inside a loop.</td>
+</tr>
+<tr>
+<td>LYR-SEM0148</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a 'break' with a value out of a 'while' or 'for'</td>
+<td>A 'break' carries a value, and the loop it leaves is a 'while' or a 'for', not a 'loop'.</td>
+</tr>
+<tr>
+<td>LYR-SEM0149</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a 'loop' whose breaks give a value only in part</td>
+<td>Some 'break's of one 'loop' carry a value and others carry none.</td>
+</tr>
+<tr>
+<td>LYR-SEM0150</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a visibility word on a conformance or its methods</td>
+<td>An 'extend … :: [Interface]' block carries 'pub', 'internal' or 'private', or one of its methods does.</td>
+</tr>
+<tr>
+<td>LYR-SEM0151</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a declaration names a type less visible than itself</td>
+<td>A declaration's signature or type names a type that is less visible than the declaration: a <code>pub</code> function returning an internal struct, an internal function taking a private one, a field, constant or inferred binding whose type is narrower than it.</td>
+</tr>
+<tr>
+<td>LYR-SEM0152</td>
+<td>W</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a member is written wider than its type</td>
+<td>A field, method or constant of a struct, class or enum, or a member of an inherent <code>extend</code> block (or the block itself), is written with a visibility wider than the type it belongs to.</td>
+</tr>
+<tr>
+<td>LYR-SEM0153</td>
+<td>W</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a name hides one of the prelude's</td>
+<td>A module declares or imports a name the prelude already gives every module (<code>assert</code>, <code>panic</code>, <code>Result</code>, <code>Test</code> …); the module's own wins in that module. The standard library itself is not warned.</td>
+</tr>
+<tr>
+<td>LYR-SEM0154</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a test takes parameters, returns a value or is private</td>
+<td>A function marked <code>@Test</code> takes parameters, returns something other than <code>void</code>, or is <code>private</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0155</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a caller attribute sits on the wrong parameter</td>
+<td><code>@callerExpr</code>, <code>@callerLine</code> or <code>@callerFile</code> is used where it cannot work: <code>@callerExpr</code> names no other parameter of the function, the parameter has the wrong type (<code>string</code> for <code>@callerExpr</code> and <code>@callerFile</code>, <code>int</code> for <code>@callerLine</code>), or it has no default.</td>
+</tr>
+<tr>
+<td>LYR-SEM0156</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a place argument or parameter that is no place</td>
+<td><code>&amp;</code> hands a call something it may not write (a <code>let</code>, a temporary, a call's result), or a place parameter <code>&amp;p</code> has a default or is <code>params</code>/variadic.</td>
+</tr>
+<tr>
+<td>LYR-SEM0157</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an argument's place mark does not fit its parameter</td>
+<td>A place parameter's argument is written without <code>&amp;</code>, a value parameter's argument with <code>&amp;</code>, or a lambda's parameter mark <code>&amp;n</code> does not match the function type expected where the lambda stands.</td>
+</tr>
+<tr>
+<td>LYR-SEM0158</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a place outlives the call that handed it over</td>
+<td>A coroutine function or a generator lambda takes a place parameter, or a lambda captures a place parameter.</td>
+</tr>
+<tr>
+<td>LYR-SEM0160</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an associated type's answer does not meet its bound</td>
+<td>A conforming type (or an <code>extend</code> block) answers an associated type with a type that does not conform to the bound the interface declared for it, such as <code>type Item :: [Named];</code> answered with <code>int</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0161</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an associated type's answer carries a bound</td>
+<td>A conforming type answers an associated type with a bound of its own, as in <code>type Item :: [Named] = Cat;</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0162</td>
+<td>W</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a second loop over the same iterator</td>
+<td>A <code>for</code> loop walks a local or parameter that an earlier loop in the same or an enclosing block already walked, with no assignment to it between, and the binding's iterator may be shared (a class, or a type parameter a class may answer).</td>
+</tr>
+<tr>
+<td>LYR-SEM0163</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a loop's head takes 'try?', 'try!' or a catching form</td>
+<td>The source of a <code>for</code> loop is marked <code>try?</code>, <code>try!</code> or with the catching form of <code>try</code> instead of the plain <code>try</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0164</td>
+<td>E</td>
+<td><a href="../../spec/12-stdlib/">12-stdlib</a></td>
+<td>a format spec in an f-string hole is malformed or does not apply</td>
+<td>The spec after <code>:</code> in an f-string hole is not of the form <code>[[fill]align][sign][#][0][width][grouping][.precision][type]</code>, or one of its parts does not apply to the value's type (a sign on a string, a precision on an integer …).</td>
+</tr>
+<tr>
+<td>LYR-SEM0165</td>
+<td>E</td>
+<td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
+<td>a 'throws' behind a task or coroutine return type is ambiguous</td>
+<td>A function's return type is a <code>Task&lt;…&gt;</code> or <code>Coroutine&lt;…&gt;</code> (possibly under <code>?</code>) without a thrown set of its own, followed by <code>throws</code> without parentheses, so the clause could be the task's or the function's.</td>
+</tr>
+<tr>
+<td>LYR-SEM0166</td>
+<td>E</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a spread argument is not the whole rest of a variadic call</td>
+<td>A call writes <code>xs...</code> where it does not stand for the variadic parameter's whole array: other arguments follow it or stand beside it in the variadic part, the call spreads twice, or the callee has no variadic parameter.</td>
+</tr>
+<tr>
+<td>LYR-SEM0167</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>an implementing member is less visible than its conformance</td>
+<td>A method or constant that implements an interface member for a type is written with a visibility narrower than the conformance, which is as visible as the narrower of the type and the interface.</td>
+</tr>
+<tr>
+<td>LYR-SEM0168</td>
+<td>W</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a type's member hides a blanket member</td>
+<td>A type has a member of its own (written, inherited as an interface default, or delegated to a field) with the same name as a member a blanket <code>extend&lt;T :: […]&gt; T</code> block gives it.</td>
+</tr>
+<tr>
+<td>LYR-SEM0169</td>
+<td>E</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a generic type's constant is not a constant expression</td>
+<td>A <code>static let</code> of a generic type or generic block has an initializer that would run (a call, an operation), or names itself directly or through another such constant.</td>
+</tr>
+<tr>
+<td>LYR-SEM0170</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an extend block's type parameter is bound by nothing</td>
+<td>An <code>extend&lt;…&gt;</code> block declares a type parameter that its target does not name and that no constraint of a named parameter fixes, as <code>U</code> in <code>extend&lt;T, U&gt; Shelf&lt;T&gt;</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0171</td>
+<td>W</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a catch-all clause that nothing reaches</td>
+<td>A <code>catch</code> clause without a type (<code>catch (_)</code>) follows clauses that already take every error type the <code>try</code> block throws.</td>
+</tr>
+<tr>
+<td>LYR-SEM0172</td>
+<td>W</td>
+<td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
+<td>a 'mut fn' generator on a value type changes a copy</td>
+<td>A non-static <code>mut fn</code> method of a struct or enum is a generator: it returns <code>Coroutine&lt;…&gt;</code> and yields.</td>
+</tr>
+<tr>
+<td>LYR-SEM0173</td>
+<td>W</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a binding or parameter holds a 'void'</td>
+<td>A local binding is initialized with a <code>void</code> value, or a parameter is declared with type <code>void</code>. Not reported for <code>_</code>, nor in generic code where a type parameter happens to be <code>void</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0174</td>
+<td>E</td>
+<td><a href="../../spec/12-stdlib/">12-stdlib</a></td>
+<td>a closeable iterator's close() throws more than its Error allows</td>
+<td>A type that is both an <code>Iterator</code> and <code>Closeable</code> declares a <code>close()</code> that throws a type its <code>Error</code> (the set its <code>next()</code> may throw) does not cover.</td>
+</tr>
+<tr>
+<td>LYR-SEM0175</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>'opaque type' is no form of Lyric 5</td>
+<td>A declaration is written <code>opaque type Name = …;</code>, the 4.x form.</td>
+</tr>
+<tr>
+<td>LYR-SEM0176</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a name is bound twice in one scope</td>
+<td>A <code>let</code> or <code>var</code> binds a name that the same block already binds, or a name of a parameter directly in the function body's block. <code>_</code> binds nothing and is exempt.</td>
+</tr>
+<tr>
+<td>LYR-SEM0177</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>'@AlwaysInline' and '@NoInline' on one function</td>
+<td>A function carries both <code>@AlwaysInline</code> and <code>@NoInline</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0178</td>
+<td>W</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>the value of a '@MustUse' call is dropped</td>
+<td>An expression statement drops the non-void value of a call to a function marked <code>@MustUse</code>, or a value whose type is marked <code>@MustUse</code> (such as a <code>Result</code> or a task handle from <code>std.task.spawn</code>).</td>
+</tr>
+<tr>
+<td>LYR-SEM0179</td>
+<td>E</td>
+<td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
+<td>a lint attribute names no lint</td>
+<td>The argument of <code>@Allow</code>, <code>@Warn</code> or <code>@Deny</code> is no lint's name or code, no group, and not <code>warnings</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0180</td>
+<td>W</td>
+<td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
+<td>an '@Allow' that takes back nothing</td>
+<td>An <code>@Allow</code> names a lint that nothing inside the declaration or module it sits on reports.</td>
+</tr>
+<tr>
+<td>LYR-SEM0181</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an inline function keeps a function parameter</td>
+<td>Inside an <code>inline fn</code>, a parameter of function type is used other than by calling it or passing it to another <code>inline fn</code>: returned, stored, captured or passed to an ordinary function.</td>
+</tr>
+<tr>
+<td>LYR-SEM0182</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an inline function reaches itself</td>
+<td>An <code>inline fn</code> calls itself, directly or through other <code>inline fn</code>s; reported at the call that closes the cycle.</td>
+</tr>
+<tr>
+<td>LYR-SEM0183</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an inline function used as a value</td>
+<td>An <code>inline fn</code> is named anywhere other than as the callee of a call: bound to a variable, passed as an argument, returned.</td>
+</tr>
+<tr>
+<td>LYR-SEM0184</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a function that cannot be inline</td>
+<td><code>inline</code> is written on a function whose body cannot be set in place: an interface member, a function without a body (<code>extern</code>), a <code>mut fn</code>, a function with a place parameter, or a body that yields.</td>
+</tr>
+<tr>
+<td>LYR-SEM0185</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a reflection access outside a round of its own</td>
+<td><code>e.[f]</code>, <code>E.[v]</code>, <code>e.[m](…)</code>, <code>e is v</code> or an attribute query (<code>fieldAttribute</code>, <code>variantAttribute</code>, <code>memberAttribute</code>, <code>parameterAttribute</code>) uses a variable that is not the variable of a <code>comptime for</code> over a known type's fields, variants or members, or applies it to a value of another type, or uses <code>E.[v]</code> for a variant with a payload.</td>
+</tr>
+<tr>
+<td>LYR-SEM0186</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a macro's signature is not syntax to syntax</td>
+<td>A <code>macro</code> declares a parameter or a result whose type is not a <code>std.syntax</code> type, declares type parameters, or, as an attribute macro (first parameter a declaration), returns something other than <code>Decl</code> or <code>Decl[]</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0187</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a macro called as a function</td>
+<td>A macro's name is called like a function, <code>name(…)</code>, instead of being expanded with <code>name!(…)</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0188</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a macro's result does not fit its site</td>
+<td>A macro that gives statements back (<code>Stmt</code>, <code>Stmt[]</code>, <code>Block</code>) stands where an expression is needed, or a macro gives back a kind (an <code>Ident</code>, a <code>Type</code>, a declaration) that no expression or statement site takes.</td>
+</tr>
+<tr>
+<td>LYR-SEM0189</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a macro expanded in its own module</td>
+<td>A site <code>name!(…)</code> or <code>@name</code> stands in the module that declares the macro.</td>
+</tr>
+<tr>
+<td>LYR-SEM0190</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a macro site names no macro</td>
+<td>A site <code>name!(…)</code> names nothing in scope, or names something that is not a macro (a function, a type).</td>
+</tr>
+<tr>
+<td>LYR-SEM0191</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a macro site's arguments do not fit the macro</td>
+<td>A macro site writes more or fewer arguments than the macro takes, an argument is not the kind of syntax its parameter takes, a trailing block meets no <code>Block</code> or <code>Stmt[]</code> parameter, or an attribute macro sits on a declaration of another kind than its first parameter, takes nothing, or is written with fields.</td>
+</tr>
+<tr>
+<td>LYR-SEM0193</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a splice outside a quote or of the wrong kind</td>
+<td>A splice <code>#{…}</code> stands outside a <code>quote</code>, or splices a kind of syntax its position in the quote does not take, such as <code>Stmt[]</code> where an expression stands.</td>
+</tr>
+<tr>
+<td>LYR-SEM0194</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a quote in a program that does not reach std.syntax</td>
+<td>A <code>quote { … }</code> stands in a program that does not import <code>std.syntax</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0195</td>
+<td>E</td>
+<td><a href="../../spec/12-stdlib/">12-stdlib</a></td>
+<td>a part of the standard library the lowering needs is missing</td>
+<td>The lowering translates a construct through the standard library (<code>for</code> through <code>std.iter</code>, string <code>+</code> and f-strings through <code>std.string</code>, <code>panic</code> through <code>std.core</code>) and does not find that part on the module path.</td>
+</tr>
+<tr>
+<td>LYR-SEM0196</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a delegation the lowering cannot express yet <em>(retired)</em></td>
+<td>A type delegates an interface to a field whose type is another interface (<code>[A by inner]</code> with <code>inner: B</code>), or a generic member of an interface is reached on a type that forwards it to a field. Retired: A field of a child interface forwards through the parent's table, and a generic member is forwarded per use, on the field's own member; nothing refuses either.</td>
+</tr>
+<tr>
+<td>LYR-SEM0197</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>the monomorphization does not terminate</td>
+<td>The set of generic instances a program asks for is not finite: each instance asks for a further one — a function that calls itself with a type built from its own (<code>grow(W&lt;T&gt; { v = x })</code>), a method whose result type is built from its own element type (<code>Wrap&lt;T&gt;.deeper(): Wrap&lt;Wrap&lt;T&gt;&gt;</code> called on its own result). Refused at a chain 128 deep, or past 20 000 instances.</td>
+</tr>
+<tr>
+<td>LYR-SEM0198</td>
+<td>W</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a parameter that is never used</td>
+<td>A function's parameter is never named in its body. A method of a type with a conformance list, and a parameter whose name begins with <code>_</code>, are not reported.</td>
+</tr>
+<tr>
+<td>LYR-SEM0199</td>
+<td>W</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a 'var' that is written and never read</td>
+<td>Every use of a <code>var</code> is the target of an assignment: what it stores is never read.</td>
+</tr>
+<tr>
+<td>LYR-SEM0200</td>
+<td>W</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a type parameter that is never used</td>
+<td>A function's or a type's type parameter is named nowhere in it — not in a parameter, the result, a field or the body.</td>
+</tr>
+<tr>
+<td>LYR-SEM0201</td>
+<td>W</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a declaration nothing uses</td>
+<td>A declaration of a module that is not <code>pub</code> and carries no attribute is named nowhere in the compilation. <code>main</code> is not reported.</td>
+</tr>
+<tr>
+<td>LYR-SEM0202</td>
+<td>W</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>an assignment written as a condition</td>
+<td>The condition of an <code>if</code>, a <code>while</code> or a <code>do … while</code> is an assignment, where a comparison with <code>==</code> is usually meant.</td>
+</tr>
+<tr>
+<td>LYR-SEM0203</td>
+<td>W</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>an assignment of a value to itself</td>
+<td>An <code>=</code> whose value is its own target — <code>x = x</code>, <code>a.b = a.b</code> — or <code>x = x++</code>, which keeps the old value.</td>
+</tr>
+<tr>
+<td>LYR-SEM0204</td>
+<td>W</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a comparison of an unsigned value with 0 that cannot fail</td>
+<td>An unsigned value compared with the literal 0 in a way that is always true (<code>n &gt;= 0</code>) or always false (<code>n &lt; 0</code>).</td>
+</tr>
+<tr>
+<td>LYR-SEM0205</td>
+<td>W</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>an equality test on floats</td>
+<td><code>==</code> or <code>!=</code> with a <code>float</code> or <code>float32</code> on both sides. Not said unless the lint is set to <code>warn</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0206</td>
+<td>W</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a local that hides one of the same name</td>
+<td>A local binding in an inner block takes the name of a local or a parameter around it. Not said unless the lint is set to <code>warn</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0207</td>
+<td>W</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a local that hides a module the file imports</td>
+<td>A local or a parameter takes the name a whole-module import binds — <code>import std.io;</code> binds <code>io</code>. Not said unless the lint is set to <code>warn</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0208</td>
+<td>W</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an integer literal that takes another type than int</td>
+<td>An integer literal without a suffix takes a type other than <code>int</code> from its context. Not said unless the lint is set to <code>warn</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0209</td>
+<td>W</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a block's implicit 'it' that hides the 'it' around it</td>
+<td>A trailing block that uses its implicit <code>it</code> stands inside another trailing block with an implicit <code>it</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0210</td>
+<td>W</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>an exit code outside 0 to 255</td>
+<td><code>fn main(): int</code> returns an integer literal below 0 or above 255; the process leaves with it modulo 256.</td>
+</tr>
+<tr>
+<td>LYR-SEM0211</td>
+<td>W</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a conformance of another package's type to another package's interface</td>
+<td>A conformance block is written for a type of another package to an interface of another package (<code>std</code> among them).</td>
+</tr>
+<tr>
+<td>LYR-SEM0212</td>
+<td>W</td>
+<td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
+<td>a task's handle dropped</td>
+<td>An expression statement starts a task with <code>spawn</code> or <code>Thread.spawn</code> and drops the <code>Task</code> it gives; a scope's <code>spawn</code> is left alone, the scope awaits it.</td>
+</tr>
+<tr>
+<td>LYR-SEM0213</td>
+<td>W</td>
+<td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
+<td>a module 'var' in a program that starts threads</td>
+<td>A module of a program that imports <code>std.thread</code> declares a module-level <code>var</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0214</td>
+<td>W</td>
+<td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
+<td>a construct an edition retires</td>
+<td>The name for the warning on a construct a newer edition retires. There is no edition yet, so nothing says it.</td>
+</tr>
+<tr>
+<td>LYR-SEM0215</td>
+<td>W</td>
+<td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
+<td>a name against the naming convention</td>
+<td>A type, a type parameter or a variant not in PascalCase; a function, a field, a parameter, a local or a constant not in camelCase; a module with capitals in its name.</td>
+</tr>
+<tr>
+<td>LYR-SEM0216</td>
+<td>W</td>
+<td><a href="../../spec/04-modules/">04-modules</a></td>
+<td>a module named as a Windows device</td>
+<td>A module is named <code>con</code>, <code>prn</code>, <code>aux</code>, <code>nul</code>, <code>com0</code> to <code>com9</code> or <code>lpt0</code> to <code>lpt9</code>, in any case.</td>
+</tr>
+<tr>
+<td>LYR-SEM0217</td>
+<td>W</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>'clone()' of a value a copy makes whole</td>
+<td><code>clone()</code> is called on a number, a <code>bool</code>, a <code>char</code>, a <code>string</code>, or a struct or an enum made of only such.</td>
+</tr>
+<tr>
+<td>LYR-SEM0218</td>
+<td>W</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a 'return;' that ends a body</td>
+<td>The last statement of a function's or a lambda's body is <code>return;</code>. Not said unless the lint is set to <code>warn</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0219</td>
+<td>W</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>'while (true)' where 'loop' is meant</td>
+<td>A <code>while</code> loop's condition is the literal <code>true</code>. Not said unless the lint is set to <code>warn</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0220</td>
+<td>W</td>
+<td><a href="../../spec/08-expressions/">08-expressions</a></td>
+<td>a string grown with '+' in a loop</td>
+<td>In a loop, a string kept across its rounds is assigned itself with something added: <code>s = s + x</code> or <code>s += x</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0221</td>
+<td>W</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a large struct passed by value</td>
+<td>A parameter's type is a struct of more than 64 bytes, counted without padding. Not said unless the lint is set to <code>warn</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0222</td>
+<td>W</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a value boxed as an interface in a loop</td>
+<td>In a loop, a number or a struct or enum value is passed where the parameter's type is an interface. Not said unless the lint is set to <code>warn</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0223</td>
+<td>W</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a pub declaration without documentation</td>
+<td>A <code>pub</code> function, type, field, method or module binding has no <code>///</code> above it; a method a conformance answers is documented by its interface. Not said unless the lint is set to <code>warn</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0224</td>
+<td>W</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a doc link that names nothing</td>
+<td>A <code>///</code> links <code>[Name]</code> or <code>[Type.member]</code>, and nothing of that name is visible where the documented declaration stands.</td>
+</tr>
+<tr>
+<td>LYR-SEM0225</td>
+<td>W</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>a module without module documentation</td>
+<td>A module that declares something <code>pub</code> does not begin with <code>//!</code> lines. Not said unless the lint is set to <code>warn</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0226</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a 'return' without the value the function returns</td>
+<td>A bare <code>return;</code> stands in a function, a lambda or a coroutine whose result is not <code>void</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0227</td>
+<td>E</td>
+<td><a href="../../spec/01-lexical/">01-lexical</a></td>
+<td>an integer literal too large for 'int'</td>
+<td>An integer literal without a suffix whose type is <code>int</code> is greater than <code>int.max</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0228</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an inline array of another length</td>
+<td>An array literal or a repetition <code>[x] * n</code> that is to be an inline array <code>T[N]</code> makes another number of elements than <code>N</code>.</td>
+</tr>
+<tr>
+<td>LYR-SEM0229</td>
+<td>E</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a place of another type than the place parameter</td>
+<td>A place argument <code>&amp;x</code> is of another type than the place parameter <code>&amp;p: T</code> it is passed to; nothing widens into a place.</td>
+</tr>
+<tr>
+<td>LYR-SEM0230</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>an interface value made through a shape's or a blanket block <em>(retired)</em></td>
+<td>A value is made into an interface it conforms to only through a block on a shape or a blanket conformance: such a value is not built in this release. Retired: A value of an interface is made through a shape's block or a blanket conformance — the shape in a box, a named type with the block's row in its table; nothing refuses it.</td>
+</tr>
+<tr>
+<td>LYR-SEM0231</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a static member of an interface called through the interface</td>
+<td>A static member of an interface is called on the interface's name, <code>Make.make&lt;Item&gt;(s)</code>: the interface has no value to call it for.</td>
+</tr>
+<tr>
+<td>LYR-SEM0232</td>
+<td>E</td>
+<td><a href="../../spec/07-statements/">07-statements</a></td>
+<td>a loop over a string</td>
+<td>A <code>for</code> loop walks a <code>string</code>, which is no <code>Iterable</code>: <code>s.chars()</code> gives its characters, <code>s.lines()</code> its lines.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a5-mac--macros">A.5 MAC — Macros</h2>
+<p>A macro's own refusal, at its site.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-MAC0001</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>an error a macro reports</td>
+<td>A macro called <code>error(at, message)</code> of <code>std.syntax</code> while it expanded: the macro refuses its arguments. The diagnostic stands at the node the macro named, with a note at the site's <code>!</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a6-ct--compile-time-evaluation">A.6 CT — Compile-time evaluation</h2>
+<p>The evaluation of <code>comptime</code>, a macro or a synthesis at build time.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-CT0001</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a panic while evaluating at compile time</td>
+<td>Code run at compile time — a <code>comptime</code> site, an attribute's value, a macro — panics. The message names the panic and the run-time code (<code>LYR-RT…</code>) the built program would have ended with; the notes show where the evaluation went.</td>
+</tr>
+<tr>
+<td>LYR-CT0002</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a compile-time evaluation over its budget</td>
+<td>A <code>comptime</code> site, or a macro's expansion, runs more interpreter steps than its budget: 50 000 000 by default, or what <code>comptimeBudget</code> under <code>[package]</code> in the root <code>lyric.toml</code> sets.</td>
+</tr>
+<tr>
+<td>LYR-CT0003</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>compile-time code that reaches outside the program</td>
+<td>Code run at compile time calls a native function that reaches the world: the console, files, the clock, the network, processes, the environment.</td>
+</tr>
+<tr>
+<td>LYR-CT0004</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>an embed that cannot read its file</td>
+<td>A call to <code>std.core.embed</code> would run in the built program instead of at compile time, or names a file that does not exist or lies outside the package's directory.</td>
+</tr>
+<tr>
+<td>LYR-CT0005</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a form that does not run at compile time yet</td>
+<td>Code run at compile time reaches something the compile-time interpreter does not run: a coroutine (a generator, <code>sequence { }</code>, a task), a native function without a compile-time implementation, a float parsed from text, or a syntax form <code>std.syntax</code> has no form for.</td>
+</tr>
+<tr>
+<td>LYR-CT0006</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a use of a declaration the build leaves out</td>
+<td>Code that is built for this target uses a declaration whose <code>@When</code> condition is false for it, so the declaration is not built.</td>
+</tr>
+<tr>
+<td>LYR-CT0007</td>
+<td>E</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a macro expansion that does not end</td>
+<td>The expansion of macro sites does not finish: after 32 rounds a macro's result still holds a site, or every macro still to be expanded waits for a module whose own sites wait for it.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a7-cg--code-generation">A.7 CG — Code generation</h2>
+<p>What the C backend does not take.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-CG0001</td>
+<td>E</td>
+<td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
+<td>a construct the C backend does not translate</td>
+<td>The backend's subset gate meets something in the IR it has no translation for: a native function of the standard library without a runtime call, a host type, an IR instruction or type the emitter does not know. The message names the construct, and says where it is a compiler bug.</td>
+</tr>
+<tr>
+<td>LYR-CG0002</td>
+<td>E</td>
+<td><a href="../../spec/12-stdlib/">12-stdlib</a></td>
+<td>a compile-time-only function called at run time</td>
+<td>The program would call, at run time, a function of <code>std.syntax</code> that reads, builds or writes a syntax tree. Reported at every such call the built program reaches, the standard library's own among them.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a8-pkg--packages-and-manifests">A.8 PKG — Packages and manifests</h2>
+<p><code>lyric.toml</code>, the lock file, dependencies.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-PKG0001</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td><code>lyric.toml</code> or <code>lyric.lock</code> is not valid TOML</td>
+<td>Reported when the manifest <code>lyric.toml</code>, or the lock <code>lyric.lock</code>, of any package of the graph does not parse as TOML. The error points at the line and column where reading failed.</td>
+</tr>
+<tr>
+<td>LYR-PKG0002</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a manifest or lock field that is missing or malformed</td>
+<td>Reported when <code>lyric.toml</code> or <code>lyric.lock</code> parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a <code>[[bin]]</code> entry, a profile, <code>[native]</code>, <code>[trust]</code>, <code>[lints]</code>, a toolchain pin, a locked revision.</td>
+</tr>
+<tr>
+<td>LYR-PKG0003</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a key or section the manifest does not have</td>
+<td>Reported for a key or section of <code>lyric.toml</code> the toolchain does not know — in <code>[package]</code>, a dependency, <code>[[bin]]</code>, a profile, <code>[native]</code>, <code>[trust]</code>, <code>[lints]</code>, or at the top — and for forms 5.0 does not have: a dependency as a bare version (a registry's form), an <code>[override]</code> from git.</td>
+</tr>
+<tr>
+<td>LYR-PKG0004</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a dependency's source holds no package of that name</td>
+<td>Reported when the directory or repository a dependency names has no <code>lyric.toml</code>, when the package found there has another name, or when a package read from git names a dependency by a directory. The error points at the line of the declaring manifest.</td>
+</tr>
+<tr>
+<td>LYR-PKG0005</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>one package name read from two sources</td>
+<td>Reported when the graph asks for a package of one name from two sources — two directories, two repositories, two revisions, or two versions of different lines — and the root's <code>[override]</code> does not pick one.</td>
+</tr>
+<tr>
+<td>LYR-PKG0006</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a repository has no such revision or no package at it</td>
+<td>Reported when a git dependency's repository does not have the tag, branch or commit it names, has no <code>lyric.toml</code> at its root at that revision, or holds the package under a tag that is a version at another version than its manifest gives.</td>
+</tr>
+<tr>
+<td>LYR-PKG0007</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a git dependency cannot be read</td>
+<td>Reported when a dependency's repository cannot be cloned or fetched, when <code>git</code> is not on the PATH, or when under <code>--offline</code> the user's cache does not hold the revision. The exit code is 2: the environment failed, not the manifest.</td>
+</tr>
+<tr>
+<td>LYR-PKG0008</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>the lock disagrees with the repository</td>
+<td>Reported when <code>lyric.lock</code> holds a commit the dependency's repository does not have, or when the package content at the locked commit is not what the lock's hash says.</td>
+</tr>
+<tr>
+<td>LYR-PKG0009</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a package asks for a newer toolchain</td>
+<td>Reported when a package of the graph has <code>toolchain = &quot;X.Y&quot;</code> (or <code>&quot;&gt;=X.Y&quot;</code>) in <code>[package]</code> and the running toolchain is older. The exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-PKG0010</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>packages that depend on each other in a cycle</td>
+<td>Reported when a package of the graph depends on itself, directly or through others. The message gives the cycle's path, <code>app -&gt; geo -&gt; app</code>, and points at the dependency that closes it.</td>
+</tr>
+<tr>
+<td>LYR-PKG0011</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td><code>--locked</code> and a lock that does not match</td>
+<td>Reported under <code>--locked</code> when <code>lyric.lock</code> lacks a revision the graph reads from git, holds one it does not read, or is missing although the program reads from git. Nothing is fetched or written.</td>
+</tr>
+<tr>
+<td>LYR-PKG0012</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a dependency's build script the root does not trust</td>
+<td>Reported when a dependency has a <code>build.lyr</code> and the root manifest's <code>[trust] build-scripts</code> does not name it. The build stops before any script runs, at the line that declares the dependency.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a9-bld--the-build">A.9 BLD — The build</h2>
+<p>The C toolchain, the runtime, the build script.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-BLD0001</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>the C compiler or the linker failed</td>
+<td>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails. The message carries the command and what the C compiler wrote; the exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-BLD0002</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a package's build script did not build or did not succeed</td>
+<td>Reported when a package's <code>build.lyr</code> does not compile, ends with an exit code other than 0, or does not end within 10 minutes. The package is not built; for a script that ran, what it wrote follows the message.</td>
+</tr>
+<tr>
+<td>LYR-BLD0003</td>
+<td>W</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a warning a build script reported</td>
+<td>Reported when a package's <code>build.lyr</code> calls <code>std.build.warn</code>: the build shows the script's message as a warning, prefixed with the package's name.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a10-cli--the-command-line">A.10 CLI — The command line</h2>
+<p>The driver's options and verbs.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-CLI0001</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a directory or file named on the command line does not exist</td>
+<td>Reported when the directory given with <code>-C</code>, or the file given to <code>build</code>, <code>run</code> or <code>expand</code>, does not exist. The path is printed as resolved; the exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-CLI0002</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>no C compiler was found</td>
+<td>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when no C compiler is found — <code>LYRIC_CC</code>, then <code>zig</code>, <code>clang</code>, <code>gcc</code> on the PATH — or when the profile needs clang (<code>asan</code>, <code>tsan</code>) and there is none. The exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-CLI0003</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a command line the toolchain does not accept</td>
+<td>Reported for an unknown verb, option or value, an option without its value, a profile or target that does not exist, a <code>--bin</code> the package does not have, a name <code>remove</code> or <code>update</code> does not find, and for <code>run</code> of a binary built for another machine. The exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-CLI0004</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>no package here or above</td>
+<td>Reported by every verb about a package — <code>build</code> and <code>run</code> without a file, <code>expand</code>, <code>test</code>, <code>bench</code>, <code>update</code>, <code>clean</code>, <code>metadata</code>, <code>add</code>, <code>remove</code> — when there is no <code>lyric.toml</code> in the directory or any directory above it. The exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-CLI0005</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a library has no program to run or print</td>
+<td>Reported by <code>run</code>, <code>expand</code> and <code>build --emit</code> for a package without <code>src/main.lyr</code> and without <code>[[bin]]</code> programs: a library. <code>build</code> checks such a package instead. The exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-CLI0006</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>the external runtime could not be started <em>(retired)</em></td>
+<td>Reported by the 4.x drivers when the bytecode VM or another tool they started as a separate process could not be launched. Retired: Lyric 5: lyric5 builds native binaries and starts no VM; only the 4.x launcher in Lyric.Core reports it, and the error for a profile that denies warnings is LYR-CLI0016</td>
+</tr>
+<tr>
+<td>LYR-CLI0007</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>several programs and none named</td>
+<td>Reported by <code>run</code>, <code>expand</code> and <code>build --emit</code> for a package with several programs — <code>[[bin]]</code> entries — and no <code>src/main.lyr</code>, when <code>--bin</code> does not name one. The message lists the programs; the exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-CLI0008</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a dependency <code>add</code> or <code>remove</code> cannot edit</td>
+<td>Reported by <code>add</code>, <code>remove</code> and <code>update</code> when the dependency to change is written in <code>lyric.toml</code> as a table of its own rather than on one line. The manifest is left as it was; the exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-CLI0009</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>the function named by <code>--function</code> is not in the module <em>(retired)</em></td>
+<td>Reported by the 4.x compiler's dump commands when <code>--function</code> named a function the module does not have. Retired: Lyric 5: lyric5 has no --function option; the constant has no use outside its declaration</td>
+</tr>
+<tr>
+<td>LYR-CLI0010</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a <code>lyric.json</code> that cannot be understood <em>(retired)</em></td>
+<td>Reported by the 4.x toolchain when a <code>lyric.json</code> project file was found and could not be read. Retired: Lyric 5: the manifest is lyric.toml, refused with LYR-PKG0001–0003; only the 4.x lyric.json reader (Lyric.Core ProjectFile, used by the 4.x language server) reports it</td>
+</tr>
+<tr>
+<td>LYR-CLI0011</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>no <code>build.lyr</code> in the directory a build was pointed at <em>(retired)</em></td>
+<td>Reported by the 4.x <code>lyrbuild</code> when the directory it was given held no build script. Retired: Lyric 5: a package is built from its lyric.toml, and a build.lyr is optional; the constant has no use outside its declaration</td>
+</tr>
+<tr>
+<td>LYR-CLI0012</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>the build script ran and did not finish its job <em>(retired)</em></td>
+<td>Reported by the 4.x <code>lyrbuild</code> when the build script panicked, had no <code>build</code> function, or declared nothing to compile. Retired: Lyric 5: a failing build.lyr is LYR-BLD0002; the constant has no use outside its declaration</td>
+</tr>
+<tr>
+<td>LYR-CLI0013</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>the stub was started without a program <em>(retired)</em></td>
+<td>Reported by the 4.x packed-executable stub when it was started directly and carried no program. Retired: Lyric 5: binaries are native and there is no stub; the constant has no use outside its declaration</td>
+</tr>
+<tr>
+<td>LYR-CLI0014</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a packed executable is damaged <em>(retired)</em></td>
+<td>Reported by the 4.x stub when the footer of a packed executable did not hold together, as after a truncated download. Retired: Lyric 5: binaries are native and there are no packs; the constant has no use outside its declaration</td>
+</tr>
+<tr>
+<td>LYR-CLI0015</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>no stub to pack into <em>(retired)</em></td>
+<td>Reported by the 4.x <code>lyrpack</code> when no stub executable was found through <code>--stub</code>, <code>LYRIC_STUB</code> or beside the binary. Retired: Lyric 5: binaries are native and there is no stub; the constant has no use outside its declaration</td>
+</tr>
+<tr>
+<td>LYR-CLI0016</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>warnings under a profile that denies them <em>(retired)</em></td>
+<td>Reported after a compilation that warned when the profile had <code>denyWarnings</code>: one error that counted the warnings, which stayed warnings. Retired: A profile that denies warnings is <code>-D warnings</code> — each warning is the error, with a note naming the profile.</td>
+</tr>
+<tr>
+<td>LYR-CLI0017</td>
+<td>W</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a <code>lyric.json</code> holds something suspect <em>(retired)</em></td>
+<td>Reported by the 4.x toolchain for a <code>lyric.json</code> that loaded but held something suspect, such as an unknown key. Retired: Lyric 5: the manifest is lyric.toml, where an unknown key is the error LYR-PKG0003; the constant has no use outside its declaration</td>
+</tr>
+<tr>
+<td>LYR-CLI0018</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a <code>lyric.json</code> asks for a newer toolchain <em>(retired)</em></td>
+<td>Reported by the 4.x toolchain when a <code>lyric.json</code> named a minimum toolchain version above its own. Retired: Lyric 5: a toolchain pin in lyric.toml is LYR-PKG0009; only the 4.x lyric.json reader (Lyric.Core ProjectFile) reports it</td>
+</tr>
+<tr>
+<td>LYR-CLI0019</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td><code>--only</code> named an artifact the build script did not declare <em>(retired)</em></td>
+<td>Reported by the 4.x <code>lyrbuild</code> when <code>--only &lt;name&gt;</code> named no artifact of the build script. Retired: Lyric 5: lyric5 has no --only option; programs are chosen with --bin (LYR-CLI0003 for an unknown one); the constant has no use outside its declaration</td>
+</tr>
+<tr>
+<td>LYR-CLI0020</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>an internal failure of the 4.x compiler <em>(retired)</em></td>
+<td>Reported by the 4.x drivers when the compiler reached a state it believed impossible. Retired: Lyric 5: lyric5 reports its own failures as LYR-ICE0001 (exit 101); nothing in lyric5 calls CliDiagnostics.FailInternal</td>
+</tr>
+<tr>
+<td>LYR-CLI0021</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>no package can be made here</td>
+<td><code>lyric new</code> names a directory that exists already, <code>lyric init</code> runs where a <code>lyric.toml</code> is, or the <code>git init</code> the command asked for failed. The exit code is 2.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a11-ir--the-lowering">A.11 IR — The lowering</h2>
+<p>Retired: each refusal of the lowering has a code of its own.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-IR0001</td>
+<td>E</td>
+<td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
+<td>a construct this compiler version could not lower <em>(retired)</em></td>
+<td>The lowering's one code for every refusal in earlier versions: what the language does not express yet, what the standard library lacked, and its own bugs, all under one number. Retired: Each refusal of the lowering says its reason under a code of its own — LYR-SEM0195, LYR-SEM0196, LYR-SEM0197, or LYR-ICE0002 for a construct the checker accepted and the lowering cannot translate.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a12-ice--internal-compiler-errors">A.12 ICE — Internal compiler errors</h2>
+<p>The toolchain's own failure: a bug to report, never the program's fault.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-ICE0001</td>
+<td>E</td>
+<td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
+<td>the toolchain crashed</td>
+<td><code>lyric5</code> met an exception it did not expect. It prints the exception, where it was in the program if it knows, and its own stack trace, and exits with 101.</td>
+</tr>
+<tr>
+<td>LYR-ICE0002</td>
+<td>E</td>
+<td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
+<td>a construct the lowering cannot translate</td>
+<td>The checker accepted a construct that the lowering to IR cannot translate. The diagnostic carries the note that it is the compiler's fault.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a13-rt--runtime-panics">A.13 RT — Runtime panics</h2>
+<p>A panic ends the program with exit code 101 and a backtrace; the compile-time evaluation reports the same codes inside <code>LYR-CT0001</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-RT0001</td>
+<td>P</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>integer division by zero</td>
+<td>An integer <code>/</code> or <code>%</code> has a zero divisor. Integer division checks its divisor in every profile; check it before dividing where zero can occur.</td>
+</tr>
+<tr>
+<td>LYR-RT0002</td>
+<td>P</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>integer overflow</td>
+<td>An integer operation's result does not fit its type: <code>+</code>, <code>-</code>, <code>*</code>, unary <code>-</code>, <code>MIN / -1</code> and <code>MIN % -1</code>, or a shift by a count outside <code>0</code> to the width minus one. Arithmetic is checked in every built-in profile; the library's wrapping operations are there where wrapping is meant.</td>
+</tr>
+<tr>
+<td>LYR-RT0003</td>
+<td>P</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an index or a range out of bounds</td>
+<td>An index is negative or not below the length, a view's range does not satisfy <code>0 &lt;= low &lt;= high &lt;= length</code>, or a string's byte index or range does not fall on a character's boundary. Copying into a shorter view panics the same way.</td>
+</tr>
+<tr>
+<td>LYR-RT0004</td>
+<td>P</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a null value unwrapped</td>
+<td><code>x!</code> met a <code>?T</code> that holds nothing. Use <code>?.</code>, <code>??</code> or a match where the value can be absent.</td>
+</tr>
+<tr>
+<td>LYR-RT0005</td>
+<td>P</td>
+<td><a href="../../spec/13-abi/">13-abi</a></td>
+<td>out of memory</td>
+<td>An allocation does not fit: the heap has no room left (or exceeds the limit the embedding host set), or an array or string length is so large that its size does not fit the address space.</td>
+</tr>
+<tr>
+<td>LYR-RT0006</td>
+<td>P</td>
+<td><a href="../../spec/13-abi/">13-abi</a></td>
+<td>stack overflow</td>
+<td>A task's or the main thread's stack is exhausted, typically by recursion without an end. The panic ends the task it happens in, like any other, with the frames that led there.</td>
+</tr>
+<tr>
+<td>LYR-RT0007</td>
+<td>P</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>an argument that breaks a precondition</td>
+<td>A length or count from the program text is negative: the count of <code>[x] * n</code>, the count of a string's repetition, the length of a new array or string. The standard library's own precondition checks (a negative capacity, a radix outside 2 to 36, a bad format string) panic with <code>LYR-RT0008</code> instead.</td>
+</tr>
+<tr>
+<td>LYR-RT0008</td>
+<td>P</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>panic called by the program</td>
+<td>The program called <code>panic(message)</code>, or a function of the standard library did on a broken precondition (a negative capacity, a radix outside 2 to 36, a format string with a brace left open). The message is printed as written, with the backtrace; the process exits with 101, or a task ends with the panic as its status.</td>
+</tr>
+<tr>
+<td>LYR-RT0009</td>
+<td>P</td>
+<td><a href="../../spec/03-types/">03-types</a></td>
+<td>a conversion to char of no Unicode scalar value</td>
+<td>An integer converted with <code>as char</code> is a surrogate (<code>0xD800</code> to <code>0xDFFF</code>) or beyond <code>0x10FFFF</code>. Check the value before converting it.</td>
+</tr>
+<tr>
+<td>LYR-RT0010</td>
+<td>P</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>try! on an error</td>
+<td><code>try! f()</code> met an error. The panic carries the error's message; use <code>try</code> and let the error propagate, or <code>catch</code> it, where it can happen.</td>
+</tr>
+<tr>
+<td>LYR-RT0011</td>
+<td>P</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>a failed assertion</td>
+<td><code>assert(condition)</code> found its condition false. The message names the condition as written and, when the assertion has one, the message its lambda builds on failure.</td>
+</tr>
+<tr>
+<td>LYR-RT0012</td>
+<td>P</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>unreachable reached</td>
+<td>Control reached <code>unreachable()</code> or <code>unreachable(message)</code> — a place the program's author held unreachable. The message starts with the word <code>unreachable</code>, followed by the program's own message.</td>
+</tr>
+<tr>
+<td>LYR-RT0013</td>
+<td>P</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>todo reached</td>
+<td>Control reached <code>todo()</code> or <code>todo(message)</code>: code that is not written yet. The message starts with <code>not implemented</code>, followed by the program's own message.</td>
+</tr>
+<tr>
+<td>LYR-RT0014</td>
+<td>P</td>
+<td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
+<td>a coroutine misused</td>
+<td>A coroutine is used against its rules: a <code>yield</code> where no coroutine runs, or in a task outside every generator; a coroutine resumed while it runs, after it ended, or on another thread; a coroutine closed while it runs or is parked; a yield of another type than the running generator's.</td>
+</tr>
+<tr>
+<td>LYR-RT0015</td>
+<td>P</td>
+<td><a href="../../spec/13-abi/">13-abi</a></td>
+<td>the system refused the runtime what it needs</td>
+<td>The operating system refused the runtime something it cannot go on without: a poller for I/O and timers, its wakeup, a pipe for signals or child processes, random bytes, a thread's attachment to the collector. No program text causes it; the machine's limits or state do (too many open descriptors, for example).</td>
+</tr>
+<tr>
+<td>LYR-RT0016</td>
+<td>P</td>
+<td><a href="../../spec/12-stdlib/">12-stdlib</a></td>
+<td>a collection changed while it was walked</td>
+<td>A collection of <code>std.collections</code> was changed while a <code>for</code> loop or an iterator walked it. The next step of the walk panics, naming the collection's kind; collect the changes and apply them after the loop.</td>
+</tr>
+<tr>
+<td>LYR-RT0017</td>
+<td>P</td>
+<td><a href="../../spec/06-errors/">06-errors</a></td>
+<td>control reached code the compiler holds unreachable</td>
+<td>Control arrived where the compiler knows it cannot arrive — behind a call that does not return, behind a match that covers every case. That is a bug in the compiler: the debug profile panics with this code; the release profile stops with the processor's trap, which the runtime reports as a crash. Report it with the program.</td>
+</tr>
+<tr>
+<td>LYR-RT0018</td>
+<td>P</td>
+<td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
+<td>a deadlock</td>
+<td>Every task of a thread waits — for a channel, a lock, another task — and nothing can wake one: no task is ready, none sleeps, no other thread lives. The wait panics in the waiting task.</td>
+</tr>
+<tr>
+<td>LYR-RT0019</td>
+<td>P</td>
+<td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
+<td>a lock poisoned by a panic</td>
+<td>A task acquires a <code>Mutex</code>, <code>RwLock</code> or <code>Once</code> whose holder panicked while it held it. The scheduler released the lock and poisoned it; the panic names the first panic's code and message.</td>
+</tr>
+<tr>
+<td>LYR-RT0020</td>
+<td>P</td>
+<td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
+<td>the runtime found its own invariant broken</td>
+<td>The runtime met a state its own rules exclude — a thread allocating that the collector does not know, an object whose descriptor gives no size, a pointer the collector's map of a type does not name, a young object stored without its barrier, a coroutine whose descriptor is no coroutine's. That is a bug in the runtime or in the compiler, never in the program.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a14-lints">A.14 Lints</h2>
+<p>Every warning is a lint (16 §5): its name, its code, its group and its level unless said. <code>warnings</code> names them all.</p>
+<table>
+<thead>
+<tr>
+<th>Lint</th>
+<th>Code</th>
+<th>Group</th>
+<th>Level</th>
+<th>Title</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>assignment-in-condition</code></td>
+<td>LYR-SEM0202</td>
+<td>correctness</td>
+<td>warn</td>
+<td>an assignment written as a condition</td>
+</tr>
+<tr>
+<td><code>blanket-shadowing</code></td>
+<td>LYR-SEM0168</td>
+<td>correctness</td>
+<td>warn</td>
+<td>a type's member hides a blanket member</td>
+</tr>
+<tr>
+<td><code>boxed-interface-in-hot-loop</code></td>
+<td>LYR-SEM0222</td>
+<td>perf</td>
+<td>allow</td>
+<td>a value boxed as an interface in a loop</td>
+</tr>
+<tr>
+<td><code>broken-doc-link</code></td>
+<td>LYR-SEM0224</td>
+<td>docs</td>
+<td>warn</td>
+<td>a doc link that names nothing</td>
+</tr>
+<tr>
+<td><code>build-script-warning</code></td>
+<td>LYR-BLD0003</td>
+<td>correctness</td>
+<td>warn</td>
+<td>a warning a build script reported</td>
+</tr>
+<tr>
+<td><code>builtin-type-shadowing</code></td>
+<td>LYR-SEM0077</td>
+<td>correctness</td>
+<td>warn</td>
+<td>an import that shadows a builtin type</td>
+</tr>
+<tr>
+<td><code>closeable-never-closed</code></td>
+<td>LYR-SEM0144</td>
+<td>resources</td>
+<td>warn</td>
+<td>a Closeable value nothing closes</td>
+</tr>
+<tr>
+<td><code>comparison-always</code></td>
+<td>LYR-SEM0204</td>
+<td>correctness</td>
+<td>warn</td>
+<td>a comparison of an unsigned value with 0 that cannot fail</td>
+</tr>
+<tr>
+<td><code>dead-code</code></td>
+<td>LYR-SEM0201</td>
+<td>unused</td>
+<td>warn</td>
+<td>a declaration nothing uses</td>
+</tr>
+<tr>
+<td><code>deprecated</code></td>
+<td>LYR-SEM0076</td>
+<td>deprecation</td>
+<td>warn</td>
+<td>a use of a deprecated declaration</td>
+</tr>
+<tr>
+<td><code>deprecated-edition</code></td>
+<td>LYR-SEM0214</td>
+<td>deprecation</td>
+<td>warn</td>
+<td>a construct an edition retires</td>
+</tr>
+<tr>
+<td><code>exit-code-range</code></td>
+<td>LYR-SEM0210</td>
+<td>correctness</td>
+<td>warn</td>
+<td>an exit code outside 0 to 255</td>
+</tr>
+<tr>
+<td><code>float-equality</code></td>
+<td>LYR-SEM0205</td>
+<td>correctness</td>
+<td>allow</td>
+<td>an equality test on floats</td>
+</tr>
+<tr>
+<td><code>foreign-conformance</code></td>
+<td>LYR-SEM0211</td>
+<td>correctness</td>
+<td>warn</td>
+<td>a conformance of another package's type to another package's interface</td>
+</tr>
+<tr>
+<td><code>generator-copies-this</code></td>
+<td>LYR-SEM0172</td>
+<td>correctness</td>
+<td>warn</td>
+<td>a 'mut fn' generator on a value type changes a copy</td>
+</tr>
+<tr>
+<td><code>global-var-without-sync</code></td>
+<td>LYR-SEM0213</td>
+<td>concurrency</td>
+<td>warn</td>
+<td>a module 'var' in a program that starts threads</td>
+</tr>
+<tr>
+<td><code>int-literal-adapts</code></td>
+<td>LYR-SEM0208</td>
+<td>correctness</td>
+<td>allow</td>
+<td>an integer literal that takes another type than int</td>
+</tr>
+<tr>
+<td><code>irrefutable-pattern</code></td>
+<td>LYR-SEM0104</td>
+<td>correctness</td>
+<td>warn</td>
+<td>a pattern that cannot fail where a test is promised</td>
+</tr>
+<tr>
+<td><code>iterator-reused</code></td>
+<td>LYR-SEM0162</td>
+<td>correctness</td>
+<td>warn</td>
+<td>a second loop over the same iterator</td>
+</tr>
+<tr>
+<td><code>large-value-copy</code></td>
+<td>LYR-SEM0221</td>
+<td>perf</td>
+<td>allow</td>
+<td>a large struct passed by value</td>
+</tr>
+<tr>
+<td><code>loop-instead-of-while-true</code></td>
+<td>LYR-SEM0219</td>
+<td>style</td>
+<td>allow</td>
+<td>'while (true)' where 'loop' is meant</td>
+</tr>
+<tr>
+<td><code>missing-docs</code></td>
+<td>LYR-SEM0223</td>
+<td>docs</td>
+<td>allow</td>
+<td>a pub declaration without documentation</td>
+</tr>
+<tr>
+<td><code>missing-module-docs</code></td>
+<td>LYR-SEM0225</td>
+<td>docs</td>
+<td>allow</td>
+<td>a module without module documentation</td>
+</tr>
+<tr>
+<td><code>module-shadowing</code></td>
+<td>LYR-SEM0207</td>
+<td>correctness</td>
+<td>allow</td>
+<td>a local that hides a module the file imports</td>
+</tr>
+<tr>
+<td><code>naming</code></td>
+<td>LYR-SEM0215</td>
+<td>style</td>
+<td>warn</td>
+<td>a name against the naming convention</td>
+</tr>
+<tr>
+<td><code>needless-return</code></td>
+<td>LYR-SEM0218</td>
+<td>style</td>
+<td>allow</td>
+<td>a 'return;' that ends a body</td>
+</tr>
+<tr>
+<td><code>prelude-shadowing</code></td>
+<td>LYR-SEM0153</td>
+<td>correctness</td>
+<td>warn</td>
+<td>a name hides one of the prelude's</td>
+</tr>
+<tr>
+<td><code>redundant-clone</code></td>
+<td>LYR-SEM0217</td>
+<td>style</td>
+<td>warn</td>
+<td>'clone()' of a value a copy makes whole</td>
+</tr>
+<tr>
+<td><code>reserved-device-name</code></td>
+<td>LYR-SEM0216</td>
+<td>style</td>
+<td>deny</td>
+<td>a module named as a Windows device</td>
+</tr>
+<tr>
+<td><code>self-assignment</code></td>
+<td>LYR-SEM0203</td>
+<td>correctness</td>
+<td>warn</td>
+<td>an assignment of a value to itself</td>
+</tr>
+<tr>
+<td><code>shadowed-it</code></td>
+<td>LYR-SEM0209</td>
+<td>correctness</td>
+<td>warn</td>
+<td>a block's implicit 'it' that hides the 'it' around it</td>
+</tr>
+<tr>
+<td><code>shadowed-local</code></td>
+<td>LYR-SEM0206</td>
+<td>correctness</td>
+<td>allow</td>
+<td>a local that hides one of the same name</td>
+</tr>
+<tr>
+<td><code>string-concat-in-loop</code></td>
+<td>LYR-SEM0220</td>
+<td>perf</td>
+<td>warn</td>
+<td>a string grown with '+' in a loop</td>
+</tr>
+<tr>
+<td><code>unreachable-catch</code></td>
+<td>LYR-SEM0171</td>
+<td>unused</td>
+<td>warn</td>
+<td>a catch-all clause that nothing reaches</td>
+</tr>
+<tr>
+<td><code>unreachable-code</code></td>
+<td>LYR-SEM0073</td>
+<td>unused</td>
+<td>warn</td>
+<td>an unreachable statement</td>
+</tr>
+<tr>
+<td><code>unreachable-pattern</code></td>
+<td>LYR-SEM0112</td>
+<td>unused</td>
+<td>warn</td>
+<td>a match arm no value can reach</td>
+</tr>
+<tr>
+<td><code>unused-assignment</code></td>
+<td>LYR-SEM0199</td>
+<td>unused</td>
+<td>warn</td>
+<td>a 'var' that is written and never read</td>
+</tr>
+<tr>
+<td><code>unused-generic</code></td>
+<td>LYR-SEM0200</td>
+<td>unused</td>
+<td>warn</td>
+<td>a type parameter that is never used</td>
+</tr>
+<tr>
+<td><code>unused-import</code></td>
+<td>LYR-SEM0072</td>
+<td>unused</td>
+<td>warn</td>
+<td>an import that is never used</td>
+</tr>
+<tr>
+<td><code>unused-label</code></td>
+<td>LYR-SEM0103</td>
+<td>unused</td>
+<td>warn</td>
+<td>a loop label nothing jumps to</td>
+</tr>
+<tr>
+<td><code>unused-parameter</code></td>
+<td>LYR-SEM0198</td>
+<td>unused</td>
+<td>warn</td>
+<td>a parameter that is never used</td>
+</tr>
+<tr>
+<td><code>unused-result</code></td>
+<td>LYR-SEM0178</td>
+<td>unused</td>
+<td>warn</td>
+<td>the value of a '@MustUse' call is dropped</td>
+</tr>
+<tr>
+<td><code>unused-task</code></td>
+<td>LYR-SEM0212</td>
+<td>resources</td>
+<td>warn</td>
+<td>a task's handle dropped</td>
+</tr>
+<tr>
+<td><code>unused-var</code></td>
+<td>LYR-SEM0075</td>
+<td>unused</td>
+<td>warn</td>
+<td>a 'var' that is never reassigned</td>
+</tr>
+<tr>
+<td><code>unused-variable</code></td>
+<td>LYR-SEM0071</td>
+<td>unused</td>
+<td>warn</td>
+<td>a local that is never used</td>
+</tr>
+<tr>
+<td><code>useless-allow</code></td>
+<td>LYR-SEM0180</td>
+<td>unused</td>
+<td>warn</td>
+<td>an '@Allow' that takes back nothing</td>
+</tr>
+<tr>
+<td><code>useless-try</code></td>
+<td>LYR-SEM0139</td>
+<td>style</td>
+<td>warn</td>
+<td>a 'try' mark over nothing that can throw</td>
+</tr>
+<tr>
+<td><code>visibility-leak</code></td>
+<td>LYR-SEM0152</td>
+<td>correctness</td>
+<td>warn</td>
+<td>a member is written wider than its type</td>
+</tr>
+<tr>
+<td><code>void-binding</code></td>
+<td>LYR-SEM0173</td>
+<td>correctness</td>
+<td>warn</td>
+<td>a binding or parameter holds a 'void'</td>
+</tr>
+</tbody>
+</table>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#a1-lex--lexical-errors">A.1 LEX — Lexical errors</a></li>
+<li class="level-2"><a href="#a2-par--syntax-errors">A.2 PAR — Syntax errors</a></li>
+<li class="level-2"><a href="#a3-res--names-and-modules">A.3 RES — Names and modules</a></li>
+<li class="level-2"><a href="#a4-sem--semantic-errors-and-warnings">A.4 SEM — Semantic errors and warnings</a></li>
+<li class="level-2"><a href="#a5-mac--macros">A.5 MAC — Macros</a></li>
+<li class="level-2"><a href="#a6-ct--compile-time-evaluation">A.6 CT — Compile-time evaluation</a></li>
+<li class="level-2"><a href="#a7-cg--code-generation">A.7 CG — Code generation</a></li>
+<li class="level-2"><a href="#a8-pkg--packages-and-manifests">A.8 PKG — Packages and manifests</a></li>
+<li class="level-2"><a href="#a9-bld--the-build">A.9 BLD — The build</a></li>
+<li class="level-2"><a href="#a10-cli--the-command-line">A.10 CLI — The command line</a></li>
+<li class="level-2"><a href="#a11-ir--the-lowering">A.11 IR — The lowering</a></li>
+<li class="level-2"><a href="#a12-ice--internal-compiler-errors">A.12 ICE — Internal compiler errors</a></li>
+<li class="level-2"><a href="#a13-rt--runtime-panics">A.13 RT — Runtime panics</a></li>
+<li class="level-2"><a href="#a14-lints">A.14 Lints</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

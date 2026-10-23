@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Metaprogramming — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a class="current" href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>Metaprogramming</h1>
+<blockquote>
+<p><strong>Partly written.</strong> §1 was begun with milestone <strong>M8a</strong> of the Lyric 5 plan (<code>@Test</code>), §2–§4 with
+<strong>M9a</strong> (<code>comptime</code>, <code>@When</code>, <code>std.meta</code>); the rest comes with <strong>M9b</strong>, spec-first: each rule lands here with its conformance case before or
+with its implementation. Source of the decisions:
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/09-metaprogrammierung.md">09 Metaprogramming</a>.</p>
+</blockquote>
+<h2 id="scope">Scope</h2>
+<p>Attributes (data, compiler instructions, macros), <code>comptime</code>, <code>std.meta</code>, conditional compilation with <code>@When</code>, macros over <code>std.syntax</code>.</p>
+<h2 id="1-attributes">1. Attributes</h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/09-metaprogrammierung.md">09 A1–A3, A11</a>)</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/11-metaprogramming/</code>; what <code>lyric test</code> makes of a test, the
+toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>TestCommandTests</code>).</p>
+<ol>
+<li>An attribute is a struct that declares a <strong>marker</strong> for where it may sit (rule 4), and a use
+writes its fields: <code>@Test { skip = &quot;needs a network&quot; }</code>. An attribute with exactly one field
+without a default also takes that field's value in parentheses, <code>@Retry(3)</code>; with any other
+number the form is refused (<code>LYR-SEM0094</code>). The compiler reads the attributes of a closed
+list in <code>std.core</code> by their identity: <code>@Test</code> is <code>std.core.Test</code> — a struct of the program's
+own named <code>Test</code> is data, nothing the compiler reads.</li>
+<li><strong><code>@Test</code></strong> — in the prelude — marks a test, which <code>lyric test</code> runs (<a href="../../spec/14-cli/">14 §3</a>): a
+function that takes no parameters, returns <code>void</code> and is not <code>private</code> (<code>LYR-SEM0154</code>), and
+is not generic (<code>LYR-SEM0067</code>, as for every attribute but the compiler instructions of rule 7).
+It may throw: an error that leaves it
+fails the test. <code>skip</code> says why the test is not run, <code>timeout</code> how many seconds it may take
+(60 unless it says; 0 for no limit).</li>
+<li><strong><code>@callerExpr(p)</code></strong> — in the prelude — sits on a parameter: where a call leaves that
+parameter out, it gets the text the call wrote for <code>p</code>, another parameter of the function —
+<code>assertEq(xs.length(), 3)</code> hands the assertion the words <code>xs.length()</code> — as it is written,
+the parentheses in it and around it included: <code>(1..5).sum()</code>, <code>(a + b)</code>. The parameter is a
+<code>string</code> and has a default, which a call that writes the argument itself keeps; the attribute
+names its parameter by name (<code>LYR-SEM0155</code>). Beside it a parameter takes what its marker
+admits there (rule 4).</li>
+<li><strong>Every declaration takes attributes</strong> (09 T7): the module header (<code>module;</code>, §3 rule 4), a function, a method, a
+field (a variant's payload's too), a <code>static let</code>, a variant, a parameter, a struct, a class, an enum, an interface, an
+alias, an <code>extend</code> block, a module-level binding, an associated type. A marker names one kind
+or a set of them (09 F1): <code>OnModule</code>; <code>OnFunction</code> (a function at the top level), <code>OnMethod</code>,
+<code>OnField</code>, <code>OnParameter</code>, <code>OnVariant</code>; <code>OnType</code> (a struct, a class, an enum), <code>OnInterface</code>,
+<code>OnAlias</code>, <code>OnExtend</code>; and the sets <code>OnCallable</code> (a function, a method), <code>OnMember</code> (a method,
+a field, a <code>static let</code>, a variant, an associated type), <code>OnTypeLike</code> (a struct, a class, an
+enum, an interface, an alias), <code>OnTopLevel</code> (what stands at a module's top level), <code>OnDecl</code>
+(every named declaration) and <code>OnAny</code> (every place). The markers inherit nothing from each
+other. An attribute none of whose markers admits the declaration it stands on is refused
+(<code>LYR-SEM0065</code>).</li>
+<li><strong>An attribute's value is computed while the program compiles</strong> (09 F4): its fields are
+values as a <code>comptime</code> site's are (§2) — literals, <code>let</code>s, calls: <code>@Test { timeout = LIMIT }</code>.
+The value is the struct the use writes, its defaults filled, and what the compiler and the
+tools read is that value. A field of a type no literal makes is refused (<code>LYR-SEM0100</code>); a
+panic while computing it is <code>LYR-CT0001</code>.</li>
+<li>An attribute makes nothing reachable (01 B13): a function only an attribute marks is not
+built. A test is reached from the program <code>lyric test</code> writes.</li>
+<li><strong>The compiler instructions</strong> — in the prelude — are the closed list of <code>std.core</code> the compiler
+reads (09 A11, T2): <code>@Test</code> (rule 2), <code>@callerExpr</code> (rule 3), <code>@callerLine</code> and <code>@callerFile</code>
+(rule 8), <code>@Deprecated</code> (rule 9), <code>@AlwaysInline</code>, <code>@NoInline</code> and <code>@Cold</code> (rule 10),
+<code>@MustUse</code> (rule 11), <code>@NonExhaustive</code> (rule 12), <code>@Allow</code> (rule 13), <code>@Shared</code> (rule 14),
+<code>@SeesConformer</code> (rule 15) and <code>@When</code> (§3). What one says holds for
+every instance, so beside <code>@Test</code> they sit on a generic declaration too, where data may not
+(<code>LYR-SEM0067</code>).</li>
+<li><strong><code>@callerLine</code></strong> on an <code>int</code> parameter and <strong><code>@callerFile</code></strong> on a <code>string</code> one: where a call
+leaves the parameter out, it gets the line the call begins on, or the file the call stands in —
+the package's name, then the path within the package, with <code>/</code> on every system:
+<code>app/src/main.lyr</code>. A call through an interface gets them as a direct call does. The parameter
+has a default, which a call that writes the argument keeps (<code>LYR-SEM0155</code>, as for another type).</li>
+<li><strong><code>@Deprecated { message, until, replacement }</code></strong> sits on what a use names: a module, what
+stands at a module's top level, a member — not a parameter (<code>LYR-SEM0065</code>); on an <code>extend</code>
+block it deprecates the block's members. Every use outside a deprecated declaration warns
+(<code>LYR-SEM0076</code>) with <code>message</code>, and names <code>replacement</code> as what to write instead. <code>until</code> names
+the release that removes the declaration: a toolchain that claims that version or a later one
+refuses the attribute (<code>LYR-SEM0081</code>), as it refuses an <code>until</code> that is no version, <code>&quot;5.1&quot;</code> or
+<code>&quot;5.1.2&quot;</code>. Each field is a value computed as rule 5 says.</li>
+<li><strong><code>@AlwaysInline</code></strong>, <strong><code>@NoInline</code></strong> and <strong><code>@Cold</code></strong> on a function or a method are hints to the
+C compiler — <code>always_inline</code>, <code>noinline</code>, <code>cold</code> —, no promise: the program computes what it
+computes without them. <code>@NoInline</code> keeps the compiler's own inlining away too. A function takes
+<code>@AlwaysInline</code> or <code>@NoInline</code>, not both (<code>LYR-SEM0177</code>).</li>
+<li><strong><code>@MustUse</code></strong> on a function or a type: an expression statement that drops what such a function
+gives, or a value of such a type, warns (<code>LYR-SEM0178</code>); <code>let _ = …</code> drops a value on purpose,
+and a <code>void</code> call gives nothing to use. In the standard library <code>Result</code> carries it, and
+<code>std.task.spawn</code>, whose handle alone carries the task's error.</li>
+<li><strong><code>@NonExhaustive</code></strong> on an enum or a sealed interface: outside the package that declares it, a
+<code>match</code> covers it with a <code>_</code> or binding arm alone (<code>LYR-SEM0050</code>; <a href="../../spec/09-patterns/">09 §3</a>) — a
+later version may add to it; inside, its variants or conformers cover it.
+<code>std.io.IoErrorKind</code> carries it.</li>
+<li><strong><code>@Allow</code>, <code>@Warn</code> and <code>@Deny</code></strong> with a lint, its code, its group or <code>warnings</code> —
+<code>@Allow(&quot;unused-variable&quot;)</code> — set the lint's level within the declaration they sit on: not said, a
+warning, an error (<a href="../../spec/16-diagnostics/#5-lints">16 §5</a>). An error that is no lint is never taken back.
+An <code>@Allow</code> that takes back nothing warns (<code>useless-allow</code>, <code>LYR-SEM0180</code>), and a selector that names
+nothing is refused (<code>LYR-SEM0179</code>).</li>
+<li><strong><code>@Shared</code></strong> on a field: the <code>clone()</code> a <code>Clone</code> synthesis writes copies the field instead of
+cloning it (<a href="../../spec/05-interfaces/#14-conformance-synthesis">05 §14</a> rule 2) — the reference, where
+the field holds one. A <code>clone()</code> the type writes itself is its own.</li>
+<li><strong><code>@SeesConformer</code></strong> on an interface: its defaults ask with the module of the conformer they
+are set in place for (<a href="#4-type-information">§4</a> rule 10), and so see every field of it, whatever
+its word. std.core's family and std.codec's <code>Encode</code> and <code>Decode</code> carry it; an interface of the
+program that builds or reads a conformer whole — a parser of arguments, a codec — says so with
+it, and its documentation says that it does (the sweep after M10, W10).</li>
+</ol>
+<h2 id="2-comptime">2. <code>comptime</code></h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/09-metaprogrammierung.md">09 A4, Q1–Q7</a>)</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/11-metaprogramming/</code>, the cases on <code>comptime</code>; that a site
+computes what the binary computes — the number tower, the texts of numbers, strings, containers,
+the error paths — in the toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>ComptimeTests</code>).</p>
+<ol>
+<li><strong><code>comptime e</code></strong> evaluates <code>e</code> while the program is compiled, and the site stands for the value,
+a literal of its type. The value is of any <strong>value type</strong>: a scalar, a <code>string</code>, and an array,
+an inline array, a tuple, an optional, a struct, an enum or a <code>Box</code> of such. An array is the
+program's to write: every evaluation of the site gives a fresh one, as an array literal does.
+An object of a class, a view, a function value, a coroutine and an interface value are no
+literal (<code>LYR-SEM0100</code>, with the reason).
+<code>e</code> sees what the module level sees and what it binds itself: it names no local or parameter of
+the function it stands in and no <code>this</code>, and assigns nothing it did not bind — a module's
+variable is the run's, not the build's (<code>LYR-SEM0100</code>).</li>
+<li><strong>The code evaluated is pure</strong> (Q3): <code>e</code> calls functions, which then run at compile time, and
+builds values of any type on its way. A call that reaches the world — the console, files, the
+network, the clock, randomness, processes, threads and tasks — is an error at the site
+(<code>LYR-CT0003</code>) that names the call and the calls that led to it.</li>
+<li><strong>A panic</strong> of the evaluation is an error at the site (<code>LYR-CT0001</code>). It names the run-time code
+the program would have ended with and shows the frames of the evaluation, innermost first (Q6).</li>
+<li><strong>The value is the binary's</strong> (Q7): <code>e</code> computes as the compiled program does, in the profile it
+is built in — an overflow panics where the profile checks (<a href="../../spec/03-types/">03 T2</a>) and wraps where
+it does not —, and alike on every platform the compiler runs on.</li>
+<li><strong>Each site has a budget</strong> of steps (Q5): the toolchain's, or <code>comptimeBudget</code> of the root
+manifest (<a href="../../spec/15-project/">15 §1</a> rule 7). A site that takes more is an error at the site
+(<code>LYR-CT0002</code>) that names the budget. What one step is belongs to the implementation. The
+standard library's sites take the toolchain's budget whatever the manifest says: a program's
+budget is its own code's, and std's tables are no part of it.</li>
+<li><strong><code>comptime { … }</code></strong> is a block evaluated whole, its last expression the value. It binds,
+assigns, loops and builds lambdas as any block does.</li>
+<li><strong><code>comptime if (c) { … } else { … }</code></strong> chooses while compiling: <code>c</code> is a site of type <code>bool</code>, and
+an <code>else if</code> after it chooses the same way. Every branch is checked; only the chosen one is part
+of the program, so a function only another branch calls is not built. A <code>let</code> condition is
+refused (<code>LYR-SEM0100</code>).</li>
+<li><strong><code>comptime for (x in w) { … }</code></strong> unrolls: <code>w</code> is a site holding an array, and the body, checked
+once, stands once per element, with <code>x</code> that element's value. A <code>continue</code> goes on with the
+next round, a <code>break</code> past the last. A pattern in place of <code>x</code>, or a <code>w</code> that is no array, is
+refused (<code>LYR-SEM0100</code>).</li>
+<li><strong><code>embed(path)</code></strong> (<code>std.core</code>) gives the bytes of a file as a <code>uint8[]</code>, read while the program
+compiles (Q4). <code>path</code> is relative to the module that calls, and the file lies within the
+package's directory; a module of no package is held to its own directory. A file outside, or
+none, is <code>LYR-CT0004</code>. It is the one thing code run at compile time reads from outside the
+program, and a build reads the file again when it changes. A <code>comptime</code> site, or what one calls,
+makes the call; a call the program would make at run time is refused (<code>LYR-CT0004</code>).</li>
+<li><strong>A module binding's site is evaluated where the program reaches the binding</strong> (09 D8; M9a
+S12b): reached from the program's own roots, from the sites outside bindings, and through
+the initializer of a binding that is reached. A binding nobody reaches is not evaluated —
+its site may reach the world or exceed the budget without an error, as unreached code may
+panic —, and the program carries nothing of it. The standard library's tables cost a build
+only where it reads them.</li>
+</ol>
+<h2 id="3-target-profile-when">3. Target, profile, <code>@When</code></h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/09-metaprogrammierung.md">09 A6</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2 P11</a>)</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/11-metaprogramming/</code>; what a cross-build emits, the toolchain's
+own tests (<code>tests/Lyric5.Tests</code>, <code>TargetTests</code>).</p>
+<ol>
+<li><strong><code>target</code></strong> and <strong><code>profile</code></strong> — <code>std.core</code>, in the prelude — are constants of the build (B4):
+<code>target.os</code> (<code>Platform</code>: <code>Linux</code>, <code>MacOS</code>, <code>Windows</code>, <code>Other</code>), <code>target.arch</code> (<code>Arch</code>: <code>X86_64</code>,
+<code>Aarch64</code>, <code>Other</code>) and <code>target.pointerWidth</code> (in bits) are the target's — a cross-build's, not
+the host's —, and <code>profile.debug</code> holds where the profile is the built-in <code>debug</code> or inherits
+from it (<a href="../../spec/15-project/">15 §4</a>). A program that reads neither carries neither.</li>
+<li><strong><code>comptime if (target.os == .Windows)</code></strong> chooses by them while compiling (§2 rule 7): every
+branch is checked, the chosen one is built.</li>
+<li><strong><code>@When(cond)</code></strong> — in the prelude — on what stands at a module's top level, or on the module
+(rule 4): <code>cond</code> is a <code>bool</code> computed while compiling (§1 rule 5), over <code>target</code> and <code>profile</code>.
+Where it holds, the declaration is built. Where it does not, the declaration is checked as every
+other, its <code>comptime</code> sites are not evaluated, and nothing of it is built. A use the program would
+run of what a build leaves out is refused (<code>LYR-CT0006</code>); a use within what it leaves out, or in
+the branch a <code>comptime if</code> does not take, is none. <code>@When</code> chooses no name: two declarations of
+one name stay refused (<code>LYR-RES0001</code>, <code>LYR-SEM0085</code>), and <code>comptime if</code> chooses between names.</li>
+<li><strong>The module header</strong> <code>module;</code> names nothing — the path names the module
+(<a href="../../spec/04-modules/">04 §2</a> rule 2) — and carries the module's attributes:
+<code>@When(target.os == .Windows) module;</code> leaves the whole module out of every other build. One
+module per target is a file per target, chosen between with <code>comptime if</code>.</li>
+</ol>
+<h2 id="4-type-information">4. Type information</h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/09-metaprogrammierung.md">09 A5, A7</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 B13 M1</a>)</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/11-metaprogramming/</code>.</p>
+<ol>
+<li><strong><code>std.meta</code></strong> answers questions about a type as constants (R1): <code>fields&lt;T&gt;()</code>, a
+<code>FieldInfo { name, type, index, visibility, isVar, hasDefault }</code> per field of a struct or a
+class, in declaration order, <code>index</code> its place in the answer, <code>hasDefault</code> whether the
+declaration writes an initializer — the type's own default counts for nothing; a payload's
+field as a struct's (the sweep after M10, W9, X2); <code>variants&lt;E&gt;()</code>, a
+<code>VariantInfo { name, index, payload }</code> per variant, the payload's fields named by their position
+where they have no names; <code>members&lt;T&gt;()</code>, a
+<code>MemberInfo { name, visibility, isStatic, isMut, kind, parameters }</code> per function, constant
+and associated type of the type's own body, in declaration order — <code>kind</code> a <code>MemberKind</code>
+(<code>Function</code>, <code>Constant</code>, <code>AssociatedType</code>), <code>parameters</code> a function's
+<code>ParameterInfo { name, type, index, hasDefault }</code>, none of a constant or an associated type,
+which are static (the sweep after M10, X4); <code>conformances&lt;T&gt;()</code> and <code>hasConformance&lt;T, I&gt;()</code>;
+<code>typeName&lt;T&gt;()</code>; <code>isStruct</code>, <code>isClass</code>, <code>isEnum</code>, <code>isInterface&lt;T&gt;()</code>. A <code>Type</code> holds its name
+and its <code>kind</code>, a <code>TypeKind</code>: <code>Primitive</code> (the scalars, <code>string</code>), <code>Struct</code>, <code>Class</code>, <code>Enum</code>,
+<code>Interface</code>, <code>Opaque</code>, <code>Optional</code>, <code>Array</code>, <code>InlineArray</code>, <code>Slice</code> (a view), <code>Tuple</code>,
+<code>Function</code>, <code>Parameter</code> (a type parameter), <code>Other</code> (W9).
+Each answer is a constant of the type at the instance it is asked at — in a generic function or a
+default, of each instance (R3). Nothing is reflected at run time (R6): a program reads a type
+through such constants alone.</li>
+<li><strong>What a question sees</strong> (R7) is what the code that asks may name: the module of the function
+it stands in, the interface's for a default. Another package's field is listed where it is
+<code>pub</code>, one of the package where it is not <code>private</code>, one of the module always; members alike.</li>
+<li><strong><code>comptime for (f in fields&lt;T&gt;())</code></strong> walks the answer (§2), its body once per field. Where <code>T</code>
+is a type the loop's place knows — a written type, or <code>Self</code> in a default (rule 5) — each round
+has the body as its own: <code>f</code> is that field's info, a constant a <code>comptime</code> site of the round may
+read (<code>comptime if (f.isVar)</code>), and <strong><code>e.[f]</code></strong> is the field of <code>e</code> that <code>f</code> names, of the
+field's own type — read, written and a place as <code>e.name</code> is (R2). <code>e</code> is a value of the type <code>f</code>
+walks the fields of (<code>LYR-SEM0185</code>). <strong><code>T.[f]</code></strong> in a type's place is the type of that field —
+<code>variants&lt;Self.[f]&gt;()</code> walks an enum field's variants, <code>fields&lt;T.[f]&gt;()</code> a struct field's
+fields, <code>let x: T.[f] = e.[f]</code> binds it —, <code>T</code> the type the round walks; anywhere else
+<code>LYR-SEM0185</code> (the sweep after M10, X5). Where <code>T</code> is known only per instance — a type parameter of
+a generic function — the rounds share one body, checked once: <code>f</code> is a <code>FieldInfo</code>, and no field
+is read through it (<code>LYR-SEM0185</code>).</li>
+<li><strong><code>attribute&lt;A&gt;(f)</code></strong> is the attribute of type <code>A</code> that the field <code>f</code> names carries, its value,
+or <code>null</code> (R4); <code>f</code> is a round's variable (<code>LYR-SEM0185</code>) — of a default's round over <code>Self</code>:
+a generic helper over <code>T</code> with <code>comptime for (f in fields&lt;T&gt;())</code> does not read attributes
+(<code>LYR-SEM0185</code> there too), so a synthesis keeps its attribute reads in the defaults (M10 S2).
+A payload's field carries attributes as a struct's does, and a round over <code>v.payload</code> reads
+them. <strong><code>variantAttribute&lt;A&gt;(v)</code></strong> is the one the variant <code>v</code> carries, <code>v</code> the variable of a
+round over <code>variants&lt;E&gt;()</code>; <strong><code>memberAttribute&lt;A&gt;(m)</code></strong> the one the member <code>m</code> carries, <code>m</code>
+the variable of a round over <code>members&lt;T&gt;()</code>: <strong><code>comptime for (m in members&lt;T&gt;())</code></strong> has a body
+per member as rule 3 has one per field, where <code>T</code> is a type the loop's place knows and the
+body reads through <code>m</code>. In such a round <strong><code>e.[m](…)</code></strong> calls the member <code>m</code> names on <code>e</code>, a
+value of the type the round walks, and <strong><code>T.[m](…)</code></strong> a static one on <code>T</code>: the call by the
+member's name, <code>e.name(…)</code>, among overloads the arguments choose, checked in the round as it
+stands — outside such a round, or on a value of another type, <code>LYR-SEM0185</code> (the sweep after
+M10, X3). <strong><code>comptime for (p in m.parameters)</code></strong> in such a round has a body per parameter of
+the function <code>m</code> names, <code>p</code> that parameter's info, and <strong><code>parameterAttribute&lt;A&gt;(p)</code></strong> is the
+attribute it carries (X4). Each reader asks its own loop's variable (<code>LYR-SEM0185</code>; the sweep
+after M10, W6). <strong><code>typeAttribute&lt;T, A&gt;()</code></strong> is the one <code>T</code>'s declaration carries — written as
+an alias, the alias's own, not its target's. What stands at a module's top level — its
+header, a function, an <code>extend</code>, a binding — no question of std.meta reads: a macro reads it
+and its attributes through std.syntax (<a href="#5-macros">§5</a>; X4).</li>
+<li><strong>A default that walks <code>Self</code>'s fields is set in place for each conformer that takes it</strong> (A5):
+checked as the conformer's — <code>Self</code> and <code>this</code> the conformer, its names those of the
+interface's module —, each round's <code>this.[f]</code> of the conformer's field's type. What is wrong
+there is said at the line written once, with the field and the conformer named. A call through
+a value of the interface reaches it; a conformer that writes the member itself takes nothing
+(<a href="../../spec/05-interfaces/">05 §14</a> rule 1). A generic conformer's field of a parameter's type has what
+the parameter's constraints give it: <code>struct Pair&lt;T :: [ToJson]&gt; :: [ToJson]</code> is written out,
+<code>Pair&lt;T&gt;</code> without the constraint is refused at the default's line. A static default is set in
+place the same way (<a href="../../spec/05-interfaces/">05 §2</a> rule 2), reached through the conformer's name
+or a constraint.</li>
+<li>A <code>comptime</code> site is evaluated once: one that asks <code>std.meta</code> about a type known only per
+instance within a larger expression is refused (<code>LYR-SEM0100</code>); asked alone,
+<code>comptime fields&lt;T&gt;()</code>, the question is answered per instance.</li>
+<li><strong><code>comptime for (v in variants&lt;E&gt;())</code></strong> walks an enum's variants (M9a S10), its body once per
+variant where <code>E</code> is a type the loop's place knows, <code>v</code> that variant's info. In such a round
+<strong><code>e is v</code></strong> is <code>true</code> where the enum value <code>e</code> holds the variant — a test of the run, a <code>bool</code>
+—; <strong><code>E.[v]</code></strong> is the value of a unit variant; <strong><code>E.[v](…)</code></strong> builds a variant with a tuple
+payload and <strong><code>E.[v] { … }</code></strong> one with a struct payload, its fields by name or by info (rule 8);
+<strong><code>comptime for (p in v.payload)</code></strong> walks the payload's fields, its body once per field with
+<code>p</code> that field's info, and <strong><code>e.[v, p]</code></strong> is that field of <code>e</code>, of the field's own type — read,
+written and a place as <code>e.name</code> is. <code>e.[v, p]</code> where <code>e</code> holds another variant is a panic. Each
+form outside such rounds, or over a type known only per instance, is <code>LYR-SEM0185</code>.</li>
+<li><strong>An initializer over infos.</strong> In an initializer of a struct or a class — a written type
+without type arguments, or <code>Self</code> in a default — <strong><code>[f] = e</code></strong> sets the field the round's
+variable <code>f</code> names, and <strong><code>comptime for (f in fields&lt;T&gt;()) [f] = e</code></strong> sets one field per round,
+<code>e</code> checked with <code>f</code> that field's info and against the field's type. The fields set are the
+written ones (<code>LYR-SEM0070</code> twice, <code>LYR-SEM0015</code> none such, an omitted one as for a written
+initializer); the rounds walk the fields of the type built (<code>LYR-SEM0185</code> otherwise). The same
+items build a variant's struct payload in <code>E.[v] { … }</code>, over <code>v.payload</code>.</li>
+<li><strong>A <code>comptime if</code> a round decides</strong> checks the chosen branch alone — against <a href="#2-comptime">§2</a>
+rule 7, which checks every branch: the other may name what this field's type has not, a
+<code>clone()</code> of a <code>@Shared</code> field. A round decides a condition made of its variables' <code>isVar</code>,
+<code>index</code>, <code>name</code> and <code>hasDefault</code>, a variant's <code>index</code> and <code>name</code>, a member's <code>name</code>, <code>isStatic</code>,
+<code>isMut</code> and <code>kind</code> against a <code>MemberKind</code>, a parameter's <code>name</code>, <code>index</code> and <code>hasDefault</code>,
+<code>attribute&lt;A&gt;(f)</code>, <code>variantAttribute&lt;A&gt;(v)</code>, <code>memberAttribute&lt;A&gt;(m)</code> and
+<code>parameterAttribute&lt;A&gt;(p)</code> against <code>null</code>, <code>isEnum&lt;T&gt;()</code> and its kin of a known type, a field's type's <code>name</code> (<code>f.type.name</code>) and
+its <code>kind</code> against a <code>TypeKind</code> (<code>f.type.kind == .Optional</code>; W9), a payload's
+<code>length()</code>, <code>startsWith</code> over such a string, literals, and <code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>,
+<code>!</code>, <code>&amp;&amp;</code> and <code>||</code> over them (M10 S3). <strong><code>comptime if (c) a else b</code> is a value</strong> too: where a round decides
+<code>c</code>, the chosen arm alone is checked and is the value; otherwise both arms, of one type
+(<code>LYR-SEM0100</code>), and the site chooses.</li>
+<li><strong>An interface marked <code>@SeesConformer</code> asks with the conformer's module</strong> (§1 rule 15; the
+sweep after M10, W10). The defaults of such an interface — std.core's <code>Equatable</code>, <code>Hashable</code>,
+<code>Ordered</code>, <code>TotalOrder</code>, <code>Clone</code>, <code>VariantName</code> and <code>Variants</code> (<a href="../../spec/05-interfaces/">05 §14</a>),
+std.codec's <code>Encode</code> and <code>Decode</code> (<a href="../../spec/12-stdlib/">12 §Codecs</a> rule 7; M10 S2), and a
+program's that carries the marker — see every field of the conformer, whatever its word: a
+type's internal and private fields compare, hash, clone and serialize as its <code>pub</code> ones do, and
+a library's parser fills them. Every other interface's default sees what rule 2 gives it. What
+is wrong in one of std.core's family's is said at the conformer's entry (<a href="../../spec/05-interfaces/">05 §14</a>
+rule 6). A write through an info, <code>this.[f] = …</code>, answers to the field's word and the
+function's <code>mut</code> as a write to the field by name does (<code>LYR-SEM0019</code>).</li>
+<li><strong>Enum reflection is synthesis</strong> (09 A7 R5; M9a S11): <code>VariantName</code> gives any enum <code>name()</code>,
+the name of the variant the value holds; <code>Variants :: [VariantName]</code> gives an enum whose
+variants all are units <code>all()</code>, every variant in declaration order, and <code>fromName(s): ?Self</code>,
+the variant of that name or <code>null</code> — std.core's defaults over <code>variants&lt;Self&gt;()</code>, taken on
+request (<code>enum E :: [Variants]</code>), both named in the prelude. A variant with a payload has no
+value without it: <code>Variants</code> on such an enum is <code>LYR-SEM0135</code> at the entry, the variant named.
+(<code>all</code>, not <code>variants</code>: inside the default the latter is the question itself.)</li>
+</ol>
+<h2 id="5-macros">5. Macros</h2>
+<p>A macro (design 09 A8, Q9; 08 Y12; 13 M9b) is a function over syntax that the compiler runs at a
+site's expansion, under the interpreter's rules of <a href="#2-comptime">§2</a>. This section is written
+slice by slice: the declaration and the sites (M9b S2), <code>quote</code> and <code>#{…}</code> with hygiene (S3),
+attribute macros (S4), the diagnostics of expanded code (S5); <code>lyric expand</code> is
+<a href="../../spec/14-cli/">14 §1.1</a> rule 6.</p>
+<ol>
+<li><strong>A macro is a function over syntax.</strong> <code>macro name(params): Ret { … }</code> stands at the top of a
+module as a function does, <code>pub</code> and imported like one. Its parameters and its result are
+types of <code>std.syntax</code> (<a href="../../spec/12-stdlib/">12 §Syntax</a>) — <code>Expr</code>, <code>Block</code>, <code>Ident</code>, <code>Literal</code>,
+<code>Type</code>, <code>Stmt</code>, <code>Stmt[]</code>, <code>Decl</code>, <code>Decl[]</code> — else <code>LYR-SEM0186</code>; it has no type parameters,
+since what a site hands over is a tree, not a value with a type. A macro is never called as a
+function and never a value (<code>LYR-SEM0187</code>): its name stands at a site, with the <code>!</code>.</li>
+<li><strong>A site expands the macro.</strong> <code>name!(args)</code>, <code>name!(args) { … }</code> and <code>name! { … }</code> are the
+three forms: the <code>!</code> directly behind the name, before <code>(</code> or <code>{</code>, is the expansion; with a
+space between, or before anything else, it is the unwrap postfix of <a href="../../spec/08-expressions/">08</a>.
+Each argument is syntax as written, checked nowhere, and reaches the macro as the value of
+its parameter's type: an expression as <code>Expr</code>, a block as <code>Block</code> or <code>Stmt[]</code>, a name as
+<code>Ident</code>, a literal as <code>Literal</code>, a path as <code>Type</code>; the trailing block goes to a last <code>Block</code> or
+<code>Stmt[]</code> parameter. The count and the kinds of the arguments are checked at the site
+(<code>LYR-SEM0191</code>).</li>
+<li><strong>The result stands in place of the site.</strong> An <code>Expr</code> replaces a site that is an expression;
+a <code>Stmt</code>, <code>Stmt[]</code> or <code>Block</code> replaces the statement a site is on its own (<code>name!(…) { … }</code> on
+its line ends at its block, as a call with a trailing block does) — elsewhere <code>LYR-SEM0188</code>.
+What the result names is resolved where the site stands: a name the macro builds with
+<code>Ident.of</code> is the caller's; what a <code>quote</code> wrote follows rule 8. A site inside an argument travels into
+the macro as syntax (<code>Expr.Macro</code>) and is expanded in the round after the outer one.</li>
+<li><strong>Expansion is a phase per module, in import order.</strong> A macro expands in the modules that
+import it, before the module is checked, and the module that declares it checks it first: a
+site of a macro of its own module is refused (<code>LYR-SEM0189</code>), a site of a name that is no
+macro (<code>LYR-SEM0190</code>). A module whose sites are not expanded yet waits for the macros it
+declares to be used; an expansion that has not ended after 32 rounds — a result holding a
+site again and again — is <code>LYR-CT0007</code>. A program without a site pays nothing.</li>
+<li><strong>The macro runs under the interpreter's rules</strong> (<a href="#2-comptime">§2</a>; 09 Q9): pure, with the
+budget, a panic <code>LYR-CT0001</code> at the site with the chain of calls. <code>error(at, msg)</code> of
+<code>std.syntax</code> is the macro's own error, <code>LYR-MAC0001</code>: the main span at the node the macro
+names (<code>e.span()</code>, an argument's as written), a note at the site's <code>!</code>.</li>
+<li><strong><code>quote { … }</code> is a tree as a value.</strong> Its content is syntax, checked nowhere: statements —
+a last expression without <code>;</code> is the tail, and a quote of a lone tail is an <code>Expr</code> — or
+declarations when the block opens with one. The quote's type is its content's kind, <code>Expr</code>,
+<code>Stmt[]</code>, <code>Block</code>, <code>Decl</code> or <code>Decl[]</code>; where the content allows two, the type the place
+expects decides (<code>Stmt[]</code> or <code>Block</code> for a lone tail, <code>Decl</code> for a lone declaration). It needs
+<code>std.syntax</code> in the program (<code>LYR-SEM0194</code>).</li>
+<li><strong><code>#{e}</code> splices a value into the content.</strong> The expression is the function's code, run at the
+quote, and its value — of a type of <code>std.syntax</code> — stands in the tree at the splice's place:
+where an expression stands, an <code>Expr</code>, an <code>Ident</code> (as a name), a <code>Literal</code> or a <code>Block</code> (as a
+block expression); where a statement stands on its own, <code>Stmt[]</code> and a <code>Block</code>'s statements
+are spliced in, a <code>Stmt</code> stands, an expression, a name or a literal is the statement or the
+tail; where a declaration's name stands (<code>fn #{name}()</code>), an <code>Ident</code>; where a type stands
+(<code>v: #{t}</code>), a <code>Type</code>. Anything else at a place is <code>LYR-SEM0193</code>. A splice statement ends at
+its <code>}</code>, as a block does.</li>
+<li><strong>A quote is hygienic.</strong> Every name the content binds — a <code>let</code>, a parameter, a loop variable,
+a <code>catch</code>'s binding, a pattern's names — is fresh at every evaluation of the quote (<code>Ident.fresh</code>):
+the caller's names are never caught, and the names of two quotes are two. What <code>#{…}</code> sets in
+is the caller's, as written. A free name of the content — a function, a type, a constant the
+content names and does not bind — is the macro's module's: it is resolved there, with that
+module's imports, wherever the tree ends up, though the site's module never imported it
+(the <code>Ident</code>'s <code>from</code>, the <code>Named</code> type's). A name built with <code>Ident.of</code> is the site's, as in
+rule 3.</li>
+<li><strong>An attribute macro is a macro whose first parameter is a declaration</strong> (09 A2 F2): a
+<code>StructDecl</code>, <code>ClassDecl</code>, <code>FnDecl</code>, <code>EnumDecl</code>, <code>InterfaceDecl</code>, <code>ExtendDecl</code>, <code>LetDecl</code>, or
+<code>Decl</code> for any; its result is a <code>Decl</code> or a <code>Decl[]</code> (<code>LYR-SEM0186</code>). It sits on a top-level
+declaration as an attribute, with no <code>!</code> (T4): <code>@Builder struct P { … }</code>, <code>@Retry(3) fn f() { … }</code>.
+The declaration reaches the macro as the first argument, without this attribute and with the
+rest; the attribute's positional argument fills the parameters after it, by their kinds as at a
+site — fields (<code>@A { x = 1 }</code>) are a data attribute's and refused (<code>LYR-SEM0191</code>); a declaration
+of another kind than the first parameter's is refused (<code>LYR-SEM0191</code>).</li>
+<li><strong>The result stands in the declaration's place</strong> (T5): a <code>Decl</code> one for one, a <code>Decl[]</code>
+spliced into the module where the declaration stood — the declaration itself only when the
+macro gives it back. Nothing else of the module is touched: an attribute never changes code
+that does not carry it. A result that carries an attribute macro again is expanded in the
+round after (rule 4); the module that declares the macro cannot carry it (<code>LYR-SEM0189</code>). A
+<code>#{t}</code> in type position splices a <code>Type</code> (rule 7), which a declaration macro needs.</li>
+<li><strong>An error in expanded code is said at the site.</strong> What a macro gives back stands in a file
+of its own, synthesized from the result as source, whose origin is the site: an error the
+check finds in it is reported at the site — <code>name!(…)</code>, or the <code>@Name</code> — with the message
+prefixed <code>in the expansion of 'name!'</code>, a note <code>synthesized as:</code> with the line of the
+expansion it stood on, and, where the result came from a <code>quote</code>, a note at the quote in the
+macro's module. What the caller wrote keeps its place: an argument's node stands where it was
+written, through the macro and back, so an error in it is the caller's, at its line, and a
+warning in it stays; a warning in the macro's own code is nobody's and falls. A site that an
+expansion holds chains: the notes of the inner expansion first, then the outer's, and the
+message names both. One mistake is said once, though a macro spliced the argument twice.
+<code>error(at, msg)</code> stays rule 5's; a panic in the macro stays <a href="#2-comptime">§2</a>'s.</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-attributes">1. Attributes</a></li>
+<li class="level-2"><a href="#2-comptime">2. comptime</a></li>
+<li class="level-2"><a href="#3-target-profile-when">3. Target, profile, @When</a></li>
+<li class="level-2"><a href="#4-type-information">4. Type information</a></li>
+<li class="level-2"><a href="#5-macros">5. Macros</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

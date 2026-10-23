@@ -1,0 +1,1616 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The standard library contract — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a class="current" href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>The standard library contract</h1>
+<blockquote>
+<p><strong>Partly written.</strong> §1 was written with milestone <strong>M3</strong> of the Lyric 5 plan; the rest comes with
+<strong>M8a–M10</strong>, spec-first: each rule lands here with its conformance case before or with its
+implementation. Source of the decisions:
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 Standard library</a>.</p>
+</blockquote>
+<h2 id="scope">Scope</h2>
+<p>What of the standard library is language: the prelude, the core interfaces and their contracts (hash, order, clone), the answer forms and the panic rule, the naming law, the syntax tree as values (<code>std.syntax</code>), serialization as a pair (<code>std.codec</code>), JSON (<code>std.json</code>), TOML (<code>std.toml</code>).</p>
+<h2 id="1-the-converters">1. The converters</h2>
+<p>The functions of <code>std.string</code> that give a scalar's text — the text an f-string hole writes
+(<a href="#2-the-format-language">§2</a> rule 4) — and the one <code>+</code> on strings compiles to, by name
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 S-series</a>): a
+program need not import <code>concat</code> for <code>+</code> to work, and a program that imports them gets the
+same functions.</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Text</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>concat(a: string, b: string): string</code></td>
+<td>the two joined; what <code>+</code> on strings is</td>
+</tr>
+<tr>
+<td><code>fromInt(value: int): string</code></td>
+<td>the decimal digits, <code>-</code> when negative (<a href="../../spec/03-types/">03 §1.7</a>)</td>
+</tr>
+<tr>
+<td><code>fromUint(value: uint): string</code></td>
+<td>the decimal digits</td>
+</tr>
+<tr>
+<td><code>fromFloat(value: float): string</code></td>
+<td>the shortest text that reads back as the value, <code>1.0</code> for an integral one; <code>inf</code>, <code>-inf</code>, <code>nan</code> (<a href="../../spec/03-types/">03 §1.7</a>)</td>
+</tr>
+<tr>
+<td><code>fromFloat32(value: float32): string</code></td>
+<td>the shortest text that reads back as the same <code>float32</code> — <code>0.1</code>, not the <code>float</code>'s <code>0.10000000149011612</code> (the review's M8a-9)</td>
+</tr>
+<tr>
+<td><code>fromBool(value: bool): string</code></td>
+<td><code>true</code> or <code>false</code></td>
+</tr>
+<tr>
+<td><code>fromChar(value: char): string</code></td>
+<td>the character, UTF-8</td>
+</tr>
+</tbody>
+</table>
+<p>A narrower integer in a hole writes its value's text, widened (<a href="../../spec/03-types/">03 §1.3</a>):
+<code>f&quot;{x}&quot;</code> with <code>x: int8</code> writes what <code>fromInt(x)</code> gives. A <code>float32</code> has a converter of its own:
+with <code>x: float32</code> the hole writes what <code>fromFloat32(x)</code> gives.</p>
+<h2 id="2-the-format-language">2. The format language</h2>
+<p>A hole may name a format after a colon — <code>{x:&gt;8}</code>, <code>{n:#x}</code>, <code>{f:.2f}</code>, <code>{v:?}</code> — in one
+language, without locale, checked where it is written
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Y7</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 S7</a>).</p>
+<ol>
+<li><strong>Form</strong>: <code>[[fill]align][sign][#][0][width][grouping][.precision][type]</code>. <code>align</code> is <code>&lt;</code>
+(left), <code>&gt;</code> (right) or <code>^</code> (centred, the odd fill after), the fill any character before it, a
+space without; <code>sign</code> is <code>+</code> (a sign on every number) or <code>-</code> (on a negative one only, as
+without); <code>#</code> writes a radix's prefix, <code>0b</code>, <code>0o</code>, <code>0x</code>, <code>0X</code>; <code>0</code> pads with zeros between the
+sign and prefix and the digits — with a grouping, the zeros are grouped with the digits and
+the width counts the separators, a minimum that no separator leads (the review's A4):
+<code>{1234:010,}</code> is <code>00,001,234</code>, <code>{1234:08_}</code> is <code>0_001_234</code>; <code>width</code> is the least number of
+<strong>characters</strong>, not bytes;
+<code>grouping</code> is <code>,</code> or <code>_</code> between each three decimal digits, <code>_</code> between each four of another
+radix; <code>precision</code> is the digits after a float's point or the most characters of a string;
+<code>type</code> is <code>b</code>, <code>o</code>, <code>x</code>, <code>X</code> (an integer's radix), <code>e</code>, <code>E</code>, <code>f</code>, <code>%</code> (a float's form) or <code>?</code>
+(<code>Debug</code>).</li>
+<li><strong>What applies</strong>: an integer takes all but a precision and a float's type; a float all but <code>#</code>
+and an integer's type; a <code>string</code> fill, alignment, width and precision; a <code>char</code>, a <code>bool</code>
+and a <code>Display</code> type fill, alignment and width, on its text — for a <code>Display</code> type, what
+<code>showTo</code> writes; <code>?</code> takes fill, alignment and width, on what <code>debugTo</code> writes, for every
+type. A spec that is no format,
+or a part that does not apply to the hole's type, is refused (<code>LYR-SEM0164</code>). A type with
+formats of its own conforms to <code>Format { fn format(spec: StringView, out: StringBuilder): void; }</code>
+and reads the spec as written, unchecked — <code>?</code> stays <code>Debug</code>.</li>
+<li><strong>Defaults</strong>: a number right-aligned, the rest left-aligned. A float without a type or a
+precision is its shortest text (<a href="../../spec/03-types/">03 §1.7</a>); with a precision and no type it is
+fixed, <code>{2.5:.3}</code> is <code>2.500</code>; <code>e</code>, <code>E</code>, <code>f</code> and <code>%</code> take six digits without a precision; <code>%</code>
+writes the value a hundredfold, fixed, with <code>%</code> after; an exponent carries its sign and two
+digits at least, <code>{1234.5:e}</code> is <code>1.234500e+03</code>. The fixed, the exponent and the percent
+forms round <strong>half away from zero</strong> on the value's exact binary digits — the language's one
+rounding rule, <code>round()</code>'s (the review's M8a-8), the same on every host: <code>{0.125:.2f}</code> is
+<code>0.13</code>, <code>{2.5:.0f}</code> is <code>3</code>, and <code>{2.675:.2f}</code> is <code>2.67</code>, the double nearest 2.675 lying below
+the half. <code>nan</code>, <code>inf</code> and <code>-inf</code> keep their words, <code>NAN</code> and <code>INF</code> under <code>E</code>.</li>
+<li><strong>Binding</strong>: an f-string writes its text into one <code>StringBuilder</code>, piece by
+piece in order (design 10 S6) — no string per hole and no chain of joins: a scalar's hole
+its text (§1), another <code>Display</code> type's through <code>showTo</code>; <code>{x:spec}</code> through
+<code>format(spec, out)</code> for a <code>Format</code> type — the scalars conform —, through the padding of what
+<code>showTo</code> writes for another <code>Display</code> type, and through <code>debugTo</code> under <code>?</code>. The calls are
+<code>std.core</code>'s, bound by the compiler: a program need not import anything for an f-string.</li>
+<li><strong>At run time</strong>: <code>std.fmt.format(template: string, args: Display...): string</code> reads its
+template when it runs, in this language (design 08 Y7, 10 S7): <code>{}</code> takes the next value and
+<code>{i}</code> the i-th from 0 — the two mix, <code>{}</code> counting only itself —, either with <code>:spec</code> as rules
+1–3 say, <code>?</code> for the value's <code>Debug</code> text; <code>{{</code> and <code>}}</code> write a brace, and a value no hole
+names is left out. A value is passed as a <code>Display</code> (<a href="../../spec/05-interfaces/">05 §2</a>), a scalar's
+too. What the compiler refuses in an f-string <strong>panics</strong> here (<code>LYR-RT0008</code>, design 10 B3): a
+brace left open or closed without being opened, a value named that is not given, a spec that
+is no format or holds a part the value's type does not take, <code>?</code> on a value without <code>Debug</code>.</li>
+</ol>
+<h2 id="numbers">Numbers</h2>
+<p>The ten number types conform, in <code>std.core</code>, to a tower of interfaces (design 10 B5 Z1), whose
+parent lists fix the operators' <code>Out</code> to <code>Self</code> (<a href="../../spec/05-interfaces/">05 §8</a> rule 7), so
+arithmetic stays in the type:</p>
+<table>
+<thead>
+<tr>
+<th>Interface</th>
+<th>Parents</th>
+<th>Members</th>
+<th>Conformers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Num</code></td>
+<td><code>Equatable</code>, <code>Ordered</code>, <code>Add</code>, <code>Sub</code>, <code>Mul</code>, <code>Div</code>, <code>Rem</code> (each <code>&lt;Out = Self&gt;</code>), <code>Display</code>, <code>Debug</code>, <code>Parse</code>, <code>Default</code></td>
+<td><code>static let zero, one: Self</code>; <code>isZero(): bool</code></td>
+<td>all ten</td>
+</tr>
+<tr>
+<td><code>Signed</code></td>
+<td><code>Num</code>, <code>Neg&lt;Out = Self&gt;</code></td>
+<td>none of its own: what <code>std.math</code>'s <code>abs</code> and <code>signum</code> take</td>
+<td><code>int8</code>…<code>int</code>, <code>float32</code>, <code>float</code></td>
+</tr>
+<tr>
+<td><code>Integer</code></td>
+<td><code>Num</code>, <code>TotalOrder</code>, <code>Hashable</code>, the bit operators (each <code>&lt;Out = Self&gt;</code>)</td>
+<td><code>static let min, max: Self</code>; <code>static let bitWidth: int</code>, <code>isSigned: bool</code></td>
+<td><code>int8</code>…<code>int</code>, <code>uint8</code>…<code>uint</code></td>
+</tr>
+<tr>
+<td><code>Float</code></td>
+<td><code>Signed</code></td>
+<td><code>static let epsilon, infinity, nan, min, max, leastPositive: Self</code>; <code>static fn fromBits(b: uint64): Self</code>; the members below</td>
+<td><code>float32</code>, <code>float</code></td>
+</tr>
+</tbody>
+</table>
+<p>The prelude passes <code>Num</code>, <code>Integer</code> and <code>Float</code> on (design 10 B2); <code>Signed</code> is <code>std.core</code>'s.</p>
+<p><code>isZero</code> is a default, each type's own (<a href="../../spec/05-interfaces/">05 §1</a> rule 4). What one computes
+with a number — its absolute value, its sign, a root, an angle — is no member of the type but
+<code>std.math</code>'s (design 10 B5 Z2, &quot;Review 2026-10-12&quot;; below): what a number <em>is</em> stands at its
+type, what one <em>does</em> with numbers in <code>std.math</code>.</p>
+<p><code>Integer</code> says where its arithmetic would leave the type, each a default:</p>
+<ul>
+<li><code>checkedAdd</code>, <code>checkedSub</code>, <code>checkedMul</code>, <code>checkedDiv</code>, <code>checkedRem</code> (<code>o: Self</code>) give <code>?Self</code>:
+<code>null</code> where the result does not fit, or the divisor is zero; <code>min / -1</code> does not fit, and a
+remainder by <code>-1</code> is <code>0</code>.</li>
+<li><code>saturatingAdd</code>, <code>saturatingSub</code>, <code>saturatingMul</code> hold at <code>min</code> or <code>max</code>, by the sign the
+result would have.</li>
+<li><code>wrappingAdd</code>, <code>wrappingSub</code>, <code>wrappingMul</code> reduce modulo 2^<code>bitWidth</code>, as <code>+%</code>, <code>-%</code>, <code>*%</code> do a
+builtin's (<a href="../../spec/08-expressions/">08</a>); <code>wrappingDiv</code> gives <code>min</code> for <code>min / -1</code> and
+<code>wrappingRem</code> <code>0</code> for a remainder by <code>-1</code> — a zero divisor panics as <code>/</code> does.</li>
+<li><code>pow(n: uint): Self</code> multiplies by squaring; an overflow is one of <code>*</code>
+(<a href="../../spec/03-types/">03</a>).</li>
+<li><code>leadingZeros</code>, <code>trailingZeros</code> and <code>popCount</code> count bits at the type's width (<code>bitWidth</code> for
+zero); <code>rotateLeft(n)</code> and <code>rotateRight(n)</code> rotate modulo the width, a negative <code>n</code> the other
+way.</li>
+</ul>
+<p><code>Float</code> describes the type in its statics (design 10 B5 Z2): <code>epsilon</code> the distance from <code>1.0</code>
+to the next value above it, <code>min</code> the most negative finite value, <code>max</code> the greatest,
+<code>leastPositive</code> the least positive one — a subnormal —, <code>nan</code> the quiet NaN with its sign clear.
+<code>fromBits(b)</code> is the value a bit pattern names, a <code>float32</code> the low 32 bits. Its members are
+defaults over <code>Self</code>, what describes the value:</p>
+<ul>
+<li><code>isNan</code>, <code>isInfinite</code>, <code>isFinite</code>;</li>
+<li><code>totalCompare(o): Ordering</code>, IEEE 754's total order: -NaN, -infinity, the negatives, <code>-0.0</code>,
+<code>0.0</code>, the positives, infinity, NaN, every value in its one place — the order <code>sortBy</code> takes,
+where <code>float</code> has no <code>TotalOrder</code> of its own;</li>
+<li><code>toBits(): uint64</code>, a <code>float32</code>'s 32 bits in the low ones.</li>
+</ul>
+<h3 id="stdmath-clamp-a-chars-code-point"><code>std.math</code>, <code>clamp</code>, a <code>char</code>'s code point</h3>
+<p>What one computes with numbers is <code>std.math</code>'s (design 10 B5 Z2, &quot;Review 2026-10-12&quot;): free
+functions, generic over the tower, so that a reader finds <code>sqrt(x)</code> where every language puts
+it and the type keeps what describes it. The elementary functions over <code>Float</code> are computed in
+<code>float</code> and rounded once to a <code>float32</code>. <code>sqrt</code>, <code>floor</code>, <code>ceil</code>, <code>round</code> and <code>trunc</code> are exact;
+the rest — <code>cbrt</code>, <code>exp</code>, the logarithms, <code>pow</code>, the trigonometric and hyperbolic functions,
+<code>hypot</code> — are one implementation's (musl's), which the runtime carries on every platform: a
+program computes the same bits wherever it runs, and a <code>comptime</code> site computes the bits the
+program would (<a href="../../spec/11-metaprogramming/">11 §2</a>):</p>
+<ul>
+<li><code>floor(x)</code>, <code>ceil(x)</code>, <code>round(x)</code> — a half away from zero —, <code>trunc(x)</code>;</li>
+<li><code>sqrt(x)</code>, <code>cbrt(x)</code>, <code>exp(x)</code>, <code>ln(x)</code>, <code>log2(x)</code>, <code>log10(x)</code>; <code>sin</code>, <code>cos</code>, <code>tan</code>, <code>asin</code>,
+<code>acos</code>, <code>atan</code>, <code>sinh</code>, <code>cosh</code>, <code>tanh</code>, in radians; <code>atan2(y, x)</code>, the angle of the point
+(x, y), -π to π; <code>hypot(x, y)</code>; <code>pow(x, e)</code> — an integer's power by squaring is its own
+<code>x.pow(n)</code>, arithmetic in the type.</li>
+</ul>
+<p>Over <code>Signed</code>: <code>abs(x)</code>, <code>0.0</code> for <code>-0.0</code>, which <code>&lt;</code> does not tell from <code>0.0</code>; <code>signum(x)</code>,
+<code>-1</code>, <code>0</code> or <code>1</code> in the type, a float's NaN staying NaN. <code>uint</code> is no <code>Signed</code>, and has neither.</p>
+<p>What describes the world rather than a type: <code>pi</code>, <code>e</code> and <code>tau</code>, typed <code>float</code> —
+<code>math.pi as float32</code> for the narrow width. Beside them stand the functions of two numbers:</p>
+<ul>
+<li><code>min(a, b)</code> and <code>max(a, b)</code> over <code>Ordered</code>, <code>a</code> where the two are equal or unordered (a NaN);</li>
+<li><code>gcd(a, b)</code> and <code>lcm(a, b)</code> over <code>Integer</code>, never negative, <code>gcd(0, 0)</code> is <code>0</code>; a result beyond
+the type overflows and panics — <code>gcd(int.min, 0)</code>;</li>
+<li><code>lerp(a, b, t)</code> over <code>Float</code>, <code>a</code> at <code>t = 0</code> and <code>b</code> at <code>t = 1</code> exactly.</li>
+</ul>
+<p>A narrowing that answers is a static of the target (Z4): <code>int8.exact(v)</code> is the <code>int8</code> an
+integer <code>v</code> of any type names, or <code>null</code> where it does not fit; <code>int8.clamping(v)</code> holds at
+<code>min</code> or <code>max</code> instead. They are members of <code>Integer</code> (the review's M8a-7): each integer type
+answers them, and a type parameter bounded by <code>Integer</code> reaches them — <code>U.exact(v)</code>,
+<code>U.clamping(v)</code>.</p>
+<p><code>x.clamp(lo, hi)</code> is a default of <code>Ordered</code>: <code>lo</code> below it, <code>hi</code> above it, the value itself
+between; <code>lo</code> above <code>hi</code> is the program's error and panics, and a value unordered with the bounds
+comes back as it is. A <code>char</code>'s code point is <code>c as uint32</code> (the review's A9e: the method that
+said the same is gone), and <code>char.fromUint32(n): ?char</code> is
+<code>null</code> for a surrogate or beyond <code>0x10FFFF</code> (Z8), where <code>n as char</code> panics
+(<a href="../../spec/03-types/">03 §1.4</a>).</p>
+<h2 id="iteration">Iteration</h2>
+<p>The protocol <code>for</code> walks (design 10 B6) is <code>std.core</code>'s; the prelude passes <code>Iterator</code>,
+<code>Iterable</code> and <code>FromIterator</code> on.</p>
+<ul>
+<li><strong><code>Iterator { type Item; type Error :: [Error] = never; mut fn next(): ?Self.Item throws Self.Error; fn sizeHint(): (int, ?int) }</code></strong>: <code>next()</code> gives the next value, and <code>null</code> at the
+end. A walk that can fail answers its <code>Error</code>, which <code>next()</code> throws; by default it throws
+nothing (<a href="../../spec/07-statements/">07 §2</a> rule 6). <code>sizeHint()</code> says how many values are left, at
+least and at most where that is known; the default says <code>(0, null)</code>. A type that is an
+<code>Iterator</code> <strong>and</strong> <code>Closeable</code> throws in <code>close()</code> only what its <code>Error</code> allows
+(<code>LYR-SEM0174</code>; the review's M8a-4): a loop that closes the iterator is covered by the
+clause that covers its pulls (<a href="../../spec/07-statements/">07 §2</a> rule 7).</li>
+<li><strong><code>Iterable { type Iter :: [Iterator]; fn iter(): Self.Iter; }</code></strong>: what <code>for</code> walks. Every
+iterator is iterable as itself, <code>extend&lt;I :: [Iterator]&gt; I :: [Iterable&lt;Iter = I&gt;]</code>.</li>
+<li><strong><code>DoubleEnded :: [Iterator] { mut fn nextBack(): ?Self.Item; }</code></strong>: the last value not yet
+given.</li>
+<li>A <strong><code>Range&lt;T&gt;</code></strong> of an integer type or of <code>char</code> is an <code>Iterator</code> of <code>T</code> and <code>DoubleEnded</code>:
+<code>next()</code> gives <code>start</code> and moves it on, <code>nextBack()</code> moves <code>end</code> back and gives it. A
+<strong><code>RangeInclusive&lt;T&gt;</code></strong> is both too and gives <code>end</code> as well; its last value leaves <code>start</code> past
+<code>end</code>, or <code>end</code> before <code>start</code> where that value is the type's last (its first, from the back) —
+no bound leaves the type. A range of characters has its values the scalar values in between,
+the surrogates passed over, its first <code>'\0'</code> and its last <code>'\u{10FFFF}'</code>. A range walked
+changes: <code>start</code> and <code>end</code> are <code>var</code>.</li>
+<li>A <strong><code>Coroutine&lt;T&gt;</code></strong> is an <code>Iterator</code> of <code>T</code> and <code>Closeable</code>, built in (design 10 B6 I7): its
+<code>Error</code> is what it throws, <code>never</code> where nothing, and it conforms to nothing else. A loop over
+one pulls it and closes it on its way out (<a href="../../spec/07-statements/">07 §2</a> rule 7): left early, its
+stack unwinds and its defers run.</li>
+<li>The <strong>adapters</strong> are members of every iterator (design 10 B6 I3, I4), each giving a struct of
+its own — monomorphized, nothing allocated. They are <code>std.iter</code>'s (M9a S11c): the prelude
+names that module, so its blocks reach every iterator in every module without an import
+(<a href="../../spec/04-modules/">04</a> rule 5), and a program imports a struct where it writes the type,
+<code>import std.iter { MapIter }</code>. The protocol, the ranges and the iterators of <code>std.core</code>'s own
+types stay <code>std.core</code>'s. Each: <code>it.map(f)</code> gives a <code>MapIter&lt;I, U, E&gt;</code> (<code>Map</code> is
+the collection's), <code>it.filter(p)</code> a <code>FilterIter&lt;I, E&gt;</code>; <code>E</code> defaults to <code>never</code>, so
+<code>MapIter&lt;I, U&gt;</code> names the one whose function throws nothing. Every iterator type's name ends in <code>Iter</code>
+(the review's A9g): the adapters (<code>TakeIter</code>, <code>ZipIter</code>, …), the string's (<code>CharsIter</code>,
+<code>SplitIter&lt;P&gt;</code>, <code>MatchesIter&lt;P&gt;</code>, <code>LinesIter</code>), the map's (<code>MapEntriesIter</code>, <code>MapKeysIter</code>,
+<code>MapValuesIter</code>), the
+slice's and the list's (<code>SliceIter</code>, <code>ListIter</code>). They pull lazily, one value at a time, and their
+<code>Error</code> is the inner iterator's, joined with what a function they take throws (below). Of one
+source besides: <code>take(n)</code> and <code>skip(n)</code>;
+<code>takeWhile(p)</code>, which stays ended once <code>p</code> failed, and <code>skipWhile(p)</code>; <code>stepBy(n)</code>, the first
+value and then every <code>n</code>th, <code>n</code> below 1 a panic; <code>enumerate()</code>, each value with its position
+from 0, <code>(int, Item)</code>; <code>inspect(f)</code>, each value shown to <code>f</code> on its way through;
+<code>mapNotNull(f)</code>, the values through <code>f</code>, the <code>null</code>s left out; <code>flatMap(f)</code>, the values of the
+<code>Iterable</code>s <code>f</code> gives, one after the other, and <code>flatten()</code> of an iterator of <code>Iterable</code>s;
+<code>dedup()</code> of an <code>Equatable</code> item and <code>dedupBy(same)</code>, a run of values <code>same</code> holds for given
+once; <code>scan(init, f)</code>, <code>init</code> and then each running value <code>f</code> makes of the one before and a
+value; <code>peekable()</code>, a <code>PeekableIter</code> whose <code>peek()</code> gives the next value without taking it;
+<code>rev()</code> of a <code>DoubleEnded</code> iterator, its values from the back — no <code>DoubleEnded</code> itself, and
+throwing nothing, as a pull from the back throws nothing; <code>cycle()</code> of an iterator that is
+<code>Clone</code>, its values over and over from a clone each time, none where it has none — an array's
+walk, a range and a string's characters are <code>Clone</code>. Of two
+sources: <code>zip(other)</code>, each value beside the other's as long as both have one, the other an
+<code>Iterable</code>; <code>chain(other)</code>, the values and then the other's, an iterator of the same items.
+An adapter over a <code>Closeable</code> iterator — <code>rev()</code> and <code>cycle()</code> excepted — is <code>Closeable</code>
+itself and passes <code>close()</code> on (the
+review's M8a-4), so a loop that leaves <code>gen().map(f)</code> early closes the generator; <code>zip</code> and
+<code>chain</code> close both of theirs, the first error winning.
+Their <code>Error</code> is the <strong>join</strong> of their sources' (design 05 E2 K7), <code>Join&lt;A, B&gt;</code> of <code>std.core</code>:
+one type where both are one, the other where one is <code>never</code>, the root <code>Error</code> where they
+differ — reduced once both are known; open, it covers each of its parts.</li>
+<li>A <strong>function an adapter or a terminator takes may throw</strong> (design 05 K4; 13 M8c P2): <code>map</code>,
+<code>filter</code>, <code>takeWhile</code>, <code>skipWhile</code> and <code>inspect</code> take a <code>fn(…) -&gt; … throws E</code> and give an
+iterator whose <code>Error</code> is <code>Join&lt;I.Error, E&gt;</code>; <code>fold</code>, <code>reduce</code>, <code>any</code>, <code>all</code>, <code>none</code>, <code>find</code>,
+<code>position</code> and <code>forEach</code> throw <code>Join&lt;I.Error, E&gt;</code>. <code>E</code> is what the function throws, bound at the
+call, and <code>never</code> where it throws nothing — then nothing is joined and no <code>try</code> stands:
+<code>words.iter().map((s) =&gt; try int.parse(s))</code> is walked with <code>try</code>, <code>xs.iter().map((x) =&gt; x * 2)</code>
+without.</li>
+<li>The <strong>terminators</strong> walk an iterator — a copy of a struct one, a class one where it stands — and
+throw what it throws: <code>count()</code>; <code>fold(init, f)</code> and <code>reduce(f)</code>, the latter <code>null</code> without a
+value; <code>first()</code>, <code>last()</code> and <code>nth(n)</code>, <code>null</code> where there is no such value, a negative <code>n</code>
+included; <code>any(p)</code>, <code>all(p)</code> (<code>true</code> for none) and <code>none(p)</code>, stopping at the value that
+decides; <code>find(p)</code> and <code>position(p)</code>; <code>forEach(f)</code>, inline
+(<a href="../../spec/03-types/#85-inline-functions">03 §8.5</a>): a lambda written at the call is set in place, its
+<code>return</code> the caller's; <code>toArray()</code>, in one pass; <code>minBy(key)</code>
+and <code>maxBy(key)</code>, the value whose <code>TotalOrder</code> key is least or greatest, the first of equal
+ones, <code>null</code> without a value. Of <code>std.collections</code>: <code>chunks(n)</code>, the values in <code>List</code>s of <code>n</code>,
+the last shorter where they do not divide, and <code>windows(n)</code>, every run of <code>n</code> values in turn,
+each a <code>List</code> of its own, none where there are fewer — <code>n</code> below 1 panics (<code>LYR-RT0008</code>);
+<code>sorted()</code> of a <code>TotalOrder</code> item and <code>sortedBy(cmp)</code>, the values in a <code>List</code>, stably sorted;
+<code>partition(p)</code>, the values <code>p</code> holds for and the others, two <code>List</code>s in order; <code>groupBy(key)</code>,
+a <code>Map</code> of the values in <code>List</code>s under their key, each list in order; <code>toMap()</code> of pairs, a
+<code>Map</code>, a later value of a key replacing the earlier one. <code>collect()</code> into an array or a list
+starts with the room the iterator's <code>sizeHint()</code> gives; where that is exact, an array is made
+without a copy.</li>
+<li><strong><code>FromIterator&lt;T&gt; { static fn fromIter&lt;I :: [Iterator&lt;Item = T&gt;]&gt;(it: I): Self throws I.Error; }</code></strong> is what <strong><code>collect&lt;C :: [FromIterator&lt;Item&gt;]&gt;()</code></strong> builds (design 10 B6, I4;
+M8a S15): the values in a <code>C</code>, the type the call's position expects —
+<code>let names: Set&lt;string&gt; = words.iter().collect();</code> —, throwing what the iterator throws. <code>T[]</code>
+is a <code>FromIterator&lt;T&gt;</code>, and so are <code>List&lt;T&gt;</code>, <code>Deque&lt;T&gt;</code>, <code>Set&lt;T&gt;</code>, <code>Heap&lt;T&gt;</code> and
+<code>Map&lt;K, V&gt;</code> of <code>(K, V)</code> (§Collections) — a set's and a map's keys once, a later value of a key
+replacing the earlier one. <code>toSet()</code>, of a <code>Hashable</code> element, is <code>collect()</code> into a <code>Set</code>, as
+<code>toList()</code> is into a <code>List</code> and <code>toArray()</code> into an array.</li>
+<li>The terminators <strong>of an element kind</strong> stand on the iterators whose <code>Item</code> admits them
+(<a href="../../spec/05-interfaces/">05 §13</a> rule 2): <code>sum()</code> and <code>product()</code> of a <code>Num</code>, zero and one where there
+is no value; <code>min()</code> and <code>max()</code> of an <code>Ordered</code>, <code>null</code> without a value, the first of equal
+ones; <code>join(sep)</code> of a <code>Display</code>, the texts with <code>sep</code> between each two; <code>average()</code> of <code>int</code>
+or of <code>float</code> values, a <code>float</code>, <code>null</code> without a value.</li>
+<li><strong><code>SliceIter&lt;T&gt;</code></strong> is the iterator of an array or a view, from both ends, through a view of its
+elements — nothing is copied, and a write to a later element is seen; its <code>sizeHint()</code> is
+exact. <code>T[]</code> and <code>Slice&lt;T&gt;</code> are <code>Iterable</code> through it: <code>xs.iter()</code>.</li>
+</ul>
+<h3 id="parsing">Parsing</h3>
+<p>A type read from a text conforms to <strong><code>Parse</code></strong>, <code>static fn parse(s: StringView): Self throws ParseError</code> (design 10 B4, B5 Z6): every number type through <code>Num</code>, and <code>bool</code>. The text is
+taken whole — no whitespace, nothing after the value — and what is wrong with it is thrown,
+never panicked (10 B3): a <strong><code>ParseError</code></strong>, whose <code>kind</code> is a <strong><code>ParseErrorKind</code></strong> — <code>Empty</code> for
+no text, <code>Invalid</code> for a text not of the type's form, <code>Overflow</code> for a number beyond the type's
+range. All three are <code>std.core</code>'s. Beside the kind a parser says what it can: <strong><code>detail</code></strong> — what
+it expected where it stopped, empty where it says nothing more — and <strong><code>offset</code></strong>, the byte of
+the text the refusal points at, <code>null</code> where it knows none; <code>message()</code> carries both. The number
+parsers say nothing more; <code>Uri.parse</code>, <code>percentDecode</code>, the address parsers and the time parsers
+fill them.</p>
+<ul>
+<li>An <strong>integer</strong> is an optional <code>+</code> or <code>-</code> and ASCII digits, <code>_</code> only between two digits.
+<code>parse(s, radix)</code> stands beside <code>parse(s)</code> (<a href="../../spec/08-expressions/">08 §1.2</a>) and reads digits in
+<code>radix</code>, 2 to 36 — <code>a</code>…<code>z</code> or <code>A</code>…<code>Z</code> for 10 to 35; a radix outside is the program's error
+and panics. An unsigned type takes no <code>-</code>, not even before <code>0</code>. A byte outside the form makes
+the text <code>Invalid</code> however many digits run before it; only a well-formed number is an
+<code>Overflow</code>.</li>
+<li>A <strong>float</strong> is an optional sign, then digits with an optional <code>.</code> and fraction — one digit at
+least — and an optional exponent, <code>e</code> or <code>E</code> with its own sign and digits, <code>_</code> only between
+two digits; or the sign and <code>inf</code> or <code>nan</code>. The value is the float nearest the text: beyond
+the range an infinity, below it a zero, as IEEE 754 rounds — a float has no <code>Overflow</code>.</li>
+<li>A <strong>bool</strong> is <code>true</code> or <code>false</code>.</li>
+</ul>
+<h2 id="results-and-conversions">Results and conversions</h2>
+<p>A failure kept as a value, and a value made from another (design 05 E1, 10 B3, B4) — both
+<code>std.core</code>'s, and named in the prelude (<a href="../../spec/04-modules/">04</a>).</p>
+<ul>
+<li><strong><code>Result&lt;T, E :: [Error]&gt;</code></strong> is an enum, <code>Ok(T)</code> or <code>Err(E)</code>, matched as every enum is
+(<a href="../../spec/09-patterns/">09</a>). <code>throws</code> stays the mechanism: two bridges lead to it and back, and no
+operator is a result's own (05 E1). <strong><code>Result.of(f)</code></strong> calls <code>f</code>, a <code>fn() -&gt; T throws E</code>, and
+is <code>Ok</code> with what it returns or <code>Err</code> with what it throws — <code>Result.of { try half(n) }</code>, <code>E</code>
+inferred from what the lambda throws (05 K4), the root <code>Error</code> where that is two types.
+<strong><code>r.get()</code></strong> is an <code>Ok</code>'s value and throws an <code>Err</code>'s error: <code>try r.get()</code>. <code>E</code> is an <code>Error</code>,
+since <code>get()</code> throws it. The library returns no <code>Result</code> (10 B3); the caller makes one. It is
+<code>@MustUse</code> (<a href="../../spec/11-metaprogramming/">11 §1</a> rule 11): a statement that drops one warns.</li>
+<li><strong><code>From&lt;T&gt; { static fn from(v: T): Self; }</code></strong> is a conversion into a type, which the type
+writes: <code>Centimeters.from(m)</code>. <strong><code>Into&lt;T&gt; { fn into(): T; }</code></strong> follows from it through
+std.core's blanket <code>extend&lt;T, U :: [From&lt;T&gt;]&gt; T :: [Into&lt;U&gt;]</code> (<a href="../../spec/05-interfaces/">05 §13</a>
+rule 9): <code>let c: Centimeters = m.into();</code> — the type the position expects chooses the target;
+where none is expected the call is refused (<code>LYR-SEM0060</code>), and a target that is no <code>From</code> of
+the value's type too (<code>LYR-SEM0028</code>). A constraint <code>T :: [Into&lt;X&gt;]</code> holds for every type <code>X</code>
+is a <code>From</code> of. <code>as</code> converts numbers only (<a href="../../spec/03-types/">03 §1.4</a>).</li>
+</ul>
+<h2 id="arrays-and-views">Arrays and views</h2>
+<p>The members of an array and of a view are <code>std.core</code>'s (design 10 C2), written once on
+<code>Slice&lt;T&gt;</code> and reached on an array through a view of all of it (<a href="../../spec/03-types/">03 §5.2</a> rule 4)
+— and so on an inline array that lies in the heap (<a href="../../spec/03-types/">03 §5.3</a> rule 6): a write
+through one reaches the array. <code>length()</code> and the index are the primitives
+(<a href="../../spec/03-types/">03 §5.1</a>).</p>
+<ul>
+<li><code>isEmpty()</code>; <code>get(i)</code>, <code>null</code> outside <code>0 ≤ i &lt; length()</code>; <code>first()</code> and <code>last()</code>, <code>null</code>
+where there is no element.</li>
+<li><code>swap(i, j)</code>, an index outside panicking as <code>[i]</code> does; <code>reverse()</code> in place; <code>reversed()</code>, a
+new array.</li>
+<li><code>copyInto(into)</code>: the elements into the view <code>into</code>, which is at least as long — a shorter
+one panics as an index outside does (<code>LYR-RT0003</code>), a longer one keeps its rest; the two may
+overlap either way (the review's B16). One copy, not an element at a time: what the
+collections grow and shift with.</li>
+<li>Of an <code>Equatable</code> element: <code>contains(x)</code>, through which <code>T[]</code> and <code>Slice&lt;T&gt;</code> are
+<code>Contains&lt;T&gt;</code> (10 C12) — what <code>x in xs</code> asks (<a href="../../spec/05-interfaces/">05 §12</a> rule 10) — and
+<code>indexOf(x)</code>, the first index or <code>null</code>.</li>
+<li>Of a <code>Clone</code> element: <code>fill(v)</code>, every element a clone of <code>v</code> — no object shared into several
+slots, as <code>[x] * n</code> shares none (<a href="../../spec/03-types/">03 §5.1</a>).</li>
+<li><code>partitionPoint(p)</code>: the first index whose element fails <code>p</code>, for elements <code>p</code> partitions —
+every one it holds for before every one it does not; a binary search. Of a <code>TotalOrder</code>
+element, <code>binarySearch(x)</code>: the index of an element equal to <code>x</code> in sorted elements, any of
+several equal ones, or <code>null</code>.</li>
+<li>Of a <code>Display</code> element: <code>join(sep)</code>, the elements' texts with <code>sep</code> between each two.</li>
+<li><strong>Clone</strong> (10 K5; N2a): of a <code>Clone</code> element, <code>T[]</code> is <code>Clone</code> — <code>clone()</code> is a new array of the
+elements' clones, and <code>[xs] * n</code> repeats such an array by <code>clone</code> (<a href="../../spec/03-types/">03 §5.1</a>).</li>
+<li><strong>Equality and display</strong> (10 C9; M8a S14): of an <code>Equatable</code> element, <code>T[]</code> and <code>Slice&lt;T&gt;</code> are
+<code>Equatable</code>, element by element in order — <code>[1, 2] == [1, 2]</code>, <code>xs[1..] == ys[1..]</code>. Of a
+<code>Debug</code> element they are <code>Debug</code> and <code>Display</code> alike: <code>[1, 2, 3]</code>, each element in its debug
+text — a string quoted, <code>[&quot;a&quot;, &quot;b&quot;]</code>, where unquoted its bounds would be lost — so <code>{xs}</code> and
+<code>{xs:?}</code> print the same, and a width pads it as a <code>Display</code> value's text. An array literal
+beside <code>==</code> or <code>!=</code> takes the other side's type, <code>xs == []</code>; <code>[] == []</code> fixes none
+(<code>LYR-SEM0060</code>).</li>
+<li>The <strong>sorts</strong> (10 C10): <code>sortBy(cmp)</code> puts the elements in the order <code>cmp</code> gives, and
+<code>sortByKey(key)</code> in the order of a <code>TotalOrder</code> key; of a <code>TotalOrder</code> element, <code>sort()</code> in
+ascending order. All three are <strong>stable</strong> — equal elements keep their order — and take a buffer
+of the length. <code>sortUnstable()</code>, of a <code>TotalOrder</code> element, sorts in place without one; equal
+elements end in any order. Each is <code>O(n log n)</code> in comparisons. A <code>float</code> has no total order
+of its own: its elements sort through <code>sortBy</code>. The comparison of <code>sortBy</code>, the key of
+<code>sortByKey</code> and the test of <code>partitionPoint(p)</code> may throw, and the call throws it: a sort that
+one ends leaves every element in the slice, in some order.</li>
+<li><code>arrayOf(n, f)</code> (<a href="../../spec/03-types/">03 §8</a>) calls <code>f</code> once per index, in order; a negative <code>n</code>
+panics; what <code>f</code> throws, the call throws, and no array is made.</li>
+</ul>
+<h2 id="hashing">Hashing</h2>
+<p>A hash is computed with a <strong><code>Hasher</code></strong> of <code>std.core</code> (design 10 Q3, K2): <code>writeByte(b)</code> writes a
+byte; <code>write(bytes)</code> the bytes of a <code>Slice&lt;uint8&gt;</code>, <code>writeUint(v)</code> and <code>writeInt(v)</code> the eight
+bytes of a word, the lowest first — defaults over <code>writeByte</code> a hasher may replace; <code>finish()</code>
+answers the hash of what was written, a <code>uint64</code>, and leaves the hasher writable. <code>std.hash</code>
+holds three:</p>
+<ul>
+<li><strong><code>DefaultHasher</code></strong>, SipHash-1-3 under a key the system draws once per process, at the first
+use — the same in every thread, another in the next run. What it hashes cannot be aimed at
+collisions from outside, and an order that follows its hashes differs from run to run.</li>
+<li><strong><code>FixedHasher</code></strong>, SipHash-1-3 under a zero key: the same hash in every run.</li>
+<li><strong><code>Fnv1a64</code></strong>, FNV-1a in 64 bits: keyless, for input no adversary chooses.</li>
+</ul>
+<p>Where the system gives no random bytes, the program panics with <code>LYR-RT0015</code>
+(<a href="../../spec/13-abi/">13</a>).</p>
+<p><code>std.hash</code> also holds three <strong>checksums</strong> of a <code>Slice&lt;uint8&gt;</code>, each a <code>uint32</code> (design 10 Q3; M8c
+S11). Each continues from a running value, as zlib's do: the checksum of the whole is that of its
+pieces, one after the other — <code>crc32(rest, crc32(first))</code>.</p>
+<ul>
+<li><strong><code>crc32(bytes, running = 0)</code></strong>, CRC-32 of ISO-HDLC (zip, gzip, PNG):
+<code>crc32(&quot;123456789&quot;.toBytes())</code> is <code>0xCBF43926</code>.</li>
+<li><strong><code>crc32c(bytes, running = 0)</code></strong>, the Castagnoli polynomial (iSCSI, RFC 3720): <code>0xE3069283</code> over
+the same nine bytes.</li>
+<li><strong><code>adler32(bytes, running = 1)</code></strong>, RFC 1950's (zlib): <code>adler32(&quot;Wikipedia&quot;.toBytes())</code> is
+<code>0x11E60398</code>.</li>
+</ul>
+<h2 id="input-and-output">Input and output</h2>
+<p>The core of <code>std.io</code>, its buffers and its text (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 O1–O3</a>;
+M8b S2, S3 and S10a). The files, the console's streams and the network follow with M8b's later
+slices.</p>
+<ol>
+<li><strong><code>IoError</code></strong> is the one error that input and output throw (O3), a struct: <code>kind: IoErrorKind</code>, <code>path: ?string</code>, <code>detail: string</code> and <code>inner: ?Error</code> — the field O3 calls
+<code>cause</code>, named so because <code>Error</code> asks for a method <code>cause()</code> and a type's members do not share
+a name (as <code>Exception</code>'s <code>inner</code>). Its <code>message()</code> is the kind in words, then the path and the
+detail where there are any: <code>not found: data.txt (opened to read)</code>. <code>IoErrorKind</code> names O3's
+kinds, and <code>Other { code }</code> a system's code no kind names. It is <code>@NonExhaustive</code>
+(<a href="../../spec/11-metaprogramming/">11 §1</a> rule 12): a later release may name another kind, so a <code>match</code>
+over it outside <code>std</code> writes a <code>_</code>.</li>
+<li><strong><code>Reader</code></strong> has <code>read(into: Slice&lt;uint8&gt;): int</code>: it fills the slice from the front and answers
+how many bytes it put there — <strong>0 only at the end</strong>, and at once for an empty slice; fewer than
+the slice holds is no end. <strong><code>Writer</code></strong> has <code>write(from: Slice&lt;uint8&gt;): int</code>: it takes from the
+front and may take <strong>fewer</strong> bytes than it is handed. <strong><code>Seek</code></strong> has <code>seek(to: SeekFrom): int</code>,
+<code>SeekFrom.Start(n)</code>, <code>.End(n)</code> or <code>.Current(n)</code>, and answers the position counted from the
+start. All three are <code>mut fn</code>s. <code>read</code>, <code>write</code> and a writer's <strong><code>flush()</code></strong> — which hands on
+what it holds back; the default does nothing (design 10 B8) — throw <strong><code>[IoError, Cancelled]</code></strong>,
+<code>seek</code> throws <code>IoError</code>. <strong>Why <code>Cancelled</code></strong> (design 10 Review 2026-10-08): a read from a socket
+or a pipe, or a write into one, waits for as long as the other side does nothing, and a cancel
+(<a href="../../spec/10-concurrency/">10 §1</a> rule 7) must be able to end that wait with the error every wait
+ends with — not with an <code>IoError</code>, which a handler would take for the stream's failure. A
+reader or writer that never waits without bound declares <code>IoError</code> alone, as an implementation
+may throw less than its member (<a href="../../spec/06-errors/">06 §2</a> rule 4); code over any reader or writer
+is told both.</li>
+<li><strong>The defaults</strong> (O1), on every reader: <code>readExact(into)</code> fills the slice whole or throws
+<code>UnexpectedEof</code>; <code>readToEnd()</code> is everything to the end in a new array; <code>readToString()</code> the
+same as UTF-8 — bytes that are no UTF-8 throw <code>InvalidData</code>, the decoder's <code>Utf8Error</code> as the
+cause. On every writer: <code>writeAll(from)</code> writes until all of it is taken — a writer that takes
+no byte of a slice that has some throws <code>Other { code: 0 }</code> rather than being asked forever —
+and <code>writeString(s)</code> writes the text's UTF-8. They throw what any reader's or writer's call
+may, <code>[IoError, Cancelled]</code> — over one that declares <code>IoError</code> alone too.</li>
+<li><strong><code>copy(r, w): int</code></strong> copies everything <code>r</code> holds into <code>w</code> and answers how many bytes, and
+throws <code>[IoError, Cancelled]</code>. The two
+are used as the values handed in: a class is itself, and a reader that is a struct is read
+through a copy, its position unmoved for the caller.</li>
+<li><strong>The streams over memory</strong> (O2): <code>ByteReader.new(bytes)</code> reads a <code>Slice&lt;uint8&gt;</code> from the
+front and seeks — a position past the end reads nothing, one before the start panics;
+<code>ByteBuffer.new()</code> appends what is written and reads from the front what was written and not
+yet read, with <code>length()</code> and <code>toArray()</code> of what it holds. Both are classes, say
+<code>throws IoError</code> and throw nothing; never waiting, they leave <code>Cancelled</code> out.</li>
+<li><strong>The buffers</strong> (O2), with 8 KiB of their own. <code>BufReader.new(r)</code> is a reader that reads <code>r</code> a
+buffer at a time; a read at least as large as the buffer, while it is empty, goes to <code>r</code>
+directly. <code>BufWriter.new(w)</code> is a writer that holds back what it is handed until the buffer is
+full, a <code>flush()</code> or a <code>close()</code>; a write at least as large goes to <code>w</code> directly, after what is
+held. A flush that throws keeps what <code>w</code> did not take, for the next. Both throw what any
+reader's or writer's call may (rule 2). A <code>BufWriter</code> is
+<code>Closeable</code>: <code>close()</code> flushes and leaves <code>w</code> open, and one that nothing closes is warned
+about (06 §7.4, <code>LYR-SEM0144</code>). <em>(Informative.)</em> O2 has both as structs with the bytes inline;
+every read hands the inner reader a view of the buffer, and an inline array in a frame has no
+view (03 §5.3), so they are classes over a buffer on the heap.</li>
+<li><strong><code>TextReader.new(r, skipBom: false)</code></strong> reads UTF-8 text through a buffer of its own.
+<code>readLine(): ?string</code> is the next line without its end — a <code>\n</code> or a <code>\r\n</code>; a <code>\r</code> alone is
+text — or <code>null</code> at the end. A last line without an end is a line; the end of the last line
+starts none. <code>lines()</code> iterates the same; <code>chars()</code> iterates the codepoints; <code>readToEnd(): string</code> is the rest. All throw <code>[IoError, Cancelled]</code>, and the two iterators' <code>Error</code> is
+<code>Join&lt;IoError, Cancelled&gt;</code>, the root <code>Error</code> once reduced (§Iteration): a loop over them is
+told <code>Error</code>. A codepoint split between two reads of <code>r</code>
+waits for its rest. Bytes that are no UTF-8 throw <code>InvalidData</code>, a <code>Utf8Error</code> as the cause
+whose offset counts from the reader's start; a line that throws is consumed. A byte order mark
+is text, <code>U+FEFF</code>, unless <code>skipBom: true</code> drops it from the front.</li>
+<li><strong><code>TextWriter.new(w)</code></strong>: <code>write(s)</code> writes the text's UTF-8, <code>writeLine(s)</code> that and a <code>\n</code>, on
+every system. It holds nothing back, and throws what <code>w</code> may.</li>
+</ol>
+<h2 id="encodings">Encodings</h2>
+<p><code>std.encoding</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 Q5</a>; M8b S4a): bytes as text and
+back, and the integers of a byte slice. Each encoding is a struct of static members, a name
+space: <code>Base64.encode(bytes)</code>.</p>
+<ol>
+<li><strong><code>EncodingError</code></strong> is what a decoder throws: <code>offset</code>, where the text first is not the
+encoding — a byte of it, a unit of UTF-16 —, and <code>detail</code>, what is wrong there. Its
+<code>message()</code> is <code>no Base64 digit at offset 1</code>.</li>
+<li><strong><code>Base64</code></strong> and <strong><code>Base64Url</code></strong> encode a <code>Slice&lt;uint8&gt;</code> with RFC 4648's alphabets (§4 with
+<code>+</code> and <code>/</code>, §5 with <code>-</code> and <code>_</code>), padded with <code>=</code> to a multiple of four characters. <code>decode</code>
+is strict: a text whose length is no multiple of four fails at its end; a character outside the
+alphabet — whitespace and the other alphabet's two among them — or a <code>=</code> before the end fails
+where it stands; bits past the last byte that are not zero fail at their character (RFC 4648
+§3.5). <strong><code>Base64Url.encodeUnpadded</code></strong> and <strong><code>decodeUnpadded</code></strong> (M10 S5; design 10 S4a) are the
+same alphabet without the <code>=</code> padding, as JOSE writes it (RFC 7515 §2): the text's length is
+4k, 4k + 2 or 4k + 3 — a length of 4k + 1 fails at its end —, a <code>=</code> is no digit here, and the
+bits past the last byte are checked as above.</li>
+<li><strong><code>Hex</code></strong> encodes two digits a byte, in small letters, and decodes either case; an odd count
+of digits fails at the end.</li>
+<li><strong><code>Utf16</code></strong> encodes a text as code units, <code>uint16[]</code>, a codepoint past <code>U+FFFF</code> as a surrogate
+pair; <code>decode</code> takes units, and half of a pair without its other half fails at its unit.</li>
+<li><strong>The integers of bytes</strong>: <code>T.fromBytesLE(s)</code> and <code>T.fromBytesBE(s)</code> for every integer type
+<code>T</code> read exactly its width — another length panics (<code>LYR-RT0008</code>) —, the first byte the lowest
+or the highest. <code>Slice&lt;uint8&gt;</code> has <code>getUint16LE(at)</code>, <code>getUint16BE</code>, the same for <code>Uint32</code>,
+<code>Uint64</code>, <code>Int16</code>, <code>Int32</code> and <code>Int64</code>: the width at the byte offset <code>at</code>. The way back:
+<code>v.toBytesLE()</code> and <code>v.toBytesBE()</code> of every integer type give its width as an inline array,
+<code>uint8[N]</code> — <code>(258 as uint16).toBytesBE()</code> is <code>[1, 2]</code> (M8c S11). An inline array in a frame
+gives no view (<a href="../../spec/03-types/">03 §5.3</a>): <code>T.fromBytesLE(v.toBytesLE().toArray())</code> is <code>v</code>. They
+are members of the module's blocks, there where <code>std.encoding</code> is imported. <em>(Informative.)</em> A string's bytes
+are <code>toBytes()</code> (§Strings).</li>
+</ol>
+<h2 id="cryptography">Cryptography</h2>
+<p><code>std.crypto</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 Q4</a>; M8b S4b): the hashes for security, HMAC,
+the system's random bytes, and a comparison of secrets. The doors are Ed25519, X25519,
+ChaCha20-Poly1305 and Argon2.</p>
+<ol>
+<li><strong><code>Digest</code></strong> is a hash fed in pieces: <code>static let size</code> and <code>static let blockSize</code> in bytes,
+<code>static fn new()</code>, <code>update(bytes)</code> as often as there are pieces, and <code>finish(): uint8[]</code>, the
+hash of all of them. <code>finish</code> leaves the digest as it was: fed further, it hashes the longer
+input. <em>(Informative.)</em> Q4 writes <code>finish(): uint8[N]</code>; an interface names no length that is
+each implementer's own, as 5.0 has no generic constant (<a href="../../spec/03-types/">03 §5</a>).</li>
+<li><strong><code>Sha256</code></strong> and <strong><code>Sha512</code></strong> are FIPS 180-4's SHA-256 and SHA-512, <strong><code>Sha1</code></strong> its SHA-1 and
+<strong><code>Md5</code></strong> RFC 1321's MD5. SHA-1 and MD5 are broken for collisions and are there for what an old
+format asks. <code>sha256(bytes): uint8[32]</code> is the hash at once.</li>
+<li><strong><code>Hmac&lt;D&gt;.new(key)</code></strong> is RFC 2104's HMAC over any <code>Digest</code>, with <code>update</code> and <code>finish</code> as a
+digest's: a key longer than <code>D.blockSize</code> is hashed first, a shorter one padded with zeros.</li>
+<li><strong><code>randomBytes(n): uint8[]</code></strong> and <strong><code>randomUint64(): uint64</code></strong> come from the system; a system
+that gives none panics (<code>LYR-RT0015</code>).</li>
+<li><strong><code>constantTimeEq(a, b): bool</code></strong> compares two byte slices in a time that depends on their
+lengths alone — not on where they first differ. Slices of different lengths are unequal.</li>
+</ol>
+<h2 id="random-numbers">Random numbers</h2>
+<p><code>std.random</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 Q2</a>; M8b S4c): a generator, its draws, and the free
+forms over the running thread's own. Not for secrets — <code>randomBytes</code> of §Cryptography is.</p>
+<ol>
+<li><strong><code>Random</code></strong> is ChaCha8 (RFC 8439's block function, eight rounds), 64 bits a draw.
+<code>Random.seeded(seed: uint64)</code> gives the stream the seed names, <strong>the same in every 5.x</strong>:
+the key is four outputs of SplitMix64 from the seed — eight words, the low half of each output
+first —, the nonce is zero, the block counter counts from zero in words 12 and 13, and each
+block's sixteen words are taken in order, two of them a draw, the first the low half.
+<code>Random.fresh()</code> keys a generator from the system's random bytes.</li>
+<li><strong>The draws.</strong> <code>nextUint64()</code>; <code>nextInt()</code>, the draw as an <code>int</code>; <code>nextInRange(r)</code>, an integer
+of the <code>Range&lt;int&gt;</code> <code>r</code>, each alike — a draw below 2⁶⁴ modulo the range's length is drawn
+again —, an empty range panics (<code>LYR-RT0008</code>); <code>nextFloat()</code>, the high 53 bits of a draw over
+2⁵³, in [0, 1); <code>nextBool()</code>, the high bit of a draw; <code>nextBytes(into)</code>, eight bytes a draw, the
+low byte first, a shorter tail from one draw's low bytes; <code>nextNormal(mean = 0.0, stdDev = 1.0)</code>, Marsaglia's polar method, two floats a try and one of the pair kept. Each takes its
+draws from the stream as said, so a seeded generator gives the same values in every 5.x —
+<code>nextNormal</code> up to the last bits of the platform's <code>ln</code> and <code>sqrt</code>.</li>
+<li><strong><code>shuffle(s)</code></strong> puts a <code>Slice&lt;T&gt;</code> in an order each of its orders alike (Fisher–Yates, from
+the back, the place <code>i</code> swapped with one of <code>0..i + 1</code>). <strong><code>choice(s): ?T</code></strong> is an element,
+each alike, or <code>null</code> for an empty slice, which draws nothing. <strong><code>sample(s, k): T[]</code></strong> is <code>k</code>
+elements from <code>k</code> different places, in a random order; <code>k</code> outside <code>0..=s.length()</code> panics.</li>
+<li><strong>The free forms</strong> <code>random.nextInRange(r)</code>, <code>random.nextFloat()</code> and <code>random.shuffle(s)</code> draw
+from the running thread's generator — its own, keyed from the system at its first use there.
+<em>(Informative.)</em> Q2 names them <code>random.int</code> and <code>random.float</code>; no declaration takes a builtin
+type's name (<a href="../../spec/07-statements/">07</a> K5), so they carry <code>Random</code>'s names.</li>
+</ol>
+<h2 id="time">Time</h2>
+<p><code>std.time</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 Q1</a>; M8b S5a, S5b): spans, the system's two clocks,
+the calendar and RFC 3339. The time zones' database and the format patterns follow with M10.</p>
+<ol>
+<li><strong><code>Duration</code></strong> is a span in whole nanoseconds, negative or not: <code>ofNanos</code>, <code>ofMicros</code>,
+<code>ofMillis</code>, <code>ofSecs</code>, <code>ofMinutes</code>, <code>ofHours</code>; <code>nanos()</code>, <code>millis()</code> and <code>secs()</code> rounded toward
+zero, <code>asSecsFloat()</code>. <code>+</code> and <code>-</code> with a <code>Duration</code>, <code>*</code> and <code>/</code> with an <code>int</code>; arithmetic that
+leaves the range of <code>int</code> panics (<code>LYR-RT0002</code>), a division by zero too (<code>LYR-RT0001</code>). It is
+<code>Equatable</code>, <code>Ordered</code>, <code>TotalOrder</code>, <code>Hashable</code>, its default is zero.</li>
+<li><strong>A duration's text</strong> is Go's: <code>0s</code>; under a second one unit — <code>ns</code>, <code>µs</code>, <code>ms</code> — with its
+fraction, the fraction's trailing zeros dropped (<code>1.5µs</code>, <code>500ms</code>); from a second on hours,
+minutes and seconds, from the first that is not zero, the seconds with their fraction
+(<code>1.5s</code>, <code>1m30s</code>, <code>1h0m0s</code>); a minus in front of a negative span.</li>
+<li><strong><code>Duration.parse(s)</code></strong> reads Go's form: an optional sign, then one or more numbers each with a
+unit — <code>ns</code>, <code>us</code> (or <code>µs</code>, <code>μs</code>), <code>ms</code>, <code>s</code>, <code>m</code>, <code>h</code> —, a number with a fraction allowed
+(<code>1.5h</code>, <code>.5s</code>), <code>0</code> alone for zero. An empty text throws <code>ParseError</code> with <code>Empty</code>, a number
+without a unit or a unit unknown, <code>Invalid</code>, a span beyond the range, <code>Overflow</code>. A fraction is
+taken as Go takes it, <code>fraction × (unit ÷ 10^digits)</code> in floating point, so what Go reads this
+reads. A duration's text parses back to it.</li>
+<li><strong><code>Instant</code></strong> is a moment on the wall clock, nanoseconds since <code>1970-01-01T00:00:00Z</code>, POSIX
+time without leap seconds: <code>Instant.now()</code>, <code>epochSecs()</code> and <code>epochMillis()</code> rounded down,
+<code>instant + duration</code>, <code>later.since(earlier): Duration</code>. Instants compare and order as the
+moments they are. The system may set its wall clock back. <strong><code>Monotonic</code></strong> is a moment on the
+clock that only moves forward, from an unspecified start: <code>Monotonic.now()</code>,
+<code>elapsed(): Duration</code>.</li>
+<li><strong>The calendar</strong> is the proleptic Gregorian one, every year an <code>int</code> holds. <code>Date.of(year, month, day)</code> and <code>Time.of(hour, minute, second, nano = 0)</code> throw <code>TimeError</code> for what is no
+date — a month outside 1–12, a day beyond the month's — and no time of day — 24:00, a second
+60, which POSIX time does not count. A year is a leap year divisible by 4, and by 400 where by
+100 (<code>isLeapYear()</code>). <code>plusDays(n)</code> moves a date, <code>dayOfWeek()</code> is a <code>Weekday</code>, <code>Monday</code> first.
+Dates and times compare and order; a date's text is ISO 8601's <code>YYYY-MM-DD</code> — a year outside
+0000–9999 with its sign and at least four digits —, a time's <code>HH:MM:SS</code> and the fraction
+without trailing zeros. Both read back from their texts (<code>Parse</code>): <code>Time.parse(&quot;09:30:00.5&quot;)</code>
+takes up to nine digits of fraction and refuses an offset, which is a <code>DateTime</code>'s.</li>
+<li><strong>A zone</strong> is a fixed offset from UTC: <code>Zone.utc</code>, <code>Zone.fixed(offset)</code> — whole minutes under
+a day, else <code>TimeError</code>. <em>(Informative.)</em> The zones of a database come with M10.</li>
+<li><strong><code>DateTime</code></strong> is a date and a time of day at an offset: <code>DateTime.of(date, time, zone)</code>,
+<code>instant.toDateTime(zone)</code>, <code>toInstant()</code>, <code>date()</code>, <code>time()</code>, <code>offset()</code>. Two compare field by
+field — one moment at two offsets is two date-times, one instant.</li>
+<li><strong>RFC 3339</strong> (§5.6) is the text of an <code>Instant</code> — in UTC, <code>Z</code> — and of a <code>DateTime</code> — its offset,
+<code>Z</code> for none —, the fraction without trailing zeros, none where it is zero. Parsing is strict: a
+<code>T</code> or <code>t</code> between date and time, <code>Z</code>, <code>z</code> or <code>±hh:mm</code>, a fraction of any length, cut to
+nanoseconds; a space for the <code>T</code>, a missing offset, a date or a time that does not exist is
+<code>Invalid</code>, an empty text <code>Empty</code>. <code>Date.parse</code> reads the full-date alone.</li>
+</ol>
+<p><strong>The zones</strong> (design 10 Q1; M10 S11). <code>Zone</code> is UTC, a fixed offset, or a zone of the database:</p>
+<ol>
+<li><strong>Where a zone comes from.</strong> <code>Zone.utc</code>; <code>Zone.fixed(offset)</code> (whole minutes under a day);
+<code>Zone.load(name)</code> reads the IANA name's TZif file (RFC 8536, versions 1 to 4: the 64-bit block
+of a version 2+ file, the footer's rule for the years beyond the last transition, leap seconds
+read over) from the system's database — <code>TZDIR</code> or <code>/usr/share/zoneinfo</code> —, <code>TimeError { kind = .NoZoneData }</code> where the system has none (Windows), <code>.NoSuchZone</code> where it has no such
+zone or the name is none (empty, absolute, with <code>..</code>); <code>Zone.fromTzif(name, bytes)</code> and
+<code>Zone.fromPosix(name, tz)</code> (a POSIX TZ string, <code>CET-1CEST,M3.5.0,M10.5.0/3</code>, <code>EST5EDT</code>,
+<code>&lt;+0330&gt;-3:30</code>; the offsets west-positive as POSIX writes them; daylight time without an
+offset one hour ahead, without a rule the US rule) take data of one's own; <code>Zone.local()</code> is
+<code>TZ</code> where set (a name of the database, else a POSIX string), else <code>/etc/localtime</code>, else UTC.
+<code>name()</code>, <code>isFixed()</code>, <code>offsetAt(instant)</code>, <code>infoAt(instant)</code> — <code>ZoneInfo { offset, isDst, abbreviation }</code> —; <code>offset()</code> of a zone of the database is its offset now. Two zones are
+equal by name and kind.</li>
+<li><strong>A moment in a zone.</strong> <code>instant.toDateTime(zone)</code> takes the offset in force at the moment.
+<code>DateTime.of(date, time, zone)</code> resolves a local time: once, it is that moment; in the hour
+the clocks fall back, it is the earlier of the two moments; in the hour they spring forward,
+it moves forward by the gap (<code>02:30</code> on the morning of the change is <code>03:30</code> at the new
+offset). A <code>DateTime</code> keeps its zone: <code>zone()</code>, <code>zoneInfo()</code>, <code>withZone(zone)</code> the same moment
+there, <code>plusDays(n)</code> the same local time <code>n</code> days on at the offset then in force (a day
+across the change is 23 or 25 hours). Two date-times are equal by date, time and offset; their
+zones' names are not compared.</li>
+<li><strong>Patterns</strong> (UTS #35, English). <code>dateTime.format(pattern)</code>: <code>y</code> the year (<code>yy</code> its last two
+digits, more <code>y</code> padded to the count), <code>M</code> the month (<code>MM</code> padded, <code>MMM</code> <code>Jan</code>, <code>MMMM</code>
+<code>January</code>, <code>MMMMM</code> <code>J</code>), <code>d</code> the day, <code>H</code> the hour of 24, <code>h</code> of 12, <code>m</code>, <code>s</code>, <code>S…</code> the
+fraction to as many digits, <code>a</code> <code>AM</code>/<code>PM</code>, <code>E</code> to <code>EEE</code> <code>Tue</code>, <code>EEEE</code> <code>Tuesday</code>, <code>EEEEE</code> <code>T</code>,
+<code>Z</code> to <code>ZZZ</code> <code>+0100</code>, <code>ZZZZ</code> <code>GMT+01:00</code> (<code>GMT</code> for none), <code>ZZZZZ</code> <code>+01:00</code> (<code>Z</code> for none),
+<code>X</code>/<code>XX</code>/<code>XXX</code> <code>+01</code>/<code>+0100</code>/<code>+01:00</code> with <code>Z</code> for none, <code>x</code>/<code>xx</code>/<code>xxx</code> the same without;
+text in <code>'…'</code> as it is, <code>''</code> a quote, what is no letter as it is; a letter the pattern does
+not know or a quote not closed is <code>TimeError</code>. <code>DateTime.parseWith(pattern, text, zone = Zone.utc)</code> reads the same fields back: a number takes the digits it finds (a padded field at
+least its width), a name is matched without case, a fraction as many digits as there are,
+<code>yy</code> as 1970–2069; what the pattern does not name is 1970-01-01 00:00:00 UTC; an offset field
+makes a fixed zone, without one the zone given resolves the local time; what does not fit is
+<code>ParseError { kind = .Invalid }</code>.</li>
+</ol>
+<h2 id="paths">Paths</h2>
+<p><code>std.path</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 O6</a>; M8b S6a): a path is a string, and there is no
+<code>Path</code> type. These functions take a path apart and put one together lexically, as Go's
+<code>path/filepath</code> does; none of them asks the file system.</p>
+<ol>
+<li><strong>The system's forms.</strong> <code>path.separator</code> is <code>\</code> on Windows and <code>/</code> elsewhere. On Windows both
+<code>\</code> and <code>/</code> separate; a path may start with a volume — a drive, <code>C:</code>, or a UNC share,
+<code>\\server\share</code> —; two names compare without regard to the case of ASCII letters; and what
+these functions build, they build with <code>\</code>.</li>
+<li><strong><code>normalize(p)</code></strong> is Go's <code>Clean</code>: separators run together, <code>.</code> elements dropped, a <code>..</code>
+taking the element before it away — above the root it is dropped, in a relative path kept —,
+no separator at the end but the root's, and <code>.</code> for nothing. <strong><code>join(parts...)</code></strong> joins the
+parts that are not empty by the separator and normalizes; it is empty for no such part.</li>
+<li><strong><code>fileName(p)</code></strong> is the last element (Go's <code>Base</code>), <strong><code>parent(p)</code></strong> the rest, normalized
+(Go's <code>Dir</code>), <strong><code>extension(p)</code></strong> the last element's extension with its dot, from its last dot
+(Go's <code>Ext</code>; of <code>.bashrc</code> that is all of it), <strong><code>stem(p)</code></strong> the last element without it, and
+<strong><code>withExtension(p, ext)</code></strong> the path with another extension — a dot added to <code>ext</code> where it
+has none, the extension dropped for an empty one.</li>
+<li><strong><code>isAbsolute(p)</code></strong> is Go's <code>IsAbs</code> — on Windows a drive with the root, or a UNC share.
+<strong><code>relative(base, target): ?string</code></strong> is Go's <code>Rel</code>: the path that names <code>target</code> from <code>base</code>,
+<code>.</code> for the same place, <code>null</code> where none exists — one absolute and the other not, two volumes,
+a base that climbs above where the target is.</li>
+<li><strong><code>components(p)</code></strong> lists the root — with its volume — and then the elements, without the
+empty ones and <code>.</code>, keeping <code>..</code>; nothing is normalized.</li>
+</ol>
+<h2 id="files">Files</h2>
+<p><code>std.fs</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 O4, O5</a>; M8b S6b, S6c): <code>File</code>, a handle on a file, and the
+conveniences that read or write a file whole or its lines one by one. The directories follow
+with S7.</p>
+<ol>
+<li><strong><code>File.open(path)</code></strong> opens to read, <strong><code>File.create(path)</code></strong> to write — made where it is not
+there, cut to nothing where it is —, <strong><code>File.openWith(path, options)</code></strong> as an <code>OpenOptions</code>
+says: <code>read</code>, <code>write</code>, <code>append</code> (writes at the end), <code>create</code>, <code>truncate</code>. Options that read and
+write nothing, cut without writing from the start, or create without writing are refused
+(<code>InvalidInput</code>).</li>
+<li><strong>A file is a <code>Reader</code>, a <code>Writer</code> and a <code>Seek</code></strong> at its position, and <code>Closeable</code>. It reads
+and writes through the caller's slice. A read or a write may take part of it, as rule 2 of
+§Input and output allows.</li>
+<li><strong>What a file cannot do is an <code>IoError</code></strong> with its path and what was done — <code>opened to read</code>,
+<code>opened to write</code>, <code>read</code>, <code>written</code>, <code>sought</code>, <code>closed</code> —: <code>not found: data.txt (opened to read)</code>. The system's errors map to <code>NotFound</code>, <code>PermissionDenied</code>, <code>AlreadyExists</code>,
+<code>IsDirectory</code>, <code>NotDirectory</code> and <code>InvalidInput</code>, and any other to <code>Other { code }</code>, the
+system's number. Whether a directory opens as a file and fails at the read, or fails to open,
+is the system's (POSIX opens it; the read says <code>IsDirectory</code>).</li>
+<li><strong>A file is closed once</strong>: after <code>close()</code> every call throws <code>Closed</code>, and a second <code>close()</code>
+does nothing. A <code>File</code> that nothing closes is warned about (06 §7.4).</li>
+<li><strong>The I/O pool.</strong> A file's calls run on a few threads of the program's own, started at the
+first call: the running task is parked meanwhile and its thread runs the other tasks. A call
+on a file ends in a bounded time and is no wait in the sense of <a href="../../spec/10-concurrency/">10 §1</a>
+rule 7: in a cancelled task it runs to its end, and the cancellation is thrown at the task's
+next wait. <em>(Informative.)</em> Ending early would hand the caller back a buffer the pool still
+writes into. So a <code>File</code> declares <code>IoError</code> alone (§Input and output rule 2), and so do the
+conveniences below and <code>FileLinesIter</code>, though the defaults they use declare <code>Cancelled</code> for
+any reader: from a file it cannot come.</li>
+<li><strong>The conveniences</strong> read or write a file whole: <strong><code>fs.readText(path)</code></strong>, its UTF-8 — bytes
+that are no UTF-8 throw <code>InvalidData</code> with the path, and a byte order mark is text, as rule 7
+of §Input and output keeps it —, <strong><code>fs.readBytes(path)</code></strong>, <strong><code>fs.writeText(path, text)</code></strong> and
+<strong><code>fs.writeBytes(path, bytes)</code></strong>, which make or cut the file as <code>File.create</code> does, and
+<strong><code>fs.appendText(path, text)</code></strong>, which writes at its end and makes it where it is not there.
+Each closes its file on every way out; what the close throws counts where nothing went
+wrong before (<a href="../../spec/06-errors/">06 §7</a>).</li>
+<li><strong><code>fs.lines(path)</code></strong> gives the file's lines as <code>TextReader</code>'s <code>readLine</code> gives them, through a
+<code>FileLinesIter</code> with <code>Error = IoError</code> that is <code>Closeable</code>: it closes the file at its end and
+at its first error, a loop that leaves it early closes it (<a href="../../spec/07-statements/">07 §2</a> rule 7),
+and so does <code>close()</code>. After its end or an error it gives no more; after <code>close()</code> a call
+throws <code>Closed</code>, and what it had read ahead is not given.</li>
+</ol>
+<h2 id="directories">Directories</h2>
+<p><code>std.fs</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 O5</a>; M8b S7a, S7b): what a path names, the directories and
+their entries, and what is put together from them. Each call of the system's runs on the I/O pool
+(§Files rule 5).</p>
+<ol>
+<li><strong><code>fs.metadata(path)</code></strong> says what a path names, through links: <code>size</code> in bytes, <code>modified</code>,
+an <code>Instant</code>, <code>isFile</code> and <code>isDir</code> — neither for what is neither —, <code>readonly</code>, and
+<code>isSymlink</code>, whether the path itself is a link. A link that leads nowhere is not found.
+<strong><code>fs.exists(path)</code></strong> is whether <code>metadata</code> answers: false where it would throw.</li>
+<li><strong><code>fs.createDir(path)</code></strong> makes a directory in one that is there, <strong><code>fs.removeDir(path)</code></strong>
+removes an empty one, <strong><code>fs.remove(path)</code></strong> a file, and <strong><code>fs.rename(from, to)</code></strong> renames on
+one file system, a file that <code>to</code> names replaced. What they cannot do is an <code>IoError</code> with the
+path and what was done — <code>made</code>, <code>removed</code>, <code>renamed to &lt;to&gt;</code>, <code>looked at</code> —, as §Files rule 3
+says. A directory that is not empty is <code>Other</code> with the system's code: no kind names it. What
+a directory removed as a file, or a file read as a directory, gives is the system's.</li>
+<li><strong><code>fs.readDir(path)</code></strong> gives the directory's entries in the system's order, without <code>.</code> and
+<code>..</code>, as <code>DirEntry</code>s: <code>name</code>, <code>path</code> — the directory's joined with the name (§Paths) —, and
+<code>isFile</code>, <code>isDir</code> and <code>isSymlink</code> of the entry itself, a link not followed; its <code>metadata()</code>
+follows it. Its <code>ReadDirIter</code>, with <code>Error = IoError</code>, is <code>Closeable</code> and lets the directory
+go as a file's lines let their file go (§Files rule 7). A name that is no UTF-8 is
+<code>InvalidData</code> with the directory's path.</li>
+<li><strong><code>fs.canonicalize(path)</code></strong> is the path absolute, its links resolved and its <code>.</code> and <code>..</code>
+taken out, as the system names it; it must be there. <strong><code>fs.absolute(path)</code></strong> makes it absolute
+by the working directory and normalizes it (§Paths), and asks nothing more of the file system.</li>
+<li><strong><code>fs.createDirAll(path)</code></strong> makes the directory and every one above it that is not there; a
+directory there already is nothing to do, and something else there is <code>NotDirectory</code>.
+<strong><code>fs.removeAll(path)</code></strong> removes the path and all that is in it: a link is removed, never
+followed into, and nothing there is nothing to do. It removes what it can and throws the first
+error it met.</li>
+<li><strong><code>fs.copy(from, to)</code></strong> copies a file's bytes — <code>to</code> made or cut as <code>File.create</code> makes it —
+and answers how many. Onto itself, the same file by <code>canonicalize</code>, it is <code>InvalidInput</code>, and
+from a directory <code>IsDirectory</code>, before anything is written.</li>
+<li><strong><code>fs.walk(path)</code></strong> gives the entries under the path, not the path itself: depth first, a
+directory before what is in it, each directory's entries in the byte order of their names,
+and links not followed. It reads each directory whole and lets it go, so it holds nothing
+open; its <code>Error</code> is <code>IoError</code>, and an error ends it.</li>
+<li><strong><code>fs.tempDir()</code></strong> makes a new directory under the system's directory for temporary files
+and answers its path; <strong><code>fs.tempFile()</code></strong> makes a new empty file there and answers its path.
+Each name is made where nothing was, so it is the program's alone. Neither is removed by
+itself.</li>
+</ol>
+<h2 id="the-console">The console</h2>
+<p><code>std.io</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 O9</a>; M8b S8a–S8c): the program's standard input, output and
+error.</p>
+<ol>
+<li><strong><code>print(v)</code></strong> writes <code>v</code>'s text — what its <code>Display</code> shows — on the standard output, and
+<strong><code>println(v)</code></strong> the same followed by a newline; <strong><code>eprint(v)</code></strong> and <strong><code>eprintln(v)</code></strong> write
+on the standard error. Each takes one argument of any type that is <code>Display</code>; an f-string
+formats more.</li>
+<li><strong>Each stream is buffered</strong>: the output a line at a time where it is a terminal, a block at a
+time otherwise; the error always a line at a time. <strong><code>flush()</code></strong> writes what both hold, the
+output's first. What they hold is written at every end of the program: when <code>main</code> returns,
+before a panic's report, and before an error that leaves <code>main</code> is reported. These functions
+drop a failed write, but for the one rule 6 names.</li>
+<li><em>(Informative.)</em> Through one pipe the two streams show the modes: the error's lines come as
+they are written, the output's block at the end. A program another reads while it runs — a
+line someone waits for — flushes, as a C program does.</li>
+<li><strong><code>stdin()</code></strong> is the program's standard input, one for the program: a <code>Reader</code> whose reads go
+through a buffer of its own, with <strong><code>readLine()</code></strong> — the next line without its end, <code>\n</code> or
+<code>\r\n</code>, and <code>null</code> at the end of the input — and <strong><code>lines()</code></strong>, an iterator of them with
+<code>Error = IoError</code>. A <code>read</code> takes what a line's read left in the buffer first. The console's
+read runs on the I/O pool as a file's call does (§Files rule 5), so <code>readLine</code>, <code>read</code> and
+<code>lines()</code> — a <code>StdinLinesIter</code> of its own — throw <code>IoError</code> alone.</li>
+<li><strong><code>stdout()</code></strong> and <strong><code>stderr()</code></strong> are <code>Writer</code>s over the buffers <code>print</code> and <code>eprint</code> write into,
+so what the two write keeps its order. Their <code>flush()</code> throws what the system says — a pipe
+nobody reads is <code>BrokenPipe</code>; the console is not <code>Closeable</code>.</li>
+<li><strong>A standard output nobody reads ends a printing program</strong>: where the flush of <code>print</code>,
+<code>println</code> or <code>flush()</code>, or the one when <code>main</code> returns, finds the standard output a pipe nobody
+reads, the program ends as SIGPIPE would have ended it — on POSIX killed by that signal, which
+a shell shows as 141 —, what the error holds written first. A <code>Writer</code> of <code>stdout()</code> throws
+<code>BrokenPipe</code> instead (rule 5), and a failed write to the error is dropped. Where there is no
+such signal (Windows), the write is dropped and the program goes on; where a host embeds the
+program (<a href="../../spec/13-abi/">13</a>), the host's signals decide.</li>
+</ol>
+<h2 id="the-terminal">The terminal</h2>
+<p><strong><code>std.term</code></strong> (design 10 Q7; M10 S10) is the terminal as ECMA-48 writes it: questions about the
+standard streams, styles as SGR sequences, the cursor and the screen as sequences to print. No
+raw mode (a door).</p>
+<ol>
+<li><strong>The questions.</strong> <code>isTerminal(stream)</code> for <code>StdStream.Stdin</code>, <code>Stdout</code> or <code>Stderr</code>: whether
+the stream is a terminal (a pipe, a file or nothing is none). <code>size()</code>: the columns and rows
+of the terminal on the standard output, <code>null</code> where it is none. Under Windows the runtime
+switches a console to virtual-terminal processing when it first writes to it, so the same
+bytes mean the same there.</li>
+<li><strong>Styles.</strong> <code>Style { fg: ?Color, bg: ?Color, bold, dim, italic, underline, inverse, strike }</code>
+with <code>Color</code> the 16 (<code>Black</code> … <code>White</code>, <code>BrightBlack</code> … <code>BrightWhite</code>), <code>Index(n)</code> of the 256
+and <code>Rgb(r, g, b)</code> (each clamped to 0..255). <code>style.sgr()</code> is the sequence that turns it on —
+<code>ESC [</code> the parameters in the order bold 1, dim 2, italic 3, underline 4, inverse 7, strike 9,
+the foreground (30–37, 90–97, <code>38;5;n</code>, <code>38;2;r;g;b</code>), the background (40–47, 100–107,
+<code>48;5;n</code>, <code>48;2;r;g;b</code>), <code>m</code> — empty for a plain style; <code>reset()</code> is <code>ESC [0m</code>. <code>style.apply (text)</code> is the text between the sequence and the reset where styles are on, the text itself
+else; <code>style.force(text)</code> wraps whatever the terminal is; a plain style changes nothing.</li>
+<li><strong>When styles are on.</strong> <code>colorsEnabled()</code>: <code>NO_COLOR</code> set and not empty says no; else
+<code>FORCE_COLOR</code> set and not empty says yes; else <code>TERM=dumb</code> says no; else the standard output
+being a terminal decides. An empty value counts as not set (<code>std.os</code> sets, it does not unset).</li>
+<li><strong>The cursor and the screen</strong>, each the sequence to print: <code>cursorUp(n = 1)</code> <code>ESC [nA</code>,
+<code>cursorDown</code> <code>B</code>, <code>cursorForward</code> <code>C</code>, <code>cursorBack</code> <code>D</code>, <code>cursorNextLine(n)</code> <code>E</code>,
+<code>cursorTo(row, column)</code> <code>ESC [row;columnH</code> (both from 1), <code>cursorHide()</code> <code>ESC [?25l</code>,
+<code>cursorShow()</code> <code>ESC [?25h</code>, <code>cursorSave()</code> <code>ESC [s</code>, <code>cursorRestore()</code> <code>ESC [u</code>,
+<code>clearScreen()</code> <code>ESC [2J ESC [H</code>, <code>clearToEnd()</code> <code>ESC [0J</code>, <code>eraseLine()</code> <code>ESC [2K</code> and a
+carriage return, <code>eraseToEndOfLine()</code> <code>ESC [0K</code>.</li>
+</ol>
+<h2 id="the-system">The system</h2>
+<p><code>std.os</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 Q9</a>; M8b S9): the program's arguments, its environment, its
+working directory, its end, and the facts of the system it runs on. A text the system holds
+that is no UTF-8 is taken with U+FFFD for its bad bytes, as <code>string.fromUtf8Lossy</code> takes it.</p>
+<ol>
+<li><strong><code>os.args()</code></strong> gives the program's arguments, its own name first, as a new <code>string[]</code>.</li>
+<li><strong><code>os.env(name)</code></strong> is the variable's value, or <code>null</code> where it is not set; <strong><code>os.envs()</code></strong> the
+whole environment as a <code>Map&lt;string, string&gt;</code>, a snapshot; <strong><code>os.setEnv(name, value)</code></strong> sets a
+variable for the process and those it starts. A name that is empty or holds <code>=</code> or a NUL, or a
+value that holds a NUL, is the program's mistake: <code>setEnv</code> panics.</li>
+<li><strong><code>os.cwd()</code></strong> is the working directory, absolute; <strong><code>os.setCwd(path)</code></strong> moves it. What they
+cannot do is an <code>IoError</code> with the path.</li>
+<li><strong><code>os.exit(code)</code></strong> ends the program with <code>code</code>: what the console holds is written, and no
+<code>defer</code>, no <code>using</code> and no other task runs (<a href="../../spec/06-errors/">06 §7</a>).</li>
+<li><strong>The facts</strong>: <code>os.platform()</code> (<code>Platform</code>: <code>Linux</code>, <code>MacOS</code>, <code>Windows</code>, <code>Other</code>) and
+<code>os.arch()</code> (<code>Arch</code>: <code>X86_64</code>, <code>Aarch64</code>, <code>Other</code>), whose texts are the target triples' words
+(<code>linux</code>, <code>macos</code>, <code>windows</code>, <code>x86_64</code>, <code>aarch64</code>) — the two kinds are <code>std.core</code>'s, whose
+<code>target</code> holds the build's (<a href="../../spec/11-metaprogramming/">11 §3</a>); <code>os.homeDir()</code>, the user's home or <code>null</code>;
+<code>os.tempDir()</code>, the system's directory for temporary files, absolute (<code>fs.tempDir()</code> makes a new
+one in it); <code>os.hostname()</code>; <code>os.cpuCount()</code>, one at least; <code>os.pid()</code>.</li>
+</ol>
+<h2 id="the-network">The network</h2>
+<p><code>std.net</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 O7</a>; M8b S10b, S10c): IP addresses, socket addresses,
+TCP, UDP and the resolver. A call that would block parks the task until the thread's poller says the socket is ready,
+and is a wait in the sense of <a href="../../spec/10-concurrency/">10 §1</a> rule 7: a cancel ends it with
+<code>Cancelled</code> (§Input and output rule 2). There are no socket timeouts: <code>withTimeout</code> is the one
+way. <em>(Informative.)</em> POSIX waits for its sockets through epoll or kqueue; Windows waits for its sockets through AFD
+poll requests on the thread's completion port (M8b S11).</p>
+<ol>
+<li><strong><code>IpAddr</code></strong> is <code>V4(a, b, c, d)</code>, four <code>uint8</code>, or <code>V6(…)</code>, eight <code>uint16</code> groups; it is
+<code>Equatable</code>. <strong><code>IpAddr.parse(s)</code></strong> takes version 4 as four decimal bytes, none with a leading
+zero, and version 6 as RFC 4291 §2.2 writes it — groups of one to four hex digits, <code>::</code> once
+for one or more zero groups, an IPv4 tail in the last 32 bits, no zone; anything else is a
+<code>ParseError</code>. Its text is version 4 dotted, and version 6 as RFC 5952 §4 has it: lower case,
+no leading zero, the longest run of two or more zero groups — the first of equals — as <code>::</code>,
+and an IPv4-mapped address (<code>::ffff:0:0/96</code>) with its dotted tail.</li>
+<li><strong><code>SocketAddr { ip, port: uint16 }</code></strong> is <code>Equatable</code>; its text, and what <code>SocketAddr.parse</code>
+takes, is <code>192.0.2.1:8080</code> or <code>[2001:db8::1]:8080</code> — a version 6 address in brackets, and only
+it —, the port decimal from 0 to 65535 with no leading zero.</li>
+<li><strong><code>TcpListener.bind(addr)</code></strong> makes a listener; port 0 asks the system for a free one, which
+<code>localAddr()</code> says. <strong><code>accept()</code></strong> waits until a connection comes and gives it as a
+<code>TcpStream</code>.</li>
+<li><strong><code>TcpStream.connect(addr)</code></strong> waits until the connection is made; one that nobody listens for
+is <code>ConnectionRefused</code>. A stream is a <code>Reader</code> and a <code>Writer</code>: <code>read</code> waits until bytes come
+and answers 0 once the peer has shut its writing; <code>write</code> waits until the system takes some.
+A peer that is gone is <code>BrokenPipe</code> or <code>ConnectionReset</code>. <strong><code>shutdown(how)</code></strong>, <code>Shutdown.Read</code>,
+<code>.Write</code> or <code>.Both</code>, ends a way of the stream; <code>setNoDelay(on)</code> turns Nagle's waiting off;
+<code>peerAddr()</code> and <code>localAddr()</code> are its two ends.</li>
+<li><strong>A socket is closed once</strong> (<code>Closeable</code>): after <code>close()</code> every call throws <code>Closed</code> — a task
+that waits in a call of it, on any thread, runs again and throws it —, and a second <code>close()</code>
+does nothing.</li>
+<li><em>(Informative.)</em> Every wait is the task's own: its thread runs its other tasks meanwhile, so
+one thread serves many connections.</li>
+<li><strong><code>UdpSocket.bind(addr)</code></strong> makes a UDP socket, port 0 as for a listener. <strong><code>sendTo(from, addr)</code></strong> sends <code>from</code> as one datagram — whole or not at all — and waits until the system takes
+it; <strong><code>recvFrom(into)</code></strong> waits for the next datagram and answers how many of its bytes went into
+<code>into</code> — the rest of a longer one is lost — and who sent it, a <code>SocketAddr</code>.</li>
+<li><strong><code>resolve(host)</code></strong> gives the addresses a name stands for — <code>localhost</code>, a name the system's
+resolver knows, or an address's own text — each once, in the resolver's order, as a
+<code>List&lt;IpAddr&gt;</code>; a name nobody knows is <code>NotFound</code>. It runs on the I/O pool as a file's call does
+(§Files rule 5): no wait in the sense of 10 §1 rule 7.</li>
+</ol>
+<h2 id="uris">URIs</h2>
+<p><strong><code>std.uri</code></strong> (design 10 O11; M10 S5) is RFC 3986, strictly: <code>Uri</code> is a reference in its five
+parts, <code>Uri.parse</code> reads one as the grammar allows, <code>show</code> writes it back, <code>resolve</code> and
+<code>normalize</code> are the RFC's algorithms, <code>percentEncode</code>/<code>percentDecode</code> the encoding per
+component, <code>Query</code> the pairs of a query. WHATWG's URL is a browser's leniency and not this.</p>
+<ol>
+<li><strong>The parts.</strong> <code>Uri { scheme: ?string, userinfo: ?string, host: ?string, port: ?int, path: string, query: ?string, fragment: ?string }</code>, each <code>null</code> where it was not written; the host
+stands without its brackets, <code>&quot;&quot;</code> for an empty authority (<code>file:///etc</code>), <code>null</code> for none; a
+port written empty is <code>null</code>. <code>authority()</code> is the text between <code>//</code> and the path,
+<code>isAbsolute()</code> whether there is a scheme. <code>show()</code> is §5.3: the parts recomposed, an address
+with a <code>:</code> in brackets — <code>parse</code> and <code>show</code> round-trip every text the grammar takes. A <code>Uri</code> is
+<code>Equatable</code>, <code>Hashable</code>, <code>Debug</code>, <code>Display</code>, <code>Parse</code> and <code>Codable</code> (its text, as an <code>Instant</code>
+is).</li>
+<li><strong><code>Uri.parse(text)</code></strong> is §3 and appendix B: the scheme up to the first <code>:</code> where its characters
+are a scheme's and no <code>/</code>, <code>?</code> or <code>#</code> comes first; after <code>//</code> the authority up to the next
+<code>/</code>, <code>?</code>, <code>#</code>, split at the last <code>@</code> and the port's <code>:</code>, a host in brackets an IPv6 address
+(an IPvFuture is refused); the path up to <code>?</code> or <code>#</code>; the query up to <code>#</code>; the fragment. Each
+part is checked against its grammar: <code>ParseError { kind = .Invalid }</code> for a character a part
+does not take — a space, a control character, one beyond ASCII, <code>&lt;</code>, <code>&gt;</code>, <code>&quot;</code>, <code>{</code>, <code>}</code>, <code>\</code>,
+a <code>%</code> without two hex digits, a port beyond 65535 or with a letter, a second <code>@</code> or <code>#</code>, a
+first segment holding <code>:</code> where there is no scheme and no authority (path-noscheme, §4.2). The
+empty text is the empty reference, <code>Uri {}</code>.</li>
+<li><strong><code>base.resolve(ref)</code></strong> is §5.2.2, strict (a reference with the base's scheme is absolute, no
+backward compatibility): the reference's scheme or authority takes over, an empty path keeps
+the base's path and, where the reference has no query, its query, a relative path merges after
+the base's last <code>/</code> (at the root where the base has an authority and no path), dot segments go
+(§5.2.4; <code>removeDotSegments(path)</code> alone), the fragment is the reference's. The examples of
+§5.4.1 and §5.4.2 hold, each. A relative base gives a relative result (§5.2.1 asks for an
+absolute one; the algorithm does not need it). <code>normalize()</code> is §6.2.2 and §6.2.3: the scheme
+and the host in small letters, a percent-encoding of an unreserved character decoded, the
+others' digits in capitals, the dot segments of a path removed where there is a scheme or an
+authority, an empty path with an authority <code>/</code>, the scheme's default port dropped — 80 for
+<code>http</code> and <code>ws</code>, 443 for <code>https</code> and <code>wss</code>, 21 for <code>ftp</code>.</li>
+<li><strong>The encoding.</strong> <code>percentEncode(text, component)</code> keeps what the component takes as it is and
+writes every other byte as <code>%</code> and two capital hex digits, a character beyond ASCII as the
+bytes of its UTF-8: <code>Component.Userinfo</code> keeps unreserved, sub-delims and <code>:</code>; <code>Host</code>
+unreserved and sub-delims; <code>Path</code> pchar and <code>/</code>; <code>Segment</code> pchar (a <code>/</code> is encoded); <code>Query</code>
+and <code>Fragment</code> pchar, <code>/</code> and <code>?</code>; <code>Pair</code> unreserved alone, for a key or a value of a query.
+<code>percentDecode(text)</code> reads <code>%XX</code> back and is <code>ParseError { kind = .Invalid }</code> for a <code>%</code>
+without two hex digits or bytes that are no UTF-8; a <code>+</code> stays. <strong><code>Query</code></strong> is the pairs of a
+query in the order written, a key more than once allowed: <code>Query.parse(text)</code> splits at <code>&amp;</code>
+and the first <code>=</code> (a part without <code>=</code> is a key with an empty value, an empty part is skipped),
+reads a <code>+</code> as a space and the percent-encodings; <code>get(key)</code> is the first value, <code>all(key)</code>
+every one, <code>has</code>, <code>length</code>, <code>isEmpty</code>, <code>pairs()</code>; <code>add</code> appends, <code>set</code> replaces the key's first
+pair and drops its others (appends where the key is new), <code>remove</code> drops the key; <code>show()</code>
+writes <code>key=value</code> joined by <code>&amp;</code>, each encoded for <code>Pair</code> (a space is <code>%20</code>). <code>uri.queryPairs()</code>
+is the query parsed, empty where there is none.</li>
+</ol>
+<h2 id="http">HTTP</h2>
+<p><strong><code>std.http</code></strong> (design 10 Q6; M10 S7 the client, S8 the server) is HTTP/1.1 over <code>Reader</code> and
+<code>Writer</code>: the message types, a client that keeps its connections, a server with a task per connection. No TLS of its own (a
+package's transport brings it), no HTTP/2, no cookies.</p>
+<ol>
+<li><p><strong>The message types.</strong> <code>Method</code> (<code>Get</code>, <code>Head</code>, <code>Post</code>, <code>Put</code>, <code>Delete</code>, <code>Patch</code>, <code>Options</code>,
+<code>Other(token)</code>; <code>Method.of(&quot;GET&quot;)</code>, its <code>show()</code> the token); <code>Status { code, reason }</code> with
+<code>Status.of(code)</code> giving RFC 9110's phrase, <code>isSuccess</code>, <code>isRedirect</code>, <code>isClientError</code>,
+<code>isServerError</code>, <code>isInformational</code>, its <code>show()</code> <code>404 Not Found</code>; <strong><code>Headers</code></strong>, the fields in
+the order written, names compared without case: <code>get</code> (the first value), <code>all</code>, <code>has</code>, <code>set</code>
+(this value alone), <code>add</code>, <code>remove</code>, <code>length</code>, <code>pairs</code>. <strong><code>Request { method, uri, headers, body: ?Reader, contentLength: ?int }</code></strong>, <code>Request.get(uri)</code>, <code>Request.post(uri, bytes, contentType)</code>, <code>setBody(bytes)</code>, <code>setText(text)</code>. <strong><code>Response { status, headers, body }</code></strong> with
+<code>bytes()</code>, <code>text()</code> (UTF-8, a wrong byte U+FFFD) and <code>json&lt;T&gt;()</code> (<code>std.json</code> into a <code>Decode</code>
+type); <code>body</code> is a <code>Reader</code> that ends where the message does.</p>
+</li>
+<li><p><strong>The client.</strong> <code>Client.new(options)</code> with <code>ClientOptions { followRedirects = false, maxRedirects = 10, timeout = null, keepAlive = true, userAgent = &quot;lyric5&quot;, transport = null }</code>; <code>client.get(uri)</code> and <code>client.send(request)</code> give the response once its head is read.
+The request goes out as RFC 9112 writes it: the request target is the path (<code>/</code> for none) and
+the query, <code>Host</code> the authority (the port where it is not the scheme's), <code>User-Agent</code> where
+none is set, a body with <code>Content-Length</code> where its length is known and in chunks
+(<code>Transfer-Encoding: chunked</code>) else, <code>Content-Length: 0</code> for a POST, PUT or PATCH without one.
+The response's body is framed by the head: none for HEAD, 204 and 304; <code>Transfer-Encoding: chunked</code> (extensions ignored, trailers read away); <code>Content-Length</code>; up to the connection's
+close else (HTTP/1.0 among them). An interim response (100, 103) is read away. A connection is
+kept for the next request to the same scheme, host and port once the body has been read to its
+end, unless a side said <code>Connection: close</code>, the body ran to the close, or <code>keepAlive</code> is off —
+a body left unread gives the connection up; an idle connection the peer closed meanwhile is
+tried again on a new one (a request without a body). <code>client.close()</code> drops the idle ones.</p>
+</li>
+<li><p><strong>Redirects, time, transport.</strong> With <code>followRedirects</code>, a 301, 302, 303, 307 or 308 with a
+<code>Location</code> is followed, the target resolved against the request's URI (§URIs), up to
+<code>maxRedirects</code> — more is <code>HttpError { kind = .Redirects }</code>; a 303, and a 301 or 302 after a
+POST, go on as a GET without the body; a 307 or 308 keep the method, and with a body are
+refused (it cannot be sent again). <code>timeout</code> spans the whole exchange — the connection, the
+request, the head — and ends it with <code>TimedOut</code>, the connection closed. <code>transport</code> is a
+<code>fn(host, port) -&gt; Stream</code> (<code>Stream :: [Reader, Writer, Closeable]</code>; a <code>TcpStream</code> is one)
+that makes the connection; <code>http</code> connects over TCP where it is <code>null</code>, <code>https</code> needs one.
+What is refused: a scheme that is neither (<code>HttpError { kind = .Unsupported }</code>), a URI
+without a host, a status line or header line that is not HTTP/1.1's (<code>.Protocol</code>: a version
+that is none, a <code>Content-Length</code> that is no number, a folded line, more than 256 lines or a
+line beyond 64 KiB), a body that ends early or a chunk that is none (<code>IoError</code>,
+<code>UnexpectedEof</code> or <code>InvalidData</code>). The errors of the connection are <code>IoError</code>, a cancel
+<code>Cancelled</code>. <code>http.get(text)</code> is a GET with the defaults and redirects followed.</p>
+</li>
+<li><p><strong>The server</strong> (M10 S8). <code>Server.bind(addr, options)</code> with <code>ServerOptions { keepAlive = true, serverName = &quot;lyric5&quot; }</code>, <code>localAddr()</code>, <code>serve(handler)</code> — <code>handler: fn(Request) -&gt; Response throws Error</code> — and <code>shutdown()</code>. <code>serve</code> accepts until the listener is closed and takes a task
+per connection; on it each request is read as the client writes one: the request line
+(origin-form, absolute-form or <code>*</code>; HTTP/1.1 or 1.0), the headers (§3's limits), the body
+framed by <code>Content-Length</code> or <code>Transfer-Encoding: chunked</code> and given to the handler as the
+request's <code>body</code> (a <code>Reader</code>; <code>request.bytes()</code>, <code>text()</code>, <code>json&lt;T&gt;()</code> read it whole; a body
+the handler leaves is read away before the next request). <code>Expect: 100-continue</code> is answered
+with <code>100 Continue</code> before the handler runs. The handler's response goes out as <code>HTTP/1.1</code>
+with <code>Server</code>, <code>Content-Length</code> where the body's length is known and in chunks else, nothing
+for a HEAD, a 204, a 304 or a 1xx; <code>Response.of(status, bytes, contentType)</code>,
+<code>Response.withText(text, status)</code>, <code>Response.withJson(value, status)</code>, <code>Response.stream(status, reader, length)</code> and <code>Response.empty(status)</code> make one, its <code>headers</code> are the handler's to
+set. A handler that throws answers <code>500</code> with the error's message as text. The connection
+stays for the next request unless the request was HTTP/1.0 without <code>keep-alive</code>, a side said
+<code>Connection: close</code>, <code>keepAlive</code> is off, or the server is shutting down; it is closed after
+the peer's remaining bytes are read away (a close with bytes unread would reset it and lose the
+answer). A request that is none — a request line or version that is none, no <code>Host</code> under
+HTTP/1.1, a target that is no URI, a <code>Content-Length</code> that is no number, a transfer encoding
+that is not chunked, a folded line — is answered <code>400 Bad Request</code> with the reason as text and
+the connection closed. <code>shutdown()</code> closes the listener (<code>serve</code> returns), closes the
+connections waiting for a request, and lets a request under way be answered first.</p>
+</li>
+<li><p><strong>The server</strong> (M10 S8). <code>Server.bind(addr, options)</code> with <code>ServerOptions { keepAlive = true, serverName = &quot;lyric5&quot; }</code>, <code>localAddr()</code>, <code>serve(handler)</code> — <code>handler: fn(Request) -&gt; Response throws Error</code> — and <code>shutdown()</code>. <code>serve</code> accepts until the listener is closed and takes a task
+per connection; on it each request is read as the client writes one: the request line
+(origin-form, absolute-form or <code>*</code>; HTTP/1.1 or 1.0), the headers (§3's limits), the body
+framed by <code>Content-Length</code> or <code>Transfer-Encoding: chunked</code> and given to the handler as the
+request's <code>body</code> (a <code>Reader</code>; <code>request.bytes()</code>, <code>text()</code>, <code>json&lt;T&gt;()</code> read it whole; a body
+the handler leaves is read away before the next request). <code>Expect: 100-continue</code> is answered
+with <code>100 Continue</code> before the handler runs. The handler's response goes out as <code>HTTP/1.1</code>
+with <code>Server</code>, <code>Content-Length</code> where the body's length is known and in chunks else, nothing
+for a HEAD, a 204, a 304 or a 1xx; <code>Response.of(status, bytes, contentType)</code>,
+<code>Response.withText(text, status)</code>, <code>Response.withJson(value, status)</code>, <code>Response.stream(status, reader, length)</code> and <code>Response.empty(status)</code> make one, its <code>headers</code> are the handler's to
+set. A handler that throws answers <code>500</code> with the error's message as text. The connection
+stays for the next request unless the request was HTTP/1.0 without <code>keep-alive</code>, a side said
+<code>Connection: close</code>, <code>keepAlive</code> is off, or the server is shutting down; it is closed after
+the peer's remaining bytes are read away (a close with bytes unread would reset it and lose the
+answer). A request that is none — a request line or version that is none, no <code>Host</code> under
+HTTP/1.1, a target that is no URI, a <code>Content-Length</code> that is no number, a transfer encoding
+that is not chunked, a folded line — is answered <code>400 Bad Request</code> with the reason as text and
+the connection closed. <code>shutdown()</code> closes the listener (<code>serve</code> returns), closes the
+connections waiting for a request, and lets a request under way be answered first.</p>
+</li>
+</ol>
+<h2 id="processes">Processes</h2>
+<p><code>std.process</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 O8, Q9</a>; M8b S12a): a child started, its
+streams, its end.</p>
+<ol>
+<li><strong><code>Command { program, args, cwd, env, stdin, stdout, stderr }</code></strong> is an options struct: the
+program a path or a name looked up on <code>PATH</code>; <code>args</code> after its name; <code>cwd</code> the parent's where
+<code>null</code>; <code>env</code> pairs set over the parent's environment; each stream <code>Stdio.Inherit</code> — the
+default —, <code>Stdio.Piped</code> or <code>Stdio.Null</code>. A NUL in an argument or a variable, or a variable's
+name that is empty or holds <code>=</code>, is <code>InvalidInput</code>.</li>
+<li><strong><code>spawn()</code></strong> starts the child. A program that is not there is <code>NotFound</code>, one that may not run
+<code>PermissionDenied</code>, the program as the path. Its piped streams are <code>stdin: ?PipeWriter</code> and
+<code>stdout</code>, <code>stderr: ?PipeReader</code> — a <code>Writer</code> and <code>Reader</code>s whose calls wait as a socket's do
+(§The network), and that are <code>Closeable</code>; closing <code>stdin</code> is the end of the child's input.</li>
+<li><strong><code>wait()</code></strong> closes the child's <code>stdin</code>, then waits for its end — a wait a cancel ends — and
+answers an <strong><code>ExitStatus</code></strong>: <code>success()</code>, <code>code(): ?int</code> — 0 to 255 on POSIX, any 32 bits on
+Windows —, and <code>signal(): ?Signal</code>, the signal that ended it; its text is <code>exit code 3</code> or
+<code>signal 9</code>. Every task that waits for one child, on
+any thread, sees its end.</li>
+<li><strong><code>kill()</code></strong> ends the child — SIGKILL on POSIX; on Windows its code is then 1 —, <strong><code>signal(s)</code></strong>
+sends it <code>s</code> (10 Q9), <code>Unsupported</code> on Windows, which has no signals; neither touches a child
+that has ended.</li>
+<li><strong><code>output()</code></strong> starts the child with no input and both other streams piped, takes the two to
+their ends at once and waits: an <strong><code>Output { status, stdout, stderr }</code></strong>. <strong><code>status()</code></strong> starts it
+with the parent's streams and waits.</li>
+<li><em>(Informative.)</em> On POSIX a child's end comes as SIGCHLD, which the runtime keeps for itself
+(10 Q9). A child starts with SIGPIPE at its default although the program ignores it: an ignored
+signal would outlive the exec. On Windows (M8b S12b) a child gets its arguments on one command
+line, quoted as the C runtime reads them back, and inherits its three handles alone; its pipes'
+calls block, and run on the I/O pool as a file's do (§Files rule 5).</li>
+</ol>
+<h2 id="characters">Characters</h2>
+<p>A <code>char</code> is a Unicode scalar value (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 S4, S5</a>; M8c S1). What it is,
+<code>std.core</code> answers from the Unicode Character Database, its version pinned:
+<code>std.string.unicodeVersion</code> is <code>&quot;18.0.0&quot;</code> for Lyric 5.0.</p>
+<ol>
+<li><strong><code>category(): UnicodeCategory</code></strong> is the character's general category (UAX #44). The enum's
+thirty variants are the standard's, in its order: <code>UppercaseLetter</code>, <code>LowercaseLetter</code>,
+<code>TitlecaseLetter</code>, <code>ModifierLetter</code>, <code>OtherLetter</code>, <code>NonspacingMark</code>, <code>SpacingMark</code>,
+<code>EnclosingMark</code>, <code>DecimalNumber</code>, <code>LetterNumber</code>, <code>OtherNumber</code>, <code>ConnectorPunctuation</code>,
+<code>DashPunctuation</code>, <code>OpenPunctuation</code>, <code>ClosePunctuation</code>, <code>InitialPunctuation</code>,
+<code>FinalPunctuation</code>, <code>OtherPunctuation</code>, <code>MathSymbol</code>, <code>CurrencySymbol</code>, <code>ModifierSymbol</code>,
+<code>OtherSymbol</code>, <code>SpaceSeparator</code>, <code>LineSeparator</code>, <code>ParagraphSeparator</code>, <code>Control</code>, <code>Format</code>,
+<code>Surrogate</code>, <code>PrivateUse</code>, <code>Unassigned</code>. No <code>char</code> is a <code>Surrogate</code>; a code point the database
+does not list is <code>Unassigned</code>.</li>
+<li><strong><code>isX</code> asks Unicode, <code>isAsciiX</code> ASCII.</strong> <code>isAlpha</code> is a letter, the categories Lu, Ll, Lt,
+Lm and Lo; <code>isDigit</code> a decimal digit of any script, Nd; <code>isAlphanumeric</code> either; <code>isUpper</code> Lu;
+<code>isLower</code> Ll; <code>isControl</code> Cc; <code>isWhitespace</code> the property White_Space. <code>isAsciiDigit</code> is
+<code>0</code>–<code>9</code>; <code>isAsciiAlpha</code> <code>a</code>–<code>z</code> and <code>A</code>–<code>Z</code>; <code>isAsciiHexDigit</code> the digits and <code>a</code>–<code>f</code>, <code>A</code>–<code>F</code>;
+<code>isAsciiWhitespace</code> the space, tab, line feed, form feed and carriage return.</li>
+<li><strong>Case maps one character to one.</strong> <code>toUpper()</code> and <code>toLower()</code> are the database's simple
+case mappings; a character without one maps to itself — <code>'ß'.toUpper()</code> is <code>'ß'</code>. No locale
+takes part.</li>
+<li><strong>Digits are ASCII</strong>, as <code>parse</code> reads them: <code>toDigit(radix): ?int</code> reads <code>0</code>–<code>9</code>, then <code>a</code>–<code>z</code>
+or <code>A</code>–<code>Z</code> as 10 to 35, and is <code>null</code> for a character that is no digit of the base;
+<code>char.fromDigit(n, radix): ?char</code> writes the digit <code>n</code>, its letters lowercase, and is <code>null</code>
+where <code>n</code> is no digit of the base. A radix outside 2–36 panics (<code>LYR-RT0008</code>).</li>
+</ol>
+<h2 id="strings">Strings</h2>
+<p>A <code>string</code> is immutable UTF-8 (design 10 S1). Its members are <code>std.core</code>'s and stand <strong>once on
+<code>StringView</code></strong> (below), which a string reaches through a view of all of itself (rule 4); <code>length()</code>
+and <code>isEmpty()</code> it has itself. What cuts gives a <strong>view</strong> of the text, no copy; what builds gives a
+new string. A pattern <code>p</code> is a <strong><code>Pattern</code></strong> (design 10 S2) — a view or a string, a <code>char</code>, a test
+of characters <code>fn(char) -&gt; bool</code> (through the block on its function type, <a href="../../spec/05-interfaces/">05 §13</a>
+rule 6), or a type of the program that conforms:
+<code>Pattern { fn matchAt(text: StringView, at: int): ?int; fn matchBefore(text: StringView, end: int): ?int; }</code>,
+the end of a match that begins at byte <code>at</code>, and the start of one that ends at byte <code>end</code> —
+<code>at</code> and <code>end</code> a character's first byte or the text's length. A third member,
+<code>fn nextIn(text: StringView, from: int): ?int</code>, the first such byte at or after <code>from</code> where a
+match begins, has a default that tries <code>matchAt</code> at each; a pattern may give a faster one. One
+signature per operation takes any of them:</p>
+<ul>
+<li><code>length()</code>, the bytes, <code>O(1)</code>; <code>isEmpty()</code>; <code>charCount()</code>, the characters, <code>O(n)</code>; <code>chars()</code>,
+the characters decoded, an <code>Iterator</code> of <code>char</code> that is <code>DoubleEnded</code> — <code>nextBack()</code> takes them
+from the end, and the two ends meet; <code>charIndices()</code>, each character with the byte index it
+begins at, an <code>Iterator</code> of <code>(int, char)</code>.</li>
+<li><code>string</code> is <code>Ordered</code> and <code>TotalOrder</code> byte by byte, which is the order of the code points.</li>
+<li>The search: <code>contains(p)</code>, <code>startsWith(p)</code>, <code>endsWith(p)</code>; <code>find(p)</code> and <code>rfind(p)</code>, the byte
+index of the first and the last <code>p</code> or <code>null</code> — an empty <code>p</code> stands at 0 and at the length;
+<code>count(p)</code>, the occurrences none overlapping another, an empty <code>p</code> between every two characters
+and at both ends.</li>
+<li><code>split(sep)</code>, the parts between the separators in order, views, empty ones kept — a separator
+that matches the empty text panics; <code>splitN(sep, n)</code>, at most <code>n</code> parts, the last one the rest,
+none for <code>n</code> of 0; <code>splitOnce(sep)</code>, the views before and after the first, or <code>null</code>;
+<code>matches(p)</code>, the matches in order, views, none overlapping another; <code>lines()</code>, views split at
+<code>\n</code> with a <code>\r</code> before it taken off and no empty line after a last <code>\n</code>.</li>
+<li><code>trim()</code>, <code>trimStart()</code>, <code>trimEnd()</code>, the view without the white space — the characters with
+the property White_Space (§Characters); <code>trimMatches(p)</code>, <code>trimStartMatches(p)</code>,
+<code>trimEndMatches(p)</code>, the view without the matches of <code>p</code> at the ends, again and again — a match
+of the empty text takes nothing; <code>isBlank()</code>, whether it holds nothing but white space, the
+empty text too; <code>stripPrefix(p)</code> and <code>stripSuffix(p)</code>, the view of the rest, or <code>null</code> where
+<code>p</code> is not there.</li>
+<li><code>toUpper()</code>, <code>toLower()</code>, a new string, each character by its simple case mapping
+(§Characters rule 3): <code>&quot;straße&quot;.toUpper()</code> is <code>&quot;STRAßE&quot;</code>, and a final sigma is no context.</li>
+<li><code>toBytes()</code>, the bytes, a new <code>uint8[]</code> — a copy, since a string does not change (design 10
+S12d); <code>string.fromChars(chars)</code>, the text of an iterator's characters in order, throwing what
+the iterator throws; <code>parse&lt;T :: [Parse]&gt;()</code>, <code>T.parse(s)</code> with <code>T</code> from where the result goes
+— <code>let n: int = try s.parse();</code>.</li>
+<li><code>replace(p, with)</code>, a new string with every <code>p</code> replaced, none overlapping — a <code>p</code> that matches
+the empty text panics; <code>replaceN(p, with, n)</code>, the first <code>n</code> replaced, all of them where <code>n</code> is
+negative; <code>padStart(width, fill = ' ')</code> and <code>padEnd(width, fill = ' ')</code>, a new string, the width
+in characters.</li>
+<li><strong>Bytes to text</strong> (design 10 S3): <code>string.fromUtf8(bytes)</code>, the text the bytes of a
+<code>Slice&lt;uint8&gt;</code> are, copied — bytes that are no well-formed UTF-8 (an overlong form, a surrogate,
+beyond U+10FFFF, a byte that begins nothing, a sequence cut short) throw a <strong><code>Utf8Error</code></strong>
+(<code>std.core</code>) whose <code>offset</code> is the first byte that is not, as the data's fault (10 B3);
+<code>string.fromUtf8Lossy(bytes)</code>, the text with each maximal part of a sequence that is not
+well-formed replaced by U+FFFD — the Unicode Standard's recommended practice (3.9).</li>
+<li><strong><code>StringBuilder</code></strong> (<code>std.string</code>, a class): <code>appendStr(s)</code> of a string or a view,
+<code>appendChar(c)</code>, <code>append(v)</code> of a <code>Display</code>, <code>length()</code> in bytes, <code>clear()</code>, <code>toString()</code> — in a
+buffer that doubles, no chain of concatenations.</li>
+</ul>
+<p><strong><code>StringView</code></strong> is the view of a string's bytes (design 10 S1, 03 A2), a primitive of <code>std.core</code>
+visible without an import, as <code>Slice&lt;T&gt;</code> is (<a href="../../spec/03-types/">03 §5.2</a> rule 6):</p>
+<ol>
+<li>A view is a pointer into a string's bytes and a length, two words, copied by a binding; it
+reads the bytes and never writes them. There is no lifetime: the string lives as long as any
+view of it does (<a href="../../spec/03-types/">03 §5.2</a> rule 5).</li>
+<li><code>s[a..b]</code> on a string or a view is the view of the bytes from <code>a</code> up to but not including <code>b</code>,
+in the forms of <a href="../../spec/03-types/">03 §5.2</a> rule 2 — <code>s[a..=b]</code>, an open end, <code>^n</code> as a bound. The
+bounds satisfy <code>0 ≤ a ≤ b ≤ length()</code>, and neither falls inside a character — on a byte that
+continues one —, or the expression <strong>panics</strong> with <code>LYR-RT0003</code>, in every profile. A view of a
+view is a view of the same string.</li>
+<li><code>s[i]</code> on a string or a view is the <strong>character</strong> that begins at byte <code>i</code>, <code>i</code> an <code>int</code> as an
+array's index is (<a href="../../spec/03-types/">03 §5.1</a>): outside <code>0 ≤ i &lt; length()</code>, or at a byte that
+continues a character, a panic (<code>LYR-RT0003</code>). Counted from the end a byte is rarely where a
+character begins: <code>^n</code> stands as a bound of a range only (<code>LYR-SEM0114</code>). The characters are
+read and never written through the index (<code>LYR-SEM0019</code>). A string and a view conform to
+<code>Index&lt;int&gt;</code> with <code>Output = char</code> (<a href="../../spec/05-interfaces/">05 §12</a> rule 9), so a type parameter
+that asks for it takes them.</li>
+<li>At a coercion site a string stands where a view is expected and gives a view of all of
+itself; a view never stands where a string is expected (<code>LYR-SEM0001</code>) — <code>toString()</code> copies
+its bytes into a string of their own. A <strong>receiver</strong> is such a site, as an array's is for the
+members written on <code>Slice&lt;T&gt;</code> (<a href="../../spec/03-types/">03 §5.2</a> rule 4): where the string's own blocks
+give no member of the name, <code>s.m()</code> is the view's member, called on a view of all of <code>s</code>. A
+view matched against a string literal compares its bytes (<a href="../../spec/09-patterns/">09 §2</a> rule 3).</li>
+<li>A view has <code>length()</code>, its bytes, built in as a slice's is, <code>isEmpty()</code> and <code>toString()</code>. It
+is <code>Equatable</code>, <code>Hashable</code>, <code>Ordered</code> and <code>TotalOrder</code> by its bytes, as a string is — it
+hashes as the string of its bytes —, <code>Display</code>, its text, and <code>Debug</code>, quoted. <code>==</code>, <code>!=</code> and
+the orderings between a string and a view compare the two as views: <code>&quot;abc&quot;[1..] == &quot;bc&quot;</code>.</li>
+</ol>
+<p><strong>Debug of text</strong> (design 10 S14) writes a string, a view or a <code>char</code> as it would be written: between
+<code>&quot;</code> — a <code>char</code> between <code>'</code> —, with <code>\\</code>, the quote, <code>\n</code>, <code>\r</code>, <code>\t</code> and <code>\0</code> escaped, and a character of
+the categories Cc, Cf, Cs, Co, Cn, Zl, Zp, or a space separator other than the space, as <code>\u{…}</code>,
+its scalar value in lowercase hex. A container's <code>Debug</code> and <code>Display</code> take it (§Collections),
+so <code>[&quot;a\&quot;b&quot;, &quot;c&quot;]</code> shows as it is written.</p>
+<p><strong>Repetition</strong> (design 10 C7): <code>s * n</code> is the text <code>s</code> <code>n</code> times over — <code>&quot;&quot;</code> for <code>n</code> of 0 — and a
+negative <code>n</code> panics with <code>LYR-RT0007</code>, as <code>[x] * n</code> does; <code>n * s</code> is refused, the one order of
+<a href="../../spec/03-types/">03 §5.1</a>.</p>
+<h2 id="compression">Compression</h2>
+<p><strong><code>std.compress</code></strong> (design 10 Q8; M10 S9) is DEFLATE (RFC 1951), zlib (RFC 1950) and gzip (RFC
+1952), whole in Lyric: an inflater, a deflater at the levels 0 to 9, the two wrappings, each as a
+stream adapter and whole in memory.</p>
+<ol>
+<li><strong>The formats.</strong> <code>Gzip.compress(bytes, level = 6)</code> and <code>Gzip.decompress(bytes)</code>, <code>Zlib.*</code> and
+<code>Deflate.*</code> (raw) over bytes in memory; <strong><code>GzipWriter&lt;W :: [Writer]&gt;</code></strong>, <code>ZlibWriter</code>,
+<code>DeflateWriter</code> (<code>new(inner, level = 6)</code>; <code>Writer</code> and <code>Closeable</code> — <code>close</code> writes the final
+block and the trailer and flushes <code>inner</code>, a second <code>close</code> does nothing, a <code>write</code> after it is
+<code>IoError { kind = .Closed }</code>; <code>flush</code> ends the block under way and writes an empty stored block
+so the bytes so far are whole) and <strong><code>GzipReader&lt;R :: [Reader]&gt;</code></strong>, <code>ZlibReader</code>,
+<code>DeflateReader</code> (<code>new(inner)</code>; <code>Reader</code>, 0 at the stream's end; <code>DeflateReader.bytesOut()</code>,
+<code>GzipWriter.bytesIn()</code>). gzip's header is the ten bytes with no name, no time, <code>OS</code> 255 and
+<code>XFL</code> 2 at level 9 and 4 at level 1; its trailer CRC-32 and the size, both checked; a header
+with an extra field, a name, a comment or a header CRC is read over; members in a row read as
+one. zlib's header is <code>78</code> with the level's <code>FLEVEL</code> (0 below 2, 1 below 6, 2 at 6, 3 above)
+and the check; its trailer the Adler-32, checked; a preset dictionary is refused.</li>
+<li><strong>The deflater.</strong> Level 0 stores (blocks of at most 65535 bytes, a final empty one); 1 the
+fixed tables over a greedy LZ77; 2 and above dynamic tables (the code lengths from the block's
+frequencies, at most 15 bits, 7 for the code length code; the lengths run-length coded) — a
+block is written with the fixed tables or stored where that is smaller; 4 and above lazy
+matching, the chains longer and the nice length higher with the level (zlib's table). The
+window is 32 KiB, a block at most 16384 symbols. A level outside 0..9 is <code>CompressError</code>; -1
+is 6. What the deflater writes, zlib and the platform's <code>gzip</code> read; what they write, the
+inflater reads (the artifact: <code>programs/gzipfile.lyr</code> against .NET's <code>GZipStream</code> and <code>gzip -d</code>).</li>
+<li><strong>The inflater</strong> reads stored, fixed and dynamic blocks (an over-subscribed code, a block of
+type 3, a stored length that does not match its complement, a distance before the start, a
+length or distance code beyond the tables, a stream that ends inside a block are each
+<code>IoError { kind = .InvalidData }</code> with a <code>CompressError</code> inside, its <code>detail</code> the reason). It
+takes from <code>inner</code> what it needs and, once a block could be the last, one byte at a time, so
+a wrapper reads its trailer where the stream ended.</li>
+<li><strong>In the client.</strong> With <code>ClientOptions.decompress</code> (the default), <code>std.http</code>'s client says
+<code>Accept-Encoding: gzip, deflate</code> and decodes a response's <code>Content-Encoding: gzip</code> (or
+<code>x-gzip</code>, or <code>deflate</code> as zlib) as the body is read; the response's headers then lose
+<code>Content-Encoding</code> and <code>Content-Length</code>; the connection returns as the raw body ends.</li>
+</ol>
+<h2 id="regular-expressions">Regular expressions</h2>
+<p><strong><code>std.regex</code></strong> (design 10 S8, B1; M10 S6) is RE2's syntax matched in linear time: a pattern
+is a tree, the tree a Thompson NFA, the NFA run by a Pike VM that carries the captures with
+each thread — every character of the text meets each instruction at most once, so the time is
+the text's length times the pattern's, whatever the pattern. What makes a backtracker's time
+exponential is not here: no backreferences, no lookaround.</p>
+<ol>
+<li><strong>The syntax</strong> (<code>Regex.new(pattern)</code>): literals; <code>.</code> (no newline unless <code>s</code>); classes
+<code>[a-z]</code>, <code>[^…]</code> (a <code>]</code> first and a <code>-</code> last are themselves), <code>\d \w \s</code> and their capitals
+(ASCII, as RE2: <code>0-9</code>, <code>0-9A-Za-z_</code>, <code>\t \n \v \f \r</code> and the space), <code>[:alpha:]</code> and the
+other POSIX names inside a class (<code>[:^alpha:]</code> negated), <code>\pL</code>, <code>\p{Lu}</code>, <code>\PL</code> over the
+Unicode categories by their one- or two-letter names (no scripts); groups <code>(…)</code>, <code>(?:…)</code>,
+<code>(?P&lt;name&gt;…)</code> and <code>(?&lt;name&gt;…)</code>; alternation <code>|</code>; the repetitions <code>* + ? {n} {n,} {n,m}</code>, each
+lazy with a <code>?</code> after it, a count at most 1000, a <code>{</code> that is no count a literal; the anchors
+<code>^</code> and <code>$</code> (the text's ends; the lines' under <code>m</code>), <code>\A</code>, <code>\z</code>, <code>\b</code>, <code>\B</code> (ASCII word
+characters); the escapes <code>\n \t \r \f \v \a \0</code>, <code>\xHH</code>, <code>\x{H…}</code>, and <code>\</code> before a
+punctuation mark; the flags <code>i</code>, <code>m</code>, <code>s</code> as <code>(?i)</code> for the rest of the group, <code>(?i:…)</code> for
+a group, <code>(?-i)</code> off. A pattern outside this is <code>RegexError { offset, detail }</code>: a group or
+class not closed, an unmatched <code>)</code>, a repetition of a repetition or of nothing, a range
+reversed, an escape that is none (a backreference <code>\1</code> among them), a flag that is none (a
+lookaround <code>(?=</code> among them), a name twice, a category or POSIX class that is none, a code
+point beyond U+10FFFF, a repetition beyond 1000.</li>
+<li><strong>The match.</strong> Alternation is leftmost-first as in Perl and RE2: of the matches starting at
+the leftmost position the first alternative's wins, a greedy repetition takes the most and a
+lazy one the least, so <code>a|ab</code> finds <code>a</code> in <code>ab</code> and <code>ab|a</code> finds <code>ab</code>. A <code>Match</code> is <code>start</code>
+and <code>end</code> (byte offsets, as a string's indices are; a character beyond ASCII is one character
+to <code>.</code> and to a class), <code>value</code> (its text, also its <code>show()</code>), <code>group(i)</code> and <code>span(i)</code> for
+the groups (0 the whole; <code>null</code> for one that took no part or does not exist — the last
+iteration's capture stands), <code>named(name)</code>, <code>groups()</code>. The empty pattern matches the empty
+text at every position.</li>
+<li><strong>The verbs.</strong> <code>isMatch(text)</code>; <code>find(text)</code> the leftmost match with its groups, <code>findFrom(text, at)</code> from a byte offset; <code>findAll(text)</code> the matches in turn, left to right, none overlapping,
+an empty match right after a match skipped (as Go does); <code>replace(text, template)</code> the first
+and <code>replaceAll</code> every match replaced by the template — <code>$1</code>, <code>${1}</code>, <code>${name}</code> the groups, <code>$0</code>
+the whole, <code>$$</code> a <code>$</code>, an unmatched group empty, a <code>$</code> before anything else itself;
+<code>split(text)</code> the pieces between the matches (Go's <code>Split</code> with no limit: an empty text is
+one empty piece, a match at the start adds no empty piece before it). <code>pattern()</code>,
+<code>groupCount()</code>, <code>groupNames()</code>.</li>
+<li><strong>The time is linear.</strong> <code>(a*)*b</code> over a hundred thousand <code>a</code>, <code>(x+x+)+y</code> over twenty
+thousand <code>x</code>, <code>(a?){30}a{30}</code> over thirty <code>a</code>: each ends in the time of one pass. <em>(A lazy
+DFA for <code>isMatch</code> and <code>find</code> without captures is a door the plan opens at Messpunkt 4; a
+<code>comptime Regex.new</code> is one of the macro line.)</em></li>
+</ol>
+<h2 id="collections">Collections</h2>
+<p><code>std.collections</code> holds the containers (design 10 B7); none is safe across threads (C11). An
+element is whatever a container's bounds admit, an object included, and every slot holds its own
+(M8a S16).</p>
+<p>An array literal stands for a container where one is expected (<a href="../../spec/03-types/">03 §5.1</a> rule 2;
+design 10 K4): <code>List&lt;T&gt;</code>, <code>Deque&lt;T&gt;</code>, <code>Heap&lt;T&gt;</code> and <code>Set&lt;T&gt;</code> are each a <strong><code>FromArrayLiteral&lt;T&gt;</code></strong>
+of <code>std.core</code> — <code>static fn fromLiteral(items: T[]): Self</code>, the container of the elements, in
+order — and <code>Map&lt;K, V&gt;</code> is one of <code>(K, V)</code>, a later value of a key replacing the earlier one;
+<code>Set</code> and <code>Map</code> with the default hasher. <code>let s: Set&lt;int&gt; = [1, 2, 3];</code>,
+<code>let m: Map&lt;string, int&gt; = [(&quot;a&quot;, 1)];</code>.</p>
+<ul>
+<li><strong><code>List&lt;T&gt;</code></strong> (C3), a class: its elements in order, at the front of a buffer that doubles when
+full. <code>new()</code>, <code>of(xs)</code> (a copy of the array), <code>from(it)</code> (the values of an iterator, in order),
+<code>withCapacity(n)</code> — room for <code>n</code> elements before
+it grows, taken at the first push, since a list holds no value it was not given (10 N3; M8a S14);
+every container's <code>withCapacity(n)</code> panics on a negative <code>n</code>. <code>xs[i]</code> and <code>xs[i] = v</code> through <code>IndexSet&lt;int&gt;</code>
+(<a href="../../spec/05-interfaces/">05 §12</a> rule 9), outside <code>0 ≤ i &lt; length()</code> a panic (<code>LYR-RT0003</code>); <code>get(i)</code>,
+<code>null</code> there. <code>push(v)</code>, <code>pushAll(xs)</code>, <code>pop()</code> (<code>null</code> for none), <code>insert(i, v)</code>, <code>removeAt(i)</code>,
+<code>removeWhere(p)</code> (how many went; a <code>p</code> that throws ends it there — what it decided is done,
+the rest kept), <code>clear()</code> (the room stays), <code>truncate(n)</code>, <code>swap(i, j)</code>,
+<code>toArray()</code> (a copy), <code>shrinkToFit()</code> (the room cut down to the elements — a view taken before
+keeps the buffer it was taken of); of an <code>Equatable</code> element <code>contains(x)</code>, <code>remove(x)</code> (whether there was one)
+and <code>dedup()</code> (runs of equal ones kept once). <code>asSlice()</code> is a view of the buffer, so the members
+of arrays and views reach the list — a sort writes it; a push past the room moves the list to a
+new buffer, and an older view keeps the older one. A list is <code>Iterable</code> front to back
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 I9</a>): a change of
+its length while it is walked panics at the next pull (<code>LYR-RT0016</code>, as for a map, a set and a
+deque).</li>
+<li><strong><code>Map&lt;K :: [Hashable], V, H :: [Hasher] = DefaultHasher&gt;</code></strong> (C4), a class: what it holds, in
+no order of its own, each key once. <code>Map&lt;K, V&gt;.new()</code> hashes with the process's key, so its
+order differs from run to run, and <code>withCapacity(n)</code> is the same with room for <code>n</code> keys before
+it grows; <code>withHasher(seed)</code> takes a hasher, which is a value the map
+copies fresh for every key — <code>FixedHasher.new()</code> hashes alike in every run; <code>from(pairs)</code>, the
+pairs of a view in a map, a later value of a key replacing the earlier one. <code>m[k]</code> through
+<code>IndexSet&lt;K&gt;</code> with <code>Output = ?V</code>: the value under <code>k</code> or <code>null</code>; <code>m[k] = v</code> puts <code>v</code> there, and
+<code>m[k] = null</code> takes <code>k</code> out. <code>insert(k, v)</code>
+answers the value it replaces or <code>null</code>; <code>get(k)</code> the value or <code>null</code>; <code>containsKey(k)</code>;
+<code>remove(k)</code> the value taken out or <code>null</code>; <code>length()</code>, <code>isEmpty()</code>, <code>clear()</code>; <code>getOr(k, d)</code>;
+<code>getOrInsert(k, make)</code>, <code>make()</code>'s value inserted where <code>k</code> has none; <code>update(k, f)</code>, whether
+there was one to replace; <code>retain(p)</code>, how many went. Their functions may throw, and the call
+throws it with the map still a map: <code>make()</code> inserts nothing, <code>f</code> replaces nothing, <code>retain</code>
+keeps what it has not judged. A map is <code>Iterable</code> over its entries,
+<code>(K, V)</code>, <code>entries()</code> too, and <code>keys()</code> and <code>values()</code> walk the same order — none the map's own (I8); a change of
+the map while it is walked panics at the next pull (I9). <em>(Informative.)</em>
+A Swiss table: groups of eight slots under a control word, the hash's seven low bits compared
+a group at a time, at most seven of eight slots filled.</li>
+<li><strong><code>Set&lt;T :: [Hashable], H :: [Hasher] = DefaultHasher&gt;</code></strong> (C5), a class over a map's keys:
+<code>new()</code>, <code>of(xs)</code> (the array's values, each once), <code>withCapacity(n)</code>, <code>withHasher(seed)</code>, <code>insert(v)</code> (whether it was not there), <code>contains(v)</code>, <code>remove(v)</code>
+(whether it was there), <code>length()</code>, <code>isEmpty()</code>, <code>clear()</code>; <code>Iterable</code> over its values, in no
+order of its own. Its operations are methods, no operators: <code>union(o)</code>, <code>intersect(o)</code>,
+<code>difference(o)</code> and <code>symmetricDifference(o)</code>, each a new set hashing as this one does;
+<code>isSubset(o)</code>, <code>isSuperset(o)</code> and <code>isDisjoint(o)</code> — the empty set a subset of every set.</li>
+<li>Every iterator's <strong><code>toList()</code></strong> collects what it gives into a <code>List</code> (I4).</li>
+<li><strong><code>Deque&lt;T&gt;</code></strong> (C6), a class over a ring buffer: <code>new()</code>, <code>withCapacity(n)</code>, <code>pushFront(v)</code>, <code>pushBack(v)</code>,
+<code>popFront()</code> and <code>popBack()</code> (the value or <code>null</code>), <code>peekFront()</code>, <code>peekBack()</code>, <code>length()</code>,
+<code>isEmpty()</code>; <code>[i]</code> from the front, panicking outside <code>0 ≤ i &lt; length()</code> (<code>LYR-RT0003</code>);
+<code>Iterable</code> front to back, a change while it is walked panicking at the next pull (I9).</li>
+<li><strong><code>Heap&lt;T :: [TotalOrder]&gt;</code></strong> (C1), a binary heap over a list, <strong>the least value first</strong> (the
+review's A1; the greatest first is a heap of a type whose order is reversed):
+<code>new()</code>, <code>withCapacity(n)</code>, <code>of(xs)</code> — the array's values, copied, in linear time —, <code>push(v)</code>,
+<code>pop()</code> and <code>peek()</code> (the value or <code>null</code>), <code>length()</code>, <code>isEmpty()</code>.
+<em>(Informative.)</em></li>
+</ul>
+<p><strong>Membership</strong> (10 C12; M8a S15): a <code>List</code> of an <code>Equatable</code> element is a <code>Contains&lt;T&gt;</code> through
+<code>contains(x)</code>, a <code>Set</code> through its own, a <code>Map</code> of its keys, <code>contains(k)</code> being <code>containsKey(k)</code> —
+what <code>x in xs</code> asks (<a href="../../spec/05-interfaces/">05 §12</a> rule 10). A <strong><code>Range&lt;T&gt;</code></strong> and a
+<strong><code>RangeInclusive&lt;T&gt;</code></strong> of an <code>Ordered</code> <code>T</code> are <code>Contains&lt;T&gt;</code> too: <code>start &lt;= x &amp;&amp; x &lt; end</code>, the
+inclusive one with <code>x &lt;= end</code>. A <code>string</code> and a <code>StringView</code> are <code>Contains&lt;char&gt;</code>: <code>'b' in &quot;abc&quot;</code>,
+through the view's <code>contains&lt;P :: [Pattern]&gt;</code> at <code>P = char</code> (<a href="../../spec/05-interfaces/">05 §1</a> rule 2) —
+the same member that finds a text in a text.</p>
+<p><strong>Clone</strong> (10 K5; N2a). A <code>List</code>, a <code>Deque</code>, a <code>Set</code>, a <code>Map</code> and a <code>Heap</code> are <code>Clone</code> where their
+elements — a map's keys and values — are: <code>clone()</code> is a new container of the elements' clones, as
+deep as the element type owns; a map keeps its hasher, a heap and a deque their order.</p>
+<p><strong>Equality and display</strong> (10 C9; M8a S14). A <code>List</code> and a <code>Deque</code> are <code>Equatable</code> where their
+elements are, element by element in order; a <code>Set</code> by its values and a <code>Map</code> by its entries —
+the same keys, equal values, where <code>V</code> is <code>Equatable</code> — in any order. Each is <code>Debug</code> and
+<code>Display</code> alike where its elements, a map's keys and values, are <code>Debug</code>: <code>[1, 2]</code> for a list
+and a deque, <code>{1, 2}</code> for a set, <code>{&quot;a&quot;: 1}</code> for a map, <code>{}</code> for an empty set or map, a set's and
+a map's in the order they are walked. A <code>Heap</code> is <code>Debug</code>, its values in brackets in an order of
+its own that no program may rely on. None is <code>Hashable</code> (10 C8).</p>
+<p>A value that hashes is <strong><code>Hashable</code></strong>, <code>fn hash&lt;H :: [Hasher]&gt;(&amp;h: H): void</code>, a child of
+<code>Equatable</code>: it writes its parts into the hasher, and equal values write the same — nothing checks
+it. An integer writes its word (<code>writeInt</code>, <code>writeUint</code> for the unsigned), a <code>bool</code> a byte, a
+<code>char</code> its code point as a word, a <code>string</code> its bytes and then 255, which no UTF-8 text holds. A
+<code>float</code> is none (10 SL-26); an array, a view, a <code>List</code>, a <code>Map</code> and a <code>Set</code> are none either (10
+C8): their slots can be written. A type's own hash is synthesized (<a href="../../spec/05-interfaces/">05 §14</a>).
+An object hashes by its address where its class is <code>Identity</code> (<a href="../../spec/05-interfaces/">05 §14</a> rule
+8): <code>hashIdentityInto(o, &amp;h)</code> writes it as <code>writeInt</code> does.</p>
+<h2 id="benchmarks">Benchmarks</h2>
+<p>A function marked <strong><code>@Bench</code></strong> is a benchmark (design 10 X4; M8c S12b): <code>fn name(&amp;b: Bench)</code>, in
+a module under <code>src/</code> or <code>tests/</code>, which <code>lyric bench</code> runs (<a href="../../spec/14-cli/">14 §4</a>). <code>Bench</code> is
+<code>std.core</code>'s, and in the prelude as <code>Test</code> is; the bench a benchmark is handed is its measure.</p>
+<ul>
+<li><strong><code>b.iter { … }</code></strong> runs the block until its time a run is known: once to warm up, then rounds
+of more runs until one takes a tenth of a second, then five rounds of that many. The bench keeps
+the round of the median time — its <code>runs</code>, its <code>nanos</code>, the <code>allocations</code> this thread made in
+it and their <code>allocatedBytes</code>. The loop's call of the block is in the time.</li>
+<li><strong><code>b.bytes(n)</code></strong> says that a run handles <code>n</code> bytes; the report gives the megabytes a second.</li>
+<li><strong><code>blackBox(x)</code></strong> of <code>std.core</code> hands <code>x</code> back through a point the compiler cannot see
+through: what computed it is not dropped as unused, and the value that comes out is not known
+in advance.</li>
+</ul>
+<h2 id="codecs">Codecs</h2>
+<p><strong><code>std.codec</code></strong> (design 10 B10 E1–E2, E5–E6; M10 S1) is serialization as a pair: <code>Encode</code>
+writes a value into an encoder, <code>Decode</code> reads one out of a decoder, <code>Codable</code> is both. A
+format — <code>std.json</code>, <code>std.toml</code> — is an encoder and a decoder of its own; <code>std.codec</code> holds the
+pair, the model a format implements, the layer a conformance writes with, the errors, the
+conformances of the core types, and <code>Value</code>, the tree of the forms that any format could write.</p>
+<ol>
+<li><strong>The pair.</strong> <code>Encode { fn encode&lt;E :: [Encoder]&gt;(&amp;e: E): void throws EncodeError; }</code>,
+<code>Decode { static fn decode&lt;D :: [Decoder]&gt;(&amp;d: D): Self throws DecodeError; }</code>, <code>Codable :: [Encode, Decode]</code>. A conformance is generic over the format's type, and the format is passed by
+reference, as a hasher is (<a href="#hashing">§Hashing</a>): the format keeps its state, and a <code>mut</code>
+method of the layer hands <code>&amp;this</code> on.</li>
+<li><strong>The model has ten forms</strong>, and a format implements them as primitives: <code>encodeNull</code>,
+<code>encodeBool</code>, <code>encodeInt</code>, <code>encodeUint</code>, <code>encodeFloat</code>, <code>encodeString</code>, <code>encodeBytes</code>, and
+<code>beginSeq(n)</code>/<code>endSeq()</code>, <code>beginMap(n)</code>/<code>beginKey()</code>/<code>endMap()</code>, <code>beginStruct(name, n)</code>/
+<code>beginField(name)</code>/<code>endStruct()</code>, <code>beginVariant(enum, name, index, hasPayload)</code>/<code>endVariant()</code>;
+the decoder mirrors them, pull-based: <code>isNull()</code> peeks, <code>decodeInt()</code> and the others take,
+<code>beginSeq(): ?int</code> answers the count where the format knows it and <code>seqHasNext()</code> whether an
+element follows, <code>beginMap()</code>/<code>mapHasNext()</code> the same with a key and a value read in turn,
+<code>beginStruct(name, fields)</code> positions on a struct and <code>structField(name)</code> on a field — <code>false</code>
+where the data has none —, <code>endStruct(denyUnknown)</code> leaves it, <code>beginVariant(enum, variants)</code>
+answers the index of the variant the data holds and <code>variantHasPayload()</code> whether one follows.
+<code>path()</code> says where the format stands, for an error. The sequence of calls is the contract: a
+format that cannot hold a form throws.</li>
+<li><strong>The layer</strong> is what a conformance writes with, on the format itself: <code>e.field(name, v)</code>,
+<code>e.element(v)</code>, <code>e.entry(k, v)</code>, <code>e.encodeUnitVariant(…)</code>, <code>e.encodeVariant(…, payload)</code>;
+<code>d.field&lt;T&gt;(name)</code> reads a field the data must have — a missing one is <code>Missing</code> —,
+<code>d.optional&lt;T&gt;(name)</code> one it may lack (<code>null</code> then, as for a <code>null</code> in the data), <code>d.next&lt;T&gt;()</code>
+the next element or <code>null</code> at the end, <code>d.nextKey&lt;K&gt;()</code> and <code>d.value&lt;V&gt;()</code> a map's entry,
+<code>d.decodeNullable&lt;T&gt;()</code> a value that may be null.</li>
+<li><strong>The core types conform.</strong> The integers (a narrower one through <code>int</code>, refused as <code>Invalid</code>
+where it does not fit; a <code>uint</code> the same), <code>float</code> and <code>float32</code>, <code>bool</code>, <code>string</code>, <code>char</code> (a
+string of one character), <code>Instant</code> (its RFC 3339 text), <code>?T</code> (<code>null</code> or the value), <code>T[]</code>,
+<code>Duration</code>, <code>Date</code>, <code>Time</code> and <code>DateTime</code> (their texts: as Go writes a duration, RFC 3339's
+full-date, <code>HH:MM:SS</code> with the fraction, RFC 3339's date-time with its offset),
+<code>Slice&lt;T&gt;</code> (writes alone), <code>List&lt;T&gt;</code>, <code>Deque&lt;T&gt;</code>, <code>Set&lt;T&gt;</code> (a sequence, in the set's order),
+<code>Map&lt;K, V&gt;</code> (a map; the keys go to the format as values, which holds them or not), the tuples
+of two and three (a sequence of that length, <code>Missing</code> where shorter). A <code>uint8[]</code> is a
+sequence of numbers; <strong><code>Bytes { value }</code></strong> is the byte form the format holds its own way
+(design 10 E6: Base64 in JSON). A format reads a number as the form asked for: an <code>int</code>
+where a <code>uint</code> fits, a <code>float</code> from an integer.</li>
+<li><strong>The errors.</strong> <code>DecodeError { kind, path, detail }</code> with the kinds <code>Missing</code>,
+<code>TypeMismatch</code>, <code>Invalid</code>, <code>UnknownField</code>, <code>UnknownVariant</code>; its message is the kind, the
+detail and the path — <code>missing: field 'name' (at User)</code>, <code>type mismatch: expected an int, got a string (at Team.[].User)</code>. <code>EncodeError { path, detail, inner }</code>. A format never panics on
+its input (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 B3</a>).
+An unknown field passes unless the conformance ends its struct with <code>endStruct(true)</code>.</li>
+<li><strong><code>Value</code></strong> is the tree: <code>Null</code>, <code>Bool</code>, <code>Int</code>, <code>Uint</code>, <code>Float</code>, <code>String</code>, <code>Bytes</code>, <code>Seq</code>, <code>Map</code>
+(entries in the order written), <code>Struct(name, fields)</code>, <code>Variant(enum, name, index, payload)</code>; <code>Equatable</code> and <code>Debug</code>. <code>Value.of(v)</code> is the tree a value writes, <code>tree.read&lt;T&gt;()</code>
+the value a tree reads as, <code>Value.encoder()</code> and <code>tree.decoder()</code> the two formats to pass on.
+A <code>Value</code> is itself <code>Codable</code>: it writes its forms into any format, and reads the scalars and
+the two anonymous containers from one — a struct or a variant it cannot read without its name.</li>
+<li><strong><code>Codable</code> writes itself</strong> (design 10 E3; <a href="../../spec/11-metaprogramming/">11 §4</a> rule 10): a struct
+or a class conforming without the members gets <code>encode</code> and <code>decode</code> over its fields in
+declaration order — every field, whatever its word —, each under its wire name; a field the
+data lacks reads as <code>decodeAbsent</code> gives it (<code>null</code> for an optional, <code>Missing</code> else); an
+unknown field passes. An enum gets its variant: a unit one as the name, one payload field as
+the value, several as a sequence in their order; reading, an unknown name is
+<code>UnknownVariant</code>. The struct's name on the wire is <code>typeName</code>'s. An own <code>encode</code> or <code>decode</code>
+replaces the synthesized one (<a href="../../spec/05-interfaces/">05 §14</a>).</li>
+<li><strong><code>@Codec</code> steers it</strong> (E4): on a field, <code>name</code> writes it under that name and <code>skip</code> leaves it
+out — it reads as absent, so it is an optional or it is <code>Missing</code> —; on a struct or a class,
+<code>rename = .SnakeCase</code> or <code>.CamelCase</code> rewrites every field's name and <code>denyUnknown</code> refuses a
+field the data has and the type has not (<code>UnknownField</code>); on an enum, <code>tag = &quot;kind&quot;</code> writes a
+variant as a struct of the tag and the payload's fields, named by position (<code>&quot;0&quot;</code>, <code>&quot;1&quot;</code>),
+and reads it by the tag. <code>default</code> is not read in 5.0: a field marked so reads as absent.</li>
+</ol>
+<h2 id="json">JSON</h2>
+<p><strong><code>std.json</code></strong> (design 10 B10 E7; M10 S3) is RFC 8259, strictly: an encoder and a decoder of
+<a href="#codecs">§Codecs</a>' model, and <code>JsonValue</code>, the tree.</p>
+<ol>
+<li><strong>The text of a value.</strong> <code>json.encode&lt;T :: [Encode]&gt;(v, opts = JsonOptions { })</code> writes any
+<code>Encode</code> value as text; <code>json.encodeTo(v, &amp;w, opts)</code> writes it into a <code>Writer</code>. A struct is an
+object of its wire names, a sequence an array, a map an object whose keys are strings — a
+number's digits where the key is a number; another key is an <code>EncodeError</code> —, bytes a Base64
+string, a unit variant its name, a variant with a payload <code>{&quot;Name&quot;: payload}</code>; <code>null</code>,
+<code>true</code>/<code>false</code>, numbers as <code>int</code> or the shortest float text. <code>NaN</code> and the infinities have no
+JSON text (RFC 8259 §6): writing one is an <code>EncodeError</code>. The quote, the backslash and the
+control characters are escaped (<code>\n</code>, <code>\t</code>, <code>\r</code>, <code>\u00XX</code>), everything else stands as it is.
+<code>JsonOptions</code>: <code>pretty</code> writes newlines and <code>indent</code> spaces per level (default 2), <code>sortKeys</code>
+an object's keys in order.</li>
+<li><strong>The value of a text.</strong> <code>json.decode&lt;T :: [Decode]&gt;(text)</code> reads any <code>Decode</code> value; a text
+that is no JSON is <code>JsonError { line, column, detail }</code>, a value the type cannot read a
+<code>DecodeError</code> of <a href="#codecs">§Codecs</a> rule 5 whose path names the structs, the members and the
+indices — <code>Team.members[0].User.id</code>. <code>json.decodeFrom&lt;T&gt;(&amp;r)</code> reads a <code>Reader</code> to its end first. A struct
+reads from an object by its members' names (the rest ignored unless the type denies them), a
+sequence from an array, a map from an object (a key as the number it spells where the key
+type is one), a variant from its name or from an object of one member, bytes from Base64. A
+number with a fraction or an exponent read as an <code>int</code> is <code>Invalid</code>; one beyond <code>int</code> is a
+float in the tree and <code>Invalid</code> as an <code>int</code>; a number read as a <code>float</code> may be an integer.</li>
+<li><strong>Strict.</strong> One value, whitespace (space, tab, CR, LF) around it, nothing else: a trailing
+comma, a leading zero, <code>+</code>, <code>.5</code>, <code>1.</code>, an unknown escape, a lone surrogate, a control
+character unescaped, a text after the value are refused with the line and column. A member
+repeated keeps the last value. The document may nest 512 levels, its outermost value the
+first; one deeper is refused before what nests deeper is read, and a document the parser
+takes is compared, written and shown in any task (<a href="../../spec/13-abi/">13</a> rule 2; the sweep after
+M10, W5).</li>
+<li><strong><code>JsonValue</code></strong> is the tree: <code>Null</code>, <code>Bool</code>, <code>Int</code>, <code>Float</code>, <code>String</code>, <code>Array(List)</code>,
+<code>Object(Map)</code>; <code>Equatable</code> by content (an object's order aside), <code>Display</code> and <code>Debug</code> the
+compact text. <code>json.parse(text)</code> reads a text into it; <code>v[&quot;key&quot;]</code> is a member or <code>null</code>,
+<code>v.at(i)</code> an element or <code>null</code>, <code>v.path(&quot;a.b[0]&quot;)</code> walks both, <code>asInt</code>/<code>asFloat</code> (an <code>Int</code>
+widened)/<code>asString</code>/<code>asBool</code>/<code>asArray</code>/<code>asObject</code>/<code>isNull</code> ask. A <code>JsonValue</code> is <code>Codable</code>
+itself: it writes its forms into any format and reads any value's forms from one; <code>v.read&lt;T&gt;()</code>
+reads a value out of the tree, <code>v.reader()</code> is the decoder to pass on.</li>
+</ol>
+<h2 id="toml">TOML</h2>
+<p><strong><code>std.toml</code></strong> (design 10 B10 E8; M10 S4) is TOML 1.0: an encoder and a decoder of
+<a href="#codecs">§Codecs</a>' model, and <code>TomlValue</code>, the tree. The toolchain's manifest reader is not
+it (15 §1): <code>std.toml</code> is for programs.</p>
+<ol>
+<li><strong>The document of a value.</strong> <code>toml.encode(v)</code> writes any <code>Encode</code> value whose form is a table
+— a struct, a map — as a document; another form is an <code>EncodeError</code>. A table's plain pairs
+come first, then its sub-tables under <code>[a.b]</code> headers (a table that holds sub-tables alone
+gets no header of its own), then its arrays of tables under <code>[[a.b]]</code>; a sequence is an
+array, a map a table whose keys are strings — a number's digits for a number; another key an
+<code>EncodeError</code> —, bytes an array of integers, a unit variant its name, a variant with a
+payload a table of one key (inline inside an array), a float <code>inf</code>, <code>-inf</code> or <code>nan</code> where it
+is no number. A key is bare where it is <code>[A-Za-z0-9_-]+</code>, quoted else; a string is a basic
+string with the quote, the backslash, the control characters escaped. A <code>null</code> field is left
+out of its table (TOML has no null); a <code>null</code> elsewhere is an <code>EncodeError</code>. <code>toml.encodeTo(v, &amp;w)</code> writes into a <code>Writer</code>.</li>
+<li><strong>The value of a document.</strong> <code>toml.decode&lt;T&gt;(text)</code> reads any <code>Decode</code> value out of a document;
+a text that is no TOML is <code>TomlError { line, column, detail }</code>, a value the type cannot read a
+<code>DecodeError</code> of <a href="#codecs">§Codecs</a> rule 5 whose path names the structs, the keys and the
+indices — <code>Config.servers[0].Server.port</code>. A struct reads from a table by its keys, a map from
+a table (a key as the number it spells where the key type is one), a sequence from an array,
+a variant from a string or a table of one key, bytes from an array of integers 0..255; a
+string reads from a string or from a date-time's text, so an <code>Instant</code> reads from an offset
+date-time; an absent key is absent (an optional reads <code>null</code>). A float read as an integer is
+<code>Invalid</code>. <code>toml.decodeFrom&lt;T&gt;(&amp;r)</code> reads a <code>Reader</code> to its end first.</li>
+<li><strong>TOML 1.0</strong> (toml.io/en/v1.0.0): comments; bare, quoted and dotted keys; basic strings with
+their escapes (<code>\b \t \n \f \r \&quot; \\ \uXXXX \UXXXXXXXX</code>), literal strings, both
+multi-line (the first newline dropped, a line-ending backslash dropping the whitespace up to
+the next character); integers decimal, <code>0x</code>, <code>0o</code>, <code>0b</code> with underscores and without a leading
+zero; floats with fraction, exponent, <code>inf</code>, <code>nan</code>; booleans; the four date-times (offset,
+local, date, time, with a fraction and <code>T</code> or a space); arrays over lines with a trailing
+comma; inline tables on one line; <code>[table]</code> and <code>[[array]]</code> headers. Refused with line and
+column: a key defined twice, a table defined twice, a header for a table a dotted key made, a
+dotted key into a table a header or an inline table made, a header where a value stands, a
+header for an array of tables and the reverse, a trailing comma in an inline table, a leading
+zero, a bare underscore, a signed prefixed integer, a date that is none. The document may nest
+<strong>128 levels</strong>: the root table the first, each segment of a header or a key one more, an array
+of tables one more for its element, an array's elements and an inline table's values one below
+them; one deeper is refused before what nests deeper is read. 128, not JSON's 512: a
+<code>TomlValue</code> is several times a <code>JsonValue</code>, and a document the parser takes is compared,
+written and shown in any task (<a href="../../spec/13-abi/">13</a> rule 2; the sweep after M10, W5).</li>
+<li><strong><code>TomlValue</code></strong> is the tree: <code>String</code>, <code>Int</code>, <code>Float</code>, <code>Bool</code>, <code>Datetime(TomlDatetime)</code>,
+<code>Array(List)</code>, <code>Table(TomlTable)</code>; <strong><code>TomlTable</code></strong> keeps its keys in the order written
+(<code>get</code>, <code>set</code>, <code>keys</code>, <code>pairs</code>, <code>length</code>); <strong><code>TomlDatetime</code></strong> is <code>Offset(DateTime)</code>,
+<code>Local(Date, Time)</code>, <code>LocalDate(Date)</code> or <code>LocalTime(Time)</code>, its text TOML's. <code>Equatable</code> by
+content, <code>Display</code> and <code>Debug</code> a table's document or a value's text. <code>toml.parse(text)</code> reads a
+document into a table; <code>v[&quot;key&quot;]</code>, <code>v.at(i)</code>, <code>v.path(&quot;a.b[0]&quot;)</code>, <code>asString</code>/<code>asInt</code>/<code>asFloat</code>
+(an <code>Int</code> widened)/<code>asBool</code>/<code>asDatetime</code>/<code>asArray</code>/<code>asTable</code> ask. A <code>TomlValue</code> is <code>Codable</code>
+itself; <code>v.read&lt;T&gt;()</code> reads a value out of the tree, <code>v.reader()</code> is the decoder to pass on.</li>
+</ol>
+<h2 id="syntax">Syntax</h2>
+<p><strong><code>std.syntax</code></strong> (design 10 B13 M2; M9b S1) is the syntax tree as values: what a program can
+write, as enums and structs a <code>comptime</code> function reads, builds and writes back. The macros of
+<a href="../../spec/11-metaprogramming/">11 §5</a> take and give these values (M9b S2–S5).</p>
+<ol>
+<li><strong>The tree is enums and structs, <code>Box</code> where a node holds its own kind.</strong> <code>Expr</code>, <code>Stmt</code>,
+<code>Decl</code>, <code>Type</code> and <code>Pattern</code> are enums, each form a variant, each node's last payload its
+<code>Span</code>; <code>Ident { name, span }</code> is a name, <code>Literal</code> a literal with its suffix (<code>Int(uint64, ?string)</code>, <code>Float</code>, <code>Str</code>, <code>Bytes</code>, <code>Char</code>, <code>Bool</code>, <code>Null</code>), <code>Block { stmts, span }</code> a block;
+a declaration's body is a struct — <code>FnDecl</code>, <code>StructDecl</code>, <code>ClassDecl</code>, <code>EnumDecl</code>, <code>InterfaceDecl</code>, <code>ExtendDecl</code>, <code>LetDecl</code>,
+<code>FieldDecl</code>, <code>AssocType</code>, <code>AliasDecl</code>, <code>ImportDecl</code> — as are <code>Param</code>, <code>GenericParam</code>,
+<code>Attribute</code>, <code>Arg</code>, <code>FieldInit</code>, <code>WithField</code>, <code>Arm</code>, <code>Catch</code>, <code>LambdaParam</code> and <code>Variant</code>;
+<code>Body</code> is an expression or a block, <code>Node</code> any of the five kinds, for a walk. A <code>Span</code> is a
+file as the diagnostics name it, a line and a column from 1 — <code>&quot;&quot;</code> and <code>0</code> for a node that was
+built, not read (<code>Span.none()</code>). The enums are <code>@NonExhaustive</code> (10 B13 M3): a <code>match</code> over
+them outside the standard library writes a <code>_</code>, and a form the compiler has that the module
+has not — the rounds of a <code>comptime for</code> over fields (<a href="../../spec/11-metaprogramming/#4-type-information">§4</a>), a local
+function, a node the parser could not read — is refused where it is read (<code>LYR-CT0005</code>). Every
+node is <code>Debug</code>; <code>Box&lt;T&gt;</code> is <code>Debug</code> where <code>T</code> is, and writes its value alone.</li>
+<li><strong><code>parseExpr(s)</code>, <code>parseStmts(s)</code> and <code>parseDecls(s)</code> read a text as the compiler reads it</strong>:
+an expression; statements as a block body holds them, a last expression without its <code>;</code> the
+tail; declarations as a module holds them. A text that is no syntax is a panic of the
+evaluation (<code>LYR-CT0001</code>), with the parser's message and the place in the text.</li>
+<li><strong><code>toSource()</code> writes a node as the formatter writes it</strong> — on an <code>Expr</code>, a <code>Stmt</code>, a <code>Block</code>
+(its statements, without the braces), a <code>Decl</code>, a <code>Type</code> and a <code>Pattern</code>. A tree read from a
+text comes back as the formatter would write that text, a built tree the same way: a literal
+from its value, so <code>1.5e3</code> is <code>1500.0</code> and <code>0x10u8</code> is <code>16u8</code>; no comments, since a tree holds
+none. The compiler's own pin: every program of its emitter tests goes tree, values, tree and
+gives the same text.</li>
+<li><strong><code>children()</code> gives the nodes directly inside one, in source order; <code>walk(f)</code> visits a node
+and every node below it, parents before children</strong> — on a <code>Node</code>, and on each of the five
+kinds.</li>
+<li><strong><code>Ident.fresh(hint)</code> is a name no written name is</strong>: <code>hint</code> and a number of its own, new at
+every call of an evaluation; <code>Ident.of(name)</code> is a name that stands nowhere. What a <code>quote</code>
+binds is fresh (<a href="../../spec/11-metaprogramming/">11 §5</a>; M9b S3).</li>
+<li><strong>The tree lives at compile time.</strong> The functions of <code>std.syntax</code> that read and write source
+run inside <code>comptime</code> only; a call the program would make at run time is refused
+(<code>LYR-CG0002</code>), as the world is refused at compile time (<a href="../../spec/11-metaprogramming/">11 §2</a> rule 3).</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-the-converters">1. The converters</a></li>
+<li class="level-2"><a href="#2-the-format-language">2. The format language</a></li>
+<li class="level-2"><a href="#numbers">Numbers</a></li>
+<li class="level-3"><a href="#stdmath-clamp-a-chars-code-point">std.math, clamp, a char's code point</a></li>
+<li class="level-2"><a href="#iteration">Iteration</a></li>
+<li class="level-3"><a href="#parsing">Parsing</a></li>
+<li class="level-2"><a href="#results-and-conversions">Results and conversions</a></li>
+<li class="level-2"><a href="#arrays-and-views">Arrays and views</a></li>
+<li class="level-2"><a href="#hashing">Hashing</a></li>
+<li class="level-2"><a href="#input-and-output">Input and output</a></li>
+<li class="level-2"><a href="#encodings">Encodings</a></li>
+<li class="level-2"><a href="#cryptography">Cryptography</a></li>
+<li class="level-2"><a href="#random-numbers">Random numbers</a></li>
+<li class="level-2"><a href="#time">Time</a></li>
+<li class="level-2"><a href="#paths">Paths</a></li>
+<li class="level-2"><a href="#files">Files</a></li>
+<li class="level-2"><a href="#directories">Directories</a></li>
+<li class="level-2"><a href="#the-console">The console</a></li>
+<li class="level-2"><a href="#the-terminal">The terminal</a></li>
+<li class="level-2"><a href="#the-system">The system</a></li>
+<li class="level-2"><a href="#the-network">The network</a></li>
+<li class="level-2"><a href="#uris">URIs</a></li>
+<li class="level-2"><a href="#http">HTTP</a></li>
+<li class="level-2"><a href="#processes">Processes</a></li>
+<li class="level-2"><a href="#characters">Characters</a></li>
+<li class="level-2"><a href="#strings">Strings</a></li>
+<li class="level-2"><a href="#compression">Compression</a></li>
+<li class="level-2"><a href="#regular-expressions">Regular expressions</a></li>
+<li class="level-2"><a href="#collections">Collections</a></li>
+<li class="level-2"><a href="#benchmarks">Benchmarks</a></li>
+<li class="level-2"><a href="#codecs">Codecs</a></li>
+<li class="level-2"><a href="#json">JSON</a></li>
+<li class="level-2"><a href="#toml">TOML</a></li>
+<li class="level-2"><a href="#syntax">Syntax</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

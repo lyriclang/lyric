@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Statements — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a class="current" href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>Statements</h1>
+<blockquote>
+<p><strong>Partly written.</strong> §1 to §5 were written with milestones <strong>M5</strong> to <strong>M8a</strong> of the Lyric 5 plan
+and the catch-up block N (2026-10-07), spec-first: each rule lands here with its conformance case
+before or with its implementation. Source of the decisions:
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Syntax</a>.</p>
+</blockquote>
+<h2 id="scope">Scope</h2>
+<p>Bindings, blocks, <code>if</code>, <code>while</code>, <code>loop</code>, <code>for</code> over <code>Iterable</code> (with <code>try</code> for throwing iterators), labels, <code>break</code>/<code>continue</code>/<code>return</code>.</p>
+<h2 id="1-loop-and-the-jumps">1. <code>loop</code> and the jumps</h2>
+<ol>
+<li><strong><code>loop { … }</code></strong> runs its block again and again; only a <code>break</code> leaves it (05 E11, 08 S3). At
+the start of a statement it is the statement, with no <code>;</code> after its block; anywhere else it is
+an expression — <code>let found = loop { … };</code>, <code>return loop { … };</code>. <code>loop</code> is a word only before
+its <code>{</code>: elsewhere it is a name like any other, and before a <code>{</code> it is always the loop.</li>
+<li>A loop is worth what its <strong>breaks</strong> give (05 E11, 08 S4): <code>break value;</code> leaves it with the
+value, and the loop's type is the values' types unified, or the type its position expects,
+each value checked against it — <code>let n: ?int = loop { break null; };</code>. A loop whose breaks
+give no value is worth nothing (<code>void</code>); a loop no <code>break</code> leaves is worth <strong><code>never</code></strong>
+(<a href="../../spec/06-errors/#9-panics-and-never">06 §9.2</a>) — a function whose body ends in one needs no
+<code>return</code>, and the loop fits where any value is wanted. The breaks of one loop give a value all
+or none (<code>LYR-SEM0149</code>). A value leaves <strong>only a <code>loop</code></strong>: <code>while</code>, <code>do</code> and <code>for</code> also end
+when their condition or their elements run out, and there would be no value then
+(<code>LYR-SEM0148</code>).</li>
+<li><strong>Labels</strong>: <code>outer: loop { … }</code>, <code>outer: while (…) { … }</code>, <code>outer: do { … } while (…);</code> and
+<code>outer: for (…) { … }</code> name the loop, and <code>break outer;</code>, <code>break outer value;</code> and
+<code>continue outer;</code> leave or continue it from a loop nested in it. After <code>break</code>, a name is the
+label when a loop around the <code>break</code> carries it, and the beginning of the value otherwise:
+<code>break x;</code> gives <code>x</code> unless a loop around is labeled <code>x</code>, and <code>break (x);</code> gives <code>x</code> whatever
+it names. A jump to a label no loop around carries is refused (<code>LYR-SEM0101</code>), as is a label
+repeating one around it — a jump to it would be ambiguous (<code>LYR-SEM0102</code>); a label nothing
+jumps to is warned (<code>LYR-SEM0103</code>). Labels share nothing with the names of values.</li>
+<li>A <code>break</code> or <code>continue</code> leaves or continues a loop <strong>of its own function</strong>: outside every loop
+it is refused (<code>LYR-SEM0147</code>). A lambda's body is a function of its own — the loops around the
+lambda are out of its jumps' reach, and their labels name nothing in it. A lambda an inline
+function's call sets in place is none (<a href="../../spec/03-types/#85-inline-functions">03 §8.5</a>): its jumps
+reach the loops around it, and the inline body's loops are out of their reach.</li>
+<li><strong>Definite assignment</strong> follows the jumps. A branch of an <code>if</code> or an arm of a <code>match</code> that does
+not complete — it returns, throws, breaks, continues or gives <code>never</code> — adds nothing to what
+follows it: the continuation follows the branches that complete. A <code>loop</code> runs its block at
+least once and is left only by its breaks: a variable is assigned after it when it is assigned
+at every <code>break</code> that leaves it. A <code>do … while (c)</code> runs its block at least once, reaches <code>c</code>
+from the end of the block and from every <code>continue</code>, and is left where <code>c</code> is false and by
+every <code>break</code>. A <code>while</code> and a <code>for</code> may not run their block at all: what is assigned after
+them is what was assigned before. A read of a variable that is not assigned on every way to it
+is refused (<code>LYR-SEM0018</code>).</li>
+<li><strong>The end of a body</strong> follows the jumps too. A function that returns a value ends every path
+in a <code>return</code>, a <code>throw</code> or an expression worth <code>never</code>
+(<a href="../../spec/06-errors/#9-panics-and-never">06 §9</a>); a body that can run off its end is refused
+(<code>LYR-SEM0017</code>). A loop ends a path only when nothing leaves it: a <code>while (true)</code> or a
+<code>do … while (true)</code> with no <code>break</code> of it, and a <code>do</code> loop whose block ends every path so and
+holds no <code>break</code> and no <code>continue</code> of the loop — a <code>break</code> is a way past what follows it, and
+a <code>continue</code> reaches the condition, which may end the loop. A jump is its loop's <strong>wherever
+it stands in the loop's block</strong>: in a nested statement, in the <code>else</code> of a <code>let … else</code>, in
+an arm of a <code>match</code> expression or a clause of a <code>try</code> expression that is part of a larger
+expression — and, when it names the loop's label, in a loop nested in it, a <code>loop</code> worth
+<code>never</code> included. Only a lambda's body is out of reach (rule 4). A statement no path reaches
+is warned about (<code>LYR-SEM0073</code>); the statement behind a loop a jump leaves is reached.</li>
+</ol>
+<h2 id="2-for">2. <code>for</code></h2>
+<ol>
+<li><strong><code>for (x in e) { … }</code></strong> walks an <strong><code>Iterable</code></strong> (design 10 B6 I2): <code>e.iter()</code> gives the
+iterator, once, and the loop calls its <code>next()</code> before every pass, running the block with <code>x</code>
+bound to the value until <code>next()</code> answers <code>null</code>. Anything else is refused (<code>LYR-SEM0007</code>). A
+<code>string</code> is no <code>Iterable</code>: its characters and its lines are two walks, <code>s.chars()</code> and
+<code>s.lines()</code>, and <code>for (c in s)</code> is refused (<code>LYR-SEM0232</code>, with <code>.chars()</code> as its fix).
+An <code>Iterator</code> is iterable as itself (<a href="../../spec/12-stdlib/">12 §Iteration</a>), its <code>iter()</code> the iterator
+as a value: a loop over a struct iterator walks a copy and leaves the variable where it was;
+over a class iterator it walks the object, and a second loop goes on where the first stopped.</li>
+<li><code>x</code> is the iterator's <strong><code>Item</code></strong>; a pattern takes it apart, <code>for ((k, v) in …)</code>, where it
+cannot fail (<code>LYR-SEM0098</code>). An <code>Item</code> may itself be optional: <code>next()</code> then answers <code>??T</code>
+(<a href="../../spec/03-types/">03 §3.1</a>), and a <code>null</code> of the inner level is a value the loop runs for. Two
+loops over one <code>Iterable</code> value each take an iterator of their own — <code>iter()</code> is called per
+loop.</li>
+<li>A range written in the head is the counted loop (<a href="../../spec/03-types/">03 §7</a> rule 2); a range held
+in a binding is an iterator like any other.</li>
+<li>A loop over a binding — a local or a parameter — that an <strong>earlier loop walked</strong> warns
+(<code>LYR-SEM0162</code>, design 10 B6 I2) where the binding's <code>iter()</code> gives the iterator itself, the
+iterator may be an object other bindings reach — a class, or a type parameter or associated
+type a class may answer —, and the earlier loop stands before it in the same block or an
+enclosing one with no assignment to the binding between: the second loop goes on where the
+first stopped (rule 1). A struct iterator is walked as a copy and warns not, nor does an
+<code>Iterable</code> whose <code>iter()</code> makes a new iterator, nor a loop after one in a branch that may not
+have run.</li>
+<li>Over an <strong>array, a view or an inline array</strong> the loop is the <strong>index loop</strong> (design 10 B6
+I10): the sequence is evaluated once — an inline array copied, as a binding copies it — and
+the element at each index below its length is read at its pass, so a write to a later
+element of an array or a view is seen, and a new array assigned to the variable is not. No
+iterator stands between: an element that is itself optional walks. An array and a view are
+<code>Iterable</code> besides, through <code>SliceIter&lt;T&gt;</code> (<a href="../../spec/12-stdlib/">12 §Iteration</a>), for what takes
+an <code>Iterable</code>; an inline array is not, as a view of a local one is refused
+(<a href="../../spec/03-types/">03 §5.3</a> rule 4).</li>
+<li>An iterator that <strong>may throw</strong> — its <code>Error</code> is not <code>never</code> (design 10 B6 I5) — makes the
+loop's calls throw sites at its head, <code>iter()</code> once and <code>next()</code> at every pass: the head is
+marked, <strong><code>for (line in try lines)</code></strong>, the <code>try</code> covering the source and every pull
+(<code>LYR-SEM0138</code> without it) — in a <code>try</code> block the block is the mark, as for every call in
+it, and one at the head is a second (<a href="../../spec/06-errors/">06 §3</a> rule 2) — and what they throw is
+covered as a call's is, by a <code>try</code> block around the loop or by the function's set. Through
+a constraint the <code>Error</code> is open: a loop over <code>A :: [Iterable]</code> throws <code>A.Iter.Error</code>, which
+the function declares, and a call where it is <code>never</code> throws nothing. A mark over a loop that
+cannot throw is warned about (<code>LYR-SEM0139</code>). Only the plain mark stands in a head
+(<code>LYR-SEM0163</code>): <code>try?</code>, <code>try!</code> and the catching form would take the head's value and leave
+the pulls outside.</li>
+<li>A loop over an iterator that is <strong><code>Closeable</code></strong> — by its type, or by its constraints —
+<strong>closes</strong> it on every way out but a panic (design 10 B6 I6, 05 E7 R7), as a <code>using</code> binding
+closes what it binds: at its end, at <code>break</code>, at <code>return</code>, and when something in it throws;
+<code>continue</code> stays inside. The <code>close()</code> is a call of the loop's, marked by its head's <code>try</code>
+where it may throw (rule 6). Where the iterator's type names a type parameter whose
+constraints do not say <code>Closeable</code>, the <strong>instance</strong> decides (the review's M8a-4): each
+monomorphized loop closes where the concrete iterator is <code>Closeable</code>, and does nothing where
+it is not. That close throws what the loop's <code>next()</code> throws — the iterator's <code>Error</code>, which
+is all a Closeable iterator's <code>close()</code> may throw (<a href="../../spec/12-stdlib/">12 §Iteration</a>,
+<code>LYR-SEM0174</code>) —, so the head's <code>try</code> and the clause that covers the pulls cover it.</li>
+</ol>
+<h2 id="3-value-blocks">3. Value blocks</h2>
+<ol>
+<li>A <strong>value block</strong> is a block that is worth a value, <code>{ …; v }</code>: statements, and last a
+<strong>tail</strong> — written without a <code>;</code>. It stands where the grammar puts one and nowhere else
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Y4</a>): as the
+body of a lambda, as a block arm of a <code>match</code>, as a clause of a <code>try</code> expression
+(<a href="../../spec/06-errors/#6-the-expression-forms">06 §6</a>), as a branch of an <code>if</code> expression and as the
+right of <code>??</code> (<a href="../../spec/08-expressions/#2-if-and-match-as-values">08 §2</a>). A brace anywhere else in
+an expression is an initializer's or a trailing lambda's: there is no block expression as
+such.</li>
+<li>The tail is an expression — or an <strong><code>if</code> with its <code>else</code>, a <code>match</code> or a <code>loop</code> standing
+last</strong>: there the three are worth what they are worth as expressions (the tail rule). Before
+the end of the block, and in every block that is no value block — a function's body, a
+loop's, the branches of an <code>if</code> statement — they are statements, and a value without <code>;</code> in a
+statement block is refused (<code>LYR-PAR0016</code>). An <code>if</code> without a final <code>else</code> is a statement
+wherever it stands, and so is one whose condition binds, <code>if (let …)</code>. The form without
+braces, <code>if (c) a else b</code>, is an expression everywhere.</li>
+<li>A value block is <strong>worth its tail's value</strong>. Without a tail it gives no value: it is worth
+<code>never</code> where every path through it leaves — by <code>return</code>, <code>throw</code>, <code>break</code>, <code>continue</code> or an
+expression worth <code>never</code> (<a href="../../spec/06-errors/#9-panics-and-never">06 §9</a>) — and <strong>nothing</strong> where
+it runs to its end. A block worth nothing stands where nobody takes a value; where the
+position wants one, or beside a branch or an arm that gives one, it is refused
+(<code>LYR-SEM0033</code>, or the branches do not unify, <code>LYR-SEM0016</code>).</li>
+<li>A value block is a <strong>scope</strong>: its bindings end with it, and its <code>defer</code>s run when it ends —
+after the tail's value is taken.</li>
+<li>A lambda's block is a value block in each of its forms: <code>(x) =&gt; { … }</code>, <code>x =&gt; { … }</code>, a
+trailing <code>{ x =&gt; … }</code>, and a trailing block that holds statements, <code>{ let d = it * 2; d + 1 }</code>.
+Its tail is the lambda's result, as <code>return tail;</code> at its end would be; a lambda nobody takes
+a value from may end in a tail worth nothing.</li>
+</ol>
+<h2 id="4-bindings">4. Bindings</h2>
+<ol>
+<li><strong><code>let</code></strong> and <strong><code>var</code></strong> bind a name in the scope of the block they stand in, from their
+statement to the end of the block; a <code>let</code> keeps its value, a <code>var</code> may be assigned. A local
+<strong><code>fn</code></strong> binds its name likewise (<a href="../../spec/03-types/#86-local-functions">03 §8.6</a>).</li>
+<li>A name is <strong>bound once in a scope</strong> (decided 2026-10-07): a second <code>let</code> or <code>var</code> of a name in
+the same block is refused (<code>LYR-SEM0176</code>). A <strong>parameter</strong> counts as bound in the body's own
+block, as in C#, Java and Go: a <code>let</code> of its name there is refused too — a lambda's parameter
+likewise. A block further in may bind the name again; its binding hides the outer one until
+that block ends. <strong><code>_</code></strong> binds nothing (<a href="../../spec/09-patterns/">09 §1</a> rule 1): <code>let _ = e;</code> keeps a
+value nobody reads, as often in a block as it is written.</li>
+</ol>
+<h2 id="5-if-while-and-do">5. <code>if</code>, <code>while</code> and <code>do</code></h2>
+<ol>
+<li><strong><code>if (c) { … }</code></strong>, with <strong><code>else { … }</code></strong> or <strong><code>else if (c) { … }</code></strong> after it: <code>c</code> is a <code>bool</code>
+(<code>LYR-SEM0004</code>). The body of an <code>if</code>, an <code>else</code>, a <code>while</code>, a <code>do</code> and a <code>for</code> is a <strong>block</strong>,
+braced even around one statement — <code>if (c) f();</code> is refused (<code>LYR-PAR0017</code>, 08 Y5 S1). An <code>if</code>
+as a value is <a href="../../spec/08-expressions/#2-if-and-match-as-values">08 §2</a>'s; <code>if (let p = e)</code> and
+<code>let p = e else { … };</code> take a pattern (<a href="../../spec/09-patterns/">09</a>).</li>
+<li><strong><code>while (c) { … }</code></strong> tests <code>c</code> before every round; <strong><code>do { … } while (c);</code></strong> after every
+round, so its block runs at least once, and a <code>;</code> ends it. A <code>continue</code> in a <code>do</code> goes to the
+test (<a href="#1-loop-and-the-jumps">§1</a>).</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-loop-and-the-jumps">1. loop and the jumps</a></li>
+<li class="level-2"><a href="#2-for">2. for</a></li>
+<li class="level-2"><a href="#3-value-blocks">3. Value blocks</a></li>
+<li class="level-2"><a href="#4-bindings">4. Bindings</a></li>
+<li class="level-2"><a href="#5-if-while-and-do">5. if, while and do</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

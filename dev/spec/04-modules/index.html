@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Modules and packages — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a class="current" href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>Modules and packages</h1>
+<blockquote>
+<p><strong>Partly written.</strong> §1 was written with milestone <strong>M3</strong> of the Lyric 5 plan (slice S6), §2 to
+§4 with <strong>M7</strong> (slices S1, S2a–S2c, S3a, S3b), §5 with the review of <strong>M8a</strong> (R3a); the rest follows with M7, spec-first: each rule
+lands here with its conformance case before or with its implementation. Source of the decisions:
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 Modules</a>.</p>
+</blockquote>
+<h2 id="scope">Scope</h2>
+<p>Module names from paths, visibility (<code>private</code>, <code>internal</code>, <code>pub</code>), imports, the prelude, editions, packages and their resolution; module-level bindings.</p>
+<h2 id="1-module-level-bindings">1. Module-level bindings</h2>
+<p>A <code>let</code> or a <code>var</code> at the top of a module
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V5</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/04-modules/</code>.</p>
+<ol>
+<li>A module has <strong>no body</strong>: it holds declarations, and importing it runs nothing (G1). A
+module-level <code>let</code> or <code>var</code> is a declaration with an initializer.</li>
+<li>The module's bindings are filled <strong>eagerly, before the entry runs</strong>, in declaration order
+within the module (G2): a later binding may read an earlier one, and the initializer is an
+ordinary expression — a call, an object, an array. A <code>static let</code> on a type that is generic
+in nothing is the same mechanism under the type's name (rule 6 for a generic type's).
+Across modules a module's bindings are filled before those of every module that imports it
+(G2) — imports form no cycle (<a href="#2-module-names">§2</a>, <code>LYR-RES0005</code>) —, so an initializer may
+read what a module it imports declares. A binding read before it is filled — a later one of
+its own module — is refused (<code>LYR-SEM0057</code>).</li>
+<li>A module-level <strong><code>var</code></strong> is written from any function that sees it, as a local is; a
+module-level <code>let</code> and a <code>static let</code> are not (<code>LYR-SEM0019</code>) (G5). What a <code>let</code> holds
+may still be written where it is a place: the fields of an object it references, the
+elements of an array (<a href="../../spec/03-types/#22-fields-and-places">03 §2.2</a>).</li>
+<li>A module-level binding is a <strong>root</strong>: what it references lives as long as the binding does
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 L1</a>).</li>
+<li>An initializer does not throw (G3) — with the errors (<a href="../../spec/06-errors/">06</a>) — and there is no
+<code>init()</code> hook (G6). <code>Lazy&lt;T&gt;</code> is a library (<a href="../../spec/12-stdlib/">12</a>).</li>
+<li>A <strong>constant of a generic type</strong> — a <code>static let</code> in the body of a generic struct, class or
+enum, or in a generic block (<a href="../../spec/05-interfaces/">05 §6</a> rule 2) — is <strong>one per instance</strong> (G2;
+the review's M8a-3): <code>Crate&lt;int&gt;.empty</code> and <code>Crate&lt;string&gt;.empty</code> are two constants, each
+with its instance's arguments for the type's parameters, <code>static let empty: ?T = null;</code>. It
+is read on an instance (<code>LYR-SEM0063</code> on the bare name of the type); inside its type also by
+its bare name, the constant of the instance the code runs for; and through a constraint,
+where it answers an interface's (<a href="../../spec/05-interfaces/">05 §7</a> rule 2). Its value is a
+<strong>constant</strong>: a literal, <code>null</code>, an empty literal <code>[]</code>, another constant — <code>T.zero</code> under a
+constraint, a unit variant —, a struct initializer of these. Nothing runs for it before the
+entry, and such constants have <strong>no order</strong>: one may name another that stands later, and
+none names itself. Anything else — a call, an operation, an object of a class — is refused
+(<code>LYR-SEM0169</code>): a value that is computed is a <code>static fn</code>. <em>(Richer constant expressions
+come with <code>comptime</code>.)</em></li>
+</ol>
+<h2 id="2-module-names">2. Module names</h2>
+<p>A module is a file, and its name comes from one source: its path
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V1</a>). A package gathers modules under one name
+(<a href="../../spec/15-project/">15 §1</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/04-modules/</code> — a rule about a package as a package case, a
+directory (<a href="https://github.com/lyriclang/lyric-spec/blob/3a45314764b99572b35da3b1a26cfe2059db50e6/conformance/README.md">the format</a>); what only the command line shows, in the
+toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>PackageTests</code>).</p>
+<ol>
+<li>A <strong>package</strong> is a directory with a manifest, <code>lyric.toml</code>; its modules are the <code>.lyr</code> files
+under its <code>src/</code>. A module's <strong>path</strong> is its file's path below <code>src/</code> without <code>.lyr</code>, with the
+package's name in front: <code>src/net/http.lyr</code> in the package <code>app</code> is <code>app.net.http</code> (M1). The
+package's own modules write the path the same way — there is no second, package-relative
+spelling.</li>
+</ol>
+<p>1a. One file is named apart: <strong><code>src/lib.lyr</code> is the package's root module</strong>, and its path is the
+package's name alone — <code>import geo { Circle }</code> (the review's M7-1). There is no module
+<code>geo.lib</code> (<code>LYR-RES0003</code>), and a directory <code>src/lib/</code> is a namespace like any other (rule 3).
+The package's own modules import the root module the same way, and it may stand beside
+<code>src/main.lyr</code>.
+2. A file <strong>names no module</strong>: a <code>module</code> header with a path is refused (<code>LYR-RES0008</code>), and the
+name is the path's alone (M2). <code>module;</code> without a path names nothing; it carries the module's
+attributes (<a href="../../spec/11-metaprogramming/">11 §3</a> rule 4).
+3. A <strong>directory is a namespace, not a module</strong>: <code>src/net.lyr</code> beside <code>src/net/</code> is the module
+<code>app.net</code>, one of its own, and a directory without such a file is no module to import
+(<code>LYR-RES0003</code>) (M5).
+4. A module path names its file <strong>exactly</strong>, case included, on every platform: <code>import app.util</code>
+does not find <code>src/Util.lyr</code> (<code>LYR-RES0003</code>), also where the file system ignores case (M6).
+5. <strong>A file is one module</strong>: a module that several others import is loaded once, and its
+bindings exist once (M4). Imports form no cycle (<code>LYR-RES0005</code>).
+6. A <strong>single file</strong> outside every package's <code>src/</code> is a package of its own, named after the
+file; it imports <code>std</code> and nothing else (<code>LYR-RES0003</code>)
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C8</a>).
+7. A program starts at the <strong><code>main</code> of its entry module</strong> — a package's <code>src/main.lyr</code>
+(<a href="../../spec/15-project/">15 §1</a>), or the module the command line names (<a href="../../spec/14-cli/">14 §1</a>) (M7a).
+That <code>main</code> is <code>fn main(): void</code> or <code>fn main(): int</code> and may declare <code>throws</code>
+(<a href="../../spec/06-errors/">06</a>); it takes no parameters (M7b) — the program's arguments are the
+standard library's (<a href="../../spec/12-stdlib/">12</a>). An entry module without <code>main</code>, or with one of
+another form, is refused (<code>LYR-SEM0021</code>).
+8. A <code>main</code> in any other module is an <strong>ordinary function</strong>: a module may be a library and a
+program at once (M7a).
+9. A <strong>declaration is its module's</strong>: two modules may each declare one name — <code>app.a.Cat</code> and
+<code>app.b.Cat</code> — and the two are two declarations. Two such types stay two everywhere, also as
+the type arguments of one generic function, block or type: <code>first([a.Cat { … }])</code> and
+<code>first([b.Cat { … }])</code> call two instances, each with its own type's fields (M1).</p>
+<h2 id="3-visibility">3. Visibility</h2>
+<p>Who may name a declaration and a member
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V2</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/04-modules/</code>; the routes one by one in the toolchain's own
+tests (<code>tests/Lyric5.Tests</code>, <code>VisibilityTests</code>).</p>
+<ol>
+<li>A declaration carries at most <strong>one visibility word</strong>, ahead of every other: <code>pub fn</code>,
+<code>internal struct</code>, <code>private let</code>, <code>pub static fn</code>, <code>pub mut fn</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 D3</a>). A second
+word is refused (<code>LYR-PAR0053</code>), and so is a word before an enum's variant, which is as visible
+as its enum.</li>
+<li><strong><code>private</code></strong> — the declaring module alone names it; <strong><code>internal</code></strong> — every module of the
+declaring package; <strong><code>pub</code></strong> — every module of every package: it is exported. A declaration
+<strong>without a word is <code>internal</code></strong>. The standard library is a package like any: what it does
+not mark <code>pub</code> is its own.</li>
+<li>Visibility is asked <strong>at every route</strong> a name takes out of its module, by one rule: a
+selective import; a name qualified by a module in an expression (<code>util.helper()</code>,
+<code>util.LIMIT</code>); a type named through a module in a signature, a field, a constraint, a
+conformance list, an <code>extend</code> target or a body; an initializer (<code>util.Point { … }</code>); a pattern;
+an interface-qualified call (<code>util.Walker.walk(x)</code>). A name that may not be named where it
+stands is refused (<code>LYR-RES0009</code>) (S1). Of an overload set, the functions that may not be
+named are not there.</li>
+<li><strong>An import is its module's own</strong>: <code>import std.io { println }</code> in <code>util</code> brings <code>println</code>
+into <code>util</code>, and no other module reaches it as <code>util.println</code> (<code>LYR-RES0009</code>) (I4).</li>
+<li>A <strong>module</strong> itself is visible to every module (B1): what it offers is what its
+declarations' words allow.</li>
+<li>A <strong>member</strong> takes its word as a declaration does (S0): a field, a method, a <code>static</code>
+function or <code>let</code>; without a word it is <code>internal</code>. It is named — read, written, called,
+destructured in a pattern — where its word allows (<code>LYR-RES0009</code>), whatever route reached its
+type. Of a member's overload set, what may not be named is not there.</li>
+<li>A type with a field a module may not name is <strong>built</strong> in no such module: its initializer
+is refused there, and so is a copy with <code>with</code> (<code>LYR-RES0009</code>) — a factory builds it
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/04-abstraktion.md">04 D11</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/02-wertmodell.md">02 W3</a>).</li>
+<li>An enum's <strong>variants</strong> are as visible as the enum. An <strong>interface's members</strong> — what it
+requires and its defaults — are as visible as the interface; a word on one is refused
+(<code>LYR-SEM0118</code>) (S4). The one exception is <strong><code>private fn</code> with a body</strong>, a helper: the
+interface's defaults call it, on any value of the interface, and nothing else does
+(<code>LYR-RES0009</code>) — a child interface's defaults no more than other code; no conformer answers
+it, and a conformer's method of its name is the conformer's own, which the defaults do not
+call. A <code>private</code> member without a body is refused (<code>LYR-SEM0118</code>).</li>
+<li>An <strong><code>extend</code> block's</strong> word is the default of the methods in it: <code>private extend Point { … }</code>
+keeps them to its module; a method's own word wins. A method of a block that a module may not
+name is not there for it (S5).</li>
+<li>A <strong>conformance</strong> — <code>extend Point :: [Shape] { … }</code> — is visible wherever its type is, its
+methods with it, whether or not the module that holds the block is imported: the conformance
+is the program's (<a href="../../spec/05-interfaces/">05 §13</a> rule 4), so a type that comes through a
+re-export, a return value or a field brings every conformance its modules give it, the
+synthesized ones (<a href="../../spec/05-interfaces/">05 §14</a> rule 9) among them, and std.codec's blocks on
+std.time's types reach a program that names neither module (the sweep after M10, W7). A
+word on the block or on one of its methods is refused (<code>LYR-SEM0150</code>) (S5).</li>
+</ol>
+<p>10a. A member that <strong>answers an interface</strong> for its type from outside a conformance block — a
+method, a static function or a constant in the type's body, or in a block of rule 9 — is
+written at least as visible as the conformance, the narrower of its type's word and its
+interface's (<code>LYR-SEM0167</code>; the review's M7-2): in <code>pub struct Sq :: [Shape]</code> with a <code>pub</code>
+interface <code>Shape</code> it is <code>pub fn area()</code>; where the type or the interface is <code>internal</code>, no
+word is enough, and <code>private</code> is not. A conformance cannot be narrowed (rule 10), so a member
+written narrower would be called through the interface by code its own name refuses.
+11. A declaration is <strong>no more visible than the types it names</strong> (S2): a function's parameters,
+result, thrown types and constraints, a field's type, an alias's, a variant's payload, a
+module binding's or a <code>static let</code>'s type — written or inferred —, a type's constraints and an
+interface's parents. A <code>pub fn</code> whose result is an <code>internal</code> type, an <code>internal fn</code> taking a
+<code>private</code> one, is refused (<code>LYR-SEM0151</code>): another module could reach it and not name what
+it hands out. A member counts as its own word narrowed to its type's.
+12. A member whose <strong>written</strong> word is wider than its type's — <code>pub x</code> in an <code>internal struct</code> — is
+allowed and warned (<code>LYR-SEM0152</code>): it is exported only once the type is (S3). A member
+without a word follows its type and is not warned. The same holds in a block of rule 9: for
+a member's own word, and for the block's — said once, at the block, for its members.</p>
+<h2 id="4-imports">4. Imports</h2>
+<p>How a module names what other modules declare (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V3</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/04-modules/</code>; the forms one by one in the toolchain's own
+tests (<code>tests/Lyric5.Tests</code>, <code>ImportTests</code>).</p>
+<ol>
+<li>An import takes one of <strong>three forms</strong> (I1): <strong>selective</strong>, <code>import app.util { answer, Point }</code>,
+binds the names it lists; <strong>qualified</strong>, <code>import app.util;</code>, binds the module under its last
+segment — <code>util.answer()</code>; <strong>aliased</strong>, <code>import app.util as u;</code>, under another name. A
+selective item may be <strong>renamed</strong>: <code>{ answer as reply }</code> binds <code>reply</code>, and <code>answer</code> is not
+bound (I2). There is no import of everything (I3).</li>
+<li><strong><code>pub import</code></strong> passes on what it binds (I4): <code>pub import app.util { answer };</code> in <code>app.facade</code>
+makes <code>answer</code> a <code>pub</code> member of <code>app.facade</code> — imported from there, named as <code>facade.answer</code>,
+under the name it was renamed to; a module imported qualified or aliased is passed on as a
+namespace (<code>facade.util.answer()</code>). It passes on what is <code>pub</code> and nothing narrower
+(<code>LYR-RES0010</code>). No other word stands before <code>import</code> (<code>LYR-PAR0053</code>); without <code>pub</code>, an
+import is its module's own (§3 rule 4). A package's root module (§2 rule 1a) is where a
+library passes on what its modules declare: <code>pub import geo.shapes { rect };</code> in <code>src/lib.lyr</code>
+makes <code>import geo { rect }</code> of it.</li>
+<li>An import a module never uses is <strong>warned</strong>, in every form (<code>LYR-SEM0072</code>) (I5): a qualified
+import is used when its module is named, or one of its extension methods called. A <code>pub import</code> is used by being passed on.</li>
+<li>The <strong>prelude</strong>, the module <code>std.prelude</code>, is named in every module without an import (I8;
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 B2</a>): <code>panic</code>, <code>assert</code>, <code>unreachable</code>, <code>todo</code>, <code>same</code>, <code>sequence</code>; <code>Error</code>, <code>Exception</code>, <code>Result</code>, <code>Box</code>,
+<code>Ordering</code>, <code>Range</code>, <code>RangeInclusive</code>, <code>RangeFrom</code>, <code>RangeTo</code>, <code>RangeFull</code>; <code>Equatable</code>,
+<code>Hashable</code>, <code>Ordered</code>, <code>TotalOrder</code>, <code>Display</code>, <code>Debug</code>, <code>Default</code>, <code>Clone</code>, <code>VariantName</code>, <code>Variants</code>, <code>Closeable</code>,
+<code>Num</code>, <code>Integer</code>, <code>Float</code>, <code>Iterator</code>, <code>Iterable</code>, <code>FromIterator</code>, <code>Into</code>, <code>From</code>, <code>Index</code>, <code>IndexSet</code>; <code>List</code>, <code>Map</code>, <code>Set</code>,
+the collections' vocabulary — what signatures and the language need, not effects: <code>println</code>
+is <code>std.io</code>'s. The rest of the
+standard library is imported, <code>std.core</code>'s operator interfaces (<code>Add</code> …) and <code>Any</code>
+among it. The prelude grows with the library (<a href="../../spec/12-stdlib/">12</a>).</li>
+<li>A name a module declares or imports hides the prelude's of that name in the module, and is
+warned (<code>LYR-SEM0153</code>) (K6). An import of the very symbol the prelude passes on hides nothing.
+A block of a module the prelude takes names from stands in every module, as <code>std.core</code>'s do:
+<code>Map&lt;K, V&gt;.new()</code> is reached wherever <code>Map</code> is — and a module the prelude imports without a
+name, <code>std.iter</code>, whose adapters every iterator has everywhere (<a href="../../spec/12-stdlib/">12</a>).</li>
+<li>A <strong>builtin type's</strong> name — <code>int</code>, <code>string</code>, <code>bool</code> … — is no declaration's (<code>LYR-RES0011</code>)
+(K5).</li>
+<li>A name a module declares or imports is <strong>not also one of its submodules</strong>: <code>app.net</code> declaring
+<code>http</code> beside the module <code>app.net.http</code> is refused (<code>LYR-RES0012</code>) (K1, K3). The question is
+asked of the package's files, not of what a program imports: a submodule nobody imported is
+one all the same. The root module's names stand beside every module of its package —
+<code>geo</code> declaring <code>shapes</code> beside <code>src/shapes.lyr</code> — but not beside its own file: there is no
+module <code>geo.lib</code>. An import that binds a module under its own name — <code>pub import geo.shapes;</code>
+in <code>geo</code> — is that module, and one meaning. <code>std</code> is the
+standard library's name: a single file <code>std.lyr</code> is refused (<code>LYR-RES0013</code>) (D1).</li>
+<li>What a failed lookup could not see is said in a <strong>note</strong> of its error (M7-3, M7-11, K4, K7):
+an import of a module that does not exist (<code>LYR-RES0003</code>) suggests the module path a typo away,
+as a change that needs a reader (<a href="../../spec/16-diagnostics/">16 §6</a>); a member a local does not have
+(<code>LYR-SEM0012</code>), where the local hides a module the file imports whole or a type of the
+prelude that has the member, says that the name is the local here and what it hides — hiding is
+legal and silent until then (rule 5 warns of a declaration or an import, never of a local); a
+method a block adds to the type in a module this one cannot see — not imported, or kept to its
+module — names it, its module and why.</li>
+</ol>
+<h2 id="5-a-types-members-by-their-bare-names">5. A type's members by their bare names</h2>
+<p>What a bare name means between the braces of a type
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V6</a>, the review's M6-30).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/04-modules/</code>.</p>
+<ol>
+<li>The body of a struct, a class, an enum or an interface is a <strong>scope inside its module's</strong>: in
+the bodies of its methods a member's name hides a module's, an import's and the prelude's of
+that name, and a local or a parameter hides the member, whole. An <code>extend</code> block is such a
+scope for the members it declares itself; the members of the type's body are not named bare
+there.</li>
+<li>A <strong>static</strong> member is reached by its bare name there — <code>of(2)</code>, <code>step</code> — as it is through
+the type.</li>
+<li>A member <strong>of an instance</strong> — a field, a method that is not <code>static</code> — is reached through its
+receiver: <code>this.label</code>, <code>this.size()</code>. Its bare name is refused (<code>LYR-SEM0055</code>). So is a
+variant's, in its enum's own methods too: a variant is written <code>.Red</code> or <code>Color.Red</code>, as in a
+pattern (<a href="../../spec/09-patterns/">09</a>).</li>
+<li>In a <strong>call</strong>, <code>label(…)</code>, a field counts only when it can be called — when its type is a
+function type, or an optional one: a field <code>label: string</code> does not hide the function <code>label</code>
+there, and the call means the function. A field that can be called is what the call means
+(rule 3). Where a field that cannot be called is all the name means, the call is refused as
+one of something that is no function (<code>LYR-SEM0013</code>).</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-module-level-bindings">1. Module-level bindings</a></li>
+<li class="level-2"><a href="#2-module-names">2. Module names</a></li>
+<li class="level-2"><a href="#3-visibility">3. Visibility</a></li>
+<li class="level-2"><a href="#4-imports">4. Imports</a></li>
+<li class="level-2"><a href="#5-a-types-members-by-their-bare-names">5. A type's members by their bare names</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

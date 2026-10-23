@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYR-RES0003 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a href="../../spec/">Spec</a><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">RES</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../diagnostics/">All codes</a></li>
+<li><a href="../../diagnostics/LYR-RES0001/">LYR-RES0001</a></li>
+<li><a href="../../diagnostics/LYR-RES0002/">LYR-RES0002</a></li>
+<li><a class="current" href="../../diagnostics/LYR-RES0003/">LYR-RES0003</a></li>
+<li><a href="../../diagnostics/LYR-RES0004/">LYR-RES0004</a></li>
+<li><a href="../../diagnostics/LYR-RES0005/">LYR-RES0005</a></li>
+<li><a href="../../diagnostics/LYR-RES0006/">LYR-RES0006</a></li>
+<li><a href="../../diagnostics/LYR-RES0007/">LYR-RES0007</a></li>
+<li><a href="../../diagnostics/LYR-RES0008/">LYR-RES0008</a></li>
+<li><a href="../../diagnostics/LYR-RES0009/">LYR-RES0009</a></li>
+<li><a href="../../diagnostics/LYR-RES0010/">LYR-RES0010</a></li>
+<li><a href="../../diagnostics/LYR-RES0011/">LYR-RES0011</a></li>
+<li><a href="../../diagnostics/LYR-RES0012/">LYR-RES0012</a></li>
+<li><a href="../../diagnostics/LYR-RES0013/">LYR-RES0013</a></li>
+<li><a href="../../diagnostics/LYR-RES0014/">LYR-RES0014</a></li>
+<li><a href="../../diagnostics/LYR-RES0015/">LYR-RES0015</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
+<h1>LYR-RES0003</h1>
+<p class="code-title">an import of a module that does not exist</p>
+<p class="meta">error · <a href="../../spec/04-modules/">spec 04-modules</a></p>
+<p>An <code>import</code> names a module that no file provides: no <code>src/&lt;path&gt;.lyr</code> in the package, no module of a dependency or of <code>std</code> by that path.</p>
+<h2 id="explanation">Explanation</h2>
+<p>A module is a file, and its name is its path: <code>app.geometry</code> is <code>src/geometry.lyr</code> of the package <code>app</code>, <code>geo.shapes</code> is <code>src/shapes.lyr</code> of the dependency <code>geo</code>. A package's root module <code>src/lib.lyr</code> is imported by the package's name alone, never as <code>&lt;package&gt;.lib</code>.</p>
+<p>Create the file, correct the path, or declare the package that holds it under <code>[dependencies]</code> in <code>lyric.toml</code>.</p>
+<h2 id="wrong">Wrong</h2>
+<pre><code class="language-lyric"><span class="kw">import</span> app.geometry { area };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    assert(area(<span class="num">2</span>) == <span class="num">4</span>);
+}</code></pre>
+<h2 id="right">Right</h2>
+<pre><code class="language-lyric"><span class="com">//- src/main.lyr</span>
+<span class="kw">import</span> app.geometry { area };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    assert(area(<span class="num">2</span>) == <span class="num">4</span>);
+}
+<span class="com">//- src/geometry.lyr</span>
+<span class="kw">pub</span> <span class="kw">fn</span> area(side: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> side * side;
+}</code></pre>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#explanation">Explanation</a></li>
+<li class="level-2"><a href="#wrong">Wrong</a></li>
+<li class="level-2"><a href="#right">Right</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

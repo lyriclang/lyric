@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>What the compiler tells you — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><span class="pending">std</span><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">What the compiler tells you</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a class="current" href="../../book/diagnostics/">What the compiler tells you</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>What the compiler tells you</h1>
+<p>A compiler that refuses a program owes its writer more than &quot;no&quot;. This chapter is about what Lyric
+says when something is wrong, how to read it, which of it you decide, and the verbs of the <code>lyric</code>
+command that work with it.</p>
+<h2 id="reading-a-diagnostic">Reading a diagnostic</h2>
+<p>Here is a program with a mistake in it:</p>
+<p class="snippet-note fails">Does not compile — the compiler reports <code>LYR-SEM0001</code></p>
+<pre class="fails"><code class="language-lyric"><span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> count: <span class="ty">int</span> = <span class="str">"three"</span>;
+    <span class="kw">let</span> _ = count;
+}</code></pre>
+<p><code>lyric build</code> answers:</p>
+<pre><code class="language-text">error[LYR-SEM0001]: cannot assign 'string' to 'int'
+ --&gt; src/main.lyr:2:5
+  |
+2 |     let count: int = "three";
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^</code></pre>
+<p>Every finding has the same parts. Its <strong>severity</strong> — <code>error</code>, which stops the build, or <code>warning</code>,
+which does not. Its <strong>code</strong>, <code>LYR-SEM0001</code>: the prefix says which part of the toolchain found it
+(<code>LEX</code> the lexer, <code>PAR</code> the parser, <code>RES</code> names and modules, <code>SEM</code> the checker, <code>PKG</code> the manifest,
+<code>CLI</code> the command line, <code>RT</code> a panic at run time). The <strong>message</strong> says what is wrong in one
+sentence. The <strong>place</strong>, a file, a line and a column, and under it the line itself with the part that
+is wrong marked.</p>
+<p>Below the source, a finding may carry <strong>notes</strong>: <code>note:</code> another place that belongs to the finding,
+<code>help:</code> what to do about it. A <code>help:</code> that shows the line as it would read is a <strong>suggestion</strong> — a
+change the compiler can make for you (see <code>lyric fix</code> below).</p>
+<p>A mistake is said once. What follows from it — the next statement that uses the broken value, the
+parser's way back into the file — is not reported again: when a build says three errors, there are
+three things to fix.</p>
+<h2 id="every-code-is-explained">Every code is explained</h2>
+<p><code>lyric explain</code> prints what a code means, why it is a rule, and a wrong and a right program:</p>
+<pre><code class="language-text">$ lyric explain LYR-SEM0001</code></pre>
+<p>The same text is in the reference of diagnostics on the website, one page a code. A code is
+written as you like — <code>sem0001</code>, <code>LYR-SEM0001</code> — and a lint (below) by its name.</p>
+<h2 id="warnings-are-lints">Warnings are lints</h2>
+<p>A warning does not stop the build, and every warning is a <strong>lint</strong>: it has a name, a group, and a
+level of its own. This program builds, and says so:</p>
+<pre><code class="language-lyric"><span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> unused = <span class="num">1</span>;
+}</code></pre>
+<pre><code class="language-text">warning[LYR-SEM0071]: 'unused' is never used
+ --&gt; src/main.lyr:2:9
+  |
+2 |     let unused = 1;
+  |         ^^^^^^
+  |
+  = note: name it '_' when the value is deliberately unused</code></pre>
+<p>The lint is <code>unused-variable</code>, in the group <code>unused</code>. The groups are <code>unused</code>, <code>correctness</code>,
+<code>resources</code>, <code>concurrency</code>, <code>deprecation</code>, <code>style</code>, <code>perf</code> and <code>docs</code>; <code>warnings</code> names them all.</p>
+<p>A lint's <strong>level</strong> is <code>allow</code> (not said), <code>warn</code> (said as a warning) or <code>deny</code> (said as an error: the
+build fails). Most lints warn; a few are allowed until you ask for them — <code>float-equality</code>,
+<code>shadowed-local</code>, <code>needless-return</code>, the documentation lints — and one, <code>reserved-device-name</code>,
+denies.</p>
+<h2 id="setting-a-lints-level">Setting a lint's level</h2>
+<p>There are three places to set a level, and they work the same way.</p>
+<p><strong>On a declaration</strong>, with an attribute. It holds for what the declaration contains:</p>
+<pre><code class="language-lyric">@Allow(<span class="str">"unused-variable"</span>)
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> unused = <span class="num">1</span>;
+}</code></pre>
+<p><code>@Warn</code> and <code>@Deny</code> take a lint, a group or a code the same way. An <code>@Allow</code> that decides nothing
+— no such warning inside — is itself warned of (<code>useless-allow</code>), so that stale ones do not pile up.</p>
+<p><strong>For the package</strong>, in <code>lyric.toml</code>:</p>
+<pre><code class="language-toml">[lints]
+deny = ["unused"]
+allow = ["shadowed-local"]</code></pre>
+<p><strong>For one command</strong>, on the command line: <code>-A</code>, <code>-W</code> and <code>-D</code> with a lint, a group, a code or
+<code>warnings</code>:</p>
+<pre><code class="language-text">$ lyric build -D warnings</code></pre>
+<p>The narrowest attribute around a finding decides. Without one, the command line decides over the
+manifest, and the manifest over the lint's own level; within one place a lint decides over its group,
+and its group over <code>warnings</code>.</p>
+<p><code>--deny-warnings</code>, and a profile's <code>denyWarnings = true</code>, turn every warning into an error — the
+setting for a continuous build that must stay clean. A denied finding says who denied it.</p>
+<p>The warnings of your dependencies, and of the standard library, are not said: they are theirs to
+fix. <code>--warn-deps</code> says them, at their own levels, and never as errors.</p>
+<h2 id="letting-the-compiler-fix-it">Letting the compiler fix it</h2>
+<p>Many findings know their remedy. <code>lyric fix</code> makes the safe ones in your package's files — an
+import taken out, <code>var</code> written as <code>let</code>, a <code>try</code> nothing under it throws, a deprecated name replaced
+by its successor — and then says what is left:</p>
+<pre><code class="language-text">$ lyric fix
+       Fixed src/main.lyr (3 changes)
+warning[LYR-SEM0215]: 'my_val' is a local, and locals are named in camelCase
+...
+help: 'myVal'</code></pre>
+<p>A suggestion that needs a reader — a new name, a guess at what was meant — is shown and not made.
+<code>lyric fix --dry-run</code> prints the changes as a diff and writes nothing. A second <code>lyric fix</code> changes
+nothing.</p>
+<h2 id="checking-without-building">Checking without building</h2>
+<p><code>lyric check</code> takes the program through everything a build does before the machine code — the
+build scripts, the checker and its lints, what runs at compile time — and stops there. It says what
+<code>build</code> would say, faster, and writes no binary: the verb for an editor's save or a pre-commit hook.</p>
+<h2 id="the-findings-as-data">The findings as data</h2>
+<p><code>--json</code> on <code>build</code>, <code>run</code>, <code>test</code>, <code>check</code> and <code>fix</code> writes one JSON object a line instead of the
+text: every finding with its code, places, notes and suggested changes, what the build wrote, and a
+closing count. A tool reads a line at a time while the command runs.</p>
+<h2 id="a-packages-first-files-and-the-settings">A package's first files, and the settings</h2>
+<p><code>lyric new &lt;name&gt;</code> makes a directory with a package in it — <code>lyric.toml</code>, <code>src/main.lyr</code> printing
+<code>Hello, world!</code>, a <code>.gitignore</code> — and <code>lyric init</code> makes the package in the directory you are in.
+<code>--lib</code> makes a library instead, <code>--git</code> a git repository with it (or set <code>LYRIC_GIT_ON_NEW=1</code> once
+for every new package).</p>
+<p><code>lyric env</code> lists every setting a build reads — the toolchain, the C compiler, the profile and each
+of its fields, the target — and where each value comes from: the command line, an environment
+variable, <code>lyric.toml</code>, or the default.</p>
+<p><code>lyric help</code> lists the verbs, <code>lyric help &lt;verb&gt;</code> a verb's options, and
+<code>lyric completions bash|zsh|fish|pwsh</code> prints a script that teaches your shell all of them.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/first-program/">← A first program</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

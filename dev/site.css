@@ -1,0 +1,312 @@
+/* The site's one stylesheet: palette, type, layout, code. Light by default, dark where the system
+   asks for it or the switch chose it. */
+
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/InterVariable.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: italic; font-weight: 100 900; font-display: swap; src: url("fonts/InterVariable-Italic.woff2") format("woff2"); }
+/* Code needs three faces of the mono: regular, bold for types, italic for comments. */
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/JetBrainsMono-Regular.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/JetBrainsMono-Bold.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: italic; font-weight: 400; font-display: swap; src: url("fonts/JetBrainsMono-Italic.woff2") format("woff2"); }
+
+:root {
+  --bg: #ffffff;
+  --text: #16181d;
+  --muted: #535a69;
+  --line: #e1e4e9;
+  --surface: #f4f5f7;
+  --accent: #6440c4;
+  --literal: #8a5a00;
+
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --space: 12px;
+  --bar: 48px;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #111317;
+  --text: #e7e9ee;
+  --muted: #a3aab6;
+  --line: #2b2f37;
+  --surface: #181b21;
+  --accent: #b29aff;
+  --literal: #d9a54a;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111317;
+    --text: #e7e9ee;
+    --muted: #a3aab6;
+    --line: #2b2f37;
+    --surface: #181b21;
+    --accent: #b29aff;
+    --literal: #d9a54a;
+    color-scheme: dark;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; border-radius: 0; }
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.55 var(--sans);
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.pending { color: var(--muted); }
+
+h1, h2, h3, h4 { line-height: 1.25; margin: calc(var(--space) * 2) 0 var(--space); }
+h1 { font-size: 28px; letter-spacing: -0.02em; }
+h2 { font-size: 21px; letter-spacing: -0.01em; }
+h3 { font-size: 17px; }
+p, ul, ol { margin: 0 0 var(--space); }
+
+code, pre { font-family: var(--mono); font-size: 13.5px; }
+:not(pre) > code { background: var(--surface); padding: 0 4px; overflow-wrap: anywhere; }
+pre {
+  background: var(--surface);
+  margin: 0 0 var(--space);
+  padding: var(--space);
+  overflow-x: auto;
+  line-height: 1.5;
+}
+pre code { background: none; padding: 0; }
+
+/* Code: keywords in the accent, types bold, literals ochre, comments muted and italic. */
+.kw { color: var(--accent); }
+.ty { font-weight: 700; }
+.str, .num { color: var(--literal); }
+.com { color: var(--muted); font-style: italic; }
+
+table { border-collapse: collapse; margin: 0 0 var(--space); display: block; max-width: 100%; overflow-x: auto; }
+th, td { border-bottom: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; }
+
+/* The header: a toolbar. */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space) * 1.5);
+  min-height: var(--bar);
+  padding: 0 calc(var(--space) * 1.5);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: baseline; gap: 8px; }
+.wordmark { color: var(--text); font-weight: 700; font-size: 19px; letter-spacing: -0.03em; }
+.wordmark:hover { text-decoration: none; }
+.version, select.version {
+  color: var(--muted);
+  font: 12px var(--sans);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  padding: 1px 6px;
+}
+.areas { display: flex; gap: var(--space); flex: 1; overflow-x: auto; white-space: nowrap; }
+.areas a, .areas .pending { color: var(--text); }
+.areas .pending { color: var(--muted); }
+.areas a.current { color: var(--accent); }
+.search input {
+  width: 180px;
+  font: 14px var(--sans);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+}
+.search input:disabled { opacity: 0.6; }
+.search { position: relative; }
+.search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: min(480px, calc(100vw - 2 * var(--space)));
+  max-height: 60vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+.search-results li { border-bottom: 1px solid var(--line); }
+.search-results li:last-child { border-bottom: none; }
+.search-results a { display: block; padding: 8px var(--space); color: var(--text); }
+.search-results a:hover, .search-results li[aria-selected="true"] a { background: var(--surface); text-decoration: none; }
+.search-results .title { font-weight: 600; }
+.search-results .area { margin-left: 8px; color: var(--muted); font-size: 12px; }
+.search-results .excerpt { display: block; color: var(--muted); font-size: 13px; }
+.search-results mark { background: none; color: var(--accent); font-weight: 600; }
+.search-results .none { padding: 8px var(--space); color: var(--muted); }
+.theme-toggle {
+  font: 16px var(--sans);
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--line);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.github { color: var(--text); }
+
+/* The footer. */
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 1.5);
+  padding: calc(var(--space) * 2) calc(var(--space) * 1.5);
+  margin-top: calc(var(--space) * 3);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+.footer a, .footer .pending { color: var(--muted); }
+
+/* Two columns for text, three for reference. */
+.columns {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: calc(var(--space) * 2);
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 calc(var(--space) * 1.5);
+}
+body.reference .columns { grid-template-columns: 240px minmax(0, 1fr) 200px; }
+
+.sidebar, .on-this-page {
+  position: sticky;
+  top: var(--bar);
+  align-self: start;
+  max-height: calc(100vh - var(--bar));
+  overflow-y: auto;
+  padding: calc(var(--space) * 1.5) 0;
+  font-size: 14px;
+}
+.sidebar-bar { display: none; }
+.sidebar-box, .on-this-page ul { list-style: none; margin: 0; padding: 0; }
+.sidebar-box li, .on-this-page li { margin: 0 0 6px; }
+.sidebar-box a, .sidebar-box .pending { color: var(--text); }
+.sidebar-box a.current { color: var(--accent); font-weight: 600; }
+.on-this-page a { color: var(--muted); }
+.on-this-page .level-3 { padding-left: var(--space); }
+.aside-title { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+.text { min-width: 0; overflow-wrap: break-word; padding: calc(var(--space) * 0.5) 0 0; }
+.text p, .text ul, .text ol, .text blockquote { max-width: 68ch; }
+
+/* Notes in a text: a block quote. */
+.text blockquote {
+  margin: 0 0 var(--space);
+  padding: var(--space);
+  background: var(--surface);
+  border-left: 3px solid var(--accent);
+}
+.text blockquote p:last-child { margin-bottom: 0; }
+
+/* What a program printed: right under its code, set apart by a rule instead of a surface. */
+pre.output { background: none; border-left: 2px solid var(--line); margin-top: calc(var(--space) * -0.5); }
+
+/* A snippet that is not a working program says so above it; one that must fail is marked at its edge. */
+.snippet-note { margin: 0; padding: 2px var(--space); font-size: 13px; color: var(--muted); background: var(--surface); border-bottom: 1px solid var(--line); }
+.snippet-note.fails { color: var(--text); border-left: 3px solid var(--muted); }
+.snippet-note.fails::before { content: "✗ "; }
+pre.fails { border-left: 3px solid var(--muted); }
+/* What the compiler says about it, right under the snippet, like a program's output. */
+pre.diagnostic { background: none; border-left: 3px solid var(--muted); margin-top: calc(var(--space) * -0.5); }
+
+/* The way on through the Book: the chapter before and the one after. */
+.pager {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space);
+  margin: calc(var(--space) * 2) 0;
+  padding-top: var(--space);
+  border-top: 1px solid var(--line);
+}
+.pager .next { margin-left: auto; }
+
+/* The start page. */
+.home-main { max-width: 1200px; margin: 0 auto; padding: calc(var(--space) * 3) calc(var(--space) * 1.5) 0; }
+.hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: calc(var(--space) * 3); align-items: start; }
+.hero h1 { font-size: 36px; letter-spacing: -0.03em; margin-top: 0; }
+.lead { font-size: 17px; color: var(--muted); max-width: 52ch; }
+.actions { display: flex; gap: var(--space); margin-top: calc(var(--space) * 2); }
+.button {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.button.primary { background: var(--accent); color: var(--bg); }
+.button:hover { text-decoration: none; }
+span.button { border-color: var(--line); color: var(--muted); }
+span.button.primary { background: var(--surface); color: var(--muted); }
+.program { margin: 0; }
+.claims, .entries {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(var(--space) * 2);
+  margin-top: calc(var(--space) * 3);
+}
+.claims { border-top: 1px solid var(--line); padding-top: calc(var(--space) * 2); }
+.claim h2, .entry h2 { font-size: 17px; margin-top: 0; }
+.claim p, .entry p { color: var(--muted); }
+
+/* "On this page" goes first. */
+@media (max-width: 1149px) {
+  body.reference .columns { grid-template-columns: 240px minmax(0, 1fr); }
+  .on-this-page { display: none; }
+}
+
+/* Narrow: the navigation becomes a bar above the text, opened into a box of its own. */
+@media (max-width: 899px) {
+  .topbar { flex-wrap: wrap; padding: 6px var(--space); gap: var(--space); }
+  .areas { order: 3; flex-basis: 100%; }
+  .search input { width: 120px; }
+  .search { position: static; }
+  .search-results { top: 100%; left: var(--space); right: var(--space); width: auto; }
+
+  .columns, body.reference .columns { display: block; padding: 0 var(--space); }
+  .sidebar {
+    position: sticky;
+    top: var(--bar);
+    z-index: 5;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .sidebar-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space);
+    padding: 8px 0;
+  }
+  .where { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .contents-toggle {
+    font: 600 14px var(--sans);
+    color: var(--accent);
+    background: none;
+    border: 1px solid var(--line);
+    padding: 2px 10px;
+    cursor: pointer;
+  }
+  .sidebar-box { max-height: 50vh; overflow-y: auto; padding-bottom: var(--space); }
+  html.js .sidebar:not(.open) .sidebar-box { display: none; }
+
+  .hero, .claims, .entries { grid-template-columns: minmax(0, 1fr); }
+  .hero h1 { font-size: 28px; }
+}

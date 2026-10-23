@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYR-PKG0012 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a href="../../spec/">Spec</a><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">PKG</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../diagnostics/">All codes</a></li>
+<li><a href="../../diagnostics/LYR-PKG0001/">LYR-PKG0001</a></li>
+<li><a href="../../diagnostics/LYR-PKG0002/">LYR-PKG0002</a></li>
+<li><a href="../../diagnostics/LYR-PKG0003/">LYR-PKG0003</a></li>
+<li><a href="../../diagnostics/LYR-PKG0004/">LYR-PKG0004</a></li>
+<li><a href="../../diagnostics/LYR-PKG0005/">LYR-PKG0005</a></li>
+<li><a href="../../diagnostics/LYR-PKG0006/">LYR-PKG0006</a></li>
+<li><a href="../../diagnostics/LYR-PKG0007/">LYR-PKG0007</a></li>
+<li><a href="../../diagnostics/LYR-PKG0008/">LYR-PKG0008</a></li>
+<li><a href="../../diagnostics/LYR-PKG0009/">LYR-PKG0009</a></li>
+<li><a href="../../diagnostics/LYR-PKG0010/">LYR-PKG0010</a></li>
+<li><a href="../../diagnostics/LYR-PKG0011/">LYR-PKG0011</a></li>
+<li><a class="current" href="../../diagnostics/LYR-PKG0012/">LYR-PKG0012</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
+<h1>LYR-PKG0012</h1>
+<p class="code-title">a dependency's build script the root does not trust</p>
+<p class="meta">error · <a href="../../spec/15-project/">spec 15-project</a></p>
+<p>Reported when a dependency has a <code>build.lyr</code> and the root manifest's <code>[trust] build-scripts</code> does not name it. The build stops before any script runs, at the line that declares the dependency.</p>
+<h2 id="explanation">Explanation</h2>
+<p>A build script is a program that runs on the machine that builds. The root package's own script always runs; a dependency's runs only where the root says so, so adding a dependency never runs someone else's code unasked.</p>
+<p>Read the dependency's script, and if it is acceptable, name the package in the root manifest: <code>[trust] build-scripts = [&quot;geo&quot;]</code>.</p>
+<h2 id="wrong">Wrong</h2>
+<pre><code class="language-lyric"><span class="com">//- lyric.toml</span>
+[package]
+name = <span class="str">"app"</span>
+version = <span class="str">"0.1.0"</span>
+
+[dependencies]
+geo = { path = <span class="str">"libs/geo"</span> }
+<span class="com">//- libs/geo/lyric.toml</span>
+[package]
+name = <span class="str">"geo"</span>
+version = <span class="str">"1.0.0"</span>
+<span class="com">//- libs/geo/build.lyr</span>
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+}
+<span class="com">//- libs/geo/src/lib.lyr</span>
+<span class="kw">pub</span> <span class="kw">fn</span> area(r: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> <span class="num">3</span> * r * r;
+}
+<span class="com">//- src/main.lyr</span>
+<span class="kw">import</span> geo { area };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> _ = area(<span class="num">2</span>);
+}</code></pre>
+<h2 id="right">Right</h2>
+<pre><code class="language-lyric"><span class="com">//- lyric.toml</span>
+[package]
+name = <span class="str">"app"</span>
+version = <span class="str">"0.1.0"</span>
+
+[dependencies]
+geo = { path = <span class="str">"libs/geo"</span> }
+
+[trust]
+build-scripts = [<span class="str">"geo"</span>]
+<span class="com">//- libs/geo/lyric.toml</span>
+[package]
+name = <span class="str">"geo"</span>
+version = <span class="str">"1.0.0"</span>
+<span class="com">//- libs/geo/build.lyr</span>
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+}
+<span class="com">//- libs/geo/src/lib.lyr</span>
+<span class="kw">pub</span> <span class="kw">fn</span> area(r: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> <span class="num">3</span> * r * r;
+}
+<span class="com">//- src/main.lyr</span>
+<span class="kw">import</span> geo { area };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> _ = area(<span class="num">2</span>);
+}</code></pre>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#explanation">Explanation</a></li>
+<li class="level-2"><a href="#wrong">Wrong</a></li>
+<li class="level-2"><a href="#right">Right</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

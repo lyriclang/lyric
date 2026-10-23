@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Concurrency — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a class="current" href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>Concurrency</h1>
+<blockquote>
+<p><strong>Skeleton.</strong> Written with milestone <strong>M6</strong> of the Lyric 5 plan, spec-first: each rule lands
+here with its conformance case before or with its implementation. Source of the decisions:
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 Concurrency</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 Runtime L4/L6</a>.</p>
+</blockquote>
+<h2 id="scope">Scope</h2>
+<p>Coroutines and generators, tasks and <code>TaskScope</code>, parking, threads with one scheduler each, channels, select and timers, atomics and synchronization, the memory model.</p>
+<h2 id="1-coroutines-and-generators">1. Coroutines and generators</h2>
+<ol>
+<li>A function whose declared result is <strong><code>Coroutine&lt;Y, R&gt;</code></strong> and whose body has a <code>yield</code> of its
+own — one outside every lambda in it — <strong>or returns no value</strong> is a <strong>coroutine function</strong>
+(08 D11; the review's M6-3): a body that yields through helpers only is one, and an empty
+body is the empty one. &quot;Returns no value&quot; is said of the body as it is written — no
+<code>return v;</code> and no value at its end —, not of where it can arrive: a body that only throws
+is one too, and its error arrives at the first pull, as every error of a coroutine function's
+body does. <code>Coroutine&lt;Y&gt;</code> is <code>Coroutine&lt;Y, void&gt;</code> (06 A1). A call of it runs
+nothing of its body: it returns a <strong>coroutine</strong>, suspended before the body's first statement
+and holding the call's arguments — a method's receiver among them, <strong>as an argument is
+held</strong>: a struct or an enum is a copy, and what a <code>mut fn</code> coroutine function writes to
+<code>this</code> stays in it (allowed, and warned about where it is declared, <code>LYR-SEM0172</code>; M6-1). A
+coroutine runs only when it is pulled. A coroutine function may be a method and may be
+generic; an instance is instantiated as any generic function is. A function that <strong>returns a
+value</strong> — <code>return make();</code> — is an ordinary function, a factory: it returns a coroutine
+value as it returns any value.</li>
+<li><strong><code>yield v;</code></strong> hands <code>v</code> to the puller and suspends the body until the next pull; <code>v</code> is
+checked against <code>Y</code> (<code>LYR-SEM0001</code>). <code>yield;</code> without a value belongs to a <code>Coroutine&lt;void&gt;</code>
+and is refused in any other coroutine (<code>LYR-SEM0038</code>). The body's locals live across its
+yields.</li>
+<li>The body's <strong><code>return</code></strong> gives the coroutine's <strong>result</strong>: <code>return v;</code> checks <code>v</code> against <code>R</code>
+and is refused where <code>R</code> is <code>void</code> (<code>LYR-SEM0039</code>); a bare <code>return;</code> is refused where <code>R</code> is
+not <code>void</code> (<code>LYR-SEM0001</code>). Where <code>R</code> is not <code>void</code>, every way out of the body returns a
+value (<code>LYR-SEM0017</code>) — a body that never ends needs none.</li>
+<li><strong><code>next()</code></strong> runs the coroutine to its next <code>yield</code> or to the end of its body and answers
+<strong><code>?Y</code></strong>: the value the yield handed over, or <code>null</code> once the body has ended — on that pull and
+on every pull after it. A <code>Coroutine&lt;?T&gt;</code>'s <code>next()</code> answers <code>??T</code>, so a yielded <code>null</code> is told
+apart from the end (<a href="../../spec/03-types/#31-the-type">03 §3.1</a>). A <code>Coroutine&lt;void&gt;</code>'s <code>next()</code>
+answers <strong><code>bool</code></strong>: whether the body stopped at a <code>yield</code>.</li>
+<li><strong><code>result()</code></strong> answers <strong><code>?R</code></strong>: what the body returned, <code>null</code> until it has returned; a
+coroutine whose <code>R</code> is <code>void</code> has no <code>result()</code> (<code>LYR-SEM0012</code>). <strong><code>isDone()</code></strong> answers whether
+the body has ended, without pulling. Whether a value follows only the body knows, by running:
+there is no <code>hasNext</code>.</li>
+<li>A coroutine function's <strong><code>throws</code></strong> clause belongs to the coroutine's type —
+<code>Coroutine&lt;Y, R&gt; throws E</code> — and so to its pulls, not to the call that makes the coroutine,
+which throws nothing: a <code>next()</code> of a throwing coroutine is marked like a call of a throwing
+function (<a href="../../spec/06-errors/#3-the-try-mark-and-coverage">06 §3</a>, <code>LYR-SEM0138</code>). An error the body
+does not catch ends the body and comes out of the <code>next()</code> that ran into it. The coroutine is
+done then: its <code>result()</code> stays <code>null</code>, and every later <code>next()</code> answers <code>null</code> and throws
+nothing.</li>
+<li>A coroutine runs on a stack of its own, on the thread that first pulled it
+(<a href="../../spec/13-abi/#16-coroutines">13 §1.6</a>). Pulling a coroutine that runs — from its own body, or
+from a coroutine it pulled — or one that runs on another thread panics with <code>LYR-RT0014</code>. A
+suspended coroutine that nothing references any more is collected with its stack, and nothing
+of its body runs again.</li>
+<li><code>resume</code> is no word of the language: Lyric 4's <code>resume co</code> is <code>co.next()!</code>, and <code>resume</code> is a
+name like any other.</li>
+<li><strong><code>close()</code></strong> ends a coroutine (06 A5). One that is done, or was never pulled, ends without
+running anything. One suspended at a <code>yield</code> of its body is continued to be unwound: that
+<code>yield</code> throws <strong><code>Cancelled</code></strong> — <code>std.task</code>'s, an <code>Error</code> — so the body's <code>defer</code>s and <code>using</code>s
+run on the way out (<a href="../../spec/06-errors/#5-the-error-path">06 §5</a>). The <code>Cancelled</code> ends at the
+close: <code>close()</code> does not throw it on. What a <code>defer</code> threw on the way out was suppressed into
+it (<a href="../../spec/06-errors/">06 §7</a>); <code>close()</code> throws the <strong>first</strong> of those, the rest suppressed into
+it (the review's M6-10) — dropped with the <code>Cancelled</code>, they were lost in silence. A body
+that catches it may still end with a result, but
+a <code>yield</code> after it panics with <code>LYR-RT0014</code>. What else escapes the body comes out of <code>close()</code>,
+which belongs to the coroutine's <code>throws</code> clause like its pulls: the <code>close()</code> of a throwing
+coroutine is marked (<code>LYR-SEM0138</code>). The coroutine is done afterwards; closing a coroutine that
+runs — itself, or one waiting on a coroutine it pulled — panics with <code>LYR-RT0014</code>.</li>
+<li>A coroutine is <strong><code>Closeable</code></strong>: <code>using let c = gen();</code> closes it when the scope is left
+(<a href="../../spec/06-errors/#7-closing-using">06 §7</a>). Unlike another <code>Closeable</code> it may also be dropped
+unclosed, without a warning: a suspended coroutine that nothing references any more runs
+nothing more — not its <code>defer</code>s either (rule 7) — and the debug profile reports one whose
+body has a <code>defer</code> or a <code>using</code> when the collector takes it.</li>
+<li>A lambda whose body has a <code>yield</code> of its own is a <strong>generator lambda</strong> (08 F5): its type is
+<code>fn(…) -&gt; Coroutine&lt;Y, R&gt;</code>, and calling it makes a coroutine over its arguments and its
+captures that runs nothing until it is pulled (rule 1). A context that expects a coroutine —
+the lambda's written result type, or the type of the place it is passed to — gives <code>Y</code> and <code>R</code>
+and checks the yields and the returns against them (<code>LYR-SEM0001</code>); without one, the types of
+the yields unify into <code>Y</code> (<code>LYR-SEM0016</code>), and those of the returns into <code>R</code>, or <code>void</code> where it
+returns none. A generator lambda whose <code>R</code> is not <code>void</code> returns on every path that ends its
+body (<code>LYR-SEM0046</code>). What its body throws belongs to its coroutine's pulls, as a coroutine
+function's clause does (rule 6): the set it writes, the one its context expects, or what
+escapes its body. A yield in a lambda nested in it belongs to that lambda.</li>
+<li><strong><code>sequence { … }</code></strong> (08 Y11) is <code>std.core</code>'s <code>fn sequence&lt;T&gt;(body: fn() -&gt; Coroutine&lt;T&gt;): Coroutine&lt;T&gt;</code>, called with a trailing generator lambda — no syntax of its own.</li>
+<li>A <code>yield</code> outside a coroutine's own body — in a function a coroutine calls (06 §10a) —
+suspends the coroutine that runs, whoever called the function. Its value is typed as what it is
+and meets that coroutine's <code>Y</code> at run time: a value of another type — and two modules' types
+of one name are two types (04 §2 rule 9) — panics with <code>LYR-RT0014</code>,
+as does such a yield where no generator runs — on a thread's own stack, or in a task (§2). It
+throws <code>Cancelled</code> at <code>close()</code> as a body's
+yield does (rule 9), so its function covers it — <code>throws Cancelled</code>, or a clause
+(<code>LYR-SEM0034</code>) — and a coroutine's body covers it for the functions it calls, as it does for
+its own yields. A yield in a lambda is not of this kind: it makes the lambda a generator
+(rule 11).</li>
+<li>A coroutine is <strong><code>Identity</code></strong> (06 A7; N2d): <code>==</code> is <code>same</code>, and its hash is its address
+(<a href="../../spec/05-interfaces/#14-conformance-synthesis">05 §14</a> rule 8) — a <code>Set</code> or a <code>Map</code> of
+coroutines finds the same one twice, whatever its pulls throw. <code>std.core</code> gives it through
+one block on <code>Coroutine&lt;Y, R&gt;</code> (<a href="../../spec/05-interfaces/#13-generic-extends">05 §13</a> rule 6).</li>
+</ol>
+<h2 id="2-tasks">2. Tasks</h2>
+<p>A <strong>task</strong> is a body that the scheduler of its thread runs on a stack of its own
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 N3–N6</a>). Unlike a generator it yields nothing: it <strong>waits</strong>. A wait parks
+the task at its thread's scheduler wherever it stands (<a href="../../spec/13-abi/">13 §1.6</a> rule 7), and the
+scheduler runs another task meanwhile. The functions this section names are <code>std.task</code>'s.</p>
+<ol>
+<li><strong><code>main</code> is a task</strong>, on the main thread's scheduler (06 T6). The program ends when <code>main</code>'s
+body returns: the tasks still ready or asleep then never run again, and none of their
+<code>defer</code>s runs. <em>(Informative: a program that never waits runs <code>main</code> on the thread's own
+stack; it cannot tell the difference.)</em></li>
+<li>A thread runs one of its tasks at a time, each until it waits (06 N8): the code between two
+waits runs with no other task of its thread in between. The tasks that are ready run in the
+order they became ready.</li>
+<li><strong><code>spawnDetached(body)</code></strong> makes <code>body</code> a task of the running thread, ready behind the tasks
+ready before it (06 T5). Nobody waits for it, and nothing it throws reaches anyone: its type,
+<code>fn() -&gt; void throws Cancelled</code>, lets only a cancellation end it early, so it handles every
+other error itself (<code>LYR-SEM0034</code>).</li>
+<li><strong><code>yieldNow()</code></strong> puts the running task behind the tasks that are ready: they run before it
+goes on (06 N8).</li>
+<li><strong><code>sleep(d)</code></strong> parks the running task until at least <code>d</code> has passed on the monotonic clock
+(06 K3; <a href="../../spec/13-abi/">13 §1.6</a> rule 8). <code>d</code> is a <code>std.time.Duration</code>, a span of whole
+nanoseconds (10 Q1). The sleepers whose time came wake in the order of their deadlines — of
+one deadline, in the order they fell asleep — behind the tasks already ready. A sleep of
+zero or less lets the ready tasks run first.</li>
+<li>A wait parks the whole task, also from within a generator the task pulls: once the task runs
+again, the generator goes on where it waited and yields to its puller as before.</li>
+<li>The waits — <code>sleep</code>, <code>yieldNow</code>, <code>await</code> — <strong>throw <code>Cancelled</code></strong> where their task is
+cancelled (06 N9 X1): a function that waits covers it, with <code>throws Cancelled</code> or a clause
+(<code>LYR-SEM0034</code>). <strong><code>main</code> covers it itself</strong>, as a coroutine function's body does (the
+review's M6-4): nobody above <code>main</code> answers a cancellation, so it says no <code>throws Cancelled</code>
+— the call that waits keeps its <code>try</code>, and a <code>Cancelled</code> that leaves <code>main</code> is reported as
+any error that leaves it is (<a href="../../spec/06-errors/#5-the-error-path">06 §5</a>).</li>
+<li><strong><code>spawn(body)</code></strong> makes <code>body</code> a task of the running thread, ready behind the tasks ready
+before it, and gives its <strong>handle</strong>, a <code>Task&lt;T&gt; throws E</code> (06 T1): <code>T</code> is what the body
+returns — <code>void</code> too (<a href="../../spec/03-types/">03 §9.1</a> rule 7) — and <code>E</code> what it throws. The handle's
+type carries the error as a coroutine's carries what its pulls throw (05 E10); <code>Task&lt;T&gt;</code>
+throws nothing, and fits where a <code>Task&lt;T&gt; throws E</code> is expected, but not the reverse
+(<code>LYR-SEM0001</code>). <code>throws</code> after any other type than a coroutine or a task is refused
+(<code>LYR-SEM0084</code>). After a <strong>return type</strong> that is a task or a coroutine — with a <code>?</code> before
+it or without — a <code>throws</code> could be the type's or the function's, and without parentheses
+it is refused (<code>LYR-SEM0165</code>): a function that returns a throwing task writes
+<code>(Task&lt;T&gt; throws E)</code>, one that throws itself <code>(Task&lt;T&gt;) throws E</code>. So behind the return type
+of a lambda and of a function type. A generator writes none: its clause is its coroutine's
+(§1 rule 6). <code>spawn</code> is <code>@MustUse</code> (<a href="../../spec/11-metaprogramming/">11 §1</a> rule 11): the handle alone
+carries the task's error, so a statement that drops it warns, under the lint <code>unused-task</code>
+(<a href="../../spec/16-diagnostics/">16 §5</a>) — and so does one that drops <code>Thread.spawn</code>'s; a scope's <code>spawn</code> is
+awaited by the scope. <code>spawnDetached</code> (rule 3) is the task nobody awaits.</li>
+<li><strong><code>task.await()</code></strong> waits until the body has ended (06 T2) and gives its value, or throws its
+error: it throws what the handle's type says and, as every wait, <code>Cancelled</code> — marked and
+covered as any call that throws (<code>LYR-SEM0138</code>, <code>LYR-SEM0034</code>). The tasks waiting for one
+task run again in the order they began to wait.</li>
+<li><strong><code>task.isDone()</code></strong> says whether the body has ended, with its value or its error (06 T3).</li>
+<li><strong><code>task.status()</code></strong> says where the task stands, without waiting (06 T3): a <code>TaskStatus&lt;T&gt;</code> —
+<code>Running</code>; <code>Done(value)</code>; <code>Failed(error)</code>, the error an <code>Error</code>; <code>Cancelled</code>, when it ended
+with <code>Cancelled</code>; or <code>Panicked(info)</code> (§5), <code>info</code> a <code>PanicInfo</code> with the panic's <code>code</code>,
+<code>message</code> and <code>trace</code>.</li>
+<li><strong>A wait nothing can end is a panic</strong> (<code>LYR-RT0018</code>; the review's M6-12). Where every task of
+a thread waits, none of them sleeps, and no other thread of the program lives that could
+wake one, no wait of that thread can end any more: one of its waiting tasks panics in its
+wait — <code>deadlock: every task waits, and nothing can wake one</code>, with the frames of the call
+that waits. It is the <strong>oldest task that waits for something other than a task's end</strong> — a
+channel, a lock: the wait that is the reason, not an <code>await</code> of it —, and where each waits
+for another, the oldest. It is that task's panic (§5): what awaits the task panics again
+with its frames, and <code>main</code>'s ends the program. While another thread lives nothing is
+proven and nothing is said — two threads whose tasks wait for each other wait —; once it
+has ended, it is.</li>
+</ol>
+<h2 id="3-cancellation">3. Cancellation</h2>
+<p>A task is cancelled cooperatively (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 N9</a>): a cancel marks it, and its waits
+throw.</p>
+<ol>
+<li><strong><code>task.cancel()</code></strong> marks the task cancelled (X1). From then on every wait in it throws
+<code>Cancelled</code>: the wait it is in ends at once, and every later wait throws before it waits (X5)
+— a task that catches <code>Cancelled</code> and waits again gets it again. A task that never waits is
+not cancelled (X2); a task that has ended stays as it ended.</li>
+<li><code>Cancelled</code> unwinds the task as any error does — its <code>defer</code>s and <code>using</code>s run — and the task
+ends with it unless its body catches it; <code>await()</code> on the handle then throws <code>Cancelled</code> (X1).</li>
+<li>A wait inside a generator the task pulls throws there: the generator unwinds and ends, its
+pull answers that it has ended, and the task's next wait throws <code>Cancelled</code> in turn.</li>
+<li><strong><code>withTimeout(d, body)</code></strong> (X4) runs <code>body</code> as a task of its own and gives its value or throws
+its error — unless <code>d</code> passes first: then the body is cancelled, and once it has ended,
+<code>TimedOut</code> is thrown. It throws what the body throws, <code>TimedOut</code> and <code>Cancelled</code>
+(<code>LYR-SEM0034</code>). Whenever it returns, the body has ended: a cancel of the caller cancels the
+body, and waits for it.</li>
+</ol>
+<h2 id="4-task-scopes">4. Task scopes</h2>
+<p>The tasks of a scope end before the scope does (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 T5</a>): structured
+concurrency.</p>
+<ol>
+<li>A <strong><code>TaskScope</code></strong>, made by <code>TaskScope.new()</code>, starts tasks with <strong><code>scope.spawn(body)</code></strong> — a
+<code>spawn</code> (§2 rule 8) whose task belongs to the scope. A scope is <code>Closeable</code>
+(<a href="../../spec/06-errors/">06 §7</a>): its <code>close()</code> waits until every task of the scope has ended, so
+under <code>using let scope = TaskScope.new();</code> no task of it outlives the block.</li>
+<li>The first task of the scope that ends with an error other than <code>Cancelled</code> cancels the scope's
+other tasks (06 N9 X3), and <code>close()</code> throws that error once they have all ended; a task that
+ends with <code>Cancelled</code> is no failure of the scope. What <code>close()</code> throws is an <code>Error</code>, as
+<code>Closeable</code> says (<code>LYR-SEM0034</code>).</li>
+<li><strong><code>scope.cancel()</code></strong> cancels every task of the scope that has not ended.</li>
+<li>A task cancelled while it waits in <code>close()</code> cancels the scope's tasks and still waits for
+them to end; then <code>close()</code> returns or throws as before.</li>
+<li><strong>A closed scope takes no task</strong> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 M6-27</a>): <code>scope.spawn</code> once <code>close()</code> has returned
+or thrown is a panic (<code>LYR-RT0008</code>) — no <code>close()</code> would wait for it. A task given while
+<code>close()</code> waits is a task of the scope like any, and the wait takes it in.</li>
+</ol>
+<h2 id="5-panics-in-tasks">5. Panics in tasks</h2>
+<p>A panic leaves the coroutine it happens in, without unwinding (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/05-fehler.md">05 E8</a>;
+<a href="../../spec/13-abi/">13 §1.6</a> rule 10), and the task it belongs to takes it (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 T4</a>).</p>
+<ol>
+<li>A panic in a task started by <code>spawn</code> — a scope's included — ends that task, not the program:
+the task is <strong>panicked</strong>, nothing more of it runs — no <code>defer</code>, no <code>using</code> — and the tasks
+waiting for it run again. A panic in a generator the task pulls passes to the task.</li>
+<li><code>await()</code> on a panicked task panics again, with the panic's code, message and frames: a panic
+stays a bug. <code>status()</code> (§2 rule 11) looks without panicking.</li>
+<li>A task of a scope that panics cancels the scope's other tasks, as a failure does (§4 rule 2),
+and <code>close()</code> panics again with it once they have all ended.</li>
+<li>A panic in <code>main</code>, or in a task started by <code>spawnDetached</code> — which nobody can look at — ends
+the program with its report (<a href="../../spec/13-abi/">13 §1.4</a>).</li>
+</ol>
+<h2 id="6-channels">6. Channels</h2>
+<p>A channel carries values from one task to another (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 N5 K1</a>).</p>
+<ol>
+<li>A <strong><code>Channel&lt;T&gt;</code></strong>, made by <code>Channel&lt;T&gt;.new(capacity)</code> — <code>0</code>, the default, for an unbuffered
+one — carries values from <code>send</code> to <code>recv</code>, in the order they were sent: between the tasks of
+one thread and across threads (§9). A send happens before the receive that gets its value
+(06 N7 P1).</li>
+<li><strong><code>send(value)</code></strong> hands the value to a task waiting in <code>recv</code>, or puts it into the buffer while
+there is room; otherwise the sending task waits until a receiver takes it. On a closed channel,
+or when the channel closes while it waits, it throws <code>ChannelClosed</code>.</li>
+<li><strong><code>recv()</code></strong> gives the next value: from the buffer — where the value of a waiting sender then
+takes the freed place — or from a task waiting in <code>send</code>; otherwise the receiving task waits
+for one. It answers <code>null</code> once the channel is closed and nothing is left in it.</li>
+<li><strong><code>close()</code></strong> closes the channel: the tasks waiting in <code>recv</code> get <code>null</code>, those waiting in
+<code>send</code> throw <code>ChannelClosed</code>, and what is buffered can still be received. Closing a closed
+channel does nothing.</li>
+<li><code>send</code> and <code>recv</code> are waits: in a cancelled task they throw <code>Cancelled</code>, and a cancel ends them
+(§3).</li>
+</ol>
+<h2 id="7-select-and-timers">7. Select and timers</h2>
+<p>A select waits on several channels at once and goes on with the first that has something
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 N5 K2–K3</a>). It is library, no statement: <code>std.task</code>'s <code>Select.on(c) { … }</code>
+begins one, a <code>Selection</code>, whose <code>.on(c) { … }</code> adds a case, <code>.timeout(d) { … }</code> a timeout, and
+<code>.run()</code> runs it. The bodies are trailing lambdas (<a href="../../spec/03-types/">03 §8.2</a>) or any function
+values of their types.</p>
+<ol>
+<li><p>A <strong>case</strong> <code>on(c, body)</code> receives from the channel <code>c</code>: <code>body</code>, a <code>fn(?T) -&gt; void throws Error</code> for a <code>Channel&lt;T&gt;</code>, gets what <code>recv()</code> would give (§6 rule 3) — the value, or <code>null</code>
+once <code>c</code> is closed and nothing is left in it.</p>
+</li>
+<li><p><strong><code>run()</code></strong> runs the first case, in the order they were added, whose channel has a value or
+is closed: a receive from it would not wait. Is there none, the running task waits on all of
+them, and the first channel to get a value or to close runs its case. One body runs, once,
+and only its case receives: the other channels keep what they get for later receives.</p>
+</li>
+<li><p><strong><code>timeout(d, body)</code></strong> (K3): <code>body</code> runs when no case could go on before <code>d</code> passed. A <code>d</code> of
+zero or less runs it at once where no case can go on at once.</p>
+<p><em>(Informative: a select is biased to its first case. A case whose channel is closed can
+always go on — while it stays in a select, no case after it runs.)</em></p>
+</li>
+<li><p><code>run()</code> is a wait: in a cancelled task it throws <code>Cancelled</code>, and a cancel ends it (§3). It
+throws what the body that runs throws; its type says <code>Error</code>, which its caller covers
+(<code>LYR-SEM0034</code>).</p>
+</li>
+<li><p><strong><code>Timer.after(d)</code></strong> gives a <code>Channel&lt;void&gt;</code> that fires once, when <code>d</code> has passed: then it
+closes, so a <code>recv()</code> from it answers <code>null</code> and a case on it runs. The program does not wait
+for a timer (§2 rule 1).</p>
+</li>
+</ol>
+<h2 id="8-atomics">8. Atomics</h2>
+<p><code>std.sync</code>'s <strong><code>Atomic&lt;T&gt;</code></strong> holds a value that every thread reads and writes in one step
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 G4, K6, N7</a>).</p>
+<ol>
+<li><code>Atomic&lt;T&gt;.new(value)</code> makes one. <code>T</code> is an <strong><code>AtomicValue</code></strong>: <code>int</code>, <code>bool</code>, a class, or an
+optional of a class (<code>?Node</code>) — a reference is one word, which the machine reads and writes in
+one step. The interface is sealed, so no other type becomes one (<code>LYR-SEM0132</code>), and an <code>Atomic</code>
+of another type — a string, a struct, an optional of anything but a class — is refused
+(<code>LYR-SEM0028</code>).</li>
+<li><strong><code>load()</code></strong> gives the value, <strong><code>store(v)</code></strong> sets it, <strong><code>exchange(v)</code></strong> sets it and gives the
+value it replaced, and <strong><code>compareAndSet(expected, desired)</code></strong> sets <code>desired</code> where the value is
+<code>expected</code> and answers whether it did. Each is one step. For a class <code>compareAndSet</code> compares
+identity (<a href="../../spec/03-types/#26-identity-and-equality">03 §2.6</a>): it sets where the value is the same
+object as <code>expected</code> (or both are <code>null</code>), whatever <code>==</code> would say.</li>
+<li>An <code>Atomic&lt;int&gt;</code> also adds: <strong><code>fetchAndAdd(n)</code></strong> gives the value before, <strong><code>addAndFetch(n)</code></strong>
+the value after. The sum wraps around, as <code>+%</code> does.</li>
+<li>Every operation is sequentially consistent (N7 P2): all threads see the operations in one
+order, and no read or write moves across one (P4). A store happens before a load that reads
+its value (P1).</li>
+</ol>
+<h2 id="9-threads">9. Threads</h2>
+<p>A program runs on the threads it starts (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 G1–G3, N7</a>). Each has a scheduler of
+its own, which runs that thread's tasks as §2 says, and a task never moves to another thread.
+Threads run at the same time. <code>Thread</code> is <code>std.thread</code>'s (10 Q10; the module cut, M8b S1).</p>
+<ol>
+<li><strong><code>Thread.spawn(body)</code></strong> starts a thread and runs <code>body</code> there as its first task. It gives
+that task's handle, a <code>Task&lt;T&gt; throws E</code> (§2 rule 8): <code>await()</code> on it waits from any thread,
+and <code>cancel()</code> cancels it from any thread (§3).</li>
+<li>A thread's handle is done when its first task has ended. The thread then <strong>cancels what
+still lives on it</strong> (§3; the review's M6-20b) — every task that has started and not ended,
+and each that starts from then on, as it starts — and runs until all of it has ended: their
+<code>defer</code>s run, their handles are done, and a task of another thread that awaits one of them
+goes on. Only the program ends with its first task and leaves the rest where it stands (§2
+rule 1): it does not wait for a thread either — when <code>main</code> ends, the program ends.</li>
+<li>A task that <code>spawn</code> starts runs on the thread of the task that started it.</li>
+<li>What a thread did before it started another happens before the new thread's first task (N7
+P1), and what a task did before it ended happens before <code>await()</code> on it returns, on any thread.</li>
+<li>Two threads that use the same place, one of them writing, with no such order between them — a
+channel's (§6), an atomic's (§8), a lock's (§10) or a task's end (rule 4) — race: the program
+has an error, and the language makes no promise about what it then does (G3).</li>
+</ol>
+<h2 id="10-locks">10. Locks</h2>
+<p>A lock hands a value to one task at a time (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 G4, K6, N10</a>). The types are
+<code>std.sync</code>'s (10 Q10; the module cut, M8b S1). A task that waits for a lock parks, as at every wait (§2): the other
+tasks of its thread run meanwhile — a lock is needed on one thread too, wherever a body waits.</p>
+<ol>
+<li><strong><code>Mutex&lt;T&gt;</code></strong>, made by <code>Mutex&lt;T&gt;.new(value)</code>: <strong><code>lock(body)</code></strong> runs <code>body</code> while the running
+task holds the mutex alone, and gives what <code>body</code> gives. The body takes the value's <strong>place</strong>
+(<a href="../../spec/03-types/">03 §2.3a</a> rule 5a), <code>m.lock { &amp;n =&gt; n += 1; }</code>: it reads and writes the value
+itself. The place is the call's — it ends with the body, and no closure in the body holds it
+(<code>LYR-SEM0158</code>) — so nothing reaches the value outside the lock.</li>
+<li><strong><code>RwLock&lt;T&gt;</code></strong>, made by <code>RwLock&lt;T&gt;.new(value)</code>: <strong><code>read(body)</code></strong> runs <code>body</code> with the value
+while no writer holds the lock — readers share it; <strong><code>write(body)</code></strong> runs <code>body</code> with the
+value's place (rule 1) while the task holds the lock alone. A writer that waits goes first:
+the readers that come after it wait for it.</li>
+<li><strong><code>Once</code></strong>, made by <code>Once.new()</code>: <strong><code>run(body)</code></strong> runs <code>body</code> unless it has run to its end
+already; a call while another task runs it waits until that has ended. Where <code>body</code> throws, the
+error comes out of that call, and the next call runs <code>body</code> again.</li>
+<li><code>lock</code>, <code>read</code>, <code>write</code> and <code>run</code> are waits: in a cancelled task they throw <code>Cancelled</code> (§3).
+They throw what their body throws.</li>
+<li>A lock orders (N7 P1): what a body did happens before what the next body that holds the lock
+does — the value one leaves is the value the next finds.</li>
+<li><strong>A panic in a body poisons the lock</strong> (the review's M6-21). A panic unwinds nothing (§5
+rule 1), so the body's lock would stay held: the scheduler releases what the panicked task
+held — newest first — and poisons it. From then on every <code>lock</code>, <code>read</code>, <code>write</code> and <code>run</code>
+on it is a panic, <code>LYR-RT0019</code>, <code>lock poisoned by a panic: &lt;code&gt;: &lt;message&gt;</code>, naming the
+first panic; a task that already waits for the lock wakes with the release and panics the
+same way. A <code>Once</code> whose body panicked is poisoned too. An error in a body — <code>Cancelled</code>
+among them — unwinds, the body's <code>defer</code> releases, and nothing is poisoned (rule 4).</li>
+<li><strong><code>Semaphore</code></strong>, made by <code>Semaphore.new(n)</code> with <code>n</code> permits — a negative <code>n</code> panics
+(<code>LYR-RT0008</code>) —, is a waker (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 K4</a>, the review's M6-31). <strong><code>acquire()</code></strong> takes a
+permit, waiting while none is left — a wait (rule 4). <strong><code>tryAcquire()</code></strong> takes one where one is
+left, says whether it did, and never waits. <strong><code>release()</code></strong> gives one back and wakes the tasks
+that wait: any task may, on any thread, and none needs to hold a permit. <strong><code>available()</code></strong> is
+the count now. A release orders as a lock does (rule 5): what a task did before <code>release()</code>
+happens before what a task does after the <code>acquire()</code> that takes that permit. A permit is no
+hold: a panic poisons no semaphore (rule 6).</li>
+</ol>
+<h2 id="11-pools">11. Pools</h2>
+<p>A pool spreads tasks over threads of its own (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 G2, T1, P5</a>). <code>Pool</code> is
+<code>std.thread</code>'s (10 Q10; the module cut, M8b S1).</p>
+<ol>
+<li><strong><code>Pool.new(n)</code></strong> starts <code>n</code> threads, one at least, each with a scheduler of its own (§9).</li>
+<li><strong><code>pool.spawn(body)</code></strong> runs <code>body</code> as a task on one of the pool's threads, each in turn, and
+gives its handle (§2 rule 8): <code>await()</code> and <code>cancel()</code> work from any thread.</li>
+<li><strong><code>pool.close()</code></strong> waits until every task given to the pool has ended, then ends its threads
+— each as a thread ends (§9 rule 2): what those tasks started there and left is cancelled, and
+has ended when <code>close()</code> returns. Closing a closed pool waits for nothing. <code>close()</code> is a wait (§3). A pool is <code>Closeable</code>
+(<a href="../../spec/06-errors/">06 §7</a>): under <code>using let pool = Pool.new(4);</code> no task of it outlives the block.</li>
+<li>A task given to a closed pool is a panic (<code>LYR-RT0008</code>). A task given <strong>while</strong> the pool
+closes is run or refused so — the check against the close and the hand-over to a thread are
+one step (the review's M6-27) —; none is left on a thread that has ended.</li>
+<li><strong><code>parallelMap(xs, f)</code></strong> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 P5</a>) gives an array of <code>f(x)</code> for each element <code>x</code> of the
+view <code>xs</code>, in the elements' order. The calls run on the program's own pool — a thread for each
+processor, started at the first call, there until the program ends —, the first element's on
+the caller's thread. Where calls throw, <code>parallelMap</code> throws, once every call it started has
+ended, the error of the <strong>first element in order</strong> whose call throws: every element before it
+was called once, a later one perhaps not. It is a wait (§3): a cancelled caller cancels the
+calls it started and throws <code>Cancelled</code>.</li>
+</ol>
+<h2 id="12-signals">12. Signals</h2>
+<p>A program learns of the system's signals through a channel (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 K5</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 Q9</a>). <code>Signal</code> and <code>signals</code> are <code>std.os</code>'s (10 Q9, Q10; the
+module cut, M8b S1). No Lyric code runs in a signal handler.</p>
+<ol>
+<li>A <strong><code>Signal</code></strong> names a signal abstractly: <code>Interrupt</code>, <code>Terminate</code>, <code>Hangup</code>, <code>Quit</code>, <code>User1</code>,
+<code>User2</code>, <code>WindowChange</code>, or <code>Other(n)</code> — the system's number <code>n</code>. Windows knows <code>Interrupt</code>
+(Ctrl+C, Ctrl+Break) and <code>Terminate</code> (its console closes) only.</li>
+<li><strong><code>signals(s…)</code></strong> gives a <code>Channel&lt;Signal&gt;</code> that the given signals come in on: from then on they
+no longer do what the system does with them — end the program, mostly — but arrive in the
+channel. Each comes to every channel that asked for it.</li>
+<li>A signal is no counter: two that come before the first went out may arrive as one, and one that
+finds a channel's buffer full — sixteen — is lost for that channel.</li>
+<li>Closing the channel ends its subscription <strong>at once</strong> (the review's M6-28): a signal no
+channel asks for any more is the system's again from the close on — not from the next one,
+which was swallowed.</li>
+<li><code>KILL</code> and <code>STOP</code> never come — the system does not deliver them — and neither do the faults
+(<code>SEGV</code>, <code>BUS</code>, <code>FPE</code>, <code>ILL</code>, <code>ABRT</code>), which end the program with a crash report, nor <code>PIPE</code>,
+<code>CHLD</code> and <code>ALRM</code>, which the runtime keeps. A runtime that a host starts without signal
+handlers catches none.</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-coroutines-and-generators">1. Coroutines and generators</a></li>
+<li class="level-2"><a href="#2-tasks">2. Tasks</a></li>
+<li class="level-2"><a href="#3-cancellation">3. Cancellation</a></li>
+<li class="level-2"><a href="#4-task-scopes">4. Task scopes</a></li>
+<li class="level-2"><a href="#5-panics-in-tasks">5. Panics in tasks</a></li>
+<li class="level-2"><a href="#6-channels">6. Channels</a></li>
+<li class="level-2"><a href="#7-select-and-timers">7. Select and timers</a></li>
+<li class="level-2"><a href="#8-atomics">8. Atomics</a></li>
+<li class="level-2"><a href="#9-threads">9. Threads</a></li>
+<li class="level-2"><a href="#10-locks">10. Locks</a></li>
+<li class="level-2"><a href="#11-pools">11. Pools</a></li>
+<li class="level-2"><a href="#12-signals">12. Signals</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

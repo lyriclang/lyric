@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The command line — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><span class="pending">std</span><a class="current" href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Specification</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../spec/">Specification</a></li>
+<li><a href="../../spec/01-lexical/">Lexical structure</a></li>
+<li><a href="../../spec/02-grammar/">Grammar</a></li>
+<li><a href="../../spec/03-types/">Types and values</a></li>
+<li><a href="../../spec/04-modules/">Modules and packages</a></li>
+<li><a href="../../spec/05-interfaces/">5. Interfaces and conformance</a></li>
+<li><a href="../../spec/06-errors/">6. Errors</a></li>
+<li><a href="../../spec/07-statements/">Statements</a></li>
+<li><a href="../../spec/08-expressions/">Expressions</a></li>
+<li><a href="../../spec/09-patterns/">Patterns</a></li>
+<li><a href="../../spec/10-concurrency/">Concurrency</a></li>
+<li><a href="../../spec/11-metaprogramming/">Metaprogramming</a></li>
+<li><a href="../../spec/12-stdlib/">The standard library contract</a></li>
+<li><a href="../../spec/13-abi/">ABI and embedding</a></li>
+<li><a class="current" href="../../spec/14-cli/">The command line</a></li>
+<li><a href="../../spec/15-project/">Projects</a></li>
+<li><a href="../../spec/16-diagnostics/">Diagnostics</a></li>
+<li><a href="../../spec/appendix-a-diagnostics/">Appendix A — Diagnostic catalogue</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
+<h1>The command line</h1>
+<blockquote>
+<p><strong>Partly written.</strong> §1 was written with milestone <strong>M2</strong> of the Lyric 5 plan, §2 with <strong>M7</strong>, §3
+with <strong>M8a</strong>; the rest comes with <strong>M8a–M13</strong>, spec-first: each rule lands here with its
+conformance case before or with its implementation. Source of the decisions:
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 Tooling and interop W1</a>.</p>
+</blockquote>
+<h2 id="scope">Scope</h2>
+<p>The one binary and its verbs, option grammar, the precedence ladder, exit codes, the NDJSON output schema. Versioned as a contract (C10).</p>
+<h2 id="1-build-and-run">1. <code>build</code> and <code>run</code></h2>
+<p>What the command line does for a single file (M2) and for a package (M7). The precedence ladder,
+the NDJSON stream and the other verbs follow with their milestones; the rules below stay.</p>
+<p><strong>Conformance.</strong> Until the suite can drive the command line (M13), the toolchain's own tests
+are the conformance of this section (<code>tests/Lyric5.Tests</code>, <code>BuildTests</code> and <code>DriverTests</code>).</p>
+<h3 id="11-verbs-and-options">1.1 Verbs and options</h3>
+<ol>
+<li><code>lyric build &lt;file.lyr&gt;</code> compiles the program that starts at the file to a binary: a single
+file's own, or — for a module of a package — the package's, entered there
+(<a href="../../spec/04-modules/">04 §2</a>). <code>lyric build</code> without a file builds the programs of the package
+of the current directory — the nearest <code>lyric.toml</code> at or above it —: its <code>src/main.lyr</code> and
+its <code>[[bin]]</code> programs (<a href="../../spec/15-project/">15 §1</a>); <code>--bin &lt;name&gt;</code> names one, and a file is a
+program by itself. <code>lyric run [&lt;file.lyr&gt;] [-- args…]</code> builds the same way and then
+runs the binary with the arguments after <code>--</code>, on the caller's own console. <code>--</code> belongs to
+<code>run</code>: <code>build</code> refuses it. <code>lyric update [&lt;package&gt;…]</code> reads the packages from git anew,
+raises a tag that is a version to the newest of its line in the manifest, and writes the lock
+(<a href="../../spec/15-project/">15 §3</a>); it takes <code>-C</code> and <code>--offline</code>.</li>
+<li>Options take a value as <code>--name value</code> or <code>--name=value</code>
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C3</a>):
+<code>--profile &lt;name&gt;</code> — a profile built in or the manifest's (<a href="../../spec/15-project/">15 §4</a>); without
+the option the environment's <code>LYRIC_PROFILE</code>, then <code>debug</code>; an unknown name is refused, from
+either; <code>asan</code> and <code>tsan</code> need clang —, <code>--target &lt;triple&gt;</code>
+(a Tier 1 triple; default: this machine), <code>--emit ir|c</code> (prints instead of building; <code>run</code>
+refuses it), <code>-C &lt;dir&gt;</code> (the package is searched from <code>&lt;dir&gt;</code> instead of the current
+directory, and a relative file is relative to it). <code>--offline</code> takes no value: nothing is
+fetched, and a package read from git comes from the user's cache (<a href="../../spec/15-project/">15 §2</a>).
+<code>--locked</code> takes none either: <code>build</code>, <code>run</code> and <code>test</code> take the lock as it is
+(<a href="../../spec/15-project/">15 §3</a> rule 4).
+A profile's fields change for one build with <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code> and <code>--lto</code>,
+<code>--debug-info</code>, <code>--deny-warnings</code>, <code>--overflow-checks</code>, <code>--fast-math</code>, each with its <code>--no-</code>
+form; a field flag
+is over the profile (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C4</a>), and a flag with its <code>--no-</code> form is refused.</li>
+<li>The command line is strict: an unknown verb, option or value is refused.</li>
+<li>A binary for a target that is not this machine is built and not run: <code>run</code> refuses it and
+names the binary.</li>
+<li>Without a file and without a manifest at or above the directory there is nothing to build
+(<code>LYR-CLI0004</code>). A package without <code>src/main.lyr</code> is a library: <code>build</code> checks it
+(<a href="../../spec/15-project/">15 §2</a>), and <code>run</code> has no program there (<code>LYR-CLI0005</code>).</li>
+<li><strong><code>lyric expand [&lt;file.lyr&gt;]</code></strong> prints the program's entry module after its macros' expansion
+(<a href="../../spec/11-metaprogramming/">11 §5</a>) to standard output: the results in the sites' places, the
+rest as written, in the formatter's form — comments fall, as do the module's header line and
+attributes. It chooses the program as <code>run</code> does (<code>--bin</code>, <code>-C</code>, the profile and the target,
+which <code>comptime</code> reads), builds nothing, and refuses <code>--emit</code>. The program is resolved and
+expanded, not checked: what the expansion needs is reported with exit 1 — a site of no macro,
+a macro's own error —, and a type error after it is <code>build</code>'s to find. Without a site, the
+module prints as it is.</li>
+<li><strong><code>lyric fix [&lt;file.lyr&gt;]</code></strong> makes the safe changes the findings suggest in the package's own
+files, and <strong><code>--dry-run</code></strong> prints them as a diff instead (<a href="../../spec/16-diagnostics/">16 §6</a>).</li>
+<li><strong><code>lyric check [&lt;file.lyr&gt;]</code></strong> takes the programs <code>build</code> would take — or checks the library, as
+<code>build</code> does — through everything a build does before the C: the build scripts, for what they
+write into <code>gen/</code> (<a href="../../spec/15-project/">15 §8</a>), the front end and the lints, <code>comptime</code>, and the
+lowering. It says what <code>build</code> says, exits as <code>build</code> does (§1.3), and makes neither C nor a
+binary. It takes <code>build</code>'s options but <code>--emit</code>.</li>
+</ol>
+<h3 id="12-where-the-files-go">1.2 Where the files go</h3>
+<ol>
+<li>A single file is an implicit package named after the file
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C8</a>);
+a package is named in its manifest (<a href="../../spec/15-project/">15 §1</a>).</li>
+<li><code>out/</code> lies by the manifest — the nearest <code>lyric.toml</code> at or above the file, also for a single
+file beside a package's <code>src/</code>; without one, at the nearest directory upward holding <code>.git</code>;
+without that, by the file (P5). Under it, the binary is <code>out/&lt;profile&gt;/&lt;target&gt;/&lt;name&gt;</code>, with
+the executable suffix of the target — named after the package for its <code>src/main.lyr</code>, after
+the module's last segment for another module of the package, after the file for a single file
+—, and <code>out/cache/</code> holds what the build keeps between runs (P4; 01 L7).</li>
+<li>An unchanged program compiles nothing twice: the same sources — every module of the program,
+the standard library's included —, toolchain and options reuse the cache, and the binary is
+linked only when an input to it changed (11 C9). A build that reuses the cache <strong>says again
+what the build that filled it said</strong>: the same findings, in the form and the colour the command
+line asks for now, counted in its <code>summary</code> (<a href="../../spec/16-diagnostics/">16 §4</a>).</li>
+<li>A build holds <strong><code>out/.lock</code></strong> while it writes into <code>out/</code>
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 P5</a>): a second build of the package waits for the first, and says so
+once. The lock is the operating system's on an open file; it ends with its process.</li>
+</ol>
+<h3 id="13-exit-codes">1.3 Exit codes</h3>
+<p>As <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C5</a>:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>done</td>
+</tr>
+<tr>
+<td>1</td>
+<td>the program or its manifest was refused: a compile error, or a construct the compiler does not translate yet</td>
+</tr>
+<tr>
+<td>2</td>
+<td>the command line or the environment: unknown verb, option or value, a missing file, no package to build, a program to run among several unnamed, no C compiler, a git repository that cannot be reached, a toolchain below what a package asks for</td>
+</tr>
+<tr>
+<td>101</td>
+<td>the toolchain itself failed (<code>LYR-ICE0001</code>)</td>
+</tr>
+<tr>
+<td>the program's</td>
+<td><code>run</code> passes the program's own exit through: its <code>main</code> value masked to <code>0..255</code> (<a href="../../spec/13-abi/">13 §1.5</a>), 101 for a panic</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-clean-metadata-add-and-remove">2. <code>clean</code>, <code>metadata</code>, <code>add</code> and <code>remove</code></h2>
+<p>The verbs about a package besides building it — the package of the nearest <code>lyric.toml</code> at or
+above the current directory, or above <code>-C &lt;dir&gt;</code>; without one there is nothing to do
+(<code>LYR-CLI0004</code>).</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>OutTests</code>,
+<code>ManifestEditTests</code>).</p>
+<ol>
+<li><p><strong><code>lyric clean</code></strong> removes the package's <code>out/</code>, once a build that writes into it is done
+(§1.2).</p>
+</li>
+<li><p><strong><code>lyric metadata</code></strong> writes the package as one JSON object, on one line, to standard output
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 P10</a>):</p>
+<ul>
+<li><code>&quot;version&quot;</code>, the schema's: 1; <code>&quot;toolchain&quot;</code>, the toolchain's version; <code>&quot;root&quot;</code>, the
+package's name;</li>
+<li><code>&quot;packages&quot;</code>, the graph's, each with its <code>&quot;name&quot;</code>, <code>&quot;version&quot;</code>, <code>&quot;edition&quot;</code>, <code>&quot;manifest&quot;</code>,
+its <code>&quot;toolchain&quot;</code> pin where it has one, where it is read from — <code>&quot;path&quot;</code>, its directory, or
+<code>&quot;git&quot;</code> with the <code>&quot;url&quot;</code>, the revision (<code>&quot;tag&quot;</code>, <code>&quot;branch&quot;</code> or <code>&quot;rev&quot;</code>, none for the default
+branch) and the <code>&quot;commit&quot;</code> — and the <code>&quot;dependencies&quot;</code> it declares;</li>
+<li><code>&quot;programs&quot;</code>, each with its binary's <code>&quot;name&quot;</code>, its <code>&quot;entry&quot;</code> file and its <code>&quot;module&quot;</code>;</li>
+<li><code>&quot;profiles&quot;</code>, each with its <code>&quot;name&quot;</code>, its <code>&quot;base&quot;</code> — the built-in profile it comes from —
+and its fields;</li>
+<li><code>&quot;targets&quot;</code>, the Tier 1 triples, <code>&quot;host&quot;</code>, this machine's, and <code>&quot;out&quot;</code>.</li>
+</ul>
+<p>Within a schema version a field may be added, none is changed or removed
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C10</a>). Its options are <code>-C</code>, <code>--offline</code>, and <code>--json</code>, the one form
+there is.</p>
+</li>
+<li><p><strong><code>lyric add &lt;name&gt; --path &lt;dir&gt;</code></strong> or <strong><code>--git &lt;url&gt;</code></strong>, with at most one of <code>--tag</code>,
+<code>--branch</code> and <code>--rev</code>, writes the dependency into <code>[dependencies]</code> as one line —
+<code>geo = { path = &quot;../geo&quot; }</code>, the path relative to the manifest — in place of the line that
+names it, or after the table's last, or in a table it begins at the end. Every other line of
+the manifest stays as it was. The graph is then read with the dependency
+(<a href="../../spec/15-project/">15 §2</a>); a graph that refuses it leaves the manifest as it was, and the
+refusal is the graph's.</p>
+</li>
+<li><p><strong><code>lyric remove &lt;name&gt;</code></strong> takes the dependency's line out of <code>[dependencies]</code>, and the graph —
+the lock with it (<a href="../../spec/15-project/">15 §3</a>) — is read again. A name the table does not hold is
+refused (<code>LYR-CLI0003</code>).</p>
+</li>
+<li><p>A dependency written otherwise than as one line — a table of its own, dotted keys — is the
+person's to edit: <code>add</code> and <code>remove</code> refuse it (<code>LYR-CLI0008</code>). Both take <code>-C</code> and
+<code>--offline</code>.</p>
+</li>
+</ol>
+<h2 id="3-test">3. <code>test</code></h2>
+<p>The package's tests (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 B12</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V4</a>) — the package of the nearest <code>lyric.toml</code>,
+as in §2.</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>TestCommandTests</code>; the
+standard library's own tests through it, <code>StdTests</code>).</p>
+<ol>
+<li><strong><code>lyric test</code></strong> builds every function the package marks <code>@Test</code>
+(<a href="../../spec/11-metaprogramming/">11 §1</a>) — in its modules under <code>src/</code> and under <code>tests/</code>
+(<a href="../../spec/15-project/">15 §7</a>) — into one program for this machine, under the profile asked for as
+<code>build</code> takes it (§1.1), and runs it in the package's directory, the one its <code>lyric.toml</code>
+stands in, wherever <code>lyric</code> is called: a test reads its package's files by their paths in it
+(the sweep after M10, X1). A library has tests as well. It takes no file. Built
+for another machine — or for the target <code>--target</code> names, as <code>run</code> takes it — the program is
+named and not run, exit 2.</li>
+<li>The tests run one after another — module by module in the order of their paths, each
+module's in the order it writes them —, each in a task of its own: a panic or an error that
+leaves a test fails it, and the run goes on. A test with a <code>skip</code> is named and not run.
+A test marked <strong><code>parallel</code></strong> — <code>@Test { parallel = true }</code> — runs beside the others marked so,
+after the rest, each in a task of its own on a pool of a thread for each processor (X3: an
+opt-in, since what tests share — the working directory, the environment, a global <code>var</code> — they
+share as threads do). Their lines come in their order; their <code>timeout</code>s are one deadline, the
+longest of them, from their start; and a parallel test has no subtest — <code>subtest</code> fails it, as
+a subtest is reported under the test that runs alone.</li>
+<li>After each test has ended, a line: <code>ok</code>, <code>FAIL</code> with the panic or the error below it, or
+<code>skip</code> with the reason — a test's own output comes before its line —; then the count. A
+subtest — <code>std.test.subtest(&quot;name&quot;) { … }</code> — runs in a task of its own and has a line of its
+own, <code>app.tests.math.table/name</code>; one that fails fails its test, and the test goes on.
+A test that outlives its <code>timeout</code> ends the run, with its <code>FAIL</code> line, exit 1: a task gives
+way only where it waits, so nothing stops it short of the end. A failure's further lines —
+the first difference of two values too long to compare by eye — stand under its first.
+<code>-f &lt;text&gt;</code> (<code>--filter &lt;text&gt;</code>) runs the tests whose name — the module's path and the
+function's, <code>app.tests.math.adds</code> — holds the text.</li>
+<li>The exit is 0 when every test held — or when there is none to run —, and 1 when one failed or
+the program was refused (§1.3).</li>
+</ol>
+<h2 id="4-bench">4. <code>bench</code></h2>
+<p>The package's benchmarks (<a href="../../spec/12-stdlib/">12 §Benchmarks</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 X4</a>) — the package of the nearest
+<code>lyric.toml</code>, as in §2.</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>BenchCommandTests</code>).</p>
+<ol>
+<li><strong><code>lyric bench</code></strong> builds every function the package marks <code>@Bench</code> — in its modules under
+<code>src/</code> and under <code>tests/</code> — into one program for this machine, in the <strong>release</strong> profile
+unless <code>--profile</code> names another, and runs them one after another on one thread, in the
+package's directory as <code>test</code> runs its program; <code>--target</code> as <code>test</code> takes it (§3). The files
+of <code>--save</code> and <code>--compare</code> are where the command line names them.</li>
+<li>A line for each: <code>bench app.tests.speed.reads: 412.3 ns/op, 0 allocs/op, 0 B/op, 2483.2 MB/s (290000 runs)</code> — the nanoseconds a run, the allocations a run and their bytes, the megabytes a
+second where the benchmark said its bytes, and the runs measured. <code>-f &lt;text&gt;</code>
+(<code>--filter &lt;text&gt;</code>) runs those whose name holds the text; where none does, or there is none,
+a line says so.</li>
+<li><strong><code>--save &lt;file&gt;</code></strong> writes the run's times to the file, a line a benchmark — its name, then the
+nanoseconds, the allocations and the bytes a run, apart by tabs —; <strong><code>--compare &lt;file&gt;</code></strong> reads
+such a file, and the line of a benchmark it has a row for ends with how its time changed:
+<code>, was 400.1 ns/op: +3.0%</code>.</li>
+<li>The exit is 0, and 1 where the file to compare with or to save to could not be read or
+written, or the program was refused (§1.3).</li>
+</ol>
+<h2 id="5-the-verbs-and-their-options">5. The verbs and their options</h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C2, C3</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>VerbTableTests</code>).</p>
+<ol>
+<li>The verbs and their options are <strong>one table</strong>: the command line is read by it, <code>lyric help</code>
+prints it, and the table below is printed from it (<code>lyric help --markdown</code>). An option the table
+does not give a verb is refused with exit 2 (§1.1 rule 3), as is a value missing or a value given
+to a flag (<code>--lto=yes</code>).</li>
+<li><strong><code>lyric help</code></strong> lists the verbs and the options every verb takes; <strong><code>lyric help &lt;verb&gt;</code></strong> and
+<strong><code>lyric &lt;verb&gt; --help</code></strong> (<code>-h</code>) list the verb's own. A <code>--help</code> after <code>run</code>'s <code>--</code> is the
+program's.</li>
+<li>The options every verb takes, before or after the verb: <code>--color &lt;auto|always|never&gt;</code>,
+<code>--absolute-paths</code>, <code>--max-errors &lt;n&gt;</code> (<a href="../../spec/16-diagnostics/">16 §1</a>); where the table marks the
+verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and the lint options <code>-A</code>, <code>-W</code>, <code>-D &lt;lint&gt;</code> and
+<code>--warn-deps</code> (<a href="../../spec/16-diagnostics/">16 §5</a>). A field of the profile is <code>--x</code> and <code>--no-x</code>.</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>verb</th>
+<th>words</th>
+<th>options</th>
+<th>lints</th>
+<th><code>--json</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>build</code></td>
+<td><code>[&lt;file.lyr&gt;]</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--emit &lt;ir|c&gt;</code></td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>run</code></td>
+<td><code>[&lt;file.lyr&gt;] [-- &lt;args&gt;…]</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code></td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>check</code></td>
+<td><code>[&lt;file.lyr&gt;]</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code></td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>expand</code></td>
+<td><code>[&lt;file.lyr&gt;]</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code></td>
+<td>yes</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>test</code></td>
+<td>—</td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--filter, -f &lt;text&gt;</code></td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>bench</code></td>
+<td>—</td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--filter, -f &lt;text&gt;</code>, <code>--save &lt;file&gt;</code>, <code>--compare &lt;file&gt;</code></td>
+<td>yes</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>fix</code></td>
+<td><code>[&lt;file.lyr&gt;]</code></td>
+<td><code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--dry-run</code></td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>env</code></td>
+<td>—</td>
+<td><code>-C &lt;dir&gt;</code>, <code>--profile &lt;name&gt;</code>, <code>--target &lt;triple&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--offline</code>, <code>--json</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>new</code></td>
+<td><code>&lt;name&gt;</code></td>
+<td><code>--lib</code>, <code>--[no-]git</code>, <code>-C &lt;dir&gt;</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>init</code></td>
+<td>—</td>
+<td><code>--lib</code>, <code>--name &lt;name&gt;</code>, <code>--[no-]git</code>, <code>-C &lt;dir&gt;</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>update</code></td>
+<td><code>[&lt;package&gt;…]</code></td>
+<td><code>-C &lt;dir&gt;</code>, <code>--offline</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>add</code></td>
+<td><code>&lt;name&gt;</code></td>
+<td><code>--path &lt;dir&gt;</code>, <code>--git &lt;url&gt;</code>, <code>--tag &lt;tag&gt;</code>, <code>--branch &lt;branch&gt;</code>, <code>--rev &lt;commit&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>remove</code></td>
+<td><code>&lt;name&gt;</code></td>
+<td><code>-C &lt;dir&gt;</code>, <code>--offline</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>clean</code></td>
+<td>—</td>
+<td><code>-C &lt;dir&gt;</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td>—</td>
+<td><code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--json</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>explain</code></td>
+<td><code>&lt;code&gt;</code></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>completions</code></td>
+<td><code>&lt;bash|zsh|fish|pwsh&gt;</code></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>help</code></td>
+<td><code>[&lt;verb&gt;]</code></td>
+<td><code>--markdown</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="6-env">6. <code>env</code></h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C4</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>VerbTableTests</code>).</p>
+<ol>
+<li><strong><code>lyric env</code></strong> says every setting a build of the package here reads — the toolchain, the
+standard library, the manifest, the C compiler, the cache, the profile and each of its fields,
+the target, and each <code>LYRIC_*</code> variable that is set — with its value and <strong>where it comes
+from</strong>: <code>command line</code>, the variable's name (<code>LYRIC_PROFILE</code>), <code>lyric.toml</code>, or <code>default</code>. The
+command line is over the environment, the environment over the manifest, the manifest over the
+default.</li>
+<li>It takes the options that change a setting — <code>-C</code>, <code>--profile</code>, the profile's fields,
+<code>--target</code> — so that it says what the build with them would read. <strong><code>--json</code></strong> writes one
+document instead: <code>{&quot;version&quot;: 1, &quot;settings&quot;: [{&quot;name&quot;, &quot;value&quot;, &quot;origin&quot;}, …]}</code>.</li>
+</ol>
+<h2 id="7-new-init-and-completions">7. <code>new</code>, <code>init</code> and <code>completions</code></h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C2</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>NewCommandTests</code>).</p>
+<ol>
+<li><strong><code>lyric new &lt;name&gt;</code></strong> makes the directory <code>&lt;name&gt;</code> and a package in it; <strong><code>lyric init</code></strong> makes
+the package in the directory it runs in — <code>-C</code> names another —, named after the directory unless
+<code>--name &lt;name&gt;</code> names it. The files: <code>lyric.toml</code> (<code>[package]</code> with <code>name</code> and
+<code>version = &quot;0.1.0&quot;</code>), <code>src/main.lyr</code> printing <code>Hello, world!</code> — or, with <strong><code>--lib</code></strong>, a library's
+<code>src/lib.lyr</code> —, and <code>.gitignore</code> holding <code>out/</code>; no build script. A file <code>init</code> finds there is
+kept.</li>
+<li>A name that is no package name (<a href="../../spec/15-project/">15 §1</a> rule 2) is refused with exit 2, and with
+the name it would be where there is one (<code>My-App</code> → <code>my_app</code>). <code>new</code> into a directory that is
+there, and <code>init</code> where a <code>lyric.toml</code> is, are refused (<code>LYR-CLI0021</code>, exit 2).</li>
+<li><strong>git</strong>: <code>--git</code> makes a repository in the package's directory, <code>--no-git</code> none; without either,
+the environment's <strong><code>LYRIC_GIT_ON_NEW</code></strong> decides — <code>1</code> or <code>true</code> makes one where no repository
+holds the directory already and git is found. The command line is over the environment (§6).
+A <code>--git</code> that git refuses, or that finds no git, fails the command (<code>LYR-CLI0021</code>) after the
+files are written.</li>
+<li><strong><code>lyric completions &lt;bash|zsh|fish|pwsh&gt;</code></strong> prints the shell's completion script — the verbs,
+and for each its options and the options every verb takes, as §5's table has them — and runs
+nothing. Another shell is refused (exit 2).</li>
+</ol>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-build-and-run">1. build and run</a></li>
+<li class="level-3"><a href="#11-verbs-and-options">1.1 Verbs and options</a></li>
+<li class="level-3"><a href="#12-where-the-files-go">1.2 Where the files go</a></li>
+<li class="level-3"><a href="#13-exit-codes">1.3 Exit codes</a></li>
+<li class="level-2"><a href="#2-clean-metadata-add-and-remove">2. clean, metadata, add and remove</a></li>
+<li class="level-2"><a href="#3-test">3. test</a></li>
+<li class="level-2"><a href="#4-bench">4. bench</a></li>
+<li class="level-2"><a href="#5-the-verbs-and-their-options">5. The verbs and their options</a></li>
+<li class="level-2"><a href="#6-env">6. env</a></li>
+<li class="level-2"><a href="#7-new-init-and-completions">7. new, init and completions</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>
