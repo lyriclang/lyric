@@ -72,7 +72,9 @@ public class ExampleTests
         TestRepo.DeleteTree(Path.Combine(app, "out"));
         Assert.Equal(Report, BuildAndRun(app, "app", "build", "-C", app, "--offline"));
 
-        // The other system's binary, from the same cache: a PE for Windows, an ELF for Linux.
+        // The other system's binary, from the same cache: a PE for Windows, an ELF for Linux —
+        // where the run builds for other targets.
+        if (!CrossTargets.Enabled) return;
         var other = Target.Host.Os == TargetOs.Windows ? Target.Parse("x86_64-linux-gnu") : Target.Parse("x86_64-windows-gnu");
         var (crossed, _, error) = Run("build", "-C", app, "--offline", "--target", other.Triple);
         Assert.True(crossed == 0, error);

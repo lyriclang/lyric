@@ -29,7 +29,7 @@ public class LtoTests
         return Path.Combine(dir, "out", "release", target.Triple, "hello" + target.ExecutableSuffix);
     }
 
-    [Theory]
+    [CrossTargetTheory]
     [MemberData(nameof(Targets))]
     public void An_lto_build_links_for_every_tier_1_target(string triple)
     {

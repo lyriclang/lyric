@@ -280,7 +280,7 @@ public class TestCommandTests
     }
 
     /// <summary><c>--target</c> as <c>build</c> and <c>run</c> take it: the tests are built for another machine and named, not run there — exit 2.</summary>
-    [Fact]
+    [CrossTargetFact]
     public void A_cross_target_builds_the_tests_and_runs_none()
     {
         var dir = App();

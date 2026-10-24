@@ -78,7 +78,7 @@ public class RuntimeBuildTests
     /// <summary>The runtime builds for every Tier 1 target with either collector — the own one
     /// compiled for macOS and Windows here — and a program
     /// links against each.</summary>
-    [Theory]
+    [CrossTargetTheory]
     [InlineData(Collector.Boehm)]
     [InlineData(Collector.Immix)]
     public void The_runtime_archive_builds_for_every_tier_1_target(Collector gc)
@@ -147,6 +147,12 @@ public class RuntimeBuildTests
     /// program's path, for a test that drives it itself — sends it signals.</summary>
     internal static string BuildEmitted(IReadOnlyList<CEmitter.Unit> units, string name, BuildProfile profile) =>
         BuildC(WriteUnits(units, name), "emitted-" + name, profile, null);
+
+    /// <summary>A program of the runtime's tests built for <paramref name="profile"/> and not run:
+    /// the archive it links and the C library zig links with it are then in the cache every
+    /// native test of that profile reads.</summary>
+    internal static string BuildTest(string name, BuildProfile profile, CCompiler? compiler = null) =>
+        BuildC([Path.Combine(Root, "runtime", "tests", name + ".c")], name + "-warm", profile, compiler);
 
     /// <summary>Where <see cref="RunEmitted"/> put the program: to run it again, timed.</summary>
     internal static string EmittedBinary(string name, BuildProfile profile) =>

@@ -1,6 +1,13 @@
 name: Set up zig
 description: Installs the zig version pinned in tooling/zig-version — the C compiler Lyric 5 builds through.
 
+inputs:
+  cache:
+    description: Whether to keep zig's cache across runs. The action saves it under a new key on
+      every run; on macOS restoring and saving its 1.6 GB took 4.5 minutes, more than the cold
+      builds it spares (zig's C library, 16 seconds a target and mode).
+    default: 'true'
+
 runs:
   using: composite
   steps:
@@ -13,3 +20,4 @@ runs:
       uses: mlugg/setup-zig@v2
       with:
         version: ${{ steps.pin.outputs.version }}
+        use-cache: ${{ inputs.cache }}
