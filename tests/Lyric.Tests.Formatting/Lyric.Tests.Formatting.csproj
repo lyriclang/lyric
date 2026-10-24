@@ -2,5 +2,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Lyric.Core\Lyric.Core.csproj" />
     <ProjectReference Include="..\..\src\Lyric.Frontend\Lyric.Frontend.csproj" />
+    <ProjectReference Include="..\..\src\Lyric5.Doc\Lyric5.Doc.csproj" />
   </ItemGroup>
 </Project>
