@@ -11,9 +11,9 @@ namespace Lyric5.Tests;
 /// The formatter keeps a program's meaning: every program of the corpus that builds — the example
 /// packages and files, the Book's snippets — is emitted as C twice, once as written against the
 /// standard library as written, once formatted against the standard library formatted, and the
-/// two C texts are the same but for where the source said each thing. Each side runs a compiler of
-/// its own (a copy of the one beside the tests, with its <c>stdlib5</c> formatted for the second),
-/// so the cases run side by side.
+/// two C texts are the same but for where the source said each thing. Both sides compile in the
+/// test's own process — the second against a formatted copy of <c>stdlib5</c> — and start no
+/// process of their own.
 /// </summary>
 public partial class FormatterProofTests
 {
@@ -64,16 +64,18 @@ public partial class FormatterProofTests
         return Formatter.Format(sm, id, new DiagnosticEngine(sm)) ?? text;
     }
 
-    /// <summary>The compiler beside the tests, and a copy of it whose standard library is formatted.</summary>
+    /// <summary>The directory of the standard library beside the tests, and that of a copy of it
+    /// with every file formatted; each holds a <c>stdlib5</c>.</summary>
     private static readonly Lazy<(string Original, string Formatted)> Compilers = new(() =>
     {
-        var copy = TestDirectories.Fresh("formatted-compiler-");
-        foreach (var file in Directory.GetFiles(AppContext.BaseDirectory, "*", SearchOption.AllDirectories))
+        var copy = TestDirectories.Fresh("formatted-std-");
+        var std = Path.Combine(AppContext.BaseDirectory, "stdlib5");
+        foreach (var file in Directory.GetFiles(std, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(AppContext.BaseDirectory, file);
             var target = Path.Combine(copy, relative);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            if (relative.Replace('\\', '/').StartsWith("stdlib5/", StringComparison.Ordinal) && file.EndsWith(".lyr", StringComparison.Ordinal))
+            if (file.EndsWith(".lyr", StringComparison.Ordinal))
                 File.WriteAllText(target, Formatted(File.ReadAllText(file), relative));
             else
                 File.Copy(file, target);
@@ -81,14 +83,12 @@ public partial class FormatterProofTests
         return (AppContext.BaseDirectory, copy);
     }, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    /// <summary>The program's C from the compiler in <paramref name="compiler"/>; <c>null</c> where
-    /// it does not build.</summary>
+    /// <summary>The program's C against the <c>stdlib5</c> in <paramref name="compiler"/>;
+    /// <c>null</c> where it does not build.</summary>
     private static string? EmitC(string compiler, string package)
     {
-        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") is { Length: > 0 } h ? h : "dotnet";
-        var result = ProcessRunner.Run(host, [Path.Combine(compiler, "lyric5.dll"), "build", "-C", package, "--emit", "c"],
-            TimeSpan.FromMinutes(5));
-        return result.ExitCode == 0 ? result.Stdout : null;
+        if (Lyric5.Build.Project.ProgramsOf(package) is not [var project, ..]) return null;
+        return Lyric5.Build.Pipeline.EmitC(project, Path.Combine(compiler, "stdlib5"), TextWriter.Null);
     }
 
     [GeneratedRegex(@"^#line .*$\n?", RegexOptions.Multiline)]

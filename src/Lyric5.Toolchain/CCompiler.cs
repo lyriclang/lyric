@@ -96,11 +96,16 @@ public static class ProcessRunner
     /// a program's 'é' came back as two characters of CP437.</summary>
     private static readonly System.Text.Encoding Utf8 = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
+    /// <summary>Runs <paramref name="file"/> with an empty standard input — what it reads ends at
+    /// once, so nothing waits on the caller's — and answers its exit code and both streams. A
+    /// process that outlives <paramref name="timeout"/> is killed, and the exception carries the
+    /// end of what it wrote.</summary>
     public static Result Run(string file, IEnumerable<string> arguments, TimeSpan timeout, string? workingDirectory = null,
         IReadOnlyDictionary<string, string>? environment = null)
     {
         var info = new ProcessStartInfo(file)
         {
+            RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             StandardOutputEncoding = Utf8,
@@ -115,15 +120,26 @@ public static class ProcessRunner
         }
 
         using var process = Process.Start(info) ?? throw new InvalidOperationException($"could not start {file}");
+        process.StandardInput.Close();
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         if (!process.WaitForExit(timeout))
         {
             try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-            throw new TimeoutException($"{file} did not finish within {timeout.TotalSeconds:0} s");
+            process.WaitForExit(TimeSpan.FromSeconds(15));
+            throw new TimeoutException($"{file} did not finish within {timeout.TotalSeconds:0} s"
+                + Tail("stdout", stdout) + Tail("stderr", stderr));
         }
         process.WaitForExit();
         return new Result(process.ExitCode, stdout.Result, stderr.Result);
+    }
+
+    /// <summary>The last lines a killed process wrote to one stream, where the stream has closed.</summary>
+    private static string Tail(string name, Task<string> stream)
+    {
+        if (!stream.Wait(TimeSpan.FromSeconds(15)) || stream.Result.Length == 0) return "";
+        var lines = stream.Result.TrimEnd().Split('\n');
+        return $"\n--- {name}, its last lines:\n" + string.Join('\n', lines[Math.Max(0, lines.Length - 20)..]);
     }
 
     /// <summary>Runs a program on the caller's own console — its output is the user's, not the
