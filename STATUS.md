@@ -54,7 +54,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M11 | Own GC | XL | **done** 2026-10-19 |
 | M12a | Diagnostics and lints | L | **done** 2026-10-21 |
 | M12b | Inference and abstraction (the review clocks) | M | **done** 2026-10-22 |
-| M12c | Docs foundation and website (comments in the W8 form, `Lyric5.Doc`, Book scaffold, `/dev/` live) | L | next, after the slice for 255 (plan 2026-10-20, design/v5/spec/14) |
+| M12c | Docs foundation and website (comments in the W8 form, `Lyric5.Doc`, Book scaffold, `/dev/` live) | L | **done** 2026-10-24 |
 | M13a | fmt, doc, api | M | — |
 | M13b | LSP, DAP, clients | XL | — |
 | M14 | FFI and embedding | L | — |
@@ -1378,6 +1378,47 @@ released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "
   conformance defaults (188, a compiler bug for the sweep; S11 worked around it); main's macOS
   job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
   step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
+
+### M12c — done (2026-10-24)
+
+The plan is design 14's D (K1, K2a–K2d, S1–S6), placed between M12b and M13a by its E. The mode of M12a:
+no halt until the close, merged on green CI with the platform matrix dispatched where native code changed,
+open points collected for the report.
+
+- **The slice for 255** before it (#540 + spec#347): a type test `is J` and a type pattern see the conformances a
+  blanket's or a shape's block gives — a row for every interface a program asks about (option C).
+- **K2a, K2b** std's comments in the doc form (#541, #542): a first sentence, behaviour and edge cases,
+  `# Panics`, `# Errors`, module docs as overviews; no labels, milestones, reviews, history or comparisons.
+  `core.lyr`'s second table of contents under its module doc went (the maintainer).
+- **D1** between them (#543 + spec#348; open points 256, 257, found by the maintainer writing a calculator):
+  a field or an initializer's field ending with `;` (`LYR-PAR0064`), a jump where a value stands
+  (`LYR-PAR0065`), a loop over a string (`LYR-SEM0232`) — each one finding at its place with a safe fix.
+- **K2c, K2d** the runtime's, the compiler's, the front end's, `Lyric.Core`'s and the tests' comments (#544,
+  #545); the std test programs too (259). The ratchet became `CommentCitationTests`, a hard guard over all of
+  them; `DiagnosticTextTests` reads the string literals of `stdlib5` and the runtime beside `src/` (258).
+- **S1** the renderer and its theme (#546): `src/Lyric5.Doc` (page shell, page forms as C#, Markdig, the
+  compiler's lexer for highlighting, the palette light and dark, Inter and JetBrains Mono shipped under the
+  OFL), `tools/Site`, home and releases.
+- **S2** the Book (#547): `docs/book/SUMMARY.md`, Getting started, A first program, What the compiler tells
+  you; every snippet built and run by `BookTests`.
+- **S3** the specification at `spec.pin` and the catalog as pages, a code's URL in `lyric explain` (#548 +
+  spec#349); the catalog's text without labels, its one broken spec link fixed.
+- **S4** search with Pagefind, pinned and hash-checked (#549); a snippet that must fail says so and shows what
+  the compiler says — found by the maintainer reading the Book.
+- **S5** the version list and the legacy site (#550): the move ran on `gh-pages` on the maintainer's word
+  (5337681e, 9a70b010) — the 1.x–4.x pages under `/legacy/`, old addresses redirected.
+- **S6** the site's workflow, DocGen gone (#551): `/dev/` live at lyric.oil1i.de since 367e7b0e.
+- Beside the slices (2026-10-23/24): the macOS CI job ran about twice Linux's time and lost runs to timeouts —
+  measured (3 virtual cores and 7 GB; a cold zig and runtime build per variant held parallel tests about 100 s;
+  1.6 GB of zig cache saved each run); the caches are warmed before the tests, the cache is not saved on macOS,
+  the cross-target tests run on Linux x64 alone (C1, #553; the job in two halves, C2, #554). And the precheck's selection: `tooling/`
+  counted whole as the harness, so every site slice ran the whole suite, 70–78 minutes — narrowed to what runs
+  the tests (T1, #552; the maintainer, 2026-10-24); a site slice's precheck takes 6–8 minutes.
+- **S7** the close (this).
+- The exit criterion — `/dev/` live with home page, Book scaffold, spec, catalog, search and legacy; the
+  comment guard at 0 — holds. Open points 260–265 from the milestone (260 the macOS outlier in a program's run,
+  261 comments outside the guard's areas, 262 `ParseError` outside the prelude, 263 the `try` messages, 264 the
+  CHANGELOG's markup and citations, 265 code in the search index). **Next: M13a, its plan in design 13 first.**
 
 ### M12b — done (2026-10-22)
 
