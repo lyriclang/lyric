@@ -236,6 +236,37 @@ promise. This entry fills with the milestones.
   **`lyric completions bash|zsh|fish|pwsh`**; one table of verbs and options behind `lyric help`, `<verb> --help`,
   the completions and the spec's table. A build that finds its C up to date says the warnings again. A build
   script that fails is exit 1.
+- **Inference and abstraction (M12b** — `design/v5/spec/03` S5, S15a, S16, T8, T19, N2b, `04` R4a3, R4b, S7, 13 M12b;
+  spec chapters 03 §9, 05 §2–§5, §11, §13, 08 §1.2, Appendix A**):** type arguments are written at a method as at
+  a function, `it.collect<List<int>>()`, `s.parse<int>()`; a parameter only a fixation names is inferred, `fn
+  countOf<I :: [Iterator<Item = T>], T>(it: I)`; a plain value binds `?U` — `mapNotNull((s) => try int.parse(s))`
+  —, and an array literal takes the type the other arguments bound, `assertEq(x.toBytesBE(), [2u8, 1u8])`. A
+  written instance meets its bounds where it is written, `fn f(s: Set<NoHash>)` is the signature's error. An
+  instantiation that does not end — `grow<T>` calling `grow<W<T>>` — is refused at a chain 128 deep with the chain
+  in the message, where the compiler ran for hours. A type's body and its inherent blocks overload by count. A
+  generic member is delegated to a field, and a field may hold a value of a child of the delegated interface; a
+  value of an interface is made from a shape (an array, a tuple, a function, an optional, a view) and from a type a
+  blanket block reaches. **A type may conform to several instances of one generic interface**, `struct Label ::
+  [From<int>, From<string>]`: members of one name and count answer their instances, and a call chooses by its
+  arguments' types, the arguments' own types first. `Pair<int>.of` is a value; `comptime if` is a value in a
+  function's body; a static member is not called through its interface (`LYR-SEM0231`); `==` on `void` is
+  refused; an import of another module's import is refused. A mismatch at a binding marks the initializer and
+  labels the written type; a count only a hidden overload takes names it in a note; `lyric fix` keeps a module
+  import whose blocks the file calls.
+- **The website and the Book (M12c** — `design/v5/spec/14`**):** <https://lyric.oil1i.de/dev/> is the Lyric 5
+  site, rebuilt on every push to `main`: a home page, *The Lyric Book* (Getting started, A first program, What the
+  compiler tells you — every snippet built and run by the test suite; one that must fail says so and shows the
+  compiler's message), the specification at the pinned commit, a page for every diagnostic code, the releases,
+  and full-text search. `lyric explain CODE` ends with the code's page for the toolchain's own version. The
+  1.0.0–4.5.0 documentation moved to <https://lyric.oil1i.de/legacy/>; its old addresses redirect there.
+- **Three mistakes said as the spelling to change:** a field or an initializer's field ending with `;`
+  (`LYR-PAR0064`, fix `,`), `continue`, `break` or `return` where a value stands (`LYR-PAR0065`, fix
+  `{ continue; }`), and `for (c in s)` over a `string` (`LYR-SEM0232`, fix `.chars()`), where the compiler said
+  "expected ':' after field name", "expected an expression" or let the loop through.
+- **The standard library's documentation** says what each element does, its edge cases, when it panics and
+  what it throws; std's messages, the runtime's and the catalog's name no design documents.
+- **`std.json`'s encode error for a non-finite float** reads "… has no JSON text — JSON has no NaN or
+  infinity" (it named a section of RFC 8259).
 
 ---
 
@@ -255,23 +286,6 @@ read before upgrading.
 Each of these compiled in 4.5 and gave an answer nobody asked for. They are listed first because
 they are the only way this release can break a build.
 
-- **Inference and abstraction (M12b** — `design/v5/spec/03` S5, S15a, S16, T8, T19, N2b, `04` R4a3, R4b, S7, 13 M12b;
-  spec chapters 03 §9, 05 §2–§5, §11, §13, 08 §1.2, Appendix A**):** type arguments are written at a method as at
-  a function, `it.collect<List<int>>()`, `s.parse<int>()`; a parameter only a fixation names is inferred, `fn
-  countOf<I :: [Iterator<Item = T>], T>(it: I)`; a plain value binds `?U` — `mapNotNull((s) => try int.parse(s))`
-  —, and an array literal takes the type the other arguments bound, `assertEq(x.toBytesBE(), [2u8, 1u8])`. A
-  written instance meets its bounds where it is written, `fn f(s: Set<NoHash>)` is the signature's error. An
-  instantiation that does not end — `grow<T>` calling `grow<W<T>>` — is refused at a chain 128 deep with the chain
-  in the message, where the compiler ran for hours. A type's body and its inherent blocks overload by count. A
-  generic member is delegated to a field, and a field may hold a value of a child of the delegated interface; a
-  value of an interface is made from a shape (an array, a tuple, a function, an optional, a view) and from a type a
-  blanket block reaches. **A type may conform to several instances of one generic interface**, `struct Label ::
-  [From<int>, From<string>]`: members of one name and count answer their instances, and a call chooses by its
-  arguments' types, the arguments' own types first. `Pair<int>.of` is a value; `comptime if` is a value in a
-  function's body; a static member is not called through its interface (`LYR-SEM0231`); `==` on `void` is
-  refused; an import of another module's import is refused. A mismatch at a binding marks the initializer and
-  labels the written type; a count only a hidden overload takes names it in a note; `lyric fix` keeps a module
-  import whose blocks the file calls.
 - **`if (c) 1 else 2.5` is `LYR-SEM0016`.** The arms unified to `float` while the integer arm
   stayed an integer, so a release build printed `5e-324` — the bit pattern of `1` read as a
   double — and a debug build died in the verifier. §3.1 lists the contexts an unsuffixed literal
