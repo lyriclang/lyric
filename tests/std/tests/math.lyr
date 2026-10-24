@@ -39,7 +39,11 @@ fn gcdAndLcm(): void {
     assertEq(math.lcm(4, 6), 12);
     assertEq(math.lcm(-4, 6), 12);
     assertEq(math.lcm(0, 3), 0);
-    assertPanics(() => { math.gcd(int.min, 0); });
+    assertPanics(
+        () => {
+            math.gcd(int.min, 0);
+        }
+    );
 }
 
 @Test
@@ -65,7 +69,11 @@ fn clampHoldsToTheBounds(): void {
     assertTrue(float.nan.clamp(0.0, 1.0).isNan());
     let c = 'q';
     assertEq(c.clamp('a', 'f'), 'f');
-    assertPanics(() => { 1.clamp(3, 0); });
+    assertPanics(
+        () => {
+            1.clamp(3, 0);
+        }
+    );
 }
 
 @Test

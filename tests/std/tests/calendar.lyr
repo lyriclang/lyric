@@ -84,7 +84,14 @@ fn aDateShowsItselfAsIso8601(): void throws TimeError {
 
 @Test
 fn whatIsNoDateOrTimeThrows(): void {
-    for ((y, m, d) in [(2026, 2, 29), (2026, 4, 31), (2026, 13, 1), (2026, 0, 1), (2026, 1, 0), (1900, 2, 29)]) {
+    for ((y, m, d) in [
+        (2026, 2, 29),
+        (2026, 4, 31),
+        (2026, 13, 1),
+        (2026, 0, 1),
+        (2026, 1, 0),
+        (1900, 2, 29),
+    ]) {
         try {
             let date = Date.of(y, m, d);
             fail(f"{date} was made");
@@ -92,7 +99,13 @@ fn whatIsNoDateOrTimeThrows(): void {
             assertFalse(e.message().isEmpty());
         }
     }
-    for ((h, m, s, n) in [(24, 0, 0, 0), (0, 60, 0, 0), (0, 0, 60, 0), (0, 0, 0, 1000000000), (-1, 0, 0, 0)]) {
+    for ((h, m, s, n) in [
+        (24, 0, 0, 0),
+        (0, 60, 0, 0),
+        (0, 0, 60, 0),
+        (0, 0, 0, 1000000000),
+        (-1, 0, 0, 0),
+    ]) {
         try {
             let time = Time.of(h, m, s, n);
             fail(f"{time} was made");
@@ -120,9 +133,18 @@ fn rfc3339ReadsAndWritesInstants(): void throws ParseError {
 
 @Test
 fn rfc3339IsReadStrictly(): void {
-    let refused = ["2026-10-08", "2026-10-08T12:00Z", "2026-10-08 12:00:00Z", "2026-10-08T12:00:00",
-        "2026-10-08T12:00:00+0200", "2026-10-08T12:00:00+24:00", "2026-10-08T12:00:00.Z", "26-10-08T12:00:00Z",
-        "2026-10-08T12:00:00ZZ", "2026-10-08T23:59:60Z"];
+    let refused = [
+        "2026-10-08",
+        "2026-10-08T12:00Z",
+        "2026-10-08 12:00:00Z",
+        "2026-10-08T12:00:00",
+        "2026-10-08T12:00:00+0200",
+        "2026-10-08T12:00:00+24:00",
+        "2026-10-08T12:00:00.Z",
+        "26-10-08T12:00:00Z",
+        "2026-10-08T12:00:00ZZ",
+        "2026-10-08T23:59:60Z",
+    ];
     for (s in refused) {
         try {
             let i = Instant.parse(s);
@@ -146,7 +168,11 @@ fn aDateTimeKeepsItsOffset(): void throws Error {
     assertEq(f"{utc}", "2026-10-08T10:34:56.789Z");
     assertFalse(utc == local);
     assertTrue(utc.toInstant() == local.toInstant());
-    let made = DateTime.of(try Date.of(2026, 10, 8), try Time.of(12, 34, 56, 789000000), try Zone.fixed(Duration.ofHours(2)));
+    let made = DateTime.of(
+        try Date.of(2026, 10, 8),
+        try Time.of(12, 34, 56, 789000000),
+        try Zone.fixed(Duration.ofHours(2))
+    );
     assertTrue(made == local);
 }
 
@@ -154,7 +180,12 @@ fn aDateTimeKeepsItsOffset(): void throws Error {
 fn aZoneIsAFixedOffsetInWholeMinutes(): void throws TimeError {
     assertEq((try Zone.fixed(Duration.ofMinutes(-330))).offset(), Duration.ofMinutes(-330));
     assertTrue(Zone.utc.offset() == Duration.ofNanos(0));
-    for (bad in [Duration.ofSecs(90), Duration.ofHours(24), Duration.ofHours(-24), Duration.ofMillis(1)]) {
+    for (bad in [
+        Duration.ofSecs(90),
+        Duration.ofHours(24),
+        Duration.ofHours(-24),
+        Duration.ofMillis(1),
+    ]) {
         try {
             Zone.fixed(bad);
             fail(f"a zone at {bad}");

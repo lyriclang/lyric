@@ -50,7 +50,12 @@ extend Ident {
 }
 
 /// The word in front of a declaration: none, `private`, `internal`, `pub`.
-pub enum Visibility :: [Equatable, Debug] { None, Private, Internal, Pub }
+pub enum Visibility :: [Equatable, Debug] {
+    None,
+    Private,
+    Internal,
+    Pub,
+}
 
 /// A literal as written: an integer with its suffix (`u8`, `i32`, ... or none), a float with its,
 /// a string, a byte string, a character, a bool, `null`.
@@ -66,26 +71,66 @@ pub enum Literal :: [Debug] {
 }
 
 @NonExhaustive
-pub enum UnaryOp :: [Equatable, Debug] { Not, Neg, BitNot, PreInc, PreDec, FromEnd, Place }
+pub enum UnaryOp :: [Equatable, Debug] {
+    Not,
+    Neg,
+    BitNot,
+    PreInc,
+    PreDec,
+    FromEnd,
+    Place,
+}
 
 @NonExhaustive
-pub enum PostfixOp :: [Equatable, Debug] { Inc, Dec, Unwrap }
+pub enum PostfixOp :: [Equatable, Debug] {
+    Inc,
+    Dec,
+    Unwrap,
+}
 
 @NonExhaustive
 pub enum BinaryOp :: [Equatable, Debug] {
-    Add, Sub, Mul, Div, Rem, AddWrap, SubWrap, MulWrap,
-    Shl, Shr, BitAnd, BitXor, BitOr,
-    Lt, Le, Gt, Ge, Eq, Ne, In, NotIn,
-    And, Or, Coalesce,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    AddWrap,
+    SubWrap,
+    MulWrap,
+    Shl,
+    Shr,
+    BitAnd,
+    BitXor,
+    BitOr,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Eq,
+    Ne,
+    In,
+    NotIn,
+    And,
+    Or,
+    Coalesce,
 }
 
 /// How a lambda was written: `(x) => e`, `x => e`, or as a trailing block `f { ... }`.
 @NonExhaustive
-pub enum LambdaForm :: [Equatable, Debug] { Paren, Bare, Trailing }
+pub enum LambdaForm :: [Equatable, Debug] {
+    Paren,
+    Bare,
+    Trailing,
+}
 
 /// The mark on a `try`: `try e`, `try? e`, `try! e`.
 @NonExhaustive
-pub enum TryKind :: [Equatable, Debug] { Plain, Optional, Force }
+pub enum TryKind :: [Equatable, Debug] {
+    Plain,
+    Optional,
+    Force,
+}
 
 /// A piece of an f-string: text as written, or a hole with its expression and its format spec.
 @NonExhaustive
@@ -714,9 +759,13 @@ extend Kids {
 
     fn body(b: Body): void {
         match (b) {
-            .Expr(e) => { this.expr(e.value); },
-            .Block(bl) => { this.block(bl); },
-            _ => { },
+            .Expr(e) => {
+                this.expr(e.value);
+            }
+            .Block(bl) => {
+                this.block(bl);
+            }
+            _ => { }
         }
     }
 
@@ -786,69 +835,137 @@ extend Expr {
     pub fn children(): Node[] {
         let k = Kids.new();
         match (this) {
-            .At(_, args, _) => { if (let xs = args) { k.exprs(xs); } },
-            .Unary(_, e, _) => { k.expr(e.value); },
-            .Postfix(e, _, _) => { k.expr(e.value); },
-            .Binary(l, _, r, _) => { k.expr(l.value); k.expr(r.value); },
-            .Assign(t, _, v, _) => { k.expr(t.value); k.expr(v.value); },
-            .Range(a, b, _, _) => { k.expr(a.value); k.expr(b.value); },
+            .At(_, args, _) => {
+                if (let xs = args) {
+                    k.exprs(xs);
+                }
+            }
+            .Unary(_, e, _) => {
+                k.expr(e.value);
+            }
+            .Postfix(e, _, _) => {
+                k.expr(e.value);
+            }
+            .Binary(l, _, r, _) => {
+                k.expr(l.value);
+                k.expr(r.value);
+            }
+            .Assign(t, _, v, _) => {
+                k.expr(t.value);
+                k.expr(v.value);
+            }
+            .Range(a, b, _, _) => {
+                k.expr(a.value);
+                k.expr(b.value);
+            }
             .SliceRange(a, b, _, _) => {
-                if (let x = a) { k.expr(x.value); }
-                if (let y = b) { k.expr(y.value); }
-            },
-            .Cast(e, t, _) => { k.expr(e.value); k.type(t); },
-            .Is(e, t, _) => { k.expr(e.value); k.type(t); },
+                if (let x = a) {
+                    k.expr(x.value);
+                }
+                if (let y = b) {
+                    k.expr(y.value);
+                }
+            }
+            .Cast(e, t, _) => {
+                k.expr(e.value);
+                k.type(t);
+            }
+            .Is(e, t, _) => {
+                k.expr(e.value);
+                k.type(t);
+            }
             .Call(c, args, targs, _) => {
                 k.expr(c.value);
                 for (a in args) {
                     k.expr(a.value);
                 }
                 k.types(targs);
-            },
-            .Index(t, i, _) => { k.expr(t.value); k.expr(i.value); },
-            .Member(t, _, _, _) => { k.expr(t.value); },
-            .Array(es, _) => { k.exprs(es); },
-            .Tuple(es, _) => { k.exprs(es); },
+            }
+            .Index(t, i, _) => {
+                k.expr(t.value);
+                k.expr(i.value);
+            }
+            .Member(t, _, _, _) => {
+                k.expr(t.value);
+            }
+            .Array(es, _) => {
+                k.exprs(es);
+            }
+            .Tuple(es, _) => {
+                k.exprs(es);
+            }
             .Interpolated(segs, _) => {
                 for (s in segs) {
                     match (s) {
-                        .Hole(e, _) => { k.expr(e); },
-                        _ => { },
+                        .Hole(e, _) => {
+                            k.expr(e);
+                        }
+                        _ => { }
                     }
                 }
-            },
+            }
             .Lambda(ps, ret, throws, body, _, _) => {
                 for (p in ps) {
                     k.optType(p.type);
-                    if (let pat = p.pattern) { k.pattern(pat); }
+                    if (let pat = p.pattern) {
+                        k.pattern(pat);
+                    }
                 }
                 k.optType(ret);
-                if (let ts = throws) { k.types(ts); }
+                if (let ts = throws) {
+                    k.types(ts);
+                }
                 k.body(body.value);
-            },
-            .LetCond(p, e, _) => { k.pattern(p); k.expr(e.value); },
-            .If(c, t, e, _) => { k.expr(c.value); k.expr(t.value); k.expr(e.value); },
-            .Match(s, arms, _) => { k.expr(s.value); k.arms(arms); },
-            .Block(b, _) => { k.block(b); },
-            .Loop(b, _, _) => { k.block(b); },
+            }
+            .LetCond(p, e, _) => {
+                k.pattern(p);
+                k.expr(e.value);
+            }
+            .If(c, t, e, _) => {
+                k.expr(c.value);
+                k.expr(t.value);
+                k.expr(e.value);
+            }
+            .Match(s, arms, _) => {
+                k.expr(s.value);
+                k.arms(arms);
+            }
+            .Block(b, _) => {
+                k.block(b);
+            }
+            .Loop(b, _, _) => {
+                k.block(b);
+            }
             .StructInit(_, targs, fields, _, _) => {
                 k.types(targs);
                 for (f in fields) {
                     k.expr(f.value);
                 }
-            },
-            .TypePath(_, targs, _) => { k.types(targs); },
+            }
+            .TypePath(_, targs, _) => {
+                k.types(targs);
+            }
             .With(t, fields, _) => {
                 k.expr(t.value);
                 for (f in fields) {
                     k.expr(f.value);
                 }
-            },
-            .Comptime(e, _) => { k.expr(e.value); },
-            .Throw(e, _) => { k.expr(e.value); },
-            .Try(e, _, cs, _) => { k.expr(e.value); k.catches(cs); },
-            .Macro(_, args, body, _) => { k.exprs(args); k.optBlock(body); },
-            _ => { },
+            }
+            .Comptime(e, _) => {
+                k.expr(e.value);
+            }
+            .Throw(e, _) => {
+                k.expr(e.value);
+            }
+            .Try(e, _, cs, _) => {
+                k.expr(e.value);
+                k.catches(cs);
+            }
+            .Macro(_, args, body, _) => {
+                k.exprs(args);
+                k.optBlock(body);
+            }
+            _ => { }
         }
         return k.done();
     }
@@ -859,31 +976,71 @@ extend Stmt {
     pub fn children(): Node[] {
         let k = Kids.new();
         match (this) {
-            .Expr(e, _) => { k.expr(e); },
-            .Tail(e, _) => { k.expr(e); },
-            .Let(_, _, t, e, _, _) => { k.optType(t); k.optExpr(e); },
-            .LetPattern(_, p, t, e, els, _) => { k.pattern(p); k.optType(t); k.expr(e); k.optBlock(els); },
+            .Expr(e, _) => {
+                k.expr(e);
+            }
+            .Tail(e, _) => {
+                k.expr(e);
+            }
+            .Let(_, _, t, e, _, _) => {
+                k.optType(t);
+                k.optExpr(e);
+            }
+            .LetPattern(_, p, t, e, els, _) => {
+                k.pattern(p);
+                k.optType(t);
+                k.expr(e);
+                k.optBlock(els);
+            }
             .If(c, t, e, _, _) => {
                 k.expr(c);
                 k.block(t);
-                if (let s = e) { k.stmt(s.value); }
-            },
-            .While(c, b, _, _) => { k.expr(c); k.block(b); },
-            .DoWhile(b, c, _, _) => { k.block(b); k.expr(c); },
+                if (let s = e) {
+                    k.stmt(s.value);
+                }
+            }
+            .While(c, b, _, _) => {
+                k.expr(c);
+                k.block(b);
+            }
+            .DoWhile(b, c, _, _) => {
+                k.block(b);
+                k.expr(c);
+            }
             .For(_, p, it, b, _, _, _) => {
-                if (let pat = p) { k.pattern(pat); }
+                if (let pat = p) {
+                    k.pattern(pat);
+                }
                 k.expr(it);
                 k.block(b);
-            },
-            .Break(_, v, _) => { k.optExpr(v); },
-            .Return(e, _) => { k.optExpr(e); },
-            .Yield(e, _) => { k.optExpr(e); },
-            .Defer(s, _) => { k.stmt(s.value); },
-            .Throw(e, _) => { k.expr(e); },
-            .Match(s, arms, _) => { k.expr(s); k.arms(arms); },
-            .Try(b, cs, _) => { k.block(b); k.catches(cs); },
-            .Block(b, _) => { k.block(b); },
-            _ => { },
+            }
+            .Break(_, v, _) => {
+                k.optExpr(v);
+            }
+            .Return(e, _) => {
+                k.optExpr(e);
+            }
+            .Yield(e, _) => {
+                k.optExpr(e);
+            }
+            .Defer(s, _) => {
+                k.stmt(s.value);
+            }
+            .Throw(e, _) => {
+                k.expr(e);
+            }
+            .Match(s, arms, _) => {
+                k.expr(s);
+                k.arms(arms);
+            }
+            .Try(b, cs, _) => {
+                k.block(b);
+                k.catches(cs);
+            }
+            .Block(b, _) => {
+                k.block(b);
+            }
+            _ => { }
         }
         return k.done();
     }
@@ -894,26 +1051,30 @@ extend Decl {
     pub fn children(): Node[] {
         let k = Kids.new();
         match (this) {
-            .Fn(f) => { k.fnDecl(f); },
+            .Fn(f) => {
+                k.fnDecl(f);
+            }
             .Struct(t) => {
                 k.generics(t.generics);
                 k.types(t.interfaces);
                 for (m in t.members) {
                     k.decl(m);
                 }
-            },
+            }
             .Class(t) => {
                 k.generics(t.generics);
                 k.types(t.interfaces);
                 for (m in t.members) {
                     k.decl(m);
                 }
-            },
+            }
             .Enum(e) => {
                 k.generics(e.generics);
                 k.types(e.interfaces);
                 for (v in e.variants) {
-                    if (let ts = v.tuple) { k.types(ts); }
+                    if (let ts = v.tuple) {
+                        k.types(ts);
+                    }
                     if (let fs = v.fields) {
                         for (f in fs) {
                             k.decl(Decl.Field(f));
@@ -923,14 +1084,14 @@ extend Decl {
                 k.assocTypes(e.types);
                 k.lets(e.statics);
                 k.fns(e.methods);
-            },
+            }
             .Interface(i) => {
                 k.generics(i.generics);
                 k.types(i.interfaces);
                 k.assocTypes(i.types);
                 k.lets(i.statics);
                 k.fns(i.members);
-            },
+            }
             .Extend(x) => {
                 k.generics(x.generics);
                 k.type(x.target);
@@ -938,12 +1099,23 @@ extend Decl {
                 k.assocTypes(x.types);
                 k.lets(x.statics);
                 k.fns(x.methods);
-            },
-            .Let(l) => { k.optType(l.type); k.optExpr(l.init); },
-            .Field(f) => { k.type(f.type); k.optExpr(f.default); },
-            .AssocType(a) => { k.types(a.bounds); k.optType(a.type); },
-            .Alias(a) => { k.type(a.aliased); },
-            _ => { },
+            }
+            .Let(l) => {
+                k.optType(l.type);
+                k.optExpr(l.init);
+            }
+            .Field(f) => {
+                k.type(f.type);
+                k.optExpr(f.default);
+            }
+            .AssocType(a) => {
+                k.types(a.bounds);
+                k.optType(a.type);
+            }
+            .Alias(a) => {
+                k.type(a.aliased);
+            }
+            _ => { }
         }
         return k.done();
     }
@@ -954,20 +1126,32 @@ extend Type {
     pub fn children(): Node[] {
         let k = Kids.new();
         match (this) {
-            .Named(_, args, _, _, _) => { k.types(args); },
-            .Optional(t, _) => { k.type(t.value); },
-            .Array(t, _, _) => { k.type(t.value); },
-            .Tuple(ts, _, _) => { k.types(ts); },
+            .Named(_, args, _, _, _) => {
+                k.types(args);
+            }
+            .Optional(t, _) => {
+                k.type(t.value);
+            }
+            .Array(t, _, _) => {
+                k.type(t.value);
+            }
+            .Tuple(ts, _, _) => {
+                k.types(ts);
+            }
             .Fn(ps, r, throws, _, _) => {
                 k.types(ps);
                 k.type(r.value);
-                if (let ts = throws) { k.types(ts); }
-            },
+                if (let ts = throws) {
+                    k.types(ts);
+                }
+            }
             .Throwing(t, e, _) => {
                 k.type(t.value);
-                if (let x = e) { k.type(x.value); }
-            },
-            _ => { },
+                if (let x = e) {
+                    k.type(x.value);
+                }
+            }
+            _ => { }
         }
         return k.done();
     }
@@ -978,22 +1162,41 @@ extend Pattern {
     pub fn children(): Node[] {
         let k = Kids.new();
         match (this) {
-            .Literal(e, _) => { k.expr(e.value); },
-            .TypePat(_, t, _) => { k.type(t); },
-            .TypeSet(_, ts, _) => { k.types(ts); },
+            .Literal(e, _) => {
+                k.expr(e.value);
+            }
+            .TypePat(_, t, _) => {
+                k.type(t);
+            }
+            .TypeSet(_, ts, _) => {
+                k.types(ts);
+            }
             .Variant(_, elems, fields, _, _) => {
-                if (let ps = elems) { k.patterns(ps); }
+                if (let ps = elems) {
+                    k.patterns(ps);
+                }
                 if (let fs = fields) {
                     for (f in fs) {
-                        if (let p = f.pattern) { k.pattern(p); }
+                        if (let p = f.pattern) {
+                            k.pattern(p);
+                        }
                     }
                 }
-            },
-            .Tuple(ps, _) => { k.patterns(ps); },
-            .Range(a, b, _, _) => { k.expr(a.value); k.expr(b.value); },
-            .Or(ps, _) => { k.patterns(ps); },
-            .Array(ps, _) => { k.patterns(ps); },
-            _ => { },
+            }
+            .Tuple(ps, _) => {
+                k.patterns(ps);
+            }
+            .Range(a, b, _, _) => {
+                k.expr(a.value);
+                k.expr(b.value);
+            }
+            .Or(ps, _) => {
+                k.patterns(ps);
+            }
+            .Array(ps, _) => {
+                k.patterns(ps);
+            }
+            _ => { }
         }
         return k.done();
     }

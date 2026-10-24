@@ -24,24 +24,32 @@ fn summed(words: string[]): int throws ParseError {
 }
 
 fn boomOf(_v: int): int throws Boom {
-    throw Boom {};
+    throw Boom { };
 }
 
 fn boomMade(): int throws Boom {
-    throw Boom {};
+    throw Boom { };
 }
 
 @Test
 fn aMapThatThrowsMakesTheWalkThrow(): void {
     assertEq(try! parsed(["1", "2", "3"]), [1, 2, 3]);
-    let e = assertThrows(() => { try parsed(["1", "x", "3"]); });
+    let e = assertThrows(
+        () => {
+            try parsed(["1", "x", "3"]);
+        }
+    );
     assertTrue(e.message().contains("x"));
 }
 
 @Test
 fn aForOverAThrowingMapIsMarked(): void {
     assertEq(try! summed(["4", "5"]), 9);
-    let e = assertThrows(() => { try summed(["4", "y"]); });
+    let e = assertThrows(
+        () => {
+            try summed(["4", "y"]);
+        }
+    );
     assertTrue(e.message().contains("y"));
 }
 
@@ -50,19 +58,31 @@ fn predicatesThatThrow(): void {
     let xs = [1, 2, 3, 4, 5];
     let failing = (x: int) => {
         if (x == 4) {
-            throw Boom {};
+            throw Boom { };
         }
         return x < 3;
     };
     assertEq(xs.iter().filter((x: int) => x % 2 == 1).toArray(), [1, 3, 5]);
-    let a = assertThrows(() => { try xs.iter().filter(failing).toArray(); });
+    let a = assertThrows(
+        () => {
+            try xs.iter().filter(failing).toArray();
+        }
+    );
     assertEq(a.message(), "boom");
     assertEq(try! xs.iter().takeWhile(failing).toArray(), [1, 2]);
-    let b = assertThrows(() => { try xs.iter().skipWhile((x: int) => (try failing(x)) || x < 4).toArray(); });
+    let b = assertThrows(
+        () => {
+            try xs.iter().skipWhile((x: int) => (try failing(x)) || x < 4).toArray();
+        }
+    );
     assertEq(b.message(), "boom");
     assertTrue(xs.iter().any((x: int) => x > 2));
     // all stops at the first value its predicate fails for — here none fails before 4 throws
-    let c = assertThrows(() => { try xs.iter().all((x: int) => (try failing(x)) || true); });
+    let c = assertThrows(
+        () => {
+            try xs.iter().all((x: int) => (try failing(x)) || true);
+        }
+    );
     assertEq(c.message(), "boom");
     assertEq(xs.iter().position((x: int) => x == 3)!, 2);
 }
@@ -71,24 +91,33 @@ fn predicatesThatThrow(): void {
 fn foldAndForEachThrowWhatTheirFunctionThrows(): void {
     let xs = [1, 2, 3];
     assertEq(xs.iter().fold(0, (a: int, x: int) => a + x), 6);
-    let a = assertThrows(() => {
-        try xs.iter().fold(0, (acc: int, x: int) => {
-            if (x == 3) {
-                throw Boom {};
-            }
-            return acc + x;
-        });
-    });
+    let a = assertThrows(
+        () => {
+            try xs.iter().fold(
+                0,
+                (acc: int, x: int) => {
+                    if (x == 3) {
+                        throw Boom { };
+                    }
+                    return acc + x;
+                }
+            );
+        }
+    );
     assertEq(a.message(), "boom");
     var seen = 0;
-    let b = assertThrows(() => {
-        try xs.iter().forEach((x: int) => {
-            if (x == 2) {
-                throw Boom {};
-            }
-            seen += x;
-        });
-    });
+    let b = assertThrows(
+        () => {
+            try xs.iter().forEach(
+                (x: int) => {
+                    if (x == 2) {
+                        throw Boom { };
+                    }
+                    seen += x;
+                }
+            );
+        }
+    );
     assertEq(b.message(), "boom");
     assertEq(seen, 1);
 }
@@ -96,14 +125,19 @@ fn foldAndForEachThrowWhatTheirFunctionThrows(): void {
 @Test
 fn arrayOfThrowsWhatItsFunctionThrows(): void {
     assertEq(arrayOf(3, (i: int) => i * i), [0, 1, 4]);
-    let e = assertThrows(() => {
-        try arrayOf(3, (i: int) => {
-            if (i == 2) {
-                throw Boom {};
-            }
-            return i;
-        });
-    });
+    let e = assertThrows(
+        () => {
+            try arrayOf(
+                3,
+                (i: int) => {
+                    if (i == 2) {
+                        throw Boom { };
+                    }
+                    return i;
+                }
+            );
+        }
+    );
     assertEq(e.message(), "boom");
 }
 
@@ -113,25 +147,31 @@ fn aSortThatThrowsAnywhereKeepsEveryElement(): void {
     // the comparison throws at each of its calls in turn, and every element is still there.
     var total = 0;
     let probe = arrayOf(50, (i: int) => (i * 37) % 50);
-    probe[..].sortBy((a: int, b: int) => {
-        total += 1;
-        return a.totalCompare(b);
-    });
+    probe[..].sortBy(
+        (a: int, b: int) => {
+            total += 1;
+            return a.totalCompare(b);
+        }
+    );
     assertEq(probe, arrayOf(50, (i: int) => i));
     var k = 1;
     while (k <= total) {
         let xs = arrayOf(50, (i: int) => (i * 37) % 50);
         var calls = 0;
         let stop = k;
-        let e = assertThrows(() => {
-            try xs[..].sortBy((a: int, b: int) => {
-                calls += 1;
-                if (calls == stop) {
-                    throw Boom {};
-                }
-                return a.totalCompare(b);
-            });
-        });
+        let e = assertThrows(
+            () => {
+                try xs[..].sortBy(
+                    (a: int, b: int) => {
+                        calls += 1;
+                        if (calls == stop) {
+                            throw Boom { };
+                        }
+                        return a.totalCompare(b);
+                    }
+                );
+            }
+        );
         assertEq(e.message(), "boom");
         let copy = xs.iter().toArray();
         copy[..].sort();
@@ -146,14 +186,18 @@ fn aSortThatThrowsAnywhereKeepsEveryElement(): void {
 @Test
 fn removeWhereThatThrowsKeepsWhatItDecidedAndTheRest(): void {
     let list = List.of([1, 2, 3, 4, 5, 6]);
-    let e = assertThrows(() => {
-        try list.removeWhere((x: int) => {
-            if (x == 4) {
-                throw Boom {};
-            }
-            return x == 2;
-        });
-    });
+    let e = assertThrows(
+        () => {
+            try list.removeWhere(
+                (x: int) => {
+                    if (x == 4) {
+                        throw Boom { };
+                    }
+                    return x == 2;
+                }
+            );
+        }
+    );
     assertEq(e.message(), "boom");
     assertEq(list.toArray(), [1, 3, 4, 5, 6]);
     assertEq(list.removeWhere((x: int) => x > 4), 2);
@@ -166,10 +210,18 @@ fn aMapIsLeftAsItWas(): void {
     {
         let _ = m.insert("a", 1);
     }
-    let a = assertThrows(() => { try m.update("a", boomOf); });
+    let a = assertThrows(
+        () => {
+            try m.update("a", boomOf);
+        }
+    );
     assertEq(a.message(), "boom");
     assertEq(m.get("a") ?? 0, 1);
-    let b = assertThrows(() => { try m.getOrInsert("b", boomMade); });
+    let b = assertThrows(
+        () => {
+            try m.getOrInsert("b", boomMade);
+        }
+    );
     assertEq(b.message(), "boom");
     assertNull(m.get("b"));
     assertEq(m.retain((k: string, v: int) => v > 0), 0);

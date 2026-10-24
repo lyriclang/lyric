@@ -1,7 +1,17 @@
 // std.io's buffers and text: a codepoint split between reads, the
 // line ends, a BOM only when asked, invalid UTF-8 as InvalidData, a BufWriter holding back until a
 // flush or its close, a BufReader reading its inner reader in blocks.
-import std.io { BufReader, BufWriter, ByteBuffer, ByteReader, IoError, Reader, TextReader, TextWriter, Writer };
+import std.io {
+    BufReader,
+    BufWriter,
+    ByteBuffer,
+    ByteReader,
+    IoError,
+    Reader,
+    TextReader,
+    TextWriter,
+    Writer,
+};
 import std.test { assertEq, assertNull, assertTrue, fail };
 import std.task { Cancelled };
 
@@ -102,7 +112,10 @@ fn aBomIsTextUnlessSkipped(): void throws [IoError, Cancelled] {
     assertTrue(kept.startsWith("\u{FEFF}"));
     assertEq(try TextReader.new(ByteReader.new(withBom[..]), skipBom: true).readToEnd(), "hi");
     let none: uint8[] = [0x68u8, 0x69u8];
-    assertEq(try TextReader.new(ByteReader.new(none[..]), skipBom: true).readLine() ?? "<end>", "hi");
+    assertEq(
+        try TextReader.new(ByteReader.new(none[..]), skipBom: true).readLine() ?? "<end>",
+        "hi"
+    );
 }
 
 @Test

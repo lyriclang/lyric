@@ -64,9 +64,15 @@ fn main(): int throws Error {
     let given = args();
     if (given.length() > 1) {
         let port = try int.parse(given[1]);
-        var server = try Server.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = port as uint16 });
+        var server = try Server.bind(
+            SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = port as uint16 }
+        );
         eprintln(f"jsonserver: http://127.0.0.1:{(try server.localAddr()).port}/items");
-        let serving = spawn(() => { try server.serve(handle); });
+        let serving = spawn(
+            () => {
+                try server.serve(handle);
+            }
+        );
         let stop = signals(Signal.Interrupt, Signal.Terminate);
         let _ = try stop.recv();
         server.shutdown();
@@ -75,7 +81,11 @@ fn main(): int throws Error {
     }
     var server = try Server.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 });
     let base = f"http://127.0.0.1:{(try server.localAddr()).port}";
-    let serving = spawn(() => { try server.serve(handle); });
+    let serving = spawn(
+        () => {
+            try server.serve(handle);
+        }
+    );
 
     var client = Client.new();
     let all = try (client.get(Uri.parse(base + "/items"))).json<Item[]>();
@@ -86,7 +96,9 @@ fn main(): int throws Error {
     post.method = Method.Post;
     post.setText("{\"name\": \"Milch\", \"price\": 1.2}", "application/json");
     let made = try client.send(post);
-    println(f"{made.status.show()} {made.headers.get("Location") ?? "-"} {(try made.json<Item>()).name}");
+    println(
+        f"{made.status.show()} {made.headers.get("Location") ?? "-"} {(try made.json<Item>()).name}"
+    );
     let one = try client.get(Uri.parse(base + "/items/3"));
     println(f"{one.status.code} {try one.text()}");
     let none = try client.get(try Uri.parse(base + "/items/9"));

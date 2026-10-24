@@ -27,8 +27,11 @@ pub struct EncodingError :: [Error] {
 // ---------------------------------------------------------------------------------------------
 
 let standardDigits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
 let urlDigits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
 let standardValues = valuesOf(standardDigits);
+
 let urlValues = valuesOf(urlDigits);
 
 /// Base64 with RFC 4648's alphabet (§4), `+` and `/`, padded with `=` to a multiple of four.
@@ -296,7 +299,10 @@ pub struct Utf16 {
             if (u >= 0xD800 && u <= 0xDBFF) {
                 let next = if (i + 1 < units.length()) units[i + 1] as int else -1;
                 if (next < 0xDC00 || next > 0xDFFF) {
-                    throw EncodingError { offset = i, detail = "a high surrogate without its low one" };
+                    throw EncodingError {
+                        offset = i,
+                        detail = "a high surrogate without its low one",
+                    };
                 }
                 code = 0x10000 + ((u - 0xD800) << 10) + (next - 0xDC00);
                 i = i + 1;
@@ -352,12 +358,19 @@ fn holdsWidth(s: Slice<uint8>, width: int): void {
 }
 
 extend int8 {
-    pub static fn fromBytesLE(s: Slice<uint8>): int8 { return littleEnd(s, 1) as int8; }
-    pub static fn fromBytesBE(s: Slice<uint8>): int8 { return bigEnd(s, 1) as int8; }
+    pub static fn fromBytesLE(s: Slice<uint8>): int8 {
+        return littleEnd(s, 1) as int8;
+    }
+
+    pub static fn fromBytesBE(s: Slice<uint8>): int8 {
+        return bigEnd(s, 1) as int8;
+    }
+
     pub fn toBytesLE(): uint8[1] {
         let v = this as uint;
         return [byteOf(v, 0)];
     }
+
     pub fn toBytesBE(): uint8[1] {
         let v = this as uint;
         return [byteOf(v, 0)];
@@ -365,12 +378,19 @@ extend int8 {
 }
 
 extend int16 {
-    pub static fn fromBytesLE(s: Slice<uint8>): int16 { return littleEnd(s, 2) as int16; }
-    pub static fn fromBytesBE(s: Slice<uint8>): int16 { return bigEnd(s, 2) as int16; }
+    pub static fn fromBytesLE(s: Slice<uint8>): int16 {
+        return littleEnd(s, 2) as int16;
+    }
+
+    pub static fn fromBytesBE(s: Slice<uint8>): int16 {
+        return bigEnd(s, 2) as int16;
+    }
+
     pub fn toBytesLE(): uint8[2] {
         let v = this as uint;
         return [byteOf(v, 0), byteOf(v, 1)];
     }
+
     pub fn toBytesBE(): uint8[2] {
         let v = this as uint;
         return [byteOf(v, 1), byteOf(v, 0)];
@@ -378,12 +398,19 @@ extend int16 {
 }
 
 extend int32 {
-    pub static fn fromBytesLE(s: Slice<uint8>): int32 { return littleEnd(s, 4) as int32; }
-    pub static fn fromBytesBE(s: Slice<uint8>): int32 { return bigEnd(s, 4) as int32; }
+    pub static fn fromBytesLE(s: Slice<uint8>): int32 {
+        return littleEnd(s, 4) as int32;
+    }
+
+    pub static fn fromBytesBE(s: Slice<uint8>): int32 {
+        return bigEnd(s, 4) as int32;
+    }
+
     pub fn toBytesLE(): uint8[4] {
         let v = this as uint;
         return [byteOf(v, 0), byteOf(v, 1), byteOf(v, 2), byteOf(v, 3)];
     }
+
     pub fn toBytesBE(): uint8[4] {
         let v = this as uint;
         return [byteOf(v, 3), byteOf(v, 2), byteOf(v, 1), byteOf(v, 0)];
@@ -391,27 +418,57 @@ extend int32 {
 }
 
 extend int {
-    pub static fn fromBytesLE(s: Slice<uint8>): int { return littleEnd(s, 8) as int; }
-    pub static fn fromBytesBE(s: Slice<uint8>): int { return bigEnd(s, 8) as int; }
+    pub static fn fromBytesLE(s: Slice<uint8>): int {
+        return littleEnd(s, 8) as int;
+    }
+
+    pub static fn fromBytesBE(s: Slice<uint8>): int {
+        return bigEnd(s, 8) as int;
+    }
+
     pub fn toBytesLE(): uint8[8] {
         let v = this as uint;
-        return [byteOf(v, 0), byteOf(v, 1), byteOf(v, 2), byteOf(v, 3),
-            byteOf(v, 4), byteOf(v, 5), byteOf(v, 6), byteOf(v, 7)];
+        return [
+            byteOf(v, 0),
+            byteOf(v, 1),
+            byteOf(v, 2),
+            byteOf(v, 3),
+            byteOf(v, 4),
+            byteOf(v, 5),
+            byteOf(v, 6),
+            byteOf(v, 7),
+        ];
     }
+
     pub fn toBytesBE(): uint8[8] {
         let v = this as uint;
-        return [byteOf(v, 7), byteOf(v, 6), byteOf(v, 5), byteOf(v, 4),
-            byteOf(v, 3), byteOf(v, 2), byteOf(v, 1), byteOf(v, 0)];
+        return [
+            byteOf(v, 7),
+            byteOf(v, 6),
+            byteOf(v, 5),
+            byteOf(v, 4),
+            byteOf(v, 3),
+            byteOf(v, 2),
+            byteOf(v, 1),
+            byteOf(v, 0),
+        ];
     }
 }
 
 extend uint8 {
-    pub static fn fromBytesLE(s: Slice<uint8>): uint8 { return littleEnd(s, 1) as uint8; }
-    pub static fn fromBytesBE(s: Slice<uint8>): uint8 { return bigEnd(s, 1) as uint8; }
+    pub static fn fromBytesLE(s: Slice<uint8>): uint8 {
+        return littleEnd(s, 1) as uint8;
+    }
+
+    pub static fn fromBytesBE(s: Slice<uint8>): uint8 {
+        return bigEnd(s, 1) as uint8;
+    }
+
     pub fn toBytesLE(): uint8[1] {
         let v = this as uint;
         return [byteOf(v, 0)];
     }
+
     pub fn toBytesBE(): uint8[1] {
         let v = this as uint;
         return [byteOf(v, 0)];
@@ -419,12 +476,19 @@ extend uint8 {
 }
 
 extend uint16 {
-    pub static fn fromBytesLE(s: Slice<uint8>): uint16 { return littleEnd(s, 2) as uint16; }
-    pub static fn fromBytesBE(s: Slice<uint8>): uint16 { return bigEnd(s, 2) as uint16; }
+    pub static fn fromBytesLE(s: Slice<uint8>): uint16 {
+        return littleEnd(s, 2) as uint16;
+    }
+
+    pub static fn fromBytesBE(s: Slice<uint8>): uint16 {
+        return bigEnd(s, 2) as uint16;
+    }
+
     pub fn toBytesLE(): uint8[2] {
         let v = this as uint;
         return [byteOf(v, 0), byteOf(v, 1)];
     }
+
     pub fn toBytesBE(): uint8[2] {
         let v = this as uint;
         return [byteOf(v, 1), byteOf(v, 0)];
@@ -432,12 +496,19 @@ extend uint16 {
 }
 
 extend uint32 {
-    pub static fn fromBytesLE(s: Slice<uint8>): uint32 { return littleEnd(s, 4) as uint32; }
-    pub static fn fromBytesBE(s: Slice<uint8>): uint32 { return bigEnd(s, 4) as uint32; }
+    pub static fn fromBytesLE(s: Slice<uint8>): uint32 {
+        return littleEnd(s, 4) as uint32;
+    }
+
+    pub static fn fromBytesBE(s: Slice<uint8>): uint32 {
+        return bigEnd(s, 4) as uint32;
+    }
+
     pub fn toBytesLE(): uint8[4] {
         let v = this as uint;
         return [byteOf(v, 0), byteOf(v, 1), byteOf(v, 2), byteOf(v, 3)];
     }
+
     pub fn toBytesBE(): uint8[4] {
         let v = this as uint;
         return [byteOf(v, 3), byteOf(v, 2), byteOf(v, 1), byteOf(v, 0)];
@@ -445,17 +516,40 @@ extend uint32 {
 }
 
 extend uint {
-    pub static fn fromBytesLE(s: Slice<uint8>): uint { return littleEnd(s, 8); }
-    pub static fn fromBytesBE(s: Slice<uint8>): uint { return bigEnd(s, 8); }
+    pub static fn fromBytesLE(s: Slice<uint8>): uint {
+        return littleEnd(s, 8);
+    }
+
+    pub static fn fromBytesBE(s: Slice<uint8>): uint {
+        return bigEnd(s, 8);
+    }
+
     pub fn toBytesLE(): uint8[8] {
         let v = this;
-        return [byteOf(v, 0), byteOf(v, 1), byteOf(v, 2), byteOf(v, 3),
-            byteOf(v, 4), byteOf(v, 5), byteOf(v, 6), byteOf(v, 7)];
+        return [
+            byteOf(v, 0),
+            byteOf(v, 1),
+            byteOf(v, 2),
+            byteOf(v, 3),
+            byteOf(v, 4),
+            byteOf(v, 5),
+            byteOf(v, 6),
+            byteOf(v, 7),
+        ];
     }
+
     pub fn toBytesBE(): uint8[8] {
         let v = this;
-        return [byteOf(v, 7), byteOf(v, 6), byteOf(v, 5), byteOf(v, 4),
-            byteOf(v, 3), byteOf(v, 2), byteOf(v, 1), byteOf(v, 0)];
+        return [
+            byteOf(v, 7),
+            byteOf(v, 6),
+            byteOf(v, 5),
+            byteOf(v, 4),
+            byteOf(v, 3),
+            byteOf(v, 2),
+            byteOf(v, 1),
+            byteOf(v, 0),
+        ];
     }
 }
 
@@ -464,16 +558,51 @@ extend uint {
 /// # Panics
 /// Panics when the slice does not hold the integer's width at that offset.
 extend Slice<uint8> {
-    pub fn getUint16LE(at: int): uint16 { return uint16.fromBytesLE(this[at..at + 2]); }
-    pub fn getUint16BE(at: int): uint16 { return uint16.fromBytesBE(this[at..at + 2]); }
-    pub fn getUint32LE(at: int): uint32 { return uint32.fromBytesLE(this[at..at + 4]); }
-    pub fn getUint32BE(at: int): uint32 { return uint32.fromBytesBE(this[at..at + 4]); }
-    pub fn getUint64LE(at: int): uint { return uint.fromBytesLE(this[at..at + 8]); }
-    pub fn getUint64BE(at: int): uint { return uint.fromBytesBE(this[at..at + 8]); }
-    pub fn getInt16LE(at: int): int16 { return int16.fromBytesLE(this[at..at + 2]); }
-    pub fn getInt16BE(at: int): int16 { return int16.fromBytesBE(this[at..at + 2]); }
-    pub fn getInt32LE(at: int): int32 { return int32.fromBytesLE(this[at..at + 4]); }
-    pub fn getInt32BE(at: int): int32 { return int32.fromBytesBE(this[at..at + 4]); }
-    pub fn getInt64LE(at: int): int { return int.fromBytesLE(this[at..at + 8]); }
-    pub fn getInt64BE(at: int): int { return int.fromBytesBE(this[at..at + 8]); }
+    pub fn getUint16LE(at: int): uint16 {
+        return uint16.fromBytesLE(this[at..at + 2]);
+    }
+
+    pub fn getUint16BE(at: int): uint16 {
+        return uint16.fromBytesBE(this[at..at + 2]);
+    }
+
+    pub fn getUint32LE(at: int): uint32 {
+        return uint32.fromBytesLE(this[at..at + 4]);
+    }
+
+    pub fn getUint32BE(at: int): uint32 {
+        return uint32.fromBytesBE(this[at..at + 4]);
+    }
+
+    pub fn getUint64LE(at: int): uint {
+        return uint.fromBytesLE(this[at..at + 8]);
+    }
+
+    pub fn getUint64BE(at: int): uint {
+        return uint.fromBytesBE(this[at..at + 8]);
+    }
+
+    pub fn getInt16LE(at: int): int16 {
+        return int16.fromBytesLE(this[at..at + 2]);
+    }
+
+    pub fn getInt16BE(at: int): int16 {
+        return int16.fromBytesBE(this[at..at + 2]);
+    }
+
+    pub fn getInt32LE(at: int): int32 {
+        return int32.fromBytesLE(this[at..at + 4]);
+    }
+
+    pub fn getInt32BE(at: int): int32 {
+        return int32.fromBytesBE(this[at..at + 4]);
+    }
+
+    pub fn getInt64LE(at: int): int {
+        return int.fromBytesLE(this[at..at + 8]);
+    }
+
+    pub fn getInt64BE(at: int): int {
+        return int.fromBytesBE(this[at..at + 8]);
+    }
 }

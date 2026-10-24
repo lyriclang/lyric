@@ -26,9 +26,11 @@ fn checked(x: int): int throws Odd {
 @Test
 fn aReleaseOnAnotherThreadWakesTheWaiter(): void throws Error {
     let sem = Semaphore.new(0);
-    let other = Thread.spawn(() => {
-        sem.release();
-    });
+    let other = Thread.spawn(
+        () => {
+            sem.release();
+        }
+    );
     try sem.acquire();
     try other.await();
     assertEq(sem.available(), 0);

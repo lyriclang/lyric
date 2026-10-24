@@ -51,6 +51,7 @@ public static partial class Program
             "test" => Test(rest, lints),
             "bench" => Bench(rest, lints),
             "fix" => Fix(rest, lints),
+            "fmt" => Fmt(rest),
             "env" => Env(rest),
             "new" => New(rest, here: false),
             "init" => New(rest, here: true),

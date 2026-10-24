@@ -1,14 +1,44 @@
 // std.core's floats: the type's constants, IEEE's total order, the
 // bits - and std.math's elementary functions over them.
-import std.math { abs, acos, pow, asin, atan, atan2, cbrt, ceil, cos, cosh, exp, floor, hypot, ln, log10, log2, round, sin, sinh, sqrt, tan, tanh, trunc };
+import std.math {
+    abs,
+    acos,
+    pow,
+    asin,
+    atan,
+    atan2,
+    cbrt,
+    ceil,
+    cos,
+    cosh,
+    exp,
+    floor,
+    hypot,
+    ln,
+    log10,
+    log2,
+    round,
+    sin,
+    sinh,
+    sqrt,
+    tan,
+    tanh,
+    trunc,
+};
 import std.test { assertEq, assertTrue, assertFalse, assertClose };
 
 fn less(o: Ordering): bool {
-    return match (o) { .Less => true, _ => false };
+    return match (o) {
+        .Less => true,
+        _ => false,
+    };
 }
 
 fn tied(o: Ordering): bool {
-    return match (o) { .Equal => true, _ => false };
+    return match (o) {
+        .Equal => true,
+        _ => false,
+    };
 }
 
 fn third<T :: [Float]>(x: T): T {
@@ -99,11 +129,24 @@ fn atan2TakesThePoint(): void {
 
 @Test
 fn totalCompareOrdersEveryValue(): void {
-    let order = [-float.nan, -float.infinity, -1.0, -float.leastPositive, -0.0, 0.0,
-                 float.leastPositive, 1.0, float.infinity, float.nan];
+    let order = [
+        -float.nan,
+        -float.infinity,
+        -1.0,
+        -float.leastPositive,
+        -0.0,
+        0.0,
+        float.leastPositive,
+        1.0,
+        float.infinity,
+        float.nan,
+    ];
     for (i in 1..order.length()) {
         assertTrue(less(order[i - 1].totalCompare(order[i])), f"{order[i - 1]} before {order[i]}");
-        assertFalse(less(order[i].totalCompare(order[i - 1])), f"{order[i]} not before {order[i - 1]}");
+        assertFalse(
+            less(order[i].totalCompare(order[i - 1])),
+            f"{order[i]} not before {order[i - 1]}"
+        );
     }
     assertTrue(tied(float.nan.totalCompare(float.nan)));
     let a: float32 = -0.0;

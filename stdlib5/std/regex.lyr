@@ -92,7 +92,12 @@ class CharClass {
     var fold: bool,
 
     static fn new(negated: bool, fold: bool): CharClass {
-        return CharClass { ranges = List.new(), predicates = List.new(), negated = negated, fold = fold };
+        return CharClass {
+            ranges = List.new(),
+            predicates = List.new(),
+            negated = negated,
+            fold = fold,
+        };
     }
 
     fn matches(c: char): bool {
@@ -132,8 +137,10 @@ fn predicateHolds(p: Predicate, c: char): bool {
         .AsciiAlnum => c.isAsciiAlpha() || c.isAsciiDigit(),
         .AsciiUpper => c >= 'A' && c <= 'Z',
         .AsciiLower => c >= 'a' && c <= 'z',
-        .AsciiPunct => (code >= 33u32 && code <= 47u32) || (code >= 58u32 && code <= 64u32)
-            || (code >= 91u32 && code <= 96u32) || (code >= 123u32 && code <= 126u32),
+        .AsciiPunct => (code >= 33u32 && code <= 47u32)
+            || (code >= 58u32 && code <= 64u32)
+            || (code >= 91u32 && code <= 96u32)
+            || (code >= 123u32 && code <= 126u32),
         .AsciiXDigit => c.isAsciiHexDigit(),
         .AsciiCntrl => code < 32u32 || code == 127u32,
         .AsciiPrint => code >= 32u32 && code <= 126u32,
@@ -190,9 +197,7 @@ fn categoryNamed(cat: UnicodeCategory, name: string): bool {
 
 fn isCategoryName(name: string): bool {
     return match (name) {
-        "L" | "Lu" | "Ll" | "Lt" | "Lm" | "Lo" | "M" | "Mn" | "Mc" | "Me" | "N" | "Nd" | "Nl" | "No"
-            | "P" | "Pc" | "Pd" | "Ps" | "Pe" | "Pi" | "Pf" | "Po" | "S" | "Sm" | "Sc" | "Sk" | "So"
-            | "Z" | "Zs" | "Zl" | "Zp" | "C" | "Cc" | "Cf" | "Cs" | "Co" | "Cn" => true,
+        "L" | "Lu" | "Ll" | "Lt" | "Lm" | "Lo" | "M" | "Mn" | "Mc" | "Me" | "N" | "Nd" | "Nl" | "No" | "P" | "Pc" | "Pd" | "Ps" | "Pe" | "Pi" | "Pf" | "Po" | "S" | "Sm" | "Sc" | "Sk" | "So" | "Z" | "Zs" | "Zl" | "Zp" | "C" | "Cc" | "Cf" | "Cs" | "Co" | "Cn" => true,
         _ => false,
     };
 }
@@ -224,7 +229,14 @@ class Parser {
         for (c in pattern.chars()) {
             cs.push(c);
         }
-        return Parser { chars = cs, at = 0, nodes = List.new(), classes = List.new(), groups = 1, names = Map<string, int>.new() };
+        return Parser {
+            chars = cs,
+            at = 0,
+            nodes = List.new(),
+            classes = List.new(),
+            groups = 1,
+            names = Map<string, int>.new(),
+        };
     }
 
     fn fail(detail: string): RegexError {
@@ -267,7 +279,7 @@ class Parser {
 
     /// The whole pattern: an alternation up to the end.
     mut fn parseAll(): int throws RegexError {
-        var flags = Flags {};
+        var flags = Flags { };
         let root = try this.parseAlternation(&flags);
         if (this.more()) {
             throw this.fail("unmatched ')'");
@@ -535,7 +547,14 @@ class Parser {
             throw this.fail("the pattern ends in '\\'");
         }
         let c = this.take();
-        if (c == 'd' || c == 'w' || c == 's' || c == 'D' || c == 'W' || c == 'S' || c == 'p' || c == 'P') {
+        if (c == 'd'
+            || c == 'w'
+            || c == 's'
+            || c == 'D'
+            || c == 'W'
+            || c == 'S'
+            || c == 'p'
+            || c == 'P') {
             this.at = this.at - 1;
             let cls = CharClass.new(false, flags.i);
             try this.classEscape(cls);
@@ -561,13 +580,27 @@ class Parser {
     /// After the `\`, one character: `n t r f v a 0`, `xHH`, `x{H…}`, or a punctuation mark.
     mut fn charEscape(): char throws RegexError {
         let c = this.take();
-        if (c == 'n') { return '\n'; }
-        if (c == 't') { return '\t'; }
-        if (c == 'r') { return '\r'; }
-        if (c == 'f') { return 12u32 as char; }
-        if (c == 'v') { return 11u32 as char; }
-        if (c == 'a') { return 7u32 as char; }
-        if (c == '0') { return 0u32 as char; }
+        if (c == 'n') {
+            return '\n';
+        }
+        if (c == 't') {
+            return '\t';
+        }
+        if (c == 'r') {
+            return '\r';
+        }
+        if (c == 'f') {
+            return 12u32 as char;
+        }
+        if (c == 'v') {
+            return 11u32 as char;
+        }
+        if (c == 'a') {
+            return 7u32 as char;
+        }
+        if (c == '0') {
+            return 0u32 as char;
+        }
         if (c == 'x') {
             var code = 0u32;
             if (this.peekIs('{')) {
@@ -642,7 +675,14 @@ class Parser {
                     throw this.fail("the pattern ends in '\\'");
                 }
                 let e = this.peek();
-                if (e == 'd' || e == 'w' || e == 's' || e == 'D' || e == 'W' || e == 'S' || e == 'p' || e == 'P') {
+                if (e == 'd'
+                    || e == 'w'
+                    || e == 's'
+                    || e == 'D'
+                    || e == 'W'
+                    || e == 'S'
+                    || e == 'p'
+                    || e == 'P') {
                     try this.classEscape(cls);
                     continue;
                 }
@@ -659,7 +699,9 @@ class Parser {
 
     /// `lo` alone, or `lo-hi` where a `-` and a character follow (a `-` before `]` is itself).
     mut fn rangeFrom(cls: CharClass, lo: char): void throws RegexError {
-        if (this.peekIs('-') && this.at + 1 < this.chars.length() && this.chars[this.at + 1] != ']') {
+        if (this.peekIs('-')
+            && this.at + 1 < this.chars.length()
+            && this.chars[this.at + 1] != ']') {
             let _ = this.take();
             var hi = this.take();
             if (hi == '\\') {
@@ -691,7 +733,9 @@ class Parser {
         while (this.more() && this.peek().isAsciiAlpha()) {
             name.appendChar(this.take());
         }
-        if (!(this.peekIs(':') && this.at + 1 < this.chars.length() && this.chars[this.at + 1] == ']')) {
+        if (!(this.peekIs(':')
+            && this.at + 1 < this.chars.length()
+            && this.chars[this.at + 1] == ']')) {
             this.at = start;
             throw this.fail("'[:' takes a name and ':]'");
         }
@@ -713,7 +757,7 @@ class Parser {
             _ => {
                 this.at = start;
                 throw this.fail(f"'[:{name.toString()}:]' is no class");
-            },
+            }
         };
         cls.predicates.push((p, negated));
     }
@@ -721,12 +765,30 @@ class Parser {
     /// At `d w s D W S p P` after a `\`: the predicate into the class.
     mut fn classEscape(cls: CharClass): void throws RegexError {
         let e = this.take();
-        if (e == 'd') { cls.predicates.push((Predicate.Digit, false)); return; }
-        if (e == 'D') { cls.predicates.push((Predicate.Digit, true)); return; }
-        if (e == 'w') { cls.predicates.push((Predicate.Word, false)); return; }
-        if (e == 'W') { cls.predicates.push((Predicate.Word, true)); return; }
-        if (e == 's') { cls.predicates.push((Predicate.Space, false)); return; }
-        if (e == 'S') { cls.predicates.push((Predicate.Space, true)); return; }
+        if (e == 'd') {
+            cls.predicates.push((Predicate.Digit, false));
+            return;
+        }
+        if (e == 'D') {
+            cls.predicates.push((Predicate.Digit, true));
+            return;
+        }
+        if (e == 'w') {
+            cls.predicates.push((Predicate.Word, false));
+            return;
+        }
+        if (e == 'W') {
+            cls.predicates.push((Predicate.Word, true));
+            return;
+        }
+        if (e == 's') {
+            cls.predicates.push((Predicate.Space, false));
+            return;
+        }
+        if (e == 'S') {
+            cls.predicates.push((Predicate.Space, true));
+            return;
+        }
         // \pL, \p{Lu}, \PL, \P{Lu}
         let negated = e == 'P';
         let start = this.at - 2;
@@ -747,7 +809,9 @@ class Parser {
         let text = name.toString();
         if (!isCategoryName(text)) {
             this.at = start;
-            throw this.fail(f"'{text}' is no Unicode category: L, Lu, N, Nd, P, S, Z, M, C and their kinds are");
+            throw this.fail(
+                f"'{text}' is no Unicode category: L, Lu, N, Nd, P, S, Z, M, C and their kinds are"
+            );
         }
         cls.predicates.push((Predicate.Category(text), negated));
     }
@@ -766,9 +830,15 @@ fn hexOf(c: char): uint32 {
 
 fn utf8Width(c: char): int {
     let code = c as uint32;
-    if (code < 0x80u32) { return 1; }
-    if (code < 0x800u32) { return 2; }
-    if (code < 0x10000u32) { return 3; }
+    if (code < 0x80u32) {
+        return 1;
+    }
+    if (code < 0x800u32) {
+        return 2;
+    }
+    if (code < 0x10000u32) {
+        return 3;
+    }
     return 4;
 }
 
@@ -820,22 +890,40 @@ class Compiler {
 
     fn compile(n: int): void {
         match (this.nodes[n]) {
-            .Empty => { },
+            .Empty => { }
             .Lit(c, fold) => {
                 if (fold && c.toLower() != c.toUpper()) {
                     let _ = this.emit(Inst.CharFold(c.toLower()));
                 } else {
                     let _ = this.emit(Inst.Char(c));
                 }
-            },
-            .Any(newline) => { let _ = this.emit(if (newline) Inst.Any else Inst.AnyNoNewline); },
-            .Class(i) => { let _ = this.emit(Inst.Class(i)); },
-            .Start(multi) => { let _ = this.emit(Inst.Assert(if (multi) Assertion.LineStart else Assertion.TextStart)); },
-            .End(multi) => { let _ = this.emit(Inst.Assert(if (multi) Assertion.LineEnd else Assertion.TextEnd)); },
-            .TextStart => { let _ = this.emit(Inst.Assert(Assertion.TextStart)); },
-            .TextEnd => { let _ = this.emit(Inst.Assert(Assertion.TextEnd)); },
-            .WordBoundary => { let _ = this.emit(Inst.Assert(Assertion.WordBoundary)); },
-            .NotWordBoundary => { let _ = this.emit(Inst.Assert(Assertion.NotWordBoundary)); },
+            }
+            .Any(newline) => {
+                let _ = this.emit(if (newline) Inst.Any else Inst.AnyNoNewline);
+            }
+            .Class(i) => {
+                let _ = this.emit(Inst.Class(i));
+            }
+            .Start(multi) => {
+                let _ = this.emit(
+                    Inst.Assert(if (multi) Assertion.LineStart else Assertion.TextStart)
+                );
+            }
+            .End(multi) => {
+                let _ = this.emit(Inst.Assert(if (multi) Assertion.LineEnd else Assertion.TextEnd));
+            }
+            .TextStart => {
+                let _ = this.emit(Inst.Assert(Assertion.TextStart));
+            }
+            .TextEnd => {
+                let _ = this.emit(Inst.Assert(Assertion.TextEnd));
+            }
+            .WordBoundary => {
+                let _ = this.emit(Inst.Assert(Assertion.WordBoundary));
+            }
+            .NotWordBoundary => {
+                let _ = this.emit(Inst.Assert(Assertion.NotWordBoundary));
+            }
             .Group(index, child) => {
                 if (let k = index) {
                     let _ = this.emit(Inst.Save(2 * k));
@@ -844,12 +932,12 @@ class Compiler {
                 } else {
                     this.compile(child);
                 }
-            },
+            }
             .Concat(items) => {
                 for (item in items) {
                     this.compile(item);
                 }
-            },
+            }
             .Alternate(branches) => {
                 // split L1, L2; L1: a; jmp end; L2: split …
                 let jumps: List<int> = List.new();
@@ -868,7 +956,7 @@ class Compiler {
                 for (j in jumps) {
                     this.patch(j, Inst.Jump(this.here()));
                 }
-            },
+            }
             .Repeat(child, min, max, greedy) => {
                 var k = 0;
                 while (k < min) {
@@ -880,7 +968,11 @@ class Compiler {
                     let split = this.emit(Inst.Split(0, 0));
                     this.compile(child);
                     let _ = this.emit(Inst.Jump(split));
-                    this.patch(split, if (greedy) Inst.Split(split + 1, this.here()) else Inst.Split(this.here(), split + 1));
+                    this.patch(
+                        split,
+                        if (greedy) Inst.Split(split + 1, this.here())
+                            else Inst.Split(this.here(), split + 1)
+                    );
                 } else {
                     // (x(x(x)?)?)? for the optional ones
                     let splits: List<int> = List.new();
@@ -891,10 +983,14 @@ class Compiler {
                         o = o + 1;
                     }
                     for (s in splits) {
-                        this.patch(s, if (greedy) Inst.Split(s + 1, this.here()) else Inst.Split(this.here(), s + 1));
+                        this.patch(
+                            s,
+                            if (greedy) Inst.Split(s + 1, this.here())
+                                else Inst.Split(this.here(), s + 1)
+                        );
                     }
                 }
-            },
+            }
         }
     }
 }
@@ -918,12 +1014,16 @@ fn decodeAt(text: Slice<uint8>, at: int): (char, int) {
         return (b0 as char, 1);
     }
     if (b0 >= 0xF0u32) {
-        let code = ((b0 & 0x07u32) << 18) | (((text[at + 1] as uint32) & 0x3Fu32) << 12)
-            | (((text[at + 2] as uint32) & 0x3Fu32) << 6) | ((text[at + 3] as uint32) & 0x3Fu32);
+        let code = ((b0 & 0x07u32) << 18)
+            | (((text[at + 1] as uint32) & 0x3Fu32) << 12)
+            | (((text[at + 2] as uint32) & 0x3Fu32) << 6)
+            | ((text[at + 3] as uint32) & 0x3Fu32);
         return (code as char, 4);
     }
     if (b0 >= 0xE0u32) {
-        let code = ((b0 & 0x0Fu32) << 12) | (((text[at + 1] as uint32) & 0x3Fu32) << 6) | ((text[at + 2] as uint32) & 0x3Fu32);
+        let code = ((b0 & 0x0Fu32) << 12)
+            | (((text[at + 1] as uint32) & 0x3Fu32) << 6)
+            | ((text[at + 2] as uint32) & 0x3Fu32);
         return (code as char, 3);
     }
     let code = ((b0 & 0x1Fu32) << 6) | ((text[at + 1] as uint32) & 0x3Fu32);
@@ -982,7 +1082,8 @@ class Vm {
     /// Whether the assertion holds between the character before `at` and the one at it.
     fn assertionHolds(a: Assertion, at: int): bool {
         let n = this.text.length();
-        let before: ?char = if (at > 0) decodeAt(this.text, previousStart(this.text, at)).0 else null;
+        let before: ?char = if (at > 0) decodeAt(this.text, previousStart(this.text, at)).0
+            else null;
         let here: ?char = if (at < n) decodeAt(this.text, at).0 else null;
         return match (a) {
             .TextStart => at == 0,
@@ -1004,12 +1105,14 @@ class Vm {
             }
             list.seen[t.pc] = list.generation;
             match (this.prog.insts[t.pc]) {
-                .Jump(x) => { this.stack.push(Thread { pc = x, slots = t.slots }); },
+                .Jump(x) => {
+                    this.stack.push(Thread { pc = x, slots = t.slots });
+                }
                 .Split(x, y) => {
                     // y below x on the stack: x is explored first
                     this.stack.push(Thread { pc = y, slots = t.slots });
                     this.stack.push(Thread { pc = x, slots = t.slots });
-                },
+                }
                 .Save(k) => {
                     if (!this.any && k < t.slots.length()) {
                         var copy = copySlots(t.slots);
@@ -1018,13 +1121,15 @@ class Vm {
                     } else {
                         this.stack.push(Thread { pc = t.pc + 1, slots = t.slots });
                     }
-                },
+                }
                 .Assert(a) => {
                     if (this.assertionHolds(a, at)) {
                         this.stack.push(Thread { pc = t.pc + 1, slots = t.slots });
                     }
-                },
-                _ => { list.threads.push(t); },
+                }
+                _ => {
+                    list.threads.push(t);
+                }
             }
         }
     }
@@ -1073,21 +1178,27 @@ class Vm {
                         matched = slots;
                         // the threads after this one have a lower priority
                         break;
-                    },
-                    .Char(x) => { goes = c == x; },
+                    }
+                    .Char(x) => {
+                        goes = c == x;
+                    }
                     .CharFold(x) => {
                         if (let ch = c) {
                             goes = ch == x || ch.toLower() == x;
                         }
-                    },
-                    .Any => { goes = c != null; },
-                    .AnyNoNewline => { goes = c != null && c != '\n'; },
+                    }
+                    .Any => {
+                        goes = c != null;
+                    }
+                    .AnyNoNewline => {
+                        goes = c != null && c != '\n';
+                    }
                     .Class(i) => {
                         if (let ch = c) {
                             goes = this.prog.classes[i].matches(ch);
                         }
-                    },
-                    _ => { },
+                    }
+                    _ => { }
                 }
                 if (goes) {
                     this.addThread(nlist, t.pc + 1, t.slots, next);
@@ -1191,7 +1302,12 @@ pub class Regex {
         compiler.compile(root);
         let _ = compiler.emit(Inst.Save(1));
         let _ = compiler.emit(Inst.Match);
-        let prog = Program { insts = compiler.insts, classes = parser.classes, groups = parser.groups, names = parser.names };
+        let prog = Program {
+            insts = compiler.insts,
+            classes = parser.classes,
+            groups = parser.groups,
+            names = parser.names,
+        };
         return Regex { prog = prog, source = pattern };
     }
 
@@ -1255,7 +1371,14 @@ pub class Regex {
             }
             g = g + 1;
         }
-        return Match { start = slots[0], end = slots[1], value = texts[0] ?? "", spans = spans, texts = texts, names = this.prog.names };
+        return Match {
+            start = slots[0],
+            end = slots[1],
+            value = texts[0] ?? "",
+            spans = spans,
+            texts = texts,
+            names = this.prog.names,
+        };
     }
 
     /// Returns every match in turn, left to right, none overlapping; an empty match right after a
@@ -1415,7 +1538,8 @@ pub struct Matches :: [Iterator] {
             let m = found;
             if (m.end == m.start) {
                 // past an empty match by one character; one right after a match is skipped
-                this.at = if (m.end < bytes.length()) m.end + decodeAt(bytes, m.end).1 else m.end + 1;
+                this.at = if (m.end < bytes.length()) m.end + decodeAt(bytes, m.end).1
+                    else m.end + 1;
                 if (m.start == this.lastEnd) {
                     continue;
                 }

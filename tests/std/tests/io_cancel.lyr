@@ -44,20 +44,36 @@ fn timedOut(body: fn() -> void throws [IoError, Cancelled]): bool throws Error {
 @Test
 fn aCancelEndsAReadThroughTheBufferAndTheText(): void throws Error {
     let text = TextReader.new(Waiting { ch = Channel.new() });
-    assertTrue(try timedOut(() => { let _ = try text.readLine(); }));
+    assertTrue(
+        try timedOut(
+            () => {
+                let _ = try text.readLine();
+            }
+        )
+    );
 }
 
 @Test
 fn aCancelEndsAWriteThroughTheBufferAndTheText(): void throws Error {
     // the buffer within the body: its close, in a task cancelled, throws Cancelled at once again
-    assertTrue(try timedOut(() => {
-        using let held = BufWriter.new(Stuck { ch = Channel.new() });
-        try TextWriter.new(held).writeLine("held back");
-        try held.flush();
-    }));
+    assertTrue(
+        try timedOut(
+            () => {
+                using let held = BufWriter.new(Stuck { ch = Channel.new() });
+                try TextWriter.new(held).writeLine("held back");
+                try held.flush();
+            }
+        )
+    );
 }
 
 @Test
 fn aCancelEndsACopy(): void throws Error {
-    assertTrue(try timedOut(() => { let _ = try copy(Waiting { ch = Channel.new() }, Stuck { ch = Channel.new() }); }));
+    assertTrue(
+        try timedOut(
+            () => {
+                let _ = try copy(Waiting { ch = Channel.new() }, Stuck { ch = Channel.new() });
+            }
+        )
+    );
 }

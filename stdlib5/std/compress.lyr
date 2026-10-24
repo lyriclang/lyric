@@ -26,7 +26,12 @@ pub struct CompressError :: [Error] {
 }
 
 fn corrupt(detail: string): IoError {
-    return IoError { kind = .InvalidData, path = null, detail = detail, inner = CompressError { detail = detail } };
+    return IoError {
+        kind = .InvalidData,
+        path = null,
+        detail = detail,
+        inner = CompressError { detail = detail },
+    };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -34,7 +39,37 @@ fn corrupt(detail: string): IoError {
 // ---------------------------------------------------------------------------------------------
 
 fn lengthBase(): int[] {
-    return [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
+    return [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        13,
+        15,
+        17,
+        19,
+        23,
+        27,
+        31,
+        35,
+        43,
+        51,
+        59,
+        67,
+        83,
+        99,
+        115,
+        131,
+        163,
+        195,
+        227,
+        258,
+    ];
 }
 
 fn lengthExtra(): int[] {
@@ -42,11 +77,73 @@ fn lengthExtra(): int[] {
 }
 
 fn distBase(): int[] {
-    return [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
+    return [
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        9,
+        13,
+        17,
+        25,
+        33,
+        49,
+        65,
+        97,
+        129,
+        193,
+        257,
+        385,
+        513,
+        769,
+        1025,
+        1537,
+        2049,
+        3073,
+        4097,
+        6145,
+        8193,
+        12289,
+        16385,
+        24577,
+    ];
 }
 
 fn distExtra(): int[] {
-    return [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
+    return [
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        2,
+        2,
+        3,
+        3,
+        4,
+        4,
+        5,
+        5,
+        6,
+        6,
+        7,
+        7,
+        8,
+        8,
+        9,
+        9,
+        10,
+        10,
+        11,
+        11,
+        12,
+        12,
+        13,
+        13,
+    ];
 }
 
 /// The order the code length code lengths are written in (§3.2.7).
@@ -169,10 +266,22 @@ fn reverseBits(code: int, len: int): int {
 fn fixedLitLengths(): int[] {
     var lengths = [0] * 288;
     var i = 0;
-    while (i < 144) { lengths[i] = 8; i = i + 1; }
-    while (i < 256) { lengths[i] = 9; i = i + 1; }
-    while (i < 280) { lengths[i] = 7; i = i + 1; }
-    while (i < 288) { lengths[i] = 8; i = i + 1; }
+    while (i < 144) {
+        lengths[i] = 8;
+        i = i + 1;
+    }
+    while (i < 256) {
+        lengths[i] = 9;
+        i = i + 1;
+    }
+    while (i < 280) {
+        lengths[i] = 7;
+        i = i + 1;
+    }
+    while (i < 288) {
+        lengths[i] = 8;
+        i = i + 1;
+    }
     return lengths;
 }
 
@@ -220,9 +329,25 @@ pub class DeflateReader<R :: [Reader]> :: [Reader] {
 
     pub static fn new(inner: R): DeflateReader<R> {
         return DeflateReader<R> {
-            inner = inner, inBuf = [0u8] * 4096, inPos = 0, inLen = 0, bitBuf = 0, bitCount = 0, innerEnded = false,
-            window = [0u8] * windowSize, wpos = 0, out = [0u8] * 65536, outHead = 0, outTail = 0,
-            finalBlock = false, done = false, inBlock = false, stored = 0, lit = null, dist = null, totalOut = 0,
+            inner = inner,
+            inBuf = [0u8] * 4096,
+            inPos = 0,
+            inLen = 0,
+            bitBuf = 0,
+            bitCount = 0,
+            innerEnded = false,
+            window = [0u8] * windowSize,
+            wpos = 0,
+            out = [0u8] * 65536,
+            outHead = 0,
+            outTail = 0,
+            finalBlock = false,
+            done = false,
+            inBlock = false,
+            stored = 0,
+            lit = null,
+            dist = null,
+            totalOut = 0,
         };
     }
 
@@ -384,10 +509,16 @@ pub class DeflateReader<R :: [Reader]> :: [Reader] {
         }
         var litLengths = [0] * hlit;
         i = 0;
-        while (i < hlit) { litLengths[i] = lengths[i]; i = i + 1; }
+        while (i < hlit) {
+            litLengths[i] = lengths[i];
+            i = i + 1;
+        }
         var distLengths = [0] * hdist;
         i = 0;
-        while (i < hdist) { distLengths[i] = lengths[hlit + i]; i = i + 1; }
+        while (i < hdist) {
+            distLengths[i] = lengths[hlit + i];
+            i = i + 1;
+        }
         this.lit = try Huffman.build(litLengths, hlit);
         this.dist = try Huffman.build(distLengths, hdist);
     }
@@ -536,7 +667,14 @@ class BitWriter<W :: [Writer]> {
     var total: int,
 
     static fn new(inner: W): BitWriter<W> {
-        return BitWriter<W> { inner = inner, buf = [0u8] * 8192, len = 0, bitBuf = 0, bitCount = 0, total = 0 };
+        return BitWriter<W> {
+            inner = inner,
+            buf = [0u8] * 8192,
+            len = 0,
+            bitBuf = 0,
+            bitCount = 0,
+            total = 0,
+        };
     }
 
     mut fn bits(value: int, n: int): void throws [IoError, Cancelled] {
@@ -578,7 +716,12 @@ class BitWriter<W :: [Writer]> {
         while (at < this.len) {
             let n = try this.inner.write(this.buf[at..this.len]);
             if (n <= 0) {
-                throw IoError { kind = .BrokenPipe, path = null, detail = "the writer took nothing", inner = null };
+                throw IoError {
+                    kind = .BrokenPipe,
+                    path = null,
+                    detail = "the writer took nothing",
+                    inner = null,
+                };
             }
             at = at + n;
         }
@@ -602,24 +745,83 @@ struct LevelConfig {
 
 fn levelConfig(level: int): LevelConfig {
     return match (level) {
-        1 => LevelConfig { goodLength = 4, maxLazy = 4, niceLength = 8, maxChain = 4, lazy = false },
-        2 => LevelConfig { goodLength = 4, maxLazy = 5, niceLength = 16, maxChain = 8, lazy = false },
-        3 => LevelConfig { goodLength = 4, maxLazy = 6, niceLength = 32, maxChain = 32, lazy = false },
-        4 => LevelConfig { goodLength = 4, maxLazy = 4, niceLength = 16, maxChain = 16, lazy = true },
-        5 => LevelConfig { goodLength = 8, maxLazy = 16, niceLength = 32, maxChain = 32, lazy = true },
-        6 => LevelConfig { goodLength = 8, maxLazy = 16, niceLength = 128, maxChain = 128, lazy = true },
-        7 => LevelConfig { goodLength = 8, maxLazy = 32, niceLength = 128, maxChain = 256, lazy = true },
-        8 => LevelConfig { goodLength = 32, maxLazy = 128, niceLength = 258, maxChain = 1024, lazy = true },
-        _ => LevelConfig { goodLength = 32, maxLazy = 258, niceLength = 258, maxChain = 4096, lazy = true },
+        1 => LevelConfig {
+            goodLength = 4,
+            maxLazy = 4,
+            niceLength = 8,
+            maxChain = 4,
+            lazy = false,
+        },
+        2 => LevelConfig {
+            goodLength = 4,
+            maxLazy = 5,
+            niceLength = 16,
+            maxChain = 8,
+            lazy = false,
+        },
+        3 => LevelConfig {
+            goodLength = 4,
+            maxLazy = 6,
+            niceLength = 32,
+            maxChain = 32,
+            lazy = false,
+        },
+        4 => LevelConfig {
+            goodLength = 4,
+            maxLazy = 4,
+            niceLength = 16,
+            maxChain = 16,
+            lazy = true,
+        },
+        5 => LevelConfig {
+            goodLength = 8,
+            maxLazy = 16,
+            niceLength = 32,
+            maxChain = 32,
+            lazy = true,
+        },
+        6 => LevelConfig {
+            goodLength = 8,
+            maxLazy = 16,
+            niceLength = 128,
+            maxChain = 128,
+            lazy = true,
+        },
+        7 => LevelConfig {
+            goodLength = 8,
+            maxLazy = 32,
+            niceLength = 128,
+            maxChain = 256,
+            lazy = true,
+        },
+        8 => LevelConfig {
+            goodLength = 32,
+            maxLazy = 128,
+            niceLength = 258,
+            maxChain = 1024,
+            lazy = true,
+        },
+        _ => LevelConfig {
+            goodLength = 32,
+            maxLazy = 258,
+            niceLength = 258,
+            maxChain = 4096,
+            lazy = true,
+        },
     };
 }
 
 /// The most symbols a block holds before it is written.
 let blockSymbols = 16384;
+
 let hashBits = 15;
+
 let hashSize = 32768;
+
 let minMatch = 3;
+
 let maxMatch = 258;
+
 /// The lookahead the matcher needs before it decides, unless the input has ended.
 let minLookahead = 262;
 
@@ -663,12 +865,24 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
         }
         let lv = if (level < 0) 6 else level;
         return DeflateWriter<W> {
-            bits = BitWriter<W>.new(inner), level = lv, config = levelConfig(lv),
-            win = [0u8] * (2 * windowSize), strStart = 0, end = 0,
-            head = [-1] * hashSize, prev = [-1] * windowSize,
-            symLen = [0] * blockSymbols, symDist = [0] * blockSymbols, symCount = 0,
-            litFreq = [0] * 286, distFreq = [0] * 30,
-            prevLength = 0, prevDist = 0, matchAvailable = false, closed = false, totalIn = 0,
+            bits = BitWriter<W>.new(inner),
+            level = lv,
+            config = levelConfig(lv),
+            win = [0u8] * (2 * windowSize),
+            strStart = 0,
+            end = 0,
+            head = [-1] * hashSize,
+            prev = [-1] * windowSize,
+            symLen = [0] * blockSymbols,
+            symDist = [0] * blockSymbols,
+            symCount = 0,
+            litFreq = [0] * 286,
+            distFreq = [0] * 30,
+            prevLength = 0,
+            prevDist = 0,
+            matchAvailable = false,
+            closed = false,
+            totalIn = 0,
         };
     }
 
@@ -684,7 +898,12 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
 
     pub mut fn write(from: Slice<uint8>): int throws [IoError, Cancelled] {
         if (this.closed) {
-            throw IoError { kind = .Closed, path = null, detail = "the deflate writer is closed", inner = null };
+            throw IoError {
+                kind = .Closed,
+                path = null,
+                detail = "the deflate writer is closed",
+                inner = null,
+            };
         }
         var at = 0;
         while (at < from.length()) {
@@ -803,14 +1022,24 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
         try this.bits.bits(0, 2);
         try this.bits.align();
         let n = bytes.length();
-        try this.bits.bytes([(n & 0xFF) as uint8, ((n >> 8) & 0xFF) as uint8, ((n ^ 0xFFFF) & 0xFF) as uint8, (((n ^ 0xFFFF) >> 8) & 0xFF) as uint8]);
+        try this.bits.bytes(
+            [
+                (n & 0xFF) as uint8,
+                ((n >> 8) & 0xFF) as uint8,
+                ((n ^ 0xFFFF) & 0xFF) as uint8,
+                (((n ^ 0xFFFF) >> 8) & 0xFF) as uint8,
+            ]
+        );
         try this.bits.bytes(bytes);
     }
 
     // -- levels 1..9: LZ77 with hash chains
 
     fn hashAt(p: int): int {
-        return (((this.win[p] as int) << 10) ^ ((this.win[p + 1] as int) << 5) ^ (this.win[p + 2] as int)) & (hashSize - 1);
+        return (((this.win[p] as int) << 10)
+            ^ ((this.win[p + 1] as int) << 5)
+            ^ (this.win[p + 2] as int))
+            & (hashSize - 1);
     }
 
     mut fn insert(p: int): void {
@@ -838,7 +1067,8 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
         while (cur >= 0 && cur >= limit && chain > 0) {
             if (cur < p) {
                 // the first bytes and the one past the best so far, then the rest
-                if (this.win[cur + bestLen] == this.win[p + bestLen] && this.win[cur] == this.win[p]) {
+                if (this.win[cur + bestLen] == this.win[p + bestLen]
+                    && this.win[cur] == this.win[p]) {
                     var len = 0;
                     let most = if (avail < maxMatch) avail else maxMatch;
                     while (len < most && this.win[cur + len] == this.win[p + len]) {
@@ -986,22 +1216,34 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
             var anyDist = false;
             var i = 0;
             while (i < 30) {
-                if (distLengths[i] > 0) { anyDist = true; }
+                if (distLengths[i] > 0) {
+                    anyDist = true;
+                }
                 i = i + 1;
             }
             if (!anyDist) {
                 distLengths[0] = 1;
             }
             hlit = 286;
-            while (hlit > 257 && litLengths[hlit - 1] == 0) { hlit = hlit - 1; }
+            while (hlit > 257 && litLengths[hlit - 1] == 0) {
+                hlit = hlit - 1;
+            }
             hdist = 30;
-            while (hdist > 1 && distLengths[hdist - 1] == 0) { hdist = hdist - 1; }
+            while (hdist > 1 && distLengths[hdist - 1] == 0) {
+                hdist = hdist - 1;
+            }
             // the code lengths, run-length coded
             var all = [0] * (hlit + hdist);
             i = 0;
-            while (i < hlit) { all[i] = litLengths[i]; i = i + 1; }
+            while (i < hlit) {
+                all[i] = litLengths[i];
+                i = i + 1;
+            }
             i = 0;
-            while (i < hdist) { all[hlit + i] = distLengths[i]; i = i + 1; }
+            while (i < hdist) {
+                all[hlit + i] = distLengths[i];
+                i = i + 1;
+            }
             runLengthCode(all, hlit + hdist, clSymbols, clExtra);
             var clFreq = [0] * 19;
             for (sym in clSymbols) {
@@ -1010,27 +1252,45 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
             clLengths = buildLengths(clFreq, 19, 7);
             let order = codeLengthOrder();
             hclen = 19;
-            while (hclen > 4 && clLengths[order[hclen - 1]] == 0) { hclen = hclen - 1; }
+            while (hclen > 4 && clLengths[order[hclen - 1]] == 0) {
+                hclen = hclen - 1;
+            }
             // the size of the block with the dynamic tables, in bits
             dynamicBits = 3 + 5 + 5 + 4 + 3 * hclen;
             var k = 0;
             while (k < clSymbols.length()) {
                 let sym = clSymbols[k];
-                dynamicBits = dynamicBits + clLengths[sym] + (if (sym == 16) 2 else if (sym == 17) 3 else if (sym == 18) 7 else 0);
+                dynamicBits = dynamicBits
+                    + clLengths[sym]
+                    + (if (sym == 16) 2 else if (sym == 17) 3 else if (sym == 18) 7 else 0);
                 k = k + 1;
             }
             i = 0;
-            while (i < 286) { dynamicBits = dynamicBits + this.litFreq[i] * litLengths[i] + this.litFreq[i] * extraBitsOfLit(i); i = i + 1; }
+            while (i < 286) {
+                dynamicBits = dynamicBits
+                    + this.litFreq[i] * litLengths[i]
+                    + this.litFreq[i] * extraBitsOfLit(i);
+                i = i + 1;
+            }
             i = 0;
-            while (i < 30) { dynamicBits = dynamicBits + this.distFreq[i] * (distLengths[i] + distExtra()[i]); i = i + 1; }
+            while (i < 30) {
+                dynamicBits = dynamicBits + this.distFreq[i] * (distLengths[i] + distExtra()[i]);
+                i = i + 1;
+            }
         }
         // the size with the fixed tables
         let fixedLit = fixedLitLengths();
         var fixedBits = 3;
         var i = 0;
-        while (i < 286) { fixedBits = fixedBits + this.litFreq[i] * (fixedLit[i] + extraBitsOfLit(i)); i = i + 1; }
+        while (i < 286) {
+            fixedBits = fixedBits + this.litFreq[i] * (fixedLit[i] + extraBitsOfLit(i));
+            i = i + 1;
+        }
         i = 0;
-        while (i < 30) { fixedBits = fixedBits + this.distFreq[i] * (5 + distExtra()[i]); i = i + 1; }
+        while (i < 30) {
+            fixedBits = fixedBits + this.distFreq[i] * (5 + distExtra()[i]);
+            i = i + 1;
+        }
         // the size stored: the literal bytes of the block
         var rawBytes = 0;
         i = 0;
@@ -1069,9 +1329,13 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
                 while (k < clSymbols.length()) {
                     let sym = clSymbols[k];
                     try this.bits.bits(clCodes[sym], clLengths[sym]);
-                    if (sym == 16) { try this.bits.bits(clExtra[k], 2); }
-                    else if (sym == 17) { try this.bits.bits(clExtra[k], 3); }
-                    else if (sym == 18) { try this.bits.bits(clExtra[k], 7); }
+                    if (sym == 16) {
+                        try this.bits.bits(clExtra[k], 2);
+                    } else if (sym == 17) {
+                        try this.bits.bits(clExtra[k], 3);
+                    } else if (sym == 18) {
+                        try this.bits.bits(clExtra[k], 7);
+                    }
                     k = k + 1;
                 }
             }
@@ -1087,11 +1351,15 @@ pub class DeflateWriter<W :: [Writer]> :: [Writer, Closeable] {
                     let (lc, le) = lengthCode(len);
                     try this.bits.bits(litCodes[lc], litLengths[lc]);
                     let lextra = lengthExtra()[lc - 257];
-                    if (lextra > 0) { try this.bits.bits(le, lextra); }
+                    if (lextra > 0) {
+                        try this.bits.bits(le, lextra);
+                    }
                     let (dc, de) = distCode(this.symDist[i]);
                     try this.bits.bits(distCodes[dc], distLengths[dc]);
                     let dextra = distExtra()[dc];
-                    if (dextra > 0) { try this.bits.bits(de, dextra); }
+                    if (dextra > 0) {
+                        try this.bits.bits(de, dextra);
+                    }
                 }
                 i = i + 1;
             }
@@ -1133,7 +1401,9 @@ fn buildLengths(freq: int[], n: int, limit: int): int[] {
     var count = 0;
     var i = 0;
     while (i < n) {
-        if (freq[i] > 0) { count = count + 1; }
+        if (freq[i] > 0) {
+            count = count + 1;
+        }
         i = i + 1;
     }
     if (count == 0) {
@@ -1142,7 +1412,9 @@ fn buildLengths(freq: int[], n: int, limit: int): int[] {
     if (count == 1) {
         i = 0;
         while (i < n) {
-            if (freq[i] > 0) { lengths[i] = 1; }
+            if (freq[i] > 0) {
+                lengths[i] = 1;
+            }
             i = i + 1;
         }
         return lengths;
@@ -1194,7 +1466,9 @@ fn buildLengths(freq: int[], n: int, limit: int): int[] {
                 p = parent[p];
             }
             lengths[i] = d;
-            if (d > maxLen) { maxLen = d; }
+            if (d > maxLen) {
+                maxLen = d;
+            }
         }
         i = i + 1;
     }
@@ -1210,8 +1484,12 @@ fn siftDown(heap: int[], size: int, weight: int[], at: int): void {
         let l = 2 * i + 1;
         let r = l + 1;
         var m = i;
-        if (l < size && weight[heap[l]] < weight[heap[m]]) { m = l; }
-        if (r < size && weight[heap[r]] < weight[heap[m]]) { m = r; }
+        if (l < size && weight[heap[l]] < weight[heap[m]]) {
+            m = l;
+        }
+        if (r < size && weight[heap[r]] < weight[heap[m]]) {
+            m = r;
+        }
         if (m == i) {
             return;
         }
@@ -1242,7 +1520,9 @@ fn limitLengths(lengths: int[], freq: int[], n: int, limit: int): void {
     }
     while (overflow > 0) {
         var bits = limit - 1;
-        while (blCount[bits] == 0) { bits = bits - 1; }
+        while (blCount[bits] == 0) {
+            bits = bits - 1;
+        }
         blCount[bits] = blCount[bits] - 1;
         blCount[bits + 1] = blCount[bits + 1] + 2;
         blCount[limit] = blCount[limit] - 1;
@@ -1345,7 +1625,12 @@ pub class ZlibReader<R :: [Reader]> :: [Reader] {
     var ended: bool,
 
     pub static fn new(inner: R): ZlibReader<R> {
-        return ZlibReader<R> { inflate = DeflateReader<R>.new(inner), headerRead = false, adler = 1u32, ended = false };
+        return ZlibReader<R> {
+            inflate = DeflateReader<R>.new(inner),
+            headerRead = false,
+            adler = 1u32,
+            ended = false,
+        };
     }
 
     mut fn readHeader(): void throws [IoError, Cancelled] {
@@ -1382,7 +1667,10 @@ pub class ZlibReader<R :: [Reader]> :: [Reader] {
         }
         let trailer: uint8[] = [0u8] * 4;
         try this.inflate.readTrailerExact(trailer[..], "zlib trailer");
-        let said = ((trailer[0] as uint32) << 24) | ((trailer[1] as uint32) << 16) | ((trailer[2] as uint32) << 8) | (trailer[3] as uint32);
+        let said = ((trailer[0] as uint32) << 24)
+            | ((trailer[1] as uint32) << 16)
+            | ((trailer[2] as uint32) << 8)
+            | (trailer[3] as uint32);
         if (said != this.adler) {
             throw corrupt("the zlib Adler-32 does not match");
         }
@@ -1402,13 +1690,25 @@ pub class ZlibWriter<W :: [Writer]> :: [Writer, Closeable] {
 
     pub static fn new(inner: W, level: int = 6): ZlibWriter<W> throws CompressError {
         let d = try DeflateWriter<W>.new(inner, level);
-        return ZlibWriter<W> { deflate = d, level = if (level < 0) 6 else level, headerWritten = false, adler = 1u32, closed = false };
+        return ZlibWriter<W> {
+            deflate = d,
+            level = if (level < 0) 6 else level,
+            headerWritten = false,
+            adler = 1u32,
+            closed = false,
+        };
     }
 
     mut fn writeHeader(): void throws [IoError, Cancelled] {
         let cmf = 0x78;
         var flevel = 2;
-        if (this.level < 2) { flevel = 0; } else if (this.level < 6) { flevel = 1; } else if (this.level >= 7) { flevel = 3; }
+        if (this.level < 2) {
+            flevel = 0;
+        } else if (this.level < 6) {
+            flevel = 1;
+        } else if (this.level >= 7) {
+            flevel = 3;
+        }
         var flg = flevel << 6;
         let fcheck = 31 - (((cmf << 8) | flg) % 31);
         flg = flg | (if (fcheck == 31) 0 else fcheck);
@@ -1445,7 +1745,14 @@ pub class ZlibWriter<W :: [Writer]> :: [Writer, Closeable] {
         }
         try this.deflate.close();
         let a = this.adler;
-        try this.deflate.bits.bytes([((a >> 24) & 0xFFu32) as uint8, ((a >> 16) & 0xFFu32) as uint8, ((a >> 8) & 0xFFu32) as uint8, (a & 0xFFu32) as uint8]);
+        try this.deflate.bits.bytes(
+            [
+                ((a >> 24) & 0xFFu32) as uint8,
+                ((a >> 16) & 0xFFu32) as uint8,
+                ((a >> 8) & 0xFFu32) as uint8,
+                (a & 0xFFu32) as uint8,
+            ]
+        );
         try this.deflate.bits.flush();
         this.closed = true;
     }
@@ -1467,7 +1774,13 @@ pub class GzipReader<R :: [Reader]> :: [Reader] {
     var ended: bool,
 
     pub static fn new(inner: R): GzipReader<R> {
-        return GzipReader<R> { inflate = DeflateReader<R>.new(inner), headerRead = false, crc = 0u32, size = 0, ended = false };
+        return GzipReader<R> {
+            inflate = DeflateReader<R>.new(inner),
+            headerRead = false,
+            crc = 0u32,
+            size = 0,
+            ended = false,
+        };
     }
 
     /// Reads a member's header; returns `false` where the stream has ended cleanly before one (at
@@ -1549,11 +1862,17 @@ pub class GzipReader<R :: [Reader]> :: [Reader] {
             }
             let trailer: uint8[] = [0u8] * 8;
             try this.inflate.readTrailerExact(trailer[..], "gzip trailer");
-            let said = (trailer[0] as uint32) | ((trailer[1] as uint32) << 8) | ((trailer[2] as uint32) << 16) | ((trailer[3] as uint32) << 24);
+            let said = (trailer[0] as uint32)
+                | ((trailer[1] as uint32) << 8)
+                | ((trailer[2] as uint32) << 16)
+                | ((trailer[3] as uint32) << 24);
             if (said != this.crc) {
                 throw corrupt("the gzip CRC-32 does not match");
             }
-            let isize = (trailer[4] as int) | ((trailer[5] as int) << 8) | ((trailer[6] as int) << 16) | ((trailer[7] as int) << 24);
+            let isize = (trailer[4] as int)
+                | ((trailer[5] as int) << 8)
+                | ((trailer[6] as int) << 16)
+                | ((trailer[7] as int) << 24);
             if (isize != (this.size & 0xFFFFFFFF)) {
                 throw corrupt("the gzip size does not match");
             }
@@ -1592,7 +1911,14 @@ pub class GzipWriter<W :: [Writer]> :: [Writer, Closeable] {
 
     pub static fn new(inner: W, level: int = 6): GzipWriter<W> throws CompressError {
         let d = try DeflateWriter<W>.new(inner, level);
-        return GzipWriter<W> { deflate = d, level = if (level < 0) 6 else level, headerWritten = false, crc = 0u32, size = 0, closed = false };
+        return GzipWriter<W> {
+            deflate = d,
+            level = if (level < 0) 6 else level,
+            headerWritten = false,
+            crc = 0u32,
+            size = 0,
+            closed = false,
+        };
     }
 
     /// Returns the number of bytes taken so far.
@@ -1602,7 +1928,9 @@ pub class GzipWriter<W :: [Writer]> :: [Writer, Closeable] {
 
     mut fn writeHeader(): void throws [IoError, Cancelled] {
         let xfl = if (this.level >= 9) 2 else if (this.level == 1) 4 else 0;
-        try this.deflate.bits.bytes([0x1Fu8, 0x8Bu8, 8u8, 0u8, 0u8, 0u8, 0u8, 0u8, xfl as uint8, 255u8]);
+        try this.deflate.bits.bytes(
+            [0x1Fu8, 0x8Bu8, 8u8, 0u8, 0u8, 0u8, 0u8, 0u8, xfl as uint8, 255u8]
+        );
         this.headerWritten = true;
     }
 
@@ -1637,8 +1965,18 @@ pub class GzipWriter<W :: [Writer]> :: [Writer, Closeable] {
         try this.deflate.close();
         let c = this.crc;
         let s = this.size & 0xFFFFFFFF;
-        try this.deflate.bits.bytes([(c & 0xFFu32) as uint8, ((c >> 8) & 0xFFu32) as uint8, ((c >> 16) & 0xFFu32) as uint8, ((c >> 24) & 0xFFu32) as uint8,
-            (s & 0xFF) as uint8, ((s >> 8) & 0xFF) as uint8, ((s >> 16) & 0xFF) as uint8, ((s >> 24) & 0xFF) as uint8]);
+        try this.deflate.bits.bytes(
+            [
+                (c & 0xFFu32) as uint8,
+                ((c >> 8) & 0xFFu32) as uint8,
+                ((c >> 16) & 0xFFu32) as uint8,
+                ((c >> 24) & 0xFFu32) as uint8,
+                (s & 0xFF) as uint8,
+                ((s >> 8) & 0xFF) as uint8,
+                ((s >> 16) & 0xFF) as uint8,
+                ((s >> 24) & 0xFF) as uint8,
+            ]
+        );
         try this.deflate.bits.flush();
         this.closed = true;
     }

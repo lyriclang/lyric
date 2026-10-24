@@ -6,7 +6,17 @@ import std.io { IoError, IoErrorKind, ByteBuffer };
 import std.net { IpAddr, SocketAddr, TcpListener, TcpStream };
 import std.task { spawn, sleep, TimedOut };
 import std.time { Duration };
-import std.http { Client, ClientOptions, Request, Response, Method, Headers, Status, HttpError, HttpErrorKind };
+import std.http {
+    Client,
+    ClientOptions,
+    Request,
+    Response,
+    Method,
+    Headers,
+    Status,
+    HttpError,
+    HttpErrorKind,
+};
 import std.uri { Uri };
 import std.codec { Codable };
 import std.test { assertEq, assertTrue, assertNull, fail };
@@ -47,7 +57,9 @@ fn readRequest(conn: TcpStream): ?(string, string) throws Error {
         let want = try int.parse(num);
         while (all.length() - headEnd < want) {
             let n = try conn.read(piece[..]);
-            if (n == 0) { break; }
+            if (n == 0) {
+                break;
+            }
             try buf.write(piece[0..n]);
             all = buf.toArray();
         }
@@ -55,7 +67,9 @@ fn readRequest(conn: TcpStream): ?(string, string) throws Error {
     } else if (lower.contains("transfer-encoding: chunked")) {
         while (!string.fromUtf8Lossy(all[headEnd..all.length()]).contains("0\r\n\r\n")) {
             let n = try conn.read(piece[..]);
-            if (n == 0) { break; }
+            if (n == 0) {
+                break;
+            }
             try buf.write(piece[0..n]);
             all = buf.toArray();
         }
@@ -76,7 +90,9 @@ fn decodeChunks(raw: Slice<uint8>): string {
             i = i + 1;
         }
         i = i + 2;
-        if (size == 0) { break; }
+        if (size == 0) {
+            break;
+        }
         try! out.write(raw[i..i + size]);
         i = i + size + 2;
     }
@@ -106,64 +122,71 @@ fn serve(listener: TcpListener): void throws Error {
         var conn = accepted!;
         conns += 1;
         let id = conns;
-        let _ = spawn(() => {
-            defer ended.n = ended.n + 1;
-            while (let (head, body) = try readRequest(conn)) {
-                let line = head.splitOnce("\r\n")!.0.toString();
-                let parts = line.splitN(' ', 3).toArray();
-                let method = parts[0].toString();
-                let path = parts[1].toString();
-                var out = "";
-                if (path == "/hello" && method == "HEAD") {
-                    out = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\nX-Conn: {id}\r\n\r\n";
-                } else if (path == "/hello") {
-                    out = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\nX-Conn: {id}\r\n\r\nhello, world";
-                } else if (path == "/chunked") {
-                    out = f"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nX-Conn: {id}\r\n\r\na;ext=1\r\nchunk one,\r\nA\r\n chunk two\r\n0\r\nX-Trailer: t\r\n\r\n";
-                } else if (path == "/redirect") {
-                    out = f"HTTP/1.1 302 Found\r\nLocation: /hello\r\nContent-Length: 0\r\nX-Conn: {id}\r\n\r\n";
-                } else if (path == "/see-other") {
-                    out = f"HTTP/1.1 303 See Other\r\nLocation: /echo\r\nContent-Length: 0\r\nX-Conn: {id}\r\n\r\n";
-                } else if (path == "/loop") {
-                    out = f"HTTP/1.1 301 Moved Permanently\r\nLocation: /loop\r\nContent-Length: 0\r\nX-Conn: {id}\r\n\r\n";
-                } else if (path == "/echo" || path == "/post") {
-                    let text = f"{method} got {body.length()} bytes: {body}";
-                    out = f"HTTP/1.1 200 OK\r\nContent-Length: {text.length()}\r\nX-Conn: {id}\r\n\r\n{text}";
-                } else if (path == "/headers") {
-                    let ua = head.toLower().contains("user-agent: lyric5");
-                    let host = head.contains(f"Host: 127.0.0.1:");
-                    out = f"HTTP/1.1 200 OK\r\nContent-Length: 11\r\nX-Conn: {id}\r\nX-Ua: {ua}\r\nX-Host: {host}\r\n\r\nheaders ok.";
-                } else if (path == "/close") {
-                    out = f"HTTP/1.1 200 OK\r\nConnection: close\r\nX-Conn: {id}\r\n\r\nbye";
-                } else if (path == "/old") {
-                    out = f"HTTP/1.0 200 OK\r\nX-Conn: {id}\r\n\r\nold style";
-                } else if (path == "/continue") {
-                    out = f"HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 7\r\nX-Conn: {id}\r\n\r\nwent on";
-                } else if (path == "/nocontent") {
-                    out = f"HTTP/1.1 204 No Content\r\nX-Conn: {id}\r\n\r\n";
-                } else if (path == "/slow") {
-                    try sleep(Duration.ofMillis(500));
-                    out = f"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nX-Conn: {id}\r\n\r\nslow";
-                } else if (path == "/json") {
-                    out = f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 22\r\nX-Conn: {id}\r\n\r\n{{\"name\":\"lyric\",\"n\":5}}";
-                } else if (path == "/short") {
-                    out = f"HTTP/1.1 200 OK\r\nContent-Length: 50\r\nX-Conn: {id}\r\n\r\nonly this";
-                } else if (path == "/badchunk") {
-                    out = f"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nX-Conn: {id}\r\n\r\nzz\r\n";
-                } else if (path == "/garbage") {
-                    out = "HTTP/9 x\r\n\r\n";
-                } else if (path == "/badlength") {
-                    out = f"HTTP/1.1 200 OK\r\nContent-Length: many\r\n\r\n";
-                } else {
-                    out = f"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nX-Conn: {id}\r\n\r\n";
+        let _ = spawn(
+            () => {
+                defer ended.n = ended.n + 1;
+                while (let (head, body) = try readRequest(conn)) {
+                    let line = head.splitOnce("\r\n")!.0.toString();
+                    let parts = line.splitN(' ', 3).toArray();
+                    let method = parts[0].toString();
+                    let path = parts[1].toString();
+                    var out = "";
+                    if (path == "/hello" && method == "HEAD") {
+                        out = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\nX-Conn: {id}\r\n\r\n";
+                    } else if (path == "/hello") {
+                        out = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\nX-Conn: {id}\r\n\r\nhello, world";
+                    } else if (path == "/chunked") {
+                        out = f"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nX-Conn: {id}\r\n\r\na;ext=1\r\nchunk one,\r\nA\r\n chunk two\r\n0\r\nX-Trailer: t\r\n\r\n";
+                    } else if (path == "/redirect") {
+                        out = f"HTTP/1.1 302 Found\r\nLocation: /hello\r\nContent-Length: 0\r\nX-Conn: {id}\r\n\r\n";
+                    } else if (path == "/see-other") {
+                        out = f"HTTP/1.1 303 See Other\r\nLocation: /echo\r\nContent-Length: 0\r\nX-Conn: {id}\r\n\r\n";
+                    } else if (path == "/loop") {
+                        out = f"HTTP/1.1 301 Moved Permanently\r\nLocation: /loop\r\nContent-Length: 0\r\nX-Conn: {id}\r\n\r\n";
+                    } else if (path == "/echo" || path == "/post") {
+                        let text = f"{method} got {body.length()} bytes: {body}";
+                        out = f"HTTP/1.1 200 OK\r\nContent-Length: {text.length()}\r\nX-Conn: {id}\r\n\r\n{text}";
+                    } else if (path == "/headers") {
+                        let ua = head.toLower().contains("user-agent: lyric5");
+                        let host = head.contains(f"Host: 127.0.0.1:");
+                        out = f"HTTP/1.1 200 OK\r\nContent-Length: 11\r\nX-Conn: {id}\r\nX-Ua: {ua}\r\nX-Host: {host}\r\n\r\nheaders ok.";
+                    } else if (path == "/close") {
+                        out = f"HTTP/1.1 200 OK\r\nConnection: close\r\nX-Conn: {id}\r\n\r\nbye";
+                    } else if (path == "/old") {
+                        out = f"HTTP/1.0 200 OK\r\nX-Conn: {id}\r\n\r\nold style";
+                    } else if (path == "/continue") {
+                        out = f"HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 7\r\nX-Conn: {id}\r\n\r\nwent on";
+                    } else if (path == "/nocontent") {
+                        out = f"HTTP/1.1 204 No Content\r\nX-Conn: {id}\r\n\r\n";
+                    } else if (path == "/slow") {
+                        try sleep(Duration.ofMillis(500));
+                        out = f"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nX-Conn: {id}\r\n\r\nslow";
+                    } else if (path == "/json") {
+                        out = f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 22\r\nX-Conn: {id}\r\n\r\n{{\"name\":\"lyric\",\"n\":5}}";
+                    } else if (path == "/short") {
+                        out = f"HTTP/1.1 200 OK\r\nContent-Length: 50\r\nX-Conn: {id}\r\n\r\nonly this";
+                    } else if (path == "/badchunk") {
+                        out = f"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nX-Conn: {id}\r\n\r\nzz\r\n";
+                    } else if (path == "/garbage") {
+                        out = "HTTP/9 x\r\n\r\n";
+                    } else if (path == "/badlength") {
+                        out = f"HTTP/1.1 200 OK\r\nContent-Length: many\r\n\r\n";
+                    } else {
+                        out = f"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nX-Conn: {id}\r\n\r\n";
+                    }
+                    try conn.writeAll(out.toBytes()[..]);
+                    if (path == "/close"
+                        || path == "/old"
+                        || path == "/garbage"
+                        || path == "/short"
+                        || path == "/badchunk"
+                        || path == "/badlength") {
+                        break;
+                    }
                 }
-                try conn.writeAll(out.toBytes()[..]);
-                if (path == "/close" || path == "/old" || path == "/garbage" || path == "/short" || path == "/badchunk" || path == "/badlength") {
-                    break;
-                }
+                try conn.close();
             }
-            try conn.close();
-        });
+        );
     }
 }
 
@@ -172,7 +195,11 @@ fn serve(listener: TcpListener): void throws Error {
 fn start(): (TcpListener, string) throws Error {
     let listener = try TcpListener.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 });
     let at = try listener.localAddr();
-    let _ = spawn(() => { try serve(listener); });
+    let _ = spawn(
+        () => {
+            try serve(listener);
+        }
+    );
     return (listener, f"http://127.0.0.1:{at.port}");
 }
 
@@ -253,7 +280,9 @@ fn aClientPostsAndFollowsRedirects(): void throws Error {
     let (listener, base) = try start();
     var client = Client.new();
     // a body with its length
-    let posted = try client.send(Request.post(uri(base, "/post"), "payload".toBytes()[..], "text/plain"));
+    let posted = try client.send(
+        Request.post(uri(base, "/post"), "payload".toBytes()[..], "text/plain")
+    );
     assertEq(try posted.text(), "POST got 7 bytes: payload");
     // a body without: chunked
     var streamed = Request { method = Method.Put, uri = uri(base, "/echo") };
@@ -319,8 +348,12 @@ fn whatIsNotHttpIsRefused(): void throws Error {
         assertTrue(e.kind == IoErrorKind.ConnectionRefused);
     }
     // schemes
-    for ((u, said) in [("ftp://x/", "unsupported: the scheme 'ftp'"), ("https://x/", "unsupported: https needs a transport"),
-                       ("/relative", "unsupported: the scheme ''"), ("http:///p", "unsupported: the URI names no host")]) {
+    for ((u, said) in [
+        ("ftp://x/", "unsupported: the scheme 'ftp'"),
+        ("https://x/", "unsupported: https needs a transport"),
+        ("/relative", "unsupported: the scheme ''"),
+        ("http:///p", "unsupported: the URI names no host"),
+    ]) {
         try {
             let _ = client.get(Uri.parse(u));
             fail(f"sent {u}");
@@ -368,7 +401,11 @@ fn theMessageTypes(): void {
     assertEq(Method.Patch.show(), "PATCH");
     assertEq(Status.of(404).show(), "404 Not Found");
     assertEq(Status.of(599).show(), "599");
-    assertTrue(Status.of(500).isServerError() && Status.of(400).isClientError() && Status.of(100).isInformational());
+    assertTrue(
+        Status.of(500).isServerError()
+            && Status.of(400).isClientError()
+            && Status.of(100).isInformational()
+    );
     let h = Headers.new();
     h.add("Content-Type", "text/plain");
     h.add("Set-Cookie", "a=1");

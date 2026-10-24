@@ -13,9 +13,17 @@ struct Ranked :: [Equatable, Ordered, TotalOrder] {
     key: int,
     tag: int,
 
-    fn equals(o: Ranked): bool { return this.key == o.key; }
-    fn compare(o: Ranked): ?Ordering { return this.key.compare(o.key); }
-    fn totalCompare(o: Ranked): Ordering { return this.key.totalCompare(o.key); }
+    fn equals(o: Ranked): bool {
+        return this.key == o.key;
+    }
+
+    fn compare(o: Ranked): ?Ordering {
+        return this.key.compare(o.key);
+    }
+
+    fn totalCompare(o: Ranked): Ordering {
+        return this.key.totalCompare(o.key);
+    }
 }
 
 @Test

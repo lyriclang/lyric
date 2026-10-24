@@ -26,8 +26,12 @@ fn isOk(r: Result<int, Odd>): bool {
 
 @Test
 fn ofKeepsTheValueOrTheError(): void {
-    let good = Result.of { try half(8) };
-    let bad = Result.of { try half(3) };
+    let good = Result.of {
+        try half(8)
+    };
+    let bad = Result.of {
+        try half(3)
+    };
     assertTrue(isOk(good));
     assertFalse(isOk(bad));
     let message = match (bad) {
@@ -39,16 +43,24 @@ fn ofKeepsTheValueOrTheError(): void {
 
 @Test
 fn getThrowsTheErrorAgain(): void throws Odd {
-    let good = Result.of { try half(8) };
+    let good = Result.of {
+        try half(8)
+    };
     assertEq(try good.get(), 4);
-    let bad = Result.of { try half(3) };
+    let bad = Result.of {
+        try half(3)
+    };
     let caught = try? bad.get();
     assertTrue(caught == null);
 }
 
 @Test
 fn resultsAreValuesToCollect(): void {
-    let all = [2, 5, 6].iter().map((n: int) => Result.of { try half(n) }).toArray();
+    let all = [2, 5, 6].iter().map(
+        (n: int) => Result.of {
+            try half(n)
+        }
+    ).toArray();
     assertEq(all.iter().filter(isOk).count(), 2);
 }
 
@@ -63,7 +75,9 @@ fn aResultIsBuiltByHandToo(): void {
 @Test
 fn twoErrorsJoinToTheRoot(): void {
     let text = "x";
-    let r = Result.of { try half(int.parse(text)) };
+    let r = Result.of {
+        try half(int.parse(text))
+    };
     let message = match (r) {
         .Ok(_) => "",
         .Err(e) => e.message(),

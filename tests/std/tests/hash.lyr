@@ -4,10 +4,28 @@
 import std.hash { DefaultHasher, FixedHasher, Fnv1a64 };
 import std.test { assertEq, assertNotEq };
 
-struct Point :: [Hashable] { x: int, y: int }
-struct Two :: [Hashable] { a: string, b: string }
-enum Shape :: [Hashable] { Dot, Circle(int), Rect { w: int, h: int } }
-struct Tagged :: [Hashable] { name: string, at: ?int, pair: (int, bool), cells: int[2] }
+struct Point :: [Hashable] {
+    x: int,
+    y: int,
+}
+
+struct Two :: [Hashable] {
+    a: string,
+    b: string,
+}
+
+enum Shape :: [Hashable] {
+    Dot,
+    Circle(int),
+    Rect { w: int, h: int },
+}
+
+struct Tagged :: [Hashable] {
+    name: string,
+    at: ?int,
+    pair: (int, bool),
+    cells: int[2],
+}
 
 fn fixedOf<T :: [Hashable]>(x: T): uint64 {
     var h = FixedHasher.new();
@@ -78,7 +96,10 @@ fn optionalsTuplesAndInlineArraysAreWrittenInside(): void {
     none.writeByte(1);
     none.writeInt(4);
     none.writeInt(5);
-    assertEq(fixedOf(Tagged { name = "n", at = null, pair = (3, true), cells = [4, 5] }), none.finish());
+    assertEq(
+        fixedOf(Tagged { name = "n", at = null, pair = (3, true), cells = [4, 5] }),
+        none.finish()
+    );
     var some = FixedHasher.new();
     some.writeByte(110);
     some.writeByte(255);
@@ -88,7 +109,10 @@ fn optionalsTuplesAndInlineArraysAreWrittenInside(): void {
     some.writeByte(1);
     some.writeInt(4);
     some.writeInt(5);
-    assertEq(fixedOf(Tagged { name = "n", at = 9, pair = (3, true), cells = [4, 5] }), some.finish());
+    assertEq(
+        fixedOf(Tagged { name = "n", at = 9, pair = (3, true), cells = [4, 5] }),
+        some.finish()
+    );
 }
 
 @Test

@@ -1,7 +1,16 @@
 // std.codec: the pair, the layer over the
 // container model, the conformances of the core types, the errors with their kinds and paths, and
 // `Value`, the tree every format could write — here the format the tests write into and read from.
-import std.codec { Codable, Encoder, Decoder, Value, Bytes, DecodeError, DecodeErrorKind, EncodeError };
+import std.codec {
+    Codable,
+    Encoder,
+    Decoder,
+    Value,
+    Bytes,
+    DecodeError,
+    DecodeErrorKind,
+    EncodeError,
+};
 import std.collections { List, Map, Set, Deque };
 import std.test { assertEq, assertTrue, fail };
 import std.time { Instant, Duration, Date, Time, DateTime, Zone };
@@ -59,9 +68,15 @@ enum Shape :: [Codable, Equatable, Debug] {
 
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         match (this) {
-            .Dot => { try e.encodeUnitVariant("Shape", "Dot", 0); },
-            .Circle(r) => { try e.encodeVariant("Shape", "Circle", 1, r); },
-            .Rect(w, h) => { try e.encodeVariant("Shape", "Rect", 2, (w, h)); },
+            .Dot => {
+                try e.encodeUnitVariant("Shape", "Dot", 0);
+            }
+            .Circle(r) => {
+                try e.encodeVariant("Shape", "Circle", 1, r);
+            }
+            .Rect(w, h) => {
+                try e.encodeVariant("Shape", "Rect", 2, (w, h));
+            }
         }
     }
 
@@ -124,16 +139,41 @@ fn said(f: fn() -> void throws DecodeError): string {
 fn aStructWritesItsFieldsInOrderAndReadsBack(): void throws Error {
     let u = User { id = 7, name = "ada", mail = null, tags = ["x", "y"] };
     let v = try Value.of(u);
-    assertEq(v, Value.Struct("User", List.of([
-        ("id", Value.Int(7)), ("name", Value.String("ada")), ("mail", Value.Null),
-        ("tags", Value.Seq(List.of([Value.String("x"), Value.String("y")]))),
-    ])));
+    assertEq(
+        v,
+        Value.Struct(
+            "User",
+            List.of(
+                [
+                    ("id", Value.Int(7)),
+                    ("name", Value.String("ada")),
+                    ("mail", Value.Null),
+                    ("tags", Value.Seq(List.of([Value.String("x"), Value.String("y")]))),
+                ]
+            )
+        )
+    );
     assertEq(try v.read<User>(), u);
     // a missing optional reads as null, a null too
-    let without = Value.Struct("User", List.of([("id", Value.Int(1)), ("name", Value.String("b")), ("tags", Value.Seq(List.new()))]));
+    let without = Value.Struct(
+        "User",
+        List.of(
+            [("id", Value.Int(1)), ("name", Value.String("b")), ("tags", Value.Seq(List.new()))]
+        )
+    );
     assertEq((try without.read<User>()).mail, null);
     // the fields in any order
-    let reordered = Value.Struct("User", List.of([("name", Value.String("c")), ("tags", Value.Seq(List.new())), ("id", Value.Int(2)), ("mail", Value.String("m"))]));
+    let reordered = Value.Struct(
+        "User",
+        List.of(
+            [
+                ("name", Value.String("c")),
+                ("tags", Value.Seq(List.new())),
+                ("id", Value.Int(2)),
+                ("mail", Value.String("m")),
+            ]
+        )
+    );
     let r = try reordered.read<User>();
     assertEq(r.id, 2);
     assertEq(r.mail, "m");
@@ -155,36 +195,63 @@ fn theScalarsAndTheContainersConform(): void throws Error {
     assertEq(try Value.Int(9).read<uint>(), 9 as uint);
     // the narrow integers through int, refused where they do not fit
     assertEq(try Value.Int(-128).read<int8>(), -128i8);
-    assertTrue(kindOf(() => { let _ = try Value.Int(128).read<int8>(); }) == DecodeErrorKind.Invalid);
-    assertTrue(kindOf(() => { let _ = try Value.Int(-1).read<uint8>(); }) == DecodeErrorKind.Invalid);
-    assertTrue(kindOf(() => { let _ = try Value.Int(-1).read<uint>(); }) == DecodeErrorKind.Invalid);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.Int(128).read<int8>();
+            }
+        ) == DecodeErrorKind.Invalid
+    );
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.Int(-1).read<uint8>();
+            }
+        ) == DecodeErrorKind.Invalid
+    );
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.Int(-1).read<uint>();
+            }
+        ) == DecodeErrorKind.Invalid
+    );
     // containers
     let xs = List<int>.new();
     xs.push(1);
     xs.push(2);
     assertEq(try Value.of(xs), Value.Seq(List.of([Value.Int(1), Value.Int(2)])));
-    assertEq((try Value.of(xs).read<List<int> >()).length(), 2);
+    assertEq((try Value.of(xs).read<List<int>>()).length(), 2);
     let dq = Deque<string>.new();
     dq.pushBack("a");
-    assertEq((try Value.of(dq).read<Deque<string> >()).length(), 1);
+    assertEq((try Value.of(dq).read<Deque<string>>()).length(), 1);
     let set = Set<int>.new();
     set.insert(4);
     assertEq(try Value.of(set), Value.Seq(List.of([Value.Int(4)])));
-    assertTrue((try Value.of(set).read<Set<int> >()).contains(4));
+    assertTrue((try Value.of(set).read<Set<int>>()).contains(4));
     let m = Map<string, int>.new();
     m["a"] = 1;
     assertEq(try Value.of(m), Value.Map(List.of([(Value.String("a"), Value.Int(1))])));
-    let back = try Value.of(m).read<Map<string, int> >();
+    let back = try Value.of(m).read<Map<string, int>>();
     assertEq(back["a"], 1);
     let keyed = Map<int, string>.new();
     keyed[3] = "three";
     assertEq(try Value.of(keyed), Value.Map(List.of([(Value.Int(3), Value.String("three"))])));
     // a tuple is a sequence of its length, and refuses a shorter one
-    assertEq(try Value.of((1, "two", true)), Value.Seq(List.of([Value.Int(1), Value.String("two"), Value.Bool(true)])));
+    assertEq(
+        try Value.of((1, "two", true)),
+        Value.Seq(List.of([Value.Int(1), Value.String("two"), Value.Bool(true)]))
+    );
     let (a, b) = try Value.Seq(List.of([Value.Int(1), Value.String("x")])).read<(int, string)>();
     assertEq(a, 1);
     assertEq(b, "x");
-    assertTrue(kindOf(() => { let _ = try Value.Seq(List.of([Value.Int(1)])).read<(int, int)>(); }) == DecodeErrorKind.Missing);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.Seq(List.of([Value.Int(1)])).read<(int, int)>();
+            }
+        ) == DecodeErrorKind.Missing
+    );
     // an optional
     let none: ?int = null;
     assertEq(try Value.of(none), Value.Null);
@@ -200,24 +267,49 @@ fn bytesAreTheirOwnFormAndAnArrayOfBytesIsASequence(): void throws Error {
     assertEq(try Value.of(bytes), Value.Seq(List.of([Value.Uint(1), Value.Uint(2)])));
     assertEq(try Value.of(Bytes { value = bytes }), Value.Bytes([1u8, 2u8]));
     assertEq((try Value.Bytes([9u8]).read<Bytes>()).value, [9u8]);
-    assertTrue(kindOf(() => { let _ = try Value.Seq(List.new()).read<Bytes>(); }) == DecodeErrorKind.TypeMismatch);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.Seq(List.new()).read<Bytes>();
+            }
+        ) == DecodeErrorKind.TypeMismatch
+    );
 }
 
 @Test
 fn anEnumIsItsVariantWithOrWithoutAPayload(): void throws Error {
     assertEq(try Value.of(Shape.Dot), Value.Variant("Shape", "Dot", 0, null));
-    assertEq(try Value.of(Shape.Circle(3)), Value.Variant("Shape", "Circle", 1, Box<Value> { value = Value.Int(3) }));
+    assertEq(
+        try Value.of(Shape.Circle(3)),
+        Value.Variant("Shape", "Circle", 1, Box<Value> { value = Value.Int(3) })
+    );
     assertEq(try Value.of(Shape.Rect(2, 5)).read<Shape>(), Shape.Rect(2, 5));
     assertEq(try Value.of(Shape.Dot).read<Shape>(), Shape.Dot);
-    assertTrue(kindOf(() => { let _ = try Value.Variant("Shape", "Blob", 9, null).read<Shape>(); }) == DecodeErrorKind.UnknownVariant);
-    assertTrue(kindOf(() => { let _ = try Value.Int(1).read<Shape>(); }) == DecodeErrorKind.TypeMismatch);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.Variant("Shape", "Blob", 9, null).read<Shape>();
+            }
+        ) == DecodeErrorKind.UnknownVariant
+    );
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.Int(1).read<Shape>();
+            }
+        ) == DecodeErrorKind.TypeMismatch
+    );
 }
 
 /// The string a value writes, or a failure.
 fn textOf(v: Value): string {
     match (v) {
-        .String(s) => { return s; },
-        _ => { fail("not a string"); },
+        .String(s) => {
+            return s;
+        }
+        _ => {
+            fail("not a string");
+        }
     }
 }
 
@@ -237,10 +329,34 @@ fn theTimeTypesAreTheirTexts(): void throws Error {
     let dt = DateTime.of(day, t, Zone.utc);
     assertEq(textOf(try Value.of(dt)), dt.show());
     assertEq(try (Value.of(dt)).read<DateTime>(), dt);
-    assertTrue(kindOf(() => { let _ = try Value.String("soon").read<Duration>(); }) == DecodeErrorKind.Invalid);
-    assertTrue(kindOf(() => { let _ = try Value.String("15.10.2026").read<Date>(); }) == DecodeErrorKind.Invalid);
-    assertTrue(kindOf(() => { let _ = try Value.String("9:30").read<Time>(); }) == DecodeErrorKind.Invalid);
-    assertTrue(kindOf(() => { let _ = try Value.String("2026-10-15 09:30").read<DateTime>(); }) == DecodeErrorKind.Invalid);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.String("soon").read<Duration>();
+            }
+        ) == DecodeErrorKind.Invalid
+    );
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.String("15.10.2026").read<Date>();
+            }
+        ) == DecodeErrorKind.Invalid
+    );
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.String("9:30").read<Time>();
+            }
+        ) == DecodeErrorKind.Invalid
+    );
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.String("2026-10-15 09:30").read<DateTime>();
+            }
+        ) == DecodeErrorKind.Invalid
+    );
 }
 
 @Test
@@ -248,28 +364,98 @@ fn anInstantIsItsText(): void throws Error {
     let t = Instant.now();
     let v = try Value.of(t);
     match (v) {
-        .String(_) => { },
-        _ => { fail("an instant is a string"); },
+        .String(_) => { }
+        _ => {
+            fail("an instant is a string");
+        }
     }
     assertEq((try v.read<Instant>()).epochSecs(), t.epochSecs());
-    assertTrue(kindOf(() => { let _ = try Value.String("yesterday").read<Instant>(); }) == DecodeErrorKind.Invalid);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.String("yesterday").read<Instant>();
+            }
+        ) == DecodeErrorKind.Invalid
+    );
 }
 
 @Test
 fn anErrorNamesItsKindAndItsPath(): void throws Error {
     let missing = Value.Struct("User", List.of([("id", Value.Int(1))]));
-    assertEq(said(() => { let _ = try missing.read<User>(); }), "missing: field 'name' (at User)");
-    assertEq(said(() => { let _ = try Value.Int(300).read<int8>(); }), "invalid: 300 does not fit int8");
-    assertEq(said(() => { let _ = try Value.String("x").read<int>(); }), "type mismatch: expected an int, got a string");
+    assertEq(
+        said(
+            () => {
+                let _ = try missing.read<User>();
+            }
+        ),
+        "missing: field 'name' (at User)"
+    );
+    assertEq(
+        said(
+            () => {
+                let _ = try Value.Int(300).read<int8>();
+            }
+        ),
+        "invalid: 300 does not fit int8"
+    );
+    assertEq(
+        said(
+            () => {
+                let _ = try Value.String("x").read<int>();
+            }
+        ),
+        "type mismatch: expected an int, got a string"
+    );
     // the path reaches into a nested struct and a sequence
-    let lead = Value.Struct("User", List.of([("id", Value.Int(1)), ("name", Value.String("l")), ("tags", Value.Seq(List.new()))]));
-    let badMember = Value.Struct("User", List.of([("id", Value.String("no")), ("name", Value.String("m")), ("tags", Value.Seq(List.new()))]));
-    let team = Value.Struct("Team", List.of([("lead", lead), ("members", Value.Seq(List.of([badMember])))]));
-    assertEq(said(() => { let _ = try team.read<Team>(); }), "type mismatch: expected an int, got a string (at Team.[].User)");
+    let lead = Value.Struct(
+        "User",
+        List.of(
+            [("id", Value.Int(1)), ("name", Value.String("l")), ("tags", Value.Seq(List.new()))]
+        )
+    );
+    let badMember = Value.Struct(
+        "User",
+        List.of(
+            [
+                ("id", Value.String("no")),
+                ("name", Value.String("m")),
+                ("tags", Value.Seq(List.new())),
+            ]
+        )
+    );
+    let team = Value.Struct(
+        "Team",
+        List.of([("lead", lead), ("members", Value.Seq(List.of([badMember])))])
+    );
+    assertEq(
+        said(
+            () => {
+                let _ = try team.read<Team>();
+            }
+        ),
+        "type mismatch: expected an int, got a string (at Team.[].User)"
+    );
     // unknown fields pass unless refused
     let extra = Value.Struct("Strict", List.of([("id", Value.Int(1)), ("more", Value.Int(2))]));
-    assertEq(said(() => { let _ = try extra.read<Strict>(); }), "unknown field: field 'more' (at Strict)");
-    let userExtra = Value.Struct("User", List.of([("id", Value.Int(1)), ("name", Value.String("n")), ("tags", Value.Seq(List.new())), ("more", Value.Int(2))]));
+    assertEq(
+        said(
+            () => {
+                let _ = try extra.read<Strict>();
+            }
+        ),
+        "unknown field: field 'more' (at Strict)"
+    );
+    let userExtra = Value.Struct(
+        "User",
+        List.of(
+            [
+                ("id", Value.Int(1)),
+                ("name", Value.String("n")),
+                ("tags", Value.Seq(List.new())),
+                ("more", Value.Int(2)),
+            ]
+        )
+    );
     assertEq((try userExtra.read<User>()).id, 1);
     // the encoder's path
     var e = Value.encoder();
@@ -284,12 +470,22 @@ fn anErrorNamesItsKindAndItsPath(): void throws Error {
 
 @Test
 fn aValueWritesItselfAndReadsTheAnonymousForms(): void throws Error {
-    let tree = Value.Seq(List.of([Value.Int(1), Value.Map(List.of([(Value.String("k"), Value.Bool(true))])), Value.Null]));
+    let tree = Value.Seq(
+        List.of(
+            [Value.Int(1), Value.Map(List.of([(Value.String("k"), Value.Bool(true))])), Value.Null]
+        )
+    );
     // through another encoder: the tree is built again
     assertEq(try Value.of(tree), tree);
     // read back as a Value from a Value decoder
     assertEq(try tree.read<Value>(), tree);
     // a struct cannot be read without its name
     let named = Value.Struct("S", List.new());
-    assertTrue(kindOf(() => { let _ = try named.read<Value>(); }) == DecodeErrorKind.TypeMismatch);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try named.read<Value>();
+            }
+        ) == DecodeErrorKind.TypeMismatch
+    );
 }

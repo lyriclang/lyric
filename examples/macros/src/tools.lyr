@@ -6,8 +6,24 @@
 import std.collections { List };
 import std.string { StringBuilder };
 import std.syntax {
-    Block, Decl, Expr, FieldDecl, FieldInit, FnDecl, Ident, Literal, Param, PostfixOp, Span, Stmt,
-    StructDecl, Type, Visibility, WithField, error, parseExpr,
+    Block,
+    Decl,
+    Expr,
+    FieldDecl,
+    FieldInit,
+    FnDecl,
+    Ident,
+    Literal,
+    Param,
+    PostfixOp,
+    Span,
+    Stmt,
+    StructDecl,
+    Type,
+    Visibility,
+    WithField,
+    error,
+    parseExpr,
 };
 
 /// `retry!(n) { body }` runs the body up to n times, until it does not throw.
@@ -24,7 +40,9 @@ pub macro retry(n: Expr, body: Block): Stmt[] {
                 #{body}
                 break;
             } catch (e) {
-                if (attempts >= #{n}) { throw e; }
+                if (attempts >= #{n}) {
+                    throw e;
+                }
             }
         }
     };
@@ -40,35 +58,126 @@ pub macro Builder(target: StructDecl): Decl[] {
     for (m in target.members) {
         match (m) {
             .Field(f) => {
-                members.push(Decl.Field(FieldDecl {
-                    visibility = Visibility.None, isVar = false, name = f.name,
-                    type = Type.Optional(Box<Type> { value = f.type }, Span.none()),
-                    default = Expr.Literal(Literal.Null, Span.none()), attributes = [], span = Span.none(),
-                }));
+                members.push(
+                    Decl.Field(
+                        FieldDecl {
+                            visibility = Visibility.None,
+                            isVar = false,
+                            name = f.name,
+                            type = Type.Optional(Box<Type> { value = f.type }, Span.none()),
+                            default = Expr.Literal(Literal.Null, Span.none()),
+                            attributes = [],
+                            span = Span.none(),
+                        }
+                    )
+                );
                 let v = Ident.of("v");
-                let setterBody = Block { stmts = [Stmt.Return(Expr.With(Box<Expr> { value = Expr.This(Span.none()) },
-                    [WithField { path = [f.name.name], value = Expr.Name(v) }], Span.none()), Span.none())], span = Span.none() };
-                members.push(Decl.Fn(FnDecl {
-                    visibility = target.visibility, isStatic = false, isMut = false, isInline = false,
-                    name = Ident.of("set_" + f.name.name), generics = [],
-                    params = [Param { name = v, type = f.type, default = null, isParams = false, isEllipsis = false, isPlace = false, attributes = [], span = Span.none() }],
-                    ret = builderType, retGrouped = false, throws = null, body = setterBody,
-                    externAbi = null, externSymbol = null, attributes = [], span = Span.none(),
-                }));
-                inits.push(FieldInit { name = f.name, value = Expr.Postfix(Box<Expr> { value = Expr.Member(Box<Expr> { value = Expr.This(Span.none()) }, f.name, false, Span.none()) }, PostfixOp.Unwrap, Span.none()), isShorthand = false });
-            },
-            _ => { },
+                let setterBody = Block {
+                    stmts = [
+                        Stmt.Return(
+                            Expr.With(
+                                Box<Expr> { value = Expr.This(Span.none()) },
+                                [WithField { path = [f.name.name], value = Expr.Name(v) }],
+                                Span.none()
+                            ),
+                            Span.none()
+                        ),
+                    ],
+                    span = Span.none(),
+                };
+                members.push(
+                    Decl.Fn(
+                        FnDecl {
+                            visibility = target.visibility,
+                            isStatic = false,
+                            isMut = false,
+                            isInline = false,
+                            name = Ident.of("set_" + f.name.name),
+                            generics = [],
+                            params = [
+                                Param {
+                                    name = v,
+                                    type = f.type,
+                                    default = null,
+                                    isParams = false,
+                                    isEllipsis = false,
+                                    isPlace = false,
+                                    attributes = [],
+                                    span = Span.none(),
+                                },
+                            ],
+                            ret = builderType,
+                            retGrouped = false,
+                            throws = null,
+                            body = setterBody,
+                            externAbi = null,
+                            externSymbol = null,
+                            attributes = [],
+                            span = Span.none(),
+                        }
+                    )
+                );
+                inits.push(
+                    FieldInit {
+                        name = f.name,
+                        value = Expr.Postfix(
+                            Box<Expr> {
+                                value = Expr.Member(
+                                    Box<Expr> { value = Expr.This(Span.none()) },
+                                    f.name,
+                                    false,
+                                    Span.none()
+                                ),
+                            },
+                            PostfixOp.Unwrap,
+                            Span.none()
+                        ),
+                        isShorthand = false,
+                    }
+                );
+            }
+            _ => { }
         }
     }
-    let buildBody = Block { stmts = [Stmt.Return(Expr.StructInit([target.name.name], [], inits.toArray(), false, Span.none()), Span.none())], span = Span.none() };
-    members.push(Decl.Fn(FnDecl {
-        visibility = target.visibility, isStatic = false, isMut = false, isInline = false, name = Ident.of("build"), generics = [], params = [],
-        ret = Type.Named([target.name.name], [], [], null, Span.none()), retGrouped = false, throws = null, body = buildBody,
-        externAbi = null, externSymbol = null, attributes = [], span = Span.none(),
-    }));
+    let buildBody = Block {
+        stmts = [
+            Stmt.Return(
+                Expr.StructInit([target.name.name], [], inits.toArray(), false, Span.none()),
+                Span.none()
+            ),
+        ],
+        span = Span.none(),
+    };
+    members.push(
+        Decl.Fn(
+            FnDecl {
+                visibility = target.visibility,
+                isStatic = false,
+                isMut = false,
+                isInline = false,
+                name = Ident.of("build"),
+                generics = [],
+                params = [],
+                ret = Type.Named([target.name.name], [], [], null, Span.none()),
+                retGrouped = false,
+                throws = null,
+                body = buildBody,
+                externAbi = null,
+                externSymbol = null,
+                attributes = [],
+                span = Span.none(),
+            }
+        )
+    );
     let builder = StructDecl {
-        visibility = target.visibility, name = Ident.of(builderName), generics = [], interfaces = [], delegates = [],
-        members = members.toArray(), attributes = [], span = Span.none(),
+        visibility = target.visibility,
+        name = Ident.of(builderName),
+        generics = [],
+        interfaces = [],
+        delegates = [],
+        members = members.toArray(),
+        attributes = [],
+        span = Span.none(),
     };
     return [Decl.Struct(target), Decl.Struct(builder)];
 }
@@ -95,7 +204,9 @@ pub macro formula(text: Expr, x: Ident): Expr {
             out.append(c);
             afterNumber = true;
         } else if (c == 'x') {
-            if (afterNumber) { out.append(" * "); }
+            if (afterNumber) {
+                out.append(" * ");
+            }
             out.append(x.name);
             if (i + 1 < chars.length() && chars[i + 1] == '^') {
                 i += 2;

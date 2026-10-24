@@ -28,6 +28,48 @@ public class Lyric5FormatterTests
     private static void Keeps(string formatted) => Assert.Equal(formatted, Format(formatted));
 
     [Fact]
+    public void A_long_list_of_interfaces_puts_one_to_a_line()
+    {
+        Keeps("""
+            interface Equatable { }
+
+            struct Short :: [Equatable] {
+                n: int,
+            }
+
+            struct Wide :: [
+                Equatable,
+                Ordered,
+                TotalOrder,
+                Hashable,
+                Display,
+                Debug,
+                Encode,
+                Decode,
+                Default,
+                Clone,
+                Copy
+            ] {
+                n: int,
+            }
+
+            """);
+    }
+
+    [Fact]
+    public void A_broken_if_expression_puts_its_else_one_level_in()
+    {
+        Assert.Equal("""
+            fn f(took: int, n: int): int {
+                let budgetedPace = if (took > 0) ((n as float) * 120000000.0 / (took as float)) as int
+                    else n * 100;
+                return budgetedPace;
+            }
+
+            """, Format("fn f(took: int, n: int): int { let budgetedPace = if (took > 0) ((n as float) * 120000000.0 / (took as float)) as int else n * 100; return budgetedPace; }"));
+    }
+
+    [Fact]
     public void Written_parentheses_stay_and_none_are_added()
     {
         Assert.Equal("""

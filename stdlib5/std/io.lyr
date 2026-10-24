@@ -89,6 +89,7 @@ fn consoleRead(into: Slice<uint8>): int;
 
 @Allow("global-var-without-sync")
 var theStdin: ?Stdin = null;
+
 let stdinGuard = SpinLock { };
 
 /// Returns the program's standard input: one for the program, made at the first call. Its reads
@@ -207,7 +208,12 @@ pub class ConsoleWriter :: [Writer] {
     pub mut fn flush(): void throws IoError {
         let answer = flushed(this.stream);
         if (answer < 0) {
-            throw failure(answer, null, if (this.stream == 2) "written to the standard error" else "written to the standard output");
+            throw failure(
+                answer,
+                null,
+                if (this.stream == 2) "written to the standard error"
+                    else "written to the standard output"
+            );
         }
     }
 }
@@ -246,6 +252,7 @@ fn failure(answer: int, path: ?string, doing: string): IoError {
 
 @Allow("global-var-without-sync")
 var ioPool: ?Pool = null;
+
 let ioPoolGuard = SpinLock { };
 
 fn pool(): Pool {
@@ -393,8 +400,7 @@ pub interface Reader {
 pub interface Writer {
     mut fn write(from: Slice<uint8>): int throws [IoError, Cancelled];
 
-    mut fn flush(): void throws [IoError, Cancelled] {
-    }
+    mut fn flush(): void throws [IoError, Cancelled] { }
 }
 
 /// Selects where a position moves to: from the start, from the end, from where it stands.
@@ -455,8 +461,11 @@ extend<R :: [Reader]> R {
     /// and what the reader's `read` throws.
     pub mut fn readToString(): string throws [IoError, Cancelled] {
         let bytes = try this.readToEnd();
-        return try string.fromUtf8(bytes[..]) catch (e: Utf8Error)
-            throw IoError { kind = .InvalidData, detail = "the bytes are no UTF-8", inner = e };
+        return try string.fromUtf8(bytes[..]) catch (e: Utf8Error) throw IoError {
+            kind = .InvalidData,
+            detail = "the bytes are no UTF-8",
+            inner = e,
+        };
     }
 }
 
@@ -473,7 +482,10 @@ extend<W :: [Writer]> W {
         while (at < from.length()) {
             let n = try this.write(from[at..]);
             if (n == 0) {
-                throw IoError { kind = .Other { code = 0 }, detail = f"the writer took none of {from.length() - at} bytes" };
+                throw IoError {
+                    kind = .Other { code = 0 },
+                    detail = f"the writer took none of {from.length() - at} bytes",
+                };
             }
             at = at + n;
         }
@@ -738,7 +750,10 @@ pub class BufWriter<W :: [Writer]> :: [Writer, Closeable] {
         while (this.sent < this.used) {
             let n = try this.inner.write(this.held[this.sent..this.used]);
             if (n == 0) {
-                throw IoError { kind = .Other { code = 0 }, detail = f"the writer took none of {this.used - this.sent} bytes" };
+                throw IoError {
+                    kind = .Other { code = 0 },
+                    detail = f"the writer took none of {this.used - this.sent} bytes",
+                };
             }
             this.sent = this.sent + n;
         }
@@ -824,7 +839,9 @@ pub class TextReader<R :: [Reader]> {
             return null;
         }
         let lead = s.held[s.start] as int;
-        let size = if (lead < 0x80) 1 else if (lead < 0xC0) 0 else if (lead < 0xE0) 2 else if (lead < 0xF0) 3 else if (lead < 0xF8) 4 else 0;
+        let size = if (lead < 0x80) 1
+            else if (lead < 0xC0) 0
+                else if (lead < 0xE0) 2 else if (lead < 0xF0) 3 else if (lead < 0xF8) 4 else 0;
         if (size == 0 || !(try s.hold(size))) {
             throw invalidAt(this.taken);
         }
@@ -839,7 +856,8 @@ pub class TextReader<R :: [Reader]> {
             k = k + 1;
         }
         // the shortest form only: two bytes from 0x80, three from 0x800, four from 0x10000
-        let least = if (size == 2) 0x80 else if (size == 3) 0x800 else if (size == 4) 0x10000 else 0;
+        let least = if (size == 2) 0x80
+            else if (size == 3) 0x800 else if (size == 4) 0x10000 else 0;
         let c = if (code < least) null else char.fromUint32(code as uint32);
         if (c == null) {
             throw invalidAt(this.taken);
@@ -869,7 +887,9 @@ pub class TextReader<R :: [Reader]> {
         this.bom = false;
         let s = this.source;
         if (try s.hold(3)) {
-            if (s.held[s.start] == 0xEFu8 && s.held[s.start + 1] == 0xBBu8 && s.held[s.start + 2] == 0xBFu8) {
+            if (s.held[s.start] == 0xEFu8
+                && s.held[s.start + 1] == 0xBBu8
+                && s.held[s.start + 2] == 0xBFu8) {
                 s.start = s.start + 3;
                 this.taken = 3;
             }
@@ -879,7 +899,11 @@ pub class TextReader<R :: [Reader]> {
 
 /// Returns the `InvalidData` error for bytes that are no UTF-8 from `offset` on.
 fn invalidAt(offset: int): IoError {
-    return IoError { kind = .InvalidData, detail = "the bytes are no UTF-8", inner = Utf8Error { offset = offset } };
+    return IoError {
+        kind = .InvalidData,
+        detail = "the bytes are no UTF-8",
+        inner = Utf8Error { offset = offset },
+    };
 }
 
 /// A `TextReader`'s lines. An iterator's `Error` is one type, so the two a reader may throw are

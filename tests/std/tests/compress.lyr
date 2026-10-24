@@ -2,7 +2,18 @@
 // round trip at every level, the formats' headers and trailers, streams through the adapters,
 // what is refused, and the bytes of RFC 1951's own examples and of zlib's output read back.
 import std.io { IoError, IoErrorKind, ByteBuffer };
-import std.compress { Gzip, Zlib, Deflate, GzipReader, GzipWriter, ZlibReader, ZlibWriter, DeflateReader, DeflateWriter, CompressError };
+import std.compress {
+    Gzip,
+    Zlib,
+    Deflate,
+    GzipReader,
+    GzipWriter,
+    ZlibReader,
+    ZlibWriter,
+    DeflateReader,
+    DeflateWriter,
+    CompressError,
+};
 import std.encoding { Hex };
 import std.hash { crc32, adler32 };
 import std.test { assertEq, assertTrue, fail };
@@ -23,7 +34,18 @@ fn sameBytes(a: uint8[], b: Slice<uint8>): bool {
 
 /// A text with structure: words that repeat at distances the window covers.
 fn sampleText(): uint8[] {
-    let words = ["lyric", "deflate", "window", "huffman", "lazy", "match", "block", "stream", "zlib", "gzip"];
+    let words = [
+        "lyric",
+        "deflate",
+        "window",
+        "huffman",
+        "lazy",
+        "match",
+        "block",
+        "stream",
+        "zlib",
+        "gzip",
+    ];
     let out = ByteBuffer.new();
     var i = 0;
     var x = 17;
@@ -59,24 +81,44 @@ fn everyLevelRoundTrips(): void throws Error {
         i = i + 1;
     }
     let empty: uint8[] = [];
-    for (data in [empty, "a".toBytes(), "hello hello hello hello, world".toBytes(), text, run, noise]) {
+    for (data in [
+        empty,
+        "a".toBytes(),
+        "hello hello hello hello, world".toBytes(),
+        text,
+        run,
+        noise,
+    ]) {
         for (level in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
             let packed = try Gzip.compress(data[..], level);
-            assertTrue(sameBytes(try Gzip.decompress(packed[..]), data[..]), f"level {level} over {data.length()} bytes");
+            assertTrue(
+                sameBytes(try Gzip.decompress(packed[..]), data[..]),
+                f"level {level} over {data.length()} bytes"
+            );
             if (level == 0) {
                 // stored: the data plus the headers and a block per 65535 bytes
-                assertEq(packed.length(), data.length() + 18 + 5 * (1 + (data.length() + 65534) / 65535));
+                assertEq(
+                    packed.length(),
+                    data.length() + 18 + 5 * (1 + (data.length() + 65534) / 65535)
+                );
             }
         }
         assertTrue(sameBytes(try Zlib.decompress((Zlib.compress(data[..], 6))[..]), data[..]));
-        assertTrue(sameBytes(try Deflate.decompress((Deflate.compress(data[..], 6))[..]), data[..]));
+        assertTrue(
+            sameBytes(try Deflate.decompress((Deflate.compress(data[..], 6))[..]), data[..])
+        );
     }
     // the text shrinks, the run collapses, the noise does not grow by much
     assertTrue((try Gzip.compress(text[..], 6)).length() < text.length() / 2, "the text shrinks");
     assertTrue((try Gzip.compress(run[..], 6)).length() < 200, "the run collapses");
-    assertTrue((try Gzip.compress(noise[..], 9)).length() < noise.length() + 100, "the noise stays");
+    assertTrue(
+        (try Gzip.compress(noise[..], 9)).length() < noise.length() + 100,
+        "the noise stays"
+    );
     // the levels order roughly: 9 is no worse than 1
-    assertTrue((try Gzip.compress(text[..], 9)).length() <= (try Gzip.compress(text[..], 1)).length());
+    assertTrue(
+        (try Gzip.compress(text[..], 9)).length() <= (try Gzip.compress(text[..], 1)).length()
+    );
 }
 
 @Test
@@ -110,14 +152,23 @@ fn theFormatsHaveTheirHeadersAndTrailers(): void throws Error {
     assertEq((try Deflate.compress([], 0)), [1u8, 0u8, 0u8, 255u8, 255u8]);
     assertEq(try Gzip.decompress((Gzip.compress([], 9))[..]), []);
     // zlib's own bytes of "hello hello hello hello, world" at level 9 read back; RFC 1951's fixed-code form of "a"
-    assertEq(try Zlib.decompress((Hex.decode("78dacb48cdc9c957c840277514caf38b725200ad6f0b25"))[..]), data);
+    assertEq(
+        try Zlib.decompress((Hex.decode("78dacb48cdc9c957c840277514caf38b725200ad6f0b25"))[..]),
+        data
+    );
     assertEq(try Deflate.decompress((Hex.decode("4b0400"))[..]), "a".toBytes());
-    assertEq(try Gzip.decompress((Hex.decode("1f8b08000000000002ff4b040043beb7e801000000"))[..]), "a".toBytes());
+    assertEq(
+        try Gzip.decompress((Hex.decode("1f8b08000000000002ff4b040043beb7e801000000"))[..]),
+        "a".toBytes()
+    );
     // a gzip header with an extra field, a name and a comment is skipped
-    let named = try Hex.decode("1f8b081c0000000002ff0300010203686900636f6d6d656e74004b040043beb7e801000000");
+    let named = try Hex.decode(
+        "1f8b081c0000000002ff0300010203686900636f6d6d656e74004b040043beb7e801000000"
+    );
     assertEq(try Gzip.decompress(named[..]), "a".toBytes());
     // two members in a row read as one
-    let two = (try Gzip.compress("one,".toBytes()[..], 6)) + (try Gzip.compress("two".toBytes()[..], 6));
+    let two = (try Gzip.compress("one,".toBytes()[..], 6))
+        + (try Gzip.compress("two".toBytes()[..], 6));
     assertEq(string.fromUtf8Lossy((try Gzip.decompress(two[..]))[..]), "one,two");
 }
 
@@ -243,5 +294,8 @@ fn whatIsNotTheFormatIsRefused(): void throws Error {
     } catch (e: CompressError) {
         assertEq(e.message(), "the level 10 is none: 0 to 9");
     }
-    assertEq((try Gzip.compress("x".toBytes()[..], -1)).length(), (try Gzip.compress("x".toBytes()[..], 6)).length());
+    assertEq(
+        (try Gzip.compress("x".toBytes()[..], -1)).length(),
+        (try Gzip.compress("x".toBytes()[..], 6)).length()
+    );
 }

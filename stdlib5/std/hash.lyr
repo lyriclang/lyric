@@ -212,15 +212,18 @@ pub fn adler32(bytes: Slice<uint8>, running: uint32 = 1): uint32 {
 /// Builds the table of a reflected CRC of `polynomial`: the remainder of each byte value after
 /// eight shifts.
 fn crcTable(polynomial: uint32): uint32[] {
-    return arrayOf(256, (n: int) => {
-        var c = n as uint32;
-        var k = 0;
-        while (k < 8) {
-            c = if ((c & 1) != 0) polynomial ^ (c >> 1) else c >> 1;
-            k = k + 1;
+    return arrayOf(
+        256,
+        (n: int) => {
+            var c = n as uint32;
+            var k = 0;
+            while (k < 8) {
+                c = if ((c & 1) != 0) polynomial ^ (c >> 1) else c >> 1;
+                k = k + 1;
+            }
+            c
         }
-        c
-    });
+    );
 }
 
 /// The CRC-32 and CRC-32C tables, computed at compile time.
@@ -228,6 +231,7 @@ fn crcTable(polynomial: uint32): uint32[] {
 /// They are data of the program, copied once before its entry where it computes a CRC; a program
 /// that computes none carries neither table.
 let ieeeTable: uint32[] = comptime crcTable(0xEDB88320);
+
 let castagnoliTable: uint32[] = comptime crcTable(0x82F63B78);
 
 fn crcOver(table: uint32[], bytes: Slice<uint8>, running: uint32): uint32 {

@@ -267,6 +267,10 @@ promise. This entry fills with the milestones.
   what it throws; std's messages, the runtime's and the catalog's name no design documents.
 - **`std.json`'s encode error for a non-finite float** reads "… has no JSON text — JSON has no NaN or
   infinity" (it named a section of RFC 8259).
+- **`lyric fmt`** puts a package's Lyric files — `src/`, `tests/`, `build.lyr` — or the files named in
+  the one form, with no options to change it; comments and the parentheses a program writes stay, and
+  a file that does not parse is left as it is. `--check` writes nothing and fails where a file would
+  change; `--diff` shows how. The standard library is in the form.
 
 ---
 

@@ -1,7 +1,29 @@
 // std.term: the styles as ECMA-48's SGR sequences, when they go
 // out (NO_COLOR, FORCE_COLOR, TERM, the terminal), the cursor and the screen sequences, the
 // terminal questions.
-import std.term { StdStream, Color, Style, isTerminal, size, colorsEnabled, reset, cursorUp, cursorDown, cursorForward, cursorBack, cursorTo, cursorNextLine, cursorHide, cursorShow, cursorSave, cursorRestore, clearScreen, clearToEnd, eraseLine, eraseToEndOfLine };
+import std.term {
+    StdStream,
+    Color,
+    Style,
+    isTerminal,
+    size,
+    colorsEnabled,
+    reset,
+    cursorUp,
+    cursorDown,
+    cursorForward,
+    cursorBack,
+    cursorTo,
+    cursorNextLine,
+    cursorHide,
+    cursorShow,
+    cursorSave,
+    cursorRestore,
+    clearScreen,
+    clearToEnd,
+    eraseLine,
+    eraseToEndOfLine,
+};
 import std.os { env, setEnv };
 import std.test { assertEq, assertTrue, assertNull };
 
@@ -34,7 +56,18 @@ fn aStyleIsItsSgrSequence(): void {
     assertEq(Style { fg = Color.Red }.sgr(), esc + "[31m");
     assertEq(Style { bg = Color.Blue }.sgr(), esc + "[44m");
     assertEq(Style { fg = Color.BrightGreen, bg = Color.BrightBlack }.sgr(), esc + "[92;100m");
-    assertEq(Style { bold = true, dim = true, italic = true, underline = true, inverse = true, strike = true, fg = Color.White }.sgr(), esc + "[1;2;3;4;7;9;37m");
+    assertEq(
+        Style {
+            bold = true,
+            dim = true,
+            italic = true,
+            underline = true,
+            inverse = true,
+            strike = true,
+            fg = Color.White,
+        }.sgr(),
+        esc + "[1;2;3;4;7;9;37m"
+    );
     assertEq(Style { fg = Color.Index(208) }.sgr(), esc + "[38;5;208m");
     assertEq(Style { bg = Color.Index(999) }.sgr(), esc + "[48;5;255m");
     assertEq(Style { fg = Color.Rgb(255, 128, 0) }.sgr(), esc + "[38;2;255;128;0m");
@@ -46,27 +79,52 @@ fn aStyleIsItsSgrSequence(): void {
 
 @Test
 fn whenStylesGoOut(): void {
-    withEnv("1", null, "xterm", () => {
-        assertTrue(!colorsEnabled());
-        assertEq(Style { bold = true }.apply("x"), "x");
-    });
-    withEnv("1", "1", "xterm", () => {
-        // NO_COLOR wins over FORCE_COLOR
-        assertTrue(!colorsEnabled());
-    });
-    withEnv("", "1", "dumb", () => {
-        // an empty NO_COLOR says nothing; FORCE_COLOR wins over a dumb terminal
-        assertTrue(colorsEnabled());
-        assertEq(Style { bold = true }.apply("x"), esc + "[1mx" + esc + "[0m");
-        assertEq(Style { }.apply("x"), "x");
-    });
-    withEnv(null, null, "dumb", () => {
-        assertTrue(!colorsEnabled());
-    });
-    withEnv(null, null, "xterm-256color", () => {
-        // without a say either way, the terminal decides
-        assertEq(colorsEnabled(), isTerminal(StdStream.Stdout));
-    });
+    withEnv(
+        "1",
+        null,
+        "xterm",
+        () => {
+            assertTrue(!colorsEnabled());
+            assertEq(Style { bold = true }.apply("x"), "x");
+        }
+    );
+    withEnv(
+        "1",
+        "1",
+        "xterm",
+        () => {
+            // NO_COLOR wins over FORCE_COLOR
+            assertTrue(!colorsEnabled());
+        }
+    );
+    withEnv(
+        "",
+        "1",
+        "dumb",
+        () => {
+            // an empty NO_COLOR says nothing; FORCE_COLOR wins over a dumb terminal
+            assertTrue(colorsEnabled());
+            assertEq(Style { bold = true }.apply("x"), esc + "[1mx" + esc + "[0m");
+            assertEq(Style { }.apply("x"), "x");
+        }
+    );
+    withEnv(
+        null,
+        null,
+        "dumb",
+        () => {
+            assertTrue(!colorsEnabled());
+        }
+    );
+    withEnv(
+        null,
+        null,
+        "xterm-256color",
+        () => {
+            // without a say either way, the terminal decides
+            assertEq(colorsEnabled(), isTerminal(StdStream.Stdout));
+        }
+    );
 }
 
 @Test

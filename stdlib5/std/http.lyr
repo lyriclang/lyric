@@ -107,11 +107,25 @@ pub struct Status :: [Equatable, Debug] {
         return Status { code = code, reason = reasonOf(code) };
     }
 
-    pub fn isInformational(): bool { return this.code >= 100 && this.code < 200; }
-    pub fn isSuccess(): bool { return this.code >= 200 && this.code < 300; }
-    pub fn isRedirect(): bool { return this.code >= 300 && this.code < 400; }
-    pub fn isClientError(): bool { return this.code >= 400 && this.code < 500; }
-    pub fn isServerError(): bool { return this.code >= 500 && this.code < 600; }
+    pub fn isInformational(): bool {
+        return this.code >= 100 && this.code < 200;
+    }
+
+    pub fn isSuccess(): bool {
+        return this.code >= 200 && this.code < 300;
+    }
+
+    pub fn isRedirect(): bool {
+        return this.code >= 300 && this.code < 400;
+    }
+
+    pub fn isClientError(): bool {
+        return this.code >= 400 && this.code < 500;
+    }
+
+    pub fn isServerError(): bool {
+        return this.code >= 500 && this.code < 600;
+    }
 }
 
 extend Status :: [Display] {
@@ -271,7 +285,11 @@ pub struct Request {
     }
 
     /// Returns a POST of the bytes, their length known.
-    pub static fn post(uri: Uri, body: Slice<uint8>, contentType: string = "application/octet-stream"): Request {
+    pub static fn post(
+        uri: Uri,
+        body: Slice<uint8>,
+        contentType: string = "application/octet-stream"
+    ): Request {
         var r = Request { method = Method.Post, uri = uri };
         r.headers.set("Content-Type", contentType);
         r.setBody(body);
@@ -351,7 +369,11 @@ pub class Response {
 
     /// Returns a response of the bytes, their length known; `Content-Type` is set where there are
     /// any.
-    pub static fn of(status: int, body: Slice<uint8> = [], contentType: string = "application/octet-stream"): Response {
+    pub static fn of(
+        status: int,
+        body: Slice<uint8> = [],
+        contentType: string = "application/octet-stream"
+    ): Response {
         let headers = Headers.new();
         if (body.length() > 0) {
             headers.set("Content-Type", contentType);
@@ -360,7 +382,11 @@ pub class Response {
     }
 
     /// Returns a response of the text, UTF-8.
-    pub static fn withText(text: string, status: int = 200, contentType: string = "text/plain; charset=utf-8"): Response {
+    pub static fn withText(
+        text: string,
+        status: int = 200,
+        contentType: string = "text/plain; charset=utf-8"
+    ): Response {
         return Response.of(status, viewBytes(text), contentType);
     }
 
@@ -369,21 +395,37 @@ pub class Response {
     /// # Errors
     ///
     /// Throws `EncodeError` where the value cannot be encoded as JSON.
-    pub static fn withJson<T :: [Encode]>(value: T, status: int = 200): Response throws EncodeError {
+    pub static fn withJson<T :: [Encode]>(
+        value: T,
+        status: int = 200
+    ): Response throws EncodeError {
         return Response.of(status, viewBytes(try jsonText(value)), "application/json");
     }
 
     /// Returns a response whose body is read from `source` as it is written — in chunks where
     /// `length` is `null`, with `Content-Length` otherwise.
-    pub static fn stream(status: int, source: Reader, length: ?int = null, contentType: string = "application/octet-stream"): Response {
+    pub static fn stream(
+        status: int,
+        source: Reader,
+        length: ?int = null,
+        contentType: string = "application/octet-stream"
+    ): Response {
         let headers = Headers.new();
         headers.set("Content-Type", contentType);
-        return Response { status = Status.of(status), headers = headers, body = Body.from(source, length) };
+        return Response {
+            status = Status.of(status),
+            headers = headers,
+            body = Body.from(source, length),
+        };
     }
 
     /// Returns a response without a body.
     pub static fn empty(status: int): Response {
-        return Response { status = Status.of(status), headers = Headers.new(), body = Body.empty() };
+        return Response {
+            status = Status.of(status),
+            headers = Headers.new(),
+            body = Body.empty(),
+        };
     }
 
     /// Reads the body whole.
@@ -437,6 +479,7 @@ extend TcpStream :: [Stream] { }
 
 /// The most a line of the head may hold.
 let maxLineBytes = 65536;
+
 /// The most lines a head may hold.
 let maxHeaderLines = 256;
 
@@ -473,7 +516,12 @@ class Conn {
                 if (total == 0) {
                     return null;
                 }
-                throw IoError { kind = .UnexpectedEof, path = null, detail = "the line is not ended", inner = null };
+                throw IoError {
+                    kind = .UnexpectedEof,
+                    path = null,
+                    detail = "the line is not ended",
+                    inner = null,
+                };
             }
             var i = this.start;
             while (i < this.end && this.buf[i] != 10u8) {
@@ -485,7 +533,12 @@ class Conn {
             total = total + (take - this.start);
             this.start = if (found) take + 1 else take;
             if (total > maxLineBytes) {
-                throw IoError { kind = .InvalidData, path = null, detail = "a line of the head beyond 64 KiB", inner = null };
+                throw IoError {
+                    kind = .InvalidData,
+                    path = null,
+                    detail = "a line of the head beyond 64 KiB",
+                    inner = null,
+                };
             }
             if (found) {
                 break;
@@ -502,7 +555,8 @@ class Conn {
     /// Reads bytes into `into`, from the buffer first; 0 at the end of the stream.
     mut fn read(into: Slice<uint8>): int throws [IoError, Cancelled] {
         if (this.start < this.end) {
-            let n = if (this.end - this.start < into.length()) this.end - this.start else into.length();
+            let n = if (this.end - this.start < into.length()) this.end - this.start
+                else into.length();
             this.buf[this.start..this.start + n].copyInto(into[0..n]);
             this.start = this.start + n;
             return n;
@@ -518,7 +572,12 @@ class Conn {
         while (at < bytes.length()) {
             let n = try this.stream.write(bytes[at..bytes.length()]);
             if (n <= 0) {
-                throw IoError { kind = .BrokenPipe, path = null, detail = "the connection took nothing", inner = null };
+                throw IoError {
+                    kind = .BrokenPipe,
+                    path = null,
+                    detail = "the connection took nothing",
+                    inner = null,
+                };
             }
             at = at + n;
         }
@@ -589,19 +648,52 @@ pub class Body :: [Reader] {
     var failed: bool,
 
     static fn empty(): Body {
-        return Body { conn = null, framing = Framing.Empty, left = 0, done = true, client = null, authority = "", source = null, sourceLength = null, owns = false, failed = false };
+        return Body {
+            conn = null,
+            framing = Framing.Empty,
+            left = 0,
+            done = true,
+            client = null,
+            authority = "",
+            source = null,
+            sourceLength = null,
+            owns = false,
+            failed = false,
+        };
     }
 
     /// Returns a body of the bytes.
     pub static fn of(bytes: Slice<uint8>): Body {
         let buf = ByteBuffer.new();
         try! buf.write(bytes);
-        return Body { conn = null, framing = Framing.Fixed, left = bytes.length(), done = bytes.length() == 0, client = null, authority = "", source = buf, sourceLength = bytes.length(), owns = false, failed = false };
+        return Body {
+            conn = null,
+            framing = Framing.Fixed,
+            left = bytes.length(),
+            done = bytes.length() == 0,
+            client = null,
+            authority = "",
+            source = buf,
+            sourceLength = bytes.length(),
+            owns = false,
+            failed = false,
+        };
     }
 
     /// Returns a body read from `source`, with its length where known.
     pub static fn from(source: Reader, length: ?int): Body {
-        return Body { conn = null, framing = Framing.UntilClose, left = 0, done = false, client = null, authority = "", source = source, sourceLength = length, owns = false, failed = false };
+        return Body {
+            conn = null,
+            framing = Framing.UntilClose,
+            left = 0,
+            done = false,
+            client = null,
+            authority = "",
+            source = source,
+            sourceLength = length,
+            owns = false,
+            failed = false,
+        };
     }
 
     /// Returns the body's length where it is known before it is read, `null` otherwise.
@@ -630,20 +722,28 @@ pub class Body :: [Reader] {
         }
         let conn = this.conn!;
         match (this.framing) {
-            .Empty => { this.finish(); return 0; },
+            .Empty => {
+                this.finish();
+                return 0;
+            }
             .Fixed => {
                 let want = if (this.left < into.length()) this.left else into.length();
                 let n = try conn.read(into[0..want]);
                 if (n == 0) {
                     this.drop();
-                    throw IoError { kind = .UnexpectedEof, path = null, detail = f"the body ended {this.left} bytes early", inner = null };
+                    throw IoError {
+                        kind = .UnexpectedEof,
+                        path = null,
+                        detail = f"the body ended {this.left} bytes early",
+                        inner = null,
+                    };
                 }
                 this.left = this.left - n;
                 if (this.left == 0) {
                     this.finish();
                 }
                 return n;
-            },
+            }
             .Chunked => {
                 if (this.left == 0) {
                     let size = try this.chunkSize(conn);
@@ -653,7 +753,12 @@ pub class Body :: [Reader] {
                             let line = try conn.readLine();
                             if (line == null) {
                                 this.drop();
-                                throw IoError { kind = .UnexpectedEof, path = null, detail = "the chunked body is not ended", inner = null };
+                                throw IoError {
+                                    kind = .UnexpectedEof,
+                                    path = null,
+                                    detail = "the chunked body is not ended",
+                                    inner = null,
+                                };
                             }
                             if (line.isEmpty()) {
                                 break;
@@ -668,7 +773,12 @@ pub class Body :: [Reader] {
                 let n = try conn.read(into[0..want]);
                 if (n == 0) {
                     this.drop();
-                    throw IoError { kind = .UnexpectedEof, path = null, detail = "a chunk ended early", inner = null };
+                    throw IoError {
+                        kind = .UnexpectedEof,
+                        path = null,
+                        detail = "a chunk ended early",
+                        inner = null,
+                    };
                 }
                 this.left = this.left - n;
                 if (this.left == 0) {
@@ -676,18 +786,23 @@ pub class Body :: [Reader] {
                     let crlf = try conn.readLine();
                     if (crlf == null || !crlf.isEmpty()) {
                         this.drop();
-                        throw IoError { kind = .InvalidData, path = null, detail = "a chunk is not ended by CRLF", inner = null };
+                        throw IoError {
+                            kind = .InvalidData,
+                            path = null,
+                            detail = "a chunk is not ended by CRLF",
+                            inner = null,
+                        };
                     }
                 }
                 return n;
-            },
+            }
             .UntilClose => {
                 let n = try conn.read(into);
                 if (n == 0) {
                     this.drop();
                 }
                 return n;
-            },
+            }
         }
     }
 
@@ -696,7 +811,12 @@ pub class Body :: [Reader] {
         let line = try conn.readLine();
         if (line == null) {
             this.drop();
-            throw IoError { kind = .UnexpectedEof, path = null, detail = "the chunked body is not ended", inner = null };
+            throw IoError {
+                kind = .UnexpectedEof,
+                path = null,
+                detail = "the chunked body is not ended",
+                inner = null,
+            };
         }
         var size = 0;
         var digits = 0;
@@ -709,16 +829,31 @@ pub class Body :: [Reader] {
                 digits = digits + 1;
                 if (size > 1073741824) {
                     this.drop();
-                    throw IoError { kind = .InvalidData, path = null, detail = "a chunk beyond 1 GiB", inner = null };
+                    throw IoError {
+                        kind = .InvalidData,
+                        path = null,
+                        detail = "a chunk beyond 1 GiB",
+                        inner = null,
+                    };
                 }
             } else {
                 this.drop();
-                throw IoError { kind = .InvalidData, path = null, detail = f"'{line}' is no chunk size", inner = null };
+                throw IoError {
+                    kind = .InvalidData,
+                    path = null,
+                    detail = f"'{line}' is no chunk size",
+                    inner = null,
+                };
             }
         }
         if (digits == 0) {
             this.drop();
-            throw IoError { kind = .InvalidData, path = null, detail = f"'{line}' is no chunk size", inner = null };
+            throw IoError {
+                kind = .InvalidData,
+                path = null,
+                detail = f"'{line}' is no chunk size",
+                inner = null,
+            };
         }
         return size;
     }
@@ -874,7 +1009,10 @@ pub class Client {
             hops = hops + 1;
             if (hops > this.options.maxRedirects) {
                 response.body.drop();
-                throw HttpError { kind = .Redirects, detail = f"more than {this.options.maxRedirects} redirects" };
+                throw HttpError {
+                    kind = .Redirects,
+                    detail = f"more than {this.options.maxRedirects} redirects",
+                };
             }
             // the body of the redirect is read away: the connection stays usable
             let _ = try response.body.readAll();
@@ -882,18 +1020,32 @@ pub class Client {
             try {
                 target = req.uri.resolve(Uri.parse(location));
             } catch (_: ParseError) {
-                throw HttpError { kind = .Redirects, detail = f"the Location '{location}' is no URI" };
+                throw HttpError {
+                    kind = .Redirects,
+                    detail = f"the Location '{location}' is no URI",
+                };
             }
-            var next = Request { method = req.method, uri = target, headers = Headers.new(), body = null, contentLength = null };
+            var next = Request {
+                method = req.method,
+                uri = target,
+                headers = Headers.new(),
+                body = null,
+                contentLength = null,
+            };
             for ((k, v) in req.headers.pairs()) {
-                if (!sameName(k, "Host") && !sameName(k, "Content-Length") && !sameName(k, "Content-Type")) {
+                if (!sameName(k, "Host")
+                    && !sameName(k, "Content-Length")
+                    && !sameName(k, "Content-Type")) {
                     next.headers.add(k, v);
                 }
             }
             if (code == 303 || ((code == 301 || code == 302) && req.method == Method.Post)) {
                 next.method = Method.Get;
             } else if (req.body != null) {
-                throw HttpError { kind = .Redirects, detail = f"a {code} asks the body to be sent again" };
+                throw HttpError {
+                    kind = .Redirects,
+                    detail = f"a {code} asks the body to be sent again",
+                };
             }
             req = next;
         }
@@ -923,7 +1075,11 @@ pub class Client {
     fn target(uri: Uri): (string, int, string) throws HttpError {
         let scheme = uri.scheme ?? "";
         if (scheme != "http" && !(scheme == "https" && this.options.transport != null)) {
-            throw HttpError { kind = .Unsupported, detail = if (scheme == "https") "https needs a transport" else f"the scheme '{scheme}'" };
+            throw HttpError {
+                kind = .Unsupported,
+                detail = if (scheme == "https") "https needs a transport"
+                    else f"the scheme '{scheme}'",
+            };
         }
         let host = uri.host ?? "";
         if (host.isEmpty()) {
@@ -943,7 +1099,12 @@ pub class Client {
         } catch (_: ParseError) {
             let found = try resolve(host);
             if (found.isEmpty()) {
-                throw IoError { kind = .NotFound, path = null, detail = f"'{host}' resolves to no address", inner = null };
+                throw IoError {
+                    kind = .NotFound,
+                    path = null,
+                    detail = f"'{host}' resolves to no address",
+                    inner = null,
+                };
             }
             ip = found[0];
         }
@@ -981,7 +1142,11 @@ pub class Client {
         this.idle = Map<string, Conn>.new();
     }
 
-    mut fn exchange(conn: Conn, req: Request, authority: string): Response throws [HttpError, IoError, Cancelled] {
+    mut fn exchange(
+        conn: Conn,
+        req: Request,
+        authority: string
+    ): Response throws [HttpError, IoError, Cancelled] {
         this.inFlight = conn;
         try {
             this.writeRequest(conn, req);
@@ -1053,7 +1218,9 @@ pub class Client {
                 head.appendStr("Transfer-Encoding: chunked\r\n");
                 chunked = true;
             }
-        } else if (req.method == Method.Post || req.method == Method.Put || req.method == Method.Patch) {
+        } else if (req.method == Method.Post
+            || req.method == Method.Put
+            || req.method == Method.Patch) {
             head.appendStr("Content-Length: 0\r\n");
         }
         for ((k, v) in req.headers.pairs()) {
@@ -1086,14 +1253,23 @@ pub class Client {
                 try conn.writeAll(viewBytes("0\r\n\r\n"));
             } else if (let n = req.contentLength) {
                 if (sent != n) {
-                    throw IoError { kind = .InvalidInput, path = null, detail = f"the body gave {sent} bytes, Content-Length said {n}", inner = null };
+                    throw IoError {
+                        kind = .InvalidInput,
+                        path = null,
+                        detail = f"the body gave {sent} bytes, Content-Length said {n}",
+                        inner = null,
+                    };
                 }
             }
         }
         try conn.stream.flush();
     }
 
-    fn readResponse(conn: Conn, req: Request, authority: string): Response throws [HttpError, IoError, Cancelled] {
+    fn readResponse(
+        conn: Conn,
+        req: Request,
+        authority: string
+    ): Response throws [HttpError, IoError, Cancelled] {
         try {
             return this.readResponseHead(conn, req, authority);
         } catch (e: HttpError) {
@@ -1105,7 +1281,11 @@ pub class Client {
         }
     }
 
-    fn readResponseHead(conn: Conn, req: Request, authority: string): Response throws [HttpError, IoError, Cancelled] {
+    fn readResponseHead(
+        conn: Conn,
+        req: Request,
+        authority: string
+    ): Response throws [HttpError, IoError, Cancelled] {
         var status = Status { code = 0 };
         var headers = Headers.new();
         var version11 = true;
@@ -1113,7 +1293,12 @@ pub class Client {
         while (true) {
             let line = try conn.readLine();
             if (line == null) {
-                throw IoError { kind = .UnexpectedEof, path = null, detail = "the connection closed before a response", inner = null };
+                throw IoError {
+                    kind = .UnexpectedEof,
+                    path = null,
+                    detail = "the connection closed before a response",
+                    inner = null,
+                };
             }
             if (line.isEmpty()) {
                 continue;
@@ -1133,7 +1318,10 @@ pub class Client {
             framing = Framing.Empty;
         } else if (let te = headers.get("Transfer-Encoding")) {
             if (!sameName(lastToken(te), "chunked")) {
-                throw HttpError { kind = .Protocol, detail = f"the transfer encoding '{te}' is not understood" };
+                throw HttpError {
+                    kind = .Protocol,
+                    detail = f"the transfer encoding '{te}' is not understood",
+                };
             }
             framing = Framing.Chunked;
         } else if (let cl = headers.get("Content-Length")) {
@@ -1145,17 +1333,39 @@ pub class Client {
             }
         }
         // keep-alive: HTTP/1.1, a framed body, neither side closing
-        var reusable = version11 && this.options.keepAlive && !headers.connectionHas("close") && !req.headers.connectionHas("close");
+        var reusable = version11
+            && this.options.keepAlive
+            && !headers.connectionHas("close")
+            && !req.headers.connectionHas("close");
         match (framing) {
-            .UntilClose => { reusable = false; },
-            _ => { },
+            .UntilClose => {
+                reusable = false;
+            }
+            _ => { }
         }
         conn.reusable = reusable;
-        var body = Body { conn = conn, framing = framing, left = length, done = false, client = this, authority = authority, source = null, sourceLength = null, owns = true, failed = false };
+        var body = Body {
+            conn = conn,
+            framing = framing,
+            left = length,
+            done = false,
+            client = this,
+            authority = authority,
+            source = null,
+            sourceLength = null,
+            owns = true,
+            failed = false,
+        };
         match (framing) {
-            .Empty => { body.finish(); },
-            .Fixed => { if (length == 0) { body.finish(); } },
-            _ => { },
+            .Empty => {
+                body.finish();
+            }
+            .Fixed => {
+                if (length == 0) {
+                    body.finish();
+                }
+            }
+            _ => { }
         }
         // a compressed body is decoded as it is read: the raw body underneath still returns
         // the connection at its end
@@ -1185,9 +1395,13 @@ fn parseStatusLine(line: string): (Status, bool) throws HttpError {
     var reason = "";
     var i = 0;
     for (p in parts) {
-        if (i == 0) { version = p.toString(); }
-        else if (i == 1) { codeText = p.toString(); }
-        else { reason = p.toString(); }
+        if (i == 0) {
+            version = p.toString();
+        } else if (i == 1) {
+            codeText = p.toString();
+        } else {
+            reason = p.toString();
+        }
         i = i + 1;
     }
     if (!(version == "HTTP/1.1" || version == "HTTP/1.0")) {
@@ -1214,14 +1428,22 @@ fn readHeaders(conn: Conn): Headers throws [HttpError, IoError, Cancelled] {
     while (true) {
         let line = try conn.readLine();
         if (line == null) {
-            throw IoError { kind = .UnexpectedEof, path = null, detail = "the head is not ended", inner = null };
+            throw IoError {
+                kind = .UnexpectedEof,
+                path = null,
+                detail = "the head is not ended",
+                inner = null,
+            };
         }
         if (line.isEmpty()) {
             return headers;
         }
         count = count + 1;
         if (count > maxHeaderLines) {
-            throw HttpError { kind = .Protocol, detail = f"more than {maxHeaderLines} header lines" };
+            throw HttpError {
+                kind = .Protocol,
+                detail = f"more than {maxHeaderLines} header lines",
+            };
         }
         if (line.startsWith(" ") || line.startsWith("\t")) {
             throw HttpError { kind = .Protocol, detail = "a folded header line (obs-fold)" };
@@ -1302,9 +1524,18 @@ pub class Server {
     /// # Errors
     ///
     /// Throws `IoError` where the address cannot be bound.
-    pub static fn bind(addr: SocketAddr, options: ServerOptions = ServerOptions { }): Server throws IoError {
+    pub static fn bind(
+        addr: SocketAddr,
+        options: ServerOptions = ServerOptions { }
+    ): Server throws IoError {
         let listener = try TcpListener.bind(addr);
-        return Server { listener = listener, options = options, idle = Map<int, Conn>.new(), nextConn = 0, closing = false };
+        return Server {
+            listener = listener,
+            options = options,
+            idle = Map<int, Conn>.new(),
+            nextConn = 0,
+            closing = false,
+        };
     }
 
     pub fn localAddr(): SocketAddr throws IoError {
@@ -1336,7 +1567,11 @@ pub class Server {
             } catch (_: IoError) { }
             this.nextConn = this.nextConn + 1;
             let id = this.nextConn;
-            let _ = spawn(() => { this.connection(id, Conn.new(stream), handler); });
+            let _ = spawn(
+                () => {
+                    this.connection(id, Conn.new(stream), handler);
+                }
+            );
         }
     }
 
@@ -1393,7 +1628,10 @@ pub class Server {
             } catch (e: Error) {
                 response = Response.withText(e.message(), 500);
             }
-            var keep = this.options.keepAlive && h.keepAlive && !response.headers.connectionHas("close") && !this.closing;
+            var keep = this.options.keepAlive
+                && h.keepAlive
+                && !response.headers.connectionHas("close")
+                && !this.closing;
             if (h.body.isDone() && h.body.conn == null && h.body.failed) {
                 keep = false;
             }
@@ -1472,7 +1710,10 @@ pub class Server {
         var length = 0;
         if (let te = headers.get("Transfer-Encoding")) {
             if (!sameName(lastToken(te), "chunked")) {
-                throw HttpError { kind = .Protocol, detail = f"the transfer encoding '{te}' is not understood" };
+                throw HttpError {
+                    kind = .Protocol,
+                    detail = f"the transfer encoding '{te}' is not understood",
+                };
             }
             framing = Framing.Chunked;
         } else if (let cl = headers.get("Content-Length")) {
@@ -1484,23 +1725,57 @@ pub class Server {
             }
         }
         conn.reusable = false;
-        let body = Body { conn = conn, framing = framing, left = length, done = false, client = null, authority = "", source = null, sourceLength = null, owns = false, failed = false };
+        let body = Body {
+            conn = conn,
+            framing = framing,
+            left = length,
+            done = false,
+            client = null,
+            authority = "",
+            source = null,
+            sourceLength = null,
+            owns = false,
+            failed = false,
+        };
         match (framing) {
-            .Empty => { body.finish(); },
-            _ => { },
+            .Empty => {
+                body.finish();
+            }
+            _ => { }
         }
-        let keepAlive = if (version11) !headers.connectionHas("close") else headers.connectionHas("keep-alive");
+        let keepAlive = if (version11) !headers.connectionHas("close")
+            else headers.connectionHas("keep-alive");
         var contentLength: ?int = null;
         match (framing) {
-            .Fixed => { contentLength = length; },
-            .Empty => { contentLength = 0; },
-            _ => { },
+            .Fixed => {
+                contentLength = length;
+            }
+            .Empty => {
+                contentLength = 0;
+            }
+            _ => { }
         }
-        let request = Request { method = Method.of(methodText), uri = uri, headers = headers, body = body, contentLength = contentLength };
-        return RequestHead { request = request, body = body, keepAlive = keepAlive, version11 = version11 };
+        let request = Request {
+            method = Method.of(methodText),
+            uri = uri,
+            headers = headers,
+            body = body,
+            contentLength = contentLength,
+        };
+        return RequestHead {
+            request = request,
+            body = body,
+            keepAlive = keepAlive,
+            version11 = version11,
+        };
     }
 
-    fn writeResponse(conn: Conn, h: RequestHead, response: Response, keep: bool): void throws [IoError, Cancelled] {
+    fn writeResponse(
+        conn: Conn,
+        h: RequestHead,
+        response: Response,
+        keep: bool
+    ): void throws [IoError, Cancelled] {
         let head = StringBuilder.new();
         let status = response.status;
         let reason = if (status.reason.isEmpty()) reasonOf(status.code) else status.reason;
@@ -1585,8 +1860,21 @@ struct RequestHead {
 /// RFC 9110's token characters.
 fn isToken(s: string): bool {
     for (b in viewBytes(s)) {
-        let ok = isWordByte(b) || b == 33u8 || b == 35u8 || b == 36u8 || b == 37u8 || b == 38u8 || b == 39u8 || b == 42u8
-            || b == 43u8 || b == 45u8 || b == 46u8 || b == 94u8 || b == 96u8 || b == 124u8 || b == 126u8;
+        let ok = isWordByte(b)
+            || b == 33u8
+            || b == 35u8
+            || b == 36u8
+            || b == 37u8
+            || b == 38u8
+            || b == 39u8
+            || b == 42u8
+            || b == 43u8
+            || b == 45u8
+            || b == 46u8
+            || b == 94u8
+            || b == 96u8
+            || b == 124u8
+            || b == 126u8;
         if (!ok) {
             return false;
         }
@@ -1595,5 +1883,8 @@ fn isToken(s: string): bool {
 }
 
 fn isWordByte(b: uint8): bool {
-    return (b >= 48u8 && b <= 57u8) || (b >= 65u8 && b <= 90u8) || (b >= 97u8 && b <= 122u8) || b == 95u8;
+    return (b >= 48u8 && b <= 57u8)
+        || (b >= 65u8 && b <= 90u8)
+        || (b >= 97u8 && b <= 122u8)
+        || b == 95u8;
 }

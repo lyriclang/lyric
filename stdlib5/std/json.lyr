@@ -55,11 +55,56 @@ extend JsonValue :: [Equatable] {
     /// keys and equal values, whatever the order.
     fn equals(o: JsonValue): bool {
         match (this) {
-            .Null => { match (o) { .Null => { return true; }, _ => { return false; } } },
-            .Bool(a) => { match (o) { .Bool(b) => { return a == b; }, _ => { return false; } } },
-            .Int(a) => { match (o) { .Int(b) => { return a == b; }, _ => { return false; } } },
-            .Float(a) => { match (o) { .Float(b) => { return a == b; }, _ => { return false; } } },
-            .String(a) => { match (o) { .String(b) => { return a == b; }, _ => { return false; } } },
+            .Null => {
+                match (o) {
+                    .Null => {
+                        return true;
+                    }
+                    _ => {
+                        return false;
+                    }
+                }
+            }
+            .Bool(a) => {
+                match (o) {
+                    .Bool(b) => {
+                        return a == b;
+                    }
+                    _ => {
+                        return false;
+                    }
+                }
+            }
+            .Int(a) => {
+                match (o) {
+                    .Int(b) => {
+                        return a == b;
+                    }
+                    _ => {
+                        return false;
+                    }
+                }
+            }
+            .Float(a) => {
+                match (o) {
+                    .Float(b) => {
+                        return a == b;
+                    }
+                    _ => {
+                        return false;
+                    }
+                }
+            }
+            .String(a) => {
+                match (o) {
+                    .String(b) => {
+                        return a == b;
+                    }
+                    _ => {
+                        return false;
+                    }
+                }
+            }
             .Array(a) => {
                 match (o) {
                     .Array(b) => {
@@ -74,10 +119,12 @@ extend JsonValue :: [Equatable] {
                             i = i + 1;
                         }
                         return true;
-                    },
-                    _ => { return false; },
+                    }
+                    _ => {
+                        return false;
+                    }
                 }
-            },
+            }
             .Object(a) => {
                 match (o) {
                     .Object(b) => {
@@ -94,10 +141,12 @@ extend JsonValue :: [Equatable] {
                             }
                         }
                         return true;
-                    },
-                    _ => { return false; },
+                    }
+                    _ => {
+                        return false;
+                    }
                 }
-            },
+            }
         }
     }
 }
@@ -134,8 +183,12 @@ extend JsonValue :: [Index<string>] {
 
     fn index(k: string): ?JsonValue {
         match (this) {
-            .Object(m) => { return m.get(k); },
-            _ => { return null; },
+            .Object(m) => {
+                return m.get(k);
+            }
+            _ => {
+                return null;
+            }
         }
     }
 }
@@ -145,8 +198,12 @@ extend JsonValue {
     /// out of it. `[]` on a `JsonValue` takes a member name, so an element is read with `at`.
     pub fn at(i: int): ?JsonValue {
         match (this) {
-            .Array(items) => { return if (i >= 0 && i < items.length()) items[i] else null; },
-            _ => { return null; },
+            .Array(items) => {
+                return if (i >= 0 && i < items.length()) items[i] else null;
+            }
+            _ => {
+                return null;
+            }
         }
     }
 
@@ -163,8 +220,7 @@ extend JsonValue {
                     var i = -1;
                     try {
                         i = int.parse(index.toString());
-                    } catch (_: ParseError) {
-                    }
+                    } catch (_: ParseError) { }
                     if (let v = current) {
                         current = v.at(i);
                     }
@@ -194,57 +250,119 @@ extend JsonValue {
     }
 
     pub fn isNull(): bool {
-        match (this) { .Null => { return true; }, _ => { return false; } }
+        match (this) {
+            .Null => {
+                return true;
+            }
+            _ => {
+                return false;
+            }
+        }
     }
 
     pub fn asBool(): ?bool {
-        match (this) { .Bool(b) => { return b; }, _ => { return null; } }
+        match (this) {
+            .Bool(b) => {
+                return b;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     pub fn asInt(): ?int {
-        match (this) { .Int(i) => { return i; }, _ => { return null; } }
+        match (this) {
+            .Int(i) => {
+                return i;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     /// Returns the number as a float, an `Int` widened; `null` for anything else.
     pub fn asFloat(): ?float {
-        match (this) { .Float(f) => { return f; }, .Int(i) => { return i as float; }, _ => { return null; } }
+        match (this) {
+            .Float(f) => {
+                return f;
+            }
+            .Int(i) => {
+                return i as float;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     pub fn asString(): ?string {
-        match (this) { .String(s) => { return s; }, _ => { return null; } }
+        match (this) {
+            .String(s) => {
+                return s;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     pub fn asArray(): ?List<JsonValue> {
-        match (this) { .Array(a) => { return a; }, _ => { return null; } }
+        match (this) {
+            .Array(a) => {
+                return a;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     pub fn asObject(): ?Map<string, JsonValue> {
-        match (this) { .Object(o) => { return o; }, _ => { return null; } }
+        match (this) {
+            .Object(o) => {
+                return o;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     /// Writes the tree into any encoder: an object as a map of string keys, an array as a
     /// sequence.
     fn writeTo<E :: [Encoder]>(&e: E): void throws EncodeError {
         match (this) {
-            .Null => { try e.encodeNull(); },
-            .Bool(b) => { try e.encodeBool(b); },
-            .Int(i) => { try e.encodeInt(i); },
-            .Float(f) => { try e.encodeFloat(f); },
-            .String(s) => { try e.encodeString(s); },
+            .Null => {
+                try e.encodeNull();
+            }
+            .Bool(b) => {
+                try e.encodeBool(b);
+            }
+            .Int(i) => {
+                try e.encodeInt(i);
+            }
+            .Float(f) => {
+                try e.encodeFloat(f);
+            }
+            .String(s) => {
+                try e.encodeString(s);
+            }
             .Array(items) => {
                 try e.beginSeq(items.length());
                 for (x in items) {
                     try e.element(x);
                 }
                 try e.endSeq();
-            },
+            }
             .Object(members) => {
                 try e.beginMap(members.length());
                 for ((k, v) in members) {
                     try e.entry(k, v);
                 }
                 try e.endMap();
-            },
+            }
         }
     }
 }
@@ -378,7 +496,11 @@ pub class JsonWriter :: [Encoder] {
             }
             this.stack[top] = Frame { isObject = true, count = f.count, keyDue = false };
         } else {
-            this.stack[top] = Frame { isObject = f.isObject, count = f.count + 1, keyDue = f.isObject };
+            this.stack[top] = Frame {
+                isObject = f.isObject,
+                count = f.count + 1,
+                keyDue = f.isObject,
+            };
         }
     }
 
@@ -427,10 +549,16 @@ pub class JsonWriter :: [Encoder] {
 
     pub mut fn encodeFloat(v: float): void throws EncodeError {
         if (!v.isFinite()) {
-            throw EncodeError { path = this.path(), detail = f"{v} has no JSON text — JSON has no NaN or infinity" };
+            throw EncodeError {
+                path = this.path(),
+                detail = f"{v} has no JSON text — JSON has no NaN or infinity",
+            };
         }
         if (this.inKey()) {
-            throw EncodeError { path = this.path(), detail = "a JSON key is a string, not a float" };
+            throw EncodeError {
+                path = this.path(),
+                detail = "a JSON key is a string, not a float",
+            };
         }
         try this.scalar(fromFloat(v));
     }
@@ -447,7 +575,10 @@ pub class JsonWriter :: [Encoder] {
 
     mut fn open(isObject: bool, segment: string): void throws EncodeError {
         if (this.inKey()) {
-            throw EncodeError { path = this.path(), detail = "a JSON key is a string, not a container" };
+            throw EncodeError {
+                path = this.path(),
+                detail = "a JSON key is a string, not a container",
+            };
         }
         try this.beforeValue();
         this.out.appendChar(if (isObject) '{' else '[');
@@ -465,20 +596,42 @@ pub class JsonWriter :: [Encoder] {
         this.afterValue();
     }
 
-    pub mut fn beginSeq(count: int): void throws EncodeError { try this.open(false, "[]"); }
-    pub mut fn endSeq(): void throws EncodeError { try this.close(false); }
-    pub mut fn beginMap(count: int): void throws EncodeError { try this.open(true, "{}"); }
+    pub mut fn beginSeq(count: int): void throws EncodeError {
+        try this.open(false, "[]");
+    }
+
+    pub mut fn endSeq(): void throws EncodeError {
+        try this.close(false);
+    }
+
+    pub mut fn beginMap(count: int): void throws EncodeError {
+        try this.open(true, "{}");
+    }
+
     pub mut fn beginKey(): void throws EncodeError { }
-    pub mut fn endMap(): void throws EncodeError { try this.close(true); }
-    pub mut fn beginStruct(name: string, count: int): void throws EncodeError { try this.open(true, name); }
+
+    pub mut fn endMap(): void throws EncodeError {
+        try this.close(true);
+    }
+
+    pub mut fn beginStruct(name: string, count: int): void throws EncodeError {
+        try this.open(true, name);
+    }
 
     pub mut fn beginField(name: string): void throws EncodeError {
         try this.encodeString(name);
     }
 
-    pub mut fn endStruct(): void throws EncodeError { try this.close(true); }
+    pub mut fn endStruct(): void throws EncodeError {
+        try this.close(true);
+    }
 
-    pub mut fn beginVariant(enumName: string, variant: string, index: int, hasPayload: bool): void throws EncodeError {
+    pub mut fn beginVariant(
+        enumName: string,
+        variant: string,
+        index: int,
+        hasPayload: bool
+    ): void throws EncodeError {
         if (!hasPayload) {
             try this.encodeString(variant);
             return;
@@ -490,7 +643,8 @@ pub class JsonWriter :: [Encoder] {
 
     pub mut fn endVariant(): void throws EncodeError {
         // a unit variant opened nothing; a payload's object closes here
-        if (!this.variants.isEmpty() && this.variants[this.variants.length() - 1] == this.stack.length()) {
+        if (!this.variants.isEmpty()
+            && this.variants[this.variants.length() - 1] == this.stack.length()) {
             this.variants.pop();
             try this.close(true);
         }
@@ -529,7 +683,8 @@ fn writeString(out: StringBuilder, s: string): void {
 }
 
 fn hexDigit(v: int): char {
-    return if (v < 10) ((('0' as uint32) + (v as uint32)) as char) else ((('a' as uint32) + ((v - 10) as uint32)) as char);
+    return if (v < 10) ((('0' as uint32) + (v as uint32)) as char)
+        else ((('a' as uint32) + ((v - 10) as uint32)) as char);
 }
 
 /// Encodes `v` as JSON text under `opts`.
@@ -552,7 +707,11 @@ pub fn encode<T :: [Encode]>(v: T, opts: JsonOptions = JsonOptions { }): string 
 /// # Errors
 ///
 /// Throws what `encode` throws, and the `IoError` or `Cancelled` of the write.
-pub fn encodeTo<T :: [Encode], W :: [Writer]>(v: T, &w: W, opts: JsonOptions = JsonOptions { }): void throws [EncodeError, IoError, Cancelled] {
+pub fn encodeTo<T :: [Encode], W :: [Writer]>(
+    v: T,
+    &w: W,
+    opts: JsonOptions = JsonOptions { }
+): void throws [EncodeError, IoError, Cancelled] {
     let text = try encode(v, opts);
     try w.writeString(text);
 }
@@ -562,7 +721,9 @@ pub fn encodeTo<T :: [Encode], W :: [Writer]>(v: T, &w: W, opts: JsonOptions = J
 fn sorted<T :: [Encode]>(v: T, opts: JsonOptions): string throws EncodeError {
     var builder = TreeBuilder { };
     try v.encode(&builder);
-    var w = JsonWriter { opts = JsonOptions { pretty = opts.pretty, indent = opts.indent, sortKeys = false } };
+    var w = JsonWriter {
+        opts = JsonOptions { pretty = opts.pretty, indent = opts.indent, sortKeys = false },
+    };
     try writeSorted(builder.value(), &w);
     return w.text();
 }
@@ -575,7 +736,7 @@ fn writeSorted<E :: [Encoder]>(v: JsonValue, &e: E): void throws EncodeError {
                 try writeSorted(x, &e);
             }
             try e.endSeq();
-        },
+        }
         .Object(members) => {
             let keys = List<string>.new();
             for ((k, _) in members) {
@@ -590,8 +751,10 @@ fn writeSorted<E :: [Encoder]>(v: JsonValue, &e: E): void throws EncodeError {
                 try writeSorted(members[k]!, &e);
             }
             try e.endMap();
-        },
-        _ => { try v.writeTo(&e); },
+        }
+        _ => {
+            try v.writeTo(&e);
+        }
     }
 }
 
@@ -627,8 +790,12 @@ pub class TreeBuilder :: [Encoder] {
             return false;
         }
         match (this.stack[this.stack.length() - 1]) {
-            .Object(_, pending) => { return pending == null; },
-            _ => { return false; },
+            .Object(_, pending) => {
+                return pending == null;
+            }
+            _ => {
+                return false;
+            }
         }
     }
 
@@ -639,7 +806,9 @@ pub class TreeBuilder :: [Encoder] {
         }
         let top = this.stack.length() - 1;
         match (this.stack[top]) {
-            .Array(items) => { items.push(v); },
+            .Array(items) => {
+                items.push(v);
+            }
             .Object(members, pending) => {
                 if (let key = pending) {
                     members[key] = v;
@@ -649,17 +818,28 @@ pub class TreeBuilder :: [Encoder] {
                     let text = match (v) {
                         .String(s) => s,
                         .Int(i) => f"{i}",
-                        _ => throw EncodeError { path = this.path(), detail = "a JSON key is a string" },
+                        _ => throw EncodeError {
+                            path = this.path(),
+                            detail = "a JSON key is a string",
+                        },
                     };
                     this.stack[top] = Building.Object(members, text);
                 }
-            },
+            }
         }
     }
 
-    pub mut fn encodeNull(): void throws EncodeError { try this.put(JsonValue.Null); }
-    pub mut fn encodeBool(v: bool): void throws EncodeError { try this.put(JsonValue.Bool(v)); }
-    pub mut fn encodeInt(v: int): void throws EncodeError { try this.put(JsonValue.Int(v)); }
+    pub mut fn encodeNull(): void throws EncodeError {
+        try this.put(JsonValue.Null);
+    }
+
+    pub mut fn encodeBool(v: bool): void throws EncodeError {
+        try this.put(JsonValue.Bool(v));
+    }
+
+    pub mut fn encodeInt(v: int): void throws EncodeError {
+        try this.put(JsonValue.Int(v));
+    }
 
     pub mut fn encodeUint(v: uint): void throws EncodeError {
         if (v > (int.max as uint)) {
@@ -671,13 +851,21 @@ pub class TreeBuilder :: [Encoder] {
 
     pub mut fn encodeFloat(v: float): void throws EncodeError {
         if (!v.isFinite()) {
-            throw EncodeError { path = this.path(), detail = f"{v} has no JSON text — JSON has no NaN or infinity" };
+            throw EncodeError {
+                path = this.path(),
+                detail = f"{v} has no JSON text — JSON has no NaN or infinity",
+            };
         }
         try this.put(JsonValue.Float(v));
     }
 
-    pub mut fn encodeString(v: string): void throws EncodeError { try this.put(JsonValue.String(v)); }
-    pub mut fn encodeBytes(v: Slice<uint8>): void throws EncodeError { try this.put(JsonValue.String(Base64.encode(v))); }
+    pub mut fn encodeString(v: string): void throws EncodeError {
+        try this.put(JsonValue.String(v));
+    }
+
+    pub mut fn encodeBytes(v: Slice<uint8>): void throws EncodeError {
+        try this.put(JsonValue.String(Base64.encode(v)));
+    }
 
     pub mut fn beginSeq(count: int): void throws EncodeError {
         this.stack.push(Building.Array(List<JsonValue>.withCapacity(count)));
@@ -689,8 +877,10 @@ pub class TreeBuilder :: [Encoder] {
             .Array(items) => {
                 this.segments.pop();
                 try this.put(JsonValue.Array(items));
-            },
-            _ => { throw EncodeError { path = this.path(), detail = "endSeq without beginSeq" }; },
+            }
+            _ => {
+                throw EncodeError { path = this.path(), detail = "endSeq without beginSeq" };
+            }
         }
     }
 
@@ -706,8 +896,10 @@ pub class TreeBuilder :: [Encoder] {
             .Object(members, _) => {
                 this.segments.pop();
                 try this.put(JsonValue.Object(members));
-            },
-            _ => { throw EncodeError { path = this.path(), detail = "endMap without beginMap" }; },
+            }
+            _ => {
+                throw EncodeError { path = this.path(), detail = "endMap without beginMap" };
+            }
         }
     }
 
@@ -719,14 +911,25 @@ pub class TreeBuilder :: [Encoder] {
     pub mut fn beginField(name: string): void throws EncodeError {
         let top = this.stack.length() - 1;
         match (this.stack[top]) {
-            .Object(members, _) => { this.stack[top] = Building.Object(members, name); },
-            _ => { throw EncodeError { path = this.path(), detail = "beginField outside a struct" }; },
+            .Object(members, _) => {
+                this.stack[top] = Building.Object(members, name);
+            }
+            _ => {
+                throw EncodeError { path = this.path(), detail = "beginField outside a struct" };
+            }
         }
     }
 
-    pub mut fn endStruct(): void throws EncodeError { try this.endMap(); }
+    pub mut fn endStruct(): void throws EncodeError {
+        try this.endMap();
+    }
 
-    pub mut fn beginVariant(enumName: string, variant: string, index: int, hasPayload: bool): void throws EncodeError {
+    pub mut fn beginVariant(
+        enumName: string,
+        variant: string,
+        index: int,
+        hasPayload: bool
+    ): void throws EncodeError {
         if (!hasPayload) {
             try this.put(JsonValue.String(variant));
             return;
@@ -737,7 +940,8 @@ pub class TreeBuilder :: [Encoder] {
     }
 
     pub mut fn endVariant(): void throws EncodeError {
-        if (!this.variants.isEmpty() && this.variants[this.variants.length() - 1] == this.stack.length()) {
+        if (!this.variants.isEmpty()
+            && this.variants[this.variants.length() - 1] == this.stack.length()) {
             this.variants.pop();
             try this.endMap();
         }
@@ -758,7 +962,11 @@ class Parser {
     var lineStart: int = 0,
 
     fn fail(detail: string): JsonError {
-        return JsonError { line = this.line, column = this.at - this.lineStart + 1, detail = detail };
+        return JsonError {
+            line = this.line,
+            column = this.at - this.lineStart + 1,
+            detail = detail,
+        };
     }
 
     fn peek(): int {
@@ -803,13 +1011,30 @@ class Parser {
         if (b < 0) {
             throw this.fail("the text ends where a value was expected");
         }
-        if (b == 0x7B) { return try this.object(depth); }
-        if (b == 0x5B) { return try this.array(depth); }
-        if (b == 0x22) { return JsonValue.String(try this.text()); }
-        if (b == 0x74) { try this.expectWord("true"); return JsonValue.Bool(true); }
-        if (b == 0x66) { try this.expectWord("false"); return JsonValue.Bool(false); }
-        if (b == 0x6E) { try this.expectWord("null"); return JsonValue.Null; }
-        if (b == 0x2D || (b >= 0x30 && b <= 0x39)) { return try this.number(); }
+        if (b == 0x7B) {
+            return try this.object(depth);
+        }
+        if (b == 0x5B) {
+            return try this.array(depth);
+        }
+        if (b == 0x22) {
+            return JsonValue.String(try this.text());
+        }
+        if (b == 0x74) {
+            try this.expectWord("true");
+            return JsonValue.Bool(true);
+        }
+        if (b == 0x66) {
+            try this.expectWord("false");
+            return JsonValue.Bool(false);
+        }
+        if (b == 0x6E) {
+            try this.expectWord("null");
+            return JsonValue.Null;
+        }
+        if (b == 0x2D || (b >= 0x30 && b <= 0x39)) {
+            return try this.number();
+        }
         throw this.fail("a value was expected");
     }
 
@@ -916,19 +1141,45 @@ class Parser {
         }
         let b = this.bytes[this.at] as int;
         this.at = this.at + 1;
-        if (b == 0x22) { out.appendChar('"'); return; }
-        if (b == 0x5C) { out.appendChar('\\'); return; }
-        if (b == 0x2F) { out.appendChar('/'); return; }
-        if (b == 0x62) { out.appendChar('\u{8}'); return; }
-        if (b == 0x66) { out.appendChar('\u{c}'); return; }
-        if (b == 0x6E) { out.appendChar('\n'); return; }
-        if (b == 0x72) { out.appendChar('\r'); return; }
-        if (b == 0x74) { out.appendChar('\t'); return; }
+        if (b == 0x22) {
+            out.appendChar('"');
+            return;
+        }
+        if (b == 0x5C) {
+            out.appendChar('\\');
+            return;
+        }
+        if (b == 0x2F) {
+            out.appendChar('/');
+            return;
+        }
+        if (b == 0x62) {
+            out.appendChar('\u{8}');
+            return;
+        }
+        if (b == 0x66) {
+            out.appendChar('\u{c}');
+            return;
+        }
+        if (b == 0x6E) {
+            out.appendChar('\n');
+            return;
+        }
+        if (b == 0x72) {
+            out.appendChar('\r');
+            return;
+        }
+        if (b == 0x74) {
+            out.appendChar('\t');
+            return;
+        }
         if (b == 0x75) {
             var code = try this.hex4();
             if (code >= 0xD800 && code <= 0xDBFF) {
                 // a high surrogate needs its low one
-                if (this.at + 1 < this.bytes.length() && this.bytes[this.at] == 0x5Cu8 && this.bytes[this.at + 1] == 0x75u8) {
+                if (this.at + 1 < this.bytes.length()
+                    && this.bytes[this.at] == 0x5Cu8
+                    && this.bytes[this.at + 1] == 0x75u8) {
                     this.at = this.at + 2;
                     let low = try this.hex4();
                     if (low < 0xDC00 || low > 0xDFFF) {
@@ -956,9 +1207,15 @@ class Parser {
         while (i < 4) {
             let b = this.bytes[this.at + i] as int;
             var digit = -1;
-            if (b >= 0x30 && b <= 0x39) { digit = b - 0x30; }
-            if (b >= 0x41 && b <= 0x46) { digit = b - 0x41 + 10; }
-            if (b >= 0x61 && b <= 0x66) { digit = b - 0x61 + 10; }
+            if (b >= 0x30 && b <= 0x39) {
+                digit = b - 0x30;
+            }
+            if (b >= 0x41 && b <= 0x46) {
+                digit = b - 0x41 + 10;
+            }
+            if (b >= 0x61 && b <= 0x66) {
+                digit = b - 0x61 + 10;
+            }
             if (digit < 0) {
                 throw this.fail("four hex digits were expected after '\\u'");
             }
@@ -1070,7 +1327,11 @@ pub class JsonReader :: [Decoder] {
     mut fn peek(): JsonValue throws DecodeError {
         if (this.stack.isEmpty()) {
             if (this.taken) {
-                throw DecodeError { kind = .Missing, path = this.path(), detail = "the value was read already" };
+                throw DecodeError {
+                    kind = .Missing,
+                    path = this.path(),
+                    detail = "the value was read already",
+                };
             }
             return this.root;
         }
@@ -1078,29 +1339,45 @@ pub class JsonReader :: [Decoder] {
         match (this.stack[top]) {
             .Array(items, at, _) => {
                 if (at >= items.length()) {
-                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the array has no more elements" };
+                    throw DecodeError {
+                        kind = .Missing,
+                        path = this.path(),
+                        detail = "the array has no more elements",
+                    };
                 }
                 this.stack[top] = Reading.Array(items, at, at);
                 return items[at];
-            },
+            }
             .Object(entries, at, keyRead) => {
                 if (at >= entries.length()) {
-                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the object has no more members" };
+                    throw DecodeError {
+                        kind = .Missing,
+                        path = this.path(),
+                        detail = "the object has no more members",
+                    };
                 }
                 return if (keyRead) entries[at].1 else JsonValue.String(entries[at].0);
-            },
+            }
             .Struct(members, _, current, _) => {
                 if (current == null) {
-                    throw DecodeError { kind = .Missing, path = this.path(), detail = "a member's value without its name" };
+                    throw DecodeError {
+                        kind = .Missing,
+                        path = this.path(),
+                        detail = "a member's value without its name",
+                    };
                 }
                 return members[current]!;
-            },
+            }
             .Variant(_, payload, _) => {
                 if (payload == null) {
-                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the variant has no payload" };
+                    throw DecodeError {
+                        kind = .Missing,
+                        path = this.path(),
+                        detail = "the variant has no payload",
+                    };
                 }
                 return payload;
-            },
+            }
         }
     }
 
@@ -1112,7 +1389,8 @@ pub class JsonReader :: [Decoder] {
         let top = this.stack.length() - 1;
         let next: Reading = match (this.stack[top]) {
             .Array(items, at, current) => Reading.Array(items, at + 1, current),
-            .Object(entries, at, keyRead) => if (keyRead) Reading.Object(entries, at + 1, false) else Reading.Object(entries, at, true),
+            .Object(entries, at, keyRead) => if (keyRead) Reading.Object(entries, at + 1, false)
+                else Reading.Object(entries, at, true),
             .Struct(members, name, current, seen) => Reading.Struct(members, name, current, seen),
             .Variant(name, payload, _) => Reading.Variant(name, payload, true),
         };
@@ -1120,7 +1398,11 @@ pub class JsonReader :: [Decoder] {
     }
 
     fn mismatch(expected: string, got: JsonValue): DecodeError {
-        return DecodeError { kind = .TypeMismatch, path = this.path(), detail = f"expected {expected}, got {formOf(got)}" };
+        return DecodeError {
+            kind = .TypeMismatch,
+            path = this.path(),
+            detail = f"expected {expected}, got {formOf(got)}",
+        };
     }
 
     /// Whether the next read is a key: a map's key reads a number from its digits.
@@ -1129,36 +1411,65 @@ pub class JsonReader :: [Decoder] {
             return false;
         }
         match (this.stack[this.stack.length() - 1]) {
-            .Object(_, _, keyRead) => { return !keyRead; },
-            _ => { return false; },
+            .Object(_, _, keyRead) => {
+                return !keyRead;
+            }
+            _ => {
+                return false;
+            }
         }
     }
 
     pub mut fn isNull(): bool throws DecodeError {
-        match (try this.peek()) { .Null => { return true; }, _ => { return false; } }
+        match (try this.peek()) {
+            .Null => {
+                return true;
+            }
+            _ => {
+                return false;
+            }
+        }
     }
 
     pub mut fn decodeNull(): void throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Null => { this.advance(); },
-            _ => { throw this.mismatch("null", v); },
+            .Null => {
+                this.advance();
+            }
+            _ => {
+                throw this.mismatch("null", v);
+            }
         }
     }
 
     pub mut fn decodeBool(): bool throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Bool(b) => { this.advance(); return b; },
-            _ => { throw this.mismatch("a bool", v); },
+            .Bool(b) => {
+                this.advance();
+                return b;
+            }
+            _ => {
+                throw this.mismatch("a bool", v);
+            }
         }
     }
 
     pub mut fn decodeInt(): int throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Int(i) => { this.advance(); return i; },
-            .Float(f) => { throw DecodeError { kind = .Invalid, path = this.path(), detail = f"{f} is no int" }; },
+            .Int(i) => {
+                this.advance();
+                return i;
+            }
+            .Float(f) => {
+                throw DecodeError {
+                    kind = .Invalid,
+                    path = this.path(),
+                    detail = f"{f} is no int",
+                };
+            }
             .String(s) => {
                 if (this.inKey()) {
                     try {
@@ -1166,12 +1477,18 @@ pub class JsonReader :: [Decoder] {
                         this.advance();
                         return i;
                     } catch (_: ParseError) {
-                        throw DecodeError { kind = .Invalid, path = this.path(), detail = f"the key '{s}' is no int" };
+                        throw DecodeError {
+                            kind = .Invalid,
+                            path = this.path(),
+                            detail = f"the key '{s}' is no int",
+                        };
                     }
                 }
                 throw this.mismatch("an int", v);
-            },
-            _ => { throw this.mismatch("an int", v); },
+            }
+            _ => {
+                throw this.mismatch("an int", v);
+            }
         }
     }
 
@@ -1186,17 +1503,30 @@ pub class JsonReader :: [Decoder] {
     pub mut fn decodeFloat(): float throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Float(f) => { this.advance(); return f; },
-            .Int(i) => { this.advance(); return i as float; },
-            _ => { throw this.mismatch("a number", v); },
+            .Float(f) => {
+                this.advance();
+                return f;
+            }
+            .Int(i) => {
+                this.advance();
+                return i as float;
+            }
+            _ => {
+                throw this.mismatch("a number", v);
+            }
         }
     }
 
     pub mut fn decodeString(): string throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .String(s) => { this.advance(); return s; },
-            _ => { throw this.mismatch("a string", v); },
+            .String(s) => {
+                this.advance();
+                return s;
+            }
+            _ => {
+                throw this.mismatch("a string", v);
+            }
         }
     }
 
@@ -1209,10 +1539,16 @@ pub class JsonReader :: [Decoder] {
                     this.advance();
                     return bytes;
                 } catch (e: EncodingError) {
-                    throw DecodeError { kind = .Invalid, path = this.path(), detail = f"no Base64: {e.detail}" };
+                    throw DecodeError {
+                        kind = .Invalid,
+                        path = this.path(),
+                        detail = f"no Base64: {e.detail}",
+                    };
                 }
-            },
-            _ => { throw this.mismatch("a Base64 string", v); },
+            }
+            _ => {
+                throw this.mismatch("a Base64 string", v);
+            }
         }
     }
 
@@ -1223,15 +1559,25 @@ pub class JsonReader :: [Decoder] {
                 this.advance();
                 this.stack.push(Reading.Array(items, 0, 0));
                 return items.length();
-            },
-            _ => { throw this.mismatch("an array", v); },
+            }
+            _ => {
+                throw this.mismatch("an array", v);
+            }
         }
     }
 
     pub fn seqHasNext(): bool throws DecodeError {
         match (this.stack[this.stack.length() - 1]) {
-            .Array(items, at, _) => { return at < items.length(); },
-            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in an array" }; },
+            .Array(items, at, _) => {
+                return at < items.length();
+            }
+            _ => {
+                throw DecodeError {
+                    kind = .TypeMismatch,
+                    path = this.path(),
+                    detail = "not in an array",
+                };
+            }
         }
     }
 
@@ -1250,15 +1596,25 @@ pub class JsonReader :: [Decoder] {
                 }
                 this.stack.push(Reading.Object(entries, 0, false));
                 return entries.length();
-            },
-            _ => { throw this.mismatch("an object", v); },
+            }
+            _ => {
+                throw this.mismatch("an object", v);
+            }
         }
     }
 
     pub fn mapHasNext(): bool throws DecodeError {
         match (this.stack[this.stack.length() - 1]) {
-            .Object(entries, at, _) => { return at < entries.length(); },
-            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in an object" }; },
+            .Object(entries, at, _) => {
+                return at < entries.length();
+            }
+            _ => {
+                throw DecodeError {
+                    kind = .TypeMismatch,
+                    path = this.path(),
+                    detail = "not in an object",
+                };
+            }
         }
     }
 
@@ -1272,8 +1628,10 @@ pub class JsonReader :: [Decoder] {
             .Object(members) => {
                 this.advance();
                 this.stack.push(Reading.Struct(members, name, null, Set<string>.new()));
-            },
-            _ => { throw this.mismatch("an object", v); },
+            }
+            _ => {
+                throw this.mismatch("an object", v);
+            }
         }
     }
 
@@ -1289,8 +1647,14 @@ pub class JsonReader :: [Decoder] {
                 seen.insert(name);
                 this.stack[top] = Reading.Struct(members, structName, name, seen);
                 return true;
-            },
-            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in an object" }; },
+            }
+            _ => {
+                throw DecodeError {
+                    kind = .TypeMismatch,
+                    path = this.path(),
+                    detail = "not in an object",
+                };
+            }
         }
     }
 
@@ -1302,12 +1666,16 @@ pub class JsonReader :: [Decoder] {
                     this.stack[top] = Reading.Struct(members, name, null, seen);
                     for ((k, _) in members) {
                         if (!seen.contains(k)) {
-                            throw DecodeError { kind = .UnknownField, path = this.path(), detail = f"member '{k}'" };
+                            throw DecodeError {
+                                kind = .UnknownField,
+                                path = this.path(),
+                                detail = f"member '{k}'",
+                            };
                         }
                     }
                 }
-            },
-            _ => { },
+            }
+            _ => { }
         }
         this.stack.pop();
     }
@@ -1317,17 +1685,24 @@ pub class JsonReader :: [Decoder] {
         var name = "";
         var payload: ?JsonValue = null;
         match (v) {
-            .String(s) => { name = s; },
+            .String(s) => {
+                name = s;
+            }
             .Object(members) => {
                 if (members.length() != 1) {
-                    throw this.mismatch(f"a variant of {enumName}: a string, or an object of one member", v);
+                    throw this.mismatch(
+                        f"a variant of {enumName}: a string, or an object of one member",
+                        v
+                    );
                 }
                 for ((k, m) in members) {
                     name = k;
                     payload = m;
                 }
-            },
-            _ => { throw this.mismatch(f"a variant of {enumName}", v); },
+            }
+            _ => {
+                throw this.mismatch(f"a variant of {enumName}", v);
+            }
         }
         var i = 0;
         while (i < variants.length()) {
@@ -1338,13 +1713,25 @@ pub class JsonReader :: [Decoder] {
             }
             i = i + 1;
         }
-        throw DecodeError { kind = .UnknownVariant, path = this.path(), detail = f"'{name}' of {enumName}" };
+        throw DecodeError {
+            kind = .UnknownVariant,
+            path = this.path(),
+            detail = f"'{name}' of {enumName}",
+        };
     }
 
     pub fn variantHasPayload(): bool throws DecodeError {
         match (this.stack[this.stack.length() - 1]) {
-            .Variant(_, payload, _) => { return payload != null; },
-            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in a variant" }; },
+            .Variant(_, payload, _) => {
+                return payload != null;
+            }
+            _ => {
+                throw DecodeError {
+                    kind = .TypeMismatch,
+                    path = this.path(),
+                    detail = "not in a variant",
+                };
+            }
         }
     }
 
@@ -1359,15 +1746,21 @@ pub class JsonReader :: [Decoder] {
         let out = StringBuilder.new();
         for (frame in this.stack) {
             match (frame) {
-                .Array(_, _, current) => { out.append(f"[{current}]"); },
-                .Object(_, _, _) => { out.append(if (out.length() == 0) "{}" else ".{}"); },
+                .Array(_, _, current) => {
+                    out.append(f"[{current}]");
+                }
+                .Object(_, _, _) => {
+                    out.append(if (out.length() == 0) "{}" else ".{}");
+                }
                 .Struct(_, name, current, _) => {
                     out.append(if (out.length() == 0) name else f".{name}");
                     if (let member = current) {
                         out.append(f".{member}");
                     }
-                },
-                .Variant(name, _, _) => { out.append(if (out.length() == 0) name else f".{name}"); },
+                }
+                .Variant(name, _, _) => {
+                    out.append(if (out.length() == 0) name else f".{name}");
+                }
             }
         }
         return out.toString();
@@ -1376,13 +1769,27 @@ pub class JsonReader :: [Decoder] {
 
 fn formOf(v: JsonValue): string {
     match (v) {
-        .Null => { return "null"; },
-        .Bool(_) => { return "a bool"; },
-        .Int(_) => { return "a number"; },
-        .Float(_) => { return "a number"; },
-        .String(_) => { return "a string"; },
-        .Array(_) => { return "an array"; },
-        .Object(_) => { return "an object"; },
+        .Null => {
+            return "null";
+        }
+        .Bool(_) => {
+            return "a bool";
+        }
+        .Int(_) => {
+            return "a number";
+        }
+        .Float(_) => {
+            return "a number";
+        }
+        .String(_) => {
+            return "a string";
+        }
+        .Array(_) => {
+            return "an array";
+        }
+        .Object(_) => {
+            return "an object";
+        }
     }
 }
 
@@ -1402,7 +1809,9 @@ pub fn decode<T :: [Decode]>(text: StringView): T throws [JsonError, DecodeError
 /// # Errors
 ///
 /// Throws what `decode` throws, and the `IoError` or `Cancelled` of the read.
-pub fn decodeFrom<T :: [Decode], R :: [Reader]>(&r: R): T throws [JsonError, DecodeError, IoError, Cancelled] {
+pub fn decodeFrom<T :: [Decode], R :: [Reader]>(
+    &r: R
+): T throws [JsonError, DecodeError, IoError, Cancelled] {
     let text = try r.readToString();
     return try decode<T>(text);
 }

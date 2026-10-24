@@ -67,8 +67,12 @@ fn base64UrlWithoutPaddingIsWhatJoseWrites(): void throws EncodingError {
     assertEq(Base64Url.encodeUnpadded([105u8, 106u8, 107u8]), "aWpr");
     assertEq(try Base64Url.decodeUnpadded("aWo"), [105u8, 106u8]);
     // as strict as the padded form: a padding character, a length of 4k + 1, bits past the last byte
-    for ((text, said) in [("aQ==", "no Base64 digit at offset 2"), ("abcde", "the text ends inside a group of four at offset 5"),
-                          ("aR", "bits past the last byte at offset 1"), ("a+o", "no Base64 digit at offset 1")]) {
+    for ((text, said) in [
+        ("aQ==", "no Base64 digit at offset 2"),
+        ("abcde", "the text ends inside a group of four at offset 5"),
+        ("aR", "bits past the last byte at offset 1"),
+        ("a+o", "no Base64 digit at offset 1"),
+    ]) {
         try {
             let _ = Base64Url.decodeUnpadded(text);
             fail(f"decoded {text}");
@@ -153,8 +157,16 @@ fn theIntegersOfAByteSlice(): void {
 @Test
 fn aNumberTakesExactlyItsWidth(): void {
     let four: uint8[] = [0u8] * 4;
-    assertPanics(() => { int.fromBytesLE(four[..]); });
-    assertPanics(() => { four[..].getUint32LE(1); });
+    assertPanics(
+        () => {
+            int.fromBytesLE(four[..]);
+        }
+    );
+    assertPanics(
+        () => {
+            four[..].getUint32LE(1);
+        }
+    );
     assertTrue(uint32.fromBytesBE(four[..]) == 0u32);
 }
 

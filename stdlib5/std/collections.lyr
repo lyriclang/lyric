@@ -13,7 +13,17 @@
 /// too.
 ///
 /// The containers are not safe across threads: share one through a `Mutex`.
-import std.core { arrayOf, AsSlice, Contains, filled, FromArrayLiteral, FromIterator, Hasher, Join, StringBuilder };
+import std.core {
+    arrayOf,
+    AsSlice,
+    Contains,
+    filled,
+    FromArrayLiteral,
+    FromIterator,
+    Hasher,
+    Join,
+    StringBuilder,
+};
 import std.hash { DefaultHasher };
 
 // --- List ----------------------------------------------------------------------------------------
@@ -59,7 +69,12 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
 
     /// Creates a list of the array's elements, copied.
     pub static fn of(xs: T[]): List<T> {
-        return List<T> { buffer = arrayOf(xs.length(), (i: int) => xs[i]), count = xs.length(), changes = 0, reserved = 0 };
+        return List<T> {
+            buffer = arrayOf(xs.length(), (i: int) => xs[i]),
+            count = xs.length(),
+            changes = 0,
+            reserved = 0,
+        };
     }
 
     /// Returns how many elements it holds.
@@ -369,7 +384,9 @@ pub struct ListIter<T> :: [Iterator] {
 
 /// A control word with all eight slots empty.
 let emptyGroup: uint64 = 0x8080808080808080;
+
 let lowBits: uint64 = 0x0101010101010101;
+
 let highBits: uint64 = 0x8080808080808080;
 
 /// Returns the high bits of the slots of a control word that are empty (0x80: the high bit set,
@@ -401,7 +418,14 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
     /// With a fixed hasher the order is the same in every run:
     /// `Map<string, int, FixedHasher>.withHasher(FixedHasher.new())`.
     pub static fn withHasher(seed: H): Map<K, V, H> {
-        return Map<K, V, H> { controls = [], slots = [], count = 0, free = 0, changes = 0, seed = seed };
+        return Map<K, V, H> {
+            controls = [],
+            slots = [],
+            count = 0,
+            free = 0,
+            changes = 0,
+            seed = seed,
+        };
     }
 
     /// Returns how many keys it holds.
@@ -813,7 +837,12 @@ pub class Set<T :: [Hashable], H :: [Hasher] = DefaultHasher> :: [Iterable, Cont
     /// cleared, while the iterator walks.
     pub fn iter(): MapKeysIter<T, bool, H> {
         return MapKeysIter<T, bool, H> {
-            entries = MapEntriesIter<T, bool, H> { map = this.table, at = 0, changes = this.table.changes, label = "Set" },
+            entries = MapEntriesIter<T, bool, H> {
+                map = this.table,
+                at = 0,
+                changes = this.table.changes,
+                label = "Set",
+            },
         };
     }
 }
@@ -1005,7 +1034,6 @@ extend<I :: [Iterator]> I {
     }
 }
 
-
 /// Yields the values of an iterator in lists of `n`; made by `it.chunks(n)`.
 ///
 /// The last list is shorter where the values do not divide evenly.
@@ -1107,7 +1135,9 @@ extend<I :: [Iterator]> I {
     /// # Errors
     ///
     /// Throws what a pull of the iterator or `cmp` throws, as the view's `sortBy` does.
-    pub fn sortedBy<E :: [Error]>(cmp: fn(I.Item, I.Item) -> Ordering throws E): List<I.Item> throws Join<I.Error, E> {
+    pub fn sortedBy<E :: [Error]>(
+        cmp: fn(I.Item, I.Item) -> Ordering throws E
+    ): List<I.Item> throws Join<I.Error, E> {
         let out = try this.toList();
         try out.asSlice().sortBy(cmp);
         return out;
@@ -1118,7 +1148,9 @@ extend<I :: [Iterator]> I {
     /// # Errors
     ///
     /// Throws what a pull of the iterator or `p` throws.
-    pub fn partition<E :: [Error]>(p: fn(I.Item) -> bool throws E): (List<I.Item>, List<I.Item>) throws Join<I.Error, E> {
+    pub fn partition<E :: [Error]>(
+        p: fn(I.Item) -> bool throws E
+    ): (List<I.Item>, List<I.Item>) throws Join<I.Error, E> {
         var it = this;
         let yes = List<I.Item>.new();
         let no = List<I.Item>.new();
@@ -1142,7 +1174,9 @@ extend<I :: [Iterator]> I {
     /// # Errors
     ///
     /// Throws what a pull of the iterator or `key` throws.
-    pub fn groupBy<K :: [Hashable], E :: [Error]>(key: fn(I.Item) -> K throws E): Map<K, List<I.Item>, DefaultHasher> throws Join<I.Error, E> {
+    pub fn groupBy<K :: [Hashable], E :: [Error]>(
+        key: fn(I.Item) -> K throws E
+    ): Map<K, List<I.Item>, DefaultHasher> throws Join<I.Error, E> {
         var it = this;
         let out = Map<K, List<I.Item>, DefaultHasher>.new();
         var x = try it.next();
@@ -1182,6 +1216,7 @@ extend<I :: [Iterator<Item = (K, V)>], K :: [Hashable], V> I {
         return out;
     }
 }
+
 extend<K :: [Hashable], V> Map<K, V, DefaultHasher> {
     /// Creates an empty map hashing with the process's key; its order differs from run to run.
     pub static fn new(): Map<K, V, DefaultHasher> {
@@ -1712,7 +1747,9 @@ extend<T :: [Hashable]> Set<T, DefaultHasher> :: [FromIterator<T>] {
 }
 
 extend<K :: [Hashable], V> Map<K, V, DefaultHasher> :: [FromIterator<(K, V)>] {
-    static fn fromIter<I :: [Iterator<Item = (K, V)>]>(it: I): Map<K, V, DefaultHasher> throws I.Error {
+    static fn fromIter<I :: [Iterator<Item = (K, V)>]>(
+        it: I
+    ): Map<K, V, DefaultHasher> throws I.Error {
         let out = Map<K, V, DefaultHasher>.new();
         var walk = it;
         var x = try walk.next();

@@ -67,12 +67,22 @@ fn aValueWritesAsADocumentAndReadsBack(): void throws Error {
     let ports = Map<string, int>.new();
     ports["http"] = 80;
     let c = Config {
-        title = "Example \"T\"", debugMode = true, ratio = 0.5,
-        servers = [Server { host = "a", port = 1, tags = ["x"] }, Server { host = "b", port = 2, tags = [] }],
-        owner = Owner { name = "ada", bio = null }, ports = ports, raw = Bytes { value = [1u8, 255u8] },
+        title = "Example \"T\"",
+        debugMode = true,
+        ratio = 0.5,
+        servers = [
+            Server { host = "a", port = 1, tags = ["x"] },
+            Server { host = "b", port = 2, tags = [] },
+        ],
+        owner = Owner { name = "ada", bio = null },
+        ports = ports,
+        raw = Bytes { value = [1u8, 255u8] },
     };
     let text = try toml.encode(c);
-    assertEq(text, "title = \"Example \\\"T\\\"\"\ndebug_mode = true\nratio = 0.5\nraw = [1, 255]\n\n[[servers]]\nhost = \"a\"\nport = 1\ntags = [\"x\"]\n\n[[servers]]\nhost = \"b\"\nport = 2\ntags = []\n\n[owner]\nname = \"ada\"\n\n[ports]\nhttp = 80\n");
+    assertEq(
+        text,
+        "title = \"Example \\\"T\\\"\"\ndebug_mode = true\nratio = 0.5\nraw = [1, 255]\n\n[[servers]]\nhost = \"a\"\nport = 1\ntags = [\"x\"]\n\n[[servers]]\nhost = \"b\"\nport = 2\ntags = []\n\n[owner]\nname = \"ada\"\n\n[ports]\nhttp = 80\n"
+    );
     assertEq(try toml.decode<Config>(text), c);
     // a value that is no table has no document
     try {
@@ -82,14 +92,22 @@ fn aValueWritesAsADocumentAndReadsBack(): void throws Error {
         assertEq(e.message(), "a TOML document is a table: encode a struct or a map");
     }
     // a null stands in a table's key alone, left out
-    let h = Holder { shapes = [Shape.Dot, Shape.Circle(3), Shape.Rect(2, 5)], one = Shape.Circle(1) };
-    assertEq(try toml.encode(h), "shapes = [\"Dot\", { Circle = 3 }, { Rect = [2, 5] }]\n\n[one]\nCircle = 1\n");
+    let h = Holder {
+        shapes = [Shape.Dot, Shape.Circle(3), Shape.Rect(2, 5)],
+        one = Shape.Circle(1),
+    };
+    assertEq(
+        try toml.encode(h),
+        "shapes = [\"Dot\", { Circle = 3 }, { Rect = [2, 5] }]\n\n[one]\nCircle = 1\n"
+    );
     assertEq(try toml.decode<Holder>(toml.encode(h)), h);
 }
 
 @Test
 fn theGrammarIsToml10(): void throws Error {
-    let doc = try toml.parse("# a comment\ntitle = 'lit'\nn = 1_000\nh = 0xff\no = 0o17\nb = 0b101\nf = 6.02e+23\nneg = -inf\nnan = nan\n\"quoted key\" = true\n[a.b]\nc = [1, 2,\n  3, # trailing\n]\nd = { x = 1, y.z = \"w\" }\ndt = 1979-05-27T07:32:00Z\ndt2 = 1979-05-27 07:32:00+01:00\nldt = 1979-05-27T07:32:00.25\nld = 1979-05-27\nlt = 07:32:00.5\n[[fruit]]\nname = \"apple\"\n[[fruit]]\nname = \"pear\"\n");
+    let doc = try toml.parse(
+        "# a comment\ntitle = 'lit'\nn = 1_000\nh = 0xff\no = 0o17\nb = 0b101\nf = 6.02e+23\nneg = -inf\nnan = nan\n\"quoted key\" = true\n[a.b]\nc = [1, 2,\n  3, # trailing\n]\nd = { x = 1, y.z = \"w\" }\ndt = 1979-05-27T07:32:00Z\ndt2 = 1979-05-27 07:32:00+01:00\nldt = 1979-05-27T07:32:00.25\nld = 1979-05-27\nlt = 07:32:00.5\n[[fruit]]\nname = \"apple\"\n[[fruit]]\nname = \"pear\"\n"
+    );
     assertEq(doc.path("title")?.asString(), "lit");
     assertEq(doc.path("n")?.asInt(), 1000);
     assertEq(doc.path("h")?.asInt(), 255);
@@ -112,7 +130,9 @@ fn theGrammarIsToml10(): void throws Error {
     assertEq(doc.asTable()!.keys()[0], "title");
     assertEq((try toml.parse(doc.show())).show(), doc.show()); // not ==: nan is not nan
     // strings: escapes, literal, multi-line with a line-ending backslash, and the first newline dropped
-    let s = try toml.parse("a = \"tab\\tq\\\"u\\u00e9\"\nb = 'C:\\path'\nc = \"\"\"\nfirst \\\n   second\"\"\"\nd = '''\nraw \\n'''\ne = \"\"\"two \"\"quotes\"\"\"\"\"");
+    let s = try toml.parse(
+        "a = \"tab\\tq\\\"u\\u00e9\"\nb = 'C:\\path'\nc = \"\"\"\nfirst \\\n   second\"\"\"\nd = '''\nraw \\n'''\ne = \"\"\"two \"\"quotes\"\"\"\"\""
+    );
     assertEq(s.path("a")?.asString(), "tab\tq\"u\u{e9}");
     assertEq(s.path("b")?.asString(), "C:\\path");
     assertEq(s.path("c")?.asString(), "first second");
@@ -126,7 +146,10 @@ fn whatTomlRefusesIsRefused(): void throws Error {
     assertEq(refused("[t]\n[t]"), "the table 't' is defined twice at 2:4");
     assertEq(refused("a.b = 1\n[a.b]"), "'a.b' is a value, not a table at 2:6");
     assertEq(refused("a.b.c = 1\n[a.b]"), "the table 'a.b' is defined twice at 2:6");
-    assertEq(refused("[a.b]\nx = 1\n[a]\nb.y = 2"), "'a.b' is defined already; a dotted key cannot add to it at 4:8");
+    assertEq(
+        refused("[a.b]\nx = 1\n[a]\nb.y = 2"),
+        "'a.b' is defined already; a dotted key cannot add to it at 4:8"
+    );
     assertEq(refused("x = 01"), "a leading zero is not allowed at 1:7");
     assertEq(refused("x = 1_"), "a digit was expected at 1:7");
     assertEq(refused("x = +0x1"), "a prefixed integer takes no sign at 1:6");
@@ -137,7 +160,10 @@ fn whatTomlRefusesIsRefused(): void throws Error {
     assertEq(refused("x = 1979-13-01"), "no such date: there is no month 13 at 1:15");
     assertEq(refused("x = \"open"), "the string is not closed at 1:10");
     assertEq(refused("x = 1 # ok\ny = 2 z"), "the end of the line was expected at 2:7");
-    assertEq(refused("x = {a = 1}\nx.b = 2"), "'x' is defined already; a dotted key cannot add to it at 2:8");
+    assertEq(
+        refused("x = {a = 1}\nx.b = 2"),
+        "'x' is defined already; a dotted key cannot add to it at 2:8"
+    );
     assertEq(refused("[[a]]\n[a]"), "'a' is an array of tables, not a table at 2:4");
     assertEq(refused("a = [1]\n[[a]]"), "'a' is a value, not a table at 2:6");
     assertEq(refused("key = \"v\" # c\n\n[t] # c\nk = 'v'\n"), "accepted");
@@ -158,12 +184,23 @@ fn theTreeAndTheErrorsHaveTheirPlaces(): void throws Error {
         assertEq(e.message(), "type mismatch: expected a string, got an integer (at Config.title)");
     }
     try {
-        let _ = toml.decode<Config>("title = \"t\"\ndebug_mode = true\nratio = 1.0\nraw = [1]\nowner = { name = \"o\" }\n[ports]\n[[servers]]\nhost = \"h\"\nport = \"no\"\ntags = []");
+        let _ = toml.decode<Config>(
+            "title = \"t\"\ndebug_mode = true\nratio = 1.0\nraw = [1]\nowner = { name = \"o\" }\n[ports]\n[[servers]]\nhost = \"h\"\nport = \"no\"\ntags = []"
+        );
         fail("a string read as an int");
     } catch (e: DecodeError) {
-        assertEq(e.message(), "type mismatch: expected an integer, got a string (at Config.servers[0].Server.port)");
+        assertEq(
+            e.message(),
+            "type mismatch: expected an integer, got a string (at Config.servers[0].Server.port)"
+        );
     }
-    assertTrue(kindOf(() => { let _ = try toml.decode<Config>("title = \"t\""); }) == DecodeErrorKind.Missing);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try toml.decode<Config>("title = \"t\"");
+            }
+        ) == DecodeErrorKind.Missing
+    );
     try {
         let _ = toml.decode<Config>("title = \"t\"");
         fail("a missing field read");
@@ -171,7 +208,13 @@ fn theTreeAndTheErrorsHaveTheirPlaces(): void throws Error {
         // at the struct, not at the key read before
         assertEq(e.message(), "missing: field 'debug_mode' (at Config)");
     }
-    assertTrue(kindOf(() => { let _ = try toml.parse("x = 1").path("x")!.read<Bytes>(); }) == DecodeErrorKind.TypeMismatch);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try toml.parse("x = 1").path("x")!.read<Bytes>();
+            }
+        ) == DecodeErrorKind.TypeMismatch
+    );
     // an Instant writes as a string and reads from a date-time or a string
     let when = try Instant.parse("1979-05-27T07:32:00Z");
     assertEq(try (toml.parse("t = 1979-05-27T07:32:00Z")).path("t")!.read<Instant>(), when);
@@ -182,8 +225,12 @@ fn theTreeAndTheErrorsHaveTheirPlaces(): void throws Error {
 fn tomlArrays(n: int): string {
     let b = StringBuilder.new();
     b.append("a = ");
-    for (_ in 0..n - 1) { b.append("["); }
-    for (_ in 0..n - 1) { b.append("]"); }
+    for (_ in 0..n - 1) {
+        b.append("[");
+    }
+    for (_ in 0..n - 1) {
+        b.append("]");
+    }
     b.append("\n");
     return b.toString();
 }
@@ -192,9 +239,13 @@ fn tomlArrays(n: int): string {
 fn tomlTables(n: int): string {
     let b = StringBuilder.new();
     b.append("a = ");
-    for (_ in 0..n - 2) { b.append("{b = "); }
+    for (_ in 0..n - 2) {
+        b.append("{b = ");
+    }
     b.append("1");
-    for (_ in 0..n - 2) { b.append("}"); }
+    for (_ in 0..n - 2) {
+        b.append("}");
+    }
     b.append("\n");
     return b.toString();
 }
@@ -203,7 +254,9 @@ fn tomlTables(n: int): string {
 fn tomlHeader(n: int): string {
     let b = StringBuilder.new();
     b.append("[k");
-    for (_ in 0..n - 3) { b.append(".k"); }
+    for (_ in 0..n - 3) {
+        b.append(".k");
+    }
     b.append("]\nx = 1\n");
     return b.toString();
 }
@@ -219,7 +272,13 @@ fn aDocumentNests128LevelsInATask(): void throws Error {
         assertTrue((try toml.encode(deep)).length() > 0);
         assertTrue(deep.debug().length() > 0);
     }
-    for (text in [tomlArrays(129), tomlTables(129), tomlHeader(129), tomlArrays(100000), tomlHeader(100000)]) {
+    for (text in [
+        tomlArrays(129),
+        tomlTables(129),
+        tomlHeader(129),
+        tomlArrays(100000),
+        tomlHeader(100000),
+    ]) {
         try {
             let _ = toml.parse(text[..]);
             fail("a document deeper than 128 levels was read");

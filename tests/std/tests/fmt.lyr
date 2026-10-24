@@ -26,7 +26,10 @@ fn aSpecFormatsAsInAnFString(): void {
     let pi = 3.14159;
     let ab = "ab";
     let big = 1234567;
-    assertEq(format("{:#x} {:08.3f} {:>5} {:,}", n, pi, ab, big), f"{n:#x} {pi:08.3f} {ab:>5} {big:,}");
+    assertEq(
+        format("{:#x} {:08.3f} {:>5} {:,}", n, pi, ab, big),
+        f"{n:#x} {pi:08.3f} {ab:>5} {big:,}"
+    );
     assertEq(format("[{:^7}]", 'c'), "[   c   ]");
     assertEq(format("[{:*<6}]", true), "[true**]");
 }

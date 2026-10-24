@@ -53,6 +53,7 @@ class Subtests {
 }
 
 let watch = Watch { };
+
 let subtests = Subtests { };
 
 /// Whether `lyric test --json` asked for the JSON form: a line for each test,
@@ -85,7 +86,9 @@ fn sayFailed(name: string, detail: string, panic: string = "", trace: string = "
     } else {
         println(f"FAIL  {name}");
         println(f"      {indented(detail)}");
-        if (trace != "") { println(trace); }
+        if (trace != "") {
+            println(trace);
+        }
     }
 }
 
@@ -128,7 +131,10 @@ fn quoted(out: StringBuilder, s: string): void {
             let code = (c as uint32) as int;
             let digit = code % 16;
             out.appendStr(if (code < 16) "\\u000" else "\\u001");
-            out.appendChar(if (digit < 10) ((('0' as uint32) + (digit as uint32)) as char) else ((('a' as uint32) + ((digit - 10) as uint32)) as char));
+            out.appendChar(
+                if (digit < 10) ((('0' as uint32) + (digit as uint32)) as char)
+                    else ((('a' as uint32) + ((digit - 10) as uint32)) as char)
+            );
         } else {
             out.appendChar(c);
         }
@@ -184,8 +190,15 @@ pub fn run(cases: TestCase[]): int {
     let count = passed + failed + skipped;
     let noun = if (count == 1) "test" else "tests";
     if (asJson) {
-        println("{\"type\":\"tests\",\"version\":1,\"passed\":" + f"{passed}" + ",\"failed\":" + f"{failed}"
-            + ",\"skipped\":" + f"{skipped}" + "}");
+        println(
+            "{\"type\":\"tests\",\"version\":1,\"passed\":"
+                + f"{passed}"
+                + ",\"failed\":"
+                + f"{failed}"
+                + ",\"skipped\":"
+                + f"{skipped}"
+                + "}"
+        );
     } else {
         println(f"\n{count} {noun}: {passed} passed, {failed} failed, {skipped} skipped");
     }
@@ -302,7 +315,9 @@ fn guard(cases: TestCase[]): void throws Cancelled {
 /// and a subtest is reported under the one test that runs.
 pub fn subtest(name: string, body: fn() -> void throws Error): void {
     if (subtests.apart.load() == 1) {
-        fail("a subtest is reported under its test, and a parallel test runs beside others: it has no subtests");
+        fail(
+            "a subtest is reported under its test, and a parallel test runs beside others: it has no subtests"
+        );
     }
     let full = subtests.parent + "/" + name;
     if (outcome(full, body)) {
@@ -329,7 +344,9 @@ pub fn assertPanics(f: fn() -> void throws Error, message: string = ""): PanicIn
     task.join();
     return match (task.status()) {
         TaskStatus.Panicked(p) => p,
-        TaskStatus.Failed(e) => fail(because("threw " + e.message() + ", expected a panic", message)),
+        TaskStatus.Failed(e) => fail(
+            because("threw " + e.message() + ", expected a panic", message)
+        ),
         _ => fail(because("ended, expected a panic", message)),
     };
 }
@@ -337,83 +354,141 @@ pub fn assertPanics(f: fn() -> void throws Error, message: string = ""): PanicIn
 /// Fails the test unless `actual` equals `expected`: `xs.length() = 2, expected 3` — the
 /// expression the call wrote for `actual`, where it is not the value itself —, then `message`,
 /// then, for values too long to compare by eye, their first difference.
-pub fn assertEq<T :: [Equatable, Debug]>(actual: T, expected: T, message: string = "",
-    @callerExpr(actual) written: string = ""): void {
+pub fn assertEq<T :: [Equatable, Debug]>(
+    actual: T,
+    expected: T,
+    message: string = "",
+    @callerExpr(actual) written: string = ""
+): void {
     if (!(actual == expected)) {
         let shown = actual.debug();
         let wanted = expected.debug();
-        fail(because(got(written, shown) + ", expected " + wanted, message) + difference(shown, wanted));
+        fail(
+            because(got(written, shown) + ", expected " + wanted, message)
+                + difference(shown, wanted)
+        );
     }
 }
 
 /// Fails the test where `actual` equals `unexpected` — the assertion for "it changed", where
 /// `assertEq` says "it is".
-pub fn assertNotEq<T :: [Equatable, Debug]>(actual: T, unexpected: T, message: string = "",
-    @callerExpr(actual) written: string = ""): void {
+pub fn assertNotEq<T :: [Equatable, Debug]>(
+    actual: T,
+    unexpected: T,
+    message: string = "",
+    @callerExpr(actual) written: string = ""
+): void {
     if (actual == unexpected) {
         fail(because(got(written, actual.debug()) + ", expected anything else", message));
     }
 }
 
 /// Fails the test unless `condition` holds.
-pub fn assertTrue(condition: bool, message: string = "", @callerExpr(condition) written: string = ""): void {
+pub fn assertTrue(
+    condition: bool,
+    message: string = "",
+    @callerExpr(condition) written: string = ""
+): void {
     if (!condition) {
         fail(because(got(written, "false") + ", expected true", message));
     }
 }
 
 /// Fails the test where `condition` holds.
-pub fn assertFalse(condition: bool, message: string = "", @callerExpr(condition) written: string = ""): void {
+pub fn assertFalse(
+    condition: bool,
+    message: string = "",
+    @callerExpr(condition) written: string = ""
+): void {
     if (condition) {
         fail(because(got(written, "true") + ", expected false", message));
     }
 }
 
 /// Fails the test where `value` is present.
-pub fn assertNull<T :: [Debug]>(value: ?T, message: string = "", @callerExpr(value) written: string = ""): void {
+pub fn assertNull<T :: [Debug]>(
+    value: ?T,
+    message: string = "",
+    @callerExpr(value) written: string = ""
+): void {
     if (let v = value) {
         fail(because(got(written, v.debug()) + ", expected null", message));
     }
 }
 
 /// Fails the test where `value` is absent; returns the value otherwise, for the test to go on with.
-pub fn assertNotNull<T>(value: ?T, message: string = "", @callerExpr(value) written: string = ""): T {
+pub fn assertNotNull<T>(
+    value: ?T,
+    message: string = "",
+    @callerExpr(value) written: string = ""
+): T {
     return value ?? fail(because(got(written, "null") + ", expected a value", message));
 }
 
 /// Fails the test unless `actual` lies within `tolerance` of `expected` — the comparison
 /// `assertEq` cannot make for floating point, where `0.1 + 0.2` is not `0.3`. NaN on either side
 /// fails: it is close to nothing.
-pub fn assertClose(actual: float, expected: float, tolerance: float, message: string = "",
-    @callerExpr(actual) written: string = ""): void {
+pub fn assertClose(
+    actual: float,
+    expected: float,
+    tolerance: float,
+    message: string = "",
+    @callerExpr(actual) written: string = ""
+): void {
     let gap = if (actual > expected) actual - expected else expected - actual;
     if (!(gap <= tolerance)) {
-        fail(because(got(written, f"{actual}") + f", expected {expected} within {tolerance}", message));
+        fail(
+            because(
+                got(written, f"{actual}") + f", expected {expected} within {tolerance}",
+                message
+            )
+        );
     }
 }
 
 /// Fails the test unless `actual` is less than `bound`.
-pub fn assertLess<T :: [Ordered, Debug]>(actual: T, bound: T, message: string = "",
-    @callerExpr(actual) written: string = ""): void {
+pub fn assertLess<T :: [Ordered, Debug]>(
+    actual: T,
+    bound: T,
+    message: string = "",
+    @callerExpr(actual) written: string = ""
+): void {
     if (!(actual < bound)) {
-        fail(because(got(written, actual.debug()) + ", expected less than " + bound.debug(), message));
+        fail(
+            because(got(written, actual.debug()) + ", expected less than " + bound.debug(), message)
+        );
     }
 }
 
 /// Fails the test unless `actual` is greater than `bound`.
-pub fn assertGreater<T :: [Ordered, Debug]>(actual: T, bound: T, message: string = "",
-    @callerExpr(actual) written: string = ""): void {
+pub fn assertGreater<T :: [Ordered, Debug]>(
+    actual: T,
+    bound: T,
+    message: string = "",
+    @callerExpr(actual) written: string = ""
+): void {
     if (!(actual > bound)) {
-        fail(because(got(written, actual.debug()) + ", expected greater than " + bound.debug(), message));
+        fail(
+            because(
+                got(written, actual.debug()) + ", expected greater than " + bound.debug(),
+                message
+            )
+        );
     }
 }
 
 /// Fails the test unless `container` holds `x` — what `x in container` asks (`Contains`):
 /// `assertContains("abc", 'b')`, `assertContains(xs, 3)`.
-pub fn assertContains<T :: [Debug], C :: [Contains<T>, Debug]>(container: C, x: T, message: string = "",
-    @callerExpr(container) written: string = ""): void {
+pub fn assertContains<T :: [Debug], C :: [Contains<T>, Debug]>(
+    container: C,
+    x: T,
+    message: string = "",
+    @callerExpr(container) written: string = ""
+): void {
     if (!container.contains(x)) {
-        fail(because(got(written, container.debug()) + ", expected to contain " + x.debug(), message));
+        fail(
+            because(got(written, container.debug()) + ", expected to contain " + x.debug(), message)
+        );
     }
 }
 
@@ -422,8 +497,11 @@ pub fn assertContains<T :: [Debug], C :: [Contains<T>, Debug]>(container: C, x: 
 ///
 /// # Errors
 /// Throws what the iterator of `c` throws — nothing, for the collections above.
-pub fn assertEmpty<C :: [Iterable, Debug]>(c: C, message: string = "",
-    @callerExpr(c) written: string = ""): void throws C.Iter.Error {
+pub fn assertEmpty<C :: [Iterable, Debug]>(
+    c: C,
+    message: string = "",
+    @callerExpr(c) written: string = ""
+): void throws C.Iter.Error {
     var walk = c.iter();
     if (try walk.next() != null) {
         fail(because(got(written, c.debug()) + ", expected nothing", message));

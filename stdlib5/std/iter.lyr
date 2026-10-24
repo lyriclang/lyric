@@ -262,7 +262,9 @@ pub struct MapNotNullIter<I :: [Iterator], U, E :: [Error] = never> :: [Iterator
 /// by `it.flatMap(f)`.
 ///
 /// `f` may return any `Iterable` — an array or a list as well as an iterator.
-pub struct FlatMapIter<I :: [Iterator], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error] = never> :: [Iterator] {
+pub struct FlatMapIter<I :: [Iterator], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error] = never> :: [
+    Iterator
+] {
     type Item = J.Item;
     type Error = Join<Join<I.Error, E>, J.Error>;
     var inner: I,
@@ -291,7 +293,9 @@ pub struct FlatMapIter<I :: [Iterator], B :: [Iterable<Iter = J>], J :: [Iterato
 
 /// Yields the values of the iterables an iterator gives, one after the other; made by
 /// `it.flatten()`.
-pub struct FlattenIter<I :: [Iterator<Item = B>], B :: [Iterable<Iter = J>], J :: [Iterator]> :: [Iterator] {
+pub struct FlattenIter<I :: [Iterator<Item = B>], B :: [Iterable<Iter = J>], J :: [Iterator]> :: [
+    Iterator
+] {
     type Item = J.Item;
     type Error = Join<I.Error, J.Error>;
     var inner: I,
@@ -518,13 +522,17 @@ extend<I :: [Iterator, Closeable]> PeekableIter<I> :: [Closeable] {
 }
 
 // The outer iterator closed; a part `f` or the source gave is the walk's own, closed by none.
-extend<I :: [Iterator, Closeable], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error]> FlatMapIter<I, B, J, E> :: [Closeable] {
+extend<I :: [Iterator, Closeable], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error]> FlatMapIter<I, B, J, E> :: [
+    Closeable
+] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator<Item = B>, Closeable], B :: [Iterable<Iter = J>], J :: [Iterator]> FlattenIter<I, B, J> :: [Closeable] {
+extend<I :: [Iterator<Item = B>, Closeable], B :: [Iterable<Iter = J>], J :: [Iterator]> FlattenIter<I, B, J> :: [
+    Closeable
+] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
@@ -537,7 +545,9 @@ extend<A :: [Iterator, Closeable], B :: [Iterator, Closeable]> ZipIter<A, B> :: 
     }
 }
 
-extend<A :: [Iterator, Closeable], B :: [Iterator<Item = A.Item>, Closeable]> ChainIter<A, B> :: [Closeable] {
+extend<A :: [Iterator, Closeable], B :: [Iterator<Item = A.Item>, Closeable]> ChainIter<A, B> :: [
+    Closeable
+] {
     fn close(): void throws Join<A.Error, B.Error> {
         defer try this.b.close();
         try this.a.close();
@@ -625,7 +635,9 @@ extend<I :: [Iterator]> I {
 
     /// Returns an iterator over the values of the iterables `f` returns for each value, one after
     /// the other.
-    pub fn flatMap<B :: [Iterable], E :: [Error]>(f: fn(I.Item) -> B throws E): FlatMapIter<I, B, B.Iter, E> {
+    pub fn flatMap<B :: [Iterable], E :: [Error]>(
+        f: fn(I.Item) -> B throws E
+    ): FlatMapIter<I, B, B.Iter, E> {
         return FlatMapIter<I, B, B.Iter, E> { inner = this, f = f, current = null };
     }
 
@@ -668,7 +680,10 @@ extend<I :: [Iterator]> I {
     /// # Errors
     ///
     /// Throws what a pull of the iterator or `f` throws.
-    pub fn fold<A, E :: [Error]>(init: A, f: fn(A, I.Item) -> A throws E): A throws Join<I.Error, E> {
+    pub fn fold<A, E :: [Error]>(
+        init: A,
+        f: fn(A, I.Item) -> A throws E
+    ): A throws Join<I.Error, E> {
         var it = this;
         var acc = init;
         var x = try it.next();
@@ -686,7 +701,9 @@ extend<I :: [Iterator]> I {
     /// # Errors
     ///
     /// Throws what a pull of the iterator or `f` throws.
-    pub fn reduce<E :: [Error]>(f: fn(I.Item, I.Item) -> I.Item throws E): ?I.Item throws Join<I.Error, E> {
+    pub fn reduce<E :: [Error]>(
+        f: fn(I.Item, I.Item) -> I.Item throws E
+    ): ?I.Item throws Join<I.Error, E> {
         var it = this;
         let first = try it.next();
         if (first == null) {
@@ -819,7 +836,6 @@ extend<I :: [Iterator]> I {
         return null;
     }
 
-
     /// Returns the value whose `key` is least, or `null` where there is none.
     ///
     /// Of values with equal keys, the first wins. `key` is called once per value.
@@ -827,7 +843,9 @@ extend<I :: [Iterator]> I {
     /// # Errors
     ///
     /// Throws what a pull of the iterator or `key` throws.
-    pub fn minBy<K :: [TotalOrder], E :: [Error]>(key: fn(I.Item) -> K throws E): ?I.Item throws Join<I.Error, E> {
+    pub fn minBy<K :: [TotalOrder], E :: [Error]>(
+        key: fn(I.Item) -> K throws E
+    ): ?I.Item throws Join<I.Error, E> {
         var it = this;
         let first = try it.next();
         if (first == null) {
@@ -854,7 +872,9 @@ extend<I :: [Iterator]> I {
     /// # Errors
     ///
     /// Throws what a pull of the iterator or `key` throws.
-    pub fn maxBy<K :: [TotalOrder], E :: [Error]>(key: fn(I.Item) -> K throws E): ?I.Item throws Join<I.Error, E> {
+    pub fn maxBy<K :: [TotalOrder], E :: [Error]>(
+        key: fn(I.Item) -> K throws E
+    ): ?I.Item throws Join<I.Error, E> {
         var it = this;
         let first = try it.next();
         if (first == null) {
@@ -873,6 +893,7 @@ extend<I :: [Iterator]> I {
         }
         return best;
     }
+
     /// Calls `f` on every value, in order.
     ///
     /// The function is inline: a lambda written at the call is set in place, so a `return` in it
@@ -881,7 +902,9 @@ extend<I :: [Iterator]> I {
     /// # Errors
     ///
     /// Throws what a pull of the iterator or `f` throws.
-    pub inline fn forEach<E :: [Error]>(f: fn(I.Item) -> void throws E): void throws Join<I.Error, E> {
+    pub inline fn forEach<E :: [Error]>(
+        f: fn(I.Item) -> void throws E
+    ): void throws Join<I.Error, E> {
         var it = this;
         var x = try it.next();
         while (x != null) {

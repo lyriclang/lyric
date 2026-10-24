@@ -32,11 +32,21 @@ fn handle(req: Request): Response throws Error {
         return Response.withText("hello, world");
     }
     if (path == "/items") {
-        return try Response.withJson([Item { id = 1, name = "one" }, Item { id = 2, name = "zwei" }]);
+        return try Response.withJson(
+            [Item { id = 1, name = "one" }, Item { id = 2, name = "zwei" }]
+        );
     }
     if (path == "/echo") {
         let bytes = try req.bytes();
-        return try Response.withJson(Echo { method = req.method.show(), path = path, query = req.uri.query, length = bytes.length(), text = string.fromUtf8Lossy(bytes[..]) });
+        return try Response.withJson(
+            Echo {
+                method = req.method.show(),
+                path = path,
+                query = req.uri.query,
+                length = bytes.length(),
+                text = string.fromUtf8Lossy(bytes[..]),
+            }
+        );
     }
     if (path == "/stream") {
         let src = ByteBuffer.new();
@@ -70,10 +80,22 @@ fn handle(req: Request): Response throws Error {
         return Response.withText("slow");
     }
     if (path == "/fail") {
-        throw IoError { kind = .NotFound, path = null, detail = "the thing is not there", inner = null };
+        throw IoError {
+            kind = .NotFound,
+            path = null,
+            detail = "the thing is not there",
+            inner = null,
+        };
     }
     if (path == "/gzipped") {
-        var r = Response.of(200, (try Gzip.compress("the body was gzipped, and the client saw none of it".toBytes()[..], 6))[..], "text/plain");
+        var r = Response.of(
+            200,
+            (try Gzip.compress(
+                "the body was gzipped, and the client saw none of it".toBytes()[..],
+                6
+            ))[..],
+            "text/plain"
+        );
         r.headers.set("Content-Encoding", "gzip");
         return r;
     }
@@ -87,7 +109,11 @@ fn handle(req: Request): Response throws Error {
 fn start(options: ServerOptions = ServerOptions { }): (Server, string) throws Error {
     var server = try Server.bind(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = 0 }, options);
     let at = try server.localAddr();
-    let _ = spawn(() => { try server.serve(handle); });
+    let _ = spawn(
+        () => {
+            try server.serve(handle);
+        }
+    );
     return (server, f"http://127.0.0.1:{at.port}");
 }
 
@@ -98,7 +124,9 @@ fn uri(base: string, path: string): Uri {
 /// Raw bytes to the server, the whole answer back (the server closes or we stop at the length).
 fn raw(base: string, text: string): string throws Error {
     let port = try int.parse(base.splitOnce("127.0.0.1:")!.1);
-    var conn = try TcpStream.connect(SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = port as uint16 });
+    var conn = try TcpStream.connect(
+        SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = port as uint16 }
+    );
     try conn.writeAll(text.toBytes()[..]);
     try conn.shutdown(.Write);
     let back = try conn.readToString();
@@ -120,8 +148,13 @@ fn aServerAnswersAndKeepsTheConnection(): void throws Error {
     let items = try (client.get(uri(base, "/items"))).json<Item[]>();
     assertEq(items, [Item { id = 1, name = "one" }, Item { id = 2, name = "zwei" }]);
     // the request's parts and body reach the handler
-    let e = try (client.send(Request.post(uri(base, "/echo?x=1"), "payload".toBytes()[..], "text/plain"))).json<Echo>();
-    assertEq(e, Echo { method = "POST", path = "/echo", query = "x=1", length = 7, text = "payload" });
+    let e = try (client.send(
+        Request.post(uri(base, "/echo?x=1"), "payload".toBytes()[..], "text/plain")
+    )).json<Echo>();
+    assertEq(
+        e,
+        Echo { method = "POST", path = "/echo", query = "x=1", length = 7, text = "payload" }
+    );
     // a chunked request body
     var put = Request { method = Method.Put, uri = uri(base, "/echo") };
     let src = ByteBuffer.new();
@@ -181,7 +214,10 @@ fn aServerAnswersAndKeepsTheConnection(): void throws Error {
 fn aServerTalksHttp11OnTheWire(): void throws Error {
     let (server, base) = try start();
     // two requests on one connection, the second with Connection: close
-    let two = try raw(base, "GET /hello HTTP/1.1\r\nHost: x\r\n\r\nGET /created HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+    let two = try raw(
+        base,
+        "GET /hello HTTP/1.1\r\nHost: x\r\n\r\nGET /created HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n"
+    );
     assertTrue(two.startsWith("HTTP/1.1 200 OK\r\n"));
     assertTrue(two.contains("\r\nContent-Length: 12\r\n"));
     assertTrue(two.contains("hello, worldHTTP/1.1 201 Created\r\n"));
@@ -189,7 +225,10 @@ fn aServerTalksHttp11OnTheWire(): void throws Error {
     assertTrue(two.contains("\r\nConnection: close\r\n"));
     assertTrue(two.endsWith("made"));
     // Expect: 100-continue is answered before the body is read
-    let cont = try raw(base, "POST /echo HTTP/1.1\r\nHost: x\r\nExpect: 100-continue\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi");
+    let cont = try raw(
+        base,
+        "POST /echo HTTP/1.1\r\nHost: x\r\nExpect: 100-continue\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi"
+    );
     assertTrue(cont.startsWith("HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\n"));
     assertTrue(cont.contains("\"length\":2"));
     // HTTP/1.0 closes unless keep-alive is asked
@@ -197,13 +236,21 @@ fn aServerTalksHttp11OnTheWire(): void throws Error {
     assertTrue(old.startsWith("HTTP/1.1 200 OK\r\n"));
     assertTrue(old.contains("\r\nConnection: close\r\n"));
     // what is no request: 400 with the reason, the connection closed
-    for ((text, said) in [("GARBAGE\r\n\r\n", "the request line is 'GARBAGE'"),
-                          ("GET /x HTTP/9\r\n\r\n", "the version is 'HTTP/9'"),
-                          ("GET /x HTTP/1.1\r\n\r\n", "no Host"),
-                          ("GET x HTTP/1.1\r\nHost: x\r\n\r\n", "the target is 'x'"),
-                          ("GET /x HTTP/1.1\r\nHost: x\r\nContent-Length: many\r\n\r\n", "'many' is no Content-Length"),
-                          ("GET /x HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: gzip\r\n\r\n", "the transfer encoding 'gzip' is not understood"),
-                          ("GET /x HTTP/1.1\r\nHost: x\r\n folded\r\n\r\n", "a folded header line (obs-fold)")]) {
+    for ((text, said) in [
+        ("GARBAGE\r\n\r\n", "the request line is 'GARBAGE'"),
+        ("GET /x HTTP/9\r\n\r\n", "the version is 'HTTP/9'"),
+        ("GET /x HTTP/1.1\r\n\r\n", "no Host"),
+        ("GET x HTTP/1.1\r\nHost: x\r\n\r\n", "the target is 'x'"),
+        (
+            "GET /x HTTP/1.1\r\nHost: x\r\nContent-Length: many\r\n\r\n",
+            "'many' is no Content-Length"
+        ),
+        (
+            "GET /x HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: gzip\r\n\r\n",
+            "the transfer encoding 'gzip' is not understood"
+        ),
+        ("GET /x HTTP/1.1\r\nHost: x\r\n folded\r\n\r\n", "a folded header line (obs-fold)"),
+    ]) {
         let back = try raw(base, text);
         assertTrue(back.startsWith("HTTP/1.1 400 Bad Request\r\n"), back);
         assertTrue(back.endsWith(f"bad request: {said}"), back);

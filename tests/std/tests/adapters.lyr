@@ -20,9 +20,11 @@ fn mapNotNullLeavesTheNullsOut(): void {
     let none: string[] = [];
     assertEq(none.iter().mapNotNull((s: string) => s.find('1')).toArray().length(), 0);
     assertEq(try! ["1", "", "3"].iter().mapNotNull(numberOf).toArray(), [1, 3]);
-    let e = assertThrows(() => {
-        try ["1", "x"].iter().mapNotNull(numberOf).toArray();
-    });
+    let e = assertThrows(
+        () => {
+            try ["1", "x"].iter().mapNotNull(numberOf).toArray();
+        }
+    );
     assertTrue(e.message().contains("x"));
 }
 
@@ -40,7 +42,10 @@ fn flatMapAndFlattenWalkWhatTheyGive(): void {
 fn dedupGivesARunOnce(): void {
     assertEq([1, 1, 2, 1, 1].iter().dedup().toArray(), [1, 2, 1]);
     let words = ["a", "A", "b", "B", "a"];
-    assertEq(words.iter().dedupBy((x: string, y: string) => x.toLower() == y.toLower()).toArray(), ["a", "b", "a"]);
+    assertEq(
+        words.iter().dedupBy((x: string, y: string) => x.toLower() == y.toLower()).toArray(),
+        ["a", "b", "a"]
+    );
 }
 
 @Test
@@ -92,15 +97,25 @@ fn chunksAndWindows(): void {
     let windows = [1, 2, 3].iter().windows(2).map((w: List<int>) => w.toArray()).toArray();
     assertEq(windows, [[1, 2], [2, 3]]);
     assertEq([1].iter().windows(2).toArray().length(), 0);
-    assertPanics(() => { let _ = [1].iter().chunks(0); });
-    assertPanics(() => { let _ = [1].iter().windows(0); });
+    assertPanics(
+        () => {
+            let _ = [1].iter().chunks(0);
+        }
+    );
+    assertPanics(
+        () => {
+            let _ = [1].iter().windows(0);
+        }
+    );
 }
 
 @Test
 fn sortedSortedByPartitionGroupBy(): void {
     assertEq([3, 1, 2].iter().sorted().toArray(), [1, 2, 3]);
     let pairs = [(2, "x"), (1, "y"), (2, "z"), (1, "w")];
-    let byFirst = pairs.iter().sortedBy((a: (int, string), b: (int, string)) => a.0.totalCompare(b.0)).toArray();
+    let byFirst = pairs.iter().sortedBy(
+        (a: (int, string), b: (int, string)) => a.0.totalCompare(b.0)
+    ).toArray();
     assertEq(byFirst, [(1, "y"), (1, "w"), (2, "x"), (2, "z")]);
     let (small, large) = [1, 5, 2, 6].iter().partition((x: int) => x < 4);
     assertEq(small.toArray(), [1, 2]);
@@ -108,9 +123,11 @@ fn sortedSortedByPartitionGroupBy(): void {
     let groups = ["ab", "c", "de", "f"].iter().groupBy((s: string) => s.length());
     assertEq(groups.get(2)!.toArray(), ["ab", "de"]);
     assertEq(groups.get(1)!.toArray(), ["c", "f"]);
-    let e = assertThrows(() => {
-        try ["1", "x"].iter().groupBy((s: string) => try int.parse(s));
-    });
+    let e = assertThrows(
+        () => {
+            try ["1", "x"].iter().groupBy((s: string) => try int.parse(s));
+        }
+    );
     assertTrue(e.message().contains("x"));
 }
 
