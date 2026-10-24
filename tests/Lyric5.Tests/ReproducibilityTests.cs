@@ -27,12 +27,16 @@ public class ReproducibilityTests
         ("deps/geo/src/shapes.lyr", "pub fn area(w: int, h: int): int {\n    return w * h;\n}\n"),
     ];
 
-    [Theory]
-    [InlineData("debug", null)]
-    [InlineData("release", null)]
+    [CrossTargetTheory]
     [InlineData("debug", "x86_64-linux-gnu")]
     [InlineData("debug", "x86_64-windows-gnu")]
     [InlineData("debug", "aarch64-macos")]
+    public void A_package_built_in_two_places_is_the_same_binary_for_another_target(string profile, string triple) =>
+        A_package_built_in_two_places_is_the_same_binary(profile, triple);
+
+    [Theory]
+    [InlineData("debug", null)]
+    [InlineData("release", null)]
     public void A_package_built_in_two_places_is_the_same_binary(string profile, string? triple)
     {
         var target = triple is null ? Target.Host : Target.Parse(triple);

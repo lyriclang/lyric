@@ -90,8 +90,12 @@ jobs:
           python3 tooling/affected.py --base origin/main --out affected
           echo "filter=$(cat affected/tests.filter)" >> "$GITHUB_OUTPUT"
 
+      # Builds for the other Tier 1 targets are the same from every machine; the C toolchain
+      # job makes them on Linux x86-64, on every pull request and on main.
       - name: Test
         shell: bash
+        env:
+          LYRIC5_CROSS_TARGETS: '0'
         run: |
           filter='${{ steps.affected.outputs.filter }}'
           if [ -n "$filter" ]; then set -- --filter "$filter"; else set --; fi
@@ -117,6 +121,10 @@ jobs:
     # M11's sweep, when the job took 41 minutes on main and twice lost a green suite (1668 passed in
     # 39 minutes) to the cap: 60.
     timeout-minutes: 60
+    # The builds for the other Tier 1 targets are the same from every machine: Linux x86-64 makes
+    # them, the other runners test their own target.
+    env:
+      LYRIC5_CROSS_TARGETS: ${{ matrix.os == 'ubuntu-latest' && '1' || '0' }}
     strategy:
       fail-fast: false
       matrix:
@@ -129,6 +137,8 @@ jobs:
 
       - name: Set up zig
         uses: ./.github/actions/setup-zig
+        with:
+          cache: ${{ runner.os != 'macOS' }}
 
       - name: The Unicode tables are the generator's
         # tooling/unicode/gen.py writes runtime/src/unicode_tables.h, the interpreter's C# twin
@@ -155,10 +165,23 @@ jobs:
       # The runtime (M1): liblyr.a for every Tier 1 triple, and its tests run on this runner — on
       # Linux x86-64 also under ASan+UBSan and TSan (clang), and there without clang they fail.
       # Only this job asks for the sanitizer runs; the whole-suite jobs skip them.
+      # Each runtime variant the native tests link, built once and in turn before them: in the
+      # suite the first test of a variant builds it while the others of that variant wait, and on
+      # macOS's three cores that wait reached two minutes and the timeouts of the tests waiting.
+      - name: Warm the caches
+        shell: bash
+        env:
+          LYRIC5_SANITIZERS: '1'
+          LYRIC5_WARM_CACHES: '1'
+          LYRIC5_WARM_REPORT: ${{ runner.temp }}/warmup.txt
+        run: |
+          dotnet test tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release --filter "FullyQualifiedName~CacheWarmupTests"
+          cat "$LYRIC5_WARM_REPORT"
+
       - name: Runtime tests
         env:
           LYRIC5_SANITIZERS: '1'
-        run: dotnet test tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release
+        run: dotnet test tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release --no-build
 
   lyric5-aot:
     # The seed of the Lyric 5 command line as one NativeAOT binary per Tier 1 target (11 C1). The

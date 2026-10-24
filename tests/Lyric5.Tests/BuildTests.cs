@@ -105,7 +105,7 @@ public class BuildTests
         Assert.Equal(101, Run("run", Path.Combine(dir, "overflow.lyr")).Exit);
     }
 
-    [Fact]
+    [CrossTargetFact]
     public void A_cross_target_builds_and_does_not_run()
     {
         var dir = Fresh("fib");
