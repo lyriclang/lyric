@@ -104,6 +104,22 @@ public static class Pipeline
         };
     }
 
+    /// <summary>The program's C as <c>--emit c</c> writes it in the debug profile, with the standard
+    /// library read from <paramref name="stdlibRoot"/> and no build script run: in the caller's
+    /// process, for a check that compares two versions of std. <c>null</c> where the program does
+    /// not compile; its findings go to <paramref name="error"/>.</summary>
+    public static string? EmitC(Project project, string stdlibRoot, TextWriter error)
+    {
+        var result = SourceCompiler.Lower(SourceOf(project), OptionsFor(project, null, null) with { StdlibRoot = stdlibRoot });
+        if (!result.Render(error) || result.Ir is null) return null;
+        if (!SubsetGate.Check(result.Ir, result.Diagnostics))
+        {
+            result.Diagnostics.RenderText(error);
+            return null;
+        }
+        return CEmitter.Join(CEmitter.Emit(result.Ir, result.Sources, stdlibRoot, overflowChecks: true));
+    }
+
     /// <summary><c>--emit ir</c> and <c>--emit c</c>: the text on <c>output</c>, the C as the
     /// profile has it emitted.</summary>
     public static int Emit(Project project, string what, TextWriter output, TextWriter error, BuildProfile? profile = null,
