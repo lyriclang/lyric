@@ -1045,3 +1045,50 @@ Interfaces (`TypeTestExpr`, Typmuster) in der Senkung, die Zeilen für sie, ein 
 auf einem `Any`, das nie in `Describe` gewandelt wurde) und die Regel in Spec 05 §9. Artefakt: der Fall, rot gegen
 `main`, grün danach. Größe S. Danach M12c nach Bereich 14 (S1–S6, K2a–K2d).
 
+
+## Nachtrag 2026-10-24 — der Plan für M13a
+
+M13a nach seiner Zeile oben, 11 E5 und E7, 07 B3 und dem Teil „in M13a“ von 14 D: **`lyric fmt`**, **`lyric doc`**
+mit den Doc-Tests und **`lyric api`**. Das Artefakt: **das Repo hält `lyric fmt --check`, und die std steht als
+Referenz unter `/dev/std/`**, ihre `# Examples` laufen als Tests. Grundlage ist der Stand nach M12c (#555): der
+4.x-Formatierer (`src/Lyric.Frontend/Formatting`, Doc-Algebra, Kommentare nach ihrer Stellung, Breite 100), die
+Lints `missing-docs` und `broken-doc-link` (M12a), der Renderer `Lyric5.Doc` mit Referenzseite und Snippet-Arten
+(M12c S1, S2, S4).
+
+| # | Entscheidung | Vergleich / Verworfen |
+|---|---|---|
+| P1 | **Ein Formatierer, der vorhandene**: der AstFormatter des Frontends lernt die Lyric-5-Syntax (Trailing-Lambdas, `match`-Arme mit Block, Attribute, Typargumente am Aufruf, `comptime`, Makros, Initialisierer, `::`-Listen …). Zuerst gemessen: der Formatierer über den Korpus — `stdlib5`, `tests/std`, `examples`, die Konformanzfälle am Pin, die Book-Snippets —, je Datei: parst die Ausgabe, ist sie gleich dem Eingang bis auf Leerraum, wo nicht. Was der Formatierer nicht kennt, wird ein Slice-Punkt, nicht eine Vermutung | gofmt, zig fmt. Verworfen: ein zweiter Formatierer für Lyric 5 neben dem des 4.x-Frontends — zwei Formen derselben Syntax |
+| P2 | **Eine Form, keine Optionen** (E5, E6 A): Breite 100, Einrückung 4, die Regeln des 4.x-Formatierers, wo Lyric 5 sie nicht ändert; **Kommentare und Klammern bleiben** (Trivia, die Klammer als Knoten); eine Datei, die nicht parst, bleibt unangetastet | Verworfen: `.lyricfmt`-Optionen |
+| P3 | **Zwei Prüfungen über den Korpus**: Idempotenz (`fmt(fmt(x)) == fmt(x)`) und **Semantik-Erhalt** — Original und formatierte Fassung zu C (`--emit c`), verglichen ohne `#line`; für Dateien ohne Programm (Bibliotheksmodule) der AST ohne Spannen. Beide als Tests in der Suite, über den ganzen Korpus | rustfmt's Idempotenz-Test, `go vet`. Verworfen: nur Goldens — sie zeigen nicht, dass sich die Bedeutung hielt |
+| P4 | **`lyric fmt [<dateien>…] [--check]`**: ohne Dateien das Paket (Quelle, Tests, `build.lyr`); `--check` schreibt nichts und endet mit 1, wo eine Datei anders würde, und nennt sie; die Book-Snippets formatiert `fmt` nicht (sie stehen in Markdown), die Suite prüft sie wie den Korpus. **Das Repo hält es**: ein CI-Schritt über `stdlib5`, `tests/std`, `examples` | `cargo fmt --check` |
+| P5 | **Formvertrag** (E30 A): eine Formänderung nach S3 nur für einen Bedeutungsfehler oder eine dokumentierte Regel, mit CHANGELOG-Satz; die Formatierer-Goldens zeigen sie | gofmt's Versprechen |
+| P6 | **`lyric doc`**: aus der Sema des Lyric-5-Frontends die `pub`-Deklarationen eines Pakets mit ihrem `///`, ihre Signaturen (mit dem Highlighter), Member, Konformanzen; je Modul eine Seite, je Typ eine (14 P6: `std/<modul>/<Typ>/`, Anker `#method.push`); die Referenzseite in drei Spalten (14 B10); **ein Paket ohne Site-Navigation** in `out/doc/` (14 C1), die std **mit** ihr unter `/dev/std/` über `tools/Site`. Abhängigkeiten auf Wunsch (`--deps`) | rustdoc. Verworfen: JSON + externer Renderer (14 P1) |
+| P7 | **Intra-Doc-Links** `[Type]`, `[Type.member]`, `[module.Type]` zu Links auf die Seite und den Anker; was nicht auflöst, ist `broken-doc-link` (der Lint aus M12a, dieselbe Auflösung) | rustdoc |
+| P8 | **Doc-Tests** (X5, 14): ` ```lyric `-Blöcke in `///` mit den Snippet-Arten des Books (`no_run`, `compile_fail=CODE`, `output`) laufen in `lyric test` — je Block ein Test, benannt nach Element und Zeile; ein Block ohne `fn main` wie im Book gewickelt, mit dem Modul des Elements importiert | rustdoc's Doc-Tests |
+| P9 | **Die `# Examples` der std**: die Modul-Docs und die wichtigsten Typen jedes Moduls bekommen ein ausführbares Beispiel (14 W8) — nicht jede Funktion; `missing-docs` bleibt die Uhr für den Rest | Rusts std |
+| P10 | **`lyric api`** (07 B3, E7): die öffentliche Fläche eines Pakets als Text (eine Zeile je Element, sortiert, deterministisch) und `--json`; **`--diff <rev>`** vergleicht mit der Fläche an einem Git-Stand oder einer veröffentlichten Version und ordnet jede Änderung ein (entfernt, Signatur geändert — brechend; hinzugefügt — verträglich); Endcode 1 bei Brechendem | `cargo public-api`, `cargo semver-checks`. Verworfen: eine Semver-Prüfung, die Verhalten errät |
+
+| Slice | Inhalt | Artefakt |
+|---|---|---|
+| **S1** Messung und Lyric-5-Syntax | P1, P2 | der Korpus-Bericht vorher; nachher parst jede formatierte Datei, Kommentare und Klammern stehen |
+| **S2** Idempotenz und Semantik-Erhalt | P3 | die zwei Korpus-Tests grün; eine absichtlich falsche Regel wird rot (Kontrolle) |
+| **S3** `lyric fmt` und das Repo formatiert | P4, P5 | `lyric fmt --check` grün über `stdlib5`, `tests/std`, `examples` als CI-Schritt; der Formatierungs-Commit ohne Codeänderung (die emittierte C gleich) |
+| **S4** `lyric doc` | P6 | `lyric doc` schreibt die Seiten eines Pakets; Goldens je Seitenform |
+| **S5** Intra-Doc-Links und die std auf der Seite | P6, P7 | `/dev/std/` live über `site.yml`, die Linkprüfung über die std-Seiten grün |
+| **S6** Doc-Tests | P8 | `lyric test` läuft die `///`-Blöcke; ein falsches `output` wird rot |
+| **S7** die `# Examples` der std | P9 | je Modul ein Beispiel, das als Doc-Test läuft |
+| **S8** `lyric api` | P10 | `lyric api` der std; `--diff` gegen einen früheren Stand nennt eine entfernte Funktion brechend |
+| **S9** Abschluss | STATUS, CHANGELOG, Bericht, der Plan für M13b als nächster Schritt | die Zeile oben |
+
+Nach Aufwand: groß S1, S4; mittel S2, S3, S5, S6, S8; klein S7, S9 (S7 ist Text, aber viel davon). Zusammen **M an
+der oberen Kante**, wie die Zeile sagt. Die Reihenfolge folgt den Abhängigkeiten: der Formatierer zuerst (S3
+formatiert das Repo einmal — danach sind alle Diffs klein), dann die Doku über den Renderer aus M12c, die
+Doc-Tests über die Snippet-Arten des Books, `lyric api` zuletzt, weil es die Fläche liest, die `lyric doc` schon
+sammelt.
+
+**Reflexion**: Der Formatierer ist der Punkt mit dem größten Risiko und dem kleinsten Spielraum — eine falsche
+Regel ändert Bedeutung oder Kommentare in jedem Paket. Deshalb misst S1, bevor es baut, und S2 prüft, bevor S3
+das Repo umschreibt. Gos Erfahrung (eine Form, früh, für alle) spricht dafür, das Repo in S3 einmal ganz zu
+formatieren statt Datei für Datei; Rusts (Optionen, die rustfmt nie wieder los wurde) gegen jede Option. `lyric
+doc` und `lyric api` teilen eine Sammlung der Fläche — rustdoc und `cargo public-api` lesen beide dieselbe
+JSON-Form; hier ist es eine C#-Struktur in `Lyric5.Doc`, aus der die Seiten und die Textform entstehen.
