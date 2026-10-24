@@ -22,11 +22,14 @@ public static class Formatter
 {
     public static string? Format(SourceManager sources, FileId file, DiagnosticEngine diagnostics)
     {
-        var module = new Parser(sources, file, diagnostics).ParseModule();
+        var parser = new Parser(sources, file, diagnostics);
+        var module = parser.ParseModule();
         if (diagnostics.HasErrors) return null;
 
         var comments = CollectComments(sources, file);
-        return DocRenderer.Render(AstFormatter.Build(module, sources.GetText(file), comments));
+        // Lyric 5 keeps the parentheses the file wrote; 4.x derives them from precedence alone.
+        return DocRenderer.Render(AstFormatter.Build(module, sources.GetText(file), comments,
+            sources.Lyric5 ? parser.Grouped : null));
     }
 
     private static IReadOnlyList<Trivia> CollectComments(SourceManager sources, FileId file)

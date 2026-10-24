@@ -50,11 +50,16 @@ public sealed class AstFormatter
     private int _next;   // the comment cursor: everything before it is already printed
     private int _lastEnd = -1; // source end of the last element printed at line level
 
-    private AstFormatter(string? source, IReadOnlyList<Trivia> comments)
+    /// <summary>The expressions the source wrote in parentheses, with the outermost pair's span;
+    /// <c>null</c> where parentheses are derived from precedence alone.</summary>
+    private readonly IReadOnlyDictionary<Expr, Span>? _grouped;
+
+    private AstFormatter(string? source, IReadOnlyList<Trivia> comments, IReadOnlyDictionary<Expr, Span>? grouped = null)
     {
         _source = source ?? "";
         _synthesized = source is null;
         _comments = comments;
+        _grouped = grouped;
 
         var starts = new List<int> { 0 };
         for (var i = 0; i < _source.Length; i++)
@@ -65,8 +70,11 @@ public sealed class AstFormatter
 
     /// <param name="comments">Every comment of the file, source-ordered — the lexer's trivia
     /// plus the doc-comment tokens, merged by the caller.</param>
-    public static Doc Build(Module module, string source, IReadOnlyList<Trivia> comments) =>
-        new AstFormatter(source, comments).ModuleDoc(module);
+    /// <param name="grouped">The parser's written parentheses, kept as written; without them every
+    /// pair is derived from precedence.</param>
+    public static Doc Build(Module module, string source, IReadOnlyList<Trivia> comments,
+        IReadOnlyDictionary<Expr, Span>? grouped = null) =>
+        new AstFormatter(source, comments, grouped).ModuleDoc(module);
 
     /// <summary>A node that was built, not read, <c>std.syntax</c>'s: there is no source
     /// to copy a spelling from, so a literal is written from its value, and there are no comments.
@@ -304,7 +312,18 @@ public sealed class AstFormatter
         _ => Air.User,
     };
 
-    private Doc DeclDoc(Decl decl) => decl switch
+    private Doc DeclDoc(Decl decl) => Doc.Of(decl switch
+    {
+        StaticBindingDecl d => Attributes(d.Attributes),
+        InterfaceDecl d => Attributes(d.Attributes),
+        ExtendDecl d => Attributes(d.Attributes),
+        AssociatedTypeDecl d => Attributes(d.Attributes),
+        GlobalBindingDecl d => Attributes(d.Attributes),
+        TypeAliasDecl d => Attributes(d.Attributes),
+        _ => Doc.Nil,
+    }, DeclBodyDoc(decl));
+
+    private Doc DeclBodyDoc(Decl decl) => decl switch
     {
         ImportDecl d => ImportDoc(d),
         FunctionDecl d => FunctionDoc(d),
@@ -385,6 +404,9 @@ public sealed class AstFormatter
         if (attributes.Length == 0) return Doc.Nil;
         if (attributes.Length == 1)
             return Doc.Of(AttributeDoc(attributes[0]), Doc.NewLine);
+        // Lyric 5 writes each attribute on a line of its own, as its standard library does.
+        if (_grouped is not null)
+            return new Doc.Concat([.. attributes.Select(a => Doc.Of(AttributeDoc(a), Doc.NewLine))]);
 
         // Two or more attributes take the GROUP shape — one spelling in the formatted corpus,
         // however the source wrote them. The parser flattens both spellings to the same list,
@@ -406,8 +428,9 @@ public sealed class AstFormatter
             Pub(decl.Visibility),
             decl.Extern is { } abi ? Doc.Of(Doc.From("extern "), _synthesized ? Doc.From(Quote(abi.Abi)) : Src(abi.AbiSpan), Doc.Space) : Doc.Nil,
             decl.IsStatic ? Doc.From("static ") : Doc.Nil,
+            decl.IsInline ? Doc.From("inline ") : Doc.Nil,
             decl.IsMut ? Doc.From("mut ") : Doc.Nil,
-            Doc.From($"{(decl.IsMacro ? "macro" : "fn")} {decl.Name}"),
+            Doc.Of(Doc.From($"{(decl.IsMacro ? "macro" : "fn")} "), NameDoc(decl.Name)),
             GenericsDoc(decl.Generics),
             ParamListDoc(decl.Parameters),
         };
@@ -420,6 +443,19 @@ public sealed class AstFormatter
 
         head.Add(decl.Body is { } body ? Doc.Of(Doc.Space, BlockDoc(body)) : Doc.From(";"));
         return new Doc.Concat(head);
+    }
+
+    /// <summary>The splices of the quotes around what is being formatted, innermost last.</summary>
+    private readonly List<Expr[]> _quoteSplices = new();
+
+    /// <summary>A declared name — or, inside a quote, the splice <c>#{e}</c> that stands for it,
+    /// which the parser keeps as <c>#</c> and the splice's index.</summary>
+    private Doc NameDoc(string name)
+    {
+        if (name.Length > 1 && name[0] == '#' && int.TryParse(name.AsSpan(1), out var index)
+            && _quoteSplices.Count > 0 && index < _quoteSplices[^1].Length)
+            return Doc.Of(Doc.From("#{"), ExprDoc(_quoteSplices[^1][index], Assign), Doc.From("}"));
+        return Doc.From(name);
     }
 
     private Doc GenericsDoc(GenericParam[] generics)
@@ -494,7 +530,7 @@ public sealed class AstFormatter
 
     private Doc FieldDoc(FieldDecl decl)
     {
-        var parts = new List<Doc> { Pub(decl.Visibility), Doc.From($"{(decl.IsVar ? "var " : "")}{decl.Name}: "), TypeDoc(decl.Type) };
+        var parts = new List<Doc> { Attributes(decl.Attributes), Pub(decl.Visibility), Doc.From($"{(decl.IsVar ? "var " : "")}{decl.Name}: "), TypeDoc(decl.Type) };
         if (decl.Default is { } fallback)
         {
             parts.Add(Doc.From(" = "));
@@ -568,7 +604,9 @@ public sealed class AstFormatter
         return line + 1 < _lineStarts.Length ? _lineStarts[line + 1] - 1 : _source.Length;
     }
 
-    private Doc VariantDoc(EnumVariant variant)
+    private Doc VariantDoc(EnumVariant variant) => Doc.Of(Attributes(variant.Attributes), VariantBodyDoc(variant));
+
+    private Doc VariantBodyDoc(EnumVariant variant)
     {
         if (variant.TupleFields is { } tuple)
             return Doc.Of(Doc.From(variant.Name), Doc.From("("),
@@ -625,7 +663,7 @@ public sealed class AstFormatter
         if (b.Value is { } value)
         {
             parts.Add(Doc.Space);
-            parts.Add(value is IdentifierExpr { Name: var name } && _loopLabels.Contains(name)
+            parts.Add(value is IdentifierExpr { Name: var name } && _loopLabels.Contains(name) && WrittenParentheses(value) == 0
                 ? Doc.Of(Doc.From("("), ExprDoc(value, Assign), Doc.From(")"))
                 : ExprDoc(value, Assign));
         }
@@ -646,9 +684,9 @@ public sealed class AstFormatter
             Doc.From(" while ("), ExprDoc(s.Condition, Assign), Doc.From(");")),
         // Both halves: the head may be a PATTERN ('for ((k, v) in …)') and the loop may carry a
         // LABEL. Written as one, neither is lost when the other is present.
-        ForInStmt s => Doc.Of(LabelDoc(s.Label), Doc.From("for ("),
+        ForInStmt s => Doc.Of(LabelDoc(s.Label), Doc.From(s.Comptime ? "comptime for (" : "for ("),
             s.Pattern is { } loopPattern ? PatternDoc(loopPattern) : Doc.From(s.Variable),
-            Doc.From(" in "), ExprDoc(s.Iterable, Assign), Doc.From(") "), Labeled(s.Label, () => BlockDoc(s.Body))),
+            Doc.From(" in "), ExprDoc(Site(s.Iterable, s.Comptime), Assign), Doc.From(") "), Labeled(s.Label, () => BlockDoc(s.Body))),
         BreakStmt b => BreakDoc(b),
         ContinueStmt c => Doc.From(c.Label is null ? "continue;" : $"continue {c.Label};"),
         ReturnStmt s => s.Value is null
@@ -671,6 +709,10 @@ public sealed class AstFormatter
         _ => throw new InternalCompilationException($"unreachable: unformatted {stmt.GetType().Name}"),
     };
 
+    /// <summary>What a <c>comptime</c> statement wrote in its head: the parser wraps it in the
+    /// <c>comptime</c> site the keyword before the statement stands for.</summary>
+    private static Expr Site(Expr expr, bool comptime) => comptime && expr is ComptimeExpr c ? c.Inner : expr;
+
     private Doc BlockDoc(Block block)
     {
         var closing = block.Span.End - 1;
@@ -680,6 +722,23 @@ public sealed class AstFormatter
 
     private Doc BindingDoc(BindingStmt binding)
     {
+        if (binding is { LocalFunction: true, Initializer: LambdaExpr fn, Type: FunctionType fnType } && fn.Body is Block body)
+        {
+            var head = new List<Doc>
+            {
+                Doc.From($"fn {binding.Name}("),
+                Doc.Join(Doc.From(", "), fn.Parameters.Select(p => p.Type is { } t
+                    ? Doc.Of(Doc.From((p.IsPlace ? "&" : "") + p.Name + ": "), TypeDoc(t))
+                    : Doc.From(p.Name)).ToArray()),
+                Doc.From(")"),
+            };
+            if (fn.ReturnType is { } ret) head.Add(Doc.Of(Doc.From(": "), ReturnDoc(ret, fnType.Throws, false)));
+            if (fnType.Throws is { } throws) head.Add(ThrowsDoc(throws));
+            head.Add(Doc.Space);
+            head.Add(BlockDoc(body));
+            return new Doc.Concat(head);
+        }
+
         var keyword = binding.Cleanup is not null ? "using let " : binding.IsMutable ? "var " : "let ";
         var parts = new List<Doc> { Doc.From(keyword), Doc.From(binding.Name) };
         if (binding.Type is { } type)
@@ -739,17 +798,19 @@ public sealed class AstFormatter
         return new Doc.Concat(parts);
     }
 
-    private Doc IfStmtDoc(IfStmt stmt)
+    private Doc IfStmtDoc(IfStmt stmt, bool inLadder = false)
     {
         var parts = new List<Doc>
         {
-            Doc.From("if ("), ExprDoc(stmt.Condition, Assign), Doc.From(") "), BlockDoc(stmt.Then),
+            Doc.From(stmt.Comptime && !inLadder ? "comptime if (" : "if ("), ExprDoc(Site(stmt.Condition, stmt.Comptime), Assign),
+            Doc.From(") "), BlockDoc(stmt.Then),
         };
 
         if (stmt.Else is { } tail)
         {
             parts.Add(Doc.From(" else "));
-            parts.Add(StmtDoc(tail)); // a Block, or the next IfStmt of an else-if ladder
+            // a Block, or the next IfStmt of an else-if ladder
+            parts.Add(tail is IfStmt next && stmt.Comptime ? IfStmtDoc(next, inLadder: true) : StmtDoc(tail));
         }
 
         return new Doc.Concat(parts);
@@ -898,7 +959,25 @@ public sealed class AstFormatter
     private Doc ExprDoc(Expr expr, int maxLevel)
     {
         var doc = ExprDocInner(expr);
+        if (_grouped is not null && expr is IfExpr { Then: BlockExpr, Else: BlockExpr } && WrittenParentheses(expr) == 0)
+            return doc;
+        if (WrittenParentheses(expr) is var written and > 0)
+        {
+            for (var i = 0; i < written; i++) doc = Doc.Of(Doc.From("("), doc, Doc.From(")"));
+            return doc;
+        }
         return LevelOf(expr) > maxLevel ? Doc.Of(Doc.From("("), doc, Doc.From(")")) : doc;
+    }
+
+    /// <summary>How many pairs of parentheses the source wrote around <paramref name="expr"/>: the
+    /// opening ones between the outermost pair's start and the expression's.</summary>
+    private int WrittenParentheses(Expr expr)
+    {
+        if (_grouped is null || !_grouped.TryGetValue(expr, out var outer)) return 0;
+        var count = 0;
+        for (var i = outer.Start; i < expr.Span.Start && i < _source.Length; i++)
+            if (_source[i] == '(') count++;
+        return Math.Max(count, 1);
     }
 
     private Doc ExprDocInner(Expr expr) => expr switch
@@ -922,9 +1001,9 @@ public sealed class AstFormatter
 
         UnaryExpr u => Doc.Of(Doc.From(PrefixSymbol(u.Operator)), ExprDoc(u.Operand, Prefix)),
         ComptimeExpr c => Doc.Of(Doc.From("comptime "), ExprDoc(c.Inner, Prefix)),
-        QuoteExpr q => Doc.Of(Doc.From("quote "), q.Declarations
+        QuoteExpr q => Quoted(q, () => Doc.Of(Doc.From("quote "), q.Declarations
             ? BracedDoc(Doc.Nil, q.Content.Length == 0, () => SequenceDoc(q.Content.Cast<Decl>().ToArray(), DeclDoc, (_, _) => Air.Forced, q.Span.End - 1))
-            : BlockDoc(new Block(q.Content.Cast<Stmt>().ToArray(), q.Span))),
+            : BlockDoc(new Block(q.Content.Cast<Stmt>().ToArray(), q.Span)))),
         SpliceExpr sp => Doc.Of(Doc.From("#{"), ExprDoc(sp.Inner, Assign), Doc.From("}")),
         ThrowExpr t => Doc.Of(Doc.From("throw "), ExprDoc(t.Value, Prefix)),
         TryExpr t => TryExprDoc(t),
@@ -964,9 +1043,23 @@ public sealed class AstFormatter
         MatchExpr m => MatchDoc(m.Scrutinee, m.Arms, m.Span),
         StructInitExpr s => StructInitDoc(s),
         WithExpr w => WithDoc(w),
+        FieldByInfoExpr f => Doc.Of(ExprDoc(f.Target, Postfix), Doc.From(".["), ExprDoc(f.Info, Assign), Doc.From("]")),
+        PayloadByInfoExpr p => Doc.Of(ExprDoc(p.Target, Postfix), Doc.From(".["), ExprDoc(p.Variant, Assign),
+            Doc.From(", "), ExprDoc(p.Field, Assign), Doc.From("]")),
+        VariantInitExpr v => InitBodyDoc(Doc.Of(ExprDoc(v.Target, Postfix), Doc.From(".["), ExprDoc(v.Variant, Assign), Doc.From("]")),
+            v.Fields, v.Rounds),
+        ComptimeIfExpr c => Doc.GroupOf(Doc.From("comptime if ("), ExprDoc(Site(c.Condition, true), Assign), Doc.From(") "),
+            ExprDoc(c.Then, Assign), Doc.LineOrSpace, Doc.From("else "), ExprDoc(c.Else, Assign)),
 
         _ => throw new InternalCompilationException($"unreachable: unformatted {expr.GetType().Name}"),
     };
+
+    private Doc Quoted(QuoteExpr quote, Func<Doc> body)
+    {
+        _quoteSplices.Add(quote.Splices);
+        try { return body(); }
+        finally { _quoteSplices.RemoveAt(_quoteSplices.Count - 1); }
+    }
 
     private Doc AtIdentifierDoc(AtIdentifierExpr expr)
     {
@@ -1065,15 +1158,18 @@ public sealed class AstFormatter
         if (expr is BinaryExpr binary && BinaryInfo(binary.Operator).Level == level)
         {
             var symbol = BinaryInfo(binary.Operator).Symbol;
+            // A written group is an operand of its own, not a link of the chain.
             if (rightAssociative)
             {
                 operands.Add(ExprDoc(binary.Left, level - 1));
                 operators.Add(symbol);
-                Flatten(binary.Right, level, true, operands, operators);
+                if (WrittenParentheses(binary.Right) > 0) operands.Add(ExprDoc(binary.Right, level));
+                else Flatten(binary.Right, level, true, operands, operators);
             }
             else
             {
-                Flatten(binary.Left, level, false, operands, operators);
+                if (WrittenParentheses(binary.Left) > 0) operands.Add(ExprDoc(binary.Left, level));
+                else Flatten(binary.Left, level, false, operands, operators);
                 operators.Add(symbol);
                 operands.Add(ExprDoc(binary.Right, level - 1));
             }
@@ -1147,6 +1243,15 @@ public sealed class AstFormatter
 
     private Doc LambdaDoc(LambdaExpr lambda)
     {
+        if (_loopLabels.Count == 0) return LambdaBodyDoc(lambda);
+        var outer = _loopLabels.ToArray();
+        _loopLabels.Clear();
+        try { return LambdaBodyDoc(lambda); }
+        finally { _loopLabels.AddRange(outer); }
+    }
+
+    private Doc LambdaBodyDoc(LambdaExpr lambda)
+    {
         // '{ acc, x => … }': the parameters stand in the block's head, before '=>'.
         if (lambda.Form == LambdaForm.Trailing && lambda.Parameters is not [{ Implicit: true }] && lambda.Body is Block withParameters)
         {
@@ -1191,22 +1296,44 @@ public sealed class AstFormatter
         return new Doc.Concat(parts);
     }
 
-    private Doc StructInitDoc(StructInitExpr init)
-    {
-        var head = Doc.Of(Doc.From((init.IsImplicit ? "." : "") + string.Join(".", init.Path)), TypeArgsDoc(init.TypeArguments));
-        if (init.Fields.Length == 0) return Doc.Of(head, Doc.From(" { }"));
+    private Doc StructInitDoc(StructInitExpr init) =>
+        InitBodyDoc(InitHeadDoc(init), init.Fields, init.Rounds);
 
+    /// <summary>The path and type arguments of an initializer — behind the enum where the source
+    /// wrote them there, <c>Ev&lt;int&gt;.Hit</c>, else behind the whole path.</summary>
+    private Doc InitHeadDoc(StructInitExpr init)
+    {
+        var prefix = init.IsImplicit ? "." : "";
+        if (init.TypeArguments.Length > 0 && init.Path.Length > 1 && !_synthesized
+            && init.NameSpan.Start > init.Span.Start
+            && _source.AsSpan(init.Span.Start, init.NameSpan.Start - init.Span.Start).Contains('<'))
+            return Doc.Of(Doc.From(prefix + string.Join(".", init.Path[..^1])), TypeArgsDoc(init.TypeArguments),
+                Doc.From("." + init.Path[^1]));
+        return Doc.Of(Doc.From(prefix + string.Join(".", init.Path)), TypeArgsDoc(init.TypeArguments));
+    }
+
+    /// <summary>An initializer's braces: its fields and its rounds, in the order they were written.</summary>
+    private Doc InitBodyDoc(Doc head, StructInitField[] fields, StructInitRound[] rounds)
+    {
+        if (fields.Length == 0 && rounds.Length == 0) return Doc.Of(head, Doc.From(" { }"));
+
+        var items = fields.Select(f => (f.Span.Start, Doc: InitFieldDoc(f)))
+            .Concat(rounds.Select(r => (r.Span.Start, Doc: Doc.Of(Doc.From($"comptime for ({r.Variable} in "),
+                ExprDoc(Site(r.Iterable, true), Assign), Doc.From(") "), InitFieldDoc(r.Item)))))
+            .OrderBy(i => i.Start).Select(i => i.Doc).ToArray();
         return Doc.GroupOf(head, Doc.From(" {"),
             Doc.IndentOf(Doc.LineOrSpace,
-                Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace),
-                    init.Fields.Select(InitFieldDoc).ToArray()),
+                Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace), items),
                 Doc.WhenBroken(Doc.From(","))),
             Doc.LineOrSpace, Doc.From("}"));
     }
 
-    private Doc InitFieldDoc(StructInitField field) => field.IsShorthand
-        ? Doc.From(field.Name)
-        : Doc.Of(Doc.From($"{field.Name} = "), ExprDoc(field.Value, Assign));
+    private Doc InitFieldDoc(StructInitField field) => field switch
+    {
+        { Info: { } info } => Doc.Of(Doc.From("["), ExprDoc(info, Assign), Doc.From("] = "), ExprDoc(field.Value, Assign)),
+        { IsShorthand: true } => Doc.From(field.Name),
+        _ => Doc.Of(Doc.From($"{field.Name} = "), ExprDoc(field.Value, Assign)),
+    };
 
     /// <summary><c>p with { x = 1, pos.y = 2 }</c>: the postfix and its fields like an initializer's.</summary>
     private Doc WithDoc(WithExpr with)

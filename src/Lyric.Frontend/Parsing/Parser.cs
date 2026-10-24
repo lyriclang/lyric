@@ -885,6 +885,10 @@ public sealed partial class Parser
     /// </summary>
     private readonly Dictionary<Expr, Span> _grouped = new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>Every expression written in parentheses of its own, with the span of the outermost
+    /// pair — what the formatter keeps of them.</summary>
+    public IReadOnlyDictionary<Expr, Span> Grouped => _grouped;
+
     /// <summary>An operand as it is written: with its parentheses, where it has them.</summary>
     private Span Whole(Expr operand) => _grouped.TryGetValue(operand, out var written) ? written : operand.Span;
 
