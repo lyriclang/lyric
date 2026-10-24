@@ -5,7 +5,8 @@
 #
 # A path is a prefix of a repository path (forward slashes). Every rule whose prefix matches
 # adds its tests and its cases; a path no rule names selects EVERYTHING (the table is extended,
-# not guessed around). `tests` are Lyric5.Tests class names, or "4x" (the Lyric.Tests.* projects
+# not guessed around). `tests` are Lyric5.Tests class names, a class of another project named whole
+# ("Lyric.Tests.Formatting.Lyric5CorpusTests"), or "4x" (the Lyric.Tests.* projects
 # of the 4.x front end), or "all5" (every Lyric5.Tests class). `cases` are prefixes of the
 # conformance labels ("12-"), or "all", or "imports": the cases that name the touched std module
 # (`std.string`); a module the prelude imports reaches every case.
@@ -39,7 +40,7 @@ cases = ["06-", "10-", "12-", "13-"]
 # The text of the language: lexing, parsing, the tree, the formatter.
 paths = ["src/Lyric.Frontend/Lexing/", "src/Lyric.Frontend/Parsing/", "src/Lyric.Frontend/AST/", "src/Lyric.Frontend/Formatting/"]
 tests = ["4x", "InterpolationTests", "UnicodeTests", "TrailingBlockCallTests", "ShiftCountTests", "ManifestTests",
-         "SiteTests"]
+         "SiteTests", "FormatterProofTests"]
 cases = ["01-", "07-", "08-", "09-"]
 
 [[rule]]
@@ -79,17 +80,18 @@ cases = []
 # text), what reads names across modules; the cases that import the touched module.
 paths = ["stdlib5/"]
 tests = ["StdTests", "ExampleTests", "CEmitterTests", "VisibilityTests", "PreludeTests", "PreludeNameTests", "ImportTests",
-         "ImportedFunctionValueTests", "RootModuleTests", "WitnessWordTests", "NativeTests", "UnicodeTests"]
+         "ImportedFunctionValueTests", "RootModuleTests", "WitnessWordTests", "NativeTests", "UnicodeTests",
+         "FormatterProofTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Formatting.Lyric5ProofTests"]
 cases = ["imports"]
 
 [[rule]]
 paths = ["tests/std/"]
-tests = ["StdTests"]
+tests = ["StdTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Formatting.Lyric5ProofTests"]
 cases = []
 
 [[rule]]
 paths = ["examples/"]
-tests = ["ExampleTests", "SiteTests"]
+tests = ["ExampleTests", "SiteTests", "FormatterProofTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Formatting.Lyric5ProofTests"]
 cases = []
 
 [[rule]]
@@ -101,7 +103,7 @@ cases = []
 [[rule]]
 # The Book: its pages and its snippets.
 paths = ["docs/book/"]
-tests = ["SiteTests", "BookTests"]
+tests = ["SiteTests", "BookTests", "FormatterProofTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Formatting.Lyric5ProofTests"]
 cases = []
 
 [[rule]]

@@ -168,6 +168,30 @@ public sealed class AstFormatter
     private bool BlankBetween(int endOffset, int startOffset) =>
         LineOf(startOffset) - LineOf(endOffset) >= 2;
 
+    /// <summary>Where an item begins in the text: at its first attribute, which its span does not
+    /// hold. Measured from the span, an attribute the form puts on a line of its own would read as
+    /// a blank line before the item the next time the file is formatted.</summary>
+    private static int StartOf(Node node) => AttributesOf(node) is [var first, ..]
+        ? Math.Min(first.Span.Start, node.Span.Start)
+        : node.Span.Start;
+
+    private static AttributeNode[] AttributesOf(Node node) => node switch
+    {
+        FunctionDecl d => d.Attributes,
+        StaticBindingDecl d => d.Attributes,
+        FieldDecl d => d.Attributes,
+        StructDecl d => d.Attributes,
+        ClassDecl d => d.Attributes,
+        EnumDecl d => d.Attributes,
+        EnumVariant d => d.Attributes,
+        InterfaceDecl d => d.Attributes,
+        ExtendDecl d => d.Attributes,
+        AssociatedTypeDecl d => d.Attributes,
+        GlobalBindingDecl d => d.Attributes,
+        TypeAliasDecl d => d.Attributes,
+        _ => [],
+    };
+
     private bool AnyCommentBefore(int position) =>
         _next < _comments.Count && _comments[_next].Span.Start < position;
 
@@ -254,7 +278,7 @@ public sealed class AstFormatter
             {
                 parts.Add(Doc.NewLine);
                 if (air == Air.Forced
-                    || (air == Air.User && _lastEnd >= 0 && BlankBetween(_lastEnd, item.Span.Start)))
+                    || (air == Air.User && _lastEnd >= 0 && BlankBetween(_lastEnd, StartOf(item))))
                     parts.Add(Doc.NewLine);
             }
 

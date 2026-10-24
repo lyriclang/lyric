@@ -41,6 +41,27 @@ public class Lyric5FormatterTests
     }
 
     [Fact]
+    public void An_attribute_put_on_its_own_line_brings_no_blank_line_on_the_next_pass()
+    {
+        // Format checks the second pass: the attribute's own line must not read as a gap
+        Assert.Equal("""
+            struct Child {
+                n: int,
+                @Keep
+                parent: int,
+            }
+
+            enum Shape {
+                @Wire(1)
+                Dot,
+                @Wire(2)
+                Box,
+            }
+
+            """, Format("struct Child { n: int, @Keep parent: int, }\n\nenum Shape { @Wire(1) Dot, @Wire(2) Box }"));
+    }
+
+    [Fact]
     public void Each_attribute_stands_on_its_own_line_on_every_declaration()
     {
         Keeps("""
