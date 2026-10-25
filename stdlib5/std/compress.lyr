@@ -1,13 +1,13 @@
-/// Compresses and decompresses DEFLATE (RFC 1951), zlib (RFC 1950) and gzip (RFC 1952), written
-/// entirely in Lyric.
-///
-/// Decoding reads stored, fixed and dynamic blocks through a 32 KiB window; encoding writes them
-/// at the levels 0 to 9 — 0 stored, 1 the fixed tables over a greedy LZ77, 2 and up dynamic
-/// tables, 4 and up with lazy matching, the chains longer with the level. The streams are
-/// `DeflateReader<R>`/`DeflateWriter<W>` raw, `ZlibReader`/`ZlibWriter` with the zlib header and
-/// Adler-32, `GzipReader`/`GzipWriter` with the gzip header and CRC-32 (members in a row read as
-/// one). `Gzip`, `Zlib` and `Deflate` compress and decompress bytes held in memory. Corrupt input
-/// is reported as `IoError { kind = .InvalidData }` carrying a `CompressError`.
+//! Compresses and decompresses DEFLATE (RFC 1951), zlib (RFC 1950) and gzip (RFC 1952), written
+//! entirely in Lyric.
+//!
+//! Decoding reads stored, fixed and dynamic blocks through a 32 KiB window; encoding writes them
+//! at the levels 0 to 9 — 0 stored, 1 the fixed tables over a greedy LZ77, 2 and up dynamic
+//! tables, 4 and up with lazy matching, the chains longer with the level. The streams are
+//! `DeflateReader<R>`/`DeflateWriter<W>` raw, `ZlibReader`/`ZlibWriter` with the zlib header and
+//! Adler-32, `GzipReader`/`GzipWriter` with the gzip header and CRC-32 (members in a row read as
+//! one). `Gzip`, `Zlib` and `Deflate` compress and decompress bytes held in memory. Corrupt input
+//! is reported as `IoError { kind = .InvalidData }` carrying a `CompressError`.
 import std.collections { List };
 import std.core { Closeable };
 import std.hash { adler32, crc32 };

@@ -1,11 +1,11 @@
-/// Measures time, and reads and writes dates, times of day and time zones.
-///
-/// The main types are `Duration`, a span; `Instant`, a moment on the wall clock in UTC;
-/// `Monotonic`, a moment on the clock that only moves forward, for how long something takes;
-/// `Date`, `Time` and `DateTime`, the proleptic Gregorian calendar with RFC 3339 text; and `Zone`,
-/// UTC, a fixed offset or a zone of the time zone database (TZif, RFC 8536). `DateTime.format`
-/// and `DateTime.parseWith` use the date patterns of UTS #35. `sleep` and the timers live in
-/// `std.task`.
+//! Measures time, and reads and writes dates, times of day and time zones.
+//!
+//! The main types are `Duration`, a span; `Instant`, a moment on the wall clock in UTC;
+//! `Monotonic`, a moment on the clock that only moves forward, for how long something takes;
+//! `Date`, `Time` and `DateTime`, the proleptic Gregorian calendar with RFC 3339 text; and `Zone`,
+//! UTC, a fixed offset or a zone of the time zone database (TZif, RFC 8536). `DateTime.format`
+//! and `DateTime.parseWith` use the date patterns of UTS #35. `sleep` and the timers live in
+//! `std.task`.
 //
 // The clocks are the runtime's (lyr/time.h), reached through C: `std.task` imports this module,
 // so the way back to its own reading of the monotonic clock would close a cycle. The zone files

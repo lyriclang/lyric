@@ -1,23 +1,23 @@
-/// Compile-time questions about a type: its name, its kind, its fields, an enum's variants, the
-/// interfaces it conforms to.
-///
-/// Each answer is a constant of the type it is asked of — in a generic function or a default, of
-/// each instance — and there is no reflection at run time: what a program reads of a type it
-/// reads as such a constant.
-///
-/// A `comptime for (f in fields<T>())` sets its body in place once per field, where `e.[f]` is
-/// the field `f` names, of the field's own type; one over `variants<E>()` once per variant, where
-/// `e is v` tests the variant, `E.[v]` is a unit variant's value and `e.[v, p]` a payload field;
-/// one over `members<T>()` once per member. A field is listed where the code that asks may name
-/// it: an interface of another package sees the `pub` fields alone. What a declaration carries,
-/// a round reads: `attribute<A>(f)` of a field — a payload's too —, `variantAttribute<A>(v)` of a
-/// variant, `memberAttribute<A>(m)` of a member — a function, a constant, an associated type —,
-/// `parameterAttribute<A>(p)` of a parameter in a round over `m.parameters`, and
-/// `typeAttribute<T, A>()` of a type, an interface or an alias. What stands at a module's top
-/// level a macro reads through `std.syntax`.
-///
-/// The questions and the infos are declared in `std.core`, whose synthesized members are written
-/// over them and which imports nothing: this module is their name to the program.
+//! Compile-time questions about a type: its name, its kind, its fields, an enum's variants, the
+//! interfaces it conforms to.
+//!
+//! Each answer is a constant of the type it is asked of — in a generic function or a default, of
+//! each instance — and there is no reflection at run time: what a program reads of a type it
+//! reads as such a constant.
+//!
+//! A `comptime for (f in fields<T>())` sets its body in place once per field, where `e.[f]` is
+//! the field `f` names, of the field's own type; one over `variants<E>()` once per variant, where
+//! `e is v` tests the variant, `E.[v]` is a unit variant's value and `e.[v, p]` a payload field;
+//! one over `members<T>()` once per member. A field is listed where the code that asks may name
+//! it: an interface of another package sees the `pub` fields alone. What a declaration carries,
+//! a round reads: `attribute<A>(f)` of a field — a payload's too —, `variantAttribute<A>(v)` of a
+//! variant, `memberAttribute<A>(m)` of a member — a function, a constant, an associated type —,
+//! `parameterAttribute<A>(p)` of a parameter in a round over `m.parameters`, and
+//! `typeAttribute<T, A>()` of a type, an interface or an alias. What stands at a module's top
+//! level a macro reads through `std.syntax`.
+//!
+//! The questions and the infos are declared in `std.core`, whose synthesized members are written
+//! over them and which imports nothing: this module is their name to the program.
 pub import std.core {
     Visibility,
     TypeKind,

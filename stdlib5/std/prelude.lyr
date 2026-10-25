@@ -1,8 +1,8 @@
-/// The prelude: the names every module can use without an import.
-///
-/// It holds what signatures and the language itself need, not effects: `println` is `std.io`'s.
-/// It passes on with `pub import` what other modules declare — the core interfaces, panics and
-/// attributes from `std.core`, and `List`, `Map` and `Set` from `std.collections`.
+//! The prelude: the names every module can use without an import.
+//!
+//! It holds what signatures and the language itself need, not effects: `println` is `std.io`'s.
+//! It passes on with `pub import` what other modules declare — the core interfaces, panics and
+//! attributes from `std.core`, and `List`, `Map` and `Set` from `std.collections`.
 pub import std.core {
     panic,
     assert,

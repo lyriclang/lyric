@@ -1,10 +1,10 @@
-/// Input and output: `import std.io { println }`. The module holds one error type (`IoError` with
-/// its `IoErrorKind`); the interfaces `Reader`, `Writer` and `Seek` with their defaults; `copy`;
-/// two streams over memory (`ByteReader`, `ByteBuffer`); the buffers `BufReader` and `BufWriter`
-/// and the text streams `TextReader` and `TextWriter`; the console's output — `print`, `println`,
-/// `eprint`, `eprintln`, `flush` — and its streams `stdin()`, `stdout()`, `stderr()`; and the I/O
-/// pool that std.fs's calls run on. A reader's and a writer's call may throw `Cancelled` where it
-/// waits without bound.
+//! Input and output: `import std.io { println }`. The module holds one error type (`IoError` with
+//! its `IoErrorKind`); the interfaces `Reader`, `Writer` and `Seek` with their defaults; `copy`;
+//! two streams over memory (`ByteReader`, `ByteBuffer`); the buffers `BufReader` and `BufWriter`
+//! and the text streams `TextReader` and `TextWriter`; the console's output — `print`, `println`,
+//! `eprint`, `eprintln`, `flush` — and its streams `stdin()`, `stdout()`, `stderr()`; and the I/O
+//! pool that std.fs's calls run on. A reader's and a writer's call may throw `Cancelled` where it
+//! waits without bound.
 import std.core { Join, Utf8Error, viewBytes };
 import std.task { Cancelled, SpinLock, schedulerRuns };
 import std.thread { Pool };

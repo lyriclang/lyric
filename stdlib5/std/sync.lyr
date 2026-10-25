@@ -1,9 +1,9 @@
-/// Synchronization between tasks and threads: [Atomic], [Mutex], [RwLock], [Once] and
-/// [Semaphore].
-///
-/// The lock state lives in `std.task`, whose scheduler releases the locks of a task that
-/// panicked. A task that waits for a lock or a permit is parked while the other tasks of its
-/// thread run.
+//! Synchronization between tasks and threads: [Atomic], [Mutex], [RwLock], [Once] and
+//! [Semaphore].
+//!
+//! The lock state lives in `std.task`, whose scheduler releases the locks of a task that
+//! panicked. A task that waits for a lock or a permit is parked while the other tasks of its
+//! thread run.
 import std.task {
     atomicLoad,
     atomicStore,

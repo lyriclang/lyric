@@ -224,6 +224,15 @@ pre.fails { border-left: 3px solid var(--muted); }
 /* What the compiler says about it, right under the snippet, like a program's output. */
 pre.diagnostic { background: none; border-left: 3px solid var(--muted); margin-top: calc(var(--space) * -0.5); }
 
+/* The reference: a member's head as written, its text under it, one member set off from the next. */
+pre.signature { margin: 0 0 calc(var(--space) * 0.5); }
+.member { border-top: 1px solid var(--line); padding-top: calc(var(--space) * 0.75); margin-top: calc(var(--space) * 0.75); }
+.member:target { border-top-color: var(--accent); }
+.conforms { color: var(--muted); font-size: 14px; }
+.listing { padding-left: 0; list-style: none; }
+.listing li, .listed { margin: 0 0 calc(var(--space) * 0.25); }
+.listed .kind, .summary { color: var(--muted); }
+
 /* The way on through the Book: the chapter before and the one after. */
 .pager {
   display: flex;

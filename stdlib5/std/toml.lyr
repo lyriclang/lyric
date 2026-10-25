@@ -1,14 +1,14 @@
-/// Reads and writes TOML 1.0 documents through `std.codec`'s model.
-///
-/// The main types are `TomlValue`, the parsed tree, with `TomlTable` and `TomlDatetime`;
-/// `TreeBuilder`, the encoder that builds a tree; `TomlReader`, the decoder over a tree; and
-/// `TomlError`, a parse failure. `toml.encode(v)` writes any `Encode` value whose form is a table
-/// as a document, `toml.decode<T>(text)` reads any `Decode` value out of one, and
-/// `toml.parse(text)` returns the tree. A struct is a table of its wire names, a sequence an
-/// array, a map a table whose keys are strings — a number's digits for a number —, bytes an array
-/// of integers, a unit variant its name, a variant with a payload a table of one key. A
-/// table keeps the order its keys were written in. Date-times are TOML's own form, in their four
-/// kinds; an `Instant` writes as a quoted RFC 3339 string and reads from a date-time or a string.
+//! Reads and writes TOML 1.0 documents through `std.codec`'s model.
+//!
+//! The main types are `TomlValue`, the parsed tree, with `TomlTable` and `TomlDatetime`;
+//! `TreeBuilder`, the encoder that builds a tree; `TomlReader`, the decoder over a tree; and
+//! `TomlError`, a parse failure. `toml.encode(v)` writes any `Encode` value whose form is a table
+//! as a document, `toml.decode<T>(text)` reads any `Decode` value out of one, and
+//! `toml.parse(text)` returns the tree. A struct is a table of its wire names, a sequence an
+//! array, a map a table whose keys are strings — a number's digits for a number —, bytes an array
+//! of integers, a unit variant its name, a variant with a payload a table of one key. A
+//! table keeps the order its keys were written in. Date-times are TOML's own form, in their four
+//! kinds; an `Instant` writes as a quoted RFC 3339 string and reads from a date-time or a string.
 import std.codec { Encode, Decode, Codable, Encoder, Decoder, EncodeError, DecodeError };
 import std.collections { List, Map, Set };
 import std.core { ParseError };

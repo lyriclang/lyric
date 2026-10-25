@@ -1,10 +1,10 @@
-/// Cryptographic hashes, HMAC and the system's random bytes: the [Digest] interface with [Sha256]
-/// and [Sha512] (FIPS 180-4), [Sha1] (FIPS 180-4) and [Md5] (RFC 1321) — the last two only for
-/// formats that require them, never where an attacker chooses the input —, [Hmac] over any digest
-/// (RFC 2104), [sha256] for a whole input at once, [randomBytes] and [randomUint64] from the
-/// system, and [constantTimeEq], a comparison of bytes whose time does not depend on where they
-/// differ. Everything is written in Lyric; the system's random bytes come through the runtime's
-/// `lyr_random_u64`.
+//! Cryptographic hashes, HMAC and the system's random bytes: the [Digest] interface with [Sha256]
+//! and [Sha512] (FIPS 180-4), [Sha1] (FIPS 180-4) and [Md5] (RFC 1321) — the last two only for
+//! formats that require them, never where an attacker chooses the input —, [Hmac] over any digest
+//! (RFC 2104), [sha256] for a whole input at once, [randomBytes] and [randomUint64] from the
+//! system, and [constantTimeEq], a comparison of bytes whose time does not depend on where they
+//! differ. Everything is written in Lyric; the system's random bytes come through the runtime's
+//! `lyr_random_u64`.
 
 extern "C" fn lyr_random_u64(): uint64;
 

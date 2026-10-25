@@ -1,21 +1,21 @@
-/// Serializes values in any format: `Encode` writes a value into an `Encoder`, `Decode` reads one
-/// out of a `Decoder`, and `Codable` is both. A format — `std.json`, `std.toml` — is an encoder and
-/// a decoder of its own; this module holds the pair, the container model the formats implement,
-/// the errors (`DecodeError`, `EncodeError`), the conformances of the core types, the `@Codec`
-/// attribute that steers the synthesized conformances, and `Value`, a tree of the ten forms that
-/// any format could write — the format of no format, for tests and for data that is passed on
-/// unread.
-///
-/// `std.encoding` is a different module: it turns bytes into text and back (Base64,
-/// hexadecimal); this one writes the form of a value, in whatever format.
-///
-/// The model has ten forms: null, bool, int, uint, float, string, bytes, a sequence, a map, a
-/// struct of named fields, and a variant of an enum with or without a payload. A format implements
-/// the primitives of `Encoder` and `Decoder` — the scalars, and begin/end around the containers —;
-/// over them lies the layer a conformance writes with: `e.field("id", this.id)` encodes a field,
-/// `d.field<int>("id")` decodes one, `e.element(x)` and `d.next<T>()` an element. An encoder or a
-/// decoder is passed by reference, `&e`, as a hasher is: a conformance is generic over the
-/// format's type, and the format keeps its state.
+//! Serializes values in any format: `Encode` writes a value into an `Encoder`, `Decode` reads one
+//! out of a `Decoder`, and `Codable` is both. A format — `std.json`, `std.toml` — is an encoder and
+//! a decoder of its own; this module holds the pair, the container model the formats implement,
+//! the errors (`DecodeError`, `EncodeError`), the conformances of the core types, the `@Codec`
+//! attribute that steers the synthesized conformances, and `Value`, a tree of the ten forms that
+//! any format could write — the format of no format, for tests and for data that is passed on
+//! unread.
+//!
+//! `std.encoding` is a different module: it turns bytes into text and back (Base64,
+//! hexadecimal); this one writes the form of a value, in whatever format.
+//!
+//! The model has ten forms: null, bool, int, uint, float, string, bytes, a sequence, a map, a
+//! struct of named fields, and a variant of an enum with or without a payload. A format implements
+//! the primitives of `Encoder` and `Decoder` — the scalars, and begin/end around the containers —;
+//! over them lies the layer a conformance writes with: `e.field("id", this.id)` encodes a field,
+//! `d.field<int>("id")` decodes one, `e.element(x)` and `d.next<T>()` an element. An encoder or a
+//! decoder is passed by reference, `&e`, as a hasher is: a conformance is generic over the
+//! format's type, and the format keeps its state.
 import std.collections { List, Map, Set, Deque };
 import std.core {
     Hasher,

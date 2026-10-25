@@ -47,6 +47,17 @@ public static class Layout
 
     private static void Header(StringBuilder sb, SiteContext site, string path, string root)
     {
+        if (site.Package is { } package)
+        {
+            sb.Append("<header class=\"topbar\">\n");
+            sb.Append("<div class=\"brand\">");
+            sb.Append($"<a class=\"wordmark\" href=\"{(root.Length == 0 ? "./" : root)}\">{Html.Text(package)}</a>");
+            sb.Append($"<span class=\"version\">{Html.Text(site.Version)}</span>");
+            sb.Append("</div>\n");
+            sb.Append("<button class=\"theme-toggle\" type=\"button\" aria-label=\"Switch between light and dark\" hidden=\"hidden\">◐</button>\n");
+            sb.Append("</header>\n");
+            return;
+        }
         sb.Append("<header class=\"topbar\">\n");
         sb.Append("<div class=\"brand\">");
         sb.Append($"<a class=\"wordmark\" href=\"{(root.Length == 0 ? "./" : root)}\">Lyric</a>");
@@ -70,6 +81,11 @@ public static class Layout
 
     private static void Footer(StringBuilder sb, SiteContext site, string path)
     {
+        if (site.Package is not null)
+        {
+            sb.Append("<footer class=\"footer\"><span>Written by lyric doc</span></footer>\n");
+            return;
+        }
         sb.Append("<footer class=\"footer\">");
         sb.Append(Anchor(site, path, new Link("Releases", "releases/")));
         sb.Append($"<a href=\"{LegacyTarget}\">{Html.Text(LegacyLabel)}</a>");

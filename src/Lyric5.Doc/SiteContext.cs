@@ -18,12 +18,18 @@ public sealed class SiteContext
     /// <param name="pages">The paths of the version's pages under its root, <c>index.html</c>,
     /// <c>releases/index.html</c>.</param>
     /// <param name="areas">The header's areas, in order.</param>
-    public SiteContext(string version, IEnumerable<string> pages, IReadOnlyList<Link> areas)
+    /// <param name="package">A package's own reference, apart from the site: its name stands where
+    /// the site's wordmark does, and there is no search, no GitHub and no legacy link.</param>
+    public SiteContext(string version, IEnumerable<string> pages, IReadOnlyList<Link> areas, string? package = null)
     {
         Version = version;
         _pages = new HashSet<string>(pages, StringComparer.Ordinal);
         Areas = areas;
+        Package = package;
     }
+
+    /// <summary>The package a reference apart from the site documents, or <c>null</c> on the site.</summary>
+    public string? Package { get; }
 
     public string Version { get; }
     public IReadOnlyList<Link> Areas { get; }

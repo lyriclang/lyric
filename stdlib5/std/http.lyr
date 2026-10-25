@@ -1,17 +1,17 @@
-/// Speaks HTTP/1.1 (RFC 9110, RFC 9112) over `Reader` and `Writer`: the message types, a client
-/// and a server.
-///
-/// The message types are `Method`, `Status`, `Headers`, `Request`, `Response` and `Body`; the
-/// errors are `HttpError` beside the I/O errors. The client: `Client.send` writes a request over a connection it keeps alive for the next one to the same authority,
-/// reads the status line and the headers, and hands the body back as a `Reader` that knows its
-/// length (`Content-Length`), its chunks (`Transfer-Encoding: chunked`) or its end (the
-/// connection's close). Redirects are followed where asked, a timeout spans the whole exchange,
-/// and the `transport` hook of the options makes the connection — TCP here, TLS where a package
-/// puts its own `Stream` into it. The server: `Server.bind(addr).serve(handler)` takes a task per
-/// connection, reads each request as the client writes one (its body a `Reader` the handler may
-/// read or leave), answers `Expect: 100-continue`, writes the handler's `Response` with its
-/// length or in chunks, keeps the connection for the next request, and ends with `shutdown()`.
-/// The module has no TLS of its own, no HTTP/2 and no cookies.
+//! Speaks HTTP/1.1 (RFC 9110, RFC 9112) over `Reader` and `Writer`: the message types, a client
+//! and a server.
+//!
+//! The message types are `Method`, `Status`, `Headers`, `Request`, `Response` and `Body`; the
+//! errors are `HttpError` beside the I/O errors. The client: `Client.send` writes a request over a connection it keeps alive for the next one to the same authority,
+//! reads the status line and the headers, and hands the body back as a `Reader` that knows its
+//! length (`Content-Length`), its chunks (`Transfer-Encoding: chunked`) or its end (the
+//! connection's close). Redirects are followed where asked, a timeout spans the whole exchange,
+//! and the `transport` hook of the options makes the connection — TCP here, TLS where a package
+//! puts its own `Stream` into it. The server: `Server.bind(addr).serve(handler)` takes a task per
+//! connection, reads each request as the client writes one (its body a `Reader` the handler may
+//! read or leave), answers `Expect: 100-continue`, writes the handler's `Response` with its
+//! length or in chunks, keeps the connection for the next request, and ends with `shutdown()`.
+//! The module has no TLS of its own, no HTTP/2 and no cookies.
 import std.collections { List, Map };
 import std.core { StringBuilder, viewBytes, Closeable, ParseError };
 import std.io { Reader, Writer, IoError, ByteBuffer };

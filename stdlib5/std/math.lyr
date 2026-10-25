@@ -1,13 +1,13 @@
-/// Provides the elementary functions and the mathematical constants.
-///
-/// The functions are free and generic over the numeric types: [min], [max], [gcd], [lcm],
-/// [abs], [signum], and for floating-point types rounding, roots, powers, logarithms and the
-/// trigonometric and hyperbolic functions. The constants [pi], [e] and [tau] are typed `float`;
-/// `math.pi as float32` gives the narrow width. What describes a number type itself stands at
-/// that type: `float.epsilon`, `int.max`, `x.isNan()`.
-///
-/// The floating-point functions compute in `float` and round a `float32` result once, at the
-/// end; they give the same bits on every tier-1 target.
+//! Provides the elementary functions and the mathematical constants.
+//!
+//! The functions are free and generic over the numeric types: [min], [max], [gcd], [lcm],
+//! [abs], [signum], and for floating-point types rounding, roots, powers, logarithms and the
+//! trigonometric and hyperbolic functions. The constants [pi], [e] and [tau] are typed `float`;
+//! `math.pi as float32` gives the narrow width. What describes a number type itself stands at
+//! that type: `float.epsilon`, `int.max`, `x.isNan()`.
+//!
+//! The floating-point functions compute in `float` and round a `float32` result once, at the
+//! end; they give the same bits on every tier-1 target.
 import std.core { Signed, asTypeOf };
 
 /// π, a half turn in radians.

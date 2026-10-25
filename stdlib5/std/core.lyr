@@ -1,10 +1,10 @@
-/// The core of the standard library, bound in every module without an import.
-///
-/// It holds the preamble ([panic], [assert], [Error], [Result], [Box], the ranges, [arrayOf]),
-/// the attributes, the operator interfaces ([Equatable], [Ordered], [Hashable], [Index],
-/// [Display], [Debug], [Clone]), the number tower ([Num], [Integer], [Float]) with [Parse], the
-/// members of `string`, `char` and the arrays and views, the format language behind f-strings,
-/// and the iterator protocol ([Iterator], [Iterable]).
+//! The core of the standard library, bound in every module without an import.
+//!
+//! It holds the preamble ([panic], [assert], [Error], [Result], [Box], the ranges, [arrayOf]),
+//! the attributes, the operator interfaces ([Equatable], [Ordered], [Hashable], [Index],
+//! [Display], [Debug], [Clone]), the number tower ([Num], [Integer], [Float]) with [Parse], the
+//! members of `string`, `char` and the arrays and views, the format language behind f-strings,
+//! and the iterator protocol ([Iterator], [Iterable]).
 
 /// Ends the process with a message and a backtrace.
 ///

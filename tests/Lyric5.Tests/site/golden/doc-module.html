@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" data-root="../" data-version="0.2.0">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>geo — Lyric</title>
+<link rel="stylesheet" href="../site.css" />
+<script src="../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../">geo</a><span class="version">0.2.0</span></div>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">geo</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../geo/">geo</a></li>
+<li><a href="../geo/Point/">Point</a></li>
+<li><a href="../geo/Dir/">Dir</a></li>
+<li><a href="../geo/Shape/">Shape</a></li>
+<li><a href="../geo/#fn.larger">larger()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="">
+<h1>geo</h1>
+<p>Shapes and the arithmetic of the plane.</p>
+<p>A [Point] is a place, a [Shape] has an area.</p>
+<h2 id="modules">Modules</h2>
+<ul class="listing">
+<li><a href="../geo/units/">geo.units</a> <span class="summary">— Units of length.</span></li>
+</ul>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../geo/Point/">Point</a> <span class="kind">struct</span> <span class="summary">— A place in the plane.</span></div>
+<div class="listed"><a href="../geo/Dir/">Dir</a> <span class="kind">enum</span> <span class="summary">— A direction.</span></div>
+<div class="listed"><a href="../geo/Shape/">Shape</a> <span class="kind">interface</span> <span class="summary">— What has an area.</span></div>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.larger">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> larger&lt;<span class="ty">T</span> :: [<span class="ty">Ordered</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>The larger of two values.</p>
+<h4 id="panics">Panics</h4>
+<p>Never.</p>
+</section>
+<h2 id="constants">Constants</h2>
+<section class="member" id="const.limit">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">let</span> limit: <span class="ty">int</span> = <span class="num">1000</span></code></pre>
+<p>The largest coordinate a point takes.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#modules">Modules</a></li>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.larger">larger</a></li>
+<li class="level-2"><a href="#constants">Constants</a></li>
+<li class="level-3"><a href="#const.limit">limit</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><span>Written by lyric doc</span></footer>
+<script src="../nav.js" defer="defer"></script>
+<script src="../version.js" defer="defer"></script>
+<script src="../search.js" defer="defer"></script>
+</body>
+</html>
