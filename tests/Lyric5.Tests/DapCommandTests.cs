@@ -101,10 +101,14 @@ public class DapCommandTests
 
         public JsonObject Event(string name) => Until(m => (string?)m["event"] == name, $"the event '{name}'");
 
+        /// <summary>What lldb-dap was sent, as its own log has it.</summary>
+        public string Sent() => File.Exists(_log) ? File.ReadAllText(_log) : "";
+
         public void Dispose()
         {
             try { if (!_process.HasExited) _process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
             _process.Dispose();
+            try { File.Delete(_log); } catch (IOException) { }
         }
     }
 
@@ -178,6 +182,19 @@ public class DapCommandTests
         var ended = dap.Until(m => (string?)m["event"] is "stopped" or "exited", "the end");
         Assert.Equal("exited", (string?)ended["event"]);
         Assert.Equal(101, (int?)ended["body"]!["exitCode"]);
+    }
+
+    [Fact]
+    public void An_initialize_reaches_lldb_dap_with_the_protocols_defaults()
+    {
+        // what lldb-dap 21 refuses without, where an editor leaves it out
+        if (Unavailable()) return;
+        using var dap = new Session();
+        var initialized = dap.Response(dap.Send("initialize", new JsonObject { ["adapterID"] = "lyric" }));
+        Assert.True((bool?)initialized["success"], initialized.ToJsonString());
+        var sent = dap.Sent();
+        Assert.Contains("\"pathFormat\":\"path\"", sent);
+        Assert.Contains("\"linesStartAt1\":true", sent);
     }
 
     [Fact]

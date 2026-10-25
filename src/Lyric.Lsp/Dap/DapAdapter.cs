@@ -83,6 +83,9 @@ public sealed class DapAdapter(Stream clientInput, Stream clientOutput, DapAdapt
         {
             switch ((string?)message["command"])
             {
+                case "initialize":
+                    WithDefaults(message);
+                    break;
                 case "launch":
                     if (await LaunchAsync(message, cancellationToken).ConfigureAwait(false) is not { } launch) continue;
                     message = launch;
@@ -97,6 +100,20 @@ public sealed class DapAdapter(Stream clientInput, Stream clientOutput, DapAdapt
             if ((string?)message["command"] == "disconnect") break;
         }
         try { _process!.StandardInput.Close(); } catch (IOException) { }
+    }
+
+    /// <summary>
+    /// An <c>initialize</c> with what the protocol takes for granted written out: the paths are paths,
+    /// lines and columns count from 1. lldb-dap 21 refuses one without <c>pathFormat</c> — and its
+    /// debugger is never made, so every request after it fails — where 23 reads the default.
+    /// </summary>
+    private static void WithDefaults(JsonObject initialize)
+    {
+        var arguments = initialize["arguments"] as JsonObject ?? [];
+        arguments["pathFormat"] ??= "path";
+        arguments["linesStartAt1"] ??= true;
+        arguments["columnsStartAt1"] ??= true;
+        initialize["arguments"] = arguments;
     }
 
     /// <summary>lldb-dap's messages, on their way to the editor.</summary>
