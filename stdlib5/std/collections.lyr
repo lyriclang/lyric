@@ -106,6 +106,21 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
     }
 
     /// Returns the element at `i`, or `null` outside `0 ≤ i < length()`.
+    ///
+    /// # Examples
+    ///
+    /// ```lyric
+    /// import std.io { println };
+    ///
+    /// let xs = List.of([10, 20]);
+    /// println(xs.get(1) ?? -1);
+    /// println(xs.get(2) ?? -1);
+    /// ```
+    ///
+    /// ```output
+    /// 20
+    /// -1
+    /// ```
     pub fn get(i: int): ?T {
         if (i < 0 || i >= this.count) {
             return null;
@@ -135,6 +150,37 @@ pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
     /// Appends `v` at the end.
     ///
     /// Amortized constant time: a full buffer is replaced by one twice its size.
+    ///
+    /// # Examples
+    ///
+    /// ```lyric
+    /// import std.io { println };
+    ///
+    /// let xs = List.of([1, 2]);
+    /// xs.push(3);
+    /// println(xs.length());
+    /// ```
+    ///
+    /// ```output
+    /// 3
+    /// ```
+    ///
+    /// The element has the list's type:
+    ///
+    /// ```lyric,compile_fail=LYR-SEM0001
+    /// fn main(): void {
+    ///     let xs = List.of([1, 2]);
+    ///     xs.push("three");
+    /// }
+    /// ```
+    ///
+    /// ```diagnostic
+    /// error[LYR-SEM0001]: cannot assign 'string' to 'int'
+    ///  --> src/main.lyr:3:13
+    ///   |
+    /// 3 |     xs.push("three");
+    ///   |             ^^^^^^^
+    /// ```
     pub mut fn push(v: T): void {
         if (this.count == this.buffer.length()) {
             this.grow(v);

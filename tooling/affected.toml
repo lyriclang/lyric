@@ -69,7 +69,7 @@ tests = ["BuildTests", "BuildScriptTests", "PackageTests", "PackageRuleTests", "
          "LockedTests", "DriverTests", "TestCommandTests", "MeasurementTests", "ManifestTests", "ManifestEditTests",
          "DependencyTests", "ProfileTests", "ReproducibilityTests", "UpdateRaiseTests", "ToolchainTests", "TestHygieneTests",
          "LtoTests", "SubsetGateTests", "OutTests", "ExampleTests", "StdTests", "FmtCommandTests", "VerbTableTests",
-         "DocCommandTests"]
+         "DocCommandTests", "DocTestTests"]
 cases = ["13-", "15-"]
 
 [[rule]]
@@ -90,7 +90,7 @@ paths = ["stdlib5/"]
 tests = ["StdTests", "ExampleTests", "CEmitterTests", "VisibilityTests", "PreludeTests", "PreludeNameTests", "ImportTests",
          "ImportedFunctionValueTests", "RootModuleTests", "WitnessWordTests", "NativeTests", "UnicodeTests",
          "FormatterProofTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Formatting.Lyric5ProofTests", "DocCommandTests",
-         "SiteTests"]
+         "SiteTests", "DocTestTests"]
 cases = ["imports"]
 
 [[rule]]
@@ -106,7 +106,7 @@ cases = []
 [[rule]]
 # The documentation's renderer, the site tool and the site's goldens.
 paths = ["src/Lyric5.Doc/", "tools/Site/", "tests/Lyric5.Tests/site/"]
-tests = ["SiteTests", "BookTests", "CatalogPageTests", "SearchTests", "LegacyTests", "DocCommandTests", "DocLinkTests"]
+tests = ["SiteTests", "BookTests", "CatalogPageTests", "SearchTests", "LegacyTests", "DocCommandTests", "DocLinkTests", "DocTestTests"]
 cases = []
 
 [[rule]]
