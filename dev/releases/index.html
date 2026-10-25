@@ -380,6 +380,16 @@ the one form, with no options to change it; comments and the parentheses a progr
 a file that does not parse is left as it is. <code>--check</code> writes nothing and fails where a file would
 change; <code>--diff</code> shows how. The standard library is in the form.</p>
 </li>
+<li><p><strong>Formatting, documentation and the API (M13a</strong> — <code>design/v5/spec/11</code> E5, E7, 07 B3; spec chapter 14 §3, §8–§10**):**
+<code>lyric fmt</code> writes the one form there is — comments and written parentheses kept, a file that does not parse left
+as it is; <code>--check</code> names a file that would change. <code>lyric doc</code> writes a package's reference: a page per module and
+type from its <code>pub</code> declarations and their comments — a module's documentation is the <code>//!</code> lines that open its
+file —, each member under an anchor that names its kind, <code>[Type.member]</code> links resolved as the <code>broken-doc-link</code>
+lint resolves them. A <code>```lyric</code> block in a doc comment is a test of <code>lyric test</code>, with the Book's kinds.
+<code>lyric api</code> prints the public surface a line per element, <code>--json</code> as data, and <code>--diff &lt;rev&gt;</code> says what changed
+since a git revision and whether it breaks code written against it (exit 1). The standard library's reference is
+at <a href="https://lyric.oil1i.de/dev/std/">https://lyric.oil1i.de/dev/std/</a>, an example in every module.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
