@@ -41,6 +41,10 @@ public static class Pipeline
     internal static string ClaimedVersion { get; } =
         typeof(Pipeline).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "5.0.0";
 
+    /// <summary>Where a binary's names lie: beside it, <c>app.lyric-names</c> — a line per function,
+    /// its C name, a tab and its Lyric name.</summary>
+    public static string NamesOf(string executable) => executable + ".lyric-names";
+
     /// <summary>The front end and the gate on a project's source: the IR, or <c>null</c> after
     /// reporting. A profile that denies warnings fails a compilation that warns. The IR
     /// optimizer — inlining, scalar replacement, devirtualization — runs where the profile
@@ -195,6 +199,10 @@ public static class Pipeline
         // What the front end said is kept beside the units and said again by a build that finds
         // them: an up-to-date build says the warnings the one that made it said.
         var said = manifest + ".said";
+        // The C name of each function and the Lyric one it stands for, beside the binary: what
+        // a debugger shows a frame as (lyric dap) — the C name is not read back, '.' and '_' are
+        // both '_' in it.
+        var names = manifest + ".names";
         List<string> sources;
         if (File.Exists(manifest))
         {
@@ -216,6 +224,8 @@ public static class Pipeline
                 WriteOnce(path, unit.Text);
                 paths.Add(path);
             }
+            WriteOnce(names, string.Concat(result.Ir!.Functions.Select(f => (C: CEmitter.FunctionName(f.Name), f.Name))
+                .DistinctBy(f => f.C).OrderBy(f => f.C, StringComparer.Ordinal).Select(f => $"{f.C}\t{f.Name}\n")));
             if (read.Count > 0) File.WriteAllLines(embeds, read);
             else File.Delete(embeds);
             // findings that cannot be read back — in a synthesized file — leave the units unlisted:
@@ -248,6 +258,7 @@ public static class Pipeline
                 build.LinkExecutable(inputs, executable, libraries);
                 File.WriteAllText(record, LinkLines(inputs, libraries));
             }
+            if (File.Exists(names)) File.Copy(names, NamesOf(executable), overwrite: true);
             return (0, executable);
         }
         catch (CBuildException failure)

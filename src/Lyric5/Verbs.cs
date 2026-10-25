@@ -76,6 +76,7 @@ internal static class Verbs
              new("--std", null, "the standard library's surface instead of a package's")]),
         new("lsp", "", "the language server: an editor speaks LSP with it on the standard input and output",
             [new("--stdio", null, "over the standard input and output — the one way there is; editors pass it")]),
+        new("dap", "", "the debug adapter: an editor speaks DAP with it on the standard input and output, lldb-dap behind it", []),
         new("env", "", "every setting a build reads, with its value and where it comes from",
             [Dir, Profile, Target, .. Fields, Offline, new("--json", null, "the settings as one JSON document")]),
         new("new", "<name>", "make the directory <name> and a package in it: lyric.toml, src/main.lyr, .gitignore",
