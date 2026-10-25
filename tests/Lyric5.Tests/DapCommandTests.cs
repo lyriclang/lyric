@@ -203,9 +203,10 @@ public class DapCommandTests
         using var dap = new Session();
         var initialized = dap.Response(dap.Send("initialize", new JsonObject { ["adapterID"] = "lyric" }));
         Assert.True((bool?)initialized["success"], initialized.ToJsonString());
+        // as the log writes it: in one line or indented, after the version
         var sent = dap.Sent();
-        Assert.Contains("\"pathFormat\":\"path\"", sent);
-        Assert.Contains("\"linesStartAt1\":true", sent);
+        Assert.Matches("\"pathFormat\":\\s*\"path\"", sent);
+        Assert.Matches("\"linesStartAt1\":\\s*true", sent);
     }
 
     [Fact]
