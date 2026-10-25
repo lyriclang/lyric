@@ -69,7 +69,7 @@ tests = ["BuildTests", "BuildScriptTests", "PackageTests", "PackageRuleTests", "
          "LockedTests", "DriverTests", "TestCommandTests", "MeasurementTests", "ManifestTests", "ManifestEditTests",
          "DependencyTests", "ProfileTests", "ReproducibilityTests", "UpdateRaiseTests", "ToolchainTests", "TestHygieneTests",
          "LtoTests", "SubsetGateTests", "OutTests", "ExampleTests", "StdTests", "FmtCommandTests", "VerbTableTests",
-         "DocCommandTests", "DocTestTests"]
+         "DocCommandTests", "ApiCommandTests", "DocTestTests"]
 cases = ["13-", "15-"]
 
 [[rule]]
@@ -89,7 +89,7 @@ cases = []
 paths = ["stdlib5/"]
 tests = ["StdTests", "ExampleTests", "CEmitterTests", "VisibilityTests", "PreludeTests", "PreludeNameTests", "ImportTests",
          "ImportedFunctionValueTests", "RootModuleTests", "WitnessWordTests", "NativeTests", "UnicodeTests",
-         "FormatterProofTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Formatting.Lyric5ProofTests", "DocCommandTests",
+         "FormatterProofTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Formatting.Lyric5ProofTests", "DocCommandTests", "ApiCommandTests",
          "SiteTests", "DocTestTests"]
 cases = ["imports"]
 
@@ -105,8 +105,8 @@ cases = []
 
 [[rule]]
 # The documentation's renderer, the site tool and the site's goldens.
-paths = ["src/Lyric5.Doc/", "tools/Site/", "tests/Lyric5.Tests/site/"]
-tests = ["SiteTests", "BookTests", "CatalogPageTests", "SearchTests", "LegacyTests", "DocCommandTests", "DocLinkTests", "DocTestTests"]
+paths = ["src/Lyric5.Doc/", "tools/Site/", "tests/Lyric5.Tests/site/", "tests/Lyric5.Tests/api/"]
+tests = ["SiteTests", "BookTests", "CatalogPageTests", "SearchTests", "LegacyTests", "DocCommandTests", "ApiCommandTests", "DocLinkTests", "DocTestTests"]
 cases = []
 
 [[rule]]

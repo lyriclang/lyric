@@ -12,11 +12,13 @@ namespace Lyric5.Build;
 public static class DocRun
 {
     /// <summary>The surface of a package's own modules: every module under its <c>src/</c>,
-    /// checked as a library is; <c>null</c> after reporting where the check fails.</summary>
-    public static Surface? PackageSurface(Manifest manifest, PackageGraph graph, TextWriter error)
+    /// checked as a library is; <c>null</c> after reporting where the check fails. With
+    /// <paramref name="warnings"/> off the findings are said only where the check fails.</summary>
+    public static Surface? PackageSurface(Manifest manifest, PackageGraph graph, TextWriter error, bool warnings = true)
     {
         var result = Pipeline.CheckPackage(manifest, graph);
-        if (!result.Render(error) || CompilationOf(result) is not { } compilation) return null;
+        if (!(warnings ? result.Render(error) : result.Ok || result.Render(error)) || CompilationOf(result) is not { } compilation)
+            return null;
         var root = Path.GetFullPath(manifest.SourceRoot) + Path.DirectorySeparatorChar;
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         var ours = compilation.Modules.Where(m =>

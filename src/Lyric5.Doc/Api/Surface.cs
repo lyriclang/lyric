@@ -33,6 +33,7 @@ public enum ItemKind
 /// <param name="Conformances">The interfaces a type conforms to — its own <c>::</c> list and the
 /// lists of the module's <c>extend</c> blocks for it — as written.</param>
 /// <param name="Target">For an extension, the type it extends, as written.</param>
+/// <param name="Default">For an interface's method, whether it has a body a conformer takes.</param>
 public sealed record Item(
     ItemKind Kind,
     string Name,
@@ -40,7 +41,8 @@ public sealed record Item(
     string? Doc,
     IReadOnlyList<Item> Members,
     IReadOnlyList<string> Conformances,
-    string? Target = null);
+    string? Target = null,
+    bool Default = false);
 
 /// <summary>A module of the surface: its dotted path, its documentation and its items in the
 /// order the source declares them.</summary>
@@ -217,7 +219,7 @@ public static class SurfaceReader
                 [.. e.Variants.Select(Variant), .. e.Methods.Where(m => m.IsPublic).Select(Method)],
                 e.Types),
             InterfaceDecl { Visibility: VisibilityWord.Pub } i => Type(i, ItemKind.Interface, i.Name, i.Interfaces,
-                [.. i.Members.Where(m => !m.IsPrivateHelper).Select(Method)], i.Types),
+                [.. i.Members.Where(m => !m.IsPrivateHelper).Select(m => Method(m) with { Default = m.Body is not null })], i.Types),
             TypeAliasDecl { Visibility: VisibilityWord.Pub } t => new Item(ItemKind.Alias, t.Name, Whole(t), docs.Of(t), [], []),
             GlobalBindingDecl { IsPublic: true } g => new Item(ItemKind.Constant, g.Name, Binding(g), docs.Of(g), [], []),
             _ => null,

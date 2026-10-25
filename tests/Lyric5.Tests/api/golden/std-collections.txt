@@ -1,0 +1,200 @@
+pub struct std.collections.ChunksIter<I :: [Iterator]>
+std.collections.ChunksIter :: Closeable
+std.collections.ChunksIter :: Iterator
+fn std.collections.ChunksIter.close(): void throws I.Error
+pub mut fn std.collections.ChunksIter.next(): ?List<I.Item> throws I.Error
+pub class std.collections.Deque<T>
+std.collections.Deque :: Clone
+std.collections.Deque :: Debug
+std.collections.Deque :: Display
+std.collections.Deque :: Equatable
+std.collections.Deque :: FromArrayLiteral<T>
+std.collections.Deque :: FromIterator<T>
+std.collections.Deque :: Index<int>
+std.collections.Deque :: Iterable
+fn std.collections.Deque.clone(): Deque<T>
+fn std.collections.Deque.debug(): string
+fn std.collections.Deque.debugTo(out: StringBuilder): void
+fn std.collections.Deque.equals(o: Deque<T>): bool
+static fn std.collections.Deque.fromIter<I :: [Iterator<Item = T>]>(it: I): Deque<T> throws I.Error
+static fn std.collections.Deque.fromLiteral(items: T[]): Deque<T>
+pub fn std.collections.Deque.index(i: int): T
+pub fn std.collections.Deque.isEmpty(): bool
+pub fn std.collections.Deque.iter(): DequeIter<T>
+pub fn std.collections.Deque.length(): int
+pub static fn std.collections.Deque.new(): Deque<T>
+pub fn std.collections.Deque.peekBack(): ?T
+pub fn std.collections.Deque.peekFront(): ?T
+pub mut fn std.collections.Deque.popBack(): ?T
+pub mut fn std.collections.Deque.popFront(): ?T
+pub mut fn std.collections.Deque.pushBack(v: T): void
+pub mut fn std.collections.Deque.pushFront(v: T): void
+fn std.collections.Deque.show(): string
+fn std.collections.Deque.showTo(out: StringBuilder): void
+pub static fn std.collections.Deque.withCapacity(n: int): Deque<T>
+pub struct std.collections.DequeIter<T>
+std.collections.DequeIter :: Iterator
+pub mut fn std.collections.DequeIter.next(): ?T
+pub class std.collections.Heap<T :: [TotalOrder]>
+std.collections.Heap :: Clone
+std.collections.Heap :: Debug
+std.collections.Heap :: FromArrayLiteral<T>
+std.collections.Heap :: FromIterator<T>
+fn std.collections.Heap.clone(): Heap<T>
+fn std.collections.Heap.debug(): string
+fn std.collections.Heap.debugTo(out: StringBuilder): void
+static fn std.collections.Heap.fromIter<I :: [Iterator<Item = T>]>(it: I): Heap<T> throws I.Error
+static fn std.collections.Heap.fromLiteral(items: T[]): Heap<T>
+pub fn std.collections.Heap.isEmpty(): bool
+pub fn std.collections.Heap.length(): int
+pub static fn std.collections.Heap.new(): Heap<T>
+pub static fn std.collections.Heap.of(xs: T[]): Heap<T>
+pub fn std.collections.Heap.peek(): ?T
+pub mut fn std.collections.Heap.pop(): ?T
+pub mut fn std.collections.Heap.push(v: T): void
+pub static fn std.collections.Heap.withCapacity(n: int): Heap<T>
+pub fn std.collections.I.chunks(n: int): ChunksIter<I>
+pub fn std.collections.I.groupBy<K :: [Hashable], E :: [Error]>(key: fn(I.Item) -> K throws E): Map<K, List<I.Item>, DefaultHasher> throws Join<I.Error, E>
+pub fn std.collections.I.partition<E :: [Error]>(p: fn(I.Item) -> bool throws E): (List<I.Item>, List<I.Item>) throws Join<I.Error, E>
+pub fn std.collections.I.sorted(): List<T> throws I.Error
+pub fn std.collections.I.sortedBy<E :: [Error]>(cmp: fn(I.Item, I.Item) -> Ordering throws E): List<I.Item> throws Join<I.Error, E>
+pub fn std.collections.I.toList(): List<I.Item> throws I.Error
+pub fn std.collections.I.toMap(): Map<K, V, DefaultHasher> throws I.Error
+pub fn std.collections.I.toSet(): Set<T> throws I.Error
+pub fn std.collections.I.windows(n: int): WindowsIter<I>
+pub class std.collections.List<T>
+std.collections.List :: AsSlice<T>
+std.collections.List :: Clone
+std.collections.List :: Contains<T>
+std.collections.List :: Debug
+std.collections.List :: Display
+std.collections.List :: Equatable
+std.collections.List :: FromArrayLiteral<T>
+std.collections.List :: FromIterator<T>
+std.collections.List :: IndexSet<int>
+std.collections.List :: Iterable
+pub fn std.collections.List.asSlice(): Slice<T>
+pub mut fn std.collections.List.clear(): void
+fn std.collections.List.clone(): List<T>
+fn std.collections.List.contains(x: T): bool
+fn std.collections.List.debug(): string
+fn std.collections.List.debugTo(out: StringBuilder): void
+pub mut fn std.collections.List.dedup(): void
+fn std.collections.List.equals(o: List<T>): bool
+pub static fn std.collections.List.from<I :: [Iterator<Item = T>]>(items: I): List<T> throws I.Error
+static fn std.collections.List.fromIter<I :: [Iterator<Item = T>]>(it: I): List<T> throws I.Error
+static fn std.collections.List.fromLiteral(items: T[]): List<T>
+pub fn std.collections.List.get(i: int): ?T
+pub fn std.collections.List.index(i: int): T
+pub mut fn std.collections.List.insert(i: int, v: T): void
+pub fn std.collections.List.isEmpty(): bool
+pub fn std.collections.List.iter(): ListIter<T>
+pub fn std.collections.List.length(): int
+pub static fn std.collections.List.new(): List<T>
+pub static fn std.collections.List.of(xs: T[]): List<T>
+pub mut fn std.collections.List.pop(): ?T
+pub mut fn std.collections.List.push(v: T): void
+pub mut fn std.collections.List.pushAll(xs: T[]): void
+pub mut fn std.collections.List.remove(x: T): bool
+pub mut fn std.collections.List.removeAt(i: int): T
+pub mut fn std.collections.List.removeWhere<E :: [Error]>(p: fn(T) -> bool throws E): int throws E
+pub mut fn std.collections.List.setIndex(i: int, v: T): void
+fn std.collections.List.show(): string
+fn std.collections.List.showTo(out: StringBuilder): void
+pub mut fn std.collections.List.shrinkToFit(): void
+pub mut fn std.collections.List.swap(i: int, j: int): void
+pub fn std.collections.List.toArray(): T[]
+pub mut fn std.collections.List.truncate(n: int): void
+pub static fn std.collections.List.withCapacity(n: int): List<T>
+pub struct std.collections.ListIter<T>
+std.collections.ListIter :: Iterator
+pub mut fn std.collections.ListIter.next(): ?T
+pub class std.collections.Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher>
+std.collections.Map :: Clone
+std.collections.Map :: Contains<K>
+std.collections.Map :: Debug
+std.collections.Map :: Display
+std.collections.Map :: Equatable
+std.collections.Map :: FromArrayLiteral<(K, V)>
+std.collections.Map :: FromIterator<(K, V)>
+std.collections.Map :: IndexSet<K>
+std.collections.Map :: Iterable
+pub mut fn std.collections.Map.clear(): void
+fn std.collections.Map.clone(): Map<K, V, H>
+fn std.collections.Map.contains(k: K): bool
+pub fn std.collections.Map.containsKey(k: K): bool
+fn std.collections.Map.debug(): string
+fn std.collections.Map.debugTo(out: StringBuilder): void
+pub fn std.collections.Map.entries(): MapEntriesIter<K, V, H>
+fn std.collections.Map.equals(o: Map<K, V, H>): bool
+pub static fn std.collections.Map.from(pairs: Slice<(K, V)>): Map<K, V, DefaultHasher>
+static fn std.collections.Map.fromIter<I :: [Iterator<Item = (K, V)>]>(it: I): Map<K, V, DefaultHasher> throws I.Error
+static fn std.collections.Map.fromLiteral(items: (K, V)[]): Map<K, V, DefaultHasher>
+pub fn std.collections.Map.get(k: K): ?V
+pub fn std.collections.Map.getOr(k: K, otherwise: V): V
+pub mut fn std.collections.Map.getOrInsert<E :: [Error]>(k: K, make: fn() -> V throws E): V throws E
+fn std.collections.Map.index(k: K): ?V
+pub mut fn std.collections.Map.insert(k: K, v: V): ?V
+pub fn std.collections.Map.isEmpty(): bool
+pub fn std.collections.Map.iter(): MapEntriesIter<K, V, H>
+pub fn std.collections.Map.keys(): MapKeysIter<K, V, H>
+pub fn std.collections.Map.length(): int
+pub static fn std.collections.Map.new(): Map<K, V, DefaultHasher>
+pub mut fn std.collections.Map.remove(k: K): ?V
+pub mut fn std.collections.Map.retain<E :: [Error]>(p: fn(K, V) -> bool throws E): int throws E
+mut fn std.collections.Map.setIndex(k: K, v: ?V): void
+fn std.collections.Map.show(): string
+fn std.collections.Map.showTo(out: StringBuilder): void
+pub mut fn std.collections.Map.update<E :: [Error]>(k: K, f: fn(V) -> V throws E): bool throws E
+pub fn std.collections.Map.values(): MapValuesIter<K, V, H>
+pub static fn std.collections.Map.withCapacity(n: int): Map<K, V, DefaultHasher>
+pub static fn std.collections.Map.withHasher(seed: H): Map<K, V, H>
+pub struct std.collections.MapEntriesIter<K :: [Hashable], V, H :: [Hasher]>
+std.collections.MapEntriesIter :: Iterator
+pub mut fn std.collections.MapEntriesIter.next(): ?(K, V)
+pub struct std.collections.MapKeysIter<K :: [Hashable], V, H :: [Hasher]>
+std.collections.MapKeysIter :: Iterator
+pub mut fn std.collections.MapKeysIter.next(): ?K
+pub struct std.collections.MapValuesIter<K :: [Hashable], V, H :: [Hasher]>
+std.collections.MapValuesIter :: Iterator
+pub mut fn std.collections.MapValuesIter.next(): ?V
+pub class std.collections.Set<T :: [Hashable], H :: [Hasher] = DefaultHasher>
+std.collections.Set :: Clone
+std.collections.Set :: Contains<T>
+std.collections.Set :: Debug
+std.collections.Set :: Display
+std.collections.Set :: Equatable
+std.collections.Set :: FromArrayLiteral<T>
+std.collections.Set :: FromIterator<T>
+std.collections.Set :: Iterable
+pub mut fn std.collections.Set.clear(): void
+fn std.collections.Set.clone(): Set<T, H>
+pub fn std.collections.Set.contains(v: T): bool
+fn std.collections.Set.debug(): string
+fn std.collections.Set.debugTo(out: StringBuilder): void
+pub fn std.collections.Set.difference(other: Set<T, H>): Set<T, H>
+fn std.collections.Set.equals(o: Set<T, H>): bool
+static fn std.collections.Set.fromIter<I :: [Iterator<Item = T>]>(it: I): Set<T, DefaultHasher> throws I.Error
+static fn std.collections.Set.fromLiteral(items: T[]): Set<T, DefaultHasher>
+pub mut fn std.collections.Set.insert(v: T): bool
+pub fn std.collections.Set.intersect(other: Set<T, H>): Set<T, H>
+pub fn std.collections.Set.isDisjoint(other: Set<T, H>): bool
+pub fn std.collections.Set.isEmpty(): bool
+pub fn std.collections.Set.isSubset(other: Set<T, H>): bool
+pub fn std.collections.Set.isSuperset(other: Set<T, H>): bool
+pub fn std.collections.Set.iter(): MapKeysIter<T, bool, H>
+pub fn std.collections.Set.length(): int
+pub static fn std.collections.Set.new(): Set<T, DefaultHasher>
+pub static fn std.collections.Set.of(xs: T[]): Set<T, DefaultHasher>
+pub mut fn std.collections.Set.remove(v: T): bool
+fn std.collections.Set.show(): string
+fn std.collections.Set.showTo(out: StringBuilder): void
+pub fn std.collections.Set.symmetricDifference(other: Set<T, H>): Set<T, H>
+pub fn std.collections.Set.union(other: Set<T, H>): Set<T, H>
+pub static fn std.collections.Set.withCapacity(n: int): Set<T, DefaultHasher>
+pub static fn std.collections.Set.withHasher(seed: H): Set<T, H>
+pub struct std.collections.WindowsIter<I :: [Iterator]>
+std.collections.WindowsIter :: Closeable
+std.collections.WindowsIter :: Iterator
+fn std.collections.WindowsIter.close(): void throws I.Error
+pub mut fn std.collections.WindowsIter.next(): ?List<I.Item> throws I.Error

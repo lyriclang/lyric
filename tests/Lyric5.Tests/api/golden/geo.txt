@@ -1,0 +1,12 @@
+pub enum geo.Dir
+variant geo.Dir.Down
+variant geo.Dir.Up
+pub struct geo.Point
+geo.Point :: Equatable
+pub geo.Point.x: float
+pub geo.Point.y: float = 0.0
+pub interface geo.Shape
+fn geo.Shape.area(): float
+fn geo.Shape.name(): string { … }
+pub fn geo.distance(a: Point, b: Point): float
+pub let geo.origin: float = 0.0
