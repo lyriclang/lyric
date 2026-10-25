@@ -260,6 +260,14 @@ public sealed class LspServer : IDisposable
                 await SendFormattingAsync(message, id, cancellationToken).ConfigureAwait(false);
                 return;
 
+            case LspMethods.CodeLens when _state == State.Running:
+                await SendCodeLensesAsync(message, id, cancellationToken).ConfigureAwait(false);
+                return;
+
+            case LspMethods.Tests when _state == State.Running:
+                await SendTestsAsync(message, id, cancellationToken).ConfigureAwait(false);
+                return;
+
             case LspMethods.ExecuteCommand when _state == State.Running:
                 await SendCommandAsync(message, id, cancellationToken).ConfigureAwait(false);
                 return;
@@ -1096,6 +1104,7 @@ public sealed class LspServer : IDisposable
             DiagnosticProvider = new DiagnosticOptions { InterFileDependencies = true, WorkspaceDiagnostics = false },
             CodeActionProvider = new CodeActionOptions { CodeActionKinds = ["quickfix"] },
             ExecuteCommandProvider = new ExecuteCommandOptions { Commands = [LspMethods.ExpandCommand] },
+            CodeLensProvider = new CodeLensOptions(),
         },
         ServerInfo = new ServerInfo { Name = "lyric", Version = _options.Version },
     };
@@ -1121,6 +1130,46 @@ public sealed class LspServer : IDisposable
         if (_diagnosticRefresh)
             await SendAsync(new JsonRpcRequest { Id = _nextRequestId++, Method = LspMethods.DiagnosticRefresh },
                 LspJson.Default.JsonRpcRequest, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The tests of a document of a package, off its last good analysis; none for a file
+    /// outside one.</summary>
+    private (string Root, IReadOnlyList<EditorTest> Tests)? TestsOf(string uri)
+    {
+        if (!DocumentUri.TryToFilePath(uri, out var path) || _analysis.LastGood(path) is not { } snapshot
+            || PackageUnit.Find(path, out _) is not { } unit || unit.ModuleOf(path) is null)
+            return null;
+        return (unit.Root, TestLensProvider.Of(snapshot, unit, path));
+    }
+
+    private static Protocol.Range LineRange(int line) =>
+        new() { Start = new Position { Line = line, Character = 0 }, End = new Position { Line = line, Character = 0 } };
+
+    /// <summary>A lens over each test: run it, debug it — commands the client runs with the
+    /// package's directory and the test's name.</summary>
+    private async Task SendCodeLensesAsync(JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.CodeLensParams);
+        var lenses = new List<CodeLens>();
+        if (parameters is not null && TestsOf(parameters.TextDocument.Uri) is { } found)
+            foreach (var test in found.Tests)
+            {
+                lenses.Add(new CodeLens { Range = LineRange(test.Line), Command = new LspCommand { Title = "Run test", Command = LspMethods.RunTest, Arguments = [found.Root, test.Name] } });
+                lenses.Add(new CodeLens { Range = LineRange(test.Line), Command = new LspCommand { Title = "Debug test", Command = LspMethods.DebugTest, Arguments = [found.Root, test.Name] } });
+            }
+        await SendResultAsync(id, lenses, LspJson.Default.IReadOnlyListCodeLens, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary><c>lyric/tests</c>: the package's directory and the document's tests.</summary>
+    private async Task SendTestsAsync(JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.CodeLensParams);
+        var found = parameters is null ? null : TestsOf(parameters.TextDocument.Uri);
+        await SendResultAsync(id, new DocumentTests
+        {
+            Root = found?.Root,
+            Tests = [.. (found?.Tests ?? []).Select(t => new DocumentTest { Name = t.Name, Kind = t.Kind, Range = LineRange(t.Line) })],
+        }, LspJson.Default.DocumentTests, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary><c>lyric.expand</c>: the module of an open document with its macros expanded, for

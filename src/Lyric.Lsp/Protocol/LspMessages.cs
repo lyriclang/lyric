@@ -159,6 +159,8 @@ public sealed record ServerCapabilities
     public required CodeActionOptions CodeActionProvider { get; init; }
 
     public required ExecuteCommandOptions ExecuteCommandProvider { get; init; }
+
+    public required CodeLensOptions CodeLensProvider { get; init; }
 }
 
 /// <summary>Diagnostics a client asks for: a document's depend on other files (an import), and
@@ -353,6 +355,52 @@ public sealed record CodeAction
 public sealed record CodeActionOptions
 {
     public required IReadOnlyList<string> CodeActionKinds { get; init; }
+}
+
+/// <summary>A command the client runs: its title, its name and what it is given.</summary>
+public sealed record LspCommand
+{
+    public required string Title { get; init; }
+    public required string Command { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Arguments { get; init; }
+}
+
+public sealed record CodeLens
+{
+    public required Range Range { get; init; }
+    public required LspCommand Command { get; init; }
+}
+
+public sealed record CodeLensOptions
+{
+    public bool ResolveProvider => false;
+}
+
+public sealed record CodeLensParams
+{
+    public required TextDocumentIdentifier TextDocument { get; init; }
+}
+
+/// <summary>What <c>lyric/tests</c> answers: the package a document belongs to and the tests the
+/// document holds, as <c>lyric test</c> names them.</summary>
+public sealed record DocumentTests
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Root { get; init; }
+
+    public required IReadOnlyList<DocumentTest> Tests { get; init; }
+}
+
+public sealed record DocumentTest
+{
+    public required string Name { get; init; }
+
+    /// <summary><c>test</c> or <c>doc-test</c>.</summary>
+    public required string Kind { get; init; }
+
+    public required Range Range { get; init; }
 }
 
 public sealed record ExecuteCommandOptions
@@ -794,6 +842,15 @@ public static class LspMethods
     public const string Diagnostic = "textDocument/diagnostic";
     public const string CodeAction = "textDocument/codeAction";
     public const string ExecuteCommand = "workspace/executeCommand";
+    public const string CodeLens = "textDocument/codeLens";
+
+    /// <summary>The tests of a document — the server's own request beside the protocol's.</summary>
+    public const string Tests = "lyric/tests";
+
+    /// <summary>The commands a test's lens gives the client to run: <c>lyric test -f</c> in the
+    /// package's directory, as it is or under the debugger.</summary>
+    public const string RunTest = "lyric.runTest";
+    public const string DebugTest = "lyric.debugTest";
 
     /// <summary>The one command: the module of a document with its macros expanded.</summary>
     public const string ExpandCommand = "lyric.expand";
