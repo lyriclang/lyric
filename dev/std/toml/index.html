@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.toml — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.toml</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/toml/">std.toml</a></li>
+<li><a href="../../std/toml/TomlError/">TomlError</a></li>
+<li><a href="../../std/toml/TomlDatetime/">TomlDatetime</a></li>
+<li><a href="../../std/toml/TomlTable/">TomlTable</a></li>
+<li><a href="../../std/toml/TomlValue/">TomlValue</a></li>
+<li><a href="../../std/toml/TreeBuilder/">TreeBuilder</a></li>
+<li><a href="../../std/toml/TomlReader/">TomlReader</a></li>
+<li><a href="../../std/toml/#fn.encode">encode()</a></li>
+<li><a href="../../std/toml/#fn.encodeTo">encodeTo()</a></li>
+<li><a href="../../std/toml/#fn.parse">parse()</a></li>
+<li><a href="../../std/toml/#fn.decode">decode()</a></li>
+<li><a href="../../std/toml/#fn.decodeFrom">decodeFrom()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.toml</h1>
+<p>Reads and writes TOML 1.0 documents through <code>std.codec</code>'s model.</p>
+<p>The main types are <code>TomlValue</code>, the parsed tree, with <code>TomlTable</code> and <code>TomlDatetime</code>;
+<code>TreeBuilder</code>, the encoder that builds a tree; <code>TomlReader</code>, the decoder over a tree; and
+<code>TomlError</code>, a parse failure. <code>toml.encode(v)</code> writes any <code>Encode</code> value whose form is a table
+as a document, <code>toml.decode&lt;T&gt;(text)</code> reads any <code>Decode</code> value out of one, and
+<code>toml.parse(text)</code> returns the tree. A struct is a table of its wire names, a sequence an
+array, a map a table whose keys are strings — a number's digits for a number —, bytes an array
+of integers, a unit variant its name, a variant with a payload a table of one key. A
+table keeps the order its keys were written in. Date-times are TOML's own form, in their four
+kinds; an <code>Instant</code> writes as a quoted RFC 3339 string and reads from a date-time or a string.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/toml/TomlError/">TomlError</a> <span class="kind">struct</span> <span class="summary">— The error for a text that is not valid TOML: the line and column where parsing stopped, and what was wrong.</span></div>
+<div class="listed"><a href="../../std/toml/TomlDatetime/">TomlDatetime</a> <span class="kind">enum</span> <span class="summary">— A date-time in one of TOML's four forms: with an offset, local, a date alone, a time alone.</span></div>
+<div class="listed"><a href="../../std/toml/TomlTable/">TomlTable</a> <span class="kind">class</span> <span class="summary">— A table: its keys in the order written, each with its value.</span></div>
+<div class="listed"><a href="../../std/toml/TomlValue/">TomlValue</a> <span class="kind">enum</span> <span class="summary">— A TOML value in one of its seven forms; a parsed document is a <code>Table</code>.</span></div>
+<div class="listed"><a href="../../std/toml/TreeBuilder/">TreeBuilder</a> <span class="kind">class</span> <span class="summary">— An encoder that builds a <code>TomlValue</code>: a struct as a table, a map as a table of string keys, a sequence as an array, bytes as an array of integers, a unit variant as its name, a payload variant as a table of one key.</span></div>
+<div class="listed"><a href="../../std/toml/TomlReader/">TomlReader</a> <span class="kind">class</span> <span class="summary">— A decoder over a <code>TomlValue</code> tree: a struct from a table by its keys, a sequence from an array, a map from a table (its keys as strings, or as the numbers they spell), a variant from a string or a table of one key, bytes from an array of integers, a string from a string or a date-time's text.</span></div>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.encode">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> encode&lt;<span class="ty">T</span> :: [<span class="ty">Encode</span>]&gt;(v: <span class="ty">T</span>): <span class="ty">string</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+<p>Encodes a value as a TOML document.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>EncodeError</code> where the value's form is not a table (encode a struct or a map), or
+where a part of it has no TOML form.</p>
+</section>
+<section class="member" id="fn.encodeTo">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> encodeTo&lt;<span class="ty">T</span> :: [<span class="ty">Encode</span>], <span class="ty">W</span> :: [<span class="ty">Writer</span>]&gt;(
+    v: <span class="ty">T</span>,
+    &amp;w: <span class="ty">W</span>
+): <span class="ty">void</span> <span class="kw">throws</span> [<span class="ty">EncodeError</span>, <span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Encodes a value as a TOML document and writes it into <code>w</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>EncodeError</code> as <code>encode</code> does, <code>IoError</code> where writing fails and <code>Cancelled</code> where
+the task is cancelled during the write.</p>
+</section>
+<section class="member" id="fn.parse">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> parse(text: <span class="ty">StringView</span>): <span class="ty">TomlValue</span> <span class="kw">throws</span> <span class="ty">TomlError</span></code></pre>
+<p>Parses a TOML document into its tree, a <code>TomlValue.Table</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>TomlError</code> with the line and column where the text is not valid TOML, is not UTF-8,
+defines a key or table twice, or nests deeper than 128 levels.</p>
+</section>
+<section class="member" id="fn.decode">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> decode&lt;<span class="ty">T</span> :: [<span class="ty">Decode</span>]&gt;(text: <span class="ty">StringView</span>): <span class="ty">T</span> <span class="kw">throws</span> [<span class="ty">TomlError</span>, <span class="ty">DecodeError</span>]</code></pre>
+<p>Decodes a value of type <code>T</code> from a TOML document: parses it, then reads the value out of the
+tree.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>TomlError</code> where the text is not valid TOML, and <code>DecodeError</code> where the tree does not
+fit <code>T</code>.</p>
+</section>
+<section class="member" id="fn.decodeFrom">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> decodeFrom&lt;<span class="ty">T</span> :: [<span class="ty">Decode</span>], <span class="ty">R</span> :: [<span class="ty">Reader</span>]&gt;(
+    &amp;r: <span class="ty">R</span>
+): <span class="ty">T</span> <span class="kw">throws</span> [<span class="ty">TomlError</span>, <span class="ty">DecodeError</span>, <span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Decodes a value of type <code>T</code> from the TOML document in <code>r</code>, read to its end first.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>TomlError</code> and <code>DecodeError</code> as <code>decode</code> does, <code>IoError</code> where reading fails and
+<code>Cancelled</code> where the task is cancelled during the read.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.encode">encode</a></li>
+<li class="level-3"><a href="#fn.encodeTo">encodeTo</a></li>
+<li class="level-3"><a href="#fn.parse">parse</a></li>
+<li class="level-3"><a href="#fn.decode">decode</a></li>
+<li class="level-3"><a href="#fn.decodeFrom">decodeFrom</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

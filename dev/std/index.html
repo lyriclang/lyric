@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en" data-root="../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std — Lyric</title>
+<link rel="stylesheet" href="../site.css" />
+<script src="../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../book/">Book</a><a class="current" href="../std/">std</a><a href="../spec/">Spec</a><a href="../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../std/build/">std.build</a></li>
+<li><a href="../std/codec/">std.codec</a></li>
+<li><a href="../std/collections/">std.collections</a></li>
+<li><a href="../std/compress/">std.compress</a></li>
+<li><a href="../std/core/">std.core</a></li>
+<li><a href="../std/crypto/">std.crypto</a></li>
+<li><a href="../std/encoding/">std.encoding</a></li>
+<li><a href="../std/fmt/">std.fmt</a></li>
+<li><a href="../std/fs/">std.fs</a></li>
+<li><a href="../std/hash/">std.hash</a></li>
+<li><a href="../std/http/">std.http</a></li>
+<li><a href="../std/io/">std.io</a></li>
+<li><a href="../std/iter/">std.iter</a></li>
+<li><a href="../std/json/">std.json</a></li>
+<li><a href="../std/math/">std.math</a></li>
+<li><a href="../std/meta/">std.meta</a></li>
+<li><a href="../std/net/">std.net</a></li>
+<li><a href="../std/os/">std.os</a></li>
+<li><a href="../std/path/">std.path</a></li>
+<li><a href="../std/prelude/">std.prelude</a></li>
+<li><a href="../std/process/">std.process</a></li>
+<li><a href="../std/random/">std.random</a></li>
+<li><a href="../std/regex/">std.regex</a></li>
+<li><a href="../std/string/">std.string</a></li>
+<li><a href="../std/sync/">std.sync</a></li>
+<li><a href="../std/syntax/">std.syntax</a></li>
+<li><a href="../std/task/">std.task</a></li>
+<li><a href="../std/term/">std.term</a></li>
+<li><a href="../std/test/">std.test</a></li>
+<li><a href="../std/thread/">std.thread</a></li>
+<li><a href="../std/time/">std.time</a></li>
+<li><a href="../std/toml/">std.toml</a></li>
+<li><a href="../std/uri/">std.uri</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std</h1>
+<ul class="listing">
+<li><a href="../std/build/">std.build</a> <span class="summary">— The build script's view of its build.</span></li>
+<li><a href="../std/codec/">std.codec</a> <span class="summary">— Serializes values in any format: <code>Encode</code> writes a value into an <code>Encoder</code>, <code>Decode</code> reads one out of a <code>Decoder</code>, and <code>Codable</code> is both.</span></li>
+<li><a href="../std/collections/">std.collections</a> <span class="summary">— Provides the growable containers of the standard library.</span></li>
+<li><a href="../std/compress/">std.compress</a> <span class="summary">— Compresses and decompresses DEFLATE (RFC 1951), zlib (RFC 1950) and gzip (RFC 1952), written entirely in Lyric.</span></li>
+<li><a href="../std/core/">std.core</a> <span class="summary">— The core of the standard library, bound in every module without an import.</span></li>
+<li><a href="../std/crypto/">std.crypto</a> <span class="summary">— Cryptographic hashes, HMAC and the system's random bytes: the <a href="../std/crypto/Digest/">Digest</a> interface with <a href="../std/crypto/Sha256/">Sha256</a> and <a href="../std/crypto/Sha512/">Sha512</a> (FIPS 180-4), <a href="../std/crypto/Sha1/">Sha1</a> (FIPS 180-4) and <a href="../std/crypto/Md5/">Md5</a> (RFC 1321) — the last two only for formats that require them, never where an attacker chooses the input —, <a href="../std/crypto/Hmac/">Hmac</a> over any digest (RFC 2104), <a href="../std/crypto/#fn.sha256">sha256</a> for a whole input at once, <a href="../std/crypto/#fn.randomBytes">randomBytes</a> and <a href="../std/crypto/#fn.randomUint64">randomUint64</a> from the system, and <a href="../std/crypto/#fn.constantTimeEq">constantTimeEq</a>, a comparison of bytes whose time does not depend on where they differ.</span></li>
+<li><a href="../std/encoding/">std.encoding</a> <span class="summary">— Encodes bytes as text and back: <a href="../std/encoding/Base64/">Base64</a> and <a href="../std/encoding/Base64Url/">Base64Url</a> (RFC 4648 §4, §5), <a href="../std/encoding/Hex/">Hex</a> (RFC 4648 §8) and <a href="../std/encoding/Utf16/">Utf16</a> (RFC 2781), plus reading and writing fixed-width integers as bytes, either end first.</span></li>
+<li><a href="../std/fmt/">std.fmt</a> <span class="summary">— Formats text from a template read at run time.</span></li>
+<li><a href="../std/fs/">std.fs</a> <span class="summary">— The file system: <a href="../std/fs/File/">File</a>, a handle on an open file that reads, writes and seeks through <code>std.io</code>'s interfaces, opened as <a href="../std/fs/OpenOptions/">OpenOptions</a> say; conveniences that read or write a file whole (<a href="../std/fs/#fn.readText">readText</a>, <a href="../std/fs/#fn.readBytes">readBytes</a>, <a href="../std/fs/#fn.writeText">writeText</a>, <a href="../std/fs/#fn.writeBytes">writeBytes</a>, <a href="../std/fs/#fn.appendText">appendText</a>) or its lines one by one (<a href="../std/fs/#fn.lines">lines</a>); what a path names (<a href="../std/fs/Metadata/">Metadata</a>, <a href="../std/fs/#fn.metadata">metadata</a>, <a href="../std/fs/#fn.exists">exists</a>); directories and their entries (<a href="../std/fs/#fn.createDir">createDir</a>, <a href="../std/fs/#fn.removeDir">removeDir</a>, <a href="../std/fs/#fn.readDir">readDir</a>, <a href="../std/fs/DirEntry/">DirEntry</a>); and operations built from those — <a href="../std/fs/#fn.createDirAll">createDirAll</a>, <a href="../std/fs/#fn.removeAll">removeAll</a>, <a href="../std/fs/#fn.copy">copy</a>, <a href="../std/fs/#fn.walk">walk</a>, <a href="../std/fs/#fn.tempDir">tempDir</a>, <a href="../std/fs/#fn.tempFile">tempFile</a>.</span></li>
+<li><a href="../std/hash/">std.hash</a> <span class="summary">— Provides the hashers and the checksums of common formats and protocols.</span></li>
+<li><a href="../std/http/">std.http</a> <span class="summary">— Speaks HTTP/1.1 (RFC 9110, RFC 9112) over <code>Reader</code> and <code>Writer</code>: the message types, a client and a server.</span></li>
+<li><a href="../std/io/">std.io</a> <span class="summary">— Input and output: <code>import std.io { println }</code>.</span></li>
+<li><a href="../std/iter/">std.iter</a> <span class="summary">— Provides the adapters and terminators of every iterator.</span></li>
+<li><a href="../std/json/">std.json</a> <span class="summary">— Reads and writes JSON by RFC 8259, strictly: <code>JsonWriter</code> and <code>TreeBuilder</code> encode and <code>JsonReader</code> decodes in <code>std.codec</code>'s model, <code>JsonValue</code> is the dynamic tree, <code>JsonOptions</code> steers the text written, and <code>JsonError</code> is what a text that is no JSON throws.</span></li>
+<li><a href="../std/math/">std.math</a> <span class="summary">— Provides the elementary functions and the mathematical constants.</span></li>
+<li><a href="../std/meta/">std.meta</a> <span class="summary">— Compile-time questions about a type: its name, its kind, its fields, an enum's variants, the interfaces it conforms to.</span></li>
+<li><a href="../std/net/">std.net</a> <span class="summary">— The network: IP addresses (<a href="../std/net/IpAddr/">IpAddr</a>) and socket addresses (<a href="../std/net/SocketAddr/">SocketAddr</a>), TCP — a <a href="../std/net/TcpListener/">TcpListener</a> that accepts, a <a href="../std/net/TcpStream/">TcpStream</a> that is a <code>Reader</code> and a <code>Writer</code> —, UDP (<a href="../std/net/UdpSocket/">UdpSocket</a>), and name resolution (<a href="../std/net/#fn.resolve">resolve</a>).</span></li>
+<li><a href="../std/os/">std.os</a> <span class="summary">— The program and the operating system it runs on: the arguments (<a href="../std/os/#fn.args">args</a>), the environment (<a href="../std/os/#fn.env">env</a>, <a href="../std/os/#fn.envs">envs</a>, <a href="../std/os/#fn.setEnv">setEnv</a>), the working directory (<a href="../std/os/#fn.cwd">cwd</a>, <a href="../std/os/#fn.setCwd">setCwd</a>), ending the program (<a href="../std/os/#fn.exit">exit</a>), facts about the machine (<a href="../std/os/#fn.platform">platform</a>, <a href="../std/os/#fn.arch">arch</a>, <a href="../std/os/#fn.hostname">hostname</a>, <a href="../std/os/#fn.cpuCount">cpuCount</a>, <a href="../std/os/#fn.pid">pid</a>, <a href="../std/os/#fn.homeDir">homeDir</a>, <a href="../std/os/#fn.tempDir">tempDir</a>), and the system's signals (<a href="../std/os/Signal/">Signal</a>, <a href="../std/os/#fn.signals">signals</a>).</span></li>
+<li><a href="../std/path/">std.path</a> <span class="summary">— Lexical operations on paths held as strings.</span></li>
+<li><a href="../std/prelude/">std.prelude</a> <span class="summary">— The prelude: the names every module can use without an import.</span></li>
+<li><a href="../std/process/">std.process</a> <span class="summary">— Starts child processes and talks to them.</span></li>
+<li><a href="../std/random/">std.random</a> <span class="summary">— Random numbers: <a href="../std/random/Random/">Random</a>, a ChaCha8 generator, and free functions over the running thread's own generator.</span></li>
+<li><a href="../std/regex/">std.regex</a> <span class="summary">— Regular expressions in RE2's syntax, matched in linear time.</span></li>
+<li><a href="../std/string/">std.string</a> <span class="summary">— Converts values to text and joins strings; the compiler calls these functions by name.</span></li>
+<li><a href="../std/sync/">std.sync</a> <span class="summary">— Synchronization between tasks and threads: <a href="../std/sync/Atomic/">Atomic</a>, <a href="../std/sync/Mutex/">Mutex</a>, <a href="../std/sync/RwLock/">RwLock</a>, <a href="../std/sync/Once/">Once</a> and <a href="../std/sync/Semaphore/">Semaphore</a>.</span></li>
+<li><a href="../std/syntax/">std.syntax</a> <span class="summary">— The syntax tree as values: what a program can write, as enums and structs a <code>comptime</code> function or a macro reads, builds and writes back.</span></li>
+<li><a href="../std/task/">std.task</a> <span class="summary">— Tasks, channels and the scheduler that runs them.</span></li>
+<li><a href="../std/term/">std.term</a> <span class="summary">— The terminal, driven by ECMA-48 escape sequences.</span></li>
+<li><a href="../std/test/">std.test</a> <span class="summary">— Tests and benchmarks: the assertions a test fails by (<a href="../std/test/#fn.assertEq">assertEq</a>, <a href="../std/test/#fn.assertTrue">assertTrue</a>, <a href="../std/test/#fn.assertThrows">assertThrows</a>, <a href="../std/test/#fn.assertPanics">assertPanics</a> and the others, <a href="../std/test/#fn.fail">fail</a>), <a href="../std/test/#fn.subtest">subtest</a>, and the runners that <code>lyric test</code> (<a href="../std/test/#fn.run">run</a>, <a href="../std/test/TestCase/">TestCase</a>) and <code>lyric bench</code> (<a href="../std/test/#fn.runBenches">runBenches</a>, <a href="../std/test/BenchCase/">BenchCase</a>) hand a package's tests and benchmarks to.</span></li>
+<li><a href="../std/thread/">std.thread</a> <span class="summary">— Threads and pools of them: <a href="../std/thread/Thread/">Thread</a>, <a href="../std/thread/Pool/">Pool</a> and <a href="../std/thread/#fn.parallelMap">parallelMap</a>.</span></li>
+<li><a href="../std/time/">std.time</a> <span class="summary">— Measures time, and reads and writes dates, times of day and time zones.</span></li>
+<li><a href="../std/toml/">std.toml</a> <span class="summary">— Reads and writes TOML 1.0 documents through <code>std.codec</code>'s model.</span></li>
+<li><a href="../std/uri/">std.uri</a> <span class="summary">— URI references as RFC 3986 defines them, strictly; section numbers below are RFC 3986's.</span></li>
+</ul>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../nav.js" defer="defer"></script>
+<script src="../version.js" defer="defer"></script>
+<script src="../search.js" defer="defer"></script>
+</body>
+</html>

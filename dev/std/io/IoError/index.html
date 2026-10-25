@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>struct IoError — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.io</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/io/">std.io</a></li>
+<li><a href="../../../std/io/Stdin/">Stdin</a></li>
+<li><a href="../../../std/io/StdinLinesIter/">StdinLinesIter</a></li>
+<li><a href="../../../std/io/ConsoleReader/">ConsoleReader</a></li>
+<li><a href="../../../std/io/ConsoleWriter/">ConsoleWriter</a></li>
+<li><a href="../../../std/io/IoErrorKind/">IoErrorKind</a></li>
+<li><a class="current" href="../../../std/io/IoError/">IoError</a></li>
+<li><a href="../../../std/io/Reader/">Reader</a></li>
+<li><a href="../../../std/io/Writer/">Writer</a></li>
+<li><a href="../../../std/io/SeekFrom/">SeekFrom</a></li>
+<li><a href="../../../std/io/Seek/">Seek</a></li>
+<li><a href="../../../std/io/ByteReader/">ByteReader</a></li>
+<li><a href="../../../std/io/ByteBuffer/">ByteBuffer</a></li>
+<li><a href="../../../std/io/BufReader/">BufReader</a></li>
+<li><a href="../../../std/io/BufWriter/">BufWriter</a></li>
+<li><a href="../../../std/io/TextReader/">TextReader</a></li>
+<li><a href="../../../std/io/TextLinesIter/">TextLinesIter</a></li>
+<li><a href="../../../std/io/TextCharsIter/">TextCharsIter</a></li>
+<li><a href="../../../std/io/TextWriter/">TextWriter</a></li>
+<li><a href="../../../std/io/#fn.print">print()</a></li>
+<li><a href="../../../std/io/#fn.println">println()</a></li>
+<li><a href="../../../std/io/#fn.eprint">eprint()</a></li>
+<li><a href="../../../std/io/#fn.eprintln">eprintln()</a></li>
+<li><a href="../../../std/io/#fn.flush">flush()</a></li>
+<li><a href="../../../std/io/#fn.stdin">stdin()</a></li>
+<li><a href="../../../std/io/#fn.stdout">stdout()</a></li>
+<li><a href="../../../std/io/#fn.stderr">stderr()</a></li>
+<li><a href="../../../std/io/#fn.copy">copy()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>struct IoError</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">IoError</span> :: [<span class="ty">Error</span>]</code></pre>
+<p class="conforms">Conforms to <code>Error</code>.</p>
+<p>The error every input and output throws: its kind, the path it concerns, what more is known,
+and what caused it. The cause is the field <code>inner</code>: <code>Error</code> asks for a method <code>cause()</code>, and a
+field and a method of one type cannot share a name.</p>
+<h2 id="fields">Fields</h2>
+<section class="member" id="field.kind">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> kind: <span class="ty">IoErrorKind</span></code></pre>
+</section>
+<section class="member" id="field.path">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> path: ?<span class="ty">string</span></code></pre>
+</section>
+<section class="member" id="field.detail">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> detail: <span class="ty">string</span> = <span class="str">""</span></code></pre>
+</section>
+<section class="member" id="field.inner">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> inner: ?<span class="ty">Error</span></code></pre>
+</section>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.message">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> message(): <span class="ty">string</span></code></pre>
+<p>Returns the kind in words, then the path and the detail where there are any:
+<code>not found: data.txt</code>.</p>
+</section>
+<section class="member" id="method.cause">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cause(): ?<span class="ty">Error</span></code></pre>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#fields">Fields</a></li>
+<li class="level-3"><a href="#field.kind">kind</a></li>
+<li class="level-3"><a href="#field.path">path</a></li>
+<li class="level-3"><a href="#field.detail">detail</a></li>
+<li class="level-3"><a href="#field.inner">inner</a></li>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.message">message</a></li>
+<li class="level-3"><a href="#method.cause">cause</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

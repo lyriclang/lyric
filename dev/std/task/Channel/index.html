@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>class Channel — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.task</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/task/">std.task</a></li>
+<li><a href="../../../std/task/Cancelled/">Cancelled</a></li>
+<li><a href="../../../std/task/PanicInfo/">PanicInfo</a></li>
+<li><a href="../../../std/task/TaskStatus/">TaskStatus</a></li>
+<li><a href="../../../std/task/Task/">Task</a></li>
+<li><a href="../../../std/task/TimedOut/">TimedOut</a></li>
+<li><a href="../../../std/task/ChannelClosed/">ChannelClosed</a></li>
+<li><a class="current" href="../../../std/task/Channel/">Channel</a></li>
+<li><a href="../../../std/task/Select/">Select</a></li>
+<li><a href="../../../std/task/Selection/">Selection</a></li>
+<li><a href="../../../std/task/Timer/">Timer</a></li>
+<li><a href="../../../std/task/TaskScope/">TaskScope</a></li>
+<li><a href="../../../std/task/#fn.sleep">sleep()</a></li>
+<li><a href="../../../std/task/#fn.yieldNow">yieldNow()</a></li>
+<li><a href="../../../std/task/#fn.spawn">spawn()</a></li>
+<li><a href="../../../std/task/#fn.withTimeout">withTimeout()</a></li>
+<li><a href="../../../std/task/#fn.spawnDetached">spawnDetached()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>class Channel</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">Channel</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>A queue of values between tasks: values go in with <a href="../../../std/task/Channel/#method.send">Channel.send</a> and come out with
+<a href="../../../std/task/Channel/#method.recv">Channel.recv</a>, in the order they went in.</p>
+<p>Unbuffered — a capacity of 0 — a send waits until a receiver takes the value; buffered, it
+waits only while the buffer is full. <a href="../../../std/task/Channel/#method.close">Channel.close</a> ends it: what is buffered can still be
+received, then <code>recv</code> answers null; a send throws <a href="../../../std/task/ChannelClosed/">ChannelClosed</a>. It works within a thread and
+across threads: a send happens before the receive that gets its value.</p>
+<p>The guard holds while the channel's state changes, and never while anything waits or a body runs.
+The locks of this module are taken in one order — channels by their ids, then a task's guard or
+a scheduler's inbox — so no two threads wait on each other's.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.new">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> new(capacity: <span class="ty">int</span> = <span class="num">0</span>): <span class="ty">Channel</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Creates a channel that holds up to <code>capacity</code> values no task has received yet.</p>
+<p>A capacity of 0 — the default — holds none: a send meets a receive. A negative capacity
+counts as 0.</p>
+</section>
+<section class="member" id="method.send">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> send(value: <span class="ty">T</span>): <span class="ty">void</span> <span class="kw">throws</span> [<span class="ty">ChannelClosed</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Puts <code>value</code> into the channel: to a task waiting to receive, or into the buffer while there
+is room — else the running task waits until a receiver takes it.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/task/ChannelClosed/">ChannelClosed</a> on a closed channel, and when the channel closes while it waits;
+<a href="../../../std/task/Cancelled/">Cancelled</a> in a cancelled task.</p>
+</section>
+<section class="member" id="method.recv">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> recv(): ?<span class="ty">T</span> <span class="kw">throws</span> <span class="ty">Cancelled</span></code></pre>
+<p>Returns the next value of the channel: from the buffer, or from a task waiting to send —
+else the running task waits for one. Returns null once the channel is closed and empty.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/task/Cancelled/">Cancelled</a> in a cancelled task.</p>
+</section>
+<section class="member" id="method.close">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> close(): <span class="ty">void</span></code></pre>
+<p>Closes the channel: the tasks waiting to receive get null, those waiting to send throw
+<code>ChannelClosed</code>; what is buffered can still be received. Closing a closed channel does nothing.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.new">new</a></li>
+<li class="level-3"><a href="#method.send">send</a></li>
+<li class="level-3"><a href="#method.recv">recv</a></li>
+<li class="level-3"><a href="#method.close">close</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

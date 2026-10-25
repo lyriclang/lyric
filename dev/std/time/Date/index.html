@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>struct Date — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.time</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/time/">std.time</a></li>
+<li><a href="../../../std/time/Duration/">Duration</a></li>
+<li><a href="../../../std/time/Instant/">Instant</a></li>
+<li><a href="../../../std/time/Monotonic/">Monotonic</a></li>
+<li><a href="../../../std/time/TimeErrorKind/">TimeErrorKind</a></li>
+<li><a href="../../../std/time/TimeError/">TimeError</a></li>
+<li><a href="../../../std/time/Weekday/">Weekday</a></li>
+<li><a class="current" href="../../../std/time/Date/">Date</a></li>
+<li><a href="../../../std/time/Time/">Time</a></li>
+<li><a href="../../../std/time/Zone/">Zone</a></li>
+<li><a href="../../../std/time/ZoneInfo/">ZoneInfo</a></li>
+<li><a href="../../../std/time/DateTime/">DateTime</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>struct Date</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Date</span> :: [<span class="ty">Equatable</span>, <span class="ty">Ordered</span>, <span class="ty">TotalOrder</span>, <span class="ty">Hashable</span>, <span class="ty">Display</span>, <span class="ty">Parse</span>]</code></pre>
+<p class="conforms">Conforms to <code>Equatable</code>, <code>Ordered</code>, <code>TotalOrder</code>, <code>Hashable</code>, <code>Display</code>, <code>Parse</code>.</p>
+<p>A day of the proleptic Gregorian calendar. Its text is ISO 8601's, <code>2026-10-08</code>; a year
+outside 0000–9999 shows its sign and its digits, <code>+10000-01-01</code>, which RFC 3339 does not read
+back.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.of">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> of(year: <span class="ty">int</span>, month: <span class="ty">int</span>, day: <span class="ty">int</span>): <span class="ty">Date</span> <span class="kw">throws</span> <span class="ty">TimeError</span></code></pre>
+<p>Returns the date <code>year-month-day</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>TimeError</code> where there is no such date: a month outside 1–12, a day beyond the
+month's.</p>
+</section>
+<section class="member" id="method.year">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> year(): <span class="ty">int</span></code></pre>
+</section>
+<section class="member" id="method.month">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> month(): <span class="ty">int</span></code></pre>
+</section>
+<section class="member" id="method.day">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> day(): <span class="ty">int</span></code></pre>
+</section>
+<section class="member" id="method.isLeapYear">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isLeapYear(): <span class="ty">bool</span></code></pre>
+<p>Returns whether the date's year has a February 29th: divisible by 4, and by 400 where by 100.</p>
+</section>
+<section class="member" id="method.dayOfWeek">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> dayOfWeek(): <span class="ty">Weekday</span></code></pre>
+</section>
+<section class="member" id="method.plusDays">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> plusDays(n: <span class="ty">int</span>): <span class="ty">Date</span></code></pre>
+<p>Returns the date <code>n</code> days later — earlier for a negative <code>n</code>.</p>
+</section>
+<section class="member" id="method.show">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> show(): <span class="ty">string</span></code></pre>
+</section>
+<section class="member" id="method.parse">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> parse(s: <span class="ty">StringView</span>): <span class="ty">Date</span> <span class="kw">throws</span> <span class="ty">ParseError</span></code></pre>
+<p>Parses RFC 3339's full-date: <code>YYYY-MM-DD</code>, four digits of year, a date that exists.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>ParseError</code> with kind <code>Empty</code> for an empty text and <code>Invalid</code> for a text of another
+shape or a date that does not exist.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.of">of</a></li>
+<li class="level-3"><a href="#method.year">year</a></li>
+<li class="level-3"><a href="#method.month">month</a></li>
+<li class="level-3"><a href="#method.day">day</a></li>
+<li class="level-3"><a href="#method.isLeapYear">isLeapYear</a></li>
+<li class="level-3"><a href="#method.dayOfWeek">dayOfWeek</a></li>
+<li class="level-3"><a href="#method.plusDays">plusDays</a></li>
+<li class="level-3"><a href="#method.show">show</a></li>
+<li class="level-3"><a href="#method.parse">parse</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

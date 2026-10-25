@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.net — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.net</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/net/">std.net</a></li>
+<li><a href="../../std/net/IpAddr/">IpAddr</a></li>
+<li><a href="../../std/net/SocketAddr/">SocketAddr</a></li>
+<li><a href="../../std/net/TcpListener/">TcpListener</a></li>
+<li><a href="../../std/net/Shutdown/">Shutdown</a></li>
+<li><a href="../../std/net/TcpStream/">TcpStream</a></li>
+<li><a href="../../std/net/UdpSocket/">UdpSocket</a></li>
+<li><a href="../../std/net/#fn.resolve">resolve()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.net</h1>
+<p>The network: IP addresses (<a href="../../std/net/IpAddr/">IpAddr</a>) and socket addresses (<a href="../../std/net/SocketAddr/">SocketAddr</a>), TCP — a
+<a href="../../std/net/TcpListener/">TcpListener</a> that accepts, a <a href="../../std/net/TcpStream/">TcpStream</a> that is a <code>Reader</code> and a <code>Writer</code> —, UDP
+(<a href="../../std/net/UdpSocket/">UdpSocket</a>), and name resolution (<a href="../../std/net/#fn.resolve">resolve</a>).</p>
+<p>A call that would block parks the task until the thread's poller says the socket is ready, then
+tries again; a cancel ends that wait with <code>Cancelled</code>, and a close — on any thread — with
+<code>Closed</code>. There are no socket timeouts: <code>withTimeout</code> bounds a call instead. On POSIX the sockets
+are polled with epoll or kqueue; on Windows they use Winsock, with an AFD poll request per
+socket on the thread's completion port.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/net/IpAddr/">IpAddr</a> <span class="kind">enum</span> <span class="summary">— An IP address: version 4's four bytes, or version 6's eight groups of 16 bits.</span></div>
+<div class="listed"><a href="../../std/net/SocketAddr/">SocketAddr</a> <span class="kind">struct</span> <span class="summary">— An IP address and a port.</span></div>
+<div class="listed"><a href="../../std/net/TcpListener/">TcpListener</a> <span class="kind">class</span> <span class="summary">— A listening TCP socket: <code>bind</code> creates it, <code>accept</code> returns each incoming connection as a <a href="../../std/net/TcpStream/">TcpStream</a>.</span></div>
+<div class="listed"><a href="../../std/net/Shutdown/">Shutdown</a> <span class="kind">enum</span> <span class="summary">— How much of a stream <a href="../../std/net/TcpStream/#method.shutdown">TcpStream.shutdown</a> ends: its reading, its writing, or both.</span></div>
+<div class="listed"><a href="../../std/net/TcpStream/">TcpStream</a> <span class="kind">class</span> <span class="summary">— A TCP connection: a <code>Reader</code> and a <code>Writer</code> whose calls wait for the socket — a read until bytes come, a write until the system takes some.</span></div>
+<div class="listed"><a href="../../std/net/UdpSocket/">UdpSocket</a> <span class="kind">class</span> <span class="summary">— A UDP socket: datagrams sent to an address, and received with their sender's.</span></div>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.resolve">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> resolve(host: <span class="ty">StringView</span>): <span class="ty">List</span>&lt;<span class="ty">IpAddr</span>&gt; <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns the addresses <code>host</code> names: a name the system's resolver knows — <code>localhost</code>,
+<code>example.org</code> — or an address's own text; each address once, in the resolver's order. It runs
+on the I/O pool, as a file's call does, so it is not a point of cancellation: a cancel shows at
+the task's next wait.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the name as the path: <code>NotFound</code> for a name nobody knows, else the
+resolver's failure.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.resolve">resolve</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

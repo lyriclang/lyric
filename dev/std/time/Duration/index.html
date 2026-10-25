@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>struct Duration — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.time</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/time/">std.time</a></li>
+<li><a class="current" href="../../../std/time/Duration/">Duration</a></li>
+<li><a href="../../../std/time/Instant/">Instant</a></li>
+<li><a href="../../../std/time/Monotonic/">Monotonic</a></li>
+<li><a href="../../../std/time/TimeErrorKind/">TimeErrorKind</a></li>
+<li><a href="../../../std/time/TimeError/">TimeError</a></li>
+<li><a href="../../../std/time/Weekday/">Weekday</a></li>
+<li><a href="../../../std/time/Date/">Date</a></li>
+<li><a href="../../../std/time/Time/">Time</a></li>
+<li><a href="../../../std/time/Zone/">Zone</a></li>
+<li><a href="../../../std/time/ZoneInfo/">ZoneInfo</a></li>
+<li><a href="../../../std/time/DateTime/">DateTime</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>struct Duration</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Duration</span> :: [
+    <span class="ty">Equatable</span>,
+    <span class="ty">Ordered</span>,
+    <span class="ty">TotalOrder</span>,
+    <span class="ty">Hashable</span>,
+    <span class="ty">Default</span>,
+    <span class="ty">Display</span>,
+    <span class="ty">Parse</span>,
+    <span class="ty">Add</span>,
+    <span class="ty">Sub</span>,
+    <span class="ty">Mul</span>&lt;<span class="ty">int</span>&gt;,
+    <span class="ty">Div</span>&lt;<span class="ty">int</span>&gt;
+]</code></pre>
+<p class="conforms">Conforms to <code>Equatable</code>, <code>Ordered</code>, <code>TotalOrder</code>, <code>Hashable</code>, <code>Default</code>, <code>Display</code>, <code>Parse</code>, <code>Add</code>, <code>Sub</code>, <code>Mul&lt;int&gt;</code>, <code>Div&lt;int&gt;</code>.</p>
+<p>A span of time in whole nanoseconds, negative or not: some 292 years either way.</p>
+<h4 id="panics">Panics</h4>
+<p>Arithmetic that leaves that range panics with an overflow (RT0002), as <code>int</code>'s does.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.ofNanos">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> ofNanos(n: <span class="ty">int</span>): <span class="ty">Duration</span></code></pre>
+</section>
+<section class="member" id="method.ofMicros">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> ofMicros(n: <span class="ty">int</span>): <span class="ty">Duration</span></code></pre>
+</section>
+<section class="member" id="method.ofMillis">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> ofMillis(n: <span class="ty">int</span>): <span class="ty">Duration</span></code></pre>
+</section>
+<section class="member" id="method.ofSecs">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> ofSecs(n: <span class="ty">int</span>): <span class="ty">Duration</span></code></pre>
+</section>
+<section class="member" id="method.ofMinutes">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> ofMinutes(n: <span class="ty">int</span>): <span class="ty">Duration</span></code></pre>
+</section>
+<section class="member" id="method.ofHours">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> ofHours(n: <span class="ty">int</span>): <span class="ty">Duration</span></code></pre>
+</section>
+<section class="member" id="method.nanos">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> nanos(): <span class="ty">int</span></code></pre>
+<p>Returns the span in nanoseconds.</p>
+</section>
+<section class="member" id="method.millis">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> millis(): <span class="ty">int</span></code></pre>
+<p>Returns the span in whole milliseconds, rounded toward zero.</p>
+</section>
+<section class="member" id="method.secs">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> secs(): <span class="ty">int</span></code></pre>
+<p>Returns the span in whole seconds, rounded toward zero.</p>
+</section>
+<section class="member" id="method.asSecsFloat">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asSecsFloat(): <span class="ty">float</span></code></pre>
+<p>Returns the span in seconds, with their fraction.</p>
+</section>
+<section class="member" id="method.add">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> add(rhs: <span class="ty">Duration</span>): <span class="ty">Duration</span></code></pre>
+</section>
+<section class="member" id="method.sub">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sub(rhs: <span class="ty">Duration</span>): <span class="ty">Duration</span></code></pre>
+</section>
+<section class="member" id="method.mul">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> mul(rhs: <span class="ty">int</span>): <span class="ty">Duration</span></code></pre>
+</section>
+<section class="member" id="method.div">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> div(rhs: <span class="ty">int</span>): <span class="ty">Duration</span></code></pre>
+<p>Divides the span by <code>rhs</code>, rounded toward zero.</p>
+<h4 id="panics">Panics</h4>
+<p>Panics on a division by zero (RT0001).</p>
+</section>
+<section class="member" id="method.show">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> show(): <span class="ty">string</span></code></pre>
+<p>Returns the span as text: <code>0s</code>; under a second one unit — <code>ns</code>, <code>µs</code>, <code>ms</code> — with the
+fraction, its trailing zeros dropped (<code>1.5µs</code>, <code>500ms</code>); from a second on hours, minutes and
+seconds with their fraction, the larger ones from the first that is not zero (<code>1.5s</code>,
+<code>1m30s</code>, <code>1h0m0s</code>); a minus in front of a negative one.</p>
+</section>
+<section class="member" id="method.parse">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> parse(s: <span class="ty">StringView</span>): <span class="ty">Duration</span> <span class="kw">throws</span> <span class="ty">ParseError</span></code></pre>
+<p>Parses a span: an optional sign, then one or more numbers each with its unit — <code>ns</code>,
+<code>us</code> (or <code>µs</code>, <code>μs</code>), <code>ms</code>, <code>s</code>, <code>m</code>, <code>h</code> —, a number with a fraction allowed: <code>1h30m</code>,
+<code>1.5h</code>, <code>-300ms</code>. <code>0</code> alone is zero. A fraction is scaled to its unit through a float: the
+nanoseconds of <code>1.5h</code> are exact, those of a long fraction of an hour may be rounded.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>ParseError</code> with kind <code>Empty</code> for an empty text, <code>Invalid</code> for a number without
+digits or a missing or unknown unit, and <code>Overflow</code> where the span does not fit.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.ofNanos">ofNanos</a></li>
+<li class="level-3"><a href="#method.ofMicros">ofMicros</a></li>
+<li class="level-3"><a href="#method.ofMillis">ofMillis</a></li>
+<li class="level-3"><a href="#method.ofSecs">ofSecs</a></li>
+<li class="level-3"><a href="#method.ofMinutes">ofMinutes</a></li>
+<li class="level-3"><a href="#method.ofHours">ofHours</a></li>
+<li class="level-3"><a href="#method.nanos">nanos</a></li>
+<li class="level-3"><a href="#method.millis">millis</a></li>
+<li class="level-3"><a href="#method.secs">secs</a></li>
+<li class="level-3"><a href="#method.asSecsFloat">asSecsFloat</a></li>
+<li class="level-3"><a href="#method.add">add</a></li>
+<li class="level-3"><a href="#method.sub">sub</a></li>
+<li class="level-3"><a href="#method.mul">mul</a></li>
+<li class="level-3"><a href="#method.div">div</a></li>
+<li class="level-3"><a href="#method.show">show</a></li>
+<li class="level-3"><a href="#method.parse">parse</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.hash — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.hash</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/hash/">std.hash</a></li>
+<li><a href="../../std/hash/DefaultHasher/">DefaultHasher</a></li>
+<li><a href="../../std/hash/FixedHasher/">FixedHasher</a></li>
+<li><a href="../../std/hash/Fnv1a64/">Fnv1a64</a></li>
+<li><a href="../../std/hash/#fn.crc32">crc32()</a></li>
+<li><a href="../../std/hash/#fn.crc32c">crc32c()</a></li>
+<li><a href="../../std/hash/#fn.adler32">adler32()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.hash</h1>
+<p>Provides the hashers and the checksums of common formats and protocols.</p>
+<p><a href="../../std/hash/DefaultHasher/">DefaultHasher</a> is SipHash-1-3 under a key the system draws once per process: a <code>Map</code> hashes
+with it, its order differs from run to run, and no input from outside can aim collisions at
+it. <a href="../../std/hash/FixedHasher/">FixedHasher</a> is the same under a zero key, for what must hash alike in every run;
+<a href="../../std/hash/Fnv1a64/">Fnv1a64</a> is fast and keyless, for trusted input. All three implement <a href="../../std/core/Hasher/">Hasher</a>. The checksums
+are <a href="../../std/hash/#fn.crc32">crc32</a>, <a href="../../std/hash/#fn.crc32c">crc32c</a> and <a href="../../std/hash/#fn.adler32">adler32</a>.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/hash/DefaultHasher/">DefaultHasher</a> <span class="kind">struct</span> <span class="summary">— Hashes with SipHash-1-3 under the process's key, drawn from the system at the first use.</span></div>
+<div class="listed"><a href="../../std/hash/FixedHasher/">FixedHasher</a> <span class="kind">struct</span> <span class="summary">— Hashes with SipHash-1-3 under a zero key.</span></div>
+<div class="listed"><a href="../../std/hash/Fnv1a64/">Fnv1a64</a> <span class="kind">struct</span> <span class="summary">— Hashes with 64-bit FNV-1a, a byte at a time and without a key.</span></div>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.crc32">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> crc32(bytes: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;, running: <span class="ty">uint32</span> = <span class="num">0</span>): <span class="ty">uint32</span></code></pre>
+<p>Returns the CRC-32 (ISO-HDLC, as in zip, gzip and PNG) of <code>bytes</code>, continued from <code>running</code>.</p>
+<p><code>running</code> is the checksum of what came before, <code>0</code> at the start, so the checksum of the whole
+is that of its pieces, one after the other. <code>crc32(&quot;123456789&quot;.toBytes())</code> is <code>0xCBF43926</code>.</p>
+</section>
+<section class="member" id="fn.crc32c">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> crc32c(bytes: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;, running: <span class="ty">uint32</span> = <span class="num">0</span>): <span class="ty">uint32</span></code></pre>
+<p>Returns the CRC-32C (the Castagnoli polynomial, as in iSCSI, RFC 3720) of <code>bytes</code>, continued
+from <code>running</code>.</p>
+<p><code>running</code> is the checksum of what came before, <code>0</code> at the start.
+<code>crc32c(&quot;123456789&quot;.toBytes())</code> is <code>0xE3069283</code>.</p>
+</section>
+<section class="member" id="fn.adler32">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> adler32(bytes: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;, running: <span class="ty">uint32</span> = <span class="num">1</span>): <span class="ty">uint32</span></code></pre>
+<p>Returns the Adler-32 (RFC 1950) of <code>bytes</code>, continued from <code>running</code>.</p>
+<p><code>running</code> is the checksum of what came before, <code>1</code> at the start.
+<code>adler32(&quot;Wikipedia&quot;.toBytes())</code> is <code>0x11E60398</code>.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.crc32">crc32</a></li>
+<li class="level-3"><a href="#fn.crc32c">crc32c</a></li>
+<li class="level-3"><a href="#fn.adler32">adler32</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>struct DateTime — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.time</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/time/">std.time</a></li>
+<li><a href="../../../std/time/Duration/">Duration</a></li>
+<li><a href="../../../std/time/Instant/">Instant</a></li>
+<li><a href="../../../std/time/Monotonic/">Monotonic</a></li>
+<li><a href="../../../std/time/TimeErrorKind/">TimeErrorKind</a></li>
+<li><a href="../../../std/time/TimeError/">TimeError</a></li>
+<li><a href="../../../std/time/Weekday/">Weekday</a></li>
+<li><a href="../../../std/time/Date/">Date</a></li>
+<li><a href="../../../std/time/Time/">Time</a></li>
+<li><a href="../../../std/time/Zone/">Zone</a></li>
+<li><a href="../../../std/time/ZoneInfo/">ZoneInfo</a></li>
+<li><a class="current" href="../../../std/time/DateTime/">DateTime</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>struct DateTime</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">DateTime</span> :: [<span class="ty">Display</span>, <span class="ty">Parse</span>]</code></pre>
+<p class="conforms">Conforms to <code>Display</code>, <code>Parse</code>, <code>Equatable</code>.</p>
+<p>A date and a time of day at an offset from UTC: the moment it names, and how it was
+written. Its text is RFC 3339, <code>2026-10-08T12:34:56.5+02:00</code>, <code>Z</code> for no offset. Two compare
+field by field: the same moment at two offsets is two date-times — <code>toInstant()</code> compares them
+as moments.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.of">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> of(date: <span class="ty">Date</span>, time: <span class="ty">Time</span>, zone: <span class="ty">Zone</span>): <span class="ty">DateTime</span></code></pre>
+<p>Returns the date and time in the zone: for a zone of the database, at the offset in force
+then. A local time that does not exist (the hour a clock springs forward) moves forward by
+the gap; one that exists twice (the hour it falls back) takes the earlier moment.</p>
+</section>
+<section class="member" id="method.date">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> date(): <span class="ty">Date</span></code></pre>
+</section>
+<section class="member" id="method.time">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> time(): <span class="ty">Time</span></code></pre>
+</section>
+<section class="member" id="method.offset">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> offset(): <span class="ty">Duration</span></code></pre>
+</section>
+<section class="member" id="method.zone">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> zone(): <span class="ty">Zone</span></code></pre>
+</section>
+<section class="member" id="method.plusDays">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> plusDays(n: <span class="ty">int</span>): <span class="ty">DateTime</span></code></pre>
+<p>Returns the same local time <code>n</code> days on, in the zone: across a change of the clocks the
+offset follows the zone (a day may be 23 or 25 hours).</p>
+</section>
+<section class="member" id="method.withZone">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> withZone(zone: <span class="ty">Zone</span>): <span class="ty">DateTime</span></code></pre>
+<p>Returns the same moment in another zone.</p>
+</section>
+<section class="member" id="method.zoneInfo">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> zoneInfo(): <span class="ty">ZoneInfo</span></code></pre>
+<p>Returns what the zone says at this moment: the offset, the abbreviation, daylight time.</p>
+</section>
+<section class="member" id="method.format">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> format(pattern: <span class="ty">string</span>): <span class="ty">string</span> <span class="kw">throws</span> <span class="ty">TimeError</span></code></pre>
+<p>Formats the date and time by a pattern of UTS #35, such as <code>yyyy-MM-dd HH:mm:ss</code>. The
+fields: <code>y</code> the year (<code>yy</code> its last two digits, <code>yyyy</code> padded to four), <code>M</code> the month
+(<code>MM</code> padded, <code>MMM</code> <code>Jan</code>, <code>MMMM</code> <code>January</code>, <code>MMMMM</code> <code>J</code>), <code>d</code> the day (<code>dd</code> padded), <code>H</code>
+the hour of 24 (<code>HH</code>), <code>h</code> of 12 (<code>hh</code>), <code>m</code> the minute, <code>s</code> the second, <code>S…</code> the fraction
+to as many digits, <code>a</code> <code>AM</code>/<code>PM</code>, <code>E</code>/<code>EEE</code> <code>Tue</code>, <code>EEEE</code> <code>Tuesday</code>, <code>EEEEE</code> <code>T</code>, <code>Z</code>
+<code>+0100</code> (<code>ZZZZZ</code> <code>+01:00</code>, <code>Z</code> for none), <code>X</code> <code>+01</code>/<code>+0100</code>/<code>+01:00</code> by its count with <code>Z</code>
+for none, <code>x</code> the same without <code>Z</code>; text in <code>'…'</code> as it is, <code>''</code> a quote; what is no
+letter as it is. Names are English.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>TimeError</code> for a pattern letter other than those above, or a malformed pattern.</p>
+</section>
+<section class="member" id="method.parseWith">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> parseWith(
+    pattern: <span class="ty">string</span>,
+    text: <span class="ty">string</span>,
+    zone: <span class="ty">Zone</span> = <span class="ty">Zone</span>.utc
+): <span class="ty">DateTime</span> <span class="kw">throws</span> <span class="ty">ParseError</span></code></pre>
+<p>Parses a date and time by a pattern of UTS #35, the fields as <code>format</code> writes them: a
+number takes as many digits as it finds (a padded field at least its width), a name is
+matched without case, a fraction as many digits as there are. What the pattern does not
+name is 1970-01-01 00:00:00; without an offset field the zone given decides.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>ParseError</code> with kind <code>Invalid</code> where the pattern is malformed, the text does not
+fit it, or the fields name no existing date, time of day or offset.</p>
+</section>
+<section class="member" id="method.toInstant">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toInstant(): <span class="ty">Instant</span></code></pre>
+<p>Returns the moment this date-time names.</p>
+<h4 id="panics">Panics</h4>
+<p>Panics with an overflow (RT0002) outside the years an <code>Instant</code> reaches.</p>
+</section>
+<section class="member" id="method.show">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> show(): <span class="ty">string</span></code></pre>
+</section>
+<section class="member" id="method.parse">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> parse(s: <span class="ty">StringView</span>): <span class="ty">DateTime</span> <span class="kw">throws</span> <span class="ty">ParseError</span></code></pre>
+<p>Parses RFC 3339's date-time (§5.6), strictly: <code>T</code> or <code>t</code> between the date and the time, a
+fraction of any length — cut to nanoseconds —, <code>Z</code>, <code>z</code> or <code>±hh:mm</code>; no space for the <code>T</code>,
+no second 60.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>ParseError</code> with kind <code>Empty</code> for an empty text and <code>Invalid</code> for a text of another
+shape or a date or time that does not exist.</p>
+</section>
+<section class="member" id="method.equals">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> equals(o: <span class="ty">DateTime</span>): <span class="ty">bool</span></code></pre>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.of">of</a></li>
+<li class="level-3"><a href="#method.date">date</a></li>
+<li class="level-3"><a href="#method.time">time</a></li>
+<li class="level-3"><a href="#method.offset">offset</a></li>
+<li class="level-3"><a href="#method.zone">zone</a></li>
+<li class="level-3"><a href="#method.plusDays">plusDays</a></li>
+<li class="level-3"><a href="#method.withZone">withZone</a></li>
+<li class="level-3"><a href="#method.zoneInfo">zoneInfo</a></li>
+<li class="level-3"><a href="#method.format">format</a></li>
+<li class="level-3"><a href="#method.parseWith">parseWith</a></li>
+<li class="level-3"><a href="#method.toInstant">toInstant</a></li>
+<li class="level-3"><a href="#method.show">show</a></li>
+<li class="level-3"><a href="#method.parse">parse</a></li>
+<li class="level-3"><a href="#method.equals">equals</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.iter — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.iter</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/iter/">std.iter</a></li>
+<li><a href="../../std/iter/MapIter/">MapIter</a></li>
+<li><a href="../../std/iter/FilterIter/">FilterIter</a></li>
+<li><a href="../../std/iter/TakeIter/">TakeIter</a></li>
+<li><a href="../../std/iter/SkipIter/">SkipIter</a></li>
+<li><a href="../../std/iter/TakeWhileIter/">TakeWhileIter</a></li>
+<li><a href="../../std/iter/SkipWhileIter/">SkipWhileIter</a></li>
+<li><a href="../../std/iter/StepByIter/">StepByIter</a></li>
+<li><a href="../../std/iter/EnumerateIter/">EnumerateIter</a></li>
+<li><a href="../../std/iter/InspectIter/">InspectIter</a></li>
+<li><a href="../../std/iter/ZipIter/">ZipIter</a></li>
+<li><a href="../../std/iter/ChainIter/">ChainIter</a></li>
+<li><a href="../../std/iter/MapNotNullIter/">MapNotNullIter</a></li>
+<li><a href="../../std/iter/FlatMapIter/">FlatMapIter</a></li>
+<li><a href="../../std/iter/FlattenIter/">FlattenIter</a></li>
+<li><a href="../../std/iter/DedupIter/">DedupIter</a></li>
+<li><a href="../../std/iter/ScanIter/">ScanIter</a></li>
+<li><a href="../../std/iter/PeekableIter/">PeekableIter</a></li>
+<li><a href="../../std/iter/RevIter/">RevIter</a></li>
+<li><a href="../../std/iter/CycleIter/">CycleIter</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.iter</h1>
+<p>Provides the adapters and terminators of every iterator.</p>
+<p>The adapters — <code>map</code>, <code>filter</code>, <code>take</code>, <code>zip</code>, <code>chain</code>, <code>flatMap</code>, <code>peekable</code>, <code>rev</code>, <code>cycle</code>
+and more — are lazy, each a struct of its own (<a href="../../std/iter/MapIter/">MapIter</a>, <a href="../../std/iter/FilterIter/">FilterIter</a>, …), monomorphized and
+allocation-free. The terminators — <code>count</code>, <code>fold</code>, <code>find</code>, <code>sum</code>, <code>product</code>, <code>average</code>, <code>min</code>,
+<code>max</code>, <code>minBy</code>, <code>maxBy</code>, <code>join</code>, <code>toArray</code>, <code>collect</code> and more — walk the iterator to an answer.
+The prelude names this module, so its members reach every iterator without an import; where a
+type is written, the structs are named through it, as <code>iter.MapIter&lt;I, U&gt;</code>.</p>
+<p>The protocol itself (<code>Iterator</code>, <code>Iterable</code>, <code>DoubleEnded</code>, <code>Step</code>, <code>FromIterator</code>), the ranges
+and the iterators of std.core's own types live in std.core.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/iter/MapIter/">MapIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of an iterator, each passed through <code>f</code>; made by <code>it.map(f)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/FilterIter/">FilterIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of an iterator for which <code>p</code> holds; made by <code>it.filter(p)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/TakeIter/">TakeIter</a> <span class="kind">struct</span> <span class="summary">— Yields the first <code>n</code> values of an iterator, or all of them where it has fewer; made by <code>it.take(n)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/SkipIter/">SkipIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of an iterator after its first <code>n</code>; made by <code>it.skip(n)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/TakeWhileIter/">TakeWhileIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of an iterator up to, not including, the first for which <code>p</code> does not hold; made by <code>it.takeWhile(p)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/SkipWhileIter/">SkipWhileIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of an iterator from the first for which <code>p</code> does not hold on; made by <code>it.skipWhile(p)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/StepByIter/">StepByIter</a> <span class="kind">struct</span> <span class="summary">— Yields the first value of an iterator, then every <code>n</code>th after it; made by <code>it.stepBy(n)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/EnumerateIter/">EnumerateIter</a> <span class="kind">struct</span> <span class="summary">— Yields each value of an iterator paired with its position, counted from 0; made by <code>it.enumerate()</code>.</span></div>
+<div class="listed"><a href="../../std/iter/InspectIter/">InspectIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of an iterator unchanged, calling <code>f</code> on each as it passes; made by <code>it.inspect(f)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/ZipIter/">ZipIter</a> <span class="kind">struct</span> <span class="summary">— Yields pairs of the values two iterators hold at the same position; made by <code>it.zip(other)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/ChainIter/">ChainIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of one iterator, then those of another; made by <code>it.chain(other)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/MapNotNullIter/">MapNotNullIter</a> <span class="kind">struct</span> <span class="summary">— Yields the results of <code>f</code> on the values of an iterator, leaving out every <code>null</code>; made by <code>it.mapNotNull(f)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/FlatMapIter/">FlatMapIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of what <code>f</code> returns for each value of an iterator, one after the other; made by <code>it.flatMap(f)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/FlattenIter/">FlattenIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of the iterables an iterator gives, one after the other; made by <code>it.flatten()</code>.</span></div>
+<div class="listed"><a href="../../std/iter/DedupIter/">DedupIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of an iterator with each run of consecutive values for which <code>same</code> holds given once; made by <code>it.dedupBy(same)</code> and <code>it.dedup()</code>.</span></div>
+<div class="listed"><a href="../../std/iter/ScanIter/">ScanIter</a> <span class="kind">struct</span> <span class="summary">— Yields <code>init</code>, then each value <code>f</code> makes of the previous one and the next value of an iterator; made by <code>it.scan(init, f)</code>.</span></div>
+<div class="listed"><a href="../../std/iter/PeekableIter/">PeekableIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of an iterator and lets <a href="../../std/iter/PeekableIter/#method.peek">PeekableIter.peek</a> look at the next one without taking it; made by <code>it.peekable()</code>.</span></div>
+<div class="listed"><a href="../../std/iter/RevIter/">RevIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of a <code>DoubleEnded</code> iterator from its back; made by <code>it.rev()</code>.</span></div>
+<div class="listed"><a href="../../std/iter/CycleIter/">CycleIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of an iterator over and over; made by <code>it.cycle()</code>.</span></div>
+<h2 id="extensions">Extensions</h2>
+<section class="member" id="ext.I">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I.method.map">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> map&lt;<span class="ty">U</span>, <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(f: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">U</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">MapIter</span>&lt;<span class="ty">I</span>, <span class="ty">U</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns an iterator over the values, each passed through <code>f</code>.</p>
+<p>Lazy: <code>f</code> runs as values are pulled. See <a href="../../std/iter/MapIter/">MapIter</a>.</p>
+</section>
+<section class="member" id="ext.I.method.filter">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> filter&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">FilterIter</span>&lt;<span class="ty">I</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns an iterator over the values for which <code>p</code> holds.</p>
+</section>
+<section class="member" id="ext.I.method.take">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> take(n: <span class="ty">int</span>): <span class="ty">TakeIter</span>&lt;<span class="ty">I</span>&gt;</code></pre>
+<p>Returns an iterator over the first <code>n</code> values, or all of them where there are fewer.</p>
+<p>A zero or negative <code>n</code> gives an empty iterator.</p>
+</section>
+<section class="member" id="ext.I.method.skip">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> skip(n: <span class="ty">int</span>): <span class="ty">SkipIter</span>&lt;<span class="ty">I</span>&gt;</code></pre>
+<p>Returns an iterator over the values after the first <code>n</code>.</p>
+<p>A zero or negative <code>n</code> skips nothing.</p>
+</section>
+<section class="member" id="ext.I.method.takeWhile">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> takeWhile&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">TakeWhileIter</span>&lt;<span class="ty">I</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns an iterator over the values up to, not including, the first for which <code>p</code> does not
+hold.</p>
+</section>
+<section class="member" id="ext.I.method.skipWhile">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> skipWhile&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">SkipWhileIter</span>&lt;<span class="ty">I</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns an iterator over the values from the first for which <code>p</code> does not hold on.</p>
+</section>
+<section class="member" id="ext.I.method.stepBy">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> stepBy(n: <span class="ty">int</span>): <span class="ty">StepByIter</span>&lt;<span class="ty">I</span>&gt;</code></pre>
+<p>Returns an iterator over the first value, then every <code>n</code>th after it.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>n</code> is less than 1.</p>
+</section>
+<section class="member" id="ext.I.method.enumerate">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> enumerate(): <span class="ty">EnumerateIter</span>&lt;<span class="ty">I</span>&gt;</code></pre>
+<p>Returns an iterator over <code>(position, value)</code> pairs, positions counted from 0.</p>
+</section>
+<section class="member" id="ext.I.method.inspect">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> inspect&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(f: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">InspectIter</span>&lt;<span class="ty">I</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns an iterator over the values unchanged, calling <code>f</code> on each as it is pulled.</p>
+</section>
+<section class="member" id="ext.I.method.zip">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> zip&lt;<span class="ty">B</span> :: [<span class="ty">Iterable</span>]&gt;(other: <span class="ty">B</span>): <span class="ty">ZipIter</span>&lt;<span class="ty">I</span>, <span class="ty">B</span>.<span class="ty">Iter</span>&gt;</code></pre>
+<p>Returns an iterator over pairs of this iterator's values and <code>other</code>'s at the same position.</p>
+<p><code>other</code> is any <code>Iterable</code>. The pairs end where either side ends.</p>
+</section>
+<section class="member" id="ext.I.method.chain">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> chain&lt;<span class="ty">B</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">I</span>.<span class="ty">Item</span>&gt;]&gt;(other: <span class="ty">B</span>): <span class="ty">ChainIter</span>&lt;<span class="ty">I</span>, <span class="ty">B</span>&gt;</code></pre>
+<p>Returns an iterator over the values, then those of <code>other</code>, an iterator of the same item type.</p>
+</section>
+<section class="member" id="ext.I.method.mapNotNull">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> mapNotNull&lt;<span class="ty">U</span>, <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(f: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; ?<span class="ty">U</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">MapNotNullIter</span>&lt;<span class="ty">I</span>, <span class="ty">U</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns an iterator over the results of <code>f</code> on the values, leaving out every <code>null</code>.</p>
+</section>
+<section class="member" id="ext.I.method.flatMap">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> flatMap&lt;<span class="ty">B</span> :: [<span class="ty">Iterable</span>], <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(
+    f: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">B</span> <span class="kw">throws</span> <span class="ty">E</span>
+): <span class="ty">FlatMapIter</span>&lt;<span class="ty">I</span>, <span class="ty">B</span>, <span class="ty">B</span>.<span class="ty">Iter</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns an iterator over the values of the iterables <code>f</code> returns for each value, one after
+the other.</p>
+</section>
+<section class="member" id="ext.I.method.dedupBy">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> dedupBy&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(same: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>, <span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">DedupIter</span>&lt;<span class="ty">I</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns an iterator that gives each run of consecutive values for which <code>same</code> holds once.</p>
+<p>The first value of a run is kept.</p>
+</section>
+<section class="member" id="ext.I.method.scan">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> scan&lt;<span class="ty">A</span>, <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(init: <span class="ty">A</span>, f: <span class="kw">fn</span>(<span class="ty">A</span>, <span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">A</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">ScanIter</span>&lt;<span class="ty">I</span>, <span class="ty">A</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns an iterator over <code>init</code>, then each running value <code>f</code> makes of the previous one and
+the next value.</p>
+</section>
+<section class="member" id="ext.I.method.peekable">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> peekable(): <span class="ty">PeekableIter</span>&lt;<span class="ty">I</span>&gt;</code></pre>
+<p>Returns an iterator over the values that can <a href="../../std/iter/PeekableIter/#method.peek">PeekableIter.peek</a> at the next one.</p>
+</section>
+<section class="member" id="ext.I.method.count">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> count(): <span class="ty">int</span> <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns how many values there are, walking them all.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I.method.fold">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fold&lt;<span class="ty">A</span>, <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(
+    init: <span class="ty">A</span>,
+    f: <span class="kw">fn</span>(<span class="ty">A</span>, <span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">A</span> <span class="kw">throws</span> <span class="ty">E</span>
+): <span class="ty">A</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Combines the values from <code>init</code> with <code>f</code> and returns the last result.</p>
+<p>Returns <code>init</code> where there are no values.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>f</code> throws.</p>
+</section>
+<section class="member" id="ext.I.method.reduce">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> reduce&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(
+    f: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>, <span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">I</span>.<span class="ty">Item</span> <span class="kw">throws</span> <span class="ty">E</span>
+): ?<span class="ty">I</span>.<span class="ty">Item</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Combines the values with <code>f</code>, starting from the first, and returns the last result.</p>
+<p>Returns <code>null</code> where there are no values, and the only value where there is one.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>f</code> throws.</p>
+</section>
+<section class="member" id="ext.I.method.first">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> first(): ?<span class="ty">I</span>.<span class="ty">Item</span> <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns the first value, or <code>null</code> where there is none.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I.method.last">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> last(): ?<span class="ty">I</span>.<span class="ty">Item</span> <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns the last value, or <code>null</code> where there is none, walking them all.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I.method.nth">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> nth(n: <span class="ty">int</span>): ?<span class="ty">I</span>.<span class="ty">Item</span> <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns the value at position <code>n</code>, counted from 0, or <code>null</code> where there is none.</p>
+<p>A negative <code>n</code> returns <code>null</code> without pulling.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I.method.any">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> any&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns whether <code>p</code> holds for some value.</p>
+<p>Stops at the first value it holds for; <code>false</code> where there are none.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>p</code> throws.</p>
+</section>
+<section class="member" id="ext.I.method.all">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> all&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns whether <code>p</code> holds for every value.</p>
+<p>Stops at the first value it does not hold for; <code>true</code> where there are none.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>p</code> throws.</p>
+</section>
+<section class="member" id="ext.I.method.none">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> none&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns whether <code>p</code> holds for no value.</p>
+<p>Stops at the first value it holds for; <code>true</code> where there are none.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>p</code> throws.</p>
+</section>
+<section class="member" id="ext.I.method.find">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> find&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): ?<span class="ty">I</span>.<span class="ty">Item</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns the first value for which <code>p</code> holds, or <code>null</code> where there is none.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>p</code> throws.</p>
+</section>
+<section class="member" id="ext.I.method.position">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> position&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): ?<span class="ty">int</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns the position, counted from 0, of the first value for which <code>p</code> holds, or <code>null</code>
+where there is none.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>p</code> throws.</p>
+</section>
+<section class="member" id="ext.I.method.minBy">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> minBy&lt;<span class="ty">K</span> :: [<span class="ty">TotalOrder</span>], <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(
+    key: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">K</span> <span class="kw">throws</span> <span class="ty">E</span>
+): ?<span class="ty">I</span>.<span class="ty">Item</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns the value whose <code>key</code> is least, or <code>null</code> where there is none.</p>
+<p>Of values with equal keys, the first wins. <code>key</code> is called once per value.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>key</code> throws.</p>
+</section>
+<section class="member" id="ext.I.method.maxBy">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> maxBy&lt;<span class="ty">K</span> :: [<span class="ty">TotalOrder</span>], <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(
+    key: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">K</span> <span class="kw">throws</span> <span class="ty">E</span>
+): ?<span class="ty">I</span>.<span class="ty">Item</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns the value whose <code>key</code> is greatest, or <code>null</code> where there is none.</p>
+<p>Of values with equal keys, the first wins. <code>key</code> is called once per value.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>key</code> throws.</p>
+</section>
+<section class="member" id="ext.I.method.forEach">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">inline</span> <span class="kw">fn</span> forEach&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(
+    f: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">E</span>
+): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Calls <code>f</code> on every value, in order.</p>
+<p>The function is inline: a lambda written at the call is set in place, so a <code>return</code> in it
+leaves the enclosing function, and <code>break</code> and <code>continue</code> reach the enclosing loops.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>f</code> throws.</p>
+</section>
+<section class="member" id="ext.I.method.toArray">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toArray(): <span class="ty">I</span>.<span class="ty">Item</span>[] <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns the values in a new array, in order.</p>
+<p>Collects in one pass through the array's <code>FromIterator</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I-2">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">B</span>&gt;], <span class="ty">B</span> :: [<span class="ty">Iterable</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-2.method.flatten">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> flatten(): <span class="ty">FlattenIter</span>&lt;<span class="ty">I</span>, <span class="ty">B</span>, <span class="ty">B</span>.<span class="ty">Iter</span>&gt;</code></pre>
+<p>Returns an iterator over the values of the iterables this iterator gives, one after the
+other.</p>
+</section>
+<section class="member" id="ext.I-3">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">T</span>&gt;], <span class="ty">T</span> :: [<span class="ty">Equatable</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-3.method.dedup">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> dedup(): <span class="ty">DedupIter</span>&lt;<span class="ty">I</span>, <span class="ty">never</span>&gt;</code></pre>
+<p>Returns an iterator that gives each run of consecutive equal values once.</p>
+</section>
+<section class="member" id="ext.I-4">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">DoubleEnded</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-4.method.rev">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> rev(): <span class="ty">RevIter</span>&lt;<span class="ty">I</span>&gt;</code></pre>
+<p>Returns an iterator over the values from the back.</p>
+</section>
+<section class="member" id="ext.I-5">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>, <span class="ty">Clone</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-5.method.cycle">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cycle(): <span class="ty">CycleIter</span>&lt;<span class="ty">I</span>&gt;</code></pre>
+<p>Returns an iterator over the values, repeated without end.</p>
+<p>Each round starts from a clone of this iterator as it was; an empty iterator yields nothing.</p>
+</section>
+<section class="member" id="ext.I-6">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">int</span>&gt;]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-6.method.average">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> average(): ?<span class="ty">float</span> <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns the arithmetic mean of the values, or <code>null</code> where there are none.</p>
+<p>The values are summed as <code>float</code>, so the sum does not overflow.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I-7">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">float</span>&gt;]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-7.method.average">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> average(): ?<span class="ty">float</span> <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns the arithmetic mean of the values, or <code>null</code> where there are none.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I-8">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">T</span>&gt;], <span class="ty">T</span> :: [<span class="ty">Num</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-8.method.sum">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sum(): <span class="ty">T</span> <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns the sum of the values; zero where there are none.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I-8.method.product">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> product(): <span class="ty">T</span> <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns the product of the values; one where there are none.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I-9">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">T</span>&gt;], <span class="ty">T</span> :: [<span class="ty">Ordered</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-9.method.min">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> min(): ?<span class="ty">T</span> <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns the least value, or <code>null</code> where there is none.</p>
+<p>Of equal values, the first wins.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I-9.method.max">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> max(): ?<span class="ty">T</span> <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns the greatest value, or <code>null</code> where there is none.</p>
+<p>Of equal values, the first wins.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I-10">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">T</span>&gt;], <span class="ty">T</span> :: [<span class="ty">Display</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-10.method.join">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> join(sep: <span class="ty">string</span>): <span class="ty">string</span> <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns the display texts of the values joined into one string, with <code>sep</code> between each two.</p>
+<p>Returns the empty string where there are no values.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I-11">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-11.method.collect">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> collect&lt;<span class="ty">C</span> :: [<span class="ty">FromIterator</span>&lt;<span class="ty">I</span>.<span class="ty">Item</span>&gt;]&gt;(): <span class="ty">C</span> <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Collects the values into a new value of the expected type, built through its <code>FromIterator</code>.</p>
+<p>The target type comes from the context: <code>let names: Set&lt;string&gt; = words.iter().collect();</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#extensions">Extensions</a></li>
+<li class="level-3"><a href="#ext.I">I</a></li>
+<li class="level-3"><a href="#ext.I-2">I</a></li>
+<li class="level-3"><a href="#ext.I-3">I</a></li>
+<li class="level-3"><a href="#ext.I-4">I</a></li>
+<li class="level-3"><a href="#ext.I-5">I</a></li>
+<li class="level-3"><a href="#ext.I-6">I</a></li>
+<li class="level-3"><a href="#ext.I-7">I</a></li>
+<li class="level-3"><a href="#ext.I-8">I</a></li>
+<li class="level-3"><a href="#ext.I-9">I</a></li>
+<li class="level-3"><a href="#ext.I-10">I</a></li>
+<li class="level-3"><a href="#ext.I-11">I</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

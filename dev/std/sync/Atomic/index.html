@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>class Atomic — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.sync</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/sync/">std.sync</a></li>
+<li><a href="../../../std/sync/AtomicValue/">AtomicValue</a></li>
+<li><a class="current" href="../../../std/sync/Atomic/">Atomic</a></li>
+<li><a href="../../../std/sync/Mutex/">Mutex</a></li>
+<li><a href="../../../std/sync/RwLock/">RwLock</a></li>
+<li><a href="../../../std/sync/Once/">Once</a></li>
+<li><a href="../../../std/sync/Semaphore/">Semaphore</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>class Atomic</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">Atomic</span>&lt;<span class="ty">T</span> :: [<span class="ty">AtomicValue</span>]&gt;</code></pre>
+<p>A value that every thread reads and writes in one step.</p>
+<p>Each operation is sequentially consistent and orders the reads and writes around it: what a
+thread did before a store, a thread that loads what it stored sees.</p>
+<p>Its operations are <code>std.task</code>'s atomic operations on the place of <code>value</code>: an atomic is the
+object around one word for a program that shares it — what holds such a word in a field of
+its own needs no object.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.new">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> new(value: <span class="ty">T</span>): <span class="ty">Atomic</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Creates an atomic that holds <code>value</code>.</p>
+</section>
+<section class="member" id="method.load">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> load(): <span class="ty">T</span></code></pre>
+<p>Returns the value.</p>
+</section>
+<section class="member" id="method.store">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> store(value: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
+<p>Sets the value.</p>
+</section>
+<section class="member" id="method.exchange">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> exchange(value: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Sets the value and returns the one it replaced.</p>
+</section>
+<section class="member" id="method.compareAndSet">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> compareAndSet(expected: <span class="ty">T</span>, desired: <span class="ty">T</span>): <span class="ty">bool</span></code></pre>
+<p>Sets the value to <code>desired</code> where it is <code>expected</code>, in one step, and returns whether it did.</p>
+<p>Returns <code>false</code>, and changes nothing, where the value was another. A class is compared by
+identity: the same object, whatever <code>==</code> says.</p>
+</section>
+<section class="member" id="method.fetchAndAdd">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> fetchAndAdd(n: <span class="ty">int</span>): <span class="ty">int</span></code></pre>
+<p>Adds <code>n</code> and returns the value before. It wraps around, as <code>+%</code> does.</p>
+</section>
+<section class="member" id="method.addAndFetch">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> addAndFetch(n: <span class="ty">int</span>): <span class="ty">int</span></code></pre>
+<p>Adds <code>n</code> and returns the value after. It wraps around, as <code>+%</code> does.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.new">new</a></li>
+<li class="level-3"><a href="#method.load">load</a></li>
+<li class="level-3"><a href="#method.store">store</a></li>
+<li class="level-3"><a href="#method.exchange">exchange</a></li>
+<li class="level-3"><a href="#method.compareAndSet">compareAndSet</a></li>
+<li class="level-3"><a href="#method.fetchAndAdd">fetchAndAdd</a></li>
+<li class="level-3"><a href="#method.addAndFetch">addAndFetch</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

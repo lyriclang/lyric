@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>struct Zone — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.time</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/time/">std.time</a></li>
+<li><a href="../../../std/time/Duration/">Duration</a></li>
+<li><a href="../../../std/time/Instant/">Instant</a></li>
+<li><a href="../../../std/time/Monotonic/">Monotonic</a></li>
+<li><a href="../../../std/time/TimeErrorKind/">TimeErrorKind</a></li>
+<li><a href="../../../std/time/TimeError/">TimeError</a></li>
+<li><a href="../../../std/time/Weekday/">Weekday</a></li>
+<li><a href="../../../std/time/Date/">Date</a></li>
+<li><a href="../../../std/time/Time/">Time</a></li>
+<li><a class="current" href="../../../std/time/Zone/">Zone</a></li>
+<li><a href="../../../std/time/ZoneInfo/">ZoneInfo</a></li>
+<li><a href="../../../std/time/DateTime/">DateTime</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>struct Zone</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Zone</span></code></pre>
+<p class="conforms">Conforms to <code>Equatable</code>.</p>
+<p>A time zone: UTC, a fixed offset, or a zone of the database — its
+transitions and the rule for the years beyond them (TZif, RFC 8536; a POSIX TZ string).
+<code>Zone.utc</code>, <code>Zone.fixed(offset)</code>, <code>Zone.load(&quot;Europe/Berlin&quot;)</code> from the system's database,
+<code>Zone.local()</code> the system's own, <code>Zone.fromTzif(name, bytes)</code> and <code>Zone.fromPosix(name, tz)</code>
+for data of one's own (a <code>tzdata</code> package's). Two zones are equal by name and kind.</p>
+<h2 id="constants">Constants</h2>
+<section class="member" id="const.utc">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">let</span> utc: <span class="ty">Zone</span> = <span class="ty">Zone</span> { label = <span class="str">"UTC"</span>, off = <span class="num">0</span>, rules = <span class="kw">null</span> }</code></pre>
+</section>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.fixed">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fixed(offset: <span class="ty">Duration</span>): <span class="ty">Zone</span> <span class="kw">throws</span> <span class="ty">TimeError</span></code></pre>
+<p>Returns the zone <code>offset</code> east of UTC — west for a negative one.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>TimeError</code> unless the offset is whole minutes under 24 hours, as RFC 3339 writes
+an offset.</p>
+</section>
+<section class="member" id="method.load">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> load(name: <span class="ty">string</span>): <span class="ty">Zone</span> <span class="kw">throws</span> <span class="ty">TimeError</span></code></pre>
+<p>Loads a zone of the system's database, <code>/usr/share/zoneinfo</code> or <code>TZDIR</code>, by its IANA name
+(<code>Europe/Berlin</code>). <code>UTC</code>, <code>Etc/UTC</code> and <code>Z</code> return <code>Zone.utc</code> without the database.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>TimeError</code> with kind <code>NoZoneData</code> where the system has no database (Windows),
+<code>NoSuchZone</code> for a name that is no zone name or that the database does not have, and
+<code>Invalid</code> for a file that is no TZif.</p>
+</section>
+<section class="member" id="method.fromTzif">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromTzif(name: <span class="ty">string</span>, bytes: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">Zone</span> <span class="kw">throws</span> <span class="ty">TimeError</span></code></pre>
+<p>Returns a zone from the bytes of a TZif file (RFC 8536, versions 1 to 4): the transitions,
+the local time types, and the footer's rule for the years beyond.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>TimeError</code> for bytes that are no valid TZif file.</p>
+</section>
+<section class="member" id="method.fromPosix">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromPosix(name: <span class="ty">string</span>, tz: <span class="ty">string</span>): <span class="ty">Zone</span> <span class="kw">throws</span> <span class="ty">TimeError</span></code></pre>
+<p>Returns a zone from a POSIX TZ string (RFC 8536 §3.3.1): <code>CET-1CEST,M3.5.0,M10.5.0/3</code>,
+<code>EST5EDT</code>, <code>&lt;+0330&gt;-3:30</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>TimeError</code> for a string that is no valid TZ string.</p>
+</section>
+<section class="member" id="method.local">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> local(): <span class="ty">Zone</span></code></pre>
+<p>Returns the system's own zone: <code>TZ</code> where set (a name of the database, or a POSIX string),
+else <code>/etc/localtime</code>, else UTC — on Windows, which has no database, UTC.</p>
+</section>
+<section class="member" id="method.name">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> name(): <span class="ty">string</span></code></pre>
+</section>
+<section class="member" id="method.isFixed">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isFixed(): <span class="ty">bool</span></code></pre>
+<p>Returns whether the zone is one offset for all time.</p>
+</section>
+<section class="member" id="method.offset">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> offset(): <span class="ty">Duration</span></code></pre>
+<p>Returns the offset of a fixed zone; for a zone of the database, its offset now.</p>
+</section>
+<section class="member" id="method.offsetAt">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> offsetAt(at: <span class="ty">Instant</span>): <span class="ty">Duration</span></code></pre>
+<p>Returns the offset east of UTC at the moment <code>at</code>.</p>
+</section>
+<section class="member" id="method.infoAt">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> infoAt(at: <span class="ty">Instant</span>): <span class="ty">ZoneInfo</span></code></pre>
+<p>Returns the offset, whether daylight time is in force, and the abbreviation at the moment
+<code>at</code>.</p>
+</section>
+<section class="member" id="method.equals">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> equals(o: <span class="ty">Zone</span>): <span class="ty">bool</span></code></pre>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#constants">Constants</a></li>
+<li class="level-3"><a href="#const.utc">utc</a></li>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.fixed">fixed</a></li>
+<li class="level-3"><a href="#method.load">load</a></li>
+<li class="level-3"><a href="#method.fromTzif">fromTzif</a></li>
+<li class="level-3"><a href="#method.fromPosix">fromPosix</a></li>
+<li class="level-3"><a href="#method.local">local</a></li>
+<li class="level-3"><a href="#method.name">name</a></li>
+<li class="level-3"><a href="#method.isFixed">isFixed</a></li>
+<li class="level-3"><a href="#method.offset">offset</a></li>
+<li class="level-3"><a href="#method.offsetAt">offsetAt</a></li>
+<li class="level-3"><a href="#method.infoAt">infoAt</a></li>
+<li class="level-3"><a href="#method.equals">equals</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.term — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.term</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/term/">std.term</a></li>
+<li><a href="../../std/term/StdStream/">StdStream</a></li>
+<li><a href="../../std/term/Color/">Color</a></li>
+<li><a href="../../std/term/Style/">Style</a></li>
+<li><a href="../../std/term/#fn.isTerminal">isTerminal()</a></li>
+<li><a href="../../std/term/#fn.size">size()</a></li>
+<li><a href="../../std/term/#fn.colorsEnabled">colorsEnabled()</a></li>
+<li><a href="../../std/term/#fn.reset">reset()</a></li>
+<li><a href="../../std/term/#fn.cursorUp">cursorUp()</a></li>
+<li><a href="../../std/term/#fn.cursorDown">cursorDown()</a></li>
+<li><a href="../../std/term/#fn.cursorForward">cursorForward()</a></li>
+<li><a href="../../std/term/#fn.cursorBack">cursorBack()</a></li>
+<li><a href="../../std/term/#fn.cursorTo">cursorTo()</a></li>
+<li><a href="../../std/term/#fn.cursorNextLine">cursorNextLine()</a></li>
+<li><a href="../../std/term/#fn.cursorHide">cursorHide()</a></li>
+<li><a href="../../std/term/#fn.cursorShow">cursorShow()</a></li>
+<li><a href="../../std/term/#fn.cursorSave">cursorSave()</a></li>
+<li><a href="../../std/term/#fn.cursorRestore">cursorRestore()</a></li>
+<li><a href="../../std/term/#fn.clearScreen">clearScreen()</a></li>
+<li><a href="../../std/term/#fn.clearToEnd">clearToEnd()</a></li>
+<li><a href="../../std/term/#fn.eraseLine">eraseLine()</a></li>
+<li><a href="../../std/term/#fn.eraseToEndOfLine">eraseToEndOfLine()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.term</h1>
+<p>The terminal, driven by ECMA-48 escape sequences.</p>
+<p><a href="../../std/term/#fn.isTerminal">isTerminal</a> asks whether a standard stream is a terminal, <a href="../../std/term/#fn.size">size</a> how wide and high the
+terminal on the standard output is. A <a href="../../std/term/Style/">Style</a> is a set of attributes — a foreground and a
+background <a href="../../std/term/Color/">Color</a> (the 16, one of the 256, or RGB), bold, dim, italic, underline, inverse,
+strike — whose <a href="../../std/term/Style/#method.apply">Style.apply</a> wraps a text in the SGR sequence and the reset where styles are
+on (see <a href="../../std/term/#fn.colorsEnabled">colorsEnabled</a>). <a href="../../std/term/#fn.cursorUp">cursorUp</a> and the functions after it return the sequences
+themselves, to print. Under Windows the runtime switches the console to virtual-terminal
+processing once, so the same bytes mean the same there. The module has no raw mode.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/term/StdStream/">StdStream</a> <span class="kind">enum</span> <span class="summary">— One of the three standard streams of the process.</span></div>
+<div class="listed"><a href="../../std/term/Color/">Color</a> <span class="kind">enum</span> <span class="summary">— A terminal color: one of the 16 of ECMA-48 and aixterm, one of the 256, or RGB.</span></div>
+<div class="listed"><a href="../../std/term/Style/">Style</a> <span class="kind">struct</span> <span class="summary">— A set of attributes to put on a text: colors and SGR flags, all off by default.</span></div>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.isTerminal">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isTerminal(stream: <span class="ty">StdStream</span>): <span class="ty">bool</span></code></pre>
+<p>Returns whether the stream is a terminal.</p>
+<p>A stream redirected to a pipe or a file, or not open at all, is not one.</p>
+</section>
+<section class="member" id="fn.size">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> size(): ?(<span class="ty">int</span>, <span class="ty">int</span>)</code></pre>
+<p>Returns the columns and rows of the terminal on the standard output.</p>
+<p>Returns <code>null</code> where the standard output is not a terminal.</p>
+</section>
+<section class="member" id="fn.colorsEnabled">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> colorsEnabled(): <span class="ty">bool</span></code></pre>
+<p>Returns whether styles are written out.</p>
+<p><code>NO_COLOR</code> set and not empty says no, else <code>FORCE_COLOR</code> set and not empty says yes, else
+<code>TERM=dumb</code> says no, else the standard output being a terminal decides. An empty value
+counts as not set, since <code>std.os</code> can set a variable but not unset it.</p>
+</section>
+<section class="member" id="fn.reset">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> reset(): <span class="ty">string</span></code></pre>
+<p>Returns the SGR sequence that turns every style off.</p>
+</section>
+<section class="member" id="fn.cursorUp">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cursorUp(n: <span class="ty">int</span> = <span class="num">1</span>): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that moves the cursor <code>n</code> rows up (<code>CUU</code>).</p>
+</section>
+<section class="member" id="fn.cursorDown">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cursorDown(n: <span class="ty">int</span> = <span class="num">1</span>): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that moves the cursor <code>n</code> rows down (<code>CUD</code>).</p>
+</section>
+<section class="member" id="fn.cursorForward">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cursorForward(n: <span class="ty">int</span> = <span class="num">1</span>): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that moves the cursor <code>n</code> columns right (<code>CUF</code>).</p>
+</section>
+<section class="member" id="fn.cursorBack">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cursorBack(n: <span class="ty">int</span> = <span class="num">1</span>): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that moves the cursor <code>n</code> columns left (<code>CUB</code>).</p>
+</section>
+<section class="member" id="fn.cursorTo">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cursorTo(row: <span class="ty">int</span>, column: <span class="ty">int</span>): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that moves the cursor to the row and column, both counted from 1 (<code>CUP</code>).</p>
+</section>
+<section class="member" id="fn.cursorNextLine">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cursorNextLine(n: <span class="ty">int</span> = <span class="num">1</span>): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that moves the cursor to the start of the line <code>n</code> lines down (<code>CNL</code>).</p>
+</section>
+<section class="member" id="fn.cursorHide">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cursorHide(): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that hides the cursor.</p>
+</section>
+<section class="member" id="fn.cursorShow">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cursorShow(): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that shows the cursor again.</p>
+</section>
+<section class="member" id="fn.cursorSave">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cursorSave(): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that saves the cursor's position (<code>SCOSC</code>).</p>
+<p><a href="../../std/term/#fn.cursorRestore">cursorRestore</a> moves the cursor back there. Both are the forms xterm and the Windows
+console accept.</p>
+</section>
+<section class="member" id="fn.cursorRestore">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cursorRestore(): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that moves the cursor to the position <a href="../../std/term/#fn.cursorSave">cursorSave</a> saved (<code>SCORC</code>).</p>
+</section>
+<section class="member" id="fn.clearScreen">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> clearScreen(): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that erases the whole screen and moves the cursor to the top left.</p>
+</section>
+<section class="member" id="fn.clearToEnd">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> clearToEnd(): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that erases from the cursor to the end of the screen.</p>
+</section>
+<section class="member" id="fn.eraseLine">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> eraseLine(): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that erases the whole line and moves the cursor to its start.</p>
+</section>
+<section class="member" id="fn.eraseToEndOfLine">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> eraseToEndOfLine(): <span class="ty">string</span></code></pre>
+<p>Returns the sequence that erases from the cursor to the end of the line.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.isTerminal">isTerminal</a></li>
+<li class="level-3"><a href="#fn.size">size</a></li>
+<li class="level-3"><a href="#fn.colorsEnabled">colorsEnabled</a></li>
+<li class="level-3"><a href="#fn.reset">reset</a></li>
+<li class="level-3"><a href="#fn.cursorUp">cursorUp</a></li>
+<li class="level-3"><a href="#fn.cursorDown">cursorDown</a></li>
+<li class="level-3"><a href="#fn.cursorForward">cursorForward</a></li>
+<li class="level-3"><a href="#fn.cursorBack">cursorBack</a></li>
+<li class="level-3"><a href="#fn.cursorTo">cursorTo</a></li>
+<li class="level-3"><a href="#fn.cursorNextLine">cursorNextLine</a></li>
+<li class="level-3"><a href="#fn.cursorHide">cursorHide</a></li>
+<li class="level-3"><a href="#fn.cursorShow">cursorShow</a></li>
+<li class="level-3"><a href="#fn.cursorSave">cursorSave</a></li>
+<li class="level-3"><a href="#fn.cursorRestore">cursorRestore</a></li>
+<li class="level-3"><a href="#fn.clearScreen">clearScreen</a></li>
+<li class="level-3"><a href="#fn.clearToEnd">clearToEnd</a></li>
+<li class="level-3"><a href="#fn.eraseLine">eraseLine</a></li>
+<li class="level-3"><a href="#fn.eraseToEndOfLine">eraseToEndOfLine</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

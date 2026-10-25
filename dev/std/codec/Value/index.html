@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>enum Value — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.codec</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/codec/">std.codec</a></li>
+<li><a href="../../../std/codec/Case/">Case</a></li>
+<li><a href="../../../std/codec/Codec/">Codec</a></li>
+<li><a href="../../../std/codec/Encode/">Encode</a></li>
+<li><a href="../../../std/codec/Decode/">Decode</a></li>
+<li><a href="../../../std/codec/Codable/">Codable</a></li>
+<li><a href="../../../std/codec/DecodeErrorKind/">DecodeErrorKind</a></li>
+<li><a href="../../../std/codec/DecodeError/">DecodeError</a></li>
+<li><a href="../../../std/codec/EncodeError/">EncodeError</a></li>
+<li><a href="../../../std/codec/Encoder/">Encoder</a></li>
+<li><a href="../../../std/codec/Decoder/">Decoder</a></li>
+<li><a href="../../../std/codec/Bytes/">Bytes</a></li>
+<li><a class="current" href="../../../std/codec/Value/">Value</a></li>
+<li><a href="../../../std/codec/ValueEncoder/">ValueEncoder</a></li>
+<li><a href="../../../std/codec/ValueDecoder/">ValueDecoder</a></li>
+<li><a href="../../../std/codec/#fn.wireName">wireName()</a></li>
+<li><a href="../../../std/codec/#fn.snakeCase">snakeCase()</a></li>
+<li><a href="../../../std/codec/#fn.camelCase">camelCase()</a></li>
+<li><a href="../../../std/codec/#fn.variantNames">variantNames()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>enum Value</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">enum</span> <span class="ty">Value</span> :: [<span class="ty">Equatable</span>, <span class="ty">Debug</span>]</code></pre>
+<p class="conforms">Conforms to <code>Equatable</code>, <code>Debug</code>, <code>Codable</code>.</p>
+<p>A tree of the ten forms: what any encoder is given and any decoder answers, as a value.
+<code>Value.of(v)</code> is the tree a value writes, <code>tree.read&lt;T&gt;()</code> the value a tree reads as. A struct
+is its name and its fields in order, a variant its enum's name, its own, its index and its
+payload where it has one; a map is its entries in the order written.</p>
+<h2 id="variants">Variants</h2>
+<section class="member" id="variant.Null">
+<pre class="signature"><code class="language-lyric"><span class="ty">Null</span></code></pre>
+</section>
+<section class="member" id="variant.Bool">
+<pre class="signature"><code class="language-lyric"><span class="ty">Bool</span>(<span class="ty">bool</span>)</code></pre>
+</section>
+<section class="member" id="variant.Int">
+<pre class="signature"><code class="language-lyric"><span class="ty">Int</span>(<span class="ty">int</span>)</code></pre>
+</section>
+<section class="member" id="variant.Uint">
+<pre class="signature"><code class="language-lyric"><span class="ty">Uint</span>(<span class="ty">uint</span>)</code></pre>
+</section>
+<section class="member" id="variant.Float">
+<pre class="signature"><code class="language-lyric"><span class="ty">Float</span>(<span class="ty">float</span>)</code></pre>
+</section>
+<section class="member" id="variant.String">
+<pre class="signature"><code class="language-lyric"><span class="ty">String</span>(<span class="ty">string</span>)</code></pre>
+</section>
+<section class="member" id="variant.Bytes">
+<pre class="signature"><code class="language-lyric"><span class="ty">Bytes</span>(<span class="ty">uint8</span>[])</code></pre>
+</section>
+<section class="member" id="variant.Seq">
+<pre class="signature"><code class="language-lyric"><span class="ty">Seq</span>(<span class="ty">List</span>&lt;<span class="ty">Value</span>&gt;)</code></pre>
+</section>
+<section class="member" id="variant.Map">
+<pre class="signature"><code class="language-lyric"><span class="ty">Map</span>(<span class="ty">List</span>&lt;(<span class="ty">Value</span>, <span class="ty">Value</span>)&gt;)</code></pre>
+</section>
+<section class="member" id="variant.Struct">
+<pre class="signature"><code class="language-lyric"><span class="ty">Struct</span>(<span class="ty">string</span>, <span class="ty">List</span>&lt;(<span class="ty">string</span>, <span class="ty">Value</span>)&gt;)</code></pre>
+</section>
+<section class="member" id="variant.Variant">
+<pre class="signature"><code class="language-lyric"><span class="ty">Variant</span>(<span class="ty">string</span>, <span class="ty">string</span>, <span class="ty">int</span>, ?<span class="ty">Box</span>&lt;<span class="ty">Value</span>&gt;)</code></pre>
+</section>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.encoder">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> encoder(): <span class="ty">ValueEncoder</span></code></pre>
+<p>Returns a new encoder that builds a tree.</p>
+</section>
+<section class="member" id="method.of">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> of&lt;<span class="ty">T</span> :: [<span class="ty">Encode</span>]&gt;(v: <span class="ty">T</span>): <span class="ty">Value</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+<p>Returns the tree <code>v</code> writes.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what encoding <code>v</code> throws.</p>
+</section>
+<section class="member" id="method.read">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> read&lt;<span class="ty">T</span> :: [<span class="ty">Decode</span>]&gt;(): <span class="ty">T</span> <span class="kw">throws</span> <span class="ty">DecodeError</span></code></pre>
+<p>Decodes a <code>T</code> out of this tree.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>DecodeError</code> where the tree does not hold a <code>T</code>.</p>
+</section>
+<section class="member" id="method.decoder">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> decoder(): <span class="ty">ValueDecoder</span></code></pre>
+<p>Returns a decoder over this tree, to pass on.</p>
+</section>
+<section class="member" id="method.encode">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> encode&lt;<span class="ty">E</span> :: [<span class="ty">Encoder</span>]&gt;(&amp;e: <span class="ty">E</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.decode">
+<pre class="signature"><code class="language-lyric"><span class="kw">static</span> <span class="kw">fn</span> decode&lt;<span class="ty">D</span> :: [<span class="ty">Decoder</span>]&gt;(&amp;d: <span class="ty">D</span>): <span class="ty">Value</span> <span class="kw">throws</span> <span class="ty">DecodeError</span></code></pre>
+<p>Reads whatever form the decoder has next. A decoder answers the form it is asked for, so
+the tree asks in turn — null, a bool, an int, a uint, a float, a string, bytes, a sequence,
+a map — and takes the first that is no mismatch. A struct or a variant cannot be asked for
+without its name: a format's own tree knows its forms; this one reads the scalars and the
+two anonymous containers.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>DecodeError</code> of kind <code>TypeMismatch</code> where the data holds a struct or a variant,
+or what reading a nested value throws.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#variants">Variants</a></li>
+<li class="level-3"><a href="#variant.Null">Null</a></li>
+<li class="level-3"><a href="#variant.Bool">Bool</a></li>
+<li class="level-3"><a href="#variant.Int">Int</a></li>
+<li class="level-3"><a href="#variant.Uint">Uint</a></li>
+<li class="level-3"><a href="#variant.Float">Float</a></li>
+<li class="level-3"><a href="#variant.String">String</a></li>
+<li class="level-3"><a href="#variant.Bytes">Bytes</a></li>
+<li class="level-3"><a href="#variant.Seq">Seq</a></li>
+<li class="level-3"><a href="#variant.Map">Map</a></li>
+<li class="level-3"><a href="#variant.Struct">Struct</a></li>
+<li class="level-3"><a href="#variant.Variant">Variant</a></li>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.encoder">encoder</a></li>
+<li class="level-3"><a href="#method.of">of</a></li>
+<li class="level-3"><a href="#method.read">read</a></li>
+<li class="level-3"><a href="#method.decoder">decoder</a></li>
+<li class="level-3"><a href="#method.encode">encode</a></li>
+<li class="level-3"><a href="#method.decode">decode</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

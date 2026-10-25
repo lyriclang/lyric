@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.fmt — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.fmt</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/fmt/">std.fmt</a></li>
+<li><a href="../../std/fmt/#fn.format">format()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.fmt</h1>
+<p>Formats text from a template read at run time.</p>
+<p><a href="../../std/fmt/#fn.format">format</a> speaks the f-strings' format language, with the values given apart from the
+template: <code>fmt.format(&quot;{} has {1:&gt;4}&quot;, name, n)</code>. What the compiler checks in an f-string is
+checked here when it runs, and a mistake panics: a template that leaves a brace open or closes
+one it did not open, a value it names that is not given, a spec that is no format or does not
+apply to its value.</p>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.format">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> format(template: <span class="ty">string</span>, args: <span class="ty">Display</span>...): <span class="ty">string</span></code></pre>
+<p>Returns the template's text with each hole replaced by its value.</p>
+<p><code>{}</code> takes the next value and <code>{i}</code> the i-th, counted from 0. The two forms mix; the counter
+of <code>{}</code> advances only on <code>{}</code>. Either may carry a <code>:spec</code> before its closing brace: a format
+that applies to the value's type, or one ending in <code>?</code> for the value's <code>Debug</code> text. <code>{{</code> and
+<code>}}</code> write a single brace. A value no hole names is left out.</p>
+<h4 id="panics">Panics</h4>
+<ul>
+<li>A <code>}</code> that closes no hole and is not part of <code>}}</code>.</li>
+<li>A hole without its closing <code>}</code>, or holding anything but an index and a <code>:spec</code>.</li>
+<li>A hole naming a value beyond those given.</li>
+<li>A spec ending in <code>?</code> for a value that is not <code>Debug</code>.</li>
+<li>A spec that is no format, or does not apply to its value's type.</li>
+</ul>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.format">format</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>struct Base64Url — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.encoding</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/encoding/">std.encoding</a></li>
+<li><a href="../../../std/encoding/EncodingError/">EncodingError</a></li>
+<li><a href="../../../std/encoding/Base64/">Base64</a></li>
+<li><a class="current" href="../../../std/encoding/Base64Url/">Base64Url</a></li>
+<li><a href="../../../std/encoding/Hex/">Hex</a></li>
+<li><a href="../../../std/encoding/Utf16/">Utf16</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>struct Base64Url</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Base64Url</span></code></pre>
+<p>Base64 with the URL- and file-safe alphabet (RFC 4648 §5), <code>-</code> and <code>_</code>, padded as <a href="../../../std/encoding/Base64/">Base64</a> is.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.encode">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> encode(bytes: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">string</span></code></pre>
+<p>Returns <code>bytes</code> as padded URL-safe Base64 text.</p>
+</section>
+<section class="member" id="method.decode">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> decode(s: <span class="ty">StringView</span>): <span class="ty">uint8</span>[] <span class="kw">throws</span> <span class="ty">EncodingError</span></code></pre>
+<p>Returns the bytes that the padded URL-safe Base64 text <code>s</code> encodes.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/encoding/EncodingError/">EncodingError</a> as <a href="../../../std/encoding/Base64/#method.decode">Base64.decode</a> does.</p>
+</section>
+<section class="member" id="method.encodeUnpadded">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> encodeUnpadded(bytes: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">string</span></code></pre>
+<p>Returns <code>bytes</code> as URL-safe Base64 text without the <code>=</code> padding, the form of RFC 7515 §2.
+The text's length is 4k, 4k + 2 or 4k + 3.</p>
+</section>
+<section class="member" id="method.decodeUnpadded">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> decodeUnpadded(s: <span class="ty">StringView</span>): <span class="ty">uint8</span>[] <span class="kw">throws</span> <span class="ty">EncodingError</span></code></pre>
+<p>Returns the bytes that the unpadded URL-safe Base64 text <code>s</code> encodes; as strict as
+<a href="../../../std/encoding/Base64Url/#method.decode">Base64Url.decode</a>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/encoding/EncodingError/">EncodingError</a> for a <code>=</code> anywhere, at the end for a length of 4k + 1, for a
+character outside the alphabet, and for bits past the last byte that are not zero.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.encode">encode</a></li>
+<li class="level-3"><a href="#method.decode">decode</a></li>
+<li class="level-3"><a href="#method.encodeUnpadded">encodeUnpadded</a></li>
+<li class="level-3"><a href="#method.decodeUnpadded">decodeUnpadded</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

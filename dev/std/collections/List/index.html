@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>class List — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.collections</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/collections/">std.collections</a></li>
+<li><a class="current" href="../../../std/collections/List/">List</a></li>
+<li><a href="../../../std/collections/ListIter/">ListIter</a></li>
+<li><a href="../../../std/collections/Map/">Map</a></li>
+<li><a href="../../../std/collections/MapEntriesIter/">MapEntriesIter</a></li>
+<li><a href="../../../std/collections/MapKeysIter/">MapKeysIter</a></li>
+<li><a href="../../../std/collections/MapValuesIter/">MapValuesIter</a></li>
+<li><a href="../../../std/collections/Set/">Set</a></li>
+<li><a href="../../../std/collections/ChunksIter/">ChunksIter</a></li>
+<li><a href="../../../std/collections/WindowsIter/">WindowsIter</a></li>
+<li><a href="../../../std/collections/Deque/">Deque</a></li>
+<li><a href="../../../std/collections/DequeIter/">DequeIter</a></li>
+<li><a href="../../../std/collections/Heap/">Heap</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>class List</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">List</span>&lt;<span class="ty">T</span>&gt; :: [<span class="ty">IndexSet</span>&lt;<span class="ty">int</span>&gt;, <span class="ty">Iterable</span>, <span class="ty">AsSlice</span>&lt;<span class="ty">T</span>&gt;]</code></pre>
+<p class="conforms">Conforms to <code>IndexSet&lt;int&gt;</code>, <code>Iterable</code>, <code>AsSlice&lt;T&gt;</code>, <code>FromArrayLiteral&lt;T&gt;</code>, <code>Equatable</code>, <code>Debug</code>, <code>Display</code>, <code>FromIterator&lt;T&gt;</code>, <code>Contains&lt;T&gt;</code>, <code>Clone</code>.</p>
+<p>A growing array: its elements in order, indexed from 0.</p>
+<p><code>list[i]</code> and <code>list[i] = v</code> work as on an array; <code>list[a..b]</code> is a view of the elements, as
+<code>asSlice()[a..b]</code>. When full, the buffer doubles, so <code>push</code> is amortized constant time. Not safe
+across threads.</p>
+<h4 id="panics">Panics</h4>
+<p><code>list[i]</code> and <code>list[i] = v</code> panic outside <code>0 ≤ i &lt; length()</code>.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.new">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> new(): <span class="ty">List</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Creates an empty list.</p>
+</section>
+<section class="member" id="method.withCapacity">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> withCapacity(n: <span class="ty">int</span>): <span class="ty">List</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Creates an empty list with room for <code>n</code> elements before it grows.</p>
+<p>The room is allocated at the first push.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>n</code> is negative.</p>
+</section>
+<section class="member" id="method.of">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> of(xs: <span class="ty">T</span>[]): <span class="ty">List</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Creates a list of the array's elements, copied.</p>
+</section>
+<section class="member" id="method.length">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> length(): <span class="ty">int</span></code></pre>
+<p>Returns how many elements it holds.</p>
+</section>
+<section class="member" id="method.isEmpty">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isEmpty(): <span class="ty">bool</span></code></pre>
+<p>Returns whether it holds no elements.</p>
+</section>
+<section class="member" id="method.index">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> index(i: <span class="ty">int</span>): <span class="ty">T</span></code></pre>
+<p>Returns the element at <code>i</code>; this is <code>list[i]</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>Outside <code>0 ≤ i &lt; length()</code>, with <code>LYR-RT0003</code>.</p>
+</section>
+<section class="member" id="method.setIndex">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> setIndex(i: <span class="ty">int</span>, v: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
+<p>Replaces the element at <code>i</code> with <code>v</code>; this is <code>list[i] = v</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>Outside <code>0 ≤ i &lt; length()</code>, with <code>LYR-RT0003</code>.</p>
+</section>
+<section class="member" id="method.get">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> get(i: <span class="ty">int</span>): ?<span class="ty">T</span></code></pre>
+<p>Returns the element at <code>i</code>, or <code>null</code> outside <code>0 ≤ i &lt; length()</code>.</p>
+</section>
+<section class="member" id="method.asSlice">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asSlice(): <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Returns a view of the elements in the list's buffer.</p>
+<p>The members of views reach the elements in place: sorting the view sorts the list. A push
+past the room moves the list to a new buffer; a view taken before stays on the old one.</p>
+</section>
+<section class="member" id="method.toArray">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toArray(): <span class="ty">T</span>[]</code></pre>
+<p>Returns the elements copied into a new array, in order.</p>
+</section>
+<section class="member" id="method.push">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> push(v: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
+<p>Appends <code>v</code> at the end.</p>
+<p>Amortized constant time: a full buffer is replaced by one twice its size.</p>
+</section>
+<section class="member" id="method.pushAll">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> pushAll(xs: <span class="ty">T</span>[]): <span class="ty">void</span></code></pre>
+<p>Appends every element of <code>xs</code> at the end, in order.</p>
+</section>
+<section class="member" id="method.pop">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> pop(): ?<span class="ty">T</span></code></pre>
+<p>Removes and returns the last element, or <code>null</code> where there is none.</p>
+</section>
+<section class="member" id="method.insert">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> insert(i: <span class="ty">int</span>, v: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
+<p>Inserts <code>v</code> at <code>i</code>, moving the elements from <code>i</code> on one place towards the end.</p>
+<p>Takes time linear in the number of elements moved.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>i</code> is outside <code>0 ≤ i ≤ length()</code>.</p>
+</section>
+<section class="member" id="method.removeAt">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> removeAt(i: <span class="ty">int</span>): <span class="ty">T</span></code></pre>
+<p>Removes and returns the element at <code>i</code>, moving those after it one place towards the front.</p>
+<p>Takes time linear in the number of elements moved.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>i</code> is outside <code>0 ≤ i &lt; length()</code>, with <code>LYR-RT0003</code>.</p>
+</section>
+<section class="member" id="method.removeWhere">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> removeWhere&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">T</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">int</span> <span class="kw">throws</span> <span class="ty">E</span></code></pre>
+<p>Removes the elements for which <code>p</code> holds, keeping the others in order, and returns how many
+were removed.</p>
+<p>One pass, linear time.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what <code>p</code> throws. The removal stops there: the elements already decided are removed or
+kept, and the rest stay in the list in their order.</p>
+</section>
+<section class="member" id="method.clear">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> clear(): <span class="ty">void</span></code></pre>
+<p>Removes every element; the allocated room stays.</p>
+</section>
+<section class="member" id="method.truncate">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> truncate(n: <span class="ty">int</span>): <span class="ty">void</span></code></pre>
+<p>Keeps the first <code>n</code> elements and removes the rest.</p>
+<p>An <code>n</code> at or past the length keeps all.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>n</code> is negative.</p>
+</section>
+<section class="member" id="method.swap">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> swap(i: <span class="ty">int</span>, j: <span class="ty">int</span>): <span class="ty">void</span></code></pre>
+<p>Exchanges the elements at <code>i</code> and <code>j</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>i</code> or <code>j</code> is outside <code>0 ≤ i &lt; length()</code>.</p>
+</section>
+<section class="member" id="method.iter">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> iter(): <span class="ty">ListIter</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Returns an iterator over the elements, front to back.</p>
+<h4 id="panics">Panics</h4>
+<p>The next pull panics (<code>LYR-RT0016</code>) after a push, a pop or another change of the length while
+the iterator walks.</p>
+</section>
+<section class="member" id="method.from">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> from&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">T</span>&gt;]&gt;(items: <span class="ty">I</span>): <span class="ty">List</span>&lt;<span class="ty">T</span>&gt; <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Creates a list of the values of an iterator, in order: <code>List.from(words.iter())</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of <code>items</code> throws.</p>
+</section>
+<section class="member" id="method.shrinkToFit">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> shrinkToFit(): <span class="ty">void</span></code></pre>
+<p>Shrinks the allocated room to the elements: a buffer of <code>length()</code> slots.</p>
+<p>A view taken before keeps the buffer it was taken of.</p>
+</section>
+<section class="member" id="method.remove">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> remove(x: <span class="ty">T</span>): <span class="ty">bool</span></code></pre>
+<p>Removes the first element equal to <code>x</code> and returns whether there was one.</p>
+</section>
+<section class="member" id="method.dedup">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> dedup(): <span class="ty">void</span></code></pre>
+<p>Removes consecutive repeated elements, keeping the first of each run of equal ones.</p>
+</section>
+<section class="member" id="method.fromLiteral">
+<pre class="signature"><code class="language-lyric"><span class="kw">static</span> <span class="kw">fn</span> fromLiteral(items: <span class="ty">T</span>[]): <span class="ty">List</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+</section>
+<section class="member" id="method.equals">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> equals(o: <span class="ty">List</span>&lt;<span class="ty">T</span>&gt;): <span class="ty">bool</span></code></pre>
+</section>
+<section class="member" id="method.debug">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> debug(): <span class="ty">string</span></code></pre>
+</section>
+<section class="member" id="method.debugTo">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> debugTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
+</section>
+<section class="member" id="method.show">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> show(): <span class="ty">string</span></code></pre>
+</section>
+<section class="member" id="method.showTo">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> showTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
+</section>
+<section class="member" id="method.fromIter">
+<pre class="signature"><code class="language-lyric"><span class="kw">static</span> <span class="kw">fn</span> fromIter&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">T</span>&gt;]&gt;(it: <span class="ty">I</span>): <span class="ty">List</span>&lt;<span class="ty">T</span>&gt; <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+</section>
+<section class="member" id="method.contains">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> contains(x: <span class="ty">T</span>): <span class="ty">bool</span></code></pre>
+<p>Returns whether an element equals <code>x</code>; this is <code>x in list</code>.</p>
+</section>
+<section class="member" id="method.clone">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> clone(): <span class="ty">List</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.new">new</a></li>
+<li class="level-3"><a href="#method.withCapacity">withCapacity</a></li>
+<li class="level-3"><a href="#method.of">of</a></li>
+<li class="level-3"><a href="#method.length">length</a></li>
+<li class="level-3"><a href="#method.isEmpty">isEmpty</a></li>
+<li class="level-3"><a href="#method.index">index</a></li>
+<li class="level-3"><a href="#method.setIndex">setIndex</a></li>
+<li class="level-3"><a href="#method.get">get</a></li>
+<li class="level-3"><a href="#method.asSlice">asSlice</a></li>
+<li class="level-3"><a href="#method.toArray">toArray</a></li>
+<li class="level-3"><a href="#method.push">push</a></li>
+<li class="level-3"><a href="#method.pushAll">pushAll</a></li>
+<li class="level-3"><a href="#method.pop">pop</a></li>
+<li class="level-3"><a href="#method.insert">insert</a></li>
+<li class="level-3"><a href="#method.removeAt">removeAt</a></li>
+<li class="level-3"><a href="#method.removeWhere">removeWhere</a></li>
+<li class="level-3"><a href="#method.clear">clear</a></li>
+<li class="level-3"><a href="#method.truncate">truncate</a></li>
+<li class="level-3"><a href="#method.swap">swap</a></li>
+<li class="level-3"><a href="#method.iter">iter</a></li>
+<li class="level-3"><a href="#method.from">from</a></li>
+<li class="level-3"><a href="#method.shrinkToFit">shrinkToFit</a></li>
+<li class="level-3"><a href="#method.remove">remove</a></li>
+<li class="level-3"><a href="#method.dedup">dedup</a></li>
+<li class="level-3"><a href="#method.fromLiteral">fromLiteral</a></li>
+<li class="level-3"><a href="#method.equals">equals</a></li>
+<li class="level-3"><a href="#method.debug">debug</a></li>
+<li class="level-3"><a href="#method.debugTo">debugTo</a></li>
+<li class="level-3"><a href="#method.show">show</a></li>
+<li class="level-3"><a href="#method.showTo">showTo</a></li>
+<li class="level-3"><a href="#method.fromIter">fromIter</a></li>
+<li class="level-3"><a href="#method.contains">contains</a></li>
+<li class="level-3"><a href="#method.clone">clone</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

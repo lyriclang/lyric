@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.json — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.json</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/json/">std.json</a></li>
+<li><a href="../../std/json/JsonOptions/">JsonOptions</a></li>
+<li><a href="../../std/json/JsonError/">JsonError</a></li>
+<li><a href="../../std/json/JsonValue/">JsonValue</a></li>
+<li><a href="../../std/json/JsonWriter/">JsonWriter</a></li>
+<li><a href="../../std/json/TreeBuilder/">TreeBuilder</a></li>
+<li><a href="../../std/json/JsonReader/">JsonReader</a></li>
+<li><a href="../../std/json/#fn.encode">encode()</a></li>
+<li><a href="../../std/json/#fn.encodeTo">encodeTo()</a></li>
+<li><a href="../../std/json/#fn.parse">parse()</a></li>
+<li><a href="../../std/json/#fn.decode">decode()</a></li>
+<li><a href="../../std/json/#fn.decodeFrom">decodeFrom()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.json</h1>
+<p>Reads and writes JSON by RFC 8259, strictly: <code>JsonWriter</code> and <code>TreeBuilder</code> encode and
+<code>JsonReader</code> decodes in <code>std.codec</code>'s model, <code>JsonValue</code> is the dynamic tree, <code>JsonOptions</code>
+steers the text written, and <code>JsonError</code> is what a text that is no JSON throws. <code>json.encode(v)</code> writes any <code>Encode</code>
+value as text, <code>json.decode&lt;T&gt;(text)</code> reads any <code>Decode</code> value out of one; <code>json.parse(text)</code>
+is the tree. A struct is an object, a sequence an array, a map an object whose keys are
+strings — a number's digits where the key is a number —, bytes a Base64 string, a unit variant
+its name, a variant with a payload <code>{&quot;Name&quot;: payload}</code>. <code>NaN</code> and the infinities have no text
+(RFC 8259 §6): writing one is an <code>EncodeError</code>. The text is read whole into the tree first,
+then decoded from it.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/json/JsonOptions/">JsonOptions</a> <span class="kind">struct</span> <span class="summary">— Steers how the text is written: <code>pretty</code> with newlines and <code>indent</code> spaces per level, <code>sortKeys</code> with an object's keys in order (which goes through the tree).</span></div>
+<div class="listed"><a href="../../std/json/JsonError/">JsonError</a> <span class="kind">struct</span> <span class="summary">— The error a text that is no JSON throws: where (line and column), and what was wrong.</span></div>
+<div class="listed"><a href="../../std/json/JsonValue/">JsonValue</a> <span class="kind">enum</span> <span class="summary">— A JSON document as a value: the six forms, a number as <code>Int</code> where it has no fraction or exponent and fits an <code>int</code>, <code>Float</code> else.</span></div>
+<div class="listed"><a href="../../std/json/JsonWriter/">JsonWriter</a> <span class="kind">class</span> <span class="summary">— The encoder that writes JSON text: compact, or pretty with newlines and indentation.</span></div>
+<div class="listed"><a href="../../std/json/TreeBuilder/">TreeBuilder</a> <span class="kind">class</span> <span class="summary">— An encoder that builds a <code>JsonValue</code>: a struct as an object, a variant as its name or an object of one member, bytes as a Base64 string, a key as its string.</span></div>
+<div class="listed"><a href="../../std/json/JsonReader/">JsonReader</a> <span class="kind">class</span> <span class="summary">— The decoder over a JSON tree: a struct from an object by its members' names, a sequence from an array, a map from an object (its keys as strings, or as the numbers they spell), a variant from its name or from an object of one member, bytes from a Base64 string.</span></div>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.encode">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> encode&lt;<span class="ty">T</span> :: [<span class="ty">Encode</span>]&gt;(v: <span class="ty">T</span>, opts: <span class="ty">JsonOptions</span> = <span class="ty">JsonOptions</span> { }): <span class="ty">string</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+<p>Encodes <code>v</code> as JSON text under <code>opts</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>EncodeError</code> for a <code>NaN</code> or an infinity, a map key that is null, a bool, a float or a
+container, or whatever <code>v</code>'s conformance throws.</p>
+</section>
+<section class="member" id="fn.encodeTo">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> encodeTo&lt;<span class="ty">T</span> :: [<span class="ty">Encode</span>], <span class="ty">W</span> :: [<span class="ty">Writer</span>]&gt;(
+    v: <span class="ty">T</span>,
+    &amp;w: <span class="ty">W</span>,
+    opts: <span class="ty">JsonOptions</span> = <span class="ty">JsonOptions</span> { }
+): <span class="ty">void</span> <span class="kw">throws</span> [<span class="ty">EncodeError</span>, <span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Encodes <code>v</code> as JSON text under <code>opts</code> and writes it into <code>w</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what <code>encode</code> throws, and the <code>IoError</code> or <code>Cancelled</code> of the write.</p>
+</section>
+<section class="member" id="fn.parse">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> parse(text: <span class="ty">StringView</span>): <span class="ty">JsonValue</span> <span class="kw">throws</span> <span class="ty">JsonError</span></code></pre>
+<p>Parses <code>text</code> into the tree it holds, strictly by RFC 8259: one value, with whitespace around
+it and nothing else.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>JsonError</code> with the line and column where the text is no JSON, text follows the value,
+or the document nests deeper than 512 levels.</p>
+</section>
+<section class="member" id="fn.decode">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> decode&lt;<span class="ty">T</span> :: [<span class="ty">Decode</span>]&gt;(text: <span class="ty">StringView</span>): <span class="ty">T</span> <span class="kw">throws</span> [<span class="ty">JsonError</span>, <span class="ty">DecodeError</span>]</code></pre>
+<p>Decodes a <code>T</code> out of <code>text</code>: parses it into the tree, then reads the value out of the tree.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>JsonError</code> where the text is no JSON, and <code>DecodeError</code> where the tree does not hold
+a <code>T</code>.</p>
+</section>
+<section class="member" id="fn.decodeFrom">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> decodeFrom&lt;<span class="ty">T</span> :: [<span class="ty">Decode</span>], <span class="ty">R</span> :: [<span class="ty">Reader</span>]&gt;(
+    &amp;r: <span class="ty">R</span>
+): <span class="ty">T</span> <span class="kw">throws</span> [<span class="ty">JsonError</span>, <span class="ty">DecodeError</span>, <span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Decodes a <code>T</code> out of the text <code>r</code> holds, read to its end first.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what <code>decode</code> throws, and the <code>IoError</code> or <code>Cancelled</code> of the read.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.encode">encode</a></li>
+<li class="level-3"><a href="#fn.encodeTo">encodeTo</a></li>
+<li class="level-3"><a href="#fn.parse">parse</a></li>
+<li class="level-3"><a href="#fn.decode">decode</a></li>
+<li class="level-3"><a href="#fn.decodeFrom">decodeFrom</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

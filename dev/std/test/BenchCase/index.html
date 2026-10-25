@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>struct BenchCase — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.test</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/test/">std.test</a></li>
+<li><a href="../../../std/test/TestCase/">TestCase</a></li>
+<li><a class="current" href="../../../std/test/BenchCase/">BenchCase</a></li>
+<li><a href="../../../std/test/#fn.run">run()</a></li>
+<li><a href="../../../std/test/#fn.subtest">subtest()</a></li>
+<li><a href="../../../std/test/#fn.assertThrows">assertThrows()</a></li>
+<li><a href="../../../std/test/#fn.assertPanics">assertPanics()</a></li>
+<li><a href="../../../std/test/#fn.assertEq">assertEq()</a></li>
+<li><a href="../../../std/test/#fn.assertNotEq">assertNotEq()</a></li>
+<li><a href="../../../std/test/#fn.assertTrue">assertTrue()</a></li>
+<li><a href="../../../std/test/#fn.assertFalse">assertFalse()</a></li>
+<li><a href="../../../std/test/#fn.assertNull">assertNull()</a></li>
+<li><a href="../../../std/test/#fn.assertNotNull">assertNotNull()</a></li>
+<li><a href="../../../std/test/#fn.assertClose">assertClose()</a></li>
+<li><a href="../../../std/test/#fn.assertLess">assertLess()</a></li>
+<li><a href="../../../std/test/#fn.assertGreater">assertGreater()</a></li>
+<li><a href="../../../std/test/#fn.assertContains">assertContains()</a></li>
+<li><a href="../../../std/test/#fn.assertEmpty">assertEmpty()</a></li>
+<li><a href="../../../std/test/#fn.fail">fail()</a></li>
+<li><a href="../../../std/test/#fn.runBenches">runBenches()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>struct BenchCase</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">BenchCase</span></code></pre>
+<p>One benchmark as <code>lyric bench</code> hands it to <a href="../../../std/test/#fn.runBenches">runBenches</a>: its name — the module's path and the
+function's — and its body, handed a bench to measure through.</p>
+<h2 id="fields">Fields</h2>
+<section class="member" id="field.name">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> name: <span class="ty">string</span></code></pre>
+</section>
+<section class="member" id="field.body">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> body: <span class="kw">fn</span>(&amp;<span class="ty">Bench</span>) -&gt; <span class="ty">void</span></code></pre>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#fields">Fields</a></li>
+<li class="level-3"><a href="#field.name">name</a></li>
+<li class="level-3"><a href="#field.body">body</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>enum TomlValue — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.toml</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/toml/">std.toml</a></li>
+<li><a href="../../../std/toml/TomlError/">TomlError</a></li>
+<li><a href="../../../std/toml/TomlDatetime/">TomlDatetime</a></li>
+<li><a href="../../../std/toml/TomlTable/">TomlTable</a></li>
+<li><a class="current" href="../../../std/toml/TomlValue/">TomlValue</a></li>
+<li><a href="../../../std/toml/TreeBuilder/">TreeBuilder</a></li>
+<li><a href="../../../std/toml/TomlReader/">TomlReader</a></li>
+<li><a href="../../../std/toml/#fn.encode">encode()</a></li>
+<li><a href="../../../std/toml/#fn.encodeTo">encodeTo()</a></li>
+<li><a href="../../../std/toml/#fn.parse">parse()</a></li>
+<li><a href="../../../std/toml/#fn.decode">decode()</a></li>
+<li><a href="../../../std/toml/#fn.decodeFrom">decodeFrom()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>enum TomlValue</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">enum</span> <span class="ty">TomlValue</span></code></pre>
+<p class="conforms">Conforms to <code>Equatable</code>, <code>Display</code>, <code>Debug</code>, <code>Index&lt;string&gt;</code>, <code>Codable</code>.</p>
+<p>A TOML value in one of its seven forms; a parsed document is a <code>Table</code>.</p>
+<h2 id="variants">Variants</h2>
+<section class="member" id="variant.String">
+<pre class="signature"><code class="language-lyric"><span class="ty">String</span>(<span class="ty">string</span>)</code></pre>
+</section>
+<section class="member" id="variant.Int">
+<pre class="signature"><code class="language-lyric"><span class="ty">Int</span>(<span class="ty">int</span>)</code></pre>
+</section>
+<section class="member" id="variant.Float">
+<pre class="signature"><code class="language-lyric"><span class="ty">Float</span>(<span class="ty">float</span>)</code></pre>
+</section>
+<section class="member" id="variant.Bool">
+<pre class="signature"><code class="language-lyric"><span class="ty">Bool</span>(<span class="ty">bool</span>)</code></pre>
+</section>
+<section class="member" id="variant.Datetime">
+<pre class="signature"><code class="language-lyric"><span class="ty">Datetime</span>(<span class="ty">TomlDatetime</span>)</code></pre>
+</section>
+<section class="member" id="variant.Array">
+<pre class="signature"><code class="language-lyric"><span class="ty">Array</span>(<span class="ty">List</span>&lt;<span class="ty">TomlValue</span>&gt;)</code></pre>
+</section>
+<section class="member" id="variant.Table">
+<pre class="signature"><code class="language-lyric"><span class="ty">Table</span>(<span class="ty">TomlTable</span>)</code></pre>
+</section>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.equals">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> equals(o: <span class="ty">TomlValue</span>): <span class="ty">bool</span></code></pre>
+<p>Returns whether both values have the same form and equal content; two tables are equal
+when they have the same keys with equal values, in any order.</p>
+</section>
+<section class="member" id="method.show">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> show(): <span class="ty">string</span></code></pre>
+<p>Returns a table as a document, any other value as its inline text.</p>
+</section>
+<section class="member" id="method.showTo">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> showTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
+</section>
+<section class="member" id="method.debug">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> debug(): <span class="ty">string</span></code></pre>
+</section>
+<section class="member" id="method.debugTo">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> debugTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
+</section>
+<section class="member" id="method.index">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> index(k: <span class="ty">string</span>): ?<span class="ty">TomlValue</span></code></pre>
+</section>
+<section class="member" id="method.at">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> at(i: <span class="ty">int</span>): ?<span class="ty">TomlValue</span></code></pre>
+<p>Returns the array element at <code>i</code>, or <code>null</code> where the value is no array or the index is
+out of range.</p>
+</section>
+<section class="member" id="method.path">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> path(p: <span class="ty">string</span>): ?<span class="ty">TomlValue</span></code></pre>
+<p>Returns the value at a path such as <code>&quot;servers.alpha.ports[0]&quot;</code>, or <code>null</code> where a step of
+the path does not exist.</p>
+</section>
+<section class="member" id="method.asString">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asString(): ?<span class="ty">string</span></code></pre>
+</section>
+<section class="member" id="method.asInt">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asInt(): ?<span class="ty">int</span></code></pre>
+</section>
+<section class="member" id="method.asFloat">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asFloat(): ?<span class="ty">float</span></code></pre>
+<p>Returns the number as a float, an <code>Int</code> widened; <code>null</code> for any other form.</p>
+</section>
+<section class="member" id="method.asBool">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asBool(): ?<span class="ty">bool</span></code></pre>
+</section>
+<section class="member" id="method.asDatetime">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asDatetime(): ?<span class="ty">TomlDatetime</span></code></pre>
+</section>
+<section class="member" id="method.asArray">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asArray(): ?<span class="ty">List</span>&lt;<span class="ty">TomlValue</span>&gt;</code></pre>
+</section>
+<section class="member" id="method.asTable">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asTable(): ?<span class="ty">TomlTable</span></code></pre>
+</section>
+<section class="member" id="method.encode">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> encode&lt;<span class="ty">E</span> :: [<span class="ty">Encoder</span>]&gt;(&amp;e: <span class="ty">E</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.decode">
+<pre class="signature"><code class="language-lyric"><span class="kw">static</span> <span class="kw">fn</span> decode&lt;<span class="ty">D</span> :: [<span class="ty">Decoder</span>]&gt;(&amp;d: <span class="ty">D</span>): <span class="ty">TomlValue</span> <span class="kw">throws</span> <span class="ty">DecodeError</span></code></pre>
+</section>
+<section class="member" id="method.reader">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> reader(): <span class="ty">TomlReader</span></code></pre>
+<p>Returns a decoder over this tree, to pass on.</p>
+</section>
+<section class="member" id="method.read">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> read&lt;<span class="ty">T</span> :: [<span class="ty">Decode</span>]&gt;(): <span class="ty">T</span> <span class="kw">throws</span> <span class="ty">DecodeError</span></code></pre>
+<p>Decodes a value of type <code>T</code> from this tree.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>DecodeError</code> where the tree does not fit <code>T</code>.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#variants">Variants</a></li>
+<li class="level-3"><a href="#variant.String">String</a></li>
+<li class="level-3"><a href="#variant.Int">Int</a></li>
+<li class="level-3"><a href="#variant.Float">Float</a></li>
+<li class="level-3"><a href="#variant.Bool">Bool</a></li>
+<li class="level-3"><a href="#variant.Datetime">Datetime</a></li>
+<li class="level-3"><a href="#variant.Array">Array</a></li>
+<li class="level-3"><a href="#variant.Table">Table</a></li>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.equals">equals</a></li>
+<li class="level-3"><a href="#method.show">show</a></li>
+<li class="level-3"><a href="#method.showTo">showTo</a></li>
+<li class="level-3"><a href="#method.debug">debug</a></li>
+<li class="level-3"><a href="#method.debugTo">debugTo</a></li>
+<li class="level-3"><a href="#method.index">index</a></li>
+<li class="level-3"><a href="#method.at">at</a></li>
+<li class="level-3"><a href="#method.path">path</a></li>
+<li class="level-3"><a href="#method.asString">asString</a></li>
+<li class="level-3"><a href="#method.asInt">asInt</a></li>
+<li class="level-3"><a href="#method.asFloat">asFloat</a></li>
+<li class="level-3"><a href="#method.asBool">asBool</a></li>
+<li class="level-3"><a href="#method.asDatetime">asDatetime</a></li>
+<li class="level-3"><a href="#method.asArray">asArray</a></li>
+<li class="level-3"><a href="#method.asTable">asTable</a></li>
+<li class="level-3"><a href="#method.encode">encode</a></li>
+<li class="level-3"><a href="#method.decode">decode</a></li>
+<li class="level-3"><a href="#method.reader">reader</a></li>
+<li class="level-3"><a href="#method.read">read</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

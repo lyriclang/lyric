@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.task — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.task</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/task/">std.task</a></li>
+<li><a href="../../std/task/Cancelled/">Cancelled</a></li>
+<li><a href="../../std/task/PanicInfo/">PanicInfo</a></li>
+<li><a href="../../std/task/TaskStatus/">TaskStatus</a></li>
+<li><a href="../../std/task/Task/">Task</a></li>
+<li><a href="../../std/task/TimedOut/">TimedOut</a></li>
+<li><a href="../../std/task/ChannelClosed/">ChannelClosed</a></li>
+<li><a href="../../std/task/Channel/">Channel</a></li>
+<li><a href="../../std/task/Select/">Select</a></li>
+<li><a href="../../std/task/Selection/">Selection</a></li>
+<li><a href="../../std/task/Timer/">Timer</a></li>
+<li><a href="../../std/task/TaskScope/">TaskScope</a></li>
+<li><a href="../../std/task/#fn.sleep">sleep()</a></li>
+<li><a href="../../std/task/#fn.yieldNow">yieldNow()</a></li>
+<li><a href="../../std/task/#fn.spawn">spawn()</a></li>
+<li><a href="../../std/task/#fn.withTimeout">withTimeout()</a></li>
+<li><a href="../../std/task/#fn.spawnDetached">spawnDetached()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.task</h1>
+<p>Tasks, channels and the scheduler that runs them.</p>
+<p>Each thread has a scheduler, written here over the runtime's park and poller, and <code>main</code> runs
+as a task of it. The module holds <a href="../../std/task/#fn.spawn">spawn</a> and its <a href="../../std/task/Task/">Task</a> with its <a href="../../std/task/TaskStatus/">TaskStatus</a>, <a href="../../std/task/TaskScope/">TaskScope</a>,
+<a href="../../std/task/#fn.spawnDetached">spawnDetached</a>, <a href="../../std/task/#fn.sleep">sleep</a> and <a href="../../std/task/#fn.yieldNow">yieldNow</a>; cancellation through <a href="../../std/task/Cancelled/">Cancelled</a> and <a href="../../std/task/#fn.withTimeout">withTimeout</a>; a
+panic that ends a task, not the process, described by <a href="../../std/task/PanicInfo/">PanicInfo</a>; and <a href="../../std/task/Channel/">Channel</a>, <a href="../../std/task/Select/">Select</a> and
+<a href="../../std/task/Timer/">Timer</a>, which work within a thread and across threads.</p>
+<p>The threads and their pool are std.thread's, the locks std.sync's and the signals std.os's;
+they stand on parts kept here, internal to std: the locks' state, the scheduler, <code>launchOn</code>,
+the registry of the living schedulers and the natives.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/task/Cancelled/">Cancelled</a> <span class="kind">class</span> <span class="summary">— The error a wait throws in a cancelled task, and a suspended <code>yield</code> when <code>close()</code> unwinds its coroutine.</span></div>
+<div class="listed"><a href="../../std/task/PanicInfo/">PanicInfo</a> <span class="kind">class</span> <span class="summary">— Describes a panic that ended a task: its code, its message, and the frames where it happened, as the panic report writes them.</span></div>
+<div class="listed"><a href="../../std/task/TaskStatus/">TaskStatus</a> <span class="kind">enum</span> <span class="summary">— Where a task stands: still running; ended with its value, with an error, with <a href="../../std/task/Cancelled/">Cancelled</a>; or ended by a panic.</span></div>
+<div class="listed"><a href="../../std/task/Task/">Task</a> <span class="kind">class</span> <span class="summary">— The handle of a task, which <a href="../../std/task/#fn.spawn">spawn</a> gives: the body's result once it ended, or the error it ended with.</span></div>
+<div class="listed"><a href="../../std/task/TimedOut/">TimedOut</a> <span class="kind">class</span> <span class="summary">— The error <a href="../../std/task/#fn.withTimeout">withTimeout</a> throws when its time ran out before the body ended.</span></div>
+<div class="listed"><a href="../../std/task/ChannelClosed/">ChannelClosed</a> <span class="kind">class</span> <span class="summary">— The error <a href="../../std/task/Channel/#method.send">Channel.send</a> throws on a closed channel.</span></div>
+<div class="listed"><a href="../../std/task/Channel/">Channel</a> <span class="kind">class</span> <span class="summary">— A queue of values between tasks: values go in with <a href="../../std/task/Channel/#method.send">Channel.send</a> and come out with <a href="../../std/task/Channel/#method.recv">Channel.recv</a>, in the order they went in.</span></div>
+<div class="listed"><a href="../../std/task/Select/">Select</a> <span class="kind">class</span> <span class="summary">— The way into a select, a wait on several channels at once.</span></div>
+<div class="listed"><a href="../../std/task/Selection/">Selection</a> <span class="kind">class</span> <span class="summary">— A select as it is built: its cases, in the order they were added, and a timeout.</span></div>
+<div class="listed"><a href="../../std/task/Timer/">Timer</a> <span class="kind">class</span> <span class="summary">— Timers, as channels a select can wait on.</span></div>
+<div class="listed"><a href="../../std/task/TaskScope/">TaskScope</a> <span class="kind">class</span> <span class="summary">— A scope whose tasks end before it does: structured concurrency.</span></div>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.sleep">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sleep(d: <span class="ty">Duration</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Cancelled</span></code></pre>
+<p>Parks the running task until at least <code>d</code> has passed, while the other tasks of its thread run.</p>
+<p>A sleep of zero or less lets the tasks that are ready run first.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/task/Cancelled/">Cancelled</a> in a cancelled task; a cancel during the sleep ends it early.</p>
+</section>
+<section class="member" id="fn.yieldNow">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> yieldNow(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Cancelled</span></code></pre>
+<p>Lets the other ready tasks of the thread run first: the running task goes behind them.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/task/Cancelled/">Cancelled</a> in a cancelled task, as every wait does.</p>
+</section>
+<section class="member" id="fn.spawn">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> spawn&lt;<span class="ty">T</span>, <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(body: <span class="kw">fn</span>() -&gt; <span class="ty">T</span> <span class="kw">throws</span> <span class="ty">E</span>): (<span class="ty">Task</span>&lt;<span class="ty">T</span>&gt; <span class="kw">throws</span> <span class="ty">E</span>)</code></pre>
+<p>Starts <code>body</code> as a task of the running thread and returns its handle.</p>
+<p>The task runs once the tasks ready before it had their turn, and <a href="../../std/task/Task/#method.await">Task.await</a> on the handle
+gives its value or throws its error — <code>E</code>, what the body throws, the handle's type carries. The
+handle is the only way to that error, so a call that drops it warns; <a href="../../std/task/#fn.spawnDetached">spawnDetached</a> is the
+task nobody awaits, and <a href="../../std/task/TaskScope/#method.spawn">TaskScope.spawn</a> one the scope's <code>close()</code> waits for.</p>
+</section>
+<section class="member" id="fn.withTimeout">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> withTimeout&lt;<span class="ty">T</span>, <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(
+    d: <span class="ty">Duration</span>,
+    body: <span class="kw">fn</span>() -&gt; <span class="ty">T</span> <span class="kw">throws</span> <span class="ty">E</span>
+): <span class="ty">T</span> <span class="kw">throws</span> [<span class="ty">E</span>, <span class="ty">TimedOut</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Runs <code>body</code> as a task of its own and returns what it returns, unless <code>d</code> passes first.</p>
+<p>When <code>d</code> passes first, the body is cancelled, and <a href="../../std/task/TimedOut/">TimedOut</a> is thrown once it has ended. A
+cancel of the caller cancels the body too; whenever this returns, the body has ended.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws the body's own errors as they are; <a href="../../std/task/TimedOut/">TimedOut</a> when <code>d</code> passed before the body ended;
+<a href="../../std/task/Cancelled/">Cancelled</a> when the caller was cancelled.</p>
+</section>
+<section class="member" id="fn.spawnDetached">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> spawnDetached(body: <span class="kw">fn</span>() -&gt; <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Cancelled</span>): <span class="ty">void</span></code></pre>
+<p>Starts <code>body</code> as a task of the running thread, with no handle.</p>
+<p>It runs once the tasks ready before it had their turn, and nobody waits for it — the program
+ends with <code>main</code>, done or not. Only a cancellation may end it early: it handles every other
+error itself.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.sleep">sleep</a></li>
+<li class="level-3"><a href="#fn.yieldNow">yieldNow</a></li>
+<li class="level-3"><a href="#fn.spawn">spawn</a></li>
+<li class="level-3"><a href="#fn.withTimeout">withTimeout</a></li>
+<li class="level-3"><a href="#fn.spawnDetached">spawnDetached</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

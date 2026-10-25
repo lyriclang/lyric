@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.path — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.path</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/path/">std.path</a></li>
+<li><a href="../../std/path/#fn.join">join()</a></li>
+<li><a href="../../std/path/#fn.normalize">normalize()</a></li>
+<li><a href="../../std/path/#fn.fileName">fileName()</a></li>
+<li><a href="../../std/path/#fn.parent">parent()</a></li>
+<li><a href="../../std/path/#fn.extension">extension()</a></li>
+<li><a href="../../std/path/#fn.stem">stem()</a></li>
+<li><a href="../../std/path/#fn.withExtension">withExtension()</a></li>
+<li><a href="../../std/path/#fn.isAbsolute">isAbsolute()</a></li>
+<li><a href="../../std/path/#fn.relative">relative()</a></li>
+<li><a href="../../std/path/#fn.components">components()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.path</h1>
+<p>Lexical operations on paths held as strings. There is no <code>Path</code> type: a path is the text the
+system takes, and these functions take it apart and put it together without touching the file
+system: <a href="../../std/path/#fn.join">join</a>, <a href="../../std/path/#fn.normalize">normalize</a>, <a href="../../std/path/#fn.fileName">fileName</a>, <a href="../../std/path/#fn.parent">parent</a>, <a href="../../std/path/#fn.extension">extension</a>, <a href="../../std/path/#fn.stem">stem</a>, <a href="../../std/path/#fn.withExtension">withExtension</a>,
+<a href="../../std/path/#fn.isAbsolute">isAbsolute</a>, <a href="../../std/path/#fn.relative">relative</a>, <a href="../../std/path/#fn.components">components</a> and <a href="../../std/path/#const.separator">separator</a>. <code>fs.absolute(p)</code>, which needs the
+working directory, is the one that asks the system.</p>
+<p>On Windows both <code>\</code> and <code>/</code> separate, a path may start with a volume — a drive, <code>C:</code>, or a UNC
+share, <code>\\server\share</code> — and names compare without regard to the case of ASCII letters; what
+these functions build, they build with <code>\</code>. Elsewhere <code>/</code> separates and names compare exactly.</p>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.join">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> join(parts: <span class="ty">string</span>...): <span class="ty">string</span></code></pre>
+<p>Returns <code>parts</code> joined by the separator, with empty parts left out and the result normalized;
+the empty string when no part is non-empty. On Windows a drive alone, <code>C:</code>, joins without a
+separator — <code>C:a</code>, relative to the directory current on that drive.</p>
+</section>
+<section class="member" id="fn.normalize">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> normalize(p: <span class="ty">StringView</span>): <span class="ty">string</span></code></pre>
+<p>Returns the shortest path that names what <code>p</code> names, lexically: runs of separators collapse,
+<code>.</code> elements are dropped, a <code>..</code> removes the element before it — at the root it is dropped, at
+the start of a relative path it is kept —, and no separator remains at the end but the root's.
+Returns <code>.</code> for an empty path.</p>
+</section>
+<section class="member" id="fn.fileName">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fileName(p: <span class="ty">StringView</span>): <span class="ty">string</span></code></pre>
+<p>Returns the last element of <code>p</code>, after dropping trailing separators. Returns <code>.</code> for an empty
+path and the separator for a path of separators alone.</p>
+</section>
+<section class="member" id="fn.parent">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> parent(p: <span class="ty">StringView</span>): <span class="ty">string</span></code></pre>
+<p>Returns all but the last element of <code>p</code>, normalized: <code>.</code> where no directory precedes it, the
+root for an element directly under the root.</p>
+</section>
+<section class="member" id="fn.extension">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> extension(p: <span class="ty">StringView</span>): <span class="ty">string</span></code></pre>
+<p>Returns the extension of the last element with its dot — <code>.txt</code> of <code>notes.txt</code> — or the empty
+string. It runs from the last dot of the last element, so of <code>.bashrc</code> it is all of it.</p>
+</section>
+<section class="member" id="fn.stem">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> stem(p: <span class="ty">StringView</span>): <span class="ty">string</span></code></pre>
+<p>Returns the last element without its extension: <code>notes</code> of <code>a/notes.txt</code>.</p>
+</section>
+<section class="member" id="fn.withExtension">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> withExtension(p: <span class="ty">StringView</span>, ext: <span class="ty">StringView</span>): <span class="ty">string</span></code></pre>
+<p>Returns <code>p</code> with its extension replaced by <code>ext</code>, adding the dot where <code>ext</code> lacks one, or with
+the extension removed for an empty <code>ext</code>: <code>withExtension(&quot;a/notes.txt&quot;, &quot;.md&quot;)</code> is <code>a/notes.md</code>.</p>
+</section>
+<section class="member" id="fn.isAbsolute">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isAbsolute(p: <span class="ty">StringView</span>): <span class="ty">bool</span></code></pre>
+<p>Returns whether <code>p</code> names the same place from every working directory: it starts with the
+root; on Windows with a drive and the root, or with a UNC share — <code>\a</code> alone is relative there,
+to the current drive.</p>
+</section>
+<section class="member" id="fn.relative">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> relative(base: <span class="ty">StringView</span>, target: <span class="ty">StringView</span>): ?<span class="ty">string</span></code></pre>
+<p>Returns the path that names <code>target</code> from <code>base</code>, lexically: <code>relative(&quot;/a&quot;, &quot;/a/b/c&quot;)</code> is
+<code>b/c</code>, <code>relative(&quot;/a&quot;, &quot;/b&quot;)</code> is <code>../b</code>, and <code>.</code> for the same place. Returns <code>null</code> where there
+is none — one absolute and the other not, different volumes, or a base whose remaining part
+starts with <code>..</code>.</p>
+</section>
+<section class="member" id="fn.components">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> components(p: <span class="ty">StringView</span>): <span class="ty">string</span>[]</code></pre>
+<p>Returns the parts of <code>p</code> in order, lexically and without normalizing: the root first where
+there is one — <code>/</code>, on Windows the volume with it, <code>C:\</code> —, then each element, with empty
+elements and <code>.</code> left out and <code>..</code> kept.</p>
+</section>
+<h2 id="constants">Constants</h2>
+<section class="member" id="const.separator">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">let</span> separator: <span class="ty">string</span> = <span class="kw">if</span> (onWindows) <span class="str">"\\"</span> <span class="kw">else</span> <span class="str">"/"</span></code></pre>
+<p>The separator the system writes: <code>\</code> on Windows, <code>/</code> elsewhere.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.join">join</a></li>
+<li class="level-3"><a href="#fn.normalize">normalize</a></li>
+<li class="level-3"><a href="#fn.fileName">fileName</a></li>
+<li class="level-3"><a href="#fn.parent">parent</a></li>
+<li class="level-3"><a href="#fn.extension">extension</a></li>
+<li class="level-3"><a href="#fn.stem">stem</a></li>
+<li class="level-3"><a href="#fn.withExtension">withExtension</a></li>
+<li class="level-3"><a href="#fn.isAbsolute">isAbsolute</a></li>
+<li class="level-3"><a href="#fn.relative">relative</a></li>
+<li class="level-3"><a href="#fn.components">components</a></li>
+<li class="level-2"><a href="#constants">Constants</a></li>
+<li class="level-3"><a href="#const.separator">separator</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

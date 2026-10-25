@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.crypto — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.crypto</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/crypto/">std.crypto</a></li>
+<li><a href="../../std/crypto/Digest/">Digest</a></li>
+<li><a href="../../std/crypto/Sha256/">Sha256</a></li>
+<li><a href="../../std/crypto/Sha512/">Sha512</a></li>
+<li><a href="../../std/crypto/Sha1/">Sha1</a></li>
+<li><a href="../../std/crypto/Md5/">Md5</a></li>
+<li><a href="../../std/crypto/Hmac/">Hmac</a></li>
+<li><a href="../../std/crypto/#fn.sha256">sha256()</a></li>
+<li><a href="../../std/crypto/#fn.randomBytes">randomBytes()</a></li>
+<li><a href="../../std/crypto/#fn.randomUint64">randomUint64()</a></li>
+<li><a href="../../std/crypto/#fn.constantTimeEq">constantTimeEq()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.crypto</h1>
+<p>Cryptographic hashes, HMAC and the system's random bytes: the <a href="../../std/crypto/Digest/">Digest</a> interface with <a href="../../std/crypto/Sha256/">Sha256</a>
+and <a href="../../std/crypto/Sha512/">Sha512</a> (FIPS 180-4), <a href="../../std/crypto/Sha1/">Sha1</a> (FIPS 180-4) and <a href="../../std/crypto/Md5/">Md5</a> (RFC 1321) — the last two only for
+formats that require them, never where an attacker chooses the input —, <a href="../../std/crypto/Hmac/">Hmac</a> over any digest
+(RFC 2104), <a href="../../std/crypto/#fn.sha256">sha256</a> for a whole input at once, <a href="../../std/crypto/#fn.randomBytes">randomBytes</a> and <a href="../../std/crypto/#fn.randomUint64">randomUint64</a> from the
+system, and <a href="../../std/crypto/#fn.constantTimeEq">constantTimeEq</a>, a comparison of bytes whose time does not depend on where they
+differ. Everything is written in Lyric; the system's random bytes come through the runtime's
+<code>lyr_random_u64</code>.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/crypto/Digest/">Digest</a> <span class="kind">interface</span> <span class="summary">— A hash fed in pieces: <code>update</code> as often as there are pieces, then <code>finish</code> for the hash of all of them.</span></div>
+<div class="listed"><a href="../../std/crypto/Sha256/">Sha256</a> <span class="kind">class</span> <span class="summary">— SHA-256 (FIPS 180-4 §6.2): 32 bytes of hash over blocks of 64.</span></div>
+<div class="listed"><a href="../../std/crypto/Sha512/">Sha512</a> <span class="kind">class</span> <span class="summary">— SHA-512 (FIPS 180-4 §6.4): 64 bytes of hash over blocks of 128.</span></div>
+<div class="listed"><a href="../../std/crypto/Sha1/">Sha1</a> <span class="kind">class</span> <span class="summary">— SHA-1 (FIPS 180-4 §6.1): 20 bytes of hash over blocks of 64.</span></div>
+<div class="listed"><a href="../../std/crypto/Md5/">Md5</a> <span class="kind">class</span> <span class="summary">— MD5 (RFC 1321): 16 bytes of hash over blocks of 64.</span></div>
+<div class="listed"><a href="../../std/crypto/Hmac/">Hmac</a> <span class="kind">class</span> <span class="summary">— A message authentication code over a digest (RFC 2104): <code>Hmac&lt;Sha256&gt;.new(key)</code>, then <code>update</code> and <code>finish</code> as with a digest.</span></div>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.sha256">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sha256(bytes: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">uint8</span>[<span class="num">32</span>]</code></pre>
+<p>Returns the SHA-256 hash of <code>bytes</code>, computed at once.</p>
+</section>
+<section class="member" id="fn.randomBytes">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> randomBytes(n: <span class="ty">int</span>): <span class="ty">uint8</span>[]</code></pre>
+<p>Returns <code>n</code> random bytes from the system (getrandom, getentropy, RtlGenRandom).</p>
+<h4 id="panics">Panics</h4>
+<p>Panics with <code>LYR-RT0015</code> when the system provides no random bytes.</p>
+</section>
+<section class="member" id="fn.randomUint64">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> randomUint64(): <span class="ty">uint64</span></code></pre>
+<p>Returns 64 random bits from the system.</p>
+<h4 id="panics">Panics</h4>
+<p>Panics with <code>LYR-RT0015</code> when the system provides no random bytes.</p>
+</section>
+<section class="member" id="fn.constantTimeEq">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> constantTimeEq(a: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;, b: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">bool</span></code></pre>
+<p>Returns whether <code>a</code> and <code>b</code> hold the same bytes, in a time that depends on their length alone —
+not on where they first differ, which a comparison that stops early reveals to whoever measures
+it. Slices of different lengths return <code>false</code> at once; lengths are not treated as secret.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.sha256">sha256</a></li>
+<li class="level-3"><a href="#fn.randomBytes">randomBytes</a></li>
+<li class="level-3"><a href="#fn.randomUint64">randomUint64</a></li>
+<li class="level-3"><a href="#fn.constantTimeEq">constantTimeEq</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

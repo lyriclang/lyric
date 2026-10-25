@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>class PipeWriter — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.process</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/process/">std.process</a></li>
+<li><a href="../../../std/process/Stdio/">Stdio</a></li>
+<li><a href="../../../std/process/Command/">Command</a></li>
+<li><a href="../../../std/process/Child/">Child</a></li>
+<li><a href="../../../std/process/ExitStatus/">ExitStatus</a></li>
+<li><a href="../../../std/process/Output/">Output</a></li>
+<li><a href="../../../std/process/PipeReader/">PipeReader</a></li>
+<li><a class="current" href="../../../std/process/PipeWriter/">PipeWriter</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>class PipeWriter</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">PipeWriter</span> :: [<span class="ty">Writer</span>, <span class="ty">Closeable</span>]</code></pre>
+<p class="conforms">Conforms to <code>Writer</code>, <code>Closeable</code>.</p>
+<p>The parent's end of a child's input pipe: a <code>Writer</code> that waits until the pipe takes some;
+writing after the child has closed its end throws <code>BrokenPipe</code>. Closing it ends the child's
+input.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.write">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> write(from: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">int</span> <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Writes from <code>from</code>, waiting until the pipe takes some, and returns how many bytes it took.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a> — <code>Closed</code> for a closed pipe, <code>BrokenPipe</code> when the child closed its end —,
+and <a href="../../../std/task/Cancelled/">Cancelled</a> when the waiting task is cancelled.</p>
+</section>
+<section class="member" id="method.close">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> close(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Closes the pipe — the child reads the end of its input; a task that waits in a write throws
+<code>Closed</code>. A second close does nothing.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a> when the system fails to close it.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.write">write</a></li>
+<li class="level-3"><a href="#method.close">close</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

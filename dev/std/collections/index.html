@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.collections — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.collections</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/collections/">std.collections</a></li>
+<li><a href="../../std/collections/List/">List</a></li>
+<li><a href="../../std/collections/ListIter/">ListIter</a></li>
+<li><a href="../../std/collections/Map/">Map</a></li>
+<li><a href="../../std/collections/MapEntriesIter/">MapEntriesIter</a></li>
+<li><a href="../../std/collections/MapKeysIter/">MapKeysIter</a></li>
+<li><a href="../../std/collections/MapValuesIter/">MapValuesIter</a></li>
+<li><a href="../../std/collections/Set/">Set</a></li>
+<li><a href="../../std/collections/ChunksIter/">ChunksIter</a></li>
+<li><a href="../../std/collections/WindowsIter/">WindowsIter</a></li>
+<li><a href="../../std/collections/Deque/">Deque</a></li>
+<li><a href="../../std/collections/DequeIter/">DequeIter</a></li>
+<li><a href="../../std/collections/Heap/">Heap</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.collections</h1>
+<p>Provides the growable containers of the standard library.</p>
+<ul>
+<li><a href="../../std/collections/List/">List</a>: a growing array, indexed from 0.</li>
+<li><a href="../../std/collections/Map/">Map</a>: keys to values by hash, each key once, in no order of its own.</li>
+<li><a href="../../std/collections/Set/">Set</a>: values by hash, each once, in no order of its own.</li>
+<li><a href="../../std/collections/Deque/">Deque</a>: a double-ended queue, pushed and popped at either end.</li>
+<li><a href="../../std/collections/Heap/">Heap</a>: a binary min-heap.</li>
+</ul>
+<p>Each can be built from an array literal and through <code>collect()</code>, and is <code>Clone</code> where its
+elements are. All but the heap are <code>Iterable</code>, and <code>Equatable</code>, <code>Debug</code> and <code>Display</code> where their
+elements are; the heap is <code>Debug</code>. The iterator methods that build containers — <code>toList</code>,
+<code>toSet</code>, <code>toMap</code>, <code>chunks</code>, <code>windows</code>, <code>sorted</code>, <code>sortedBy</code>, <code>partition</code>, <code>groupBy</code> — live here
+too.</p>
+<p>The containers are not safe across threads: share one through a <code>Mutex</code>.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/collections/List/">List</a> <span class="kind">class</span> <span class="summary">— A growing array: its elements in order, indexed from 0.</span></div>
+<div class="listed"><a href="../../std/collections/ListIter/">ListIter</a> <span class="kind">struct</span> <span class="summary">— Iterates over a list's elements, front to back; made by <a href="../../std/collections/List/#method.iter">List.iter</a>.</span></div>
+<div class="listed"><a href="../../std/collections/Map/">Map</a> <span class="kind">class</span> <span class="summary">— A hash map from keys to values: each key once, in no order of its own.</span></div>
+<div class="listed"><a href="../../std/collections/MapEntriesIter/">MapEntriesIter</a> <span class="kind">struct</span> <span class="summary">— Iterates over a map's entries, <code>(K, V)</code>, slot by slot; made by <a href="../../std/collections/Map/#method.iter">Map.iter</a>.</span></div>
+<div class="listed"><a href="../../std/collections/MapKeysIter/">MapKeysIter</a> <span class="kind">struct</span> <span class="summary">— Iterates over a map's keys or a set's values; made by <a href="../../std/collections/Map/#method.keys">Map.keys</a> and <a href="../../std/collections/Set/#method.iter">Set.iter</a>.</span></div>
+<div class="listed"><a href="../../std/collections/MapValuesIter/">MapValuesIter</a> <span class="kind">struct</span> <span class="summary">— Iterates over a map's values; made by <a href="../../std/collections/Map/#method.values">Map.values</a>.</span></div>
+<div class="listed"><a href="../../std/collections/Set/">Set</a> <span class="kind">class</span> <span class="summary">— A hash set: values, each once, in no order of its own.</span></div>
+<div class="listed"><a href="../../std/collections/ChunksIter/">ChunksIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of an iterator in lists of <code>n</code>; made by <code>it.chunks(n)</code>.</span></div>
+<div class="listed"><a href="../../std/collections/WindowsIter/">WindowsIter</a> <span class="kind">struct</span> <span class="summary">— Yields every run of <code>n</code> consecutive values of an iterator in turn, each in a new list; made by <code>it.windows(n)</code>.</span></div>
+<div class="listed"><a href="../../std/collections/Deque/">Deque</a> <span class="kind">class</span> <span class="summary">— A double-ended queue: values pushed and popped at either end in amortized constant time.</span></div>
+<div class="listed"><a href="../../std/collections/DequeIter/">DequeIter</a> <span class="kind">struct</span> <span class="summary">— Iterates over a deque's values, front to back; made by <a href="../../std/collections/Deque/#method.iter">Deque.iter</a>.</span></div>
+<div class="listed"><a href="../../std/collections/Heap/">Heap</a> <span class="kind">class</span> <span class="summary">— A binary min-heap: <a href="../../std/collections/Heap/#method.peek">Heap.peek</a> and <a href="../../std/collections/Heap/#method.pop">Heap.pop</a> give the least value.</span></div>
+<h2 id="extensions">Extensions</h2>
+<section class="member" id="ext.I">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I.method.toList">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toList(): <span class="ty">List</span>&lt;<span class="ty">I</span>.<span class="ty">Item</span>&gt; <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Collects the values into a new list, in order.</p>
+<p>The list starts with room for the iterator's lower <code>sizeHint</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I-2">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-2.method.chunks">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> chunks(n: <span class="ty">int</span>): <span class="ty">ChunksIter</span>&lt;<span class="ty">I</span>&gt;</code></pre>
+<p>Returns an iterator over the values in lists of <code>n</code>, the last one possibly shorter.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>n</code> is less than 1.</p>
+</section>
+<section class="member" id="ext.I-2.method.windows">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> windows(n: <span class="ty">int</span>): <span class="ty">WindowsIter</span>&lt;<span class="ty">I</span>&gt;</code></pre>
+<p>Returns an iterator over every run of <code>n</code> consecutive values, each in a new list.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>n</code> is less than 1.</p>
+</section>
+<section class="member" id="ext.I-2.method.sortedBy">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sortedBy&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(
+    cmp: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>, <span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">Ordering</span> <span class="kw">throws</span> <span class="ty">E</span>
+): <span class="ty">List</span>&lt;<span class="ty">I</span>.<span class="ty">Item</span>&gt; <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns the values in a new list, sorted by <code>cmp</code>.</p>
+<p>The sort is stable: equal values keep their order.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>cmp</code> throws, as the view's <code>sortBy</code> does.</p>
+</section>
+<section class="member" id="ext.I-2.method.partition">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> partition&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(
+    p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>
+): (<span class="ty">List</span>&lt;<span class="ty">I</span>.<span class="ty">Item</span>&gt;, <span class="ty">List</span>&lt;<span class="ty">I</span>.<span class="ty">Item</span>&gt;) <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Splits the values into two new lists: those for which <code>p</code> holds and the others, each in order.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>p</code> throws.</p>
+</section>
+<section class="member" id="ext.I-2.method.groupBy">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> groupBy&lt;<span class="ty">K</span> :: [<span class="ty">Hashable</span>], <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(
+    key: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">K</span> <span class="kw">throws</span> <span class="ty">E</span>
+): <span class="ty">Map</span>&lt;<span class="ty">K</span>, <span class="ty">List</span>&lt;<span class="ty">I</span>.<span class="ty">Item</span>&gt;, <span class="ty">DefaultHasher</span>&gt; <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Groups the values into a new map from each <code>key</code> to the list of values with that key.</p>
+<p>Eager: walks the whole iterator. Each list keeps the values' order.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator or <code>key</code> throws.</p>
+</section>
+<section class="member" id="ext.I-3">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">T</span>&gt;], <span class="ty">T</span> :: [<span class="ty">TotalOrder</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-3.method.sorted">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sorted(): <span class="ty">List</span>&lt;<span class="ty">T</span>&gt; <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Returns the values in a new list, in ascending order.</p>
+<p>The sort is stable: equal values keep their order.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I-4">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = (<span class="ty">K</span>, <span class="ty">V</span>)&gt;], <span class="ty">K</span> :: [<span class="ty">Hashable</span>], <span class="ty">V</span>&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-4.method.toMap">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toMap(): <span class="ty">Map</span>&lt;<span class="ty">K</span>, <span class="ty">V</span>, <span class="ty">DefaultHasher</span>&gt; <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Collects the pairs into a new map; a later value of a key replaces the earlier one.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+<section class="member" id="ext.I-5">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">T</span>&gt;], <span class="ty">T</span> :: [<span class="ty">Hashable</span>]&gt; <span class="ty">I</span></code></pre>
+</section>
+<section class="member" id="ext.I-5.method.toSet">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toSet(): <span class="ty">Set</span>&lt;<span class="ty">T</span>&gt; <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Collects the values into a new set, each once.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of the iterator throws.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#extensions">Extensions</a></li>
+<li class="level-3"><a href="#ext.I">I</a></li>
+<li class="level-3"><a href="#ext.I-2">I</a></li>
+<li class="level-3"><a href="#ext.I-3">I</a></li>
+<li class="level-3"><a href="#ext.I-4">I</a></li>
+<li class="level-3"><a href="#ext.I-5">I</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

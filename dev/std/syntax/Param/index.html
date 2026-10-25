@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>struct Param — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.syntax</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/syntax/">std.syntax</a></li>
+<li><a href="../../../std/syntax/Span/">Span</a></li>
+<li><a href="../../../std/syntax/Ident/">Ident</a></li>
+<li><a href="../../../std/syntax/Visibility/">Visibility</a></li>
+<li><a href="../../../std/syntax/Literal/">Literal</a></li>
+<li><a href="../../../std/syntax/UnaryOp/">UnaryOp</a></li>
+<li><a href="../../../std/syntax/PostfixOp/">PostfixOp</a></li>
+<li><a href="../../../std/syntax/BinaryOp/">BinaryOp</a></li>
+<li><a href="../../../std/syntax/LambdaForm/">LambdaForm</a></li>
+<li><a href="../../../std/syntax/TryKind/">TryKind</a></li>
+<li><a href="../../../std/syntax/Segment/">Segment</a></li>
+<li><a href="../../../std/syntax/Arg/">Arg</a></li>
+<li><a href="../../../std/syntax/FieldInit/">FieldInit</a></li>
+<li><a href="../../../std/syntax/WithField/">WithField</a></li>
+<li><a href="../../../std/syntax/LambdaParam/">LambdaParam</a></li>
+<li><a href="../../../std/syntax/Body/">Body</a></li>
+<li><a href="../../../std/syntax/Arm/">Arm</a></li>
+<li><a href="../../../std/syntax/Catch/">Catch</a></li>
+<li><a href="../../../std/syntax/Expr/">Expr</a></li>
+<li><a href="../../../std/syntax/Stmt/">Stmt</a></li>
+<li><a href="../../../std/syntax/Block/">Block</a></li>
+<li><a href="../../../std/syntax/FieldPattern/">FieldPattern</a></li>
+<li><a href="../../../std/syntax/Pattern/">Pattern</a></li>
+<li><a href="../../../std/syntax/Type/">Type</a></li>
+<li><a href="../../../std/syntax/Attribute/">Attribute</a></li>
+<li><a href="../../../std/syntax/GenericParam/">GenericParam</a></li>
+<li><a class="current" href="../../../std/syntax/Param/">Param</a></li>
+<li><a href="../../../std/syntax/FnDecl/">FnDecl</a></li>
+<li><a href="../../../std/syntax/FieldDecl/">FieldDecl</a></li>
+<li><a href="../../../std/syntax/LetDecl/">LetDecl</a></li>
+<li><a href="../../../std/syntax/AssocType/">AssocType</a></li>
+<li><a href="../../../std/syntax/StructDecl/">StructDecl</a></li>
+<li><a href="../../../std/syntax/ClassDecl/">ClassDecl</a></li>
+<li><a href="../../../std/syntax/Variant/">Variant</a></li>
+<li><a href="../../../std/syntax/EnumDecl/">EnumDecl</a></li>
+<li><a href="../../../std/syntax/InterfaceDecl/">InterfaceDecl</a></li>
+<li><a href="../../../std/syntax/ExtendDecl/">ExtendDecl</a></li>
+<li><a href="../../../std/syntax/AliasDecl/">AliasDecl</a></li>
+<li><a href="../../../std/syntax/ImportDecl/">ImportDecl</a></li>
+<li><a href="../../../std/syntax/Decl/">Decl</a></li>
+<li><a href="../../../std/syntax/Node/">Node</a></li>
+<li><a href="../../../std/syntax/#fn.parseExpr">parseExpr()</a></li>
+<li><a href="../../../std/syntax/#fn.parseStmts">parseStmts()</a></li>
+<li><a href="../../../std/syntax/#fn.parseDecls">parseDecls()</a></li>
+<li><a href="../../../std/syntax/#fn.error">error()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>struct Param</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Param</span> :: [<span class="ty">Debug</span>]</code></pre>
+<p class="conforms">Conforms to <code>Debug</code>.</p>
+<p>A parameter of a function: <code>name: T</code>, <code>&amp;name: T</code>, <code>name: T = default</code>, <code>name: T...</code>.</p>
+<h2 id="fields">Fields</h2>
+<section class="member" id="field.name">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> name: <span class="ty">Ident</span></code></pre>
+</section>
+<section class="member" id="field.type">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> type: <span class="ty">Type</span></code></pre>
+</section>
+<section class="member" id="field.default">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> default: ?<span class="ty">Expr</span></code></pre>
+</section>
+<section class="member" id="field.isParams">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> isParams: <span class="ty">bool</span></code></pre>
+</section>
+<section class="member" id="field.isEllipsis">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> isEllipsis: <span class="ty">bool</span></code></pre>
+</section>
+<section class="member" id="field.isPlace">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> isPlace: <span class="ty">bool</span></code></pre>
+</section>
+<section class="member" id="field.attributes">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> attributes: <span class="ty">Attribute</span>[]</code></pre>
+</section>
+<section class="member" id="field.span">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> span: <span class="ty">Span</span></code></pre>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#fields">Fields</a></li>
+<li class="level-3"><a href="#field.name">name</a></li>
+<li class="level-3"><a href="#field.type">type</a></li>
+<li class="level-3"><a href="#field.default">default</a></li>
+<li class="level-3"><a href="#field.isParams">isParams</a></li>
+<li class="level-3"><a href="#field.isEllipsis">isEllipsis</a></li>
+<li class="level-3"><a href="#field.isPlace">isPlace</a></li>
+<li class="level-3"><a href="#field.attributes">attributes</a></li>
+<li class="level-3"><a href="#field.span">span</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>class Random — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.random</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/random/">std.random</a></li>
+<li><a class="current" href="../../../std/random/Random/">Random</a></li>
+<li><a href="../../../std/random/#fn.nextInRange">nextInRange()</a></li>
+<li><a href="../../../std/random/#fn.nextFloat">nextFloat()</a></li>
+<li><a href="../../../std/random/#fn.shuffle">shuffle()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>class Random</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">Random</span></code></pre>
+<p>A generator of random numbers: ChaCha8 (eight rounds), 64 bits a draw.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.seeded">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> seeded(seed: <span class="ty">uint64</span>): <span class="ty">Random</span></code></pre>
+<p>Returns the generator whose stream <code>seed</code> names.</p>
+<p>The same seed gives the same stream in every 5.x.</p>
+</section>
+<section class="member" id="method.fresh">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fresh(): <span class="ty">Random</span></code></pre>
+<p>Returns a generator keyed from 32 of the system's random bytes, a stream no run repeats.</p>
+</section>
+<section class="member" id="method.nextUint64">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> nextUint64(): <span class="ty">uint64</span></code></pre>
+<p>Returns the next 64 bits of the stream.</p>
+</section>
+<section class="member" id="method.nextInt">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> nextInt(): <span class="ty">int</span></code></pre>
+<p>Returns the next 64 bits as an <code>int</code>, each value from <code>int.min</code> to <code>int.max</code> alike.</p>
+</section>
+<section class="member" id="method.nextInRange">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> nextInRange(r: <span class="ty">Range</span>&lt;<span class="ty">int</span>&gt;): <span class="ty">int</span></code></pre>
+<p>Returns an integer of <code>r</code>, each alike.</p>
+<p>Draws that would favour the low results are rejected and drawn again, so a call can take
+more than one draw.</p>
+<h4 id="panics">Panics</h4>
+<p>Panics if <code>r</code> is empty.</p>
+</section>
+<section class="member" id="method.nextFloat">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> nextFloat(): <span class="ty">float</span></code></pre>
+<p>Returns a float in [0, 1) from the high 53 bits of a draw, each value of that grid alike.</p>
+</section>
+<section class="member" id="method.nextBool">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> nextBool(): <span class="ty">bool</span></code></pre>
+<p>Returns <code>true</code> or <code>false</code>, alike, from the high bit of a draw.</p>
+</section>
+<section class="member" id="method.nextBytes">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> nextBytes(into: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">void</span></code></pre>
+<p>Fills <code>into</code> with random bytes.</p>
+<p>Each draw gives eight bytes, the low byte first; a tail of fewer than eight takes a draw's
+low bytes.</p>
+</section>
+<section class="member" id="method.nextNormal">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> nextNormal(mean: <span class="ty">float</span> = <span class="num">0.0</span>, stdDev: <span class="ty">float</span> = <span class="num">1.0</span>): <span class="ty">float</span></code></pre>
+<p>Returns a normally distributed float with the given mean and standard deviation.</p>
+<p>Uses Marsaglia's polar method: two draws a try, a try taken inside the unit circle, one of
+the pair it makes kept.</p>
+</section>
+<section class="member" id="method.shuffle">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> shuffle&lt;<span class="ty">T</span>&gt;(s: <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;): <span class="ty">void</span></code></pre>
+<p>Shuffles <code>s</code> in place, each of its orders alike (Fisher–Yates, from the back).</p>
+</section>
+<section class="member" id="method.choice">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> choice&lt;<span class="ty">T</span>&gt;(s: <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;): ?<span class="ty">T</span></code></pre>
+<p>Returns an element of <code>s</code>, each alike.</p>
+<p>Returns <code>null</code> for an empty slice, without drawing.</p>
+</section>
+<section class="member" id="method.sample">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> sample&lt;<span class="ty">T</span>&gt;(s: <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;, k: <span class="ty">int</span>): <span class="ty">T</span>[]</code></pre>
+<p>Returns <code>k</code> elements of <code>s</code> from <code>k</code> different places, in a random order.</p>
+<h4 id="panics">Panics</h4>
+<p>Panics if <code>k</code> is negative or greater than the length of <code>s</code>.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.seeded">seeded</a></li>
+<li class="level-3"><a href="#method.fresh">fresh</a></li>
+<li class="level-3"><a href="#method.nextUint64">nextUint64</a></li>
+<li class="level-3"><a href="#method.nextInt">nextInt</a></li>
+<li class="level-3"><a href="#method.nextInRange">nextInRange</a></li>
+<li class="level-3"><a href="#method.nextFloat">nextFloat</a></li>
+<li class="level-3"><a href="#method.nextBool">nextBool</a></li>
+<li class="level-3"><a href="#method.nextBytes">nextBytes</a></li>
+<li class="level-3"><a href="#method.nextNormal">nextNormal</a></li>
+<li class="level-3"><a href="#method.shuffle">shuffle</a></li>
+<li class="level-3"><a href="#method.choice">choice</a></li>
+<li class="level-3"><a href="#method.sample">sample</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

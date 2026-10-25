@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>class UdpSocket — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.net</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/net/">std.net</a></li>
+<li><a href="../../../std/net/IpAddr/">IpAddr</a></li>
+<li><a href="../../../std/net/SocketAddr/">SocketAddr</a></li>
+<li><a href="../../../std/net/TcpListener/">TcpListener</a></li>
+<li><a href="../../../std/net/Shutdown/">Shutdown</a></li>
+<li><a href="../../../std/net/TcpStream/">TcpStream</a></li>
+<li><a class="current" href="../../../std/net/UdpSocket/">UdpSocket</a></li>
+<li><a href="../../../std/net/#fn.resolve">resolve()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>class UdpSocket</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">UdpSocket</span> :: [<span class="ty">Closeable</span>]</code></pre>
+<p class="conforms">Conforms to <code>Closeable</code>.</p>
+<p>A UDP socket: datagrams sent to an address, and received with their sender's.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.bind">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> bind(addr: <span class="ty">SocketAddr</span>): <span class="ty">UdpSocket</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns a socket bound to <code>addr</code>; port 0 asks the system for a free one, which <code>localAddr</code>
+reports.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a> with the address when the socket cannot be created or bound.</p>
+</section>
+<section class="member" id="method.sendTo">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> sendTo(from: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;, addr: <span class="ty">SocketAddr</span>): <span class="ty">int</span> <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Sends <code>from</code> as one datagram to <code>addr</code>, waiting until the system takes it, and returns how
+many bytes went — all of them, since a datagram goes whole or not at all.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a> — <code>Closed</code> after <code>close()</code>, else the system's failure with the address —,
+and <a href="../../../std/task/Cancelled/">Cancelled</a> when the waiting task is cancelled.</p>
+</section>
+<section class="member" id="method.recvFrom">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> recvFrom(into: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): (<span class="ty">int</span>, <span class="ty">SocketAddr</span>) <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Receives the next datagram, waiting until one comes, and returns how many of its bytes went
+into <code>into</code> — the rest of a longer one is lost — and who sent it.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a> — <code>Closed</code> after <code>close()</code> —, and <a href="../../../std/task/Cancelled/">Cancelled</a> when the waiting task is
+cancelled.</p>
+</section>
+<section class="member" id="method.localAddr">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> localAddr(): <span class="ty">SocketAddr</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns the address it is bound to — with the port the system chose, where <code>bind</code> asked
+for 0.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a>: <code>Closed</code> after <code>close()</code>, else the system's failure.</p>
+</section>
+<section class="member" id="method.close">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> close(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Closes the socket; a task that waits in one of its calls throws <code>Closed</code>. A second close
+does nothing.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a> when the system fails to close it.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.bind">bind</a></li>
+<li class="level-3"><a href="#method.sendTo">sendTo</a></li>
+<li class="level-3"><a href="#method.recvFrom">recvFrom</a></li>
+<li class="level-3"><a href="#method.localAddr">localAddr</a></li>
+<li class="level-3"><a href="#method.close">close</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

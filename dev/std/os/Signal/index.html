@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>enum Signal — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.os</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/os/">std.os</a></li>
+<li><a class="current" href="../../../std/os/Signal/">Signal</a></li>
+<li><a href="../../../std/os/#fn.args">args()</a></li>
+<li><a href="../../../std/os/#fn.env">env()</a></li>
+<li><a href="../../../std/os/#fn.envs">envs()</a></li>
+<li><a href="../../../std/os/#fn.setEnv">setEnv()</a></li>
+<li><a href="../../../std/os/#fn.cwd">cwd()</a></li>
+<li><a href="../../../std/os/#fn.setCwd">setCwd()</a></li>
+<li><a href="../../../std/os/#fn.exit">exit()</a></li>
+<li><a href="../../../std/os/#fn.platform">platform()</a></li>
+<li><a href="../../../std/os/#fn.arch">arch()</a></li>
+<li><a href="../../../std/os/#fn.homeDir">homeDir()</a></li>
+<li><a href="../../../std/os/#fn.tempDir">tempDir()</a></li>
+<li><a href="../../../std/os/#fn.hostname">hostname()</a></li>
+<li><a href="../../../std/os/#fn.cpuCount">cpuCount()</a></li>
+<li><a href="../../../std/os/#fn.pid">pid()</a></li>
+<li><a href="../../../std/os/#fn.signals">signals()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>enum Signal</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">enum</span> <span class="ty">Signal</span></code></pre>
+<p>A signal of the system, by an abstract name: Windows knows only <code>Interrupt</code> (Ctrl+C,
+Ctrl+Break) and <code>Terminate</code> (its console closes). <code>Other(n)</code> is the system's number <code>n</code>.</p>
+<h2 id="variants">Variants</h2>
+<section class="member" id="variant.Interrupt">
+<pre class="signature"><code class="language-lyric"><span class="ty">Interrupt</span></code></pre>
+</section>
+<section class="member" id="variant.Terminate">
+<pre class="signature"><code class="language-lyric"><span class="ty">Terminate</span></code></pre>
+</section>
+<section class="member" id="variant.Hangup">
+<pre class="signature"><code class="language-lyric"><span class="ty">Hangup</span></code></pre>
+</section>
+<section class="member" id="variant.Quit">
+<pre class="signature"><code class="language-lyric"><span class="ty">Quit</span></code></pre>
+</section>
+<section class="member" id="variant.User1">
+<pre class="signature"><code class="language-lyric"><span class="ty">User1</span></code></pre>
+</section>
+<section class="member" id="variant.User2">
+<pre class="signature"><code class="language-lyric"><span class="ty">User2</span></code></pre>
+</section>
+<section class="member" id="variant.WindowChange">
+<pre class="signature"><code class="language-lyric"><span class="ty">WindowChange</span></code></pre>
+</section>
+<section class="member" id="variant.Other">
+<pre class="signature"><code class="language-lyric"><span class="ty">Other</span>(<span class="ty">int</span>)</code></pre>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#variants">Variants</a></li>
+<li class="level-3"><a href="#variant.Interrupt">Interrupt</a></li>
+<li class="level-3"><a href="#variant.Terminate">Terminate</a></li>
+<li class="level-3"><a href="#variant.Hangup">Hangup</a></li>
+<li class="level-3"><a href="#variant.Quit">Quit</a></li>
+<li class="level-3"><a href="#variant.User1">User1</a></li>
+<li class="level-3"><a href="#variant.User2">User2</a></li>
+<li class="level-3"><a href="#variant.WindowChange">WindowChange</a></li>
+<li class="level-3"><a href="#variant.Other">Other</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

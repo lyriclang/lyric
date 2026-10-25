@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.encoding — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.encoding</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/encoding/">std.encoding</a></li>
+<li><a href="../../std/encoding/EncodingError/">EncodingError</a></li>
+<li><a href="../../std/encoding/Base64/">Base64</a></li>
+<li><a href="../../std/encoding/Base64Url/">Base64Url</a></li>
+<li><a href="../../std/encoding/Hex/">Hex</a></li>
+<li><a href="../../std/encoding/Utf16/">Utf16</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.encoding</h1>
+<p>Encodes bytes as text and back: <a href="../../std/encoding/Base64/">Base64</a> and <a href="../../std/encoding/Base64Url/">Base64Url</a> (RFC 4648 §4, §5), <a href="../../std/encoding/Hex/">Hex</a> (RFC 4648
+§8) and <a href="../../std/encoding/Utf16/">Utf16</a> (RFC 2781), plus reading and writing fixed-width integers as bytes, either end
+first. Each encoding is a struct of static members used as a name space:
+<code>Base64.encode(bytes)</code>.</p>
+<p>This module handles bytes and text only; writing the shape of a value — its fields, variants
+and elements — into a format such as JSON is <code>std.codec</code>'s job.</p>
+<p>The decoders are strict, as RFC 4648 §3.3 and §3.5 allow: Base64 requires its padding and zero
+bits past the last byte, and accepts no whitespace. Input that is not the encoding throws an
+<a href="../../std/encoding/EncodingError/">EncodingError</a> at the first offset that is wrong.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/encoding/EncodingError/">EncodingError</a> <span class="kind">struct</span> <span class="summary">— The error thrown for text that is not the encoding it was decoded as: where — a byte of the text, a unit of UTF-16 — and what is wrong there.</span></div>
+<div class="listed"><a href="../../std/encoding/Base64/">Base64</a> <span class="kind">struct</span> <span class="summary">— Base64 with RFC 4648's alphabet (§4), <code>+</code> and <code>/</code>, padded with <code>=</code> to a multiple of four.</span></div>
+<div class="listed"><a href="../../std/encoding/Base64Url/">Base64Url</a> <span class="kind">struct</span> <span class="summary">— Base64 with the URL- and file-safe alphabet (RFC 4648 §5), <code>-</code> and <code>_</code>, padded as <a href="../../std/encoding/Base64/">Base64</a> is.</span></div>
+<div class="listed"><a href="../../std/encoding/Hex/">Hex</a> <span class="kind">struct</span> <span class="summary">— Hexadecimal, two digits per byte: <code>encode</code> writes small letters, <code>decode</code> reads either case.</span></div>
+<div class="listed"><a href="../../std/encoding/Utf16/">Utf16</a> <span class="kind">struct</span> <span class="summary">— Text as UTF-16 code units and back.</span></div>
+<h2 id="extensions">Extensions</h2>
+<section class="member" id="ext.int8">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">int8</span></code></pre>
+</section>
+<section class="member" id="ext.int8.method.fromBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesLE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">int8</span></code></pre>
+</section>
+<section class="member" id="ext.int8.method.fromBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesBE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">int8</span></code></pre>
+</section>
+<section class="member" id="ext.int8.method.toBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesLE(): <span class="ty">uint8</span>[<span class="num">1</span>]</code></pre>
+</section>
+<section class="member" id="ext.int8.method.toBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesBE(): <span class="ty">uint8</span>[<span class="num">1</span>]</code></pre>
+</section>
+<section class="member" id="ext.int16">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">int16</span></code></pre>
+</section>
+<section class="member" id="ext.int16.method.fromBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesLE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">int16</span></code></pre>
+</section>
+<section class="member" id="ext.int16.method.fromBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesBE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">int16</span></code></pre>
+</section>
+<section class="member" id="ext.int16.method.toBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesLE(): <span class="ty">uint8</span>[<span class="num">2</span>]</code></pre>
+</section>
+<section class="member" id="ext.int16.method.toBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesBE(): <span class="ty">uint8</span>[<span class="num">2</span>]</code></pre>
+</section>
+<section class="member" id="ext.int32">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">int32</span></code></pre>
+</section>
+<section class="member" id="ext.int32.method.fromBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesLE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">int32</span></code></pre>
+</section>
+<section class="member" id="ext.int32.method.fromBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesBE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">int32</span></code></pre>
+</section>
+<section class="member" id="ext.int32.method.toBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesLE(): <span class="ty">uint8</span>[<span class="num">4</span>]</code></pre>
+</section>
+<section class="member" id="ext.int32.method.toBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesBE(): <span class="ty">uint8</span>[<span class="num">4</span>]</code></pre>
+</section>
+<section class="member" id="ext.int">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">int</span></code></pre>
+</section>
+<section class="member" id="ext.int.method.fromBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesLE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">int</span></code></pre>
+</section>
+<section class="member" id="ext.int.method.fromBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesBE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">int</span></code></pre>
+</section>
+<section class="member" id="ext.int.method.toBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesLE(): <span class="ty">uint8</span>[<span class="num">8</span>]</code></pre>
+</section>
+<section class="member" id="ext.int.method.toBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesBE(): <span class="ty">uint8</span>[<span class="num">8</span>]</code></pre>
+</section>
+<section class="member" id="ext.uint8">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">uint8</span></code></pre>
+</section>
+<section class="member" id="ext.uint8.method.fromBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesLE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">uint8</span></code></pre>
+</section>
+<section class="member" id="ext.uint8.method.fromBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesBE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">uint8</span></code></pre>
+</section>
+<section class="member" id="ext.uint8.method.toBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesLE(): <span class="ty">uint8</span>[<span class="num">1</span>]</code></pre>
+</section>
+<section class="member" id="ext.uint8.method.toBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesBE(): <span class="ty">uint8</span>[<span class="num">1</span>]</code></pre>
+</section>
+<section class="member" id="ext.uint16">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">uint16</span></code></pre>
+</section>
+<section class="member" id="ext.uint16.method.fromBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesLE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">uint16</span></code></pre>
+</section>
+<section class="member" id="ext.uint16.method.fromBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesBE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">uint16</span></code></pre>
+</section>
+<section class="member" id="ext.uint16.method.toBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesLE(): <span class="ty">uint8</span>[<span class="num">2</span>]</code></pre>
+</section>
+<section class="member" id="ext.uint16.method.toBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesBE(): <span class="ty">uint8</span>[<span class="num">2</span>]</code></pre>
+</section>
+<section class="member" id="ext.uint32">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">uint32</span></code></pre>
+</section>
+<section class="member" id="ext.uint32.method.fromBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesLE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">uint32</span></code></pre>
+</section>
+<section class="member" id="ext.uint32.method.fromBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesBE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">uint32</span></code></pre>
+</section>
+<section class="member" id="ext.uint32.method.toBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesLE(): <span class="ty">uint8</span>[<span class="num">4</span>]</code></pre>
+</section>
+<section class="member" id="ext.uint32.method.toBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesBE(): <span class="ty">uint8</span>[<span class="num">4</span>]</code></pre>
+</section>
+<section class="member" id="ext.uint">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">uint</span></code></pre>
+</section>
+<section class="member" id="ext.uint.method.fromBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesLE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">uint</span></code></pre>
+</section>
+<section class="member" id="ext.uint.method.fromBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromBytesBE(s: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">uint</span></code></pre>
+</section>
+<section class="member" id="ext.uint.method.toBytesLE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesLE(): <span class="ty">uint8</span>[<span class="num">8</span>]</code></pre>
+</section>
+<section class="member" id="ext.uint.method.toBytesBE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytesBE(): <span class="ty">uint8</span>[<span class="num">8</span>]</code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;</code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8.method.getUint16LE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> getUint16LE(at: <span class="ty">int</span>): <span class="ty">uint16</span></code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8.method.getUint16BE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> getUint16BE(at: <span class="ty">int</span>): <span class="ty">uint16</span></code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8.method.getUint32LE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> getUint32LE(at: <span class="ty">int</span>): <span class="ty">uint32</span></code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8.method.getUint32BE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> getUint32BE(at: <span class="ty">int</span>): <span class="ty">uint32</span></code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8.method.getUint64LE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> getUint64LE(at: <span class="ty">int</span>): <span class="ty">uint</span></code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8.method.getUint64BE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> getUint64BE(at: <span class="ty">int</span>): <span class="ty">uint</span></code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8.method.getInt16LE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> getInt16LE(at: <span class="ty">int</span>): <span class="ty">int16</span></code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8.method.getInt16BE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> getInt16BE(at: <span class="ty">int</span>): <span class="ty">int16</span></code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8.method.getInt32LE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> getInt32LE(at: <span class="ty">int</span>): <span class="ty">int32</span></code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8.method.getInt32BE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> getInt32BE(at: <span class="ty">int</span>): <span class="ty">int32</span></code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8.method.getInt64LE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> getInt64LE(at: <span class="ty">int</span>): <span class="ty">int</span></code></pre>
+</section>
+<section class="member" id="ext.Sliceuint8.method.getInt64BE">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> getInt64BE(at: <span class="ty">int</span>): <span class="ty">int</span></code></pre>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#extensions">Extensions</a></li>
+<li class="level-3"><a href="#ext.int8">int8</a></li>
+<li class="level-3"><a href="#ext.int16">int16</a></li>
+<li class="level-3"><a href="#ext.int32">int32</a></li>
+<li class="level-3"><a href="#ext.int">int</a></li>
+<li class="level-3"><a href="#ext.uint8">uint8</a></li>
+<li class="level-3"><a href="#ext.uint16">uint16</a></li>
+<li class="level-3"><a href="#ext.uint32">uint32</a></li>
+<li class="level-3"><a href="#ext.uint">uint</a></li>
+<li class="level-3"><a href="#ext.Sliceuint8">Slice&lt;uint8&gt;</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

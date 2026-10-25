@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.fs — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.fs</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/fs/">std.fs</a></li>
+<li><a href="../../std/fs/OpenOptions/">OpenOptions</a></li>
+<li><a href="../../std/fs/File/">File</a></li>
+<li><a href="../../std/fs/FileLinesIter/">FileLinesIter</a></li>
+<li><a href="../../std/fs/Metadata/">Metadata</a></li>
+<li><a href="../../std/fs/DirEntry/">DirEntry</a></li>
+<li><a href="../../std/fs/ReadDirIter/">ReadDirIter</a></li>
+<li><a href="../../std/fs/WalkIter/">WalkIter</a></li>
+<li><a href="../../std/fs/#fn.readText">readText()</a></li>
+<li><a href="../../std/fs/#fn.readBytes">readBytes()</a></li>
+<li><a href="../../std/fs/#fn.lines">lines()</a></li>
+<li><a href="../../std/fs/#fn.writeText">writeText()</a></li>
+<li><a href="../../std/fs/#fn.writeBytes">writeBytes()</a></li>
+<li><a href="../../std/fs/#fn.appendText">appendText()</a></li>
+<li><a href="../../std/fs/#fn.metadata">metadata()</a></li>
+<li><a href="../../std/fs/#fn.exists">exists()</a></li>
+<li><a href="../../std/fs/#fn.createDir">createDir()</a></li>
+<li><a href="../../std/fs/#fn.remove">remove()</a></li>
+<li><a href="../../std/fs/#fn.removeDir">removeDir()</a></li>
+<li><a href="../../std/fs/#fn.rename">rename()</a></li>
+<li><a href="../../std/fs/#fn.readDir">readDir()</a></li>
+<li><a href="../../std/fs/#fn.canonicalize">canonicalize()</a></li>
+<li><a href="../../std/fs/#fn.absolute">absolute()</a></li>
+<li><a href="../../std/fs/#fn.createDirAll">createDirAll()</a></li>
+<li><a href="../../std/fs/#fn.removeAll">removeAll()</a></li>
+<li><a href="../../std/fs/#fn.copy">copy()</a></li>
+<li><a href="../../std/fs/#fn.walk">walk()</a></li>
+<li><a href="../../std/fs/#fn.tempDir">tempDir()</a></li>
+<li><a href="../../std/fs/#fn.tempFile">tempFile()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.fs</h1>
+<p>The file system: <a href="../../std/fs/File/">File</a>, a handle on an open file that reads, writes and seeks through
+<code>std.io</code>'s interfaces, opened as <a href="../../std/fs/OpenOptions/">OpenOptions</a> say; conveniences that read or write a file whole
+(<a href="../../std/fs/#fn.readText">readText</a>, <a href="../../std/fs/#fn.readBytes">readBytes</a>, <a href="../../std/fs/#fn.writeText">writeText</a>, <a href="../../std/fs/#fn.writeBytes">writeBytes</a>, <a href="../../std/fs/#fn.appendText">appendText</a>) or its lines one by one
+(<a href="../../std/fs/#fn.lines">lines</a>); what a path names (<a href="../../std/fs/Metadata/">Metadata</a>, <a href="../../std/fs/#fn.metadata">metadata</a>, <a href="../../std/fs/#fn.exists">exists</a>); directories and their entries
+(<a href="../../std/fs/#fn.createDir">createDir</a>, <a href="../../std/fs/#fn.removeDir">removeDir</a>, <a href="../../std/fs/#fn.readDir">readDir</a>, <a href="../../std/fs/DirEntry/">DirEntry</a>); and operations built from those —
+<a href="../../std/fs/#fn.createDirAll">createDirAll</a>, <a href="../../std/fs/#fn.removeAll">removeAll</a>, <a href="../../std/fs/#fn.copy">copy</a>, <a href="../../std/fs/#fn.walk">walk</a>, <a href="../../std/fs/#fn.tempDir">tempDir</a>, <a href="../../std/fs/#fn.tempFile">tempFile</a>.</p>
+<p>Where a scheduler runs, every call on a file runs on the program's I/O pool (std.io's): a few
+threads, started at the first use, do the system's call while the running task is parked, and
+the thread it runs on goes on with the other tasks; where no scheduler runs, the call runs on the
+thread itself. A call on a regular file ends in a bounded time and is not a point of
+cancellation: a cancellation is seen at the task's next wait. Reads and writes go through the
+caller's slice, never a copy.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/fs/OpenOptions/">OpenOptions</a> <span class="kind">struct</span> <span class="summary">— How a file is opened: to read, to write, to append at its end, created where it is not there, truncated to nothing where it is.</span></div>
+<div class="listed"><a href="../../std/fs/File/">File</a> <span class="kind">class</span> <span class="summary">— An open file: read from its position, written there — at the end, where it was opened to append —, its position moved.</span></div>
+<div class="listed"><a href="../../std/fs/FileLinesIter/">FileLinesIter</a> <span class="kind">class</span> <span class="summary">— The lines of a file, from <a href="../../std/fs/#fn.lines">lines</a>.</span></div>
+<div class="listed"><a href="../../std/fs/Metadata/">Metadata</a> <span class="kind">struct</span> <span class="summary">— What a path names, through links: its size in bytes, when it was last written, whether it is a file or a directory — neither, for a device or a socket —, whether it cannot be written; and whether the path itself is a link.</span></div>
+<div class="listed"><a href="../../std/fs/DirEntry/">DirEntry</a> <span class="kind">struct</span> <span class="summary">— An entry of a directory, from <a href="../../std/fs/#fn.readDir">readDir</a>: its name, its path — the directory's joined with the name —, and what the entry is itself: a link is reported as a link, not as what it leads to.</span></div>
+<div class="listed"><a href="../../std/fs/ReadDirIter/">ReadDirIter</a> <span class="kind">class</span> <span class="summary">— A directory's entries, from <a href="../../std/fs/#fn.readDir">readDir</a>.</span></div>
+<div class="listed"><a href="../../std/fs/WalkIter/">WalkIter</a> <span class="kind">class</span> <span class="summary">— The entries under a directory, from <a href="../../std/fs/#fn.walk">walk</a>.</span></div>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.readText">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> readText(path: <span class="ty">StringView</span>): <span class="ty">string</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns the whole file at <code>path</code> as UTF-8 text. A byte order mark is kept as text like any
+other.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path: <code>InvalidData</code> for bytes that are not UTF-8, else the system's
+failure to open, read or close the file.</p>
+</section>
+<section class="member" id="fn.readBytes">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> readBytes(path: <span class="ty">StringView</span>): <span class="ty">uint8</span>[] <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns the whole file at <code>path</code> as bytes.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path when the file cannot be opened, read or closed.</p>
+</section>
+<section class="member" id="fn.lines">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> lines(path: <span class="ty">StringView</span>): <span class="ty">FileLinesIter</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns an iterator over the lines of the file at <code>path</code>, as <code>TextReader.readLine</code> gives them:
+without their line ends, and a last line without an end still a line. The iterator closes the
+file at its end and at an error; a <code>for</code> that leaves it early closes it, and so does <code>close()</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path when the file cannot be opened.</p>
+</section>
+<section class="member" id="fn.writeText">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> writeText(path: <span class="ty">StringView</span>, text: <span class="ty">StringView</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Writes <code>text</code> as the file at <code>path</code>, created where it is not there, truncated where it is.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path when the file cannot be created, written or closed.</p>
+</section>
+<section class="member" id="fn.writeBytes">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> writeBytes(path: <span class="ty">StringView</span>, bytes: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Writes <code>bytes</code> as the file at <code>path</code>, created where it is not there, truncated where it is.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path when the file cannot be created, written or closed.</p>
+</section>
+<section class="member" id="fn.appendText">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> appendText(path: <span class="ty">StringView</span>, text: <span class="ty">StringView</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Appends <code>text</code> to the end of the file at <code>path</code>, created where it is not there.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path when the file cannot be opened, written or closed.</p>
+</section>
+<section class="member" id="fn.metadata">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> metadata(path: <span class="ty">StringView</span>): <span class="ty">Metadata</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns the <a href="../../std/fs/Metadata/">Metadata</a> of what <code>path</code> names, following links.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path: <code>NotFound</code> where nothing is there or a link leads nowhere,
+else the system's failure.</p>
+</section>
+<section class="member" id="fn.exists">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> exists(path: <span class="ty">StringView</span>): <span class="ty">bool</span></code></pre>
+<p>Returns whether <code>path</code> names anything — <code>false</code> where it cannot be told, and for a link that
+leads nowhere.</p>
+</section>
+<section class="member" id="fn.createDir">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> createDir(path: <span class="ty">StringView</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Creates the directory <code>path</code>; its parent must exist.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path: <code>AlreadyExists</code> where something is there, <code>NotFound</code> where the
+parent is missing, else the system's failure.</p>
+</section>
+<section class="member" id="fn.remove">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> remove(path: <span class="ty">StringView</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Removes the file <code>path</code>; a directory is removed with <a href="../../std/fs/#fn.removeDir">removeDir</a>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path when the system cannot remove it.</p>
+</section>
+<section class="member" id="fn.removeDir">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> removeDir(path: <span class="ty">StringView</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Removes the directory <code>path</code>, which must be empty.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path when the system cannot remove it; a directory that is not empty
+is <code>Other</code> with the system's code, since no kind names it.</p>
+</section>
+<section class="member" id="fn.rename">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> rename(from: <span class="ty">StringView</span>, to: <span class="ty">StringView</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Renames <code>from</code> to <code>to</code>, replacing a file there. Both must be on the same file system.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the source path when the system cannot rename it, including across file
+systems.</p>
+</section>
+<section class="member" id="fn.readDir">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> readDir(path: <span class="ty">StringView</span>): <span class="ty">ReadDirIter</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns an iterator over the entries of the directory <code>path</code>, in the order the system keeps
+them; <code>.</code> and <code>..</code> are not among them. The iterator holds the directory open: it releases it at
+its end and at its first error, a loop that leaves it early releases it, and so does <code>close()</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path when the directory cannot be opened.</p>
+</section>
+<section class="member" id="fn.canonicalize">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> canonicalize(path: <span class="ty">StringView</span>): <span class="ty">string</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns <code>path</code> absolute, its links resolved and its <code>.</code> and <code>..</code> removed: where the system says
+the file is.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path: <code>NotFound</code> where nothing is there, <code>InvalidData</code> for a result
+that is not UTF-8, else the system's failure.</p>
+</section>
+<section class="member" id="fn.absolute">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> absolute(path: <span class="ty">StringView</span>): <span class="ty">string</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns <code>path</code> made absolute against the working directory, then normalized: nothing else is
+asked of the file system, and links in it stay.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path when the working directory cannot be read, or <code>InvalidData</code>
+for a result that is not UTF-8.</p>
+</section>
+<section class="member" id="fn.createDirAll">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> createDirAll(path: <span class="ty">StringView</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Creates the directory <code>path</code> and every missing directory above it. Where <code>path</code> is already a
+directory there is nothing to do.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path: <code>NotDirectory</code> where <code>path</code> or a directory above it is
+something else, else the system's failure.</p>
+</section>
+<section class="member" id="fn.removeAll">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> removeAll(path: <span class="ty">StringView</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Removes <code>path</code> and everything in it: a link is removed, never followed into, and where nothing
+is there there is nothing to do. It removes all it can.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws the first <a href="../../std/io/IoError/">IoError</a> it met.</p>
+</section>
+<section class="member" id="fn.copy">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> copy(from: <span class="ty">StringView</span>, to: <span class="ty">StringView</span>): <span class="ty">int</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Copies the bytes of the file <code>from</code> to the file <code>to</code> — created, or truncated where it is
+there — and returns how many. Permissions and times are not copied.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the source path: <code>IsDirectory</code> for a directory, <code>InvalidInput</code> for
+anything else that is not a file and for a copy onto itself — truncating would lose what it
+copies —, else the failure of opening, reading or writing.</p>
+</section>
+<section class="member" id="fn.walk">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> walk(path: <span class="ty">StringView</span>): <span class="ty">WalkIter</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns an iterator over the entries under <code>path</code>, depth first — a directory before what is in
+it —, each directory's entries in the byte order of their names; <code>path</code> itself is not among
+them, and links are not followed. Each directory is read whole and closed before its first
+entry is given, so the walk holds nothing open. An error ends the walk.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> with the path when <code>path</code> cannot be read as a directory.</p>
+</section>
+<section class="member" id="fn.tempDir">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> tempDir(): <span class="ty">string</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Creates a new directory under the system's directory for temporary files and returns its path.
+Nothing removes it but <a href="../../std/fs/#fn.removeAll">removeAll</a>. The system's directory itself is <code>os.tempDir</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> when the directory cannot be created, or after 100 random names that all
+existed already.</p>
+</section>
+<section class="member" id="fn.tempFile">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> tempFile(): <span class="ty">string</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Creates a new empty file under the system's directory for temporary files and returns its
+path, for <a href="../../std/fs/File/#method.openWith">File.openWith</a> and the conveniences to take from there. Nothing removes it but
+<a href="../../std/fs/#fn.remove">remove</a>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../std/io/IoError/">IoError</a> when the file cannot be created or closed, or after 100 random names that all
+existed already.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.readText">readText</a></li>
+<li class="level-3"><a href="#fn.readBytes">readBytes</a></li>
+<li class="level-3"><a href="#fn.lines">lines</a></li>
+<li class="level-3"><a href="#fn.writeText">writeText</a></li>
+<li class="level-3"><a href="#fn.writeBytes">writeBytes</a></li>
+<li class="level-3"><a href="#fn.appendText">appendText</a></li>
+<li class="level-3"><a href="#fn.metadata">metadata</a></li>
+<li class="level-3"><a href="#fn.exists">exists</a></li>
+<li class="level-3"><a href="#fn.createDir">createDir</a></li>
+<li class="level-3"><a href="#fn.remove">remove</a></li>
+<li class="level-3"><a href="#fn.removeDir">removeDir</a></li>
+<li class="level-3"><a href="#fn.rename">rename</a></li>
+<li class="level-3"><a href="#fn.readDir">readDir</a></li>
+<li class="level-3"><a href="#fn.canonicalize">canonicalize</a></li>
+<li class="level-3"><a href="#fn.absolute">absolute</a></li>
+<li class="level-3"><a href="#fn.createDirAll">createDirAll</a></li>
+<li class="level-3"><a href="#fn.removeAll">removeAll</a></li>
+<li class="level-3"><a href="#fn.copy">copy</a></li>
+<li class="level-3"><a href="#fn.walk">walk</a></li>
+<li class="level-3"><a href="#fn.tempDir">tempDir</a></li>
+<li class="level-3"><a href="#fn.tempFile">tempFile</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>enum TomlDatetime — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.toml</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/toml/">std.toml</a></li>
+<li><a href="../../../std/toml/TomlError/">TomlError</a></li>
+<li><a class="current" href="../../../std/toml/TomlDatetime/">TomlDatetime</a></li>
+<li><a href="../../../std/toml/TomlTable/">TomlTable</a></li>
+<li><a href="../../../std/toml/TomlValue/">TomlValue</a></li>
+<li><a href="../../../std/toml/TreeBuilder/">TreeBuilder</a></li>
+<li><a href="../../../std/toml/TomlReader/">TomlReader</a></li>
+<li><a href="../../../std/toml/#fn.encode">encode()</a></li>
+<li><a href="../../../std/toml/#fn.encodeTo">encodeTo()</a></li>
+<li><a href="../../../std/toml/#fn.parse">parse()</a></li>
+<li><a href="../../../std/toml/#fn.decode">decode()</a></li>
+<li><a href="../../../std/toml/#fn.decodeFrom">decodeFrom()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>enum TomlDatetime</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">enum</span> <span class="ty">TomlDatetime</span> :: [<span class="ty">Equatable</span>]</code></pre>
+<p class="conforms">Conforms to <code>Equatable</code>, <code>Display</code>, <code>Debug</code>.</p>
+<p>A date-time in one of TOML's four forms: with an offset, local, a date alone, a time alone.</p>
+<h2 id="variants">Variants</h2>
+<section class="member" id="variant.Offset">
+<pre class="signature"><code class="language-lyric"><span class="ty">Offset</span>(<span class="ty">DateTime</span>)</code></pre>
+</section>
+<section class="member" id="variant.Local">
+<pre class="signature"><code class="language-lyric"><span class="ty">Local</span>(<span class="ty">Date</span>, <span class="ty">Time</span>)</code></pre>
+</section>
+<section class="member" id="variant.LocalDate">
+<pre class="signature"><code class="language-lyric"><span class="ty">LocalDate</span>(<span class="ty">Date</span>)</code></pre>
+</section>
+<section class="member" id="variant.LocalTime">
+<pre class="signature"><code class="language-lyric"><span class="ty">LocalTime</span>(<span class="ty">Time</span>)</code></pre>
+</section>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.show">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> show(): <span class="ty">string</span></code></pre>
+<p>Returns the TOML text: <code>1979-05-27T07:32:00Z</code>, <code>1979-05-27T07:32:00</code>, <code>1979-05-27</code>, <code>07:32:00</code>.</p>
+</section>
+<section class="member" id="method.showTo">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> showTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
+</section>
+<section class="member" id="method.debug">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> debug(): <span class="ty">string</span></code></pre>
+</section>
+<section class="member" id="method.debugTo">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> debugTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#variants">Variants</a></li>
+<li class="level-3"><a href="#variant.Offset">Offset</a></li>
+<li class="level-3"><a href="#variant.Local">Local</a></li>
+<li class="level-3"><a href="#variant.LocalDate">LocalDate</a></li>
+<li class="level-3"><a href="#variant.LocalTime">LocalTime</a></li>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.show">show</a></li>
+<li class="level-3"><a href="#method.showTo">showTo</a></li>
+<li class="level-3"><a href="#method.debug">debug</a></li>
+<li class="level-3"><a href="#method.debugTo">debugTo</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

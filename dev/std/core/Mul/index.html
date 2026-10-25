@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>interface Mul — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.core</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/core/">std.core</a></li>
+<li><a href="../../../std/core/Any/">Any</a></li>
+<li><a href="../../../std/core/Box/">Box</a></li>
+<li><a href="../../../std/core/Range/">Range</a></li>
+<li><a href="../../../std/core/RangeInclusive/">RangeInclusive</a></li>
+<li><a href="../../../std/core/RangeFrom/">RangeFrom</a></li>
+<li><a href="../../../std/core/RangeTo/">RangeTo</a></li>
+<li><a href="../../../std/core/RangeFull/">RangeFull</a></li>
+<li><a href="../../../std/core/Error/">Error</a></li>
+<li><a href="../../../std/core/Exception/">Exception</a></li>
+<li><a href="../../../std/core/Backtrace/">Backtrace</a></li>
+<li><a href="../../../std/core/Result/">Result</a></li>
+<li><a href="../../../std/core/OnAny/">OnAny</a></li>
+<li><a href="../../../std/core/OnDecl/">OnDecl</a></li>
+<li><a href="../../../std/core/OnTopLevel/">OnTopLevel</a></li>
+<li><a href="../../../std/core/OnTypeLike/">OnTypeLike</a></li>
+<li><a href="../../../std/core/OnMember/">OnMember</a></li>
+<li><a href="../../../std/core/OnCallable/">OnCallable</a></li>
+<li><a href="../../../std/core/OnModule/">OnModule</a></li>
+<li><a href="../../../std/core/OnType/">OnType</a></li>
+<li><a href="../../../std/core/OnFunction/">OnFunction</a></li>
+<li><a href="../../../std/core/OnMethod/">OnMethod</a></li>
+<li><a href="../../../std/core/OnField/">OnField</a></li>
+<li><a href="../../../std/core/OnParameter/">OnParameter</a></li>
+<li><a href="../../../std/core/OnVariant/">OnVariant</a></li>
+<li><a href="../../../std/core/OnInterface/">OnInterface</a></li>
+<li><a href="../../../std/core/OnAlias/">OnAlias</a></li>
+<li><a href="../../../std/core/OnExtend/">OnExtend</a></li>
+<li><a href="../../../std/core/Test/">Test</a></li>
+<li><a href="../../../std/core/Bench/">Bench</a></li>
+<li><a href="../../../std/core/callerExpr/">callerExpr</a></li>
+<li><a href="../../../std/core/callerLine/">callerLine</a></li>
+<li><a href="../../../std/core/callerFile/">callerFile</a></li>
+<li><a href="../../../std/core/Deprecated/">Deprecated</a></li>
+<li><a href="../../../std/core/AlwaysInline/">AlwaysInline</a></li>
+<li><a href="../../../std/core/NoInline/">NoInline</a></li>
+<li><a href="../../../std/core/Cold/">Cold</a></li>
+<li><a href="../../../std/core/MustUse/">MustUse</a></li>
+<li><a href="../../../std/core/NonExhaustive/">NonExhaustive</a></li>
+<li><a href="../../../std/core/Allow/">Allow</a></li>
+<li><a href="../../../std/core/Warn/">Warn</a></li>
+<li><a href="../../../std/core/Deny/">Deny</a></li>
+<li><a href="../../../std/core/Closeable/">Closeable</a></li>
+<li><a href="../../../std/core/Add/">Add</a></li>
+<li><a href="../../../std/core/Sub/">Sub</a></li>
+<li><a class="current" href="../../../std/core/Mul/">Mul</a></li>
+<li><a href="../../../std/core/Div/">Div</a></li>
+<li><a href="../../../std/core/Rem/">Rem</a></li>
+<li><a href="../../../std/core/Neg/">Neg</a></li>
+<li><a href="../../../std/core/BitAnd/">BitAnd</a></li>
+<li><a href="../../../std/core/BitOr/">BitOr</a></li>
+<li><a href="../../../std/core/BitXor/">BitXor</a></li>
+<li><a href="../../../std/core/BitNot/">BitNot</a></li>
+<li><a href="../../../std/core/Shl/">Shl</a></li>
+<li><a href="../../../std/core/Shr/">Shr</a></li>
+<li><a href="../../../std/core/Equatable/">Equatable</a></li>
+<li><a href="../../../std/core/Ordering/">Ordering</a></li>
+<li><a href="../../../std/core/Ordered/">Ordered</a></li>
+<li><a href="../../../std/core/TotalOrder/">TotalOrder</a></li>
+<li><a href="../../../std/core/Hasher/">Hasher</a></li>
+<li><a href="../../../std/core/Hashable/">Hashable</a></li>
+<li><a href="../../../std/core/Identity/">Identity</a></li>
+<li><a href="../../../std/core/VariantName/">VariantName</a></li>
+<li><a href="../../../std/core/Variants/">Variants</a></li>
+<li><a href="../../../std/core/Index/">Index</a></li>
+<li><a href="../../../std/core/IndexSet/">IndexSet</a></li>
+<li><a href="../../../std/core/AsSlice/">AsSlice</a></li>
+<li><a href="../../../std/core/Contains/">Contains</a></li>
+<li><a href="../../../std/core/Display/">Display</a></li>
+<li><a href="../../../std/core/Debug/">Debug</a></li>
+<li><a href="../../../std/core/Clone/">Clone</a></li>
+<li><a href="../../../std/core/Default/">Default</a></li>
+<li><a href="../../../std/core/From/">From</a></li>
+<li><a href="../../../std/core/Into/">Into</a></li>
+<li><a href="../../../std/core/UnicodeCategory/">UnicodeCategory</a></li>
+<li><a href="../../../std/core/Num/">Num</a></li>
+<li><a href="../../../std/core/Signed/">Signed</a></li>
+<li><a href="../../../std/core/Integer/">Integer</a></li>
+<li><a href="../../../std/core/Float/">Float</a></li>
+<li><a href="../../../std/core/ParseErrorKind/">ParseErrorKind</a></li>
+<li><a href="../../../std/core/ParseError/">ParseError</a></li>
+<li><a href="../../../std/core/Parse/">Parse</a></li>
+<li><a href="../../../std/core/Pattern/">Pattern</a></li>
+<li><a href="../../../std/core/SplitIter/">SplitIter</a></li>
+<li><a href="../../../std/core/MatchesIter/">MatchesIter</a></li>
+<li><a href="../../../std/core/LinesIter/">LinesIter</a></li>
+<li><a href="../../../std/core/StringBuilder/">StringBuilder</a></li>
+<li><a href="../../../std/core/Utf8Error/">Utf8Error</a></li>
+<li><a href="../../../std/core/Format/">Format</a></li>
+<li><a href="../../../std/core/CharsIter/">CharsIter</a></li>
+<li><a href="../../../std/core/CharIndicesIter/">CharIndicesIter</a></li>
+<li><a href="../../../std/core/Iterator/">Iterator</a></li>
+<li><a href="../../../std/core/Iterable/">Iterable</a></li>
+<li><a href="../../../std/core/DoubleEnded/">DoubleEnded</a></li>
+<li><a href="../../../std/core/SliceIter/">SliceIter</a></li>
+<li><a href="../../../std/core/FromArrayLiteral/">FromArrayLiteral</a></li>
+<li><a href="../../../std/core/FromIterator/">FromIterator</a></li>
+<li><a href="../../../std/core/Join/">Join</a></li>
+<li><a href="../../../std/core/Platform/">Platform</a></li>
+<li><a href="../../../std/core/Arch/">Arch</a></li>
+<li><a href="../../../std/core/Target/">Target</a></li>
+<li><a href="../../../std/core/Profile/">Profile</a></li>
+<li><a href="../../../std/core/When/">When</a></li>
+<li><a href="../../../std/core/Shared/">Shared</a></li>
+<li><a href="../../../std/core/SeesConformer/">SeesConformer</a></li>
+<li><a href="../../../std/core/Visibility/">Visibility</a></li>
+<li><a href="../../../std/core/TypeKind/">TypeKind</a></li>
+<li><a href="../../../std/core/Type/">Type</a></li>
+<li><a href="../../../std/core/FieldInfo/">FieldInfo</a></li>
+<li><a href="../../../std/core/VariantInfo/">VariantInfo</a></li>
+<li><a href="../../../std/core/MemberKind/">MemberKind</a></li>
+<li><a href="../../../std/core/ParameterInfo/">ParameterInfo</a></li>
+<li><a href="../../../std/core/MemberInfo/">MemberInfo</a></li>
+<li><a href="../../../std/core/#fn.panic">panic()</a></li>
+<li><a href="../../../std/core/#fn.assert">assert()</a></li>
+<li><a href="../../../std/core/#fn.unreachable">unreachable()</a></li>
+<li><a href="../../../std/core/#fn.todo">todo()</a></li>
+<li><a href="../../../std/core/#fn.embed">embed()</a></li>
+<li><a href="../../../std/core/#fn.arrayOf">arrayOf()</a></li>
+<li><a href="../../../std/core/#fn.repeatArray">repeatArray()</a></li>
+<li><a href="../../../std/core/#fn.blackBox">blackBox()</a></li>
+<li><a href="../../../std/core/#fn.equalViews">equalViews()</a></li>
+<li><a href="../../../std/core/#fn.compareViews">compareViews()</a></li>
+<li><a href="../../../std/core/#fn.charAtByte">charAtByte()</a></li>
+<li><a href="../../../std/core/#fn.fstringStart">fstringStart()</a></li>
+<li><a href="../../../std/core/#fn.fstringEnd">fstringEnd()</a></li>
+<li><a href="../../../std/core/#fn.fstringText">fstringText()</a></li>
+<li><a href="../../../std/core/#fn.fstringInt">fstringInt()</a></li>
+<li><a href="../../../std/core/#fn.fstringUint">fstringUint()</a></li>
+<li><a href="../../../std/core/#fn.fstringFloat">fstringFloat()</a></li>
+<li><a href="../../../std/core/#fn.fstringFloat32">fstringFloat32()</a></li>
+<li><a href="../../../std/core/#fn.fstringBool">fstringBool()</a></li>
+<li><a href="../../../std/core/#fn.fstringChar">fstringChar()</a></li>
+<li><a href="../../../std/core/#fn.fstringShown">fstringShown()</a></li>
+<li><a href="../../../std/core/#fn.fstringFormatted">fstringFormatted()</a></li>
+<li><a href="../../../std/core/#fn.fstringPadded">fstringPadded()</a></li>
+<li><a href="../../../std/core/#fn.fstringDebugged">fstringDebugged()</a></li>
+<li><a href="../../../std/core/#fn.repeatText">repeatText()</a></li>
+<li><a href="../../../std/core/#fn.debugArray">debugArray()</a></li>
+<li><a href="../../../std/core/#fn.debugSlice">debugSlice()</a></li>
+<li><a href="../../../std/core/#fn.debugOptional">debugOptional()</a></li>
+<li><a href="../../../std/core/#fn.equalArrays">equalArrays()</a></li>
+<li><a href="../../../std/core/#fn.equalSlices">equalSlices()</a></li>
+<li><a href="../../../std/core/#fn.equalOptionals">equalOptionals()</a></li>
+<li><a href="../../../std/core/#fn.hashOptionalInto">hashOptionalInto()</a></li>
+<li><a href="../../../std/core/#fn.hashIdentityInto">hashIdentityInto()</a></li>
+<li><a href="../../../std/core/#fn.cloneArray">cloneArray()</a></li>
+<li><a href="../../../std/core/#fn.cloneOptional">cloneOptional()</a></li>
+<li><a href="../../../std/core/#fn.sequence">sequence()</a></li>
+<li><a href="../../../std/core/#fn.fields">fields()</a></li>
+<li><a href="../../../std/core/#fn.members">members()</a></li>
+<li><a href="../../../std/core/#fn.attribute">attribute()</a></li>
+<li><a href="../../../std/core/#fn.variantAttribute">variantAttribute()</a></li>
+<li><a href="../../../std/core/#fn.memberAttribute">memberAttribute()</a></li>
+<li><a href="../../../std/core/#fn.parameterAttribute">parameterAttribute()</a></li>
+<li><a href="../../../std/core/#fn.typeAttribute">typeAttribute()</a></li>
+<li><a href="../../../std/core/#fn.variants">variants()</a></li>
+<li><a href="../../../std/core/#fn.conformances">conformances()</a></li>
+<li><a href="../../../std/core/#fn.hasConformance">hasConformance()</a></li>
+<li><a href="../../../std/core/#fn.typeName">typeName()</a></li>
+<li><a href="../../../std/core/#fn.isStruct">isStruct()</a></li>
+<li><a href="../../../std/core/#fn.isClass">isClass()</a></li>
+<li><a href="../../../std/core/#fn.isEnum">isEnum()</a></li>
+<li><a href="../../../std/core/#fn.isInterface">isInterface()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>interface Mul</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">interface</span> <span class="ty">Mul</span>&lt;<span class="ty">Rhs</span> = <span class="ty">Self</span>&gt;</code></pre>
+<p>The operator <code>*</code>: <code>a * b</code> is <code>a.mul(b)</code>.</p>
+<h2 id="associated-types">Associated types</h2>
+<section class="member" id="assoc.Out">
+<pre class="signature"><code class="language-lyric">type <span class="ty">Out</span> = <span class="ty">Self</span></code></pre>
+</section>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.mul">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> mul(rhs: <span class="ty">Rhs</span>): <span class="ty">Self</span>.<span class="ty">Out</span></code></pre>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#associated-types">Associated types</a></li>
+<li class="level-3"><a href="#assoc.Out">Out</a></li>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.mul">mul</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

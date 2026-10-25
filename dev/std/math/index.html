@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.math — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.math</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/math/">std.math</a></li>
+<li><a href="../../std/math/#fn.min">min()</a></li>
+<li><a href="../../std/math/#fn.max">max()</a></li>
+<li><a href="../../std/math/#fn.gcd">gcd()</a></li>
+<li><a href="../../std/math/#fn.lcm">lcm()</a></li>
+<li><a href="../../std/math/#fn.lerp">lerp()</a></li>
+<li><a href="../../std/math/#fn.floor">floor()</a></li>
+<li><a href="../../std/math/#fn.ceil">ceil()</a></li>
+<li><a href="../../std/math/#fn.round">round()</a></li>
+<li><a href="../../std/math/#fn.trunc">trunc()</a></li>
+<li><a href="../../std/math/#fn.sqrt">sqrt()</a></li>
+<li><a href="../../std/math/#fn.cbrt">cbrt()</a></li>
+<li><a href="../../std/math/#fn.exp">exp()</a></li>
+<li><a href="../../std/math/#fn.ln">ln()</a></li>
+<li><a href="../../std/math/#fn.log2">log2()</a></li>
+<li><a href="../../std/math/#fn.log10">log10()</a></li>
+<li><a href="../../std/math/#fn.sin">sin()</a></li>
+<li><a href="../../std/math/#fn.cos">cos()</a></li>
+<li><a href="../../std/math/#fn.tan">tan()</a></li>
+<li><a href="../../std/math/#fn.asin">asin()</a></li>
+<li><a href="../../std/math/#fn.acos">acos()</a></li>
+<li><a href="../../std/math/#fn.atan">atan()</a></li>
+<li><a href="../../std/math/#fn.sinh">sinh()</a></li>
+<li><a href="../../std/math/#fn.cosh">cosh()</a></li>
+<li><a href="../../std/math/#fn.tanh">tanh()</a></li>
+<li><a href="../../std/math/#fn.atan2">atan2()</a></li>
+<li><a href="../../std/math/#fn.hypot">hypot()</a></li>
+<li><a href="../../std/math/#fn.pow">pow()</a></li>
+<li><a href="../../std/math/#fn.abs">abs()</a></li>
+<li><a href="../../std/math/#fn.signum">signum()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.math</h1>
+<p>Provides the elementary functions and the mathematical constants.</p>
+<p>The functions are free and generic over the numeric types: <a href="../../std/math/#fn.min">min</a>, <a href="../../std/math/#fn.max">max</a>, <a href="../../std/math/#fn.gcd">gcd</a>, <a href="../../std/math/#fn.lcm">lcm</a>,
+<a href="../../std/math/#fn.abs">abs</a>, <a href="../../std/math/#fn.signum">signum</a>, and for floating-point types rounding, roots, powers, logarithms and the
+trigonometric and hyperbolic functions. The constants <a href="../../std/math/#const.pi">pi</a>, <a href="../../std/math/#const.e">e</a> and <a href="../../std/math/#const.tau">tau</a> are typed <code>float</code>;
+<code>math.pi as float32</code> gives the narrow width. What describes a number type itself stands at
+that type: <code>float.epsilon</code>, <code>int.max</code>, <code>x.isNan()</code>.</p>
+<p>The floating-point functions compute in <code>float</code> and round a <code>float32</code> result once, at the
+end; they give the same bits on every tier-1 target.</p>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.min">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> min&lt;<span class="ty">T</span> :: [<span class="ty">Ordered</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the lesser of <code>a</code> and <code>b</code>.</p>
+<p>Returns <code>a</code> when the two are equal, and when they are unordered (a NaN).</p>
+</section>
+<section class="member" id="fn.max">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> max&lt;<span class="ty">T</span> :: [<span class="ty">Ordered</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the greater of <code>a</code> and <code>b</code>.</p>
+<p>Returns <code>a</code> when the two are equal, and when they are unordered (a NaN).</p>
+</section>
+<section class="member" id="fn.gcd">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> gcd&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the greatest common divisor of <code>a</code> and <code>b</code>, never negative.</p>
+<p><code>gcd(0, 0)</code> is <code>0</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>When the divisor's magnitude does not fit the type: a signed type's <code>min</code> has none, so
+<code>gcd(int.min, 0)</code> overflows, as <a href="../../std/math/#fn.abs">abs</a> does.</p>
+</section>
+<section class="member" id="fn.lcm">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> lcm&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the least common multiple of <code>a</code> and <code>b</code>, never negative.</p>
+<p>Returns <code>0</code> when either is <code>0</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>When the multiple, or its magnitude, does not fit the type.</p>
+</section>
+<section class="member" id="fn.lerp">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> lerp&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>, t: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the value the fraction <code>t</code> of the way from <code>a</code> to <code>b</code>.</p>
+<p>The result is exactly <code>a</code> at <code>t = 0</code> and exactly <code>b</code> at <code>t = 1</code>; a <code>t</code> outside 0…1
+extrapolates beyond the two.</p>
+</section>
+<section class="member" id="fn.floor">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> floor&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the greatest integral value not above <code>x</code>.</p>
+</section>
+<section class="member" id="fn.ceil">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> ceil&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the least integral value not below <code>x</code>.</p>
+</section>
+<section class="member" id="fn.round">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> round&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the integral value nearest to <code>x</code>, rounding halves away from zero.</p>
+</section>
+<section class="member" id="fn.trunc">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trunc&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the integral part of <code>x</code>, rounding toward zero.</p>
+</section>
+<section class="member" id="fn.sqrt">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sqrt&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the square root of <code>x</code>; NaN below zero.</p>
+</section>
+<section class="member" id="fn.cbrt">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cbrt&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the cube root of <code>x</code>.</p>
+</section>
+<section class="member" id="fn.exp">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> exp&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns <em>e</em> to the power <code>x</code>.</p>
+</section>
+<section class="member" id="fn.ln">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> ln&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the natural logarithm of <code>x</code>; NaN below zero, negative infinity at zero.</p>
+</section>
+<section class="member" id="fn.log2">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> log2&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the logarithm of <code>x</code> to base 2.</p>
+</section>
+<section class="member" id="fn.log10">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> log10&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the logarithm of <code>x</code> to base 10.</p>
+</section>
+<section class="member" id="fn.sin">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sin&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the sine of <code>x</code>, in radians.</p>
+</section>
+<section class="member" id="fn.cos">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cos&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the cosine of <code>x</code>, in radians.</p>
+</section>
+<section class="member" id="fn.tan">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> tan&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the tangent of <code>x</code>, in radians.</p>
+</section>
+<section class="member" id="fn.asin">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asin&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the arcsine of <code>x</code>, in radians.</p>
+</section>
+<section class="member" id="fn.acos">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> acos&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the arccosine of <code>x</code>, in radians.</p>
+</section>
+<section class="member" id="fn.atan">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> atan&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the arctangent of <code>x</code>, in radians.</p>
+</section>
+<section class="member" id="fn.sinh">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sinh&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the hyperbolic sine of <code>x</code>.</p>
+</section>
+<section class="member" id="fn.cosh">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cosh&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the hyperbolic cosine of <code>x</code>.</p>
+</section>
+<section class="member" id="fn.tanh">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> tanh&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the hyperbolic tangent of <code>x</code>.</p>
+</section>
+<section class="member" id="fn.atan2">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> atan2&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(y: <span class="ty">T</span>, x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the angle of the point (x, y) from the positive x axis, in radians from -π to π.</p>
+</section>
+<section class="member" id="fn.hypot">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> hypot&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>, y: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the length of the hypotenuse of a right triangle with legs <code>x</code> and <code>y</code>.</p>
+<p>Unlike <code>sqrt(x * x + y * y)</code>, it does not overflow in the intermediate squares.</p>
+</section>
+<section class="member" id="fn.pow">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> pow&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>, e: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns <code>x</code> to the power <code>e</code>.</p>
+<p>For an integer power of an integer, use the integer's own <code>x.pow(n)</code>.</p>
+</section>
+<section class="member" id="fn.abs">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> abs&lt;<span class="ty">T</span> :: [<span class="ty">Signed</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the magnitude of <code>x</code>, the value without its sign.</p>
+<p>A float's <code>-0.0</code> gives <code>0.0</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>For a signed integer type's <code>min</code>, whose magnitude the type cannot hold.</p>
+</section>
+<section class="member" id="fn.signum">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> signum&lt;<span class="ty">T</span> :: [<span class="ty">Signed</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the sign of <code>x</code>: <code>-1</code>, <code>0</code> or <code>1</code> as a value of its type.</p>
+<p>A float's NaN gives NaN.</p>
+</section>
+<h2 id="constants">Constants</h2>
+<section class="member" id="const.pi">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">let</span> pi: <span class="ty">float</span> = <span class="num">3.141592653589793</span></code></pre>
+<p>π, a half turn in radians.</p>
+</section>
+<section class="member" id="const.e">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">let</span> e: <span class="ty">float</span> = <span class="num">2.718281828459045</span></code></pre>
+<p><em>e</em>, the base of the natural logarithm.</p>
+</section>
+<section class="member" id="const.tau">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">let</span> tau: <span class="ty">float</span> = <span class="num">6.283185307179586</span></code></pre>
+<p>τ = 2π, a full turn in radians.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.min">min</a></li>
+<li class="level-3"><a href="#fn.max">max</a></li>
+<li class="level-3"><a href="#fn.gcd">gcd</a></li>
+<li class="level-3"><a href="#fn.lcm">lcm</a></li>
+<li class="level-3"><a href="#fn.lerp">lerp</a></li>
+<li class="level-3"><a href="#fn.floor">floor</a></li>
+<li class="level-3"><a href="#fn.ceil">ceil</a></li>
+<li class="level-3"><a href="#fn.round">round</a></li>
+<li class="level-3"><a href="#fn.trunc">trunc</a></li>
+<li class="level-3"><a href="#fn.sqrt">sqrt</a></li>
+<li class="level-3"><a href="#fn.cbrt">cbrt</a></li>
+<li class="level-3"><a href="#fn.exp">exp</a></li>
+<li class="level-3"><a href="#fn.ln">ln</a></li>
+<li class="level-3"><a href="#fn.log2">log2</a></li>
+<li class="level-3"><a href="#fn.log10">log10</a></li>
+<li class="level-3"><a href="#fn.sin">sin</a></li>
+<li class="level-3"><a href="#fn.cos">cos</a></li>
+<li class="level-3"><a href="#fn.tan">tan</a></li>
+<li class="level-3"><a href="#fn.asin">asin</a></li>
+<li class="level-3"><a href="#fn.acos">acos</a></li>
+<li class="level-3"><a href="#fn.atan">atan</a></li>
+<li class="level-3"><a href="#fn.sinh">sinh</a></li>
+<li class="level-3"><a href="#fn.cosh">cosh</a></li>
+<li class="level-3"><a href="#fn.tanh">tanh</a></li>
+<li class="level-3"><a href="#fn.atan2">atan2</a></li>
+<li class="level-3"><a href="#fn.hypot">hypot</a></li>
+<li class="level-3"><a href="#fn.pow">pow</a></li>
+<li class="level-3"><a href="#fn.abs">abs</a></li>
+<li class="level-3"><a href="#fn.signum">signum</a></li>
+<li class="level-2"><a href="#constants">Constants</a></li>
+<li class="level-3"><a href="#const.pi">pi</a></li>
+<li class="level-3"><a href="#const.e">e</a></li>
+<li class="level-3"><a href="#const.tau">tau</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

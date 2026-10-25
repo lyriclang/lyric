@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>class Regex — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.regex</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/regex/">std.regex</a></li>
+<li><a href="../../../std/regex/RegexError/">RegexError</a></li>
+<li><a href="../../../std/regex/Match/">Match</a></li>
+<li><a class="current" href="../../../std/regex/Regex/">Regex</a></li>
+<li><a href="../../../std/regex/Matches/">Matches</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>class Regex</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">Regex</span></code></pre>
+<p>A compiled regular expression.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.new">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> new(pattern: <span class="ty">string</span>): <span class="ty">Regex</span> <span class="kw">throws</span> <span class="ty">RegexError</span></code></pre>
+<p>Compiles <code>pattern</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>RegexError { offset, detail }</code> where the pattern is not RE2's syntax.</p>
+</section>
+<section class="member" id="method.pattern">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> pattern(): <span class="ty">string</span></code></pre>
+<p>Returns the pattern as given.</p>
+</section>
+<section class="member" id="method.groupCount">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> groupCount(): <span class="ty">int</span></code></pre>
+<p>Returns how many capture groups the pattern has, the whole match not counted.</p>
+</section>
+<section class="member" id="method.groupNames">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> groupNames(): <span class="ty">Map</span>&lt;<span class="ty">string</span>, <span class="ty">int</span>&gt;</code></pre>
+<p>Returns the names of the named groups with their indices.</p>
+</section>
+<section class="member" id="method.isMatch">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isMatch(s: <span class="ty">StringView</span>): <span class="ty">bool</span></code></pre>
+<p>Returns whether the text holds a match.</p>
+</section>
+<section class="member" id="method.find">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> find(s: <span class="ty">StringView</span>): ?<span class="ty">Match</span></code></pre>
+<p>Returns the leftmost match, with its groups; <code>null</code> where there is none.</p>
+</section>
+<section class="member" id="method.findFrom">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> findFrom(s: <span class="ty">StringView</span>, from: <span class="ty">int</span>): ?<span class="ty">Match</span></code></pre>
+<p>Returns the leftmost match at or after the byte offset <code>from</code>; <code>null</code> where there is none
+or <code>from</code> lies past the end of the text.</p>
+</section>
+<section class="member" id="method.findAll">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> findAll(s: <span class="ty">StringView</span>): <span class="ty">Matches</span></code></pre>
+<p>Returns every match in turn, left to right, none overlapping; an empty match right after a
+match is skipped.</p>
+</section>
+<section class="member" id="method.replace">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> replace(s: <span class="ty">StringView</span>, template: <span class="ty">string</span>): <span class="ty">string</span></code></pre>
+<p>Returns the text with its first match replaced by the template: <code>$1</code> and <code>${name}</code> are the groups, <code>$0</code> the
+whole, <code>$$</code> a <code>$</code>; an unmatched group is empty.</p>
+</section>
+<section class="member" id="method.replaceAll">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> replaceAll(s: <span class="ty">StringView</span>, template: <span class="ty">string</span>): <span class="ty">string</span></code></pre>
+<p>Returns the text with every match replaced by the template, as <code>replace</code> expands it.</p>
+</section>
+<section class="member" id="method.split">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> split(s: <span class="ty">StringView</span>): <span class="ty">string</span>[]</code></pre>
+<p>Returns the pieces of the text between its matches. An empty text is one empty piece; an
+empty match at the very start adds no empty piece before it.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.new">new</a></li>
+<li class="level-3"><a href="#method.pattern">pattern</a></li>
+<li class="level-3"><a href="#method.groupCount">groupCount</a></li>
+<li class="level-3"><a href="#method.groupNames">groupNames</a></li>
+<li class="level-3"><a href="#method.isMatch">isMatch</a></li>
+<li class="level-3"><a href="#method.find">find</a></li>
+<li class="level-3"><a href="#method.findFrom">findFrom</a></li>
+<li class="level-3"><a href="#method.findAll">findAll</a></li>
+<li class="level-3"><a href="#method.replace">replace</a></li>
+<li class="level-3"><a href="#method.replaceAll">replaceAll</a></li>
+<li class="level-3"><a href="#method.split">split</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

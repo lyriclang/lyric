@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>class Child — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.process</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/process/">std.process</a></li>
+<li><a href="../../../std/process/Stdio/">Stdio</a></li>
+<li><a href="../../../std/process/Command/">Command</a></li>
+<li><a class="current" href="../../../std/process/Child/">Child</a></li>
+<li><a href="../../../std/process/ExitStatus/">ExitStatus</a></li>
+<li><a href="../../../std/process/Output/">Output</a></li>
+<li><a href="../../../std/process/PipeReader/">PipeReader</a></li>
+<li><a href="../../../std/process/PipeWriter/">PipeWriter</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>class Child</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">Child</span></code></pre>
+<p>A started child process: its standard streams where the command piped them, waiting for its
+end, and signalling it.</p>
+<h2 id="fields">Fields</h2>
+<section class="member" id="field.stdin">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">var</span> stdin: ?<span class="ty">PipeWriter</span></code></pre>
+<p>The child's standard input, where the command piped it: close it to end the child's input.</p>
+</section>
+<section class="member" id="field.stdout">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> stdout: ?<span class="ty">PipeReader</span></code></pre>
+<p>The child's standard output, where the command piped it.</p>
+</section>
+<section class="member" id="field.stderr">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> stderr: ?<span class="ty">PipeReader</span></code></pre>
+<p>The child's standard error, where the command piped it.</p>
+</section>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.wait">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> wait(): <span class="ty">ExitStatus</span> <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Waits until the child has ended and returns how. A piped standard input is closed first:
+otherwise a child reading it would wait for the parent while the parent waits for the child.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a> when closing the input or waiting fails, and <a href="../../../std/task/Cancelled/">Cancelled</a> when the waiting
+task is cancelled.</p>
+</section>
+<section class="member" id="method.kill">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> kill(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Ends the child now — SIGKILL on POSIX, TerminateProcess on Windows (code 1). A child that has
+ended already is not touched: its process id may belong to another process by then.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a> when the system refuses the signal.</p>
+</section>
+<section class="member" id="method.signal">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> signal(s: <span class="ty">Signal</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Sends the signal <code>s</code> to the child, where it has not ended.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a>: <code>Unsupported</code> for a signal the system does not have — on Windows every
+signal but a kill —, and the system's failure when it refuses the signal.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#fields">Fields</a></li>
+<li class="level-3"><a href="#field.stdin">stdin</a></li>
+<li class="level-3"><a href="#field.stdout">stdout</a></li>
+<li class="level-3"><a href="#field.stderr">stderr</a></li>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.wait">wait</a></li>
+<li class="level-3"><a href="#method.kill">kill</a></li>
+<li class="level-3"><a href="#method.signal">signal</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

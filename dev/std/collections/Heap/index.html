@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>class Heap — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.collections</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/collections/">std.collections</a></li>
+<li><a href="../../../std/collections/List/">List</a></li>
+<li><a href="../../../std/collections/ListIter/">ListIter</a></li>
+<li><a href="../../../std/collections/Map/">Map</a></li>
+<li><a href="../../../std/collections/MapEntriesIter/">MapEntriesIter</a></li>
+<li><a href="../../../std/collections/MapKeysIter/">MapKeysIter</a></li>
+<li><a href="../../../std/collections/MapValuesIter/">MapValuesIter</a></li>
+<li><a href="../../../std/collections/Set/">Set</a></li>
+<li><a href="../../../std/collections/ChunksIter/">ChunksIter</a></li>
+<li><a href="../../../std/collections/WindowsIter/">WindowsIter</a></li>
+<li><a href="../../../std/collections/Deque/">Deque</a></li>
+<li><a href="../../../std/collections/DequeIter/">DequeIter</a></li>
+<li><a class="current" href="../../../std/collections/Heap/">Heap</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>class Heap</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">Heap</span>&lt;<span class="ty">T</span> :: [<span class="ty">TotalOrder</span>]&gt;</code></pre>
+<p class="conforms">Conforms to <code>FromArrayLiteral&lt;T&gt;</code>, <code>Debug</code>, <code>FromIterator&lt;T&gt;</code>, <code>Clone</code>.</p>
+<p>A binary min-heap: <a href="../../../std/collections/Heap/#method.peek">Heap.peek</a> and <a href="../../../std/collections/Heap/#method.pop">Heap.pop</a> give the least value.</p>
+<p><code>push</code> and <code>pop</code> take <code>log n</code> steps, <code>peek</code> constant time; the values lie in a list. For the
+greatest value first, use a type whose order is reversed. Not safe across threads.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.new">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> new(): <span class="ty">Heap</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Creates an empty heap.</p>
+</section>
+<section class="member" id="method.withCapacity">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> withCapacity(n: <span class="ty">int</span>): <span class="ty">Heap</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Creates an empty heap with room for <code>n</code> values before it grows.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>n</code> is negative.</p>
+</section>
+<section class="member" id="method.of">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> of(xs: <span class="ty">T</span>[]): <span class="ty">Heap</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Creates a heap of the array's values, copied.</p>
+<p>Builds the heap in linear time by sinking each parent to its place, from the last one up
+(Floyd's method); pushing the values one by one would take <code>n log n</code>.</p>
+</section>
+<section class="member" id="method.length">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> length(): <span class="ty">int</span></code></pre>
+<p>Returns how many values it holds.</p>
+</section>
+<section class="member" id="method.isEmpty">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isEmpty(): <span class="ty">bool</span></code></pre>
+<p>Returns whether it holds no values.</p>
+</section>
+<section class="member" id="method.peek">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> peek(): ?<span class="ty">T</span></code></pre>
+<p>Returns the least value without removing it, or <code>null</code> where there is none.</p>
+</section>
+<section class="member" id="method.push">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> push(v: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
+<p>Adds <code>v</code>, letting it rise to its place, in <code>log n</code> steps.</p>
+</section>
+<section class="member" id="method.pop">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> pop(): ?<span class="ty">T</span></code></pre>
+<p>Removes and returns the least value, or <code>null</code> where there is none.</p>
+<p>The last value is put at the top and sunk to its place, in <code>log n</code> steps.</p>
+</section>
+<section class="member" id="method.fromLiteral">
+<pre class="signature"><code class="language-lyric"><span class="kw">static</span> <span class="kw">fn</span> fromLiteral(items: <span class="ty">T</span>[]): <span class="ty">Heap</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+</section>
+<section class="member" id="method.debug">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> debug(): <span class="ty">string</span></code></pre>
+</section>
+<section class="member" id="method.debugTo">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> debugTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
+</section>
+<section class="member" id="method.fromIter">
+<pre class="signature"><code class="language-lyric"><span class="kw">static</span> <span class="kw">fn</span> fromIter&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">T</span>&gt;]&gt;(it: <span class="ty">I</span>): <span class="ty">Heap</span>&lt;<span class="ty">T</span>&gt; <span class="kw">throws</span> <span class="ty">I</span>.<span class="ty">Error</span></code></pre>
+<p>Creates a heap of the iterator's values, built at once as <a href="../../../std/collections/Heap/#method.of">Heap.of</a> does.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what a pull of <code>it</code> throws.</p>
+</section>
+<section class="member" id="method.clone">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> clone(): <span class="ty">Heap</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.new">new</a></li>
+<li class="level-3"><a href="#method.withCapacity">withCapacity</a></li>
+<li class="level-3"><a href="#method.of">of</a></li>
+<li class="level-3"><a href="#method.length">length</a></li>
+<li class="level-3"><a href="#method.isEmpty">isEmpty</a></li>
+<li class="level-3"><a href="#method.peek">peek</a></li>
+<li class="level-3"><a href="#method.push">push</a></li>
+<li class="level-3"><a href="#method.pop">pop</a></li>
+<li class="level-3"><a href="#method.fromLiteral">fromLiteral</a></li>
+<li class="level-3"><a href="#method.debug">debug</a></li>
+<li class="level-3"><a href="#method.debugTo">debugTo</a></li>
+<li class="level-3"><a href="#method.fromIter">fromIter</a></li>
+<li class="level-3"><a href="#method.clone">clone</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

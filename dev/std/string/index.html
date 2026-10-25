@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.string — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.string</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/string/">std.string</a></li>
+<li><a href="../../std/string/#fn.concat">concat()</a></li>
+<li><a href="../../std/string/#fn.fromInt">fromInt()</a></li>
+<li><a href="../../std/string/#fn.fromUint">fromUint()</a></li>
+<li><a href="../../std/string/#fn.fromFloat">fromFloat()</a></li>
+<li><a href="../../std/string/#fn.fromFloat32">fromFloat32()</a></li>
+<li><a href="../../std/string/#fn.fromChar">fromChar()</a></li>
+<li><a href="../../std/string/#fn.fromBool">fromBool()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.string</h1>
+<p>Converts values to text and joins strings; the compiler calls these functions by name.</p>
+<p>f-strings and <code>+</code> on strings lower to <a href="../../std/string/#fn.concat">concat</a> and the <code>from…</code> conversions. The module also
+re-exports <a href="../../std/core/StringBuilder/">StringBuilder</a> for building text piece by piece, and names the Unicode version
+behind <code>char</code> in <a href="../../std/string/#const.unicodeVersion">unicodeVersion</a>.</p>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.concat">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> concat(a: <span class="ty">string</span>, b: <span class="ty">string</span>): <span class="ty">string</span></code></pre>
+<p>Returns <code>a</code> followed by <code>b</code>.</p>
+</section>
+<section class="member" id="fn.fromInt">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fromInt(value: <span class="ty">int</span>): <span class="ty">string</span></code></pre>
+<p>Returns the decimal text of a signed integer.</p>
+</section>
+<section class="member" id="fn.fromUint">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fromUint(value: <span class="ty">uint</span>): <span class="ty">string</span></code></pre>
+<p>Returns the decimal text of an unsigned integer.</p>
+</section>
+<section class="member" id="fn.fromFloat">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fromFloat(value: <span class="ty">float</span>): <span class="ty">string</span></code></pre>
+<p>Returns the shortest decimal text that reads back as the same <code>float</code>.</p>
+<p>Infinities are written <code>inf</code> and <code>-inf</code>, a NaN as <code>NaN</code>.</p>
+</section>
+<section class="member" id="fn.fromFloat32">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fromFloat32(value: <span class="ty">float32</span>): <span class="ty">string</span></code></pre>
+<p>Returns the shortest decimal text that reads back as the same <code>float32</code>.</p>
+<p>The text is the <code>float32</code>'s own: <code>0.1</code>, not the <code>0.10000000149011612</code> of the <code>float</code> it
+widens to.</p>
+</section>
+<section class="member" id="fn.fromChar">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fromChar(value: <span class="ty">char</span>): <span class="ty">string</span></code></pre>
+<p>Returns the character as a one-character string.</p>
+</section>
+<section class="member" id="fn.fromBool">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fromBool(value: <span class="ty">bool</span>): <span class="ty">string</span></code></pre>
+<p>Returns <code>true</code> or <code>false</code>.</p>
+</section>
+<h2 id="constants">Constants</h2>
+<section class="member" id="const.unicodeVersion">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">let</span> unicodeVersion: <span class="ty">string</span> = <span class="str">"18.0.0"</span></code></pre>
+<p>The version of the Unicode Character Database behind <code>char</code>'s answers.</p>
+<p>It governs a character's general category, its simple case mappings and <code>isWhitespace</code>.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.concat">concat</a></li>
+<li class="level-3"><a href="#fn.fromInt">fromInt</a></li>
+<li class="level-3"><a href="#fn.fromUint">fromUint</a></li>
+<li class="level-3"><a href="#fn.fromFloat">fromFloat</a></li>
+<li class="level-3"><a href="#fn.fromFloat32">fromFloat32</a></li>
+<li class="level-3"><a href="#fn.fromChar">fromChar</a></li>
+<li class="level-3"><a href="#fn.fromBool">fromBool</a></li>
+<li class="level-2"><a href="#constants">Constants</a></li>
+<li class="level-3"><a href="#const.unicodeVersion">unicodeVersion</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

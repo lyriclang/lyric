@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>class JsonWriter — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.json</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/json/">std.json</a></li>
+<li><a href="../../../std/json/JsonOptions/">JsonOptions</a></li>
+<li><a href="../../../std/json/JsonError/">JsonError</a></li>
+<li><a href="../../../std/json/JsonValue/">JsonValue</a></li>
+<li><a class="current" href="../../../std/json/JsonWriter/">JsonWriter</a></li>
+<li><a href="../../../std/json/TreeBuilder/">TreeBuilder</a></li>
+<li><a href="../../../std/json/JsonReader/">JsonReader</a></li>
+<li><a href="../../../std/json/#fn.encode">encode()</a></li>
+<li><a href="../../../std/json/#fn.encodeTo">encodeTo()</a></li>
+<li><a href="../../../std/json/#fn.parse">parse()</a></li>
+<li><a href="../../../std/json/#fn.decode">decode()</a></li>
+<li><a href="../../../std/json/#fn.decodeFrom">decodeFrom()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>class JsonWriter</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">JsonWriter</span> :: [<span class="ty">Encoder</span>]</code></pre>
+<p class="conforms">Conforms to <code>Encoder</code>.</p>
+<p>The encoder that writes JSON text: compact, or pretty with newlines and indentation.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.new">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> new(opts: <span class="ty">JsonOptions</span> = <span class="ty">JsonOptions</span> { }): <span class="ty">JsonWriter</span></code></pre>
+<p>Returns a writer under the options; a program hands it to <code>v.encode(&amp;w)</code> and takes
+<code>text()</code>.</p>
+</section>
+<section class="member" id="method.text">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> text(): <span class="ty">string</span></code></pre>
+<p>Returns the text written so far.</p>
+</section>
+<section class="member" id="method.encodeNull">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> encodeNull(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.encodeBool">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> encodeBool(v: <span class="ty">bool</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.encodeInt">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> encodeInt(v: <span class="ty">int</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.encodeUint">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> encodeUint(v: <span class="ty">uint</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.encodeFloat">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> encodeFloat(v: <span class="ty">float</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.encodeString">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> encodeString(v: <span class="ty">string</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.encodeBytes">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> encodeBytes(v: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.beginSeq">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> beginSeq(count: <span class="ty">int</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.endSeq">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> endSeq(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.beginMap">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> beginMap(count: <span class="ty">int</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.beginKey">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> beginKey(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.endMap">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> endMap(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.beginStruct">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> beginStruct(name: <span class="ty">string</span>, count: <span class="ty">int</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.beginField">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> beginField(name: <span class="ty">string</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.endStruct">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> endStruct(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.beginVariant">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> beginVariant(
+    enumName: <span class="ty">string</span>,
+    variant: <span class="ty">string</span>,
+    index: <span class="ty">int</span>,
+    hasPayload: <span class="ty">bool</span>
+): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.endVariant">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> endVariant(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
+</section>
+<section class="member" id="method.path">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> path(): <span class="ty">string</span></code></pre>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.new">new</a></li>
+<li class="level-3"><a href="#method.text">text</a></li>
+<li class="level-3"><a href="#method.encodeNull">encodeNull</a></li>
+<li class="level-3"><a href="#method.encodeBool">encodeBool</a></li>
+<li class="level-3"><a href="#method.encodeInt">encodeInt</a></li>
+<li class="level-3"><a href="#method.encodeUint">encodeUint</a></li>
+<li class="level-3"><a href="#method.encodeFloat">encodeFloat</a></li>
+<li class="level-3"><a href="#method.encodeString">encodeString</a></li>
+<li class="level-3"><a href="#method.encodeBytes">encodeBytes</a></li>
+<li class="level-3"><a href="#method.beginSeq">beginSeq</a></li>
+<li class="level-3"><a href="#method.endSeq">endSeq</a></li>
+<li class="level-3"><a href="#method.beginMap">beginMap</a></li>
+<li class="level-3"><a href="#method.beginKey">beginKey</a></li>
+<li class="level-3"><a href="#method.endMap">endMap</a></li>
+<li class="level-3"><a href="#method.beginStruct">beginStruct</a></li>
+<li class="level-3"><a href="#method.beginField">beginField</a></li>
+<li class="level-3"><a href="#method.endStruct">endStruct</a></li>
+<li class="level-3"><a href="#method.beginVariant">beginVariant</a></li>
+<li class="level-3"><a href="#method.endVariant">endVariant</a></li>
+<li class="level-3"><a href="#method.path">path</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

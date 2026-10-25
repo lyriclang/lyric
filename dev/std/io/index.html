@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.io — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.io</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/io/">std.io</a></li>
+<li><a href="../../std/io/Stdin/">Stdin</a></li>
+<li><a href="../../std/io/StdinLinesIter/">StdinLinesIter</a></li>
+<li><a href="../../std/io/ConsoleReader/">ConsoleReader</a></li>
+<li><a href="../../std/io/ConsoleWriter/">ConsoleWriter</a></li>
+<li><a href="../../std/io/IoErrorKind/">IoErrorKind</a></li>
+<li><a href="../../std/io/IoError/">IoError</a></li>
+<li><a href="../../std/io/Reader/">Reader</a></li>
+<li><a href="../../std/io/Writer/">Writer</a></li>
+<li><a href="../../std/io/SeekFrom/">SeekFrom</a></li>
+<li><a href="../../std/io/Seek/">Seek</a></li>
+<li><a href="../../std/io/ByteReader/">ByteReader</a></li>
+<li><a href="../../std/io/ByteBuffer/">ByteBuffer</a></li>
+<li><a href="../../std/io/BufReader/">BufReader</a></li>
+<li><a href="../../std/io/BufWriter/">BufWriter</a></li>
+<li><a href="../../std/io/TextReader/">TextReader</a></li>
+<li><a href="../../std/io/TextLinesIter/">TextLinesIter</a></li>
+<li><a href="../../std/io/TextCharsIter/">TextCharsIter</a></li>
+<li><a href="../../std/io/TextWriter/">TextWriter</a></li>
+<li><a href="../../std/io/#fn.print">print()</a></li>
+<li><a href="../../std/io/#fn.println">println()</a></li>
+<li><a href="../../std/io/#fn.eprint">eprint()</a></li>
+<li><a href="../../std/io/#fn.eprintln">eprintln()</a></li>
+<li><a href="../../std/io/#fn.flush">flush()</a></li>
+<li><a href="../../std/io/#fn.stdin">stdin()</a></li>
+<li><a href="../../std/io/#fn.stdout">stdout()</a></li>
+<li><a href="../../std/io/#fn.stderr">stderr()</a></li>
+<li><a href="../../std/io/#fn.copy">copy()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.io</h1>
+<p>Input and output: <code>import std.io { println }</code>. The module holds one error type (<code>IoError</code> with
+its <code>IoErrorKind</code>); the interfaces <code>Reader</code>, <code>Writer</code> and <code>Seek</code> with their defaults; <code>copy</code>;
+two streams over memory (<code>ByteReader</code>, <code>ByteBuffer</code>); the buffers <code>BufReader</code> and <code>BufWriter</code>
+and the text streams <code>TextReader</code> and <code>TextWriter</code>; the console's output — <code>print</code>, <code>println</code>,
+<code>eprint</code>, <code>eprintln</code>, <code>flush</code> — and its streams <code>stdin()</code>, <code>stdout()</code>, <code>stderr()</code>; and the I/O
+pool that std.fs's calls run on. A reader's and a writer's call may throw <code>Cancelled</code> where it
+waits without bound.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/io/Stdin/">Stdin</a> <span class="kind">class</span> <span class="summary">— The standard input (<code>stdin()</code>): a <code>Reader</code>, and its text a line at a time.</span></div>
+<div class="listed"><a href="../../std/io/StdinLinesIter/">StdinLinesIter</a> <span class="kind">struct</span> <span class="summary">— The standard input's lines (<code>stdin().lines()</code>).</span></div>
+<div class="listed"><a href="../../std/io/ConsoleReader/">ConsoleReader</a> <span class="kind">class</span> <span class="summary">— The console's input as bytes, unbuffered (lyr/console.h): what <code>stdin()</code> reads through its buffer.</span></div>
+<div class="listed"><a href="../../std/io/ConsoleWriter/">ConsoleWriter</a> <span class="kind">class</span> <span class="summary">— One of the console's output streams as a <code>Writer</code> (<code>stdout()</code>, <code>stderr()</code>).</span></div>
+<div class="listed"><a href="../../std/io/IoErrorKind/">IoErrorKind</a> <span class="kind">enum</span> <span class="summary">— Classifies what went wrong in an input or an output — a file's, a socket's, a process's, memory's alike.</span></div>
+<div class="listed"><a href="../../std/io/IoError/">IoError</a> <span class="kind">struct</span> <span class="summary">— The error every input and output throws: its kind, the path it concerns, what more is known, and what caused it.</span></div>
+<div class="listed"><a href="../../std/io/Reader/">Reader</a> <span class="kind">interface</span> <span class="summary">— A source of bytes.</span></div>
+<div class="listed"><a href="../../std/io/Writer/">Writer</a> <span class="kind">interface</span> <span class="summary">— A sink of bytes.</span></div>
+<div class="listed"><a href="../../std/io/SeekFrom/">SeekFrom</a> <span class="kind">enum</span> <span class="summary">— Selects where a position moves to: from the start, from the end, from where it stands.</span></div>
+<div class="listed"><a href="../../std/io/Seek/">Seek</a> <span class="kind">interface</span> <span class="summary">— A stream with a position: <code>seek</code> moves it and returns where it then stands, counted from the start.</span></div>
+<div class="listed"><a href="../../std/io/ByteReader/">ByteReader</a> <span class="kind">class</span> <span class="summary">— A <code>Reader</code> over bytes in memory: it reads them from the front, and <code>seek</code> moves it.</span></div>
+<div class="listed"><a href="../../std/io/ByteBuffer/">ByteBuffer</a> <span class="kind">class</span> <span class="summary">— A growing buffer of bytes in memory: a <code>Writer</code> that appends, a <code>Reader</code> that takes from the front what was written and not yet read.</span></div>
+<div class="listed"><a href="../../std/io/BufReader/">BufReader</a> <span class="kind">class</span> <span class="summary">— A <code>Reader</code> with a buffer of its own: it reads its inner reader 8 KiB at a time, so that small reads do not each reach it.</span></div>
+<div class="listed"><a href="../../std/io/BufWriter/">BufWriter</a> <span class="kind">class</span> <span class="summary">— A <code>Writer</code> with a buffer of its own: what it is handed waits there until 8 KiB are together, a <code>flush()</code> or a <code>close()</code>.</span></div>
+<div class="listed"><a href="../../std/io/TextReader/">TextReader</a> <span class="kind">class</span> <span class="summary">— A reader of UTF-8 text: a <code>BufReader</code> and a decoder.</span></div>
+<div class="listed"><a href="../../std/io/TextLinesIter/">TextLinesIter</a> <span class="kind">struct</span> <span class="summary">— A <code>TextReader</code>'s lines.</span></div>
+<div class="listed"><a href="../../std/io/TextCharsIter/">TextCharsIter</a> <span class="kind">struct</span> <span class="summary">— A <code>TextReader</code>'s characters, their <code>Error</code> joined as the lines' is.</span></div>
+<div class="listed"><a href="../../std/io/TextWriter/">TextWriter</a> <span class="kind">class</span> <span class="summary">— A writer of text: its UTF-8, to the inner writer as it comes.</span></div>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.print">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> print&lt;<span class="ty">T</span> :: [<span class="ty">Display</span>]&gt;(v: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
+<p>Writes <code>v</code>'s text on the standard output.</p>
+</section>
+<section class="member" id="fn.println">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> println&lt;<span class="ty">T</span> :: [<span class="ty">Display</span>]&gt;(v: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
+<p>Writes <code>v</code>'s text and a newline on the standard output.</p>
+</section>
+<section class="member" id="fn.eprint">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> eprint&lt;<span class="ty">T</span> :: [<span class="ty">Display</span>]&gt;(v: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
+<p>Writes <code>v</code>'s text on the standard error.</p>
+</section>
+<section class="member" id="fn.eprintln">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> eprintln&lt;<span class="ty">T</span> :: [<span class="ty">Display</span>]&gt;(v: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
+<p>Writes <code>v</code>'s text and a newline on the standard error.</p>
+</section>
+<section class="member" id="fn.flush">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> flush(): <span class="ty">void</span></code></pre>
+<p>Writes out what the console holds now: the standard output's, then the standard error's — for
+before a prompt waits for its answer, or where the program's next lines take long.</p>
+</section>
+<section class="member" id="fn.stdin">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> stdin(): <span class="ty">Stdin</span></code></pre>
+<p>Returns the program's standard input: one for the program, made at the first call. Its reads
+go through a buffer of its own, so <code>readLine</code>, <code>lines</code> and <code>read</code> take turns on it without a
+byte lost — on the I/O pool where a scheduler runs.</p>
+</section>
+<section class="member" id="fn.stdout">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> stdout(): <span class="ty">ConsoleWriter</span></code></pre>
+<p>Returns the standard output as a <code>Writer</code>: the buffer print writes into, so the two keep their
+order.</p>
+</section>
+<section class="member" id="fn.stderr">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> stderr(): <span class="ty">ConsoleWriter</span></code></pre>
+<p>Returns the standard error as a <code>Writer</code>: the buffer eprint writes into.</p>
+</section>
+<section class="member" id="fn.copy">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> copy&lt;<span class="ty">R</span> :: [<span class="ty">Reader</span>], <span class="ty">W</span> :: [<span class="ty">Writer</span>]&gt;(r: <span class="ty">R</span>, w: <span class="ty">W</span>): <span class="ty">int</span> <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Copies everything <code>r</code> holds into <code>w</code>, through a buffer of its own, and returns how many bytes
+it copied. The two are read and written as the values handed in — the handles and the
+streams here are classes, so that is the object itself; a reader that is a struct is read
+through a copy, and its position does not move for the caller.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what <code>r</code>'s <code>read</code> and <code>w</code>'s <code>write</code> throw.</p>
+</section>
+<h2 id="extensions">Extensions</h2>
+<section class="member" id="ext.R">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">R</span> :: [<span class="ty">Reader</span>]&gt; <span class="ty">R</span></code></pre>
+</section>
+<section class="member" id="ext.R.method.readExact">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> readExact(into: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">void</span> <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Fills <code>into</code> whole, reading as often as it takes.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>UnexpectedEof</code> where the source ends before, the bytes that came in the detail,
+and what the reader's <code>read</code> throws.</p>
+</section>
+<section class="member" id="ext.R.method.readToEnd">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> readToEnd(): <span class="ty">uint8</span>[] <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Reads everything to the end and returns it in one new array.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what the reader's <code>read</code> throws.</p>
+</section>
+<section class="member" id="ext.R.method.readToString">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> readToString(): <span class="ty">string</span> <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Reads everything to the end and returns it as UTF-8 text.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>InvalidData</code> for bytes that are no UTF-8, with the decoder's error as the cause,
+and what the reader's <code>read</code> throws.</p>
+</section>
+<section class="member" id="ext.W">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">W</span> :: [<span class="ty">Writer</span>]&gt; <span class="ty">W</span></code></pre>
+</section>
+<section class="member" id="ext.W.method.writeAll">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> writeAll(from: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">void</span> <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Writes all of <code>from</code>, writing as often as it takes.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <code>Other { code = 0 }</code> where the writer takes no byte of a slice that has some (it
+would be asked forever), and what the writer's <code>write</code> throws.</p>
+</section>
+<section class="member" id="ext.W.method.writeString">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> writeString(s: <span class="ty">StringView</span>): <span class="ty">void</span> <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Writes all the bytes of <code>s</code> (its UTF-8).</p>
+<h4 id="errors">Errors</h4>
+<p>Throws what <code>writeAll</code> throws.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.print">print</a></li>
+<li class="level-3"><a href="#fn.println">println</a></li>
+<li class="level-3"><a href="#fn.eprint">eprint</a></li>
+<li class="level-3"><a href="#fn.eprintln">eprintln</a></li>
+<li class="level-3"><a href="#fn.flush">flush</a></li>
+<li class="level-3"><a href="#fn.stdin">stdin</a></li>
+<li class="level-3"><a href="#fn.stdout">stdout</a></li>
+<li class="level-3"><a href="#fn.stderr">stderr</a></li>
+<li class="level-3"><a href="#fn.copy">copy</a></li>
+<li class="level-2"><a href="#extensions">Extensions</a></li>
+<li class="level-3"><a href="#ext.R">R</a></li>
+<li class="level-3"><a href="#ext.W">W</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

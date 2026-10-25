@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>class TcpStream — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.net</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/net/">std.net</a></li>
+<li><a href="../../../std/net/IpAddr/">IpAddr</a></li>
+<li><a href="../../../std/net/SocketAddr/">SocketAddr</a></li>
+<li><a href="../../../std/net/TcpListener/">TcpListener</a></li>
+<li><a href="../../../std/net/Shutdown/">Shutdown</a></li>
+<li><a class="current" href="../../../std/net/TcpStream/">TcpStream</a></li>
+<li><a href="../../../std/net/UdpSocket/">UdpSocket</a></li>
+<li><a href="../../../std/net/#fn.resolve">resolve()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>class TcpStream</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">TcpStream</span> :: [<span class="ty">Reader</span>, <span class="ty">Writer</span>, <span class="ty">Closeable</span>]</code></pre>
+<p class="conforms">Conforms to <code>Reader</code>, <code>Writer</code>, <code>Closeable</code>.</p>
+<p>A TCP connection: a <code>Reader</code> and a <code>Writer</code> whose calls wait for the socket — a read until
+bytes come, a write until the system takes some.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.connect">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> connect(addr: <span class="ty">SocketAddr</span>): <span class="ty">TcpStream</span> <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Opens a connection to <code>addr</code>, waiting until it is made or refused.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a> with the address when the connection fails, such as <code>ConnectionRefused</code>,
+and <a href="../../../std/task/Cancelled/">Cancelled</a> when the waiting task is cancelled.</p>
+</section>
+<section class="member" id="method.read">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> read(into: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">int</span> <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Reads bytes from the connection into <code>into</code>, waiting until some come, and returns how many;
+0 once the peer has ended its writing.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a> — <code>Closed</code> after <code>close()</code> —, and <a href="../../../std/task/Cancelled/">Cancelled</a> when the waiting task is
+cancelled.</p>
+</section>
+<section class="member" id="method.write">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> write(from: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;): <span class="ty">int</span> <span class="kw">throws</span> [<span class="ty">IoError</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Writes bytes from <code>from</code> into the connection, waiting until the system takes some, and
+returns how many — possibly fewer than <code>from</code> holds (<code>writeAll</code> writes the rest).</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a> — <code>Closed</code> after <code>close()</code>, <code>BrokenPipe</code> for a peer that is gone —, and
+<a href="../../../std/task/Cancelled/">Cancelled</a> when the waiting task is cancelled.</p>
+</section>
+<section class="member" id="method.shutdown">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> shutdown(how: <span class="ty">Shutdown</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Ends the reading, the writing or both: a peer reading sees the end once the writing is shut.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a>: <code>Closed</code> after <code>close()</code>, else the system's failure.</p>
+</section>
+<section class="member" id="method.setNoDelay">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> setNoDelay(on: <span class="ty">bool</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Turns Nagle's algorithm off when <code>on</code> — each small write goes out at once — or on again.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a>: <code>Closed</code> after <code>close()</code>, else the system's failure.</p>
+</section>
+<section class="member" id="method.peerAddr">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> peerAddr(): <span class="ty">SocketAddr</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns the address of the connection's other end.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a>: <code>Closed</code> after <code>close()</code>, else the system's failure.</p>
+</section>
+<section class="member" id="method.localAddr">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> localAddr(): <span class="ty">SocketAddr</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Returns the address of this end.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a>: <code>Closed</code> after <code>close()</code>, else the system's failure.</p>
+</section>
+<section class="member" id="method.close">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> close(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span></code></pre>
+<p>Closes the connection; a task that waits in a read or a write throws <code>Closed</code>. A second
+close does nothing.</p>
+<h4 id="errors">Errors</h4>
+<p>Throws <a href="../../../std/io/IoError/">IoError</a> when the system fails to close it.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.connect">connect</a></li>
+<li class="level-3"><a href="#method.read">read</a></li>
+<li class="level-3"><a href="#method.write">write</a></li>
+<li class="level-3"><a href="#method.shutdown">shutdown</a></li>
+<li class="level-3"><a href="#method.setNoDelay">setNoDelay</a></li>
+<li class="level-3"><a href="#method.peerAddr">peerAddr</a></li>
+<li class="level-3"><a href="#method.localAddr">localAddr</a></li>
+<li class="level-3"><a href="#method.close">close</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

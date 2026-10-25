@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.thread — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.thread</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/thread/">std.thread</a></li>
+<li><a href="../../std/thread/Thread/">Thread</a></li>
+<li><a href="../../std/thread/Pool/">Pool</a></li>
+<li><a href="../../std/thread/#fn.parallelMap">parallelMap()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.thread</h1>
+<p>Threads and pools of them: <a href="../../std/thread/Thread/">Thread</a>, <a href="../../std/thread/Pool/">Pool</a> and <a href="../../std/thread/#fn.parallelMap">parallelMap</a>.</p>
+<p>Each thread runs a scheduler of its own from <code>std.task</code>; a task never moves to another
+thread. Threads run at the same time: what they share, they share through a channel, an
+atomic or a lock — anything else is a data race.</p>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/thread/Thread/">Thread</a> <span class="kind">class</span> <span class="summary">— An operating-system thread with a scheduler of its own.</span></div>
+<div class="listed"><a href="../../std/thread/Pool/">Pool</a> <span class="kind">class</span> <span class="summary">— A fixed set of threads that run the tasks given to the pool.</span></div>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.parallelMap">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> parallelMap&lt;<span class="ty">T</span>, <span class="ty">U</span>, <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(
+    xs: <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;,
+    f: <span class="kw">fn</span>(<span class="ty">T</span>) -&gt; <span class="ty">U</span> <span class="kw">throws</span> <span class="ty">E</span>
+): <span class="ty">U</span>[] <span class="kw">throws</span> [<span class="ty">E</span>, <span class="ty">Cancelled</span>]</code></pre>
+<p>Calls <code>f</code> on every element of <code>xs</code> on several threads and returns the results in the
+elements' order.</p>
+<p>The program's pool does the work — a thread for each processor, started at the first call
+and there until the program ends — in pieces, four for each thread; the first element's call
+runs on the caller's thread. <code>f</code> runs on other threads: what it shares, it shares through a
+channel, an atomic or a lock.</p>
+<h4 id="errors">Errors</h4>
+<p>Where calls throw, the error of the first element, in order, whose call throws comes out
+once every piece has ended; a piece stops at its first error, so a later element of that
+piece may go uncalled. An error from the first element's call comes out at once. A cancelled
+caller cancels the pieces and throws <code>Cancelled</code>.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.parallelMap">parallelMap</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>
