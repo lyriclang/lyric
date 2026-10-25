@@ -32,9 +32,10 @@ public static partial class TestRun
     /// <summary>Builds the package's tests — those whose name holds <paramref name="filter"/>, where
     /// one is given — and runs them, what they print passed on as it comes. The answer is the
     /// program's exit: 0 when every test held, 1 when one failed; a refused program is 1
-    /// as well, a build that could not run 2.</summary>
+    /// as well, a build that could not run 2. Without <paramref name="run"/> the program is built and
+    /// its path printed, and no doc-test is built: each is a program of its own.</summary>
     public static int Run(Project project, BuildProfile profile, Target target, CCompiler compiler, string version, string? filter,
-        TextWriter output, TextWriter error)
+        TextWriter output, TextWriter error, bool run = true)
     {
         // the scripts first, so that a test may import what they generate
         var (ran, _) = BuildScripts.Run(project, Target.Host, profile, compiler, version, error);
@@ -44,7 +45,7 @@ public static partial class TestRun
         var (docs, unread) = DocTestsOf(project);
         bool Chosen(string name) => filter is null || name.Contains(filter, StringComparison.Ordinal);
         var chosen = tests.Where(t => Chosen(t.Name)).ToList();
-        var chosenDocs = docs.Where(d => Chosen(d.Name)).ToList();
+        var chosenDocs = run ? docs.Where(d => Chosen(d.Name)).ToList() : [];
         var chosenUnread = unread.Where(u => Chosen(u.Name)).ToList();
         if (chosen.Count == 0 && chosenDocs.Count == 0 && chosenUnread.Count == 0)
         {
@@ -60,6 +61,12 @@ public static partial class TestRun
         if (target.IsHost)
             outcomes.AddRange(chosenDocs.Select(d => (d.Name, RunDocTest(project, d, profile, target, compiler, version))));
         var program = project with { EntryText = Driver(chosen, outcomes) };
+        if (!run)
+        {
+            var (exit, built) = Pipeline.Build(new BuildRequest(program, profile, target, compiler, version), error);
+            if (exit == 0 && built is not null) output.WriteLine(built);
+            return exit;
+        }
         return BuildAndRun(program, profile, target, compiler, version, output, error);
     }
 

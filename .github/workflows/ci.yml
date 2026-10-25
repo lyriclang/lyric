@@ -324,6 +324,45 @@ jobs:
           print(f"lyric5 --version:   {best([lyric5, '--version'], 10):.1f} ms (min of 10)")
           PY
 
+  # lyric dap on Windows, MEASURED and not promised (design 11 E4): the binary there carries PDB
+  # rather than DWARF, and whether LLVM's lldb-dap reads it — a line breakpoint, the locals, the
+  # stop at a panic — is what this job reports. It runs by hand and on main, and its failure fails
+  # no run.
+  dap-windows:
+    name: lyric dap on Windows (measured)
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up zig
+        uses: ./.github/actions/setup-zig
+
+      - name: The preinstalled .NET, if it is 10
+        id: dotnet
+        shell: bash
+        run: dotnet --list-sdks 2>/dev/null | grep -q '^10\.' && echo "have=1" >> "$GITHUB_OUTPUT" || true
+
+      - name: Set up .NET from global.json
+        if: steps.dotnet.outputs.have != '1'
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Find lldb-dap
+        shell: bash
+        run: |
+          dap=$(ls "/c/Program Files/LLVM/bin/lldb-dap.exe" 2>/dev/null || command -v lldb-dap || true)
+          echo "lldb-dap: ${dap:-none}"
+          if [ -n "$dap" ]; then echo "LYRIC_LLDB_DAP=$(cygpath -w "$dap")" >> "$GITHUB_ENV"; "$dap" --version || true; fi
+
+      - name: The adapter's tests
+        shell: bash
+        run: dotnet test tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release --filter "FullyQualifiedName~DapCommandTests" --logger "console;verbosity=normal"
+
   bench:
     # Measurement points 2 and 3 (design/v5/spec/13) on this runner, for the record: the table
     # goes into the run's summary. A shared runner is too noisy for the plan's ratchet (1.5x Go),

@@ -13,8 +13,11 @@ void lyr__globals__9ee5f9b5(void);
 
 #line 2 "programs/checks.lyr"
 int64_t lyr_app_main_add(int64_t l0_a, int64_t l1_b) {
+#line 2
     int64_t t0 = 0;
+#line 2
     int64_t t1 = 0;
+#line 2
     int64_t t2 = 0;
 bb0:;
 #line 2
@@ -29,8 +32,11 @@ bb0:;
 
 #line 3 "programs/checks.lyr"
 int64_t lyr_app_main_div(int64_t l0_a, int64_t l1_b) {
+#line 3
     int64_t t0 = 0;
+#line 3
     int64_t t1 = 0;
+#line 3
     int64_t t2 = 0;
 bb0:;
 #line 3
@@ -45,8 +51,11 @@ bb0:;
 
 #line 4 "programs/checks.lyr"
 int64_t lyr_app_main_rem(int64_t l0_a, int64_t l1_b) {
+#line 4
     int64_t t0 = 0;
+#line 4
     int64_t t1 = 0;
+#line 4
     int64_t t2 = 0;
 bb0:;
 #line 4
@@ -61,7 +70,9 @@ bb0:;
 
 #line 5 "programs/checks.lyr"
 int64_t lyr_app_main_neg(int64_t l0_a) {
+#line 5
     int64_t t0 = 0;
+#line 5
     int64_t t1 = 0;
 bb0:;
 #line 5
@@ -74,41 +85,77 @@ bb0:;
 
 #line 8 "programs/checks.lyr"
 LYR_NOINLINE int64_t lyr_app_main_main(void) {
+#line 8
     LYR_STACK_CHECK();
+#line 8
     int64_t l0_v = 0;
+#line 8
     int64_t l1_bits = 0;
+#line 8
     int64_t t0 = 0;
+#line 8
     int64_t t1 = 0;
+#line 8
     int64_t t2 = 0;
+#line 8
     int64_t t3 = 0;
+#line 8
     int64_t t4 = 0;
+#line 8
     int64_t t5 = 0;
+#line 8
     int64_t t6 = 0;
+#line 8
     int64_t t7 = 0;
+#line 8
     int64_t t8 = 0;
+#line 8
     int64_t t9 = 0;
+#line 8
     int64_t t10 = 0;
+#line 8
     int64_t t11 = 0;
+#line 8
     int64_t t12 = 0;
+#line 8
     int64_t t13 = 0;
+#line 8
     int64_t t14 = 0;
+#line 8
     int64_t t15 = 0;
+#line 8
     int64_t t16 = 0;
+#line 8
     uint8_t t17 = 0;
+#line 8
     int64_t t18 = 0;
+#line 8
     int64_t t19 = 0;
+#line 8
     int64_t t20 = 0;
+#line 8
     int64_t t21 = 0;
+#line 8
     int64_t t22 = 0;
+#line 8
     int64_t t23 = 0;
+#line 8
     int64_t t24 = 0;
+#line 8
     int64_t t25 = 0;
+#line 8
     int64_t t26 = 0;
+#line 8
     int64_t t27 = 0;
+#line 8
     int64_t t28 = 0;
+#line 8
     int64_t t29 = 0;
+#line 8
     uint8_t t30 = 0;
+#line 8
     int64_t t31 = 0;
+#line 8
     int64_t t32 = 0;
 bb0:;
 #line 8

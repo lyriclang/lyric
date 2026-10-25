@@ -157,6 +157,37 @@ public sealed class CEmitter
         return units;
     }
 
+    /// <summary>
+    /// What a debugger shows the program's C as, a line each, tab-separated — beside the binary as
+    /// <c>&lt;binary&gt;.lyric-names</c>: a function's C name and its Lyric name; <c>type</c>, a
+    /// struct's C name and the type's Lyric name; <c>variant</c>, an enum's C name, a tag, the
+    /// variant's name and whether it has a payload (its member is <c>as.v&lt;tag&gt;</c>);
+    /// <c>global</c>, a global's C name and its Lyric name.
+    /// </summary>
+    public static IReadOnlyList<string> DebugNames(IrModule module, SourceManager sources)
+    {
+        var emitter = new CEmitter(module, sources, null, null, true);
+        var lines = new List<string>();
+        foreach (var function in module.Functions.DistinctBy(f => FunctionName(f.Name)))
+            lines.Add($"{FunctionName(function.Name)}\t{function.Name}");
+        for (var i = 0; i < module.Globals.Count; i++)
+            lines.Add($"global\t{emitter._globalNames[i]}\t{(module.Globals[i].Module.Length > 0 ? $"{module.Globals[i].Module}.{module.Globals[i].Name}" : module.Globals[i].Name)}");
+        for (var i = 0; i < module.Types.Count; i++)
+        {
+            var def = module.Types[i];
+            if (emitter._variants.ContainsKey(i) || def.Name.StartsWith('<') || def.MethodSlots.Length > 0) continue;
+            var c = emitter.StructName(new TypeId(i));
+            lines.Add($"type\t{c}\t{(def.Module.Length > 0 ? $"{def.Module}.{def.Name}" : def.Name)}");
+            for (var tag = 0; tag < def.Variants.Length; tag++)
+            {
+                var variant = module.Types[def.Variants[tag].Value];
+                var own = variant.Name.StartsWith(def.Name + ".", StringComparison.Ordinal) ? variant.Name[(def.Name.Length + 1)..] : variant.Name;
+                lines.Add($"variant\t{c}\t{tag}\t{own}\t{(variant.FieldTypes.Length > 1 ? 1 : 0)}");
+            }
+        }
+        return lines;
+    }
+
     /// <summary>All units as one text, for reading (<c>--emit c</c>) and for the goldens. The
     /// units are separate translation units and this text is not one: a struct two of them need
     /// is defined in both.</summary>
@@ -1615,6 +1646,7 @@ public sealed class CEmitter
         // frames of a Windows backtrace went missing (measured).
         Line(FirstSpan(function));
         _fn.Append(Signature(function)).AppendLine(" {");
+        var prologue = _fn.Length;
 
         // The prologue's check of the stack — the first statement, before the
         // locals are zeroed: a function that calls compares its frame with the thread's bound; one
@@ -1665,6 +1697,19 @@ public sealed class CEmitter
 
         if (function.Blocks.Count > 0 && function.Blocks[0].Id != function.Entry)
             _fn.AppendLine($"    goto bb{function.Entry.Value};");
+
+        // Every line of the prologue at the function's own line: C counts on from a #line, and the
+        // locals zeroed below the signature took the lines of the statements after it — a
+        // breakpoint on one of those stopped before the locals had a value.
+        if (FirstSpan(function) is var first && first != default)
+        {
+            var written = _fn.ToString(prologue, _fn.Length - prologue);
+            _fn.Length = prologue;
+            var line = _sources.LocateStart(first).Line;
+            foreach (var text in written.Split('\n'))
+                if (text.TrimEnd('\r') is { Length: > 0 } code)
+                    _fn.AppendLine($"#line {line}").AppendLine(code);
+        }
 
         foreach (var block in function.Blocks)
         {
