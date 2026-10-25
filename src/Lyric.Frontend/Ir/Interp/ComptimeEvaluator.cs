@@ -28,10 +28,13 @@ public static class ComptimeEvaluator
     /// <param name="standard">Which sites are the standard library's: they run under
     /// <see cref="DefaultBudget"/>, the program's manifest's budget being the program's — a tight one
     /// would stop std.hash's tables in every program that set it.</param>
+    /// <param name="quiet">Whether <paramref name="budget"/> is an editor's, below the program's: a
+    /// site of the program that runs out of it is left without a value and without a finding — the
+    /// build, under the program's own budget, says what it comes to.</param>
     /// <returns>Each site's constant, or <c>null</c> where a site was reported.</returns>
     public static IReadOnlyDictionary<int, IrConstValue>? Evaluate(IrModule hoisted, TypeResult types,
         DiagnosticEngine diagnostics, long budget, bool overflowChecks, EmbedReader? embed = null, BuildFacts? build = null,
-        Func<int, bool>? include = null, Func<int, bool>? standard = null)
+        Func<int, bool>? include = null, Func<int, bool>? standard = null, bool quiet = false)
     {
         var interpreter = new Interpreter(hoisted, budget, overflowChecks, embed, build);
         var sites = types.ComptimeSites;
@@ -47,6 +50,10 @@ public static class ComptimeEvaluator
             {
                 interpreter.Refill(standard?.Invoke(i) == true ? DefaultBudget : null);
                 values[i] = Constant(interpreter.Run(new FunctionId(index)), hoisted.Functions[index].ReturnType, hoisted);
+            }
+            catch (ComptimeFailure failure) when (quiet && failure.Code == "LYR-CT0002" && standard?.Invoke(i) != true)
+            {
+                // the editor's budget, not the program's: no value, nothing said
             }
             catch (ComptimeFailure failure)
             {

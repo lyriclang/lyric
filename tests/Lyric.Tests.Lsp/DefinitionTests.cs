@@ -164,6 +164,52 @@ public sealed class DefinitionTests
     }
 
     [Fact]
+    public void A_payload_field_named_in_an_initializer_jumps_to_its_declaration()
+    {
+        // The field of a variant's payload has no symbol of its own; the jump used to land on the
+        // variant around it.
+        JumpsToMarker("enum E {\n    A { ^code: int },\n    B,\n}\nfn main(): int {\n    let e: E = .A { co$de = 1 };\n    return 0;\n}\n");
+    }
+
+    [Fact]
+    public void The_enum_of_a_qualified_variant_initializer_jumps_to_the_enum()
+    {
+        // 'E.A { … }' binds to the variant; the cursor on 'E' means the enum.
+        JumpsToMarker("enum ^E {\n    A { code: int },\n    B,\n}\nfn main(): int {\n    let e = $E.A { code = 1 };\n    return 0;\n}\n");
+    }
+
+    [Fact]
+    public void A_later_name_of_a_type_path_jumps_to_the_associated_type()
+    {
+        // 'I.Iter.Item' binds to 'I'; the cursor on 'Iter' means Iterable's associated type, on
+        // 'Item' the one of Iter's bound, Iterator.
+        foreach (var (marked, name) in new[]
+                 {
+                     ("fn first<I :: [Iterable]>(i: I): ?I.It$er.Item {\n    return i.iter().next();\n}\nfn main(): int {\n    return 0;\n}\n", "Iter"),
+                     ("fn first<I :: [Iterable]>(i: I): ?I.Iter.It$em {\n    return i.iter().next();\n}\nfn main(): int {\n    return 0;\n}\n", "Item"),
+                     // the name of a named argument: Iterator's own
+                     ("fn count<I :: [Iterator<It$em = int, Error = never>]>(it: I): int {\n    return 0;\n}\nfn main(): int {\n    return 0;\n}\n", "Item"),
+                 })
+        {
+            var target = TargetAt(marked, out var result);
+            Assert.NotNull(target);
+            Assert.Equal(name, result.Sources.GetText(target.File).Substring(target.NameSpan.Start, target.NameSpan.Length));
+            Assert.EndsWith("std/core.lyr", result.Sources.GetPath(target.File).Replace('\\', '/'));
+        }
+    }
+
+    [Fact]
+    public void A_module_jumps_to_its_file_and_selects_nothing()
+    {
+        // The module's node spans its whole file; selecting it selected everything.
+        var target = TargetAt("import std.io;\n\nfn main(): int {\n    i$o.println(\"hi\");\n    return 0;\n}\n", out var result);
+        Assert.NotNull(target);
+        Assert.EndsWith("std/io.lyr", result.Sources.GetPath(target.File).Replace('\\', '/'));
+        Assert.Equal(0, target.NameSpan.Start);
+        Assert.Equal(0, target.NameSpan.Length);
+    }
+
+    [Fact]
     public void The_target_carries_the_declaration_AND_the_name()
     {
         // Two spans rather than one, because a jump reveals the declaration and selects the name.

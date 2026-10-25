@@ -1243,3 +1243,35 @@ Datei) — der Teil, den nur die Tür oben wegnähme.
 die im Editor am Budget scheitert, im Build aber nicht, wäre eine Meldung, die `lyric check` nicht
 sagt — gegen 14 §11 Regel 3; der Editor müsste eine solche Stelle **ungewertet lassen**, ohne Meldung.
 Das braucht den Abbruch im Interpreter ohne Diagnose und kommt mit **S3**.
+
+### Nachtrag 2026-10-25 — S3: die Fähigkeiten über den Korpus
+
+Statt je Provider eine Liste von Lyric-5-Formen zu raten, läuft **jeder Provider über die Lyric-5-Pakete des
+Repos** — die Tests der std (71 Dateien) und die drei Beispiele — **an jedem Namen**, den sie schreiben
+(`ProviderCorpusTests`, wie der Korpus des Formatierers in M13a): kein Provider wirft, eine Definition und
+jede Referenz liegt in einer geschriebenen Datei und nennt den Namen unter dem Cursor, Gliederung, Faltung,
+Inlay-Hints und semantische Tokens halten die Regeln des Protokolls. Gefunden und behoben:
+
+- ein **Modul** als Definition markierte seine ganze Datei; jetzt ihr Anfang, nichts markiert;
+- das **Feld einer Varianten-Nutzlast** (`.Other { code = 0 }`) hat kein eigenes Symbol — die Definition
+  landete auf der Variante; jetzt auf dem Feld;
+- die späteren Namen eines **Typpfads** (`I.Iter.Item`) und die Namen **benannter Typargumente**
+  (`Iterator<Item = int>`) sprangen zum ersten Namen bzw. zum Interface; jetzt zum assoziierten Typ;
+- `Shape.Rect { … }` an `Shape`: jetzt das Enum;
+- eine Definition **antwortet nur für den Namen unter dem Cursor**: an `with` in `(u with {…}).show()`
+  oder an `length` in `n = items.length()` sprang sie auf das umgebende `show` bzw. `n`; ein `_` nennt
+  nichts; synthetisierter Code (`hash` eines `T[4]`) hat keine Datei — jeweils keine Antwort statt einer
+  falschen.
+
+Dazu: **Hover zeigt den Kopf einer Deklaration, wie er geschrieben steht** — `fn twice(n: int): int`,
+mit Namen, Schranken, Defaults und `throws` —, aus derselben Funktion, die `lyric doc` schreibt (P6);
+**Referenzen und Rename über die Pakete**, die der Editor analysiert hat: die Verwendungen einer
+Bibliotheksfunktion in einem offenen Programm, das von ihr abhängt, findet dessen Kompilation, an derselben
+Deklaration (gleiche Datei, Stelle, Text); ein Rename, der ein Paket aus dem Git-Cache oder die std
+änderte, wird abgelehnt (14 §11 Regel 7); das **kleinere Budget** der Auswertung im Editor (P3, offener
+Punkt aus S2): ein Zehntel des Standards, eine Stelle des Programms, die es überschreitet, bleibt ohne Wert
+und ohne Meldung (Regel 6) — die std behält ihres.
+
+Nicht gebaut: Completion im Korpus (jede Anfrage kompiliert neu; ihre Tests decken die Formen); ein
+Workspace-weites Suchen nach Paketen, die der Editor nicht offen hat — die Verwendungen in einem nie
+geöffneten abhängigen Paket findet niemand, wie bei gopls ohne geladenes Paket.

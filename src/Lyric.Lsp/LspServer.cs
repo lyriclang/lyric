@@ -633,20 +633,31 @@ public sealed class LspServer : IDisposable
             return;
         }
 
+        var offset = 0;
         if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
             || _analysis.LastGood(path) is not { } snapshot
             || ReferenceProvider.At(snapshot.Model, snapshot.Root, snapshot.File,
-                TextOffsets.ToOffset(snapshot.Text, parameters.Position),
+                offset = TextOffsets.ToOffset(snapshot.Text, parameters.Position),
                 parameters.Context.IncludeDeclaration) is not { } sites)
         {
             await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        var locations = new List<Location>(sites.Count);
-        foreach (var site in sites)
+        // The uses in the other packages the editor analysed, each found by its own compilation
+        // at the same declaration — a package's function is used where packages depend on it.
+        var found = new List<(Core.SourceManager Sources, ReferenceSite Site)>(sites.Select(s => (snapshot.Sources, s)));
+        if (Across.DeclarationName(snapshot, offset) is { } name)
+            foreach (var (other, file, root, at) in Across.Elsewhere(snapshot, name, _analysis.CurrentCompilations()))
+                foreach (var site in ReferenceProvider.At(other.Model, root, file, at, parameters.Context.IncludeDeclaration) ?? [])
+                    found.Add((other.Sources, site));
+
+        var locations = new List<Location>(found.Count);
+        var seen = new HashSet<(string, int, int)>();
+        foreach (var (sources, site) in found)
         {
-            var sitePath = snapshot.Sources.GetPath(site.File);
+            var sitePath = sources.GetPath(site.File);
+            if (!seen.Add((Path.GetFullPath(sitePath), site.Span.Start, site.Span.End))) continue;
 
             // The client's own spelling for the file it asked about, a built URI for the rest — the
             // same rule the jump follows, and for the same reason.
@@ -655,7 +666,7 @@ public sealed class LspServer : IDisposable
                 Uri = DocumentUri.PathComparer.Equals(sitePath, path)
                     ? parameters.TextDocument.Uri
                     : DocumentUri.FromFilePath(sitePath),
-                Range = SpanMapper.ToRange(snapshot.Sources, site.Span),
+                Range = SpanMapper.ToRange(sources, site.Span),
             });
         }
 
@@ -875,10 +886,29 @@ public sealed class LspServer : IDisposable
             return;
         }
 
-        var changes = new Dictionary<string, List<TextEdit>>(StringComparer.Ordinal);
-        foreach (var edit in edits)
+        // The other packages the editor analysed rename their own uses of the same declaration.
+        var all = new List<(Core.SourceManager Sources, ReferenceSite Edit)>(edits.Select(e => (snapshot.Sources, e)));
+        if (Across.DeclarationName(snapshot, offset) is { } name)
+            foreach (var (other, file, root, at) in Across.Elsewhere(snapshot, name, _analysis.CurrentCompilations()))
+                if (RenameProvider.Rename(other.Model, root, file, at, parameters.NewName, other.ProjectWide).Edits is { } more)
+                    all.AddRange(more.Select(e => (other.Sources, e)));
+
+        // A package read from git is the cache's, and std is the toolchain's: neither is edited
+        // from here, and a rename that would leave their uses behind is no rename.
+        if (all.Select(e => e.Sources.GetPath(e.Edit.File)).FirstOrDefault(PackageUnit.IsReadOnly) is { } fixedFile)
         {
-            var editPath = snapshot.Sources.GetPath(edit.File);
+            await SendErrorAsync(id, JsonRpcErrorCodes.RequestFailed,
+                $"the rename would edit '{fixedFile}', which this editor does not change: it is read from git or is the standard library",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var changes = new Dictionary<string, List<TextEdit>>(StringComparer.Ordinal);
+        var seen = new HashSet<(string, int, int)>();
+        foreach (var (sources, edit) in all)
+        {
+            var editPath = sources.GetPath(edit.File);
+            if (!seen.Add((Path.GetFullPath(editPath), edit.Span.Start, edit.Span.End))) continue;
 
             // The client's own spelling for the file it asked about, a built URI for the rest —
             // the rule every answer with URIs in it follows here.
@@ -891,7 +921,7 @@ public sealed class LspServer : IDisposable
 
             list.Add(new TextEdit
             {
-                Range = SpanMapper.ToRange(snapshot.Sources, edit.Span),
+                Range = SpanMapper.ToRange(sources, edit.Span),
                 NewText = parameters.NewName,
             });
         }

@@ -49,7 +49,7 @@ public static class HoverProvider
         var type = node is Expr expression ? model.Types.TypeOf(expression) : null;
         if (type is not null && !IsShowable(type)) type = null;
 
-        if (symbol is not null && Signature(model, symbol, type) is { } signature)
+        if (symbol is not null && (Written(model, symbol) ?? Signature(model, symbol, type)) is { } signature)
             return Code(signature) + Documentation(model, symbol);
 
         // No symbol, but a type: an operator, a literal, an index expression. Worth showing — "what
@@ -139,6 +139,20 @@ public static class HoverProvider
 
         _ => null,
     };
+
+    /// <summary>
+    /// A declared function's, type's or variant's head as its source writes it — names, bounds,
+    /// defaults, <c>throws</c> and all — the signature <c>lyric doc</c> shows for it. <c>null</c>
+    /// for a symbol without a declaration in a written file, which <see cref="Signature"/> renders.
+    /// </summary>
+    private static string? Written(SemanticModel model, Symbol symbol)
+    {
+        var target = symbol is ImportBindingSymbol import ? ReferenceProvider.Target(import) : symbol;
+        if (target is not (FunctionSymbol or TypeSymbol or EnumVariantSymbol)) return null;
+        if (target.Declaration is not { } declaration || !declaration.Span.File.IsValid
+            || model.Compilation.IsSynthesized(declaration.Span.File)) return null;
+        return Lyric5.Doc.Api.SurfaceReader.SignatureOf(model.Compilation.Sources.GetText(declaration.Span.File), declaration);
+    }
 
     private static string Named(string name, LyrType? type) =>
         type is null ? name : $"{name}: {TypeFacts.Display(type)}";

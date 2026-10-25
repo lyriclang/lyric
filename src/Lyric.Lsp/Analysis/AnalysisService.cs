@@ -378,6 +378,10 @@ public sealed class AnalysisService : IDisposable
             : (Options(PackageUnit.SingleFileOptions(document.Path), cancellationToken), null);
     }
 
+    /// <summary>The steps a <c>comptime</c> site of the program may take in the editor, a tenth of
+    /// the default: a keystroke's analysis does not wait seconds on one site.</summary>
+    public const long EditorBudget = Lyric.Ir.Interp.ComptimeEvaluator.DefaultBudget / 10;
+
     /// <summary>What the editor compiles under: the unit's options, the library parsed once, no
     /// lowering — the editor shows what the checker and the evaluation say —, and the run's token,
     /// which stops a compilation whose text has changed between two of its phases.</summary>
@@ -386,6 +390,7 @@ public sealed class AnalysisService : IDisposable
         StdlibRoot = _stdlibRoot ?? unit.StdlibRoot,
         StdlibSeed = _seed.IsCompletedSuccessfully ? _seed.Result : null,
         Lower = false,
+        EditorBudget = EditorBudget,
         Cancellation = cancellationToken,
 
         // Everything the editor holds, not only the files this run starts from. Without it a
