@@ -53,6 +53,10 @@ public sealed class DocumentStore
         return document;
     }
 
+    /// <summary>The buffer a URI names, if it is open.</summary>
+    public OpenDocument? ByUri(string uri) =>
+        DocumentUri.TryToFilePath(uri, out var path) && _documents.TryGetValue(path, out var document) ? document : null;
+
     /// <summary>Forgets a buffer. Returns what was there, so the caller can clear the diagnostics
     /// that were published under its URI.</summary>
     public OpenDocument? Remove(string uri)

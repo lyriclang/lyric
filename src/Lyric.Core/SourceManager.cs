@@ -49,7 +49,17 @@ public sealed class SourceManager
         id.IsValid && id.Value <= _files.Count ? _files[id.Value - 1].Origin : null;
     
     private readonly List<FileEntry> _files = new();
-    
+
+    /// <summary>A manager that holds this one's files under the same ids, and adds its own after
+    /// them: a parse shared by compilations that follow each other (the standard library's, in an
+    /// editor). The entries are immutable; the two lists are not shared.</summary>
+    public SourceManager Fork()
+    {
+        var fork = new SourceManager { Lyric5 = Lyric5 };
+        fork._files.AddRange(_files);
+        return fork;
+    }
+
     public int FileCount => _files.Count;
     
     public int LineCount(FileId id)

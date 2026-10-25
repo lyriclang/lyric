@@ -144,6 +144,29 @@ public sealed record ServerCapabilities
     public required bool InlayHintProvider { get; init; }
 
     public required bool DocumentFormattingProvider { get; init; }
+
+    public required DiagnosticOptions DiagnosticProvider { get; init; }
+}
+
+/// <summary>Diagnostics a client asks for: a document's depend on other files (an import), and
+/// there is no workspace-wide question — the files nobody has open are pushed.</summary>
+public sealed record DiagnosticOptions
+{
+    public required bool InterFileDependencies { get; init; }
+    public required bool WorkspaceDiagnostics { get; init; }
+}
+
+public sealed record DocumentDiagnosticParams
+{
+    public required TextDocumentIdentifier TextDocument { get; init; }
+}
+
+/// <summary>The full report of a document: the protocol's <c>RelatedFullDocumentDiagnosticReport</c>
+/// without the related documents, which arrive pushed.</summary>
+public sealed record FullDocumentDiagnosticReport
+{
+    public string Kind => "full";
+    public required IReadOnlyList<LspDiagnostic> Items { get; init; }
 }
 
 public sealed record DocumentFormattingParams
@@ -473,6 +496,16 @@ public sealed record WorkspaceClientCapabilities
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DidChangeWatchedFilesClientCapabilities? DidChangeWatchedFiles { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DiagnosticWorkspaceClientCapabilities? Diagnostics { get; init; }
+}
+
+public sealed record DiagnosticWorkspaceClientCapabilities
+{
+    /// <summary>Whether the client asks again when told to (<c>workspace/diagnostic/refresh</c>):
+    /// what an edit in one file changes in another open one.</summary>
+    public bool RefreshSupport { get; init; }
 }
 
 public sealed record DidChangeWatchedFilesClientCapabilities
@@ -487,6 +520,11 @@ public sealed record TextDocumentClientCapabilities
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DefinitionClientCapabilities? Definition { get; init; }
+
+    /// <summary>Present where the client asks for a document's diagnostics itself; then they are
+    /// not pushed for the documents it has open.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public System.Text.Json.JsonElement? Diagnostic { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DocumentSymbolClientCapabilities? DocumentSymbol { get; init; }
@@ -572,10 +610,13 @@ public sealed record DidOpenTextDocumentParams
     public required TextDocumentItem TextDocument { get; init; }
 }
 
-/// <summary>One change. Under <see cref="TextDocumentSyncKind.Full"/> the range members are absent
-/// and <see cref="Text"/> is the entire document.</summary>
+/// <summary>One change: <see cref="Text"/> in place of <see cref="Range"/>, or, without a range,
+/// the entire document.</summary>
 public sealed record TextDocumentContentChangeEvent
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Range? Range { get; init; }
+
     public required string Text { get; init; }
 }
 
@@ -687,6 +728,8 @@ public static class LspMethods
     public const string FoldingRange = "textDocument/foldingRange";
     public const string InlayHint = "textDocument/inlayHint";
     public const string Formatting = "textDocument/formatting";
+    public const string Diagnostic = "textDocument/diagnostic";
+    public const string DiagnosticRefresh = "workspace/diagnostic/refresh";
 
     public const string DidChangeWatchedFiles = "workspace/didChangeWatchedFiles";
 

@@ -34,10 +34,12 @@ public static class StdlibLoader
     /// <c>std.io.console</c> → <c>&lt;root&gt;/std/io/console.lyr</c> — the same derivation as for
     /// user code, in the other direction.
     /// </summary>
+    /// <param name="seed">The library parsed once: a file it holds is handed out as parsed, where
+    /// the overlay does not hold it — the source manager is then the seed's fork.</param>
     public static Func<string[], LoadedModule?> ForRoot(
         string root, SourceManager sourceManager, DiagnosticEngine diagnostics,
-        IReadOnlyDictionary<string, string>? overlay = null) =>
-        Build(root, sourceManager, diagnostics, native: true, overlay);
+        IReadOnlyDictionary<string, string>? overlay = null, StdlibSeed? seed = null) =>
+        Build(root, sourceManager, diagnostics, native: true, overlay, seed);
 
     /// <summary>
     /// Builds the loader for a program's OWN modules, rooted at the directory of its entry file.
@@ -54,7 +56,7 @@ public static class StdlibLoader
 
     private static Func<string[], LoadedModule?> Build(
         string root, SourceManager sourceManager, DiagnosticEngine diagnostics, bool native,
-        IReadOnlyDictionary<string, string>? overlay) =>
+        IReadOnlyDictionary<string, string>? overlay, StdlibSeed? seed = null) =>
         path =>
         {
             var file = Path.Combine(root, Path.Combine(path)) + ".lyr";
@@ -67,6 +69,10 @@ public static class StdlibLoader
             if (overlay is not null && overlay.TryGetValue(Path.GetFullPath(file), out var text))
             {
                 id = sourceManager.AddVirtual(file, text);
+            }
+            else if (seed?.Find(file) is { } parsedOnce)
+            {
+                return parsedOnce;
             }
             else
             {

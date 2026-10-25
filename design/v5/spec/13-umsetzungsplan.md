@@ -1184,3 +1184,62 @@ std größer ist und jede Analyse sie **ganz** prüft, auswertet und senkt. Dara
 Neben der Messung: Referenzen und Rename fanden Stellen in synthetisiertem Code (`<synthesized Debug for
 main.Point>`) und hätten dort editiert — jetzt ausgeschlossen; Hover schreibt Signaturen noch in 4.x-Form
 (`fn println<T>(T) -> void`) — ein Punkt für S3.
+
+### Nachtrag 2026-10-25 — S2: geteilt wird die Parse, nicht die Prüfung
+
+**Befund vor dem Bauen** (P2 verlangte ihn als Bericht): die Wiederverwendung je Modul, die 11 E1 B
+beschreibt — ein Modul, dessen Text und Abhängigkeiten gleich sind, wird nicht neu geprüft —, setzt voraus,
+dass das Ergebnis der std nicht vom Paket abhängt. **Das stimmt für Lyric 5 nicht**, und nicht aus einer
+Schwäche des Checkers, sondern aus der Sprache:
+
+- ein Konformanzblock erreicht jedes Modul ohne Import (04 Regel 10, `Compilation.Reaches`): ein Block
+  des Pakets auf einem std-Typ ist im Rumpf einer std-Funktion sichtbar und kann dort entscheiden, welches
+  Member ein Aufruf trifft; die Kohärenz („eine Konformanz je Typ und Interface im Programm“) ist eine
+  Frage über das ganze Programm;
+- jede geschriebene Länge `T[n]` des Pakets synthetisiert Blöcke **in std.core**;
+- der Checker schreibt Antworten des Pakets in std-Symbole (`AssociatedTypeSymbol.Bind` je Konformer,
+  die Felder eines `ExtensionBlock`), und welche std-Module überhaupt geladen werden, hängt von den
+  Importen des Pakets ab.
+
+Eine geprüfte std aus einer Kompilation in die nächste zu tragen hieße, die Tabellen des Checkers in
+„std allein“ und „was das Programm hinzufügt“ zu teilen und jede Antwort des zweiten Teils als
+Abhängigkeit zu verfolgen — das ist Salsa, und das hat 11 E1 verworfen. rust-analyzer braucht es aus
+genau diesem Grund (Traits über Crate-Grenzen); gopls kommt ohne aus, weil Go keine Methoden außerhalb
+des Pakets eines Typs kennt. **Entscheidung (nach Empfehlung, zur Bestätigung)**: E1 B wird für 5.0
+**auf die Parse** beschränkt; die geprüfte std ist eine Tür mit Uhr nach 5.0, Voraussetzung: der Checker
+trennt seine Tabellen nach Herkunft.
+
+**Gebaut:**
+
+- **`StdlibSeed`**: die std einmal geparst — je Prozess, im Hintergrund beim Start des Servers —, jede
+  Kompilation beginnt mit einer Kopie seines Quellverwalters (`SourceManager.Fork`, die std unter
+  denselben `FileId`s) und bekommt die Bäume statt der Dateien. Eine Datei, die sich seit der Parse
+  geändert hat, und eine, die der Editor offen hält, werden gelesen wie ohne Seed.
+- **Kein Senken im Editor** (`CompilerOptions.Lower`): Prüfung, Auswertung, Lints — was nur das Senken
+  findet (`LYR-SEM0197`), sagt der Build (14 §11 Regel 3).
+- **Abbruch zwischen den Phasen** (`CompilerOptions.Cancellation`): eine neue Eingabe hält die laufende
+  Analyse nach dem Auflösen, nach der Prüfung und nach der Auswertung an.
+- **Inkrementeller Text-Sync** und **Pull-Diagnosen** (`textDocument/diagnostic`) für einen Client, der
+  sie verlangt; die Dateien, die er nicht offen hat, werden weiter geschickt. `workspace/diagnostic`
+  nicht: die Push-Meldungen decken es.
+- **Ein Fehler im Protokoll, gefunden beim Messen** (auch in 4.x): eine Diagnose, deren Analyse eine
+  neuere Eingabe überholte, brach **nach dem Header** ab — jede folgende Nachricht wurde an der falschen
+  Stelle gelesen, die Verbindung war tot. Das Token bricht jetzt das Warten auf den Strom ab, nie das
+  Schreiben.
+
+**Gemessen** — die Latenz vom Edit bis zur Diagnose im NativeAOT-Binary (`lyric5 lsp`, Median aus 30
+Edits, die 50 ms Entprellung eingeschlossen; S1 = main vor diesem Slice):
+
+| Einheit | S1 | S2 |
+|---|---|---|
+| eine Datei (`println`) | 510–585 ms | 400–490 ms |
+| ein Paket, 21 Module | — (die Verbindung brach, s. o.) | 320–340 ms |
+
+Im Prozess, nach dem JIT warm (die Messung aus S1, wiederholt): eine Datei 370 → 251 ms, das Paket
+263 → 186 ms, alle std-Module 1290 → 965 ms. Übrig bleibt die Prüfung der std (~190 ms der einen
+Datei) — der Teil, den nur die Tür oben wegnähme.
+
+**Nicht gebaut, mit Uhr:** das kleinere Budget der Auswertung im Editor (P3, 09 Q5). Eine Auswertung,
+die im Editor am Budget scheitert, im Build aber nicht, wäre eine Meldung, die `lyric check` nicht
+sagt — gegen 14 §11 Regel 3; der Editor müsste eine solche Stelle **ungewertet lassen**, ohne Meldung.
+Das braucht den Abbruch im Interpreter ohne Diagnose und kommt mit **S3**.

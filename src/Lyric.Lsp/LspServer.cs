@@ -22,6 +22,9 @@ public sealed record LspServerOptions
     /// </summary>
     public TimeSpan Debounce { get; init; } = TimeSpan.FromMilliseconds(50);
 
+    /// <summary>The version the server says it is in <c>initialize</c>: the toolchain's.</summary>
+    public string Version { get; init; } = ToolchainVersion.Value;
+
     /// <summary>As in <see cref="Compiler.CompilerOptions.StdlibRoot"/>: <c>null</c> is the
     /// standard library beside the binary, the one <c>lyric build</c> compiles against.</summary>
     public string? StdlibRoot { get; init; }
@@ -75,6 +78,15 @@ public sealed class LspServer : IDisposable
     /// <summary>The id of the next request THIS side issues. Distinct from the client's ids by
     /// construction: each side numbers its own requests.</summary>
     private int _nextRequestId = 1;
+
+    /// <summary>Whether the client asks for an open document's diagnostics itself
+    /// (<c>textDocument/diagnostic</c>), and whether it asks again when told to.</summary>
+    private bool _pullDiagnostics;
+    private bool _diagnosticRefresh;
+
+    /// <summary>The newest diagnostics of each file, by URI: what a pull answers.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, PublishDiagnosticsParams> _lastDiagnostics =
+        new(StringComparer.Ordinal);
 
     public LspServer(Stream input, Stream output, LspServerOptions? options = null)
     {
@@ -183,6 +195,8 @@ public sealed class LspServer : IDisposable
                     client?.DocumentSymbol?.HierarchicalDocumentSymbolSupport ?? false;
                 _watchedFilesSupport =
                     capabilities?.Workspace?.DidChangeWatchedFiles?.DynamicRegistration ?? false;
+                _pullDiagnostics = client?.Diagnostic is { ValueKind: JsonValueKind.Object };
+                _diagnosticRefresh = capabilities?.Workspace?.Diagnostics?.RefreshSupport ?? false;
 
                 await SendResultAsync(id, BuildInitializeResult(),
                     LspJson.Default.InitializeResult, cancellationToken).ConfigureAwait(false);
@@ -243,6 +257,10 @@ public sealed class LspServer : IDisposable
 
             case LspMethods.Formatting when _state == State.Running:
                 await SendFormattingAsync(message, id, cancellationToken).ConfigureAwait(false);
+                return;
+
+            case LspMethods.Diagnostic when _state == State.Running:
+                await SendDocumentDiagnosticsAsync(message, id, cancellationToken).ConfigureAwait(false);
                 return;
 
             case LspMethods.Shutdown when _state == State.Running:
@@ -350,14 +368,27 @@ public sealed class LspServer : IDisposable
             message.Params, LspJson.Default.DidChangeTextDocumentParams);
         if (parameters is null) return;
 
-        // Full synchronisation: the last change carries the whole document. An empty list is not
-        // an error, it is a change that changed nothing.
+        // An empty list is not an error, it is a change that changed nothing.
         if (parameters.ContentChanges.Count == 0) return;
 
-        var document = _documents.Set(
-            parameters.TextDocument.Uri,
-            parameters.TextDocument.Version,
-            parameters.ContentChanges[^1].Text);
+        // In order: each change's range counts in the text the one before it left. A change
+        // without a range is the whole document; a range on a document this server does not hold
+        // has nothing to count in, and the change is dropped rather than applied to nothing.
+        var text = _documents.ByUri(parameters.TextDocument.Uri)?.Text;
+        foreach (var change in parameters.ContentChanges)
+        {
+            if (change.Range is not { } range)
+            {
+                text = change.Text;
+                continue;
+            }
+            if (text is null) return;
+            var start = TextOffsets.ToOffset(text, range.Start);
+            var end = Math.Max(start, TextOffsets.ToOffset(text, range.End));
+            text = string.Concat(text.AsSpan(0, start), change.Text, text.AsSpan(end));
+        }
+
+        var document = _documents.Set(parameters.TextDocument.Uri, parameters.TextDocument.Version, text!);
 
         if (document is not null) _analysis.Schedule(document);
     }
@@ -1006,7 +1037,7 @@ public sealed class LspServer : IDisposable
     {
         Capabilities = new ServerCapabilities
         {
-            TextDocumentSync = new TextDocumentSyncOptions { Change = TextDocumentSyncKind.Full },
+            TextDocumentSync = new TextDocumentSyncOptions { Change = TextDocumentSyncKind.Incremental },
 
             // The encoding Span already counts in. Announcing anything else would mean converting
             // every offset twice per message for no gain.
@@ -1032,15 +1063,58 @@ public sealed class LspServer : IDisposable
             FoldingRangeProvider = true,
             InlayHintProvider = true,
             DocumentFormattingProvider = true,
+            DiagnosticProvider = new DiagnosticOptions { InterFileDependencies = true, WorkspaceDiagnostics = false },
         },
-        ServerInfo = new ServerInfo { Name = "lyrls", Version = ToolchainVersion.Value },
+        ServerInfo = new ServerInfo { Name = "lyric", Version = _options.Version },
     };
 
-    private Task PublishDiagnosticsAsync(
-        PublishDiagnosticsParams parameters, CancellationToken cancellationToken) =>
-        SendNotificationAsync(LspMethods.PublishDiagnostics,
-            LspJson.ToElement(parameters, LspJson.Default.PublishDiagnosticsParams),
-            cancellationToken);
+    /// <summary>
+    /// What an analysis says of a file. Kept by URI, the newest only, for the client that asks
+    /// (<c>textDocument/diagnostic</c>); pushed — unless that client asks for the file itself
+    /// because it has it open. Then it is told to ask again where it can be
+    /// (<c>workspace/diagnostic/refresh</c>): an edit in one file changes what another open one
+    /// says.
+    /// </summary>
+    private async Task PublishDiagnosticsAsync(
+        PublishDiagnosticsParams parameters, CancellationToken cancellationToken)
+    {
+        _lastDiagnostics[parameters.Uri] = parameters;
+        if (!_pullDiagnostics || _documents.ByUri(parameters.Uri) is null)
+        {
+            await SendNotificationAsync(LspMethods.PublishDiagnostics,
+                LspJson.ToElement(parameters, LspJson.Default.PublishDiagnosticsParams),
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        if (_diagnosticRefresh)
+            await SendAsync(new JsonRpcRequest { Id = _nextRequestId++, Method = LspMethods.DiagnosticRefresh },
+                LspJson.Default.JsonRpcRequest, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A document's diagnostics, asked for: what the newest analysis of its current version said,
+    /// running the analysis first where none has said anything of that version yet.
+    /// </summary>
+    private async Task SendDocumentDiagnosticsAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.DocumentDiagnosticParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "textDocument/diagnostic needs a document",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var uri = parameters.TextDocument.Uri;
+        if (_documents.ByUri(uri) is { } document
+            && !(_lastDiagnostics.TryGetValue(uri, out var said) && said.Version == document.Version))
+            await _analysis.AnalyzeAsync(document, cancellationToken).ConfigureAwait(false);
+
+        var items = _lastDiagnostics.TryGetValue(uri, out var known) ? known.Diagnostics : [];
+        await SendResultAsync(id, new FullDocumentDiagnosticReport { Items = items },
+            LspJson.Default.FullDocumentDiagnosticReport, cancellationToken).ConfigureAwait(false);
+    }
 
     private Task LogAsync(string message, MessageType type, CancellationToken cancellationToken) =>
         SendNotificationAsync(LspMethods.LogMessage,

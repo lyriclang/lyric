@@ -21,6 +21,31 @@ public sealed class FramingTests
 
     private static byte[] Ascii(string text) => Encoding.ASCII.GetBytes(text);
 
+    /// <summary>A stream that cancels the writer's token as soon as the first bytes arrive — the
+    /// newer edit that withdraws a diagnostic while it is being written — and, like a pipe,
+    /// refuses a write under a cancelled token.</summary>
+    private sealed class CancelsMidMessage(CancellationTokenSource writer) : MemoryStream
+    {
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await base.WriteAsync(buffer, CancellationToken.None);
+            await writer.CancelAsync();
+        }
+    }
+
+    [Fact]
+    public async Task A_message_begun_is_written_whole_when_its_token_is_cancelled()
+    {
+        using var cancel = new CancellationTokenSource();
+        using var stream = new CancelsMidMessage(cancel);
+        using var connection = new LspConnection(new MemoryStream(), stream);
+
+        await connection.WriteAsync(Ascii("{\"a\":1}"), cancel.Token);
+
+        Assert.Equal("Content-Length: 7\r\n\r\n{\"a\":1}", Encoding.ASCII.GetString(stream.ToArray()));
+    }
+
     [Fact]
     public async Task Reads_a_message_framed_exactly_as_the_specification_writes_it()
     {

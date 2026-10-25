@@ -114,6 +114,10 @@ public sealed class LspConnection : IDisposable
     /// characters; the body is counted in BYTES rather than in characters, which is the difference
     /// that breaks every implementation that forgets it the moment a message carries a non-ASCII
     /// identifier.</para>
+    ///
+    /// <para>The token cancels the WAIT for the stream, never the writing: a message whose header
+    /// went out and whose body did not leaves every later message read at the wrong place. A
+    /// diagnostic withdrawn by a newer edit stopped exactly there once.</para>
     /// </summary>
     public async Task WriteAsync(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken)
     {
@@ -123,9 +127,9 @@ public sealed class LspConnection : IDisposable
         await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await _output.WriteAsync(header, cancellationToken).ConfigureAwait(false);
-            await _output.WriteAsync(payload, cancellationToken).ConfigureAwait(false);
-            await _output.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await _output.WriteAsync(header, CancellationToken.None).ConfigureAwait(false);
+            await _output.WriteAsync(payload, CancellationToken.None).ConfigureAwait(false);
+            await _output.FlushAsync(CancellationToken.None).ConfigureAwait(false);
         }
         finally
         {

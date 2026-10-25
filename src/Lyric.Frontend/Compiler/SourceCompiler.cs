@@ -57,7 +57,7 @@ public static class SourceCompiler
     private static CompileResult Run(ScriptSource source, Stage stage, CompilerOptions options)
     {
         var report = options.Progress;
-        var sources = new SourceManager { Lyric5 = options.PackageRoots is not null };
+        var sources = SourcesFor(options);
         var diagnostics = new DiagnosticEngine(sources);
 
         report?.BeginPhase(Phase.Read, source.DisplayName);
@@ -153,9 +153,11 @@ public static class SourceCompiler
         }
         if (stage == Stage.Expand) return new CompileResult(sources, diagnostics, null) { Expanded = diagnostics.HasErrors ? null : entry };
 
+        options.Cancellation.ThrowIfCancellationRequested();
         report?.BeginPhase(Phase.Check, ModuleCount(loaded));
         var types = Semantics.Analyze(compilation, binding, diagnostics);
         report?.EndPhase();
+        options.Cancellation.ThrowIfCancellationRequested();
 
         // From here on every exit carries it. A program WITH errors still has a model, and that is
         // the case an editor cares about most: the text under a cursor is usually mid-edit.
@@ -174,6 +176,7 @@ public static class SourceCompiler
             return new CompileResult(sources, diagnostics, null, model);
         WarnDeprecated(compilation, binding, types, diagnostics, options, comptime);
         if (diagnostics.HasErrors) return new CompileResult(sources, diagnostics, null, model); // an 'until' come due
+        if (!options.Lower) return Unlowered(compilation, types, diagnostics, options, sources, model, embed, comptime);
 
         // Lowering limits arrive as LYR-ICE0002 in the same engine and are rendered with file, line and
         // column like any other error.
@@ -363,8 +366,9 @@ public static class SourceCompiler
         SourceManager sources, DiagnosticEngine diagnostics, CompilerOptions options,
         string fallbackSourceRoot)
     {
+        options.Cancellation.ThrowIfCancellationRequested();
         var fromStdlib = StdlibLoader.ForRoot(options.StdlibRoot ?? StdlibLoader.DefaultRoot(),
-            sources, diagnostics, options.SourceOverlay);
+            sources, diagnostics, options.SourceOverlay, SeedOf(options));
         var fromProject = StdlibLoader.ForProject(
             options.SourceRoot ?? fallbackSourceRoot, sources, diagnostics, options.SourceOverlay);
 
@@ -459,6 +463,29 @@ public static class SourceCompiler
         return loader;
     }
 
+    /// <summary>A compilation's source manager: the seed's fork where the options hold a seed of
+    /// the library they read, a fresh one otherwise.</summary>
+    private static SourceManager SourcesFor(CompilerOptions options) =>
+        SeedOf(options) is { } seed ? seed.Fork() : new SourceManager { Lyric5 = options.PackageRoots is not null };
+
+    /// <summary>The options' seed, where it is a Lyric 5 compilation's of the library the options
+    /// read.</summary>
+    private static StdlibSeed? SeedOf(CompilerOptions options) =>
+        options.StdlibSeed is { } seed && options.PackageRoots is not null
+        && seed.Serves(options.StdlibRoot ?? StdlibLoader.DefaultRoot()) ? seed : null;
+
+    /// <summary>The end of an editor's check, where <see cref="CompilerOptions.Lower"/> is off: the
+    /// lints' levels over what was said, no IR. What only the lowering finds — a monomorphization
+    /// that does not end (<c>LYR-SEM0197</c>) — is the build's to say.</summary>
+    private static CompileResult Unlowered(Compilation compilation, TypeResult types, DiagnosticEngine diagnostics,
+        CompilerOptions options, SourceManager sources, SemanticModel model, EmbedReader embed, ComptimeTable? comptime)
+    {
+        if (compilation.Lyric5Modules)
+            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps);
+        return new CompileResult(sources, diagnostics, null, model)
+            { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive };
+    }
+
     /// <summary>
     /// Everything <see cref="Check(ScriptSource, CompilerOptions?)"/> does, over every root of a
     /// project at once: ONE compilation, one source manager, one model.
@@ -483,7 +510,7 @@ public static class SourceCompiler
         IReadOnlyList<ScriptSource> roots, CompilerOptions? options = null)
     {
         options ??= new CompilerOptions();
-        var sources = new SourceManager { Lyric5 = options.PackageRoots is not null };
+        var sources = SourcesFor(options);
         var diagnostics = new DiagnosticEngine(sources);
 
         var loader = BuildModuleLoader(sources, diagnostics, options,
@@ -525,8 +552,10 @@ public static class SourceCompiler
         CompilerPosition.Begin(sources);
         var binding = compilation.Resolve();
         times.Mark(PhaseClock.Resolve);
+        options.Cancellation.ThrowIfCancellationRequested();
         var types = Semantics.Analyze(compilation, binding, diagnostics, singleProgram: false);
         times.Mark(PhaseClock.Check);
+        options.Cancellation.ThrowIfCancellationRequested();
 
         var model = new SemanticModel(compilation, entry, binding, types);
 
@@ -542,6 +571,13 @@ public static class SourceCompiler
         if (!evaluated) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
         WarnDeprecated(compilation, binding, types, diagnostics, options, comptime);
         if (diagnostics.HasErrors) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases }; // an 'until' come due
+        options.Cancellation.ThrowIfCancellationRequested();
+        if (!options.Lower)
+        {
+            var unlowered = Unlowered(compilation, types, diagnostics, options, sources, model, embed, comptime);
+            times.Mark(PhaseClock.Lint);
+            return unlowered with { Times = times.Phases };
+        }
 
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
             optimize: options.Optimize, libraryRoots: true, passes: options.Passes, comptime: comptime);
@@ -652,6 +688,19 @@ public sealed record CompilerOptions
     /// <c>StdlibLoader.DefaultRoot()</c>: <c>LYRIC_STDLIB</c> or the directory next to the
     /// binary.</summary>
     public string? StdlibRoot { get; init; }
+
+    /// <summary>The standard library parsed once (<see cref="Parsing.StdlibSeed"/>): an editor's
+    /// compilations follow each other and need not parse it again. Taken where it is the seed of
+    /// <see cref="StdlibRoot"/> and the compilation is Lyric 5's.</summary>
+    public Parsing.StdlibSeed? StdlibSeed { get; init; }
+
+    /// <summary>Whether the compilation is lowered after it checked. An editor's is not: it shows
+    /// what the checker and the evaluation say, and the lowering's findings are the build's.</summary>
+    public bool Lower { get; init; } = true;
+
+    /// <summary>Stops the compilation between its phases — an editor's, when the text it reads has
+    /// changed meanwhile — with an <see cref="OperationCanceledException"/>.</summary>
+    public CancellationToken Cancellation { get; init; }
 
     /// <summary>Where phase reports go. <c>null</c> means nobody is listening, and the compiler
     /// then runs with no output dependency at all, which is what the embedding API needs.
