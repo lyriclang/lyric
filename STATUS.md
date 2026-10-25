@@ -55,7 +55,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M12a | Diagnostics and lints | L | **done** 2026-10-21 |
 | M12b | Inference and abstraction (the review clocks) | M | **done** 2026-10-22 |
 | M12c | Docs foundation and website (comments in the W8 form, `Lyric5.Doc`, Book scaffold, `/dev/` live) | L | **done** 2026-10-24 |
-| M13a | fmt, doc, api | M | — |
+| M13a | fmt, doc, api | M | **done** 2026-10-25 |
 | M13b | LSP, DAP, clients | XL | — |
 | M14 | FFI and embedding | L | — |
 | M15 | Distribution | M | — |
@@ -1378,6 +1378,37 @@ released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "
   conformance defaults (188, a compiler bug for the sweep; S11 worked around it); main's macOS
   job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
   step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
+
+### M13a — done (2026-10-25)
+
+The plan is design 13's addendum "der Plan für M13a" (P1–P10, S1–S9), #556. The mode of M12: no halt until the close,
+merged on green CI with the platform matrix dispatched where native code changed, open points collected.
+
+- **S1** the formatter keeps Lyric 5's syntax whole (#557): measured over the corpus first — std 5 of 33 files came
+  back as they went in, after it 33 —; written parentheses, attributes, `comptime`, `inline`, local functions.
+- **S2** formatting twice is formatting once, and keeps the meaning (#558): over 1735 conformance cases and the repo's
+  corpus, the tree without spans and the emitted C compared; one rule fixed (an attribute's line read as a gap).
+- **S3** `lyric fmt` and the repository in its form (#559 + spec#350): std, its tests and the Lyric 5 examples
+  formatted once in a commit that changed no code; CI holds them; the form is a contract (CONTRIBUTING).
+- **S4** `lyric doc` (#561 + spec#351): the surface model, a page per package, module and type, anchors by kind;
+  std's module docs became `//!`, as the specification says.
+- **S5** links between the doc pages; std's reference on the site (#562): one resolution for the pages and the
+  `broken-doc-link` lint; `/dev/std/` live, 507 links, none broken.
+- **S6** doc-tests (#563 + spec#352): ```lyric blocks of doc comments run in `lyric test` with the Book's kinds.
+- **S7** an example in every std module (#564): 33, 27 running with their output.
+- **S8** `lyric api` (#565 + spec#353): the surface a line per element in one spelling, `--json`, `--diff <rev>`
+  breaking or compatible.
+- Beside the slices: the formatter's proof timed out on CI four times (open point 266) — a pipe of one process held
+  by another started in parallel; the proof compiles in its own process now and every child reads an empty input
+  (#560). The precheck script ran no conformance where the selection said "every case", and no front-end suite where
+  it named them — both found and fixed before a slice merged without them. The platform runs caught two before
+  their merge: `std.path`'s example printed a separator (`\` on Windows), and `--diff` computed the package's
+  place against git's top-level, which macOS reaches through a link.
+- **S9** the close (this).
+- The exit criterion — the repository holds `lyric fmt --check`; the std stands as reference under `/dev/std/`, its
+  `# Examples` running as tests — holds: the CI step on every pull request, the live site, `DocTestTests`. Open points
+  266–272 from the milestone (266 done; 267 a flaky time window; 268–272 found writing std's examples). **Next: M13b,
+  its plan in design 13 first.**
 
 ### M12c — done (2026-10-24)
 
