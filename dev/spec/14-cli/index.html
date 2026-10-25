@@ -333,6 +333,13 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <td>yes</td>
 </tr>
 <tr>
+<td><code>fmt</code></td>
+<td><code>[&lt;file.lyr&gt;…]</code></td>
+<td><code>-C &lt;dir&gt;</code>, <code>--check</code>, <code>--diff</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>env</code></td>
 <td>—</td>
 <td><code>-C &lt;dir&gt;</code>, <code>--profile &lt;name&gt;</code>, <code>--target &lt;triple&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--offline</code>, <code>--json</code></td>
@@ -454,6 +461,23 @@ files are written.</li>
 and for each its options and the options every verb takes, as §5's table has them — and runs
 nothing. Another shell is refused (exit 2).</li>
 </ol>
+<h2 id="8-fmt">8. <code>fmt</code></h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 E5</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>FmtCommandTests</code>; the form itself
+in <code>tests/Lyric.Tests.Formatting</code>).</p>
+<ol>
+<li><strong><code>lyric fmt</code></strong> puts Lyric files in <strong>the one form</strong>: there are no options that change it. Without
+words it takes the package found from here (<code>-C</code> names another directory) — every <code>.lyr</code> file
+under <code>src/</code> and <code>tests/</code>, and <code>build.lyr</code> —; with words, the files named and no others.</li>
+<li>The form keeps what the program means, its comments and the parentheses it writes; formatting a
+formatted file changes nothing. A file in the form is not written. A file is written with LF line
+ends and one final newline.</li>
+<li>A file that does not parse is <strong>left as it is</strong>: its findings are said, and the command ends with
+exit 1 after the other files are formatted.</li>
+<li><strong><code>--check</code></strong> writes nothing: it names each file that would change, one to a line, and ends with
+exit 1 where one would, 0 where none would. <strong><code>--diff</code></strong>, with <code>--check</code> only, shows each change
+as a unified diff instead of the name.</li>
+</ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -469,6 +493,7 @@ nothing. Another shell is refused (exit 2).</li>
 <li class="level-2"><a href="#5-the-verbs-and-their-options">5. The verbs and their options</a></li>
 <li class="level-2"><a href="#6-env">6. env</a></li>
 <li class="level-2"><a href="#7-new-init-and-completions">7. new, init and completions</a></li>
+<li class="level-2"><a href="#8-fmt">8. fmt</a></li>
 </ul>
 </aside>
 </div>

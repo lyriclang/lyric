@@ -375,6 +375,11 @@ what it throws; std's messages, the runtime's and the catalog's name no design d
 <li><p><strong><code>std.json</code>'s encode error for a non-finite float</strong> reads &quot;… has no JSON text — JSON has no NaN or
 infinity&quot; (it named a section of RFC 8259).</p>
 </li>
+<li><p><strong><code>lyric fmt</code></strong> puts a package's Lyric files — <code>src/</code>, <code>tests/</code>, <code>build.lyr</code> — or the files named in
+the one form, with no options to change it; comments and the parentheses a program writes stay, and
+a file that does not parse is left as it is. <code>--check</code> writes nothing and fails where a file would
+change; <code>--diff</code> shows how. The standard library is in the form.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
