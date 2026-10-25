@@ -2,7 +2,16 @@
 // enum conform without a line, written over std.meta's infos by the defaults of std.codec's
 // `Encode` and `Decode`; `@Codec` steers names, skipping, renaming, the tag and unknown fields; an
 // own `encode`/`decode` replaces the synthesis.
-import std.codec { Codable, Codec, Encoder, Decoder, Value, DecodeError, DecodeErrorKind, EncodeError };
+import std.codec {
+    Codable,
+    Codec,
+    Encoder,
+    Decoder,
+    Value,
+    DecodeError,
+    DecodeErrorKind,
+    EncodeError,
+};
 import std.collections { List, Map };
 import std.core { ParseError };
 import std.test { assertEq, assertTrue, fail };
@@ -88,61 +97,186 @@ fn kindOf(f: fn() -> void throws DecodeError): ?DecodeErrorKind {
 fn aStructConformsWithoutALine(): void throws Error {
     let p = Plain { id = 7, name = "ada", mail = null, tags = ["x", "y"] };
     let v = try Value.of(p);
-    assertEq(v, Value.Struct("Plain", List.of([
-        ("id", Value.Int(7)), ("name", Value.String("ada")), ("mail", Value.Null),
-        ("tags", Value.Seq(List.of([Value.String("x"), Value.String("y")]))),
-    ])));
+    assertEq(
+        v,
+        Value.Struct(
+            "Plain",
+            List.of(
+                [
+                    ("id", Value.Int(7)),
+                    ("name", Value.String("ada")),
+                    ("mail", Value.Null),
+                    ("tags", Value.Seq(List.of([Value.String("x"), Value.String("y")]))),
+                ]
+            )
+        )
+    );
     assertEq(try v.read<Plain>(), p);
     // a missing optional is null, a missing field Missing, an unknown field passes
-    let partial = Value.Struct("Plain", List.of([("id", Value.Int(1)), ("name", Value.String("n")), ("tags", Value.Seq(List.new())), ("extra", Value.Int(0))]));
+    let partial = Value.Struct(
+        "Plain",
+        List.of(
+            [
+                ("id", Value.Int(1)),
+                ("name", Value.String("n")),
+                ("tags", Value.Seq(List.new())),
+                ("extra", Value.Int(0)),
+            ]
+        )
+    );
     assertEq((try partial.read<Plain>()).mail, null);
-    assertTrue(kindOf(() => { let _ = try Value.Struct("Plain", List.of([("id", Value.Int(1))])).read<Plain>(); }) == DecodeErrorKind.Missing);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.Struct("Plain", List.of([("id", Value.Int(1))])).read<Plain>();
+            }
+        ) == DecodeErrorKind.Missing
+    );
 }
 
 @Test
 fn theAttributeSteersNamesSkippingAndUnknownFields(): void throws Error {
     let u = User { userId = 7, eMail = null, tags = ["x"], cached = 5 };
     let v = try Value.of(u);
-    assertEq(v, Value.Struct("User", List.of([("user_id", Value.Int(7)), ("mail", Value.Null), ("tags", Value.Seq(List.of([Value.String("x")])))])));
+    assertEq(
+        v,
+        Value.Struct(
+            "User",
+            List.of(
+                [
+                    ("user_id", Value.Int(7)),
+                    ("mail", Value.Null),
+                    ("tags", Value.Seq(List.of([Value.String("x")]))),
+                ]
+            )
+        )
+    );
     let back = try v.read<User>();
     assertEq(back.userId, 7);
     assertEq(back.cached, null);
-    assertTrue(kindOf(() => { let _ = try Value.Struct("User", List.of([("user_id", Value.Int(1)), ("tags", Value.Seq(List.new())), ("zzz", Value.Int(0))])).read<User>(); }) == DecodeErrorKind.UnknownField);
-    assertEq(try Value.of(Snaky { first_name = "a", last_name = "b" }), Value.Struct("Snaky", List.of([("firstName", Value.String("a")), ("lastName", Value.String("b"))])));
-    assertEq(try Value.of(Snaky { first_name = "a", last_name = "b" }).read<Snaky>(), Snaky { first_name = "a", last_name = "b" });
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.Struct(
+                    "User",
+                    List.of(
+                        [
+                            ("user_id", Value.Int(1)),
+                            ("tags", Value.Seq(List.new())),
+                            ("zzz", Value.Int(0)),
+                        ]
+                    )
+                ).read<User>();
+            }
+        ) == DecodeErrorKind.UnknownField
+    );
+    assertEq(
+        try Value.of(Snaky { first_name = "a", last_name = "b" }),
+        Value.Struct(
+            "Snaky",
+            List.of([("firstName", Value.String("a")), ("lastName", Value.String("b"))])
+        )
+    );
+    assertEq(
+        try Value.of(Snaky { first_name = "a", last_name = "b" }).read<Snaky>(),
+        Snaky { first_name = "a", last_name = "b" }
+    );
     // a skipped field that cannot be absent
-    assertEq(try Value.of(Oddly { x = 1, y = 2 }), Value.Struct("Oddly", List.of([("x", Value.Int(1))])));
-    assertTrue(kindOf(() => { let _ = try Value.Struct("Oddly", List.of([("x", Value.Int(1))])).read<Oddly>(); }) == DecodeErrorKind.Missing);
+    assertEq(
+        try Value.of(Oddly { x = 1, y = 2 }),
+        Value.Struct("Oddly", List.of([("x", Value.Int(1))]))
+    );
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.Struct("Oddly", List.of([("x", Value.Int(1))])).read<Oddly>();
+            }
+        ) == DecodeErrorKind.Missing
+    );
 }
 
 @Test
 fn anEnumIsItsVariantExternallyOrInternallyTagged(): void throws Error {
     assertEq(try Value.of(Shape.Dot), Value.Variant("Shape", "Dot", 0, null));
-    assertEq(try Value.of(Shape.Circle(3)), Value.Variant("Shape", "Circle", 1, Box<Value> { value = Value.Int(3) }));
-    assertEq(try Value.of(Shape.Rect(2, 5)), Value.Variant("Shape", "Rect", 2, Box<Value> { value = Value.Seq(List.of([Value.Int(2), Value.Int(5)])) }));
+    assertEq(
+        try Value.of(Shape.Circle(3)),
+        Value.Variant("Shape", "Circle", 1, Box<Value> { value = Value.Int(3) })
+    );
+    assertEq(
+        try Value.of(Shape.Rect(2, 5)),
+        Value.Variant(
+            "Shape",
+            "Rect",
+            2,
+            Box<Value> { value = Value.Seq(List.of([Value.Int(2), Value.Int(5)])) }
+        )
+    );
     for (s in [Shape.Dot, Shape.Circle(3), Shape.Rect(2, 5)]) {
         assertEq(try Value.of(s).read<Shape>(), s);
     }
-    assertTrue(kindOf(() => { let _ = try Value.Variant("Shape", "Blob", 9, null).read<Shape>(); }) == DecodeErrorKind.UnknownVariant);
-    assertEq(try Value.of(Event.Moved(1, 2)), Value.Struct("Event", List.of([("kind", Value.String("Moved")), ("0", Value.Int(1)), ("1", Value.Int(2))])));
-    assertEq(try Value.of(Event.Started), Value.Struct("Event", List.of([("kind", Value.String("Started"))])));
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.Variant("Shape", "Blob", 9, null).read<Shape>();
+            }
+        ) == DecodeErrorKind.UnknownVariant
+    );
+    assertEq(
+        try Value.of(Event.Moved(1, 2)),
+        Value.Struct(
+            "Event",
+            List.of([("kind", Value.String("Moved")), ("0", Value.Int(1)), ("1", Value.Int(2))])
+        )
+    );
+    assertEq(
+        try Value.of(Event.Started),
+        Value.Struct("Event", List.of([("kind", Value.String("Started"))]))
+    );
     assertEq(try Value.of(Event.Moved(1, 2)).read<Event>(), Event.Moved(1, 2));
     assertEq(try Value.of(Event.Started).read<Event>(), Event.Started);
-    assertTrue(kindOf(() => { let _ = try Value.Struct("Event", List.of([("kind", Value.String("Jumped"))])).read<Event>(); }) == DecodeErrorKind.UnknownVariant);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try Value.Struct(
+                    "Event",
+                    List.of([("kind", Value.String("Jumped"))])
+                ).read<Event>();
+            }
+        ) == DecodeErrorKind.UnknownVariant
+    );
 }
 
 @Test
 fn aNestedTypeIsWrittenThroughAndAnOwnPairReplacesTheSynthesis(): void throws Error {
     let scores = Map<string, int>.new();
     scores["a"] = 1;
-    let t = Team { lead = User { userId = 1, eMail = "l@x", tags = [], cached = null }, members = [User { userId = 2, eMail = null, tags = ["m"], cached = null }], scores = scores };
+    let t = Team {
+        lead = User { userId = 1, eMail = "l@x", tags = [], cached = null },
+        members = [User { userId = 2, eMail = null, tags = ["m"], cached = null }],
+        scores = scores,
+    };
     let v = try Value.of(t);
     let back = try v.read<Team>();
     assertEq(back.lead.eMail, "l@x");
     assertEq(back.members.length(), 1);
     assertEq(back.scores["a"], 1);
     // the path reaches into the nesting
-    let bad = Value.Struct("Team", List.of([("lead", Value.Struct("User", List.of([("user_id", Value.String("no")), ("tags", Value.Seq(List.new()))]))), ("members", Value.Seq(List.new())), ("scores", Value.Map(List.new()))]));
+    let bad = Value.Struct(
+        "Team",
+        List.of(
+            [
+                (
+                    "lead",
+                    Value.Struct(
+                        "User",
+                        List.of([("user_id", Value.String("no")), ("tags", Value.Seq(List.new()))])
+                    )
+                ),
+                ("members", Value.Seq(List.new())),
+                ("scores", Value.Map(List.new())),
+            ]
+        )
+    );
     try {
         let _ = bad.read<Team>();
         fail("a string read as an int");

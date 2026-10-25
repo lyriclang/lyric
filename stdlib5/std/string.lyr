@@ -4,7 +4,6 @@
 /// re-exports [StringBuilder] for building text piece by piece, and names the Unicode version
 /// behind `char` in [unicodeVersion].
 
-
 pub import std.core { StringBuilder };
 
 /// Returns `a` followed by `b`.

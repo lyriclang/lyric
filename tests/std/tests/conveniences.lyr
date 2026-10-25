@@ -110,7 +110,11 @@ fn theLinesCloseTheirFile(): void throws IoError {
         assertEq(line, "a");
         break;
     }
-    let e = thrown(() => { try early.next(); });
+    let e = thrown(
+        () => {
+            try early.next();
+        }
+    );
     assertTrue(e != null);
     assertTrue(e!.kind == IoErrorKind.Closed);
     // at its end it closes itself and gives no more, and a close after it does nothing
@@ -129,7 +133,13 @@ fn theLinesCloseTheirFile(): void throws IoError {
     let manual = try fs.lines(lines);
     assertEq(try manual.next() ?? "", "a");
     try manual.close();
-    assertTrue(thrown(() => { try manual.next(); })!.kind == IoErrorKind.Closed);
+    assertTrue(
+        thrown(
+            () => {
+                try manual.next();
+            }
+        )!.kind == IoErrorKind.Closed
+    );
     try fs.removeAll(w);
 }
 
@@ -139,10 +149,21 @@ fn bytesThatAreNoUtf8AreSaidWithThePath(): void throws IoError {
     let badFile = path.join(w, "conv-bad.txt");
     let bad: uint8[] = [0x61u8, 0x0Au8, 0xFFu8, 0x0Au8];
     try fs.writeBytes(badFile, bad[..]);
-    assertEq(said(() => { try fs.readText(badFile); }), f"invalid data: {badFile} (the bytes are no UTF-8)");
+    assertEq(
+        said(
+            () => {
+                try fs.readText(badFile);
+            }
+        ),
+        f"invalid data: {badFile} (the bytes are no UTF-8)"
+    );
     let it = try fs.lines(badFile);
     assertEq(try it.next() ?? "", "a");
-    let e = thrown(() => { try it.next(); });
+    let e = thrown(
+        () => {
+            try it.next();
+        }
+    );
     assertTrue(e!.kind == IoErrorKind.InvalidData);
     assertEq(e!.path ?? "", badFile);
     // after its error it gives no more, and its file is closed already
@@ -159,24 +180,85 @@ fn everyKindAFileCanGive(): void throws IoError {
     let w = try fs.tempDir();
     let kinds = path.join(w, "conv-kinds.txt");
     try fs.writeText(kinds, "abc");
-    assertEq(said(() => { try fs.readText("conv-no-such.txt"); }), "not found: conv-no-such.txt (opened to read)");
+    assertEq(
+        said(
+            () => {
+                try fs.readText("conv-no-such.txt");
+            }
+        ),
+        "not found: conv-no-such.txt (opened to read)"
+    );
     if (posix()) {
         // POSIX opens a directory; its read says what it is
-        assertEq(said(() => { try fs.readText("."); }), "is a directory: . (read)");
-        assertEq(said(() => { try fs.readText(kinds + "/x"); }), f"not a directory: {kinds}/x (opened to read)");
-        assertEq(said(() => { try fs.writeText(".", "x"); }), "is a directory: . (opened to write)");
+        assertEq(
+            said(
+                () => {
+                    try fs.readText(".");
+                }
+            ),
+            "is a directory: . (read)"
+        );
+        assertEq(
+            said(
+                () => {
+                    try fs.readText(kinds + "/x");
+                }
+            ),
+            f"not a directory: {kinds}/x (opened to read)"
+        );
+        assertEq(
+            said(
+                () => {
+                    try fs.writeText(".", "x");
+                }
+            ),
+            "is a directory: . (opened to write)"
+        );
     } else {
-        assertEq(said(() => { try fs.readText("."); }), "permission denied: . (opened to read)");
-        assertEq(said(() => { try fs.readText(kinds + "/x"); }), f"not found: {kinds}/x (opened to read)");
+        assertEq(
+            said(
+                () => {
+                    try fs.readText(".");
+                }
+            ),
+            "permission denied: . (opened to read)"
+        );
+        assertEq(
+            said(
+                () => {
+                    try fs.readText(kinds + "/x");
+                }
+            ),
+            f"not found: {kinds}/x (opened to read)"
+        );
     }
-    assertEq(said(() => { using let f = try File.openWith(kinds, OpenOptions { }); }), f"invalid input: {kinds} (opened neither to read nor to write)");
-    assertEq(said(() => {
-        using let f = try File.open(kinds);
-        let four: uint8[] = [0u8] * 4;
-        try f.readExact(four[..]);
-    }), "unexpected end of input (3 of 4 bytes)");
+    assertEq(
+        said(
+            () => {
+                using let f = try File.openWith(kinds, OpenOptions { });
+            }
+        ),
+        f"invalid input: {kinds} (opened neither to read nor to write)"
+    );
+    assertEq(
+        said(
+            () => {
+                using let f = try File.open(kinds);
+                let four: uint8[] = [0u8] * 4;
+                try f.readExact(four[..]);
+            }
+        ),
+        "unexpected end of input (3 of 4 bytes)"
+    );
     let closed = try File.open(kinds);
     try closed.close();
-    assertEq(said(() => { try closed.readToString(); }), f"closed: {kinds} (read)");
+    assertEq(
+        said(
+            () => {
+                try closed.readToString();
+            }
+        ),
+        f"closed: {kinds} (read)"
+    );
     try fs.removeAll(w);
 }

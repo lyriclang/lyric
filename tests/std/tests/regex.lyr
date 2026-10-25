@@ -201,7 +201,10 @@ fn whatIsRefusedIsRefusedWithItsOffset(): void {
     assertEq(refused("(?P<n>a)(?P<n>b)"), "the group name 'n' is used twice at offset 14");
     assertEq(refused("(?P<a-b>x)"), "a group's name is letters, digits and '_' at offset 5");
     assertEq(refused("(?P<1x>a)"), "accepted");
-    assertEq(refused("\\p{Greek}"), "'Greek' is no Unicode category: L, Lu, N, Nd, P, S, Z, M, C and their kinds are at offset 0");
+    assertEq(
+        refused("\\p{Greek}"),
+        "'Greek' is no Unicode category: L, Lu, N, Nd, P, S, Z, M, C and their kinds are at offset 0"
+    );
     assertEq(refused("[[:foo:]]"), "'[:foo:]' is no class at offset 1");
     assertEq(refused("\\x{110000}"), "the code point is beyond U+10FFFF at offset 9");
     assertEq(refused("\\xZ1"), "'\\x' takes two hex digits at offset 2");

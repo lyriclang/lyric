@@ -10,7 +10,20 @@ import std.test { assertEq, assertPanics, assertTrue };
 fn aSeedNamesItsStream(): void {
     let r = Random.seeded(0);
     let got = arrayOf(9, (i) => r.nextUint64());
-    assertEq(got, [13804888775535289832u64, 4211859015901796865u64, 4415496932110364166u64, 1713244878998487631u64, 6692990728071973259u64, 785888715741328994u64, 6858711743081713853u64, 10796604925839515679u64, 1239024447360315208u64]);
+    assertEq(
+        got,
+        [
+            13804888775535289832u64,
+            4211859015901796865u64,
+            4415496932110364166u64,
+            1713244878998487631u64,
+            6692990728071973259u64,
+            785888715741328994u64,
+            6858711743081713853u64,
+            10796604925839515679u64,
+            1239024447360315208u64,
+        ]
+    );
     let again = Random.seeded(0);
     assertEq(again.nextUint64(), 13804888775535289832u64);
 }
@@ -18,7 +31,10 @@ fn aSeedNamesItsStream(): void {
 @Test
 fn nextIntIsTheDrawAsAnInt(): void {
     let r = Random.seeded(12345);
-    assertEq(arrayOf(4, (i) => r.nextInt()), [3192928694849931527, 413646854545440538, -6449572774746238618, 1682560787029495770]);
+    assertEq(
+        arrayOf(4, (i) => r.nextInt()),
+        [3192928694849931527, 413646854545440538, -6449572774746238618, 1682560787029495770]
+    );
 }
 
 @Test
@@ -119,7 +135,15 @@ fn freshGeneratorsAndTheFreeFormsDrawFromTheSystem(): void {
 @Test
 fn anEmptyRangeAndAnOversizedSamplePanic(): void {
     let r = Random.seeded(1);
-    assertPanics(() => { r.nextInRange(4..4); });
+    assertPanics(
+        () => {
+            r.nextInRange(4..4);
+        }
+    );
     let xs: int[] = [1, 2];
-    assertPanics(() => { r.sample(xs[..], 3); });
+    assertPanics(
+        () => {
+            r.sample(xs[..], 3);
+        }
+    );
 }

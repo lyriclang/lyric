@@ -99,7 +99,7 @@ public static class FixRun
     /// <summary>The change to one file as a unified diff, three lines around each change. The lines
     /// between the first and the last change are matched as a longest common subsequence; past a
     /// size where that table would not fit, they are one change.</summary>
-    private static void Diff(TextWriter output, string shown, string before, string after)
+    internal static void Diff(TextWriter output, string shown, string before, string after)
     {
         var a = before.Split('\n');
         var b = after.Split('\n');

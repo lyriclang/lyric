@@ -100,10 +100,13 @@ fn joinShowsEachElement(): void {
 @Test
 fn arrayOfCallsInOrderOncePerIndex(): void {
     var calls = "";
-    let xs = arrayOf(5, (i) => {
-        calls = calls + f"{i}";
-        return i * i;
-    });
+    let xs = arrayOf(
+        5,
+        (i) => {
+            calls = calls + f"{i}";
+            return i * i;
+        }
+    );
     assertEq(calls, "01234");
     assertEq(xs.join(","), "0,1,4,9,16");
     assertEq(arrayOf(0, (i) => i).length(), 0);
@@ -139,7 +142,11 @@ fn copyIntoALongerViewKeepsItsRest(): void {
 fn copyIntoAShorterViewPanics(): void {
     let from = [1, 2, 3];
     let into = [0, 0];
-    assertPanics(() => { from[..].copyInto(into[..]); });
+    assertPanics(
+        () => {
+            from[..].copyInto(into[..]);
+        }
+    );
 }
 
 @Test

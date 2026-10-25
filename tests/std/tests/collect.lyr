@@ -4,7 +4,9 @@ import std.collections { Deque, Heap, List, Map, Set };
 import std.test { assertEq, assertTrue };
 
 class Fail :: [Error] {
-    fn message(): string { return "fail"; }
+    fn message(): string {
+        return "fail";
+    }
 }
 
 /// Gives 1, 2, then throws.
@@ -16,7 +18,7 @@ struct FailingAtThree :: [Iterator] {
     mut fn next(): ?int throws Fail {
         this.i = this.i + 1;
         if (this.i == 3) {
-            throw Fail {};
+            throw Fail { };
         }
         return this.i;
     }

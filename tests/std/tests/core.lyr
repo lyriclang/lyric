@@ -1,6 +1,15 @@
 // std.core: what the language binds without an import, and the helpers synthesized members call.
 import std.test { assertEq, assertTrue, assertFalse };
-import std.core { arrayOf, repeatArray, debugArray, debugOptional, equalArrays, equalOptionals, hashOptionalInto, cloneArray };
+import std.core {
+    arrayOf,
+    repeatArray,
+    debugArray,
+    debugOptional,
+    equalArrays,
+    equalOptionals,
+    hashOptionalInto,
+    cloneArray,
+};
 import std.hash { FixedHasher };
 
 @Test
@@ -58,7 +67,10 @@ fn orderingIsEquatableHashableAndDebug(): void {
     assertTrue(Ordering.Less == Ordering.Less);
     assertFalse(Ordering.Less == Ordering.Greater);
     assertTrue(Ordering.Equal != Ordering.Greater);
-    assertEq(f"{Ordering.Less:?} {Ordering.Equal:?} {Ordering.Greater:?}", "Ordering.Less Ordering.Equal Ordering.Greater");
+    assertEq(
+        f"{Ordering.Less:?} {Ordering.Equal:?} {Ordering.Greater:?}",
+        "Ordering.Less Ordering.Equal Ordering.Greater"
+    );
     assertEq(hashOfOrdering(Ordering.Less), hashOfOrdering(Ordering.Less));
     assertTrue(hashOfOrdering(Ordering.Less) != hashOfOrdering(Ordering.Greater));
     let one = 1;

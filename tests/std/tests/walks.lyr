@@ -40,11 +40,13 @@ fn aChangeWhileWalkingPanics(): void {
     let m = Map<int, int>.new();
     m.insert(1, 1);
     m.insert(2, 2);
-    let info = assertPanics(() => {
-        for (k in m.keys()) {
-            m.insert(k + 10, 0);
+    let info = assertPanics(
+        () => {
+            for (k in m.keys()) {
+                m.insert(k + 10, 0);
+            }
         }
-    });
+    );
     assertEq(info.message, "Map: changed while it was walked");
     assertEq(info.code, "LYR-RT0016");
 }

@@ -564,15 +564,18 @@ public sealed class AstFormatter
         return new Doc.Concat(parts);
     }
 
+    /// <summary>A declaration's interfaces; too long for the line, one to a line like parameters.</summary>
     /// <param name="delegates">The field an entry delegates to (<c>Walker by legs</c>).</param>
     private Doc InterfaceListDoc(TypeNode[] interfaces, string?[]? delegates = null) =>
         interfaces.Length == 0
             ? Doc.Nil
-            : Doc.Of(Doc.From(" :: ["),
-                Doc.Join(Doc.From(", "), interfaces.Select((t, i) =>
-                    delegates is not null && i < delegates.Length && delegates[i] is { } field
-                        ? Doc.Of(TypeDoc(t), Doc.From($" by {field}"))
-                        : TypeDoc(t)).ToArray()), Doc.From("]"));
+            : Doc.Of(Doc.From(" :: "), Doc.GroupOf(Doc.From("["),
+                Doc.IndentOf(Doc.LineOrNothing,
+                    Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace), interfaces.Select((t, i) =>
+                        delegates is not null && i < delegates.Length && delegates[i] is { } field
+                            ? Doc.Of(TypeDoc(t), Doc.From($" by {field}"))
+                            : TypeDoc(t)).ToArray())),
+                Doc.LineOrNothing, Doc.From("]")));
 
     private Doc EnumDoc(EnumDecl decl)
     {
@@ -1061,8 +1064,9 @@ public sealed class AstFormatter
         // on one line, an 'else if' ladder straight down.
         IfExpr { Then: BlockExpr } i => Doc.Of(Doc.From("if ("), ExprDoc(i.Condition, Assign), Doc.From(") "),
             ExprDoc(i.Then, Assign), Doc.From(" else "), ExprDoc(i.Else, Assign)),
+        // Broken, its 'else' goes on a line of its own one level in, under the 'if' it belongs to.
         IfExpr i => Doc.GroupOf(Doc.From("if ("), ExprDoc(i.Condition, Assign), Doc.From(") "),
-            ExprDoc(i.Then, Assign), Doc.LineOrSpace, Doc.From("else "), ExprDoc(i.Else, Assign)),
+            ExprDoc(i.Then, Assign), Doc.IndentOf(Doc.LineOrSpace, Doc.From("else "), ExprDoc(i.Else, Assign))),
         BlockExpr b => BlockDoc(b.Block),
         MatchExpr m => MatchDoc(m.Scrutinee, m.Arms, m.Span),
         StructInitExpr s => StructInitDoc(s),

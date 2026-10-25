@@ -59,7 +59,7 @@ pub import std.core {
     SeesConformer,
     sequence,
     target,
-    profile
+    profile,
 };
 pub import std.collections { List, Map, Set };
 // The iterator adapters' module, named here so its blocks reach every iterator in every module; the structs are imported where a type is written, `import std.iter { MapIter }`.

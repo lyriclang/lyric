@@ -7,7 +7,9 @@ struct Countdown :: [Iterator] {
     var n: int,
 
     mut fn next(): ?int {
-        if (this.n == 0) { return null; }
+        if (this.n == 0) {
+            return null;
+        }
         this.n = this.n - 1;
         return this.n + 1;
     }
@@ -39,7 +41,9 @@ fn anInclusiveRangeReachesTheTypesEnds(): void {
     let hi: uint8 = 255;
     let r = lo..=hi;
     var seen = "";
-    for (v in r) { seen = seen + f"{v} "; }
+    for (v in r) {
+        seen = seen + f"{v} ";
+    }
     assertEq(seen, "253 254 255 ");
     var up = lo..=hi;
     assertEq(up.next() ?? 0, 253);
@@ -128,10 +132,14 @@ class Counting :: [Iterator] {
 @Test
 fn mapAndFilterChain(): void {
     var seen = "";
-    for (x in (1..7).filter((v) => v % 2 == 0).map((v) => v * 10)) { seen = seen + f"{x} "; }
+    for (x in (1..7).filter((v) => v % 2 == 0).map((v) => v * 10)) {
+        seen = seen + f"{x} ";
+    }
     assertEq(seen, "20 40 60 ");
     var words = "";
-    for (w in [1, 2].iter().map((v) => f"<{v}>")) { words = words + w; }
+    for (w in [1, 2].iter().map((v) => f"<{v}>")) {
+        words = words + w;
+    }
     assertEq(words, "<1><2>");
 }
 
@@ -147,7 +155,9 @@ fn adaptersPullLazily(): void {
 
 fn text<I :: [Iterator<Item = int, Error = never>]>(it: I): string {
     var out = "";
-    for (x in it) { out = out + f"{x}"; }
+    for (x in it) {
+        out = out + f"{x}";
+    }
     return out;
 }
 
@@ -179,10 +189,18 @@ fn stepByTakesEveryNth(): void {
 @Test
 fn enumerateAndInspect(): void {
     var seen = "";
-    for ((i, w) in ["a", "b"].iter().enumerate()) { seen = seen + f"{i}{w}"; }
+    for ((i, w) in ["a", "b"].iter().enumerate()) {
+        seen = seen + f"{i}{w}";
+    }
     assertEq(seen, "0a1b");
     let c = Counting { n = 0, pulls = 0 };
-    let total = text((0..3).inspect((v) => { c.pulls = c.pulls + v; }));
+    let total = text(
+        (0..3).inspect(
+            (v) => {
+                c.pulls = c.pulls + v;
+            }
+        )
+    );
     assertEq(total, "012");
     assertEq(c.pulls, 3);
 }
@@ -190,7 +208,9 @@ fn enumerateAndInspect(): void {
 @Test
 fn zipStopsAtTheShorter(): void {
     var seen = "";
-    for ((n, w) in (1..9).zip(["a", "b", "c"])) { seen = seen + f"{n}{w}"; }
+    for ((n, w) in (1..9).zip(["a", "b", "c"])) {
+        seen = seen + f"{n}{w}";
+    }
     assertEq(seen, "1a2b3c");
     var z = [1, 2].iter().zip(10..11);
     let first = z.next();
@@ -242,7 +262,11 @@ fn predicatesStopEarly(): void {
 @Test
 fn forEachAndToArray(): void {
     let c = Counting { n = 0, pulls = 0 };
-    (0..4).forEach((v) => { c.pulls = c.pulls + v; });
+    (0..4).forEach(
+        (v) => {
+            c.pulls = c.pulls + v;
+        }
+    );
     assertEq(c.pulls, 6);
     let xs = (2..5).toArray();
     assertEq(xs.length(), 3);
@@ -280,9 +304,15 @@ fn joinShowsWithASeparator(): void {
 @Test
 fn forWalksARangeAndAnIterator(): void {
     var seen = "";
-    for (i in 2..5) { seen = seen + f"{i}"; }
+    for (i in 2..5) {
+        seen = seen + f"{i}";
+    }
     let r = 0..3;
-    for (i in r) { seen = seen + f"{i}"; }
-    for (i in Countdown { n = 3 }) { seen = seen + f"{i}"; }
+    for (i in r) {
+        seen = seen + f"{i}";
+    }
+    for (i in Countdown { n = 3 }) {
+        seen = seen + f"{i}";
+    }
     assertEq(seen, "234012321");
 }

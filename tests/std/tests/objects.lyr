@@ -54,10 +54,13 @@ fn aDequeAndAListHoldObjects(): void {
 @Test
 fn arrayOfGivesEverySlotItsOwn(): void {
     let calls = List<int>.new();
-    let cells = arrayOf(5, (i: int) => {
-        calls.push(i);
-        return Cell { v = i };
-    });
+    let cells = arrayOf(
+        5,
+        (i: int) => {
+            calls.push(i);
+            return Cell { v = i };
+        }
+    );
     assertEq(calls.length(), 5);
     assertEq(calls.get(4)!, 4);
     cells[0].v = 9;

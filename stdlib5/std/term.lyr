@@ -147,7 +147,14 @@ pub struct Style :: [Equatable, Debug] {
 
     /// Returns whether the style sets no color and no attribute.
     pub fn isPlain(): bool {
-        return this.fg == null && this.bg == null && !this.bold && !this.dim && !this.italic && !this.underline && !this.inverse && !this.strike;
+        return this.fg == null
+            && this.bg == null
+            && !this.bold
+            && !this.dim
+            && !this.italic
+            && !this.underline
+            && !this.inverse
+            && !this.strike;
     }
 
     /// Returns the SGR sequence that turns the style on.
@@ -167,14 +174,30 @@ pub struct Style :: [Equatable, Debug] {
             first = false;
             out.appendStr(p);
         };
-        if (this.bold) { add("1"); }
-        if (this.dim) { add("2"); }
-        if (this.italic) { add("3"); }
-        if (this.underline) { add("4"); }
-        if (this.inverse) { add("7"); }
-        if (this.strike) { add("9"); }
-        if (let c = this.fg) { add(colorParam(c, false)); }
-        if (let c = this.bg) { add(colorParam(c, true)); }
+        if (this.bold) {
+            add("1");
+        }
+        if (this.dim) {
+            add("2");
+        }
+        if (this.italic) {
+            add("3");
+        }
+        if (this.underline) {
+            add("4");
+        }
+        if (this.inverse) {
+            add("7");
+        }
+        if (this.strike) {
+            add("9");
+        }
+        if (let c = this.fg) {
+            add(colorParam(c, false));
+        }
+        if (let c = this.bg) {
+            add(colorParam(c, true));
+        }
         out.appendChar('m');
         return out.toString();
     }

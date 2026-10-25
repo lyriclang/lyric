@@ -37,7 +37,10 @@ fn aUriIsItsFivePartsAndTheirText(): void throws Error {
     let mail = try Uri.parse("mailto:John.Doe@example.com");
     assertNull(mail.host);
     assertEq(mail.path, "John.Doe@example.com");
-    assertEq((try Uri.parse("urn:oasis:names:specification:docbook:dtd:xml:4.1.2")).path, "oasis:names:specification:docbook:dtd:xml:4.1.2");
+    assertEq(
+        (try Uri.parse("urn:oasis:names:specification:docbook:dtd:xml:4.1.2")).path,
+        "oasis:names:specification:docbook:dtd:xml:4.1.2"
+    );
     assertEq((try Uri.parse("tel:+1-816-555-1212")).path, "+1-816-555-1212");
     assertEq((try Uri.parse("telnet://192.0.2.16:80/")).port, 80);
     // an empty authority, an empty port, the empty reference
@@ -46,15 +49,18 @@ fn aUriIsItsFivePartsAndTheirText(): void throws Error {
     assertEq(file.path, "/etc/hosts");
     assertEq(file.show(), "file:///etc/hosts");
     assertNull((try Uri.parse("http://h:/")).port);
-    assertEq(try Uri.parse(""), Uri {});
-    assertEq(Uri {}.show(), "");
+    assertEq(try Uri.parse(""), Uri { });
+    assertEq(Uri { }.show(), "");
     // a relative reference
     let rel = try Uri.parse("../g?x#y");
     assertTrue(!rel.isAbsolute());
     assertNull(rel.scheme);
     assertEq(rel.path, "../g");
     // the literal builds one
-    assertEq(Uri { scheme = "https", host = "h", port = 8443, path = "/p", query = "q" }.show(), "https://h:8443/p?q");
+    assertEq(
+        Uri { scheme = "https", host = "h", port = 8443, path = "/p", query = "q" }.show(),
+        "https://h:8443/p?q"
+    );
     assertEq(Uri { host = "::1", path = "/" }.show(), "//[::1]/");
     // Codable: its text
     assertEq(try json.encode(Uri.parse("http://h/p")), "\"http://h/p\"");
@@ -63,7 +69,10 @@ fn aUriIsItsFivePartsAndTheirText(): void throws Error {
         let _ = json.decode<Uri>("\"http://a b\"");
         fail("a space in a host decoded");
     } catch (e: DecodeError) {
-        assertEq(e.message(), "invalid: 'http://a b' is no URI: the text is not a value of the type: a character the host does not allow (at byte 7)");
+        assertEq(
+            e.message(),
+            "invalid: 'http://a b' is no URI: the text is not a value of the type: a character the host does not allow (at byte 7)"
+        );
     }
 }
 
@@ -71,22 +80,53 @@ fn aUriIsItsFivePartsAndTheirText(): void throws Error {
 fn resolveTakesTheExamplesOfTheRfc(): void throws Error {
     let base = try Uri.parse("http://a/b/c/d;p?q");
     let examples = [
-        // §5.4.1 normal
-        ("g:h", "g:h"), ("g", "http://a/b/c/g"), ("./g", "http://a/b/c/g"), ("g/", "http://a/b/c/g/"),
-        ("/g", "http://a/g"), ("//g", "http://g"), ("?y", "http://a/b/c/d;p?y"), ("g?y", "http://a/b/c/g?y"),
-        ("#s", "http://a/b/c/d;p?q#s"), ("g#s", "http://a/b/c/g#s"), ("g?y#s", "http://a/b/c/g?y#s"),
-        (";x", "http://a/b/c/;x"), ("g;x", "http://a/b/c/g;x"), ("g;x?y#s", "http://a/b/c/g;x?y#s"),
-        ("", "http://a/b/c/d;p?q"), (".", "http://a/b/c/"), ("./", "http://a/b/c/"), ("..", "http://a/b/"),
-        ("../", "http://a/b/"), ("../g", "http://a/b/g"), ("../..", "http://a/"), ("../../", "http://a/"),
+        ("g:h", "g:h"),
+        ("g", "http://a/b/c/g"),
+        ("./g", "http://a/b/c/g"),
+        ("g/", "http://a/b/c/g/"),
+        ("/g", "http://a/g"),
+        ("//g", "http://g"),
+        ("?y", "http://a/b/c/d;p?y"),
+        ("g?y", "http://a/b/c/g?y"),
+        ("#s", "http://a/b/c/d;p?q#s"),
+        ("g#s", "http://a/b/c/g#s"),
+        ("g?y#s", "http://a/b/c/g?y#s"),
+        (";x", "http://a/b/c/;x"),
+        ("g;x", "http://a/b/c/g;x"),
+        ("g;x?y#s", "http://a/b/c/g;x?y#s"),
+        ("", "http://a/b/c/d;p?q"),
+        (".", "http://a/b/c/"),
+        ("./", "http://a/b/c/"),
+        ("..", "http://a/b/"),
+        ("../", "http://a/b/"),
+        ("../g", "http://a/b/g"),
+        ("../..", "http://a/"),
+        ("../../", "http://a/"),
         ("../../g", "http://a/g"),
-        // §5.4.2 abnormal
-        ("../../../g", "http://a/g"), ("../../../../g", "http://a/g"), ("/./g", "http://a/g"), ("/../g", "http://a/g"),
-        ("g.", "http://a/b/c/g."), (".g", "http://a/b/c/.g"), ("g..", "http://a/b/c/g.."), ("..g", "http://a/b/c/..g"),
-        ("./../g", "http://a/b/g"), ("./g/.", "http://a/b/c/g/"), ("g/./h", "http://a/b/c/g/h"), ("g/../h", "http://a/b/c/h"),
-        ("g;x=1/./y", "http://a/b/c/g;x=1/y"), ("g;x=1/../y", "http://a/b/c/y"), ("g?y/./x", "http://a/b/c/g?y/./x"),
-        ("g?y/../x", "http://a/b/c/g?y/../x"), ("g#s/./x", "http://a/b/c/g#s/./x"), ("g#s/../x", "http://a/b/c/g#s/../x"),
+        ("../../../g", "http://a/g"),
+        ("../../../../g", "http://a/g"),
+        ("/./g", "http://a/g"),
+        ("/../g", "http://a/g"),
+        ("g.", "http://a/b/c/g."),
+        (".g", "http://a/b/c/.g"),
+        ("g..", "http://a/b/c/g.."),
+        ("..g", "http://a/b/c/..g"),
+        ("./../g", "http://a/b/g"),
+        ("./g/.", "http://a/b/c/g/"),
+        ("g/./h", "http://a/b/c/g/h"),
+        ("g/../h", "http://a/b/c/h"),
+        ("g;x=1/./y", "http://a/b/c/g;x=1/y"),
+        ("g;x=1/../y", "http://a/b/c/y"),
+        ("g?y/./x", "http://a/b/c/g?y/./x"),
+        ("g?y/../x", "http://a/b/c/g?y/../x"),
+        ("g#s/./x", "http://a/b/c/g#s/./x"),
+        ("g#s/../x", "http://a/b/c/g#s/../x"),
         ("http:g", "http:g"),
     ];
+    // §5.4.1 normal
+
+    // §5.4.2 abnormal
+
     for ((r, want) in examples) {
         assertEq(base.resolve(try Uri.parse(r)).show(), want);
     }
@@ -99,11 +139,20 @@ fn resolveTakesTheExamplesOfTheRfc(): void throws Error {
 
 @Test
 fn normalizeAndThePercentEncoding(): void throws Error {
-    assertEq((try Uri.parse("HTTP://www.EXAMPLE.com:80/a/./b/../%7Eu%2fx?q#f")).normalize().show(), "http://www.example.com/a/~u%2Fx?q#f");
+    assertEq(
+        (try Uri.parse("HTTP://www.EXAMPLE.com:80/a/./b/../%7Eu%2fx?q#f")).normalize().show(),
+        "http://www.example.com/a/~u%2Fx?q#f"
+    );
     assertEq((try Uri.parse("https://h:443")).normalize().show(), "https://h/");
     assertEq((try Uri.parse("https://h:8443")).normalize().show(), "https://h:8443/");
-    assertEq((try Uri.parse("example://a/b/c/%7Bfoo%7D")).normalize().show(), "example://a/b/c/%7Bfoo%7D");
-    assertEq((try Uri.parse("eXAMPLE://a/./b/../b/%63/%7bfoo%7d")).normalize().show(), "example://a/b/c/%7Bfoo%7D");
+    assertEq(
+        (try Uri.parse("example://a/b/c/%7Bfoo%7D")).normalize().show(),
+        "example://a/b/c/%7Bfoo%7D"
+    );
+    assertEq(
+        (try Uri.parse("eXAMPLE://a/./b/../b/%63/%7bfoo%7d")).normalize().show(),
+        "example://a/b/c/%7Bfoo%7D"
+    );
     // a relative path keeps its dot segments: they mean something against a base
     assertEq((try Uri.parse("../a/./b")).normalize().show(), "../a/./b");
     // per component
@@ -156,13 +205,43 @@ fn aQueryIsItsPairsInOrder(): void throws Error {
 
 @Test
 fn whatTheGrammarRefusesIsRefused(): void {
-    for (bad in ["http://a b/", "http://[::1", "http://[::1]x/", "http://[1.2.3.4]/", "http://h:99999/", "http://h:x/",
-                 "http://h/%zz", "http://h/%4", "http://h/\u{e4}", "http://h/a\tb", "1http://x", "a:b/c" + "\u{e9}",
-                 "a#b#c", "http://u@h@x/", "http://h/<p>", "http://h/p?q{", "http://h/p#f\"", "http://h\\p"]) {
+    for (bad in [
+        "http://a b/",
+        "http://[::1",
+        "http://[::1]x/",
+        "http://[1.2.3.4]/",
+        "http://h:99999/",
+        "http://h:x/",
+        "http://h/%zz",
+        "http://h/%4",
+        "http://h/\u{e4}",
+        "http://h/a\tb",
+        "1http://x",
+        "a:b/c" + "\u{e9}",
+        "a#b#c",
+        "http://u@h@x/",
+        "http://h/<p>",
+        "http://h/p?q{",
+        "http://h/p#f\"",
+        "http://h\\p",
+    ]) {
         assertTrue(refused(bad), f"accepted {bad}");
     }
-    for (good in ["//h", "?q", "#f", "g:h", "http://h:/", "a/b:c", "./a:b", "http://u:p@h:1/p;x?q=/?#f/?",
-                  "http://h/%C3%A9", "HTTP://H/", "x-y+z.1:p", "http://192.0.2.1/", "http://[v6.fe80::a]/"]) {
+    for (good in [
+        "//h",
+        "?q",
+        "#f",
+        "g:h",
+        "http://h:/",
+        "a/b:c",
+        "./a:b",
+        "http://u:p@h:1/p;x?q=/?#f/?",
+        "http://h/%C3%A9",
+        "HTTP://H/",
+        "x-y+z.1:p",
+        "http://192.0.2.1/",
+        "http://[v6.fe80::a]/",
+    ]) {
         assertTrue(!refused(good) || good == "http://[v6.fe80::a]/", f"refused {good}");
     }
     // an IPvFuture literal is refused: only an IPv6 address stands in brackets (a reading)
@@ -194,7 +273,10 @@ fn aRefusalSaysWhereAndWhy(): void {
             assertEq(e.kind, ParseErrorKind.Invalid);
             assertEq(e.detail, detail);
             assertEq(e.offset ?? -1, offset);
-            assertEq(e.message(), f"the text is not a value of the type: {detail} (at byte {offset})");
+            assertEq(
+                e.message(),
+                f"the text is not a value of the type: {detail} (at byte {offset})"
+            );
         }
     }
     try {

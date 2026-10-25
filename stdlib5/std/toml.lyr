@@ -43,16 +43,32 @@ extend TomlDatetime :: [Display, Debug] {
     /// Returns the TOML text: `1979-05-27T07:32:00Z`, `1979-05-27T07:32:00`, `1979-05-27`, `07:32:00`.
     fn show(): string {
         match (this) {
-            .Offset(dt) => { return dt.show(); },
-            .Local(d, t) => { return f"{d.show()}T{t.show()}"; },
-            .LocalDate(d) => { return d.show(); },
-            .LocalTime(t) => { return t.show(); },
+            .Offset(dt) => {
+                return dt.show();
+            }
+            .Local(d, t) => {
+                return f"{d.show()}T{t.show()}";
+            }
+            .LocalDate(d) => {
+                return d.show();
+            }
+            .LocalTime(t) => {
+                return t.show();
+            }
         }
     }
 
-    fn showTo(out: StringBuilder): void { out.appendStr(this.show()); }
-    fn debug(): string { return this.show(); }
-    fn debugTo(out: StringBuilder): void { out.appendStr(this.show()); }
+    fn showTo(out: StringBuilder): void {
+        out.appendStr(this.show());
+    }
+
+    fn debug(): string {
+        return this.show();
+    }
+
+    fn debugTo(out: StringBuilder): void {
+        out.appendStr(this.show());
+    }
 }
 
 /// A table: its keys in the order written, each with its value.
@@ -119,11 +135,56 @@ extend TomlValue :: [Equatable] {
     /// when they have the same keys with equal values, in any order.
     fn equals(o: TomlValue): bool {
         match (this) {
-            .String(a) => { match (o) { .String(b) => { return a == b; }, _ => { return false; } } },
-            .Int(a) => { match (o) { .Int(b) => { return a == b; }, _ => { return false; } } },
-            .Float(a) => { match (o) { .Float(b) => { return a == b; }, _ => { return false; } } },
-            .Bool(a) => { match (o) { .Bool(b) => { return a == b; }, _ => { return false; } } },
-            .Datetime(a) => { match (o) { .Datetime(b) => { return a == b; }, _ => { return false; } } },
+            .String(a) => {
+                match (o) {
+                    .String(b) => {
+                        return a == b;
+                    }
+                    _ => {
+                        return false;
+                    }
+                }
+            }
+            .Int(a) => {
+                match (o) {
+                    .Int(b) => {
+                        return a == b;
+                    }
+                    _ => {
+                        return false;
+                    }
+                }
+            }
+            .Float(a) => {
+                match (o) {
+                    .Float(b) => {
+                        return a == b;
+                    }
+                    _ => {
+                        return false;
+                    }
+                }
+            }
+            .Bool(a) => {
+                match (o) {
+                    .Bool(b) => {
+                        return a == b;
+                    }
+                    _ => {
+                        return false;
+                    }
+                }
+            }
+            .Datetime(a) => {
+                match (o) {
+                    .Datetime(b) => {
+                        return a == b;
+                    }
+                    _ => {
+                        return false;
+                    }
+                }
+            }
             .Array(a) => {
                 match (o) {
                     .Array(b) => {
@@ -138,10 +199,12 @@ extend TomlValue :: [Equatable] {
                             i = i + 1;
                         }
                         return true;
-                    },
-                    _ => { return false; },
+                    }
+                    _ => {
+                        return false;
+                    }
                 }
-            },
+            }
             .Table(a) => {
                 match (o) {
                     .Table(b) => {
@@ -158,10 +221,12 @@ extend TomlValue :: [Equatable] {
                             }
                         }
                         return true;
-                    },
-                    _ => { return false; },
+                    }
+                    _ => {
+                        return false;
+                    }
                 }
-            },
+            }
         }
     }
 }
@@ -174,18 +239,26 @@ extend TomlValue :: [Display, Debug] {
                 let out = StringBuilder.new();
                 writeTable(out, [], t);
                 return out.toString();
-            },
+            }
             _ => {
                 let out = StringBuilder.new();
                 writeValue(out, this);
                 return out.toString();
-            },
+            }
         }
     }
 
-    fn showTo(out: StringBuilder): void { out.appendStr(this.show()); }
-    fn debug(): string { return this.show(); }
-    fn debugTo(out: StringBuilder): void { out.appendStr(this.show()); }
+    fn showTo(out: StringBuilder): void {
+        out.appendStr(this.show());
+    }
+
+    fn debug(): string {
+        return this.show();
+    }
+
+    fn debugTo(out: StringBuilder): void {
+        out.appendStr(this.show());
+    }
 }
 
 /// Returns the member `v["key"]`, or `null` where the value is no table or has no such key.
@@ -194,8 +267,12 @@ extend TomlValue :: [Index<string>] {
 
     fn index(k: string): ?TomlValue {
         match (this) {
-            .Table(t) => { return t.get(k); },
-            _ => { return null; },
+            .Table(t) => {
+                return t.get(k);
+            }
+            _ => {
+                return null;
+            }
         }
     }
 }
@@ -205,8 +282,12 @@ extend TomlValue {
     /// out of range.
     pub fn at(i: int): ?TomlValue {
         match (this) {
-            .Array(items) => { return if (i >= 0 && i < items.length()) items[i] else null; },
-            _ => { return null; },
+            .Array(items) => {
+                return if (i >= 0 && i < items.length()) items[i] else null;
+            }
+            _ => {
+                return null;
+            }
         }
     }
 
@@ -223,8 +304,7 @@ extend TomlValue {
                     var i = -1;
                     try {
                         i = int.parse(index.toString());
-                    } catch (_: ParseError) {
-                    }
+                    } catch (_: ParseError) { }
                     if (let v = current) {
                         current = v.at(i);
                     }
@@ -254,32 +334,84 @@ extend TomlValue {
     }
 
     pub fn asString(): ?string {
-        match (this) { .String(s) => { return s; }, _ => { return null; } }
+        match (this) {
+            .String(s) => {
+                return s;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     pub fn asInt(): ?int {
-        match (this) { .Int(i) => { return i; }, _ => { return null; } }
+        match (this) {
+            .Int(i) => {
+                return i;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     /// Returns the number as a float, an `Int` widened; `null` for any other form.
     pub fn asFloat(): ?float {
-        match (this) { .Float(f) => { return f; }, .Int(i) => { return i as float; }, _ => { return null; } }
+        match (this) {
+            .Float(f) => {
+                return f;
+            }
+            .Int(i) => {
+                return i as float;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     pub fn asBool(): ?bool {
-        match (this) { .Bool(b) => { return b; }, _ => { return null; } }
+        match (this) {
+            .Bool(b) => {
+                return b;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     pub fn asDatetime(): ?TomlDatetime {
-        match (this) { .Datetime(d) => { return d; }, _ => { return null; } }
+        match (this) {
+            .Datetime(d) => {
+                return d;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     pub fn asArray(): ?List<TomlValue> {
-        match (this) { .Array(a) => { return a; }, _ => { return null; } }
+        match (this) {
+            .Array(a) => {
+                return a;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     pub fn asTable(): ?TomlTable {
-        match (this) { .Table(t) => { return t; }, _ => { return null; } }
+        match (this) {
+            .Table(t) => {
+                return t;
+            }
+            _ => {
+                return null;
+            }
+        }
     }
 
     /// Writes the tree into any encoder: a table as a map of string keys, an array as a
@@ -290,25 +422,35 @@ extend TomlValue {
     /// Throws `EncodeError` where the encoder rejects a value.
     fn writeTo<E :: [Encoder]>(&e: E): void throws EncodeError {
         match (this) {
-            .String(s) => { try e.encodeString(s); },
-            .Int(i) => { try e.encodeInt(i); },
-            .Float(f) => { try e.encodeFloat(f); },
-            .Bool(b) => { try e.encodeBool(b); },
-            .Datetime(d) => { try e.encodeString(d.show()); },
+            .String(s) => {
+                try e.encodeString(s);
+            }
+            .Int(i) => {
+                try e.encodeInt(i);
+            }
+            .Float(f) => {
+                try e.encodeFloat(f);
+            }
+            .Bool(b) => {
+                try e.encodeBool(b);
+            }
+            .Datetime(d) => {
+                try e.encodeString(d.show());
+            }
             .Array(items) => {
                 try e.beginSeq(items.length());
                 for (x in items) {
                     try e.element(x);
                 }
                 try e.endSeq();
-            },
+            }
             .Table(t) => {
                 try e.beginMap(t.length());
                 for ((k, v) in t.pairs()) {
                     try e.entry(k, v);
                 }
                 try e.endMap();
-            },
+            }
         }
     }
 }
@@ -406,7 +548,8 @@ fn writeString(out: StringBuilder, s: string): void {
 }
 
 fn hexDigit(v: int): char {
-    return if (v < 10) ((('0' as uint32) + (v as uint32)) as char) else ((('A' as uint32) + ((v - 10) as uint32)) as char);
+    return if (v < 10) ((('0' as uint32) + (v as uint32)) as char)
+        else ((('A' as uint32) + ((v - 10) as uint32)) as char);
 }
 
 /// Returns whether an array holds tables alone (and at least one); such an array is written as
@@ -417,8 +560,10 @@ fn isArrayOfTables(items: List<TomlValue>): bool {
     }
     for (x in items) {
         match (x) {
-            .Table(_) => { },
-            _ => { return false; },
+            .Table(_) => { }
+            _ => {
+                return false;
+            }
         }
     }
     return true;
@@ -427,8 +572,12 @@ fn isArrayOfTables(items: List<TomlValue>): bool {
 /// Writes a value inline: a scalar, an array, an inline table.
 fn writeValue(out: StringBuilder, v: TomlValue): void {
     match (v) {
-        .String(s) => { writeString(out, s); },
-        .Int(i) => { out.appendStr(f"{i}"); },
+        .String(s) => {
+            writeString(out, s);
+        }
+        .Int(i) => {
+            out.appendStr(f"{i}");
+        }
         .Float(f) => {
             if (f.isNan()) {
                 out.appendStr("nan");
@@ -437,9 +586,13 @@ fn writeValue(out: StringBuilder, v: TomlValue): void {
             } else {
                 out.appendStr(fromFloat(f));
             }
-        },
-        .Bool(b) => { out.appendStr(if (b) "true" else "false"); },
-        .Datetime(d) => { out.appendStr(d.show()); },
+        }
+        .Bool(b) => {
+            out.appendStr(if (b) "true" else "false");
+        }
+        .Datetime(d) => {
+            out.appendStr(d.show());
+        }
         .Array(items) => {
             out.appendChar('[');
             var first = true;
@@ -451,7 +604,7 @@ fn writeValue(out: StringBuilder, v: TomlValue): void {
                 writeValue(out, x);
             }
             out.appendChar(']');
-        },
+        }
         .Table(t) => {
             out.appendStr("{ ");
             var first = true;
@@ -465,7 +618,7 @@ fn writeValue(out: StringBuilder, v: TomlValue): void {
                 writeValue(out, x);
             }
             out.appendStr(if (first) "}" else " }");
-        },
+        }
     }
 }
 
@@ -486,9 +639,15 @@ fn writeHeader(out: StringBuilder, path: string[], array: bool): void {
 fn hasPlainPairs(t: TomlTable): bool {
     for ((_, v) in t.pairs()) {
         match (v) {
-            .Table(_) => { },
-            .Array(items) => { if (!isArrayOfTables(items)) { return true; } },
-            _ => { return true; },
+            .Table(_) => { }
+            .Array(items) => {
+                if (!isArrayOfTables(items)) {
+                    return true;
+                }
+            }
+            _ => {
+                return true;
+            }
         }
     }
     return false;
@@ -522,7 +681,7 @@ fn writeTable(out: StringBuilder, path: string[], t: TomlTable): void {
                     writeHeader(out, sub, false);
                 }
                 writeTable(out, sub, inner);
-            },
+            }
             .Array(items) => {
                 if (isArrayOfTables(items)) {
                     for (x in items) {
@@ -533,13 +692,13 @@ fn writeTable(out: StringBuilder, path: string[], t: TomlTable): void {
                                 }
                                 writeHeader(out, sub, true);
                                 writeTable(out, sub, inner);
-                            },
-                            _ => { },
+                            }
+                            _ => { }
                         }
                     }
                 }
-            },
-            _ => { },
+            }
+            _ => { }
         }
     }
 }
@@ -578,7 +737,9 @@ pub class TreeBuilder :: [Encoder] {
         }
         let top = this.stack.length() - 1;
         match (this.stack[top]) {
-            .Array(items) => { items.push(v); },
+            .Array(items) => {
+                items.push(v);
+            }
             .Table(t, pending) => {
                 if (let key = pending) {
                     t.set(key, v);
@@ -587,11 +748,14 @@ pub class TreeBuilder :: [Encoder] {
                     let text = match (v) {
                         .String(s) => s,
                         .Int(i) => f"{i}",
-                        _ => throw EncodeError { path = this.path(), detail = "a TOML key is a string" },
+                        _ => throw EncodeError {
+                            path = this.path(),
+                            detail = "a TOML key is a string",
+                        },
                     };
                     this.stack[top] = Building.Table(t, text);
                 }
-            },
+            }
         }
     }
 
@@ -609,15 +773,23 @@ pub class TreeBuilder :: [Encoder] {
                         this.stack[top] = Building.Table(t, null);
                         return;
                     }
-                },
-                _ => { },
+                }
+                _ => { }
             }
         }
-        throw EncodeError { path = this.path(), detail = "TOML has no null: a null stands in a table's key alone, left out" };
+        throw EncodeError {
+            path = this.path(),
+            detail = "TOML has no null: a null stands in a table's key alone, left out",
+        };
     }
 
-    pub mut fn encodeBool(v: bool): void throws EncodeError { try this.put(TomlValue.Bool(v)); }
-    pub mut fn encodeInt(v: int): void throws EncodeError { try this.put(TomlValue.Int(v)); }
+    pub mut fn encodeBool(v: bool): void throws EncodeError {
+        try this.put(TomlValue.Bool(v));
+    }
+
+    pub mut fn encodeInt(v: int): void throws EncodeError {
+        try this.put(TomlValue.Int(v));
+    }
 
     pub mut fn encodeUint(v: uint): void throws EncodeError {
         if (v > (int.max as uint)) {
@@ -626,8 +798,13 @@ pub class TreeBuilder :: [Encoder] {
         try this.put(TomlValue.Int(v as int));
     }
 
-    pub mut fn encodeFloat(v: float): void throws EncodeError { try this.put(TomlValue.Float(v)); }
-    pub mut fn encodeString(v: string): void throws EncodeError { try this.put(TomlValue.String(v)); }
+    pub mut fn encodeFloat(v: float): void throws EncodeError {
+        try this.put(TomlValue.Float(v));
+    }
+
+    pub mut fn encodeString(v: string): void throws EncodeError {
+        try this.put(TomlValue.String(v));
+    }
 
     pub mut fn encodeBytes(v: Slice<uint8>): void throws EncodeError {
         let items = List<TomlValue>.withCapacity(v.length());
@@ -647,8 +824,10 @@ pub class TreeBuilder :: [Encoder] {
             .Array(items) => {
                 this.segments.pop();
                 try this.put(TomlValue.Array(items));
-            },
-            _ => { throw EncodeError { path = this.path(), detail = "endSeq without beginSeq" }; },
+            }
+            _ => {
+                throw EncodeError { path = this.path(), detail = "endSeq without beginSeq" };
+            }
         }
     }
 
@@ -664,8 +843,10 @@ pub class TreeBuilder :: [Encoder] {
             .Table(t, _) => {
                 this.segments.pop();
                 try this.put(TomlValue.Table(t));
-            },
-            _ => { throw EncodeError { path = this.path(), detail = "endMap without beginMap" }; },
+            }
+            _ => {
+                throw EncodeError { path = this.path(), detail = "endMap without beginMap" };
+            }
         }
     }
 
@@ -677,14 +858,25 @@ pub class TreeBuilder :: [Encoder] {
     pub mut fn beginField(name: string): void throws EncodeError {
         let top = this.stack.length() - 1;
         match (this.stack[top]) {
-            .Table(t, _) => { this.stack[top] = Building.Table(t, name); },
-            _ => { throw EncodeError { path = this.path(), detail = "beginField outside a struct" }; },
+            .Table(t, _) => {
+                this.stack[top] = Building.Table(t, name);
+            }
+            _ => {
+                throw EncodeError { path = this.path(), detail = "beginField outside a struct" };
+            }
         }
     }
 
-    pub mut fn endStruct(): void throws EncodeError { try this.endMap(); }
+    pub mut fn endStruct(): void throws EncodeError {
+        try this.endMap();
+    }
 
-    pub mut fn beginVariant(enumName: string, variant: string, index: int, hasPayload: bool): void throws EncodeError {
+    pub mut fn beginVariant(
+        enumName: string,
+        variant: string,
+        index: int,
+        hasPayload: bool
+    ): void throws EncodeError {
         if (!hasPayload) {
             try this.put(TomlValue.String(variant));
             return;
@@ -695,7 +887,8 @@ pub class TreeBuilder :: [Encoder] {
     }
 
     pub mut fn endVariant(): void throws EncodeError {
-        if (!this.variants.isEmpty() && this.variants[this.variants.length() - 1] == this.stack.length()) {
+        if (!this.variants.isEmpty()
+            && this.variants[this.variants.length() - 1] == this.stack.length()) {
             this.variants.pop();
             try this.endMap();
         }
@@ -720,8 +913,13 @@ pub fn encode<T :: [Encode]>(v: T): string throws EncodeError {
             let out = StringBuilder.new();
             writeTable(out, [], t);
             return out.toString();
-        },
-        _ => { throw EncodeError { path = "", detail = "a TOML document is a table: encode a struct or a map" }; },
+        }
+        _ => {
+            throw EncodeError {
+                path = "",
+                detail = "a TOML document is a table: encode a struct or a map",
+            };
+        }
     }
 }
 
@@ -731,7 +929,10 @@ pub fn encode<T :: [Encode]>(v: T): string throws EncodeError {
 ///
 /// Throws `EncodeError` as `encode` does, `IoError` where writing fails and `Cancelled` where
 /// the task is cancelled during the write.
-pub fn encodeTo<T :: [Encode], W :: [Writer]>(v: T, &w: W): void throws [EncodeError, IoError, Cancelled] {
+pub fn encodeTo<T :: [Encode], W :: [Writer]>(
+    v: T,
+    &w: W
+): void throws [EncodeError, IoError, Cancelled] {
     let text = try encode(v);
     try w.writeString(text);
 }
@@ -763,7 +964,11 @@ class Parser {
     var origins: Map<string, Origin> = Map.new(),
 
     fn fail(detail: string): TomlError {
-        return TomlError { line = this.line, column = this.at - this.lineStart + 1, detail = detail };
+        return TomlError {
+            line = this.line,
+            column = this.at - this.lineStart + 1,
+            detail = detail,
+        };
     }
 
     fn peek(): int {
@@ -771,7 +976,8 @@ class Parser {
     }
 
     fn peekAt(offset: int): int {
-        return if (this.at + offset < this.bytes.length()) (this.bytes[this.at + offset] as int) else -1;
+        return if (this.at + offset < this.bytes.length()) (this.bytes[this.at + offset] as int)
+            else -1;
     }
 
     mut fn advance(): void {
@@ -911,16 +1117,22 @@ class Parser {
                                 throw this.fail(f"'{walked}' is a table, not an array of tables");
                             }
                             match (this.origins.get(walked) ?? Origin.Implicit) {
-                                .Implicit => { this.origins[walked] = Origin.Header; },
-                                _ => { throw this.fail(f"the table '{walked}' is defined twice"); },
+                                .Implicit => {
+                                    this.origins[walked] = Origin.Header;
+                                }
+                                _ => {
+                                    throw this.fail(f"the table '{walked}' is defined twice");
+                                }
                             }
                         }
                         t = inner;
-                    },
+                    }
                     .Array(items) => {
                         match (this.origins.get(walked) ?? Origin.Inline) {
-                            .ArrayElement => { },
-                            _ => { throw this.fail(f"'{walked}' is a value, not a table"); },
+                            .ArrayElement => { }
+                            _ => {
+                                throw this.fail(f"'{walked}' is a value, not a table");
+                            }
                         }
                         if (last && array) {
                             let element = TomlTable.new();
@@ -928,15 +1140,21 @@ class Parser {
                             t = element;
                         } else {
                             match (items[items.length() - 1]) {
-                                .Table(inner) => { t = inner; },
-                                _ => { throw this.fail(f"'{walked}' is a value, not a table"); },
+                                .Table(inner) => {
+                                    t = inner;
+                                }
+                                _ => {
+                                    throw this.fail(f"'{walked}' is a value, not a table");
+                                }
                             }
                             if (last) {
                                 throw this.fail(f"'{walked}' is an array of tables, not a table");
                             }
                         }
-                    },
-                    _ => { throw this.fail(f"'{walked}' is a value, not a table"); },
+                    }
+                    _ => {
+                        throw this.fail(f"'{walked}' is a value, not a table");
+                    }
                 }
             } else {
                 if (last && array) {
@@ -960,7 +1178,12 @@ class Parser {
 
     /// Assigns `a.b.c = v` in the current table: the tables on the way are made by the dotted
     /// key, and the last key must be new.
-    mut fn assign(current: TomlTable, currentPath: string, path: string[], v: TomlValue): void throws TomlError {
+    mut fn assign(
+        current: TomlTable,
+        currentPath: string,
+        path: string[],
+        v: TomlValue
+    ): void throws TomlError {
         var t = current;
         var walked = currentPath;
         var i = 0;
@@ -971,13 +1194,19 @@ class Parser {
                 match (existing) {
                     .Table(inner) => {
                         match (this.origins.get(walked) ?? Origin.Dotted) {
-                            .Dotted => { },
-                            .Implicit => { },
-                            _ => { throw this.fail(f"'{walked}' is defined already; a dotted key cannot add to it"); },
+                            .Dotted => { }
+                            .Implicit => { }
+                            _ => {
+                                throw this.fail(
+                                    f"'{walked}' is defined already; a dotted key cannot add to it"
+                                );
+                            }
                         }
                         t = inner;
-                    },
-                    _ => { throw this.fail(f"'{walked}' is a value, not a table"); },
+                    }
+                    _ => {
+                        throw this.fail(f"'{walked}' is a value, not a table");
+                    }
                 }
             } else {
                 let inner = TomlTable.new();
@@ -993,9 +1222,13 @@ class Parser {
             throw this.fail(f"the key '{walked}' is defined twice");
         }
         match (v) {
-            .Table(_) => { this.origins[walked] = Origin.Inline; },
-            .Array(_) => { this.origins[walked] = Origin.Inline; },
-            _ => { },
+            .Table(_) => {
+                this.origins[walked] = Origin.Inline;
+            }
+            .Array(_) => {
+                this.origins[walked] = Origin.Inline;
+            }
+            _ => { }
         }
         t.set(last, v);
     }
@@ -1051,10 +1284,20 @@ class Parser {
             }
             return TomlValue.String(try this.literalString());
         }
-        if (b == 0x5B) { return try this.array(level); }
-        if (b == 0x7B) { return try this.inlineTable(level); }
-        if (b == 0x74 && this.word("true")) { this.at = this.at + 4; return TomlValue.Bool(true); }
-        if (b == 0x66 && this.word("false")) { this.at = this.at + 5; return TomlValue.Bool(false); }
+        if (b == 0x5B) {
+            return try this.array(level);
+        }
+        if (b == 0x7B) {
+            return try this.inlineTable(level);
+        }
+        if (b == 0x74 && this.word("true")) {
+            this.at = this.at + 4;
+            return TomlValue.Bool(true);
+        }
+        if (b == 0x66 && this.word("false")) {
+            this.at = this.at + 5;
+            return TomlValue.Bool(false);
+        }
         return try this.numberOrDatetime();
     }
 
@@ -1232,13 +1475,34 @@ class Parser {
             return;
         }
         this.at = this.at + 1;
-        if (b == 0x22) { out.appendChar('"'); return; }
-        if (b == 0x5C) { out.appendChar('\\'); return; }
-        if (b == 0x62) { out.appendChar('\u{8}'); return; }
-        if (b == 0x66) { out.appendChar('\u{c}'); return; }
-        if (b == 0x6E) { out.appendChar('\n'); return; }
-        if (b == 0x72) { out.appendChar('\r'); return; }
-        if (b == 0x74) { out.appendChar('\t'); return; }
+        if (b == 0x22) {
+            out.appendChar('"');
+            return;
+        }
+        if (b == 0x5C) {
+            out.appendChar('\\');
+            return;
+        }
+        if (b == 0x62) {
+            out.appendChar('\u{8}');
+            return;
+        }
+        if (b == 0x66) {
+            out.appendChar('\u{c}');
+            return;
+        }
+        if (b == 0x6E) {
+            out.appendChar('\n');
+            return;
+        }
+        if (b == 0x72) {
+            out.appendChar('\r');
+            return;
+        }
+        if (b == 0x74) {
+            out.appendChar('\t');
+            return;
+        }
         if (b == 0x75 || b == 0x55) {
             let code = try this.hex(if (b == 0x75) 4 else 8);
             if ((code >= 0xD800 && code <= 0xDFFF) || code > 0x10FFFF) {
@@ -1256,9 +1520,15 @@ class Parser {
         while (i < n) {
             let b = this.peekAt(i);
             var digit = -1;
-            if (b >= 0x30 && b <= 0x39) { digit = b - 0x30; }
-            if (b >= 0x41 && b <= 0x46) { digit = b - 0x41 + 10; }
-            if (b >= 0x61 && b <= 0x66) { digit = b - 0x61 + 10; }
+            if (b >= 0x30 && b <= 0x39) {
+                digit = b - 0x30;
+            }
+            if (b >= 0x41 && b <= 0x46) {
+                digit = b - 0x41 + 10;
+            }
+            if (b >= 0x61 && b <= 0x66) {
+                digit = b - 0x61 + 10;
+            }
             if (digit < 0) {
                 throw this.fail(f"{n} hex digits were expected");
             }
@@ -1330,7 +1600,11 @@ class Parser {
     mut fn numberOrDatetime(): TomlValue throws TomlError {
         let start = this.at;
         // a date: four digits and '-'; a local time: two digits and ':'
-        if (isDigit(this.peek()) && isDigit(this.peekAt(1)) && isDigit(this.peekAt(2)) && isDigit(this.peekAt(3)) && this.peekAt(4) == 0x2D) {
+        if (isDigit(this.peek())
+            && isDigit(this.peekAt(1))
+            && isDigit(this.peekAt(2))
+            && isDigit(this.peekAt(3))
+            && this.peekAt(4) == 0x2D) {
             return try this.datetime();
         }
         if (isDigit(this.peek()) && isDigit(this.peekAt(1)) && this.peekAt(2) == 0x3A) {
@@ -1349,7 +1623,8 @@ class Parser {
             this.at = this.at + 3;
             return TomlValue.Float(0.0 / 0.0);
         }
-        if (this.peek() == 0x30 && (this.peekAt(1) == 0x78 || this.peekAt(1) == 0x6F || this.peekAt(1) == 0x62)) {
+        if (this.peek() == 0x30
+            && (this.peekAt(1) == 0x78 || this.peekAt(1) == 0x6F || this.peekAt(1) == 0x62)) {
             if (this.bytes[start] != 0x30u8) {
                 throw this.fail("a prefixed integer takes no sign");
             }
@@ -1441,10 +1716,14 @@ class Parser {
 
     mut fn date(): Date throws TomlError {
         let y = try this.digitsExactly(4);
-        if (this.peek() != 0x2D) { throw this.fail("'-' was expected in the date"); }
+        if (this.peek() != 0x2D) {
+            throw this.fail("'-' was expected in the date");
+        }
         this.at = this.at + 1;
         let m = try this.digitsExactly(2);
-        if (this.peek() != 0x2D) { throw this.fail("'-' was expected in the date"); }
+        if (this.peek() != 0x2D) {
+            throw this.fail("'-' was expected in the date");
+        }
         this.at = this.at + 1;
         let d = try this.digitsExactly(2);
         try {
@@ -1456,10 +1735,14 @@ class Parser {
 
     mut fn time(): Time throws TomlError {
         let h = try this.digitsExactly(2);
-        if (this.peek() != 0x3A) { throw this.fail("':' was expected in the time"); }
+        if (this.peek() != 0x3A) {
+            throw this.fail("':' was expected in the time");
+        }
         this.at = this.at + 1;
         let mi = try this.digitsExactly(2);
-        if (this.peek() != 0x3A) { throw this.fail("':' was expected in the time"); }
+        if (this.peek() != 0x3A) {
+            throw this.fail("':' was expected in the time");
+        }
         this.at = this.at + 1;
         let s = try this.digitsExactly(2);
         var nano = 0;
@@ -1489,7 +1772,10 @@ class Parser {
     mut fn datetime(): TomlValue throws TomlError {
         let d = try this.date();
         let sep = this.peek();
-        if (!((sep == 0x54 || sep == 0x74 || sep == 0x20) && isDigit(this.peekAt(1)) && isDigit(this.peekAt(2)) && this.peekAt(3) == 0x3A)) {
+        if (!((sep == 0x54 || sep == 0x74 || sep == 0x20)
+            && isDigit(this.peekAt(1))
+            && isDigit(this.peekAt(2))
+            && this.peekAt(3) == 0x3A)) {
             return TomlValue.Datetime(TomlDatetime.LocalDate(d));
         }
         this.at = this.at + 1;
@@ -1502,7 +1788,9 @@ class Parser {
         if (z == 0x2B || z == 0x2D) {
             this.at = this.at + 1;
             let oh = try this.digitsExactly(2);
-            if (this.peek() != 0x3A) { throw this.fail("':' was expected in the offset"); }
+            if (this.peek() != 0x3A) {
+                throw this.fail("':' was expected in the offset");
+            }
             this.at = this.at + 1;
             let om = try this.digitsExactly(2);
             let seconds = (oh * 60 + om) * 60 * (if (z == 0x2D) -1 else 1);
@@ -1525,14 +1813,24 @@ fn isDigit(b: int): bool {
 }
 
 fn isDigitIn(b: int, radix: int): bool {
-    if (radix == 2) { return b == 0x30 || b == 0x31; }
-    if (radix == 8) { return b >= 0x30 && b <= 0x37; }
-    if (radix == 16) { return isDigit(b) || (b >= 0x41 && b <= 0x46) || (b >= 0x61 && b <= 0x66); }
+    if (radix == 2) {
+        return b == 0x30 || b == 0x31;
+    }
+    if (radix == 8) {
+        return b >= 0x30 && b <= 0x37;
+    }
+    if (radix == 16) {
+        return isDigit(b) || (b >= 0x41 && b <= 0x46) || (b >= 0x61 && b <= 0x66);
+    }
     return isDigit(b);
 }
 
 fn isBareByte(b: int): bool {
-    return isDigit(b) || (b >= 0x41 && b <= 0x5A) || (b >= 0x61 && b <= 0x7A) || b == 0x5F || b == 0x2D;
+    return isDigit(b)
+        || (b >= 0x41 && b <= 0x5A)
+        || (b >= 0x61 && b <= 0x7A)
+        || b == 0x5F
+        || b == 0x2D;
 }
 
 fn joined(path: string[]): string {
@@ -1571,7 +1869,11 @@ pub class TomlReader :: [Decoder] {
     mut fn peek(): TomlValue throws DecodeError {
         if (this.stack.isEmpty()) {
             if (this.taken) {
-                throw DecodeError { kind = .Missing, path = this.path(), detail = "the value was read already" };
+                throw DecodeError {
+                    kind = .Missing,
+                    path = this.path(),
+                    detail = "the value was read already",
+                };
             }
             return this.root;
         }
@@ -1579,29 +1881,45 @@ pub class TomlReader :: [Decoder] {
         match (this.stack[top]) {
             .Array(items, at, _) => {
                 if (at >= items.length()) {
-                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the array has no more elements" };
+                    throw DecodeError {
+                        kind = .Missing,
+                        path = this.path(),
+                        detail = "the array has no more elements",
+                    };
                 }
                 this.stack[top] = Reading.Array(items, at, at);
                 return items[at];
-            },
+            }
             .Map(entries, at, keyRead) => {
                 if (at >= entries.length()) {
-                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the table has no more keys" };
+                    throw DecodeError {
+                        kind = .Missing,
+                        path = this.path(),
+                        detail = "the table has no more keys",
+                    };
                 }
                 return if (keyRead) entries[at].1 else TomlValue.String(entries[at].0);
-            },
+            }
             .Struct(t, _, current, _) => {
                 if (current == null) {
-                    throw DecodeError { kind = .Missing, path = this.path(), detail = "a key's value without its key" };
+                    throw DecodeError {
+                        kind = .Missing,
+                        path = this.path(),
+                        detail = "a key's value without its key",
+                    };
                 }
                 return t.get(current)!;
-            },
+            }
             .Variant(_, payload, _) => {
                 if (payload == null) {
-                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the variant has no payload" };
+                    throw DecodeError {
+                        kind = .Missing,
+                        path = this.path(),
+                        detail = "the variant has no payload",
+                    };
                 }
                 return payload;
-            },
+            }
         }
     }
 
@@ -1613,7 +1931,8 @@ pub class TomlReader :: [Decoder] {
         let top = this.stack.length() - 1;
         let next: Reading = match (this.stack[top]) {
             .Array(items, at, current) => Reading.Array(items, at + 1, current),
-            .Map(entries, at, keyRead) => if (keyRead) Reading.Map(entries, at + 1, false) else Reading.Map(entries, at, true),
+            .Map(entries, at, keyRead) => if (keyRead) Reading.Map(entries, at + 1, false)
+                else Reading.Map(entries, at, true),
             .Struct(t, name, current, seen) => Reading.Struct(t, name, current, seen),
             .Variant(name, payload, _) => Reading.Variant(name, payload, true),
         };
@@ -1621,7 +1940,11 @@ pub class TomlReader :: [Decoder] {
     }
 
     fn mismatch(expected: string, got: TomlValue): DecodeError {
-        return DecodeError { kind = .TypeMismatch, path = this.path(), detail = f"expected {expected}, got {formOf(got)}" };
+        return DecodeError {
+            kind = .TypeMismatch,
+            path = this.path(),
+            detail = f"expected {expected}, got {formOf(got)}",
+        };
     }
 
     fn inKey(): bool {
@@ -1629,8 +1952,12 @@ pub class TomlReader :: [Decoder] {
             return false;
         }
         match (this.stack[this.stack.length() - 1]) {
-            .Map(_, _, keyRead) => { return !keyRead; },
-            _ => { return false; },
+            .Map(_, _, keyRead) => {
+                return !keyRead;
+            }
+            _ => {
+                return false;
+            }
         }
     }
 
@@ -1646,16 +1973,30 @@ pub class TomlReader :: [Decoder] {
     pub mut fn decodeBool(): bool throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Bool(b) => { this.advance(); return b; },
-            _ => { throw this.mismatch("a bool", v); },
+            .Bool(b) => {
+                this.advance();
+                return b;
+            }
+            _ => {
+                throw this.mismatch("a bool", v);
+            }
         }
     }
 
     pub mut fn decodeInt(): int throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Int(i) => { this.advance(); return i; },
-            .Float(f) => { throw DecodeError { kind = .Invalid, path = this.path(), detail = f"{f} is no integer" }; },
+            .Int(i) => {
+                this.advance();
+                return i;
+            }
+            .Float(f) => {
+                throw DecodeError {
+                    kind = .Invalid,
+                    path = this.path(),
+                    detail = f"{f} is no integer",
+                };
+            }
             .String(s) => {
                 if (this.inKey()) {
                     try {
@@ -1663,12 +2004,18 @@ pub class TomlReader :: [Decoder] {
                         this.advance();
                         return i;
                     } catch (_: ParseError) {
-                        throw DecodeError { kind = .Invalid, path = this.path(), detail = f"the key '{s}' is no integer" };
+                        throw DecodeError {
+                            kind = .Invalid,
+                            path = this.path(),
+                            detail = f"the key '{s}' is no integer",
+                        };
                     }
                 }
                 throw this.mismatch("an integer", v);
-            },
-            _ => { throw this.mismatch("an integer", v); },
+            }
+            _ => {
+                throw this.mismatch("an integer", v);
+            }
         }
     }
 
@@ -1683,9 +2030,17 @@ pub class TomlReader :: [Decoder] {
     pub mut fn decodeFloat(): float throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Float(f) => { this.advance(); return f; },
-            .Int(i) => { this.advance(); return i as float; },
-            _ => { throw this.mismatch("a number", v); },
+            .Float(f) => {
+                this.advance();
+                return f;
+            }
+            .Int(i) => {
+                this.advance();
+                return i as float;
+            }
+            _ => {
+                throw this.mismatch("a number", v);
+            }
         }
     }
 
@@ -1697,9 +2052,17 @@ pub class TomlReader :: [Decoder] {
     pub mut fn decodeString(): string throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .String(s) => { this.advance(); return s; },
-            .Datetime(d) => { this.advance(); return d.show(); },
-            _ => { throw this.mismatch("a string", v); },
+            .String(s) => {
+                this.advance();
+                return s;
+            }
+            .Datetime(d) => {
+                this.advance();
+                return d.show();
+            }
+            _ => {
+                throw this.mismatch("a string", v);
+            }
         }
     }
 
@@ -1713,18 +2076,26 @@ pub class TomlReader :: [Decoder] {
                     match (items[i]) {
                         .Int(b) => {
                             if (b < 0 || b > 255) {
-                                throw DecodeError { kind = .Invalid, path = this.path(), detail = f"{b} is no byte" };
+                                throw DecodeError {
+                                    kind = .Invalid,
+                                    path = this.path(),
+                                    detail = f"{b} is no byte",
+                                };
                             }
                             out[i] = b as uint8;
-                        },
-                        _ => { throw this.mismatch("an array of integers", v); },
+                        }
+                        _ => {
+                            throw this.mismatch("an array of integers", v);
+                        }
                     }
                     i = i + 1;
                 }
                 this.advance();
                 return out;
-            },
-            _ => { throw this.mismatch("an array of integers", v); },
+            }
+            _ => {
+                throw this.mismatch("an array of integers", v);
+            }
         }
     }
 
@@ -1735,15 +2106,25 @@ pub class TomlReader :: [Decoder] {
                 this.advance();
                 this.stack.push(Reading.Array(items, 0, 0));
                 return items.length();
-            },
-            _ => { throw this.mismatch("an array", v); },
+            }
+            _ => {
+                throw this.mismatch("an array", v);
+            }
         }
     }
 
     pub fn seqHasNext(): bool throws DecodeError {
         match (this.stack[this.stack.length() - 1]) {
-            .Array(items, at, _) => { return at < items.length(); },
-            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in an array" }; },
+            .Array(items, at, _) => {
+                return at < items.length();
+            }
+            _ => {
+                throw DecodeError {
+                    kind = .TypeMismatch,
+                    path = this.path(),
+                    detail = "not in an array",
+                };
+            }
         }
     }
 
@@ -1758,15 +2139,25 @@ pub class TomlReader :: [Decoder] {
                 this.advance();
                 this.stack.push(Reading.Map(List.of(t.pairs()), 0, false));
                 return t.length();
-            },
-            _ => { throw this.mismatch("a table", v); },
+            }
+            _ => {
+                throw this.mismatch("a table", v);
+            }
         }
     }
 
     pub fn mapHasNext(): bool throws DecodeError {
         match (this.stack[this.stack.length() - 1]) {
-            .Map(entries, at, _) => { return at < entries.length(); },
-            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in a table" }; },
+            .Map(entries, at, _) => {
+                return at < entries.length();
+            }
+            _ => {
+                throw DecodeError {
+                    kind = .TypeMismatch,
+                    path = this.path(),
+                    detail = "not in a table",
+                };
+            }
         }
     }
 
@@ -1780,8 +2171,10 @@ pub class TomlReader :: [Decoder] {
             .Table(t) => {
                 this.advance();
                 this.stack.push(Reading.Struct(t, name, null, Set<string>.new()));
-            },
-            _ => { throw this.mismatch("a table", v); },
+            }
+            _ => {
+                throw this.mismatch("a table", v);
+            }
         }
     }
 
@@ -1797,8 +2190,14 @@ pub class TomlReader :: [Decoder] {
                 seen.insert(name);
                 this.stack[top] = Reading.Struct(t, structName, name, seen);
                 return true;
-            },
-            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in a table" }; },
+            }
+            _ => {
+                throw DecodeError {
+                    kind = .TypeMismatch,
+                    path = this.path(),
+                    detail = "not in a table",
+                };
+            }
         }
     }
 
@@ -1810,12 +2209,16 @@ pub class TomlReader :: [Decoder] {
                     this.stack[top] = Reading.Struct(t, name, null, seen);
                     for (k in t.keys()) {
                         if (!seen.contains(k)) {
-                            throw DecodeError { kind = .UnknownField, path = this.path(), detail = f"key '{k}'" };
+                            throw DecodeError {
+                                kind = .UnknownField,
+                                path = this.path(),
+                                detail = f"key '{k}'",
+                            };
                         }
                     }
                 }
-            },
-            _ => { },
+            }
+            _ => { }
         }
         this.stack.pop();
     }
@@ -1825,17 +2228,24 @@ pub class TomlReader :: [Decoder] {
         var name = "";
         var payload: ?TomlValue = null;
         match (v) {
-            .String(s) => { name = s; },
+            .String(s) => {
+                name = s;
+            }
             .Table(t) => {
                 if (t.length() != 1) {
-                    throw this.mismatch(f"a variant of {enumName}: a string, or a table of one key", v);
+                    throw this.mismatch(
+                        f"a variant of {enumName}: a string, or a table of one key",
+                        v
+                    );
                 }
                 for ((k, m) in t.pairs()) {
                     name = k;
                     payload = m;
                 }
-            },
-            _ => { throw this.mismatch(f"a variant of {enumName}", v); },
+            }
+            _ => {
+                throw this.mismatch(f"a variant of {enumName}", v);
+            }
         }
         var i = 0;
         while (i < variants.length()) {
@@ -1846,13 +2256,25 @@ pub class TomlReader :: [Decoder] {
             }
             i = i + 1;
         }
-        throw DecodeError { kind = .UnknownVariant, path = this.path(), detail = f"'{name}' of {enumName}" };
+        throw DecodeError {
+            kind = .UnknownVariant,
+            path = this.path(),
+            detail = f"'{name}' of {enumName}",
+        };
     }
 
     pub fn variantHasPayload(): bool throws DecodeError {
         match (this.stack[this.stack.length() - 1]) {
-            .Variant(_, payload, _) => { return payload != null; },
-            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in a variant" }; },
+            .Variant(_, payload, _) => {
+                return payload != null;
+            }
+            _ => {
+                throw DecodeError {
+                    kind = .TypeMismatch,
+                    path = this.path(),
+                    detail = "not in a variant",
+                };
+            }
         }
     }
 
@@ -1867,15 +2289,21 @@ pub class TomlReader :: [Decoder] {
         let out = StringBuilder.new();
         for (frame in this.stack) {
             match (frame) {
-                .Array(_, _, current) => { out.append(f"[{current}]"); },
-                .Map(_, _, _) => { out.append(if (out.length() == 0) "{}" else ".{}"); },
+                .Array(_, _, current) => {
+                    out.append(f"[{current}]");
+                }
+                .Map(_, _, _) => {
+                    out.append(if (out.length() == 0) "{}" else ".{}");
+                }
                 .Struct(_, name, current, _) => {
                     out.append(if (out.length() == 0) name else f".{name}");
                     if (let key = current) {
                         out.append(f".{key}");
                     }
-                },
-                .Variant(name, _, _) => { out.append(if (out.length() == 0) name else f".{name}"); },
+                }
+                .Variant(name, _, _) => {
+                    out.append(if (out.length() == 0) name else f".{name}");
+                }
             }
         }
         return out.toString();
@@ -1884,13 +2312,27 @@ pub class TomlReader :: [Decoder] {
 
 fn formOf(v: TomlValue): string {
     match (v) {
-        .String(_) => { return "a string"; },
-        .Int(_) => { return "an integer"; },
-        .Float(_) => { return "a float"; },
-        .Bool(_) => { return "a bool"; },
-        .Datetime(_) => { return "a date-time"; },
-        .Array(_) => { return "an array"; },
-        .Table(_) => { return "a table"; },
+        .String(_) => {
+            return "a string";
+        }
+        .Int(_) => {
+            return "an integer";
+        }
+        .Float(_) => {
+            return "a float";
+        }
+        .Bool(_) => {
+            return "a bool";
+        }
+        .Datetime(_) => {
+            return "a date-time";
+        }
+        .Array(_) => {
+            return "an array";
+        }
+        .Table(_) => {
+            return "a table";
+        }
     }
 }
 
@@ -1912,7 +2354,9 @@ pub fn decode<T :: [Decode]>(text: StringView): T throws [TomlError, DecodeError
 ///
 /// Throws `TomlError` and `DecodeError` as `decode` does, `IoError` where reading fails and
 /// `Cancelled` where the task is cancelled during the read.
-pub fn decodeFrom<T :: [Decode], R :: [Reader]>(&r: R): T throws [TomlError, DecodeError, IoError, Cancelled] {
+pub fn decodeFrom<T :: [Decode], R :: [Reader]>(
+    &r: R
+): T throws [TomlError, DecodeError, IoError, Cancelled] {
     let text = try r.readToString();
     return try decode<T>(text);
 }

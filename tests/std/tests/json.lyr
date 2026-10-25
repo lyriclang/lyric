@@ -59,10 +59,19 @@ fn refused(text: string): string {
 fn aValueWritesAsTextAndReadsBack(): void throws Error {
     let u = User { userId = 7, name = "ada \"q\"", mail = null, tags = ["x", "y"] };
     let text = try json.encode(u);
-    assertEq(text, "{\"user_id\":7,\"name\":\"ada \\\"q\\\"\",\"mail\":null,\"tags\":[\"x\",\"y\"]}");
+    assertEq(
+        text,
+        "{\"user_id\":7,\"name\":\"ada \\\"q\\\"\",\"mail\":null,\"tags\":[\"x\",\"y\"]}"
+    );
     assertEq(try json.decode<User>(text), u);
-    assertEq(try json.encode(u, JsonOptions { pretty = true }), "{\n  \"user_id\": 7,\n  \"name\": \"ada \\\"q\\\"\",\n  \"mail\": null,\n  \"tags\": [\n    \"x\",\n    \"y\"\n  ]\n}");
-    assertEq(try json.encode(u, JsonOptions { sortKeys = true }), "{\"mail\":null,\"name\":\"ada \\\"q\\\"\",\"tags\":[\"x\",\"y\"],\"user_id\":7}");
+    assertEq(
+        try json.encode(u, JsonOptions { pretty = true }),
+        "{\n  \"user_id\": 7,\n  \"name\": \"ada \\\"q\\\"\",\n  \"mail\": null,\n  \"tags\": [\n    \"x\",\n    \"y\"\n  ]\n}"
+    );
+    assertEq(
+        try json.encode(u, JsonOptions { sortKeys = true }),
+        "{\"mail\":null,\"name\":\"ada \\\"q\\\"\",\"tags\":[\"x\",\"y\"],\"user_id\":7}"
+    );
     // the scalars
     assertEq(try json.encode(true), "true");
     assertEq(try json.encode(-3), "-3");
@@ -86,7 +95,7 @@ fn aMapIsAnObjectWithStringKeysAndBytesAreBase64(): void throws Error {
     let m = Map<int, string>.new();
     m[3] = "three";
     assertEq(try json.encode(m), "{\"3\":\"three\"}");
-    let back = try json.decode<Map<int, string> >("{\"3\": \"three\"}");
+    let back = try json.decode<Map<int, string>>("{\"3\": \"three\"}");
     assertEq(back[3], "three");
     let bad = Map<bool, int>.new();
     bad[true] = 1;
@@ -98,10 +107,21 @@ fn aMapIsAnObjectWithStringKeysAndBytesAreBase64(): void throws Error {
     }
     assertEq(try json.encode(Bytes { value = [104u8, 105u8] }), "\"aGk=\"");
     assertEq((try json.decode<Bytes>("\"aGk=\"")).value, [104u8, 105u8]);
-    assertTrue(kindOf(() => { let _ = try json.decode<Bytes>("\"!!\""); }) == DecodeErrorKind.Invalid);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try json.decode<Bytes>("\"!!\"");
+            }
+        ) == DecodeErrorKind.Invalid
+    );
     let scores = Map<string, int>.new();
     scores["a"] = 1;
-    let t = Team { lead = User { userId = 1, name = "l", mail = "l@x", tags = [] }, members = [User { userId = 2, name = "m", mail = null, tags = ["t"] }], scores = scores, raw = Bytes { value = [1u8] } };
+    let t = Team {
+        lead = User { userId = 1, name = "l", mail = "l@x", tags = [] },
+        members = [User { userId = 2, name = "m", mail = null, tags = ["t"] }],
+        scores = scores,
+        raw = Bytes { value = [1u8] },
+    };
     assertEq(try json.decode<Team>(json.encode(t)), t);
 }
 
@@ -113,16 +133,33 @@ fn anEnumIsItsNameOrAnObjectOfOneMember(): void throws Error {
     for (s in [Shape.Dot, Shape.Circle(3), Shape.Rect(2, 5)]) {
         assertEq(try json.decode<Shape>(json.encode(s)), s);
     }
-    assertTrue(kindOf(() => { let _ = try json.decode<Shape>("\"Blob\""); }) == DecodeErrorKind.UnknownVariant);
-    assertTrue(kindOf(() => { let _ = try json.decode<Shape>("{\"Circle\": 1, \"Dot\": 2}"); }) == DecodeErrorKind.TypeMismatch);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try json.decode<Shape>("\"Blob\"");
+            }
+        ) == DecodeErrorKind.UnknownVariant
+    );
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try json.decode<Shape>("{\"Circle\": 1, \"Dot\": 2}");
+            }
+        ) == DecodeErrorKind.TypeMismatch
+    );
     assertEq(try json.encode(Event.Moved(1, 2)), "{\"kind\":\"Moved\",\"0\":1,\"1\":2}");
-    assertEq(try json.decode<Event>("{\"kind\": \"Moved\", \"0\": 1, \"1\": 2}"), Event.Moved(1, 2));
+    assertEq(
+        try json.decode<Event>("{\"kind\": \"Moved\", \"0\": 1, \"1\": 2}"),
+        Event.Moved(1, 2)
+    );
     assertEq(try json.decode<Event>("{\"kind\": \"Started\"}"), Event.Started);
 }
 
 @Test
 fn theTreeHoldsADocument(): void throws Error {
-    let v = try json.parse(" {\"a\": [1, 2.5, true, null, \"s\\u00e9\\n\"], \"b\": {\"c\": -0.5e2}} ");
+    let v = try json.parse(
+        " {\"a\": [1, 2.5, true, null, \"s\\u00e9\\n\"], \"b\": {\"c\": -0.5e2}} "
+    );
     assertEq(v.show(), "{\"a\":[1,2.5,true,null,\"sé\\n\"],\"b\":{\"c\":-50.0}}");
     assertEq(v.path("a[1]")?.asFloat(), 2.5);
     assertEq(v.path("a[0]")?.asInt(), 1);
@@ -139,11 +176,25 @@ fn theTreeHoldsADocument(): void throws Error {
     assertEq(try json.parse("{\"x\": 1, \"y\": 2}"), try json.parse("{\"y\": 2, \"x\": 1}"));
     // a number beyond int is a float
     match (try json.parse("12345678901234567890")) {
-        .Float(_) => { },
-        _ => { fail("a big number is a float"); },
+        .Float(_) => { }
+        _ => {
+            fail("a big number is a float");
+        }
     }
-    assertTrue(kindOf(() => { let _ = try json.decode<int>("12345678901234567890"); }) == DecodeErrorKind.Invalid);
-    assertTrue(kindOf(() => { let _ = try json.decode<int>("1.5"); }) == DecodeErrorKind.Invalid);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try json.decode<int>("12345678901234567890");
+            }
+        ) == DecodeErrorKind.Invalid
+    );
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try json.decode<int>("1.5");
+            }
+        ) == DecodeErrorKind.Invalid
+    );
 }
 
 @Test
@@ -174,13 +225,20 @@ fn theTextIsReadStrictly(): void throws Error {
 @Test
 fn anErrorNamesItsPathAndAWriterTakesTheText(): void throws Error {
     try {
-        let _ = json.decode<Team>("{\"lead\": {\"user_id\": 1, \"name\": \"l\", \"tags\": []}, \"members\": [{\"user_id\": \"x\"}], \"scores\": {}, \"raw\": \"\"}");
+        let _ = json.decode<Team>(
+            "{\"lead\": {\"user_id\": 1, \"name\": \"l\", \"tags\": []}, \"members\": [{\"user_id\": \"x\"}], \"scores\": {}, \"raw\": \"\"}"
+        );
         fail("a string read as an int");
     } catch (e: DecodeError) {
-        assertEq(e.message(), "type mismatch: expected an int, got a string (at Team.members[0].User.user_id)");
+        assertEq(
+            e.message(),
+            "type mismatch: expected an int, got a string (at Team.members[0].User.user_id)"
+        );
     }
     try {
-        let _ = json.decode<Team>("{\"lead\": {\"user_id\": 1, \"name\": \"l\"}, \"members\": [], \"scores\": {}, \"raw\": \"\"}");
+        let _ = json.decode<Team>(
+            "{\"lead\": {\"user_id\": 1, \"name\": \"l\"}, \"members\": [], \"scores\": {}, \"raw\": \"\"}"
+        );
         fail("a missing member read");
     } catch (e: DecodeError) {
         // at the struct, not at the member read before
@@ -202,8 +260,12 @@ fn anErrorNamesItsPathAndAWriterTakesTheText(): void throws Error {
 /// `[[…]]` of `n` levels.
 fn nestedArrays(n: int): string {
     let b = StringBuilder.new();
-    for (_ in 0..n) { b.append("["); }
-    for (_ in 0..n) { b.append("]"); }
+    for (_ in 0..n) {
+        b.append("[");
+    }
+    for (_ in 0..n) {
+        b.append("]");
+    }
     return b.toString();
 }
 

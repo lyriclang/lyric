@@ -77,6 +77,17 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
+      # The repository's Lyric code is in the one form: std, its tests and the Lyric 5 examples
+      # (the 4.x examples stay as they were written, the input of the migration).
+      - name: The Lyric code is in the form
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          src/Lyric5/bin/Release/net10.0/lyric5 fmt --check \
+            $(find stdlib5 tests/std -name '*.lyr' | sort) \
+            examples/inventory.lyr examples/stats.lyr examples/stack.lyr \
+            examples/jsonserver/src/*.lyr examples/logfilter/src/*.lyr examples/macros/src/*.lyr
+
       # WHICH TESTS (tooling/affected.toml; the maintainer's decision of 2026-10-11): a pull
       # request runs the tests its diff reaches and a fixed regression group — the goldens, the
       # native runs, the examples —; main after a merge, and a dispatched run, run everything.

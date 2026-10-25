@@ -4,12 +4,14 @@ import std.collections { Map };
 import std.hash { FixedHasher, Hasher };
 import std.test { assertEq, assertFalse, assertNull, assertTrue };
 
-struct Point :: [Hashable] { x: int, y: int }
+struct Point :: [Hashable] {
+    x: int,
+    y: int,
+}
 
 /// Every key hashes alike: the probe runs through full groups.
 struct Same :: [Hasher] {
-    mut fn writeByte(b: uint8): void {
-    }
+    mut fn writeByte(b: uint8): void { }
 
     fn finish(): uint64 {
         return 7;

@@ -29,9 +29,11 @@ fn anIndexPastTheLengthPanics(): void {
     let xs = List<int>.new();
     xs.push(1);
     xs.push(2);
-    let info = assertPanics(() => {
-        assertEq(xs[2], 0);
-    });
+    let info = assertPanics(
+        () => {
+            assertEq(xs[2], 0);
+        }
+    );
     assertTrue(info.code == "LYR-RT0003");
 }
 
@@ -96,13 +98,15 @@ fn forWalksItAndAChangePanics(): void {
         sum = sum + x;
     }
     assertEq(sum, 6);
-    let info = assertPanics(() => {
-        for (x in xs) {
-            if (x == 1) {
-                xs.push(4);
+    let info = assertPanics(
+        () => {
+            for (x in xs) {
+                if (x == 1) {
+                    xs.push(4);
+                }
             }
         }
-    });
+    );
     assertEq(info.message, "List: changed while it was walked");
     assertEq(info.code, "LYR-RT0016");
 }

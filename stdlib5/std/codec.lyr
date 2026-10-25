@@ -17,14 +17,31 @@
 /// decoder is passed by reference, `&e`, as a hasher is: a conformance is generic over the
 /// format's type, and the format keeps its state.
 import std.collections { List, Map, Set, Deque };
-import std.core { Hasher, ParseError, StringBuilder, OnField, OnType, fields, variants, attribute, typeAttribute, typeName, isEnum, FieldInfo };
+import std.core {
+    Hasher,
+    ParseError,
+    StringBuilder,
+    OnField,
+    OnType,
+    fields,
+    variants,
+    attribute,
+    typeAttribute,
+    typeName,
+    isEnum,
+    FieldInfo,
+};
 import std.hash { DefaultHasher };
 import std.time { Instant, Duration, Date, Time, DateTime };
 
 // ------------------------------------------------------------------ the attribute
 
 /// Selects how a field name is rewritten on the wire: as written, `camelCase`, or `snake_case`.
-pub enum Case :: [Equatable, Debug] { Same, CamelCase, SnakeCase }
+pub enum Case :: [Equatable, Debug] {
+    Same,
+    CamelCase,
+    SnakeCase,
+}
 
 /// Steers the synthesized `encode` and `decode`. On a field, `@Codec { name = "user_id" }` writes
 /// the field under that name, `@Codec { skip = true }` leaves it out (it reads as `null`, so it
@@ -158,7 +175,10 @@ pub interface Encode {
             try e.beginStruct(typeName<Self>(), count);
             comptime for (f in fields<Self>()) {
                 if (!(attribute<Codec>(f)?.skip ?? false)) {
-                    try e.field(wireName(f, attribute<Codec>(f), typeAttribute<Self, Codec>()), this.[f]);
+                    try e.field(
+                        wireName(f, attribute<Codec>(f), typeAttribute<Self, Codec>()),
+                        this.[f]
+                    );
                 }
             }
             try e.endStruct();
@@ -187,12 +207,18 @@ pub interface Decode {
                 let which = try d.field<string>(tag);
                 comptime for (v in variants<Self>()) {
                     if (which == v.name) {
-                        let r = Self.[v] { comptime for (p in v.payload) [p] = try d.field(p.name) };
+                        let r = Self.[v] {
+                            comptime for (p in v.payload) [p] = try d.field(p.name),
+                        };
                         try d.endStruct(typeAttribute<Self, Codec>()?.denyUnknown ?? false);
                         return r;
                     }
                 }
-                throw DecodeError { kind = .UnknownVariant, path = d.path(), detail = f"'{which}' of {typeName<Self>()}" };
+                throw DecodeError {
+                    kind = .UnknownVariant,
+                    path = d.path(),
+                    detail = f"'{which}' of {typeName<Self>()}",
+                };
             }
             let i = try d.beginVariant(typeName<Self>(), variantNames<Self>());
             comptime for (v in variants<Self>()) {
@@ -202,12 +228,16 @@ pub interface Decode {
                         return Self.[v];
                     } else {
                         comptime if (v.payload.length() == 1) {
-                            let r = Self.[v] { comptime for (p in v.payload) [p] = try d.payload() };
+                            let r = Self.[v] {
+                                comptime for (p in v.payload) [p] = try d.payload(),
+                            };
                             try d.endVariant();
                             return r;
                         } else {
                             let _ = try d.beginSeq();
-                            let r = Self.[v] { comptime for (p in v.payload) [p] = try d.element() };
+                            let r = Self.[v] {
+                                comptime for (p in v.payload) [p] = try d.element(),
+                            };
                             try d.endSeq();
                             try d.endVariant();
                             return r;
@@ -215,7 +245,11 @@ pub interface Decode {
                     }
                 }
             }
-            throw DecodeError { kind = .UnknownVariant, path = d.path(), detail = f"variant {i} of {typeName<Self>()}" };
+            throw DecodeError {
+                kind = .UnknownVariant,
+                path = d.path(),
+                detail = f"variant {i} of {typeName<Self>()}",
+            };
         } else {
             let names = List<string>.new();
             comptime for (f in fields<Self>()) {
@@ -224,7 +258,12 @@ pub interface Decode {
                 }
             }
             try d.beginStruct(typeName<Self>(), names.toArray());
-            let r = Self { comptime for (f in fields<Self>()) [f] = try d.fieldOrAbsent(wireName(f, attribute<Codec>(f), typeAttribute<Self, Codec>()), attribute<Codec>(f)?.skip ?? false) };
+            let r = Self {
+                comptime for (f in fields<Self>()) [f] = try d.fieldOrAbsent(
+                    wireName(f, attribute<Codec>(f), typeAttribute<Self, Codec>()),
+                    attribute<Codec>(f)?.skip ?? false
+                ),
+            };
             try d.endStruct(typeAttribute<Self, Codec>()?.denyUnknown ?? false);
             return r;
         }
@@ -243,8 +282,7 @@ pub interface Decode {
 
 /// A value that is both `Encode` and `Decode`: what `std.json.encode` takes and
 /// `std.json.decode<T>` gives.
-pub interface Codable :: [Encode, Decode] {
-}
+pub interface Codable :: [Encode, Decode] { }
 
 // ------------------------------------------------------------------ the errors
 
@@ -336,7 +374,12 @@ pub interface Encoder {
     mut fn beginField(name: string): void throws EncodeError;
     mut fn endStruct(): void throws EncodeError;
 
-    mut fn beginVariant(enumName: string, variant: string, index: int, hasPayload: bool): void throws EncodeError;
+    mut fn beginVariant(
+        enumName: string,
+        variant: string,
+        index: int,
+        hasPayload: bool
+    ): void throws EncodeError;
     mut fn endVariant(): void throws EncodeError;
 
     /// Returns where the encoder stands, for an error: `""` at the root.
@@ -423,7 +466,11 @@ extend<E :: [Encoder]> E {
     /// # Errors
     ///
     /// Throws what the encoder throws.
-    pub mut fn encodeUnitVariant(enumName: string, variant: string, index: int): void throws EncodeError {
+    pub mut fn encodeUnitVariant(
+        enumName: string,
+        variant: string,
+        index: int
+    ): void throws EncodeError {
         try this.beginVariant(enumName, variant, index, false);
         try this.endVariant();
     }
@@ -433,7 +480,12 @@ extend<E :: [Encoder]> E {
     /// # Errors
     ///
     /// Throws what the encoder or encoding `payload` throws.
-    pub mut fn encodeVariant<T :: [Encode]>(enumName: string, variant: string, index: int, payload: T): void throws EncodeError {
+    pub mut fn encodeVariant<T :: [Encode]>(
+        enumName: string,
+        variant: string,
+        index: int,
+        payload: T
+    ): void throws EncodeError {
         try this.beginVariant(enumName, variant, index, true);
         try payload.encode(&this);
         try this.endVariant();
@@ -543,7 +595,10 @@ extend<D :: [Decoder]> D {
     ///
     /// Throws `DecodeError` of kind `Missing` for an absent non-optional field, or what decoding
     /// the value throws.
-    pub mut fn fieldOrAbsent<T :: [Decode]>(name: string, skipped: bool = false): T throws DecodeError {
+    pub mut fn fieldOrAbsent<T :: [Decode]>(
+        name: string,
+        skipped: bool = false
+    ): T throws DecodeError {
         if (skipped || !(try this.structField(name))) {
             return try T.decodeAbsent(&this, name);
         }
@@ -589,64 +644,120 @@ fn narrowed<D :: [Decoder]>(&d: D, low: int, high: int, name: string): int throw
 }
 
 extend int8 :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeInt(this as int); }
-    static fn decode<D :: [Decoder]>(&d: D): int8 throws DecodeError { return (try narrowed(&d, int8.min as int, int8.max as int, "int8")) as int8; }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeInt(this as int);
+    }
+
+    static fn decode<D :: [Decoder]>(&d: D): int8 throws DecodeError {
+        return (try narrowed(&d, int8.min as int, int8.max as int, "int8")) as int8;
+    }
 }
 
 extend int16 :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeInt(this as int); }
-    static fn decode<D :: [Decoder]>(&d: D): int16 throws DecodeError { return (try narrowed(&d, int16.min as int, int16.max as int, "int16")) as int16; }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeInt(this as int);
+    }
+
+    static fn decode<D :: [Decoder]>(&d: D): int16 throws DecodeError {
+        return (try narrowed(&d, int16.min as int, int16.max as int, "int16")) as int16;
+    }
 }
 
 extend int32 :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeInt(this as int); }
-    static fn decode<D :: [Decoder]>(&d: D): int32 throws DecodeError { return (try narrowed(&d, int32.min as int, int32.max as int, "int32")) as int32; }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeInt(this as int);
+    }
+
+    static fn decode<D :: [Decoder]>(&d: D): int32 throws DecodeError {
+        return (try narrowed(&d, int32.min as int, int32.max as int, "int32")) as int32;
+    }
 }
 
 extend uint8 :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeUint(this as uint); }
-    static fn decode<D :: [Decoder]>(&d: D): uint8 throws DecodeError { return (try narrowed(&d, 0, uint8.max as int, "uint8")) as uint8; }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeUint(this as uint);
+    }
+
+    static fn decode<D :: [Decoder]>(&d: D): uint8 throws DecodeError {
+        return (try narrowed(&d, 0, uint8.max as int, "uint8")) as uint8;
+    }
 }
 
 extend uint16 :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeUint(this as uint); }
-    static fn decode<D :: [Decoder]>(&d: D): uint16 throws DecodeError { return (try narrowed(&d, 0, uint16.max as int, "uint16")) as uint16; }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeUint(this as uint);
+    }
+
+    static fn decode<D :: [Decoder]>(&d: D): uint16 throws DecodeError {
+        return (try narrowed(&d, 0, uint16.max as int, "uint16")) as uint16;
+    }
 }
 
 extend uint32 :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeUint(this as uint); }
-    static fn decode<D :: [Decoder]>(&d: D): uint32 throws DecodeError { return (try narrowed(&d, 0, uint32.max as int, "uint32")) as uint32; }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeUint(this as uint);
+    }
+
+    static fn decode<D :: [Decoder]>(&d: D): uint32 throws DecodeError {
+        return (try narrowed(&d, 0, uint32.max as int, "uint32")) as uint32;
+    }
 }
 
 extend uint :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeUint(this); }
-    static fn decode<D :: [Decoder]>(&d: D): uint throws DecodeError { return try d.decodeUint(); }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeUint(this);
+    }
+
+    static fn decode<D :: [Decoder]>(&d: D): uint throws DecodeError {
+        return try d.decodeUint();
+    }
 }
 
 extend float :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeFloat(this); }
-    static fn decode<D :: [Decoder]>(&d: D): float throws DecodeError { return try d.decodeFloat(); }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeFloat(this);
+    }
+
+    static fn decode<D :: [Decoder]>(&d: D): float throws DecodeError {
+        return try d.decodeFloat();
+    }
 }
 
 extend float32 :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeFloat(this as float); }
-    static fn decode<D :: [Decoder]>(&d: D): float32 throws DecodeError { return (try d.decodeFloat()) as float32; }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeFloat(this as float);
+    }
+
+    static fn decode<D :: [Decoder]>(&d: D): float32 throws DecodeError {
+        return (try d.decodeFloat()) as float32;
+    }
 }
 
 extend string :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this); }
-    static fn decode<D :: [Decoder]>(&d: D): string throws DecodeError { return try d.decodeString(); }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeString(this);
+    }
+
+    static fn decode<D :: [Decoder]>(&d: D): string throws DecodeError {
+        return try d.decodeString();
+    }
 }
 
 /// Encodes a character as a string of one character; decoding refuses any other length as
 /// `Invalid`.
 extend char :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(f"{this}"); }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeString(f"{this}");
+    }
 
     static fn decode<D :: [Decoder]>(&d: D): char throws DecodeError {
         let s = try d.decodeString();
         if (s.charCount() != 1) {
-            throw DecodeError { kind = .Invalid, path = d.path(), detail = f"'{s}' is no single character" };
+            throw DecodeError {
+                kind = .Invalid,
+                path = d.path(),
+                detail = f"'{s}' is no single character",
+            };
         }
         var it = s.chars();
         return it.next()!;
@@ -656,14 +767,20 @@ extend char :: [Codable] {
 /// Encodes an `Instant` as its RFC 3339 text; decoding refuses text that does not parse as
 /// `Invalid`.
 extend Instant :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeString(this.show());
+    }
 
     static fn decode<D :: [Decoder]>(&d: D): Instant throws DecodeError {
         let s = try d.decodeString();
         try {
             return Instant.parse(s);
         } catch (p: ParseError) {
-            throw DecodeError { kind = .Invalid, path = d.path(), detail = f"'{s}' is no instant: {p.message()}" };
+            throw DecodeError {
+                kind = .Invalid,
+                path = d.path(),
+                detail = f"'{s}' is no instant: {p.message()}",
+            };
         }
     }
 }
@@ -672,53 +789,77 @@ extend Instant :: [Codable] {
 /// `DateTime` as RFC 3339's date-time with its offset. Decoding refuses text that does not parse
 /// as `Invalid`.
 extend Duration :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeString(this.show());
+    }
 
     static fn decode<D :: [Decoder]>(&d: D): Duration throws DecodeError {
         let s = try d.decodeString();
         try {
             return Duration.parse(s);
         } catch (p: ParseError) {
-            throw DecodeError { kind = .Invalid, path = d.path(), detail = f"'{s}' is no duration: {p.message()}" };
+            throw DecodeError {
+                kind = .Invalid,
+                path = d.path(),
+                detail = f"'{s}' is no duration: {p.message()}",
+            };
         }
     }
 }
 
 extend Date :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeString(this.show());
+    }
 
     static fn decode<D :: [Decoder]>(&d: D): Date throws DecodeError {
         let s = try d.decodeString();
         try {
             return Date.parse(s);
         } catch (p: ParseError) {
-            throw DecodeError { kind = .Invalid, path = d.path(), detail = f"'{s}' is no date: {p.message()}" };
+            throw DecodeError {
+                kind = .Invalid,
+                path = d.path(),
+                detail = f"'{s}' is no date: {p.message()}",
+            };
         }
     }
 }
 
 extend Time :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeString(this.show());
+    }
 
     static fn decode<D :: [Decoder]>(&d: D): Time throws DecodeError {
         let s = try d.decodeString();
         try {
             return Time.parse(s);
         } catch (p: ParseError) {
-            throw DecodeError { kind = .Invalid, path = d.path(), detail = f"'{s}' is no time of day: {p.message()}" };
+            throw DecodeError {
+                kind = .Invalid,
+                path = d.path(),
+                detail = f"'{s}' is no time of day: {p.message()}",
+            };
         }
     }
 }
 
 extend DateTime :: [Codable] {
-    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError { try e.encodeString(this.show()); }
+    fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
+        try e.encodeString(this.show());
+    }
 
     static fn decode<D :: [Decoder]>(&d: D): DateTime throws DecodeError {
         let s = try d.decodeString();
         try {
             return DateTime.parse(s);
         } catch (p: ParseError) {
-            throw DecodeError { kind = .Invalid, path = d.path(), detail = f"'{s}' is no date-time: {p.message()}" };
+            throw DecodeError {
+                kind = .Invalid,
+                path = d.path(),
+                detail = f"'{s}' is no date-time: {p.message()}",
+            };
         }
     }
 }
@@ -953,7 +1094,11 @@ fn tupleElement<T :: [Decode], D :: [Decoder]>(&d: D, index: int): T throws Deco
     if (let x = try d.next<T>()) {
         return x;
     }
-    throw DecodeError { kind = .Missing, path = d.path(), detail = f"element {index} of the tuple" };
+    throw DecodeError {
+        kind = .Missing,
+        path = d.path(),
+        detail = f"element {index} of the tuple",
+    };
 }
 
 // ------------------------------------------------------------------ Value, the format of no format
@@ -1008,7 +1153,7 @@ pub class ValueEncoder :: [Encoder] {
             .Seq(items) => {
                 items.push(v);
                 Building.Seq(items)
-            },
+            }
             .Map(entries, pendingKey) => {
                 var pending: ?Box<Value> = Box<Value> { value = v };
                 if (let k = pendingKey) {
@@ -1016,25 +1161,52 @@ pub class ValueEncoder :: [Encoder] {
                     pending = null;
                 }
                 Building.Map(entries, pending)
-            },
+            }
             .Struct(name, fieldList, pendingField) => {
                 if (pendingField == null) {
-                    throw EncodeError { path = this.path(), detail = "a struct's value without its field" };
+                    throw EncodeError {
+                        path = this.path(),
+                        detail = "a struct's value without its field",
+                    };
                 }
                 fieldList.push((pendingField, v));
                 Building.Struct(name, fieldList, null)
-            },
-            .Variant(enumName, variant, index, hasPayload, _) => Building.Variant(enumName, variant, index, hasPayload, Box<Value> { value = v }),
+            }
+            .Variant(enumName, variant, index, hasPayload, _) => Building.Variant(
+                enumName,
+                variant,
+                index,
+                hasPayload,
+                Box<Value> { value = v }
+            ),
         };
         this.stack[top] = next;
     }
 
-    pub mut fn encodeNull(): void throws EncodeError { try this.put(Value.Null); }
-    pub mut fn encodeBool(v: bool): void throws EncodeError { try this.put(Value.Bool(v)); }
-    pub mut fn encodeInt(v: int): void throws EncodeError { try this.put(Value.Int(v)); }
-    pub mut fn encodeUint(v: uint): void throws EncodeError { try this.put(Value.Uint(v)); }
-    pub mut fn encodeFloat(v: float): void throws EncodeError { try this.put(Value.Float(v)); }
-    pub mut fn encodeString(v: string): void throws EncodeError { try this.put(Value.String(v)); }
+    pub mut fn encodeNull(): void throws EncodeError {
+        try this.put(Value.Null);
+    }
+
+    pub mut fn encodeBool(v: bool): void throws EncodeError {
+        try this.put(Value.Bool(v));
+    }
+
+    pub mut fn encodeInt(v: int): void throws EncodeError {
+        try this.put(Value.Int(v));
+    }
+
+    pub mut fn encodeUint(v: uint): void throws EncodeError {
+        try this.put(Value.Uint(v));
+    }
+
+    pub mut fn encodeFloat(v: float): void throws EncodeError {
+        try this.put(Value.Float(v));
+    }
+
+    pub mut fn encodeString(v: string): void throws EncodeError {
+        try this.put(Value.String(v));
+    }
+
     pub mut fn encodeBytes(v: Slice<uint8>): void throws EncodeError {
         let copy: uint8[] = [0u8] * v.length();
         v.copyInto(copy[..]);
@@ -1051,8 +1223,10 @@ pub class ValueEncoder :: [Encoder] {
             .Seq(items) => {
                 this.segments.pop();
                 try this.put(Value.Seq(items));
-            },
-            _ => { throw EncodeError { path = this.path(), detail = "endSeq without beginSeq" }; },
+            }
+            _ => {
+                throw EncodeError { path = this.path(), detail = "endSeq without beginSeq" };
+            }
         }
     }
 
@@ -1061,16 +1235,17 @@ pub class ValueEncoder :: [Encoder] {
         this.segments.push("{}");
     }
 
-    pub mut fn beginKey(): void throws EncodeError {
-    }
+    pub mut fn beginKey(): void throws EncodeError { }
 
     pub mut fn endMap(): void throws EncodeError {
         match (this.stack.pop()) {
             .Map(entries, _) => {
                 this.segments.pop();
                 try this.put(Value.Map(entries));
-            },
-            _ => { throw EncodeError { path = this.path(), detail = "endMap without beginMap" }; },
+            }
+            _ => {
+                throw EncodeError { path = this.path(), detail = "endMap without beginMap" };
+            }
         }
     }
 
@@ -1082,8 +1257,12 @@ pub class ValueEncoder :: [Encoder] {
     pub mut fn beginField(name: string): void throws EncodeError {
         let top = this.stack.length() - 1;
         match (this.stack[top]) {
-            .Struct(structName, fieldList, _) => { this.stack[top] = Building.Struct(structName, fieldList, name); },
-            _ => { throw EncodeError { path = this.path(), detail = "beginField outside a struct" }; },
+            .Struct(structName, fieldList, _) => {
+                this.stack[top] = Building.Struct(structName, fieldList, name);
+            }
+            _ => {
+                throw EncodeError { path = this.path(), detail = "beginField outside a struct" };
+            }
         }
     }
 
@@ -1092,12 +1271,19 @@ pub class ValueEncoder :: [Encoder] {
             .Struct(name, fieldList, _) => {
                 this.segments.pop();
                 try this.put(Value.Struct(name, fieldList));
-            },
-            _ => { throw EncodeError { path = this.path(), detail = "endStruct without beginStruct" }; },
+            }
+            _ => {
+                throw EncodeError { path = this.path(), detail = "endStruct without beginStruct" };
+            }
         }
     }
 
-    pub mut fn beginVariant(enumName: string, variant: string, index: int, hasPayload: bool): void throws EncodeError {
+    pub mut fn beginVariant(
+        enumName: string,
+        variant: string,
+        index: int,
+        hasPayload: bool
+    ): void throws EncodeError {
         this.stack.push(Building.Variant(enumName, variant, index, hasPayload, null));
         this.segments.push(variant);
     }
@@ -1107,8 +1293,13 @@ pub class ValueEncoder :: [Encoder] {
             .Variant(enumName, variant, index, _, payload) => {
                 this.segments.pop();
                 try this.put(Value.Variant(enumName, variant, index, payload));
-            },
-            _ => { throw EncodeError { path = this.path(), detail = "endVariant without beginVariant" }; },
+            }
+            _ => {
+                throw EncodeError {
+                    path = this.path(),
+                    detail = "endVariant without beginVariant",
+                };
+            }
         }
     }
 
@@ -1141,7 +1332,11 @@ pub class ValueDecoder :: [Decoder] {
     fn peek(): Value throws DecodeError {
         if (this.stack.isEmpty()) {
             if (this.taken) {
-                throw DecodeError { kind = .Missing, path = this.path(), detail = "the value was read already" };
+                throw DecodeError {
+                    kind = .Missing,
+                    path = this.path(),
+                    detail = "the value was read already",
+                };
             }
             return this.root;
         }
@@ -1149,28 +1344,44 @@ pub class ValueDecoder :: [Decoder] {
         return match (this.stack[top]) {
             .Seq(items, at) => {
                 if (at >= items.length()) {
-                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the sequence has no more elements" };
+                    throw DecodeError {
+                        kind = .Missing,
+                        path = this.path(),
+                        detail = "the sequence has no more elements",
+                    };
                 }
                 items[at]
-            },
+            }
             .Map(entries, at, keyRead) => {
                 if (at >= entries.length()) {
-                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the map has no more entries" };
+                    throw DecodeError {
+                        kind = .Missing,
+                        path = this.path(),
+                        detail = "the map has no more entries",
+                    };
                 }
                 if (keyRead) entries[at].1 else entries[at].0
-            },
+            }
             .Struct(_, fieldList, current, _) => {
                 if (current == null) {
-                    throw DecodeError { kind = .Missing, path = this.path(), detail = "a struct's value without its field" };
+                    throw DecodeError {
+                        kind = .Missing,
+                        path = this.path(),
+                        detail = "a struct's value without its field",
+                    };
                 }
                 fieldList[current].1
-            },
+            }
             .Variant(_, _, _, payload, _) => {
                 if (payload == null) {
-                    throw DecodeError { kind = .Missing, path = this.path(), detail = "the variant has no payload" };
+                    throw DecodeError {
+                        kind = .Missing,
+                        path = this.path(),
+                        detail = "the variant has no payload",
+                    };
                 }
                 payload.value
-            },
+            }
         };
     }
 
@@ -1184,15 +1395,26 @@ pub class ValueDecoder :: [Decoder] {
         let top = this.stack.length() - 1;
         let next: Reading = match (this.stack[top]) {
             .Seq(items, at) => Reading.Seq(items, at + 1),
-            .Map(entries, at, keyRead) => if (keyRead) Reading.Map(entries, at + 1, false) else Reading.Map(entries, at, true),
+            .Map(entries, at, keyRead) => if (keyRead) Reading.Map(entries, at + 1, false)
+                else Reading.Map(entries, at, true),
             .Struct(name, fieldList, _, seen) => Reading.Struct(name, fieldList, null, seen),
-            .Variant(enumName, variant, index, payload, _) => Reading.Variant(enumName, variant, index, payload, true),
+            .Variant(enumName, variant, index, payload, _) => Reading.Variant(
+                enumName,
+                variant,
+                index,
+                payload,
+                true
+            ),
         };
         this.stack[top] = next;
     }
 
     fn mismatch(expected: string, got: Value): DecodeError {
-        return DecodeError { kind = .TypeMismatch, path = this.path(), detail = f"expected {expected}, got {formOf(got)}" };
+        return DecodeError {
+            kind = .TypeMismatch,
+            path = this.path(),
+            detail = f"expected {expected}, got {formOf(got)}",
+        };
     }
 
     pub mut fn isNull(): bool throws DecodeError {
@@ -1205,72 +1427,120 @@ pub class ValueDecoder :: [Decoder] {
     pub mut fn decodeNull(): void throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Null => { this.advance(); },
-            _ => { throw this.mismatch("null", v); },
+            .Null => {
+                this.advance();
+            }
+            _ => {
+                throw this.mismatch("null", v);
+            }
         }
     }
 
     pub mut fn decodeBool(): bool throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Bool(b) => { this.advance(); return b; },
-            _ => { throw this.mismatch("a bool", v); },
+            .Bool(b) => {
+                this.advance();
+                return b;
+            }
+            _ => {
+                throw this.mismatch("a bool", v);
+            }
         }
     }
 
     pub mut fn decodeInt(): int throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Int(i) => { this.advance(); return i; },
+            .Int(i) => {
+                this.advance();
+                return i;
+            }
             .Uint(u) => {
                 if (u > (int.max as uint)) {
-                    throw DecodeError { kind = .Invalid, path = this.path(), detail = f"{u} does not fit int" };
+                    throw DecodeError {
+                        kind = .Invalid,
+                        path = this.path(),
+                        detail = f"{u} does not fit int",
+                    };
                 }
                 this.advance();
                 return u as int;
-            },
-            _ => { throw this.mismatch("an int", v); },
+            }
+            _ => {
+                throw this.mismatch("an int", v);
+            }
         }
     }
 
     pub mut fn decodeUint(): uint throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Uint(u) => { this.advance(); return u; },
+            .Uint(u) => {
+                this.advance();
+                return u;
+            }
             .Int(i) => {
                 if (i < 0) {
-                    throw DecodeError { kind = .Invalid, path = this.path(), detail = f"{i} is negative" };
+                    throw DecodeError {
+                        kind = .Invalid,
+                        path = this.path(),
+                        detail = f"{i} is negative",
+                    };
                 }
                 this.advance();
                 return i as uint;
-            },
-            _ => { throw this.mismatch("a uint", v); },
+            }
+            _ => {
+                throw this.mismatch("a uint", v);
+            }
         }
     }
 
     pub mut fn decodeFloat(): float throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Float(f) => { this.advance(); return f; },
-            .Int(i) => { this.advance(); return i as float; },
-            .Uint(u) => { this.advance(); return u as float; },
-            _ => { throw this.mismatch("a float", v); },
+            .Float(f) => {
+                this.advance();
+                return f;
+            }
+            .Int(i) => {
+                this.advance();
+                return i as float;
+            }
+            .Uint(u) => {
+                this.advance();
+                return u as float;
+            }
+            _ => {
+                throw this.mismatch("a float", v);
+            }
         }
     }
 
     pub mut fn decodeString(): string throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .String(s) => { this.advance(); return s; },
-            _ => { throw this.mismatch("a string", v); },
+            .String(s) => {
+                this.advance();
+                return s;
+            }
+            _ => {
+                throw this.mismatch("a string", v);
+            }
         }
     }
 
     pub mut fn decodeBytes(): uint8[] throws DecodeError {
         let v = try this.peek();
         match (v) {
-            .Bytes(b) => { this.advance(); return b; },
-            _ => { throw this.mismatch("bytes", v); },
+            .Bytes(b) => {
+                this.advance();
+                return b;
+            }
+            _ => {
+                throw this.mismatch("bytes", v);
+            }
         }
     }
 
@@ -1282,16 +1552,26 @@ pub class ValueDecoder :: [Decoder] {
                 this.stack.push(Reading.Seq(items, 0));
                 this.segments.push("[]");
                 return items.length();
-            },
-            _ => { throw this.mismatch("a sequence", v); },
+            }
+            _ => {
+                throw this.mismatch("a sequence", v);
+            }
         }
     }
 
     pub fn seqHasNext(): bool throws DecodeError {
         let top = this.stack.length() - 1;
         match (this.stack[top]) {
-            .Seq(items, at) => { return at < items.length(); },
-            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in a sequence" }; },
+            .Seq(items, at) => {
+                return at < items.length();
+            }
+            _ => {
+                throw DecodeError {
+                    kind = .TypeMismatch,
+                    path = this.path(),
+                    detail = "not in a sequence",
+                };
+            }
         }
     }
 
@@ -1308,16 +1588,26 @@ pub class ValueDecoder :: [Decoder] {
                 this.stack.push(Reading.Map(entries, 0, false));
                 this.segments.push("{}");
                 return entries.length();
-            },
-            _ => { throw this.mismatch("a map", v); },
+            }
+            _ => {
+                throw this.mismatch("a map", v);
+            }
         }
     }
 
     pub fn mapHasNext(): bool throws DecodeError {
         let top = this.stack.length() - 1;
         match (this.stack[top]) {
-            .Map(entries, at, _) => { return at < entries.length(); },
-            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in a map" }; },
+            .Map(entries, at, _) => {
+                return at < entries.length();
+            }
+            _ => {
+                throw DecodeError {
+                    kind = .TypeMismatch,
+                    path = this.path(),
+                    detail = "not in a map",
+                };
+            }
         }
     }
 
@@ -1333,8 +1623,10 @@ pub class ValueDecoder :: [Decoder] {
                 this.advance();
                 this.stack.push(Reading.Struct(found, fieldList, null, Set<int>.new()));
                 this.segments.push(name);
-            },
-            _ => { throw this.mismatch(f"the struct {name}", v); },
+            }
+            _ => {
+                throw this.mismatch(f"the struct {name}", v);
+            }
         }
     }
 
@@ -1352,8 +1644,14 @@ pub class ValueDecoder :: [Decoder] {
                     i = i + 1;
                 }
                 return false;
-            },
-            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in a struct" }; },
+            }
+            _ => {
+                throw DecodeError {
+                    kind = .TypeMismatch,
+                    path = this.path(),
+                    detail = "not in a struct",
+                };
+            }
         }
     }
 
@@ -1364,14 +1662,18 @@ pub class ValueDecoder :: [Decoder] {
                     var i = 0;
                     while (i < fieldList.length()) {
                         if (!seen.contains(i)) {
-                            throw DecodeError { kind = .UnknownField, path = this.path(), detail = f"field '{fieldList[i].0}'" };
+                            throw DecodeError {
+                                kind = .UnknownField,
+                                path = this.path(),
+                                detail = f"field '{fieldList[i].0}'",
+                            };
                         }
                         i = i + 1;
                     }
                 }
                 this.segments.pop();
-            },
-            _ => { },
+            }
+            _ => { }
         }
     }
 
@@ -1389,17 +1691,31 @@ pub class ValueDecoder :: [Decoder] {
                     }
                     i = i + 1;
                 }
-                throw DecodeError { kind = .UnknownVariant, path = this.path(), detail = f"'{variant}' of {enumName}" };
-            },
-            _ => { throw this.mismatch(f"a variant of {enumName}", v); },
+                throw DecodeError {
+                    kind = .UnknownVariant,
+                    path = this.path(),
+                    detail = f"'{variant}' of {enumName}",
+                };
+            }
+            _ => {
+                throw this.mismatch(f"a variant of {enumName}", v);
+            }
         }
     }
 
     pub fn variantHasPayload(): bool throws DecodeError {
         let top = this.stack.length() - 1;
         match (this.stack[top]) {
-            .Variant(_, _, _, payload, _) => { return payload != null; },
-            _ => { throw DecodeError { kind = .TypeMismatch, path = this.path(), detail = "not in a variant" }; },
+            .Variant(_, _, _, payload, _) => {
+                return payload != null;
+            }
+            _ => {
+                throw DecodeError {
+                    kind = .TypeMismatch,
+                    path = this.path(),
+                    detail = "not in a variant",
+                };
+            }
         }
     }
 
@@ -1468,41 +1784,55 @@ extend Value {
 extend Value :: [Codable] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         match (this) {
-            .Null => { try e.encodeNull(); },
-            .Bool(b) => { try e.encodeBool(b); },
-            .Int(i) => { try e.encodeInt(i); },
-            .Uint(u) => { try e.encodeUint(u); },
-            .Float(f) => { try e.encodeFloat(f); },
-            .String(s) => { try e.encodeString(s); },
-            .Bytes(b) => { try e.encodeBytes(b[..]); },
+            .Null => {
+                try e.encodeNull();
+            }
+            .Bool(b) => {
+                try e.encodeBool(b);
+            }
+            .Int(i) => {
+                try e.encodeInt(i);
+            }
+            .Uint(u) => {
+                try e.encodeUint(u);
+            }
+            .Float(f) => {
+                try e.encodeFloat(f);
+            }
+            .String(s) => {
+                try e.encodeString(s);
+            }
+            .Bytes(b) => {
+                try e.encodeBytes(b[..]);
+            }
             .Seq(items) => {
                 try e.beginSeq(items.length());
                 for (x in items) {
                     try e.element(x);
                 }
                 try e.endSeq();
-            },
+            }
             .Map(entries) => {
                 try e.beginMap(entries.length());
                 for ((k, v) in entries) {
                     try e.entry(k, v);
                 }
                 try e.endMap();
-            },
+            }
             .Struct(name, fieldList) => {
                 try e.beginStruct(name, fieldList.length());
                 for ((f, v) in fieldList) {
                     try e.field(f, v);
                 }
                 try e.endStruct();
-            },
+            }
             .Variant(enumName, variant, index, payload) => {
                 if (let p = payload) {
                     try e.encodeVariant(enumName, variant, index, p.value);
                 } else {
                     try e.encodeUnitVariant(enumName, variant, index);
                 }
-            },
+            }
         }
     }
 
@@ -1557,6 +1887,10 @@ extend Value :: [Codable] {
             try d.endMap();
             return Value.Map(entries);
         }
-        throw DecodeError { kind = .TypeMismatch, path = d.path(), detail = "a struct or a variant, which a Value cannot read without its name" };
+        throw DecodeError {
+            kind = .TypeMismatch,
+            path = d.path(),
+            detail = "a struct or a variant, which a Value cannot read without its name",
+        };
     }
 }

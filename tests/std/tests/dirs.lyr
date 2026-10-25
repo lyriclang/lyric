@@ -33,7 +33,8 @@ fn root(): string throws IoError {
 fn listed(dir: string): string throws IoError {
     let seen: List<string> = List.new();
     for (e in try fs.readDir(dir)) {
-        let kind = if (e.isFile) "file" else if (e.isDir) "dir" else if (e.isSymlink) "link" else "other";
+        let kind = if (e.isFile) "file"
+            else if (e.isDir) "dir" else if (e.isSymlink) "link" else "other";
         assertEq(e.path, path.join(dir, e.name));
         seen.push(f"{e.name}:{kind}");
     }
@@ -47,15 +48,31 @@ fn aDirectoryIsMadeReadAndRemoved(): void throws IoError {
     let t = try root();
     let a = path.join(t, "a");
     try fs.createDir(a);
-    assertTrue(kindOf(() => { try fs.createDir(a); }) == IoErrorKind.AlreadyExists);
-    assertTrue(kindOf(() => { try fs.createDir(path.join(t, "none", "x")); }) == IoErrorKind.NotFound);
+    assertTrue(
+        kindOf(
+            () => {
+                try fs.createDir(a);
+            }
+        ) == IoErrorKind.AlreadyExists
+    );
+    assertTrue(
+        kindOf(
+            () => {
+                try fs.createDir(path.join(t, "none", "x"));
+            }
+        ) == IoErrorKind.NotFound
+    );
     assertEq(try listed(a), "");
     try fs.writeText(path.join(a, "one.txt"), "1");
     try fs.writeText(path.join(a, "two.txt"), "22");
     try fs.createDir(path.join(a, "sub"));
     assertEq(try listed(a), "one.txt:file sub:dir two.txt:file");
     // one that is not empty stays, with the system's code
-    let e = thrown(() => { try fs.removeDir(a); });
+    let e = thrown(
+        () => {
+            try fs.removeDir(a);
+        }
+    );
     assertTrue(e != null);
     assertTrue(e!.message().startsWith("system error"));
     assertEq(e!.path ?? "", a);
@@ -64,8 +81,20 @@ fn aDirectoryIsMadeReadAndRemoved(): void throws IoError {
     try fs.removeDir(path.join(a, "sub"));
     try fs.removeDir(a);
     assertFalse(fs.exists(a));
-    assertTrue(kindOf(() => { try fs.removeDir(a); }) == IoErrorKind.NotFound);
-    assertTrue(kindOf(() => { try fs.remove(a); }) == IoErrorKind.NotFound);
+    assertTrue(
+        kindOf(
+            () => {
+                try fs.removeDir(a);
+            }
+        ) == IoErrorKind.NotFound
+    );
+    assertTrue(
+        kindOf(
+            () => {
+                try fs.remove(a);
+            }
+        ) == IoErrorKind.NotFound
+    );
     try fs.removeDir(t);
 }
 
@@ -88,7 +117,11 @@ fn metadataSaysWhatAPathNames(): void throws IoError {
     assertTrue(d.isDir);
     assertFalse(d.isFile);
     let gone = path.join(t, "no-such");
-    let none = thrown(() => { let _ = try fs.metadata(gone); });
+    let none = thrown(
+        () => {
+            let _ = try fs.metadata(gone);
+        }
+    );
     assertTrue(none!.kind == IoErrorKind.NotFound);
     assertEq(none!.message(), f"not found: {gone} (looked at)");
     // an entry's metadata is the path's
@@ -113,13 +146,27 @@ fn whatIsNoDirectoryOrNoFileIsSaid(): void throws IoError {
     try fs.writeText(plain, "x");
     try fs.createDir(dir);
     // a file read as a directory, a directory removed as a file: the system's kinds
-    let asDir = kindOf(() => { using let it = try fs.readDir(plain); });
+    let asDir = kindOf(
+        () => {
+            using let it = try fs.readDir(plain);
+        }
+    );
     assertTrue(asDir != null);
-    let asFile = kindOf(() => { try fs.remove(dir); });
+    let asFile = kindOf(
+        () => {
+            try fs.remove(dir);
+        }
+    );
     assertTrue(asFile == IoErrorKind.IsDirectory || asFile == IoErrorKind.PermissionDenied);
     if (path.separator == "/") {
         assertTrue(asDir == IoErrorKind.NotDirectory);
-        assertTrue(kindOf(() => { try fs.removeDir(plain); }) == IoErrorKind.NotDirectory);
+        assertTrue(
+            kindOf(
+                () => {
+                    try fs.removeDir(plain);
+                }
+            ) == IoErrorKind.NotDirectory
+        );
     }
     assertTrue(fs.exists(dir));
     assertTrue(fs.exists(plain));
@@ -143,7 +190,11 @@ fn renameReplacesAFile(): void throws IoError {
     assertTrue((try fs.metadata(path.join(t, "r2"))).isDir);
     let gone = path.join(t, "gone.txt");
     let other = path.join(t, "x.txt");
-    let e = thrown(() => { try fs.rename(gone, other); });
+    let e = thrown(
+        () => {
+            try fs.rename(gone, other);
+        }
+    );
     assertTrue(e!.kind == IoErrorKind.NotFound);
     assertEq(e!.message(), f"not found: {gone} (renamed to {other})");
     try fs.removeDir(path.join(t, "r2"));
@@ -160,7 +211,13 @@ fn aPathIsMadeAbsoluteAndCanonical(): void throws IoError {
     let s = path.separator;
     let c = try fs.canonicalize(f"{t}{s}..{s}{path.fileName(t)}");
     assertEq(c, try fs.canonicalize(t));
-    assertTrue(kindOf(() => { let _ = try fs.canonicalize(path.join(t, "not-there")); }) == IoErrorKind.NotFound);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try fs.canonicalize(path.join(t, "not-there"));
+            }
+        ) == IoErrorKind.NotFound
+    );
     // absolute asks nothing of the file system: a path that is not there is made absolute too,
     // by the working directory as the system names it (a short name on Windows stays short)
     let cwd = try fs.absolute(".");
@@ -181,7 +238,13 @@ fn theEntriesCloseTheirDirectory(): void throws IoError {
     for (_ in try early) {
         break;
     }
-    assertTrue(kindOf(() => { let _ = try early.next(); }) == IoErrorKind.Closed);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try early.next();
+            }
+        ) == IoErrorKind.Closed
+    );
     let whole = try fs.readDir(t);
     var n = 0;
     loop {
@@ -196,7 +259,13 @@ fn theEntriesCloseTheirDirectory(): void throws IoError {
     let manual = try fs.readDir(t);
     try manual.close();
     try manual.close();
-    assertTrue(kindOf(() => { let _ = try manual.next(); }) == IoErrorKind.Closed);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try manual.next();
+            }
+        ) == IoErrorKind.Closed
+    );
     for (k in 0..3) {
         try fs.remove(path.join(t, f"{k}.txt"));
     }

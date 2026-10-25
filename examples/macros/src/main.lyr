@@ -7,7 +7,9 @@ import macros.tools { Builder, formula, retry };
 class Flaky :: [Error] {
     n: int,
 
-    fn message(): string { return f"flaky {this.n}"; }
+    fn message(): string {
+        return f"flaky {this.n}";
+    }
 }
 
 var calls = 0;
@@ -15,7 +17,9 @@ var calls = 0;
 /// Throws twice, then answers.
 fn fetch(): int throws Flaky {
     calls += 1;
-    if (calls < 3) { throw Flaky { n = calls }; }
+    if (calls < 3) {
+        throw Flaky { n = calls };
+    }
     return calls * 10;
 }
 
@@ -31,7 +35,7 @@ fn main(): void throws Flaky {
     var result = 0;
     retry!(3) {
         result = try fetch();
-    }
+    };
     println(f"fetched {result} after {calls} calls; attempts is still {attempts}");
 
     let p = PointBuilder { }.set_x(3).set_y(4).build();

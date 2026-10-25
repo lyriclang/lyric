@@ -121,9 +121,11 @@ made on impulse (e.g. "I just thought of something better") are forbidden.
 | Comments | English, describing the technique and the logic. No justifications, no project history, no milestone or decision references. |
 
 For C# code, follow these rules manually. For Lyric code (`.lyr`) the formatter is the rule:
-`lyric fmt` writes the one shape there is, the repository's own Lyric (stdlib, examples,
-templates) is kept formatted, and a test in `Lyric.Tests.Formatting` fails when it stops
-being it.
+`lyric fmt` writes the one form there is, and the repository's Lyric — `stdlib5`, `tests/std`, the
+Lyric 5 examples — is kept in it: CI runs `lyric fmt --check` over them and names a file that is
+not. The form is a contract: once code is formatted, a change of what the formatter writes is made
+only to fix a meaning it broke or to follow a rule written down, and it comes with a sentence in
+the CHANGELOG, since every package's next `lyric fmt` shows it.
 
 ### Diagnostics
 

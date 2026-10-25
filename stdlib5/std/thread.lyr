@@ -4,8 +4,21 @@
 /// thread. Threads run at the same time: what they share, they share through a channel, an
 /// atomic or a lock — anything else is a data race.
 import std.core { filled };
-import std.task { atomicFetchAndAdd, atomicLoad, atomicStore, Cancelled, Channel, enlist, launchOn, living,
-    Scheduler, setCurrentScheduler, SpinLock, startThread, Task };
+import std.task {
+    atomicFetchAndAdd,
+    atomicLoad,
+    atomicStore,
+    Cancelled,
+    Channel,
+    enlist,
+    launchOn,
+    living,
+    Scheduler,
+    setCurrentScheduler,
+    SpinLock,
+    startThread,
+    Task,
+};
 
 /// An operating-system thread with a scheduler of its own.
 ///
@@ -24,17 +37,19 @@ pub class Thread {
         let s = Scheduler { };
         enlist(s);
         let task = launchOn(s, body, null);
-        startThread(() => {
-            setCurrentScheduler(s);
-            s.started();
-            while (!task.isDone()) {
-                s.step();
+        startThread(
+            () => {
+                setCurrentScheduler(s);
+                s.started();
+                while (!task.isDone()) {
+                    s.step();
+                }
+                s.wind();
+                s.stopped();
+                living.leave(s);
+                setCurrentScheduler(null);
             }
-            s.wind();
-            s.stopped();
-            living.leave(s);
-            setCurrentScheduler(null);
-        });
+        );
         return task;
     }
 }
@@ -87,9 +102,13 @@ pub class Pool :: [Closeable] {
         atomicFetchAndAdd(&w.active, 1);
         this.guard.release();
         // counted, the worker stays for it; the hand-over itself needs no guard
-        return launchOn(w.scheduler, body, () => {
-            atomicFetchAndAdd(&w.active, -1);
-        });
+        return launchOn(
+            w.scheduler,
+            body,
+            () => {
+                atomicFetchAndAdd(&w.active, -1);
+            }
+        );
     }
 
     /// Waits until every task given to the pool has ended, then ends its threads.
@@ -123,10 +142,14 @@ pub class Pool :: [Closeable] {
     mut fn pick(): Worker {
         var k = this.picks % this.size;
         this.picks = this.picks +% 1;
-        if (k < 0) { k = -k; }
+        if (k < 0) {
+            k = -k;
+        }
         var at: ?Worker = this.workers;
         while (let w = at) {
-            if (k == 0) { return w; }
+            if (k == 0) {
+                return w;
+            }
             k -= 1;
             at = w.next;
         }
@@ -147,18 +170,20 @@ class Worker {
         let s = this.scheduler;
         let w = this;
         enlist(s);
-        startThread(() => {
-            setCurrentScheduler(s);
-            s.started();
-            while (!(atomicLoad(&w.closing) && atomicLoad(&w.active) == 0)) {
-                s.step();
+        startThread(
+            () => {
+                setCurrentScheduler(s);
+                s.started();
+                while (!(atomicLoad(&w.closing) && atomicLoad(&w.active) == 0)) {
+                    s.step();
+                }
+                s.wind();
+                w.finished.close();
+                s.stopped();
+                living.leave(s);
+                setCurrentScheduler(null);
             }
-            s.wind();
-            w.finished.close();
-            s.stopped();
-            living.leave(s);
-            setCurrentScheduler(null);
-        });
+        );
     }
 
     /// Marks the worker as closing and wakes its thread, which ends once its tasks have.
@@ -182,7 +207,10 @@ class Worker {
 /// once every piece has ended; a piece stops at its first error, so a later element of that
 /// piece may go uncalled. An error from the first element's call comes out at once. A cancelled
 /// caller cancels the pieces and throws `Cancelled`.
-pub fn parallelMap<T, U, E :: [Error]>(xs: Slice<T>, f: fn(T) -> U throws E): U[] throws [E, Cancelled] {
+pub fn parallelMap<T, U, E :: [Error]>(
+    xs: Slice<T>,
+    f: fn(T) -> U throws E
+): U[] throws [E, Cancelled] {
     let n = xs.length();
     if (n == 0) {
         return [];
@@ -242,6 +270,7 @@ pub fn parallelMap<T, U, E :: [Error]>(xs: Slice<T>, f: fn(T) -> U throws E): U[
 /// The program's pool for [parallelMap], made at its first call: a thread for each processor.
 @Allow("global-var-without-sync")
 var sharedPool: ?Pool = null;
+
 let sharedPoolGuard = SpinLock { };
 
 fn programPool(): Pool {

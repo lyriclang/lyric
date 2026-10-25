@@ -4,8 +4,20 @@
 /// The lock state lives in `std.task`, whose scheduler releases the locks of a task that
 /// panicked. A task that waits for a lock or a permit is parked while the other tasks of its
 /// thread run.
-import std.task { atomicLoad, atomicStore, atomicExchange, atomicCompareAndSet, atomicFetchAndAdd,
-    Cancelled, here, LockState, park, Slot, SpinLock, Waiters };
+import std.task {
+    atomicLoad,
+    atomicStore,
+    atomicExchange,
+    atomicCompareAndSet,
+    atomicFetchAndAdd,
+    Cancelled,
+    here,
+    LockState,
+    park,
+    Slot,
+    SpinLock,
+    Waiters,
+};
 
 /// The types an [Atomic] holds: those the machine reads and writes in one step.
 ///
@@ -14,6 +26,7 @@ import std.task { atomicLoad, atomicStore, atomicExchange, atomicCompareAndSet, 
 pub sealed interface AtomicValue { }
 
 extend int :: [AtomicValue] { }
+
 extend bool :: [AtomicValue] { }
 
 /// A value that every thread reads and writes in one step.
@@ -164,7 +177,9 @@ pub class Once {
     /// again. Throws `Cancelled` when the task is cancelled during the wait.
     pub fn run<E :: [Error]>(body: fn() -> void throws E): void throws [E, Cancelled] {
         let first = try this.state.beginOnce();
-        if (!first) { return; }
+        if (!first) {
+            return;
+        }
         var done = false;
         defer {
             this.state.endOnce(done);
@@ -234,7 +249,9 @@ class PermitState {
     mut fn acquire(): void throws Cancelled {
         let s = here();
         let me = s.running ?? panic("a semaphore where no task runs");
-        if (atomicLoad(&me.cancelled)) { throw Cancelled { }; }
+        if (atomicLoad(&me.cancelled)) {
+            throw Cancelled { };
+        }
         this.guard.acquire();
         while (this.permits == 0) {
             me.beginWait();
@@ -257,7 +274,9 @@ class PermitState {
     mut fn tryAcquire(): bool {
         this.guard.acquire();
         let took = this.permits > 0;
-        if (took) { this.permits -= 1; }
+        if (took) {
+            this.permits -= 1;
+        }
         this.guard.release();
         return took;
     }

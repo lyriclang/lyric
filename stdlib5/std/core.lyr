@@ -6,7 +6,6 @@
 /// members of `string`, `char` and the arrays and views, the format language behind f-strings,
 /// and the iterator protocol ([Iterator], [Iterable]).
 
-
 /// Ends the process with a message and a backtrace.
 ///
 /// The report is `LYR-RT0008` and the exit code 101. Its type is `never`, so a call stands
@@ -21,7 +20,11 @@ pub fn panic(message: string): never;
 /// # Panics
 /// When `condition` is false: `LYR-RT0011`, "assertion failed: " and the condition as it is
 /// written, then the message where one is given.
-pub inline fn assert(condition: bool, message: fn() -> string = () => "", @callerExpr(condition) written: string = ""): void {
+pub inline fn assert(
+    condition: bool,
+    message: fn() -> string = () => "",
+    @callerExpr(condition) written: string = ""
+): void {
     if (!condition) {
         assertFailed(written, message());
     }
@@ -157,7 +160,9 @@ internal fn filled<T>(n: int, x: T): T[];
 /// # Panics
 /// When `n` is negative.
 pub fn repeatArray<T :: [Clone]>(xs: T[], n: int): T[] {
-    if (n < 0) { panic("negative repeat count"); }
+    if (n < 0) {
+        panic("negative repeat count");
+    }
     let m = xs.length();
     return arrayOf(m * n, (i: int) => xs[i % m].clone());
 }
@@ -358,7 +363,8 @@ pub struct Bench :: [OnFunction] {
         var took = timedRound(body, n).0;
         while (took < 100000000) {
             // as many runs as a tenth of a second at this pace, a fifth more, at most a hundred times more
-            let pace = if (took > 0) ((n as float) * 120000000.0 / (took as float)) as int else n * 100;
+            let pace = if (took > 0) ((n as float) * 120000000.0 / (took as float)) as int
+                else n * 100;
             n = if (pace > n * 100) n * 100 else if (pace <= n) n + 1 else pace;
             took = timedRound(body, n).0;
         }
@@ -622,7 +628,11 @@ pub interface Equatable {
 }
 
 /// The answer of a comparison; equatable, hashable and printable like any plain enum.
-pub enum Ordering :: [Equatable, Hashable, Debug] { Less, Equal, Greater }
+pub enum Ordering :: [Equatable, Hashable, Debug] {
+    Less,
+    Equal,
+    Greater,
+}
 
 /// The operators `<`, `<=`, `>` and `>=`, which read `a.compare(b)`.
 ///
@@ -661,7 +671,12 @@ pub interface Ordered :: [Equatable] {
                         if (c == null) {
                             return null;
                         }
-                        match (c) { .Equal => { }, _ => { return c; } }
+                        match (c) {
+                            .Equal => { }
+                            _ => {
+                                return c;
+                            }
+                        }
                     }
                     return Ordering.Equal;
                 }
@@ -673,7 +688,12 @@ pub interface Ordered :: [Equatable] {
                 if (c == null) {
                     return null;
                 }
-                match (c) { .Equal => { }, _ => { return c; } }
+                match (c) {
+                    .Equal => { }
+                    _ => {
+                        return c;
+                    }
+                }
             }
             return Ordering.Equal;
         }
@@ -727,7 +747,12 @@ pub interface TotalOrder :: [Ordered] {
                 if (this is v) {
                     comptime for (p in v.payload) {
                         let c = this.[v, p].totalCompare(o.[v, p]);
-                        match (c) { .Equal => { }, _ => { return c; } }
+                        match (c) {
+                            .Equal => { }
+                            _ => {
+                                return c;
+                            }
+                        }
                     }
                     return Ordering.Equal;
                 }
@@ -736,7 +761,12 @@ pub interface TotalOrder :: [Ordered] {
         } else {
             comptime for (f in fields<Self>()) {
                 let c = this.[f].totalCompare(o.[f]);
-                match (c) { .Equal => { }, _ => { return c; } }
+                match (c) {
+                    .Equal => { }
+                    _ => {
+                        return c;
+                    }
+                }
             }
             return Ordering.Equal;
         }
@@ -811,8 +841,7 @@ pub interface Hashable :: [Equatable] {
 /// address, so a `Map<Node, X>` keys by the object without a member written. Only a class can
 /// conform; a value has no identity. Nothing on the heap moves, so an object keeps its address
 /// while it lives.
-pub interface Identity :: [Hashable] {
-}
+pub interface Identity :: [Hashable] { }
 
 /// Gives an enum value the name of its variant, as written.
 ///
@@ -904,299 +933,992 @@ pub interface Display {
 }
 
 // --- the scalars ------------------------------------------------------------------------------
-extend int :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, Neg, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
-    fn equals(o: int): bool { return this == o; }
+extend int :: [
+    Equatable,
+    Ordered,
+    TotalOrder,
+    Hashable,
+    Display,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Neg,
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+    Shl,
+    Shr
+] {
+    fn equals(o: int): bool {
+        return this == o;
+    }
+
     fn compare(o: int): ?Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
+
     fn totalCompare(o: int): Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
-    fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
-    fn show(): string { return f"{this}"; }
-    fn showTo(out: StringBuilder): void { out.putInt(this); }
-    fn add(rhs: int): int { return this + rhs; }
-    fn sub(rhs: int): int { return this - rhs; }
-    fn mul(rhs: int): int { return this * rhs; }
-    fn div(rhs: int): int { return this / rhs; }
-    fn rem(rhs: int): int { return this % rhs; }
-    fn neg(): int { return -this; }
-    fn bitAnd(rhs: int): int { return this & rhs; }
-    fn bitOr(rhs: int): int { return this | rhs; }
-    fn bitXor(rhs: int): int { return this ^ rhs; }
-    fn bitNot(): int { return ~this; }
-    fn shl(rhs: int): int { return this << rhs; }
-    fn shr(rhs: int): int { return this >> rhs; }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        h.writeInt(this as int);
+    }
+
+    fn show(): string {
+        return f"{this}";
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.putInt(this);
+    }
+
+    fn add(rhs: int): int {
+        return this + rhs;
+    }
+
+    fn sub(rhs: int): int {
+        return this - rhs;
+    }
+
+    fn mul(rhs: int): int {
+        return this * rhs;
+    }
+
+    fn div(rhs: int): int {
+        return this / rhs;
+    }
+
+    fn rem(rhs: int): int {
+        return this % rhs;
+    }
+
+    fn neg(): int {
+        return -this;
+    }
+
+    fn bitAnd(rhs: int): int {
+        return this & rhs;
+    }
+
+    fn bitOr(rhs: int): int {
+        return this | rhs;
+    }
+
+    fn bitXor(rhs: int): int {
+        return this ^ rhs;
+    }
+
+    fn bitNot(): int {
+        return ~this;
+    }
+
+    fn shl(rhs: int): int {
+        return this << rhs;
+    }
+
+    fn shr(rhs: int): int {
+        return this >> rhs;
+    }
 }
 
-extend int8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, Neg, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
-    fn equals(o: int8): bool { return this == o; }
+extend int8 :: [
+    Equatable,
+    Ordered,
+    TotalOrder,
+    Hashable,
+    Display,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Neg,
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+    Shl,
+    Shr
+] {
+    fn equals(o: int8): bool {
+        return this == o;
+    }
+
     fn compare(o: int8): ?Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
+
     fn totalCompare(o: int8): Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
-    fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
-    fn show(): string { return f"{this}"; }
-    fn showTo(out: StringBuilder): void { out.putInt(this); }
-    fn add(rhs: int8): int8 { return this + rhs; }
-    fn sub(rhs: int8): int8 { return this - rhs; }
-    fn mul(rhs: int8): int8 { return this * rhs; }
-    fn div(rhs: int8): int8 { return this / rhs; }
-    fn rem(rhs: int8): int8 { return this % rhs; }
-    fn neg(): int8 { return -this; }
-    fn bitAnd(rhs: int8): int8 { return this & rhs; }
-    fn bitOr(rhs: int8): int8 { return this | rhs; }
-    fn bitXor(rhs: int8): int8 { return this ^ rhs; }
-    fn bitNot(): int8 { return ~this; }
-    fn shl(rhs: int): int8 { return this << rhs; }
-    fn shr(rhs: int): int8 { return this >> rhs; }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        h.writeInt(this as int);
+    }
+
+    fn show(): string {
+        return f"{this}";
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.putInt(this);
+    }
+
+    fn add(rhs: int8): int8 {
+        return this + rhs;
+    }
+
+    fn sub(rhs: int8): int8 {
+        return this - rhs;
+    }
+
+    fn mul(rhs: int8): int8 {
+        return this * rhs;
+    }
+
+    fn div(rhs: int8): int8 {
+        return this / rhs;
+    }
+
+    fn rem(rhs: int8): int8 {
+        return this % rhs;
+    }
+
+    fn neg(): int8 {
+        return -this;
+    }
+
+    fn bitAnd(rhs: int8): int8 {
+        return this & rhs;
+    }
+
+    fn bitOr(rhs: int8): int8 {
+        return this | rhs;
+    }
+
+    fn bitXor(rhs: int8): int8 {
+        return this ^ rhs;
+    }
+
+    fn bitNot(): int8 {
+        return ~this;
+    }
+
+    fn shl(rhs: int): int8 {
+        return this << rhs;
+    }
+
+    fn shr(rhs: int): int8 {
+        return this >> rhs;
+    }
 }
 
-extend int16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, Neg, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
-    fn equals(o: int16): bool { return this == o; }
+extend int16 :: [
+    Equatable,
+    Ordered,
+    TotalOrder,
+    Hashable,
+    Display,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Neg,
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+    Shl,
+    Shr
+] {
+    fn equals(o: int16): bool {
+        return this == o;
+    }
+
     fn compare(o: int16): ?Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
+
     fn totalCompare(o: int16): Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
-    fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
-    fn show(): string { return f"{this}"; }
-    fn showTo(out: StringBuilder): void { out.putInt(this); }
-    fn add(rhs: int16): int16 { return this + rhs; }
-    fn sub(rhs: int16): int16 { return this - rhs; }
-    fn mul(rhs: int16): int16 { return this * rhs; }
-    fn div(rhs: int16): int16 { return this / rhs; }
-    fn rem(rhs: int16): int16 { return this % rhs; }
-    fn neg(): int16 { return -this; }
-    fn bitAnd(rhs: int16): int16 { return this & rhs; }
-    fn bitOr(rhs: int16): int16 { return this | rhs; }
-    fn bitXor(rhs: int16): int16 { return this ^ rhs; }
-    fn bitNot(): int16 { return ~this; }
-    fn shl(rhs: int): int16 { return this << rhs; }
-    fn shr(rhs: int): int16 { return this >> rhs; }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        h.writeInt(this as int);
+    }
+
+    fn show(): string {
+        return f"{this}";
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.putInt(this);
+    }
+
+    fn add(rhs: int16): int16 {
+        return this + rhs;
+    }
+
+    fn sub(rhs: int16): int16 {
+        return this - rhs;
+    }
+
+    fn mul(rhs: int16): int16 {
+        return this * rhs;
+    }
+
+    fn div(rhs: int16): int16 {
+        return this / rhs;
+    }
+
+    fn rem(rhs: int16): int16 {
+        return this % rhs;
+    }
+
+    fn neg(): int16 {
+        return -this;
+    }
+
+    fn bitAnd(rhs: int16): int16 {
+        return this & rhs;
+    }
+
+    fn bitOr(rhs: int16): int16 {
+        return this | rhs;
+    }
+
+    fn bitXor(rhs: int16): int16 {
+        return this ^ rhs;
+    }
+
+    fn bitNot(): int16 {
+        return ~this;
+    }
+
+    fn shl(rhs: int): int16 {
+        return this << rhs;
+    }
+
+    fn shr(rhs: int): int16 {
+        return this >> rhs;
+    }
 }
 
-extend int32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, Neg, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
-    fn equals(o: int32): bool { return this == o; }
+extend int32 :: [
+    Equatable,
+    Ordered,
+    TotalOrder,
+    Hashable,
+    Display,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Neg,
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+    Shl,
+    Shr
+] {
+    fn equals(o: int32): bool {
+        return this == o;
+    }
+
     fn compare(o: int32): ?Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
+
     fn totalCompare(o: int32): Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
-    fn hash<H :: [Hasher]>(&h: H): void { h.writeInt(this as int); }
-    fn show(): string { return f"{this}"; }
-    fn showTo(out: StringBuilder): void { out.putInt(this); }
-    fn add(rhs: int32): int32 { return this + rhs; }
-    fn sub(rhs: int32): int32 { return this - rhs; }
-    fn mul(rhs: int32): int32 { return this * rhs; }
-    fn div(rhs: int32): int32 { return this / rhs; }
-    fn rem(rhs: int32): int32 { return this % rhs; }
-    fn neg(): int32 { return -this; }
-    fn bitAnd(rhs: int32): int32 { return this & rhs; }
-    fn bitOr(rhs: int32): int32 { return this | rhs; }
-    fn bitXor(rhs: int32): int32 { return this ^ rhs; }
-    fn bitNot(): int32 { return ~this; }
-    fn shl(rhs: int): int32 { return this << rhs; }
-    fn shr(rhs: int): int32 { return this >> rhs; }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        h.writeInt(this as int);
+    }
+
+    fn show(): string {
+        return f"{this}";
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.putInt(this);
+    }
+
+    fn add(rhs: int32): int32 {
+        return this + rhs;
+    }
+
+    fn sub(rhs: int32): int32 {
+        return this - rhs;
+    }
+
+    fn mul(rhs: int32): int32 {
+        return this * rhs;
+    }
+
+    fn div(rhs: int32): int32 {
+        return this / rhs;
+    }
+
+    fn rem(rhs: int32): int32 {
+        return this % rhs;
+    }
+
+    fn neg(): int32 {
+        return -this;
+    }
+
+    fn bitAnd(rhs: int32): int32 {
+        return this & rhs;
+    }
+
+    fn bitOr(rhs: int32): int32 {
+        return this | rhs;
+    }
+
+    fn bitXor(rhs: int32): int32 {
+        return this ^ rhs;
+    }
+
+    fn bitNot(): int32 {
+        return ~this;
+    }
+
+    fn shl(rhs: int): int32 {
+        return this << rhs;
+    }
+
+    fn shr(rhs: int): int32 {
+        return this >> rhs;
+    }
 }
 
-extend uint :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
-    fn equals(o: uint): bool { return this == o; }
+extend uint :: [
+    Equatable,
+    Ordered,
+    TotalOrder,
+    Hashable,
+    Display,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+    Shl,
+    Shr
+] {
+    fn equals(o: uint): bool {
+        return this == o;
+    }
+
     fn compare(o: uint): ?Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
+
     fn totalCompare(o: uint): Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
-    fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
-    fn show(): string { return f"{this}"; }
-    fn showTo(out: StringBuilder): void { out.putUint(this); }
-    fn add(rhs: uint): uint { return this + rhs; }
-    fn sub(rhs: uint): uint { return this - rhs; }
-    fn mul(rhs: uint): uint { return this * rhs; }
-    fn div(rhs: uint): uint { return this / rhs; }
-    fn rem(rhs: uint): uint { return this % rhs; }
-    fn bitAnd(rhs: uint): uint { return this & rhs; }
-    fn bitOr(rhs: uint): uint { return this | rhs; }
-    fn bitXor(rhs: uint): uint { return this ^ rhs; }
-    fn bitNot(): uint { return ~this; }
-    fn shl(rhs: int): uint { return this << rhs; }
-    fn shr(rhs: int): uint { return this >> rhs; }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        h.writeUint(this as uint64);
+    }
+
+    fn show(): string {
+        return f"{this}";
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.putUint(this);
+    }
+
+    fn add(rhs: uint): uint {
+        return this + rhs;
+    }
+
+    fn sub(rhs: uint): uint {
+        return this - rhs;
+    }
+
+    fn mul(rhs: uint): uint {
+        return this * rhs;
+    }
+
+    fn div(rhs: uint): uint {
+        return this / rhs;
+    }
+
+    fn rem(rhs: uint): uint {
+        return this % rhs;
+    }
+
+    fn bitAnd(rhs: uint): uint {
+        return this & rhs;
+    }
+
+    fn bitOr(rhs: uint): uint {
+        return this | rhs;
+    }
+
+    fn bitXor(rhs: uint): uint {
+        return this ^ rhs;
+    }
+
+    fn bitNot(): uint {
+        return ~this;
+    }
+
+    fn shl(rhs: int): uint {
+        return this << rhs;
+    }
+
+    fn shr(rhs: int): uint {
+        return this >> rhs;
+    }
 }
 
-extend uint8 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
-    fn equals(o: uint8): bool { return this == o; }
+extend uint8 :: [
+    Equatable,
+    Ordered,
+    TotalOrder,
+    Hashable,
+    Display,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+    Shl,
+    Shr
+] {
+    fn equals(o: uint8): bool {
+        return this == o;
+    }
+
     fn compare(o: uint8): ?Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
+
     fn totalCompare(o: uint8): Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
-    fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
-    fn show(): string { return f"{this}"; }
-    fn showTo(out: StringBuilder): void { out.putUint(this); }
-    fn add(rhs: uint8): uint8 { return this + rhs; }
-    fn sub(rhs: uint8): uint8 { return this - rhs; }
-    fn mul(rhs: uint8): uint8 { return this * rhs; }
-    fn div(rhs: uint8): uint8 { return this / rhs; }
-    fn rem(rhs: uint8): uint8 { return this % rhs; }
-    fn bitAnd(rhs: uint8): uint8 { return this & rhs; }
-    fn bitOr(rhs: uint8): uint8 { return this | rhs; }
-    fn bitXor(rhs: uint8): uint8 { return this ^ rhs; }
-    fn bitNot(): uint8 { return ~this; }
-    fn shl(rhs: int): uint8 { return this << rhs; }
-    fn shr(rhs: int): uint8 { return this >> rhs; }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        h.writeUint(this as uint64);
+    }
+
+    fn show(): string {
+        return f"{this}";
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.putUint(this);
+    }
+
+    fn add(rhs: uint8): uint8 {
+        return this + rhs;
+    }
+
+    fn sub(rhs: uint8): uint8 {
+        return this - rhs;
+    }
+
+    fn mul(rhs: uint8): uint8 {
+        return this * rhs;
+    }
+
+    fn div(rhs: uint8): uint8 {
+        return this / rhs;
+    }
+
+    fn rem(rhs: uint8): uint8 {
+        return this % rhs;
+    }
+
+    fn bitAnd(rhs: uint8): uint8 {
+        return this & rhs;
+    }
+
+    fn bitOr(rhs: uint8): uint8 {
+        return this | rhs;
+    }
+
+    fn bitXor(rhs: uint8): uint8 {
+        return this ^ rhs;
+    }
+
+    fn bitNot(): uint8 {
+        return ~this;
+    }
+
+    fn shl(rhs: int): uint8 {
+        return this << rhs;
+    }
+
+    fn shr(rhs: int): uint8 {
+        return this >> rhs;
+    }
 }
 
-extend uint16 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
-    fn equals(o: uint16): bool { return this == o; }
+extend uint16 :: [
+    Equatable,
+    Ordered,
+    TotalOrder,
+    Hashable,
+    Display,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+    Shl,
+    Shr
+] {
+    fn equals(o: uint16): bool {
+        return this == o;
+    }
+
     fn compare(o: uint16): ?Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
+
     fn totalCompare(o: uint16): Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
-    fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
-    fn show(): string { return f"{this}"; }
-    fn showTo(out: StringBuilder): void { out.putUint(this); }
-    fn add(rhs: uint16): uint16 { return this + rhs; }
-    fn sub(rhs: uint16): uint16 { return this - rhs; }
-    fn mul(rhs: uint16): uint16 { return this * rhs; }
-    fn div(rhs: uint16): uint16 { return this / rhs; }
-    fn rem(rhs: uint16): uint16 { return this % rhs; }
-    fn bitAnd(rhs: uint16): uint16 { return this & rhs; }
-    fn bitOr(rhs: uint16): uint16 { return this | rhs; }
-    fn bitXor(rhs: uint16): uint16 { return this ^ rhs; }
-    fn bitNot(): uint16 { return ~this; }
-    fn shl(rhs: int): uint16 { return this << rhs; }
-    fn shr(rhs: int): uint16 { return this >> rhs; }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        h.writeUint(this as uint64);
+    }
+
+    fn show(): string {
+        return f"{this}";
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.putUint(this);
+    }
+
+    fn add(rhs: uint16): uint16 {
+        return this + rhs;
+    }
+
+    fn sub(rhs: uint16): uint16 {
+        return this - rhs;
+    }
+
+    fn mul(rhs: uint16): uint16 {
+        return this * rhs;
+    }
+
+    fn div(rhs: uint16): uint16 {
+        return this / rhs;
+    }
+
+    fn rem(rhs: uint16): uint16 {
+        return this % rhs;
+    }
+
+    fn bitAnd(rhs: uint16): uint16 {
+        return this & rhs;
+    }
+
+    fn bitOr(rhs: uint16): uint16 {
+        return this | rhs;
+    }
+
+    fn bitXor(rhs: uint16): uint16 {
+        return this ^ rhs;
+    }
+
+    fn bitNot(): uint16 {
+        return ~this;
+    }
+
+    fn shl(rhs: int): uint16 {
+        return this << rhs;
+    }
+
+    fn shr(rhs: int): uint16 {
+        return this >> rhs;
+    }
 }
 
-extend uint32 :: [Equatable, Ordered, TotalOrder, Hashable, Display, Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
-    fn equals(o: uint32): bool { return this == o; }
+extend uint32 :: [
+    Equatable,
+    Ordered,
+    TotalOrder,
+    Hashable,
+    Display,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+    Shl,
+    Shr
+] {
+    fn equals(o: uint32): bool {
+        return this == o;
+    }
+
     fn compare(o: uint32): ?Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
+
     fn totalCompare(o: uint32): Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
-    fn hash<H :: [Hasher]>(&h: H): void { h.writeUint(this as uint64); }
-    fn show(): string { return f"{this}"; }
-    fn showTo(out: StringBuilder): void { out.putUint(this); }
-    fn add(rhs: uint32): uint32 { return this + rhs; }
-    fn sub(rhs: uint32): uint32 { return this - rhs; }
-    fn mul(rhs: uint32): uint32 { return this * rhs; }
-    fn div(rhs: uint32): uint32 { return this / rhs; }
-    fn rem(rhs: uint32): uint32 { return this % rhs; }
-    fn bitAnd(rhs: uint32): uint32 { return this & rhs; }
-    fn bitOr(rhs: uint32): uint32 { return this | rhs; }
-    fn bitXor(rhs: uint32): uint32 { return this ^ rhs; }
-    fn bitNot(): uint32 { return ~this; }
-    fn shl(rhs: int): uint32 { return this << rhs; }
-    fn shr(rhs: int): uint32 { return this >> rhs; }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        h.writeUint(this as uint64);
+    }
+
+    fn show(): string {
+        return f"{this}";
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.putUint(this);
+    }
+
+    fn add(rhs: uint32): uint32 {
+        return this + rhs;
+    }
+
+    fn sub(rhs: uint32): uint32 {
+        return this - rhs;
+    }
+
+    fn mul(rhs: uint32): uint32 {
+        return this * rhs;
+    }
+
+    fn div(rhs: uint32): uint32 {
+        return this / rhs;
+    }
+
+    fn rem(rhs: uint32): uint32 {
+        return this % rhs;
+    }
+
+    fn bitAnd(rhs: uint32): uint32 {
+        return this & rhs;
+    }
+
+    fn bitOr(rhs: uint32): uint32 {
+        return this | rhs;
+    }
+
+    fn bitXor(rhs: uint32): uint32 {
+        return this ^ rhs;
+    }
+
+    fn bitNot(): uint32 {
+        return ~this;
+    }
+
+    fn shl(rhs: int): uint32 {
+        return this << rhs;
+    }
+
+    fn shr(rhs: int): uint32 {
+        return this >> rhs;
+    }
 }
 
 extend float :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
-    fn equals(o: float): bool { return this == o; }
+    fn equals(o: float): bool {
+        return this == o;
+    }
+
     fn compare(o: float): ?Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
-        if (this == o) { return Ordering.Equal; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
+        if (this == o) {
+            return Ordering.Equal;
+        }
         return null;
     }
-    fn show(): string { return f"{this}"; }
-    fn showTo(out: StringBuilder): void { out.appendStr(textOfFloat(this)); }
-    fn add(rhs: float): float { return this + rhs; }
-    fn sub(rhs: float): float { return this - rhs; }
-    fn mul(rhs: float): float { return this * rhs; }
-    fn div(rhs: float): float { return this / rhs; }
-    fn rem(rhs: float): float { return this % rhs; }
-    fn neg(): float { return -this; }
+
+    fn show(): string {
+        return f"{this}";
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.appendStr(textOfFloat(this));
+    }
+
+    fn add(rhs: float): float {
+        return this + rhs;
+    }
+
+    fn sub(rhs: float): float {
+        return this - rhs;
+    }
+
+    fn mul(rhs: float): float {
+        return this * rhs;
+    }
+
+    fn div(rhs: float): float {
+        return this / rhs;
+    }
+
+    fn rem(rhs: float): float {
+        return this % rhs;
+    }
+
+    fn neg(): float {
+        return -this;
+    }
 }
 
 extend float32 :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
-    fn equals(o: float32): bool { return this == o; }
+    fn equals(o: float32): bool {
+        return this == o;
+    }
+
     fn compare(o: float32): ?Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
-        if (this == o) { return Ordering.Equal; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
+        if (this == o) {
+            return Ordering.Equal;
+        }
         return null;
     }
-    fn show(): string { return f"{this}"; }
-    fn showTo(out: StringBuilder): void { out.appendStr(textOfFloat32(this)); }
-    fn add(rhs: float32): float32 { return this + rhs; }
-    fn sub(rhs: float32): float32 { return this - rhs; }
-    fn mul(rhs: float32): float32 { return this * rhs; }
-    fn div(rhs: float32): float32 { return this / rhs; }
-    fn rem(rhs: float32): float32 { return this % rhs; }
-    fn neg(): float32 { return -this; }
+
+    fn show(): string {
+        return f"{this}";
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.appendStr(textOfFloat32(this));
+    }
+
+    fn add(rhs: float32): float32 {
+        return this + rhs;
+    }
+
+    fn sub(rhs: float32): float32 {
+        return this - rhs;
+    }
+
+    fn mul(rhs: float32): float32 {
+        return this * rhs;
+    }
+
+    fn div(rhs: float32): float32 {
+        return this / rhs;
+    }
+
+    fn rem(rhs: float32): float32 {
+        return this % rhs;
+    }
+
+    fn neg(): float32 {
+        return -this;
+    }
 }
 
 extend bool :: [Equatable, Hashable, Display] {
-    fn equals(o: bool): bool { return this == o; }
-    fn hash<H :: [Hasher]>(&h: H): void { h.writeByte(if (this) 1 else 0); }
-    fn show(): string { return f"{this}"; }
-    fn showTo(out: StringBuilder): void { out.appendStr(if (this) "true" else "false"); }
+    fn equals(o: bool): bool {
+        return this == o;
+    }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        h.writeByte(if (this) 1 else 0);
+    }
+
+    fn show(): string {
+        return f"{this}";
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.appendStr(if (this) "true" else "false");
+    }
 }
 
 extend char :: [Equatable, Ordered, TotalOrder, Hashable, Display] {
-    fn equals(o: char): bool { return this == o; }
+    fn equals(o: char): bool {
+        return this == o;
+    }
+
     fn compare(o: char): ?Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
+
     fn totalCompare(o: char): Ordering {
-        if (this < o) { return Ordering.Less; }
-        if (this > o) { return Ordering.Greater; }
+        if (this < o) {
+            return Ordering.Less;
+        }
+        if (this > o) {
+            return Ordering.Greater;
+        }
         return Ordering.Equal;
     }
-    fn hash<H :: [Hasher]>(&h: H): void { h.writeUint((this as uint32) as uint64); }
-    fn show(): string { return f"{this}"; }
-    fn showTo(out: StringBuilder): void { out.appendChar(this); }
+
+    fn hash<H :: [Hasher]>(&h: H): void {
+        h.writeUint((this as uint32) as uint64);
+    }
+
+    fn show(): string {
+        return f"{this}";
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.appendChar(this);
+    }
 }
 
 extend string :: [Equatable, Display, Add] {
-    fn equals(o: string): bool { return this == o; }
-    fn show(): string { return this; }
-    fn showTo(out: StringBuilder): void { out.appendStr(this); }
-    fn add(rhs: string): string { return this + rhs; }
+    fn equals(o: string): bool {
+        return this == o;
+    }
+
+    fn show(): string {
+        return this;
+    }
+
+    fn showTo(out: StringBuilder): void {
+        out.appendStr(this);
+    }
+
+    fn add(rhs: string): string {
+        return this + rhs;
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1235,7 +1957,11 @@ pub interface Clone {
             }
             return this;
         } else {
-            return Self { comptime for (f in fields<Self>()) [f] = comptime if (attribute<Shared>(f) != null) this.[f] else this.[f].clone() };
+            return Self {
+                comptime for (f in fields<Self>()) [f] = comptime if (attribute<Shared>(f)
+                    != null) this.[f]
+                else this.[f].clone(),
+            };
         }
     }
 }
@@ -1273,69 +1999,157 @@ extend<T, U :: [From<T>]> T :: [Into<U>] {
 }
 
 extend int :: [Debug, Clone, Default] {
-    fn debug(): string { return f"{this}"; }
-    fn clone(): int { return this; }
-    static fn default(): int { return 0; }
+    fn debug(): string {
+        return f"{this}";
+    }
+
+    fn clone(): int {
+        return this;
+    }
+
+    static fn default(): int {
+        return 0;
+    }
 }
 
 extend int8 :: [Debug, Clone, Default] {
-    fn debug(): string { return f"{this}"; }
-    fn clone(): int8 { return this; }
-    static fn default(): int8 { return 0; }
+    fn debug(): string {
+        return f"{this}";
+    }
+
+    fn clone(): int8 {
+        return this;
+    }
+
+    static fn default(): int8 {
+        return 0;
+    }
 }
 
 extend int16 :: [Debug, Clone, Default] {
-    fn debug(): string { return f"{this}"; }
-    fn clone(): int16 { return this; }
-    static fn default(): int16 { return 0; }
+    fn debug(): string {
+        return f"{this}";
+    }
+
+    fn clone(): int16 {
+        return this;
+    }
+
+    static fn default(): int16 {
+        return 0;
+    }
 }
 
 extend int32 :: [Debug, Clone, Default] {
-    fn debug(): string { return f"{this}"; }
-    fn clone(): int32 { return this; }
-    static fn default(): int32 { return 0; }
+    fn debug(): string {
+        return f"{this}";
+    }
+
+    fn clone(): int32 {
+        return this;
+    }
+
+    static fn default(): int32 {
+        return 0;
+    }
 }
 
 extend uint :: [Debug, Clone, Default] {
-    fn debug(): string { return f"{this}"; }
-    fn clone(): uint { return this; }
-    static fn default(): uint { return 0; }
+    fn debug(): string {
+        return f"{this}";
+    }
+
+    fn clone(): uint {
+        return this;
+    }
+
+    static fn default(): uint {
+        return 0;
+    }
 }
 
 extend uint8 :: [Debug, Clone, Default] {
-    fn debug(): string { return f"{this}"; }
-    fn clone(): uint8 { return this; }
-    static fn default(): uint8 { return 0; }
+    fn debug(): string {
+        return f"{this}";
+    }
+
+    fn clone(): uint8 {
+        return this;
+    }
+
+    static fn default(): uint8 {
+        return 0;
+    }
 }
 
 extend uint16 :: [Debug, Clone, Default] {
-    fn debug(): string { return f"{this}"; }
-    fn clone(): uint16 { return this; }
-    static fn default(): uint16 { return 0; }
+    fn debug(): string {
+        return f"{this}";
+    }
+
+    fn clone(): uint16 {
+        return this;
+    }
+
+    static fn default(): uint16 {
+        return 0;
+    }
 }
 
 extend uint32 :: [Debug, Clone, Default] {
-    fn debug(): string { return f"{this}"; }
-    fn clone(): uint32 { return this; }
-    static fn default(): uint32 { return 0; }
+    fn debug(): string {
+        return f"{this}";
+    }
+
+    fn clone(): uint32 {
+        return this;
+    }
+
+    static fn default(): uint32 {
+        return 0;
+    }
 }
 
 extend float :: [Debug, Clone, Default] {
-    fn debug(): string { return f"{this}"; }
-    fn clone(): float { return this; }
-    static fn default(): float { return 0.0; }
+    fn debug(): string {
+        return f"{this}";
+    }
+
+    fn clone(): float {
+        return this;
+    }
+
+    static fn default(): float {
+        return 0.0;
+    }
 }
 
 extend float32 :: [Debug, Clone, Default] {
-    fn debug(): string { return f"{this}"; }
-    fn clone(): float32 { return this; }
-    static fn default(): float32 { return 0.0; }
+    fn debug(): string {
+        return f"{this}";
+    }
+
+    fn clone(): float32 {
+        return this;
+    }
+
+    static fn default(): float32 {
+        return 0.0;
+    }
 }
 
 extend bool :: [Debug, Clone, Default] {
-    fn debug(): string { return f"{this}"; }
-    fn clone(): bool { return this; }
-    static fn default(): bool { return false; }
+    fn debug(): string {
+        return f"{this}";
+    }
+
+    fn clone(): bool {
+        return this;
+    }
+
+    static fn default(): bool {
+        return false;
+    }
 }
 
 extend char :: [Debug, Clone] {
@@ -1348,7 +2162,10 @@ extend char :: [Debug, Clone] {
         out.appendChar('\'');
         return out.toString();
     }
-    fn clone(): char { return this; }
+
+    fn clone(): char {
+        return this;
+    }
 }
 
 // The way into a char: it answers `null` where `as char` would panic, since a number from data is
@@ -1612,9 +2429,18 @@ extend string :: [Debug, Clone, Default] {
         debugText(out, this);
         return out.toString();
     }
-    fn debugTo(out: StringBuilder): void { debugText(out, this); }
-    fn clone(): string { return this; }
-    static fn default(): string { return ""; }
+
+    fn debugTo(out: StringBuilder): void {
+        debugText(out, this);
+    }
+
+    fn clone(): string {
+        return this;
+    }
+
+    static fn default(): string {
+        return "";
+    }
 }
 
 fn debugText(out: StringBuilder, s: StringView): void {
@@ -1701,8 +2527,19 @@ extend string {
 // ---------------------------------------------------------------------------------------------
 
 /// Every number type: its zero and its one, arithmetic that stays in the type.
-pub interface Num :: [Equatable, Ordered, Add<Out = Self>, Sub<Out = Self>, Mul<Out = Self>,
-    Div<Out = Self>, Rem<Out = Self>, Display, Debug, Parse, Default] {
+pub interface Num :: [
+    Equatable,
+    Ordered,
+    Add<Out = Self>,
+    Sub<Out = Self>,
+    Mul<Out = Self>,
+    Div<Out = Self>,
+    Rem<Out = Self>,
+    Display,
+    Debug,
+    Parse,
+    Default
+] {
     static let zero: Self;
     static let one: Self;
 
@@ -1714,12 +2551,20 @@ pub interface Num :: [Equatable, Ordered, Add<Out = Self>, Sub<Out = Self>, Mul<
 
 /// A number with a sign: the signed integers and the floats — what `std.math`'s `abs` and
 /// `signum` take; `uint` has neither.
-pub interface Signed :: [Num, Neg<Out = Self>] {
-}
+pub interface Signed :: [Num, Neg<Out = Self>] { }
 
 /// The eight integer types: their range, a total order, a hash, the bit operators.
-pub interface Integer :: [Num, TotalOrder, Hashable, BitAnd<Out = Self>, BitOr<Out = Self>,
-    BitXor<Out = Self>, BitNot<Out = Self>, Shl<Out = Self>, Shr<Out = Self>] {
+pub interface Integer :: [
+    Num,
+    TotalOrder,
+    Hashable,
+    BitAnd<Out = Self>,
+    BitOr<Out = Self>,
+    BitXor<Out = Self>,
+    BitNot<Out = Self>,
+    Shl<Out = Self>,
+    Shr<Out = Self>
+] {
     static let min: Self;
     static let max: Self;
     static let bitWidth: int;
@@ -1777,7 +2622,8 @@ pub interface Integer :: [Num, TotalOrder, Hashable, BitAnd<Out = Self>, BitOr<O
 
     /// Returns the product, held at `min` or `max` by the sign it would have.
     fn saturatingMul(o: Self): Self {
-        return this.checkedMul(o) ?? (if ((this < Self.zero) != (o < Self.zero)) Self.min else Self.max);
+        return this.checkedMul(o)
+            ?? (if ((this < Self.zero) != (o < Self.zero)) Self.min else Self.max);
     }
 
     /// Returns the sum modulo 2^bitWidth, as `+%` on the type.
@@ -2299,7 +3145,11 @@ extend float32 :: [Num, Signed, Float] {
 // ---------------------------------------------------------------------------------------------
 
 /// Why a text is not a value of the type.
-pub enum ParseErrorKind :: [Equatable, Debug] { Empty, Invalid, Overflow }
+pub enum ParseErrorKind :: [Equatable, Debug] {
+    Empty,
+    Invalid,
+    Overflow,
+}
 
 /// The error `parse` throws when a text is not a value of the type.
 ///
@@ -3637,8 +4487,16 @@ fn readSpec(text: StringView): FormatSpec {
     if (i != n) {
         panic(f"'{text}' is no format spec");
     }
-    return FormatSpec { fill = fill, align = align, plus = plus, alternate = alternate, width = width,
-        grouping = grouping, precision = precision, kind = kind };
+    return FormatSpec {
+        fill = fill,
+        align = align,
+        plus = plus,
+        alternate = alternate,
+        width = width,
+        grouping = grouping,
+        precision = precision,
+        kind = kind,
+    };
 }
 
 fn isAlignment(c: char): bool {
@@ -3677,7 +4535,12 @@ fn paddingOnly(spec: StringView, what: string): FormatSpec {
 /// Returns whether the spec says no more than fill, alignment and width, besides the type
 /// `kind`.
 fn padsOnly(s: FormatSpec, kind: char): bool {
-    return !s.plus && !s.alternate && s.align != '=' && s.grouping == '\0' && s.precision < 0 && s.kind == kind;
+    return !s.plus
+        && !s.alternate
+        && s.align != '='
+        && s.grouping == '\0'
+        && s.precision < 0
+        && s.kind == kind;
 }
 
 /// Writes `text` into `out` in the spec's width, counted in characters.
@@ -3710,7 +4573,13 @@ fn fillOut(c: char, count: int, out: StringBuilder): void {
 ///
 /// Under `0` the zeros go between the sign and the prefix and the digits; otherwise the whole
 /// is padded, right-aligned unless the spec aligns it.
-fn finishNumber(sign: string, prefix: string, digits: string, s: FormatSpec, out: StringBuilder): void {
+fn finishNumber(
+    sign: string,
+    prefix: string,
+    digits: string,
+    s: FormatSpec,
+    out: StringBuilder
+): void {
     if (s.align == '=') {
         out.appendStr(sign);
         out.appendStr(prefix);
@@ -3727,19 +4596,23 @@ fn finishNumber(sign: string, prefix: string, digits: string, s: FormatSpec, out
 /// grouped by three (decimal) or four (another radix).
 fn formatInteger(negative: bool, magnitude: uint, spec: StringView, out: StringBuilder): void {
     let s = readSpec(spec);
-    if (s.precision >= 0 || !(s.kind == '\0' || s.kind == 'b' || s.kind == 'o' || s.kind == 'x' || s.kind == 'X')) {
+    if (s.precision >= 0
+        || !(s.kind == '\0' || s.kind == 'b' || s.kind == 'o' || s.kind == 'x' || s.kind == 'X')) {
         refuseSpec(spec, "an integer");
     }
-    let radix = if (s.kind == 'b') 2 else if (s.kind == 'o') 8 else if (s.kind == 'x' || s.kind == 'X') 16 else 10;
+    let radix = if (s.kind == 'b') 2
+        else if (s.kind == 'o') 8 else if (s.kind == 'x' || s.kind == 'X') 16 else 10;
     var prefix = "";
     if (s.alternate) {
-        prefix = if (s.kind == 'b') "0b" else if (s.kind == 'o') "0o" else if (s.kind == 'X') "0X" else "0x";
+        prefix = if (s.kind == 'b') "0b"
+            else if (s.kind == 'o') "0o" else if (s.kind == 'X') "0X" else "0x";
     }
     let sign = if (negative) "-" else if (s.plus) "+" else "";
     let size = if (radix == 10) 3 else 4;
     // under `0` with a grouping, the zeros are grouped with the digits and the width counts the
     // separators: as many digits as fill the width, at least
-    let least = if (zeroGrouped(s)) digitsFor(s.width - byteCount(sign) - byteCount(prefix), size) else 0;
+    let least = if (zeroGrouped(s)) digitsFor(s.width - byteCount(sign) - byteCount(prefix), size)
+        else 0;
     let digits = digitsOf(magnitude, radix as uint, s.kind == 'X', s.grouping, size, least);
     finishNumber(sign, prefix, digits, s, out);
 }
@@ -3772,7 +4645,14 @@ fn formatSigned(v: int, spec: StringView, out: StringBuilder): void {
 ///
 /// `grouping` stands between each `size` of them from the right; there are `least` digits at
 /// least, zeros before the first.
-fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int, least: int): string {
+fn digitsOf(
+    magnitude: uint,
+    radix: uint,
+    upper: bool,
+    grouping: char,
+    size: int,
+    least: int
+): string {
     var count = 1;
     var rest = magnitude / radix;
     while (rest != 0) {
@@ -3811,7 +4691,8 @@ fn digitsOf(magnitude: uint, radix: uint, upper: bool, grouping: char, size: int
 /// the integer part grouped (the zeros of `0` with it), padded.
 fn formatFloat(v: float, narrow: bool, spec: StringView, out: StringBuilder): void {
     let s = readSpec(spec);
-    if (s.alternate || !(s.kind == '\0' || s.kind == 'e' || s.kind == 'E' || s.kind == 'f' || s.kind == '%')) {
+    if (s.alternate
+        || !(s.kind == '\0' || s.kind == 'e' || s.kind == 'E' || s.kind == 'f' || s.kind == '%')) {
         refuseSpec(spec, "a float");
     }
     let digits = if (s.precision < 0) 6 else s.precision;
@@ -3907,45 +4788,65 @@ fn floatText(value: float, precision: int, form: int): string;
 fn shortestFloat32(value: float32): string;
 
 extend int :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { formatSigned(this, spec, out); }
+    fn format(spec: StringView, out: StringBuilder): void {
+        formatSigned(this, spec, out);
+    }
 }
 
 extend int8 :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { formatSigned(this as int, spec, out); }
+    fn format(spec: StringView, out: StringBuilder): void {
+        formatSigned(this as int, spec, out);
+    }
 }
 
 extend int16 :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { formatSigned(this as int, spec, out); }
+    fn format(spec: StringView, out: StringBuilder): void {
+        formatSigned(this as int, spec, out);
+    }
 }
 
 extend int32 :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { formatSigned(this as int, spec, out); }
+    fn format(spec: StringView, out: StringBuilder): void {
+        formatSigned(this as int, spec, out);
+    }
 }
 
 extend uint :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { formatInteger(false, this, spec, out); }
+    fn format(spec: StringView, out: StringBuilder): void {
+        formatInteger(false, this, spec, out);
+    }
 }
 
 extend uint8 :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { formatInteger(false, this as uint, spec, out); }
+    fn format(spec: StringView, out: StringBuilder): void {
+        formatInteger(false, this as uint, spec, out);
+    }
 }
 
 extend uint16 :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { formatInteger(false, this as uint, spec, out); }
+    fn format(spec: StringView, out: StringBuilder): void {
+        formatInteger(false, this as uint, spec, out);
+    }
 }
 
 extend uint32 :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { formatInteger(false, this as uint, spec, out); }
+    fn format(spec: StringView, out: StringBuilder): void {
+        formatInteger(false, this as uint, spec, out);
+    }
 }
 
 extend float :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { formatFloat(this, false, spec, out); }
+    fn format(spec: StringView, out: StringBuilder): void {
+        formatFloat(this, false, spec, out);
+    }
 }
 
 /// Formats a `float32` as the `float` it widens to, the same value exactly; its shortest text is
 /// its own.
 extend float32 :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { formatFloat(this as float, true, spec, out); }
+    fn format(spec: StringView, out: StringBuilder): void {
+        formatFloat(this as float, true, spec, out);
+    }
 }
 
 /// Formats a string: fill, alignment, width, and the precision as the most characters it keeps.
@@ -3960,13 +4861,16 @@ extend string :: [Format] {
 }
 
 extend char :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { pad(f"{this}", paddingOnly(spec, "a char"), '<', out); }
+    fn format(spec: StringView, out: StringBuilder): void {
+        pad(f"{this}", paddingOnly(spec, "a char"), '<', out);
+    }
 }
 
 extend bool :: [Format] {
-    fn format(spec: StringView, out: StringBuilder): void { pad(f"{this}", paddingOnly(spec, "a bool"), '<', out); }
+    fn format(spec: StringView, out: StringBuilder): void {
+        pad(f"{this}", paddingOnly(spec, "a bool"), '<', out);
+    }
 }
-
 
 /// Iterates over a string's characters, decoded from its UTF-8 bytes.
 ///
@@ -4033,7 +4937,6 @@ pub struct CharIndicesIter :: [Iterator] {
 fn asTypeOf<T, U>(v: T, like: U): U;
 fn floatOfText(s: string): float;
 fn float32OfText(s: string): float32;
-
 
 // ---------------------------------------------------------------------------------------------
 // Iteration: a source of values, one at a time, and what `for` walks.
@@ -4120,66 +5023,165 @@ interface Step :: [TotalOrder] {
 }
 
 extend int :: [Step] {
-    static fn first(): int { return int.min; }
-    static fn last(): int { return int.max; }
-    fn after(): int { return this + 1; }
-    fn before(): int { return this - 1; }
+    static fn first(): int {
+        return int.min;
+    }
+
+    static fn last(): int {
+        return int.max;
+    }
+
+    fn after(): int {
+        return this + 1;
+    }
+
+    fn before(): int {
+        return this - 1;
+    }
 }
 
 extend int8 :: [Step] {
-    static fn first(): int8 { return int8.min; }
-    static fn last(): int8 { return int8.max; }
-    fn after(): int8 { return this + 1; }
-    fn before(): int8 { return this - 1; }
+    static fn first(): int8 {
+        return int8.min;
+    }
+
+    static fn last(): int8 {
+        return int8.max;
+    }
+
+    fn after(): int8 {
+        return this + 1;
+    }
+
+    fn before(): int8 {
+        return this - 1;
+    }
 }
 
 extend int16 :: [Step] {
-    static fn first(): int16 { return int16.min; }
-    static fn last(): int16 { return int16.max; }
-    fn after(): int16 { return this + 1; }
-    fn before(): int16 { return this - 1; }
+    static fn first(): int16 {
+        return int16.min;
+    }
+
+    static fn last(): int16 {
+        return int16.max;
+    }
+
+    fn after(): int16 {
+        return this + 1;
+    }
+
+    fn before(): int16 {
+        return this - 1;
+    }
 }
 
 extend int32 :: [Step] {
-    static fn first(): int32 { return int32.min; }
-    static fn last(): int32 { return int32.max; }
-    fn after(): int32 { return this + 1; }
-    fn before(): int32 { return this - 1; }
+    static fn first(): int32 {
+        return int32.min;
+    }
+
+    static fn last(): int32 {
+        return int32.max;
+    }
+
+    fn after(): int32 {
+        return this + 1;
+    }
+
+    fn before(): int32 {
+        return this - 1;
+    }
 }
 
 extend uint :: [Step] {
-    static fn first(): uint { return uint.min; }
-    static fn last(): uint { return uint.max; }
-    fn after(): uint { return this + 1; }
-    fn before(): uint { return this - 1; }
+    static fn first(): uint {
+        return uint.min;
+    }
+
+    static fn last(): uint {
+        return uint.max;
+    }
+
+    fn after(): uint {
+        return this + 1;
+    }
+
+    fn before(): uint {
+        return this - 1;
+    }
 }
 
 extend uint8 :: [Step] {
-    static fn first(): uint8 { return uint8.min; }
-    static fn last(): uint8 { return uint8.max; }
-    fn after(): uint8 { return this + 1; }
-    fn before(): uint8 { return this - 1; }
+    static fn first(): uint8 {
+        return uint8.min;
+    }
+
+    static fn last(): uint8 {
+        return uint8.max;
+    }
+
+    fn after(): uint8 {
+        return this + 1;
+    }
+
+    fn before(): uint8 {
+        return this - 1;
+    }
 }
 
 extend uint16 :: [Step] {
-    static fn first(): uint16 { return uint16.min; }
-    static fn last(): uint16 { return uint16.max; }
-    fn after(): uint16 { return this + 1; }
-    fn before(): uint16 { return this - 1; }
+    static fn first(): uint16 {
+        return uint16.min;
+    }
+
+    static fn last(): uint16 {
+        return uint16.max;
+    }
+
+    fn after(): uint16 {
+        return this + 1;
+    }
+
+    fn before(): uint16 {
+        return this - 1;
+    }
 }
 
 extend uint32 :: [Step] {
-    static fn first(): uint32 { return uint32.min; }
-    static fn last(): uint32 { return uint32.max; }
-    fn after(): uint32 { return this + 1; }
-    fn before(): uint32 { return this - 1; }
+    static fn first(): uint32 {
+        return uint32.min;
+    }
+
+    static fn last(): uint32 {
+        return uint32.max;
+    }
+
+    fn after(): uint32 {
+        return this + 1;
+    }
+
+    fn before(): uint32 {
+        return this - 1;
+    }
 }
 
 extend char :: [Step] {
-    static fn first(): char { return '\0'; }
-    static fn last(): char { return '\u{10FFFF}'; }
-    fn after(): char { return charAfter(this); }
-    fn before(): char { return charBefore(this); }
+    static fn first(): char {
+        return '\0';
+    }
+
+    static fn last(): char {
+        return '\u{10FFFF}';
+    }
+
+    fn after(): char {
+        return charAfter(this);
+    }
+
+    fn before(): char {
+        return charBefore(this);
+    }
 }
 
 /// Iterates over an array's or a view's elements, from the front and from the back.
@@ -4605,11 +5607,17 @@ extend<T :: [TotalOrder]> Slice<T> {
 }
 
 fn isLess(o: Ordering): bool {
-    return match (o) { .Less => true, _ => false };
+    return match (o) {
+        .Less => true,
+        _ => false,
+    };
 }
 
 fn isGreater(o: Ordering): bool {
-    return match (o) { .Greater => true, _ => false };
+    return match (o) {
+        .Greater => true,
+        _ => false,
+    };
 }
 
 /// Sorts a run by insertion as `sortRunBy` does, under the type's own order.
@@ -4689,7 +5697,12 @@ fn sortRunBy<T, E :: [Error]>(xs: Slice<T>, cmp: fn(T, T) -> Ordering throws E):
 ///
 /// # Errors
 /// What `cmp` throws.
-fn mergeRunsBy<T, E :: [Error]>(src: Slice<T>, dst: Slice<T>, width: int, cmp: fn(T, T) -> Ordering throws E): void throws E {
+fn mergeRunsBy<T, E :: [Error]>(
+    src: Slice<T>,
+    dst: Slice<T>,
+    width: int,
+    cmp: fn(T, T) -> Ordering throws E
+): void throws E {
     let n = src.length();
     var lo = 0;
     while (lo < n) {
@@ -4924,7 +5937,9 @@ pub fn debugSlice<T :: [Debug]>(xs: Slice<T>): string {
 
 /// Returns the debug text of an optional: `null`, or the value's.
 pub fn debugOptional<T :: [Debug]>(o: ?T): string {
-    if (o == null) { return "null"; }
+    if (o == null) {
+        return "null";
+    }
     return o.debug();
 }
 
@@ -4941,8 +5956,12 @@ pub fn equalSlices<T :: [Equatable]>(a: Slice<T>, b: Slice<T>): bool {
 
 /// Returns whether two optionals are equal: both absent, or both present and equal.
 pub fn equalOptionals<T :: [Equatable]>(a: ?T, b: ?T): bool {
-    if (a == null) { return b == null; }
-    if (b == null) { return false; }
+    if (a == null) {
+        return b == null;
+    }
+    if (b == null) {
+        return false;
+    }
     return a == b;
 }
 
@@ -4975,7 +5994,9 @@ pub fn cloneArray<T :: [Clone]>(xs: T[]): T[] {
 
 /// Returns a clone of an optional's value, or `null`.
 pub fn cloneOptional<T :: [Clone]>(o: ?T): ?T {
-    if (o == null) { return null; }
+    if (o == null) {
+        return null;
+    }
     return o.clone();
 }
 
@@ -5228,13 +6249,17 @@ extend<T0 :: [Display], T1 :: [Display], T2 :: [Display]> (T0, T1, T2) :: [Displ
     }
 }
 
-extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable]> (T0, T1, T2, T3) :: [Equatable] {
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable]> (T0, T1, T2, T3) :: [
+    Equatable
+] {
     fn equals(o: (T0, T1, T2, T3)): bool {
         return this.0 == o.0 && this.1 == o.1 && this.2 == o.2 && this.3 == o.3;
     }
 }
 
-extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable]> (T0, T1, T2, T3) :: [Hashable] {
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable]> (T0, T1, T2, T3) :: [
+    Hashable
+] {
     fn hash<H :: [Hasher]>(&h: H): void {
         this.0.hash(&h);
         this.1.hash(&h);
@@ -5263,7 +6288,9 @@ extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug]> (T0, T1, T2, 
     }
 }
 
-extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display]> (T0, T1, T2, T3) :: [Display] {
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display]> (T0, T1, T2, T3) :: [
+    Display
+] {
     fn show(): string {
         let out = StringBuilder.new();
         this.showTo(out);
@@ -5283,13 +6310,17 @@ extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display]> (T0, 
     }
 }
 
-extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable]> (T0, T1, T2, T3, T4) :: [Equatable] {
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable]> (T0, T1, T2, T3, T4) :: [
+    Equatable
+] {
     fn equals(o: (T0, T1, T2, T3, T4)): bool {
         return this.0 == o.0 && this.1 == o.1 && this.2 == o.2 && this.3 == o.3 && this.4 == o.4;
     }
 }
 
-extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable]> (T0, T1, T2, T3, T4) :: [Hashable] {
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable]> (T0, T1, T2, T3, T4) :: [
+    Hashable
+] {
     fn hash<H :: [Hasher]>(&h: H): void {
         this.0.hash(&h);
         this.1.hash(&h);
@@ -5299,7 +6330,9 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T
     }
 }
 
-extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]> (T0, T1, T2, T3, T4) :: [Debug] {
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]> (T0, T1, T2, T3, T4) :: [
+    Debug
+] {
     fn debug(): string {
         let out = StringBuilder.new();
         this.debugTo(out);
@@ -5321,7 +6354,9 @@ extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]
     }
 }
 
-extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display]> (T0, T1, T2, T3, T4) :: [Display] {
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display]> (T0, T1, T2, T3, T4) :: [
+    Display
+] {
     fn show(): string {
         let out = StringBuilder.new();
         this.showTo(out);
@@ -5343,13 +6378,22 @@ extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 ::
     }
 }
 
-extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable]> (T0, T1, T2, T3, T4, T5) :: [Equatable] {
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable]> (T0, T1, T2, T3, T4, T5) :: [
+    Equatable
+] {
     fn equals(o: (T0, T1, T2, T3, T4, T5)): bool {
-        return this.0 == o.0 && this.1 == o.1 && this.2 == o.2 && this.3 == o.3 && this.4 == o.4 && this.5 == o.5;
+        return this.0 == o.0
+            && this.1 == o.1
+            && this.2 == o.2
+            && this.3 == o.3
+            && this.4 == o.4
+            && this.5 == o.5;
     }
 }
 
-extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable]> (T0, T1, T2, T3, T4, T5) :: [Hashable] {
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable]> (T0, T1, T2, T3, T4, T5) :: [
+    Hashable
+] {
     fn hash<H :: [Hasher]>(&h: H): void {
         this.0.hash(&h);
         this.1.hash(&h);
@@ -5360,7 +6404,9 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T
     }
 }
 
-extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug]> (T0, T1, T2, T3, T4, T5) :: [Debug] {
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug]> (T0, T1, T2, T3, T4, T5) :: [
+    Debug
+] {
     fn debug(): string {
         let out = StringBuilder.new();
         this.debugTo(out);
@@ -5384,7 +6430,9 @@ extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]
     }
 }
 
-extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display]> (T0, T1, T2, T3, T4, T5) :: [Display] {
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display]> (T0, T1, T2, T3, T4, T5) :: [
+    Display
+] {
     fn show(): string {
         let out = StringBuilder.new();
         this.showTo(out);
@@ -5408,13 +6456,23 @@ extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 ::
     }
 }
 
-extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable], T6 :: [Equatable]> (T0, T1, T2, T3, T4, T5, T6) :: [Equatable] {
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable], T6 :: [Equatable]> (T0, T1, T2, T3, T4, T5, T6) :: [
+    Equatable
+] {
     fn equals(o: (T0, T1, T2, T3, T4, T5, T6)): bool {
-        return this.0 == o.0 && this.1 == o.1 && this.2 == o.2 && this.3 == o.3 && this.4 == o.4 && this.5 == o.5 && this.6 == o.6;
+        return this.0 == o.0
+            && this.1 == o.1
+            && this.2 == o.2
+            && this.3 == o.3
+            && this.4 == o.4
+            && this.5 == o.5
+            && this.6 == o.6;
     }
 }
 
-extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable], T6 :: [Hashable]> (T0, T1, T2, T3, T4, T5, T6) :: [Hashable] {
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable], T6 :: [Hashable]> (T0, T1, T2, T3, T4, T5, T6) :: [
+    Hashable
+] {
     fn hash<H :: [Hasher]>(&h: H): void {
         this.0.hash(&h);
         this.1.hash(&h);
@@ -5426,7 +6484,9 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T
     }
 }
 
-extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug], T6 :: [Debug]> (T0, T1, T2, T3, T4, T5, T6) :: [Debug] {
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug], T6 :: [Debug]> (T0, T1, T2, T3, T4, T5, T6) :: [
+    Debug
+] {
     fn debug(): string {
         let out = StringBuilder.new();
         this.debugTo(out);
@@ -5452,7 +6512,9 @@ extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]
     }
 }
 
-extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display], T6 :: [Display]> (T0, T1, T2, T3, T4, T5, T6) :: [Display] {
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display], T6 :: [Display]> (T0, T1, T2, T3, T4, T5, T6) :: [
+    Display
+] {
     fn show(): string {
         let out = StringBuilder.new();
         this.showTo(out);
@@ -5478,13 +6540,24 @@ extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 ::
     }
 }
 
-extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable], T6 :: [Equatable], T7 :: [Equatable]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Equatable] {
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable], T6 :: [Equatable], T7 :: [Equatable]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [
+    Equatable
+] {
     fn equals(o: (T0, T1, T2, T3, T4, T5, T6, T7)): bool {
-        return this.0 == o.0 && this.1 == o.1 && this.2 == o.2 && this.3 == o.3 && this.4 == o.4 && this.5 == o.5 && this.6 == o.6 && this.7 == o.7;
+        return this.0 == o.0
+            && this.1 == o.1
+            && this.2 == o.2
+            && this.3 == o.3
+            && this.4 == o.4
+            && this.5 == o.5
+            && this.6 == o.6
+            && this.7 == o.7;
     }
 }
 
-extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable], T6 :: [Hashable], T7 :: [Hashable]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Hashable] {
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable], T6 :: [Hashable], T7 :: [Hashable]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [
+    Hashable
+] {
     fn hash<H :: [Hasher]>(&h: H): void {
         this.0.hash(&h);
         this.1.hash(&h);
@@ -5497,7 +6570,9 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T
     }
 }
 
-extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug], T6 :: [Debug], T7 :: [Debug]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Debug] {
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug], T6 :: [Debug], T7 :: [Debug]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [
+    Debug
+] {
     fn debug(): string {
         let out = StringBuilder.new();
         this.debugTo(out);
@@ -5525,7 +6600,9 @@ extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]
     }
 }
 
-extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display], T6 :: [Display], T7 :: [Display]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Display] {
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display], T6 :: [Display], T7 :: [Display]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [
+    Display
+] {
     fn show(): string {
         let out = StringBuilder.new();
         this.showTo(out);
@@ -5693,7 +6770,11 @@ pub struct SeesConformer :: [OnInterface] { }
 // by name.
 
 /// Who may name a declaration.
-pub enum Visibility :: [Equatable, Debug] { Pub, Internal, Private }
+pub enum Visibility :: [Equatable, Debug] {
+    Pub,
+    Internal,
+    Private,
+}
 
 /// The kind of a type, for decisions while compiling: `comptime if (f.type.kind == .Optional)`.
 ///
@@ -5701,7 +6782,20 @@ pub enum Visibility :: [Equatable, Debug] { Pub, Internal, Private }
 /// `Opaque` for an opaque alias; the shapes `?T`, `T[]`, `T[N]`, a view, a tuple, a function; a
 /// type parameter in a generic body; `Other` for what none of these names.
 pub enum TypeKind :: [Equatable, Debug] {
-    Primitive, Struct, Class, Enum, Interface, Opaque, Optional, Array, InlineArray, Slice, Tuple, Function, Parameter, Other,
+    Primitive,
+    Struct,
+    Class,
+    Enum,
+    Interface,
+    Opaque,
+    Optional,
+    Array,
+    InlineArray,
+    Slice,
+    Tuple,
+    Function,
+    Parameter,
+    Other,
 }
 
 /// A type as a value while compiling: its name, as [typeName] gives it, and its kind.
@@ -5735,7 +6829,11 @@ pub struct VariantInfo :: [Equatable, Debug] {
 
 /// The kind of a member of a type's own body: a function, a constant (a `static let`), an
 /// associated type.
-pub enum MemberKind :: [Equatable, Debug] { Function, Constant, AssociatedType }
+pub enum MemberKind :: [Equatable, Debug] {
+    Function,
+    Constant,
+    AssociatedType,
+}
 
 /// Describes a parameter of a function, in declaration order.
 ///

@@ -15,7 +15,18 @@ import std.collections { List };
 import std.core { Utf8Error };
 import std.crypto { randomUint64 };
 import std.io;
-import std.io { IoError, IoErrorKind, Reader, Seek, SeekFrom, TextReader, Writer, failure, onPool, uncancelled };
+import std.io {
+    IoError,
+    IoErrorKind,
+    Reader,
+    Seek,
+    SeekFrom,
+    TextReader,
+    Writer,
+    failure,
+    onPool,
+    uncancelled,
+};
 import std.os;
 import std.path { join, normalize, parent };
 import std.time { Instant, instantOfEpochNanos };
@@ -69,7 +80,10 @@ pub class File :: [Reader, Writer, Seek, Closeable] {
     /// # Errors
     /// Throws [IoError] with the path when the system cannot open or create it.
     pub static fn create(path: StringView): File throws IoError {
-        return try File.openWith(path, OpenOptions { write = true, create = true, truncate = true });
+        return try File.openWith(
+            path,
+            OpenOptions { write = true, create = true, truncate = true }
+        );
     }
 
     /// Opens `path` as `options` say.
@@ -80,24 +94,50 @@ pub class File :: [Reader, Writer, Seek, Closeable] {
     pub static fn openWith(path: StringView, options: OpenOptions): File throws IoError {
         let name = path.toString();
         if (!options.read && !options.write && !options.append) {
-            throw IoError { kind = .InvalidInput, path = name, detail = "opened neither to read nor to write" };
+            throw IoError {
+                kind = .InvalidInput,
+                path = name,
+                detail = "opened neither to read nor to write",
+            };
         }
         if (options.truncate && (!options.write || options.append)) {
-            throw IoError { kind = .InvalidInput, path = name, detail = "cut to nothing without being written from the start" };
+            throw IoError {
+                kind = .InvalidInput,
+                path = name,
+                detail = "cut to nothing without being written from the start",
+            };
         }
         if (options.create && !options.write && !options.append) {
-            throw IoError { kind = .InvalidInput, path = name, detail = "created without being written" };
+            throw IoError {
+                kind = .InvalidInput,
+                path = name,
+                detail = "created without being written",
+            };
         }
         var how = 0;
-        if (options.read) { how = how | 1; }
-        if (options.write) { how = how | 2; }
-        if (options.append) { how = how | 4; }
-        if (options.create) { how = how | 8; }
-        if (options.truncate) { how = how | 16; }
+        if (options.read) {
+            how = how | 1;
+        }
+        if (options.write) {
+            how = how | 2;
+        }
+        if (options.append) {
+            how = how | 4;
+        }
+        if (options.create) {
+            how = how | 8;
+        }
+        if (options.truncate) {
+            how = how | 16;
+        }
         let flags = how;
         let handle = onPool(() => fsOpen(name, flags));
         if (handle < 0) {
-            throw failure(handle, name, if (options.write || options.append) "opened to write" else "opened to read");
+            throw failure(
+                handle,
+                name,
+                if (options.write || options.append) "opened to write" else "opened to read"
+            );
         }
         return File { handle = handle, name = name };
     }
@@ -277,7 +317,9 @@ pub class FileLinesIter :: [Iterator, Closeable] {
         } catch (e: IoError) {
             this.done = true;
             // the first error wins, the close's is attached to it
-            defer { try this.file.close(); }
+            defer {
+                try this.file.close();
+            }
             throw withPath(e, this.file.name);
         }
         if (line == null) {
@@ -486,15 +528,28 @@ pub class ReadDirIter :: [Iterator, Closeable] {
             let kind = answer >> 32;
             try {
                 let name = string.fromUtf8(this.room[..length]);
-                entry = DirEntry { name = name, path = join(this.dir, name), isFile = kind == 1, isDir = kind == 2, isSymlink = kind == 3 };
+                entry = DirEntry {
+                    name = name,
+                    path = join(this.dir, name),
+                    isFile = kind == 1,
+                    isDir = kind == 2,
+                    isSymlink = kind == 3,
+                };
             } catch (e: Utf8Error) {
-                error = IoError { kind = .InvalidData, path = this.dir, detail = "a name in it is no UTF-8", inner = e };
+                error = IoError {
+                    kind = .InvalidData,
+                    path = this.dir,
+                    detail = "a name in it is no UTF-8",
+                    inner = e,
+                };
             }
         }
         if (let e = error) {
             this.done = true;
             // the first error wins, the close's is attached to it
-            defer { try this.letGo(); }
+            defer {
+                try this.letGo();
+            }
             throw e;
         }
         return entry;
@@ -565,10 +620,18 @@ pub fn copy(from: StringView, to: StringView): int throws IoError {
     let target = to.toString();
     let what = try statOf(source);
     if (!what.isFile) {
-        throw IoError { kind = if (what.isDir) .IsDirectory else .InvalidInput, path = source, detail = "copied: no file" };
+        throw IoError {
+            kind = if (what.isDir) .IsDirectory else .InvalidInput,
+            path = source,
+            detail = "copied: no file",
+        };
     }
     if (exists(target) && (try canonicalize(source)) == (try canonicalize(target))) {
-        throw IoError { kind = .InvalidInput, path = source, detail = f"copied onto itself, {target}" };
+        throw IoError {
+            kind = .InvalidInput,
+            path = source,
+            detail = f"copied onto itself, {target}",
+        };
     }
     using let r = try File.open(source);
     using let w = try File.create(target);
@@ -742,8 +805,7 @@ fn takeAway(name: string, isDir: bool, isLink: bool): ?IoError {
                 try {
                     removeDir(name);
                     return null;
-                } catch (_: IoError) {
-                }
+                } catch (_: IoError) { }
             }
             return e;
         }
@@ -822,8 +884,12 @@ fn pathFrom(name: string, doing: string, call: fn(Slice<uint8>) -> int): string 
             throw failure(answer, name, doing);
         }
         if (answer <= room) {
-            return try string.fromUtf8(buffer[..answer]) catch (e: Utf8Error)
-                throw IoError { kind = .InvalidData, path = name, detail = doing, inner = e };
+            return try string.fromUtf8(buffer[..answer]) catch (e: Utf8Error) throw IoError {
+                kind = .InvalidData,
+                path = name,
+                detail = doing,
+                inner = e,
+            };
         }
         room = answer;
     }

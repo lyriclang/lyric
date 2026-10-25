@@ -55,8 +55,20 @@ fn createDirAllMakesWhatIsNotThere(): void throws IoError {
     try fs.createDirAll(deep);
     try fs.createDirAll(t);
     try fs.writeText(path.join(t, "f"), "");
-    assertTrue(kindOf(() => { try fs.createDirAll(path.join(t, "f")); }) == IoErrorKind.NotDirectory);
-    assertTrue(kindOf(() => { try fs.createDirAll(path.join(t, "f", "g")); }) != null);
+    assertTrue(
+        kindOf(
+            () => {
+                try fs.createDirAll(path.join(t, "f"));
+            }
+        ) == IoErrorKind.NotDirectory
+    );
+    assertTrue(
+        kindOf(
+            () => {
+                try fs.createDirAll(path.join(t, "f", "g"));
+            }
+        ) != null
+    );
     try fs.removeAll(t);
 }
 
@@ -74,7 +86,13 @@ fn aWalkGoesDepthFirstInTheOrderOfTheNames(): void throws IoError {
     assertEq(try walked(t), "A.md a/ a.txt b/ b/c/ b/c/x.txt b/y.txt z.txt");
     // an empty directory walks to nothing; one that is not there throws
     assertEq(try walked(path.join(t, "a")), "");
-    assertTrue(kindOf(() => { let _ = try walked(path.join(t, "none")); }) == IoErrorKind.NotFound);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try walked(path.join(t, "none"));
+            }
+        ) == IoErrorKind.NotFound
+    );
     try fs.removeAll(t);
 }
 
@@ -91,11 +109,29 @@ fn copyCopiesTheBytes(): void throws IoError {
     assertEq(try fs.readText(path.join(t, "copy.bin")), "small");
     // onto itself, from a directory, from nothing
     let s = path.separator;
-    assertTrue(kindOf(() => { let _ = try fs.copy(path.join(t, "small.txt"), f"{t}{s}.{s}small.txt"); }) == IoErrorKind.InvalidInput);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try fs.copy(path.join(t, "small.txt"), f"{t}{s}.{s}small.txt");
+            }
+        ) == IoErrorKind.InvalidInput
+    );
     assertEq(try fs.readText(path.join(t, "small.txt")), "small");
-    assertTrue(kindOf(() => { let _ = try fs.copy(t, path.join(t, "d")); }) == IoErrorKind.IsDirectory);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try fs.copy(t, path.join(t, "d"));
+            }
+        ) == IoErrorKind.IsDirectory
+    );
     assertFalse(fs.exists(path.join(t, "d")));
-    assertTrue(kindOf(() => { let _ = try fs.copy(path.join(t, "none"), path.join(t, "e")); }) == IoErrorKind.NotFound);
+    assertTrue(
+        kindOf(
+            () => {
+                let _ = try fs.copy(path.join(t, "none"), path.join(t, "e"));
+            }
+        ) == IoErrorKind.NotFound
+    );
     try fs.removeAll(t);
 }
 

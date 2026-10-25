@@ -45,7 +45,10 @@ pub fn envs(): Map<string, string> {
         let entry = block[at..end];
         // the name ends at the first '=' after its first byte (Windows' own entries begin with one)
         if (let eq = entry[1..].indexOf(61u8)) {
-            let _ = all.insert(string.fromUtf8Lossy(entry[..(eq + 1)]), string.fromUtf8Lossy(entry[(eq + 2)..]));
+            let _ = all.insert(
+                string.fromUtf8Lossy(entry[..(eq + 1)]),
+                string.fromUtf8Lossy(entry[(eq + 2)..])
+            );
         }
         at = end + 1;
     }
@@ -62,7 +65,9 @@ pub fn envs(): Map<string, string> {
 pub fn setEnv(name: StringView, value: StringView): void {
     let key = name.toString();
     if (key.isEmpty() || key.contains('=') || key.contains('\0') || value.contains('\0')) {
-        panic(f"os.setEnv: '{key}' cannot be an environment variable's name, or its value holds a NUL");
+        panic(
+            f"os.setEnv: '{key}' cannot be an environment variable's name, or its value holds a NUL"
+        );
     }
     let answer = osSetEnv(key, value.toString());
     if (answer < 0) {
@@ -285,9 +290,11 @@ class SignalHub {
         this.guard.release();
         catchAll(added, true);
         if (start) {
-            let _ = Thread.spawn(() => {
-                signalHub.watch();
-            });
+            let _ = Thread.spawn(
+                () => {
+                    signalHub.watch();
+                }
+            );
         }
     }
 

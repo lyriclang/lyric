@@ -16,9 +16,13 @@ import std.task { keepThreadRandomState, threadRandomState };
 /// The layout of a generator's state: the key, the block counter (low, high), the block, and how
 /// many of its words are used (16: all of them, a new block is due).
 let keyAt = 0;
+
 let counterAt = 8;
+
 let blockAt = 10;
+
 let usedAt = 26;
+
 let stateWords = 27;
 
 /// A generator of random numbers: ChaCha8 (eight rounds), 64 bits a draw.
@@ -52,8 +56,10 @@ pub class Random {
         let state: uint32[] = [0u32] * stateWords;
         var i = 0;
         while (i < 8) {
-            state[keyAt + i] = (key[4 * i] as uint32) | ((key[4 * i + 1] as uint32) << 8)
-                | ((key[4 * i + 2] as uint32) << 16) | ((key[4 * i + 3] as uint32) << 24);
+            state[keyAt + i] = (key[4 * i] as uint32)
+                | ((key[4 * i + 1] as uint32) << 8)
+                | ((key[4 * i + 2] as uint32) << 16)
+                | ((key[4 * i + 3] as uint32) << 24);
             i = i + 1;
         }
         state[usedAt] = 16u32;
@@ -182,9 +188,24 @@ pub class Random {
 /// Computes one ChaCha8 block (RFC 8439 §2.3, eight rounds) from the key and the counter into
 /// the state's block, moves the counter on and marks the block's words unused.
 fn chacha8(state: uint32[]): void {
-    let x: uint32[] = [0x61707865u32, 0x3320646eu32, 0x79622d32u32, 0x6b206574u32,
-        state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7],
-        state[counterAt], state[counterAt + 1], 0u32, 0u32];
+    let x: uint32[] = [
+        0x61707865u32,
+        0x3320646eu32,
+        0x79622d32u32,
+        0x6b206574u32,
+        state[0],
+        state[1],
+        state[2],
+        state[3],
+        state[4],
+        state[5],
+        state[6],
+        state[7],
+        state[counterAt],
+        state[counterAt + 1],
+        0u32,
+        0u32,
+    ];
     let input = x.clone();
     var round = 0;
     while (round < 4) {

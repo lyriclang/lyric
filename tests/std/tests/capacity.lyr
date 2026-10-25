@@ -64,9 +64,29 @@ fn everyContainerTakesACapacity(): void {
 
 @Test
 fn aNegativeCapacityPanics(): void {
-    assertPanics(() => { List<int>.withCapacity(-1); });
-    assertPanics(() => { Deque<int>.withCapacity(-1); });
-    assertPanics(() => { Map<int, int>.withCapacity(-1); });
-    assertPanics(() => { Set<int>.withCapacity(-1); });
-    assertPanics(() => { Heap<int>.withCapacity(-1); });
+    assertPanics(
+        () => {
+            List<int>.withCapacity(-1);
+        }
+    );
+    assertPanics(
+        () => {
+            Deque<int>.withCapacity(-1);
+        }
+    );
+    assertPanics(
+        () => {
+            Map<int, int>.withCapacity(-1);
+        }
+    );
+    assertPanics(
+        () => {
+            Set<int>.withCapacity(-1);
+        }
+    );
+    assertPanics(
+        () => {
+            Heap<int>.withCapacity(-1);
+        }
+    );
 }

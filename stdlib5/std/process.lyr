@@ -16,7 +16,16 @@ import std.task;
 import std.task { Cancelled, Channel, SpinLock, Waits, awaitDescriptor, forgetDescriptor, here };
 import std.thread { Thread };
 
-fn processSpawn(program: string, args: Slice<uint8>, argc: int, env: Slice<uint8>, envc: int, cwd: string, modes: int, ends: Slice<int>): int;
+fn processSpawn(
+    program: string,
+    args: Slice<uint8>,
+    argc: int,
+    env: Slice<uint8>,
+    envc: int,
+    cwd: string,
+    modes: int,
+    ends: Slice<int>
+): int;
 fn processAttach(): void;
 fn processNudge(): void;
 fn processReap(pid: int): int;
@@ -67,7 +76,11 @@ pub struct Command {
         for (pair in this.env) {
             let (name, value) = pair;
             if (name.isEmpty() || name.contains("=")) {
-                throw IoError { kind = .InvalidInput, path = this.program, detail = f"a variable named '{name}'" };
+                throw IoError {
+                    kind = .InvalidInput,
+                    path = this.program,
+                    detail = f"a variable named '{name}'",
+                };
             }
             try appendPart(env, f"{name}={value}", nul);
         }
@@ -75,8 +88,16 @@ pub struct Command {
         let ends: int[] = [-1, -1, -1];
         let argBytes = args.toString();
         let envBytes = env.toString();
-        let pid = processSpawn(this.program, viewBytes(argBytes), this.args.length() + 1, viewBytes(envBytes),
-            this.env.length(), this.cwd ?? "", modes, ends[..]);
+        let pid = processSpawn(
+            this.program,
+            viewBytes(argBytes),
+            this.args.length() + 1,
+            viewBytes(envBytes),
+            this.env.length(),
+            this.cwd ?? "",
+            modes,
+            ends[..]
+        );
         if (pid < 0) {
             throw failure(pid, this.program, "started");
         }
@@ -98,13 +119,19 @@ pub struct Command {
     /// Throws [IoError] when the child cannot be started or a pipe fails, and [Cancelled] when the
     /// waiting task is cancelled.
     pub fn output(): Output throws [IoError, Cancelled] {
-        var child = try (this with { stdin = Stdio.Null, stdout = Stdio.Piped, stderr = Stdio.Piped }).spawn();
+        var child = try (this with {
+            stdin = Stdio.Null,
+            stdout = Stdio.Piped,
+            stderr = Stdio.Piped,
+        }).spawn();
         var errors = child.stderr!;
-        let taken = task.spawn(() => {
-            let bytes = try errors.readToEnd();
-            try errors.close();
-            return bytes;
-        });
+        let taken = task.spawn(
+            () => {
+                let bytes = try errors.readToEnd();
+                try errors.close();
+                return bytes;
+            }
+        );
         var out = child.stdout!;
         let bytes = try out.readToEnd();
         try out.close();
@@ -232,7 +259,8 @@ pub struct ExitStatus :: [Equatable, Debug] {
 extend ExitStatus :: [Display] {
     /// Returns `exit code 3` or `signal 9`.
     fn show(): string {
-        return if (this.raw < signalled) f"exit code {this.raw}" else f"signal {this.raw - signalled}";
+        return if (this.raw < signalled) f"exit code {this.raw}"
+            else f"signal {this.raw - signalled}";
     }
 }
 
@@ -401,9 +429,11 @@ class Reaper {
         this.started = true;
         this.guard.release();
         if (start) {
-            let _ = Thread.spawn(() => {
-                reaper.watch();
-            });
+            let _ = Thread.spawn(
+                () => {
+                    reaper.watch();
+                }
+            );
         } else {
             processNudge();
         }

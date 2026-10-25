@@ -14,7 +14,9 @@ class Res :: [Closeable] {
 }
 
 class Boom :: [Error] {
-    fn message(): string { return "boom"; }
+    fn message(): string {
+        return "boom";
+    }
 }
 
 fn explode(): void throws Boom {
@@ -46,7 +48,9 @@ fn messages(errors: Error[]): string[] {
 
 @Test
 fn aCloseThatFailsIsSeenInTheClause(): void {
-    try { closing(); } catch (e) {
+    try {
+        closing();
+    } catch (e) {
         assertEq(e.message(), "boom");
         assertEq(messages(e.suppressed()), ["close b", "close a"]);
     }
@@ -54,14 +58,18 @@ fn aCloseThatFailsIsSeenInTheClause(): void {
 
 @Test
 fn aDeferThatFailsIsSeenInATypedClause(): void throws Error {
-    try { deferring(); } catch (e: Boom) {
+    try {
+        deferring();
+    } catch (e: Boom) {
         assertEq(messages(e.suppressed()), ["defer d"]);
     }
 }
 
 @Test
 fn anErrorNothingWasSuppressedIntoHasNone(): void {
-    try { explode(); } catch (e) {
+    try {
+        explode();
+    } catch (e) {
         assertEq(e.suppressed().length(), 0);
     }
 }
@@ -70,7 +78,9 @@ fn anErrorNothingWasSuppressedIntoHasNone(): void {
 fn aRethrownBindingKeepsWhatWasSuppressed(): void {
     var inner = -1;
     try {
-        try { closing(); } catch (e) {
+        try {
+            closing();
+        } catch (e) {
             inner = e.suppressed().length();
             throw e;
         }
@@ -82,7 +92,9 @@ fn aRethrownBindingKeepsWhatWasSuppressed(): void {
 
 @Test
 fn theArrayIsTheClausesOwn(): void {
-    try { closing(); } catch (e) {
+    try {
+        closing();
+    } catch (e) {
         let first = e.suppressed();
         first[0] = Exception("changed");
         assertEq(e.suppressed()[0].message(), "close b");
@@ -102,7 +114,9 @@ fn counted(): int throws Error {
 
 @Test
 fn aBacktraceNamesTheThrowerWhereOneIsKept(): void {
-    try { explode(); } catch (e) {
+    try {
+        explode();
+    } catch (e) {
         let where = e.backtrace();
         if (where != null) {
             assertTrue(where.show().contains("explode"));
@@ -111,7 +125,9 @@ fn aBacktraceNamesTheThrowerWhereOneIsKept(): void {
 }
 
 fn shownTrace(_i: int): bool {
-    try { explode(); } catch (e) {
+    try {
+        explode();
+    } catch (e) {
         let where = e.backtrace();
         if (where != null) {
             return where.show().contains("explode");
