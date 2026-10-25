@@ -158,14 +158,15 @@ public sealed record Project(string Source, string Name, string Module, string R
     /// <param name="offline">Whether packages from git come from the user's cache alone.</param>
     /// <exception cref="ManifestException">The manifest, or one of the graph's, is refused.</exception>
     /// <param name="locked">Whether the lock is taken as it is (<c>--locked</c>).</param>
-    public static Project? TestsOf(string directory, bool offline = false, bool locked = false)
+    /// <param name="write">Whether the lock is written; the editor reads a package and writes nothing.</param>
+    public static Project? TestsOf(string directory, bool offline = false, bool locked = false, bool write = true)
     {
         if (FindManifest(Path.GetFullPath(directory)) is not { } manifestFile) return null;
         var manifest = Manifest.Read(manifestFile);
         return new Project(Path.Combine(manifest.Root, "tests", TestRun.DriverModule + ".lyr"), manifest.Name,
             $"{manifest.Name}.{TestRun.DriverModule}", manifest.Root, manifest)
         {
-            Graph = Resolve(manifest, offline, locked: locked),
+            Graph = Resolve(manifest, offline, locked: locked, write: write),
             Binary = manifest.Name,
             TestRoot = Path.Combine(manifest.Root, "tests"),
         };
@@ -173,10 +174,11 @@ public sealed record Project(string Source, string Name, string Module, string R
 
     /// <summary>The graph of <paramref name="manifest"/>'s program, read at the commits its
     /// <c>lyric.lock</c> holds; the lock is written afterwards with what the graph read —
-    /// or, <paramref name="locked"/>, taken as it is and not written.</summary>
+    /// or, <paramref name="locked"/>, taken as it is and not written; not <paramref name="write"/>,
+    /// left as it is.</summary>
     /// <exception cref="ManifestException">The graph, or the lock, is refused.</exception>
     public static PackageGraph Resolve(Manifest manifest, bool offline, Func<string, bool>? refresh = null,
-        Func<Locked, bool>? keep = null, bool locked = false)
+        Func<Locked, bool>? keep = null, bool locked = false, bool write = true)
     {
         var lockFile = LockFile.For(manifest);
         var held = LockFile.Read(lockFile).Where(keep ?? (_ => true)).ToList();
@@ -190,7 +192,7 @@ public sealed record Project(string Source, string Name, string Module, string R
                 scripts[package.Name] = PackageGraph.Resolve(package.ScriptRoot(manifest), git, held, frozen: locked);
         var entries = LockFile.Sorted(graph.Locked.Concat(scripts.Values.SelectMany(s => s.Locked)).Distinct()).ToList();
         if (locked) LockFile.RefuseChange(lockFile, entries);
-        else LockFile.Write(lockFile, entries);
+        else if (write) LockFile.Write(lockFile, entries);
         return graph with { Scripts = scripts };
     }
 

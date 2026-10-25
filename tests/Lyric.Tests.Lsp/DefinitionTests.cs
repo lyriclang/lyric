@@ -26,7 +26,7 @@ public sealed class DefinitionTests
         var (program, cursor, expected) = Markers(marked);
         var path = Path.Combine(AppContext.BaseDirectory, "definition.lyr");
 
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, program));
+        var result = Single.Check(path, program);
         Assert.NotNull(result.Model);
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);
@@ -48,7 +48,7 @@ public sealed class DefinitionTests
         var (program, cursor, _) = Markers(marked);
         var path = Path.Combine(AppContext.BaseDirectory, "definition.lyr");
 
-        result = SourceCompiler.Check(ScriptSource.FromBuffer(path, program));
+        result = Single.Check(path, program);
         Assert.NotNull(result.Model);
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);
@@ -214,9 +214,9 @@ public sealed class DefinitionTests
         // works without a second mechanism for "foreign" targets.
         var path = Path.Combine(AppContext.BaseDirectory, "stdlib-jump.lyr");
         const string program =
-            "import std.io.console { println };\n\nfn main(): int {\n    println(\"hi\");\n    return 0;\n}\n";
+            "import std.io { println };\n\nfn main(): int {\n    println(\"hi\");\n    return 0;\n}\n";
 
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, program));
+        var result = Single.Check(path, program);
         Assert.NotNull(result.Model);
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);
@@ -227,7 +227,7 @@ public sealed class DefinitionTests
         Assert.NotEqual(file, target.File);
 
         var targetPath = result.Sources.GetPath(target.File);
-        Assert.EndsWith("console.lyr", targetPath.Replace('\\', '/'));
+        Assert.EndsWith("std/io.lyr", targetPath.Replace('\\', '/'));
 
         // A real path, so a URI can be built from it and the editor can open the file.
         Assert.True(File.Exists(targetPath));
@@ -346,7 +346,7 @@ public sealed class DefinitionProtocolTests
     {
         var uri = DocumentUri.FromFilePath(BufferPath());
         const string program =
-            "import std.io.console { println };\n\nfn main(): int {\n    println(\"hi\");\n    return 0;\n}\n";
+            "import std.io { println };\n\nfn main(): int {\n    println(\"hi\");\n    return 0;\n}\n";
 
         await using var harness = new ServerHarness();
         await harness.InitializeAsync();
@@ -362,7 +362,7 @@ public sealed class DefinitionProtocolTests
         Assert.NotNull(target);
         Assert.NotEqual(uri, target);
         Assert.StartsWith("file:///", target);
-        Assert.EndsWith("console.lyr", target);
+        Assert.EndsWith("std/io.lyr", target);
 
         // The point of building it: the client has to be able to turn it back into a file.
         Assert.True(DocumentUri.TryToFilePath(target, out var back) && File.Exists(back));

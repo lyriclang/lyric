@@ -54,6 +54,7 @@ public static partial class Program
             "fmt" => Fmt(rest),
             "doc" => Doc(rest),
             "api" => Api(rest),
+            "lsp" => Lsp(rest),
             "env" => Env(rest),
             "new" => New(rest, here: false),
             "init" => New(rest, here: true),

@@ -24,7 +24,7 @@ public sealed record RenameRange(Span Span, string Placeholder);
 /// would be the second answer to the same question — the thing this project does not do.</para>
 ///
 /// <para>Every refusal carries its reason. A rename that silently does nothing reads as a broken
-/// editor; one that says "declared outside this project" reads as a rule.</para>
+/// editor; one that says "declared outside this package" reads as a rule.</para>
 /// </summary>
 public static class RenameProvider
 {
@@ -72,7 +72,7 @@ public static class RenameProvider
 
         var declaringModule = ModuleOf(model, declaration.Span.File);
         if (declaringModule is null || model.Compilation.IsNative(declaringModule))
-            return Refuse($"'{symbol.Name}' is declared outside this project");
+            return Refuse($"'{symbol.Name}' is declared outside this package");
 
         if (declaration is not INamedDecl named)
             return Refuse($"renaming this form of declaration is not supported");
@@ -85,6 +85,10 @@ public static class RenameProvider
             if (!ReferenceEquals(ReferenceProvider.Target(bound), symbol)) continue;
             if (ReferenceEquals(symbol.Declaration, use)) continue;
             if (!visited.Add(use)) continue;
+
+            // Code the compiler wrote — a synthesized Debug or Equatable — is made from the
+            // declaration again; it has no file to edit.
+            if (model.Compilation.IsSynthesized(use.Span.File)) continue;
 
             var span = NameSpans.Of(use);
             if (span is null)
@@ -126,15 +130,15 @@ public static class RenameProvider
             .DistinctBy(site => (site.File, site.Span.Start, site.Span.End))
             .ToList();
 
-        // Outside a project the compilation is rooted at one buffer, and files this compilation
+        // Outside a package the compilation is rooted at one buffer, and files this compilation
         // cannot see may import the edited one. Within one file nothing outside can break.
         if (!projectWide)
         {
             foreach (var site in deduplicated)
                 if (site.File != file)
                     return Refuse(
-                        "the file is not part of a project; a rename that would touch other files "
-                        + "needs a lyric.json");
+                        "the file is not part of a package; a rename that would touch other files "
+                        + "needs a lyric.toml");
         }
 
         var range = new RenameRange(NameSpans.Of(node) ?? node.Span, symbol.Name);

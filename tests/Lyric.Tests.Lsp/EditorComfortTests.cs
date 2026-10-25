@@ -20,7 +20,7 @@ public sealed class SignatureHelpTests
         var program = programWithMarker.Remove(offset, 1);
         var path = Path.Combine(AppContext.BaseDirectory, "sighelp.lyr");
 
-        return SignatureHelpProvider.At(path, program, offset, new CompilerOptions());
+        return SignatureHelpProvider.At(path, program, offset, Single.Options(path));
     }
 
     private const string Fixture =
@@ -109,7 +109,7 @@ public sealed class SignatureHelpTests
     [Fact]
     public void The_standard_library_answers_from_its_declaration()
     {
-        const string program = "import std.io.console { println };\n"
+        const string program = "import std.io { println };\n"
             + "fn main(): int {\n"
             + "    println($);\n"
             + "    return 0;\n"
@@ -128,7 +128,7 @@ public sealed class FoldingTests
     private static IReadOnlyList<FoldingRange> Fold(string program)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "folding.lyr");
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, program));
+        var result = Single.Check(path, program);
         Assert.NotNull(result.Model);
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);
@@ -181,7 +181,7 @@ public sealed class InlayHintTests
     private static IReadOnlyList<InlayHint> Hints(string program)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "inlay.lyr");
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, program));
+        var result = Single.Check(path, program);
         Assert.NotNull(result.Model);
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);

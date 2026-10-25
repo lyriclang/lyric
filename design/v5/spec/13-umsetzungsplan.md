@@ -1153,3 +1153,34 @@ S7 sie aus `RuntimeLayout` und prüft sie mit lldb im Batch-Modus. Die Tree-sitt
 der Sprache und darum der riskanteste Text des Meilensteins — die Korpusprüfung über dieselben Dateien, die der
 Formatierer schon bestand, hält sie ehrlich; eine TextMate-Grammatik von Hand daneben wäre der Fehler, den die
 Regel „ein Mechanismus pro Konzept“ verbietet.
+
+### Nachtrag 2026-10-25 — S1 gemessen: die std trägt jede Analyse
+
+`lyric lsp` analysiert ein Paket so, wie `lyric test` es kompiliert (`src/` und `tests/`, der Graph offline,
+kein Lock geschrieben); eine Datei außerhalb jedes Pakets allein mit der std. Gemessen je Analyse mit
+`CheckProject` und seinen neuen Phasenzeiten (Release, 8 Kerne, WSL; warm = Median aus sechs Läufen nach
+dem ersten):
+
+| Einheit | Dateien | kalt | warm | warm je Phase (ms) |
+|---|---|---|---|---|
+| eine Datei (`println`) | 199 | 2715 ms | 812 ms | parse 0, resolve 95, check 391, evaluate 105, lower 201, lint 20 |
+| ein Paket, 21 Module | 153 | 426 ms | 431 ms | parse 4, resolve 70, check 224, evaluate 35, lower 75, lint 22 |
+| eine Datei, die 31 std-Module importiert | 429 | 2193 ms | 1609 ms | resolve 245, check 753, evaluate 291, lower 285, lint 35 |
+
+„Dateien“ zählt die Quellen der Kompilation: die std-Module und die synthetisierten Konformanzen machen fast
+alle aus. 4.x brauchte 93–106 ms je 5-Zeilen-Datei; Lyric 5 braucht für dieselbe Größe das Achtfache, weil die
+std größer ist und jede Analyse sie **ganz** prüft, auswertet und senkt. Daraus für S2:
+
+- **Die std ist der Schnitt.** Ihre Module hängen nicht vom Paket ab; geprüft einmal je Toolchain und
+  wiederverwendet, fallen resolve und check auf den Anteil des Pakets (im 21-Modul-Paket ~60 von 300 ms).
+  Was der Checker dafür braucht — die Tabellen eines Moduls ohne die Instanzen, die erst das Paket
+  verlangt, und die synthetisierten Konformanzen der Pakettypen in den std-Interfaces —, klärt S2 zuerst
+  als Bericht.
+- **Senken gehört nicht in den Editor**: `lower` sind 25 % der Einzeldatei; die Meldungen des Senkens
+  (`LYR-IR…`) sind die einzigen, die verloren gingen. S2 misst, welche das sind, bevor es den Schritt
+  streicht — 11 E1 schreibt „ohne Monomorphisierung/Senkung“.
+- `evaluate` (Q8) bleibt, mit dem kleineren Budget des Editors.
+
+Neben der Messung: Referenzen und Rename fanden Stellen in synthetisiertem Code (`<synthesized Debug for
+main.Point>`) und hätten dort editiert — jetzt ausgeschlossen; Hover schreibt Signaturen noch in 4.x-Form
+(`fn println<T>(T) -> void`) — ein Punkt für S3.

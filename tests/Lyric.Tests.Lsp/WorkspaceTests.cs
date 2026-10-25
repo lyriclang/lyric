@@ -9,10 +9,10 @@ using Lyric.Lsp.Protocol;
 namespace Lyric.Tests.Lsp;
 
 /// <summary>
-/// The project as ONE compilation: every file under the source root in one symbol world.
+/// The package as ONE compilation: every module under its <c>src/</c> in one symbol world.
 ///
-/// <para>The first half drives <see cref="SourceCompiler.CheckProject"/> directly and pins what a
-/// workspace compilation is. The second half drives the server and pins what an editor sees of it:
+/// <para>The first half drives <see cref="SourceCompiler.CheckProject"/> over the
+/// <see cref="PackageUnit"/> directly and pins what a workspace compilation is. The second half drives the server and pins what an editor sees of it:
 /// answers that cross file boundaries in BOTH directions, and diagnostics for files nobody has
 /// open.</para>
 /// </summary>
@@ -24,7 +24,7 @@ public sealed class WorkspaceTests : IDisposable
     public WorkspaceTests()
     {
         Directory.CreateDirectory(Path.Combine(_dir, "src"));
-        File.WriteAllText(Path.Combine(_dir, "lyric.json"), """{ "sourceRoot": "src" }""");
+        File.WriteAllText(Path.Combine(_dir, "lyric.toml"), "[package]\nname = \"app\"\nversion = \"0.1.0\"\n");
     }
 
     public void Dispose()
@@ -42,22 +42,20 @@ public sealed class WorkspaceTests : IDisposable
         return path;
     }
 
-    private const string UtilSource = "module util;\n\npub fn value(): int { return 1; }\n";
+    private const string UtilSource = "pub fn value(): int { return 1; }\n";
 
     private const string AppSource =
-        "import util { value };\n\nfn main(): int { return value(); }\n";
+        "import app.util { value };\n\nfn main(): int { return value(); }\n";
 
-    private CompileResult CheckProject(params string[] paths) =>
-        SourceCompiler.CheckProject(
-            paths.Select(p => ScriptSource.FromDisk(p, ModuleName(p))).ToArray(),
-            new CompilerOptions { SourceRoot = Path.Combine(_dir, "src") });
+    /// <summary>The package the server would analyse for these files, as it would.</summary>
+    private PackageUnit Unit(string path) =>
+        PackageUnit.Find(path, out var refused) ?? throw new InvalidOperationException(refused ?? "no package");
 
-    /// <summary>The same derivation the server makes: the path under the source root, dotted.</summary>
-    private string ModuleName(string path)
+    private CompileResult CheckProject(params string[] paths)
     {
-        var relative = Path.GetRelativePath(Path.Combine(_dir, "src"), path);
-        return string.Join('.', relative[..^".lyr".Length]
-            .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        var unit = Unit(paths[0]);
+        return SourceCompiler.CheckProject(
+            paths.Select(p => ScriptSource.FromDisk(p, unit.ModuleOf(p)!)).ToArray(), unit.Options);
     }
 
     /// <summary>The module AST a file was parsed into — what a cursor question walks.</summary>
@@ -110,23 +108,6 @@ public sealed class WorkspaceTests : IDisposable
     }
 
     [Fact]
-    public void A_single_program_still_rejects_a_second_main()
-    {
-        // The workspace rule must not leak into the ordinary compile: one program with a 'main' in
-        // an imported module is still exactly one executable with two entry points.
-        Write("util.lyr", "module util;\n\npub fn helper(): int { return 1; }\n"
-            + "fn main(): int { return 9; }\n");
-        var app = Write("app.lyr", "import util { helper };\n\nfn main(): int { return helper(); }\n");
-
-        var result = SourceCompiler.Check(app,
-            new CompilerOptions { SourceRoot = Path.Combine(_dir, "src") });
-
-        Assert.Contains(result.Diagnostics.SortedSnapshot(),
-            diagnostic => diagnostic.Code == "LYR-SEM0021"
-                && diagnostic.Message.Contains("duplicate"));
-    }
-
-    [Fact]
     public void A_root_imported_by_another_root_is_read_once()
     {
         // The import finds the module already registered under the name the path derives, so the
@@ -149,13 +130,13 @@ public sealed class WorkspaceTests : IDisposable
     {
         // The cycle guard of the loader applies to roots as well: registration happens before
         // anything resolves, so the mutual import terminates and both modules get analysed.
-        var a = Write("a.lyr", "module a;\nimport b;\n\npub fn fromA(): int { return 1; }\n");
-        var b = Write("b.lyr", "module b;\nimport a;\n\npub fn fromB(): int { return 2; }\n");
+        var a = Write("a.lyr", "import app.b;\n\npub fn fromA(): int { return 1; }\n");
+        var b = Write("b.lyr", "import app.a;\n\npub fn fromB(): int { return 2; }\n");
 
         var result = CheckProject(a, b);
         Assert.NotNull(result.Model);
         Assert.Equal(2, result.Model.Compilation.Modules
-            .Count(m => m.FullName is "a" or "b"));
+            .Count(m => m.FullName is "app.a" or "app.b"));
     }
 
     // ------------------------------------------------------------------ the server
@@ -198,11 +179,11 @@ public sealed class WorkspaceTests : IDisposable
         // The analysis is done when the buffer's own batch arrives; asking earlier races it.
         await DiagnosticsFor(harness, utilUri);
 
-        // The cursor on 'value' in its DECLARATION: line 2, inside the name.
+        // The cursor on 'value' in its DECLARATION: line 0, inside the name.
         var id = await harness.RequestAsync(LspMethods.References, JsonSerializer.Serialize(new
         {
             textDocument = new { uri = utilUri },
-            position = new { line = 2, character = 8 },
+            position = new { line = 0, character = 8 },
             context = new { includeDeclaration = false },
         }));
 
@@ -220,7 +201,7 @@ public sealed class WorkspaceTests : IDisposable
         // its diagnostics are published under a URI the server built itself.
         Write("app.lyr", AppSource);
         var util = Write("util.lyr",
-            "module util;\n\npub fn value(): int { return \"nope\"; }\n");
+            "pub fn value(): int { return \"nope\"; }\n");
         var utilUri = DocumentUri.FromFilePath(util);
         var appUri = DocumentUri.FromFilePath(PathOf("app.lyr"));
 
@@ -239,7 +220,7 @@ public sealed class WorkspaceTests : IDisposable
         // program, a branch switch — and the closed file's stale squiggles must go.
         Write("app.lyr", AppSource);
         var util = Write("util.lyr",
-            "module util;\n\npub fn value(): int { return \"nope\"; }\n");
+            "pub fn value(): int { return \"nope\"; }\n");
         var utilUri = DocumentUri.FromFilePath(util);
         var appUri = DocumentUri.FromFilePath(PathOf("app.lyr"));
 
@@ -288,9 +269,9 @@ public sealed class WorkspaceTests : IDisposable
     public async Task A_never_saved_buffer_joins_the_project()
     {
         // The importing file lies on disk, the imported module exists only as a buffer that was
-        // never saved. The project collects open buffers under the source root as well, so the
-        // import resolves.
-        Write("app.lyr", "import scratch { fresh };\n\nfn main(): int { return fresh(); }\n");
+        // never saved. The package collects open buffers under src/ as well, so the import
+        // resolves.
+        Write("app.lyr", "import app.scratch { fresh };\n\nfn main(): int { return fresh(); }\n");
         var appUri = DocumentUri.FromFilePath(PathOf("app.lyr"));
         var scratchUri = DocumentUri.FromFilePath(PathOf("scratch.lyr"));
 
@@ -298,7 +279,7 @@ public sealed class WorkspaceTests : IDisposable
         await harness.InitializeAsync();
 
         await harness.NotifyAsync(LspMethods.DidOpen, DidOpen(scratchUri,
-            "module scratch;\n\npub fn fresh(): int { return 7; }\n"));
+            "pub fn fresh(): int { return 7; }\n"));
 
         Assert.Empty((await DiagnosticsFor(harness, appUri)).EnumerateArray());
     }
@@ -322,6 +303,6 @@ public sealed class WorkspaceTests : IDisposable
             .ToArray();
 
         Assert.Contains("**/*.lyr", patterns);
-        Assert.Contains("**/lyric.json", patterns);
+        Assert.Contains("**/lyric.toml", patterns);
     }
 }

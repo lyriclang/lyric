@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>lyrlsp</AssemblyName>
     <RootNamespace>Lyric.Lsp</RootNamespace>
     <Description>The language server: the front end answering an editor over JSON-RPC.</Description>
   </PropertyGroup>
@@ -14,6 +13,8 @@
     -->
     <ProjectReference Include="..\Lyric.Core\Lyric.Core.csproj" />
     <ProjectReference Include="..\Lyric.Frontend\Lyric.Frontend.csproj" />
+    <!-- A package as lyric test reads it: the manifest, the graph, the modules of src/ and tests/. -->
+    <ProjectReference Include="..\Lyric5.Build\Lyric5.Build.csproj" />
   </ItemGroup>
 
 </Project>

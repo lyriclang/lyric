@@ -24,10 +24,7 @@ public sealed class ScopeCompletionTests
         var program = programWithCursor.Remove(offset, 1);
         var path = Path.Combine(AppContext.BaseDirectory, "scope.lyr");
 
-        var items = CompletionProvider.At(path, program, offset, new CompilerOptions
-        {
-            StdlibRoot = Path.Combine(RepoRoot(), "stdlib"),
-        });
+        var items = CompletionProvider.At(path, program, offset, Single.Options(path));
 
         Assert.NotNull(items);
         return items;

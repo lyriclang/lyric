@@ -23,11 +23,11 @@ namespace Lyric.Lsp.Analysis;
 /// </summary>
 public static class SignatureHelpProvider
 {
-    public static SignatureHelp? At(string path, string text, int offset, CompilerOptions options)
+    public static SignatureHelp? At(string path, string text, int offset, CompilerOptions options, string? moduleName = null)
     {
         if (offset < 0 || offset > text.Length) return null;
 
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, text), options);
+        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, text, moduleName), options);
         if (result.Model is not { } model) return null;
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);

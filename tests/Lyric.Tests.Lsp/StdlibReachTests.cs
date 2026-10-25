@@ -26,7 +26,7 @@ public sealed class StdlibReachTests
     public async Task A_program_using_the_standard_library_checks_clean()
     {
         const string program =
-            "import std.io.console { println };\n\nfn main(): int {\n    println(\"hi\");\n    return 0;\n}\n";
+            "import std.io { println };\n\nfn main(): int {\n    println(\"hi\");\n    return 0;\n}\n";
 
         var uri = DocumentUri.FromFilePath(BufferPath("stdlib-user"));
         await using var harness = new ServerHarness();
@@ -45,7 +45,7 @@ public sealed class StdlibReachTests
         // merely tolerated: an opaque external symbol accepts any argument list, so only a
         // rejected call shows that the real signature was in hand.
         const string program =
-            "import std.io.console { println };\n\nfn main(): int {\n    println(1, 2, 3);\n    return 0;\n}\n";
+            "import std.io { println };\n\nfn main(): int {\n    println(1, 2, 3);\n    return 0;\n}\n";
 
         var uri = DocumentUri.FromFilePath(BufferPath("stdlib-misuse"));
         await using var harness = new ServerHarness();

@@ -426,6 +426,10 @@ public static class Pipeline
     public static CompileResult Check(Project project) =>
         SourceCompiler.Check(SourceOf(project), OptionsFor(project, null, null));
 
+    /// <summary>The options a program's source is checked under, without a profile: what the
+    /// editor checks a single file with.</summary>
+    public static CompilerOptions CheckOptions(Project project) => OptionsFor(project, null, null);
+
     /// <summary>The front end on a library's modules, nothing rendered: what <c>lyric fix</c> reads.</summary>
     public static CompileResult Check(LibraryException library, LintArgs? lints) =>
         CheckPackage(library.Manifest, library.Graph, lints);

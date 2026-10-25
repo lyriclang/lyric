@@ -182,33 +182,18 @@ public static partial class TestRun
     {
         var manifest = project.Manifest!;
         var testRoot = project.TestRoot!;
-        var roots = new List<ScriptSource>();
-        foreach (var file in Files(manifest.SourceRoot))
-            roots.Add(ScriptSource.FromDisk(file, Project.ModulePathOf(manifest, file)!));
         foreach (var file in Files(testRoot))
         {
-            var relative = Path.GetRelativePath(testRoot, file);
-            var module = $"{manifest.Name}.tests.{ScriptSource.ModuleNameUnder(testRoot, file)}";
             // 'app.tests.x' is one module: src/tests/x.lyr or tests/x.lyr, not both.
-            if (File.Exists(Path.Combine(manifest.SourceRoot, "tests", relative)))
+            if (File.Exists(Path.Combine(manifest.SourceRoot, "tests", Path.GetRelativePath(testRoot, file))))
             {
-                Say.Error(error, "LYR-RES0015", $"the module '{module}' lies under src/tests/ and under tests/", "rename one of the two files");
+                Say.Error(error, "LYR-RES0015", $"the module '{TestModuleOf(manifest, testRoot, file)}' lies under src/tests/ and under tests/",
+                    "rename one of the two files");
                 return null;
             }
-            roots.Add(ScriptSource.FromDisk(file, module));
         }
-
-        var options = new CompilerOptions
-        {
-            StdlibRoot = Pipeline.StdlibRoot, PackageRoots = project.PackageRoots,
-            PackageDependencies = project.DeclaredDependencies,
-            PackageTestRoots = new Dictionary<string, string> { [manifest.Name] = testRoot },
-            PackageGenRoots = Pipeline.GenRoots(project),
-            PlaceNames = Pipeline.Places(project),
-            ToolchainVersion = Pipeline.ClaimedVersion,
-            LintLevels = project.LintLevels, RootPackage = project.Name, WarnDeps = project.LintArgs.WarnDeps,
-        };
-        var result = SourceCompiler.CheckProject(roots, options);
+        var (files, options) = PackageUnit(project);
+        var result = SourceCompiler.CheckProject(files.Select(f => ScriptSource.FromDisk(f.File, f.Module)).ToList(), options);
         // The warnings are the build's to report, which compiles the program again: once is enough.
         if (!result.Ok || result.Model is not { } model)
         {
@@ -239,6 +224,36 @@ public static partial class TestRun
         }
         return found;
     }
+
+    /// <summary>
+    /// The package as one compilation sees it — every module under <c>src/</c> and <c>tests/</c>,
+    /// by file and module path, with the options they are checked under. What <c>lyric test</c>
+    /// reads for its marks and the editor analyses; <paramref name="project"/> is
+    /// <see cref="Project.TestsOf"/>'s.
+    /// </summary>
+    public static (IReadOnlyList<(string File, string Module)> Files, CompilerOptions Options) PackageUnit(Project project)
+    {
+        var manifest = project.Manifest!;
+        var testRoot = project.TestRoot!;
+        var files = new List<(string, string)>();
+        foreach (var file in Files(manifest.SourceRoot)) files.Add((file, Project.ModulePathOf(manifest, file)!));
+        foreach (var file in Files(testRoot)) files.Add((file, TestModuleOf(manifest, testRoot, file)));
+        var options = new CompilerOptions
+        {
+            StdlibRoot = Pipeline.StdlibRoot, PackageRoots = project.PackageRoots,
+            PackageDependencies = project.DeclaredDependencies,
+            PackageTestRoots = new Dictionary<string, string> { [manifest.Name] = testRoot },
+            PackageGenRoots = Pipeline.GenRoots(project),
+            PlaceNames = Pipeline.Places(project),
+            ToolchainVersion = Pipeline.ClaimedVersion,
+            LintLevels = project.LintLevels, RootPackage = project.Name, WarnDeps = project.LintArgs.WarnDeps,
+        };
+        return (files, options);
+    }
+
+    /// <summary>The module path of a file under a package's <c>tests/</c>: <c>app.tests.x</c>.</summary>
+    public static string TestModuleOf(Manifest manifest, string testRoot, string file) =>
+        $"{manifest.Name}.tests.{ScriptSource.ModuleNameUnder(testRoot, file)}";
 
     /// <summary>The program: each test imported under a name of its own and called from a lambda —
     /// with <c>try</c> where it throws —, the list handed to <c>std.test.run</c>, whose answer is

@@ -297,7 +297,7 @@ title = "a `lyric.json` that cannot be understood"
 severity = "error"
 area = "14-cli"
 summary = "Reported by the 4.x toolchain when a `lyric.json` project file was found and could not be read."
-retired = "Lyric 5: the manifest is lyric.toml, refused with LYR-PKG0001–0003; only the 4.x lyric.json reader (Lyric.Core ProjectFile, used by the 4.x language server) reports it"
+retired = "Lyric 5: the manifest is lyric.toml, refused with LYR-PKG0001–0003; only the 4.x lyric.json reader (Lyric.Core ProjectFile, read by the front end's 4.x suites) reports it"
 
 [LYR-CLI0011]
 title = "no `build.lyr` in the directory a build was pointed at"

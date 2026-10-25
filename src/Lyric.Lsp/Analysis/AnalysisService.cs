@@ -38,16 +38,17 @@ public sealed record AnalysisSnapshot(
 /// <summary>
 /// Turns buffer and disk changes into published diagnostics.
 ///
-/// <para>The unit of analysis is a PROJECT where there is one: a document under the source root of
-/// a <c>lyric.json</c> is compiled together with every other <c>.lyr</c> file under that root, as
-/// one compilation with one symbol world — which is what makes an answer about "every place this
-/// name occurs" complete instead of complete-for-one-buffer. A document outside any project keeps
-/// the old shape: its own compilation, rooted at itself.</para>
+/// <para>The unit of analysis is a PACKAGE where there is one: a module under the <c>src/</c> or
+/// <c>tests/</c> of a <c>lyric.toml</c> is compiled together with every other module of the
+/// package (<see cref="PackageUnit"/>), as one compilation with one symbol world — which is what
+/// makes an answer about "every place this name occurs" complete instead of
+/// complete-for-one-buffer. A document outside every package is a single file, checked alone with
+/// std, as <c>lyric check</c> checks it.</para>
 ///
 /// <para>The compiler is run WHOLE for every analysis, project or not. It has no incremental mode,
 /// and building one before the cost is known would be optimising a number nobody has measured in
 /// this process. The cost is dominated by the standard library rather than by the user's files,
-/// and it is the same work <c>lyrc check</c> does.</para>
+/// and it is the same work <c>lyric check</c> does.</para>
 ///
 /// <para>A run in flight cannot be stopped: <see cref="SourceCompiler"/> takes no cancellation
 /// token. Cancellation therefore means the RESULT IS DISCARDED, not that the work stops. For a
@@ -241,11 +242,10 @@ public sealed class AnalysisService : IDisposable
                 return;
             }
 
-            var project = await ProjectForAsync(path).ConfigureAwait(false);
-            if (project is not null
-                && (IsProjectManifest(path) || IsUnder(path, project.SourceRoot)))
+            var unit = await UnitForAsync(path).ConfigureAwait(false);
+            if (unit is not null && (PackageUnit.IsManifest(path) || unit.ModuleOf(path) is not null))
             {
-                await AnalyzeProjectAsync(project, trigger: null, token).ConfigureAwait(false);
+                await AnalyzeProjectAsync(unit, trigger: null, token).ConfigureAwait(false);
             }
 
             // A closed file some OPEN unit reads: the unit's last compile read the old bytes.
@@ -275,41 +275,25 @@ public sealed class AnalysisService : IDisposable
     }
 
     /// <summary>
-    /// The <c>lyric.json</c> above this path, or <c>null</c> when there is none or it cannot be
-    /// understood.
+    /// The package of this path, or <c>null</c> when there is none or its manifest cannot be read.
     ///
-    /// <para>A BROKEN FILE DOES NOT STOP THE ANALYSIS. Falling back to the plain rules gives
-    /// resolution that may be wrong, and the log says why; publishing nothing would leave the
-    /// editor showing the diagnostics of some earlier state with no hint that anything happened.
-    /// For a tool someone is looking at, wrong-and-explained beats silent.</para>
+    /// <para>A BROKEN MANIFEST DOES NOT STOP THE ANALYSIS. The file is checked alone, which may
+    /// resolve wrongly, and the log says why; publishing nothing would leave the editor showing the
+    /// diagnostics of some earlier state with no hint that anything happened. For a tool someone is
+    /// looking at, wrong-and-explained beats silent.</para>
     ///
     /// <para>Not published as a diagnostic on this document: the fault is in another file, and
     /// pointing at the wrong place is how a reader loses an afternoon. The log is where a message
     /// about a file the client did not ask about belongs.</para>
     /// </summary>
-    private async Task<ProjectFile?> ProjectForAsync(string path)
+    private async Task<PackageUnit?> UnitForAsync(string path)
     {
         var directory = Path.GetDirectoryName(path);
         if (directory is null) return null;
 
-        try
-        {
-            var project = ProjectFile.Discover(directory);
-
-            var notice = project is null || project.Warnings.Count == 0
-                ? string.Empty
-                : $"{Path.Combine(project.Directory, ProjectFile.FileName)}: "
-                  + string.Join("; ", project.Warnings);
-
-            await NoticeAsync(directory, notice, MessageType.Warning).ConfigureAwait(false);
-            return project;
-        }
-        catch (ProjectFileException broken)
-        {
-            await NoticeAsync(directory, $"{broken.Path}: {broken.Message}", MessageType.Error)
-                .ConfigureAwait(false);
-            return null;
-        }
+        var unit = PackageUnit.Find(path, out var refused);
+        await NoticeAsync(directory, refused ?? string.Empty, MessageType.Error).ConfigureAwait(false);
+        return unit;
     }
 
     /// <summary>
@@ -359,7 +343,7 @@ public sealed class AnalysisService : IDisposable
         return files;
     }
 
-    /// <summary>Says something about a project file only when it differs from what was last said
+    /// <summary>Says something about a manifest only when it differs from what was last said
     /// about it.</summary>
     private async Task NoticeAsync(string directory, string message, MessageType type)
     {
@@ -372,25 +356,24 @@ public sealed class AnalysisService : IDisposable
     }
 
     /// <summary>
-    /// How a lone document is compiled: where the standard library is, what its project file says,
-    /// and the text of everything else the editor holds.
+    /// How a lone document is compiled: as a module of its package, under the package's options, or
+    /// alone; with the text of everything else the editor holds.
     ///
     /// <para>One place, because the analysis and the completion have to compile the same program.
-    /// Two option sets that differ in the project root would answer two different questions about
-    /// one file, and only one of them would be on screen.</para>
+    /// Two option sets that differ in the package would answer two different questions about one
+    /// file, and only one of them would be on screen.</para>
     /// </summary>
-    private async Task<CompilerOptions> OptionsForAsync(OpenDocument document)
+    private async Task<(CompilerOptions Options, string? Module)> OptionsForAsync(OpenDocument document)
     {
-        var project = await ProjectForAsync(document.Path).ConfigureAwait(false);
-        return Options(project);
+        var unit = await UnitForAsync(document.Path).ConfigureAwait(false);
+        return unit?.ModuleOf(document.Path) is { } module
+            ? (Options(unit.Options), module)
+            : (Options(PackageUnit.SingleFileOptions(document.Path)), null);
     }
 
-    private CompilerOptions Options(ProjectFile? project) => new()
+    private CompilerOptions Options(CompilerOptions unit) => unit with
     {
-        StdlibRoot = _stdlibRoot,
-        SourceRoot = project?.SourceRoot,
-        NativeRoots = project?.NativeRoots,
-        DependencyRoots = project?.Dependencies,
+        StdlibRoot = _stdlibRoot ?? unit.StdlibRoot,
 
         // Everything the editor holds, not only the files this run starts from. Without it a
         // program is checked against the last SAVE of every module it imports, and the two
@@ -408,10 +391,10 @@ public sealed class AnalysisService : IDisposable
     public async Task<IReadOnlyList<CompletionItem>?> CompleteAsync(
         OpenDocument document, int offset, CancellationToken cancellationToken)
     {
-        var options = await OptionsForAsync(document).ConfigureAwait(false);
+        var (options, module) = await OptionsForAsync(document).ConfigureAwait(false);
 
         return await Task.Run(
-            () => CompletionProvider.At(document.Path, document.Text, offset, options),
+            () => CompletionProvider.At(document.Path, document.Text, offset, options, module),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -423,10 +406,10 @@ public sealed class AnalysisService : IDisposable
     public async Task<SignatureHelp?> SignatureHelpAsync(
         OpenDocument document, int offset, CancellationToken cancellationToken)
     {
-        var options = await OptionsForAsync(document).ConfigureAwait(false);
+        var (options, module) = await OptionsForAsync(document).ConfigureAwait(false);
 
         return await Task.Run(
-            () => SignatureHelpProvider.At(document.Path, document.Text, offset, options),
+            () => SignatureHelpProvider.At(document.Path, document.Text, offset, options, module),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -434,11 +417,11 @@ public sealed class AnalysisService : IDisposable
     /// the debounce. The analysis a test drives directly.</summary>
     public async Task AnalyzeAsync(OpenDocument document, CancellationToken cancellationToken)
     {
-        var project = await ProjectForAsync(document.Path).ConfigureAwait(false);
+        var unit = await UnitForAsync(document.Path).ConfigureAwait(false);
 
-        if (project is not null && IsUnder(document.Path, project.SourceRoot))
+        if (unit is not null && unit.ModuleOf(document.Path) is not null)
         {
-            await AnalyzeProjectAsync(project, document, cancellationToken).ConfigureAwait(false);
+            await AnalyzeProjectAsync(unit, document, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -446,19 +429,19 @@ public sealed class AnalysisService : IDisposable
     }
 
     /// <summary>
-    /// The whole project as one compilation: every <c>.lyr</c> under the source root, saved or
-    /// not, plus every open buffer under it that was never saved at all.
+    /// The whole package as one compilation: every module under <c>src/</c> and <c>tests/</c>,
+    /// saved or not, plus every open buffer there that was never saved at all.
     /// </summary>
     private async Task AnalyzeProjectAsync(
-        ProjectFile project, OpenDocument? trigger, CancellationToken cancellationToken)
+        PackageUnit unit, OpenDocument? trigger, CancellationToken cancellationToken)
     {
-        var unitKey = Path.GetFullPath(project.SourceRoot);
+        var unitKey = Path.GetFullPath(unit.Root);
 
         // A second trigger for the same unit withdraws the run of the first; see _running.
         using var run = BeginRun(unitKey, cancellationToken);
         var token = run.Token;
 
-        var roots = CollectRoots(project);
+        var roots = CollectRoots(unit);
         if (roots.Count == 0) return;
 
         // The buffers that go into this compile, captured BEFORE it: the version guard below has
@@ -467,7 +450,7 @@ public sealed class AnalysisService : IDisposable
         var scripts = new List<ScriptSource>(roots.Count);
         foreach (var path in roots)
         {
-            var name = ModuleNameFor(unitKey, path);
+            var name = unit.ModuleOf(path)!;
             if (_documents.ByPath(path) is { } open)
             {
                 opens.Add(open);
@@ -479,7 +462,7 @@ public sealed class AnalysisService : IDisposable
             }
         }
 
-        var options = Options(project);
+        var options = Options(unit.Options);
 
         // Off the caller's thread: the compile is synchronous and CPU-bound, and the caller is
         // either the read loop or a test.
@@ -555,7 +538,7 @@ public sealed class AnalysisService : IDisposable
     /// server knew what a project was.</summary>
     private async Task AnalyzeSingleAsync(OpenDocument document, CancellationToken cancellationToken)
     {
-        var options = await OptionsForAsync(document).ConfigureAwait(false);
+        var (options, _) = await OptionsForAsync(document).ConfigureAwait(false);
 
         var result = await Task.Run(
             () => SourceCompiler.Check(
@@ -603,13 +586,13 @@ public sealed class AnalysisService : IDisposable
     /// <summary>
     /// What closing a document means depends on what the document was.
     ///
-    /// <para>A project file's diagnostics belong to the PROJECT, not to the buffer: they stay, and
+    /// <para>A package module's diagnostics belong to the PACKAGE, not to the buffer: they stay, and
     /// the project is re-analysed because the authority over the text just moved back to the disk —
     /// which may hold something older than the buffer did. A never-saved buffer has no disk side at
     /// all; the re-analysis no longer finds it and withdraws its diagnostics through the ordinary
     /// bookkeeping.</para>
     ///
-    /// <para>A document outside every project takes its diagnostics with it, as it always did: an
+    /// <para>A document outside every package takes its diagnostics with it, as it always did: an
     /// empty list rather than no message, because a server that simply stops talking about a file
     /// leaves its last squiggles in the editor for as long as the session lasts.</para>
     /// </summary>
@@ -617,8 +600,8 @@ public sealed class AnalysisService : IDisposable
     {
         if (_pending.TryRemove(document.Path, out var pending)) Retire(pending);
 
-        var project = await ProjectForAsync(document.Path).ConfigureAwait(false);
-        if (project is not null && IsUnder(document.Path, project.SourceRoot))
+        var unit = await UnitForAsync(document.Path).ConfigureAwait(false);
+        if (unit is not null && unit.ModuleOf(document.Path) is not null)
         {
             // The document is already out of the store, so the re-analysis reads the disk.
             ChangedOnDisk(document.Path);
@@ -657,48 +640,25 @@ public sealed class AnalysisService : IDisposable
             .ToList();
 
     /// <summary>
-    /// Every root of the project: the <c>.lyr</c> files under its source root as the disk knows
-    /// them, plus the open buffers under it the disk does not know yet.
+    /// Every root of the package: its modules as the disk knows them, plus the open buffers among
+    /// them the disk does not know yet.
     ///
     /// <para>Sorted, so the compilation is the same one whatever order the triggers arrived in —
     /// the first root becomes <see cref="SemanticModel.Entry"/>, and an unstable choice there would
     /// make two analyses of one state disagree.</para>
     /// </summary>
-    private List<string> CollectRoots(ProjectFile project)
+    private List<string> CollectRoots(PackageUnit unit)
     {
         var files = new HashSet<string>(DocumentUri.PathComparer);
-
-        try
-        {
-            foreach (var file in Directory.EnumerateFiles(
-                project.SourceRoot, "*.lyr", SearchOption.AllDirectories))
-                files.Add(Path.GetFullPath(file));
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            // A vanished or unreadable source root. The open buffers below still analyse.
-        }
-
+        foreach (var (file, _) in unit.Files) files.Add(Path.GetFullPath(file));
         foreach (var open in _documents.All)
-            if (IsUnder(open.Path, project.SourceRoot))
+            if (unit.ModuleOf(open.Path) is not null)
                 files.Add(Path.GetFullPath(open.Path));
 
         var roots = files.ToList();
         roots.Sort(StringComparer.OrdinalIgnoreCase);
         return roots;
     }
-
-    /// <summary>
-    /// The module name a file under the source root is importable as: the inverse of the loader's
-    /// path derivation, <c>&lt;root&gt;/a/b.lyr</c> → <c>a.b</c>.
-    ///
-    /// <para>It must be exactly that inverse, or an import of the module would not find the root
-    /// already in the compilation and would read the file a second time. A file whose name is not
-    /// an importable module path — a hyphen, a space — still gets its derived name: nothing can
-    /// import it either way, and the file still checks.</para>
-    /// </summary>
-    private static string ModuleNameFor(string sourceRoot, string path) =>
-        ScriptSource.ModuleNameUnder(sourceRoot, path);
 
     /// <summary>The module AST a file was parsed into, or <c>null</c> for a file that holds no
     /// module of this compilation — which happens when the file could not be read.</summary>
@@ -711,35 +671,6 @@ public sealed class AnalysisService : IDisposable
         }
 
         return null;
-    }
-
-    private static bool IsProjectManifest(string path) =>
-        DocumentUri.PathComparer.Equals(Path.GetFileName(path), ProjectFile.FileName);
-
-    /// <summary>Is the path strictly inside the directory? The comparison follows the platform's
-    /// idea of path equality, like <see cref="DocumentUri.PathComparer"/>.</summary>
-    private static bool IsUnder(string path, string directory)
-    {
-        string full;
-        string root;
-        try
-        {
-            full = Path.GetFullPath(path);
-            root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-
-        var comparison = OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-
-        return full.Length > root.Length + 1
-            && full.StartsWith(root, comparison)
-            && (full[root.Length] == Path.DirectorySeparatorChar
-                || full[root.Length] == Path.AltDirectorySeparatorChar);
     }
 
     /// <summary>The path form of a URI this server itself published under; falls back to the URI

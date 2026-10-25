@@ -24,6 +24,8 @@
     <ProjectReference Include="..\Lyric5.Toolchain\Lyric5.Toolchain.csproj" />
     <!-- The build: front end behind the subset gate, C emitter, cache, runtime archive, C toolchain (13, M2). -->
     <ProjectReference Include="..\Lyric5.Build\Lyric5.Build.csproj" />
+    <!-- The language server: the front end answering an editor over JSON-RPC. -->
+    <ProjectReference Include="..\Lyric.Lsp\Lyric.Lsp.csproj" />
   </ItemGroup>
 
   <ItemGroup>

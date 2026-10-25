@@ -498,6 +498,7 @@ public static class SourceCompiler
             ModuleOnDisk = ModuleProbe(options),
         };
 
+        var times = new PhaseClock();
         Module? entry = null;
         foreach (var root in roots)
         {
@@ -519,33 +520,39 @@ public static class SourceCompiler
         // No root could even be opened. The diagnostics say why, and there is no module to hang a
         // model on.
         if (entry is null) return new CompileResult(sources, diagnostics, null);
+        times.Mark(PhaseClock.Parse);
 
         CompilerPosition.Begin(sources);
         var binding = compilation.Resolve();
+        times.Mark(PhaseClock.Resolve);
         var types = Semantics.Analyze(compilation, binding, diagnostics, singleProgram: false);
+        times.Mark(PhaseClock.Check);
 
         var model = new SemanticModel(compilation, entry, binding, types);
 
         if (diagnostics.HasErrors)
-            return new CompileResult(sources, diagnostics, null, model);
+            return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
 
         // Every build that lowers evaluates — a library by itself too; an
         // attribute's value is read from here ('lyric test' its '@Test').
         var embed = EmbedReaderFor(sources, options);
         types.SourcePlace = SourcePlaceFor(sources, options);
-        if (!EvaluateSites(compilation, binding, types, diagnostics, options, embed, report: null, out var comptime))
-            return new CompileResult(sources, diagnostics, null, model);
+        var evaluated = EvaluateSites(compilation, binding, types, diagnostics, options, embed, report: null, out var comptime);
+        times.Mark(PhaseClock.Evaluate);
+        if (!evaluated) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
         WarnDeprecated(compilation, binding, types, diagnostics, options, comptime);
-        if (diagnostics.HasErrors) return new CompileResult(sources, diagnostics, null, model); // an 'until' come due
+        if (diagnostics.HasErrors) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases }; // an 'until' come due
 
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
             optimize: options.Optimize, libraryRoots: true, passes: options.Passes, comptime: comptime);
-        if (ir is null) return new CompileResult(sources, diagnostics, null, model);
+        times.Mark(PhaseClock.Lower);
+        if (ir is null) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
         if (compilation.Lyric5Modules)
             LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps);
+        times.Mark(PhaseClock.Lint);
 
         return new CompileResult(sources, diagnostics, ir, model)
-            { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive };
+            { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive, Times = times.Phases };
     }
 
     /// <summary>
@@ -819,6 +826,25 @@ public sealed record CompilerOptions
 /// declaration a name refers to — is in these three tables, and rebuilding them outside would mean
 /// running the front end a second time and getting a second answer to the same question.</para>
 /// </param>
+/// <summary>A stopwatch read at the end of each phase: what each one took since the last.</summary>
+internal sealed class PhaseClock
+{
+    public const string Parse = "parse", Resolve = "resolve", Check = "check", Evaluate = "evaluate",
+        Lower = "lower", Lint = "lint";
+
+    private readonly List<(string, TimeSpan)> _phases = [];
+    private long _last = Stopwatch.GetTimestamp();
+
+    public IReadOnlyList<(string Phase, TimeSpan Time)> Phases => _phases;
+
+    public void Mark(string phase)
+    {
+        var now = Stopwatch.GetTimestamp();
+        _phases.Add((phase, Stopwatch.GetElapsedTime(_last, now)));
+        _last = now;
+    }
+}
+
 public sealed record CompileResult(
     SourceManager Sources,
     DiagnosticEngine Diagnostics,
@@ -842,6 +868,10 @@ public sealed record CompileResult(
     /// <summary>The entry module after the macros' expansion, from
     /// <see cref="SourceCompiler.Expand"/> alone; <c>null</c> after an error.</summary>
     public Module? Expanded { get; init; }
+
+    /// <summary>Where <see cref="SourceCompiler.CheckProject"/>'s time went, phase by phase in the
+    /// order they ran, as far as it got; <c>null</c> from the other entries.</summary>
+    public IReadOnlyList<(string Phase, TimeSpan Time)>? Times { get; init; }
 
     /// <summary>Renders every diagnostic exactly once and reports whether the run was clean.
     /// </summary>
