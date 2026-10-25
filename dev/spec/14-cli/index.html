@@ -374,6 +374,13 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <td>—</td>
 </tr>
 <tr>
+<td><code>dap</code></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>env</code></td>
 <td>—</td>
 <td><code>-C &lt;dir&gt;</code>, <code>--profile &lt;name&gt;</code>, <code>--target &lt;triple&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--offline</code>, <code>--json</code></td>
@@ -613,6 +620,26 @@ name <code>lyric test</code> gives it — <code>app.tests.check.adds</code>, <co
 <code>lyric/tests</code> lists them for a document. The server runs no test: the editor runs
 <code>lyric test -f &lt;name&gt;</code> (<a href="#3-test">§3</a>).</li>
 </ol>
+<h2 id="12-dap">12. <code>dap</code></h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 E4</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 L12</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>DapCommandTests</code>).</p>
+<ol>
+<li><strong><code>lyric dap</code></strong> is the debug adapter: it speaks the Debug Adapter Protocol with an editor over
+its standard input and output, and <strong>lldb-dap</strong> behind it does the debugging — breakpoints with
+their conditions, logpoints, stepping, threads, attaching are lldb's. Where no lldb-dap is
+found (<code>LYRIC_LLDB_DAP</code> names one, else the path and Xcode's), each request is refused with the
+reason.</li>
+<li>A <strong><code>launch</code></strong> names in <code>program</code> a package's directory or a <code>.lyr</code> file: the adapter builds it
+in the debug profile first, what the build says reaches the editor's console, and a program
+that does not build is refused; the binary built is what runs, with the <code>args</code> and <code>cwd</code> the
+launch gives.</li>
+<li><strong>A panic</strong> is the exception filter <code>lyric-panic</code>, on unless the editor turns it off: the
+program stops where it panics, before the panic leaves its task. It is the only filter offered.</li>
+<li>A frame is shown by its <strong>Lyric name</strong> (<code>app.main.deep</code>) at its Lyric line. A build writes the
+names beside the binary — <code>&lt;binary&gt;.lyric-names</code>, a line per function: its C name, a tab, its
+Lyric name —; a frame of the runtime keeps its name and is marked as set back (<code>subtle</code>).</li>
+</ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -632,6 +659,7 @@ name <code>lyric test</code> gives it — <code>app.tests.check.adds</code>, <co
 <li class="level-2"><a href="#9-doc">9. doc</a></li>
 <li class="level-2"><a href="#10-api">10. api</a></li>
 <li class="level-2"><a href="#11-lsp">11. lsp</a></li>
+<li class="level-2"><a href="#12-dap">12. dap</a></li>
 </ul>
 </aside>
 </div>
