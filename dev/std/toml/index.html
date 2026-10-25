@@ -45,6 +45,21 @@ array, a map a table whose keys are strings — a number's digits for a number �
 of integers, a unit variant its name, a variant with a payload a table of one key. A
 table keeps the order its keys were written in. Date-times are TOML's own form, in their four
 kinds; an <code>Instant</code> writes as a quoted RFC 3339 string and reads from a date-time or a string.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.codec { <span class="ty">Codable</span>, <span class="ty">DecodeError</span> };
+<span class="kw">import</span> std.toml;
+
+<span class="kw">struct</span> <span class="ty">Server</span> :: [<span class="ty">Codable</span>] {
+    host: <span class="ty">string</span>,
+    port: <span class="ty">int</span>,
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> [toml.<span class="ty">TomlError</span>, <span class="ty">DecodeError</span>] {
+    <span class="kw">let</span> s = <span class="kw">try</span> toml.decode&lt;<span class="ty">Server</span>&gt;(<span class="str">"host = \"localhost\"\nport = 8080\n"</span>);
+    println(<span class="str">f"</span>{s.host}<span class="str">:</span>{s.port}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>localhost:8080</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/toml/TomlError/">TomlError</a> <span class="kind">struct</span> <span class="summary">— The error for a text that is not valid TOML: the line and column where parsing stopped, and what was wrong.</span></div>
 <div class="listed"><a href="../../std/toml/TomlDatetime/">TomlDatetime</a> <span class="kind">enum</span> <span class="summary">— A date-time in one of TOML's four forms: with an offset, local, a date alone, a time alone.</span></div>

@@ -44,6 +44,24 @@ strings — a number's digits where the key is a number —, bytes a Base64 stri
 its name, a variant with a payload <code>{&quot;Name&quot;: payload}</code>. <code>NaN</code> and the infinities have no text
 (RFC 8259 §6): writing one is an <code>EncodeError</code>. The text is read whole into the tree first,
 then decoded from it.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.codec { <span class="ty">Codable</span>, <span class="ty">EncodeError</span>, <span class="ty">DecodeError</span> };
+<span class="kw">import</span> std.json;
+
+<span class="kw">struct</span> <span class="ty">Point</span> :: [<span class="ty">Codable</span>] {
+    x: <span class="ty">int</span>,
+    y: <span class="ty">int</span>,
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> [<span class="ty">EncodeError</span>, json.<span class="ty">JsonError</span>, <span class="ty">DecodeError</span>] {
+    <span class="kw">let</span> text = <span class="kw">try</span> json.encode(<span class="ty">Point</span> { x = <span class="num">3</span>, y = <span class="num">4</span> });
+    println(text);
+    <span class="kw">let</span> back = <span class="kw">try</span> json.decode&lt;<span class="ty">Point</span>&gt;(<span class="str">"{\"x\": 5, \"y\": 6}"</span>);
+    println(back.x + back.y);
+}</code></pre>
+<pre class="output"><code>{"x":3,"y":4}
+11</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/json/JsonOptions/">JsonOptions</a> <span class="kind">struct</span> <span class="summary">— Steers how the text is written: <code>pretty</code> with newlines and <code>indent</code> spaces per level, <code>sortKeys</code> with an object's keys in order (which goes through the tree).</span></div>
 <div class="listed"><a href="../../std/json/JsonError/">JsonError</a> <span class="kind">struct</span> <span class="summary">— The error a text that is no JSON throws: where (line and column), and what was wrong.</span></div>

@@ -39,6 +39,16 @@ tries again; a cancel ends that wait with <code>Cancelled</code>, and a close �
 <code>Closed</code>. There are no socket timeouts: <code>withTimeout</code> bounds a call instead. On POSIX the sockets
 are polled with epoll or kqueue; on Windows they use Winsock, with an AFD poll request per
 socket on the thread's completion port.</p>
+<h4 id="examples">Examples</h4>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.net { <span class="ty">TcpListener</span>, <span class="ty">SocketAddr</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> listener = <span class="kw">try</span> <span class="ty">TcpListener</span>.bind(<span class="ty">SocketAddr</span>.parse(<span class="str">"127.0.0.1:8080"</span>));
+    <span class="kw">let</span> stream = <span class="kw">try</span> listener.accept();
+    <span class="kw">try</span> stream.write(<span class="str">"hello\n"</span>.toBytes());
+    <span class="kw">try</span> stream.close();
+}</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/net/IpAddr/">IpAddr</a> <span class="kind">enum</span> <span class="summary">— An IP address: version 4's four bytes, or version 6's eight groups of 16 bits.</span></div>
 <div class="listed"><a href="../../std/net/SocketAddr/">SocketAddr</a> <span class="kind">struct</span> <span class="summary">— An IP address and a port.</span></div>

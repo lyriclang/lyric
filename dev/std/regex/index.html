@@ -39,6 +39,18 @@ are no backreferences and no lookaround: they cannot be matched in linear time. 
 <code>(?&lt;name&gt;…)</code>), alternation, the repetitions <code>* + ? {n} {n,} {n,m}</code> each greedy or lazy with a
 <code>?</code>, the anchors <code>^ $ \A \z</code>, <code>\b</code> and <code>\B</code>, and the flags <code>i m s</code> inline (<code>(?i)</code>, <code>(?i:…)</code>,
 <code>(?-i)</code>). Positions are byte offsets into the text, as a string's indices are.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.regex { <span class="ty">Regex</span>, <span class="ty">RegexError</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">RegexError</span> {
+    <span class="kw">let</span> date = <span class="kw">try</span> <span class="ty">Regex</span>.new(<span class="str">"(\\d{4})-(\\d{2})-(\\d{2})"</span>);
+    <span class="kw">let</span> m = date.find(<span class="str">"due 2026-10-24, paid"</span>) ?? panic(<span class="str">"no date"</span>);
+    println(m.group(<span class="num">1</span>) ?? <span class="str">""</span>);
+    println(date.replaceAll(<span class="str">"2026-10-24 and 2026-11-01"</span>, <span class="str">"${3}.${2}.${1}"</span>));
+}</code></pre>
+<pre class="output"><code>2026
+24.10.2026 and 01.11.2026</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/regex/RegexError/">RegexError</a> <span class="kind">struct</span> <span class="summary">— The error <code>Regex.new</code> throws: <code>offset</code> is where in the pattern, <code>detail</code> what is wrong there.</span></div>
 <div class="listed"><a href="../../std/regex/Match/">Match</a> <span class="kind">struct</span> <span class="summary">— A match: where it is in the text (byte offsets), its text, and its groups — group 0 the whole, a group that took no part <code>null</code>.</span></div>

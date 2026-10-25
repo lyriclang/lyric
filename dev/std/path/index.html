@@ -42,6 +42,19 @@ working directory, is the one that asks the system.</p>
 <p>On Windows both <code>\</code> and <code>/</code> separate, a path may start with a volume — a drive, <code>C:</code>, or a UNC
 share, <code>\\server\share</code> — and names compare without regard to the case of ASCII letters; what
 these functions build, they build with <code>\</code>. Elsewhere <code>/</code> separates and names compare exactly.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.path;
+
+<span class="kw">let</span> p = path.normalize(<span class="str">"docs/./book/../guide/intro.md"</span>);
+println(path.components(p).iter().join(<span class="str">" "</span>));
+println(path.fileName(p));
+println(path.extension(p));
+println(path.fileName(path.withExtension(p, <span class="str">"html"</span>)));</code></pre>
+<pre class="output"><code>docs guide intro.md
+intro.md
+.md
+intro.html</code></pre>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.join">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> join(parts: <span class="ty">string</span>...): <span class="ty">string</span></code></pre>

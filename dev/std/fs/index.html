@@ -64,6 +64,24 @@ the thread it runs on goes on with the other tasks; where no scheduler runs, the
 thread itself. A call on a regular file ends in a bounded time and is not a point of
 cancellation: a cancellation is seen at the task's next wait. Reads and writes go through the
 caller's slice, never a copy.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { print, println, <span class="ty">IoError</span> };
+<span class="kw">import</span> std.fs;
+<span class="kw">import</span> std.path;
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span> {
+    <span class="kw">let</span> dir = <span class="kw">try</span> fs.tempDir();
+    <span class="kw">let</span> file = path.join(dir, <span class="str">"notes.txt"</span>);
+    <span class="kw">try</span> fs.writeText(file, <span class="str">"first\nsecond\n"</span>);
+    <span class="kw">try</span> fs.appendText(file, <span class="str">"third\n"</span>);
+    print(<span class="kw">try</span> fs.readText(file));
+    <span class="kw">try</span> fs.removeAll(dir);
+    println(fs.exists(dir));
+}</code></pre>
+<pre class="output"><code>first
+second
+third
+false</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/fs/OpenOptions/">OpenOptions</a> <span class="kind">struct</span> <span class="summary">— How a file is opened: to read, to write, to append at its end, created where it is not there, truncated to nothing where it is.</span></div>
 <div class="listed"><a href="../../std/fs/File/">File</a> <span class="kind">class</span> <span class="summary">— An open file: read from its position, written there — at the end, where it was opened to append —, its position moved.</span></div>

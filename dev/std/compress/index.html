@@ -43,6 +43,20 @@ tables, 4 and up with lazy matching, the chains longer with the level. The strea
 Adler-32, <code>GzipReader</code>/<code>GzipWriter</code> with the gzip header and CRC-32 (members in a row read as
 one). <code>Gzip</code>, <code>Zlib</code> and <code>Deflate</code> compress and decompress bytes held in memory. Corrupt input
 is reported as <code>IoError { kind = .InvalidData }</code> carrying a <code>CompressError</code>.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println, <span class="ty">IoError</span> };
+<span class="kw">import</span> std.compress { <span class="ty">Gzip</span>, <span class="ty">CompressError</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> [<span class="ty">CompressError</span>, <span class="ty">IoError</span>] {
+    <span class="kw">let</span> line = <span class="str">"to be or not to be, that is the question; "</span>;
+    <span class="kw">let</span> text = [line, line, line, line, line, line, line, line].iter().join(<span class="str">""</span>);
+    <span class="kw">let</span> packed = <span class="kw">try</span> <span class="ty">Gzip</span>.compress(text.toBytes());
+    println(packed.length() &lt; text.length());
+    <span class="kw">let</span> back = <span class="kw">try</span> <span class="ty">Gzip</span>.decompress(packed);
+    println(back.length() == text.length());
+}</code></pre>
+<pre class="output"><code>true
+true</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/compress/CompressError/">CompressError</a> <span class="kind">struct</span> <span class="summary">— The error for bytes that are not the format, a checksum or a length that does not hold, or a compression level outside 0 to 9.</span></div>
 <div class="listed"><a href="../../std/compress/DeflateReader/">DeflateReader</a> <span class="kind">class</span> <span class="summary">— A <code>Reader</code> that decompresses raw DEFLATE blocks read from <code>inner</code>.</span></div>

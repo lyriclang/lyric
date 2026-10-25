@@ -31,6 +31,13 @@ template: <code>fmt.format(&quot;{} has {1:&gt;4}&quot;, name, n)</code>. What t
 checked here when it runs, and a mistake panics: a template that leaves a brace open or closes
 one it did not open, a value it names that is not given, a spec that is no format or does not
 apply to its value.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.fmt;
+
+<span class="kw">let</span> template = <span class="str">"{} has {1:&gt;4} items"</span>;
+println(fmt.format(template, <span class="str">"cart"</span>, <span class="num">12</span>));</code></pre>
+<pre class="output"><code>cart has   12 items</code></pre>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.format">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> format(template: <span class="ty">string</span>, args: <span class="ty">Display</span>...): <span class="ty">string</span></code></pre>

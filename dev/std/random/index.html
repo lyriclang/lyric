@@ -36,6 +36,17 @@ the system. None of this is for secrets: those come from <code>std.crypto</code>
 the low half of each first —, the nonce is zero, a 64-bit block counter runs from zero in
 words 12 and 13, and each block's sixteen words are used in order, two of them a <code>uint64</code>,
 the first the low half.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.random { <span class="ty">Random</span> };
+
+<span class="kw">let</span> a = <span class="ty">Random</span>.seeded(<span class="num">7</span>);
+<span class="kw">let</span> b = <span class="ty">Random</span>.seeded(<span class="num">7</span>);
+<span class="kw">let</span> x = a.nextInRange(<span class="num">1</span>..<span class="num">7</span>);
+println(x == b.nextInRange(<span class="num">1</span>..<span class="num">7</span>));
+println(x &gt;= <span class="num">1</span> &amp;&amp; x &lt; <span class="num">7</span>);</code></pre>
+<pre class="output"><code>true
+true</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/random/Random/">Random</a> <span class="kind">class</span> <span class="summary">— A generator of random numbers: ChaCha8 (eight rounds), 64 bits a draw.</span></div>
 <h2 id="functions">Functions</h2>

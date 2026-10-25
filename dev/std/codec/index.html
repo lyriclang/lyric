@@ -58,6 +58,22 @@ over them lies the layer a conformance writes with: <code>e.field(&quot;id&quot;
 <code>d.field&lt;int&gt;(&quot;id&quot;)</code> decodes one, <code>e.element(x)</code> and <code>d.next&lt;T&gt;()</code> an element. An encoder or a
 decoder is passed by reference, <code>&amp;e</code>, as a hasher is: a conformance is generic over the
 format's type, and the format keeps its state.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.codec { <span class="ty">Codable</span>, <span class="ty">Codec</span>, <span class="ty">EncodeError</span> };
+<span class="kw">import</span> std.json;
+
+@Codec { rename = .<span class="ty">SnakeCase</span> }
+<span class="kw">struct</span> <span class="ty">Account</span> :: [<span class="ty">Codable</span>] {
+    userName: <span class="ty">string</span>,
+    @Codec { skip = <span class="kw">true</span> }
+    token: ?<span class="ty">string</span>,
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span> {
+    println(<span class="kw">try</span> json.encode(<span class="ty">Account</span> { userName = <span class="str">"ada"</span>, token = <span class="str">"secret"</span> }));
+}</code></pre>
+<pre class="output"><code>{"user_name":"ada"}</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/codec/Case/">Case</a> <span class="kind">enum</span> <span class="summary">— Selects how a field name is rewritten on the wire: as written, <code>camelCase</code>, or <code>snake_case</code>.</span></div>
 <div class="listed"><a href="../../std/codec/Codec/">Codec</a> <span class="kind">struct</span> <span class="summary">— Steers the synthesized <code>encode</code> and <code>decode</code>.</span></div>

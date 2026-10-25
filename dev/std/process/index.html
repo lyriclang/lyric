@@ -40,6 +40,16 @@ own asks each child that has not been seen to end (lyr/process.h), and an end wa
 that waits for it, on any thread. Waiting is a point of cancellation: a cancel ends it. On
 Windows a child is its process handle, its end wakes the reaper from a registered wait, and a
 kill is the only signal there is.</p>
+<h4 id="examples">Examples</h4>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.process { <span class="ty">Command</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> run = <span class="ty">Command</span> { program = <span class="str">"git"</span>, args = [<span class="str">"--version"</span>], stdout = .<span class="ty">Piped</span> };
+    <span class="kw">let</span> out = <span class="kw">try</span> run.output();
+    println(out.status.success());
+}</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/process/Stdio/">Stdio</a> <span class="kind">enum</span> <span class="summary">— What a child's standard stream is connected to: the parent's, a pipe to the parent, or nothing.</span></div>
 <div class="listed"><a href="../../std/process/Command/">Command</a> <span class="kind">struct</span> <span class="summary">— Describes a process to start: the program — a path, or a name looked up on PATH —, its arguments, its working directory (the parent's where <code>null</code>), variables set over the parent's environment, and its three standard streams.</span></div>

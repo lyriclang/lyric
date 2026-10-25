@@ -61,6 +61,18 @@ trigonometric and hyperbolic functions. The constants <a href="../../std/math/#c
 that type: <code>float.epsilon</code>, <code>int.max</code>, <code>x.isNan()</code>.</p>
 <p>The floating-point functions compute in <code>float</code> and round a <code>float32</code> result once, at the
 end; they give the same bits on every tier-1 target.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.math;
+
+println(math.sqrt(<span class="num">2.0</span>));
+println(math.hypot(<span class="num">3.0</span>, <span class="num">4.0</span>));
+println(math.gcd(<span class="num">84</span>, <span class="num">36</span>));
+println(math.max(<span class="num">7</span>, <span class="num">3</span>));</code></pre>
+<pre class="output"><code>1.4142135623730951
+5.0
+12
+7</code></pre>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.min">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> min&lt;<span class="ty">T</span> :: [<span class="ty">Ordered</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>

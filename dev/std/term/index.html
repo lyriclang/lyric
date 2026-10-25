@@ -53,6 +53,13 @@ strike — whose <a href="../../std/term/Style/#method.apply">Style.apply</a> wr
 on (see <a href="../../std/term/#fn.colorsEnabled">colorsEnabled</a>). <a href="../../std/term/#fn.cursorUp">cursorUp</a> and the functions after it return the sequences
 themselves, to print. Under Windows the runtime switches the console to virtual-terminal
 processing once, so the same bytes mean the same there. The module has no raw mode.</p>
+<h4 id="examples">Examples</h4>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.term { <span class="ty">Style</span> };
+
+<span class="kw">let</span> warn = <span class="ty">Style</span> { fg = .<span class="ty">Yellow</span>, bold = <span class="kw">true</span> };
+println(warn.apply(<span class="str">"careful"</span>));</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/term/StdStream/">StdStream</a> <span class="kind">enum</span> <span class="summary">— One of the three standard streams of the process.</span></div>
 <div class="listed"><a href="../../std/term/Color/">Color</a> <span class="kind">enum</span> <span class="summary">— A terminal color: one of the 16 of ECMA-48 and aixterm, one of the 256, or RGB.</span></div>

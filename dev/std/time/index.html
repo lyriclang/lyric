@@ -42,6 +42,20 @@
 UTC, a fixed offset or a zone of the time zone database (TZif, RFC 8536). <code>DateTime.format</code>
 and <code>DateTime.parseWith</code> use the date patterns of UTS #35. <code>sleep</code> and the timers live in
 <code>std.task</code>.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.core { <span class="ty">ParseError</span> };
+<span class="kw">import</span> std.time { <span class="ty">Date</span>, <span class="ty">Duration</span>, <span class="ty">TimeError</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> [<span class="ty">TimeError</span>, <span class="ty">ParseError</span>] {
+    <span class="kw">let</span> d = <span class="kw">try</span> <span class="ty">Date</span>.of(<span class="num">2026</span>, <span class="num">10</span>, <span class="num">24</span>);
+    println(d.plusDays(<span class="num">10</span>));
+    println(<span class="kw">try</span> <span class="ty">Duration</span>.parse(<span class="str">"1h30m"</span>));
+    println(<span class="kw">try</span> <span class="ty">Date</span>.parse(<span class="str">"2024-02-29"</span>));
+}</code></pre>
+<pre class="output"><code>2026-11-03
+1h30m0s
+2024-02-29</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/time/Duration/">Duration</a> <span class="kind">struct</span> <span class="summary">— A span of time in whole nanoseconds, negative or not: some 292 years either way.</span></div>
 <div class="listed"><a href="../../std/time/Instant/">Instant</a> <span class="kind">struct</span> <span class="summary">— A moment on the wall clock, in nanoseconds since 1970-01-01T00:00:00Z — POSIX time, no leap seconds counted: the years 1677 to 2262.</span></div>

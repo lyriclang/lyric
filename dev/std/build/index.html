@@ -42,6 +42,13 @@ toolchain sets.</p>
 <h4 id="panics">Panics</h4>
 <p>Every function of this module panics outside a build script, where the toolchain's
 environment is not set, and where a directive cannot be written.</p>
+<h4 id="examples">Examples</h4>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.build;
+
+build.compileC(<span class="str">"native/fast.c"</span>);
+build.linkLib(<span class="str">"m"</span>);
+build.rerunIfChanged(<span class="str">"native/fast.c"</span>);</code></pre>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.target">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> target(): <span class="ty">string</span></code></pre>

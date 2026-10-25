@@ -58,6 +58,18 @@ and the text streams <code>TextReader</code> and <code>TextWriter</code>; the co
 <code>eprint</code>, <code>eprintln</code>, <code>flush</code> — and its streams <code>stdin()</code>, <code>stdout()</code>, <code>stderr()</code>; and the I/O
 pool that std.fs's calls run on. A reader's and a writer's call may throw <code>Cancelled</code> where it
 waits without bound.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println, print, <span class="ty">ByteBuffer</span>, <span class="ty">IoError</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">IoError</span> {
+    print(<span class="str">"one, "</span>);
+    println(<span class="str">"two"</span>);
+    <span class="kw">let</span> buffer = <span class="ty">ByteBuffer</span>.new();
+    <span class="kw">try</span> buffer.write(<span class="str">"written to memory"</span>.toBytes());
+    println(buffer.length());
+}</code></pre>
+<pre class="output"><code>one, two
+17</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/io/Stdin/">Stdin</a> <span class="kind">class</span> <span class="summary">— The standard input (<code>stdin()</code>): a <code>Reader</code>, and its text a line at a time.</span></div>
 <div class="listed"><a href="../../std/io/StdinLinesIter/">StdinLinesIter</a> <span class="kind">struct</span> <span class="summary">— The standard input's lines (<code>stdin().lines()</code>).</span></div>

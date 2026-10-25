@@ -45,6 +45,14 @@
 (<a href="../../std/os/#fn.exit">exit</a>), facts about the machine (<a href="../../std/os/#fn.platform">platform</a>, <a href="../../std/os/#fn.arch">arch</a>, <a href="../../std/os/#fn.hostname">hostname</a>, <a href="../../std/os/#fn.cpuCount">cpuCount</a>, <a href="../../std/os/#fn.pid">pid</a>,
 <a href="../../std/os/#fn.homeDir">homeDir</a>, <a href="../../std/os/#fn.tempDir">tempDir</a>), and the system's signals (<a href="../../std/os/Signal/">Signal</a>, <a href="../../std/os/#fn.signals">signals</a>). A signal's watcher is a
 thread of its own, whose one task hands each caught signal on.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.os;
+
+println(os.env(<span class="str">"LYRIC_EXAMPLE_UNSET"</span>) ?? <span class="str">"not set"</span>);
+println(os.cpuCount() &gt; <span class="num">0</span>);</code></pre>
+<pre class="output"><code>not set
+true</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/os/Signal/">Signal</a> <span class="kind">enum</span> <span class="summary">— A signal of the system, by an abstract name: Windows knows only <code>Interrupt</code> (Ctrl+C, Ctrl+Break) and <code>Terminate</code> (its console closes).</span></div>
 <h2 id="functions">Functions</h2>

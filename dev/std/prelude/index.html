@@ -28,6 +28,14 @@
 <p>It holds what signatures and the language itself need, not effects: <code>println</code> is <code>std.io</code>'s.
 It passes on with <code>pub import</code> what other modules declare — the core interfaces, panics and
 attributes from <code>std.core</code>, and <code>List</code>, <code>Map</code> and <code>Set</code> from <code>std.collections</code>.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> primes = <span class="ty">List</span>.of([<span class="num">2</span>, <span class="num">3</span>, <span class="num">5</span>, <span class="num">7</span>]);
+<span class="kw">let</span> ages = <span class="ty">Map</span>&lt;<span class="ty">string</span>, <span class="ty">int</span>&gt;.new();
+ages.insert(<span class="str">"ada"</span>, <span class="num">36</span>);
+println(primes.length() + (ages.get(<span class="str">"ada"</span>) ?? <span class="num">0</span>));</code></pre>
+<pre class="output"><code>40</code></pre>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>

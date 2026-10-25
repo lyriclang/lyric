@@ -78,6 +78,14 @@ quote binds; <code>error(at, msg)</code> ends a macro's expansion with an error.
 <code>_</code>, and a form the compiler has that this module has not - the rounds of a <code>comptime for</code>
 over fields and variants among them - is refused where it is read (<code>LYR-CT0005</code>).</p>
 <p>A node built here, not read, has a <code>Span</code> of nothing: file <code>&quot;&quot;</code>, line and column <code>0</code>.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.syntax { parseExpr };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(<span class="kw">comptime</span> parseExpr(<span class="str">"1+2 *  3"</span>).toSource());
+}</code></pre>
+<pre class="output"><code>1 + 2 * 3</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/syntax/Span/">Span</a> <span class="kind">struct</span> <span class="summary">— Where a node stands: a file as the diagnostics name it, a line and a column from 1; <code>&quot;&quot;</code> and <code>0</code> where the node was built, not read.</span></div>
 <div class="listed"><a href="../../std/syntax/Ident/">Ident</a> <span class="kind">struct</span> <span class="summary">— A name as written, with where it was written.</span></div>

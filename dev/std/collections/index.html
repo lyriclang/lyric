@@ -50,6 +50,20 @@ elements are; the heap is <code>Debug</code>. The iterator methods that build co
 <code>toSet</code>, <code>toMap</code>, <code>chunks</code>, <code>windows</code>, <code>sorted</code>, <code>sortedBy</code>, <code>partition</code>, <code>groupBy</code> — live here
 too.</p>
 <p>The containers are not safe across threads: share one through a <code>Mutex</code>.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.collections { <span class="ty">List</span>, <span class="ty">Map</span>, <span class="ty">Set</span> };
+
+<span class="kw">let</span> words = <span class="ty">List</span>.of([<span class="str">"fig"</span>, <span class="str">"pear"</span>, <span class="str">"fig"</span>, <span class="str">"plum"</span>, <span class="str">"pear"</span>, <span class="str">"fig"</span>]);
+<span class="kw">let</span> counts = <span class="ty">Map</span>&lt;<span class="ty">string</span>, <span class="ty">int</span>&gt;.new();
+<span class="kw">for</span> (w <span class="kw">in</span> words) {
+    counts.insert(w, (counts.get(w) ?? <span class="num">0</span>) + <span class="num">1</span>);
+}
+println(counts.get(<span class="str">"fig"</span>) ?? <span class="num">0</span>);
+<span class="kw">let</span> distinct = <span class="ty">Set</span>.of([<span class="str">"fig"</span>, <span class="str">"pear"</span>, <span class="str">"plum"</span>, <span class="str">"fig"</span>]);
+println(distinct.length());</code></pre>
+<pre class="output"><code>3
+3</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/collections/List/">List</a> <span class="kind">class</span> <span class="summary">— A growing array: its elements in order, indexed from 0.</span></div>
 <div class="listed"><a href="../../std/collections/ListIter/">ListIter</a> <span class="kind">struct</span> <span class="summary">— Iterates over a list's elements, front to back; made by <a href="../../std/collections/List/#method.iter">List.iter</a>.</span></div>

@@ -41,6 +41,20 @@ formats that require them, never where an attacker chooses the input —, <a hre
 system, and <a href="../../std/crypto/#fn.constantTimeEq">constantTimeEq</a>, a comparison of bytes whose time does not depend on where they
 differ. Everything is written in Lyric; the system's random bytes come through the runtime's
 <code>lyr_random_u64</code>.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.crypto { <span class="ty">Sha256</span>, constantTimeEq };
+<span class="kw">import</span> std.encoding { <span class="ty">Hex</span> };
+
+<span class="kw">let</span> h = <span class="ty">Sha256</span>.new();
+h.update(<span class="str">"abc"</span>.toBytes());
+<span class="kw">let</span> digest = h.finish();
+println(<span class="ty">Hex</span>.encode(digest));
+<span class="kw">let</span> again = <span class="ty">Sha256</span>.new();
+again.update(<span class="str">"abc"</span>.toBytes());
+println(constantTimeEq(digest, again.finish()));</code></pre>
+<pre class="output"><code>ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+true</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/crypto/Digest/">Digest</a> <span class="kind">interface</span> <span class="summary">— A hash fed in pieces: <code>update</code> as often as there are pieces, then <code>finish</code> for the hash of all of them.</span></div>
 <div class="listed"><a href="../../std/crypto/Sha256/">Sha256</a> <span class="kind">class</span> <span class="summary">— SHA-256 (FIPS 180-4 §6.2): 32 bytes of hash over blocks of 64.</span></div>

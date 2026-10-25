@@ -49,6 +49,26 @@ panic that ends a task, not the process, described by <a href="../../std/task/Pa
 <p>The threads and their pool are std.thread's, the locks std.sync's and the signals std.os's;
 they stand on parts kept here, internal to std: the locks' state, the scheduler, <code>launchOn</code>,
 the registry of the living schedulers and the natives.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.task { spawn, <span class="ty">Channel</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> ch = <span class="ty">Channel</span>&lt;<span class="ty">int</span>&gt;.new();
+    <span class="kw">let</span> producer = spawn(() =&gt; {
+        <span class="kw">for</span> (i <span class="kw">in</span> <span class="num">1</span>..=<span class="num">3</span>) {
+            <span class="kw">try</span> ch.send(i * <span class="num">10</span>);
+        }
+        ch.close();
+    });
+    <span class="kw">var</span> total = <span class="num">0</span>;
+    <span class="kw">while</span> (<span class="kw">let</span> v = <span class="kw">try</span> ch.recv()) {
+        total += v;
+    }
+    <span class="kw">try</span> producer.await();
+    println(total);
+}</code></pre>
+<pre class="output"><code>60</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/task/Cancelled/">Cancelled</a> <span class="kind">class</span> <span class="summary">— The error a wait throws in a cancelled task, and a suspended <code>yield</code> when <code>close()</code> unwinds its coroutine.</span></div>
 <div class="listed"><a href="../../std/task/PanicInfo/">PanicInfo</a> <span class="kind">class</span> <span class="summary">— Describes a panic that ended a task: its code, its message, and the frames where it happened, as the panic report writes them.</span></div>

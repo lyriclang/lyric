@@ -41,6 +41,24 @@ variant, <code>memberAttribute&lt;A&gt;(m)</code> of a member — a function, a 
 level a macro reads through <code>std.syntax</code>.</p>
 <p>The questions and the infos are declared in <code>std.core</code>, whose synthesized members are written
 over them and which imports nothing: this module is their name to the program.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.meta { fields, typeName };
+
+<span class="kw">struct</span> <span class="ty">Point</span> {
+    x: <span class="ty">int</span>,
+    y: <span class="ty">int</span>,
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(typeName&lt;<span class="ty">Point</span>&gt;());
+    <span class="kw">comptime</span> <span class="kw">for</span> (f <span class="kw">in</span> fields&lt;<span class="ty">Point</span>&gt;()) {
+        println(f.name);
+    }
+}</code></pre>
+<pre class="output"><code>Point
+x
+y</code></pre>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>

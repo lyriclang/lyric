@@ -35,6 +35,20 @@
 <p>The lock state lives in <code>std.task</code>, whose scheduler releases the locks of a task that
 panicked. A task that waits for a lock or a permit is parked while the other tasks of its
 thread run.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.sync { <span class="ty">Atomic</span> };
+<span class="kw">import</span> std.task { spawn };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> hits = <span class="ty">Atomic</span>&lt;<span class="ty">int</span>&gt;.new(<span class="num">0</span>);
+    <span class="kw">let</span> tasks = [spawn(() =&gt; { hits.fetchAndAdd(<span class="num">1</span>); }), spawn(() =&gt; { hits.fetchAndAdd(<span class="num">2</span>); })];
+    <span class="kw">for</span> (t <span class="kw">in</span> tasks) {
+        <span class="kw">try</span> t.await();
+    }
+    println(hits.load());
+}</code></pre>
+<pre class="output"><code>3</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/sync/AtomicValue/">AtomicValue</a> <span class="kind">interface</span> <span class="summary">— The types an <a href="../../std/sync/Atomic/">Atomic</a> holds: those the machine reads and writes in one step.</span></div>
 <div class="listed"><a href="../../std/sync/Atomic/">Atomic</a> <span class="kind">class</span> <span class="summary">— A value that every thread reads and writes in one step.</span></div>

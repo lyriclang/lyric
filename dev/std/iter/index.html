@@ -52,6 +52,16 @@ The prelude names this module, so its members reach every iterator without an im
 type is written, the structs are named through it, as <code>iter.MapIter&lt;I, U&gt;</code>.</p>
 <p>The protocol itself (<code>Iterator</code>, <code>Iterable</code>, <code>DoubleEnded</code>, <code>Step</code>, <code>FromIterator</code>), the ranges
 and the iterators of std.core's own types live in std.core.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> squares = (<span class="num">1</span>..=<span class="num">10</span>).filter((n) =&gt; n % <span class="num">2</span> == <span class="num">0</span>).map((n) =&gt; n * n).toArray();
+println(squares.length());
+println((<span class="num">1</span>..=<span class="num">4</span>).fold(<span class="num">0</span>, (sum, n) =&gt; sum + n));
+println([<span class="str">"a"</span>, <span class="str">"b"</span>, <span class="str">"c"</span>].iter().join(<span class="str">"-"</span>));</code></pre>
+<pre class="output"><code>5
+10
+a-b-c</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/iter/MapIter/">MapIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of an iterator, each passed through <code>f</code>; made by <code>it.map(f)</code>.</span></div>
 <div class="listed"><a href="../../std/iter/FilterIter/">FilterIter</a> <span class="kind">struct</span> <span class="summary">— Yields the values of an iterator for which <code>p</code> holds; made by <code>it.filter(p)</code>.</span></div>

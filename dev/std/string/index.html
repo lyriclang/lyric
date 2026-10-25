@@ -35,6 +35,16 @@
 <p>f-strings and <code>+</code> on strings lower to <a href="../../std/string/#fn.concat">concat</a> and the <code>from…</code> conversions. The module also
 re-exports <a href="../../std/core/StringBuilder/">StringBuilder</a> for building text piece by piece, and names the Unicode version
 behind <code>char</code> in <a href="../../std/string/#const.unicodeVersion">unicodeVersion</a>.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.<span class="ty">string</span> { <span class="ty">StringBuilder</span> };
+
+<span class="kw">let</span> sb = <span class="ty">StringBuilder</span>.new();
+<span class="kw">for</span> (i <span class="kw">in</span> <span class="num">1</span>..=<span class="num">3</span>) {
+    sb.append(<span class="str">f"</span>{i}<span class="str">,</span><span class="str">"</span>);
+}
+println(sb.toString());</code></pre>
+<pre class="output"><code>1,2,3,</code></pre>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.concat">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> concat(a: <span class="ty">string</span>, b: <span class="ty">string</span>): <span class="ty">string</span></code></pre>

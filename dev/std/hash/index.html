@@ -36,6 +36,18 @@ with it, its order differs from run to run, and no input from outside can aim co
 it. <a href="../../std/hash/FixedHasher/">FixedHasher</a> is the same under a zero key, for what must hash alike in every run;
 <a href="../../std/hash/Fnv1a64/">Fnv1a64</a> is fast and keyless, for trusted input. All three implement <a href="../../std/core/Hasher/">Hasher</a>. The checksums
 are <a href="../../std/hash/#fn.crc32">crc32</a>, <a href="../../std/hash/#fn.crc32c">crc32c</a> and <a href="../../std/hash/#fn.adler32">adler32</a>.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.hash { crc32, <span class="ty">FixedHasher</span> };
+
+println(crc32(<span class="str">"hello"</span>.toBytes()));
+<span class="kw">var</span> a = <span class="ty">FixedHasher</span>.new();
+<span class="str">"hello"</span>.hash(&amp;a);
+<span class="kw">var</span> b = <span class="ty">FixedHasher</span>.new();
+<span class="str">"hello"</span>.hash(&amp;b);
+println(a.finish() == b.finish());</code></pre>
+<pre class="output"><code>907060870
+true</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/hash/DefaultHasher/">DefaultHasher</a> <span class="kind">struct</span> <span class="summary">— Hashes with SipHash-1-3 under the process's key, drawn from the system at the first use.</span></div>
 <div class="listed"><a href="../../std/hash/FixedHasher/">FixedHasher</a> <span class="kind">struct</span> <span class="summary">— Hashes with SipHash-1-3 under a zero key.</span></div>

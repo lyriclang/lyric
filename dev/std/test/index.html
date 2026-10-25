@@ -52,6 +52,17 @@ module of the package or under its <code>tests/</code>.</p>
 <code>Debug</code> writes it, and names the expression it got it from: <code>xs.length() = 2, expected 3</code>. The
 actual value comes first. Two values too long to compare by eye get their first difference
 named below: a text's first line that differs, else the first character.</p>
+<h4 id="examples">Examples</h4>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.test { assertEq, assertTrue };
+
+@Test
+<span class="kw">fn</span> aListGrows() {
+    <span class="kw">let</span> xs = <span class="ty">List</span>.of([<span class="num">1</span>, <span class="num">2</span>]);
+    xs.push(<span class="num">3</span>);
+    assertEq(xs.length(), <span class="num">3</span>);
+    assertTrue(xs.contains(<span class="num">3</span>));
+}</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/test/TestCase/">TestCase</a> <span class="kind">struct</span> <span class="summary">— One test as <code>lyric test</code> hands it to <a href="../../std/test/#fn.run">run</a>: its name — the module's path and the function's —, its body, why it is skipped, if it is, how many seconds it may take, and whether it runs beside the others that say so (<code>@Test { skip = &quot;…&quot;, timeout = 10, parallel = true }</code>).</span></div>
 <div class="listed"><a href="../../std/test/BenchCase/">BenchCase</a> <span class="kind">struct</span> <span class="summary">— One benchmark as <code>lyric bench</code> hands it to <a href="../../std/test/#fn.runBenches">runBenches</a>: its name — the module's path and the function's — and its body, handed a bench to measure through.</span></div>

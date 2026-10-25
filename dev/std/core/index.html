@@ -193,6 +193,18 @@ the attributes, the operator interfaces (<a href="../../std/core/Equatable/">Equ
 <a href="../../std/core/Display/">Display</a>, <a href="../../std/core/Debug/">Debug</a>, <a href="../../std/core/Clone/">Clone</a>), the number tower (<a href="../../std/core/Num/">Num</a>, <a href="../../std/core/Integer/">Integer</a>, <a href="../../std/core/Float/">Float</a>) with <a href="../../std/core/Parse/">Parse</a>, the
 members of <code>string</code>, <code>char</code> and the arrays and views, the format language behind f-strings,
 and the iterator protocol (<a href="../../std/core/Iterator/">Iterator</a>, <a href="../../std/core/Iterable/">Iterable</a>).</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> n = (<span class="kw">try</span>? <span class="ty">int</span>.parse(<span class="str">"42"</span>)) ?? <span class="num">0</span>;
+println(n + <span class="num">1</span>);
+<span class="kw">let</span> name: ?<span class="ty">string</span> = <span class="kw">null</span>;
+println(name ?? <span class="str">"nobody"</span>);
+<span class="kw">let</span> first = [<span class="num">3</span>, <span class="num">1</span>, <span class="num">2</span>].iter().min() ?? <span class="num">0</span>;
+println(first);</code></pre>
+<pre class="output"><code>43
+nobody
+1</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/core/Any/">Any</a> <span class="kind">interface</span> <span class="summary">— The empty interface, which every struct, class and enum value conforms to.</span></div>
 <div class="listed"><a href="../../std/core/Box/">Box</a> <span class="kind">class</span> <span class="summary">— Holds a value behind a reference.</span></div>

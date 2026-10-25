@@ -38,6 +38,20 @@ address), <code>show</code> writes them back (§5.3), <a href="../../std/uri/Uri
 (§5.2), and <a href="../../std/uri/Uri/#method.normalize">Uri.normalize</a> normalizes the case, the percent-encoding and the dot segments
 (§6.2). <a href="../../std/uri/#fn.percentEncode">percentEncode</a> and <a href="../../std/uri/#fn.percentDecode">percentDecode</a> encode a text for a <a href="../../std/uri/Component/">Component</a> and decode it
 again; <a href="../../std/uri/Query/">Query</a> holds the pairs of a query in their order.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.core { <span class="ty">ParseError</span> };
+<span class="kw">import</span> std.uri { <span class="ty">Uri</span>, <span class="ty">Query</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">ParseError</span> {
+    <span class="kw">let</span> base = <span class="kw">try</span> <span class="ty">Uri</span>.parse(<span class="str">"https://example.com/docs/guide/"</span>);
+    <span class="kw">let</span> page = base.resolve(<span class="kw">try</span> <span class="ty">Uri</span>.parse(<span class="str">"../api/index.html?lang=en"</span>));
+    println(page.show());
+    <span class="kw">let</span> q = <span class="kw">try</span> <span class="ty">Query</span>.parse(<span class="str">"a=1&amp;b=two&amp;a=3"</span>);
+    println(q.all(<span class="str">"a"</span>).length());
+}</code></pre>
+<pre class="output"><code>https://example.com/docs/api/index.html?lang=en
+2</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/uri/Component/">Component</a> <span class="kind">enum</span> <span class="summary">— A component of a URI, for percent-encoding: each keeps a different set of characters as they are.</span></div>
 <div class="listed"><a href="../../std/uri/Uri/">Uri</a> <span class="kind">struct</span> <span class="summary">— A URI reference (§4.1): absolute where it has a scheme, relative otherwise.</span></div>

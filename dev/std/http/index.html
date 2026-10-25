@@ -52,6 +52,16 @@ connection, reads each request as the client writes one (its body a <code>Reader
 read or leave), answers <code>Expect: 100-continue</code>, writes the handler's <code>Response</code> with its
 length or in chunks, keeps the connection for the next request, and ends with <code>shutdown()</code>.
 The module has no TLS of its own, no HTTP/2 and no cookies.</p>
+<h4 id="examples">Examples</h4>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.http;
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> response = <span class="kw">try</span> http.get(<span class="str">"http://example.com/"</span>);
+    println(response.status);
+    println(<span class="kw">try</span> response.text());
+}</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/http/HttpErrorKind/">HttpErrorKind</a> <span class="kind">enum</span></div>
 <div class="listed"><a href="../../std/http/HttpError/">HttpError</a> <span class="kind">struct</span> <span class="summary">— The error the client throws beyond the I/O errors of the connection.</span></div>

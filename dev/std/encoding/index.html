@@ -38,6 +38,20 @@ and elements — into a format such as JSON is <code>std.codec</code>'s job.</p>
 <p>The decoders are strict, as RFC 4648 §3.3 and §3.5 allow: Base64 requires its padding and zero
 bits past the last byte, and accepts no whitespace. Input that is not the encoding throws an
 <a href="../../std/encoding/EncodingError/">EncodingError</a> at the first offset that is wrong.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.encoding { <span class="ty">Base64</span>, <span class="ty">Hex</span>, <span class="ty">EncodingError</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodingError</span> {
+    <span class="kw">let</span> bytes = <span class="str">"Lyric"</span>.toBytes();
+    println(<span class="ty">Base64</span>.encode(bytes));
+    println(<span class="ty">Hex</span>.encode(bytes));
+    <span class="kw">let</span> back = <span class="kw">try</span> <span class="ty">Base64</span>.decode(<span class="str">"THlyaWM="</span>);
+    println(back.length());
+}</code></pre>
+<pre class="output"><code>THlyaWM=
+4c79726963
+5</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/encoding/EncodingError/">EncodingError</a> <span class="kind">struct</span> <span class="summary">— The error thrown for text that is not the encoding it was decoded as: where — a byte of the text, a unit of UTF-16 — and what is wrong there.</span></div>
 <div class="listed"><a href="../../std/encoding/Base64/">Base64</a> <span class="kind">struct</span> <span class="summary">— Base64 with RFC 4648's alphabet (§4), <code>+</code> and <code>/</code>, padded with <code>=</code> to a multiple of four.</span></div>
