@@ -367,6 +367,13 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <td>—</td>
 </tr>
 <tr>
+<td><code>lsp</code></td>
+<td>—</td>
+<td><code>--stdio</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>env</code></td>
 <td>—</td>
 <td><code>-C &lt;dir&gt;</code>, <code>--profile &lt;name&gt;</code>, <code>--target &lt;triple&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--offline</code>, <code>--json</code></td>
@@ -562,6 +569,25 @@ breaking and 0 where none is; <strong><code>--json</code></strong> prints
 <li>A directory in no git repository, a revision git cannot read, or one without the package's
 <code>lyric.toml</code> is <strong>LYR-CLI0022</strong>, exit 2. <code>--diff</code> with <code>--std</code> is refused with exit 2.</li>
 </ol>
+<h2 id="11-lsp">11. <code>lsp</code></h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 E1, E3</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric.Tests.Lsp</code>; the verb in <code>tests/Lyric5.Tests</code>,
+<code>LspCommandTests</code>).</p>
+<ol>
+<li><strong><code>lyric lsp</code></strong> is the language server: it speaks the Language Server Protocol with an editor
+over its standard input and output until the editor says <code>exit</code>, and ends with exit 0 after a
+<code>shutdown</code>, 1 without one. <strong><code>--stdio</code></strong> names the one way there is; editors pass it.</li>
+<li>A file is analysed <strong>as a module of its package</strong> where it lies under the <code>src/</code> or <code>tests/</code> of
+the nearest <code>lyric.toml</code> above it: with every other module of the package, in the one
+compilation <code>lyric test</code> makes of them (<a href="#3-test">§3</a>), and the packages of its graph. Any other
+file is analysed <strong>alone</strong>, with the standard library, as <code>lyric check &lt;file&gt;</code> checks it.</li>
+<li>The findings the editor shows are those <code>lyric check</code> says of the same text; the text of every
+file the editor holds open counts instead of what is saved.</li>
+<li>The server reads the manifest and the graph as a build reads them, except that it <strong>fetches
+nothing</strong> — a package from git comes from the cache — and <strong>writes nothing</strong>: <code>lyric.lock</code> is
+left as it is. A manifest it cannot read leaves the file analysed alone, and the server says why
+in the editor's log.</li>
+</ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -580,6 +606,7 @@ breaking and 0 where none is; <strong><code>--json</code></strong> prints
 <li class="level-2"><a href="#8-fmt">8. fmt</a></li>
 <li class="level-2"><a href="#9-doc">9. doc</a></li>
 <li class="level-2"><a href="#10-api">10. api</a></li>
+<li class="level-2"><a href="#11-lsp">11. lsp</a></li>
 </ul>
 </aside>
 </div>
