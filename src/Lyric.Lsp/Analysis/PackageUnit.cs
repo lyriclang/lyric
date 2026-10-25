@@ -31,6 +31,9 @@ public sealed class PackageUnit
     /// <summary>The directory of the manifest: the unit's key.</summary>
     public string Root => _manifest.Root;
 
+    /// <summary>The package's manifest, as read.</summary>
+    public Manifest Manifest => _manifest;
+
     public string ManifestFile => _manifest.File;
 
     public string SourceRoot => _manifest.SourceRoot;
