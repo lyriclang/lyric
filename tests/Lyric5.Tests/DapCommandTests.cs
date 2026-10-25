@@ -15,7 +15,7 @@ namespace Lyric5.Tests;
 /// </summary>
 public class DapCommandTests
 {
-    private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(90);
 
     private sealed class Session : IDisposable
     {
@@ -69,13 +69,21 @@ public class DapCommandTests
             }
         }
 
+        /// <summary>What arrived and was passed over, the newest last: said where a wait fails.</summary>
+        private readonly List<string> _passed = [];
+
         public JsonObject Until(Func<JsonObject, bool> wanted, string what)
         {
             var deadline = DateTime.UtcNow + Timeout;
             while (true)
             {
-                var message = _inbox.Take(deadline - DateTime.UtcNow) ?? throw new InvalidOperationException($"the adapter ended before {what}");
+                JsonObject? message;
+                try { message = _inbox.Take(deadline - DateTime.UtcNow); }
+                catch (TimeoutException) { throw new TimeoutException($"no {what}; passed over:\n{string.Join('\n', _passed.TakeLast(30))}"); }
+                if (message is null) throw new InvalidOperationException($"the adapter ended before {what}; passed over:\n{string.Join('\n', _passed.TakeLast(30))}");
                 if (wanted(message)) return message;
+                var shown = message.ToJsonString();
+                _passed.Add(shown.Length > 300 ? shown[..300] : shown);
             }
         }
 
