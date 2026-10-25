@@ -21,13 +21,11 @@ public sealed class DependencyTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(_dir, "src"));
 
-        File.WriteAllText(Path.Combine(_dir, "lyric.json"), """{ "sourceRoot": "src" }""");
+        File.WriteAllText(Path.Combine(_dir, "lyric.toml"), "[package]\nname = \"app\"\nversion = \"0.1.0\"\n");
 
         // On DISK the module has what the program imports. Every test below changes that in a
         // BUFFER, so a wrong answer is one that read the file.
         File.WriteAllText(Path.Combine(_dir, "src", "util.lyr"), """
-            module util;
-
             pub fn value(): int { return 1; }
             """);
     }
@@ -41,15 +39,13 @@ public sealed class DependencyTests : IDisposable
     private string PathOf(string name) => Path.Combine(_dir, "src", name);
 
     private const string Program = """
-        import util { value };
+        import app.util { value };
 
         fn main(): int { return value(); }
         """;
 
     /// <summary>The module without the function the program imports.</summary>
     private const string UtilWithoutValue = """
-        module util;
-
         pub fn other(): int { return 2; }
         """;
 
@@ -159,8 +155,6 @@ public sealed class DependencyTests : IDisposable
         Assert.NotEmpty((await DiagnosticsFor(harness, app)).EnumerateArray());
 
         await harness.NotifyAsync(LspMethods.DidChange, DidChange(util, 2, """
-            module util;
-
             pub fn value(): int { return 41; }
             """));
 
@@ -175,8 +169,8 @@ public sealed class DependencyTests : IDisposable
         // the cascade could be re-analysing everything on every keystroke and the three tests
         // above would still pass.
         //
-        // Outside the SOURCE ROOT on purpose: a file under it belongs to the project unit, and
-        // opening one re-publishes the whole project by design.
+        // Outside src/ on purpose: a file under it belongs to the package unit, and opening one
+        // re-publishes the whole package by design.
         var stranger = DocumentUri.FromFilePath(Path.Combine(_dir, "stranger.lyr"));
         var app = DocumentUri.FromFilePath(PathOf("app.lyr"));
         var util = DocumentUri.FromFilePath(PathOf("util.lyr"));
@@ -192,8 +186,6 @@ public sealed class DependencyTests : IDisposable
         await DiagnosticsFor(harness, util);
 
         await harness.NotifyAsync(LspMethods.DidOpen, DidOpen(stranger, """
-            module stranger;
-
             pub fn alone(): int { return 0; }
             """));
 

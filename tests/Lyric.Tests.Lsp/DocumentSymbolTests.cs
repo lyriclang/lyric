@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Lyric.AST;
 using Lyric.Compiler;
 using Lyric.Core;
 using Lyric.Lsp.Analysis;
@@ -21,7 +22,7 @@ public sealed class DocumentSymbolTests
     private static IReadOnlyList<DocumentSymbol> SymbolsOf(string program)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "symbols.lyr");
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, program));
+        var result = Single.Check(path, program);
         Assert.NotNull(result.Model);
 
         return DocumentSymbolProvider.Of(result.Sources, result.Model.Entry);
@@ -173,8 +174,8 @@ public sealed class DocumentSymbolTests
         // The property the whole approach rests on. An outline is read WHILE the file is broken, and
         // this test is only green as long as nothing here consults the binding or type tables.
         var path = Path.Combine(AppContext.BaseDirectory, "broken.lyr");
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(
-            path, "struct P { v: int, }\nfn main(): int {\n    return \"not an int\" + nowhere;\n}\n"));
+        var result = Single.Check(
+            path, "struct P { v: int, }\nfn main(): int {\n    return \"not an int\" + nowhere;\n}\n");
 
         Assert.True(result.Diagnostics.HasErrors);
         Assert.NotNull(result.Model);
@@ -191,13 +192,14 @@ public sealed class DocumentSymbolTests
     {
         var data = new TheoryData<string>();
         foreach (var file in Directory.EnumerateFiles(
-            Path.Combine(RepoRoot(), "stdlib"), "*.lyr", SearchOption.AllDirectories))
+            Path.Combine(RepoRoot(), "stdlib5"), "*.lyr", SearchOption.AllDirectories))
             data.Add(file);
         return data;
     }
 
     /// <summary>
-    /// Every standard library file produces an outline, and every entry in it satisfies the
+    /// Every standard library file that declares something produces an outline — a module of
+    /// re-exports alone, like the prelude, has none —, and every entry in it satisfies the
     /// protocol's containment rule.
     ///
     /// <para>Two things at once, both of which only real files reach: the kind switch is total over
@@ -208,11 +210,12 @@ public sealed class DocumentSymbolTests
     [MemberData(nameof(StandardLibrary))]
     public void Every_standard_library_file_produces_a_well_formed_outline(string path)
     {
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, File.ReadAllText(path)));
+        var result = Single.Check(path, File.ReadAllText(path));
         Assert.NotNull(result.Model);
 
         var symbols = DocumentSymbolProvider.Of(result.Sources, result.Model.Entry);
-        Assert.NotEmpty(symbols);
+        if (result.Model.Entry.Declarations.Any(d => d is not ImportDecl)) Assert.NotEmpty(symbols);
+        else Assert.Empty(symbols);
 
         Check(symbols);
 

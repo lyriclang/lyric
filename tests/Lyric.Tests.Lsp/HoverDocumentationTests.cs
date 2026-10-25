@@ -23,7 +23,7 @@ public sealed class HoverDocumentationTests
         var program = programWithMarker.Remove(offset, 1);
         var path = Path.Combine(AppContext.BaseDirectory, "hover-docs.lyr");
 
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, program));
+        var result = Single.Check(path, program);
         Assert.NotNull(result.Model);
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);
@@ -125,13 +125,13 @@ public sealed class HoverDocumentationTests
     [Fact]
     public void A_standard_library_function_shows_the_block_written_in_its_own_file()
     {
-        // The test the whole slice exists for: the block stands in stdlib/std/os.lyr, which the
+        // The test the whole slice exists for: the block stands in stdlib5/std/os.lyr, which the
         // entry module never sees. Without the table crossing the module boundary this is silent.
         var text = Text(
             "import std.os { cpuCount };\nfn main(): int {\n    return cpuC$ount();\n}\n");
 
         Assert.Contains("fn cpuCount", text);
-        Assert.Contains("How many cores the machine has", text);
+        Assert.Contains("Returns the number of processors online", text);
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public sealed class HoverDocumentationTests
         var text = Text(
             "import std.os { cpuCount };\nfn main(): int {\n    return cpu$Count();\n}\n");
 
-        Assert.Contains("How many cores the machine has", text);
+        Assert.Contains("Returns the number of processors online", text);
     }
 
     // ------------------------------------------------------------------ counter-checks
@@ -204,7 +204,7 @@ public sealed class HoverDocumentationTests
             + "fn main(): int {\n    return cores() + cpuCount();\n}\n";
 
         var path = Path.Combine(AppContext.BaseDirectory, "collision.lyr");
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, program));
+        var result = Single.Check(path, program);
         Assert.NotNull(result.Model);
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);
@@ -213,7 +213,7 @@ public sealed class HoverDocumentationTests
 
         Assert.NotNull(found);
         Assert.Contains("Local one.", found.Markdown);
-        Assert.DoesNotContain("How many cores", found.Markdown);
+        Assert.DoesNotContain("number of processors", found.Markdown);
     }
 
     [Fact]
@@ -222,8 +222,8 @@ public sealed class HoverDocumentationTests
         // A count rather than a single lookup: it fails loudly if the loader side of the seam is
         // wired up for one module and not for the rest.
         var path = Path.Combine(AppContext.BaseDirectory, "table.lyr");
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(
-            path, "import std.os { cpuCount };\nfn main(): int {\n    return cpuCount();\n}\n"));
+        var result = Single.Check(
+            path, "import std.os { cpuCount };\nfn main(): int {\n    return cpuCount();\n}\n");
 
         Assert.NotNull(result.Model);
         Assert.True(result.Model.Documentation.Count > 10,

@@ -15,7 +15,7 @@ public static class CliDiagnostics
     public const string FileUnreadable = "LYR-CLI0001";
 
     /// <summary>A <c>lyric.json</c> was found and could not be understood — the 4.x project file,
-    /// which the language server still reads.</summary>
+    /// which the front end's own 4.x suites still read.</summary>
     public const string BadProjectFile = "LYR-CLI0010";
 
     /// <summary>A <c>lyric.json</c> names a minimum toolchain this one does not reach (the 4.x

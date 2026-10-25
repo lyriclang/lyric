@@ -60,7 +60,12 @@ public static class ReferenceProvider
             // list should underline 'add', not 'p.add' — and a synthesized use (an operator
             // desugar) still counts as a place, shown as the expression that stands for it.
             var span = NameSpans.Of(node) ?? node.Span;
-            if (span.File.IsValid) sites.Add(new ReferenceSite(span.File, span));
+
+            // A use in code the compiler wrote — a synthesized Debug or Equatable — is no place in
+            // a file: its text is made from the declaration again, and an edit there has no file
+            // to land in.
+            if (span.File.IsValid && !model.Compilation.IsSynthesized(span.File))
+                sites.Add(new ReferenceSite(span.File, span));
         }
 
         if (includeDeclaration && symbol.Declaration is { } declaration

@@ -18,7 +18,7 @@ public sealed class RenameProtocolTests : IDisposable
     public RenameProtocolTests()
     {
         Directory.CreateDirectory(Path.Combine(_dir, "src"));
-        File.WriteAllText(Path.Combine(_dir, "lyric.json"), """{ "sourceRoot": "src" }""");
+        File.WriteAllText(Path.Combine(_dir, "lyric.toml"), "[package]\nname = \"app\"\nversion = \"0.1.0\"\n");
     }
 
     public void Dispose()
@@ -80,8 +80,8 @@ public sealed class RenameProtocolTests : IDisposable
     [Fact]
     public async Task A_rename_applied_leaves_a_compiling_project_with_the_new_name()
     {
-        var utilText = "module util;\n\npub fn value(): int { return 1; }\n";
-        var appText = "import util { value };\n\nfn main(): int { return value(); }\n";
+        var utilText = "pub fn value(): int { return 1; }\n";
+        var appText = "import app.util { value };\n\nfn main(): int { return value(); }\n";
         var util = Write("util.lyr", utilText);
         var app = Write("app.lyr", appText);
         var utilUri = DocumentUri.FromFilePath(util);
@@ -93,11 +93,11 @@ public sealed class RenameProtocolTests : IDisposable
         await WaitForDiagnostics(harness, utilUri);
 
         // The rename is asked ON THE DECLARATION, which is where the other direction begins:
-        // 'pub fn value' stands at line 2, the name from character 7.
+        // 'pub fn value' stands at line 0, the name from character 7.
         var id = await harness.RequestAsync(LspMethods.Rename, JsonSerializer.Serialize(new
         {
             textDocument = new { uri = utilUri },
-            position = new { line = 2, character = 8 },
+            position = new { line = 0, character = 8 },
             newName = "amount",
         }));
 
@@ -119,9 +119,10 @@ public sealed class RenameProtocolTests : IDisposable
         File.WriteAllText(util, texts[utilUri]);
         File.WriteAllText(app, texts[appUri]);
 
+        var unit = PackageUnit.Find(app, out _)!;
         var recompiled = SourceCompiler.CheckProject(
-            [ScriptSource.FromDisk(app, "app"), ScriptSource.FromDisk(util, "util")],
-            new CompilerOptions { SourceRoot = Path.Combine(_dir, "src") });
+            [ScriptSource.FromDisk(app, unit.ModuleOf(app)!), ScriptSource.FromDisk(util, unit.ModuleOf(util)!)],
+            unit.Options);
 
         Assert.True(recompiled.Ok, string.Join("\n",
             recompiled.Diagnostics.SortedSnapshot().Select(d => $"{d.Code}: {d.Message}")));
@@ -133,7 +134,7 @@ public sealed class RenameProtocolTests : IDisposable
     [Fact]
     public async Task A_refused_rename_carries_its_reason_to_the_client()
     {
-        var appText = "import std.io.console { println };\n\n"
+        var appText = "import std.io { println };\n\n"
             + "fn main(): int {\n    println(\"hi\");\n    return 0;\n}\n";
         var app = Write("app.lyr", appText);
         var appUri = DocumentUri.FromFilePath(app);
@@ -154,15 +155,15 @@ public sealed class RenameProtocolTests : IDisposable
         var error = response.GetProperty("error");
 
         Assert.Equal(-32803, error.GetProperty("code").GetInt32());
-        Assert.Contains("outside this project", error.GetProperty("message").GetString());
+        Assert.Contains("outside this package", error.GetProperty("message").GetString());
     }
 
     [Fact]
     public async Task The_workspace_symbol_search_spans_the_project()
     {
-        var utilText = "module util;\n\npub fn value(): int { return 1; }\n"
+        var utilText = "pub fn value(): int { return 1; }\n"
             + "pub struct Holder { amount: int, }\n";
-        var appText = "import util { value };\n\nfn main(): int { return value(); }\n";
+        var appText = "import app.util { value };\n\nfn main(): int { return value(); }\n";
         var util = Write("util.lyr", utilText);
         Write("app.lyr", appText);
         var utilUri = DocumentUri.FromFilePath(util);

@@ -75,11 +75,11 @@ public sealed class DiagnosticsTests
         Assert.Equal((int)LspSeverity.Error, diagnostic.GetProperty("severity").GetInt32());
         Assert.Equal("lyric", diagnostic.GetProperty("source").GetString());
 
-        // The compiler renders this at line 2, column 5. Both origins move by one, and nothing
-        // else does: the character is a UTF-16 offset on both sides.
+        // The compiler renders this at line 2, column 18 — the initializer. Both origins move by
+        // one, and nothing else does: the character is a UTF-16 offset on both sides.
         var start = diagnostic.GetProperty("range").GetProperty("start");
         Assert.Equal(1, start.GetProperty("line").GetInt32());
-        Assert.Equal(4, start.GetProperty("character").GetInt32());
+        Assert.Equal(17, start.GetProperty("character").GetInt32());
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public sealed class DiagnosticsTests
         var path = BufferPath();
         var uri = DocumentUri.FromFilePath(path);
 
-        var direct = SourceCompiler.Check(ScriptSource.FromBuffer(path, Faulty))
+        var direct = Single.Check(path, Faulty)
             .Diagnostics.SortedSnapshot()
             .Where(d => d.Span.File.IsValid)
             .Select(d => d.Code)

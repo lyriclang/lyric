@@ -43,12 +43,12 @@ public static class CompletionProvider
     /// </summary>
     /// <param name="text">The buffer as the editor holds it, WITHOUT the marker.</param>
     public static IReadOnlyList<CompletionItem>? At(
-        string path, string text, int offset, CompilerOptions options)
+        string path, string text, int offset, CompilerOptions options, string? moduleName = null)
     {
         if (offset < 0 || offset > text.Length) return null;
 
         var marked = text.Insert(offset, Marker);
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, marked), options);
+        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, marked, moduleName), options);
         if (result.Model is not { } model) return null;
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);

@@ -26,7 +26,7 @@ public sealed class HoverTests
         var program = programWithMarker.Remove(offset, 1);
         var path = Path.Combine(AppContext.BaseDirectory, "hover.lyr");
 
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, program));
+        var result = Single.Check(path, program);
         var model = result.Model;
         Assert.NotNull(model);
 

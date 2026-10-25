@@ -24,7 +24,7 @@ public sealed class ReferenceTests
         var program = programWithMarker.Remove(offset, 1);
         var path = Path.Combine(AppContext.BaseDirectory, "references.lyr");
 
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, program));
+        var result = Single.Check(path, program);
         Assert.NotNull(result.Model);
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);
@@ -221,8 +221,7 @@ public sealed class ReferenceTests
         var offset = "fn main(): int { return 1; }\n".IndexOf("return", StringComparison.Ordinal);
         var path = Path.Combine(AppContext.BaseDirectory, "nothing.lyr");
 
-        var result = SourceCompiler.Check(
-            ScriptSource.FromBuffer(path, "fn main(): int { return 1; }\n"));
+        var result = Single.Check(path, "fn main(): int { return 1; }\n");
         Assert.NotNull(result.Model);
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);
@@ -253,7 +252,7 @@ public sealed class ReferenceTests
             + "    let p = Point { x = 1 };\n    return p.x;\n}\n";
 
         var path = Path.Combine(AppContext.BaseDirectory, "structinit.lyr");
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, program));
+        var result = Single.Check(path, program);
         Assert.NotNull(result.Model);
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);

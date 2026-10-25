@@ -21,7 +21,7 @@ public sealed class RenameTests : IDisposable
     public RenameTests()
     {
         Directory.CreateDirectory(Path.Combine(_dir, "src"));
-        File.WriteAllText(Path.Combine(_dir, "lyric.json"), """{ "sourceRoot": "src" }""");
+        File.WriteAllText(Path.Combine(_dir, "lyric.toml"), "[package]\nname = \"app\"\nversion = \"0.1.0\"\n");
     }
 
     public void Dispose()
@@ -37,11 +37,12 @@ public sealed class RenameTests : IDisposable
         return path;
     }
 
-    private CompileResult Check(params string[] paths) =>
-        SourceCompiler.CheckProject(
-            paths.Select(p => ScriptSource.FromDisk(
-                p, Path.GetFileNameWithoutExtension(p))).ToArray(),
-            new CompilerOptions { SourceRoot = Path.Combine(_dir, "src") });
+    private static CompileResult Check(params string[] paths)
+    {
+        var unit = PackageUnit.Find(paths[0], out var refused) ?? throw new InvalidOperationException(refused);
+        return SourceCompiler.CheckProject(
+            paths.Select(p => ScriptSource.FromDisk(p, unit.ModuleOf(p)!)).ToArray(), unit.Options);
+    }
 
     private static Module RootOf(SemanticModel model, FileId file)
     {
@@ -77,10 +78,10 @@ public sealed class RenameTests : IDisposable
     public void A_function_rename_reaches_the_importing_file_and_its_import_clause()
     {
         // The headline: the declaration, the call in ANOTHER file, and the name inside
-        // 'import util { value }' — the clause declares a binding rather than using the target, so
+        // 'import app.util { value }' — the clause declares a binding rather than using the target, so
         // no reference table carries it, and forgetting it breaks every importer.
-        var utilText = "module util;\n\npub fn value(): int { return 1; }\n";
-        var appText = "import util { value };\n\nfn main(): int { return value(); }\n";
+        var utilText = "pub fn value(): int { return 1; }\n";
+        var appText = "import app.util { value };\n\nfn main(): int { return value(); }\n";
         var util = Write("util.lyr", utilText);
         var app = Write("app.lyr", appText);
 
@@ -100,8 +101,8 @@ public sealed class RenameTests : IDisposable
     [Fact]
     public void A_struct_rename_covers_annotation_initializer_and_import()
     {
-        var shapesText = "module shapes;\n\npub struct Point { x: int, }\n";
-        var appText = "import shapes { Point };\n\n"
+        var shapesText = "pub struct Point { x: int, }\n";
+        var appText = "import app.shapes { Point };\n\n"
             + "fn main(): int {\n    let p: Point = Point { x = 1 };\n    return p.x;\n}\n";
         var shapes = Write("shapes.lyr", shapesText);
         var app = Write("app.lyr", appText);
@@ -145,7 +146,7 @@ public sealed class RenameTests : IDisposable
         // synthesized. The rename must edit the declaration and the WRITTEN call — and must not
         // touch the operator expression, whose text contains no 'add' to replace.
         var text = "import std.core { Add };\n\n"
-            + "struct Vec :: [Add<Vec, Vec>] {\n"
+            + "struct Vec :: [Add] {\n"
             + "    x: int,\n"
             + "    fn add(other: Vec): Vec {\n"
             + "        return Vec { x = this.x + other.x };\n"
@@ -178,7 +179,7 @@ public sealed class RenameTests : IDisposable
     [Fact]
     public void The_standard_library_is_not_renamed_from_here()
     {
-        var text = "import std.io.console { println };\n\n"
+        var text = "import std.io { println };\n\n"
             + "fn main(): int {\n    println(\"hi\");\n    return 0;\n}\n";
         var app = Write("app.lyr", text);
 
@@ -187,7 +188,7 @@ public sealed class RenameTests : IDisposable
             text.IndexOf("println(\"hi\")", StringComparison.Ordinal) + 1, "shout");
 
         Assert.Null(edits);
-        Assert.Contains("outside this project", refusal);
+        Assert.Contains("outside this package", refusal);
     }
 
     [Fact]
@@ -211,8 +212,8 @@ public sealed class RenameTests : IDisposable
     [Fact]
     public void A_module_is_refused_with_its_reason()
     {
-        var utilText = "module util;\n\npub fn value(): int { return 1; }\n";
-        var appText = "import util;\n\nfn main(): int { return util.value(); }\n";
+        var utilText = "pub fn value(): int { return 1; }\n";
+        var appText = "import app.util;\n\nfn main(): int { return util.value(); }\n";
         var util = Write("util.lyr", utilText);
         var app = Write("app.lyr", appText);
 
@@ -225,40 +226,29 @@ public sealed class RenameTests : IDisposable
     }
 
     [Fact]
-    public void Outside_a_project_a_rename_must_stay_in_the_file()
+    public void Outside_a_package_a_rename_stays_in_the_file()
     {
-        // The compilation of a lone file is rooted at that file, and files it cannot see may
-        // import it: a cross-file edit set cannot be trusted to be complete, so it is refused. A
-        // rename that stays inside the file is safe and allowed.
-        var loose = Path.Combine(_dir, "loose");
-        Directory.CreateDirectory(loose);
-        var utilPath = Path.Combine(loose, "util.lyr");
-        var appPath = Path.Combine(loose, "app.lyr");
-        File.WriteAllText(utilPath, "module util;\n\npub fn value(): int { return 1; }\n");
-        var appText = "import util { value };\n\nfn main(): int {\n"
-            + "    let total = value();\n    return total;\n}\n";
-        File.WriteAllText(appPath, appText);
+        // A lone file reaches std and nothing else of the user's: a rename inside it is the whole
+        // rename, and allowed; std's names are refused as everywhere.
+        var loose = Path.Combine(_dir, "loose.lyr");
+        var text = "import std.io { println };\n\nfn main(): int {\n"
+            + "    let total = 1;\n    println(total);\n    return total;\n}\n";
+        File.WriteAllText(loose, text);
 
-        var result = SourceCompiler.Check(appPath, new CompilerOptions());
+        var result = Single.Check(loose, text);
         Assert.NotNull(result.Model);
-        var file = DiagnosticMapper.FindFile(result.Sources, appPath);
+        var file = DiagnosticMapper.FindFile(result.Sources, loose);
 
-        // Renaming the imported function would edit util.lyr: refused.
-        var (crossEdits, crossRefusal) = RenameProvider.Rename(result.Model,
-            result.Model.Entry, file,
-            appText.IndexOf("value()", StringComparison.Ordinal) + 1, "amount",
-            projectWide: false);
-        Assert.Null(crossEdits);
-        Assert.Contains("lyric.json", crossRefusal);
-
-        // Renaming the local stays in the file: allowed.
-        var (localEdits, localRefusal) = RenameProvider.Rename(result.Model,
-            result.Model.Entry, file,
-            appText.IndexOf("total", StringComparison.Ordinal) + 1, "sum",
-            projectWide: false);
+        var (localEdits, localRefusal) = RenameProvider.Rename(result.Model, result.Model.Entry, file,
+            text.IndexOf("total", StringComparison.Ordinal) + 1, "sum", projectWide: false);
         Assert.Null(localRefusal);
         Assert.NotNull(localEdits);
-        Assert.Equal(2, localEdits.Count);
+        Assert.Equal(3, localEdits.Count);
+
+        var (stdEdits, stdRefusal) = RenameProvider.Rename(result.Model, result.Model.Entry, file,
+            text.IndexOf("println(total)", StringComparison.Ordinal) + 1, "show", projectWide: false);
+        Assert.Null(stdEdits);
+        Assert.Contains("outside this package", stdRefusal);
     }
 
     // ------------------------------------------------------------------ prepare

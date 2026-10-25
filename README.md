@@ -90,7 +90,7 @@ lyric/
 │   ├── Lyric5.Toolchain/ → the C side: compiler, targets, profiles, cached C builds of the runtime
 │   ├── Lyric.Core/       → lyrcore.dll   diagnostics, source manager, shared tool basics
 │   ├── Lyric.Frontend/   → lyrfe.dll     lexer, parser, resolver, sema, IR (4.x, the basis of 5)
-│   └── Lyric.Lsp/        → lyrlsp.dll    language server protocol and analysis (4.x; M13b decides)
+│   └── Lyric.Lsp/        → Lyric.Lsp.dll the language server behind `lyric5 lsp`: protocol and analysis
 ├── stdlib/               the 4.x standard library in Lyric (the front-end tests import it; M8a)
 ├── tests/                xUnit test projects
 ├── examples/             22 example programs (4.x; the input of M16)

@@ -2,6 +2,12 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Lyric.Core\Lyric.Core.csproj" />
     <ProjectReference Include="..\..\src\Lyric.Frontend\Lyric.Frontend.csproj" />
+    <ProjectReference Include="..\..\src\Lyric5.Build\Lyric5.Build.csproj" />
     <ProjectReference Include="..\..\src\Lyric.Lsp\Lyric.Lsp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The standard library the server analyses against, beside the tests as beside lyric5. -->
+    <Content Include="..\..\stdlib5\**\*.lyr" Link="stdlib5\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

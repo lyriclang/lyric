@@ -23,7 +23,7 @@ public sealed record LspServerOptions
     public TimeSpan Debounce { get; init; } = TimeSpan.FromMilliseconds(50);
 
     /// <summary>As in <see cref="Compiler.CompilerOptions.StdlibRoot"/>: <c>null</c> is the
-    /// directory beside the binary.</summary>
+    /// standard library beside the binary, the one <c>lyric build</c> compiles against.</summary>
     public string? StdlibRoot { get; init; }
 }
 
@@ -411,8 +411,9 @@ public sealed class LspServer : IDisposable
                     {
                         Watchers =
                         [
-                            new LspFileSystemWatcher { GlobPattern ="**/*.lyr" },
-                            new LspFileSystemWatcher { GlobPattern ="**/lyric.json" },
+                            new LspFileSystemWatcher { GlobPattern = "**/*.lyr" },
+                            new LspFileSystemWatcher { GlobPattern = "**/lyric.toml" },
+                            new LspFileSystemWatcher { GlobPattern = "**/lyric.lock" },
                         ],
                     },
                 },

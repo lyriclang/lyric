@@ -27,10 +27,7 @@ public sealed class CompletionTests
         var program = programWithCursor.Remove(offset, 1);
         var path = Path.Combine(AppContext.BaseDirectory, "completion.lyr");
 
-        return CompletionProvider.At(path, program, offset, new CompilerOptions
-        {
-            StdlibRoot = Path.Combine(RepoRoot(), "stdlib"),
-        });
+        return CompletionProvider.At(path, program, offset, Single.Options(path));
     }
 
     private static string[] Labels(string programWithCursor)

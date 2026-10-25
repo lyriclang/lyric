@@ -19,7 +19,7 @@ public sealed class SemanticTokenTests
     private static Token[] TokensOf(string program)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "semantic.lyr");
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, program));
+        var result = Single.Check(path, program);
         Assert.NotNull(result.Model);
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);
@@ -62,7 +62,7 @@ public sealed class SemanticTokenTests
     }
 
     private const string Program =
-        "import std.io.console { println };\n"
+        "import std.io { println };\n"
         + "\n"
         + "struct Point {\n"
         + "    x: int,\n"
@@ -113,7 +113,7 @@ public sealed class SemanticTokenTests
     {
         // The wire format breaks silently on both: a negative delta corrupts every later token.
         var path = Path.Combine(AppContext.BaseDirectory, "semantic.lyr");
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, Program));
+        var result = Single.Check(path, Program);
         Assert.NotNull(result.Model);
         var file = DiagnosticMapper.FindFile(result.Sources, path);
 
@@ -143,7 +143,7 @@ public sealed class SemanticTokenTests
         // expression would paint 'a + b' as a method.
         const string program = "import std.core { Add };\n"
             + "\n"
-            + "struct Vec :: [Add<Vec, Vec>] {\n"
+            + "struct Vec :: [Add] {\n"
             + "    x: int,\n"
             + "    fn add(other: Vec): Vec {\n"
             + "        return Vec { x = this.x + other.x };\n"
