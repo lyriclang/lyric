@@ -64,6 +64,19 @@ public sealed class AnalysisService : IDisposable
     private readonly TimeSpan _debounce;
     private readonly string? _stdlibRoot;
 
+    /// <summary>The toolchain's version: which catalog pages a diagnostic links to.</summary>
+    private readonly string? _toolVersion;
+
+    /// <summary>What the newest analysis of each file found, as the compiler said it — with the
+    /// changes its notes suggest, which the code actions offer.</summary>
+    private readonly ConcurrentDictionary<string, (Core.SourceManager Sources, IReadOnlyList<Core.Diagnostic> Findings)> _findings =
+        new(DocumentUri.PathComparer);
+
+    /// <summary>The findings of the newest analysis of a file, with the source manager their spans
+    /// count in; <c>null</c> before one.</summary>
+    public (Core.SourceManager Sources, IReadOnlyList<Core.Diagnostic> Findings)? FindingsOf(string path) =>
+        _findings.TryGetValue(path, out var found) ? found : null;
+
     /// <summary>The standard library parsed once, on a thread of its own from the start: an
     /// analysis before it is ready parses the library itself.</summary>
     private readonly Task<StdlibSeed> _seed;
@@ -140,8 +153,10 @@ public sealed class AnalysisService : IDisposable
         Func<PublishDiagnosticsParams, CancellationToken, Task> publish,
         Func<string, MessageType, CancellationToken, Task> log,
         TimeSpan debounce,
-        string? stdlibRoot = null)
+        string? stdlibRoot = null,
+        string? toolVersion = null)
     {
+        _toolVersion = toolVersion;
         _documents = documents;
         _publish = publish;
         _log = log;
@@ -375,7 +390,7 @@ public sealed class AnalysisService : IDisposable
         var unit = await UnitForAsync(document.Path).ConfigureAwait(false);
         return unit?.ModuleOf(document.Path) is { } module
             ? (Options(unit.Options, cancellationToken), module)
-            : (Options(PackageUnit.SingleFileOptions(document.Path), cancellationToken), null);
+            : (Options(PackageUnit.SingleFileOptions(document.Path), cancellationToken), PackageUnit.SingleFileModule(document.Path));
     }
 
     /// <summary>The steps a <c>comptime</c> site of the program may take in the editor, a tenth of
@@ -429,6 +444,21 @@ public sealed class AnalysisService : IDisposable
         return await Task.Run(
             () => SignatureHelpProvider.At(document.Path, document.Text, offset, options, module),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The document's module with its macros expanded, in the formatter's form — what
+    /// <c>lyric expand</c> prints —, or the first finding that stopped the expansion.
+    /// </summary>
+    public async Task<(string? Text, string? Refused)> ExpandAsync(OpenDocument document, CancellationToken cancellationToken)
+    {
+        var (options, module) = await OptionsForAsync(document, cancellationToken).ConfigureAwait(false);
+        var result = await Task.Run(() => SourceCompiler.Expand(ScriptSource.FromBuffer(document.Path, document.Text, module),
+            options with { Cancellation = cancellationToken }), cancellationToken).ConfigureAwait(false);
+        if (result.Expanded is { } expanded)
+            return (Lyric.Formatting.AstFormatter.FormatDeclarations(expanded.Declarations), null);
+        var errors = result.Diagnostics.SortedSnapshot().Where(d => d.Severity == Core.Severity.Error).ToList();
+        return (null, errors.Count == 0 ? "the module does not expand" : $"{errors[0].Code}: {errors[0].Message}");
     }
 
     /// <summary>Compiles the unit this document belongs to and publishes its diagnostics, without
@@ -521,12 +551,13 @@ public sealed class AnalysisService : IDisposable
             }
 
             published.Add(uri);
+            if (file.IsValid) _findings[path] = (result.Sources, diagnostics.Where(d => d.Span.File == file).ToList());
             await _publish(new PublishDiagnosticsParams
             {
                 Uri = uri,
                 Version = open?.Version,
                 Diagnostics = file.IsValid
-                    ? DiagnosticMapper.ForFile(result.Sources, diagnostics, file)
+                    ? DiagnosticMapper.ForFile(result.Sources, diagnostics, file, _toolVersion)
                     : [],
             }, token).ConfigureAwait(false);
         }
@@ -556,11 +587,11 @@ public sealed class AnalysisService : IDisposable
     /// server knew what a project was.</summary>
     private async Task AnalyzeSingleAsync(OpenDocument document, CancellationToken cancellationToken)
     {
-        var (options, _) = await OptionsForAsync(document, cancellationToken).ConfigureAwait(false);
+        var (options, module) = await OptionsForAsync(document, cancellationToken).ConfigureAwait(false);
 
         var result = await Task.Run(
             () => SourceCompiler.Check(
-                ScriptSource.FromBuffer(document.Path, document.Text), options),
+                ScriptSource.FromBuffer(document.Path, document.Text, module), options),
             cancellationToken).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -571,8 +602,10 @@ public sealed class AnalysisService : IDisposable
         if (!_documents.IsCurrent(document)) return;
 
         var file = DiagnosticMapper.FindFile(result.Sources, document.Path);
+        if (file.IsValid)
+            _findings[document.Path] = (result.Sources, result.Diagnostics.SortedSnapshot().Where(d => d.Span.File == file).ToList());
         var diagnostics = file.IsValid
-            ? DiagnosticMapper.ForFile(result.Sources, result.Diagnostics.SortedSnapshot(), file)
+            ? DiagnosticMapper.ForFile(result.Sources, result.Diagnostics.SortedSnapshot(), file, _toolVersion)
             : [];
 
         if (file.IsValid && result.Model is { } model)

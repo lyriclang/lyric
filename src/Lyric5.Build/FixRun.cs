@@ -101,36 +101,7 @@ public static class FixRun
     /// size where that table would not fit, they are one change.</summary>
     internal static void Diff(TextWriter output, string shown, string before, string after)
     {
-        var a = before.Split('\n');
-        var b = after.Split('\n');
-        var head = 0;
-        while (head < a.Length && head < b.Length && a[head] == b[head]) head++;
-        var tail = 0;
-        while (tail < a.Length - head && tail < b.Length - head && a[^(tail + 1)] == b[^(tail + 1)]) tail++;
-        // the script: ' ' kept, '-' taken out, '+' put in — with the line of each side it stands at
-        var script = new List<(char Op, string Text, int A, int B)>();
-        for (var i = 0; i < head; i++) script.Add((' ', a[i], i, i));
-        int n = a.Length - head - tail, m = b.Length - head - tail;
-        if ((long)n * m <= 4_000_000)
-        {
-            var lcs = new int[n + 1, m + 1];
-            for (var i = n - 1; i >= 0; i--)
-                for (var j = m - 1; j >= 0; j--)
-                    lcs[i, j] = a[head + i] == b[head + j] ? lcs[i + 1, j + 1] + 1 : Math.Max(lcs[i + 1, j], lcs[i, j + 1]);
-            int x = 0, y = 0;
-            while (x < n || y < m)
-            {
-                if (x < n && y < m && a[head + x] == b[head + y]) { script.Add((' ', a[head + x], head + x, head + y)); x++; y++; }
-                else if (x < n && (y == m || lcs[x + 1, y] >= lcs[x, y + 1])) { script.Add(('-', a[head + x], head + x, head + y)); x++; }
-                else { script.Add(('+', b[head + y], head + x, head + y)); y++; }
-            }
-        }
-        else
-        {
-            for (var i = 0; i < n; i++) script.Add(('-', a[head + i], head + i, head));
-            for (var j = 0; j < m; j++) script.Add(('+', b[head + j], head + n, head + j));
-        }
-        for (var i = 0; i < tail; i++) script.Add((' ', a[a.Length - tail + i], a.Length - tail + i, b.Length - tail + i));
+        var script = LineDiff.Script(before.Split('\n'), after.Split('\n'));
 
         var text = new StringBuilder();
         text.Append($"--- a/{shown}\n+++ b/{shown}\n");

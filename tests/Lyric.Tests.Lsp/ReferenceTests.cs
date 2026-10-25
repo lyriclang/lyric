@@ -293,7 +293,7 @@ public sealed class ReferenceProtocolTests
 
     private static string BufferPath(
         [System.Runtime.CompilerServices.CallerMemberName] string name = "") =>
-        Path.Combine(AppContext.BaseDirectory, $"{name}.lyr");
+        Path.Combine(AppContext.BaseDirectory, $"{name.ToLowerInvariant()}.lyr");
 
     private static string DidOpen(string uri, string text) =>
         JsonSerializer.Serialize(new

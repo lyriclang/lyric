@@ -97,7 +97,8 @@ public sealed class LspServer : IDisposable
             PublishDiagnosticsAsync,
             LogAsync,
             _options.Debounce,
-            _options.StdlibRoot);
+            _options.StdlibRoot,
+            _options.Version);
     }
 
     /// <summary>
@@ -257,6 +258,14 @@ public sealed class LspServer : IDisposable
 
             case LspMethods.Formatting when _state == State.Running:
                 await SendFormattingAsync(message, id, cancellationToken).ConfigureAwait(false);
+                return;
+
+            case LspMethods.ExecuteCommand when _state == State.Running:
+                await SendCommandAsync(message, id, cancellationToken).ConfigureAwait(false);
+                return;
+
+            case LspMethods.CodeAction when _state == State.Running:
+                await SendCodeActionsAsync(message, id, cancellationToken).ConfigureAwait(false);
                 return;
 
             case LspMethods.Diagnostic when _state == State.Running:
@@ -1015,11 +1024,10 @@ public sealed class LspServer : IDisposable
             return;
         }
 
-        // A manager of its own, as everywhere: spans are coupled to the manager they were made
-        // in. The engine is throwaway — the analysis already published these diagnostics.
-        var sources = new SourceManager();
-        var file = sources.AddVirtual(path, document.Text);
-        var formatted = Formatting.Formatter.Format(sources, file, new DiagnosticEngine(sources));
+        // The form 'lyric fmt' writes, Lyric 5's, through the same call; the diagnostics are
+        // thrown away — the analysis already published them. A file that does not parse is left
+        // as it is.
+        var formatted = Lyric5.Build.FmtRun.Format(path, document.Text, out _);
 
         if (formatted is null)
         {
@@ -1027,18 +1035,10 @@ public sealed class LspServer : IDisposable
             return;
         }
 
-        if (formatted == document.Text)
-        {
-            // In shape already: an empty list, not null — "nothing to change" is an answer.
-            await SendResultAsync(id, Array.Empty<TextEdit>(),
-                LspJson.Default.IReadOnlyListTextEdit, cancellationToken).ConfigureAwait(false);
-            return;
-        }
-
-        IReadOnlyList<TextEdit> edits =
-            [new TextEdit { Range = WholeDocument(document.Text), NewText = formatted }];
-        await SendResultAsync(id, edits, LspJson.Default.IReadOnlyListTextEdit, cancellationToken)
-            .ConfigureAwait(false);
+        // In shape already: an empty list, not null — "nothing to change" is an answer. Otherwise
+        // a hunk of changed lines each: the editor keeps the cursor and the marks of the rest.
+        await SendResultAsync(id, FormattingEdits.Of(document.Text, formatted),
+            LspJson.Default.IReadOnlyListTextEdit, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>The range from the first character to just past the last, in protocol
@@ -1094,6 +1094,8 @@ public sealed class LspServer : IDisposable
             InlayHintProvider = true,
             DocumentFormattingProvider = true,
             DiagnosticProvider = new DiagnosticOptions { InterFileDependencies = true, WorkspaceDiagnostics = false },
+            CodeActionProvider = new CodeActionOptions { CodeActionKinds = ["quickfix"] },
+            ExecuteCommandProvider = new ExecuteCommandOptions { Commands = [LspMethods.ExpandCommand] },
         },
         ServerInfo = new ServerInfo { Name = "lyric", Version = _options.Version },
     };
@@ -1119,6 +1121,47 @@ public sealed class LspServer : IDisposable
         if (_diagnosticRefresh)
             await SendAsync(new JsonRpcRequest { Id = _nextRequestId++, Method = LspMethods.DiagnosticRefresh },
                 LspJson.Default.JsonRpcRequest, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary><c>lyric.expand</c>: the module of an open document with its macros expanded, for
+    /// the client to show beside it.</summary>
+    private async Task SendCommandAsync(JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.ExecuteCommandParams);
+        if (parameters is not { Command: LspMethods.ExpandCommand, Arguments: [var uri, ..] })
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams,
+                $"the one command is '{LspMethods.ExpandCommand}', with the URI of an open document", cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        if (_documents.ByUri(uri) is not { } document)
+        {
+            await SendResultAsync(id, new ExpandResult { Refused = "the document is not open" },
+                LspJson.Default.ExpandResult, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        var (text, refused) = await _analysis.ExpandAsync(document, cancellationToken).ConfigureAwait(false);
+        await SendResultAsync(id, new ExpandResult { Text = text, Refused = refused },
+            LspJson.Default.ExpandResult, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The quick fixes in a range: off the newest findings of the file — the changes the
+    /// compiler suggested, and the <c>@Allow</c> of a lint.</summary>
+    private async Task SendCodeActionsAsync(JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.CodeActionParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected a text document and a range",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        IReadOnlyList<CodeAction> actions = [];
+        if (DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path) && _analysis.FindingsOf(path) is { } found)
+            actions = CodeActionProvider.At(path, parameters.TextDocument.Uri, parameters.Range, found.Sources, found.Findings,
+                _analysis.LastGood(path), _options.Version);
+        await SendResultAsync(id, actions, LspJson.Default.IReadOnlyListCodeAction, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

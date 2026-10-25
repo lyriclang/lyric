@@ -89,6 +89,11 @@ public sealed class PackageUnit
     public static bool IsManifest(string path) =>
         Path.GetFileName(path) is ManifestName or LockName;
 
+    /// <summary>The module a file outside every package is: named after the file, as
+    /// <c>lyric check</c> names it — its warnings are then the program's own, not a dependency's
+    /// the lints keep quiet.</summary>
+    public static string SingleFileModule(string path) => Path.GetFileNameWithoutExtension(path);
+
     /// <summary>The options a file outside every package is checked under: the file alone, with
     /// std, as <c>lyric check</c> checks it.</summary>
     public static CompilerOptions SingleFileOptions(string path)

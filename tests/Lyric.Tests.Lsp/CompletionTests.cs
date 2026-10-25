@@ -238,7 +238,7 @@ public sealed class CompletionProtocolTests
         "struct Point { x: int, }\nfn main(): int {\n    let p = Point { x = 1 };\n    return p.;\n}\n";
 
     private static string BufferPath([CallerMemberName] string name = "") =>
-        Path.Combine(AppContext.BaseDirectory, $"{name}.lyr");
+        Path.Combine(AppContext.BaseDirectory, $"{name.ToLowerInvariant()}.lyr");
 
     [Fact]
     public async Task The_capability_and_its_trigger_character_are_announced()
