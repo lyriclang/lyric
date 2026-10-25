@@ -340,6 +340,13 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <td>—</td>
 </tr>
 <tr>
+<td><code>doc</code></td>
+<td>—</td>
+<td><code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--out &lt;dir&gt;</code>, <code>--std</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>env</code></td>
 <td>—</td>
 <td><code>-C &lt;dir&gt;</code>, <code>--profile &lt;name&gt;</code>, <code>--target &lt;triple&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--offline</code>, <code>--json</code></td>
@@ -478,6 +485,24 @@ exit 1 after the other files are formatted.</li>
 exit 1 where one would, 0 where none would. <strong><code>--diff</code></strong>, with <code>--check</code> only, shows each change
 as a unified diff instead of the name.</li>
 </ol>
+<h2 id="9-doc">9. <code>doc</code></h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 E7</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>DocCommandTests</code>).</p>
+<ol>
+<li><strong><code>lyric doc</code></strong> writes the reference of the package found from here (<code>-C</code> names another
+directory) as static pages, into <code>out/doc/</code> or the directory <code>--out</code> names: a page for the
+package, one for each module and one for each type, from the <code>pub</code> declarations the checker sees
+and their documentation comments. A package that does not check is not documented: its findings
+are said and the command ends with exit 1, writing nothing.</li>
+<li>A <strong>module's documentation</strong> is the <code>//!</code> lines that open its file
+(<a href="../../spec/01-lexical/">01</a>); an item's is the <code>///</code> lines above it. A page shows each item's signature
+as written, its documentation as Markdown, and for a type its conformances — those its
+declaration lists and those blocks of the package add.</li>
+<li>Each member stands under an anchor that names its kind: <code>#field.x</code>, <code>#method.push</code>,
+<code>#variant.Up</code>, <code>#assoc.Item</code>, <code>#const.x</code> on a type's page, <code>#fn.name</code>, <code>#const.name</code>,
+<code>#type.Alias</code> on a module's. A second member of one name and kind takes <code>-2</code>, and so on.</li>
+<li><strong><code>--std</code></strong> writes the standard library's reference instead of a package's.</li>
+</ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -494,6 +519,7 @@ as a unified diff instead of the name.</li>
 <li class="level-2"><a href="#6-env">6. env</a></li>
 <li class="level-2"><a href="#7-new-init-and-completions">7. new, init and completions</a></li>
 <li class="level-2"><a href="#8-fmt">8. fmt</a></li>
+<li class="level-2"><a href="#9-doc">9. doc</a></li>
 </ul>
 </aside>
 </div>
