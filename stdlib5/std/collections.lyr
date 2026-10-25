@@ -13,6 +13,27 @@
 //! too.
 //!
 //! The containers are not safe across threads: share one through a `Mutex`.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.collections { List, Map, Set };
+//!
+//! let words = List.of(["fig", "pear", "fig", "plum", "pear", "fig"]);
+//! let counts = Map<string, int>.new();
+//! for (w in words) {
+//!     counts.insert(w, (counts.get(w) ?? 0) + 1);
+//! }
+//! println(counts.get("fig") ?? 0);
+//! let distinct = Set.of(["fig", "pear", "plum", "fig"]);
+//! println(distinct.length());
+//! ```
+//!
+//! ```output
+//! 3
+//! 3
+//! ```
 import std.core {
     arrayOf,
     AsSlice,

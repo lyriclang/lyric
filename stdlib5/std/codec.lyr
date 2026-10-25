@@ -16,6 +16,29 @@
 //! `d.field<int>("id")` decodes one, `e.element(x)` and `d.next<T>()` an element. An encoder or a
 //! decoder is passed by reference, `&e`, as a hasher is: a conformance is generic over the
 //! format's type, and the format keeps its state.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.codec { Codable, Codec, EncodeError };
+//! import std.json;
+//!
+//! @Codec { rename = .SnakeCase }
+//! struct Account :: [Codable] {
+//!     userName: string,
+//!     @Codec { skip = true }
+//!     token: ?string,
+//! }
+//!
+//! fn main(): void throws EncodeError {
+//!     println(try json.encode(Account { userName = "ada", token = "secret" }));
+//! }
+//! ```
+//!
+//! ```output
+//! {"user_name":"ada"}
+//! ```
 import std.collections { List, Map, Set, Deque };
 import std.core {
     Hasher,

@@ -3,6 +3,21 @@
 //! ([exit]), facts about the machine ([platform], [arch], [hostname], [cpuCount], [pid],
 //! [homeDir], [tempDir]), and the system's signals ([Signal], [signals]). A signal's watcher is a
 //! thread of its own, whose one task hands each caught signal on.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.os;
+//!
+//! println(os.env("LYRIC_EXAMPLE_UNSET") ?? "not set");
+//! println(os.cpuCount() > 0);
+//! ```
+//!
+//! ```output
+//! not set
+//! true
+//! ```
 import std.collections { List, Map };
 import std.io { IoError, failure };
 import std.task { Channel, here, Scheduler, SpinLock };

@@ -173,10 +173,20 @@ public class DocTestTests
         }
     }
 
+    /// <summary>Every module of std shows its typical use in a <c># Examples</c> section of its
+    /// module doc, as one Lyric block.</summary>
     [Fact]
-    public void The_standard_library_has_doc_tests()
+    public void Every_module_of_the_standard_library_shows_an_example()
     {
-        Assert.True(StdTests().Count() >= 3, "std's documentation holds fewer than three Lyric blocks");
+        var std = Path.Combine(RuntimeLayout.FindRoot(AppContext.BaseDirectory), "stdlib5", "std");
+        var missing = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(std, "*.lyr", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
+        {
+            var doc = File.ReadLines(file).TakeWhile(l => l.StartsWith("//!")).ToList();
+            if (!doc.Contains("//! # Examples") || !doc.Any(l => l.StartsWith("//! ```lyric")))
+                missing.Add(Path.GetRelativePath(std, file).Replace('\\', '/'));
+        }
+        Assert.True(missing.Count == 0, "modules without an example: " + string.Join(", ", missing));
     }
 
     [Theory]

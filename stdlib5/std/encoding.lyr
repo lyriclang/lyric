@@ -9,6 +9,27 @@
 //! The decoders are strict, as RFC 4648 §3.3 and §3.5 allow: Base64 requires its padding and zero
 //! bits past the last byte, and accepts no whitespace. Input that is not the encoding throws an
 //! [EncodingError] at the first offset that is wrong.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.encoding { Base64, Hex, EncodingError };
+//!
+//! fn main(): void throws EncodingError {
+//!     let bytes = "Lyric".toBytes();
+//!     println(Base64.encode(bytes));
+//!     println(Hex.encode(bytes));
+//!     let back = try Base64.decode("THlyaWM=");
+//!     println(back.length());
+//! }
+//! ```
+//!
+//! ```output
+//! THlyaWM=
+//! 4c79726963
+//! 5
+//! ```
 import std.core { StringBuilder, viewBytes };
 
 /// The error thrown for text that is not the encoding it was decoded as: where — a byte of the

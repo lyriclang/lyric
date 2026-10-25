@@ -8,6 +8,25 @@
 //!
 //! The floating-point functions compute in `float` and round a `float32` result once, at the
 //! end; they give the same bits on every tier-1 target.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.math;
+//!
+//! println(math.sqrt(2.0));
+//! println(math.hypot(3.0, 4.0));
+//! println(math.gcd(84, 36));
+//! println(math.max(7, 3));
+//! ```
+//!
+//! ```output
+//! 1.4142135623730951
+//! 5.0
+//! 12
+//! 7
+//! ```
 import std.core { Signed, asTypeOf };
 
 /// π, a half turn in radians.

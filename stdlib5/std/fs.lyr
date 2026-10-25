@@ -11,6 +11,31 @@
 //! thread itself. A call on a regular file ends in a bounded time and is not a point of
 //! cancellation: a cancellation is seen at the task's next wait. Reads and writes go through the
 //! caller's slice, never a copy.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { print, println, IoError };
+//! import std.fs;
+//! import std.path;
+//!
+//! fn main(): void throws IoError {
+//!     let dir = try fs.tempDir();
+//!     let file = path.join(dir, "notes.txt");
+//!     try fs.writeText(file, "first\nsecond\n");
+//!     try fs.appendText(file, "third\n");
+//!     print(try fs.readText(file));
+//!     try fs.removeAll(dir);
+//!     println(fs.exists(dir));
+//! }
+//! ```
+//!
+//! ```output
+//! first
+//! second
+//! third
+//! false
+//! ```
 import std.collections { List };
 import std.core { Utf8Error };
 import std.crypto { randomUint64 };

@@ -7,6 +7,26 @@
 //! On Windows both `\` and `/` separate, a path may start with a volume — a drive, `C:`, or a UNC
 //! share, `\\server\share` — and names compare without regard to the case of ASCII letters; what
 //! these functions build, they build with `\`. Elsewhere `/` separates and names compare exactly.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.path;
+//!
+//! let p = path.normalize("docs/./book/../guide/intro.md");
+//! println(path.components(p).iter().join(" "));
+//! println(path.fileName(p));
+//! println(path.extension(p));
+//! println(path.fileName(path.withExtension(p, "html")));
+//! ```
+//!
+//! ```output
+//! docs guide intro.md
+//! intro.md
+//! .md
+//! intro.html
+//! ```
 import std.core { arrayOf, viewBytes };
 
 // the target's OS, fixed at compile time: a cross-build for Windows handles Windows paths

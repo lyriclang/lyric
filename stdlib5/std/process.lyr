@@ -8,6 +8,19 @@
 //! that waits for it, on any thread. Waiting is a point of cancellation: a cancel ends it. On
 //! Windows a child is its process handle, its end wakes the reaper from a registered wait, and a
 //! kill is the only signal there is.
+//!
+//! # Examples
+//!
+//! ```lyric,no_run
+//! import std.io { println };
+//! import std.process { Command };
+//!
+//! fn main(): void throws Error {
+//!     let run = Command { program = "git", args = ["--version"], stdout = .Piped };
+//!     let out = try run.output();
+//!     println(out.status.success());
+//! }
+//! ```
 import std.collections { List };
 import std.core { StringBuilder, viewBytes };
 import std.io { IoError, Reader, Writer, failure };

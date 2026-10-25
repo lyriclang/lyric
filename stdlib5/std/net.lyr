@@ -7,6 +7,19 @@
 //! `Closed`. There are no socket timeouts: `withTimeout` bounds a call instead. On POSIX the sockets
 //! are polled with epoll or kqueue; on Windows they use Winsock, with an AFD poll request per
 //! socket on the thread's completion port.
+//!
+//! # Examples
+//!
+//! ```lyric,no_run
+//! import std.net { TcpListener, SocketAddr };
+//!
+//! fn main(): void throws Error {
+//!     let listener = try TcpListener.bind(SocketAddr.parse("127.0.0.1:8080"));
+//!     let stream = try listener.accept();
+//!     try stream.write("hello\n".toBytes());
+//!     try stream.close();
+//! }
+//! ```
 import std.collections { List };
 import std.core { Parse, ParseError, StringBuilder, viewBytes };
 import std.io { IoError, Reader, Writer, failure, onPool };

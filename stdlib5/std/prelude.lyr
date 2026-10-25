@@ -3,6 +3,21 @@
 //! It holds what signatures and the language itself need, not effects: `println` is `std.io`'s.
 //! It passes on with `pub import` what other modules declare — the core interfaces, panics and
 //! attributes from `std.core`, and `List`, `Map` and `Set` from `std.collections`.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//!
+//! let primes = List.of([2, 3, 5, 7]);
+//! let ages = Map<string, int>.new();
+//! ages.insert("ada", 36);
+//! println(primes.length() + (ages.get("ada") ?? 0));
+//! ```
+//!
+//! ```output
+//! 40
+//! ```
 pub import std.core {
     panic,
     assert,

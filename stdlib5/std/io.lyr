@@ -5,6 +5,25 @@
 //! `eprint`, `eprintln`, `flush` — and its streams `stdin()`, `stdout()`, `stderr()`; and the I/O
 //! pool that std.fs's calls run on. A reader's and a writer's call may throw `Cancelled` where it
 //! waits without bound.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println, print, ByteBuffer, IoError };
+//!
+//! fn main(): void throws IoError {
+//!     print("one, ");
+//!     println("two");
+//!     let buffer = ByteBuffer.new();
+//!     try buffer.write("written to memory".toBytes());
+//!     println(buffer.length());
+//! }
+//! ```
+//!
+//! ```output
+//! one, two
+//! 17
+//! ```
 import std.core { Join, Utf8Error, viewBytes };
 import std.task { Cancelled, SpinLock, schedulerRuns };
 import std.thread { Pool };

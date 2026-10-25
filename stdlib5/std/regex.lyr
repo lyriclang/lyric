@@ -9,6 +9,25 @@
 //! `(?<name>…)`), alternation, the repetitions `* + ? {n} {n,} {n,m}` each greedy or lazy with a
 //! `?`, the anchors `^ $ \A \z`, `\b` and `\B`, and the flags `i m s` inline (`(?i)`, `(?i:…)`,
 //! `(?-i)`). Positions are byte offsets into the text, as a string's indices are.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.regex { Regex, RegexError };
+//!
+//! fn main(): void throws RegexError {
+//!     let date = try Regex.new("(\\d{4})-(\\d{2})-(\\d{2})");
+//!     let m = date.find("due 2026-10-24, paid") ?? panic("no date");
+//!     println(m.group(1) ?? "");
+//!     println(date.replaceAll("2026-10-24 and 2026-11-01", "${3}.${2}.${1}"));
+//! }
+//! ```
+//!
+//! ```output
+//! 2026
+//! 24.10.2026 and 01.11.2026
+//! ```
 import std.collections { List, Map };
 import std.core { StringBuilder, viewBytes, UnicodeCategory };
 

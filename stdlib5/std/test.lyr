@@ -8,6 +8,20 @@
 //! `Debug` writes it, and names the expression it got it from: `xs.length() = 2, expected 3`. The
 //! actual value comes first. Two values too long to compare by eye get their first difference
 //! named below: a text's first line that differs, else the first character.
+//!
+//! # Examples
+//!
+//! ```lyric,no_run
+//! import std.test { assertEq, assertTrue };
+//!
+//! @Test
+//! fn aListGrows() {
+//!     let xs = List.of([1, 2]);
+//!     xs.push(3);
+//!     assertEq(xs.length(), 3);
+//!     assertTrue(xs.contains(3));
+//! }
+//! ```
 
 import std.core { Contains, StringBuilder, filled };
 import std.fs { readText, writeText };

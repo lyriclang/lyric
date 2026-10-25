@@ -8,6 +8,27 @@
 //! Adler-32, `GzipReader`/`GzipWriter` with the gzip header and CRC-32 (members in a row read as
 //! one). `Gzip`, `Zlib` and `Deflate` compress and decompress bytes held in memory. Corrupt input
 //! is reported as `IoError { kind = .InvalidData }` carrying a `CompressError`.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println, IoError };
+//! import std.compress { Gzip, CompressError };
+//!
+//! fn main(): void throws [CompressError, IoError] {
+//!     let line = "to be or not to be, that is the question; ";
+//!     let text = [line, line, line, line, line, line, line, line].iter().join("");
+//!     let packed = try Gzip.compress(text.toBytes());
+//!     println(packed.length() < text.length());
+//!     let back = try Gzip.decompress(packed);
+//!     println(back.length() == text.length());
+//! }
+//! ```
+//!
+//! ```output
+//! true
+//! true
+//! ```
 import std.collections { List };
 import std.core { Closeable };
 import std.hash { adler32, crc32 };

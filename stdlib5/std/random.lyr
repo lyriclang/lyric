@@ -8,6 +8,24 @@
 //! the low half of each first —, the nonce is zero, a 64-bit block counter runs from zero in
 //! words 12 and 13, and each block's sixteen words are used in order, two of them a `uint64`,
 //! the first the low half.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.random { Random };
+//!
+//! let a = Random.seeded(7);
+//! let b = Random.seeded(7);
+//! let x = a.nextInRange(1..7);
+//! println(x == b.nextInRange(1..7));
+//! println(x >= 1 && x < 7);
+//! ```
+//!
+//! ```output
+//! true
+//! true
+//! ```
 import std.core { arrayOf };
 import std.math { ln, sqrt };
 import std.crypto { randomBytes };

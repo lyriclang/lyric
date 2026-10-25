@@ -18,6 +18,31 @@
 //!
 //! The questions and the infos are declared in `std.core`, whose synthesized members are written
 //! over them and which imports nothing: this module is their name to the program.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.meta { fields, typeName };
+//!
+//! struct Point {
+//!     x: int,
+//!     y: int,
+//! }
+//!
+//! fn main(): void {
+//!     println(typeName<Point>());
+//!     comptime for (f in fields<Point>()) {
+//!         println(f.name);
+//!     }
+//! }
+//! ```
+//!
+//! ```output
+//! Point
+//! x
+//! y
+//! ```
 pub import std.core {
     Visibility,
     TypeKind,

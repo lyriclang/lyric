@@ -7,6 +7,31 @@
 //! its name, a variant with a payload `{"Name": payload}`. `NaN` and the infinities have no text
 //! (RFC 8259 §6): writing one is an `EncodeError`. The text is read whole into the tree first,
 //! then decoded from it.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.codec { Codable, EncodeError, DecodeError };
+//! import std.json;
+//!
+//! struct Point :: [Codable] {
+//!     x: int,
+//!     y: int,
+//! }
+//!
+//! fn main(): void throws [EncodeError, json.JsonError, DecodeError] {
+//!     let text = try json.encode(Point { x = 3, y = 4 });
+//!     println(text);
+//!     let back = try json.decode<Point>("{\"x\": 5, \"y\": 6}");
+//!     println(back.x + back.y);
+//! }
+//! ```
+//!
+//! ```output
+//! {"x":3,"y":4}
+//! 11
+//! ```
 import std.codec { Encode, Decode, Codable, Encoder, Decoder, EncodeError, DecodeError };
 import std.collections { List, Map, Set };
 import std.core { ParseError };
