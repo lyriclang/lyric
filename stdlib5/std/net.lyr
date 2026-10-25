@@ -1,12 +1,12 @@
-/// The network: IP addresses ([IpAddr]) and socket addresses ([SocketAddr]), TCP — a
-/// [TcpListener] that accepts, a [TcpStream] that is a `Reader` and a `Writer` —, UDP
-/// ([UdpSocket]), and name resolution ([resolve]).
-///
-/// A call that would block parks the task until the thread's poller says the socket is ready, then
-/// tries again; a cancel ends that wait with `Cancelled`, and a close — on any thread — with
-/// `Closed`. There are no socket timeouts: `withTimeout` bounds a call instead. On POSIX the sockets
-/// are polled with epoll or kqueue; on Windows they use Winsock, with an AFD poll request per
-/// socket on the thread's completion port.
+//! The network: IP addresses ([IpAddr]) and socket addresses ([SocketAddr]), TCP — a
+//! [TcpListener] that accepts, a [TcpStream] that is a `Reader` and a `Writer` —, UDP
+//! ([UdpSocket]), and name resolution ([resolve]).
+//!
+//! A call that would block parks the task until the thread's poller says the socket is ready, then
+//! tries again; a cancel ends that wait with `Cancelled`, and a close — on any thread — with
+//! `Closed`. There are no socket timeouts: `withTimeout` bounds a call instead. On POSIX the sockets
+//! are polled with epoll or kqueue; on Windows they use Winsock, with an AFD poll request per
+//! socket on the thread's completion port.
 import std.collections { List };
 import std.core { Parse, ParseError, StringBuilder, viewBytes };
 import std.io { IoError, Reader, Writer, failure, onPool };

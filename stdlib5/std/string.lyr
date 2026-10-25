@@ -1,8 +1,8 @@
-/// Converts values to text and joins strings; the compiler calls these functions by name.
-///
-/// f-strings and `+` on strings lower to [concat] and the `from…` conversions. The module also
-/// re-exports [StringBuilder] for building text piece by piece, and names the Unicode version
-/// behind `char` in [unicodeVersion].
+//! Converts values to text and joins strings; the compiler calls these functions by name.
+//!
+//! f-strings and `+` on strings lower to [concat] and the `from…` conversions. The module also
+//! re-exports [StringBuilder] for building text piece by piece, and names the Unicode version
+//! behind `char` in [unicodeVersion].
 
 pub import std.core { StringBuilder };
 

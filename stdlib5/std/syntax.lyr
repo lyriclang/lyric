@@ -1,14 +1,14 @@
-/// The syntax tree as values: what a program can write, as enums and structs a `comptime`
-/// function or a macro reads, builds and writes back. The main types are `Expr`, `Stmt`, `Decl`,
-/// `Type` and `Pattern`, with `Node` for any of them and `Span` for where one stands.
-/// `parseExpr(s)`, `parseStmts(s)`, `parseDecls(s)` read source; `toSource()` writes a node as the
-/// formatter would; `children()` and `walk(f)` go over a tree; `Ident.fresh(hint)` names what a
-/// quote binds; `error(at, msg)` ends a macro's expansion with an error. The enums are
-/// `@NonExhaustive`: a `match` over them outside std writes a
-/// `_`, and a form the compiler has that this module has not - the rounds of a `comptime for`
-/// over fields and variants among them - is refused where it is read (`LYR-CT0005`).
-///
-/// A node built here, not read, has a `Span` of nothing: file `""`, line and column `0`.
+//! The syntax tree as values: what a program can write, as enums and structs a `comptime`
+//! function or a macro reads, builds and writes back. The main types are `Expr`, `Stmt`, `Decl`,
+//! `Type` and `Pattern`, with `Node` for any of them and `Span` for where one stands.
+//! `parseExpr(s)`, `parseStmts(s)`, `parseDecls(s)` read source; `toSource()` writes a node as the
+//! formatter would; `children()` and `walk(f)` go over a tree; `Ident.fresh(hint)` names what a
+//! quote binds; `error(at, msg)` ends a macro's expansion with an error. The enums are
+//! `@NonExhaustive`: a `match` over them outside std writes a
+//! `_`, and a form the compiler has that this module has not - the rounds of a `comptime for`
+//! over fields and variants among them - is refused where it is read (`LYR-CT0005`).
+//!
+//! A node built here, not read, has a `Span` of nothing: file `""`, line and column `0`.
 
 import std.collections { List };
 

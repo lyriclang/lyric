@@ -1,8 +1,8 @@
-/// The program and the operating system it runs on: the arguments ([args]), the environment
-/// ([env], [envs], [setEnv]), the working directory ([cwd], [setCwd]), ending the program
-/// ([exit]), facts about the machine ([platform], [arch], [hostname], [cpuCount], [pid],
-/// [homeDir], [tempDir]), and the system's signals ([Signal], [signals]). A signal's watcher is a
-/// thread of its own, whose one task hands each caught signal on.
+//! The program and the operating system it runs on: the arguments ([args]), the environment
+//! ([env], [envs], [setEnv]), the working directory ([cwd], [setCwd]), ending the program
+//! ([exit]), facts about the machine ([platform], [arch], [hostname], [cpuCount], [pid],
+//! [homeDir], [tempDir]), and the system's signals ([Signal], [signals]). A signal's watcher is a
+//! thread of its own, whose one task hands each caught signal on.
 import std.collections { List, Map };
 import std.io { IoError, failure };
 import std.task { Channel, here, Scheduler, SpinLock };

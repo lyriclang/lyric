@@ -1,18 +1,18 @@
-/// Provides the growable containers of the standard library.
-///
-/// - [List]: a growing array, indexed from 0.
-/// - [Map]: keys to values by hash, each key once, in no order of its own.
-/// - [Set]: values by hash, each once, in no order of its own.
-/// - [Deque]: a double-ended queue, pushed and popped at either end.
-/// - [Heap]: a binary min-heap.
-///
-/// Each can be built from an array literal and through `collect()`, and is `Clone` where its
-/// elements are. All but the heap are `Iterable`, and `Equatable`, `Debug` and `Display` where their
-/// elements are; the heap is `Debug`. The iterator methods that build containers — `toList`,
-/// `toSet`, `toMap`, `chunks`, `windows`, `sorted`, `sortedBy`, `partition`, `groupBy` — live here
-/// too.
-///
-/// The containers are not safe across threads: share one through a `Mutex`.
+//! Provides the growable containers of the standard library.
+//!
+//! - [List]: a growing array, indexed from 0.
+//! - [Map]: keys to values by hash, each key once, in no order of its own.
+//! - [Set]: values by hash, each once, in no order of its own.
+//! - [Deque]: a double-ended queue, pushed and popped at either end.
+//! - [Heap]: a binary min-heap.
+//!
+//! Each can be built from an array literal and through `collect()`, and is `Clone` where its
+//! elements are. All but the heap are `Iterable`, and `Equatable`, `Debug` and `Display` where their
+//! elements are; the heap is `Debug`. The iterator methods that build containers — `toList`,
+//! `toSet`, `toMap`, `chunks`, `windows`, `sorted`, `sortedBy`, `partition`, `groupBy` — live here
+//! too.
+//!
+//! The containers are not safe across threads: share one through a `Mutex`.
 import std.core {
     arrayOf,
     AsSlice,

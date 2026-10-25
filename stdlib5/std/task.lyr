@@ -1,14 +1,14 @@
-/// Tasks, channels and the scheduler that runs them.
-///
-/// Each thread has a scheduler, written here over the runtime's park and poller, and `main` runs
-/// as a task of it. The module holds [spawn] and its [Task] with its [TaskStatus], [TaskScope],
-/// [spawnDetached], [sleep] and [yieldNow]; cancellation through [Cancelled] and [withTimeout]; a
-/// panic that ends a task, not the process, described by [PanicInfo]; and [Channel], [Select] and
-/// [Timer], which work within a thread and across threads.
-///
-/// The threads and their pool are std.thread's, the locks std.sync's and the signals std.os's;
-/// they stand on parts kept here, internal to std: the locks' state, the scheduler, `launchOn`,
-/// the registry of the living schedulers and the natives.
+//! Tasks, channels and the scheduler that runs them.
+//!
+//! Each thread has a scheduler, written here over the runtime's park and poller, and `main` runs
+//! as a task of it. The module holds [spawn] and its [Task] with its [TaskStatus], [TaskScope],
+//! [spawnDetached], [sleep] and [yieldNow]; cancellation through [Cancelled] and [withTimeout]; a
+//! panic that ends a task, not the process, described by [PanicInfo]; and [Channel], [Select] and
+//! [Timer], which work within a thread and across threads.
+//!
+//! The threads and their pool are std.thread's, the locks std.sync's and the signals std.os's;
+//! they stand on parts kept here, internal to std: the locks' state, the scheduler, `launchOn`,
+//! the registry of the living schedulers and the natives.
 
 import std.core { filled };
 import std.time { Duration };

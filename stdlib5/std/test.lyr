@@ -1,13 +1,13 @@
-/// Tests and benchmarks: the assertions a test fails by ([assertEq], [assertTrue], [assertThrows],
-/// [assertPanics] and the others, [fail]), [subtest], and the runners that `lyric test` ([run],
-/// [TestCase]) and `lyric bench` ([runBenches], [BenchCase]) hand a package's tests and benchmarks
-/// to. A test is a function marked `@Test` — no parameters, `void`, possibly throwing — in a
-/// module of the package or under its `tests/`.
-///
-/// An assertion that does not hold panics with what it got against what was expected, each as
-/// `Debug` writes it, and names the expression it got it from: `xs.length() = 2, expected 3`. The
-/// actual value comes first. Two values too long to compare by eye get their first difference
-/// named below: a text's first line that differs, else the first character.
+//! Tests and benchmarks: the assertions a test fails by ([assertEq], [assertTrue], [assertThrows],
+//! [assertPanics] and the others, [fail]), [subtest], and the runners that `lyric test` ([run],
+//! [TestCase]) and `lyric bench` ([runBenches], [BenchCase]) hand a package's tests and benchmarks
+//! to. A test is a function marked `@Test` — no parameters, `void`, possibly throwing — in a
+//! module of the package or under its `tests/`.
+//!
+//! An assertion that does not hold panics with what it got against what was expected, each as
+//! `Debug` writes it, and names the expression it got it from: `xs.length() = 2, expected 3`. The
+//! actual value comes first. Two values too long to compare by eye get their first difference
+//! named below: a text's first line that differs, else the first character.
 
 import std.core { Contains, StringBuilder, filled };
 import std.fs { readText, writeText };

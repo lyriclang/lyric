@@ -1,14 +1,14 @@
-/// Encodes bytes as text and back: [Base64] and [Base64Url] (RFC 4648 §4, §5), [Hex] (RFC 4648
-/// §8) and [Utf16] (RFC 2781), plus reading and writing fixed-width integers as bytes, either end
-/// first. Each encoding is a struct of static members used as a name space:
-/// `Base64.encode(bytes)`.
-///
-/// This module handles bytes and text only; writing the shape of a value — its fields, variants
-/// and elements — into a format such as JSON is `std.codec`'s job.
-///
-/// The decoders are strict, as RFC 4648 §3.3 and §3.5 allow: Base64 requires its padding and zero
-/// bits past the last byte, and accepts no whitespace. Input that is not the encoding throws an
-/// [EncodingError] at the first offset that is wrong.
+//! Encodes bytes as text and back: [Base64] and [Base64Url] (RFC 4648 §4, §5), [Hex] (RFC 4648
+//! §8) and [Utf16] (RFC 2781), plus reading and writing fixed-width integers as bytes, either end
+//! first. Each encoding is a struct of static members used as a name space:
+//! `Base64.encode(bytes)`.
+//!
+//! This module handles bytes and text only; writing the shape of a value — its fields, variants
+//! and elements — into a format such as JSON is `std.codec`'s job.
+//!
+//! The decoders are strict, as RFC 4648 §3.3 and §3.5 allow: Base64 requires its padding and zero
+//! bits past the last byte, and accepts no whitespace. Input that is not the encoding throws an
+//! [EncodingError] at the first offset that is wrong.
 import std.core { StringBuilder, viewBytes };
 
 /// The error thrown for text that is not the encoding it was decoded as: where — a byte of the

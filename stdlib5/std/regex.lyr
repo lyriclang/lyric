@@ -1,14 +1,14 @@
-/// Regular expressions in RE2's syntax, matched in linear time. `Regex` is a compiled pattern,
-/// `Match` one match with its groups, `Matches` the matches of a text in turn, and `RegexError`
-/// what a pattern that does not parse throws. A pattern is parsed into a tree, compiled into Thompson's NFA, and run by a Pike
-/// VM that carries the captures with each thread: every character of the text is looked at once
-/// per instruction at most, so `(a*)*b` over a hundred thousand `a` ends in milliseconds. There
-/// are no backreferences and no lookaround: they cannot be matched in linear time. Literals, `.`, classes (`[a-z]`,
-/// `[^…]`, `\d \w \s` and their capitals, `[:alpha:]` and the other POSIX names, `\pL` and
-/// `\p{Lu}` over the Unicode categories), groups (capturing, `(?:…)`, `(?P<name>…)` and
-/// `(?<name>…)`), alternation, the repetitions `* + ? {n} {n,} {n,m}` each greedy or lazy with a
-/// `?`, the anchors `^ $ \A \z`, `\b` and `\B`, and the flags `i m s` inline (`(?i)`, `(?i:…)`,
-/// `(?-i)`). Positions are byte offsets into the text, as a string's indices are.
+//! Regular expressions in RE2's syntax, matched in linear time. `Regex` is a compiled pattern,
+//! `Match` one match with its groups, `Matches` the matches of a text in turn, and `RegexError`
+//! what a pattern that does not parse throws. A pattern is parsed into a tree, compiled into Thompson's NFA, and run by a Pike
+//! VM that carries the captures with each thread: every character of the text is looked at once
+//! per instruction at most, so `(a*)*b` over a hundred thousand `a` ends in milliseconds. There
+//! are no backreferences and no lookaround: they cannot be matched in linear time. Literals, `.`, classes (`[a-z]`,
+//! `[^…]`, `\d \w \s` and their capitals, `[:alpha:]` and the other POSIX names, `\pL` and
+//! `\p{Lu}` over the Unicode categories), groups (capturing, `(?:…)`, `(?P<name>…)` and
+//! `(?<name>…)`), alternation, the repetitions `* + ? {n} {n,} {n,m}` each greedy or lazy with a
+//! `?`, the anchors `^ $ \A \z`, `\b` and `\B`, and the flags `i m s` inline (`(?i)`, `(?i:…)`,
+//! `(?-i)`). Positions are byte offsets into the text, as a string's indices are.
 import std.collections { List, Map };
 import std.core { StringBuilder, viewBytes, UnicodeCategory };
 

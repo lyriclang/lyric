@@ -1,12 +1,12 @@
-/// Reads and writes JSON by RFC 8259, strictly: `JsonWriter` and `TreeBuilder` encode and
-/// `JsonReader` decodes in `std.codec`'s model, `JsonValue` is the dynamic tree, `JsonOptions`
-/// steers the text written, and `JsonError` is what a text that is no JSON throws. `json.encode(v)` writes any `Encode`
-/// value as text, `json.decode<T>(text)` reads any `Decode` value out of one; `json.parse(text)`
-/// is the tree. A struct is an object, a sequence an array, a map an object whose keys are
-/// strings — a number's digits where the key is a number —, bytes a Base64 string, a unit variant
-/// its name, a variant with a payload `{"Name": payload}`. `NaN` and the infinities have no text
-/// (RFC 8259 §6): writing one is an `EncodeError`. The text is read whole into the tree first,
-/// then decoded from it.
+//! Reads and writes JSON by RFC 8259, strictly: `JsonWriter` and `TreeBuilder` encode and
+//! `JsonReader` decodes in `std.codec`'s model, `JsonValue` is the dynamic tree, `JsonOptions`
+//! steers the text written, and `JsonError` is what a text that is no JSON throws. `json.encode(v)` writes any `Encode`
+//! value as text, `json.decode<T>(text)` reads any `Decode` value out of one; `json.parse(text)`
+//! is the tree. A struct is an object, a sequence an array, a map an object whose keys are
+//! strings — a number's digits where the key is a number —, bytes a Base64 string, a unit variant
+//! its name, a variant with a payload `{"Name": payload}`. `NaN` and the infinities have no text
+//! (RFC 8259 §6): writing one is an `EncodeError`. The text is read whole into the tree first,
+//! then decoded from it.
 import std.codec { Encode, Decode, Codable, Encoder, Decoder, EncodeError, DecodeError };
 import std.collections { List, Map, Set };
 import std.core { ParseError };

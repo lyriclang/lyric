@@ -1,12 +1,12 @@
-/// Lexical operations on paths held as strings. There is no `Path` type: a path is the text the
-/// system takes, and these functions take it apart and put it together without touching the file
-/// system: [join], [normalize], [fileName], [parent], [extension], [stem], [withExtension],
-/// [isAbsolute], [relative], [components] and [separator]. `fs.absolute(p)`, which needs the
-/// working directory, is the one that asks the system.
-///
-/// On Windows both `\` and `/` separate, a path may start with a volume — a drive, `C:`, or a UNC
-/// share, `\\server\share` — and names compare without regard to the case of ASCII letters; what
-/// these functions build, they build with `\`. Elsewhere `/` separates and names compare exactly.
+//! Lexical operations on paths held as strings. There is no `Path` type: a path is the text the
+//! system takes, and these functions take it apart and put it together without touching the file
+//! system: [join], [normalize], [fileName], [parent], [extension], [stem], [withExtension],
+//! [isAbsolute], [relative], [components] and [separator]. `fs.absolute(p)`, which needs the
+//! working directory, is the one that asks the system.
+//!
+//! On Windows both `\` and `/` separate, a path may start with a volume — a drive, `C:`, or a UNC
+//! share, `\\server\share` — and names compare without regard to the case of ASCII letters; what
+//! these functions build, they build with `\`. Elsewhere `/` separates and names compare exactly.
 import std.core { arrayOf, viewBytes };
 
 // the target's OS, fixed at compile time: a cross-build for Windows handles Windows paths

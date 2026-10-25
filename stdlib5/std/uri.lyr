@@ -1,11 +1,11 @@
-/// URI references as RFC 3986 defines them, strictly; section numbers below are RFC 3986's. [Uri]
-/// holds the five parts of a reference — scheme, authority (user information, host, port), path,
-/// query, fragment —; [Uri.parse] reads them and refuses what the grammar refuses (a space, a
-/// character beyond ASCII, a `%` without two hex digits, a host in brackets that is not an IPv6
-/// address), `show` writes them back (§5.3), [Uri.resolve] resolves a reference against a base
-/// (§5.2), and [Uri.normalize] normalizes the case, the percent-encoding and the dot segments
-/// (§6.2). [percentEncode] and [percentDecode] encode a text for a [Component] and decode it
-/// again; [Query] holds the pairs of a query in their order.
+//! URI references as RFC 3986 defines them, strictly; section numbers below are RFC 3986's. [Uri]
+//! holds the five parts of a reference — scheme, authority (user information, host, port), path,
+//! query, fragment —; [Uri.parse] reads them and refuses what the grammar refuses (a space, a
+//! character beyond ASCII, a `%` without two hex digits, a host in brackets that is not an IPv6
+//! address), `show` writes them back (§5.3), [Uri.resolve] resolves a reference against a base
+//! (§5.2), and [Uri.normalize] normalizes the case, the percent-encoding and the dot segments
+//! (§6.2). [percentEncode] and [percentDecode] encode a text for a [Component] and decode it
+//! again; [Query] holds the pairs of a query in their order.
 import std.collections { List };
 import std.core { Parse, ParseError, StringBuilder, viewBytes, Utf8Error };
 import std.net { IpAddr };

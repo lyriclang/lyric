@@ -427,21 +427,25 @@ public static class Pipeline
         SourceCompiler.Check(SourceOf(project), OptionsFor(project, null, null));
 
     /// <summary>The front end on a library's modules, nothing rendered: what <c>lyric fix</c> reads.</summary>
-    public static CompileResult Check(LibraryException library, LintArgs? lints)
+    public static CompileResult Check(LibraryException library, LintArgs? lints) =>
+        CheckPackage(library.Manifest, library.Graph, lints);
+
+    /// <summary>The front end on every module under a package's <c>src/</c>, a program's as a
+    /// library's, nothing rendered: what <c>lyric doc</c> reads.</summary>
+    public static CompileResult CheckPackage(Manifest manifest, PackageGraph graph, LintArgs? lints = null)
     {
-        var manifest = library.Manifest;
         var roots = Directory.Exists(manifest.SourceRoot)
             ? Directory.EnumerateFiles(manifest.SourceRoot, "*.lyr", SearchOption.AllDirectories)
                 .Order(StringComparer.Ordinal)
                 .Select(file => ScriptSource.FromDisk(file, Project.ModulePathOf(manifest, file)!))
                 .ToList()
             : [];
-        var levels = library.Graph.Packages.ToDictionary(p => p.Key,
+        var levels = graph.Packages.ToDictionary(p => p.Key,
             p => new LintSettings(p.Key == manifest.Name ? (lints ?? LintArgs.None).Rules : [], p.Value.Lints), StringComparer.Ordinal);
         return SourceCompiler.CheckProject(roots, new CompilerOptions
         {
-            StdlibRoot = StdlibRoot, PackageRoots = library.Graph.SourceRoots,
-            PackageDependencies = library.Graph.Declared,
+            StdlibRoot = StdlibRoot, PackageRoots = graph.SourceRoots,
+            PackageDependencies = graph.Declared,
             LintLevels = LintLevelsOf(levels, manifest.Name, null), RootPackage = manifest.Name,
             WarnDeps = (lints ?? LintArgs.None).WarnDeps,
         });

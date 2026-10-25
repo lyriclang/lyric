@@ -1,14 +1,14 @@
-/// Provides the adapters and terminators of every iterator.
-///
-/// The adapters — `map`, `filter`, `take`, `zip`, `chain`, `flatMap`, `peekable`, `rev`, `cycle`
-/// and more — are lazy, each a struct of its own ([MapIter], [FilterIter], …), monomorphized and
-/// allocation-free. The terminators — `count`, `fold`, `find`, `sum`, `product`, `average`, `min`,
-/// `max`, `minBy`, `maxBy`, `join`, `toArray`, `collect` and more — walk the iterator to an answer.
-/// The prelude names this module, so its members reach every iterator without an import; where a
-/// type is written, the structs are named through it, as `iter.MapIter<I, U>`.
-///
-/// The protocol itself (`Iterator`, `Iterable`, `DoubleEnded`, `Step`, `FromIterator`), the ranges
-/// and the iterators of std.core's own types live in std.core.
+//! Provides the adapters and terminators of every iterator.
+//!
+//! The adapters — `map`, `filter`, `take`, `zip`, `chain`, `flatMap`, `peekable`, `rev`, `cycle`
+//! and more — are lazy, each a struct of its own ([MapIter], [FilterIter], …), monomorphized and
+//! allocation-free. The terminators — `count`, `fold`, `find`, `sum`, `product`, `average`, `min`,
+//! `max`, `minBy`, `maxBy`, `join`, `toArray`, `collect` and more — walk the iterator to an answer.
+//! The prelude names this module, so its members reach every iterator without an import; where a
+//! type is written, the structs are named through it, as `iter.MapIter<I, U>`.
+//!
+//! The protocol itself (`Iterator`, `Iterable`, `DoubleEnded`, `Step`, `FromIterator`), the ranges
+//! and the iterators of std.core's own types live in std.core.
 import std.core { DoubleEnded, Join, StringBuilder };
 
 /// Yields the values of an iterator, each passed through `f`; made by `it.map(f)`.

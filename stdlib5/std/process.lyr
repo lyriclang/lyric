@@ -1,13 +1,13 @@
-/// Starts child processes and talks to them. A [Command] says what to start, [Command.spawn]
-/// starts it as a [Child] — its standard streams pipes ([PipeReader], [PipeWriter]) where the
-/// command asked for them —, and [Child.wait] waits for its end as an [ExitStatus];
-/// [Command.output] and [Command.status] do it all at once.
-///
-/// A child's end comes as SIGCHLD, which the runtime keeps for itself: a reaper on a thread of its
-/// own asks each child that has not been seen to end (lyr/process.h), and an end wakes every task
-/// that waits for it, on any thread. Waiting is a point of cancellation: a cancel ends it. On
-/// Windows a child is its process handle, its end wakes the reaper from a registered wait, and a
-/// kill is the only signal there is.
+//! Starts child processes and talks to them. A [Command] says what to start, [Command.spawn]
+//! starts it as a [Child] — its standard streams pipes ([PipeReader], [PipeWriter]) where the
+//! command asked for them —, and [Child.wait] waits for its end as an [ExitStatus];
+//! [Command.output] and [Command.status] do it all at once.
+//!
+//! A child's end comes as SIGCHLD, which the runtime keeps for itself: a reaper on a thread of its
+//! own asks each child that has not been seen to end (lyr/process.h), and an end wakes every task
+//! that waits for it, on any thread. Waiting is a point of cancellation: a cancel ends it. On
+//! Windows a child is its process handle, its end wakes the reaper from a registered wait, and a
+//! kill is the only signal there is.
 import std.collections { List };
 import std.core { StringBuilder, viewBytes };
 import std.io { IoError, Reader, Writer, failure };

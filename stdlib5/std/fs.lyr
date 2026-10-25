@@ -1,16 +1,16 @@
-/// The file system: [File], a handle on an open file that reads, writes and seeks through
-/// `std.io`'s interfaces, opened as [OpenOptions] say; conveniences that read or write a file whole
-/// ([readText], [readBytes], [writeText], [writeBytes], [appendText]) or its lines one by one
-/// ([lines]); what a path names ([Metadata], [metadata], [exists]); directories and their entries
-/// ([createDir], [removeDir], [readDir], [DirEntry]); and operations built from those —
-/// [createDirAll], [removeAll], [copy], [walk], [tempDir], [tempFile].
-///
-/// Where a scheduler runs, every call on a file runs on the program's I/O pool (std.io's): a few
-/// threads, started at the first use, do the system's call while the running task is parked, and
-/// the thread it runs on goes on with the other tasks; where no scheduler runs, the call runs on the
-/// thread itself. A call on a regular file ends in a bounded time and is not a point of
-/// cancellation: a cancellation is seen at the task's next wait. Reads and writes go through the
-/// caller's slice, never a copy.
+//! The file system: [File], a handle on an open file that reads, writes and seeks through
+//! `std.io`'s interfaces, opened as [OpenOptions] say; conveniences that read or write a file whole
+//! ([readText], [readBytes], [writeText], [writeBytes], [appendText]) or its lines one by one
+//! ([lines]); what a path names ([Metadata], [metadata], [exists]); directories and their entries
+//! ([createDir], [removeDir], [readDir], [DirEntry]); and operations built from those —
+//! [createDirAll], [removeAll], [copy], [walk], [tempDir], [tempFile].
+//!
+//! Where a scheduler runs, every call on a file runs on the program's I/O pool (std.io's): a few
+//! threads, started at the first use, do the system's call while the running task is parked, and
+//! the thread it runs on goes on with the other tasks; where no scheduler runs, the call runs on the
+//! thread itself. A call on a regular file ends in a bounded time and is not a point of
+//! cancellation: a cancellation is seen at the task's next wait. Reads and writes go through the
+//! caller's slice, never a copy.
 import std.collections { List };
 import std.core { Utf8Error };
 import std.crypto { randomUint64 };

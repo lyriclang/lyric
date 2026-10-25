@@ -1,12 +1,12 @@
-/// The terminal, driven by ECMA-48 escape sequences.
-///
-/// [isTerminal] asks whether a standard stream is a terminal, [size] how wide and high the
-/// terminal on the standard output is. A [Style] is a set of attributes — a foreground and a
-/// background [Color] (the 16, one of the 256, or RGB), bold, dim, italic, underline, inverse,
-/// strike — whose [Style.apply] wraps a text in the SGR sequence and the reset where styles are
-/// on (see [colorsEnabled]). [cursorUp] and the functions after it return the sequences
-/// themselves, to print. Under Windows the runtime switches the console to virtual-terminal
-/// processing once, so the same bytes mean the same there. The module has no raw mode.
+//! The terminal, driven by ECMA-48 escape sequences.
+//!
+//! [isTerminal] asks whether a standard stream is a terminal, [size] how wide and high the
+//! terminal on the standard output is. A [Style] is a set of attributes — a foreground and a
+//! background [Color] (the 16, one of the 256, or RGB), bold, dim, italic, underline, inverse,
+//! strike — whose [Style.apply] wraps a text in the SGR sequence and the reset where styles are
+//! on (see [colorsEnabled]). [cursorUp] and the functions after it return the sequences
+//! themselves, to print. Under Windows the runtime switches the console to virtual-terminal
+//! processing once, so the same bytes mean the same there. The module has no raw mode.
 import std.os { env };
 import std.core { StringBuilder };
 

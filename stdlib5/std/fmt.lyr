@@ -1,10 +1,10 @@
-/// Formats text from a template read at run time.
-///
-/// [format] speaks the f-strings' format language, with the values given apart from the
-/// template: `fmt.format("{} has {1:>4}", name, n)`. What the compiler checks in an f-string is
-/// checked here when it runs, and a mistake panics: a template that leaves a brace open or closes
-/// one it did not open, a value it names that is not given, a spec that is no format or does not
-/// apply to its value.
+//! Formats text from a template read at run time.
+//!
+//! [format] speaks the f-strings' format language, with the values given apart from the
+//! template: `fmt.format("{} has {1:>4}", name, n)`. What the compiler checks in an f-string is
+//! checked here when it runs, and a mistake panics: a template that leaves a brace open or closes
+//! one it did not open, a value it names that is not given, a spec that is no format or does not
+//! apply to its value.
 import std.core { Format, fstringDebugged, fstringFormatted, fstringPadded, StringBuilder };
 
 /// Returns the template's text with each hole replaced by its value.

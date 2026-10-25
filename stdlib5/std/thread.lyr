@@ -1,8 +1,8 @@
-/// Threads and pools of them: [Thread], [Pool] and [parallelMap].
-///
-/// Each thread runs a scheduler of its own from `std.task`; a task never moves to another
-/// thread. Threads run at the same time: what they share, they share through a channel, an
-/// atomic or a lock — anything else is a data race.
+//! Threads and pools of them: [Thread], [Pool] and [parallelMap].
+//!
+//! Each thread runs a scheduler of its own from `std.task`; a task never moves to another
+//! thread. Threads run at the same time: what they share, they share through a channel, an
+//! atomic or a lock — anything else is a data race.
 import std.core { filled };
 import std.task {
     atomicFetchAndAdd,
