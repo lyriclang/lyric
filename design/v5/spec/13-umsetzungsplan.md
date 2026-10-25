@@ -1092,3 +1092,64 @@ das Repo umschreibt. Gos Erfahrung (eine Form, früh, für alle) spricht dafür,
 formatieren statt Datei für Datei; Rusts (Optionen, die rustfmt nie wieder los wurde) gegen jede Option. `lyric
 doc` und `lyric api` teilen eine Sammlung der Fläche — rustdoc und `cargo public-api` lesen beide dieselbe
 JSON-Form; hier ist es eine C#-Struktur in `Lyric5.Doc`, aus der die Seiten und die Textform entstehen.
+
+## Nachtrag 2026-10-25 — der Plan für M13b
+
+M13b nach seiner Zeile oben, 11 E1–E4 und E8, 09 Q5/Q8 für den Editor und 12 O4: **`lyric lsp`**, **`lyric
+dap`**, **`tree-sitter-lyric`** und die **Clients auf 5**. Das Artefakt: **im Editor Hover, Completion, Rename und
+ein Fix über eine Lyric-5-Quelle, Tests per CodeLens; der Debugger hält an einer Panik und zeigt Lyric-Werte;
+das Risiko lldb auf Windows gemessen**. Grundlage ist der Stand nach M13a (#566): der 4.x-Sprachserver
+`src/Lyric.Lsp` (`lyrlsp`, ~5 300 Zeilen: JSON-RPC, Dokumente, 15 Provider über das `SemanticModel` des Frontends,
+`Lyric.Tests.Lsp`), das gemeinsame Frontend mit `SourceCompiler.Check`/`CheckProject`, `Pipeline` mit Manifest
+und Paketgraph, der Diagnose-Record mit Fixes und Katalog-Code (M12a), `lyric test --json`, `lyric fmt` (M13a),
+die Mangling-Regel `lyr_<modul>_<name>` (01 C4) und die Laufzeit-Layouts (`RuntimeLayout`).
+
+| # | Entscheidung | Vergleich / Verworfen |
+|---|---|---|
+| P1 | **Ein Server, der vorhandene, auf 5** (E1 „kein zweites Frontend“): `Lyric.Lsp` wird der Server der 5-Linie — die Einheit kommt aus `lyric.toml` über `Pipeline` (Manifest, Paketgraph, `tests/` mit dem Paket, `build.lyr` als eigene Einheit „Build-Skript“, BS3), eine Datei außerhalb jedes Manifests ist Skript-Modus (C8), die std ist `stdlib5` bei der Toolchain. **`lyric lsp`** im selben Binary (C1); `lyrlsp` und die `lyric.json`-Einheit fallen (Lyric-Script hat seinen Server im eigenen Repo, 12 O4) | gopls, rust-analyzer. Verworfen: ein neuer Server neben dem alten — 15 Provider zweimal |
+| P2 | **Erst gemessen, dann die Wiederverwendung** (E1 B): S1 misst die Zeit je Analyse über drei Größen — eine Datei, ein Paket mit ~20 Modulen, die std selbst als Paket — und teilt sie in Parse, Auflösung, Sema; die Zahl entscheidet, wo der Schnitt liegt. Die Vorgabe des Designs: **je Modul Parse+Sema, Schlüssel der Modulgraph** — ein Modul, dessen Text und dessen Abhängigkeiten gleich sind, wird nicht neu geprüft; die std zuerst, weil sie jede Analyse trägt (4.x: 93–106 ms je 5-Zeilen-Datei, von der std dominiert). Was das Frontend dafür ändern muss, nennt S1 als Bericht, nicht als Vermutung | gopls (Paket-Granularität), Go's Export-Daten. Verworfen: Salsa/Roslyn-Feinkörnigkeit (E1); Ganz-Compile je Tastendruck ohne Zahl |
+| P3 | **Abbrechbar und inkrementell** (E1): ein `CancellationToken` durch die Modulschleife des Checks — eine neue Eingabe bricht die laufende Analyse zwischen zwei Modulen ab, nicht nur ihr Ergebnis (4.x verwarf nur); inkrementeller Text-Sync; **Pull-Diagnosen** (`textDocument/diagnostic`, `workspace/diagnostic`) neben dem Push für alte Clients. Die Diagnosen sind die von `lyric check` — ohne Monomorphisierung und Senkung, **mit** Auswertung (Q8), im Editor unter einem **kleineren Budget** (Q5 „strenger“), das das Manifest nicht hebt | rust-analyzer's Cancellation |
+| P4 | **Fähigkeiten auf 5** (E2): Hover, Completion aus dem Schnappschuss, Signaturhilfe, Definition/Referenzen/Rename paketweit **und in Abhängigkeiten** (Quelle, L7; `std` bei der Toolchain, schreibgeschützt), Inlay-Hints, semantische Tokens, Symbole, Folding — jeder Provider über die Lyric-5-Syntax geprüft (Trailing-Lambdas, `match`-Blöcke, `comptime`, Makros, Initialisierer, `::`-Listen); was ein Provider nicht kennt, wird ein Slice-Punkt | rust-analyzer |
+| P5 | **Code Actions aus dem Record** (G7, M12a): jede Diagnose mit Fix wird eine Quick-Fix-Aktion mit genau den Edits, die `lyric fix` schreibt; `codeDescription.href` auf die Katalogseite des Codes (`DiagnosticCatalog.PagePath`, dieselbe, die `lyric explain` nennt); `@Allow(code)` als Aktion für Lints. **Formatierung als minimale Edits** (E29 B): `lyric fmt`s Form, als Differenz zum Puffer, nicht als Ganz-Ersatz; `lyric expand` als Server-Kommando (Q7) | gopls, clippy-Fixes über rust-analyzer |
+| P6 | **Tests im Editor** (E2, E24): CodeLens „Run test“/„Debug test“ über jedem `@Test` und jedem Doc-Test-Block, `lyric/tests` liefert die Tests eines Dokuments, ausgeführt über `lyric test --json -f <name>` — der Server führt nichts selbst aus | rust-analyzer's Runnables |
+| P7 | **`lyric dap` = Adapter über lldb-dap** (E4, L12): der Adapter sucht `lldb-dap` (Pfad, `LYRIC_LLDB_DAP`, die Xcode-/LLVM-Orte), baut das Ziel im Debug-Profil mit Debug-Info und reicht DAP durch; er setzt die Startkommandos (`command source lyric.lldbinit`), übersetzt `launch`/`attach` (Programm, Argumente, `runInTerminal`) und meldet **„Panic“ als Exception-Breakpoint-Filter**, der ein Breakpoint auf `lyr_panic` ist. Bedingte Breakpoints, Logpoints, Attach sind lldb's — nativ, nicht nachgebaut (4.x ignorierte `condition` still) | `rust-lldb`, CodeLLDB, delve. Verworfen: ein eigener Debugger (01 L12) |
+| P8 | **Lyric-Werte in lldb** (E4): `lyric.lldbinit` mit Python-Summaries und synthetischen Kindern für `string`, Listen, `Map`/`Set`, `?T`, `Result`, Enums mit Payload, Klassen/Structs, Tupel und Closures; Rahmen- und Funktionsnamen entmangelt (01 C4) — **die Layouts aus `RuntimeLayout` erzeugt**, nicht von Hand, damit eine Layoutänderung die Summaries mitnimmt; die Datei liegt bei der Toolchain. **Tasks**: OS-Thread = DAP-Thread; die schwebenden Koroutinen eines Threads als Scope „Tasks“ über ein lldb-Kommando, das die Koroutinentabelle der Laufzeit liest (E15 A) | `rust-lldb`'s Formatter, Go's `runtime-gdb.py` |
+| P9 | **Windows gemessen, nicht versprochen** (E4): `lyric dap` auf `x86_64-windows-gnu` mit dem lldb-dap einer LLVM-Release — hält es an einem Breakpoint, zeigt es lokale Werte, hält es an `lyr_panic`; das Ergebnis steht im Bericht, ein Fehlschlag macht `-windows-msvc` + PDB zur benannten Tür nach 5.0, nicht zum Slice | — |
+| P10 | **`tree-sitter-lyric`** (E8, 12 O4): ein Repo im Org mit der Grammatik der 5-Syntax, `highlights.scm`, `locals.scm`, `injections.scm`; **die Korpusprüfung**: jede Datei aus `stdlib5`, `tests/std`, `examples`, den Konformanzfällen am Pin und den Book-Snippets parst ohne `ERROR`-Knoten — dieselbe Liste wie M13a P1. Die Grammatik ist die Hervorhebungsquelle; die TextMate-Grammatik der Clients wird **aus ihr erzeugt** (Schlüsselwörter, Operatoren, Literalformen), damit es eine Quelle gibt; semantische Tokens vom Server liegen darüber (E13) | Zig, Rust (`tree-sitter-rust`). Verworfen: TextMate von Hand neben Tree-sitter — zwei Wahrheiten |
+| P11 | **Die Clients auf 5** (E8): `vscode-lyric` und `jetbrains-lyric` je **2.0.0** — starten `lyric lsp` und `lyric dap` (kein `lyrlsp`, kein `lyrdbg`), `.lyr` mit der erzeugten Grammatik, die CodeLens-Befehle, die Debug-Konfiguration „Lyric“ (launch, attach, Panik-Filter); dünn: kein Wissen über Lyric, das nicht der Server hat. Die Snippets der Clients werden gegen `lyric check` geprüft (ein Snippet hat schon einmal nie geparst). Releases wie bisher als Asset an einem Tag, kein Marketplace | Zig, Rust |
+
+| Slice | Inhalt | Artefakt |
+|---|---|---|
+| **S1** der Server auf 5 und die Messung | P1, P2 | `lyric lsp` beantwortet `Lyric.Tests.Lsp` über Lyric-5-Pakete (`lyric.toml`, std 5); der Messbericht je Größe und Phase |
+| **S2** Wiederverwendung je Modul | P2, P3 | eine Änderung in einem Modul prüft nur es und die, die es importieren — die std nie; die Zeit je Tastendruck gemessen vorher/nachher; Abbruch zwischen Modulen; Pull-Diagnosen |
+| **S3** die Fähigkeiten über die 5-Syntax | P4 | je Provider ein Test über Lyric-5-Konstrukte; Rename über zwei Pakete und eine Abhängigkeit; Hover über ein std-Element zeigt sein `///` |
+| **S4** Code Actions, Formatierung, Expand | P5 | ein Quick-Fix aus dem Record schreibt dieselben Edits wie `lyric fix`; Formatierung als minimale Edits; Katalog-Link je Diagnose |
+| **S5** Tests im Editor | P6 | CodeLens über `@Test` und Doc-Test-Blöcken; `lyric/tests`; ein Lauf über `lyric test --json` |
+| **S6** `lyric dap` | P7 | ein DAP-Skripttest (Linux, macOS): launch, Breakpoint, Schritt, Stack mit entmangelten Namen, Halt an einer Panik |
+| **S7** Lyric-Werte und Tasks | P8, P9 | `lyric.lldbinit` aus den Layouts erzeugt; lldb im Batch-Modus zeigt eine Liste, eine Map, ein Enum, ein `?T` als Lyric-Werte; der Scope „Tasks“; der Windows-Lauf gemessen |
+| **S8** `tree-sitter-lyric` | P10 | das Repo mit Grammatik, Abfragen und CI; der Korpus parst ohne `ERROR`; die erzeugte TextMate-Grammatik |
+| **S9** die Clients | P11 | `vscode-lyric` 2.0.0 und `jetbrains-lyric` 2.0.0 veröffentlicht; die Checkliste der Clients einmal gegen das Release gefahren |
+| **S10** Abschluss | STATUS, CHANGELOG, Bericht, der Plan für M14 als nächster Schritt | die Zeile oben |
+
+Nach Aufwand: groß S1, S2, S7; mittel S3, S4, S6, S8, S9; klein S5, S10. Zusammen **XL**, wie die Zeile sagt —
+der größte Brocken der Werkzeuge. Die Reihenfolge folgt den Abhängigkeiten und dem Risiko: der Server zuerst auf
+5 gestellt und gemessen (S1), weil jede weitere Zahl auf ihm steht; die Wiederverwendung (S2) vor den
+Fähigkeiten, weil ein Provider-Test über einen 2-Sekunden-Check niemand fährt; der Debugger danach als eigener
+Strang (S6, S7), die Grammatik und die Clients zuletzt, weil sie alles Vorige brauchen. S6–S8 hängen nicht an
+S2–S5 und dürfen davor gezogen werden, wo ein PR in CI wartet.
+
+**Was der Maintainer freigibt, bevor der Slice läuft**: S8 legt ein neues Repo im Org an (`lyriclang/
+tree-sitter-lyric`) und lädt die Tree-sitter-CLI; S9 veröffentlicht zwei Client-Releases. Beides fragt am
+Slice-Anfang.
+
+**Reflexion**: Der Sprachserver ist da — die Gefahr ist nicht das Bauen, sondern das Messen auszulassen. 4.x hat
+jeden Tastendruck die Welt kompiliert und es nie gezählt, bis die Bestandsaufnahme 0,3–1,9 s je Projekt fand;
+deshalb misst S1, bevor S2 einen Cache baut, und der Cache bekommt die Granularität, die die Zahl verlangt —
+gopls fährt mit Paketen gut, rust-analyzer brauchte Salsa erst für Makros und Traits über Crate-Grenzen, die
+Lyric so nicht hat. Der Debugger ist bewusst **kein** eigener: lldb kennt DWARF, Threads, bedingte Breakpoints
+und Attach, und was Lyric dazu gibt, sind Namen und Werte — Rust und Go tun genau das mit Python-Formattern. Die
+Gefahr dort ist Drift: eine Layoutänderung der Laufzeit, die die Summaries still falsch macht; deshalb erzeugt
+S7 sie aus `RuntimeLayout` und prüft sie mit lldb im Batch-Modus. Die Tree-sitter-Grammatik ist der zweite Parser
+der Sprache und darum der riskanteste Text des Meilensteins — die Korpusprüfung über dieselben Dateien, die der
+Formatierer schon bestand, hält sie ehrlich; eine TextMate-Grammatik von Hand daneben wäre der Fehler, den die
+Regel „ein Mechanismus pro Konzept“ verbietet.
