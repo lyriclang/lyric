@@ -1,6 +1,7 @@
 using Lyric.AST;
 using Lyric.Core;
 using Lyric.Resolver;
+using Lyric.Sema;
 
 namespace Lyric5.Doc.Api;
 
@@ -70,7 +71,7 @@ public static class SurfaceReader
     {
         var ast = compilation.LoadedAstOf(module);
         var text = compilation.Sources.GetText(ast.Span.File);
-        var docs = compilation.Documentation;
+        var docs = new LinkedDocs(compilation, module, ast);
         var reader = new Reader(text, docs);
 
         var items = new List<Item>();
@@ -109,7 +110,7 @@ public static class SurfaceReader
                 conformances, reader.Slice(decl.Target.Span)));
         }
 
-        return new SurfaceModule(module.FullName, ModuleDoc(text), items);
+        return new SurfaceModule(module.FullName, docs.OfModule(ModuleDoc(text)), items);
     }
 
     /// <summary>The members an extension shows: a conformance block's all — they are as visible as the
@@ -125,22 +126,85 @@ public static class SurfaceReader
     }
 
     /// <summary>The module's documentation: the <c>//!</c> lines that open the file.</summary>
-    public static string? ModuleDoc(string text)
+    public static string? ModuleDoc(string text) => DocLinks.ModuleText(text);
+
+    /// <summary>A link of the documentation as the pages take it: <c>[List.push](lyric-doc:KEY)</c>,
+    /// the key naming the page and the anchor — the module, the type, the member's kind and name.</summary>
+    public const string LinkScheme = "lyric-doc:";
+
+    /// <summary>Where a link's target stands in the reference, as a key; <c>null</c> for a target
+    /// that has no page — a builtin type, a type parameter, what the compiler makes up.</summary>
+    public static string? KeyOf(DocTarget? hit)
     {
-        var lines = text.TrimStart('﻿').Replace("\r\n", "\n").Split('\n');
-        var i = 0;
-        while (i < lines.Length && lines[i].Trim().Length == 0) i++;
-        var block = new List<string>();
-        while (i < lines.Length && lines[i].TrimStart().StartsWith("//!", StringComparison.Ordinal))
+        if (hit?.Symbol is not { } symbol) return null;
+        string? HomeOf(Symbol s) => s.Home?.FullName;
+        if (hit.Owner is { } owner && HomeOf(owner) is { } ownerHome)
         {
-            var line = lines[i].TrimStart()[3..];
-            block.Add(line.StartsWith(' ') ? line[1..] : line);
-            i++;
+            var kind = symbol switch
+            {
+                FunctionSymbol => "method",
+                FieldSymbol => "field",
+                EnumVariantSymbol => "variant",
+                AssociatedTypeSymbol => "assoc",
+                GlobalSymbol => "const",
+                _ => null,
+            };
+            return kind is null ? null : $"m:{ownerHome}:{owner.Name}:{kind}:{symbol.Name}";
         }
-        return block.Count == 0 ? null : string.Join('\n', block).Trim('\n');
+        return symbol switch
+        {
+            ModuleSymbol m => $"M:{m.FullName}",
+            TypeSymbol { Declaration: not null, Kind: TypeSymbolKind.Alias } a when HomeOf(a) is { } home => $"A:{home}:{a.Name}",
+            TypeSymbol { Declaration: not null } type when HomeOf(type) is { } home =>
+                hit.Member is { } member ? $"m:{home}:{type.Name}:method:{member}" : $"T:{home}:{type.Name}",
+            FunctionSymbol f when HomeOf(f) is { } home => $"F:{home}:{f.Name}",
+            GlobalSymbol g when HomeOf(g) is { } home => $"C:{home}:{g.Name}",
+            _ => null,
+        };
     }
 
-    private sealed class Reader(string text, DocumentationTable docs)
+    /// <summary>The documentation of a module's declarations with each link that names something
+    /// written as a link to it — by the resolution the <c>broken-doc-link</c> lint reads.</summary>
+    private sealed class LinkedDocs
+    {
+        private readonly DocumentationTable _docs;
+        private readonly DocLinks? _links;
+        private readonly ModuleSymbol _module;
+        private readonly Module _ast;
+        private readonly Dictionary<Node, Dictionary<string, DocTarget?>> _hits = new(ReferenceEqualityComparer.Instance);
+
+        public LinkedDocs(Compilation compilation, ModuleSymbol module, Module ast)
+        {
+            _docs = compilation.Documentation;
+            _links = compilation.DocLinks;
+            _module = module;
+            _ast = ast;
+            if (_links is null) return;
+            foreach (var link in _links.Of(module, ast))
+            {
+                if (!_hits.TryGetValue(link.Node, out var targets)) _hits[link.Node] = targets = new(StringComparer.Ordinal);
+                targets.TryAdd(link.Target, link.Hit);
+            }
+        }
+
+        public string? Of(Node node) =>
+            _docs.Of(node) is not { } text ? null
+            : _hits.TryGetValue(node, out var targets) ? Linked(text, targets) : text;
+
+        public string? OfModule(string? text)
+        {
+            if (text is null || _links is null) return text;
+            var targets = new Dictionary<string, DocTarget?>(StringComparer.Ordinal);
+            foreach (var (target, hit) in _links.OfModuleText(_module, _ast, text)) targets.TryAdd(target, hit);
+            return Linked(text, targets);
+        }
+
+        private static string Linked(string text, Dictionary<string, DocTarget?> targets) =>
+            DocLinks.Rewrite(text, target =>
+                targets.TryGetValue(target, out var hit) && KeyOf(hit) is { } key ? $"[{target}]({LinkScheme}{key})" : null);
+    }
+
+    private sealed class Reader(string text, LinkedDocs docs)
     {
         public string Slice(Span span) => text[span.Start..span.End];
 

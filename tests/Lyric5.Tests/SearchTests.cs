@@ -137,7 +137,8 @@ public class SearchTests
             Assert.Contains("/diagnostics/LYR-SEM0001/", index.Find("LYR-SEM0001"));
             Assert.Contains("/book/getting-started/", index.Find("toolchain"));
             Assert.DoesNotContain("/", index.Find("toolchain"));
-            Assert.Equal(["Book", "Diagnostics", "Releases", "Spec"], index.Areas());
+            Assert.Contains("/std/collections/List/", index.Find("push"));
+            Assert.Equal(["Book", "Diagnostics", "Releases", "Spec", "std"], index.Areas());
         }
         finally
         {

@@ -391,118 +391,22 @@ internal sealed partial class WarningAnalyzer
                 new DiagnosticNote("say what the module is for in '//!' lines at the top of the file"));
     }
 
-    private static readonly Regex DocLink = new(@"(?<![\w\]\)!])\[([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\](?![\(\[:])", RegexOptions.CultureInvariant);
-
-    /// <summary>broken-doc-link: <c>[Type]</c> or <c>[Type.member]</c> in a <c>///</c> that names
-    /// nothing the module can see. Code — in backticks or a fence — is not read.</summary>
+    /// <summary>broken-doc-link: <c>[Type]</c> or <c>[Type.member]</c> in a <c>///</c> or in the
+    /// module's <c>//!</c> lines that names nothing the module can see. Code — in backticks or a
+    /// fence — is not read.</summary>
     private void WarnDocLinks(ModuleSymbol module, Module ast)
     {
-        var docs = _comp.Documentation;
-        var modules = ModuleNames(ast);
-        void Check(Node node, TypeSymbol? owner, GenericParam[] outer)
-        {
-            if (docs.Of(node) is not { } text || node is not INamedDecl named) return;
-            // a type parameter of the declaration, or of the type around it, is a name its text may use
-            var generics = outer.Concat(GenericsOf(node)).Select(g => g.Name).ToHashSet(StringComparer.Ordinal);
-            foreach (var target in LinksIn(text))
-                if (!generics.Contains(target) && !Resolves(target.Split('.'), module, modules, owner))
-                    _de.Report("LYR-SEM0224", Severity.Warning, named.NameSpan,
-                        $"the documentation of '{named.Name}' links '[{target}]', which names nothing here",
+        var links = _comp.DocLinks ?? new DocLinks(_comp, _binding, _types);
+        if (DocLinks.ModuleText(_comp.Sources.GetText(ast.Span.File)) is { } moduleText)
+            foreach (var (target, hit) in links.OfModuleText(module, ast, moduleText))
+                if (hit is null)
+                    _de.Report("LYR-SEM0224", Severity.Warning, new Span(ast.Span.File, 0, 0),
+                        $"the documentation of the module '{module.FullName}' links '[{target}]', which names nothing here",
                         new DiagnosticNote("name a type, a function or a member the module sees, or write it in backticks"));
-        }
-        foreach (var decl in ast.Declarations)
-        {
-            Check(decl, null, []);
-            var owner = decl is INamedDecl n ? module.Members.LookupLocal(n.Name) as TypeSymbol : null;
-            IEnumerable<Node> members = decl switch
-            {
-                StructDecl s => s.Members,
-                ClassDecl c => c.Members,
-                EnumDecl e => [.. e.Variants, .. e.Methods],
-                InterfaceDecl i => i.Members,
-                ExtendDecl x => x.Methods,
-                _ => [],
-            };
-            if (decl is ExtendDecl extend) owner = (_binding.Resolve(extend.Target) ?? _types.RefOf(extend.Target)) as TypeSymbol;
-            foreach (var member in members) Check(member, owner, GenericsOf(decl));
-        }
-    }
-
-    private static GenericParam[] GenericsOf(Node node) => node switch
-    {
-        FunctionDecl f => f.Generics,
-        StructDecl s => s.Generics,
-        ClassDecl c => c.Generics,
-        EnumDecl e => e.Generics,
-        InterfaceDecl i => i.Generics,
-        _ => [],
-    };
-
-    /// <summary>The link targets of a doc text, its code spans and fences left out.</summary>
-    private static IEnumerable<string> LinksIn(string text)
-    {
-        var prose = new StringBuilder();
-        var fenced = false;
-        foreach (var line in text.Split('\n'))
-        {
-            if (line.TrimStart().StartsWith("```", StringComparison.Ordinal)) { fenced = !fenced; prose.Append('\n'); continue; }
-            if (fenced) { prose.Append('\n'); continue; }
-            var inCode = false;
-            foreach (var c in line)
-            {
-                if (c == '`') { inCode = !inCode; prose.Append(' '); continue; }
-                prose.Append(inCode ? ' ' : c);
-            }
-            prose.Append('\n');
-        }
-        return DocLink.Matches(prose.ToString()).Select(m => m.Groups[1].Value);
-    }
-
-    private bool Resolves(string[] path, ModuleSymbol module, Dictionary<string, string> modules, TypeSymbol? owner)
-    {
-        Symbol? at = owner?.Members.LookupLocal(path[0])
-                     ?? module.Members.Lookup(path[0])
-                     ?? _comp.PreludeMember(path[0])
-                     ?? _comp.Builtins.Lookup(path[0]);
-        if (at is null && modules.TryGetValue(path[0], out var full)) at = _comp.FindModule(full.Split('.'));
-        if (at is null && _comp.FindModule([path[0]]) is { } top) at = top;
-        for (var i = 1; at is not null && i < path.Length; i++)
-        {
-            while (at is ImportBindingSymbol shell) at = shell.Target;
-            at = at switch
-            {
-                ModuleSymbol m => m.Members.LookupLocal(path[i]) ?? _comp.FindModule([.. m.Path, path[i]]),
-                TypeSymbol t => t.Members.LookupLocal(path[i]) ?? (HasMember(t, path[i]) ? t : null),
-                _ => null,
-            };
-        }
-        return at is not null;
-    }
-
-    /// <summary>Whether the type has the member beyond its own table: a method an <c>extend</c> block
-    /// declares for it, or a member of an interface it conforms to — in its declaration or in a block —,
-    /// a default among them.</summary>
-    private bool HasMember(TypeSymbol type, string name)
-    {
-        var interfaces = new List<TypeNode>(type.Declaration switch
-        {
-            StructDecl s => s.Interfaces,
-            ClassDecl c => c.Interfaces,
-            EnumDecl e => e.Interfaces,
-            InterfaceDecl i => i.Interfaces,
-            _ => [],
-        });
-        foreach (var module in _comp.Modules)
-            foreach (var extend in _comp.AstOf(module).Declarations.OfType<ExtendDecl>())
-                if (ReferenceEquals(_binding.Resolve(extend.Target) ?? _types.RefOf(extend.Target), type))
-                {
-                    if (extend.Methods.Any(m => m.Name == name)) return true;
-                    interfaces.AddRange(extend.Interfaces);
-                }
-        var seen = new HashSet<InterfaceDecl>(ReferenceEqualityComparer.Instance);
-        bool Declares(TypeNode node) =>
-            (_binding.Resolve(node) ?? _types.RefOf(node)) is TypeSymbol { Declaration: InterfaceDecl i } iface && seen.Add(i)
-            && (iface.Members.LookupLocal(name) is not null || i.Members.Any(m => m.Name == name) || i.Interfaces.Any(Declares));
-        return interfaces.Any(Declares);
+        foreach (var link in links.Of(module, ast))
+            if (link.Hit is null && link.Node is INamedDecl named)
+                _de.Report("LYR-SEM0224", Severity.Warning, named.NameSpan,
+                    $"the documentation of '{named.Name}' links '[{link.Target}]', which names nothing here",
+                    new DiagnosticNote("name a type, a function or a member the module sees, or write it in backticks"));
     }
 }

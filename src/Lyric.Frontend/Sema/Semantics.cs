@@ -31,6 +31,7 @@ public static class Semantics
 
         // Warnings describe a program that compiles. Over a broken one the reference tables are
         // partial, and a warning computed from half a table is a guess with a confident tone.
+        compilation.DocLinks = new DocLinks(compilation, binding, types);
         if (!de.HasErrors) new WarningAnalyzer(compilation, binding, types, de).Run();
         return types;
     }

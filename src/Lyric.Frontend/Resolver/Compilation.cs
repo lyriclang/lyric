@@ -191,6 +191,10 @@ public sealed class Compilation
     /// </summary>
     public DocumentationTable Documentation { get; } = new();
 
+    /// <summary>What the links of the documentation name, once the checker has run: the lint that
+    /// reports the broken ones and <c>lyric doc</c>, which links the others, read the same.</summary>
+    public Sema.DocLinks? DocLinks { get; set; }
+
     /// <summary>
     /// Does the module come from the standard library? Only there is a bodyless function an import
     /// declaration; anywhere else it is an error (<c>LYR-SEM0051</c>).
