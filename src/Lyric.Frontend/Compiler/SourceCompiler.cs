@@ -301,17 +301,20 @@ public static class SourceCompiler
         // the standard library's sites run under the default budget, not the program's
         var stdFiles = compilation.Modules.Where(compilation.IsNative).Select(m => compilation.AstOf(m).Span.File).ToHashSet();
         bool Standard(int site) => stdFiles.Contains(types.ComptimeSites[site].Span.File);
+        // an editor's budget caps the program's: its analysis is asked again at the next keystroke
+        var quiet = options.EditorBudget is { } cap && cap < options.ComptimeBudget;
+        var budget = quiet ? options.EditorBudget!.Value : options.ComptimeBudget;
         var chosen = when.Count == 0 ? new Dictionary<int, IrConstValue>()
-            : ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks,
-                embed, options.Build, include: when.ContainsKey, standard: Standard);
+            : ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, budget, options.OverflowChecks,
+                embed, options.Build, include: when.ContainsKey, standard: Standard, quiet: quiet);
         if (chosen is null) return false;
         var inactive = new Inactivity();
         foreach (var (site, (decl, file)) in when)
-            if (chosen[site] is StructConst { Fields: [BoolConst { Value: false }, ..] })
+            if (chosen.GetValueOrDefault(site) is StructConst { Fields: [BoolConst { Value: false }, ..] })
                 if (decl is null) inactive.Module(file); else inactive.Declaration(decl);
-        var rest = ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, options.ComptimeBudget, options.OverflowChecks,
+        var rest = ComptimeEvaluator.Evaluate(hoisted, types, diagnostics, budget, options.OverflowChecks,
             embed, options.Build, include: i => !when.ContainsKey(i) && !inactive.Covers(types.ComptimeSites[i].Span) && !(hoisting.Skipped?.Contains(i) ?? false),
-            standard: Standard);
+            standard: Standard, quiet: quiet);
         if (rest is null) return false;
         var values = new Dictionary<int, IrConstValue>(rest);
         foreach (var (site, value) in chosen) values[site] = value;
@@ -693,6 +696,12 @@ public sealed record CompilerOptions
     /// compilations follow each other and need not parse it again. Taken where it is the seed of
     /// <see cref="StdlibRoot"/> and the compilation is Lyric 5's.</summary>
     public Parsing.StdlibSeed? StdlibSeed { get; init; }
+
+    /// <summary>An editor's cap on the budget of each <c>comptime</c> site, below the program's own
+    /// (<see cref="ComptimeBudget"/>): a site of the program that runs out of it stays without a
+    /// value and without a finding, which the build gives under the program's budget. The
+    /// standard library's sites keep theirs.</summary>
+    public long? EditorBudget { get; init; }
 
     /// <summary>Whether the compilation is lowered after it checked. An editor's is not: it shows
     /// what the checker and the evaluation say, and the lowering's findings are the build's.</summary>

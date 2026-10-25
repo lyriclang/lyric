@@ -76,7 +76,7 @@ public sealed class HoverTests
     {
         var text = Text("fn twice(n: int): int { return n * 2; }\nfn main(): int {\n    return tw$ice(1);\n}\n");
 
-        Assert.Contains("fn twice(int) -> int", text);
+        Assert.Contains("fn twice(n: int): int", text);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class HoverTests
         var text = Text(
             "fn id<T>(v: T): T { return v; }\nfn main(): int {\n    return i$d(1);\n}\n");
 
-        Assert.Contains("fn id<T>(T) -> T", text);
+        Assert.Contains("fn id<T>(v: T): T", text);
     }
 
     /// <summary>An attribute is a reference to its struct, so hovering it answers with the struct

@@ -115,6 +115,14 @@ public static class SurfaceReader
         return new SurfaceModule(module.FullName, docs.OfModule(ModuleDoc(text)), items);
     }
 
+    /// <summary>
+    /// The signature a page shows for a declaration — its head as written, without its body, its
+    /// attributes or its documentation —, for every other reader of the source: what the editor
+    /// shows under the cursor is what <c>lyric doc</c> writes. <c>null</c> for a node that declares
+    /// nothing a page lists.
+    /// </summary>
+    public static string? SignatureOf(string text, Node node) => new Reader(text, null).SignatureOf(node);
+
     /// <summary>The members an extension shows: a conformance block's all — they are as visible as the
     /// conformance —, another block's <c>pub</c> ones.</summary>
     private static IEnumerable<FunctionDecl> Visible(ExtendDecl extend) =>
@@ -206,9 +214,18 @@ public static class SurfaceReader
                 targets.TryGetValue(target, out var hit) && KeyOf(hit) is { } key ? $"[{target}]({LinkScheme}{key})" : null);
     }
 
-    private sealed class Reader(string text, LinkedDocs docs)
+    private sealed class Reader(string text, LinkedDocs? docs)
     {
         public string Slice(Span span) => text[span.Start..span.End];
+
+        public string? SignatureOf(Node node) => node switch
+        {
+            FunctionDecl f => Function(f, ItemKind.Function).Signature,
+            StructDecl or ClassDecl or EnumDecl or InterfaceDecl or ExtendDecl => Head((Decl)node),
+            FieldDecl or EnumVariant or AssociatedTypeDecl or TypeAliasDecl => Whole(node),
+            GlobalBindingDecl or StaticBindingDecl => Binding(node),
+            _ => null,
+        };
 
         public Item? Read(Decl decl) => decl switch
         {
@@ -220,14 +237,14 @@ public static class SurfaceReader
                 e.Types),
             InterfaceDecl { Visibility: VisibilityWord.Pub } i => Type(i, ItemKind.Interface, i.Name, i.Interfaces,
                 [.. i.Members.Where(m => !m.IsPrivateHelper).Select(m => Method(m) with { Default = m.Body is not null })], i.Types),
-            TypeAliasDecl { Visibility: VisibilityWord.Pub } t => new Item(ItemKind.Alias, t.Name, Whole(t), docs.Of(t), [], []),
-            GlobalBindingDecl { IsPublic: true } g => new Item(ItemKind.Constant, g.Name, Binding(g), docs.Of(g), [], []),
+            TypeAliasDecl { Visibility: VisibilityWord.Pub } t => new Item(ItemKind.Alias, t.Name, Whole(t), docs?.Of(t), [], []),
+            GlobalBindingDecl { IsPublic: true } g => new Item(ItemKind.Constant, g.Name, Binding(g), docs?.Of(g), [], []),
             _ => null,
         };
 
         private Item Type(Decl decl, ItemKind kind, string name, TypeNode[] interfaces, IReadOnlyList<Item> members,
             AssociatedTypeDecl[] types) =>
-            new(kind, name, Head(decl), docs.Of(decl), [.. types.Select(AssociatedType), .. members],
+            new(kind, name, Head(decl), docs?.Of(decl), [.. types.Select(AssociatedType), .. members],
                 [.. interfaces.Select(i => Slice(i.Span))]);
 
         private List<Item> Members(Decl[] members)
@@ -237,10 +254,10 @@ public static class SurfaceReader
                 switch (m)
                 {
                     case FieldDecl { Visibility: VisibilityWord.Pub } field:
-                        items.Add(new Item(ItemKind.Field, field.Name, Whole(field), docs.Of(field), [], []));
+                        items.Add(new Item(ItemKind.Field, field.Name, Whole(field), docs?.Of(field), [], []));
                         break;
                     case StaticBindingDecl { IsPublic: true } constant:
-                        items.Add(new Item(ItemKind.Constant, constant.Name, Binding(constant), docs.Of(constant), [], []));
+                        items.Add(new Item(ItemKind.Constant, constant.Name, Binding(constant), docs?.Of(constant), [], []));
                         break;
                     case FunctionDecl { IsPublic: true } method:
                         items.Add(Method(method));
@@ -254,12 +271,12 @@ public static class SurfaceReader
         private Item Function(FunctionDecl f, ItemKind kind)
         {
             var end = f.Body is { } body ? body.Span.Start : f.Span.End;
-            return new Item(kind, f.Name, Dedent(f.Span.Start, Clean(text[f.Span.Start..end])), docs.Of(f), [], []);
+            return new Item(kind, f.Name, Dedent(f.Span.Start, Clean(text[f.Span.Start..end])), docs?.Of(f), [], []);
         }
 
-        private Item Variant(EnumVariant v) => new(ItemKind.Variant, v.Name, Whole(v), docs.Of(v), [], []);
+        private Item Variant(EnumVariant v) => new(ItemKind.Variant, v.Name, Whole(v), docs?.Of(v), [], []);
 
-        private Item AssociatedType(AssociatedTypeDecl t) => new(ItemKind.AssociatedType, t.Name, Whole(t), docs.Of(t), [], []);
+        private Item AssociatedType(AssociatedTypeDecl t) => new(ItemKind.AssociatedType, t.Name, Whole(t), docs?.Of(t), [], []);
 
         /// <summary>A declaration with no body: all of it, its attributes and its end left out.</summary>
         private string Whole(Node node) => Dedent(node.Span.Start, Clean(Slice(node.Span)));

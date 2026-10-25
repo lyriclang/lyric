@@ -156,7 +156,7 @@ public sealed class HoverDocumentationTests
             + "fn main(): int {\n    return tw$ice(2);\n}\n");
 
         Assert.DoesNotContain("---", text);
-        Assert.Equal("```lyric\nfn twice(int) -> int\n```", text);
+        Assert.Equal("```lyric\nfn twice(n: int): int\n```", text);
     }
 
     [Fact]

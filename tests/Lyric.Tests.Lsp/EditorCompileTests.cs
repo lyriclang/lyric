@@ -140,4 +140,45 @@ public sealed class EditorCompileTests : IDisposable
         Assert.Throws<OperationCanceledException>(() =>
             Check(path, PackageUnit.SingleFileOptions(path) with { Cancellation = cancelled.Token }));
     }
+
+    /// <summary>A site of about 7.8 million steps — a round of the loop takes 13 —: within the
+    /// default budget, over a tenth of it.</summary>
+    private const string Spins = "fn spin(n: int): int {\n    var s = 0;\n    var i = 0;\n    while (i < n) {\n"
+        + "        s += i;\n        i += 1;\n    }\n    return s;\n}\n\nfn main(): int {\n    return comptime spin(600000) % 7;\n}\n";
+
+    [Fact]
+    public void A_site_over_the_editors_budget_stays_without_a_value_and_without_a_finding()
+    {
+        var path = Program(Spins);
+        var options = PackageUnit.SingleFileOptions(path) with { Lower = false };
+
+        // the program's own site: the one in its file
+        static bool Valued(CompileResult result)
+        {
+            var sites = result.Model!.Types.ComptimeSites;
+            var file = result.Model.Entry.Span.File;
+            var own = Enumerable.Range(0, sites.Count).Single(i => sites[i].Span.File == file);
+            return result.ComptimeValues?.ContainsKey(own) == true;
+        }
+
+        var build = Check(path, options);
+        Assert.Empty(Said(build));
+        Assert.True(Valued(build));
+
+        var editor = Check(path, options with { EditorBudget = AnalysisService.EditorBudget });
+        Assert.Empty(Said(editor));
+        Assert.False(Valued(editor));
+    }
+
+    [Fact]
+    public void Under_a_program_budget_below_the_editors_the_editor_says_what_the_build_says()
+    {
+        // The program's own budget is the smaller: the editor's cap is no cap, and the site's
+        // finding is the build's.
+        var path = Program(Spins);
+        var options = PackageUnit.SingleFileOptions(path) with { Lower = false, ComptimeBudget = 20000 };
+        var build = Said(Check(path, options));
+        Assert.Contains(build, l => l.StartsWith("LYR-CT0002", StringComparison.Ordinal));
+        Assert.Equal(build, Said(Check(path, options with { EditorBudget = AnalysisService.EditorBudget })));
+    }
 }

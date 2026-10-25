@@ -77,6 +77,14 @@ public sealed class PackageUnit
         return IsUnder(full, TestRoot) ? TestRun.TestModuleOf(_manifest, TestRoot, full) : null;
     }
 
+    /// <summary>Whether the editor leaves a file as it is: a package read from git lives in the
+    /// user's cache and is the same for every project, std is the toolchain's.</summary>
+    public static bool IsReadOnly(string path)
+    {
+        var full = Path.GetFullPath(path);
+        return IsUnder(full, Path.Combine(Lyric5.Toolchain.UserCache.Root, "git")) || IsUnder(full, Pipeline.StdlibRoot);
+    }
+
     /// <summary>Whether a change to this file changes what the unit is: its manifest or its lock.</summary>
     public static bool IsManifest(string path) =>
         Path.GetFileName(path) is ManifestName or LockName;
