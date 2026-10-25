@@ -246,7 +246,7 @@ public sealed class DocumentSymbolProtocolTests
     private const string Program = "struct P {\n    x: int,\n}\nfn main(): int { return 0; }\n";
 
     private static string BufferPath([CallerMemberName] string name = "") =>
-        Path.Combine(AppContext.BaseDirectory, $"{name}.lyr");
+        Path.Combine(AppContext.BaseDirectory, $"{name.ToLowerInvariant()}.lyr");
 
     private static string DidOpen(string uri, string text) =>
         JsonSerializer.Serialize(new

@@ -18,16 +18,19 @@ public static class DiagnosticMapper
     /// library is real, but it is not about the document the user has open, and an editor has no
     /// way to show it against a file it did not ask about.</para>
     /// </summary>
+    /// <param name="toolVersion">The toolchain's version, which picks the catalog's pages a
+    /// diagnostic links to; none without it.</param>
     public static List<LspDiagnostic> ForFile(
         SourceManager sources,
         IEnumerable<Diagnostic> diagnostics,
-        FileId file)
+        FileId file,
+        string? toolVersion = null)
     {
         var mapped = new List<LspDiagnostic>();
         foreach (var diagnostic in diagnostics)
         {
             if (diagnostic.Span.File != file) continue;
-            mapped.Add(Map(sources, diagnostic));
+            mapped.Add(Map(sources, diagnostic, toolVersion));
         }
         return mapped;
     }
@@ -51,9 +54,13 @@ public static class DiagnosticMapper
         return FileId.None;
     }
 
-    private static LspDiagnostic Map(SourceManager sources, Diagnostic diagnostic) =>
+    public static LspDiagnostic Map(SourceManager sources, Diagnostic diagnostic, string? toolVersion = null) =>
         new()
         {
+            // the code's page in the catalog, of this toolchain's version, as 'lyric explain' names it
+            CodeDescription = toolVersion is not null && DiagnosticCatalog.Entries.ContainsKey(diagnostic.Code)
+                ? new CodeDescription { Href = DiagnosticCatalog.PageUrl(diagnostic.Code, toolVersion) }
+                : null,
             Range = SpanMapper.ToVisibleRange(sources, diagnostic.Span),
             Severity = ToSeverity(diagnostic.Severity),
             Code = diagnostic.Code,

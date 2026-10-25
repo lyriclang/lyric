@@ -13,5 +13,5 @@ internal static class Single
     public static CompilerOptions Options(string path) => PackageUnit.SingleFileOptions(path);
 
     public static CompileResult Check(string path, string text) =>
-        SourceCompiler.Check(ScriptSource.FromBuffer(path, text), Options(path));
+        SourceCompiler.Check(ScriptSource.FromBuffer(path, text, PackageUnit.SingleFileModule(path)), Options(path));
 }

@@ -48,6 +48,10 @@ public sealed record LspDiagnostic
     /// number, because the diagnostic codes of this compiler are strings.</summary>
     public required string Code { get; init; }
 
+    /// <summary>Where the code is explained: its page in the catalog.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CodeDescription? CodeDescription { get; init; }
+
     /// <summary>Who is speaking. Editors show it beside the message when several servers report on
     /// one file.</summary>
     public string Source => "lyric";
@@ -74,6 +78,11 @@ public enum LspDiagnosticTag
 
 /// <summary>One note of a diagnostic, as the protocol wants it: a place and what it has to do
 /// with the finding.</summary>
+public sealed record CodeDescription
+{
+    public required string Href { get; init; }
+}
+
 public sealed record LspDiagnosticRelatedInformation
 {
     public required Location Location { get; init; }
@@ -146,6 +155,10 @@ public sealed record ServerCapabilities
     public required bool DocumentFormattingProvider { get; init; }
 
     public required DiagnosticOptions DiagnosticProvider { get; init; }
+
+    public required CodeActionOptions CodeActionProvider { get; init; }
+
+    public required ExecuteCommandOptions ExecuteCommandProvider { get; init; }
 }
 
 /// <summary>Diagnostics a client asks for: a document's depend on other files (an import), and
@@ -315,6 +328,56 @@ public sealed record TextEdit
 public sealed record WorkspaceEdit
 {
     public required Dictionary<string, List<TextEdit>> Changes { get; init; }
+}
+
+public sealed record CodeActionParams
+{
+    public required TextDocumentIdentifier TextDocument { get; init; }
+    public required Range Range { get; init; }
+}
+
+/// <summary>A change offered at a place: its title, its kind and what it edits.</summary>
+public sealed record CodeAction
+{
+    public required string Title { get; init; }
+    public required string Kind { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<LspDiagnostic>? Diagnostics { get; init; }
+
+    public bool IsPreferred { get; init; }
+
+    public required WorkspaceEdit Edit { get; init; }
+}
+
+public sealed record CodeActionOptions
+{
+    public required IReadOnlyList<string> CodeActionKinds { get; init; }
+}
+
+public sealed record ExecuteCommandOptions
+{
+    public required IReadOnlyList<string> Commands { get; init; }
+}
+
+/// <summary>A command the client asks the server to run: <c>lyric.expand</c> with the URI of a
+/// document.</summary>
+public sealed record ExecuteCommandParams
+{
+    public required string Command { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Arguments { get; init; }
+}
+
+/// <summary>What <c>lyric.expand</c> answers: the module with its macros expanded, or why not.</summary>
+public sealed record ExpandResult
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Text { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Refused { get; init; }
 }
 
 public sealed record WorkspaceSymbolParams
@@ -729,6 +792,11 @@ public static class LspMethods
     public const string InlayHint = "textDocument/inlayHint";
     public const string Formatting = "textDocument/formatting";
     public const string Diagnostic = "textDocument/diagnostic";
+    public const string CodeAction = "textDocument/codeAction";
+    public const string ExecuteCommand = "workspace/executeCommand";
+
+    /// <summary>The one command: the module of a document with its macros expanded.</summary>
+    public const string ExpandCommand = "lyric.expand";
     public const string DiagnosticRefresh = "workspace/diagnostic/refresh";
 
     public const string DidChangeWatchedFiles = "workspace/didChangeWatchedFiles";

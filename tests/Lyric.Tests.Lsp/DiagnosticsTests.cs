@@ -22,7 +22,7 @@ public sealed class DiagnosticsTests
     /// <summary>A path in the output directory. It need not exist: the buffer carries the text and
     /// the path is only the identity.</summary>
     private static string BufferPath([System.Runtime.CompilerServices.CallerMemberName] string name = "") =>
-        Path.Combine(AppContext.BaseDirectory, $"{name}.lyr");
+        Path.Combine(AppContext.BaseDirectory, $"{name.ToLowerInvariant()}.lyr");
 
     private static string DidOpen(string uri, int version, string text) =>
         JsonSerializer.Serialize(new
