@@ -581,12 +581,17 @@ over its standard input and output until the editor says <code>exit</code>, and 
 the nearest <code>lyric.toml</code> above it: with every other module of the package, in the one
 compilation <code>lyric test</code> makes of them (<a href="#3-test">§3</a>), and the packages of its graph. Any other
 file is analysed <strong>alone</strong>, with the standard library, as <code>lyric check &lt;file&gt;</code> checks it.</li>
-<li>The findings the editor shows are those <code>lyric check</code> says of the same text; the text of every
-file the editor holds open counts instead of what is saved.</li>
+<li>The findings the editor shows are those <code>lyric check</code> says of the same text, except those only
+the lowering finds — a monomorphization that does not end (<code>LYR-SEM0197</code>) is said by the build;
+the text of every file the editor holds open counts instead of what is saved.</li>
 <li>The server reads the manifest and the graph as a build reads them, except that it <strong>fetches
 nothing</strong> — a package from git comes from the cache — and <strong>writes nothing</strong>: <code>lyric.lock</code> is
 left as it is. A manifest it cannot read leaves the file analysed alone, and the server says why
 in the editor's log.</li>
+<li>An edit arrives as the ranges it replaces. A client that asks for a document's findings
+(<code>textDocument/diagnostic</code>) gets them for the documents it has open; the findings of every other
+file of the package are sent to it (<code>textDocument/publishDiagnostics</code>), as to a client that does
+not ask.</li>
 </ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
