@@ -592,6 +592,14 @@ in the editor's log.</li>
 (<code>textDocument/diagnostic</code>) gets them for the documents it has open; the findings of every other
 file of the package are sent to it (<code>textDocument/publishDiagnostics</code>), as to a client that does
 not ask.</li>
+<li>A <code>comptime</code> site of the program is evaluated under at most a tenth of the toolchain's budget
+(<a href="../../spec/11-metaprogramming/#2-comptime">11 §2</a> rule 5); a site that runs out of it is shown without a
+value and without a finding — the build evaluates it under the program's budget. The standard
+library's sites keep theirs.</li>
+<li>What a declaration is under the cursor — its signature, its uses, its new name — is answered for
+every package the editor has analysed: the uses of a library's function include those of an open
+program that depends on it. A rename edits each of them, and nothing in a package read from git or
+in the standard library; a rename that would is refused, and says why.</li>
 </ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
