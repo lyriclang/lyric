@@ -22,6 +22,7 @@ public class DapCommandTests
         private readonly Process _process;
         private int _seq;
         private readonly BlockingQueue _inbox = new();
+        private readonly string _log = Path.Combine(Path.GetTempPath(), $"lyric-dap-{Guid.NewGuid():N}.log");
 
         public Session()
         {
@@ -32,6 +33,8 @@ public class DapCommandTests
             };
             start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "lyric5.dll"));
             start.ArgumentList.Add("dap");
+            // lldb-dap's own account of the session, for a wait that fails
+            start.Environment["LLDBDAP_LOG"] = _log;
             _process = Process.Start(start)!;
             _ = Task.Run(Read);
         }
@@ -79,12 +82,18 @@ public class DapCommandTests
             {
                 JsonObject? message;
                 try { message = _inbox.Take(deadline - DateTime.UtcNow); }
-                catch (TimeoutException) { throw new TimeoutException($"no {what}; passed over:\n{string.Join('\n', _passed.TakeLast(30))}"); }
-                if (message is null) throw new InvalidOperationException($"the adapter ended before {what}; passed over:\n{string.Join('\n', _passed.TakeLast(30))}");
+                catch (TimeoutException) { throw new TimeoutException($"no {what}; passed over:\n{string.Join('\n', _passed.TakeLast(30))}{LldbLog()}"); }
+                if (message is null) throw new InvalidOperationException($"the adapter ended before {what}; passed over:\n{string.Join('\n', _passed.TakeLast(30))}{LldbLog()}");
                 if (wanted(message)) return message;
                 var shown = message.ToJsonString();
                 _passed.Add(shown.Length > 300 ? shown[..300] : shown);
             }
+        }
+
+        private string LldbLog()
+        {
+            try { return "\nlldb-dap said:\n" + string.Join('\n', File.ReadAllLines(_log).TakeLast(80).Select(l => l.Length > 400 ? l[..400] : l)); }
+            catch (IOException) { return ""; }
         }
 
         public JsonObject Response(int seq) =>
