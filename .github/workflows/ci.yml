@@ -103,6 +103,17 @@ jobs:
 
       # Builds for the other Tier 1 targets are the same from every machine; the C toolchain
       # job makes them on Linux x86-64, on every pull request and on main.
+      # lyric dap runs lldb-dap; Linux's comes with the distribution's lldb, macOS's with Xcode.
+      - name: lldb-dap for the debug adapter's tests
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          find_dap() { command -v lldb-dap || ls /usr/bin/lldb-dap-* /usr/lib/llvm-*/bin/lldb-dap 2>/dev/null | sort -V | tail -1; }
+          dap=$(find_dap)
+          if [ -z "$dap" ]; then sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends lldb; dap=$(find_dap); fi
+          echo "lldb-dap: $dap"
+          echo "LYRIC_LLDB_DAP=$dap" >> "$GITHUB_ENV"
+
       - name: Test
         shell: bash
         env:
@@ -197,6 +208,17 @@ jobs:
         run: |
           dotnet test tests/Lyric5.Tests/Lyric5.Tests.csproj --configuration Release --filter "FullyQualifiedName~CacheWarmupTests"
           cat "$LYRIC5_WARM_REPORT"
+
+      # lyric dap runs lldb-dap; Linux's comes with the distribution's lldb, macOS's with Xcode.
+      - name: lldb-dap for the debug adapter's tests
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          find_dap() { command -v lldb-dap || ls /usr/bin/lldb-dap-* /usr/lib/llvm-*/bin/lldb-dap 2>/dev/null | sort -V | tail -1; }
+          dap=$(find_dap)
+          if [ -z "$dap" ]; then sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends lldb; dap=$(find_dap); fi
+          echo "lldb-dap: $dap"
+          echo "LYRIC_LLDB_DAP=$dap" >> "$GITHUB_ENV"
 
       - name: Runtime tests
         shell: bash

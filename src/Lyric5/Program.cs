@@ -55,6 +55,7 @@ public static partial class Program
             "doc" => Doc(rest),
             "api" => Api(rest),
             "lsp" => Lsp(rest),
+            "dap" => Dap(rest),
             "env" => Env(rest),
             "new" => New(rest, here: false),
             "init" => New(rest, here: true),
