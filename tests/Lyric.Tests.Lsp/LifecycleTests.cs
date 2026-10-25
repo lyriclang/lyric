@@ -17,7 +17,7 @@ public sealed class LifecycleTests
         response.GetProperty("error").GetProperty("code").GetInt32();
 
     [Fact]
-    public async Task Announces_full_synchronisation_and_the_encoding_spans_already_use()
+    public async Task Announces_incremental_synchronisation_and_the_encoding_spans_already_use()
     {
         await using var harness = new ServerHarness();
 
@@ -25,7 +25,7 @@ public sealed class LifecycleTests
         var response = await harness.ReceiveResponseAsync(id);
 
         var capabilities = response.GetProperty("result").GetProperty("capabilities");
-        Assert.Equal((int)TextDocumentSyncKind.Full,
+        Assert.Equal((int)TextDocumentSyncKind.Incremental,
             capabilities.GetProperty("textDocumentSync").GetProperty("change").GetInt32());
 
         // Announcing anything else would mean converting every offset: Span counts UTF-16 code

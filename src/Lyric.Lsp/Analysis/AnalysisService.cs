@@ -4,6 +4,7 @@ using Lyric.Compiler;
 using Lyric.Core;
 using Lyric.Lsp.Documents;
 using Lyric.Lsp.Protocol;
+using Lyric.Parsing;
 
 namespace Lyric.Lsp.Analysis;
 
@@ -50,10 +51,10 @@ public sealed record AnalysisSnapshot(
 /// this process. The cost is dominated by the standard library rather than by the user's files,
 /// and it is the same work <c>lyric check</c> does.</para>
 ///
-/// <para>A run in flight cannot be stopped: <see cref="SourceCompiler"/> takes no cancellation
-/// token. Cancellation therefore means the RESULT IS DISCARDED, not that the work stops. For a
-/// keystroke-driven server that is the distinction that matters — the wasted milliseconds are
-/// invisible, a published stale answer is not.</para>
+/// <para>A run in flight stops between two phases of the compiler when its token is cancelled
+/// (<see cref="CompilerOptions.Cancellation"/>); within a phase it runs on, and its result is
+/// discarded. For a keystroke-driven server the second is the distinction that matters — the
+/// wasted milliseconds are invisible, a published stale answer is not.</para>
 /// </summary>
 public sealed class AnalysisService : IDisposable
 {
@@ -62,6 +63,10 @@ public sealed class AnalysisService : IDisposable
     private readonly Func<string, MessageType, CancellationToken, Task> _log;
     private readonly TimeSpan _debounce;
     private readonly string? _stdlibRoot;
+
+    /// <summary>The standard library parsed once, on a thread of its own from the start: an
+    /// analysis before it is ready parses the library itself.</summary>
+    private readonly Task<StdlibSeed> _seed;
 
     /// <summary>The pending analysis per triggering path. Replacing an entry cancels the run it
     /// stands for. Keyed by the trigger rather than by the unit, because the unit is not known
@@ -142,6 +147,7 @@ public sealed class AnalysisService : IDisposable
         _log = log;
         _debounce = debounce;
         _stdlibRoot = stdlibRoot;
+        _seed = Task.Run(() => StdlibSeed.Shared(stdlibRoot ?? Lyric5.Build.Pipeline.StdlibRoot));
     }
 
     /// <summary>
@@ -363,17 +369,24 @@ public sealed class AnalysisService : IDisposable
     /// Two option sets that differ in the package would answer two different questions about one
     /// file, and only one of them would be on screen.</para>
     /// </summary>
-    private async Task<(CompilerOptions Options, string? Module)> OptionsForAsync(OpenDocument document)
+    private async Task<(CompilerOptions Options, string? Module)> OptionsForAsync(OpenDocument document,
+        CancellationToken cancellationToken = default)
     {
         var unit = await UnitForAsync(document.Path).ConfigureAwait(false);
         return unit?.ModuleOf(document.Path) is { } module
-            ? (Options(unit.Options), module)
-            : (Options(PackageUnit.SingleFileOptions(document.Path)), null);
+            ? (Options(unit.Options, cancellationToken), module)
+            : (Options(PackageUnit.SingleFileOptions(document.Path), cancellationToken), null);
     }
 
-    private CompilerOptions Options(CompilerOptions unit) => unit with
+    /// <summary>What the editor compiles under: the unit's options, the library parsed once, no
+    /// lowering — the editor shows what the checker and the evaluation say —, and the run's token,
+    /// which stops a compilation whose text has changed between two of its phases.</summary>
+    private CompilerOptions Options(CompilerOptions unit, CancellationToken cancellationToken) => unit with
     {
         StdlibRoot = _stdlibRoot ?? unit.StdlibRoot,
+        StdlibSeed = _seed.IsCompletedSuccessfully ? _seed.Result : null,
+        Lower = false,
+        Cancellation = cancellationToken,
 
         // Everything the editor holds, not only the files this run starts from. Without it a
         // program is checked against the last SAVE of every module it imports, and the two
@@ -391,7 +404,7 @@ public sealed class AnalysisService : IDisposable
     public async Task<IReadOnlyList<CompletionItem>?> CompleteAsync(
         OpenDocument document, int offset, CancellationToken cancellationToken)
     {
-        var (options, module) = await OptionsForAsync(document).ConfigureAwait(false);
+        var (options, module) = await OptionsForAsync(document, cancellationToken).ConfigureAwait(false);
 
         return await Task.Run(
             () => CompletionProvider.At(document.Path, document.Text, offset, options, module),
@@ -406,7 +419,7 @@ public sealed class AnalysisService : IDisposable
     public async Task<SignatureHelp?> SignatureHelpAsync(
         OpenDocument document, int offset, CancellationToken cancellationToken)
     {
-        var (options, module) = await OptionsForAsync(document).ConfigureAwait(false);
+        var (options, module) = await OptionsForAsync(document, cancellationToken).ConfigureAwait(false);
 
         return await Task.Run(
             () => SignatureHelpProvider.At(document.Path, document.Text, offset, options, module),
@@ -462,7 +475,7 @@ public sealed class AnalysisService : IDisposable
             }
         }
 
-        var options = Options(unit.Options);
+        var options = Options(unit.Options, token);
 
         // Off the caller's thread: the compile is synchronous and CPU-bound, and the caller is
         // either the read loop or a test.
@@ -538,7 +551,7 @@ public sealed class AnalysisService : IDisposable
     /// server knew what a project was.</summary>
     private async Task AnalyzeSingleAsync(OpenDocument document, CancellationToken cancellationToken)
     {
-        var (options, _) = await OptionsForAsync(document).ConfigureAwait(false);
+        var (options, _) = await OptionsForAsync(document, cancellationToken).ConfigureAwait(false);
 
         var result = await Task.Run(
             () => SourceCompiler.Check(

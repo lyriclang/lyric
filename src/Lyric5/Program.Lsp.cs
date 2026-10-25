@@ -13,7 +13,8 @@ public static partial class Program
         if (parsed.Words.Count > 0) return Unknown($"'lsp' takes no file, got '{parsed.Words[0]}'");
         if (parsed.Rest is not null) return Unknown("unknown option '--' for 'lsp'");
 
-        using var server = new LspServer(Console.OpenStandardInput(), Console.OpenStandardOutput());
+        using var server = new LspServer(Console.OpenStandardInput(), Console.OpenStandardOutput(),
+            new LspServerOptions { Version = DisplayVersion() });
         return server.RunAsync().GetAwaiter().GetResult();
     }
 }
