@@ -37,6 +37,13 @@ tests = ["RuntimeBuildTests", "RuntimeProgramTests", "SanitizerTests", "PanicTex
 cases = ["06-", "10-", "12-", "13-"]
 
 [[rule]]
+# What a link in documentation names: the broken-doc-link lint and the pages read it alike. Before
+# the front end's rule, which would name everything; 4.x runs the same lint.
+paths = ["src/Lyric.Frontend/Sema/DocLinks.cs"]
+tests = ["4x", "DocLinkTests", "DocCommandTests", "SiteTests"]
+cases = []
+
+[[rule]]
 # The text of the language: lexing, parsing, the tree, the formatter.
 paths = ["src/Lyric.Frontend/Lexing/", "src/Lyric.Frontend/Parsing/", "src/Lyric.Frontend/AST/", "src/Lyric.Frontend/Formatting/"]
 tests = ["4x", "InterpolationTests", "UnicodeTests", "TrailingBlockCallTests", "ShiftCountTests", "ManifestTests",
@@ -82,7 +89,8 @@ cases = []
 paths = ["stdlib5/"]
 tests = ["StdTests", "ExampleTests", "CEmitterTests", "VisibilityTests", "PreludeTests", "PreludeNameTests", "ImportTests",
          "ImportedFunctionValueTests", "RootModuleTests", "WitnessWordTests", "NativeTests", "UnicodeTests",
-         "FormatterProofTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Formatting.Lyric5ProofTests", "DocCommandTests"]
+         "FormatterProofTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Formatting.Lyric5ProofTests", "DocCommandTests",
+         "SiteTests"]
 cases = ["imports"]
 
 [[rule]]
@@ -98,7 +106,7 @@ cases = []
 [[rule]]
 # The documentation's renderer, the site tool and the site's goldens.
 paths = ["src/Lyric5.Doc/", "tools/Site/", "tests/Lyric5.Tests/site/"]
-tests = ["SiteTests", "BookTests", "CatalogPageTests", "SearchTests", "LegacyTests", "DocCommandTests"]
+tests = ["SiteTests", "BookTests", "CatalogPageTests", "SearchTests", "LegacyTests", "DocCommandTests", "DocLinkTests"]
 cases = []
 
 [[rule]]

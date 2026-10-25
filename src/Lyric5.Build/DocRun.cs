@@ -26,9 +26,10 @@ public static class DocRun
 
     /// <summary>The surface of the standard library beside the toolchain: every module of
     /// <c>stdlib5/std</c>.</summary>
-    public static Surface? StdSurface(string version, TextWriter error)
+    public static Surface? StdSurface(string version, TextWriter error, string? stdlibRoot = null)
     {
-        var std = Path.Combine(Pipeline.StdlibRoot, "std");
+        var library = stdlibRoot ?? Pipeline.StdlibRoot;
+        var std = Path.Combine(library, "std");
         var modules = Directory.EnumerateFiles(std, "*.lyr", SearchOption.AllDirectories)
             .Select(f => "std." + Path.GetRelativePath(std, f)[..^4].Replace(Path.DirectorySeparatorChar, '.').Replace('/', '.'))
             .Order(StringComparer.Ordinal)
@@ -36,7 +37,7 @@ public static class DocRun
         var root = ScriptSource.FromText("docs", string.Concat(modules.Select(m => $"import {m};\n")));
         var result = SourceCompiler.CheckProject([root], new CompilerOptions
         {
-            StdlibRoot = Pipeline.StdlibRoot,
+            StdlibRoot = library,
             PackageRoots = new Dictionary<string, string>(StringComparer.Ordinal),
         });
         // The root that imports every module is the run's own: what it warns about is no one's.

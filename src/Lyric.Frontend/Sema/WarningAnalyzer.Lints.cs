@@ -49,17 +49,7 @@ internal sealed partial class WarningAnalyzer
     };
 
     /// <summary>The names whole-module imports bind in a file: <c>import std.io;</c> binds <c>io</c>.</summary>
-    private static Dictionary<string, string> ModuleNames(Module ast)
-    {
-        var names = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var import in ast.Declarations.OfType<ImportDecl>())
-            switch (import.Clause)
-            {
-                case null: names[import.Path[^1]] = string.Join('.', import.Path); break;
-                case ImportAlias alias: names[alias.Alias] = string.Join('.', import.Path); break;
-            }
-        return names;
-    }
+    private static Dictionary<string, string> ModuleNames(Module ast) => DocLinks.ModuleNames(ast);
 
     /// <summary>unused-generic: a function's type parameter that nothing in it names. A type's are not
     /// looked at: a type may carry a parameter only its name uses, a phantom (<c>Join&lt;A, B&gt;</c>).</summary>

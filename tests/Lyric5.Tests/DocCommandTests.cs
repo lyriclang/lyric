@@ -119,7 +119,7 @@ public class DocCommandTests
         Assert.Contains("id=\"fn.larger\"", module);
         Assert.Contains("id=\"const.limit\"", module);
         Assert.Contains("<h4 id=\"panics\">Panics</h4>", module);
-        Assert.Contains("A [Point] is a place", module);
+        Assert.Contains("A <a href=\"../geo/Point/\">Point</a> is a place", module);
         Assert.Contains("id=\"type.Meters\"", Read("geo/units/index.html"));
     }
 

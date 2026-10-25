@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Lyric5.Doc\Lyric5.Doc.csproj" />
+    <ProjectReference Include="..\..\src\Lyric5.Build\Lyric5.Build.csproj" />
   </ItemGroup>
 
 </Project>

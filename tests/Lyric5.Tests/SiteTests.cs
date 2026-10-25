@@ -135,6 +135,18 @@ public partial class SiteTests
         Assert.Contains("<a href=\"book/\">Book</a>", home);
     }
 
+    [Fact]
+    public void The_built_site_carries_the_std_and_its_header_leads_there()
+    {
+        var pages = SiteBuilder.Build(Root, "dev", "main");
+        var paths = pages.Select(p => p.Path).ToHashSet(StringComparer.Ordinal);
+        Assert.Contains("std/index.html", paths);
+        Assert.Contains("std/collections/index.html", paths);
+        Assert.Contains("std/collections/List/index.html", paths);
+        Assert.Contains("id=\"method.push\"", pages.Single(p => p.Path == "std/collections/List/index.html").Html);
+        Assert.Contains("<a href=\"std/\">std</a>", pages.Single(p => p.Path == SiteBuilder.HomePath).Html);
+    }
+
     /// <summary>The site of the repository, built into a fresh directory.</summary>
     private static string BuildSite()
     {

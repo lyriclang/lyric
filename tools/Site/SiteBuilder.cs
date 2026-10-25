@@ -1,5 +1,7 @@
 using Lyric.Core;
 using Lyric5.Doc;
+using Lyric5.Doc.Api;
+using Lyric5.Build;
 
 namespace Lyric5.Site;
 
@@ -49,11 +51,13 @@ public static class SiteBuilder
         var chapterTexts = summary.Chapters.ToDictionary(c => c, c => File.ReadAllText(Path.Combine(bookDir, c.File)));
         var catalog = DiagnosticCatalog.Read(File.ReadAllText(Path.Combine(root, CatalogFile)));
         IReadOnlyList<SpecChapter> specChapters = spec is null ? [] : SpecPages.Chapters(spec);
+        var std = StdOf(root, version);
 
         var paths = new List<string> { HomePath, ReleasesPath, BookPath };
         paths.AddRange(summary.Chapters.Select(c => SiteContext.FileOf(Book.PageOf(c))));
         paths.AddRange(CatalogPages.Paths(catalog));
         if (spec is not null) paths.AddRange(SpecPages.Paths(specChapters));
+        paths.AddRange(DocPages.PathsOf(std));
         var site = new SiteContext(version, paths, SiteContext.DefaultAreas);
 
         var program = FunctionOf(File.ReadAllText(Path.Combine(root, HomeProgramFile)), HomeProgramFunction);
@@ -71,8 +75,18 @@ public static class SiteBuilder
         }
         pages.AddRange(CatalogPages.Build(site, catalog));
         if (spec is not null) pages.AddRange(SpecPages.Build(site, specChapters, spec.Commit));
+        pages.AddRange(DocPages.Build(std, site));
         return pages;
     }
+
+    /// <summary>The standard library's surface from the repository's <c>stdlib5</c>, read once per
+    /// repository and version — every build of the site in one process takes the same.</summary>
+    private static Surface StdOf(string root, string version) =>
+        StdSurfaces.GetOrAdd((Path.GetFullPath(root), version), key =>
+            DocRun.StdSurface(key.Version, Console.Error, Path.Combine(key.Root, "stdlib5"))
+            ?? throw new InvalidOperationException($"the standard library under {key.Root} does not check"));
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(string Root, string Version), Surface> StdSurfaces = new();
 
     /// <summary>The Book's first page: its contents as <c>SUMMARY.md</c> writes them, each
     /// chapter a link, and the first chapter as the way on.</summary>
