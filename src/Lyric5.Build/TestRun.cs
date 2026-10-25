@@ -2,6 +2,7 @@ using System.Text;
 using Lyric.AST;
 using Lyric.Compiler;
 using Lyric.Ir;
+using Lyric5.Doc;
 using Lyric5.Toolchain;
 
 namespace Lyric5.Build;
@@ -22,7 +23,7 @@ public sealed record TestCase(string Module, string Function, bool Throws, strin
 /// program and run. The program is ordinary Lyric: a module the toolchain writes, which hands the
 /// tests to <c>std.test.run</c>; that runs each in a task of its own and answers the exit.
 /// </summary>
-public static class TestRun
+public static partial class TestRun
 {
     /// <summary>The module the toolchain writes the program into, in the package's namespace: the
     /// tests it imports need not be <c>pub</c>, only not <c>private</c>.</summary>
@@ -40,17 +41,89 @@ public static class TestRun
         if (ran != 0) return ran;
         var tests = Discover(project, error);
         if (tests is null) return 1;
-        var chosen = filter is null ? tests : tests.Where(t => t.Name.Contains(filter, StringComparison.Ordinal)).ToList();
-        if (chosen.Count == 0)
+        var (docs, unread) = DocTestsOf(project);
+        bool Chosen(string name) => filter is null || name.Contains(filter, StringComparison.Ordinal);
+        var chosen = tests.Where(t => Chosen(t.Name)).ToList();
+        var chosenDocs = docs.Where(d => Chosen(d.Name)).ToList();
+        var chosenUnread = unread.Where(u => Chosen(u.Name)).ToList();
+        if (chosen.Count == 0 && chosenDocs.Count == 0 && chosenUnread.Count == 0)
         {
             // the JSON form's count says it, with nothing run
             if (Lyric.Core.Rendering.RenderStyle.Current.Events is { } none)
                 none.Raw("{\"type\":\"tests\",\"version\":1,\"passed\":0,\"failed\":0,\"skipped\":0}");
-            else output.WriteLine(tests.Count == 0 ? "no tests" : $"no test's name holds '{filter}'");
+            else output.WriteLine(tests.Count + docs.Count + unread.Count == 0 ? "no tests" : $"no test's name holds '{filter}'");
             return 0;
         }
-        var program = project with { EntryText = Driver(chosen) };
+        // a doc-test is a program of its own, built and run here; its outcome joins the others in
+        // the one run, so it is counted, named and filtered as they are
+        var outcomes = new List<(string, string?)>(chosenUnread.Select(u => (u.Name, (string?)u.Failure)));
+        if (target.IsHost)
+            outcomes.AddRange(chosenDocs.Select(d => (d.Name, RunDocTest(project, d, profile, target, compiler, version))));
+        var program = project with { EntryText = Driver(chosen, outcomes) };
         return BuildAndRun(program, profile, target, compiler, version, output, error);
+    }
+
+    /// <summary>The doc-tests of the package's modules under <c>src/</c>, module by module in the
+    /// order of their paths; and, for a module whose comments hold a snippet the Book's form
+    /// refuses, a test of its own that fails with what is wrong.</summary>
+    internal static (List<DocTest> Docs, List<(string Name, string Failure)> Unread) DocTestsOf(Project project)
+    {
+        var manifest = project.Manifest!;
+        var docs = new List<DocTest>();
+        var unread = new List<(string, string)>();
+        foreach (var file in Files(manifest.SourceRoot))
+        {
+            var relative = Path.GetRelativePath(manifest.Root, file).Replace('\\', '/');
+            var module = Project.ModulePathOf(manifest, file)!;
+            try { docs.AddRange(DocTests.Extract(relative, module, File.ReadAllText(file))); }
+            catch (InvalidDataException e) { unread.Add(($"doc: {module} ({relative})", e.Message)); }
+        }
+        return (docs, unread);
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^error\[(?<code>LYR-[A-Z]+\d+)\]", System.Text.RegularExpressions.RegexOptions.Multiline)]
+    private static partial System.Text.RegularExpressions.Regex ErrorCode();
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"--> \S+?:(?<at>\d+:\d+)")]
+    private static partial System.Text.RegularExpressions.Regex Place();
+
+    /// <summary>A doc-test built — and run, where its snippet runs — beside the package: what is
+    /// wrong with it, or <c>null</c> where it does what its fence says.</summary>
+    public static string? RunDocTest(Project project, DocTest test, BuildProfile profile, Target target, CCompiler compiler,
+        string version)
+    {
+        var program = project with { EntryText = test.Program };
+        var said = new StringWriter();
+        // the build's findings are the doc-test's to read, as plain text — not the run's to report,
+        // nor events of the JSON form
+        var style = Lyric.Core.Rendering.RenderStyle.Current;
+        Lyric.Core.Rendering.RenderStyle.Current = style with { Events = null, Color = false };
+        int exit;
+        string? built;
+        try { (exit, built) = Pipeline.Build(new BuildRequest(program, profile, target, compiler, version), said); }
+        finally { Lyric.Core.Rendering.RenderStyle.Current = style; }
+        var snippet = test.Snippet;
+        if (snippet.Kind == SnippetKind.CompileFail)
+        {
+            var codes = ErrorCode().Matches(said.ToString()).Select(m => m.Groups["code"].Value).Distinct().ToList();
+            if (exit == 0) return $"it builds; it should fail with {snippet.Error}";
+            if (!codes.SequenceEqual([snippet.Error!])) return $"it should fail with {snippet.Error} alone; the build said:\n{said}";
+            if (snippet.Output is { } expected)
+            {
+                // the place as the Book writes it, whatever file the program was built from
+                var text = Place().Replace(said.ToString().Replace("\r\n", "\n"), "--> src/main.lyr:${at}").TrimEnd('\n') + "\n";
+                if (expected != text) return $"the diagnostic block says\n{expected}the build said\n{text}";
+            }
+            return null;
+        }
+        if (exit != 0 || built is null) return $"it does not build:\n{said}";
+        if (snippet.Kind == SnippetKind.NoRun) return null;
+        var ran = ProcessRunner.Run(built, [], TimeSpan.FromMinutes(1), project.Manifest?.Root ?? project.Root);
+        if (ran.ExitCode != 0) return $"it exits with {ran.ExitCode}:\n{ran.Stderr}";
+        var printed = ran.Stdout.Replace("\r\n", "\n");
+        if (snippet.Output is { } output && output != printed)
+            return $"the output block says\n{output}the program printed\n{printed}";
+        return null;
     }
 
     /// <summary>The program built for <paramref name="target"/> and run — on this machine only; for
@@ -170,8 +243,9 @@ public static class TestRun
     /// <summary>The program: each test imported under a name of its own and called from a lambda —
     /// with <c>try</c> where it throws —, the list handed to <c>std.test.run</c>, whose answer is
     /// the exit. A lambda rather than the function itself: an imported function is no value the
-    /// lowering takes yet.</summary>
-    public static string Driver(IReadOnlyList<TestCase> tests)
+    /// lowering takes yet. The doc-tests, already run, follow as tests that hold or throw what was
+    /// wrong.</summary>
+    public static string Driver(IReadOnlyList<TestCase> tests, IReadOnlyList<(string Name, string? Failure)>? docs = null)
     {
         var text = new StringBuilder();
         text.Append("// The test program lyric test writes.\n");
@@ -188,6 +262,12 @@ public static class TestRun
             }
             text.Append($"import {module.Key} {{ {string.Join(", ", imports)} }};\n");
         }
+        if (docs is { Count: > 0 })
+        {
+            text.Append("\n/// What a doc-test the toolchain ran found wrong.\n");
+            text.Append("struct DocTestFailed :: [Error] {\n    text: string,\n\n");
+            text.Append("    fn message(): string {\n        return this.text;\n    }\n}\n");
+        }
         text.Append("\nfn main(): int {\n    return run([\n");
         foreach (var (test, alias) in named)
         {
@@ -196,6 +276,13 @@ public static class TestRun
             if (test.Parallel) skip += ", parallel = true";
             var call = test.Throws ? $"try {alias}()" : $"{alias}()";
             text.Append($"        TestCase {{ name = {Quote(test.Name)}, body = () => {call}{skip} }},\n");
+        }
+        foreach (var (docName, failure) in docs ?? [])
+        {
+            var body = failure is null
+                ? "() => {}"
+                : $"() => {{ throw DocTestFailed {{ text = {Quote(failure.TrimEnd('\n'))} }}; }}";
+            text.Append($"        TestCase {{ name = {Quote(docName)}, body = {body} }},\n");
         }
         text.Append("    ]);\n}\n");
         return text.ToString();
