@@ -6,6 +6,27 @@
 //! UTC, a fixed offset or a zone of the time zone database (TZif, RFC 8536). `DateTime.format`
 //! and `DateTime.parseWith` use the date patterns of UTS #35. `sleep` and the timers live in
 //! `std.task`.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.core { ParseError };
+//! import std.time { Date, Duration, TimeError };
+//!
+//! fn main(): void throws [TimeError, ParseError] {
+//!     let d = try Date.of(2026, 10, 24);
+//!     println(d.plusDays(10));
+//!     println(try Duration.parse("1h30m"));
+//!     println(try Date.parse("2024-02-29"));
+//! }
+//! ```
+//!
+//! ```output
+//! 2026-11-03
+//! 1h30m0s
+//! 2024-02-29
+//! ```
 //
 // The clocks are the runtime's (lyr/time.h), reached through C: `std.task` imports this module,
 // so the way back to its own reading of the monotonic clock would close a cycle. The zone files

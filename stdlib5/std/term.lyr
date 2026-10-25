@@ -7,6 +7,16 @@
 //! on (see [colorsEnabled]). [cursorUp] and the functions after it return the sequences
 //! themselves, to print. Under Windows the runtime switches the console to virtual-terminal
 //! processing once, so the same bytes mean the same there. The module has no raw mode.
+//!
+//! # Examples
+//!
+//! ```lyric,no_run
+//! import std.io { println };
+//! import std.term { Style };
+//!
+//! let warn = Style { fg = .Yellow, bold = true };
+//! println(warn.apply("careful"));
+//! ```
 import std.os { env };
 import std.core { StringBuilder };
 

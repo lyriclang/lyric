@@ -10,6 +10,16 @@
 //!
 //! Every function of this module panics outside a build script, where the toolchain's
 //! environment is not set, and where a directive cannot be written.
+//!
+//! # Examples
+//!
+//! ```lyric,no_run
+//! import std.build;
+//!
+//! build.compileC("native/fast.c");
+//! build.linkLib("m");
+//! build.rerunIfChanged("native/fast.c");
+//! ```
 import std.fs;
 import std.io { IoError };
 import std.os;

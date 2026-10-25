@@ -9,6 +9,28 @@
 //! of integers, a unit variant its name, a variant with a payload a table of one key. A
 //! table keeps the order its keys were written in. Date-times are TOML's own form, in their four
 //! kinds; an `Instant` writes as a quoted RFC 3339 string and reads from a date-time or a string.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.codec { Codable, DecodeError };
+//! import std.toml;
+//!
+//! struct Server :: [Codable] {
+//!     host: string,
+//!     port: int,
+//! }
+//!
+//! fn main(): void throws [toml.TomlError, DecodeError] {
+//!     let s = try toml.decode<Server>("host = \"localhost\"\nport = 8080\n");
+//!     println(f"{s.host}:{s.port}");
+//! }
+//! ```
+//!
+//! ```output
+//! localhost:8080
+//! ```
 import std.codec { Encode, Decode, Codable, Encoder, Decoder, EncodeError, DecodeError };
 import std.collections { List, Map, Set };
 import std.core { ParseError };

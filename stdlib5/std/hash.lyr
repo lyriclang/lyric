@@ -5,6 +5,25 @@
 //! it. [FixedHasher] is the same under a zero key, for what must hash alike in every run;
 //! [Fnv1a64] is fast and keyless, for trusted input. All three implement [Hasher]. The checksums
 //! are [crc32], [crc32c] and [adler32].
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.hash { crc32, FixedHasher };
+//!
+//! println(crc32("hello".toBytes()));
+//! var a = FixedHasher.new();
+//! "hello".hash(&a);
+//! var b = FixedHasher.new();
+//! "hello".hash(&b);
+//! println(a.finish() == b.finish());
+//! ```
+//!
+//! ```output
+//! 907060870
+//! true
+//! ```
 pub import std.core { Hasher };
 import std.core { arrayOf };
 

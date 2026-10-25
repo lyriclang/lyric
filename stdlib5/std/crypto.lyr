@@ -5,6 +5,27 @@
 //! system, and [constantTimeEq], a comparison of bytes whose time does not depend on where they
 //! differ. Everything is written in Lyric; the system's random bytes come through the runtime's
 //! `lyr_random_u64`.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.crypto { Sha256, constantTimeEq };
+//! import std.encoding { Hex };
+//!
+//! let h = Sha256.new();
+//! h.update("abc".toBytes());
+//! let digest = h.finish();
+//! println(Hex.encode(digest));
+//! let again = Sha256.new();
+//! again.update("abc".toBytes());
+//! println(constantTimeEq(digest, again.finish()));
+//! ```
+//!
+//! ```output
+//! ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+//! true
+//! ```
 
 extern "C" fn lyr_random_u64(): uint64;
 

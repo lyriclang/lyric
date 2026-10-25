@@ -9,6 +9,23 @@
 //!
 //! The protocol itself (`Iterator`, `Iterable`, `DoubleEnded`, `Step`, `FromIterator`), the ranges
 //! and the iterators of std.core's own types live in std.core.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//!
+//! let squares = (1..=10).filter((n) => n % 2 == 0).map((n) => n * n).toArray();
+//! println(squares.length());
+//! println((1..=4).fold(0, (sum, n) => sum + n));
+//! println(["a", "b", "c"].iter().join("-"));
+//! ```
+//!
+//! ```output
+//! 5
+//! 10
+//! a-b-c
+//! ```
 import std.core { DoubleEnded, Join, StringBuilder };
 
 /// Yields the values of an iterator, each passed through `f`; made by `it.map(f)`.

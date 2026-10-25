@@ -6,6 +6,27 @@
 //! (§5.2), and [Uri.normalize] normalizes the case, the percent-encoding and the dot segments
 //! (§6.2). [percentEncode] and [percentDecode] encode a text for a [Component] and decode it
 //! again; [Query] holds the pairs of a query in their order.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.core { ParseError };
+//! import std.uri { Uri, Query };
+//!
+//! fn main(): void throws ParseError {
+//!     let base = try Uri.parse("https://example.com/docs/guide/");
+//!     let page = base.resolve(try Uri.parse("../api/index.html?lang=en"));
+//!     println(page.show());
+//!     let q = try Query.parse("a=1&b=two&a=3");
+//!     println(q.all("a").length());
+//! }
+//! ```
+//!
+//! ```output
+//! https://example.com/docs/api/index.html?lang=en
+//! 2
+//! ```
 import std.collections { List };
 import std.core { Parse, ParseError, StringBuilder, viewBytes, Utf8Error };
 import std.net { IpAddr };

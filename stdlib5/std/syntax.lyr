@@ -9,6 +9,21 @@
 //! over fields and variants among them - is refused where it is read (`LYR-CT0005`).
 //!
 //! A node built here, not read, has a `Span` of nothing: file `""`, line and column `0`.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.syntax { parseExpr };
+//!
+//! fn main(): void {
+//!     println(comptime parseExpr("1+2 *  3").toSource());
+//! }
+//! ```
+//!
+//! ```output
+//! 1 + 2 * 3
+//! ```
 
 import std.collections { List };
 

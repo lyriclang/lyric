@@ -5,6 +5,20 @@
 //! checked here when it runs, and a mistake panics: a template that leaves a brace open or closes
 //! one it did not open, a value it names that is not given, a spec that is no format or does not
 //! apply to its value.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.fmt;
+//!
+//! let template = "{} has {1:>4} items";
+//! println(fmt.format(template, "cart", 12));
+//! ```
+//!
+//! ```output
+//! cart has   12 items
+//! ```
 import std.core { Format, fstringDebugged, fstringFormatted, fstringPadded, StringBuilder };
 
 /// Returns the template's text with each hole replaced by its value.

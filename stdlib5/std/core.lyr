@@ -5,6 +5,25 @@
 //! [Display], [Debug], [Clone]), the number tower ([Num], [Integer], [Float]) with [Parse], the
 //! members of `string`, `char` and the arrays and views, the format language behind f-strings,
 //! and the iterator protocol ([Iterator], [Iterable]).
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//!
+//! let n = (try? int.parse("42")) ?? 0;
+//! println(n + 1);
+//! let name: ?string = null;
+//! println(name ?? "nobody");
+//! let first = [3, 1, 2].iter().min() ?? 0;
+//! println(first);
+//! ```
+//!
+//! ```output
+//! 43
+//! nobody
+//! 1
+//! ```
 
 /// Ends the process with a message and a backtrace.
 ///

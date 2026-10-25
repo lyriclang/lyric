@@ -3,6 +3,23 @@
 //! f-strings and `+` on strings lower to [concat] and the `from…` conversions. The module also
 //! re-exports [StringBuilder] for building text piece by piece, and names the Unicode version
 //! behind `char` in [unicodeVersion].
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.string { StringBuilder };
+//!
+//! let sb = StringBuilder.new();
+//! for (i in 1..=3) {
+//!     sb.append(f"{i},");
+//! }
+//! println(sb.toString());
+//! ```
+//!
+//! ```output
+//! 1,2,3,
+//! ```
 
 pub import std.core { StringBuilder };
 

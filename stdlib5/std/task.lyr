@@ -9,6 +9,33 @@
 //! The threads and their pool are std.thread's, the locks std.sync's and the signals std.os's;
 //! they stand on parts kept here, internal to std: the locks' state, the scheduler, `launchOn`,
 //! the registry of the living schedulers and the natives.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.task { spawn, Channel };
+//!
+//! fn main(): void throws Error {
+//!     let ch = Channel<int>.new();
+//!     let producer = spawn(() => {
+//!         for (i in 1..=3) {
+//!             try ch.send(i * 10);
+//!         }
+//!         ch.close();
+//!     });
+//!     var total = 0;
+//!     while (let v = try ch.recv()) {
+//!         total += v;
+//!     }
+//!     try producer.await();
+//!     println(total);
+//! }
+//! ```
+//!
+//! ```output
+//! 60
+//! ```
 
 import std.core { filled };
 import std.time { Duration };

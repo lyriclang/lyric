@@ -12,6 +12,19 @@
 //! read or leave), answers `Expect: 100-continue`, writes the handler's `Response` with its
 //! length or in chunks, keeps the connection for the next request, and ends with `shutdown()`.
 //! The module has no TLS of its own, no HTTP/2 and no cookies.
+//!
+//! # Examples
+//!
+//! ```lyric,no_run
+//! import std.io { println };
+//! import std.http;
+//!
+//! fn main(): void throws Error {
+//!     let response = try http.get("http://example.com/");
+//!     println(response.status);
+//!     println(try response.text());
+//! }
+//! ```
 import std.collections { List, Map };
 import std.core { StringBuilder, viewBytes, Closeable, ParseError };
 import std.io { Reader, Writer, IoError, ByteBuffer };

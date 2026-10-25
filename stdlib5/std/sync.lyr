@@ -4,6 +4,27 @@
 //! The lock state lives in `std.task`, whose scheduler releases the locks of a task that
 //! panicked. A task that waits for a lock or a permit is parked while the other tasks of its
 //! thread run.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.io { println };
+//! import std.sync { Atomic };
+//! import std.task { spawn };
+//!
+//! fn main(): void throws Error {
+//!     let hits = Atomic<int>.new(0);
+//!     let tasks = [spawn(() => { hits.fetchAndAdd(1); }), spawn(() => { hits.fetchAndAdd(2); })];
+//!     for (t in tasks) {
+//!         try t.await();
+//!     }
+//!     println(hits.load());
+//! }
+//! ```
+//!
+//! ```output
+//! 3
+//! ```
 import std.task {
     atomicLoad,
     atomicStore,
