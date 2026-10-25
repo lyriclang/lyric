@@ -360,6 +360,13 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <td>—</td>
 </tr>
 <tr>
+<td><code>api</code></td>
+<td>—</td>
+<td><code>-C &lt;dir&gt;</code>, <code>--json</code>, <code>--diff &lt;rev&gt;</code>, <code>--std</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>env</code></td>
 <td>—</td>
 <td><code>-C &lt;dir&gt;</code>, <code>--profile &lt;name&gt;</code>, <code>--target &lt;triple&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--offline</code>, <code>--json</code></td>
@@ -516,6 +523,45 @@ declaration lists and those blocks of the package add.</li>
 <code>#type.Alias</code> on a module's. A second member of one name and kind takes <code>-2</code>, and so on.</li>
 <li><strong><code>--std</code></strong> writes the standard library's reference instead of a package's.</li>
 </ol>
+<h2 id="10-api">10. <code>api</code></h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 E7</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 B3</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>ApiCommandTests</code>).</p>
+<ol>
+<li><strong><code>lyric api</code></strong> prints the <strong>public surface</strong> of the package found from here (<code>-C</code> names another
+directory): what <code>lyric doc</code> documents (§9) — each <code>pub</code> item of its modules, each member of a
+type, each conformance a type's declaration lists or a block of the package adds — <strong>one line per
+element</strong>. A package that does not check prints nothing: its findings are said and the command
+ends with exit 1. <strong><code>--std</code></strong> prints the standard library's surface instead.</li>
+<li>A line is the element's <strong>signature with its qualified path for its name</strong>
+(<code>pub fn geo.distance(a: Point, b: Point): float</code>, <code>pub geo.Point.y: float = 0.0</code>,
+<code>variant geo.Dir.Up</code>); a conformance is a line of its own (<code>geo.Point :: Equatable</code>), and a
+type's line carries no <code>::</code> list. An interface's method that has a body ends with <code>{ … }</code>.</li>
+<li>The lines are written in <strong>one spelling</strong>: comments, line breaks, spaces and a trailing comma do
+not change a line; a parameter's name does, since a call may name its argument. The lines are
+sorted by path, a type's own line before its conformances: the same declarations print the same
+text, byte for byte.</li>
+<li><strong><code>--json</code></strong> prints the same elements as one document:
+<code>{&quot;package&quot;, &quot;version&quot;, &quot;elements&quot;: [{&quot;module&quot;, &quot;path&quot;, &quot;kind&quot;, &quot;signature&quot;, &quot;line&quot;, &quot;owner&quot;?, &quot;default&quot;?}]}</code>,
+in the text's order; <code>kind</code> is one of <code>fn</code>, <code>struct</code>, <code>class</code>, <code>enum</code>, <code>interface</code>, <code>type</code>,
+<code>const</code>, <code>field</code>, <code>method</code>, <code>variant</code>, <code>assoc</code>, <code>conformance</code>; <code>owner</code> is the kind of a member's
+type, <code>default</code> is present and true where a field or an associated type has a value or an
+interface's method has a body.</li>
+<li><strong><code>--diff &lt;rev&gt;</code></strong> compares the surface with the package's as the <strong>git revision</strong> <code>&lt;rev&gt;</code> of its
+repository holds it — read from the repository, not from the working tree. Each element is
+<strong>removed</strong>, <strong>added</strong> or <strong>changed</strong> (the same kind and path with another line). Removed and
+changed are <strong>breaking</strong>; added is breaking only where the language makes code written before
+write it out: a field without a value in a struct or class (an initializer names it), a variant of
+an enum (a <code>match</code> over every case misses it), an interface's method without a body or
+associated type without a value (each conformer must give it). An interface's method that only
+gains a body is compatible; one that loses it is breaking.</li>
+<li>The diff lists the breaking changes first, each with the old line (<code>-</code>) and the new (<code>+</code>), then
+the compatible ones, and ends with the count. The command ends with <strong>exit 1</strong> where a change is
+breaking and 0 where none is; <strong><code>--json</code></strong> prints
+<code>{&quot;breaking&quot;: n, &quot;changes&quot;: [{&quot;change&quot;, &quot;breaking&quot;, &quot;path&quot;, &quot;kind&quot;, &quot;old&quot;?, &quot;new&quot;?, &quot;why&quot;}]}</code>.</li>
+<li>A directory in no git repository, a revision git cannot read, or one without the package's
+<code>lyric.toml</code> is <strong>LYR-CLI0022</strong>, exit 2. <code>--diff</code> with <code>--std</code> is refused with exit 2.</li>
+</ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -533,6 +579,7 @@ declaration lists and those blocks of the package add.</li>
 <li class="level-2"><a href="#7-new-init-and-completions">7. new, init and completions</a></li>
 <li class="level-2"><a href="#8-fmt">8. fmt</a></li>
 <li class="level-2"><a href="#9-doc">9. doc</a></li>
+<li class="level-2"><a href="#10-api">10. api</a></li>
 </ul>
 </aside>
 </div>

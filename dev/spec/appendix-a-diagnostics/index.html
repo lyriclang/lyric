@@ -2669,6 +2669,13 @@ code is no longer reported, and its number is not given again.</p>
 <td>no package can be made here</td>
 <td><code>lyric new</code> names a directory that exists already, <code>lyric init</code> runs where a <code>lyric.toml</code> is, or the <code>git init</code> the command asked for failed. The exit code is 2.</td>
 </tr>
+<tr>
+<td>LYR-CLI0022</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>the revision <code>lyric api --diff</code> names cannot be read</td>
+<td><code>lyric api --diff &lt;rev&gt;</code> runs in no git repository, names a revision git does not know, or the revision holds no <code>lyric.toml</code> where the package is. The exit code is 2.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a11-ir--the-lowering">A.11 IR — The lowering</h2>
