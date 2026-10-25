@@ -1,0 +1,99 @@
+{
+  "package": "geo",
+  "version": "0.1.0",
+  "elements": [
+    {
+      "module": "geo",
+      "path": "geo.Dir",
+      "kind": "enum",
+      "signature": "pub enum Dir",
+      "line": "pub enum geo.Dir"
+    },
+    {
+      "module": "geo",
+      "path": "geo.Dir.Down",
+      "kind": "variant",
+      "signature": "Down",
+      "line": "variant geo.Dir.Down",
+      "owner": "enum"
+    },
+    {
+      "module": "geo",
+      "path": "geo.Dir.Up",
+      "kind": "variant",
+      "signature": "Up",
+      "line": "variant geo.Dir.Up",
+      "owner": "enum"
+    },
+    {
+      "module": "geo",
+      "path": "geo.Point",
+      "kind": "struct",
+      "signature": "pub struct Point",
+      "line": "pub struct geo.Point"
+    },
+    {
+      "module": "geo",
+      "path": "geo.Point",
+      "kind": "conformance",
+      "signature": "Equatable",
+      "line": "geo.Point :: Equatable"
+    },
+    {
+      "module": "geo",
+      "path": "geo.Point.x",
+      "kind": "field",
+      "signature": "pub x: float",
+      "line": "pub geo.Point.x: float",
+      "owner": "struct"
+    },
+    {
+      "module": "geo",
+      "path": "geo.Point.y",
+      "kind": "field",
+      "signature": "pub y: float = 0.0",
+      "line": "pub geo.Point.y: float = 0.0",
+      "owner": "struct",
+      "default": true
+    },
+    {
+      "module": "geo",
+      "path": "geo.Shape",
+      "kind": "interface",
+      "signature": "pub interface Shape",
+      "line": "pub interface geo.Shape"
+    },
+    {
+      "module": "geo",
+      "path": "geo.Shape.area",
+      "kind": "method",
+      "signature": "fn area(): float",
+      "line": "fn geo.Shape.area(): float",
+      "owner": "interface"
+    },
+    {
+      "module": "geo",
+      "path": "geo.Shape.name",
+      "kind": "method",
+      "signature": "fn name(): string",
+      "line": "fn geo.Shape.name(): string { \u2026 }",
+      "owner": "interface",
+      "default": true
+    },
+    {
+      "module": "geo",
+      "path": "geo.distance",
+      "kind": "fn",
+      "signature": "pub fn distance(a: Point, b: Point): float",
+      "line": "pub fn geo.distance(a: Point, b: Point): float"
+    },
+    {
+      "module": "geo",
+      "path": "geo.origin",
+      "kind": "const",
+      "signature": "pub let origin: float = 0.0",
+      "line": "pub let geo.origin: float = 0.0",
+      "default": true
+    }
+  ]
+}

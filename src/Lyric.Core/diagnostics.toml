@@ -387,6 +387,21 @@ error[LYR-CLI0021]: '/home/ada/app' exists already
   = help: lyric5 init makes a package in a directory that is there
 '''
 
+[LYR-CLI0022]
+title = "the revision `lyric api --diff` names cannot be read"
+severity = "error"
+area = "14-cli"
+summary = "`lyric api --diff <rev>` runs in no git repository, names a revision git does not know, or the revision holds no `lyric.toml` where the package is. The exit code is 2."
+explanation = '''
+`--diff <rev>` reads the package as the revision `<rev>` of its git repository holds it — never the working tree — and compares that surface with the one here. The revision is anything git takes: a commit, a branch, a tag such as `v1.2.0`.
+
+Run it inside the package's repository, name a revision that exists (`git log --oneline`), and one at which the package was already there.
+'''
+example = '''
+$ lyric5 api --diff v9.9.9
+error[LYR-CLI0022]: git cannot read 'v9.9.9': fatal: not a valid object name v9.9.9
+'''
+
 [LYR-CT0001]
 title = "a panic while evaluating at compile time"
 severity = "error"

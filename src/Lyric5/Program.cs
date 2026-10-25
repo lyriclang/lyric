@@ -53,6 +53,7 @@ public static partial class Program
             "fix" => Fix(rest, lints),
             "fmt" => Fmt(rest),
             "doc" => Doc(rest),
+            "api" => Api(rest),
             "env" => Env(rest),
             "new" => New(rest, here: false),
             "init" => New(rest, here: true),
