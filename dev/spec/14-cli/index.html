@@ -607,6 +607,11 @@ word for word — the one <code>lyric fix</code> applies preferred, the others o
 own.</li>
 <li>The document's form is <code>lyric fmt</code>'s (<a href="#8-fmt">§8</a>), sent as the lines it changes. The command
 <code>lyric.expand</code> answers the open module with its macros expanded, as <code>lyric expand</code> prints it.</li>
+<li>Each <code>@Test</code> function of a package's file and each runnable block of its documentation carries
+two commands for the editor to run, <em>run</em> and <em>debug</em>, with the package's directory and the
+name <code>lyric test</code> gives it — <code>app.tests.check.adds</code>, <code>doc: app.add (src/lib.lyr:3)</code>; the request
+<code>lyric/tests</code> lists them for a document. The server runs no test: the editor runs
+<code>lyric test -f &lt;name&gt;</code> (<a href="#3-test">§3</a>).</li>
 </ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
