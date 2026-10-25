@@ -203,8 +203,8 @@ person's to edit: <code>add</code> and <code>remove</code> refuse it (<code>LYR-
 <h2 id="3-test">3. <code>test</code></h2>
 <p>The package's tests (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 B12</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V4</a>) — the package of the nearest <code>lyric.toml</code>,
 as in §2.</p>
-<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>TestCommandTests</code>; the
-standard library's own tests through it, <code>StdTests</code>).</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>TestCommandTests</code>, <code>DocTestTests</code>;
+the standard library's own tests through it, <code>StdTests</code>).</p>
 <ol>
 <li><strong><code>lyric test</code></strong> builds every function the package marks <code>@Test</code>
 (<a href="../../spec/11-metaprogramming/">11 §1</a>) — in its modules under <code>src/</code> and under <code>tests/</code>
@@ -234,6 +234,19 @@ the first difference of two values too long to compare by eye — stand under it
 function's, <code>app.tests.math.adds</code> — holds the text.</li>
 <li>The exit is 0 when every test held — or when there is none to run —, and 1 when one failed or
 the program was refused (§1.3).</li>
+<li><strong>Doc-tests</strong>: each <code>```lyric</code> block in a documentation comment — <code>///</code> or <code>//!</code> — of the
+package's modules under <code>src/</code> is a test of its own, after the marked ones, module by module in
+the order of their paths. It is named <code>doc: &lt;module&gt;.&lt;element&gt; (&lt;file&gt;:&lt;line&gt;)</code> — the element
+the comment documents, a member as <code>Type.member</code>, the module alone for <code>//!</code> — and <code>-f</code> and the
+count take it as the others. Its fence says what it must do, as the Book's snippets
+(<a href="https://lyric.oil1i.de/dev/book/">Book</a>) do: <code>lyric</code> builds and runs, and prints what an
+<code>```output</code> block right below it says; <code>lyric,no_run</code> builds; <code>lyric,compile_fail=CODE</code> fails
+to build with that code and no other, and says what a <code>```diagnostic</code> block right below it
+says. A block without <code>fn main</code> is made a program as the Book's are — its statements the body
+of <code>main</code>, or its declarations beside an empty one —, and imports the element it documents, its
+type for a member, where that is <code>pub</code> and the block imports nothing of the module itself. A
+comment whose block the form refuses fails a test named after its module. Built for another
+machine, no doc-test is built.</li>
 </ol>
 <h2 id="4-bench">4. <code>bench</code></h2>
 <p>The package's benchmarks (<a href="../../spec/12-stdlib/">12 §Benchmarks</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 X4</a>) — the package of the nearest

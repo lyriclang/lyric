@@ -83,6 +83,14 @@ across threads.</p>
 <section class="member" id="method.get">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> get(i: <span class="ty">int</span>): ?<span class="ty">T</span></code></pre>
 <p>Returns the element at <code>i</code>, or <code>null</code> outside <code>0 ≤ i &lt; length()</code>.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> xs = <span class="ty">List</span>.of([<span class="num">10</span>, <span class="num">20</span>]);
+println(xs.get(<span class="num">1</span>) ?? -<span class="num">1</span>);
+println(xs.get(<span class="num">2</span>) ?? -<span class="num">1</span>);</code></pre>
+<pre class="output"><code>20
+-1</code></pre>
 </section>
 <section class="member" id="method.asSlice">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asSlice(): <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
@@ -98,6 +106,24 @@ past the room moves the list to a new buffer; a view taken before stays on the o
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> push(v: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
 <p>Appends <code>v</code> at the end.</p>
 <p>Amortized constant time: a full buffer is replaced by one twice its size.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> xs = <span class="ty">List</span>.of([<span class="num">1</span>, <span class="num">2</span>]);
+xs.push(<span class="num">3</span>);
+println(xs.length());</code></pre>
+<pre class="output"><code>3</code></pre>
+<p>The element has the list's type:</p>
+<p class="snippet-note fails">Does not compile — the compiler reports <code>LYR-SEM0001</code></p>
+<pre class="fails"><code class="language-lyric"><span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> xs = <span class="ty">List</span>.of([<span class="num">1</span>, <span class="num">2</span>]);
+    xs.push(<span class="str">"three"</span>);
+}</code></pre>
+<pre class="diagnostic"><code>error[LYR-SEM0001]: cannot assign 'string' to 'int'
+ --&gt; src/main.lyr:3:13
+  |
+3 |     xs.push("three");
+  |             ^^^^^^^</code></pre>
 </section>
 <section class="member" id="method.pushAll">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> pushAll(xs: <span class="ty">T</span>[]): <span class="ty">void</span></code></pre>
