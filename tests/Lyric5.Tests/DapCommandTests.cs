@@ -72,23 +72,34 @@ public class DapCommandTests
             }
         }
 
-        /// <summary>What arrived and was passed over, the newest last: said where a wait fails.</summary>
-        private readonly List<string> _passed = [];
+        /// <summary>What arrived and no wait has taken yet, oldest first. lldb-dap's versions
+        /// order a launch's answer differently — 21 before the 'initialized' event, 23 after the
+        /// 'configurationDone' —, so a wait looks here before it reads on.</summary>
+        private readonly List<JsonObject> _passed = [];
 
         public JsonObject Until(Func<JsonObject, bool> wanted, string what)
         {
+            var earlier = _passed.FindIndex(m => wanted(m));
+            if (earlier >= 0)
+            {
+                var found = _passed[earlier];
+                _passed.RemoveAt(earlier);
+                return found;
+            }
             var deadline = DateTime.UtcNow + Timeout;
             while (true)
             {
                 JsonObject? message;
                 try { message = _inbox.Take(deadline - DateTime.UtcNow); }
-                catch (TimeoutException) { throw new TimeoutException($"no {what}; passed over:\n{string.Join('\n', _passed.TakeLast(30))}{LldbLog()}"); }
-                if (message is null) throw new InvalidOperationException($"the adapter ended before {what}; passed over:\n{string.Join('\n', _passed.TakeLast(30))}{LldbLog()}");
+                catch (TimeoutException) { throw new TimeoutException($"no {what}; passed over:\n{Passed()}{LldbLog()}"); }
+                if (message is null) throw new InvalidOperationException($"the adapter ended before {what}; passed over:\n{Passed()}{LldbLog()}");
                 if (wanted(message)) return message;
-                var shown = message.ToJsonString();
-                _passed.Add(shown.Length > 300 ? shown[..300] : shown);
+                _passed.Add(message);
             }
         }
+
+        private string Passed() =>
+            string.Join('\n', _passed.TakeLast(30).Select(m => m.ToJsonString()).Select(s => s.Length > 300 ? s[..300] : s));
 
         private string LldbLog()
         {
