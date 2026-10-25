@@ -271,6 +271,15 @@ promise. This entry fills with the milestones.
   the one form, with no options to change it; comments and the parentheses a program writes stay, and
   a file that does not parse is left as it is. `--check` writes nothing and fails where a file would
   change; `--diff` shows how. The standard library is in the form.
+- **Formatting, documentation and the API (M13a** — `design/v5/spec/11` E5, E7, 07 B3; spec chapter 14 §3, §8–§10**):**
+  `lyric fmt` writes the one form there is — comments and written parentheses kept, a file that does not parse left
+  as it is; `--check` names a file that would change. `lyric doc` writes a package's reference: a page per module and
+  type from its `pub` declarations and their comments — a module's documentation is the `//!` lines that open its
+  file —, each member under an anchor that names its kind, `[Type.member]` links resolved as the `broken-doc-link`
+  lint resolves them. A ```` ```lyric ```` block in a doc comment is a test of `lyric test`, with the Book's kinds.
+  `lyric api` prints the public surface a line per element, `--json` as data, and `--diff <rev>` says what changed
+  since a git revision and whether it breaks code written against it (exit 1). The standard library's reference is
+  at <https://lyric.oil1i.de/dev/std/>, an example in every module.
 
 ---
 
