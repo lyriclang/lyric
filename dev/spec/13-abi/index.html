@@ -412,6 +412,17 @@ no variant stands for is a panic (<code>LYR-RT0021</code>), before any <code>mat
 <li><code>@Layout</code> takes <code>C</code> or an integer type, written as a name: <code>@Layout(C)</code>, <code>@Layout(uint8)</code>. It
 sits on a struct or an enum that is not generic; on a class, on a generic type, on a struct
 with an integer type, or in another form it is refused (<code>LYR-SEM0099</code>).</li>
+<li><strong>C's variadic arguments</strong>: a bare <code>...</code> after the last parameter of a C function,
+<code>extern &quot;C&quot; fn printf(format: CStr, ...): int32;</code>, takes any number of arguments beyond the
+parameters. A parameter stands before it (<code>LYR-SEM0099</code>), and only a C function has it
+(<code>LYR-PAR0026</code>) — a Lyric function's variadic parameter, <code>xs: T...</code>
+(<a href="../../spec/03-types/">03</a>), is another thing and unchanged. Each argument beyond the parameters is
+of a type that crosses as a parameter does (<code>LYR-SEM0099</code>), a <code>string</code> as its bytes as into a
+<code>CStr</code> (rule 3); a spread <code>xs...</code> does not hand an array over them. They cross as C's default
+argument promotions make them: a <code>float32</code> as <code>double</code>, an integer narrower than C's <code>int</code> — a
+<code>bool</code> and an enum of such an integer among them — as <code>int</code>; every other as itself. <em>(Informative:
+what the callee reads is its format's to say; an <code>int</code> is C's <code>int64_t</code>, which <code>%lld</code> reads,
+not <code>%d</code>.)</em></li>
 </ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">

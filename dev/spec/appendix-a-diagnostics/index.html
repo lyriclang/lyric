@@ -356,7 +356,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/02-grammar/">02-grammar</a></td>
 <td>a name is missing</td>
-<td>Where a declaration, a parameter, a field, a variant, a type parameter, an attribute, an import item or a path segment is named, no name stands — or a reserved word, which is then read as the name; an import list <code>{ }</code> names nothing.</td>
+<td>Where a declaration, a parameter, a field, a variant, a type parameter, an attribute, an import item or a path segment is named, no name stands — or a reserved word, which is then read as the name; an import list <code>{ }</code> names nothing; a bare <code>...</code> closes the parameters of a function that is no <code>extern &quot;C&quot;</code> one.</td>
 </tr>
 <tr>
 <td>LYR-PAR0028</td>
@@ -1373,7 +1373,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/13-abi/">13-abi</a></td>
 <td>an extern declaration that cannot cross into C</td>
-<td>An <code>extern</code> function names an ABI other than &quot;C&quot;, a symbol that is no C name, type parameters, <code>throws</code>, a place parameter, or a parameter or return type that does not cross into C; or <code>@Layout</code> stands where C cannot lay the type out, or in another form than <code>@Layout(C)</code> or an integer type.</td>
+<td>An <code>extern</code> function names an ABI other than &quot;C&quot;, a symbol that is no C name, type parameters, <code>throws</code>, a place parameter, or a parameter or return type that does not cross into C; a bare <code>...</code> with no parameter before it, or a variadic argument of a type that does not cross; or <code>@Layout</code> stands where C cannot lay the type out, or in another form than <code>@Layout(C)</code> or an integer type.</td>
 </tr>
 <tr>
 <td>LYR-SEM0100</td>

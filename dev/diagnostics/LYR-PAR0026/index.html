@@ -85,7 +85,7 @@
 <h1>LYR-PAR0026</h1>
 <p class="code-title">a name is missing</p>
 <p class="meta">error · <a href="../../spec/02-grammar/">spec 02-grammar</a></p>
-<p>Where a declaration, a parameter, a field, a variant, a type parameter, an attribute, an import item or a path segment is named, no name stands — or a reserved word, which is then read as the name; an import list <code>{ }</code> names nothing.</p>
+<p>Where a declaration, a parameter, a field, a variant, a type parameter, an attribute, an import item or a path segment is named, no name stands — or a reserved word, which is then read as the name; an import list <code>{ }</code> names nothing; a bare <code>...</code> closes the parameters of a function that is no <code>extern &quot;C&quot;</code> one.</p>
 <h2 id="explanation">Explanation</h2>
 <p>A declaration and each of its parts is named with an identifier. A reserved word such as <code>match</code> or <code>in</code> cannot be a name; the error carries a note when that is the reason. An import's braces name at least one item; for the whole module, leave them off.</p>
 <p>Write the name, or choose one that is not a keyword.</p>
