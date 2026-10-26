@@ -10974,6 +10974,14 @@ public sealed class TypeChecker
             && ex.def.Members.LookupLocal(si.Path[0]) is EnumVariantSymbol cev)
             return CheckVariantInit(si, cev, ex.def, ex.instance, scope);
 
+        // A name from a module that could not be found — 'Rect { … }' or 'missing.Rect { … }' — was
+        // reported at its import (LYR-RES0003); the initializer is the error type, its fields checked.
+        if (sym is ExternalSymbol || scope.Lookup(si.Path[0]) is ExternalSymbol)
+        {
+            foreach (var f in si.Fields) CheckExpr(f.Value, scope);
+            return LyrType.Error;
+        }
+
         if (sym is not TypeSymbol ts)
         {
             if (sym is null)
