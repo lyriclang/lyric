@@ -86,6 +86,13 @@ public sealed class TypeResult
     public bool IsCStrArgument(Expr argument) => _cstrArguments.Contains(argument);
     internal void MarkCStrArgument(Expr argument) => _cstrArguments.Add(argument);
 
+    private readonly HashSet<Expr> _cCallbacks = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>A function — named, or a lambda that captures nothing — where a C function's
+    /// pointer is expected: C calls it through a trampoline.</summary>
+    public bool IsCCallback(Expr source) => _cCallbacks.Contains(source);
+    internal void MarkCCallback(Expr source) => _cCallbacks.Add(source);
+
     /// <summary>The parameter whose argument's text <paramref name="parameter"/> takes, or
     /// <c>null</c> where no <c>@callerExpr</c> sits on it.</summary>
     public string? CallerExprOf(Param parameter) => _callerExpr.GetValueOrDefault(parameter);

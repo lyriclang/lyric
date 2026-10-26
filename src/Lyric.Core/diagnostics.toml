@@ -4072,6 +4072,21 @@ $ ./out/debug/x86_64-linux-gnu/app
 panic [LYR-RT0021]: C returned 7, which is no variant of app.main.Color (it has 3)
 '''
 
+[LYR-RT0022]
+title = "a Lyric function called from a thread Lyric does not run"
+severity = "panic"
+area = "13-abi"
+summary = "C called a Lyric function through its pointer on a thread the runtime does not know: one C started itself, which no collector attached. There is no Lyric to run it on, and the process ends."
+explanation = '''
+A Lyric function C calls runs on the thread that calls it, with that thread's stack, its collector and its tasks. A thread C started itself has none of them: the runtime never saw it. The callback ends the process with this report rather than run without them.
+
+Call the callback from the thread that handed it to C — the one Lyric runs on.
+'''
+example = '''
+$ ./out/debug/x86_64-linux-gnu/app
+panic [LYR-RT0022]: C called a Lyric function on a thread Lyric does not run
+'''
+
 [LYR-SEM0001]
 title = "a value of another type than the place takes"
 severity = "error"
@@ -6640,7 +6655,7 @@ fn main(): void {
 title = "an extern declaration that cannot cross into C"
 severity = "error"
 area = "13-abi"
-summary = "An `extern` function names an ABI other than \"C\", a symbol that is no C name, type parameters, `throws`, a place parameter, or a parameter or return type that does not cross into C; a bare `...` with no parameter before it, or a variadic argument of a type that does not cross; or `@Layout` stands where C cannot lay the type out, or in another form than `@Layout(C)` or an integer type."
+summary = "An `extern` function names an ABI other than \"C\", a symbol that is no C name, type parameters, `throws`, a place parameter, or a parameter or return type that does not cross into C; a bare `...` with no parameter before it, or a variadic argument of a type that does not cross; a C function type, `extern \"C\" fn(…)`, whose parameters or result do not cross, that throws, or that names another ABI; or `@Layout` stands where C cannot lay the type out, or in another form than `@Layout(C)` or an integer type."
 explanation = '''
 Lyric 5's one foreign boundary is C. Integers, floats, `bool` and `char` cross it (and `void` as a return); `std.ffi`'s `Ptr<T>` and `CStr` cross as C's pointers, `?Ptr<T>` and `?CStr` as pointers that may be null; a struct with `@Layout(C)` crosses as C's struct, by value, and an enum with `@Layout` as its integer. A `string` argument crosses into a `CStr` parameter as its bytes. Classes, arrays, other optionals, places, generics and thrown errors do not, so a declaration nobody could bind is refused where it stands, whether or not it is called.
 

@@ -335,6 +335,17 @@ public sealed record PlaceAt(TempId Dest, TempId Address, IrType Type, Span Span
 /// <c>sizeof</c> says of it, and the step between two of them.</summary>
 public sealed record SizeOf(TempId Dest, IrType Type, Span Span) : IrOp(Span);
 
+/// <summary>A Lyric function as a C function's pointer, a <c>uint</c>: the address of a trampoline
+/// that takes C's values in their <paramref name="Params"/> forms, calls <paramref name="Function"/>
+/// and returns its result in the <paramref name="Return"/> form.</summary>
+public sealed record CCallback(TempId Dest, FunctionId Function, IrCForm[] Params, IrCForm Return, Span Span) : IrOp(Span);
+
+/// <summary>A call through a C function's pointer, <paramref name="Callee"/> a <c>uint</c>: each
+/// argument of <paramref name="ParamTypes"/> in its form, the result back from its own — as a call
+/// of an <c>extern "C"</c> function is.</summary>
+public sealed record CallCPointer(TempId? Dest, TempId Callee, TempId[] Args, IrType[] ParamTypes, IrType ReturnType,
+    IrCForm[] Params, IrCForm Return, Span Span) : IrOp(Span);
+
 /// <summary><c>std.ffi</c>'s address of the first element of an array or a slice, a
 /// <c>uint</c>.</summary>
 public sealed record DataAddress(TempId Dest, TempId Value, IrType Element, Span Span) : IrOp(Span);

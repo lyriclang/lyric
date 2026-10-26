@@ -2662,6 +2662,7 @@ internal sealed class FunctionLowerer
     private TempId? LowerExprOrVoid(Expr expr) =>
         _chainReceivers.TryGetValue(expr, out var alreadyUnwrapped) ? alreadyUnwrapped
         : _types.RewriteOf(expr) is { } rewritten ? LowerExprOrVoid(rewritten) // what the checker set in its place
+        : _types.IsCCallback(expr) ? LowerCCallback(expr) // a function where C's pointer to one is expected
         : expr switch
     {
         IntLiteralExpr e => LowerIntLiteral(e),
@@ -7456,6 +7457,7 @@ internal sealed class FunctionLowerer
 
     private TempId? LowerIndirectCall(CallExpr expr)
     {
+        if (_types.TypeOf(expr.Callee) is FnType { IsC: true } cFunction) return LowerCPointerCall(expr, cFunction);
         if (LowerType(_types.TypeOf(expr.Callee), expr.Callee.Span) is not IrFunctionType signature)
             throw Bug("indirect call on a non-function value");
 
@@ -8630,6 +8632,46 @@ internal sealed class FunctionLowerer
         }
     }
 
+    /// <summary>
+    /// A function where a C function's pointer is expected: a named one, or a lambda that captures
+    /// nothing, lifted as any lambda is. The value is the address of the trampoline the emitter
+    /// writes for it, which takes C's values and hands them on as Lyric's.
+    /// </summary>
+    private TempId LowerCCallback(Expr source)
+    {
+        if (LowerType(_types.TypeOf(source), source.Span) is not IrFunctionType signature)
+            throw Bug($"a callback without a function type, for {source.Span}");
+        FunctionId function;
+        if (source is LambdaExpr lambda)
+            function = _lambdas.Register(lambda, _name, [], false, VoidType, ReceiverForLambda(), _substitution);
+        else if (_types.RefOf(source) is not FunctionSymbol named || !TryResolveFunction(named, out function))
+            throw Bug($"a callback that names no lowered function, for {source.Span}");
+        var compilation = _typeTable.Compilation!;
+        var address = _slots.NewTemp(new IrScalarType(IrScalar.U64));
+        _b.Emit(new CCallback(address, function,
+            [.. signature.Parameters.Select(p => ModuleLowerer.CFormOf(p, _typeTable, compilation))],
+            ModuleLowerer.CFormOf(signature.Return, _typeTable, compilation), source.Span));
+        return address;
+    }
+
+    /// <summary>A call through a C function's pointer: as a call of an <c>extern "C"</c>
+    /// function, each value in the form it crosses in.</summary>
+    private TempId? LowerCPointerCall(CallExpr expr, FnType cFunction)
+    {
+        var compilation = _typeTable.Compilation!;
+        var callee = LowerExpr(expr.Callee);
+        var parameters = cFunction.Parameters.Select(p => LowerType(p, expr.Span)).ToArray();
+        var returned = LowerType(cFunction.Return, expr.Span);
+        var args = new TempId[expr.Arguments.Length];
+        for (var i = 0; i < args.Length; i++)
+            args[i] = LowerExprAs(expr.Arguments[i], parameters[i]);
+        var forms = parameters.Select(p => ModuleLowerer.CFormOf(p, _typeTable, compilation)).ToArray();
+        var form = ModuleLowerer.CFormOf(returned, _typeTable, compilation);
+        var dest = IsVoid(returned) ? (TempId?)null : _slots.NewTemp(returned);
+        _b.Emit(new CallCPointer(dest, callee, args, parameters, returned, forms, form, expr.Span));
+        return dest;
+    }
+
     /// <summary>A string handed to a C function as a <c>CStr</c>: its bytes, for the call.</summary>
     private TempId StringAsCStr(Expr argument, IrType cstrType, Span span)
     {
@@ -9019,7 +9061,7 @@ internal sealed class FunctionLowerer
         Optional o => new Optional(SubstituteType(o.Inner)),
         Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()) { Labels = t.Labels },
         FnType f => new FnType(
-            f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)) { Throws = ThrownHere(f.Throws), Places = f.Places },
+            f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)) { Throws = ThrownHere(f.Throws), Places = f.Places, IsC = f.IsC },
         CoroutineOf c => c with
         {
             Yield = SubstituteType(c.Yield),

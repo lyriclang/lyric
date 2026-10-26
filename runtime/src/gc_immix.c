@@ -2218,6 +2218,8 @@ void lyr_gc_set_heap_limit(size_t bytes) {
 
 /* --- threads ----------------------------------------------------------------------------------- */
 
+int lyr_thread_attached(void) { return self != NULL; }
+
 int lyr_thread_attach(void) {
     if (self != NULL) return 0;  /* the main thread, attached by lyr_gc_init */
     if (register_this_thread() == NULL) return -1;

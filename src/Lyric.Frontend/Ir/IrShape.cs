@@ -90,6 +90,8 @@ public static class IrShape
         BlackBox b => new[] { b.Value },
         PlaceAt p => new[] { p.Address },
         SizeOf => Array.Empty<TempId>(),
+        CCallback => Array.Empty<TempId>(),
+        CallCPointer c => new[] { c.Callee }.Concat(c.Args).ToArray(),
         DataAddress d => new[] { d.Value },
 
         _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
@@ -173,6 +175,8 @@ public static class IrShape
         BlackBox b => b.Dest,
         PlaceAt p => p.Dest,
         SizeOf s => s.Dest,
+        CCallback c => c.Dest,
+        CallCPointer c => c.Dest,
         DataAddress d => d.Dest,
         ClearError or StashError or RestoreError or SuppressError => null,
 
@@ -279,6 +283,8 @@ public static class IrShape
             BlackBox b => b with { Dest = temp(b.Dest), Value = temp(b.Value) },
             PlaceAt p => p with { Dest = temp(p.Dest), Address = temp(p.Address) },
             SizeOf s => s with { Dest = temp(s.Dest) },
+            CCallback c => c with { Dest = temp(c.Dest) },
+            CallCPointer c => c with { Dest = Opt(c.Dest), Callee = temp(c.Callee), Args = All(c.Args) },
             DataAddress d => d with { Dest = temp(d.Dest), Value = temp(d.Value) },
             ClearError or StashError or RestoreError or SuppressError => op,
 

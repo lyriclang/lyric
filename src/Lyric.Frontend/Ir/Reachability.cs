@@ -204,6 +204,9 @@ internal static class Reachability
                         // lifted function, and it is called indirectly later.
                         case MakeClosure closure: Wurzel(closure.Target); break;
 
+                        // A function C calls: its trampoline names it.
+                        case CCallback callback: Wurzel(callback.Function); break;
+
                         // A coroutine body the same way: 'mkcoro' names it, the chain calls it
                         // by index at the first pull.
                         case MakeCoroutine coroutine: Wurzel(coroutine.Body); break;
@@ -262,6 +265,7 @@ internal static class Reachability
                     {
                         Call call => call with { Target = new FunctionId(funktionen[call.Target.Value]) },
                         MakeClosure c => c with { Target = new FunctionId(funktionen[c.Target.Value]) },
+                        CCallback cb => cb with { Function = new FunctionId(funktionen[cb.Function.Value]) },
                         MakeCoroutine co => co with { Body = new FunctionId(funktionen[co.Body.Value]) },
                         CallImport ci => ci with { Target = new ImportId(importe[ci.Target.Value]) },
                         var other => other,

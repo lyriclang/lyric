@@ -44,4 +44,10 @@ uint64_t lyr_ffi_alloc(int64_t count, uint64_t size);
 /* std.ffi.free: the memory lyr_ffi_alloc gave, back to C's heap. */
 void lyr_ffi_free(uint64_t address);
 
+/* A callback's trampoline, around the Lyric function C calls: the frames below are C's, which the
+ * running coroutine counts (lyr_coro_enter_foreign). On a thread Lyric does not run — attached to
+ * no collector — there is no Lyric to call, and the process ends with a report. */
+void lyr_ffi_callback_enter(void);
+void lyr_ffi_callback_leave(void);
+
 #endif
